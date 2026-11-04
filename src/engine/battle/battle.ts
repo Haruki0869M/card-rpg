@@ -3,7 +3,7 @@
 // 入力の state は変更しない（内部で複製してから書き換える）。
 
 import { BALANCE } from '../../data/balance';
-import { getCard } from '../../data/cards';
+import { cardOf } from '../../data/cards';
 import { getClass } from '../../data/classes';
 import { getEnemy, getEnemyAction } from '../../data/enemies';
 import type {
@@ -13,6 +13,7 @@ import type {
   BattleState,
   CardDef,
   CardEffect,
+  CardInstance,
   Command,
   CommandResult,
   EnemyState,
@@ -25,21 +26,15 @@ import { createRng, type Rng, shuffle } from '../rng';
 import { affinityOf } from '../stats';
 import { absorb, calcDamage } from './damage';
 import { discardHand, drawCards } from './deck';
-import {
-  applyTaunt,
-  decideAllIntents,
-  enemyHitDamage,
-  livingAllies,
-  livingEnemies,
-  retargetAfterDeath,
-} from './intents';
+import { applyTaunt, decideAllIntents, enemyHitDamage, livingAllies, livingEnemies, retargetAfterDeath } from './intents';
 import { finalChance, selectTier } from './probability';
 
-export const STATE_VERSION = 2;
+export const STATE_VERSION = 3;
 
-const emptyStatuses = (): Statuses => ({ vulnerable: 0, weak: 0 });
+export const emptyStatuses = (): Statuses => ({ vulnerable: 0, weak: 0, burn: 0, poison: 0 });
 
-export const STATUS_NAMES: Record<StatusId, string> = { vulnerable: '脆弱', weak: '弱体' };
+export const STATUS_NAMES: Record<StatusId, string> = { vulnerable: '脆弱', weak: '弱体', burn: '火傷', poison: '毒' };
+
 
 // ---------- 生成 ----------
 
@@ -62,27 +57,31 @@ export function createBattle(setup: BattleSetup): BattleState {
   let uid = 1;
   const allies: AllyState[] = party.map((m, i) => {
     const def = getClass(m.classId);
-    const cards = def.deck.flatMap((d) => {
-      getCard(d.cardId); // 存在チェック
-      return Array.from({ length: d.count }, () => ({ uid: `c${uid++}`, cardId: d.cardId }));
-    });
+    const cards: CardInstance[] = m.deck
+      ? m.deck.map((c) => ({ ...c }))
+      : def.deck.flatMap((d) => Array.from({ length: d.count }, () => ({ uid: `c${uid++}`, cardId: d.cardId })));
+    for (const c of cards) cardOf(c); // 存在チェック
+    const maxHp = m.maxHp ?? def.baseMaxHp;
     return {
-      id: `a${i}`,
+      id: m.heroId ?? `a${i}`,
       classId: def.id,
       gender: m.gender,
       name: m.name,
       playerId: m.playerId,
       level: m.level ?? 1,
-      hp: def.baseMaxHp,
-      maxHp: def.baseMaxHp,
+      hp: Math.min(maxHp, m.hp ?? maxHp),
+      maxHp,
       block: 0,
       mana: 0,
-      focus: BALANCE.focusStart,
-      statuses: emptyStatuses(),
+      focus: m.focus ?? BALANCE.focusStart,
+      focusMax: m.focusMax ?? BALANCE.focusMax,
+      stats: m.stats ?? def.stats,
+      extraDraw: m.extraDraw ?? 0,
+      statuses: { ...emptyStatuses(), ...m.statuses },
       drawPile: shuffle(cards, rng),
       hand: [],
       discard: [],
-      dead: false,
+      dead: (m.hp ?? maxHp) <= 0,
     };
   });
 
@@ -111,6 +110,7 @@ export function createBattle(setup: BattleSetup): BattleState {
       seqIndex: 0,
       history: [],
       dead: false,
+      phase: 0,
     };
   });
 
@@ -129,9 +129,13 @@ export function createBattle(setup: BattleSetup): BattleState {
     nextUid: uid,
     encounterId: encounter.id,
   };
-  addLog(state, `戦闘開始（シード ${seed} / ${party.length}人 / ${encounter.name}）`);
+  addLog(state, `戦闘開始（${party.length}人 / ${encounter.name}）`);
   decideAllIntents(state, rng);
   startAllyPhase(state, rng, []);
+  // 装備による戦闘開始時のブロック（味方フェーズ開始のリセットの後に入れる）
+  party.forEach((m, i) => {
+    if (m.startBlock && !allies[i].dead) allies[i].block += m.startBlock;
+  });
   state.rngState = rng.state;
   return state;
 }
@@ -147,7 +151,9 @@ export function findEnemy(state: BattleState, uid: string): EnemyState | undefin
 }
 
 export function enemyName(enemy: EnemyState): string {
-  return getEnemy(enemy.defId).name + (enemy.nameSuffix ? ` ${enemy.nameSuffix}` : '');
+  const def = getEnemy(enemy.defId);
+  const phaseName = enemy.phase > 0 ? def.phases?.[enemy.phase - 1]?.name : undefined;
+  return (phaseName ?? def.name) + (enemy.nameSuffix ? ` ${enemy.nameSuffix}` : '');
 }
 
 export function unitName(state: BattleState, unitId: string): string {
@@ -162,18 +168,21 @@ export function chanceFor(ally: AllyState, card: CardDef): number {
   return finalChance(card, affinityOf(ally));
 }
 
+/** 対象として敵を選ぶ必要があるカードか */
+export const needsEnemyTarget = (card: CardDef) => card.target === 'enemy';
+
 /** カードが使えない理由（使えるなら null） */
 export function unusableReason(state: BattleState, ally: AllyState, card: CardDef): string | null {
   if (state.phase !== 'ally') return '味方フェーズではありません';
   if (ally.dead) return '戦闘不能です';
   if (ally.mana < card.cost) return 'マナが足りません';
-  if (card.target === 'enemy' && !state.enemies.some((e) => !e.dead)) return '対象がいません';
+  if ((card.target === 'enemy' || card.target === 'allEnemies') && !state.enemies.some((e) => !e.dead)) return '対象がいません';
   return null;
 }
 
 export function usableCardCount(state: BattleState, ally: AllyState): number {
   let n = 0;
-  for (const c of ally.hand) if (unusableReason(state, ally, getCard(c.cardId)) === null) n++;
+  for (const c of ally.hand) if (unusableReason(state, ally, cardOf(c)) === null) n++;
   return n;
 }
 
@@ -210,14 +219,14 @@ function startAllyPhase(state: BattleState, rng: Rng, events: BattleEvent[]) {
     if (a.dead) continue;
     a.block = 0;
     a.mana = BALANCE.manaPerTurn;
-    const { reshuffled } = drawCards(a, BALANCE.drawPerTurn, rng);
+    const { reshuffled } = drawCards(a, BALANCE.drawPerTurn + a.extraDraw, rng);
     if (reshuffled) addLog(state, `${a.name}: 捨札をシャッフルして山札に戻した`);
   }
   events.push({ type: 'phase', phase: 'ally' });
 }
 
 function checkEnd(state: BattleState, events: BattleEvent[]): boolean {
-  if (state.phase === 'victory' || state.phase === 'defeat') return true;
+  if (state.phase === 'victory' || state.phase === 'defeat' || state.phase === 'escaped') return true;
   if (!state.enemies.some((e) => !e.dead)) {
     state.phase = 'victory';
     addLog(state, '勝利！');
@@ -245,6 +254,40 @@ function abilityTriggered(state: BattleState, unitId: string, name: string, even
 
 // ---------- ダメージ・死亡 ----------
 
+function killAlly(state: BattleState, ally: AllyState, rng: Rng, events: BattleEvent[]) {
+  ally.dead = true;
+  ally.block = 0;
+  ally.statuses = emptyStatuses();
+  addLog(state, `${ally.name}が戦闘不能になった`);
+  events.push({ type: 'death', unitId: ally.id });
+  retargetAfterDeath(state, ally.id, rng, events);
+}
+
+function killEnemy(state: BattleState, enemy: EnemyState, events: BattleEvent[]) {
+  enemy.dead = true;
+  enemy.intent = undefined;
+  enemy.tauntedBy = undefined;
+  enemy.block = 0;
+  addLog(state, `${enemyName(enemy)}を倒した`);
+  events.push({ type: 'death', unitId: enemy.uid });
+}
+
+/** ボスの段階の切り替え（HPが一定以下になったら） */
+function checkEnemyPhase(state: BattleState, enemy: EnemyState, events: BattleEvent[]) {
+  const phases = getEnemy(enemy.defId).phases;
+  if (!phases || enemy.dead) return;
+  for (let i = phases.length - 1; i >= 0; i--) {
+    if (enemy.phase < i + 1 && enemy.hp * 100 <= enemy.maxHp * phases[i].belowHpPct) {
+      enemy.phase = i + 1;
+      enemy.seqIndex = 0;
+      enemy.history = [];
+      addLog(state, `${getEnemy(enemy.defId).name}が「${phases[i].name}」に姿を変えた！`);
+      events.push({ type: 'enemyPhase', enemyUid: enemy.uid, name: phases[i].name });
+      return;
+    }
+  }
+}
+
 /** 敵にダメージ（計算済みの値）を与える。HPに入った量を返す */
 function hitEnemy(state: BattleState, enemy: EnemyState, dmg: number, sourceId: string, events: BattleEvent[]): number {
   if (enemy.dead) return 0;
@@ -253,14 +296,8 @@ function hitEnemy(state: BattleState, enemy: EnemyState, dmg: number, sourceId: 
   enemy.hp = r.hp;
   events.push({ type: 'damage', unitId: enemy.uid, amount: r.hpLoss, blocked: r.blocked, sourceId });
   state.stats.totalDamage += r.hpLoss;
-  if (enemy.hp <= 0) {
-    enemy.dead = true;
-    enemy.intent = undefined;
-    enemy.tauntedBy = undefined;
-    enemy.block = 0;
-    addLog(state, `${enemyName(enemy)}を倒した`);
-    events.push({ type: 'death', unitId: enemy.uid });
-  }
+  if (enemy.hp <= 0) killEnemy(state, enemy, events);
+  else checkEnemyPhase(state, enemy, events);
   return r.hpLoss;
 }
 
@@ -294,15 +331,35 @@ function hitAlly(
   victim.block = r.block;
   victim.hp = r.hp;
   events.push({ type: 'damage', unitId: victim.id, amount: r.hpLoss, blocked: r.blocked, sourceId: enemy.uid });
-  if (victim.hp <= 0) {
-    victim.dead = true;
-    victim.block = 0;
-    victim.statuses = emptyStatuses();
-    addLog(state, `${victim.name}が戦闘不能になった`);
-    events.push({ type: 'death', unitId: victim.id });
-    retargetAfterDeath(state, victim.id, rng, events);
-  }
+  if (victim.hp <= 0) killAlly(state, victim, rng, events);
   return { victim, hpLoss: r.hpLoss };
+}
+
+/** 毒・火傷のダメージ（ブロックを無視）→ 毒は1減る、火傷も1減る */
+function tickDamageOverTime(state: BattleState, side: 'ally' | 'enemy', rng: Rng, events: BattleEvent[]) {
+  const units = side === 'ally' ? state.allies : state.enemies;
+  for (const u of units) {
+    if (u.dead) continue;
+    let dmg = 0;
+    if (u.statuses.poison > 0) {
+      dmg += u.statuses.poison;
+      u.statuses.poison -= 1;
+    }
+    if (u.statuses.burn > 0) {
+      dmg += BALANCE.burnDamage;
+      u.statuses.burn -= 1;
+    }
+    if (dmg <= 0) continue;
+    const loss = Math.min(u.hp, dmg);
+    u.hp -= loss;
+    const id = 'uid' in u ? u.uid : u.id;
+    events.push({ type: 'damage', unitId: id, amount: loss, blocked: 0 });
+    addLog(state, `${'uid' in u ? enemyName(u) : u.name}は毒・火傷で${loss}ダメージ`);
+    if (u.hp <= 0) {
+      if ('uid' in u) killEnemy(state, u, events);
+      else killAlly(state, u, rng, events);
+    } else if ('uid' in u) checkEnemyPhase(state, u, events);
+  }
 }
 
 // ---------- コマンド処理 ----------
@@ -317,10 +374,13 @@ export function applyCommand(input: BattleState, cmd: Command): CommandResult {
       error = playCard(state, cmd, rng, events);
       break;
     case 'END_TURN':
-      error = endTurn(state, cmd.playerId, events);
+      error = endTurn(state, cmd.playerId, rng, events);
       break;
     case 'ENEMY_STEP':
       error = enemyStep(state, rng, events);
+      break;
+    case 'USE_ITEM':
+      error = useItem(state, cmd, events);
       break;
     default:
       error = '不明なコマンドです';
@@ -340,6 +400,14 @@ export function rollSlots(slots: number, focusUsed: number, chance: number, rng:
   return out;
 }
 
+function healUnit(ally: AllyState, amount: number, events: BattleEvent[]): number {
+  if (ally.dead) return 0;
+  const healed = Math.min(amount, ally.maxHp - ally.hp);
+  ally.hp += healed;
+  if (healed > 0) events.push({ type: 'heal', unitId: ally.id, amount: healed });
+  return healed;
+}
+
 function playCard(
   state: BattleState,
   cmd: Extract<Command, { type: 'PLAY_CARD' }>,
@@ -352,7 +420,7 @@ function playCard(
   const idx = ally.hand.findIndex((c) => c.uid === cmd.cardInstanceId);
   if (idx < 0) return '手札にありません';
   const inst = ally.hand[idx];
-  const card = getCard(inst.cardId);
+  const card = cardOf(inst);
   const reason = unusableReason(state, ally, card);
   if (reason) return reason;
   const focusUsed = cmd.focusUsed;
@@ -364,6 +432,8 @@ function playCard(
     target = cmd.targetId ? findEnemy(state, cmd.targetId) : undefined;
     if (!target || target.dead) return '対象を選んでください';
   }
+  /** ダメージ・状態異常を与える相手（全体攻撃なら生存中の全員） */
+  const victims = () => (card.target === 'allEnemies' ? livingEnemies(state) : target && !target.dead ? [target] : []);
 
   // 支払い
   ally.mana -= card.cost;
@@ -386,27 +456,40 @@ function playCard(
   for (const eff of tier.effects) {
     switch (eff.kind) {
       case 'damage':
-        if (target) dealt += hitEnemy(state, target, calcDamage(eff.amount, ally.statuses, target.statuses, dmgMul.multiplier), ally.id, events);
+        for (const v of victims()) dealt += hitEnemy(state, v, calcDamage(eff.amount, ally.statuses, v.statuses, dmgMul.multiplier), ally.id, events);
         break;
       case 'block':
         ally.block += eff.amount;
         events.push({ type: 'block', unitId: ally.id, amount: eff.amount });
         parts.push(`${eff.amount} BLOCK`);
         break;
-      case 'applyStatus':
-        if (target && !target.dead) {
-          target.statuses[eff.status] += eff.amount;
-          events.push({ type: 'status', unitId: target.uid, status: eff.status, amount: eff.amount });
-          parts.push(`${STATUS_NAMES[eff.status]}${eff.amount}`);
+      case 'blockAllies':
+        for (const a of livingAllies(state)) {
+          a.block += eff.amount;
+          events.push({ type: 'block', unitId: a.id, amount: eff.amount });
         }
+        parts.push(`全員 ${eff.amount} BLOCK`);
         break;
+      case 'healAllies':
+        for (const a of livingAllies(state)) healUnit(a, eff.amount, events);
+        parts.push(`全員 回復${eff.amount}`);
+        break;
+      case 'applyStatus': {
+        const vs = victims();
+        for (const v of vs) {
+          v.statuses[eff.status] += eff.amount;
+          events.push({ type: 'status', unitId: v.uid, status: eff.status, amount: eff.amount });
+        }
+        if (vs.length) parts.push(`${STATUS_NAMES[eff.status]}${eff.amount}`);
+        break;
+      }
       case 'gainMana':
         ally.mana += eff.amount;
         parts.push(`マナ+${eff.amount}`);
         break;
       case 'gainFocus': {
         const before = ally.focus;
-        ally.focus = Math.min(BALANCE.focusMax, ally.focus + eff.amount);
+        ally.focus = Math.min(ally.focusMax, ally.focus + eff.amount);
         parts.push(`フォーカス+${ally.focus - before}`);
         break;
       }
@@ -449,12 +532,16 @@ function playCard(
         dealt += d;
         parts.push(`${ab.name}+${d}`);
         addLog(state, `${ally.name}の「${ab.name}」！ ${enemyName(t)}に${d}ダメージ`);
-      } else if (e.kind === 'onPerfectApplyStatus' && hasDamage && target && !target.dead) {
+      } else if (e.kind === 'onPerfectApplyStatus' && hasDamage) {
+        const vs = victims();
+        if (!vs.length) continue;
         abilityTriggered(state, ally.id, ab.name, events);
-        target.statuses[e.status] += e.amount;
-        events.push({ type: 'status', unitId: target.uid, status: e.status, amount: e.amount });
+        for (const v of vs) {
+          v.statuses[e.status] += e.amount;
+          events.push({ type: 'status', unitId: v.uid, status: e.status, amount: e.amount });
+        }
         parts.push(`${ab.name}`);
-        addLog(state, `${ally.name}の「${ab.name}」！ ${enemyName(target)}に${STATUS_NAMES[e.status]}${e.amount}`);
+        addLog(state, `${ally.name}の「${ab.name}」！ ${STATUS_NAMES[e.status]}${e.amount}`);
       }
     }
   }
@@ -464,7 +551,7 @@ function playCard(
 
   const resultLabel = perfect ? '完全成功' : `${successes}成功`;
   const summary = `${resultLabel}！ ${parts.join(' ')}`;
-  const targetText = target ? ` → ${enemyName(target)}` : '';
+  const targetText = card.target === 'allEnemies' ? ' → 敵全体' : target ? ` → ${enemyName(target)}` : '';
   addLog(
     state,
     `${ally.name} ${card.name}${targetText} 成功率${chance}%${focusUsed ? `（🌟${focusUsed}）` : ''} → ${results
@@ -486,13 +573,52 @@ function playCard(
   return undefined;
 }
 
-function endTurn(state: BattleState, playerId: string, events: BattleEvent[]): string | undefined {
+function useItem(state: BattleState, cmd: Extract<Command, { type: 'USE_ITEM' }>, events: BattleEvent[]): string | undefined {
+  if (state.phase !== 'ally') return '味方フェーズではありません';
+  const user = findAlly(state, cmd.characterId);
+  if (!user || user.dead) return '使うキャラが戦闘不能です';
+  if (user.playerId !== cmd.playerId) return '担当していないキャラです';
+  const target = findAlly(state, cmd.targetId);
+  if (!target || target.dead) return '対象が戦闘不能です';
+  const e = cmd.effect;
+  switch (e.kind) {
+    case 'heal': {
+      if (target.hp >= target.maxHp) return 'HPは満タンです';
+      const h = healUnit(target, e.amount, events);
+      addLog(state, `${user.name}が${cmd.itemName}を使った（${target.name}のHP+${h}）`);
+      break;
+    }
+    case 'focus': {
+      if (target.focus >= target.focusMax) return 'フォーカスは最大です';
+      const before = target.focus;
+      target.focus = Math.min(target.focusMax, target.focus + e.amount);
+      addLog(state, `${user.name}が${cmd.itemName}を使った（${target.name}のフォーカス+${target.focus - before}）`);
+      break;
+    }
+    case 'cleanse': {
+      const s = target.statuses;
+      if (!s.weak && !s.vulnerable && !s.poison && !s.burn) return '治す状態異常がありません';
+      target.statuses = emptyStatuses();
+      addLog(state, `${user.name}が${cmd.itemName}を使った（${target.name}の状態異常が治った）`);
+      break;
+    }
+    case 'escape':
+      state.phase = 'escaped';
+      addLog(state, `${user.name}が${cmd.itemName}を使った。戦闘から逃げ出した！`);
+      events.push({ type: 'phase', phase: 'escaped' });
+      break;
+  }
+  return undefined;
+}
+
+function endTurn(state: BattleState, playerId: string, rng: Rng, events: BattleEvent[]): string | undefined {
   if (state.phase !== 'ally') return '味方フェーズではありません';
   if (!state.allies.some((a) => a.playerId === playerId)) return 'このパーティのプレイヤーではありません';
-  for (const a of state.allies) {
-    discardHand(a);
-    decrementStatuses(a.statuses);
-  }
+  for (const a of state.allies) discardHand(a);
+  // 味方側の毒・火傷 → 状態異常を1減らす
+  tickDamageOverTime(state, 'ally', rng, events);
+  for (const a of state.allies) decrementStatuses(a.statuses);
+  if (checkEnd(state, events)) return undefined;
   // 敵のブロックは敵フェーズ開始時に0へ
   for (const e of state.enemies) e.block = 0;
   state.phase = 'enemy';
@@ -515,7 +641,9 @@ function enemyStep(state: BattleState, rng: Rng, events: BattleEvent[]): string 
     return undefined;
   }
 
-  // 敵フェーズ終了: 状態異常を1減らす → 挑発解除 → 次のインテント → 味方フェーズ
+  // 敵フェーズ終了: 毒・火傷 → 状態異常を1減らす → 挑発解除 → 次のインテント → 味方フェーズ
+  tickDamageOverTime(state, 'enemy', rng, events);
+  if (checkEnd(state, events)) return undefined;
   for (const e of state.enemies) {
     decrementStatuses(e.statuses);
     e.tauntedBy = undefined;
@@ -559,13 +687,16 @@ function executeIntent(state: BattleState, enemy: EnemyState, rng: Rng, events: 
         break;
       }
       case 'debuff': {
-        const t = findAlly(state, enemy.intent?.targetId ?? '');
-        if (t && !t.dead) {
+        const targets =
+          eff.target === 'all'
+            ? livingAllies(state)
+            : [findAlly(state, enemy.intent?.targetId ?? '')].filter((a): a is AllyState => !!a && !a.dead);
+        for (const t of targets) {
           t.statuses[eff.status] += eff.amount;
           if (!targetIds.includes(t.id)) targetIds.push(t.id);
           events.push({ type: 'status', unitId: t.id, status: eff.status, amount: eff.amount });
-          logParts.push(`${t.name}に${STATUS_NAMES[eff.status]}${eff.amount}`);
         }
+        if (targets.length) logParts.push(`${eff.target === 'all' ? '全員' : targets[0].name}に${STATUS_NAMES[eff.status]}${eff.amount}`);
         break;
       }
     }

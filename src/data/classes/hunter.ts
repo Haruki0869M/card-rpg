@@ -26,9 +26,14 @@ export const hunter: ClassDef = {
   exploreAbility: {
     id: 'tracking',
     name: '追跡',
-    description: '世界マップの視界+1。隠し宝箱を見つけやすい',
-    effect: { kind: 'visionBonus', amount: 1 },
+    description: '隠し宝箱を見つけやすい（戦闘後に発見する確率+30%）。世界マップの視界+1（M3）',
+    effect: { kind: 'tracking', vision: 1, hiddenFindBonus: 30 },
   },
   names: { male: ['カイ', 'リオ', 'ジェイド', 'アルト'], female: ['リナ', 'フィオ', 'シエラ', 'ネル'] },
   unlocked: true,
+  hpPerLevel: 5,
+  weaponType: 'bow',
+  startingEquipment: { weapon: 'hunterBow', armor: 'travelerClothes' },
+  cardPool: ['poisonArrow', 'rapidShot', 'vitalShot', 'setTrap', 'evade', 'gambleBolt', 'heavySwing', 'meditate'],
+  growthWeights: { dex: 3, per: 3, agi: 2, luk: 1 },
 };

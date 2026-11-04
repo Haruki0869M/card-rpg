@@ -15,6 +15,8 @@ export const BALANCE = {
   /** 状態異常の倍率 */
   vulnerableMultiplier: 1.5,
   weakMultiplier: 0.75,
+  /** 火傷1回あたりのダメージ（毒は残り数がそのままダメージ） */
+  burnDamage: 4,
   /** 戦闘に参加した味方の人数ごとの敵HP倍率（index = 人数。端数切り捨て） */
   enemyHpByPartySize: [0, 0.6, 1.0, 1.35, 1.7] as readonly number[],
   /** 敵のレベルが baseLevel より1上がるごとの増加率 */
@@ -27,6 +29,28 @@ export const BALANCE = {
   maxPartySize: 4,
   /** 1回の戦闘の敵の最大数 */
   maxEnemies: 4,
+  /** 冒険: レベル上限・次のレベルまでの経験値（20 + 15×(レベル-1)） */
+  maxLevel: 20,
+  expBase: 20,
+  expPerLevel: 15,
+  /** 敵のレベルが1上がるごとの経験値・ゴールドの増加率 */
+  rewardPerLevel: 0.15,
+  /** 成長ボーナスの量 */
+  growthStat: 5,
+  growthMaxHp: 8,
+  /** 休憩部屋の回復（HPは最大HPの割合） */
+  restHpRatio: 0.35,
+  restFocus: 2,
+  /** 宝箱: 運の判定の枠数、鍵開け（器用）の枠数と必要成功数 */
+  chestLuckSlots: 3,
+  lockSlots: 2,
+  lockNeed: 1,
+  /** 宝箱のゴールド（レア度ごとの基準） */
+  chestGold: { common: 15, rare: 35, epic: 70, legend: 120 } as Record<string, number>,
+  /** 戦闘後に隠し宝箱を見つける基本確率（%） */
+  hiddenChestBase: 5,
+  /** 難易度ごとの敵レベルの補正 */
+  difficultyLevel: { easy: -1, normal: 0, hard: 1 } as Record<string, number>,
   /** 戦闘ログの最大件数 */
   logLimit: 300,
 } as const;

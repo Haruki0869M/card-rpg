@@ -7,6 +7,8 @@ export const goblinBrute: EnemyDef = {
   maxHp: 52,
   baseLevel: 4,
   size: 1.15,
+  exp: 14,
+  gold: 10,
   pattern: 'sequence',
   actions: [
     { id: 'slam', name: '叩きつけ', effects: [{ kind: 'attack', amount: 10, hits: 1, target: 'single' }] },

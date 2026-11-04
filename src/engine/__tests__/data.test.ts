@@ -4,6 +4,9 @@ import { CARDS } from '../../data/cards';
 import { CLASSES } from '../../data/classes';
 import { ENCOUNTERS, ENEMIES } from '../../data/enemies';
 import { createRegistry } from '../../data/registry';
+import { DUNGEONS } from '../../data/dungeons';
+import { EVENTS } from '../../data/events';
+import { ITEMS } from '../../data/items';
 import type { ClassDef, EnemyDef } from '../../types';
 import { applyCommand, createBattle } from '../index';
 import { nextTurn, play } from './helpers';
@@ -42,6 +45,41 @@ describe('データの整合性', () => {
       for (const e of enc.enemies) expect(ENEMIES.has(e.defId)).toBe(true);
     }
   });
+  it('職業: 報酬カード・初期装備が存在し、武器の種類が合う', () => {
+    for (const c of CLASSES.all) {
+      for (const id of c.cardPool) expect(CARDS.has(id), `${c.id}: ${id}`).toBe(true);
+      for (const id of Object.values(c.startingEquipment)) expect(ITEMS.has(id!), `${c.id}: ${id}`).toBe(true);
+      if (c.startingEquipment.weapon) expect(ITEMS.get(c.startingEquipment.weapon).weaponType).toBe(c.weaponType);
+      // 各職業の武器が4段階そろっている
+      const rar = ITEMS.all.filter((i) => i.weaponType === c.weaponType).map((i) => i.rarity);
+      expect(new Set(rar)).toEqual(new Set(['common', 'rare', 'epic', 'legend']));
+    }
+  });
+  it('アイテム: 武器のカードが存在し、消費アイテムには効果がある', () => {
+    for (const i of ITEMS.all) {
+      for (const c of i.cards ?? []) expect(CARDS.has(c.cardId), `${i.id}: ${c.cardId}`).toBe(true);
+      if (i.slot === 'consumable') expect(i.use).toBeDefined();
+      if (i.slot === 'weapon') expect(i.weaponType).toBeDefined();
+    }
+  });
+  it('ダンジョン: 敵・イベントが存在し、部屋のつながりが正しい', () => {
+    for (const d of DUNGEONS.all) {
+      for (const g of [...d.pools.battle, ...d.pools.elite, d.pools.boss]) for (const id of g) expect(ENEMIES.has(id), `${d.id}: ${id}`).toBe(true);
+      if (d.layout) {
+        d.layout.forEach((row, r) =>
+          row.forEach((room) => {
+            for (const n of room.next) expect(n).toBeLessThan(d.layout![r + 1].length);
+            if (room.eventId) expect(EVENTS.has(room.eventId)).toBe(true);
+            if (r < d.layout!.length - 1) expect(room.next.length).toBeGreaterThan(0);
+          }),
+        );
+        expect(d.layout.at(-1)![0].type).toBe('boss');
+      }
+    }
+  });
+  it('敵: 段階の行動もそろっている', () => {
+    for (const e of ENEMIES.all) for (const p of e.phases ?? []) expect(p.actions.length).toBeGreaterThan(0);
+  });
   it('登録表: 同じIDの二重登録はエラー', () => {
     expect(() => createRegistry('x', [{ id: 'a' }, { id: 'a' }])).toThrow();
   });
@@ -67,6 +105,8 @@ describe('拡張性: データを1件足すだけで戦闘に登場する', () =
       icon: '🗿',
       maxHp: 40,
       baseLevel: 1,
+      exp: 1,
+      gold: 1,
       pattern: 'sequence',
       actions: [{ id: 'punch', name: '殴る', effects: [{ kind: 'attack', amount: 3, hits: 1, target: 'all' }] }],
     };

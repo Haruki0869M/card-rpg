@@ -15,11 +15,11 @@ export function affinityFromStats(stats: Stats): Affinity {
   };
 }
 
-/** キャラの現在の能力値（M2で装備・成長ボーナスを加算する） */
-export function statsOf(ally: Pick<AllyState, 'classId'>): Stats {
-  return getClass(ally.classId).stats;
+/** キャラの現在の能力値（戦闘中は装備・成長を反映した値を持つ。無ければ職業の初期値） */
+export function statsOf(ally: Pick<AllyState, 'classId'> & { stats?: Stats }): Stats {
+  return ally.stats ?? getClass(ally.classId).stats;
 }
 
-export function affinityOf(ally: Pick<AllyState, 'classId'>): Affinity {
+export function affinityOf(ally: Pick<AllyState, 'classId'> & { stats?: Stats }): Affinity {
   return affinityFromStats(statsOf(ally));
 }

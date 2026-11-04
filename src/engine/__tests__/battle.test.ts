@@ -20,7 +20,7 @@ import {
 } from '../index';
 import { END, giveHand, makeImmortal, nextTurn, party, play, setup } from './helpers';
 
-const statuses = (vulnerable = 0, weak = 0) => ({ vulnerable, weak });
+const statuses = (vulnerable = 0, weak = 0) => ({ vulnerable, weak, burn: 0, poison: 0 });
 
 describe('成功率計算（能力値から適性補正）', () => {
   it('v1と同じ成功率になる', () => {
@@ -108,6 +108,9 @@ describe('山札', () => {
     block: 0,
     mana: 3,
     focus: 4,
+    focusMax: 6,
+    stats: { str: 60, vit: 60, int: 60, per: 60, dex: 60, agi: 60, luk: 60 },
+    extraDraw: 0,
     statuses: statuses(),
     drawPile: Array.from({ length: draw }, (_, i) => ({ uid: `d${i}`, cardId: 'strike' })),
     discard: Array.from({ length: discard }, (_, i) => ({ uid: `x${i}`, cardId: 'guard' })),
