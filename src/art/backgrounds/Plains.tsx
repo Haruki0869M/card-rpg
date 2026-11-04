@@ -5,7 +5,7 @@ import { useArtIds } from '../kit';
 export const PlainsBackground = memo(function PlainsBackground({ className }: { className?: string }) {
   const { id, url } = useArtIds();
   return (
-    <svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" className={className} aria-hidden>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" className={className} aria-hidden>
       <defs>
         <linearGradient id={id('sky')} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#120b2a" />

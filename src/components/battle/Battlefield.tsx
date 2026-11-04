@@ -1,0 +1,342 @@
+// ===== 戦場（画面上半分） =====
+// 背景の上に、敵（上段）と味方（下段）が向かい合う。動きの演出はラッパー要素の transform だけで行う。
+
+import { motion, useAnimate } from 'framer-motion';
+import { memo, useEffect, useMemo } from 'react';
+import { BattleBackground, CharacterArt, EnemyArt } from '../../art';
+import { TIMING } from '../../data/balance';
+import { getCard } from '../../data/cards';
+import { getEnemy } from '../../data/enemies';
+import { enemyName, findAlly, tierDamageAgainst, tierIndex } from '../../engine';
+import { useElementSize } from '../../hooks/useElementSize';
+import { usePress } from '../../hooks/usePress';
+import { speedFactor, useBattle, type UnitFx } from '../../store/battleStore';
+import type { AllyState, EnemyState } from '../../types';
+import { intentView, type IntentPart } from '../format';
+import { HpBar } from '../ui/HpBar';
+import { Shield, Skull, STATUS_STYLE, Swords } from '../ui/icons';
+import { StatusChips } from '../ui/StatusChips';
+import { UnitPopups } from './Popups';
+import { SlotOverlay } from './SlotOverlay';
+
+/** 動きの演出（攻撃・被弾・詠唱）。fx.id が変わった時だけ再生する */
+function useUnitMotion(unitId: string, side: 'ally' | 'enemy') {
+  const [scope, animate] = useAnimate<HTMLDivElement>();
+  const fx: UnitFx | undefined = useBattle((s) => s.unitFx[unitId]);
+  const fast = useBattle((s) => s.settings.fastMode);
+  useEffect(() => {
+    if (!fx || !scope.current) return;
+    const k = 1 / speedFactor({ fastMode: fast, vibration: false });
+    const dir = side === 'ally' ? 1 : -1;
+    if (fx.kind === 'attack') {
+      animate(scope.current, { x: [0, 26 * dir, 0], y: [0, -12 * dir, 0], scale: [1, 1.08, 1] }, { duration: 0.28 * k, ease: 'easeOut' });
+    } else if (fx.kind === 'cast') {
+      animate(scope.current, { y: [0, -10, 0], scale: [1, 1.06, 1] }, { duration: 0.3 * k, ease: 'easeOut' });
+    } else {
+      animate(
+        scope.current,
+        { x: [0, -7 * dir, 7 * dir, -4 * dir, 0], opacity: [1, 0.35, 1, 0.55, 1] },
+        { duration: 0.3 * k, ease: 'linear' },
+      );
+    }
+  }, [fx?.id]);
+  return scope;
+}
+
+function TargetFace({ allyId }: { allyId?: string }) {
+  const ally = useBattle((s) => (allyId ? findAlly(s.battle, allyId) : undefined));
+  if (!ally) return null;
+  return (
+    <span className="inline-block h-[18px] w-[18px] overflow-hidden rounded-full border border-amber-200/80 bg-[#1d2440]">
+      <CharacterArt classId={ally.classId} gender={ally.gender} face className="h-full w-full" />
+    </span>
+  );
+}
+
+function IntentPartView({ p }: { p: IntentPart }) {
+  switch (p.kind) {
+    case 'attack':
+      return (
+        <span className="flex items-center gap-0.5 text-red-300">
+          <Swords size={14} strokeWidth={2.6} />
+          <TargetFace allyId={p.targetId} />
+          <span className="tabular-nums">{p.hits > 1 ? `${p.damage}×${p.hits}` : p.damage}</span>
+        </span>
+      );
+    case 'attackAll':
+      return (
+        <span className="flex items-center gap-0.5 text-red-300">
+          <Skull size={14} strokeWidth={2.6} />
+          <span className="text-[12px]">全</span>
+          <span className="tabular-nums">{p.hits > 1 ? `${p.damage}×${p.hits}` : p.damage}</span>
+        </span>
+      );
+    case 'block':
+      return (
+        <span className="flex items-center gap-0.5 text-sky-300">
+          <Shield size={14} strokeWidth={2.6} />
+          {p.others && <span className="text-[12px]">仲間</span>}
+          <span className="tabular-nums">{p.amount}</span>
+        </span>
+      );
+    case 'debuff': {
+      const st = STATUS_STYLE[p.status];
+      return (
+        <span className="flex items-center gap-0.5" style={{ color: st.color }}>
+          <st.Icon size={14} strokeWidth={2.6} />
+          <TargetFace allyId={p.targetId} />
+          <span className="tabular-nums">{p.amount}</span>
+        </span>
+      );
+    }
+  }
+}
+
+function IntentBubble({ enemy, onTap }: { enemy: EnemyState; onTap: () => void }) {
+  const battle = useBattle((s) => s.battle);
+  const retargetKey = useBattle((s) => s.retargets[enemy.uid] ?? 0);
+  const press = usePress(onTap, { type: 'intent', uid: enemy.uid });
+  const view = intentView(battle, enemy);
+  return (
+    <div {...press} className="flex h-[30px] items-end justify-center">
+      {view && (
+        <motion.div
+          key={retargetKey}
+          initial={retargetKey ? { scale: 1.45 } : false}
+          animate={{ scale: 1 }}
+          transition={{ type: 'spring', stiffness: 500, damping: 18 }}
+          className="relative flex items-center gap-1 rounded-lg border border-red-300/50 bg-[#1c0a10]/90 px-1.5 py-0.5 text-[14px] leading-5 font-black whitespace-nowrap shadow-[0_2px_0_rgba(0,0,0,.6)]"
+        >
+          {view.parts.map((p, i) => (
+            <IntentPartView key={i} p={p} />
+          ))}
+          <span className="absolute -bottom-[5px] left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-r border-b border-red-300/50 bg-[#1c0a10]" />
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
+const EnemyUnit = memo(function EnemyUnit({
+  enemy,
+  left,
+  top,
+  slotW,
+  spriteH,
+}: {
+  enemy: EnemyState;
+  left: number;
+  top: number;
+  slotW: number;
+  spriteH: number;
+}) {
+  const def = getEnemy(enemy.defId);
+  const tapEnemy = useBattle((s) => s.tapEnemy);
+  const selection = useBattle((s) => s.selection);
+  const activeId = useBattle((s) => s.activeId);
+  const battle = useBattle((s) => s.battle);
+  const onTap = () => tapEnemy(enemy.uid);
+  const press = usePress(onTap, { type: 'enemy', uid: enemy.uid });
+  const scope = useUnitMotion(enemy.uid, 'enemy');
+
+  // カード選択中の対象表示とダメージ予測
+  const ally = findAlly(battle, activeId);
+  const inst = selection && ally?.hand.find((c) => c.uid === selection.cardUid);
+  const card = inst ? getCard(inst.cardId) : null;
+  const targetable = !!card && card.target === 'enemy' && !enemy.dead;
+  const isTarget = targetable && selection?.targetId === enemy.uid;
+  const waiting = targetable && !selection?.targetId;
+  let prediction: string | null = null;
+  if (targetable && ally && card && card.tiers.some((t) => t.effects.some((e) => e.kind === 'damage'))) {
+    const dmg = tierDamageAgainst(ally, card, enemy).slice(tierIndex(card, selection!.focus)).filter((d) => d > 0);
+    if (dmg.length) {
+      const lo = Math.min(...dmg);
+      const hi = Math.max(...dmg);
+      prediction = lo === hi ? `${lo}` : `${lo}〜${hi}`;
+    }
+  }
+  const h = spriteH * (def.size ?? 1);
+  const barW = Math.min(slotW - 6, 104);
+
+  return (
+    <div
+      {...press}
+      className="absolute flex flex-col items-center"
+      style={{ left: left - slotW / 2, top, width: slotW }}
+      data-enemy={enemy.uid}
+      data-dead={enemy.dead || undefined}
+      data-hp={enemy.hp}
+    >
+      <IntentBubble enemy={enemy} onTap={onTap} />
+      <div className="relative flex w-full justify-center" style={{ height: spriteH }}>
+        {(isTarget || waiting) && (
+          <div
+            className={`absolute bottom-0 left-1/2 h-[18px] -translate-x-1/2 rounded-[50%] border-2 ${
+              isTarget ? 'border-amber-300 bg-amber-400/25' : 'glow-pulse border-amber-200/80'
+            }`}
+            style={{ width: Math.min(slotW - 4, h * 0.9) }}
+          />
+        )}
+        <motion.div
+          className="absolute bottom-0"
+          animate={enemy.dead ? { opacity: 0, scale: 0.85, y: 10 } : { opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: 0.45 }}
+          style={{ width: h * 0.85, height: h }}
+        >
+          <div ref={scope} className="h-full w-full will-change-transform">
+            <div className="idle-bob h-full w-full" style={{ animationDelay: `${(enemy.uid.charCodeAt(1) % 4) * -0.7}s` }}>
+              <EnemyArt defId={enemy.defId} className="h-full w-full" />
+            </div>
+          </div>
+        </motion.div>
+        {prediction && (
+          <div className="pointer-events-none absolute top-[30%] z-20 rounded-md border border-red-300 bg-[#3a0610]/95 px-1.5 text-[13px] leading-5 font-black text-amber-100 tabular-nums">
+            予測 {prediction}
+          </div>
+        )}
+        <UnitPopups unitId={enemy.uid} top="10%" />
+      </div>
+      {!enemy.dead && (
+        <div className="mt-0.5 flex flex-col items-center gap-0.5" style={{ width: barW }}>
+          <div className="text-outline w-full truncate text-center text-[12px] leading-[14px] font-bold text-zinc-100">
+            <span className="text-amber-300">Lv{enemy.level}</span> {enemyName(enemy)}
+          </div>
+          <HpBar hp={enemy.hp} max={enemy.maxHp} block={enemy.block} tone="enemy" height={12} />
+          <StatusChips s={enemy.statuses} side="enemy" onTap={onTap} tauntedBy={enemy.tauntedBy} />
+        </div>
+      )}
+    </div>
+  );
+});
+
+const AllySprite = memo(function AllySprite({ ally, left, bottom, h, active }: { ally: AllyState; left: number; bottom: number; h: number; active: boolean }) {
+  const scope = useUnitMotion(ally.id, 'ally');
+  const setActive = useBattle((s) => s.setActive);
+  const press = usePress(() => setActive(ally.id), { type: 'ally', id: ally.id });
+  return (
+    <div {...press} className="absolute" style={{ left: left - h * 0.4, bottom, width: h * 0.8, height: h }}>
+      {active && (
+        <div className="glow-pulse absolute -bottom-1 left-1/2 h-[16px] w-[90%] -translate-x-1/2 rounded-[50%] border-2 border-amber-300 bg-amber-300/20" />
+      )}
+      <div ref={scope} className={`h-full w-full will-change-transform ${ally.dead ? 'opacity-40 grayscale' : ''}`}>
+        <div className={`h-full w-full ${ally.dead ? '' : 'idle-breathe'}`} style={{ animationDelay: `${Number(ally.id.slice(1)) * -0.6}s` }}>
+          <CharacterArt classId={ally.classId} gender={ally.gender} className="h-full w-full" />
+        </div>
+      </div>
+      <UnitPopups unitId={ally.id} top="5%" />
+    </div>
+  );
+});
+
+const Embers = memo(function Embers() {
+  const list = useMemo(
+    () =>
+      Array.from({ length: 7 }, (_, i) => ({
+        left: `${8 + i * 13}%`,
+        bottom: `${10 + ((i * 37) % 30)}%`,
+        dx: `${(i % 2 ? 1 : -1) * (8 + i * 2)}px`,
+        dur: `${4.5 + (i % 3)}s`,
+        delay: `${-i * 0.9}s`,
+      })),
+    [],
+  );
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      {list.map((e, i) => (
+        <span
+          key={i}
+          className="ember"
+          style={{ left: e.left, bottom: e.bottom, ['--dx' as string]: e.dx, ['--dur' as string]: e.dur, ['--delay' as string]: e.delay }}
+        />
+      ))}
+    </div>
+  );
+});
+
+export function Battlefield() {
+  const [ref, size] = useElementSize<HTMLDivElement>();
+  const enemies = useBattle((s) => s.battle.enemies);
+  const allies = useBattle((s) => s.battle.allies);
+  const activeId = useBattle((s) => s.activeId);
+  const phase = useBattle((s) => s.battle.phase);
+  const W = size.width;
+  const H = size.height;
+
+  // 敵: 上側 58%。味方: 下側。人数が増えたら小さくする
+  const nE = enemies.length;
+  const enemySlotW = W / nE;
+  const enemyTop = 2;
+  const enemyInfoH = 30 + 14 + 14 + 22; // 吹き出し + 名前 + HP + 状態異常
+  const enemySpriteH = Math.max(40, Math.min(H * 0.58 - enemyInfoH, enemySlotW * 1.15));
+  const nA = allies.length;
+  const allyAreaW = nA <= 2 ? W * 0.62 : W;
+  const allyH = Math.max(48, Math.min(H * 0.42, (allyAreaW / nA) * 1.25));
+
+  return (
+    <div ref={ref} className="relative min-h-[190px] flex-1 overflow-hidden border-y border-amber-500/30">
+      <BattleBackground className="absolute inset-0 h-full w-full" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/45" />
+      <Embers />
+      {W > 0 && (
+        <>
+          {enemies.map((e, i) => (
+            <EnemyUnit
+              key={e.uid}
+              enemy={e}
+              left={enemySlotW * (i + 0.5)}
+              top={enemyTop + (nE >= 3 && i % 2 === 1 ? 10 : 0)}
+              slotW={enemySlotW}
+              spriteH={enemySpriteH}
+            />
+          ))}
+          {allies.map((a, i) => (
+            <AllySprite
+              key={a.id}
+              ally={a}
+              left={(allyAreaW / nA) * (i + 0.5) + (nA <= 2 ? W * 0.02 : 0)}
+              bottom={6 + (nA >= 3 && i % 2 === 1 ? 8 : 0)}
+              h={allyH}
+              active={a.id === activeId && phase === 'ally'}
+            />
+          ))}
+        </>
+      )}
+      <div className="pointer-events-none absolute inset-x-0 top-[46%] z-40 flex justify-center">
+        <SlotOverlay />
+      </div>
+      <PhaseBanner />
+    </div>
+  );
+}
+
+/** フェーズが変わった時に一瞬出る帯（操作をブロックしない） */
+function PhaseBanner() {
+  const phase = useBattle((s) => s.battle.phase);
+  const turn = useBattle((s) => s.battle.turn);
+  const fast = useBattle((s) => s.settings.fastMode);
+  if (phase !== 'ally' && phase !== 'enemy') return null;
+  const k = 1 / speedFactor({ fastMode: fast, vibration: false });
+  return (
+    <motion.div
+      key={`${phase}-${turn}`}
+      initial={{ opacity: 0, scaleX: 0.6 }}
+      animate={{ opacity: [0, 1, 1, 0], scaleX: [0.6, 1, 1, 1.05] }}
+      transition={{ duration: (TIMING.resultPopup + 0.4) * k, times: [0, 0.2, 0.75, 1] }}
+      className="pointer-events-none absolute inset-x-0 top-[40%] z-30 flex justify-center"
+    >
+      <div
+        className={`font-display text-outline w-full py-1 text-center text-[22px] tracking-[0.3em] ${
+          phase === 'ally' ? 'text-amber-100' : 'text-red-200'
+        }`}
+        style={{
+          background:
+            phase === 'ally'
+              ? 'linear-gradient(90deg,transparent,rgba(40,70,140,.85),transparent)'
+              : 'linear-gradient(90deg,transparent,rgba(120,20,30,.85),transparent)',
+        }}
+      >
+        {phase === 'ally' ? `ターン ${turn}` : '敵のターン'}
+      </div>
+    </motion.div>
+  );
+}

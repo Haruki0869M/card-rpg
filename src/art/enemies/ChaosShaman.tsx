@@ -9,7 +9,7 @@ export const ChaosShaman = memo(function ChaosShaman({ className }: { className?
   const skin = url('skin');
   const bone = url('bone');
   return (
-    <svg viewBox={ENEMY_VIEWBOX} className={className} aria-hidden>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox={ENEMY_VIEWBOX} className={className} aria-hidden>
       <defs>
         <Grad3 id={id('skin')} c={['#8fb85a', '#4a6a26', '#1a2a0a']} x2={0.4} />
         <Grad3 id={id('robe')} c={['#6a3a9a', '#2e1450', '#0e0418']} />

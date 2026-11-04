@@ -1,52 +1,17 @@
-// 実際のUIをタップ操作して、勝利・敗北まで到達できるか確認する
-// npx vite preview を起動した状態で: node scripts/playthrough.mjs
-import { createRequire } from 'node:module';
-import { execSync } from 'node:child_process';
+// 実際のUIをタップ操作して、1〜4人それぞれで勝利・敗北まで到達できるか確認する
+// npm run build && npx vite preview --port 4173 を起動した状態で: node scripts/playthrough.mjs
 import { mkdirSync } from 'node:fs';
-const require = createRequire(execSync('npm root -g').toString().trim() + '/');
-const { chromium } = require('playwright');
+import { chromium, layoutIssues, startBattle } from './lib.mjs';
 
-const URL = process.env.URL ?? 'http://localhost:4173/card-rpg/';
 mkdirSync('screenshots', { recursive: true });
 const browser = await chromium.launch();
 const issues = [];
 
-async function tap(page, locator) {
+async function tapCard(page, locator) {
   const box = await locator.boundingBox();
   if (!box) return false;
-  // カードは重なっている可能性があるので左上寄りを押す
-  await page.mouse.click(box.x + Math.min(20, box.width / 2), box.y + Math.min(60, box.height / 2));
+  await page.mouse.click(box.x + Math.min(16, box.width / 2), box.y + Math.min(70, box.height / 2));
   return true;
-}
-
-async function layoutIssues(page) {
-  return page.evaluate(() => {
-    const out = [];
-    const de = document.documentElement;
-    if (de.scrollHeight > innerHeight + 1 || de.scrollWidth > innerWidth + 1) out.push('page overflow');
-    for (const el of document.querySelectorAll('.game-bg button')) {
-      const r = el.getBoundingClientRect();
-      if (r.width && (r.width < 43.5 || r.height < 43.5)) out.push(`small button "${el.textContent}" ${r.width}x${r.height}`);
-      if (r.bottom > innerHeight + 1 || r.right > innerWidth + 1) out.push(`offscreen "${el.textContent}"`);
-    }
-    return out;
-  });
-}
-
-async function setup(page, party, fast = true) {
-  await page.goto(URL);
-  await page.evaluate(() => localStorage.clear());
-  await page.reload();
-  if (party === 4) {
-    await page.getByLabel('メニュー').click();
-    await page.getByText('4人', { exact: true }).click(); // 切り替えるとバトルがリセットされメニューが閉じる
-    await page.waitForTimeout(150);
-  }
-  await page.getByLabel('メニュー').click();
-  if (await page.getByText('高速モード').count()) {
-    if (fast) await page.getByText('高速モード').click();
-    await page.getByLabel('閉じる').click();
-  }
 }
 
 async function resultText(page) {
@@ -55,21 +20,18 @@ async function resultText(page) {
   return null;
 }
 
-/** 攻撃的にプレイして勝利を目指す */
 async function playToWin(page, tag) {
   for (let turn = 0; turn < 40; turn++) {
     let r = await resultText(page);
     if (r) return r;
-    // 敵フェーズ待ち
-    await page.waitForSelector('text=ターン終了', { timeout: 10000 });
+    await page.waitForSelector('button:has-text("ターン終了"):not([disabled])', { timeout: 15000 });
     for (let guard = 0; guard < 40; guard++) {
       if ((r = await resultText(page))) return r;
       const allies = page.locator('[data-ally]:not([data-done]):not([data-dead])');
       if ((await allies.count()) === 0) break;
-      await tap(page, allies.first());
+      await allies.first().click();
       const cards = page.locator('[data-card-index][data-usable]');
       if ((await cards.count()) === 0) break;
-      // 攻撃カード優先
       let card = cards.first();
       for (const id of ['heavySwing', 'gambleBolt', 'shieldBash', 'strike', 'magicArrow', 'warCry', 'meditate', 'guard']) {
         const c = page.locator(`[data-card-index][data-usable][data-card-id="${id}"]`);
@@ -78,16 +40,15 @@ async function playToWin(page, tag) {
           break;
         }
       }
-      await tap(page, card);
-      await page.waitForTimeout(30);
-      if (await page.getByText('対象を選択').count()) {
-        // HPが最も低い敵
+      const id = await card.getAttribute('data-card-id');
+      await tapCard(page, card);
+      await page.waitForTimeout(40);
+      if (await page.getByText('敵をタップ').count()) {
         const hps = await page.$$eval('[data-enemy]:not([data-dead])', (els) => els.map((e) => [e.dataset.enemy, +e.dataset.hp]));
         hps.sort((a, b) => a[1] - b[1]);
-        await tap(page, page.locator(`[data-enemy="${hps[0][0]}"]`));
+        const box = await page.locator(`[data-enemy="${hps[0][0]}"]`).boundingBox();
+        await page.mouse.click(box.x + box.width / 2, box.y + 60);
       }
-      // 大技ならフォーカス全投入
-      const id = await card.getAttribute('data-card-id').catch(() => null);
       if (id === 'heavySwing' || id === 'gambleBolt') {
         for (let i = 0; i < 4; i++) {
           const plus = page.getByLabel('フォーカスを増やす');
@@ -96,32 +57,31 @@ async function playToWin(page, tag) {
       }
       const li = await layoutIssues(page);
       if (li.length) issues.push(`${tag}: ${li.join(', ')}`);
-      const go = page.getByText('発動', { exact: true });
+      const go = page.locator('button:has-text("発動")');
       if (await go.count()) await go.click();
-      await page.waitForTimeout(30);
+      await page.waitForTimeout(40);
     }
     if ((r = await resultText(page))) return r;
-    await page.getByText('ターン終了').click();
+    await page.locator('button:has-text("ターン終了")').click();
     await page.waitForTimeout(100);
   }
   return 'timeout';
 }
 
-/** 何もせずターン終了を繰り返して敗北する */
 async function playToLose(page) {
   for (let turn = 0; turn < 80; turn++) {
     const r = await resultText(page);
     if (r) return r;
-    await page.waitForSelector('text=ターン終了', { timeout: 10000 });
+    await page.locator('button:has-text("ターン終了"):not([disabled])').or(page.getByText('敗北…', { exact: true })).first().waitFor({ timeout: 15000 });
     if (await resultText(page)) continue;
-    await page.getByText('ターン終了').click();
+    await page.locator('button:has-text("ターン終了")').click();
     await page.waitForTimeout(50);
   }
   return 'timeout';
 }
 
 let failed = false;
-for (const party of [2, 4]) {
+for (const party of [1, 2, 3, 4]) {
   for (const goal of ['victory', 'defeat']) {
     const ctx = await browser.newContext({ viewport: { width: 360, height: 640 }, hasTouch: true, isMobile: true });
     const page = await ctx.newPage();
@@ -130,11 +90,10 @@ for (const party of [2, 4]) {
     let attempts = 0;
     do {
       attempts++;
-      await setup(page, party);
+      await startBattle(page, party, party === 1 ? '重装兵（1体）' : 'ゴブリンの一団（3体）');
       result = goal === 'victory' ? await playToWin(page, `${party}p`) : await playToLose(page);
     } while (result !== goal && attempts < 6);
-    const turn = await page.locator('text=/^ターン数/').locator('..').textContent().catch(() => '');
-    console.log(`${party}人 ${goal}: ${result === goal ? 'OK' : 'NG(' + result + ')'} (試行${attempts}回) ${turn}`);
+    console.log(`${party}人 ${goal}: ${result === goal ? 'OK' : 'NG(' + result + ')'} (試行${attempts}回)`);
     await page.waitForTimeout(500);
     await page.screenshot({ path: `screenshots/result-${party}p-${goal}.png` });
     if (result !== goal) failed = true;

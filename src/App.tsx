@@ -1,13 +1,13 @@
 import { AnimatePresence, MotionConfig } from 'framer-motion';
 import { useEffect } from 'react';
-import { BottomBar, TopBar } from './components/Bars';
+import { BottomBar, TopBar } from './components/battle/Bars';
+import { Battlefield } from './components/battle/Battlefield';
+import { FocusPanel } from './components/battle/FocusPanel';
+import { Hand } from './components/battle/Hand';
+import { PartyStrip } from './components/battle/PartyStrip';
 import { DetailPopup } from './components/DetailPopup';
-import { FocusPanel } from './components/FocusPanel';
-import { Hand } from './components/Hand';
 import { ResultScreen } from './components/ResultScreen';
 import { Sheets } from './components/Sheets';
-import { SlotOverlay } from './components/SlotOverlay';
-import { EnemyRow, PartyRow } from './components/Units';
 import { findAlly } from './engine';
 import { useBackButton } from './hooks/useBackButton';
 import { useDetail } from './hooks/usePress';
@@ -71,14 +71,10 @@ export default function App() {
           onClick={() => selection && cancel()}
         >
           <TopBar />
-          <EnemyRow />
-          <div className="relative z-30 h-2">
-            <div className="absolute inset-x-0 top-1">
-              <SlotOverlay />
-            </div>
-          </div>
-          <PartyRow />
-          <div className="relative z-40 min-h-1 flex-1">
+          <Battlefield />
+          <PartyStrip />
+          {/* フォーカス注入パネル: 手札のすぐ上に重ねて出す */}
+          <div className="relative z-40 h-0">
             <div className="absolute inset-x-0 bottom-1">
               <AnimatePresence>{selection && <FocusPanel key="focus" />}</AnimatePresence>
             </div>

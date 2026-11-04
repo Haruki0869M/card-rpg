@@ -10,7 +10,7 @@ export const GoblinBrute = memo(function GoblinBrute({ className }: { className?
   const iron = url('iron');
   const bone = url('bone');
   return (
-    <svg viewBox={ENEMY_VIEWBOX} className={className} aria-hidden>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox={ENEMY_VIEWBOX} className={className} aria-hidden>
       <defs>
         <Grad3 id={id('skin')} c={['#9cbc4e', '#56722a', '#1f2c0c']} x2={0.4} />
         <Grad3 id={id('iron')} c={['#7a7090', '#2e2838', '#0c0a10']} x2={1} />

@@ -9,7 +9,7 @@ export const GoblinScout = memo(function GoblinScout({ className }: { className?
   const skin = url('skin');
   const blade = url('blade');
   return (
-    <svg viewBox={ENEMY_VIEWBOX} className={className} aria-hidden>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox={ENEMY_VIEWBOX} className={className} aria-hidden>
       <defs>
         <Grad3 id={id('skin')} c={['#a8c860', '#5e7c2c', '#22300c']} x2={0.4} />
         <Grad3 id={id('cloak')} c={['#a8323e', '#5a1220', '#1e050a']} />

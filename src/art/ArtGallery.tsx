@@ -2,8 +2,6 @@
 import { CLASSES } from '../data/classes';
 import { ENEMIES } from '../data/enemies';
 import '@fontsource/zen-antique/400.css';
-import '@fontsource/dela-gothic-one/400.css';
-import '@fontsource/shippori-mincho-b1/800.css';
 import { PlainsBackground } from './backgrounds/Plains';
 import { CharacterArt, EnemyArt } from './index';
 
@@ -49,12 +47,10 @@ export default function ArtGallery() {
         <CharacterArt classId="warrior" gender="male" className="absolute top-[150px] left-[20px] h-[140px] w-[105px]" />
         <CharacterArt classId="mage" gender="female" className="absolute top-[160px] left-[110px] h-[130px] w-[95px]" />
       </div>
-      <h1 className="mt-4 mb-2 text-[18px] font-black text-amber-200">見出しフォントの候補</h1>
+      <h1 className="mt-4 mb-2 text-[18px] font-black text-amber-200">見出しフォント</h1>
       <div className="flex flex-col gap-2">
         {[
-          ['A. Zen Antique（重厚な古書風）', "'Zen Antique'"],
-          ['B. Shippori Mincho B1（力強い明朝）', "'Shippori Mincho B1'"],
-          ['C. Dela Gothic One（太く迫力のあるゴシック）', "'Dela Gothic One'"],
+          ['Zen Antique（採用）', "'Zen Antique'"],
         ].map(([label, family]) => (
           <div key={label} className="rounded-lg border border-amber-500/30 bg-gradient-to-b from-[#2a2030] to-[#120c16] px-3 py-2">
             <div className="text-[12px] text-zinc-400">{label}</div>

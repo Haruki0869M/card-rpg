@@ -4,10 +4,10 @@ import { HERO_VIEWBOX } from './hero/Hero';
 import { ENEMY_VIEWBOX } from './enemies/common';
 import { INK, STROKE, useArtIds } from './kit';
 
-export const FallbackHero = memo(function FallbackHero({ label, className }: { label: string; className?: string }) {
+export const FallbackHero = memo(function FallbackHero({ label, className, viewBox }: { label: string; className?: string; viewBox?: string }) {
   const { id, url } = useArtIds();
   return (
-    <svg viewBox={HERO_VIEWBOX} className={className} aria-hidden>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox={viewBox ?? HERO_VIEWBOX} className={className} aria-hidden>
       <defs>
         <linearGradient id={id('g')} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#5a6a90" />
@@ -28,7 +28,7 @@ export const FallbackHero = memo(function FallbackHero({ label, className }: { l
 export const FallbackEnemy = memo(function FallbackEnemy({ label, className }: { label: string; className?: string }) {
   const { id, url } = useArtIds();
   return (
-    <svg viewBox={ENEMY_VIEWBOX} className={className} aria-hidden>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox={ENEMY_VIEWBOX} className={className} aria-hidden>
       <defs>
         <radialGradient id={id('g')} cx="50%" cy="40%" r="60%">
           <stop offset="0" stopColor="#6a2a5a" />

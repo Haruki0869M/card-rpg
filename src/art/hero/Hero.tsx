@@ -28,6 +28,8 @@ export interface HeroLook {
 }
 
 export const HERO_VIEWBOX = '0 -30 240 330';
+/** 顔まわりだけを切り出す（ステータス枠・吹き出しの小さな顔用） */
+export const HERO_FACE_VIEWBOX = '52 28 136 136';
 
 // ---------- 部品 ----------
 
@@ -575,9 +577,9 @@ function HeroBody({ look }: { look: HeroLook }) {
 }
 
 /** 味方キャラの絵。memo 化して、同じ見た目の再描画を避ける */
-export const Hero = memo(function Hero({ look, className }: { look: HeroLook; className?: string }) {
+export const Hero = memo(function Hero({ look, className, viewBox }: { look: HeroLook; className?: string; viewBox?: string }) {
   return (
-    <svg viewBox={HERO_VIEWBOX} className={className} aria-hidden>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox={viewBox ?? HERO_VIEWBOX} className={className} aria-hidden>
       <HeroBody look={look} />
     </svg>
   );
