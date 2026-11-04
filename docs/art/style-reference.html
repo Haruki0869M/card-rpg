@@ -1,0 +1,245 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+body{margin:0;background:#07050a}
+.wrap{display:flex;gap:0}
+svg{display:block}
+</style></head><body><div class="wrap">
+
+<!-- ===================== 戦士 ===================== -->
+<svg viewBox="0 0 420 480" width="420" height="480">
+<defs>
+  <radialGradient id="w_bg" cx="50%" cy="38%" r="70%"><stop offset="0" stop-color="#2d3f66"/><stop offset=".55" stop-color="#151a2e"/><stop offset="1" stop-color="#07070d"/></radialGradient>
+  <radialGradient id="w_light" cx="50%" cy="40%" r="50%"><stop offset="0" stop-color="#9fd4ff" stop-opacity=".35"/><stop offset="1" stop-color="#9fd4ff" stop-opacity="0"/></radialGradient>
+  <linearGradient id="w_skin" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe7d3"/><stop offset="1" stop-color="#f7c2a0"/></linearGradient>
+  <linearGradient id="w_hair" x1="0" y1="0" x2=".3" y2="1"><stop offset="0" stop-color="#ffb347"/><stop offset=".5" stop-color="#f06a1c"/><stop offset="1" stop-color="#a8320c"/></linearGradient>
+  <linearGradient id="w_steel" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".35" stop-color="#c9d4e6"/><stop offset=".7" stop-color="#7d8aa6"/><stop offset="1" stop-color="#3e4660"/></linearGradient>
+  <linearGradient id="w_steelD" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6d7894"/><stop offset="1" stop-color="#343a52"/></linearGradient>
+  <linearGradient id="w_blue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a6fe0"/><stop offset="1" stop-color="#1b2f80"/></linearGradient>
+  <linearGradient id="w_cape" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e2384e"/><stop offset=".6" stop-color="#951428"/><stop offset="1" stop-color="#4a0712"/></linearGradient>
+  <linearGradient id="w_gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff2b0"/><stop offset=".45" stop-color="#f2c24a"/><stop offset="1" stop-color="#9a6410"/></linearGradient>
+  <linearGradient id="w_blade" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#d8f0ff"/><stop offset=".5" stop-color="#8fb8dc"/><stop offset="1" stop-color="#4b6a8f"/></linearGradient>
+  <radialGradient id="w_iris" cx="50%" cy="65%" r="60%"><stop offset="0" stop-color="#9ff3ff"/><stop offset=".5" stop-color="#2f9bff"/><stop offset="1" stop-color="#16307a"/></radialGradient>
+  <filter id="w_glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <filter id="w_soft"><feGaussianBlur stdDeviation="2.5"/></filter>
+</defs>
+<rect width="420" height="480" fill="url(#w_bg)"/>
+<!-- 床と光 -->
+<ellipse cx="210" cy="455" rx="190" ry="34" fill="#1d2440"/>
+<ellipse cx="210" cy="190" rx="200" ry="200" fill="url(#w_light)"/>
+<g opacity=".7" fill="#bfe6ff"><circle cx="70" cy="120" r="2"/><circle cx="350" cy="90" r="1.6"/><circle cx="330" cy="300" r="2.2"/><circle cx="60" cy="330" r="1.5"/><circle cx="110" cy="60" r="1.2"/></g>
+<ellipse cx="205" cy="448" rx="105" ry="13" fill="#000" opacity=".55" filter="url(#w_soft)"/>
+
+<!-- マント（後ろ・なびく） -->
+<path d="M150 238 C120 300 80 350 40 420 C80 410 100 430 130 418 C150 440 175 430 190 440 L250 250 Z" fill="url(#w_cape)" stroke="#2a0309" stroke-width="3.5" stroke-linejoin="round"/>
+<path d="M150 260 C130 310 105 350 80 400" stroke="#ff7a8c" stroke-width="3" fill="none" opacity=".5"/>
+<path d="M175 280 C160 330 145 380 140 415" stroke="#3d0410" stroke-width="3" fill="none" opacity=".6"/>
+
+<!-- 大剣（肩に担ぐ） -->
+<g filter="url(#w_glow)">
+  <path d="M286 222 L360 52 L382 40 L378 64 L304 232 Z" fill="url(#w_blade)" stroke="#1b2740" stroke-width="3.5" stroke-linejoin="round"/>
+  <path d="M296 224 L368 56" stroke="#e8fbff" stroke-width="2.5"/>
+  <path d="M318 172 L332 140 M334 134 L346 108" stroke="#7fd8ff" stroke-width="3" stroke-linecap="round"/>
+</g>
+<path d="M266 214 L322 240 L316 252 L260 226 Z" fill="url(#w_gold)" stroke="#4a2c04" stroke-width="3" stroke-linejoin="round"/>
+<circle cx="291" cy="232" r="7" fill="#43d3ff" stroke="#0e2d55" stroke-width="2.5"/>
+<path d="M276 238 L262 270" stroke="#4b2a12" stroke-width="12" stroke-linecap="round"/>
+<path d="M276 238 L262 270" stroke="#140902" stroke-width="12" stroke-linecap="round" fill="none" opacity=".0"/>
+<circle cx="259" cy="276" r="8" fill="url(#w_gold)" stroke="#4a2c04" stroke-width="2.5"/>
+
+<!-- 脚 -->
+<path d="M160 340 L150 412 L184 414 L192 342 Z" fill="url(#w_blue)" stroke="#0b1030" stroke-width="3.5" stroke-linejoin="round"/>
+<path d="M218 342 L228 412 L262 410 L250 340 Z" fill="url(#w_blue)" stroke="#0b1030" stroke-width="3.5" stroke-linejoin="round"/>
+<path d="M140 404 Q144 388 168 390 Q190 390 190 404 L192 428 Q160 436 132 430 Z" fill="url(#w_steel)" stroke="#161a2a" stroke-width="3.5" stroke-linejoin="round"/>
+<path d="M222 404 Q226 388 248 388 Q270 390 272 404 L276 428 Q248 436 222 430 Z" fill="url(#w_steel)" stroke="#161a2a" stroke-width="3.5" stroke-linejoin="round"/>
+<path d="M140 412 L190 412 M224 412 L272 412" stroke="url(#w_gold)" stroke-width="5"/>
+
+<!-- 胴（鎧） -->
+<path d="M146 236 Q205 214 262 236 L258 300 Q256 336 205 346 Q154 336 152 300 Z" fill="url(#w_steel)" stroke="#161a2a" stroke-width="4" stroke-linejoin="round"/>
+<path d="M205 236 Q240 240 252 262 L250 300 Q246 330 205 340 Z" fill="url(#w_steelD)" opacity=".55"/>
+<path d="M162 250 Q205 234 248 250" stroke="#ffffff" stroke-width="3" fill="none" opacity=".8"/>
+<path d="M205 236 L205 340" stroke="#3e4660" stroke-width="2.5"/>
+<!-- 胸の紋章 -->
+<path d="M205 262 L222 276 L205 304 L188 276 Z" fill="url(#w_gold)" stroke="#4a2c04" stroke-width="2.5" stroke-linejoin="round"/>
+<path d="M205 270 L212 277 L205 292 L198 277 Z" fill="#43d3ff"/>
+<!-- ベルト・腰布 -->
+<path d="M152 318 Q205 332 258 318 L258 334 Q205 348 152 334 Z" fill="#4a2a15" stroke="#160a03" stroke-width="3"/>
+<rect x="193" y="320" width="24" height="20" rx="4" fill="url(#w_gold)" stroke="#4a2c04" stroke-width="2.5"/>
+<path d="M164 338 L158 372 L190 366 L198 342 Z" fill="url(#w_blue)" stroke="#0b1030" stroke-width="3" stroke-linejoin="round"/>
+<path d="M246 338 L252 372 L220 366 L212 342 Z" fill="url(#w_blue)" stroke="#0b1030" stroke-width="3" stroke-linejoin="round"/>
+
+<!-- 左腕（下） -->
+<path d="M150 254 Q124 290 128 330" stroke="#161a2a" stroke-width="30" stroke-linecap="round" fill="none"/>
+<path d="M150 254 Q124 290 128 330" stroke="url(#w_blue)" stroke-width="23" stroke-linecap="round" fill="none"/>
+<path d="M114 318 Q128 304 146 318 L146 346 Q130 356 114 346 Z" fill="url(#w_steel)" stroke="#161a2a" stroke-width="3.5" stroke-linejoin="round"/>
+<!-- 右腕（剣を握る） -->
+<path d="M258 252 Q290 250 284 230" stroke="#161a2a" stroke-width="30" stroke-linecap="round" fill="none"/>
+<path d="M258 252 Q290 250 284 230" stroke="url(#w_blue)" stroke-width="23" stroke-linecap="round" fill="none"/>
+<path d="M266 222 Q286 210 300 226 L292 248 Q276 252 266 240 Z" fill="url(#w_steel)" stroke="#161a2a" stroke-width="3.5" stroke-linejoin="round"/>
+
+<!-- 肩当て -->
+<path d="M110 250 Q112 214 152 214 Q176 218 178 240 Q160 262 128 266 Q112 264 110 250 Z" fill="url(#w_steel)" stroke="#161a2a" stroke-width="4" stroke-linejoin="round"/>
+<path d="M118 248 Q124 226 150 224" stroke="#fff" stroke-width="3" fill="none"/>
+<path d="M112 256 Q140 262 174 244" stroke="url(#w_gold)" stroke-width="5" fill="none"/>
+<path d="M300 250 Q298 214 258 214 Q234 218 232 240 Q250 262 282 266 Q298 264 300 250 Z" fill="url(#w_steel)" stroke="#161a2a" stroke-width="4" stroke-linejoin="round"/>
+<path d="M298 256 Q270 262 236 244" stroke="url(#w_gold)" stroke-width="5" fill="none"/>
+<path d="M292 252 Q296 232 280 222" stroke="#7fd8ff" stroke-width="3" fill="none" opacity=".8"/>
+
+<!-- 首 -->
+<path d="M188 212 L222 212 L220 234 L190 234 Z" fill="#e9a988" stroke="#5a2e1e" stroke-width="3"/>
+
+<!-- 後ろ髪 -->
+<path d="M118 150 Q108 210 132 236 L150 200 Z M292 150 Q302 210 278 236 L260 200 Z" fill="#b83e10" stroke="#4a1404" stroke-width="3.5" stroke-linejoin="round"/>
+<!-- 顔 -->
+<path d="M124 140 Q124 70 205 64 Q286 70 286 140 Q284 196 236 220 Q205 234 174 220 Q126 196 124 140 Z" fill="url(#w_skin)" stroke="#5a2e1e" stroke-width="4"/>
+<path d="M262 120 Q286 150 268 196 Q252 214 236 220 Q262 190 262 120 Z" fill="#e8a888" opacity=".5"/>
+<!-- 目 -->
+<g>
+  <path d="M146 150 Q160 136 184 144 L182 182 Q164 186 150 176 Z" fill="#fff"/>
+  <ellipse cx="168" cy="162" rx="14" ry="19" fill="url(#w_iris)"/>
+  <ellipse cx="168" cy="166" rx="6" ry="9" fill="#0b1640"/>
+  <path d="M142 150 Q160 132 190 144" stroke="#2a1208" stroke-width="7" fill="none" stroke-linecap="round"/>
+  <path d="M184 144 L194 140" stroke="#2a1208" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="162" cy="154" r="5" fill="#fff"/><circle cx="174" cy="172" r="2.5" fill="#fff"/>
+
+  <path d="M264 150 Q250 136 226 144 L228 182 Q246 186 260 176 Z" fill="#fff"/>
+  <ellipse cx="242" cy="162" rx="14" ry="19" fill="url(#w_iris)"/>
+  <ellipse cx="242" cy="166" rx="6" ry="9" fill="#0b1640"/>
+  <path d="M268 150 Q250 132 220 144" stroke="#2a1208" stroke-width="7" fill="none" stroke-linecap="round"/>
+  <path d="M226 144 L216 140" stroke="#2a1208" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="236" cy="154" r="5" fill="#fff"/><circle cx="248" cy="172" r="2.5" fill="#fff"/>
+</g>
+<!-- 眉（凛々しく） -->
+<path d="M146 130 L188 138 M264 130 L222 138" stroke="#a8320c" stroke-width="6" stroke-linecap="round"/>
+<!-- 口・頬 -->
+<path d="M192 202 Q206 210 222 198" stroke="#6a2a1a" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+<path d="M218 199 L224 194" stroke="#6a2a1a" stroke-width="3" stroke-linecap="round"/>
+<ellipse cx="148" cy="188" rx="14" ry="7" fill="#ff8a9a" opacity=".35"/><ellipse cx="262" cy="188" rx="14" ry="7" fill="#ff8a9a" opacity=".35"/>
+<path d="M240 192 L258 186" stroke="#c46a52" stroke-width="2.5" stroke-linecap="round"/>
+
+<!-- 前髪（トゲ） -->
+<path d="M112 136 Q104 60 170 42 Q140 30 196 22 Q190 14 230 26 Q270 16 262 40 Q314 52 300 136
+         L284 112 L276 144 L258 104 L246 134 L232 96 L218 130 L206 92 L192 128 L176 94 L166 132 L152 102 L142 140 L128 112 Z"
+      fill="url(#w_hair)" stroke="#5a1804" stroke-width="4" stroke-linejoin="round"/>
+<path d="M150 56 Q180 40 214 40" stroke="#ffe08a" stroke-width="6" fill="none" stroke-linecap="round" opacity=".85"/>
+<path d="M236 46 Q262 54 274 72" stroke="#ffe08a" stroke-width="4" fill="none" stroke-linecap="round" opacity=".7"/>
+<!-- サークレット -->
+<path d="M126 110 Q205 82 286 110" stroke="url(#w_gold)" stroke-width="10" fill="none" stroke-linecap="round"/>
+<path d="M126 110 Q205 82 286 110" stroke="#4a2c04" stroke-width="1.5" fill="none"/>
+<path d="M205 82 L216 96 L205 112 L194 96 Z" fill="#43d3ff" stroke="#0e2d55" stroke-width="2.5"/>
+<!-- リムライト -->
+<path d="M282 120 Q290 160 268 200" stroke="#9fe6ff" stroke-width="3" fill="none" opacity=".8"/>
+<path d="M258 250 L256 300" stroke="#9fe6ff" stroke-width="3" fill="none" opacity=".6"/>
+
+<text x="210" y="472" text-anchor="middle" font-family="sans-serif" font-weight="900" font-size="18" fill="#d9ecff" letter-spacing="2">戦士  Lv.5</text>
+</svg>
+
+<!-- ===================== ゴブリン重装兵 ===================== -->
+<svg viewBox="0 0 420 480" width="420" height="480">
+<defs>
+  <radialGradient id="g_bg" cx="50%" cy="45%" r="70%"><stop offset="0" stop-color="#3a1030"/><stop offset=".55" stop-color="#170814"/><stop offset="1" stop-color="#060306"/></radialGradient>
+  <linearGradient id="g_skin" x1="0" y1="0" x2=".4" y2="1"><stop offset="0" stop-color="#8fae46"/><stop offset=".5" stop-color="#4f6a22"/><stop offset="1" stop-color="#1f2c0c"/></linearGradient>
+  <linearGradient id="g_iron" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6f6680"/><stop offset=".4" stop-color="#2e2838"/><stop offset="1" stop-color="#0c0a10"/></linearGradient>
+  <linearGradient id="g_rust" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a04a1e"/><stop offset="1" stop-color="#3a1206"/></linearGradient>
+  <linearGradient id="g_bone" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6dc"/><stop offset="1" stop-color="#b8a47a"/></linearGradient>
+  <linearGradient id="g_cleaver" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8a8496"/><stop offset=".5" stop-color="#3a3444"/><stop offset="1" stop-color="#16121c"/></linearGradient>
+  <radialGradient id="g_eye"><stop offset="0" stop-color="#fffbe0"/><stop offset=".3" stop-color="#ffd040"/><stop offset=".6" stop-color="#ff3010"/><stop offset="1" stop-color="#ff1000" stop-opacity="0"/></radialGradient>
+  <radialGradient id="g_under" cx="50%" cy="100%" r="80%"><stop offset="0" stop-color="#ff2a3a" stop-opacity=".45"/><stop offset="1" stop-color="#ff2a3a" stop-opacity="0"/></radialGradient>
+  <filter id="g_smoke" x="-20%" y="-20%" width="140%" height="140%">
+    <feTurbulence type="fractalNoise" baseFrequency=".018" numOctaves="3" seed="7" result="n"/>
+    <feColorMatrix in="n" type="matrix" values="0 0 0 0 .55  0 0 0 0 .1  0 0 0 0 .9  0 0 0 1.6 -.75" result="c"/>
+    <feComposite in="c" in2="SourceGraphic" operator="in"/>
+  </filter>
+  <filter id="g_glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <filter id="g_soft"><feGaussianBlur stdDeviation="3"/></filter>
+</defs>
+<rect width="420" height="480" fill="url(#g_bg)"/>
+<!-- 瘴気 -->
+<ellipse cx="210" cy="300" rx="210" ry="200" fill="#fff" filter="url(#g_smoke)" opacity=".9"/>
+<ellipse cx="210" cy="455" rx="200" ry="36" fill="#1c0a18"/>
+<ellipse cx="210" cy="420" rx="220" ry="120" fill="url(#g_under)"/>
+<ellipse cx="210" cy="448" rx="135" ry="15" fill="#000" opacity=".7" filter="url(#g_soft)"/>
+<g fill="#ff6a3a" opacity=".8"><circle cx="60" cy="380" r="2"/><circle cx="360" cy="350" r="2.4"/><circle cx="90" cy="250" r="1.5"/><circle cx="340" cy="180" r="1.6"/></g>
+
+<!-- 鎖 -->
+<g stroke="#5c5468" stroke-width="5" fill="none"><ellipse cx="128" cy="356" rx="9" ry="6"/><ellipse cx="140" cy="370" rx="6" ry="9"/><ellipse cx="150" cy="386" rx="9" ry="6"/><ellipse cx="160" cy="400" rx="6" ry="9"/></g>
+
+<!-- 大鉈（右手） -->
+<g transform="rotate(-14 330 260)">
+  <rect x="318" y="210" width="20" height="150" rx="6" fill="#3a2010" stroke="#0e0602" stroke-width="3.5"/>
+  <path d="M312 230 L344 230" stroke="#6b5f78" stroke-width="7"/>
+  <path d="M300 40 L382 70 Q392 140 360 214 L312 218 Q296 140 300 40 Z" fill="url(#g_cleaver)" stroke="#050308" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M300 40 L306 60 L298 74 L308 92 L300 110 L310 130 L302 150" stroke="#b8b0c6" stroke-width="3" fill="none"/>
+  <g filter="url(#g_glow)" stroke="#ff2a3a" stroke-width="4" fill="none" stroke-linecap="round">
+    <path d="M336 90 L350 110 L334 126 L352 146"/><path d="M326 168 L346 170"/>
+  </g>
+  <path d="M352 180 Q356 196 350 214" stroke="#7a0a0a" stroke-width="6" stroke-linecap="round"/>
+</g>
+
+<!-- 脚 -->
+<path d="M140 350 L120 428 L180 432 L186 356 Z" fill="url(#g_rust)" stroke="#060306" stroke-width="4" stroke-linejoin="round"/>
+<path d="M236 356 L242 432 L302 428 L282 350 Z" fill="url(#g_rust)" stroke="#060306" stroke-width="4" stroke-linejoin="round"/>
+<path d="M118 420 L112 440 L186 440 L182 420 Z M240 420 L238 440 L310 440 L304 420 Z" fill="url(#g_iron)" stroke="#060306" stroke-width="3.5"/>
+<path d="M112 440 L104 446 M186 440 L194 446 M310 440 L318 446" stroke="#c8c0d6" stroke-width="4" stroke-linecap="round"/>
+
+<!-- 胴（猫背で大きい） -->
+<path d="M96 210 Q210 150 324 210 L314 330 Q210 380 106 330 Z" fill="url(#g_iron)" stroke="#060306" stroke-width="4.5" stroke-linejoin="round"/>
+<path d="M120 236 Q210 196 300 236" stroke="#8a8098" stroke-width="3" fill="none" opacity=".7"/>
+<path d="M114 280 Q210 250 306 280" stroke="#4a4258" stroke-width="5" fill="none"/>
+<g fill="#b8b0c6"><circle cx="130" cy="276" r="5"/><circle cx="170" cy="266" r="5"/><circle cx="250" cy="266" r="5"/><circle cx="290" cy="276" r="5"/></g>
+<!-- 腰の髑髏 -->
+<path d="M210 288 q-24 0 -24 22 q0 14 10 18 l0 10 l28 0 l0 -10 q10 -4 10 -18 q0 -22 -24 -22z" fill="url(#g_bone)" stroke="#1a120a" stroke-width="3"/>
+<ellipse cx="201" cy="310" rx="6" ry="7" fill="#0a0404"/><ellipse cx="219" cy="310" rx="6" ry="7" fill="#0a0404"/>
+<circle cx="201" cy="311" r="2" fill="#ff3a20" filter="url(#g_glow)"/><circle cx="219" cy="311" r="2" fill="#ff3a20" filter="url(#g_glow)"/>
+<path d="M202 334 L202 340 M210 334 L210 340 M218 334 L218 340" stroke="#1a120a" stroke-width="2.5"/>
+
+<!-- 左腕（垂れた太い腕） -->
+<path d="M100 236 Q58 290 76 350" stroke="#0a0f04" stroke-width="46" stroke-linecap="round" fill="none"/>
+<path d="M100 236 Q58 290 76 350" stroke="url(#g_skin)" stroke-width="38" stroke-linecap="round" fill="none"/>
+<path d="M92 252 Q70 290 78 330" stroke="#b6d46a" stroke-width="4" fill="none" opacity=".5"/>
+<path d="M58 330 Q76 316 98 330 L100 360 Q78 374 56 360 Z" fill="url(#g_iron)" stroke="#060306" stroke-width="3.5"/>
+<path d="M58 360 L50 380 M72 366 L68 388 M88 364 L90 386" stroke="#d8cfe0" stroke-width="5" stroke-linecap="round"/>
+<!-- 右腕 -->
+<path d="M318 236 Q350 250 336 286" stroke="#0a0f04" stroke-width="44" stroke-linecap="round" fill="none"/>
+<path d="M318 236 Q350 250 336 286" stroke="url(#g_skin)" stroke-width="36" stroke-linecap="round" fill="none"/>
+
+<!-- 肩当て（トゲ） -->
+<path d="M50 230 Q56 160 132 176 L140 222 Q100 256 50 230 Z" fill="url(#g_iron)" stroke="#060306" stroke-width="4.5" stroke-linejoin="round"/>
+<path d="M60 196 L24 150 L84 180 Z M88 178 L72 120 L112 176 Z M114 176 L120 128 L134 180 Z" fill="url(#g_bone)" stroke="#060306" stroke-width="3" stroke-linejoin="round"/>
+<path d="M370 230 Q364 160 288 176 L280 222 Q320 256 370 230 Z" fill="url(#g_iron)" stroke="#060306" stroke-width="4.5" stroke-linejoin="round"/>
+<path d="M360 196 L396 150 L336 180 Z M332 178 L348 120 L308 176 Z M306 176 L300 128 L286 180 Z" fill="url(#g_bone)" stroke="#060306" stroke-width="3" stroke-linejoin="round"/>
+<path d="M60 220 Q90 236 128 212" stroke="#a0329a" stroke-width="3" fill="none" opacity=".7"/>
+
+<!-- 頭（前に突き出す） -->
+<path d="M150 196 Q140 124 210 112 Q280 124 270 196 Q262 236 210 246 Q158 236 150 196 Z" fill="url(#g_skin)" stroke="#0a0f04" stroke-width="4.5" stroke-linejoin="round"/>
+<!-- 耳 -->
+<path d="M154 168 L84 140 L104 158 L80 168 L154 196 Z" fill="url(#g_skin)" stroke="#0a0f04" stroke-width="4" stroke-linejoin="round"/>
+<path d="M266 168 L336 140 L316 158 L340 168 L266 196 Z" fill="url(#g_skin)" stroke="#0a0f04" stroke-width="4" stroke-linejoin="round"/>
+<path d="M98 152 L140 170" stroke="#2a3a10" stroke-width="3"/><path d="M322 152 L280 170" stroke="#2a3a10" stroke-width="3"/>
+<circle cx="320" cy="160" r="5" fill="none" stroke="url(#g_bone)" stroke-width="3"/>
+<!-- 兜 -->
+<path d="M144 168 Q140 96 210 88 Q280 96 276 168 Q248 150 210 152 Q172 150 144 168 Z" fill="url(#g_iron)" stroke="#060306" stroke-width="4.5" stroke-linejoin="round"/>
+<path d="M210 88 L210 150" stroke="#8a8098" stroke-width="5"/>
+<path d="M160 124 Q140 70 112 40 Q156 66 182 110 Z" fill="url(#g_bone)" stroke="#060306" stroke-width="3.5" stroke-linejoin="round"/>
+<path d="M260 124 Q280 70 308 40 Q264 66 238 110 Z" fill="url(#g_bone)" stroke="#060306" stroke-width="3.5" stroke-linejoin="round"/>
+<path d="M150 160 Q210 138 270 160" stroke="#a0329a" stroke-width="2.5" fill="none" opacity=".6"/>
+<!-- 目（発光） -->
+<g filter="url(#g_glow)">
+  <path d="M166 178 L200 188 L168 196 Z" fill="url(#g_eye)"/>
+  <path d="M254 178 L220 188 L252 196 Z" fill="url(#g_eye)"/>
+</g>
+<path d="M164 176 L202 188 L166 198 Z M256 176 L218 188 L254 198 Z" fill="#ffdf60" stroke="#250602" stroke-width="2.5" stroke-linejoin="round"/>
+<path d="M180 185 L184 191 M240 185 L236 191" stroke="#3a0602" stroke-width="3" stroke-linecap="round"/>
+<path d="M158 168 L204 184 M262 168 L216 184" stroke="#0a0f04" stroke-width="7" stroke-linecap="round"/>
+<!-- 口・牙 -->
+<path d="M170 214 Q210 240 250 214 Q246 236 210 240 Q174 236 170 214 Z" fill="#280404" stroke="#0a0f04" stroke-width="3.5"/>
+<path d="M180 220 L186 196 L194 226 Z M226 226 L234 196 L240 220 Z" fill="url(#g_bone)" stroke="#1a120a" stroke-width="2.5" stroke-linejoin="round"/>
+<path d="M198 230 L202 238 L206 230 M212 232 L216 238 L220 230" stroke="#fff3d0" stroke-width="2.5" fill="none"/>
+<!-- 傷 -->
+<path d="M248 150 L226 222" stroke="#3a0808" stroke-width="3.5"/>
+<path d="M244 166 L254 170 M238 184 L248 188 M232 202 L242 206" stroke="#3a0808" stroke-width="2.5"/>
+<!-- リムライト（紫） -->
+<path d="M266 190 Q262 230 214 244" stroke="#d07aff" stroke-width="3" fill="none" opacity=".75"/>
+<path d="M318 214 L310 320" stroke="#d07aff" stroke-width="3" fill="none" opacity=".6"/>
+
+<text x="210" y="472" text-anchor="middle" font-family="sans-serif" font-weight="900" font-size="18" fill="#ffb0a0" letter-spacing="2">ゴブリン重装兵  Lv.7</text>
+</svg>
+</div></body></html>
