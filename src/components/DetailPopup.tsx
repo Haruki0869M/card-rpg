@@ -1,38 +1,53 @@
+// ===== 長押しで出る詳細（指を離すと閉じる。操作はブロックしない） =====
+import { CharacterArt, EnemyArt } from '../art';
 import { getCard } from '../data/cards';
-import { getCharacter } from '../data/characters';
+import { getClass } from '../data/classes';
 import { getEnemy } from '../data/enemies';
-import { chanceFor, findAlly, findEnemy, incomingDamage, tierDistribution, toPercents } from '../engine';
+import { affinityOf, chanceFor, enemyName, findAlly, findEnemy, incomingDamage, statsOf, tierDistribution, toPercents } from '../engine';
 import { type Detail, useDetail } from '../hooks/usePress';
 import { useBattle } from '../store/battleStore';
-import type { BattleState } from '../types';
-import { CATEGORY_LABEL, intentView, longEffect, STATUS_INFO, tierTitle } from './format';
+import type { BattleState, StatId } from '../types';
+import { CATEGORY_LABEL, intentView, longEffect, tierTitle } from './format';
+import { CATEGORY_STYLE, STATUS_STYLE } from './ui/icons';
 
 function signed(n: number) {
   return n > 0 ? `+${n}%` : n < 0 ? `${n}%` : '±0%';
+}
+
+const STAT_LABEL: Record<StatId, string> = { str: '力', vit: '体力', int: '知力', per: '感知', dex: '器用', agi: '素早さ', luk: '運' };
+
+function Title({ children }: { children: React.ReactNode }) {
+  return <div className="font-display text-[17px] leading-6 text-amber-100">{children}</div>;
 }
 
 function Content({ d, battle }: { d: Detail; battle: BattleState }) {
   switch (d.type) {
     case 'card': {
       const card = getCard(d.cardId);
-      const ally = findAlly(battle, d.allyId)!;
-      const ch = getCharacter(ally.id);
+      const ally = findAlly(battle, d.allyId);
+      if (!ally) return null;
+      const cls = getClass(ally.classId);
       const chance = chanceFor(ally, card);
       const focus = d.focus ?? 0;
       const pcts = toPercents(tierDistribution(card, focus, chance));
+      const cat = CATEGORY_STYLE[card.category];
       return (
         <>
-          <div className="text-[16px] font-bold text-amber-100">{card.name}</div>
+          <Title>
+            <span className="inline-flex items-center gap-1">
+              <cat.Icon size={16} style={{ color: cat.glow }} /> {card.name}
+            </span>
+          </Title>
           <div className="text-[13px] text-zinc-300">
             {CATEGORY_LABEL[card.category]} / コスト{card.cost} / {card.slots}枠 / 対象：{card.target === 'enemy' ? '敵単体' : '自分'}
           </div>
           <div className="mt-1 text-[13px]">
             成功率 <b className="text-amber-200">{chance}%</b>
             <span className="text-zinc-400">
-              （基礎{card.baseChance}% {ch.name}の{CATEGORY_LABEL[card.category]}適性{signed(ch.affinity[card.category])}）
+              （基礎{card.baseChance}% ・{cls.name}の{CATEGORY_LABEL[card.category]}適性{signed(affinityOf(ally)[card.category])}）
             </span>
           </div>
-          {focus > 0 && <div className="text-[12px] text-amber-300">🌟{focus}使用時の確率</div>}
+          {focus > 0 && <div className="text-[12px] text-amber-300">★フォーカス{focus}使用時の確率</div>}
           <table className="mt-1 w-full text-[13px]">
             <tbody>
               {card.tiers.map((t, i) => (
@@ -49,75 +64,83 @@ function Content({ d, battle }: { d: Detail; battle: BattleState }) {
     }
     case 'enemy':
     case 'intent': {
-      const e = findEnemy(battle, d.uid)!;
+      const e = findEnemy(battle, d.uid);
+      if (!e) return null;
       const def = getEnemy(e.defId);
       const iv = intentView(battle, e);
       return (
-        <>
-          <div className="text-[16px] font-bold text-amber-100">
-            {def.icon} {def.name}
-          </div>
-          <div className="text-[13px] text-zinc-300">
-            HP {e.hp}/{e.maxHp} {e.block > 0 && `/ ブロック${e.block}`}
-          </div>
-          {iv ? (
-            <div className="mt-1 text-[13px]">
-              <div className="font-bold text-red-300">次の行動：「{iv.name}」</div>
-              {iv.details.map((t, i) => (
-                <div key={i}>・{t}</div>
-              ))}
+        <div className="flex gap-2">
+          <EnemyArt defId={e.defId} className="h-[78px] w-[66px] shrink-0" />
+          <div className="min-w-0 flex-1">
+            <Title>
+              {enemyName(e)} <span className="text-[13px] text-amber-300">Lv{e.level}</span>
+            </Title>
+            <div className="text-[13px] text-zinc-300">
+              HP {e.hp}/{e.maxHp} {e.block > 0 && `/ ブロック${e.block}`}
             </div>
-          ) : (
-            <div className="mt-1 text-[13px] text-zinc-400">{e.dead ? '撃破済み' : '行動済み'}</div>
-          )}
-          {e.tauntedBy && <div className="text-[13px] text-amber-300">😤 {getCharacter(e.tauntedBy).name}に挑発されている</div>}
-          {(e.statuses.vulnerable > 0 || e.statuses.weak > 0) && (
-            <div className="mt-1 text-[12px] text-zinc-300">
-              {e.statuses.vulnerable > 0 && <div>💔脆弱{e.statuses.vulnerable}：{STATUS_INFO.vulnerable.text}</div>}
-              {e.statuses.weak > 0 && <div>🥀弱体{e.statuses.weak}：{STATUS_INFO.weak.text}</div>}
+            {iv ? (
+              <div className="mt-1 text-[13px]">
+                <div className="font-bold text-red-300">次の行動：「{iv.name}」</div>
+                {iv.details.map((t, i) => (
+                  <div key={i}>・{t}</div>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-1 text-[13px] text-zinc-400">{e.dead ? '撃破済み' : '行動済み'}</div>
+            )}
+            {e.tauntedBy && <div className="text-[13px] text-amber-300">{findAlly(battle, e.tauntedBy)?.name}に挑発されている</div>}
+            <div className="mt-1 text-[12px] text-zinc-500">
+              {def.pattern === 'sequence'
+                ? `行動順：${def.actions.map((a) => a.name).join(' → ')} → 最初に戻る`
+                : `ランダム行動：${def.actions.map((a) => a.name).join(' / ')}`}
             </div>
-          )}
-          <div className="mt-1 text-[12px] text-zinc-500">
-            {def.pattern === 'sequence'
-              ? `行動順：${def.actions.map((a) => a.name).join(' → ')} → 最初に戻る`
-              : `ランダム行動：${def.actions.map((a) => a.name).join(' / ')}`}
           </div>
-        </>
+        </div>
       );
     }
     case 'ally': {
-      const a = findAlly(battle, d.id)!;
-      const def = getCharacter(a.id);
+      const a = findAlly(battle, d.id);
+      if (!a) return null;
+      const cls = getClass(a.classId);
+      const aff = affinityOf(a);
+      const stats = statsOf(a);
       return (
-        <>
-          <div className="text-[16px] font-bold text-amber-100">
-            {def.icon} {def.name} <span className="text-[12px] text-zinc-400">{def.role}</span>
+        <div className="flex gap-2">
+          <CharacterArt classId={a.classId} gender={a.gender} className="h-[96px] w-[72px] shrink-0" />
+          <div className="min-w-0 flex-1">
+            <Title>
+              {a.name} <span className="text-[13px] text-zinc-400">{cls.name}・{cls.role}</span>
+            </Title>
+            <div className="text-[13px]">
+              HP {a.hp}/{a.maxHp} ・ ブロック{a.block} ・ マナ{a.mana} ・ フォーカス{a.focus}
+            </div>
+            <div className="text-[12px] text-zinc-300">
+              {(Object.keys(STAT_LABEL) as StatId[]).map((k) => `${STAT_LABEL[k]}${stats[k]}`).join(' ')}
+            </div>
+            <div className="text-[12px] text-zinc-400">
+              適性：物理{signed(aff.physical)} 魔法{signed(aff.magic)} スキル{signed(aff.skill)}
+            </div>
+            <div className="mt-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-[12px]">
+              <span className="font-display text-amber-200">《{cls.battleAbility.name}》</span> {cls.battleAbility.description}
+            </div>
+            <div className="mt-0.5 text-[13px] text-red-300">被弾予定 {incomingDamage(battle, a)}（ブロック差し引き後）</div>
           </div>
-          <div className="text-[13px]">
-            HP {a.hp}/{a.maxHp} / ブロック{a.block} / マナ{a.mana} / フォーカス{a.focus}
-          </div>
-          <div className="text-[13px] text-zinc-300">
-            適性：物理{signed(def.affinity.physical)} 魔法{signed(def.affinity.magic)} スキル{signed(def.affinity.skill)}
-          </div>
-          <div className="text-[13px] text-red-300">被弾予定 {incomingDamage(battle, a)}（ブロック差し引き後）</div>
-          {a.statuses.weak > 0 && <div className="text-[12px]">🥀弱体{a.statuses.weak}：{STATUS_INFO.weak.text}</div>}
-          {a.statuses.vulnerable > 0 && <div className="text-[12px]">💔脆弱{a.statuses.vulnerable}：{STATUS_INFO.vulnerable.text}</div>}
-          <div className="text-[12px] text-zinc-500">
-            山札{a.drawPile.length} / 手札{a.hand.length} / 捨札{a.discard.length}
-          </div>
-        </>
+        </div>
       );
     }
     case 'status': {
-      const info = STATUS_INFO[d.status];
+      const st = STATUS_STYLE[d.status];
+      const by = d.by ? findAlly(battle, d.by) : undefined;
       return (
         <>
-          <div className="text-[16px] font-bold text-amber-100">
-            {info.icon} {info.name}
-            {d.status !== 'taunt' && ` ${d.amount}`}
-          </div>
-          <div className="text-[13px]">{info.text}</div>
-          {d.status === 'taunt' && d.by && <div className="text-[13px] text-amber-300">挑発した味方：{getCharacter(d.by).name}</div>}
+          <Title>
+            <span className="inline-flex items-center gap-1" style={{ color: st.color }}>
+              <st.Icon size={18} /> {st.name}
+              {d.status !== 'taunt' && ` ${d.amount}`}
+            </span>
+          </Title>
+          <div className="text-[13px]">{st.text}</div>
+          {by && <div className="text-[13px] text-amber-300">挑発した味方：{by.name}</div>}
           {d.status !== 'taunt' && (
             <div className="mt-1 text-[12px] text-zinc-400">
               残り{d.amount}ターン。{d.side === 'enemy' ? '敵' : '味方'}フェーズ終了時に1減る。
@@ -129,13 +152,12 @@ function Content({ d, battle }: { d: Detail; battle: BattleState }) {
   }
 }
 
-/** 長押し中だけ出る詳細（操作はブロックしない） */
 export function DetailPopup() {
   const detail = useDetail((s) => s.detail);
   const battle = useBattle((s) => s.battle);
   if (!detail) return null;
   return (
-    <div className="pointer-events-none absolute inset-x-3 top-14 z-[70] rounded-xl border border-amber-400/60 bg-stone-950/97 p-3 leading-5">
+    <div className="panel panel-gold-edge pointer-events-none absolute inset-x-2 top-12 z-[70] rounded-xl p-3 leading-5 shadow-[0_8px_24px_rgba(0,0,0,.6)]">
       <Content d={detail} battle={battle} />
     </div>
   );

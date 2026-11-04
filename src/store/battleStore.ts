@@ -1,21 +1,13 @@
 // ===== Zustand ストア =====
-// 戦闘ロジックは src/engine を呼ぶだけ。ここでは UI 用の一時状態（選択中のカード・演出キュー）と
+// 戦闘ロジックは src/engine を呼ぶだけ。ここでは UI 用の一時状態（選択中のカード・演出）と
 // 保存・敵フェーズのタイマーを扱う。
 
 import { create } from 'zustand';
 import { TIMING, VIBRATION } from '../data/balance';
 import { getCard } from '../data/cards';
-import {
-  applyCommand,
-  createBattle,
-  findAlly,
-  isDone,
-  livingEnemies,
-  makeSeed,
-  STATE_VERSION,
-  unusableReason,
-} from '../engine';
+import { applyCommand, createBattle, findAlly, isDone, makeSeed, STATE_VERSION, unusableReason } from '../engine';
 import type { BattleEvent, BattleState, Command, SlotResult } from '../types';
+import { type BattleConfig, LOCAL_PLAYER, sanitizeConfig, toSetup } from './battleConfig';
 
 export interface Settings {
   fastMode: boolean;
@@ -39,24 +31,30 @@ export interface Popup {
   id: number;
   unitId: string;
   text: string;
-  tone: 'damage' | 'block' | 'status' | 'zero';
+  tone: 'damage' | 'block' | 'status' | 'zero' | 'ability';
 }
 
-export type Sheet = null | 'menu' | 'log' | 'draw' | 'discard';
+/** ユニットごとの動きの演出 */
+export interface UnitFx {
+  kind: 'attack' | 'hit' | 'cast';
+  id: number;
+}
+
+export type Sheet = null | 'menu' | 'log' | 'draw' | 'discard' | 'setup';
 
 interface StoreState {
   battle: BattleState;
   settings: Settings;
+  config: BattleConfig;
   activeId: string;
   selection: Selection | null;
   sheet: Sheet;
   confirmReset: boolean;
   rollFx: RollFx | null;
   popups: Popup[];
+  unitFx: Record<string, UnitFx>;
   /** 挑発でインテント対象が変わった敵（演出用、値は演出ID） */
   retargets: Record<string, number>;
-  /** 現在行動中の敵 */
-  actingEnemy: string | null;
   /** 使えないカードをタップした時の理由 */
   flash: { cardUid: string; text: string; id: number } | null;
   /** ターン終了ボタン付近のヒント */
@@ -70,7 +68,7 @@ interface StoreState {
   cancel: () => void;
   setActive: (id: string) => void;
   endTurn: () => void;
-  newBattle: (opts?: { sameSeed?: boolean; partySize?: 2 | 4 }) => void;
+  newBattle: (opts?: { sameSeed?: boolean; config?: BattleConfig }) => void;
   setSettings: (s: Partial<Settings>) => void;
   openSheet: (s: Sheet) => void;
   setConfirmReset: (v: boolean) => void;
@@ -84,6 +82,7 @@ interface SaveData {
   version: number;
   battle: BattleState;
   settings: Settings;
+  config: BattleConfig;
   activeId: string;
 }
 
@@ -99,13 +98,23 @@ function load(): SaveData | null {
   }
 }
 
-function save(s: Pick<StoreState, 'battle' | 'settings' | 'activeId'>) {
+function writeSave(s: Pick<StoreState, 'battle' | 'settings' | 'config' | 'activeId'>) {
   try {
-    const data: SaveData = { version: STATE_VERSION, battle: s.battle, settings: s.settings, activeId: s.activeId };
+    const data: SaveData = { version: STATE_VERSION, battle: s.battle, settings: s.settings, config: s.config, activeId: s.activeId };
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
   } catch {
     // 保存できなくても普通に遊べる
   }
+}
+
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+/** 保存は連続した操作をまとめて1回にする（書き込み回数を減らす） */
+function scheduleSave(get: () => StoreState) {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    writeSave(get());
+  }, 150);
 }
 
 function vibrate(settings: Settings, pattern: number | readonly number[]) {
@@ -124,19 +133,18 @@ export function speedFactor(settings: Settings): number {
 let fxId = 1;
 let enemyTimer: ReturnType<typeof setTimeout> | null = null;
 
-/** 次に操作するキャラ（現在のキャラが行動完了なら、まだ行動できる次のキャラ） */
+/** 次に操作するキャラ（この端末の担当キャラだけが対象） */
 function nextActive(battle: BattleState, current: string): string {
-  const allies = battle.allies;
-  const cur = findAlly(battle, current);
+  const mine = battle.allies.filter((a) => a.playerId === LOCAL_PLAYER);
+  const cur = mine.find((a) => a.id === current);
   if (cur && !isDone(battle, cur)) return current;
-  const start = Math.max(0, allies.findIndex((a) => a.id === current));
-  for (let i = 1; i <= allies.length; i++) {
-    const a = allies[(start + i) % allies.length];
+  const start = Math.max(0, mine.findIndex((a) => a.id === current));
+  for (let i = 1; i <= mine.length; i++) {
+    const a = mine[(start + i) % mine.length];
     if (!isDone(battle, a)) return a.id;
   }
-  // 全員行動完了: 生存している誰か（現在のキャラが生きていればそのまま）
   if (cur && !cur.dead) return current;
-  return allies.find((a) => !a.dead)?.id ?? current;
+  return mine.find((a) => !a.dead)?.id ?? mine[0]?.id ?? current;
 }
 
 function popupsFromEvents(events: BattleEvent[]): Popup[] {
@@ -144,18 +152,21 @@ function popupsFromEvents(events: BattleEvent[]): Popup[] {
   for (const e of events) {
     if (e.type === 'damage') {
       if (e.amount > 0) out.push({ id: fxId++, unitId: e.unitId, text: `-${e.amount}`, tone: 'damage' });
-      else out.push({ id: fxId++, unitId: e.unitId, text: e.blocked > 0 ? `🛡${e.blocked}` : '0', tone: 'zero' });
+      else out.push({ id: fxId++, unitId: e.unitId, text: e.blocked > 0 ? `防御 ${e.blocked}` : '0', tone: 'zero' });
     } else if (e.type === 'block') {
-      out.push({ id: fxId++, unitId: e.unitId, text: `+🛡${e.amount}`, tone: 'block' });
+      out.push({ id: fxId++, unitId: e.unitId, text: `+${e.amount}`, tone: 'block' });
     } else if (e.type === 'status') {
-      out.push({ id: fxId++, unitId: e.unitId, text: e.status === 'vulnerable' ? `脆弱${e.amount}` : `弱体${e.amount}`, tone: 'status' });
+      out.push({ id: fxId++, unitId: e.unitId, text: e.status === 'vulnerable' ? `脆弱 ${e.amount}` : `弱体 ${e.amount}`, tone: 'status' });
+    } else if (e.type === 'ability') {
+      out.push({ id: fxId++, unitId: e.unitId, text: e.name, tone: 'ability' });
     }
   }
   return out;
 }
 
 const saved = load();
-const initialBattle = saved?.battle ?? createBattle(makeSeed(), 2);
+const initialConfig = sanitizeConfig(saved?.config);
+const initialBattle = saved?.battle ?? createBattle(toSetup(makeSeed(), initialConfig));
 
 export const useBattle = create<StoreState>((set, get) => {
   /** 敵フェーズを自動で進める */
@@ -174,30 +185,38 @@ export const useBattle = create<StoreState>((set, get) => {
 
   const applyEvents = (events: BattleEvent[]) => {
     const { settings } = get();
-    const newPopups = popupsFromEvents(events);
     const patch: Partial<StoreState> = {};
+    const unitFx: Record<string, UnitFx> = { ...get().unitFx };
+    let unitFxChanged = false;
+    const setFx = (unitId: string, kind: UnitFx['kind']) => {
+      unitFx[unitId] = { kind, id: fxId++ };
+      unitFxChanged = true;
+    };
     for (const e of events) {
       if (e.type === 'roll') {
         patch.rollFx = { id: fxId++, results: e.results, summary: e.summary, perfect: e.perfect };
+        setFx(e.characterId, getCard(e.cardId).target === 'enemy' ? 'attack' : 'cast');
         if (e.perfect) vibrate(settings, VIBRATION.perfect);
       } else if (e.type === 'retarget') {
         patch.retargets = { ...(patch.retargets ?? get().retargets), [e.enemyUid]: fxId++ };
       } else if (e.type === 'enemyAct') {
-        patch.actingEnemy = e.enemyUid;
-      } else if (e.type === 'damage' && e.amount > 0 && !e.unitId.startsWith('e')) {
-        vibrate(settings, VIBRATION.hurt);
-      } else if (e.type === 'phase') {
-        if (e.phase === 'ally') patch.actingEnemy = null;
-        if (e.phase === 'victory') vibrate(settings, VIBRATION.victory);
+        setFx(e.enemyUid, 'attack');
+      } else if (e.type === 'damage') {
+        if (e.amount > 0 || e.blocked > 0) setFx(e.unitId, 'hit');
+        if (e.amount > 0 && findAlly(get().battle, e.unitId)) vibrate(settings, VIBRATION.hurt);
+      } else if (e.type === 'phase' && e.phase === 'victory') {
+        vibrate(settings, VIBRATION.victory);
       }
     }
+    if (unitFxChanged) patch.unitFx = unitFx;
+    const newPopups = popupsFromEvents(events);
     if (newPopups.length) {
-      // 同時に出す演出は最大8個に絞る
-      patch.popups = [...get().popups, ...newPopups].slice(-8);
+      // 同時に出す演出は最大10個に絞る
+      patch.popups = [...get().popups, ...newPopups].slice(-10);
       const ids = new Set(newPopups.map((p) => p.id));
       setTimeout(
         () => set((s) => ({ popups: s.popups.filter((p) => !ids.has(p.id)) })),
-        (TIMING.resultPopup * 1000 + 200) / speedFactor(settings),
+        (TIMING.resultPopup * 1000 + 250) / speedFactor(settings),
       );
     }
     set(patch);
@@ -206,33 +225,35 @@ export const useBattle = create<StoreState>((set, get) => {
   return {
     battle: initialBattle,
     settings: saved?.settings ?? { fastMode: false, vibration: true },
-    activeId: saved?.activeId ?? nextActive(initialBattle, initialBattle.allies[0].id),
+    config: initialConfig,
+    activeId: nextActive(initialBattle, saved?.activeId ?? initialBattle.allies[0].id),
     selection: null,
     sheet: null,
     confirmReset: false,
     rollFx: null,
     popups: [],
+    unitFx: {},
     retargets: {},
-    actingEnemy: null,
     flash: null,
     hint: null,
 
     dispatch: (cmd) => {
       const { state, events, error } = applyCommand(get().battle, cmd);
       if (error) return error;
+      // 演出より先に状態を更新し、勝敗が決まったら選択などを閉じる
+      const finished = state.phase === 'victory' || state.phase === 'defeat';
       const activeId = state.phase === 'ally' ? nextActive(state, get().activeId) : get().activeId;
-      set({ battle: state, activeId });
+      set(finished ? { battle: state, activeId, selection: null, sheet: null } : { battle: state, activeId });
       applyEvents(events);
-      save(get());
+      scheduleSave(get);
       if (state.phase === 'enemy') scheduleEnemy();
-      if (state.phase === 'victory' || state.phase === 'defeat') set({ selection: null, sheet: null });
       return undefined;
     },
 
     tapCard: (cardUid) => {
       const { battle, activeId, selection } = get();
       const ally = findAlly(battle, activeId);
-      if (!ally) return;
+      if (!ally || ally.playerId !== LOCAL_PLAYER) return;
       const inst = ally.hand.find((c) => c.uid === cardUid);
       if (!inst) return;
       if (selection?.cardUid === cardUid) {
@@ -247,7 +268,7 @@ export const useBattle = create<StoreState>((set, get) => {
       }
       let targetId: string | undefined;
       if (card.target === 'enemy') {
-        const alive = livingEnemies(battle);
+        const alive = battle.enemies.filter((e) => !e.dead);
         if (alive.length === 1) targetId = alive[0].uid;
       }
       set({ selection: { cardUid, targetId, focus: 0 }, flash: null });
@@ -271,7 +292,8 @@ export const useBattle = create<StoreState>((set, get) => {
       const inst = ally?.hand.find((c) => c.uid === selection.cardUid);
       if (!ally || !inst) return;
       const max = Math.min(getCard(inst.cardId).slots, ally.focus);
-      set({ selection: { ...selection, focus: Math.max(0, Math.min(max, n)) } });
+      const focus = Math.max(0, Math.min(max, n));
+      if (focus !== selection.focus) set({ selection: { ...selection, focus } });
     },
 
     confirm: () => {
@@ -287,6 +309,7 @@ export const useBattle = create<StoreState>((set, get) => {
       }
       const err = get().dispatch({
         type: 'PLAY_CARD',
+        playerId: LOCAL_PLAYER,
         characterId: activeId,
         cardInstanceId: selection.cardUid,
         targetId: card.target === 'enemy' ? selection.targetId : undefined,
@@ -296,49 +319,53 @@ export const useBattle = create<StoreState>((set, get) => {
       else set({ selection: null });
     },
 
-    cancel: () => set({ selection: null }),
+    cancel: () => {
+      if (get().selection) set({ selection: null });
+    },
 
     setActive: (id) => {
       const ally = findAlly(get().battle, id);
-      if (!ally || ally.dead) return;
+      if (!ally || ally.dead || ally.playerId !== LOCAL_PLAYER) return;
+      if (get().activeId === id && !get().selection) return;
       set({ activeId: id, selection: null });
-      save(get());
+      scheduleSave(get);
     },
 
     endTurn: () => {
       const { battle } = get();
       if (battle.phase !== 'ally') return;
-      const canAct = battle.allies.some((a) => !isDone(battle, a));
+      const canAct = battle.allies.some((a) => a.playerId === LOCAL_PLAYER && !isDone(battle, a));
       set({ selection: null, hint: canAct ? { text: 'まだ行動できるキャラがいます', id: fxId++ } : null });
-      get().dispatch({ type: 'END_TURN' });
+      get().dispatch({ type: 'END_TURN', playerId: LOCAL_PLAYER });
     },
 
     newBattle: (opts) => {
       const { battle } = get();
       const seed = opts?.sameSeed ? battle.seed : makeSeed();
-      const size = opts?.partySize ?? battle.partySize;
+      const config = sanitizeConfig(opts?.config ?? get().config);
       if (enemyTimer) clearTimeout(enemyTimer);
       enemyTimer = null;
-      const next = createBattle(seed, size);
+      const next = createBattle(toSetup(seed, config));
       set({
         battle: next,
-        activeId: next.allies[0].id,
+        config,
+        activeId: nextActive(next, next.allies[0].id),
         selection: null,
         sheet: null,
         confirmReset: false,
         rollFx: null,
         popups: [],
+        unitFx: {},
         retargets: {},
-        actingEnemy: null,
         flash: null,
         hint: null,
       });
-      save(get());
+      scheduleSave(get);
     },
 
     setSettings: (s) => {
       set({ settings: { ...get().settings, ...s } });
-      save(get());
+      scheduleSave(get);
     },
 
     openSheet: (sheet) => set({ sheet, selection: sheet ? null : get().selection }),
@@ -347,8 +374,8 @@ export const useBattle = create<StoreState>((set, get) => {
     closeTop: () => {
       const s = get();
       if (s.confirmReset) return set({ confirmReset: false }), true;
-      if (s.sheet === 'log' || s.sheet === 'draw' || s.sheet === 'discard') {
-        set({ sheet: s.sheet === 'log' ? 'menu' : null });
+      if (s.sheet === 'log' || s.sheet === 'setup') {
+        set({ sheet: 'menu' });
         return true;
       }
       if (s.sheet) return set({ sheet: null }), true;
@@ -361,4 +388,18 @@ export const useBattle = create<StoreState>((set, get) => {
 // 中断中に敵フェーズだった場合は再開する
 if (initialBattle.phase === 'enemy') {
   setTimeout(() => useBattle.getState().dispatch({ type: 'ENEMY_STEP' }), 300);
+}
+
+// 画面を閉じる・裏に回る直前に、保存待ちを確実に書き出す
+if (typeof window !== 'undefined') {
+  const flush = () => {
+    if (!saveTimer) return;
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    writeSave(useBattle.getState());
+  };
+  window.addEventListener('pagehide', flush);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flush();
+  });
 }

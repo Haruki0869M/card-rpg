@@ -1,14 +1,22 @@
 // ===== ゲーム全体で使う型定義 =====
-// データ（カード・キャラ・敵）は src/data に、ロジックは src/engine に置く。
+// データ（職業・カード・敵）は src/data に、ロジックは src/engine に置く。
+// 特定の職業ID・敵IDに依存した分岐はエンジンにも画面にも書かない（spec §2.4）。
 
 export type CardCategory = 'physical' | 'magic' | 'skill';
 export type StatusId = 'vulnerable' | 'weak';
-export type Side = 'ally' | 'enemy';
+export type Gender = 'male' | 'female';
+export type PlayerId = 'P1' | 'P2' | 'P3' | 'P4';
 
-/** カードの対象 */
+/** 7つの能力値（spec §6.1） */
+export type StatId = 'str' | 'vit' | 'int' | 'per' | 'dex' | 'agi' | 'luk';
+export type Stats = Record<StatId, number>;
+/** カテゴリごとの成功率補正（%） */
+export type Affinity = Record<CardCategory, number>;
+
+// ---------- カード ----------
+
 export type CardTarget = 'enemy' | 'self';
 
-/** カードのTier効果 */
 export type CardEffect =
   | { kind: 'damage'; amount: number }
   | { kind: 'block'; amount: number }
@@ -38,24 +46,72 @@ export interface CardDef {
   target: CardTarget;
   /** minSuccesses 昇順 */
   tiers: CardTier[];
-  flavor?: string;
 }
 
-export type Affinity = Record<CardCategory, number>;
+// ---------- 特殊能力（データで定義する共通の部品） ----------
 
-export interface CharacterDef {
+/** 能力の発動条件・効果。新しい種類が必要になったら、ここに1つ追加する */
+export type BattleAbility =
+  /** 常時: 条件を満たす間、自分の与えるダメージを倍率で補正 */
+  | {
+      kind: 'damageMultiplier';
+      category?: CardCategory;
+      multiplier: number;
+      whenSelfHpAtMostPct?: number;
+    }
+  /** カードの完全成功時: ランダムな生存敵に追加ダメージ */
+  | { kind: 'onPerfectBonusDamage'; category?: CardCategory; amount: number; chance?: number }
+  /** カードの完全成功時: ダメージを与えるカードなら対象に状態異常 */
+  | { kind: 'onPerfectApplyStatus'; category?: CardCategory; status: StatusId; amount: number; chance?: number }
+  /** 他の味方がHP0になるダメージを受ける時、確率で代わりに受ける */
+  | { kind: 'coverLethal'; chance: number };
+
+/** 探索の特殊能力（M2以降で使用。M1ではデータと説明のみ） */
+export type ExploreAbility =
+  | { kind: 'checkBonus'; check: string; bonus: number }
+  | { kind: 'visionBonus'; amount: number }
+  | { kind: 'nightAmbushReduction'; multiplier: number }
+  | { kind: 'extraEventOption'; tag: string };
+
+export interface AbilityDef<T> {
+  id: string;
+  name: string;
+  description: string;
+  effect: T;
+}
+
+// ---------- 職業 ----------
+
+export interface ClassDef {
   id: string;
   name: string;
   role: string;
+  /** 小さく表示する時の記号（絵が無い場合の代替にも使う） */
   icon: string;
-  maxHp: number;
-  affinity: Affinity;
+  /** 職業の色（枠などに使う） */
+  color: string;
+  baseMaxHp: number;
+  stats: Stats;
   deck: { cardId: string; count: number }[];
-  /** 4人モードでのみ登場 */
-  fourOnly: boolean;
+  battleAbility: AbilityDef<BattleAbility>;
+  exploreAbility: AbilityDef<ExploreAbility>;
+  /** 名前の候補（性別ごと） */
+  names: Record<Gender, string[]>;
+  /** 最初から選べるか（M4の伝承の書で解放） */
+  unlocked: boolean;
 }
 
-/** 敵の行動効果 */
+/** パーティの1枠の指定（キャラクター作成の結果） */
+export interface PartyMemberSpec {
+  classId: string;
+  gender: Gender;
+  name: string;
+  playerId: PlayerId;
+  level?: number;
+}
+
+// ---------- 敵 ----------
+
 export type EnemyEffect =
   | { kind: 'attack'; amount: number; hits: number; target: 'single' | 'all' }
   | { kind: 'block'; amount: number; target: 'self' | 'otherEnemies' }
@@ -73,15 +129,25 @@ export interface EnemyDef {
   id: string;
   name: string;
   icon: string;
+  /** baseLevel の時のHP */
   maxHp: number;
-  /** sequence: 決まった順番 / random: ランダム */
+  /** このデータの数値が想定しているレベル */
+  baseLevel: number;
   pattern: 'sequence' | 'random';
   actions: EnemyActionDef[];
-  /** 1ターン目に必ず使う行動 */
   firstActionId?: string;
-  /** random時、同じ行動を連続で使える最大回数 */
   maxConsecutive?: number;
+  /** 戦場での大きさ（1 = 標準、ボスは大きく） */
+  size?: number;
 }
+
+export interface EncounterSpec {
+  id: string;
+  name: string;
+  enemies: { defId: string; level?: number }[];
+}
+
+// ---------- 戦闘の状態 ----------
 
 export type Statuses = Record<StatusId, number>;
 
@@ -91,7 +157,13 @@ export interface CardInstance {
 }
 
 export interface AllyState {
-  id: string; // CharacterDef.id
+  /** 戦闘内で一意のID（a0, a1, ...）。同じ職業が複数いても区別できる */
+  id: string;
+  classId: string;
+  gender: Gender;
+  name: string;
+  playerId: PlayerId;
+  level: number;
   hp: number;
   maxHp: number;
   block: number;
@@ -106,23 +178,24 @@ export interface AllyState {
 
 export interface Intent {
   actionId: string;
-  /** 単体対象（単体攻撃・単体デバフ）の対象の味方ID */
   targetId?: string;
 }
 
 export interface EnemyState {
   uid: string;
   defId: string;
+  /** 同じ敵が複数いる時の区別（A, B, ...） */
+  nameSuffix?: string;
+  level: number;
+  /** レベルによる攻撃力の倍率 */
+  attackMul: number;
   hp: number;
   maxHp: number;
   block: number;
   statuses: Statuses;
-  /** 挑発した味方ID（次の敵フェーズ終了まで） */
   tauntedBy?: string;
   intent?: Intent;
-  /** sequence 用の次の行動インデックス */
   seqIndex: number;
-  /** 直近の行動ID履歴（新しい順ではなく古い→新しい） */
   history: string[];
   dead: boolean;
 }
@@ -134,6 +207,7 @@ export interface BattleStats {
   maxDamage: number;
   perfects: number;
   focusUsed: number;
+  abilityTriggers: number;
 }
 
 export interface LogEntry {
@@ -146,30 +220,36 @@ export interface BattleState {
   version: number;
   seed: number;
   rngState: number;
-  partySize: 2 | 4;
   turn: number;
   phase: Phase;
   allies: AllyState[];
   enemies: EnemyState[];
-  /** 敵フェーズ中、次に行動する敵のインデックス */
   enemyCursor: number;
   stats: BattleStats;
   log: LogEntry[];
   nextLogId: number;
   nextUid: number;
+  encounterId: string;
 }
 
-// ===== コマンド（シリアライズ可能・将来のマルチプレイで同期する単位） =====
+export interface BattleSetup {
+  seed: number;
+  party: PartyMemberSpec[];
+  encounter: EncounterSpec;
+}
+
+// ===== コマンド（シリアライズ可能・オンライン協力で同期する単位） =====
 export type Command =
   | {
       type: 'PLAY_CARD';
+      playerId: PlayerId;
       characterId: string;
       cardInstanceId: string;
       targetId?: string;
       focusUsed: number;
     }
-  | { type: 'END_TURN' }
-  /** 敵フェーズを1ステップ進める（敵1体の行動、または敵フェーズ終了処理） */
+  | { type: 'END_TURN'; playerId: PlayerId }
+  /** 敵フェーズを1ステップ進める（ホストが発行するシステムコマンド） */
   | { type: 'ENEMY_STEP' };
 
 export type SlotResult = 'focus' | 'hit' | 'miss';
@@ -180,17 +260,19 @@ export type BattleEvent =
       type: 'roll';
       characterId: string;
       cardId: string;
+      targetId?: string;
       chance: number;
       results: SlotResult[];
       successes: number;
       perfect: boolean;
       summary: string;
     }
-  | { type: 'damage'; unitId: string; amount: number; blocked: number }
+  | { type: 'damage'; unitId: string; amount: number; blocked: number; sourceId?: string }
   | { type: 'block'; unitId: string; amount: number }
   | { type: 'status'; unitId: string; status: StatusId; amount: number }
+  | { type: 'ability'; unitId: string; name: string }
   | { type: 'retarget'; enemyUid: string }
-  | { type: 'enemyAct'; enemyUid: string; actionName: string }
+  | { type: 'enemyAct'; enemyUid: string; actionName: string; targetIds: string[] }
   | { type: 'death'; unitId: string }
   | { type: 'phase'; phase: Phase };
 

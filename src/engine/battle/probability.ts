@@ -1,5 +1,5 @@
-import { BALANCE } from '../data/balance';
-import type { Affinity, CardDef, CardTier } from '../types';
+import { BALANCE } from '../../data/balance';
+import type { Affinity, CardDef, CardTier } from '../../types';
 
 /** 最終成功率 = 基礎成功率 + 適性補正（5%〜95%に制限） */
 export function finalChance(card: CardDef, affinity: Affinity): number {

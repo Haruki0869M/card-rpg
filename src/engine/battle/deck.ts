@@ -1,6 +1,6 @@
-import { BALANCE } from '../data/balance';
-import type { AllyState } from '../types';
-import { type Rng, shuffle } from './rng';
+import { BALANCE } from '../../data/balance';
+import type { AllyState } from '../../types';
+import { type Rng, shuffle } from '../rng';
 
 /**
  * n枚ドローする（ally を直接書き換える）。
