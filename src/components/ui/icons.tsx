@@ -1,6 +1,10 @@
 // アイコン（絵文字は端末で見た目が変わるため、SVGアイコンに統一する）
 import {
   ArrowBigDown,
+  Biohazard,
+  Flame,
+  HeartPulse,
+  ShieldPlus,
   Copy,
   Droplet,
   HeartCrack,
@@ -18,6 +22,8 @@ import type { CardCategory, CardEffect, StatusId } from '../../types';
 export const STATUS_STYLE: Record<StatusId | 'taunt', { Icon: LucideIcon; name: string; color: string; bg: string; text: string }> = {
   vulnerable: { Icon: HeartCrack, name: '脆弱', color: '#ff8aa0', bg: '#5a1424', text: '受けるダメージ×1.5（端数切り捨て）' },
   weak: { Icon: ArrowBigDown, name: '弱体', color: '#c8a0ff', bg: '#341a5a', text: '与えるダメージ×0.75（端数切り捨て）' },
+  burn: { Icon: Flame, name: '火傷', color: '#ffa04a', bg: '#5a2208', text: 'フェーズ終了時に4ダメージ（ブロック無視）。1減る' },
+  poison: { Icon: Biohazard, name: '毒', color: '#9aff6a', bg: '#1e4a10', text: 'フェーズ終了時に数値分のダメージ（ブロック無視）。1減る' },
   taunt: {
     Icon: Megaphone,
     name: '挑発',
@@ -42,6 +48,8 @@ const EFFECT_ICON: Record<CardEffect['kind'], { Icon: LucideIcon; color: string 
   draw: { Icon: Copy, color: '#d8d0ff' },
   tauntTarget: { Icon: Megaphone, color: '#ffd06a' },
   tauntAll: { Icon: Megaphone, color: '#ffd06a' },
+  blockAllies: { Icon: ShieldPlus, color: '#7ac8ff' },
+  healAllies: { Icon: HeartPulse, color: '#7dffa8' },
 };
 
 /** カードの効果1つ分の短い表示（アイコン＋数値） */
@@ -53,6 +61,10 @@ export function EffectChip({ e, size = 12 }: { e: CardEffect; size?: number }) {
     case 'damage':
     case 'block':
       text = `${e.amount}`;
+      break;
+    case 'blockAllies':
+    case 'healAllies':
+      text = `全${e.amount}`;
       break;
     case 'applyStatus':
       text = `${e.amount}`;

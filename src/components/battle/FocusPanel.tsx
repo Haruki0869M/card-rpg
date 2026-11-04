@@ -1,7 +1,7 @@
 // ===== フォーカス注入パネル（カード選択時に手札のすぐ上に出る） =====
 import { motion } from 'framer-motion';
 import { Minus, Plus, Star, X } from 'lucide-react';
-import { getCard } from '../../data/cards';
+import { cardOf } from '../../data/cards';
 import { chanceFor, findAlly, tierDistribution, toPercents } from '../../engine';
 import { useBattle } from '../../store/battleStore';
 import { CATEGORY_STYLE, EffectChip } from '../ui/icons';
@@ -19,7 +19,7 @@ export function FocusPanel() {
   const ally = findAlly(battle, activeId);
   const inst = selection && ally?.hand.find((c) => c.uid === selection.cardUid);
   if (!selection || !ally || !inst) return null;
-  const card = getCard(inst.cardId);
+  const card = cardOf(inst);
   const cat = CATEGORY_STYLE[card.category];
   const chance = chanceFor(ally, card);
   const max = Math.min(card.slots, ally.focus);

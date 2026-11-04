@@ -1,13 +1,16 @@
-// ===== 勝利・敗北の画面 =====
+// ===== 戦闘の勝敗の画面（勝利 → 報酬へ / 全滅 → 結果へ / 逃走 → ダンジョンへ） =====
 import { motion } from 'framer-motion';
 import { CharacterArt } from '../art';
+import { LOCAL_PLAYER } from '../store/battleConfig';
 import { useBattle } from '../store/battleStore';
 
 export function ResultScreen() {
   const battle = useBattle((s) => s.battle);
-  const newBattle = useBattle((s) => s.newBattle);
-  if (battle.phase !== 'victory' && battle.phase !== 'defeat') return null;
+  const mode = useBattle((s) => s.game?.mode);
+  const dispatchGame = useBattle((s) => s.dispatchGame);
+  if (mode !== 'battle' || (battle.phase !== 'victory' && battle.phase !== 'defeat' && battle.phase !== 'escaped')) return null;
   const win = battle.phase === 'victory';
+  const escaped = battle.phase === 'escaped';
   const st = battle.stats;
   const rows: [string, string | number][] = [
     ['ターン数', battle.turn],
@@ -42,19 +45,19 @@ export function ResultScreen() {
         animate={{ scale: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 260, damping: 20 }}
         className="panel panel-gold-edge relative w-full max-w-xs rounded-2xl p-4"
-        style={win ? undefined : { borderColor: 'rgba(255,90,90,.6)' }}
+        style={win || escaped ? undefined : { borderColor: 'rgba(255,90,90,.6)' }}
       >
         <div
           className="font-display text-center text-[40px] leading-[48px]"
           style={{
-            background: win ? 'linear-gradient(180deg,#fff6d0,#f2c24a 55%,#a86a12)' : 'linear-gradient(180deg,#ffb0b0,#c0303a)',
+            background: win ? 'linear-gradient(180deg,#fff6d0,#f2c24a 55%,#a86a12)' : escaped ? 'linear-gradient(180deg,#e0f0ff,#7ab0ff)' : 'linear-gradient(180deg,#ffb0b0,#c0303a)',
             WebkitBackgroundClip: 'text',
             backgroundClip: 'text',
             color: 'transparent',
             filter: 'drop-shadow(0 2px 0 rgba(0,0,0,.8))',
           }}
         >
-          {win ? '勝利！' : '敗北…'}
+          {win ? '勝利！' : escaped ? '逃走成功' : '全滅…'}
         </div>
         <div className="mt-1 flex justify-center -space-x-2">
           {battle.allies.map((a) => (
@@ -63,25 +66,23 @@ export function ResultScreen() {
             </span>
           ))}
         </div>
-        <div className="mt-2 flex flex-col text-[14px]">
-          {rows.map(([k, v]) => (
-            <div key={k} className="flex justify-between border-b border-white/10 py-1">
-              <span className="text-zinc-300">{k}</span>
-              <span className="font-bold tabular-nums">{v}</span>
-            </div>
-          ))}
-          <div className="pt-1 text-center text-[12px] text-zinc-500">
-            シード {battle.seed} / {battle.allies.length}人パーティ
+        {!escaped && (
+          <div className="mt-2 flex flex-col text-[14px]">
+            {rows.map(([k, v]) => (
+              <div key={k} className="flex justify-between border-b border-white/10 py-1">
+                <span className="text-zinc-300">{k}</span>
+                <span className="font-bold tabular-nums">{v}</span>
+              </div>
+            ))}
           </div>
-        </div>
-        <div className="mt-4 flex flex-col gap-2">
-          <button onClick={() => newBattle()} className="btn btn-gold font-display h-12 rounded-xl text-[17px]">
-            もう一度（新しいシード）
-          </button>
-          <button onClick={() => newBattle({ sameSeed: true })} className="btn btn-dark h-12 rounded-xl text-[15px] font-bold">
-            同じシードで再戦
-          </button>
-        </div>
+        )}
+        {escaped && <div className="mt-2 text-center text-[13px] text-zinc-300">報酬は得られないが、部屋は通過できる。</div>}
+        <button
+          onClick={() => dispatchGame({ type: 'FINISH_BATTLE', playerId: LOCAL_PLAYER })}
+          className="btn btn-gold font-display mt-4 h-12 w-full rounded-xl text-[18px]"
+        >
+          {win ? '報酬を受け取る' : escaped ? 'ダンジョンへ戻る' : '冒険の結果へ'}
+        </button>
       </motion.div>
     </motion.div>
   );

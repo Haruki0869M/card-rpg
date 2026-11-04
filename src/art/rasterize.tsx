@@ -3,7 +3,7 @@
 // 絵ごとに1回だけ文字列にして <img> で表示すると、ブラウザが画像としてキャッシュするので軽い。
 // （画像の中のグラデーションIDは画像ごとに独立するので、IDの衝突も起きない）
 
-import { type ReactElement, useEffect, useState } from 'react';
+import { type CSSProperties, type ReactElement, useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 
@@ -44,8 +44,8 @@ export function useArtUrl(key: string, render: () => ReactElement): string {
 }
 
 /** 画像として表示する（指での操作は親要素が受け取る） */
-export function ArtImage({ src, className, cover }: { src: string; className?: string; cover?: boolean }) {
-  if (!src) return <span className={className} />;
+export function ArtImage({ src, className, cover, style }: { src: string; className?: string; cover?: boolean; style?: CSSProperties }) {
+  if (!src) return <span className={className} style={style} />;
   return (
     <img
       src={src}
@@ -53,7 +53,7 @@ export function ArtImage({ src, className, cover }: { src: string; className?: s
       draggable={false}
       decoding="async"
       className={className}
-      style={{ pointerEvents: 'none', WebkitUserSelect: 'none', userSelect: 'none', objectFit: cover ? 'cover' : 'contain' }}
+      style={{ pointerEvents: 'none', WebkitUserSelect: 'none', userSelect: 'none', objectFit: cover ? 'cover' : 'contain', ...style }}
     />
   );
 }

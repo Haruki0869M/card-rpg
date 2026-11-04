@@ -15,7 +15,7 @@ export function SlotOverlay() {
   const fx = useBattle((s) => s.rollFx);
   const fast = useBattle((s) => s.settings.fastMode);
   const [visible, setVisible] = useState<number | null>(null);
-  const speed = speedFactor({ fastMode: fast, vibration: false });
+  const speed = speedFactor({ fastMode: fast });
   const reveal = TIMING.slotReveal / speed;
   const hold = TIMING.resultPopup / speed;
 
