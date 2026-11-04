@@ -28,13 +28,21 @@ export async function layoutIssues(page) {
     const out = [];
     const de = document.documentElement;
     if (de.scrollHeight > innerHeight + 1 || de.scrollWidth > innerWidth + 1) out.push(`page overflow ${de.scrollWidth}x${de.scrollHeight}`);
-    const game = document.querySelector('.game-bg');
+    const game = document.querySelector('.game-bg') ?? document.body;
     const visible = (el) => {
       const r = el.getBoundingClientRect();
       return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden';
     };
+    // スクロールできる領域の中は、画面外にあってもスクロールで見られるので対象外
+    const inScroller = (el) => {
+      for (let p = el.parentElement; p && p !== game; p = p.parentElement) {
+        const cs = getComputedStyle(p);
+        if (/(auto|scroll)/.test(cs.overflowX + cs.overflowY)) return true;
+      }
+      return false;
+    };
     for (const el of game.querySelectorAll('button, [data-card-index], [data-enemy], [data-ally]')) {
-      if (!visible(el)) continue;
+      if (!visible(el) || inScroller(el)) continue;
       const r = el.getBoundingClientRect();
       if (r.bottom > innerHeight + 1 || r.right > innerWidth + 1 || r.left < -1 || r.top < -1)
         out.push(`offscreen: "${el.textContent.slice(0, 16)}" ${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.right)},${Math.round(r.bottom)}`);

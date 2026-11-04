@@ -7,7 +7,7 @@ import { BattleBackground, CharacterArt, EnemyArt } from '../../art';
 import { TIMING } from '../../data/balance';
 import { cardOf } from '../../data/cards';
 import { getEnemy } from '../../data/enemies';
-import { enemyName, findAlly, tierDamageAgainst, tierIndex } from '../../engine';
+import { enemyName, findAlly, tierDamageAgainst, tierIndex, weaponRarity } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
 import { usePress } from '../../hooks/usePress';
 import { speedFactor, useBattle, type UnitFx } from '../../store/battleStore';
@@ -213,6 +213,10 @@ const EnemyUnit = memo(function EnemyUnit({
 const AllySprite = memo(function AllySprite({ ally, left, bottom, h, active }: { ally: AllyState; left: number; bottom: number; h: number; active: boolean }) {
   const scope = useUnitMotion(ally.id, 'ally');
   const setActive = useBattle((s) => s.setActive);
+  const weapon = useBattle((s) => {
+    const h = s.game?.heroes.find((x) => x.id === ally.id);
+    return h ? weaponRarity(h) : undefined;
+  });
   const press = usePress(() => setActive(ally.id), { type: 'ally', id: ally.id });
   return (
     <div {...press} className="absolute" style={{ left: left - h * 0.4, bottom, width: h * 0.8, height: h }}>
@@ -221,7 +225,7 @@ const AllySprite = memo(function AllySprite({ ally, left, bottom, h, active }: {
       )}
       <div ref={scope} className={`h-full w-full will-change-transform ${ally.dead ? 'opacity-40 grayscale' : ''}`}>
         <div className={`h-full w-full ${ally.dead ? '' : 'idle-breathe'}`} style={{ animationDelay: `${Number(ally.id.slice(1)) * -0.6}s` }}>
-          <CharacterArt classId={ally.classId} gender={ally.gender} className="h-full w-full" />
+          <CharacterArt classId={ally.classId} gender={ally.gender} weapon={weapon} className="h-full w-full" />
         </div>
       </div>
       <UnitPopups unitId={ally.id} top="5%" />

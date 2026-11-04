@@ -56,7 +56,7 @@ export function SetupScreen() {
                 style={sel ? { boxShadow: '0 0 16px rgba(255,200,90,.45)' } : undefined}
               >
                 <div className="relative h-[92px]">
-                  <BattleBackground className={`absolute inset-0 h-full w-full ${sc.unlocked ? '' : 'grayscale brightness-50'}`} />
+                  <BattleBackground kind="castle" className={`absolute inset-0 h-full w-full ${sc.unlocked ? '' : 'grayscale brightness-50'}`} />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 to-transparent" />
                   <div className="font-display text-outline absolute bottom-1 left-2 text-[20px] text-amber-50">{sc.name}</div>
                   {!sc.unlocked && <Lock size={28} className="absolute top-2 right-2 text-zinc-300" />}

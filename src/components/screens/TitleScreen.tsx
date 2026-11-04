@@ -31,7 +31,7 @@ export function TitleScreen() {
   return (
     <Screen>
       <div className="relative min-h-0 flex-1 overflow-hidden">
-        <BattleBackground className="absolute inset-0 h-full w-full" />
+        <BattleBackground kind="castle" className="absolute inset-0 h-full w-full" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-[#0b0810]" />
         <div className="absolute inset-x-0 top-[8%] text-center">
           <motion.div

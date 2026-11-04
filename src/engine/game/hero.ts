@@ -83,3 +83,9 @@ export function clampHero(hero: Hero) {
   hero.hp = Math.min(hero.hp, heroMaxHp(hero));
   hero.focus = Math.min(hero.focus, heroFocusMax(hero));
 }
+
+/** 装備中の武器のレア度（見た目用） */
+export function weaponRarity(hero: Hero) {
+  const w = hero.equipment.weapon;
+  return w ? getItem(w.itemId).rarity : undefined;
+}

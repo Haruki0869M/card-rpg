@@ -18,7 +18,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { CharacterArt } from '../../art';
+import { CharacterArt, ItemImage } from '../../art';
 import { getClass } from '../../data/classes';
 import { getItem } from '../../data/items';
 import { expToNext, heroFocusMax, heroMaxHp } from '../../engine';
@@ -54,13 +54,18 @@ const ITEM_ICON: Record<string, LucideIcon> = {
 /** アイテムのアイコン（レア度の色の枠と光） */
 export function ItemIcon({ item, size = 44 }: { item: ItemDef; size?: number }) {
   const r = RARITY_STYLE[item.rarity];
+  const known = item.icon in ITEM_ICON;
   const Icon = ITEM_ICON[item.icon] ?? Star;
   return (
     <span
       className="relative inline-flex shrink-0 items-center justify-center rounded-lg border-2"
       style={{ width: size, height: size, borderColor: r.color, background: r.bg, boxShadow: `0 0 10px ${r.glow}, inset 0 1px 0 rgba(255,255,255,.15)` }}
     >
-      <Icon size={size * 0.56} strokeWidth={2.2} style={{ color: r.color }} />
+      {known ? (
+        <ItemImage icon={item.icon} rarity={item.rarity} className="h-[88%] w-[88%]" />
+      ) : (
+        <Icon size={size * 0.56} strokeWidth={2.2} style={{ color: r.color }} />
+      )}
     </span>
   );
 }

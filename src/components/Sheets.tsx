@@ -17,6 +17,7 @@ import {
   heroMaxHp,
   heroStats,
   STAT_IDS,
+  weaponRarity,
 } from '../engine';
 import { LOCAL_PLAYER } from '../store/battleConfig';
 import { useBattle } from '../store/battleStore';
@@ -226,7 +227,7 @@ function PartySheet() {
       </div>
 
       <div className="mt-2 flex gap-2">
-        <CharacterArt classId={hero.classId} gender={hero.gender} className="h-[132px] w-[100px] shrink-0" />
+        <CharacterArt classId={hero.classId} gender={hero.gender} weapon={weaponRarity(hero)} className="h-[132px] w-[100px] shrink-0" />
         <div className="min-w-0 flex-1">
           <div className="font-display text-[20px] leading-6">
             {hero.name} <span className="text-[13px]" style={{ color: cls.color }}>{cls.name}</span>

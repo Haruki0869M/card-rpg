@@ -25,9 +25,19 @@ export interface HeroLook {
   gem: string;
   /** リムライトの色 */
   rim: string;
+  /** 装備中の武器のレア度（光り方が変わる。未指定は試作どおり） */
+  weaponTier?: 'common' | 'rare' | 'epic' | 'legend';
 }
 
 export const HERO_VIEWBOX = '0 -30 240 330';
+
+/** 刀身の色（武器のレア度ごと） */
+const BLADE = {
+  common: ['#ffffff', '#d4dbe6', '#7a8496'],
+  rare: ['#ffffff', '#cfe9ff', '#5f7fa6'],
+  epic: ['#fbf4ff', '#dcc0ff', '#6a3aa8'],
+  legend: ['#fffbe0', '#ffd27a', '#c0581a'],
+} as const;
 /** 顔まわりだけを切り出す（ステータス枠・吹き出しの小さな顔用） */
 export const HERO_FACE_VIEWBOX = '52 28 136 136';
 
@@ -45,7 +55,7 @@ function Defs({ look, ids }: { look: HeroLook; ids: Ids }) {
       <Grad3 id={id('metal')} c={look.metal} x2={1} />
       <Grad3 id={id('trim')} c={look.trim} />
       <Grad3 id={id('leather')} c={['#a8673a', '#6e3d1d', '#3a1d0b']} />
-      <Grad3 id={id('blade')} c={['#ffffff', '#cfe9ff', '#5f7fa6']} x2={1} y2={0} />
+      <Grad3 id={id('blade')} c={BLADE[look.weaponTier ?? 'rare']} x2={1} y2={0} />
       <radialGradient id={id('iris')} cx="50%" cy="68%" r="62%">
         <stop offset="0" stopColor="#ffffff" stopOpacity=".9" />
         <stop offset=".25" stopColor={look.eyes} />
@@ -407,7 +417,9 @@ function WeaponBack({ look, ids }: { look: HeroLook; ids: Ids }) {
     case 'greatsword':
       return (
         <g className="hero-weapon">
-          <ellipse cx="190" cy="92" rx="30" ry="98" transform="rotate(21 190 92)" fill={url('glow')} opacity=".55" />
+          {look.weaponTier !== 'common' && (
+            <ellipse cx="190" cy="92" rx={look.weaponTier === 'legend' ? 40 : 30} ry="98" transform="rotate(21 190 92)" fill={url('glow')} opacity={look.weaponTier === 'legend' ? 0.85 : 0.55} />
+          )}
           <path d="M150 180 L206 26 L224 12 L222 34 L166 188 Z" fill={url('blade')} {...STROKE} />
           <path d="M158 182 L214 28" stroke="#ffffff" strokeWidth="2.5" />
           <path d="M178 132 L188 106 M192 96 L200 74" stroke={look.gem} strokeWidth="3" strokeLinecap="round" />

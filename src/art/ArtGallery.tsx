@@ -1,14 +1,22 @@
 // アートの一覧（確認用ページ: URL の末尾に #art）
+import '@fontsource/zen-antique/400.css';
 import { CLASSES } from '../data/classes';
 import { ENEMIES } from '../data/enemies';
-import '@fontsource/zen-antique/400.css';
-import { PlainsBackground } from './backgrounds/Plains';
-import { CharacterArt, EnemyArt } from './index';
+import type { Rarity } from '../types';
+import { BattleBackground, CharacterArt, ChestImage, EnemyArt, ItemImage } from './index';
+
+const RARITIES: Rarity[] = ['common', 'rare', 'epic', 'legend'];
+const RARITY_NAME = { common: 'コモン', rare: 'レア', epic: 'エピック', legend: 'レジェンド' };
+const ICONS = ['sword', 'staff', 'hammer', 'bow', 'armor', 'robe', 'ring', 'amulet', 'charm', 'crest', 'boots', 'potion', 'ether', 'antidote', 'smoke'];
+
+function H({ children }: { children: React.ReactNode }) {
+  return <h1 className="font-display mt-4 mb-2 text-[20px] text-amber-200">{children}</h1>;
+}
 
 export default function ArtGallery() {
   return (
-    <div className="min-h-dvh overflow-auto bg-[#0b0910] p-3 text-zinc-100" style={{ position: 'fixed', inset: 0 }}>
-      <h1 className="mb-2 text-[18px] font-black text-amber-200">味方（職業 × 性別）</h1>
+    <div className="overflow-auto bg-[#0b0910] p-3 text-zinc-100" style={{ position: 'fixed', inset: 0 }}>
+      <H>味方（職業 × 性別）</H>
       <div className="grid grid-cols-4 gap-2">
         {CLASSES.all.flatMap((c) =>
           (['male', 'female'] as const).map((g) => (
@@ -20,48 +28,58 @@ export default function ArtGallery() {
             </div>
           )),
         )}
-        <div className="rounded-lg bg-gradient-to-b from-[#24345a] to-[#0c0f1c] p-1 text-center">
-          <CharacterArt classId="unknown" gender="male" className="mx-auto block h-[190px] w-full" />
-          <div className="text-[13px] font-bold">絵が未作成の職業</div>
-        </div>
       </div>
-      <h1 className="mt-4 mb-2 text-[18px] font-black text-red-300">敵</h1>
+      <H>武器のレア度で見た目が変わる（戦士）</H>
       <div className="grid grid-cols-4 gap-2">
-        {ENEMIES.all.map((e) => (
-          <div key={e.id} className="rounded-lg bg-gradient-to-b from-[#3a1030] to-[#0c0609] p-1 text-center">
-            <EnemyArt defId={e.id} className="mx-auto block h-[190px] w-full" />
-            <div className="text-[13px] font-bold">{e.name}</div>
+        {RARITIES.map((r) => (
+          <div key={r} className="rounded-lg bg-gradient-to-b from-[#24345a] to-[#0c0f1c] p-1 text-center">
+            <CharacterArt classId="warrior" gender="male" weapon={r} className="mx-auto block h-[170px] w-full" />
+            <div className="text-[13px] font-bold">{RARITY_NAME[r]}</div>
           </div>
         ))}
+      </div>
+      <H>敵（ボスは2形態）</H>
+      <div className="grid grid-cols-4 gap-2">
+        {ENEMIES.all.flatMap((e) =>
+          Array.from({ length: 1 + (e.phases?.length ?? 0) }, (_, ph) => (
+            <div key={e.id + ph} className="rounded-lg bg-gradient-to-b from-[#3a1030] to-[#0c0609] p-1 text-center">
+              <EnemyArt defId={e.id} phase={ph} className="mx-auto block h-[170px] w-full" />
+              <div className="text-[13px] font-bold">{ph ? e.phases![ph - 1].name : e.name}</div>
+            </div>
+          )),
+        )}
         <div className="rounded-lg bg-gradient-to-b from-[#3a1030] to-[#0c0609] p-1 text-center">
-          <EnemyArt defId="unknown" className="mx-auto block h-[190px] w-full" />
+          <EnemyArt defId="unknown" className="mx-auto block h-[170px] w-full" />
           <div className="text-[13px] font-bold">絵が未作成の敵</div>
         </div>
       </div>
-      <h1 className="mt-4 mb-2 text-[18px] font-black text-amber-200">戦場のイメージ（背景＋配置。画面の作り込みはステップ3）</h1>
-      <div className="relative mx-auto h-[300px] w-[390px] overflow-hidden rounded-xl border border-amber-500/40">
-        <PlainsBackground className="absolute inset-0 h-full w-full" />
-        <EnemyArt defId="goblinBrute" className="absolute top-[10px] left-[200px] h-[130px] w-[110px]" />
-        <EnemyArt defId="chaosShaman" className="absolute top-[18px] left-[285px] h-[118px] w-[100px]" />
-        <EnemyArt defId="goblinScout" className="absolute top-[70px] left-[130px] h-[110px] w-[95px]" />
-        <CharacterArt classId="warrior" gender="male" className="absolute top-[150px] left-[20px] h-[140px] w-[105px]" />
-        <CharacterArt classId="mage" gender="female" className="absolute top-[160px] left-[110px] h-[130px] w-[95px]" />
-      </div>
-      <h1 className="mt-4 mb-2 text-[18px] font-black text-amber-200">見出しフォント</h1>
-      <div className="flex flex-col gap-2">
-        {[
-          ['Zen Antique（採用）', "'Zen Antique'"],
-        ].map(([label, family]) => (
-          <div key={label} className="rounded-lg border border-amber-500/30 bg-gradient-to-b from-[#2a2030] to-[#120c16] px-3 py-2">
-            <div className="text-[12px] text-zinc-400">{label}</div>
-            <div style={{ fontFamily: family, fontWeight: family.includes('Shippori') ? 800 : 400 }} className="text-[28px] leading-tight text-amber-100">
-              勝利！ ターン終了 侵食の魔王
-            </div>
-            <div style={{ fontFamily: family, fontWeight: family.includes('Shippori') ? 800 : 400 }} className="text-[18px] text-zinc-200">
-              ヘビースイング　完全成功！ 26 DMG
-            </div>
+      <H>背景（平原・翠の神殿・タイトルの魔王城）</H>
+      <div className="grid grid-cols-3 gap-2">
+        {['plains', 'temple', 'castle'].map((k) => (
+          <div key={k} className="h-[150px] overflow-hidden rounded-lg">
+            <BattleBackground kind={k} className="h-full w-full" />
           </div>
         ))}
+      </div>
+      <H>宝箱（閉じた姿 / 開いた姿）</H>
+      <div className="grid grid-cols-4 gap-2">
+        {RARITIES.map((r) => (
+          <div key={r} className="rounded-lg bg-black/40 p-1 text-center">
+            <ChestImage rarity={r} className="mx-auto block h-[80px] w-full" />
+            <ChestImage rarity={r} open className="mx-auto block h-[80px] w-full" />
+            <div className="text-[13px] font-bold">{RARITY_NAME[r]}</div>
+          </div>
+        ))}
+      </div>
+      <H>アイテム（レア度ごとの光）</H>
+      <div className="grid grid-cols-8 gap-1">
+        {ICONS.flatMap((icon) =>
+          (['common', 'legend'] as Rarity[]).map((r) => (
+            <div key={icon + r} className="rounded-md bg-black/40 p-0.5">
+              <ItemImage icon={icon} rarity={r} className="block h-[64px] w-full" />
+            </div>
+          )),
+        )}
       </div>
     </div>
   );

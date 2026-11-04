@@ -1,8 +1,8 @@
 // ===== 宝箱・イベント・休憩の画面 =====
 import { motion } from 'framer-motion';
-import { Coins, Flame, Gift, Lock, Sparkles, Star } from 'lucide-react';
+import { Coins, Flame, Lock, Sparkles, Star } from 'lucide-react';
 import { useState } from 'react';
-import { BattleBackground } from '../../art';
+import { BattleBackground, ChestImage } from '../../art';
 import { BALANCE } from '../../data/balance';
 import { EVENTS } from '../../data/events';
 import { getItem } from '../../data/items';
@@ -96,10 +96,8 @@ export function ChestScreen() {
             className="relative my-3 flex h-[120px] w-[150px] items-center justify-center"
           >
             <span className="absolute inset-0 rounded-full" style={{ background: `radial-gradient(closest-side, ${r.glow}, transparent)` }} />
-            <span className="relative flex h-[96px] w-[120px] items-center justify-center rounded-2xl border-4" style={{ borderColor: r.color, background: r.bg }}>
-              <Gift size={60} style={{ color: r.color }} />
-              {locked && <Lock size={26} className="absolute -bottom-3 rounded-full bg-zinc-900 p-1 text-amber-200" />}
-            </span>
+            <ChestImage rarity={chest.spec.rarity} open={opened} className="relative h-[120px] w-[150px]" />
+            {locked && <Lock size={28} className="absolute bottom-0 rounded-full bg-zinc-900 p-1 text-amber-200" />}
           </motion.div>
           {chest.lastRoll && (
             <div className="flex flex-col items-center gap-1">
