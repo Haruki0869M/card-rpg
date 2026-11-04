@@ -1,4 +1,4 @@
-import { getCharacter } from '../data/characters';
+import { getClass } from '../data/classes';
 import { getEnemyAction } from '../data/enemies';
 import { calcDamage, findAlly } from '../engine';
 import type { BattleState, CardDef, CardEffect, CardTier, EnemyState } from '../types';
@@ -85,8 +85,8 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
   if (!enemy.intent || enemy.dead) return null;
   const action = getEnemyAction(enemy.defId, enemy.intent.actionId);
   const target = enemy.intent.targetId ? findAlly(state, enemy.intent.targetId) : undefined;
-  const targetIcon = target ? getCharacter(target.id).icon : '？';
-  const targetName = target ? getCharacter(target.id).name : '（対象なし）';
+  const targetIcon = target ? getClass(target.classId).icon : '？';
+  const targetName = target ? target.name : '（対象なし）';
   const parts: IntentView['parts'] = [];
   const details: string[] = [];
   for (const eff of action.effects) {

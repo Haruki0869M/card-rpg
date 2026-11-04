@@ -15,8 +15,18 @@ export const BALANCE = {
   /** 状態異常の倍率 */
   vulnerableMultiplier: 1.5,
   weakMultiplier: 0.75,
-  /** 4人モードの敵HP倍率（端数切り捨て） */
-  fourPlayerEnemyHpMultiplier: 1.7,
+  /** 戦闘に参加した味方の人数ごとの敵HP倍率（index = 人数。端数切り捨て） */
+  enemyHpByPartySize: [0, 0.6, 1.0, 1.35, 1.7] as readonly number[],
+  /** 敵のレベルが baseLevel より1上がるごとの増加率 */
+  enemyHpPerLevel: 0.1,
+  enemyAttackPerLevel: 0.08,
+  /** 能力値 → 戦闘の適性補正: (能力値 - statPivot) / statDivisor（端数切り捨て） */
+  statPivot: 60,
+  statDivisor: 2,
+  /** パーティの最大人数 */
+  maxPartySize: 4,
+  /** 1回の戦闘の敵の最大数 */
+  maxEnemies: 4,
   /** 戦闘ログの最大件数 */
   logLimit: 300,
 } as const;

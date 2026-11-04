@@ -39,7 +39,7 @@ async function setup(page, party, fast = true) {
   await page.reload();
   if (party === 4) {
     await page.getByLabel('メニュー').click();
-    await page.getByText('4人モード').click(); // 切り替えるとバトルがリセットされメニューが閉じる
+    await page.getByText('4人', { exact: true }).click(); // 切り替えるとバトルがリセットされメニューが閉じる
     await page.waitForTimeout(150);
   }
   await page.getByLabel('メニュー').click();

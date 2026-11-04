@@ -36,7 +36,7 @@ export function ResultScreen() {
             </div>
           ))}
           <div className="pt-1 text-center text-[12px] text-zinc-500">
-            シード {battle.seed} / {battle.partySize}人モード
+            シード {battle.seed} / {battle.allies.length}人パーティ
           </div>
         </div>
         <div className="mt-4 flex flex-col gap-2">

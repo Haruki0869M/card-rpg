@@ -1,9 +1,9 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { TIMING } from '../data/balance';
 import { getCard } from '../data/cards';
-import { getCharacter } from '../data/characters';
+import { getClass } from '../data/classes';
 import { getEnemy } from '../data/enemies';
-import { findAlly, incomingDamage, isDone, tierDamageAgainst, tierIndex, usableCardCount } from '../engine';
+import { enemyName, findAlly, incomingDamage, isDone, tierDamageAgainst, tierIndex, usableCardCount } from '../engine';
 import { usePress } from '../hooks/usePress';
 import { speedFactor, useBattle } from '../store/battleStore';
 import type { AllyState, EnemyState, Statuses } from '../types';
@@ -54,6 +54,7 @@ function StatusChip({
   onTap?: () => void;
 }) {
   const press = usePress(onTap, { type: 'status', status, amount, side, by });
+  const byClass = useBattle((s) => (by ? s.battle.allies.find((a) => a.id === by)?.classId : undefined));
   const info = STATUS_INFO[status];
   return (
     <span
@@ -61,7 +62,7 @@ function StatusChip({
       className="inline-flex items-center rounded bg-black/50 px-0.5 text-[12px] leading-4 text-amber-100 tabular-nums"
     >
       {info.icon}
-      {status === 'taunt' ? (by ? getCharacter(by).icon : '') : amount}
+      {status === 'taunt' ? (by ? (byClass ? getClass(byClass).icon : '') : '') : amount}
     </span>
   );
 }
@@ -199,7 +200,9 @@ function EnemyUnit({ enemy }: { enemy: EnemyState }) {
         {def.icon}
         {isTarget && <span className="absolute -right-4 -top-1 text-[16px]">🎯</span>}
       </div>
-      <div className="w-full truncate text-center text-[12px] leading-4 text-zinc-200">{def.name}</div>
+      <div className="w-full truncate text-center text-[12px] leading-4 text-zinc-200">
+        <span className="text-amber-300">Lv{enemy.level}</span> {enemyName(enemy)}
+      </div>
       <div className="mt-0.5 flex w-full items-center gap-0.5">
         <BlockBadge block={enemy.block} />
         <HpBar hp={enemy.hp} max={enemy.maxHp} block={enemy.block} tone="enemy" />
@@ -253,7 +256,7 @@ function FocusOrbs({ n, max = 6, spend = 0 }: { n: number; max?: number; spend?:
 }
 
 function AllyFrame({ ally }: { ally: AllyState }) {
-  const def = getCharacter(ally.id);
+  const def = getClass(ally.classId);
   const battle = useBattle((s) => s.battle);
   const activeId = useBattle((s) => s.activeId);
   const selection = useBattle((s) => s.selection);
@@ -279,7 +282,7 @@ function AllyFrame({ ally }: { ally: AllyState }) {
     >
       <div className="flex items-center gap-0.5 text-[12px] leading-4">
         <span className="text-[14px]">{def.icon}</span>
-        <span className="truncate font-bold">{def.name}</span>
+        <span className="truncate font-bold">{ally.name}</span>
       </div>
       <div className="flex items-center gap-0.5">
         <BlockBadge block={ally.block} />

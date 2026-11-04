@@ -16,6 +16,7 @@ import {
   unusableReason,
 } from '../engine';
 import type { BattleEvent, BattleState, Command, SlotResult } from '../types';
+import { type BattleConfig, LOCAL_PLAYER, sanitizeConfig, toSetup } from './battleConfig';
 
 export interface Settings {
   fastMode: boolean;
@@ -47,6 +48,7 @@ export type Sheet = null | 'menu' | 'log' | 'draw' | 'discard';
 interface StoreState {
   battle: BattleState;
   settings: Settings;
+  config: BattleConfig;
   activeId: string;
   selection: Selection | null;
   sheet: Sheet;
@@ -70,7 +72,7 @@ interface StoreState {
   cancel: () => void;
   setActive: (id: string) => void;
   endTurn: () => void;
-  newBattle: (opts?: { sameSeed?: boolean; partySize?: 2 | 4 }) => void;
+  newBattle: (opts?: { sameSeed?: boolean; config?: BattleConfig }) => void;
   setSettings: (s: Partial<Settings>) => void;
   openSheet: (s: Sheet) => void;
   setConfirmReset: (v: boolean) => void;
@@ -84,6 +86,7 @@ interface SaveData {
   version: number;
   battle: BattleState;
   settings: Settings;
+  config: BattleConfig;
   activeId: string;
 }
 
@@ -99,9 +102,9 @@ function load(): SaveData | null {
   }
 }
 
-function save(s: Pick<StoreState, 'battle' | 'settings' | 'activeId'>) {
+function save(s: Pick<StoreState, 'battle' | 'settings' | 'activeId' | 'config'>) {
   try {
-    const data: SaveData = { version: STATE_VERSION, battle: s.battle, settings: s.settings, activeId: s.activeId };
+    const data: SaveData = { version: STATE_VERSION, battle: s.battle, settings: s.settings, config: s.config, activeId: s.activeId };
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
   } catch {
     // 保存できなくても普通に遊べる
@@ -126,17 +129,18 @@ let enemyTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** 次に操作するキャラ（現在のキャラが行動完了なら、まだ行動できる次のキャラ） */
 function nextActive(battle: BattleState, current: string): string {
-  const allies = battle.allies;
-  const cur = findAlly(battle, current);
+  // この端末のプレイヤーが担当するキャラだけが対象
+  const mine = battle.allies.filter((a) => a.playerId === LOCAL_PLAYER);
+  const cur = mine.find((a) => a.id === current);
   if (cur && !isDone(battle, cur)) return current;
-  const start = Math.max(0, allies.findIndex((a) => a.id === current));
-  for (let i = 1; i <= allies.length; i++) {
-    const a = allies[(start + i) % allies.length];
+  const start = Math.max(0, mine.findIndex((a) => a.id === current));
+  for (let i = 1; i <= mine.length; i++) {
+    const a = mine[(start + i) % mine.length];
     if (!isDone(battle, a)) return a.id;
   }
   // 全員行動完了: 生存している誰か（現在のキャラが生きていればそのまま）
   if (cur && !cur.dead) return current;
-  return allies.find((a) => !a.dead)?.id ?? current;
+  return mine.find((a) => !a.dead)?.id ?? mine[0]?.id ?? current;
 }
 
 function popupsFromEvents(events: BattleEvent[]): Popup[] {
@@ -155,7 +159,8 @@ function popupsFromEvents(events: BattleEvent[]): Popup[] {
 }
 
 const saved = load();
-const initialBattle = saved?.battle ?? createBattle(makeSeed(), 2);
+const initialConfig = sanitizeConfig(saved?.config);
+const initialBattle = saved?.battle ?? createBattle(toSetup(makeSeed(), initialConfig));
 
 export const useBattle = create<StoreState>((set, get) => {
   /** 敵フェーズを自動で進める */
@@ -206,6 +211,7 @@ export const useBattle = create<StoreState>((set, get) => {
   return {
     battle: initialBattle,
     settings: saved?.settings ?? { fastMode: false, vibration: true },
+    config: initialConfig,
     activeId: saved?.activeId ?? nextActive(initialBattle, initialBattle.allies[0].id),
     selection: null,
     sheet: null,
@@ -287,6 +293,7 @@ export const useBattle = create<StoreState>((set, get) => {
       }
       const err = get().dispatch({
         type: 'PLAY_CARD',
+        playerId: LOCAL_PLAYER,
         characterId: activeId,
         cardInstanceId: selection.cardUid,
         targetId: card.target === 'enemy' ? selection.targetId : undefined,
@@ -300,7 +307,7 @@ export const useBattle = create<StoreState>((set, get) => {
 
     setActive: (id) => {
       const ally = findAlly(get().battle, id);
-      if (!ally || ally.dead) return;
+      if (!ally || ally.dead || ally.playerId !== LOCAL_PLAYER) return;
       set({ activeId: id, selection: null });
       save(get());
     },
@@ -310,18 +317,19 @@ export const useBattle = create<StoreState>((set, get) => {
       if (battle.phase !== 'ally') return;
       const canAct = battle.allies.some((a) => !isDone(battle, a));
       set({ selection: null, hint: canAct ? { text: 'まだ行動できるキャラがいます', id: fxId++ } : null });
-      get().dispatch({ type: 'END_TURN' });
+      get().dispatch({ type: 'END_TURN', playerId: LOCAL_PLAYER });
     },
 
     newBattle: (opts) => {
       const { battle } = get();
       const seed = opts?.sameSeed ? battle.seed : makeSeed();
-      const size = opts?.partySize ?? battle.partySize;
+      const config = sanitizeConfig(opts?.config ?? get().config);
       if (enemyTimer) clearTimeout(enemyTimer);
       enemyTimer = null;
-      const next = createBattle(seed, size);
+      const next = createBattle(toSetup(seed, config));
       set({
         battle: next,
+        config,
         activeId: next.allies[0].id,
         selection: null,
         sheet: null,

@@ -1,7 +1,7 @@
-import { getEnemy, getEnemyAction } from '../data/enemies';
-import type { AllyState, BattleEvent, BattleState, EnemyActionDef, EnemyState } from '../types';
+import { getEnemy, getEnemyAction } from '../../data/enemies';
+import type { AllyState, BattleEvent, BattleState, EnemyActionDef, EnemyState } from '../../types';
+import type { Rng } from '../rng';
 import { calcDamage } from './damage';
-import type { Rng } from './rng';
 
 export function livingAllies(state: BattleState): AllyState[] {
   return state.allies.filter((a) => !a.dead);
@@ -30,7 +30,7 @@ function pickRandomAlly(state: BattleState, rng: Rng): string | undefined {
 /** 次の行動を選ぶ（ルール: 順番 / ランダム・連続制限 / 1ターン目固定 / 単独時の代替） */
 export function chooseAction(enemy: EnemyState, state: BattleState, rng: Rng): EnemyActionDef {
   const def = getEnemy(enemy.defId);
-  const alone = livingEnemies(state).filter((e) => e.uid !== enemy.uid).length === 0;
+  const alone = !state.enemies.some((e) => !e.dead && e.uid !== enemy.uid);
   const resolve = (a: EnemyActionDef) =>
     alone && a.fallbackIfAloneId ? getEnemyAction(def.id, a.fallbackIfAloneId) : a;
 
@@ -92,6 +92,11 @@ export function retargetAfterDeath(state: BattleState, deadAllyId: string, rng: 
   }
 }
 
+/** 敵の攻撃1回あたりのダメージ（レベル補正・弱体・脆弱を反映。ブロック考慮前） */
+export function enemyHitDamage(enemy: EnemyState, base: number, target: AllyState | undefined): number {
+  return calcDamage(base, enemy.statuses, target?.statuses, enemy.attackMul);
+}
+
 /** 敵の行動が ally に与える予定ダメージ（1回あたりの値の配列。ブロック考慮前） */
 export function intentHitsOn(enemy: EnemyState, ally: AllyState): number[] {
   if (enemy.dead || !enemy.intent || ally.dead) return [];
@@ -100,13 +105,13 @@ export function intentHitsOn(enemy: EnemyState, ally: AllyState): number[] {
   for (const eff of action.effects) {
     if (eff.kind !== 'attack') continue;
     if (eff.target === 'single' && enemy.intent.targetId !== ally.id) continue;
-    const dmg = calcDamage(eff.amount, enemy.statuses, ally.statuses);
+    const dmg = enemyHitDamage(enemy, eff.amount, ally);
     for (let i = 0; i < eff.hits; i++) hits.push(dmg);
   }
   return hits;
 }
 
-/** 被弾予定（インテント合計 − 現在のブロック、0未満にはしない） */
+/** 被弾予定（インテント合計 − 現在のブロック、0未満にはしない）。かばう（確率）は含めない */
 export function incomingDamage(state: BattleState, ally: AllyState): number {
   if (ally.dead) return 0;
   let total = 0;

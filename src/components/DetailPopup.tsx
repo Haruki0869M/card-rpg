@@ -1,7 +1,7 @@
 import { getCard } from '../data/cards';
-import { getCharacter } from '../data/characters';
+import { getClass } from '../data/classes';
 import { getEnemy } from '../data/enemies';
-import { chanceFor, findAlly, findEnemy, incomingDamage, tierDistribution, toPercents } from '../engine';
+import { affinityOf, chanceFor, enemyName, findAlly, findEnemy, incomingDamage, tierDistribution, toPercents } from '../engine';
 import { type Detail, useDetail } from '../hooks/usePress';
 import { useBattle } from '../store/battleStore';
 import type { BattleState } from '../types';
@@ -16,7 +16,7 @@ function Content({ d, battle }: { d: Detail; battle: BattleState }) {
     case 'card': {
       const card = getCard(d.cardId);
       const ally = findAlly(battle, d.allyId)!;
-      const ch = getCharacter(ally.id);
+      const ch = getClass(ally.classId);
       const chance = chanceFor(ally, card);
       const focus = d.focus ?? 0;
       const pcts = toPercents(tierDistribution(card, focus, chance));
@@ -29,7 +29,7 @@ function Content({ d, battle }: { d: Detail; battle: BattleState }) {
           <div className="mt-1 text-[13px]">
             成功率 <b className="text-amber-200">{chance}%</b>
             <span className="text-zinc-400">
-              （基礎{card.baseChance}% {ch.name}の{CATEGORY_LABEL[card.category]}適性{signed(ch.affinity[card.category])}）
+              （基礎{card.baseChance}% {ch.name}の{CATEGORY_LABEL[card.category]}適性{signed(affinityOf(ally)[card.category])}）
             </span>
           </div>
           {focus > 0 && <div className="text-[12px] text-amber-300">🌟{focus}使用時の確率</div>}
@@ -55,7 +55,7 @@ function Content({ d, battle }: { d: Detail; battle: BattleState }) {
       return (
         <>
           <div className="text-[16px] font-bold text-amber-100">
-            {def.icon} {def.name}
+            {def.icon} {enemyName(e)} <span className="text-[12px] text-amber-300">Lv{e.level}</span>
           </div>
           <div className="text-[13px] text-zinc-300">
             HP {e.hp}/{e.maxHp} {e.block > 0 && `/ ブロック${e.block}`}
@@ -70,7 +70,7 @@ function Content({ d, battle }: { d: Detail; battle: BattleState }) {
           ) : (
             <div className="mt-1 text-[13px] text-zinc-400">{e.dead ? '撃破済み' : '行動済み'}</div>
           )}
-          {e.tauntedBy && <div className="text-[13px] text-amber-300">😤 {getCharacter(e.tauntedBy).name}に挑発されている</div>}
+          {e.tauntedBy && <div className="text-[13px] text-amber-300">😤 {findAlly(battle, e.tauntedBy)?.name}に挑発されている</div>}
           {(e.statuses.vulnerable > 0 || e.statuses.weak > 0) && (
             <div className="mt-1 text-[12px] text-zinc-300">
               {e.statuses.vulnerable > 0 && <div>💔脆弱{e.statuses.vulnerable}：{STATUS_INFO.vulnerable.text}</div>}
@@ -87,17 +87,17 @@ function Content({ d, battle }: { d: Detail; battle: BattleState }) {
     }
     case 'ally': {
       const a = findAlly(battle, d.id)!;
-      const def = getCharacter(a.id);
+      const def = getClass(a.classId);
       return (
         <>
           <div className="text-[16px] font-bold text-amber-100">
-            {def.icon} {def.name} <span className="text-[12px] text-zinc-400">{def.role}</span>
+            {def.icon} {a.name}（{def.name}） <span className="text-[12px] text-zinc-400">{def.role}</span>
           </div>
           <div className="text-[13px]">
             HP {a.hp}/{a.maxHp} / ブロック{a.block} / マナ{a.mana} / フォーカス{a.focus}
           </div>
           <div className="text-[13px] text-zinc-300">
-            適性：物理{signed(def.affinity.physical)} 魔法{signed(def.affinity.magic)} スキル{signed(def.affinity.skill)}
+            適性：物理{signed(affinityOf(a).physical)} 魔法{signed(affinityOf(a).magic)} スキル{signed(affinityOf(a).skill)}
           </div>
           <div className="text-[13px] text-red-300">被弾予定 {incomingDamage(battle, a)}（ブロック差し引き後）</div>
           {a.statuses.weak > 0 && <div className="text-[12px]">🥀弱体{a.statuses.weak}：{STATUS_INFO.weak.text}</div>}
@@ -117,7 +117,7 @@ function Content({ d, battle }: { d: Detail; battle: BattleState }) {
             {d.status !== 'taunt' && ` ${d.amount}`}
           </div>
           <div className="text-[13px]">{info.text}</div>
-          {d.status === 'taunt' && d.by && <div className="text-[13px] text-amber-300">挑発した味方：{getCharacter(d.by).name}</div>}
+          {d.status === 'taunt' && d.by && <div className="text-[13px] text-amber-300">挑発した味方：{findAlly(battle, d.by)?.name}</div>}
           {d.status !== 'taunt' && (
             <div className="mt-1 text-[12px] text-zinc-400">
               残り{d.amount}ターン。{d.side === 'enemy' ? '敵' : '味方'}フェーズ終了時に1減る。

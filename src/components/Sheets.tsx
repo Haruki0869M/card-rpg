@@ -2,7 +2,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ScrollText, X } from 'lucide-react';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { getCard } from '../data/cards';
-import { getCharacter } from '../data/characters';
+import { CLASSES } from '../data/classes';
+import { member } from '../store/battleConfig';
 import { findAlly } from '../engine';
 import { useBattle } from '../store/battleStore';
 import { shortTier } from './format';
@@ -73,14 +74,14 @@ function MenuSheet() {
       <div className="flex flex-col gap-2">
         <div className="text-[12px] text-zinc-400">パーティ人数（切り替えるとバトルをリセット）</div>
         <div className="flex gap-2">
-          {([2, 4] as const).map((n) => (
+          {([1, 2, 3, 4] as const).map((n) => (
             <motion.button
               key={n}
               whileTap={{ scale: 0.95 }}
-              onClick={() => n !== battle.partySize && newBattle({ partySize: n })}
-              className={`${btn} ${battle.partySize === n ? 'bg-amber-500 text-stone-950' : 'bg-white/5 text-zinc-200'}`}
+              onClick={() => n !== battle.allies.length && newBattle({ config: { encounterId: battle.encounterId, party: CLASSES.all.slice(0, n).map((c, i) => member(c.id, i % 2 ? 'female' : 'male', i)) } })}
+              className={`${btn} ${battle.allies.length === n ? 'bg-amber-500 text-stone-950' : 'bg-white/5 text-zinc-200'}`}
             >
-              {n}人モード
+              {n}人
             </motion.button>
           ))}
         </div>
@@ -140,7 +141,7 @@ function PileSheet({ kind }: { kind: 'draw' | 'discard' }) {
   const counts = new Map<string, number>();
   for (const c of pile ?? []) counts.set(c.cardId, (counts.get(c.cardId) ?? 0) + 1);
   const rows = [...counts.entries()].sort((a, b) => getCard(a[0]).name.localeCompare(getCard(b[0]).name, 'ja'));
-  const name = ally ? getCharacter(ally.id).name : '';
+  const name = ally?.name ?? '';
   return (
     <BottomSheet
       title={`${name}の${kind === 'draw' ? '山札（順不同）' : '捨札'} ${pile?.length ?? 0}枚`}

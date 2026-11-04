@@ -1,6 +1,6 @@
-import type { CardDef } from '../types';
+import type { CardDef } from '../../types';
 
-export const CARDS: Record<string, CardDef> = {
+export const BASIC_CARDS: Record<string, CardDef> = {
   heavySwing: {
     id: 'heavySwing',
     name: 'ヘビースイング',
@@ -118,9 +118,3 @@ export const CARDS: Record<string, CardDef> = {
     ],
   },
 };
-
-export function getCard(id: string): CardDef {
-  const c = CARDS[id];
-  if (!c) throw new Error(`Unknown card: ${id}`);
-  return c;
-}

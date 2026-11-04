@@ -17,7 +17,7 @@ for (const [w, h] of [[360, 640], [412, 780], [360, 560]]) {
     await page.goto(URL);
     if (party === 4) {
       await page.getByLabel('メニュー').click();
-      await page.getByText('4人モード').click();
+      await page.getByText('4人', { exact: true }).click();
     }
     await page.waitForTimeout(300);
     const tag = `${w}x${h}-${party}p`;
