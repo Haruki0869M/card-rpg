@@ -10,10 +10,11 @@ export interface ActiveAbility {
   effect: BattleAbility;
 }
 
-/** キャラが持つ戦闘の特殊能力の一覧（M2で装備由来の能力も加える） */
-export function battleAbilitiesOf(ally: Pick<AllyState, 'classId'>): ActiveAbility[] {
+/** キャラが持つ戦闘の特殊能力の一覧（職業 + 装備） */
+export function battleAbilitiesOf(ally: Pick<AllyState, 'classId' | 'abilities'>): ActiveAbility[] {
   const a = getClass(ally.classId).battleAbility;
-  return [{ name: a.name, effect: a.effect }];
+  const own = { name: a.name, effect: a.effect };
+  return ally.abilities?.length ? [own, ...ally.abilities] : [own];
 }
 
 function matchesCategory(effect: { category?: CardDef['category'] }, card: CardDef): boolean {
@@ -50,15 +51,24 @@ export function activePassiveNames(ally: AllyState): string[] {
 export function perfectAbilities(ally: AllyState, card: CardDef) {
   return battleAbilitiesOf(ally).filter(
     (ab) =>
-      (ab.effect.kind === 'onPerfectBonusDamage' || ab.effect.kind === 'onPerfectApplyStatus') &&
+      (ab.effect.kind === 'onPerfectBonusDamage' ||
+        ab.effect.kind === 'onPerfectApplyStatus' ||
+        ab.effect.kind === 'onPerfectGainFocus' ||
+        ab.effect.kind === 'onPerfectDraw') &&
       matchesCategory(ab.effect, card),
   );
 }
 
-/** かばう能力の発動確率（持っていなければ 0） */
+/** かばう能力の発動確率（複数あれば一番高いもの。持っていなければ null） */
 export function coverChance(ally: AllyState): { chance: number; name: string } | null {
+  let best: { chance: number; name: string } | null = null;
   for (const ab of battleAbilitiesOf(ally)) {
-    if (ab.effect.kind === 'coverLethal') return { chance: ab.effect.chance, name: ab.name };
+    if (ab.effect.kind === 'coverLethal' && (!best || ab.effect.chance > best.chance)) best = { chance: ab.effect.chance, name: ab.name };
   }
-  return null;
+  return best;
+}
+
+/** 味方フェーズの開始時に発動する能力 */
+export function turnStartAbilities(ally: AllyState): ActiveAbility[] {
+  return battleAbilitiesOf(ally).filter((ab) => ab.effect.kind === 'turnStartBlock' || ab.effect.kind === 'turnStartHeal' || ab.effect.kind === 'turnStartFocus');
 }

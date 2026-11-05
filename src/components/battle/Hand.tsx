@@ -8,6 +8,7 @@ import { useElementSize } from '../../hooks/useElementSize';
 import { usePress } from '../../hooks/usePress';
 import { useBattle } from '../../store/battleStore';
 import { tierRange } from '../format';
+import { CardTitle, RarityAura } from '../ui/CardFace';
 import { CATEGORY_STYLE, EffectChip } from '../ui/icons';
 
 export const CARD_H = 160;
@@ -77,7 +78,7 @@ const CardView = memo(function CardView({
       }}
     >
     <div
-      className="card-enter h-full w-full rounded-[10px] p-[2px] transition-[filter] duration-100 active:scale-[.95]"
+      className="card-enter relative h-full w-full rounded-[10px] p-[2px] transition-[filter] duration-100 active:scale-[.95]"
       style={{
         background: selected
           ? 'linear-gradient(160deg,#fff3c4,#f2c24a 40%,#a86a12)'
@@ -86,6 +87,7 @@ const CardView = memo(function CardView({
         filter: reason && !selected ? 'grayscale(.85) brightness(.7)' : undefined,
       }}
     >
+      {!selected && <RarityAura rarity={card.rarity} />}
       <div className="relative flex h-full flex-col overflow-hidden rounded-[8px] px-1 pt-0.5 pb-1" style={{ background: cat.inner }}>
         {/* 透かしのカテゴリアイコン */}
         <cat.Icon size={64} strokeWidth={1.5} className="pointer-events-none absolute right-[-10px] bottom-[-8px] opacity-[0.09]" style={{ color: cat.glow }} />
@@ -110,7 +112,7 @@ const CardView = memo(function CardView({
             ))}
           </span>
         </div>
-        <div className="font-display relative line-clamp-2 h-[30px] shrink-0 text-[12.5px] leading-[15px] text-amber-50">{card.name}</div>
+        <CardTitle card={card} compact />
         <div className="relative flex shrink-0 items-baseline gap-0.5">
           <cat.Icon size={12} strokeWidth={2.6} style={{ color: cat.glow }} />
           <span className="font-display text-outline text-[19px] leading-[22px] text-amber-200 tabular-nums">{chance}</span>

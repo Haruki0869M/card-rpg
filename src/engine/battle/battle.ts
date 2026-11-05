@@ -21,7 +21,7 @@ import type {
   StatusId,
   Statuses,
 } from '../../types';
-import { coverChance, damageMultiplierFor, perfectAbilities } from '../abilities';
+import { coverChance, damageMultiplierFor, perfectAbilities, turnStartAbilities } from '../abilities';
 import { createRng, type Rng, shuffle } from '../rng';
 import { affinityOf } from '../stats';
 import { absorb, calcDamage } from './damage';
@@ -77,6 +77,7 @@ export function createBattle(setup: BattleSetup): BattleState {
       focusMax: m.focusMax ?? BALANCE.focusMax,
       stats: m.stats ?? def.stats,
       extraDraw: m.extraDraw ?? 0,
+      ...(m.abilities?.length ? { abilities: m.abilities.map((a) => ({ name: a.name, effect: { ...a.effect } })) } : {}),
       statuses: { ...emptyStatuses(), ...m.statuses },
       drawPile: shuffle(cards, rng),
       hand: [],
@@ -193,12 +194,18 @@ export function isDone(state: BattleState, ally: AllyState): boolean {
 
 /** カードのダメージ効果が対象に与える実際の値（Tierごと。特殊能力の倍率も反映） */
 export function tierDamageAgainst(ally: AllyState, card: CardDef, target: EnemyState): number[] {
-  const { multiplier } = damageMultiplierFor(ally, card);
+  const multiplier = damageMultiplierFor(ally, card).multiplier * executeMultiplier(card, target);
   return card.tiers.map((t) =>
     t.effects
       .filter((e): e is Extract<CardEffect, { kind: 'damage' }> => e.kind === 'damage')
       .reduce((sum, e) => sum + calcDamage(e.amount, ally.statuses, target.statuses, multiplier), 0),
   );
+}
+
+/** カードの特殊能力「止め」: 対象のHPが一定以下ならダメージの倍率 */
+export function executeMultiplier(card: CardDef, target: Pick<EnemyState, 'hp' | 'maxHp'>): number {
+  const t = card.trait?.effect;
+  return t?.kind === 'execute' && target.hp * 100 <= target.maxHp * t.belowPct ? t.multiplier : 1;
 }
 
 // ---------- ログ ----------
@@ -221,6 +228,29 @@ function startAllyPhase(state: BattleState, rng: Rng, events: BattleEvent[]) {
     a.mana = BALANCE.manaPerTurn;
     const { reshuffled } = drawCards(a, BALANCE.drawPerTurn + a.extraDraw, rng);
     if (reshuffled) addLog(state, `${a.name}: 捨札をシャッフルして山札に戻した`);
+  }
+  // ターン開始時の特殊能力（装備など）。ブロックのリセットの後に入れる
+  for (const a of state.allies) {
+    if (a.dead || !a.abilities?.length) continue;
+    for (const ab of turnStartAbilities(a)) {
+      const e = ab.effect;
+      if (e.kind === 'turnStartBlock') {
+        const targets = e.allies ? state.allies.filter((x) => !x.dead) : [a];
+        for (const t of targets) {
+          t.block += e.amount;
+          events.push({ type: 'block', unitId: t.id, amount: e.amount });
+        }
+        abilityTriggered(state, a.id, ab.name, events);
+      } else if (e.kind === 'turnStartHeal') {
+        if (healUnit(a, e.amount, events) > 0) abilityTriggered(state, a.id, ab.name, events);
+      } else if (e.kind === 'turnStartFocus') {
+        if (a.focus < a.focusMax && rng.next() * 100 < e.chance) {
+          a.focus = Math.min(a.focusMax, a.focus + e.amount);
+          abilityTriggered(state, a.id, ab.name, events);
+          addLog(state, `${a.name}の「${ab.name}」！ フォーカス+${e.amount}`);
+        }
+      }
+    }
   }
   events.push({ type: 'phase', phase: 'ally' });
 }
@@ -289,10 +319,10 @@ function checkEnemyPhase(state: BattleState, enemy: EnemyState, events: BattleEv
 }
 
 /** 敵にダメージ（計算済みの値）を与える。HPに入った量を返す */
-function hitEnemy(state: BattleState, enemy: EnemyState, dmg: number, sourceId: string, events: BattleEvent[]): number {
+function hitEnemy(state: BattleState, enemy: EnemyState, dmg: number, sourceId: string, events: BattleEvent[], pierce = false): number {
   if (enemy.dead) return 0;
-  const r = absorb(dmg, enemy.block, enemy.hp);
-  enemy.block = r.block;
+  const r = absorb(dmg, pierce ? 0 : enemy.block, enemy.hp);
+  if (!pierce) enemy.block = r.block;
   enemy.hp = r.hp;
   events.push({ type: 'damage', unitId: enemy.uid, amount: r.hpLoss, blocked: r.blocked, sourceId });
   state.stats.totalDamage += r.hpLoss;
@@ -453,10 +483,18 @@ function playCard(
   // 効果
   let dealt = 0;
   const parts: string[] = [];
+  const trait = card.trait;
+  const pierce = trait?.effect.kind === 'pierce';
+  let traitFired = false;
   for (const eff of tier.effects) {
     switch (eff.kind) {
       case 'damage':
-        for (const v of victims()) dealt += hitEnemy(state, v, calcDamage(eff.amount, ally.statuses, v.statuses, dmgMul.multiplier), ally.id, events);
+        for (const v of victims()) {
+          const ex = executeMultiplier(card, v);
+          if (ex !== 1) traitFired = true;
+          if (pierce && v.block > 0) traitFired = true;
+          dealt += hitEnemy(state, v, calcDamage(eff.amount, ally.statuses, v.statuses, dmgMul.multiplier * ex), ally.id, events, pierce);
+        }
         break;
       case 'block':
         ally.block += eff.amount;
@@ -517,13 +555,45 @@ function playCard(
     for (const n of dmgMul.active) abilityTriggered(state, ally.id, n, events);
   }
 
+  // カードの特殊能力（吸収・魔力還元。貫通・止めはダメージの計算で反映済み）
+  if (trait) {
+    const t = trait.effect;
+    if (t.kind === 'drain' && dealt > 0) {
+      const healed = healUnit(ally, Math.floor((dealt * t.pct) / 100), events);
+      if (healed > 0) {
+        traitFired = true;
+        parts.push(`HP+${healed}`);
+      }
+    } else if (t.kind === 'perfectMana' && perfect) {
+      ally.mana += t.amount;
+      traitFired = true;
+      parts.push(`マナ+${t.amount}`);
+    }
+    if (traitFired) {
+      abilityTriggered(state, ally.id, trait.name, events);
+      addLog(state, `${ally.name}の「${card.name}」の特殊能力「${trait.name}」が発動`);
+    }
+  }
+
   // 完全成功時の特殊能力
   if (perfect) {
     for (const ab of perfectAbilities(ally, card)) {
       const e = ab.effect;
       if ((e.kind === 'onPerfectBonusDamage' || e.kind === 'onPerfectApplyStatus') && e.chance !== undefined && rng.next() * 100 >= e.chance)
         continue;
-      if (e.kind === 'onPerfectBonusDamage') {
+      if (e.kind === 'onPerfectGainFocus') {
+        if (ally.focus >= ally.focusMax) continue;
+        ally.focus = Math.min(ally.focusMax, ally.focus + e.amount);
+        abilityTriggered(state, ally.id, ab.name, events);
+        parts.push(`${ab.name}（フォーカス+${e.amount}）`);
+        addLog(state, `${ally.name}の「${ab.name}」！ フォーカス+${e.amount}`);
+      } else if (e.kind === 'onPerfectDraw') {
+        const { drawn } = drawCards(ally, e.amount, rng);
+        if (!drawn) continue;
+        abilityTriggered(state, ally.id, ab.name, events);
+        parts.push(`${ab.name}（${drawn}枚ドロー）`);
+        addLog(state, `${ally.name}の「${ab.name}」！ カードを${drawn}枚引いた`);
+      } else if (e.kind === 'onPerfectBonusDamage') {
         const alive = livingEnemies(state);
         if (!alive.length) continue;
         const t = alive[rng.int(alive.length)];

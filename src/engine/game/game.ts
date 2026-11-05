@@ -29,7 +29,7 @@ import type {
 import { applyCommand, createBattle, STATE_VERSION } from '../battle/battle';
 import { finalChanceOf } from './checks';
 import { createRng, type Rng } from '../rng';
-import { buildDungeon, findRoom, raiseRarity, rarityIndex, reachableRooms } from './dungeon';
+import { buildDungeon, findRoom, RARITIES, rarityIndex, reachableRooms } from './dungeon';
 import {
   canEquip,
   clampHero,
@@ -40,7 +40,7 @@ import {
   STAT_IDS,
   toPartyMember,
 } from './hero';
-import { newItem, rollCardOffers, rollChestContents, rollConsumable, rollEquipment } from './loot';
+import { cardRewardOdds, chestOdds, newItem, rollCardOffers, rollChestContents, rollConsumable, rollEquipment, rollGrade } from './loot';
 
 export const GAME_VERSION = STATE_VERSION;
 
@@ -381,7 +381,8 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
   }
   game.gold += gold;
 
-  const reward: RewardState = { gold, exp: [], levelUps: [], cardOffers: rollCardOffers(game, survivors, rng), cardPicked: false, loot: [] };
+  const cardOdds = cardRewardOdds(room.type);
+  const reward: RewardState = { gold, exp: [], levelUps: [], cardOffers: rollCardOffers(game, survivors, rng, cardOdds), cardOdds, cardPicked: false, loot: [] };
   for (const id of survivors) {
     const h = findHero(game, id)!;
     const fromLevel = h.level;
@@ -400,7 +401,7 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
 
   // 強敵は装備を落とす。ボスの大宝箱は報酬の後に開ける
   if (room.type === 'elite') {
-    const item = newItem(game, rollEquipment(rng.next() < 0.3 ? 'epic' : 'rare', game.heroes, rng));
+    const item = newItem(game, rollEquipment(rng.next() * 100 < BALANCE.eliteEpicDrop ? 'epic' : 'rare', game.heroes, rng));
     reward.loot.push({ kind: 'item', item });
     addItem(game, item, true);
   } else if (room.type === 'battle' && rng.next() < 0.25) {
@@ -409,7 +410,7 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
     addItem(game, item, true);
   }
   if (room.type !== 'boss' && rng.next() * 100 < hiddenChestChance(game)) {
-    reward.hiddenChest = { rarity: rng.next() < 0.3 ? 'rare' : 'common', locked: rng.next() < 0.5 };
+    reward.hiddenChest = { rarity: RARITIES[rng.next() < 0.3 ? 1 : 0], locked: rng.next() < 0.5 };
   }
   room.cleared = true;
   game.reward = reward;
@@ -509,6 +510,7 @@ const DUNGEON_BOSS_CHEST = (id: string): Rarity => DUNGEONS.get(id).bossChest;
 // ---------- 宝箱 ----------
 
 export const LOCK_TRAP_DAMAGE = 5;
+const GRADE_NAME: Record<Rarity, string> = { common: 'コモン', rare: 'レア', epic: 'エピック', legend: 'レジェンド' };
 
 function openChest(game: GameState, playerId: string, heroId: string, focusUsed: number, rng: Rng): string | undefined {
   const c = game.chest;
@@ -532,14 +534,19 @@ function openChest(game: GameState, playerId: string, heroId: string, focusUsed:
     }
     return undefined;
   }
+  // 運のスロット → 成功数で確率が上の格へずれる → 格を1回だけ抽選（spec §10.3）
   const results = rollWithFocus(slots, focusUsed, statChance(h, 'luk', 'luck'), rng);
-  const perfect = successes(results) === slots;
-  const rarity = perfect ? raiseRarity(c.spec.rarity) : c.spec.rarity;
-  c.lastRoll = { kind: 'luck', heroId, results, success: perfect, upgraded: perfect && rarity !== c.spec.rarity };
-  c.spec = { ...c.spec, rarity };
-  c.contents = rollChestContents(game, rarity, !!c.spec.big, rng);
+  const n = successes(results);
+  const oddsBefore = chestOdds(c.spec.rarity, 0);
+  const odds = chestOdds(c.spec.rarity, n);
+  const grade = rollGrade(odds, rng);
+  const omen = grade === 'legend' && rng.next() * 100 < BALANCE.chestOmenChance;
+  c.grade = grade;
+  c.lastRoll = { kind: 'luck', heroId, results, success: n === slots, oddsBefore, odds, grade, gradeChance: odds[rarityIndex(grade)], omen };
+  c.contents = rollChestContents(game, grade, !!c.spec.big, rng);
   addLoot(game, c.contents);
   game.stats.chestsOpened += 1;
+  addLog(game, `宝箱の中身は${GRADE_NAME[grade]}だった（確率${odds[rarityIndex(grade)].toFixed(1)}%）`);
   return undefined;
 }
 

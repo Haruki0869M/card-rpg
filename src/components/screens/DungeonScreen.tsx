@@ -6,11 +6,12 @@ import { BattleBackground, EnemyArt } from '../../art';
 import { getEnemy } from '../../data/enemies';
 import { EVENTS } from '../../data/events';
 import { getItem } from '../../data/items';
-import { reachableRooms, retreatLoss } from '../../engine';
+import { chestOdds, reachableRooms, retreatLoss } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
 import { LOCAL_PLAYER } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
 import type { Room, RoomType } from '../../types';
+import { CHEST_NAME, OddsBar } from '../ui/ChestOdds';
 import { HeroMini, ItemIcon, RARITY_STYLE, Screen } from '../ui/game';
 
 const ROOM: Record<RoomType, { name: string; Icon: typeof Swords; color: string; bg: string }> = {
@@ -56,12 +57,15 @@ function RoomInfo({ room }: { room: Room }) {
           宝箱
         </div>
         <div>
-          中身の格：<span style={{ color: r.color }}>{r.name}</span>
+          <span style={{ color: r.color }}>{CHEST_NAME[room.chest.rarity]}</span>
           {room.chest.locked && (
             <span className="ml-1 text-amber-200">
               <Lock size={12} className="inline" /> 鍵付き（器用で判定・失敗すると罠）
             </span>
           )}
+        </div>
+        <div className="mt-0.5">
+          <OddsBar odds={chestOdds(room.chest.rarity, 0)} label="中身の格の確率（運のスロットで上げられる）" height={8} />
         </div>
       </div>
     );

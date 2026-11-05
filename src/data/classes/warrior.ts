@@ -33,6 +33,6 @@ export const warrior: ClassDef = {
   hpPerLevel: 6,
   weaponType: 'sword',
   startingEquipment: { weapon: 'copperSword', armor: 'leatherArmor' },
-  cardPool: ['mightyBlow', 'ironWall', 'sweep', 'battleCry', 'charge', 'heavySwing', 'shieldBash', 'warCry'],
+  cardPool: ['mightyBlow', 'ironWall', 'sweep', 'battleCry', 'charge', 'heavySwing', 'shieldBash', 'warCry', 'berserkSlash', 'armorBreak'],
   growthWeights: { str: 3, vit: 3, dex: 1, agi: 1 },
 };

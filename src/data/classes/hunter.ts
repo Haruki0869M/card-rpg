@@ -34,6 +34,6 @@ export const hunter: ClassDef = {
   hpPerLevel: 5,
   weaponType: 'bow',
   startingEquipment: { weapon: 'hunterBow', armor: 'travelerClothes' },
-  cardPool: ['poisonArrow', 'rapidShot', 'vitalShot', 'setTrap', 'evade', 'gambleBolt', 'heavySwing', 'meditate'],
+  cardPool: ['poisonArrow', 'rapidShot', 'vitalShot', 'setTrap', 'evade', 'gambleBolt', 'heavySwing', 'meditate', 'snipe', 'shadowArrow'],
   growthWeights: { dex: 3, per: 3, agi: 2, luk: 1 },
 };

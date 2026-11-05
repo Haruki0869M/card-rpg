@@ -2,9 +2,10 @@
 import { Backpack, Castle, Coins, Crown, Menu, Shuffle, Swords, Users } from 'lucide-react';
 import { BattleBackground } from '../../art';
 import { DUNGEONS } from '../../data/dungeons';
-import { availableDungeons } from '../../engine';
+import { availableDungeons, chestOdds } from '../../engine';
 import { LOCAL_PLAYER } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
+import { CHEST_NAME, fmtPct } from '../ui/ChestOdds';
 import { HeroMini, RARITY_STYLE, Screen } from '../ui/game';
 
 export function HubScreen() {
@@ -74,8 +75,8 @@ export function HubScreen() {
                   <span className="block text-[12px] leading-4 text-zinc-300">{d.description}</span>
                   <span className="mt-0.5 block text-[12px] text-zinc-400">
                     敵 Lv{d.baseLevel + (random ? game.clearedDungeons.length : 0)}〜・
-                    {random ? '入るたびに形が変わる' : 'シナリオダンジョン'}・最奥の宝：
-                    <span style={{ color: r.color }}>{r.name}</span>
+                    {random ? '入るたびに形が変わる' : 'シナリオダンジョン'}・最奥の大宝箱：
+                    <span style={{ color: r.color }}>{CHEST_NAME[d.bossChest]}</span>（レジェンド{fmtPct(chestOdds(d.bossChest, 0)[3])}）
                   </span>
                 </span>
               </button>

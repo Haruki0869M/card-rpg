@@ -32,6 +32,12 @@ export function heroFocusMax(hero: Hero): number {
 export const heroStartBlock = (hero: Hero) => equippedItems(hero).reduce((n, i) => n + (i.startBlock ?? 0), 0);
 export const heroExtraDraw = (hero: Hero) => equippedItems(hero).reduce((n, i) => n + (i.extraDraw ?? 0), 0);
 
+/** 装備の特殊能力（エピック以上。spec §12.7） */
+export const heroAbilities = (hero: Hero) =>
+  equippedItems(hero)
+    .filter((i) => i.ability)
+    .map((i) => ({ name: i.ability!.name, effect: i.ability!.effect }));
+
 /** 武器の専用カード（戦闘時に山札へ加わる） */
 export function weaponCards(hero: Hero): CardInstance[] {
   const w = hero.equipment.weapon;
@@ -67,6 +73,7 @@ export function toPartyMember(hero: Hero): PartyMemberSpec {
     deck: battleDeck(hero),
     startBlock: heroStartBlock(hero),
     extraDraw: heroExtraDraw(hero),
+    abilities: heroAbilities(hero),
     statuses: hero.nextBattleStatuses,
   };
 }

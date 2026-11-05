@@ -80,6 +80,7 @@ export function itemSummary(item: ItemDef): string {
   if (item.extraDraw) parts.push(`毎ターン+${item.extraDraw}枚`);
   for (const c of item.cards ?? []) parts.push(`カード追加×${c.count}`);
   if (item.use) parts.push(item.description);
+  if (item.ability) parts.unshift(`《${item.ability.name}》${item.ability.description}`);
   return parts.join('・') || item.description;
 }
 

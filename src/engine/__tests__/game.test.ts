@@ -10,6 +10,7 @@ import {
   applyGameCommand,
   battleDeck,
   buildDungeon,
+  chestOdds,
   createBattle,
   createGame,
   createRng,
@@ -117,17 +118,53 @@ describe('宝箱', () => {
     g.chest = { roomId: 'r2c0', spec: { rarity: 'common', locked }, unlocked: !locked };
     return g;
   }
-  it('フォーカス全投入で完全成功 → レア度が1段階上がる', () => {
+  it('フォーカス全投入で完全成功 → 確率が上の格へずれ、抽選した格の中身が入る', () => {
     let g = chestGame(false);
     g.heroes[0].focus = 3;
     g = run(g, { type: 'OPEN_CHEST', playerId: P, heroId: 'h0', focusUsed: 3 });
-    expect(g.chest!.spec.rarity).toBe('rare');
-    expect(g.chest!.lastRoll!.upgraded).toBe(true);
+    const roll = g.chest!.lastRoll!;
+    expect(roll.success).toBe(true);
+    expect(roll.oddsBefore).toEqual(chestOdds('common', 0));
+    expect(roll.odds).toEqual(chestOdds('common', 3));
+    expect(roll.grade).toBe(g.chest!.grade);
+    expect(roll.gradeChance).toBeCloseTo(roll.odds![['common', 'rare', 'epic', 'legend'].indexOf(roll.grade!)]);
+    // 見た目（木箱）は変わらない
+    expect(g.chest!.spec.rarity).toBe('common');
     const item = g.chest!.contents!.find((c) => c.kind === 'item');
     expect(item).toBeDefined();
     expect(g.stats.chestsOpened).toBe(1);
     g = run(g, { type: 'LEAVE_CHEST', playerId: P });
     expect(g.mode).toBe('dungeon');
+  });
+  it('同じシードなら同じ格・同じ中身（オンライン同期の前提）', () => {
+    const a = run(chestGame(false), { type: 'OPEN_CHEST', playerId: P, heroId: 'h0', focusUsed: 1 });
+    const b = run(chestGame(false), { type: 'OPEN_CHEST', playerId: P, heroId: 'h0', focusUsed: 1 });
+    expect(a.chest).toEqual(b.chest);
+  });
+  it('エピック以上の格では必ずその格の装備が入る', () => {
+    const counts: Record<string, number> = {};
+    for (let seed = 1; seed <= 400; seed++) {
+      let g = chestGame(false);
+      g.chest!.spec = { rarity: 'legend', locked: false };
+      g.rngState = seed;
+      g.heroes[0].focus = 3;
+      g = run(g, { type: 'OPEN_CHEST', playerId: P, heroId: 'h0', focusUsed: 3 });
+      const grade = g.chest!.grade!;
+      counts[grade] = (counts[grade] ?? 0) + 1;
+      const main = g.chest!.contents![0];
+      expect(main.kind).toBe('item');
+      if (main.kind === 'item') {
+        const def = getItem(main.item.itemId);
+        expect(def.rarity).toBe(grade);
+        if (grade === 'epic' || grade === 'legend') {
+          expect(def.slot).not.toBe('consumable');
+          expect(def.ability).toBeDefined();
+        }
+      }
+      expect(grade).not.toBe('common'); // 黄金箱にコモンは無い
+    }
+    expect(counts.legend).toBeGreaterThan(0);
+    expect(counts.epic).toBeGreaterThan(0);
   });
   it('鍵開けに失敗すると罠（全員5ダメージ）。成功すれば開けられる', () => {
     let failed = false;

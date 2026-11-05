@@ -155,7 +155,7 @@ function scheduleSave(get: () => StoreState) {
   }, 150);
 }
 
-function vibrate(settings: Settings, pattern: number | readonly number[]) {
+export function vibrate(settings: Settings, pattern: number | readonly number[]) {
   if (!settings.vibration) return;
   try {
     navigator.vibrate?.(pattern as number | number[]);

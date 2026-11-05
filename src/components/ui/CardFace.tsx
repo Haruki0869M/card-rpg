@@ -1,7 +1,49 @@
 // ===== カードの見た目（手札以外: 報酬・デッキ一覧など） =====
-import type { CardDef } from '../../types';
+import { Sparkles } from 'lucide-react';
+import type { CardDef, Rarity } from '../../types';
 import { tierRange } from '../format';
+import { RARITY_STYLE } from './game';
 import { CATEGORY_STYLE, EffectChip } from './icons';
+
+/** レア度の枠の光（レア＝青い縁、エピック・レジェンド＝脈打つ光）。親は relative にする */
+export function RarityAura({ rarity }: { rarity?: Rarity }) {
+  if (!rarity || rarity === 'common') return null;
+  const r = RARITY_STYLE[rarity];
+  const strong = rarity === 'epic' || rarity === 'legend';
+  return (
+    <span
+      aria-hidden
+      className={`pointer-events-none absolute -inset-[2px] rounded-[12px] ${strong ? 'glow-pulse' : ''}`}
+      style={{ boxShadow: `0 0 0 2px ${r.color}, 0 0 ${strong ? 16 : 8}px ${r.glow}` }}
+    />
+  );
+}
+
+/** カード名（特殊能力があれば、その名前の帯を2行目に出す） */
+export function CardTitle({ card, compact }: { card: CardDef; compact?: boolean }) {
+  // 手札（幅が狭い）では、名前は2行のまま、能力の印だけを右上に出す（能力名は長押しの詳細で見る）
+  if (card.trait && compact)
+    return (
+      <div className="font-display relative line-clamp-2 h-[30px] shrink-0 pr-[13px] text-[12.5px] leading-[15px] text-amber-50">
+        {card.name}
+        <Sparkles size={12} className="absolute top-[1px] right-0" style={{ color: RARITY_STYLE[card.rarity ?? 'epic'].color }} />
+      </div>
+    );
+  if (!card.trait) return <div className="font-display relative line-clamp-2 h-[30px] shrink-0 text-[12.5px] leading-[15px] text-amber-50">{card.name}</div>;
+  const r = RARITY_STYLE[card.rarity ?? 'epic'];
+  return (
+    <div className="relative flex h-[30px] shrink-0 flex-col">
+      <div className="font-display truncate text-[12.5px] leading-[15px] text-amber-50">{card.name}</div>
+      <div
+        className="flex h-[15px] items-center gap-[2px] truncate rounded-sm px-[2px] text-[12px] leading-[15px] font-bold"
+        style={{ color: r.color, background: 'rgba(0,0,0,.45)', boxShadow: `inset 0 0 0 1px ${r.color}55` }}
+      >
+        <Sparkles size={10} className="shrink-0" />
+        <span className="truncate">{card.trait.name}</span>
+      </div>
+    </div>
+  );
+}
 
 export function CardFace({ card, chance, width = 98, height = 150, glow }: { card: CardDef; chance?: number; width?: number; height?: number; glow?: string }) {
   const cat = CATEGORY_STYLE[card.category];
@@ -15,6 +57,7 @@ export function CardFace({ card, chance, width = 98, height = 150, glow }: { car
         boxShadow: glow ? `0 0 14px ${glow}` : '0 3px 6px rgba(0,0,0,.6)',
       }}
     >
+      <RarityAura rarity={card.rarity} />
       <div className="relative flex h-full flex-col overflow-hidden rounded-[8px] px-1 pt-0.5 pb-1" style={{ background: cat.inner }}>
         <cat.Icon size={60} strokeWidth={1.5} className="pointer-events-none absolute right-[-10px] bottom-[-8px] opacity-[0.09]" style={{ color: cat.glow }} />
         <div className="relative flex h-[22px] shrink-0 items-center justify-between">
@@ -30,7 +73,7 @@ export function CardFace({ card, chance, width = 98, height = 150, glow }: { car
             ))}
           </span>
         </div>
-        <div className="font-display relative line-clamp-2 h-[30px] shrink-0 text-[12.5px] leading-[15px] text-amber-50">{card.name}</div>
+        <CardTitle card={card} />
         <div className="relative flex shrink-0 items-baseline gap-0.5">
           <cat.Icon size={12} strokeWidth={2.6} style={{ color: cat.glow }} />
           <span className="font-display text-outline text-[18px] leading-[22px] text-amber-200 tabular-nums">{chance ?? card.baseChance}</span>

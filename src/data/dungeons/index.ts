@@ -22,7 +22,7 @@ export const DUNGEONS = createRegistry<DungeonDef>('dungeon', [
     background: 'temple',
     baseLevel: 3,
     pools: FOREST_POOLS,
-    bossChest: 'rare',
+    bossChest: 'epic',
     // 行ごとの部屋。next は次の行の何番目の部屋につながるか
     layout: [
       [{ type: 'battle', next: [0, 1] }],
@@ -54,7 +54,7 @@ export const DUNGEONS = createRegistry<DungeonDef>('dungeon', [
     background: 'temple',
     baseLevel: 4,
     pools: { ...FOREST_POOLS, boss: ['treeWarden', 'toxicShroom'] },
-    bossChest: 'epic',
+    bossChest: 'legend',
     rows: 6,
   },
 ]);

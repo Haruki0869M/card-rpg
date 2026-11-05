@@ -1,15 +1,15 @@
 // ===== 宝箱・イベント・休憩の画面 =====
 import { motion } from 'framer-motion';
-import { Coins, Flame, Lock, Sparkles, Star } from 'lucide-react';
+import { Coins, Flame, Sparkles, Star } from 'lucide-react';
 import { useState } from 'react';
-import { BattleBackground, ChestImage } from '../../art';
+import { BattleBackground } from '../../art';
 import { BALANCE } from '../../data/balance';
 import { EVENTS } from '../../data/events';
 import { getItem } from '../../data/items';
 import { eventOptionState, heroFocusMax, heroMaxHp, statChance } from '../../engine';
 import { LOCAL_PLAYER } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
-import type { Hero, Loot, Rarity } from '../../types';
+import type { Hero, Loot } from '../../types';
 import { CheckPanel, RollStrip } from '../ui/CheckPanel';
 import { HeroFace, ItemIcon, itemSummary, RARITY_STYLE, Screen } from '../ui/game';
 
@@ -56,147 +56,6 @@ export function LootList({ loot }: { loot: Loot[] }) {
         );
       })}
     </div>
-  );
-}
-
-/** 1段階下のレア度（格上げ前の表示用） */
-const prevRarity = (r: Rarity): Rarity => (['common', 'common', 'rare', 'epic'] as Rarity[])[(['common', 'rare', 'epic', 'legend'] as Rarity[]).indexOf(r)];
-
-const CHEST_LOOK: Record<Rarity, string> = { common: '木の宝箱', rare: '鉄の宝箱', epic: '装飾の宝箱', legend: '黄金の宝箱' };
-
-export function ChestScreen() {
-  const game = useBattle((s) => s.game)!;
-  const dispatchGame = useBattle((s) => s.dispatchGame);
-  const chest = game.chest!;
-  const locked = !chest.unlocked;
-  const [heroId, setHeroId] = useState(() => bestHero(game.heroes, (h) => statChance(h, locked ? 'dex' : 'luk')));
-  const [focus, setFocus] = useState(0);
-  const r = RARITY_STYLE[chest.spec.rarity];
-  const opened = !!chest.contents;
-  const rollHero = chest.lastRoll ? game.heroes.find((h) => h.id === chest.lastRoll!.heroId) : undefined;
-
-  return (
-    <Screen>
-      <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        <BattleBackground kind={game.dungeon?.background} className="absolute inset-0 h-full w-full opacity-35" />
-        <div className="relative flex flex-col items-center px-3 pt-4">
-          <div className="font-display text-outline text-[24px]" style={{ color: r.color }}>
-            {chest.spec.big ? '大宝箱' : CHEST_LOOK[chest.spec.rarity]}
-          </div>
-          <div className="text-[13px] text-zinc-300">
-            中身の格：<b style={{ color: r.color }}>{r.name}</b>
-            {locked && (
-              <span className="ml-1 text-amber-200">
-                <Lock size={13} className="inline" /> 鍵がかかっている
-              </span>
-            )}
-          </div>
-          <motion.div
-            key={opened ? 'open' : chest.lastRoll ? `r${chest.lastRoll.results.join()}` : 'closed'}
-            initial={opened ? { scale: 0.8, rotate: -6 } : { scale: 1 }}
-            animate={opened ? { scale: [0.8, 1.15, 1], rotate: [-6, 6, 0] } : { rotate: [0, -3, 3, 0] }}
-            transition={{ duration: opened ? 0.5 : 0.4 }}
-            className="relative my-3 flex h-[120px] w-[150px] items-center justify-center"
-          >
-            <span className="absolute inset-0 rounded-full" style={{ background: `radial-gradient(closest-side, ${r.glow}, transparent)` }} />
-            <ChestImage rarity={chest.spec.rarity} open={opened} className="relative h-[120px] w-[150px]" />
-            {locked && <Lock size={28} className="absolute bottom-0 rounded-full bg-zinc-900 p-1 text-amber-200" />}
-          </motion.div>
-          {chest.lastRoll?.kind === 'lock' && !opened && (
-            <div className="flex flex-col items-center gap-1">
-              <RollStrip results={chest.lastRoll.results} />
-              {chest.lastRoll.success ? (
-                <div className="text-[15px] font-bold text-emerald-300">{rollHero?.name}が鍵を開けた！ 次は宝箱を開けよう</div>
-              ) : (
-                <div className="text-center">
-                  <div className="text-[15px] font-bold text-red-300">{chest.lastRoll.trap}</div>
-                  <div className="text-[12px] text-zinc-400">鍵はまだ閉まっている。もう一度挑戦するか、立ち去れます</div>
-                </div>
-              )}
-            </div>
-          )}
-          {opened && chest.lastRoll?.kind === 'luck' && (
-            <div className="flex w-full flex-col items-center gap-1">
-              {chest.lastRoll.upgraded ? (
-                <motion.div
-                  initial={{ scale: 0.4, opacity: 0 }}
-                  animate={{ scale: [0.4, 1.2, 1], opacity: 1 }}
-                  transition={{ duration: 0.45 }}
-                  className="flex flex-col items-center rounded-xl border-2 px-4 py-1.5"
-                  style={{ borderColor: r.color, background: 'rgba(0,0,0,.6)', boxShadow: `0 0 24px ${r.glow}` }}
-                >
-                  <div className="font-display text-outline text-[22px] text-amber-200">完全成功！ 格上げ！</div>
-                  <div className="text-[14px] font-bold">
-                    <span style={{ color: RARITY_STYLE[prevRarity(chest.spec.rarity)].color }}>{RARITY_STYLE[prevRarity(chest.spec.rarity)].name}</span>
-                    <span className="mx-1 text-zinc-300">→</span>
-                    <span style={{ color: r.color }}>{r.name}</span>
-                  </div>
-                </motion.div>
-              ) : (
-                <div className="font-display text-outline text-[22px] text-amber-50">宝箱を開けた！</div>
-              )}
-              <div className="flex items-center gap-1.5 text-[12px] text-zinc-400">
-                <span>格上げ判定</span>
-                <RollStrip results={chest.lastRoll.results} neutral small />
-              </div>
-              {!chest.lastRoll.upgraded && (
-                <div className="text-[12px] text-zinc-400">
-                  格上げはならず。中身は「<span style={{ color: r.color }}>{r.name}</span>」のまま、すべて手に入れた
-                </div>
-              )}
-            </div>
-          )}
-          {opened && (
-            <div className="mt-2 w-full">
-              <LootList loot={chest.contents!} />
-              <div className="mt-1 text-center text-[12px] text-zinc-400">装備品は「パーティ・装備」から誰にでも装備できます</div>
-            </div>
-          )}
-        </div>
-      </div>
-      <div className="panel shrink-0 rounded-t-2xl px-3 pt-2 pb-3">
-        {!opened ? (
-          <>
-            {!locked && (
-              <div className="mb-1 rounded-lg bg-emerald-950/60 px-2 py-1 text-[12px] leading-4 text-emerald-200">
-                ✓ 判定に失敗しても、中身（{r.name}）は必ずすべて手に入ります。運で3つ全部成功すると、中身が1段階上の格になります。
-              </div>
-            )}
-            <CheckPanel
-              heroes={game.heroes}
-              heroId={heroId}
-              setHeroId={setHeroId}
-              focus={focus}
-              setFocus={setFocus}
-              stat={locked ? 'dex' : 'luk'}
-              tag={locked ? 'lock' : 'luck'}
-              slots={locked ? BALANCE.lockSlots : BALANCE.chestLuckSlots}
-              need={locked ? BALANCE.lockNeed : BALANCE.chestLuckSlots}
-              successLabel={locked ? '鍵が開く（0成功は罠：全員5ダメージ）' : '格上げ'}
-              bonusOnly={!locked}
-            />
-            <div className="mt-2 grid grid-cols-[1fr_2fr] gap-2">
-              <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} className="btn btn-dark h-12 rounded-xl text-[14px] font-bold">
-                {chest.spec.big ? '開けずに去る' : '立ち去る'}
-              </button>
-              <button
-                onClick={() => {
-                  dispatchGame({ type: 'OPEN_CHEST', playerId: LOCAL_PLAYER, heroId, focusUsed: focus });
-                  setFocus(0);
-                }}
-                className="btn btn-gold font-display h-12 rounded-xl text-[18px]"
-              >
-                {locked ? '鍵を開ける' : '開ける'}
-              </button>
-            </div>
-          </>
-        ) : (
-          <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px]">
-            {chest.spec.big ? 'ダンジョン制覇！' : '先へ進む'}
-          </button>
-        )}
-      </div>
-    </Screen>
   );
 }
 
