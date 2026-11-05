@@ -5,21 +5,35 @@ const require = createRequire(execSync('npm root -g').toString().trim() + '/');
 export const { chromium } = require('playwright');
 export const URL = process.env.URL ?? 'http://localhost:4173/card-rpg/';
 
-/** テスト戦闘の設定から、人数と敵の組み合わせを選んで戦闘を始める */
-export async function startBattle(page, partySize, encounterName, fast = true) {
+/**
+ * 新しい冒険を始めて（人数を指定）、翠の神殿の最初の部屋で戦闘を始める。
+ * enemies を渡すと、最初の部屋の敵をその組み合わせに差し替える（敵1〜4体の確認用）。
+ */
+export async function startBattle(page, partySize, enemies, fast = true) {
   await page.goto(URL);
-  await page.evaluate(() => localStorage.clear());
+  await page.evaluate((fast) => {
+    localStorage.clear();
+    localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: fast, vibration: false }));
+  }, fast);
   await page.reload();
-  await page.getByLabel('メニュー').click();
-  if (fast) await page.getByText('高速モード').click();
-  await page.getByText('テスト戦闘の設定').click();
-  for (let i = 0; i < 3; i++) {
-    const minus = page.getByLabel('人数を減らす');
-    if (await minus.isEnabled()) await minus.click();
+  await page.getByText('新しい冒険').click();
+  await page.getByText(`${partySize}人`, { exact: true }).click();
+  await page.getByText('キャラクター作成へ').click();
+  await page.getByText('冒険に出発').click();
+  await page.getByText('翠の神殿').first().click();
+  await page.waitForTimeout(300);
+  if (enemies) {
+    await page.evaluate((enemies) => {
+      const k = 'card-rpg/adventure';
+      const d = JSON.parse(localStorage.getItem(k));
+      d.game.dungeon.rooms.find((r) => r.id === 'r0c0').enemies = enemies.map((defId) => ({ defId, level: 3 }));
+      localStorage.setItem(k, JSON.stringify(d));
+    }, enemies);
+    await page.reload();
+    await page.getByText('つづきから').click();
   }
-  for (let i = 1; i < partySize; i++) await page.getByLabel('人数を増やす').click();
-  if (encounterName) await page.getByText(encounterName).click();
-  await page.getByText('この設定で戦闘開始').click();
+  await page.getByLabel('戦闘').first().click();
+  await page.getByText('この部屋へ進む').click();
   await page.waitForTimeout(400);
 }
 

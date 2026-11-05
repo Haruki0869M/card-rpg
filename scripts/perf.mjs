@@ -4,7 +4,7 @@ import { chromium, startBattle } from './lib.mjs';
 
 const browser = await chromium.launch();
 const results = [];
-for (const [n, enc] of [[2, 'ゴブリンの一団（3体）'], [4, 'ゴブリンの軍勢（4体）']]) {
+for (const [n, enc] of [[2, ['goblinBrute', 'chaosShaman', 'goblinScout']], [4, ['treeWarden', 'chaosShaman', 'forestWolf', 'toxicShroom']]]) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 780 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2.6 });
   const page = await ctx.newPage();
   await startBattle(page, n, enc, false);

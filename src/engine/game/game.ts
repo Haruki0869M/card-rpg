@@ -179,6 +179,13 @@ export function statChance(hero: Hero, stat: StatId, tag?: string): number {
 // ---------- コマンド処理 ----------
 
 export function applyGameCommand(input: GameState, cmd: GameCommand): GameResult {
+  // 戦闘中のカード操作は戦闘の状態しか変わらない。冒険全体を複製せず、戦闘エンジンの結果だけを差し替える（軽い）
+  if (cmd.type === 'BATTLE' && cmd.command.type !== 'USE_ITEM') {
+    if (input.mode !== 'battle' || !input.battle) return { state: input, battleEvents: [], error: '戦闘中ではありません' };
+    const r = applyCommand(input.battle, cmd.command);
+    if (r.error) return { state: input, battleEvents: [], error: r.error };
+    return { state: { ...input, battle: r.state }, battleEvents: r.events };
+  }
   const game: GameState = structuredClone(input);
   const rng = createRng(input.rngState);
   let battleEvents: BattleEvent[] = [];
