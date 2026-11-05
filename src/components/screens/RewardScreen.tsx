@@ -1,16 +1,17 @@
 // ===== 戦闘の報酬（ゴールド → 経験値 → レベルアップ → カード → ドロップ） =====
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowUpCircle, Coins, Gift, Heart, Sparkles, Star, TrendingUp } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { REVEAL_TIMING, VIBRATION } from '../../data/balance';
 import { cardOf, getCard } from '../../data/cards';
 import { expToNext, findHero, heroStats } from '../../engine';
 import { finalChance } from '../../engine';
 import { affinityFromStats } from '../../engine';
 import { LOCAL_PLAYER } from '../../store/battleConfig';
-import { useBattle } from '../../store/battleStore';
-import type { GrowthOption, Hero } from '../../types';
+import { speedFactor, useBattle, vibrate } from '../../store/battleStore';
+import type { GrowthOption, Hero, Rarity } from '../../types';
 import { CardFace } from '../ui/CardFace';
-import { Bar, HeroFace, Screen, STAT_LABEL } from '../ui/game';
+import { Bar, HeroFace, RARITY_STYLE, Screen, STAT_LABEL } from '../ui/game';
 import { LootList } from './RoomScreens';
 
 function growthText(o: GrowthOption) {
@@ -24,6 +25,136 @@ function growthText(o: GrowthOption) {
     case 'upgradeCard':
       return { title: 'カード強化', Icon: ArrowUpCircle, text: '山札のカード1枚を強化（成功率+10%・効果アップ）' };
   }
+}
+
+const CARD_BACK: Record<string, { color: string; glow: string }> = {
+  common: { color: '#8a7a5a', glow: 'transparent' },
+  rare: { color: RARITY_STYLE.rare.color, glow: RARITY_STYLE.rare.glow },
+  epic: { color: RARITY_STYLE.epic.color, glow: RARITY_STYLE.epic.glow },
+  legend: { color: RARITY_STYLE.legend.color, glow: RARITY_STYLE.legend.glow },
+};
+
+/** カードの裏面。charge = めくる前の溜め（レア以上のときだけ、その格の色で光る） */
+function CardBack({ width, height, charge }: { width: number; height: number; charge?: Rarity }) {
+  const c = CARD_BACK[charge ?? 'common'];
+  return (
+    <div
+      className={`relative flex items-center justify-center rounded-[10px] border-2 ${charge ? 'chest-shake' : ''}`}
+      style={{
+        width,
+        height,
+        borderColor: charge ? c.color : '#6a5a40',
+        background: 'repeating-linear-gradient(45deg,#2a1e30 0 8px,#22182a 8px 16px)',
+        boxShadow: charge ? `0 0 22px ${c.glow}, inset 0 0 18px ${c.glow}` : '0 3px 6px rgba(0,0,0,.6)',
+      }}
+    >
+      <span className="flex h-12 w-12 items-center justify-center rounded-full border-2" style={{ borderColor: charge ? c.color : '#8a7a5a', background: '#140e18' }}>
+        <Sparkles size={24} style={{ color: charge ? c.color : '#8a7a5a' }} />
+      </span>
+    </div>
+  );
+}
+
+/** カード報酬: 裏向きで並び、左から順にめくれる。レア以上は格の色で溜めてからめくれ、エピックは光の柱が立つ */
+function RewardCards() {
+  const game = useBattle((s) => s.game)!;
+  const settings = useBattle((s) => s.settings);
+  const dispatchGame = useBattle((s) => s.dispatchGame);
+  const r = game.reward!;
+  const speed = speedFactor(settings);
+  const n = r.cardOffers.length;
+  const [shown, setShown] = useState(0);
+  const [charging, setCharging] = useState(-1);
+  const done = shown >= n;
+
+  useEffect(() => {
+    if (shown >= n) return;
+    const rarity = getCard(r.cardOffers[shown].cardId).rarity ?? 'common';
+    const special = rarity !== 'common';
+    if (special && charging !== shown) {
+      const t = setTimeout(() => setCharging(shown), (REVEAL_TIMING.cardFlip * 1000) / speed);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(
+      () => {
+        setShown((x) => x + 1);
+        if (rarity === 'epic' || rarity === 'legend') vibrate(settings, VIBRATION.chestReach);
+        else if (special) vibrate(settings, VIBRATION.chestStep);
+      },
+      ((special ? REVEAL_TIMING.cardFlipRare : REVEAL_TIMING.cardFlip) * 1000) / speed,
+    );
+    return () => clearTimeout(t);
+  }, [shown, charging, n, speed]);
+
+  const odds = r.cardOdds;
+  return (
+    <div className="mt-3" onClick={() => !done && setShown(n)}>
+      <div className="font-display text-center text-[17px] text-amber-100">カードを1枚、山札に加える</div>
+      {odds && (
+        <div className="text-center text-[12px] text-zinc-400">
+          1枚ごとの格の確率：
+          {(['common', 'rare', 'epic'] as Rarity[]).map((g, i) => (
+            <span key={g} className="ml-1" style={{ color: RARITY_STYLE[g].color }}>
+              {RARITY_STYLE[g].name}
+              {odds[i]}%
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="mt-2 flex justify-center gap-1.5">
+        {r.cardOffers.map((o, i) => {
+          const h = findHero(game, o.heroId)!;
+          const card = getCard(o.cardId);
+          const rarity = card.rarity ?? 'common';
+          const open = i < shown;
+          const big = rarity === 'epic' || rarity === 'legend';
+          return (
+            <button
+              key={i}
+              disabled={!done}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (done) dispatchGame({ type: 'PICK_CARD', playerId: LOCAL_PLAYER, offerIndex: i });
+                else setShown(n);
+              }}
+              className="btn relative flex flex-col items-center gap-1 disabled:opacity-100 disabled:filter-none"
+            >
+              {open && big && (
+                <motion.span
+                  initial={{ opacity: 0, scaleY: 0.2 }}
+                  animate={{ opacity: [0, 1, 0.55], scaleY: 1 }}
+                  transition={{ duration: 0.5 }}
+                  className="pointer-events-none absolute -top-6 bottom-6 left-1/2 w-16 -translate-x-1/2 origin-bottom"
+                  style={{ background: `linear-gradient(0deg, ${RARITY_STYLE[rarity].glow}, transparent)` }}
+                />
+              )}
+              <AnimatePresence mode="wait" initial={false}>
+                {open ? (
+                  <motion.div key="front" initial={{ scaleX: 0 }} animate={{ scaleX: big ? [0, 1.12, 1] : 1 }} transition={{ duration: big ? 0.32 : 0.14 }}>
+                    <CardFace card={card} chance={chanceOf(h, o.cardId)} width={104} height={156} />
+                  </motion.div>
+                ) : (
+                  <motion.div key="back" initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ scaleX: 0 }} transition={{ duration: 0.12 }}>
+                    <CardBack width={104} height={156} charge={charging === i && rarity !== 'common' ? rarity : undefined} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              <span className="flex items-center gap-1 text-[12px]">
+                <HeroFace hero={h} size={20} /> {h.name}
+              </span>
+              {open && rarity !== 'common' && (
+                <span className="font-display text-[13px] leading-4" style={{ color: RARITY_STYLE[rarity].color }}>
+                  {RARITY_STYLE[rarity].name}
+                  {big ? '！' : ''}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      {!done && <div className="mt-1 text-center text-[12px] text-zinc-400">タップですぐにめくる</div>}
+    </div>
+  );
 }
 
 const chanceOf = (hero: Hero, cardId: string, upgraded?: boolean) => finalChance(getCard(cardId, upgraded), affinityFromStats(heroStats(hero)));
@@ -81,32 +212,8 @@ export function RewardScreen() {
             ))}
         </div>
 
-        {/* カード報酬 */}
-        {!lu && !r.cardPicked && r.cardOffers.length > 0 && (
-          <div className="mt-3">
-            <div className="font-display text-center text-[17px] text-amber-100">カードを1枚、山札に加える</div>
-            <div className="mt-2 flex justify-center gap-1.5">
-              {r.cardOffers.map((o, i) => {
-                const h = findHero(game, o.heroId)!;
-                return (
-                  <motion.button
-                    key={i}
-                    initial={{ y: 30, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.1 + i * 0.08 }}
-                    onClick={() => dispatchGame({ type: 'PICK_CARD', playerId: LOCAL_PLAYER, offerIndex: i })}
-                    className="btn flex flex-col items-center gap-1"
-                  >
-                    <CardFace card={getCard(o.cardId)} chance={chanceOf(h, o.cardId)} width={104} height={156} glow={getCard(o.cardId).rarity === 'rare' ? 'rgba(80,170,255,.7)' : undefined} />
-                    <span className="flex items-center gap-1 text-[12px]">
-                      <HeroFace hero={h} size={20} /> {h.name}
-                    </span>
-                  </motion.button>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {/* カード報酬（裏向きで並び、1枚ずつめくれる。spec §13） */}
+        {!lu && !r.cardPicked && r.cardOffers.length > 0 && <RewardCards />}
 
         {/* ドロップ */}
         {r.loot.length > 0 && (

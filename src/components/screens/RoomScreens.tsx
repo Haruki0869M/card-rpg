@@ -1,15 +1,15 @@
 // ===== 宝箱・イベント・休憩の画面 =====
 import { motion } from 'framer-motion';
-import { Coins, Flame, Lock, Sparkles, Star } from 'lucide-react';
+import { Coins, Flame, Sparkles, Star } from 'lucide-react';
 import { useState } from 'react';
-import { BattleBackground, ChestImage } from '../../art';
+import { BattleBackground } from '../../art';
 import { BALANCE } from '../../data/balance';
 import { EVENTS } from '../../data/events';
 import { getItem } from '../../data/items';
 import { eventOptionState, heroFocusMax, heroMaxHp, statChance } from '../../engine';
 import { LOCAL_PLAYER } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
-import type { Hero, Loot, Rarity } from '../../types';
+import type { Hero, Loot } from '../../types';
 import { CheckPanel, RollStrip } from '../ui/CheckPanel';
 import { HeroFace, ItemIcon, itemSummary, RARITY_STYLE, Screen } from '../ui/game';
 
@@ -56,108 +56,6 @@ export function LootList({ loot }: { loot: Loot[] }) {
         );
       })}
     </div>
-  );
-}
-
-const CHEST_LOOK: Record<Rarity, string> = { common: '木の宝箱', rare: '鉄の宝箱', epic: '装飾の宝箱', legend: '黄金の宝箱' };
-
-export function ChestScreen() {
-  const game = useBattle((s) => s.game)!;
-  const dispatchGame = useBattle((s) => s.dispatchGame);
-  const chest = game.chest!;
-  const locked = !chest.unlocked;
-  const [heroId, setHeroId] = useState(() => bestHero(game.heroes, (h) => statChance(h, locked ? 'dex' : 'luk')));
-  const [focus, setFocus] = useState(0);
-  const r = RARITY_STYLE[chest.spec.rarity];
-  const opened = !!chest.contents;
-  const rollHero = chest.lastRoll ? game.heroes.find((h) => h.id === chest.lastRoll!.heroId) : undefined;
-
-  return (
-    <Screen>
-      <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        <BattleBackground kind={game.dungeon?.background} className="absolute inset-0 h-full w-full opacity-35" />
-        <div className="relative flex flex-col items-center px-3 pt-4">
-          <div className="font-display text-outline text-[24px]" style={{ color: r.color }}>
-            {chest.spec.big ? '大宝箱' : CHEST_LOOK[chest.spec.rarity]}
-          </div>
-          <div className="text-[13px] text-zinc-300">
-            中身の格：<b style={{ color: r.color }}>{r.name}</b>
-            {locked && (
-              <span className="ml-1 text-amber-200">
-                <Lock size={13} className="inline" /> 鍵がかかっている
-              </span>
-            )}
-          </div>
-          <motion.div
-            key={opened ? 'open' : chest.lastRoll ? `r${chest.lastRoll.results.join()}` : 'closed'}
-            initial={opened ? { scale: 0.8, rotate: -6 } : { scale: 1 }}
-            animate={opened ? { scale: [0.8, 1.15, 1], rotate: [-6, 6, 0] } : { rotate: [0, -3, 3, 0] }}
-            transition={{ duration: opened ? 0.5 : 0.4 }}
-            className="relative my-3 flex h-[120px] w-[150px] items-center justify-center"
-          >
-            <span className="absolute inset-0 rounded-full" style={{ background: `radial-gradient(closest-side, ${r.glow}, transparent)` }} />
-            <ChestImage rarity={chest.spec.rarity} open={opened} className="relative h-[120px] w-[150px]" />
-            {locked && <Lock size={28} className="absolute bottom-0 rounded-full bg-zinc-900 p-1 text-amber-200" />}
-          </motion.div>
-          {chest.lastRoll && (
-            <div className="flex flex-col items-center gap-1">
-              <RollStrip results={chest.lastRoll.results} />
-              <div className={`text-[14px] font-bold ${chest.lastRoll.success ? 'text-emerald-300' : 'text-red-300'}`}>
-                {chest.lastRoll.kind === 'lock'
-                  ? chest.lastRoll.success
-                    ? `${rollHero?.name}が鍵を開けた！`
-                    : chest.lastRoll.trap
-                  : chest.lastRoll.upgraded
-                    ? `完全成功！ 中身が「${r.name}」に格上げされた！`
-                    : `${rollHero?.name}が宝箱を開けた`}
-              </div>
-            </div>
-          )}
-          {opened && (
-            <div className="mt-2 w-full">
-              <LootList loot={chest.contents!} />
-              <div className="mt-1 text-center text-[12px] text-zinc-400">装備品は「パーティ・装備」から誰にでも装備できます</div>
-            </div>
-          )}
-        </div>
-      </div>
-      <div className="panel shrink-0 rounded-t-2xl px-3 pt-2 pb-3">
-        {!opened ? (
-          <>
-            <CheckPanel
-              heroes={game.heroes}
-              heroId={heroId}
-              setHeroId={setHeroId}
-              focus={focus}
-              setFocus={setFocus}
-              stat={locked ? 'dex' : 'luk'}
-              tag={locked ? 'lock' : 'luck'}
-              slots={locked ? BALANCE.lockSlots : BALANCE.chestLuckSlots}
-              need={locked ? BALANCE.lockNeed : BALANCE.chestLuckSlots}
-              successLabel={locked ? '鍵が開く（0成功は罠：全員5ダメージ）' : '中身の格が1段階上がる（失敗しても損はしない）'}
-            />
-            <div className="mt-2 grid grid-cols-[1fr_2fr] gap-2">
-              <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} className="btn btn-dark h-12 rounded-xl text-[14px] font-bold">
-                {chest.spec.big ? '開けずに去る' : '立ち去る'}
-              </button>
-              <button
-                onClick={() => {
-                  dispatchGame({ type: 'OPEN_CHEST', playerId: LOCAL_PLAYER, heroId, focusUsed: focus });
-                  setFocus(0);
-                }}
-                className="btn btn-gold font-display h-12 rounded-xl text-[18px]"
-              >
-                {locked ? '鍵を開ける' : '開ける'}
-              </button>
-            </div>
-          </>
-        ) : (
-          <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px]">
-            {chest.spec.big ? 'ダンジョン制覇！' : '先へ進む'}
-          </button>
-        )}
-      </div>
-    </Screen>
   );
 }
 

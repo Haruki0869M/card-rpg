@@ -32,6 +32,6 @@ export const mage: ClassDef = {
   hpPerLevel: 4,
   weaponType: 'staff',
   startingEquipment: { weapon: 'oakStaff', armor: 'travelerClothes' },
-  cardPool: ['fireball', 'iceLance', 'thunder', 'manaShield', 'deepFocus', 'gambleBolt', 'meditate', 'magicArrow'],
+  cardPool: ['fireball', 'iceLance', 'thunder', 'manaShield', 'deepFocus', 'gambleBolt', 'meditate', 'magicArrow', 'meteor', 'soulDrain'],
   growthWeights: { int: 4, dex: 2, luk: 1, per: 1 },
 };

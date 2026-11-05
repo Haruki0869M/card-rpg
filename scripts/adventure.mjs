@@ -150,6 +150,21 @@ async function run(party, difficulty) {
       await page.getByText('カードを選ばない').click();
       continue;
     }
+    // 宝箱の演出中（最初の1回は演出を最後まで見る。以降は飛ばす）
+    if (await page.getByText('タップで結果まで飛ばす').count()) {
+      if (seen.has('chest-anim')) await clickText(page, 'タップで結果まで飛ばす');
+      else {
+        seen.add('chest-anim');
+        await page.waitForTimeout(700);
+        await page.screenshot({ path: `screenshots/adv-chest-anim.png` });
+      }
+      continue;
+    }
+    if (await page.getByText('運のスロット').count() && (await page.getByText('先へ進む').count()) && !seen.has('chest-result')) {
+      seen.add('chest-result');
+      await check(page, 'chest-result');
+      await page.screenshot({ path: `screenshots/adv-chest-result.png` });
+    }
     if (await clickText(page, '先へ進む')) continue;
     if (await page.locator('button:has-text("ダンジョン制覇！")').count()) {
       await page.screenshot({ path: `screenshots/adv-bigchest.png` });

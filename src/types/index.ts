@@ -53,6 +53,25 @@ export interface CardDef {
   tiers: CardTier[];
   /** 報酬・宝箱での出やすさの格（未指定はコモン扱い） */
   rarity?: Rarity;
+  /** カードの特殊能力（エピック以上は必ず持つ。spec §13.1） */
+  trait?: CardTraitDef;
+}
+
+/** カードの特殊能力の種類。新しい種類が必要になったら、ここに1つ追加する */
+export type CardTrait =
+  /** 貫通: ダメージがブロックを無視する */
+  | { kind: 'pierce' }
+  /** 吸収: HPに与えたダメージの pct% だけ自分のHPを回復 */
+  | { kind: 'drain'; pct: number }
+  /** 魔力還元: 完全成功でマナ+amount */
+  | { kind: 'perfectMana'; amount: number }
+  /** 止め: 対象のHPが belowPct% 以下ならダメージ×multiplier */
+  | { kind: 'execute'; belowPct: number; multiplier: number };
+
+export interface CardTraitDef {
+  name: string;
+  description: string;
+  effect: CardTrait;
 }
 
 // ---------- 特殊能力（データで定義する共通の部品） ----------
@@ -71,7 +90,17 @@ export type BattleAbility =
   /** カードの完全成功時: ダメージを与えるカードなら対象に状態異常 */
   | { kind: 'onPerfectApplyStatus'; category?: CardCategory; status: StatusId; amount: number; chance?: number }
   /** 他の味方がHP0になるダメージを受ける時、確率で代わりに受ける */
-  | { kind: 'coverLethal'; chance: number };
+  | { kind: 'coverLethal'; chance: number }
+  /** カードの完全成功時: フォーカス回復 */
+  | { kind: 'onPerfectGainFocus'; category?: CardCategory; amount: number }
+  /** カードの完全成功時: カードを引く */
+  | { kind: 'onPerfectDraw'; category?: CardCategory; amount: number }
+  /** 味方フェーズの開始時: ブロック（allies なら味方全員） */
+  | { kind: 'turnStartBlock'; amount: number; allies?: boolean }
+  /** 味方フェーズの開始時: HP回復 */
+  | { kind: 'turnStartHeal'; amount: number }
+  /** 味方フェーズの開始時: 確率（%）でフォーカス回復 */
+  | { kind: 'turnStartFocus'; amount: number; chance: number };
 
 /** 探索の特殊能力（M2以降で使用。M1ではデータと説明のみ） */
 export type ExploreAbility =
@@ -143,6 +172,14 @@ export interface PartyMemberSpec {
   extraDraw?: number;
   /** 戦闘開始時の状態異常 */
   statuses?: Partial<Statuses>;
+  /** 職業以外から得た戦闘の特殊能力（装備） */
+  abilities?: GrantedAbility[];
+}
+
+/** 装備などから得た戦闘の特殊能力（戦闘の状態に持たせる。シリアライズ可能） */
+export interface GrantedAbility {
+  name: string;
+  effect: BattleAbility;
 }
 
 // ---------- 敵 ----------
@@ -225,6 +262,8 @@ export interface AllyState {
   /** 装備・成長を反映した能力値 */
   stats: Stats;
   extraDraw: number;
+  /** 装備から得た戦闘の特殊能力 */
+  abilities?: GrantedAbility[];
   statuses: Statuses;
   drawPile: CardInstance[];
   hand: CardInstance[];

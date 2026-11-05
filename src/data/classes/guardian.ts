@@ -33,6 +33,6 @@ export const guardian: ClassDef = {
   hpPerLevel: 7,
   weaponType: 'hammer',
   startingEquipment: { weapon: 'oakHammer', armor: 'leatherArmor' },
-  cardPool: ['guardFormation', 'shieldStance', 'holyLight', 'counterShield', 'rally', 'shieldBash', 'warCry', 'guard'],
+  cardPool: ['guardFormation', 'shieldStance', 'holyLight', 'counterShield', 'rally', 'shieldBash', 'warCry', 'guard', 'judgment', 'sanctuary'],
   growthWeights: { vit: 4, dex: 2, str: 2 },
 };

@@ -1,5 +1,6 @@
 // ===== 冒険（ゲーム全体）の型 =====
 import type {
+  BattleAbility,
   BattleState,
   CardInstance,
   Command,
@@ -36,6 +37,8 @@ export interface ItemDef {
   cards?: { cardId: string; count: number }[];
   /** 消費アイテムの効果 */
   use?: ConsumableEffect;
+  /** 装備の特殊能力（エピック以上は必ず持つ。spec §12.7） */
+  ability?: { name: string; description: string; effect: BattleAbility };
 }
 
 export interface ItemInstance {
@@ -71,6 +74,7 @@ export interface Hero {
 export type RoomType = 'battle' | 'elite' | 'event' | 'rest' | 'chest' | 'boss';
 
 export interface ChestSpec {
+  /** 宝箱の見た目（common=木箱 / rare=鉄箱 / epic=装飾箱 / legend=黄金箱）。中身の格の確率を決める */
   rarity: Rarity;
   locked: boolean;
   /** 大宝箱（ボス撃破後） */
@@ -102,7 +106,7 @@ export interface DungeonDef {
   pools: { battle: string[][]; elite: string[][]; boss: string[] };
   /** 固定の部屋の並び（行ごと）。無ければ自動生成 */
   layout?: { type: RoomType; next: number[]; chest?: ChestSpec; eventId?: string }[][];
-  /** 大宝箱のレア度 */
+  /** 大宝箱の見た目（中身の格の確率を決める） */
   bossChest: Rarity;
   /** 自動生成の時の部屋の行数 */
   rows?: number;
@@ -135,8 +139,26 @@ export interface ChestState {
   unlocked: boolean;
   /** 開けた後の中身（開ける前は undefined） */
   contents?: Loot[];
+  /** 抽選された中身の格（開ける前は undefined） */
+  grade?: Rarity;
   /** 判定の結果（演出用） */
-  lastRoll?: { kind: 'lock' | 'luck'; heroId: string; results: ('focus' | 'hit' | 'miss')[]; success: boolean; upgraded?: boolean; trap?: string };
+  lastRoll?: ChestRoll;
+}
+
+export interface ChestRoll {
+  kind: 'lock' | 'luck';
+  heroId: string;
+  results: ('focus' | 'hit' | 'miss')[];
+  success: boolean;
+  trap?: string;
+  /** 運の判定: スロット前の確率と、成功数で上へずれた後の確率（%・格の順） */
+  oddsBefore?: number[];
+  odds?: number[];
+  /** 運の判定: 抽選された格と、その格が出る確率（%） */
+  grade?: Rarity;
+  gradeChance?: number;
+  /** 先読み予告（レジェンドのときだけ一定の確率で出る） */
+  omen?: boolean;
 }
 
 export interface EventCheck {
@@ -202,6 +224,8 @@ export interface RewardState {
   levelUps: { heroId: string; level: number; options: GrowthOption[] }[];
   /** カード報酬（3枚から1枚） */
   cardOffers: { cardId: string; heroId: string }[];
+  /** カード報酬の格の確率（%・コモン/レア/エピック。表示用） */
+  cardOdds?: number[];
   cardPicked: boolean;
   /** ドロップ品（自動で持ち物に入る。表示用） */
   loot: Loot[];

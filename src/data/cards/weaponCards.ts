@@ -10,6 +10,7 @@ export const WEAPON_CARDS: CardDef[] = [
   { id: 'wSlash', name: '斬撃', category: 'physical', cost: 1, slots: 1, baseChance: 80, target: 'enemy', tiers: [{ minSuccesses: 0, effects: [d(5)] }, { minSuccesses: 1, effects: [d(8)] }] },
   {
     id: 'wSteelCombo',
+    rarity: 'rare',
     name: '鋼の連撃',
     category: 'physical',
     cost: 1,
@@ -20,6 +21,8 @@ export const WEAPON_CARDS: CardDef[] = [
   },
   {
     id: 'wMithrilSlash',
+    rarity: 'epic',
+    trait: { name: '貫通', description: 'ダメージが敵のブロックを無視する', effect: { kind: 'pierce' } },
     name: 'ミスリル斬り',
     category: 'physical',
     cost: 1,
@@ -30,6 +33,8 @@ export const WEAPON_CARDS: CardDef[] = [
   },
   {
     id: 'wFlameSlash',
+    rarity: 'legend',
+    trait: { name: '焼き尽くし', description: '対象のHPが30%以下ならダメージ1.5倍', effect: { kind: 'execute', belowPct: 30, multiplier: 1.5 } },
     name: '火炎斬り',
     category: 'physical',
     cost: 2,
@@ -47,6 +52,7 @@ export const WEAPON_CARDS: CardDef[] = [
   { id: 'wManaBolt', name: '魔力弾', category: 'magic', cost: 1, slots: 1, baseChance: 80, target: 'enemy', tiers: [{ minSuccesses: 0, effects: [d(5)] }, { minSuccesses: 1, effects: [d(8)] }] },
   {
     id: 'wManaTorrent',
+    rarity: 'rare',
     name: '魔力の奔流',
     category: 'magic',
     cost: 1,
@@ -57,6 +63,8 @@ export const WEAPON_CARDS: CardDef[] = [
   },
   {
     id: 'wLightning',
+    rarity: 'epic',
+    trait: { name: '魔力還元', description: '完全成功でマナ+1', effect: { kind: 'perfectMana', amount: 1 } },
     name: '落雷',
     category: 'magic',
     cost: 2,
@@ -67,6 +75,8 @@ export const WEAPON_CARDS: CardDef[] = [
   },
   {
     id: 'wStarfall',
+    rarity: 'legend',
+    trait: { name: '星の貫き', description: 'ダメージが敵のブロックを無視する', effect: { kind: 'pierce' } },
     name: '星降り',
     category: 'magic',
     cost: 2,
@@ -84,6 +94,7 @@ export const WEAPON_CARDS: CardDef[] = [
   { id: 'wPound', name: '打ち据え', category: 'physical', cost: 1, slots: 1, baseChance: 80, target: 'enemy', tiers: [{ minSuccesses: 0, effects: [d(5)] }, { minSuccesses: 1, effects: [d(8), b(3)] }] },
   {
     id: 'wIronHammer',
+    rarity: 'rare',
     name: '鉄槌',
     category: 'physical',
     cost: 1,
@@ -98,6 +109,8 @@ export const WEAPON_CARDS: CardDef[] = [
   },
   {
     id: 'wHolyHammer',
+    rarity: 'epic',
+    trait: { name: '聖なる癒し', description: 'HPに与えたダメージの25%だけHP回復', effect: { kind: 'drain', pct: 25 } },
     name: '聖槌',
     category: 'physical',
     cost: 2,
@@ -108,6 +121,8 @@ export const WEAPON_CARDS: CardDef[] = [
   },
   {
     id: 'wEarthGuard',
+    rarity: 'legend',
+    trait: { name: '大地の恵み', description: 'HPに与えたダメージの40%だけHP回復', effect: { kind: 'drain', pct: 40 } },
     name: '大地の守護',
     category: 'physical',
     cost: 2,
@@ -125,6 +140,7 @@ export const WEAPON_CARDS: CardDef[] = [
   { id: 'wAimedShot', name: '狙い射ち', category: 'physical', cost: 1, slots: 1, baseChance: 80, target: 'enemy', tiers: [{ minSuccesses: 0, effects: [d(4)] }, { minSuccesses: 1, effects: [d(8)] }] },
   {
     id: 'wDoubleShot',
+    rarity: 'rare',
     name: '二連射',
     category: 'physical',
     cost: 1,
@@ -135,6 +151,8 @@ export const WEAPON_CARDS: CardDef[] = [
   },
   {
     id: 'wGaleArrow',
+    rarity: 'epic',
+    trait: { name: '止め', description: '対象のHPが30%以下ならダメージ1.5倍', effect: { kind: 'execute', belowPct: 30, multiplier: 1.5 } },
     name: '疾風の矢',
     category: 'physical',
     cost: 1,
@@ -149,6 +167,8 @@ export const WEAPON_CARDS: CardDef[] = [
   },
   {
     id: 'wSkyPiercer',
+    rarity: 'legend',
+    trait: { name: '天穿の貫き', description: 'ダメージが敵のブロックを無視する', effect: { kind: 'pierce' } },
     name: '天穿',
     category: 'physical',
     cost: 2,

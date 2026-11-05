@@ -3,7 +3,7 @@ import { getDungeon } from './registry';
 import type { ChestSpec, DungeonDef, DungeonRun, Rarity, Room, RoomType } from '../../types';
 import type { Rng } from '../rng';
 
-const RARITIES: Rarity[] = ['common', 'rare', 'epic', 'legend'];
+export const RARITIES: Rarity[] = ['common', 'rare', 'epic', 'legend'];
 export const rarityIndex = (r: Rarity) => RARITIES.indexOf(r);
 export const raiseRarity = (r: Rarity, n = 1): Rarity => RARITIES[Math.min(RARITIES.length - 1, rarityIndex(r) + n)];
 
@@ -17,10 +17,14 @@ function rollEnemies(def: DungeonDef, type: RoomType, row: number, levelBonus: n
   return ids.map((defId) => ({ defId, level: Math.max(1, lv) }));
 }
 
+/** ダンジョンの宝箱の見た目（木箱が中心。奥の行ほど良い箱が出やすい） */
 function rollChest(row: number, rng: Rng): ChestSpec {
-  const r = rng.next();
-  const rarity: Rarity = r < 0.12 + row * 0.03 ? 'epic' : r < 0.5 + row * 0.04 ? 'rare' : 'common';
-  return { rarity, locked: rng.next() < 0.4 };
+  const weights = [Math.max(30, 70 - row * 5), 25 + row * 2, 4 + row * 2, 1 + row * 0.5];
+  const total = weights.reduce((a, b) => a + b, 0);
+  let x = rng.next() * total;
+  let i = 0;
+  while (i < weights.length - 1 && (x -= weights[i]) >= 0) i++;
+  return { rarity: RARITIES[i], locked: rng.next() < 0.4 };
 }
 
 /** ランダム生成の部屋の並び（1行あたり1〜3部屋。各部屋は次の行の近い部屋につながる） */

@@ -9,6 +9,7 @@ import { type Detail, useDetail } from '../hooks/usePress';
 import { useBattle } from '../store/battleStore';
 import type { BattleState, StatId } from '../types';
 import { CATEGORY_LABEL, intentView, longEffect, tierTitle } from './format';
+import { RARITY_STYLE } from './ui/game';
 import { CATEGORY_STYLE, STATUS_STYLE } from './ui/icons';
 
 function signed(n: number) {
@@ -48,6 +49,14 @@ function Content({ d, battle }: { d: Detail; battle: BattleState }) {
               （基礎{card.baseChance}% ・{cls.name}の{CATEGORY_LABEL[card.category]}適性{signed(affinityOf(ally)[card.category])}）
             </span>
           </div>
+          {card.trait && (
+            <div className="mt-1 rounded px-1.5 py-0.5 text-[12px]" style={{ background: 'rgba(190,120,255,.14)' }}>
+              <span className="font-display" style={{ color: RARITY_STYLE[card.rarity ?? 'epic'].color }}>
+                《{card.trait.name}》
+              </span>{' '}
+              {card.trait.description}
+            </div>
+          )}
           {focus > 0 && <div className="text-[12px] text-amber-300">★フォーカス{focus}使用時の確率</div>}
           <table className="mt-1 w-full text-[13px]">
             <tbody>
@@ -124,6 +133,11 @@ function Content({ d, battle }: { d: Detail; battle: BattleState }) {
             <div className="mt-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-[12px]">
               <span className="font-display text-amber-200">《{cls.battleAbility.name}》</span> {cls.battleAbility.description}
             </div>
+            {a.abilities?.map((ab) => (
+              <div key={ab.name} className="mt-0.5 rounded bg-fuchsia-500/10 px-1.5 py-0.5 text-[12px]">
+                <span className="font-display text-fuchsia-200">《{ab.name}》</span> 装備の特殊能力
+              </div>
+            ))}
             <div className="mt-0.5 text-[13px] text-red-300">被弾予定 {incomingDamage(battle, a)}（ブロック差し引き後）</div>
           </div>
         </div>
@@ -135,6 +149,14 @@ function Content({ d, battle }: { d: Detail; battle: BattleState }) {
         <>
           <Title>{it.name}</Title>
           <div className="text-[13px]">{it.description}</div>
+          {it.ability && (
+            <div className="mt-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-[12px]">
+              <span className="font-display" style={{ color: RARITY_STYLE[it.rarity].color }}>
+                《{it.ability.name}》
+              </span>{' '}
+              {it.ability.description}
+            </div>
+          )}
         </>
       );
     }

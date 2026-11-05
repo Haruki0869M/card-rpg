@@ -23,6 +23,7 @@ export function CheckPanel({
   slots,
   need,
   successLabel,
+  bonusOnly,
 }: {
   heroes: Hero[];
   heroId: string;
@@ -34,6 +35,8 @@ export function CheckPanel({
   slots: number;
   need: number;
   successLabel: string;
+  /** 失敗しても損の無い判定（成功率を「〜の確率」と中立の色で出す） */
+  bonusOnly?: boolean;
 }) {
   const hero = heroes.find((h) => h.id === heroId) ?? heroes[0];
   const chance = hero ? statChance(hero, stat, tag) : 0;
@@ -88,7 +91,8 @@ export function CheckPanel({
         </button>
       </div>
       <div className="text-center text-[13px]">
-        成功率 <b className={p >= 80 ? 'text-emerald-300' : p >= 50 ? 'text-amber-200' : 'text-red-300'}>{p}%</b>
+        {bonusOnly ? `${successLabel}の確率` : '成功率'}{' '}
+        <b className={bonusOnly ? 'text-amber-200' : p >= 80 ? 'text-emerald-300' : p >= 50 ? 'text-amber-200' : 'text-red-300'}>{p}%</b>
         <span className="text-zinc-400">
           （フォーカス {hero?.focus ?? 0} → {(hero?.focus ?? 0) - focus}）
         </span>
@@ -97,8 +101,13 @@ export function CheckPanel({
   );
 }
 
-/** 判定の結果の表示（左から順に出る） */
-export function RollStrip({ results }: { results: SlotResult[] }) {
+/**
+ * 判定の結果の表示（左から順に出る）。
+ * neutral: 失敗しても損が無い判定（宝箱の格上げなど）。失敗の枠を赤ではなく灰色で控えめに出す
+ */
+export function RollStrip({ results, neutral, small }: { results: SlotResult[]; neutral?: boolean; small?: boolean }) {
+  const size = small ? 'h-7 w-7' : 'h-10 w-10';
+  const icon = small ? 15 : 20;
   return (
     <div className="flex justify-center gap-1">
       {results.map((r, i) => (
@@ -107,16 +116,18 @@ export function RollStrip({ results }: { results: SlotResult[] }) {
           initial={{ opacity: 0, scale: 1.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: i * 0.05, duration: 0.06 }}
-          className="flex h-10 w-10 items-center justify-center rounded-lg border-2"
+          className={`flex ${size} items-center justify-center rounded-lg border-2`}
           style={
             r === 'focus'
               ? { background: 'linear-gradient(180deg,#ffe9a8,#e2a72a)', borderColor: '#fff3c4', color: '#5a3a06' }
               : r === 'hit'
                 ? { background: 'linear-gradient(180deg,#5af2a8,#138a50)', borderColor: '#b8ffd8', color: '#06301a' }
-                : { background: 'linear-gradient(180deg,#5a2430,#2a0c12)', borderColor: '#ff7a8a', color: '#ff9aa8' }
+                : neutral
+                  ? { background: 'linear-gradient(180deg,#3a3640,#1e1c22)', borderColor: '#6a6670', color: '#9a96a0' }
+                  : { background: 'linear-gradient(180deg,#5a2430,#2a0c12)', borderColor: '#ff7a8a', color: '#ff9aa8' }
           }
         >
-          {r === 'focus' ? <Star size={20} /> : r === 'hit' ? <Check size={20} strokeWidth={3} /> : <X size={20} strokeWidth={3} />}
+          {r === 'focus' ? <Star size={icon} /> : r === 'hit' ? <Check size={icon} strokeWidth={3} /> : <X size={icon} strokeWidth={3} />}
         </motion.span>
       ))}
     </div>

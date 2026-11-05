@@ -45,8 +45,39 @@ export const BALANCE = {
   chestLuckSlots: 3,
   lockSlots: 2,
   lockNeed: 1,
-  /** 宝箱のゴールド（レア度ごとの基準） */
-  chestGold: { common: 15, rare: 35, epic: 70, legend: 120 } as Record<string, number>,
+  /** 宝箱のゴールド（中身の格ごとの基準） */
+  chestGold: { common: 10, rare: 30, epic: 80, legend: 200 } as Record<string, number>,
+  /**
+   * 宝箱の見た目ごとの中身の格の確率（%・コモン/レア/エピック/レジェンド）。spec §10.2
+   * common=木箱 / rare=鉄箱 / epic=装飾箱 / legend=黄金箱
+   */
+  chestOdds: {
+    common: [88, 10, 1.8, 0.2],
+    rare: [55, 38, 6, 1],
+    epic: [20, 50, 26, 4],
+    legend: [0, 40, 45, 15],
+  } as Record<string, readonly number[]>,
+  /** 運のスロットの成功数（index）ごとの、格の重みの倍率（コモン/レア/エピック/レジェンド） */
+  chestLuckBoost: [
+    [1, 1, 1, 1],
+    [1, 1.2, 1.5, 1.5],
+    [1, 1.4, 2.5, 2.5],
+    [1, 1.7, 4, 4],
+  ] as readonly (readonly number[])[],
+  /** レジェンドのときに先読み予告が出る確率（%） */
+  chestOmenChance: 50,
+  /** 中身の格ごとの「装備が出る」確率（%。残りは同じ格の消費アイテム。エピック以上は必ず装備） */
+  chestEquipChance: { common: 60, rare: 65, epic: 100, legend: 100 } as Record<string, number>,
+  /** 中身の格がレア以下の時に、おまけの消費アイテムが付く確率（%） */
+  chestBonusConsumable: 25,
+  /** 強敵のドロップがエピックになる確率（%。残りはレア） */
+  eliteEpicDrop: 10,
+  /** カード報酬の格の確率（%・コモン/レア/エピック）。部屋の種類ごと */
+  cardRewardOdds: {
+    battle: [72, 24, 4],
+    elite: [55, 35, 10],
+    boss: [35, 45, 20],
+  } as Record<string, readonly number[]>,
   /** 戦闘後に隠し宝箱を見つける基本確率（%） */
   hiddenChestBase: 5,
   /** 難易度ごとの敵レベルの補正 */
@@ -71,8 +102,34 @@ export const TIMING = {
   fastModeFactor: 2,
 } as const;
 
+/** 宝箱・カード報酬の演出時間（秒）。高速モードでは fastModeFactor で割る。spec §10.3 */
+export const REVEAL_TIMING = {
+  /** リールが止まる間隔 / テンパイ時の最後のリールの溜め */
+  reelStop: 0.28,
+  reelTenpai: 0.9,
+  /** 確率の帯が伸びる */
+  oddsShift: 0.55,
+  /** 先読み予告 */
+  omen: 0.9,
+  /** 揺れ（最初の光が漏れるまで） */
+  shake: 0.45,
+  /** 光の色が1段上がるごと */
+  lightStep: 0.55,
+  /** リーチ演出（エピック以上） */
+  reach: 1.1,
+  /** レジェンドのプレミア演出 */
+  premium: 1.6,
+  /** カード報酬: 1枚めくる間隔 / レア以上の溜め */
+  cardFlip: 0.22,
+  cardFlipRare: 0.45,
+} as const;
+
 /** 振動パターン（ms） */
 export const VIBRATION = {
+  /** 宝箱: 光が1段上がる / リーチ / レジェンド確定 */
+  chestStep: 30,
+  chestReach: [60, 50, 60],
+  chestLegend: [120, 60, 120, 60, 300],
   perfect: [25, 30, 25],
   hurt: 20,
   victory: [40, 40, 80],
