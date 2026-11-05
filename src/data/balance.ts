@@ -12,11 +12,6 @@ export const BALANCE = {
   /** 成功率の下限・上限（%） */
   chanceMin: 5,
   chanceMax: 95,
-  /** 状態異常の倍率 */
-  vulnerableMultiplier: 1.5,
-  weakMultiplier: 0.75,
-  /** 火傷1回あたりのダメージ（毒は残り数がそのままダメージ） */
-  burnDamage: 4,
   /** 戦闘に参加した味方の人数ごとの敵HP倍率（index = 人数。端数切り捨て） */
   enemyHpByPartySize: [0, 0.6, 1.0, 1.35, 1.7] as readonly number[],
   /** 敵のレベルが baseLevel より1上がるごとの増加率 */

@@ -1,9 +1,12 @@
+import { getStatus } from '../data/statuses';
+import { activeStatuses } from '../engine';
 import { getEnemyAction } from '../data/enemies';
 import { enemyHitDamage, findAlly } from '../engine';
 import type { BattleState, CardDef, CardEffect, EnemyState, StatusId } from '../types';
 
 export const CATEGORY_LABEL = { physical: '物理', magic: '魔法', skill: 'スキル' } as const;
-export const STATUS_LABEL = { vulnerable: '脆弱', weak: '弱体', burn: '火傷', poison: '毒' } as const;
+/** 状態異常の名前 */
+export const STATUS_LABEL = (id: string) => getStatus(id).name;
 
 /** Tierがカバーする成功数の範囲表記（例: "0-1", "2"） */
 export function tierRange(card: CardDef, i: number): string {
@@ -26,7 +29,7 @@ export function longEffect(e: CardEffect): string {
     case 'block':
       return `ブロック${e.amount}獲得`;
     case 'applyStatus':
-      return `敵に「${STATUS_LABEL[e.status]}」${e.amount}付与`;
+      return `敵に「${STATUS_LABEL(e.status)}」${e.amount}付与`;
     case 'gainMana':
       return `マナ${e.amount}回復`;
     case 'gainFocus':
@@ -81,12 +84,13 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
     } else if (eff.kind === 'debuff') {
       const all = eff.target === 'all';
       parts.push({ kind: 'debuff', status: eff.status, amount: eff.amount, targetId: all ? undefined : target?.id, all });
-      details.push(`${all ? '味方全員' : targetName}に「${STATUS_LABEL[eff.status]}」${eff.amount}`);
+      details.push(`${all ? '味方全員' : targetName}に「${STATUS_LABEL(eff.status)}」${eff.amount}`);
     }
   }
   if (action.effects.some((e) => e.kind === 'attack')) {
     if (enemy.attackMul !== 1) details.push(`（Lv${enemy.level}の攻撃力補正 ×${enemy.attackMul.toFixed(2)} 反映済み）`);
-    if (enemy.statuses.weak > 0) details.push('（弱体によりダメージ×0.75 反映済み）');
+    for (const { def } of activeStatuses(enemy.statuses))
+      if (def.dealtMultiplier !== undefined) details.push(`（${def.name}によりダメージ×${def.dealtMultiplier} 反映済み）`);
   }
   return { parts, name: action.name, details };
 }

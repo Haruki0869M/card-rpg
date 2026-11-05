@@ -11,3 +11,4 @@ export * from './game/dungeon';
 export * from './game/game';
 export * from './game/hero';
 export * from './game/loot';
+export * from './battle/statuses';

@@ -1,8 +1,8 @@
-import { BALANCE } from '../../data/balance';
 import { getEnemy, getEnemyAction } from '../../data/enemies';
 import type { AllyState, BattleEvent, BattleState, EnemyActionDef, EnemyState } from '../../types';
 import type { Rng } from '../rng';
 import { calcDamage } from './damage';
+import { tickDamageOf } from './statuses';
 
 export function livingAllies(state: BattleState): AllyState[] {
   return state.allies.filter((a) => !a.dead);
@@ -120,9 +120,9 @@ export function intentHitsOn(enemy: EnemyState, ally: AllyState): number[] {
   return hits;
 }
 
-/** 毒・火傷で次に受けるダメージ（ブロック無視） */
+/** 継続ダメージの状態異常（毒・火傷など）で次に受けるダメージ（ブロック無視） */
 export function dotDamage(ally: AllyState): number {
-  return ally.statuses.poison + (ally.statuses.burn > 0 ? BALANCE.burnDamage : 0);
+  return tickDamageOf(ally.statuses);
 }
 
 /** 被弾予定（インテント合計 − 現在のブロック ＋ 毒・火傷）。かばう（確率）は含めない */

@@ -18,22 +18,23 @@ import type {
   CommandResult,
   EnemyState,
   SlotResult,
-  StatusId,
   Statuses,
 } from '../../types';
 import { coverChance, damageMultiplierFor, perfectAbilities, turnStartAbilities } from '../abilities';
 import { createRng, type Rng, shuffle } from '../rng';
 import { affinityOf } from '../stats';
 import { absorb, calcDamage } from './damage';
+import { addStatus, applyTick, cleanse, decayStatuses, emptyStatuses, hasHarmful } from './statuses';
+import { getStatus } from '../../data/statuses';
 import { discardHand, drawCards } from './deck';
 import { applyTaunt, decideAllIntents, enemyHitDamage, livingAllies, livingEnemies, retargetAfterDeath } from './intents';
 import { finalChance, selectTier } from './probability';
 
 export const STATE_VERSION = 3;
 
-export const emptyStatuses = (): Statuses => ({ vulnerable: 0, weak: 0, burn: 0, poison: 0 });
 
-export const STATUS_NAMES: Record<StatusId, string> = { vulnerable: '脆弱', weak: '弱体', burn: '火傷', poison: '毒' };
+/** 状態異常の名前 */
+const statusName = (id: string) => getStatus(id).name;
 
 
 // ---------- 生成 ----------
@@ -78,7 +79,7 @@ export function createBattle(setup: BattleSetup): BattleState {
       stats: m.stats ?? def.stats,
       extraDraw: m.extraDraw ?? 0,
       ...(m.abilities?.length ? { abilities: m.abilities.map((a) => ({ name: a.name, effect: { ...a.effect } })) } : {}),
-      statuses: { ...emptyStatuses(), ...m.statuses },
+      statuses: { ...emptyStatuses(), ...(m.statuses as Statuses) },
       drawPile: shuffle(cards, rng),
       hand: [],
       discard: [],
@@ -272,10 +273,7 @@ function checkEnd(state: BattleState, events: BattleEvent[]): boolean {
   return false;
 }
 
-function decrementStatuses(s: Statuses) {
-  s.vulnerable = Math.max(0, s.vulnerable - 1);
-  s.weak = Math.max(0, s.weak - 1);
-}
+const decrementStatuses = decayStatuses;
 
 function abilityTriggered(state: BattleState, unitId: string, name: string, events: BattleEvent[]) {
   state.stats.abilityTriggers += 1;
@@ -365,26 +363,18 @@ function hitAlly(
   return { victim, hpLoss: r.hpLoss };
 }
 
-/** 毒・火傷のダメージ（ブロックを無視）→ 毒は1減る、火傷も1減る */
+/** 継続ダメージの状態異常（毒・火傷など。ブロックを無視）→ その状態異常は減る */
 function tickDamageOverTime(state: BattleState, side: 'ally' | 'enemy', rng: Rng, events: BattleEvent[]) {
   const units = side === 'ally' ? state.allies : state.enemies;
   for (const u of units) {
     if (u.dead) continue;
-    let dmg = 0;
-    if (u.statuses.poison > 0) {
-      dmg += u.statuses.poison;
-      u.statuses.poison -= 1;
-    }
-    if (u.statuses.burn > 0) {
-      dmg += BALANCE.burnDamage;
-      u.statuses.burn -= 1;
-    }
+    const { damage: dmg, names } = applyTick(u.statuses);
     if (dmg <= 0) continue;
     const loss = Math.min(u.hp, dmg);
     u.hp -= loss;
     const id = 'uid' in u ? u.uid : u.id;
     events.push({ type: 'damage', unitId: id, amount: loss, blocked: 0 });
-    addLog(state, `${'uid' in u ? enemyName(u) : u.name}は毒・火傷で${loss}ダメージ`);
+    addLog(state, `${'uid' in u ? enemyName(u) : u.name}は${names.join('・')}で${loss}ダメージ`);
     if (u.hp <= 0) {
       if ('uid' in u) killEnemy(state, u, events);
       else killAlly(state, u, rng, events);
@@ -515,10 +505,10 @@ function playCard(
       case 'applyStatus': {
         const vs = victims();
         for (const v of vs) {
-          v.statuses[eff.status] += eff.amount;
+          addStatus(v.statuses, eff.status, eff.amount);
           events.push({ type: 'status', unitId: v.uid, status: eff.status, amount: eff.amount });
         }
-        if (vs.length) parts.push(`${STATUS_NAMES[eff.status]}${eff.amount}`);
+        if (vs.length) parts.push(`${statusName(eff.status)}${eff.amount}`);
         break;
       }
       case 'gainMana':
@@ -607,11 +597,11 @@ function playCard(
         if (!vs.length) continue;
         abilityTriggered(state, ally.id, ab.name, events);
         for (const v of vs) {
-          v.statuses[e.status] += e.amount;
+          addStatus(v.statuses, e.status, e.amount);
           events.push({ type: 'status', unitId: v.uid, status: e.status, amount: e.amount });
         }
         parts.push(`${ab.name}`);
-        addLog(state, `${ally.name}の「${ab.name}」！ ${STATUS_NAMES[e.status]}${e.amount}`);
+        addLog(state, `${ally.name}の「${ab.name}」！ ${statusName(e.status)}${e.amount}`);
       }
     }
   }
@@ -666,9 +656,8 @@ function useItem(state: BattleState, cmd: Extract<Command, { type: 'USE_ITEM' }>
       break;
     }
     case 'cleanse': {
-      const s = target.statuses;
-      if (!s.weak && !s.vulnerable && !s.poison && !s.burn) return '治す状態異常がありません';
-      target.statuses = emptyStatuses();
+      if (!hasHarmful(target.statuses)) return '治す状態異常がありません';
+      cleanse(target.statuses);
       addLog(state, `${user.name}が${cmd.itemName}を使った（${target.name}の状態異常が治った）`);
       break;
     }
@@ -762,11 +751,11 @@ function executeIntent(state: BattleState, enemy: EnemyState, rng: Rng, events: 
             ? livingAllies(state)
             : [findAlly(state, enemy.intent?.targetId ?? '')].filter((a): a is AllyState => !!a && !a.dead);
         for (const t of targets) {
-          t.statuses[eff.status] += eff.amount;
+          addStatus(t.statuses, eff.status, eff.amount);
           if (!targetIds.includes(t.id)) targetIds.push(t.id);
           events.push({ type: 'status', unitId: t.id, status: eff.status, amount: eff.amount });
         }
-        if (targets.length) logParts.push(`${eff.target === 'all' ? '全員' : targets[0].name}に${STATUS_NAMES[eff.status]}${eff.amount}`);
+        if (targets.length) logParts.push(`${eff.target === 'all' ? '全員' : targets[0].name}に${statusName(eff.status)}${eff.amount}`);
         break;
       }
     }

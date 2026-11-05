@@ -180,7 +180,7 @@ export type EventOutcome =
   | { kind: 'item'; rarity: Rarity; slot?: 'equipment' | 'consumable' }
   | { kind: 'exp'; amount: number }
   | { kind: 'focus'; amount: number; all?: boolean }
-  | { kind: 'status'; status: 'weak' | 'vulnerable' | 'poison' | 'burn'; amount: number }
+  | { kind: 'status'; status: StatusId; amount: number }
   | { kind: 'card' }
   | { kind: 'nothing' };
 

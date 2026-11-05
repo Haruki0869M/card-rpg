@@ -3,7 +3,8 @@
 // 特定の職業ID・敵IDに依存した分岐はエンジンにも画面にも書かない（spec §2.4）。
 
 export type CardCategory = 'physical' | 'magic' | 'skill';
-export type StatusId = 'vulnerable' | 'weak' | 'burn' | 'poison';
+/** 状態異常のID（src/content の statuses に登録したもの） */
+export type StatusId = string;
 export type Rarity = 'common' | 'rare' | 'epic' | 'legend';
 export type Gender = 'male' | 'female';
 export type PlayerId = 'P1' | 'P2' | 'P3' | 'P4';
@@ -236,7 +237,30 @@ export interface EncounterSpec {
 
 // ---------- 戦闘の状態 ----------
 
+/** 状態異常の数値（ID → 数。登録されていないIDや0は「無し」） */
 export type Statuses = Record<StatusId, number>;
+
+/** 状態異常の定義（spec §14・M3-0） */
+export interface StatusDef {
+  id: string;
+  order?: number;
+  name: string;
+  /** アイコンの種類（画面側の STATUS_ICONS のキー） */
+  icon: string;
+  color: string;
+  bg: string;
+  /** 悪い効果か（万能薬で治る） */
+  harmful: boolean;
+  /** 持ち主のフェーズの終わりに受ける継続ダメージ（'stacks' = 数値分、数 = 固定値）。ブロック無視 */
+  tickDamage?: 'stacks' | number;
+  /** 持ち主のフェーズの終わりに減る数（省略は1。0なら減らない） */
+  decay?: number;
+  /** 付いている間、与えるダメージ・受けるダメージにかかる倍率 */
+  dealtMultiplier?: number;
+  takenMultiplier?: number;
+  /** 説明文（省略すると数値から自動で作る） */
+  description?: string;
+}
 
 export interface CardInstance {
   uid: string;

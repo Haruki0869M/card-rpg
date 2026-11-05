@@ -14,7 +14,7 @@ import { speedFactor, useBattle, type UnitFx } from '../../store/battleStore';
 import type { AllyState, EnemyState } from '../../types';
 import { intentView, type IntentPart } from '../format';
 import { HpBar } from '../ui/HpBar';
-import { Shield, Skull, STATUS_STYLE, Swords } from '../ui/icons';
+import { Shield, Skull, statusStyle, Swords } from '../ui/icons';
 import { StatusChips } from '../ui/StatusChips';
 import { UnitPopups } from './Popups';
 import { SlotOverlay } from './SlotOverlay';
@@ -80,7 +80,7 @@ function IntentPartView({ p }: { p: IntentPart }) {
         </span>
       );
     case 'debuff': {
-      const st = STATUS_STYLE[p.status];
+      const st = statusStyle(p.status);
       return (
         <span className="flex items-center gap-0.5" style={{ color: st.color }}>
           <st.Icon size={14} strokeWidth={2.6} />

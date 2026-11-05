@@ -10,7 +10,7 @@ import { useBattle } from '../store/battleStore';
 import type { BattleState, StatId } from '../types';
 import { CATEGORY_LABEL, intentView, longEffect, tierTitle } from './format';
 import { RARITY_STYLE } from './ui/game';
-import { CATEGORY_STYLE, STATUS_STYLE } from './ui/icons';
+import { CATEGORY_STYLE, statusStyle } from './ui/icons';
 
 function signed(n: number) {
   return n > 0 ? `+${n}%` : n < 0 ? `${n}%` : '±0%';
@@ -161,7 +161,7 @@ function Content({ d, battle }: { d: Detail; battle: BattleState }) {
       );
     }
     case 'status': {
-      const st = STATUS_STYLE[d.status];
+      const st = statusStyle(d.status);
       const by = d.by ? findAlly(battle, d.by) : undefined;
       return (
         <>

@@ -8,7 +8,8 @@ export type Detail =
   | { type: 'enemy'; uid: string }
   | { type: 'intent'; uid: string }
   | { type: 'ally'; id: string }
-  | { type: 'status'; status: 'vulnerable' | 'weak' | 'burn' | 'poison' | 'taunt'; amount: number; side: 'ally' | 'enemy'; by?: string }
+  /** status: 状態異常のID、または 'taunt'（挑発） */
+  | { type: 'status'; status: string; amount: number; side: 'ally' | 'enemy'; by?: string }
   | { type: 'item'; itemId: string };
 
 export const useDetail = create<{ detail: Detail | null; show: (d: Detail) => void; hide: () => void }>((set) => ({
