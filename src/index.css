@@ -184,3 +184,9 @@ button {
 @media (prefers-reduced-motion: reduce) {
   .card-enter { animation: none; }
 }
+
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}

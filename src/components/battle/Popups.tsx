@@ -14,7 +14,7 @@ const TONE: Record<string, string> = {
 export function UnitPopups({ unitId, top = '20%' }: { unitId: string; top?: string }) {
   const popups = useBattle((s) => s.popups);
   const fast = useBattle((s) => s.settings.fastMode);
-  const dur = TIMING.resultPopup / speedFactor({ fastMode: fast, vibration: false });
+  const dur = TIMING.resultPopup / speedFactor({ fastMode: fast });
   const mine = popups.filter((p) => p.unitId === unitId);
   return (
     <div className="pointer-events-none absolute inset-x-0 z-30 flex justify-center" style={{ top }}>

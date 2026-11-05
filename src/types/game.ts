@@ -1,0 +1,290 @@
+// ===== 冒険（ゲーム全体）の型 =====
+import type {
+  BattleState,
+  CardInstance,
+  Command,
+  ConsumableEffect,
+  EquipSlot,
+  Gender,
+  PlayerId,
+  Rarity,
+  StatId,
+  Stats,
+  StatusId,
+  WeaponType,
+} from './index';
+
+// ---------- アイテム ----------
+
+export interface ItemDef {
+  id: string;
+  name: string;
+  slot: EquipSlot | 'consumable';
+  rarity: Rarity;
+  /** 武器の種類（武器のみ） */
+  weaponType?: WeaponType;
+  /** 見た目のアイコンの種類 */
+  icon: string;
+  description: string;
+  /** 能力値の加算 */
+  stats?: Partial<Stats>;
+  maxHp?: number;
+  focusMax?: number;
+  startBlock?: number;
+  extraDraw?: number;
+  /** 装備中に山札へ加わるカード（武器） */
+  cards?: { cardId: string; count: number }[];
+  /** 消費アイテムの効果 */
+  use?: ConsumableEffect;
+}
+
+export interface ItemInstance {
+  uid: string;
+  itemId: string;
+}
+
+// ---------- 冒険中のキャラ ----------
+
+export interface Hero {
+  id: string;
+  classId: string;
+  gender: Gender;
+  name: string;
+  playerId: PlayerId;
+  level: number;
+  exp: number;
+  hp: number;
+  focus: number;
+  /** 成長ボーナスで得た能力値・最大HP・フォーカス最大値 */
+  bonusStats: Partial<Stats>;
+  bonusMaxHp: number;
+  bonusFocusMax: number;
+  /** 自分の山札（武器のカードは戦闘開始時に加わる） */
+  deck: CardInstance[];
+  equipment: Partial<Record<EquipSlot, ItemInstance>>;
+  /** 次の戦闘の開始時に付く状態異常（イベントの失敗など） */
+  nextBattleStatuses: Partial<Record<StatusId, number>>;
+}
+
+// ---------- ダンジョン ----------
+
+export type RoomType = 'battle' | 'elite' | 'event' | 'rest' | 'chest' | 'boss';
+
+export interface ChestSpec {
+  rarity: Rarity;
+  locked: boolean;
+  /** 大宝箱（ボス撃破後） */
+  big?: boolean;
+}
+
+export interface Room {
+  id: string;
+  row: number;
+  col: number;
+  type: RoomType;
+  next: string[];
+  /** 戦闘の敵（生成済み） */
+  enemies?: { defId: string; level: number }[];
+  chest?: ChestSpec;
+  eventId?: string;
+  cleared: boolean;
+}
+
+export interface DungeonDef {
+  id: string;
+  name: string;
+  description: string;
+  /** 背景の種類 */
+  background: string;
+  /** 敵の基準レベル */
+  baseLevel: number;
+  /** 出現する敵（戦闘・強敵・ボス） */
+  pools: { battle: string[][]; elite: string[][]; boss: string[] };
+  /** 固定の部屋の並び（行ごと）。無ければ自動生成 */
+  layout?: { type: RoomType; next: number[]; chest?: ChestSpec; eventId?: string }[][];
+  /** 大宝箱のレア度 */
+  bossChest: Rarity;
+  /** 自動生成の時の部屋の行数 */
+  rows?: number;
+}
+
+export interface DungeonRun {
+  dungeonId: string;
+  /** ランダムダンジョンの時の名前 */
+  name: string;
+  random: boolean;
+  background: string;
+  rooms: Room[];
+  /** 今いる部屋（未入場なら undefined） */
+  currentRoomId?: string;
+  /** このダンジョンで手に入れたもの（撤退時に1つ失う候補） */
+  gained: ItemInstance[];
+}
+
+// ---------- 宝箱・イベント・報酬 ----------
+
+export type Loot =
+  | { kind: 'item'; item: ItemInstance }
+  | { kind: 'gold'; amount: number }
+  | { kind: 'card'; cardId: string; heroId: string };
+
+export interface ChestState {
+  roomId: string;
+  spec: ChestSpec;
+  /** 鍵開け済み */
+  unlocked: boolean;
+  /** 開けた後の中身（開ける前は undefined） */
+  contents?: Loot[];
+  /** 判定の結果（演出用） */
+  lastRoll?: { kind: 'lock' | 'luck'; heroId: string; results: ('focus' | 'hit' | 'miss')[]; success: boolean; upgraded?: boolean; trap?: string };
+}
+
+export interface EventCheck {
+  stat: StatId;
+  slots: number;
+  /** 成功に必要な成功数 */
+  need: number;
+  /** 判定の種類（探索の特殊能力のボーナス対象） */
+  tag?: string;
+}
+
+export type EventOutcome =
+  | { kind: 'heal'; amount: number; all?: boolean }
+  | { kind: 'damage'; amount: number; all?: boolean }
+  | { kind: 'gold'; amount: number }
+  | { kind: 'loseGold'; amount: number }
+  | { kind: 'item'; rarity: Rarity; slot?: 'equipment' | 'consumable' }
+  | { kind: 'exp'; amount: number }
+  | { kind: 'focus'; amount: number; all?: boolean }
+  | { kind: 'status'; status: 'weak' | 'vulnerable' | 'poison' | 'burn'; amount: number }
+  | { kind: 'card' }
+  | { kind: 'nothing' };
+
+export interface EventOption {
+  label: string;
+  /** この選択肢を出すのに必要な探索の特殊能力のタグ */
+  requiresTag?: string;
+  /** 必要なゴールド */
+  cost?: number;
+  check?: EventCheck;
+  success: EventOutcome[];
+  fail?: EventOutcome[];
+  successText: string;
+  failText?: string;
+}
+
+export interface EventDef {
+  id: string;
+  title: string;
+  text: string;
+  icon: string;
+  options: EventOption[];
+}
+
+export interface EventState {
+  roomId: string;
+  eventId: string;
+  /** 選んだ結果（選ぶ前は undefined） */
+  result?: { optionIndex: number; heroId?: string; results?: ('focus' | 'hit' | 'miss')[]; success: boolean; text: string; loot: Loot[] };
+}
+
+export interface GrowthOption {
+  kind: 'stat' | 'maxHp' | 'focusMax' | 'upgradeCard';
+  stat?: StatId;
+  amount: number;
+}
+
+export interface RewardState {
+  gold: number;
+  /** キャラごとの経験値（演出用に、前後の値も持つ） */
+  exp: { heroId: string; gained: number; fromLevel: number; toLevel: number; fromExp: number; toExp: number }[];
+  /** 未選択のレベルアップ（先頭から順に選ぶ） */
+  levelUps: { heroId: string; level: number; options: GrowthOption[] }[];
+  /** カード報酬（3枚から1枚） */
+  cardOffers: { cardId: string; heroId: string }[];
+  cardPicked: boolean;
+  /** ドロップ品（自動で持ち物に入る。表示用） */
+  loot: Loot[];
+  /** 戦闘後に見つけた隠し宝箱 */
+  hiddenChest?: ChestSpec;
+}
+
+export type GameMode = 'hub' | 'dungeon' | 'battle' | 'reward' | 'chest' | 'event' | 'rest' | 'gameover' | 'cleared';
+
+export interface AdventureStats {
+  battlesWon: number;
+  dungeonsCleared: number;
+  chestsOpened: number;
+  bestRarity?: Rarity;
+  totalDamage: number;
+  perfects: number;
+}
+
+export interface GameLog {
+  id: number;
+  text: string;
+}
+
+export interface GameState {
+  version: number;
+  seed: number;
+  rngState: number;
+  scenarioId: string;
+  difficulty: Difficulty;
+  heroes: Hero[];
+  gold: number;
+  /** 装備していない装備品（パーティ共有） */
+  stash: ItemInstance[];
+  /** 消費アイテムの袋（パーティ共有・上限あり） */
+  pouch: ItemInstance[];
+  mode: GameMode;
+  dungeon?: DungeonRun;
+  battle?: BattleState;
+  reward?: RewardState;
+  chest?: ChestState;
+  event?: EventState;
+  /** 撃破したダンジョンのID */
+  clearedDungeons: string[];
+  /** 拠点で選べるランダムダンジョンの種（拠点に戻るたびに変わる） */
+  randomDungeonSeed: number;
+  stats: AdventureStats;
+  log: GameLog[];
+  nextUid: number;
+  nextLogId: number;
+}
+
+export type Difficulty = 'easy' | 'normal' | 'hard';
+
+export interface NewGameSetup {
+  seed: number;
+  scenarioId: string;
+  difficulty: Difficulty;
+  party: { classId: string; gender: Gender; name: string; playerId: PlayerId }[];
+}
+
+/** 冒険のコマンド（すべて「誰の操作か」を含む） */
+export type GameCommand =
+  | { type: 'ENTER_DUNGEON'; playerId: PlayerId; dungeonId: string }
+  | { type: 'ENTER_ROOM'; playerId: PlayerId; roomId: string }
+  | { type: 'BATTLE'; command: Command }
+  | { type: 'USE_POUCH_ITEM'; playerId: PlayerId; itemUid: string; userId: string; targetId: string }
+  | { type: 'FINISH_BATTLE'; playerId: PlayerId }
+  | { type: 'CHOOSE_GROWTH'; playerId: PlayerId; optionIndex: number; cardUid?: string }
+  | { type: 'PICK_CARD'; playerId: PlayerId; offerIndex: number | null }
+  | { type: 'FINISH_REWARD'; playerId: PlayerId }
+  | { type: 'OPEN_CHEST'; playerId: PlayerId; heroId: string; focusUsed: number }
+  | { type: 'LEAVE_CHEST'; playerId: PlayerId }
+  | { type: 'CHOOSE_EVENT'; playerId: PlayerId; optionIndex: number; heroId?: string; focusUsed: number }
+  | { type: 'FINISH_EVENT'; playerId: PlayerId }
+  | { type: 'REST'; playerId: PlayerId; kind: 'hp' | 'focus' }
+  | { type: 'RETREAT'; playerId: PlayerId }
+  | { type: 'RETURN_TO_HUB'; playerId: PlayerId }
+  | { type: 'EQUIP'; playerId: PlayerId; heroId: string; itemUid: string }
+  | { type: 'UNEQUIP'; playerId: PlayerId; heroId: string; slot: EquipSlot };
+
+export interface GameResult {
+  state: GameState;
+  /** 戦闘中なら戦闘のイベント（演出用） */
+  battleEvents: import('./index').BattleEvent[];
+  error?: string;
+}

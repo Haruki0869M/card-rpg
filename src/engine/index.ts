@@ -6,3 +6,8 @@ export * from './battle/intents';
 export * from './battle/probability';
 export * from './rng';
 export * from './stats';
+export * from './game/checks';
+export * from './game/dungeon';
+export * from './game/game';
+export * from './game/hero';
+export * from './game/loot';

@@ -2,7 +2,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useEffect, useMemo, useState } from 'react';
 import { TIMING } from '../../data/balance';
-import { getCard } from '../../data/cards';
+import { cardOf } from '../../data/cards';
 import { chanceFor, findAlly, unusableReason } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
 import { usePress } from '../../hooks/usePress';
@@ -23,6 +23,7 @@ interface Pos {
 const CardView = memo(function CardView({
   uid,
   cardId,
+  upgraded,
   allyId,
   chance,
   index,
@@ -34,6 +35,7 @@ const CardView = memo(function CardView({
 }: {
   uid: string;
   cardId: string;
+  upgraded: boolean;
   allyId: string;
   chance: number;
   index: number;
@@ -43,10 +45,10 @@ const CardView = memo(function CardView({
   focus: number;
   reason: string | null;
 }) {
-  const card = getCard(cardId);
+  const card = cardOf({ cardId, upgraded });
   const flash = useBattle((s) => (s.flash?.cardUid === uid ? s.flash : null));
   const tapCard = useBattle((s) => s.tapCard);
-  const press = usePress(() => tapCard(uid), () => ({ type: 'card', cardId: card.id, allyId, focus }));
+  const press = usePress(() => tapCard(uid), () => ({ type: 'card', cardId: card.id, upgraded, allyId, focus }));
   const cat = CATEGORY_STYLE[card.category];
   const [showFlash, setShowFlash] = useState(false);
 
@@ -208,14 +210,15 @@ export function Hand() {
               key={c.uid}
               uid={c.uid}
               cardId={c.cardId}
+              upgraded={!!c.upgraded}
               allyId={ally.id}
-              chance={chanceFor(ally, getCard(c.cardId))}
+              chance={chanceFor(ally, cardOf(c))}
               index={i}
               width={cardW}
               pos={positions[i]}
               selected={selection?.cardUid === c.uid}
               focus={selection?.cardUid === c.uid ? selection.focus : 0}
-              reason={unusableReason(battle, ally, getCard(c.cardId))}
+              reason={unusableReason(battle, ally, cardOf(c))}
             />
           ))}
     </div>

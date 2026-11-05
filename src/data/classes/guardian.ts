@@ -30,4 +30,9 @@ export const guardian: ClassDef = {
   },
   names: { male: ['ゴードン', 'ハンス', 'ドルフ', 'ラガン'], female: ['ブレンダ', 'ヒルダ', 'マルタ', 'ジーナ'] },
   unlocked: true,
+  hpPerLevel: 7,
+  weaponType: 'hammer',
+  startingEquipment: { weapon: 'oakHammer', armor: 'leatherArmor' },
+  cardPool: ['guardFormation', 'shieldStance', 'holyLight', 'counterShield', 'rally', 'shieldBash', 'warCry', 'guard'],
+  growthWeights: { vit: 4, dex: 2, str: 2 },
 };

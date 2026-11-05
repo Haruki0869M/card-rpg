@@ -6,10 +6,10 @@ mkdirSync('screenshots', { recursive: true });
 const browser = await chromium.launch();
 let problems = 0;
 const configs = [
-  [1, '重装兵（1体）'],
-  [2, 'ゴブリンの一団（3体）'],
-  [3, '斥候の二人組（2体）'],
-  [4, 'ゴブリンの軍勢（4体）'],
+  [1, ['goblinBrute']],
+  [2, ['goblinBrute', 'chaosShaman', 'goblinScout']],
+  [3, ['forestWolf', 'toxicShroom']],
+  [4, ['treeWarden', 'chaosShaman', 'forestWolf', 'toxicShroom']],
 ];
 for (const [w, h] of [[360, 640], [412, 860], [360, 560]]) {
   for (const [n, enc] of configs) {

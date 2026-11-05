@@ -9,7 +9,7 @@ function Chip({
   by,
   onTap,
 }: {
-  status: 'vulnerable' | 'weak' | 'taunt';
+  status: 'vulnerable' | 'weak' | 'burn' | 'poison' | 'taunt';
   amount: number;
   side: 'ally' | 'enemy';
   by?: string;
@@ -40,11 +40,13 @@ export function StatusChips({
   onTap?: () => void;
   tauntedBy?: string;
 }) {
-  if (!s.vulnerable && !s.weak && !tauntedBy) return null;
+  if (!s.vulnerable && !s.weak && !s.burn && !s.poison && !tauntedBy) return null;
   return (
     <div className="flex flex-wrap justify-center gap-0.5">
       {s.vulnerable > 0 && <Chip status="vulnerable" amount={s.vulnerable} side={side} onTap={onTap} />}
       {s.weak > 0 && <Chip status="weak" amount={s.weak} side={side} onTap={onTap} />}
+      {s.poison > 0 && <Chip status="poison" amount={s.poison} side={side} onTap={onTap} />}
+      {s.burn > 0 && <Chip status="burn" amount={s.burn} side={side} onTap={onTap} />}
       {tauntedBy && <Chip status="taunt" amount={1} side={side} by={tauntedBy} onTap={onTap} />}
     </div>
   );

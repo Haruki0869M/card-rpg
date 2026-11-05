@@ -29,4 +29,9 @@ export const mage: ClassDef = {
   },
   names: { male: ['エルド', 'ノア', 'シオン', 'ユリウス'], female: ['ミーナ', 'ルーシア', 'エマ', 'ソフィア'] },
   unlocked: true,
+  hpPerLevel: 4,
+  weaponType: 'staff',
+  startingEquipment: { weapon: 'oakStaff', armor: 'travelerClothes' },
+  cardPool: ['fireball', 'iceLance', 'thunder', 'manaShield', 'deepFocus', 'gambleBolt', 'meditate', 'magicArrow'],
+  growthWeights: { int: 4, dex: 2, luk: 1, per: 1 },
 };

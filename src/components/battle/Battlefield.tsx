@@ -5,9 +5,9 @@ import { motion, useAnimate } from 'framer-motion';
 import { memo, useEffect, useMemo } from 'react';
 import { BattleBackground, CharacterArt, EnemyArt } from '../../art';
 import { TIMING } from '../../data/balance';
-import { getCard } from '../../data/cards';
+import { cardOf } from '../../data/cards';
 import { getEnemy } from '../../data/enemies';
-import { enemyName, findAlly, tierDamageAgainst, tierIndex } from '../../engine';
+import { enemyName, findAlly, tierDamageAgainst, tierIndex, weaponRarity } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
 import { usePress } from '../../hooks/usePress';
 import { speedFactor, useBattle, type UnitFx } from '../../store/battleStore';
@@ -26,7 +26,7 @@ function useUnitMotion(unitId: string, side: 'ally' | 'enemy') {
   const fast = useBattle((s) => s.settings.fastMode);
   useEffect(() => {
     if (!fx || !scope.current) return;
-    const k = 1 / speedFactor({ fastMode: fast, vibration: false });
+    const k = 1 / speedFactor({ fastMode: fast });
     const dir = side === 'ally' ? 1 : -1;
     if (fx.kind === 'attack') {
       animate(scope.current, { x: [0, 26 * dir, 0], y: [0, -12 * dir, 0], scale: [1, 1.08, 1] }, { duration: 0.28 * k, ease: 'easeOut' });
@@ -84,7 +84,7 @@ function IntentPartView({ p }: { p: IntentPart }) {
       return (
         <span className="flex items-center gap-0.5" style={{ color: st.color }}>
           <st.Icon size={14} strokeWidth={2.6} />
-          <TargetFace allyId={p.targetId} />
+          {p.all ? <span className="text-[12px]">全</span> : <TargetFace allyId={p.targetId} />}
           <span className="tabular-nums">{p.amount}</span>
         </span>
       );
@@ -142,10 +142,11 @@ const EnemyUnit = memo(function EnemyUnit({
   // カード選択中の対象表示とダメージ予測
   const ally = findAlly(battle, activeId);
   const inst = selection && ally?.hand.find((c) => c.uid === selection.cardUid);
-  const card = inst ? getCard(inst.cardId) : null;
-  const targetable = !!card && card.target === 'enemy' && !enemy.dead;
-  const isTarget = targetable && selection?.targetId === enemy.uid;
-  const waiting = targetable && !selection?.targetId;
+  const card = inst ? cardOf(inst) : null;
+  const aoe = !!card && card.target === 'allEnemies' && !enemy.dead;
+  const targetable = !!card && (card.target === 'enemy' || aoe) && !enemy.dead;
+  const isTarget = aoe || (targetable && selection?.targetId === enemy.uid);
+  const waiting = targetable && !aoe && !selection?.targetId;
   let prediction: string | null = null;
   if (targetable && ally && card && card.tiers.some((t) => t.effects.some((e) => e.kind === 'damage'))) {
     const dmg = tierDamageAgainst(ally, card, enemy).slice(tierIndex(card, selection!.focus)).filter((d) => d > 0);
@@ -185,7 +186,7 @@ const EnemyUnit = memo(function EnemyUnit({
         >
           <div ref={scope} className="h-full w-full will-change-transform">
             <div className="idle-bob h-full w-full" style={{ animationDelay: `${(enemy.uid.charCodeAt(1) % 4) * -0.7}s` }}>
-              <EnemyArt defId={enemy.defId} className="h-full w-full" />
+              <EnemyArt defId={enemy.defId} phase={enemy.phase} className="h-full w-full" />
             </div>
           </div>
         </motion.div>
@@ -212,6 +213,10 @@ const EnemyUnit = memo(function EnemyUnit({
 const AllySprite = memo(function AllySprite({ ally, left, bottom, h, active }: { ally: AllyState; left: number; bottom: number; h: number; active: boolean }) {
   const scope = useUnitMotion(ally.id, 'ally');
   const setActive = useBattle((s) => s.setActive);
+  const weapon = useBattle((s) => {
+    const h = s.game?.heroes.find((x) => x.id === ally.id);
+    return h ? weaponRarity(h) : undefined;
+  });
   const press = usePress(() => setActive(ally.id), { type: 'ally', id: ally.id });
   return (
     <div {...press} className="absolute" style={{ left: left - h * 0.4, bottom, width: h * 0.8, height: h }}>
@@ -220,7 +225,7 @@ const AllySprite = memo(function AllySprite({ ally, left, bottom, h, active }: {
       )}
       <div ref={scope} className={`h-full w-full will-change-transform ${ally.dead ? 'opacity-40 grayscale' : ''}`}>
         <div className={`h-full w-full ${ally.dead ? '' : 'idle-breathe'}`} style={{ animationDelay: `${Number(ally.id.slice(1)) * -0.6}s` }}>
-          <CharacterArt classId={ally.classId} gender={ally.gender} className="h-full w-full" />
+          <CharacterArt classId={ally.classId} gender={ally.gender} weapon={weapon} className="h-full w-full" />
         </div>
       </div>
       <UnitPopups unitId={ally.id} top="5%" />
@@ -259,6 +264,7 @@ export function Battlefield() {
   const allies = useBattle((s) => s.battle.allies);
   const activeId = useBattle((s) => s.activeId);
   const phase = useBattle((s) => s.battle.phase);
+  const bgKind = useBattle((s) => s.game?.dungeon?.background ?? 'plains');
   const W = size.width;
   const H = size.height;
 
@@ -274,7 +280,7 @@ export function Battlefield() {
 
   return (
     <div ref={ref} className="relative min-h-[190px] flex-1 overflow-hidden border-y border-amber-500/30">
-      <BattleBackground className="absolute inset-0 h-full w-full" />
+      <BattleBackground kind={bgKind} className="absolute inset-0 h-full w-full" />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/45" />
       <Embers />
       {W > 0 && (
@@ -315,7 +321,7 @@ function PhaseBanner() {
   const turn = useBattle((s) => s.battle.turn);
   const fast = useBattle((s) => s.settings.fastMode);
   if (phase !== 'ally' && phase !== 'enemy') return null;
-  const k = 1 / speedFactor({ fastMode: fast, vibration: false });
+  const k = 1 / speedFactor({ fastMode: fast });
   return (
     <motion.div
       key={`${phase}-${turn}`}

@@ -3,7 +3,8 @@
 // 特定の職業ID・敵IDに依存した分岐はエンジンにも画面にも書かない（spec §2.4）。
 
 export type CardCategory = 'physical' | 'magic' | 'skill';
-export type StatusId = 'vulnerable' | 'weak';
+export type StatusId = 'vulnerable' | 'weak' | 'burn' | 'poison';
+export type Rarity = 'common' | 'rare' | 'epic' | 'legend';
 export type Gender = 'male' | 'female';
 export type PlayerId = 'P1' | 'P2' | 'P3' | 'P4';
 
@@ -15,7 +16,7 @@ export type Affinity = Record<CardCategory, number>;
 
 // ---------- カード ----------
 
-export type CardTarget = 'enemy' | 'self';
+export type CardTarget = 'enemy' | 'self' | 'allEnemies';
 
 export type CardEffect =
   | { kind: 'damage'; amount: number }
@@ -27,7 +28,11 @@ export type CardEffect =
   /** 対象の敵の単体攻撃を自分に向ける */
   | { kind: 'tauntTarget' }
   /** 敵全体の単体攻撃を自分に向ける */
-  | { kind: 'tauntAll' };
+  | { kind: 'tauntAll' }
+  /** 味方全員にブロック */
+  | { kind: 'blockAllies'; amount: number }
+  /** 味方全員のHP回復 */
+  | { kind: 'healAllies'; amount: number };
 
 export interface CardTier {
   /** この成功数以上で発動（高い方が優先） */
@@ -46,6 +51,8 @@ export interface CardDef {
   target: CardTarget;
   /** minSuccesses 昇順 */
   tiers: CardTier[];
+  /** 報酬・宝箱での出やすさの格（未指定はコモン扱い） */
+  rarity?: Rarity;
 }
 
 // ---------- 特殊能力（データで定義する共通の部品） ----------
@@ -69,7 +76,8 @@ export type BattleAbility =
 /** 探索の特殊能力（M2以降で使用。M1ではデータと説明のみ） */
 export type ExploreAbility =
   | { kind: 'checkBonus'; check: string; bonus: number }
-  | { kind: 'visionBonus'; amount: number }
+  /** 視界+N（M3）、隠し宝箱を見つける確率+X% */
+  | { kind: 'tracking'; vision: number; hiddenFindBonus: number }
   | { kind: 'nightAmbushReduction'; multiplier: number }
   | { kind: 'extraEventOption'; tag: string };
 
@@ -99,7 +107,20 @@ export interface ClassDef {
   names: Record<Gender, string[]>;
   /** 最初から選べるか（M4の伝承の書で解放） */
   unlocked: boolean;
+  /** レベルが1上がるごとの最大HP */
+  hpPerLevel: number;
+  /** 装備できる武器の種類 */
+  weaponType: WeaponType;
+  /** 初期装備（アイテムID） */
+  startingEquipment: Partial<Record<EquipSlot, string>>;
+  /** 報酬で出るカードの候補（カードID） */
+  cardPool: string[];
+  /** 成長ボーナスで伸びやすい能力値（重み） */
+  growthWeights: Partial<Record<StatId, number>>;
 }
+
+export type WeaponType = 'sword' | 'staff' | 'hammer' | 'bow';
+export type EquipSlot = 'weapon' | 'armor' | 'accessory';
 
 /** パーティの1枠の指定（キャラクター作成の結果） */
 export interface PartyMemberSpec {
@@ -108,6 +129,20 @@ export interface PartyMemberSpec {
   name: string;
   playerId: PlayerId;
   level?: number;
+  /** 冒険中のキャラから戦闘を作る時の引き継ぎ値（無ければ職業の初期値） */
+  heroId?: string;
+  hp?: number;
+  maxHp?: number;
+  focus?: number;
+  focusMax?: number;
+  stats?: Stats;
+  deck?: CardInstance[];
+  /** 戦闘開始時のブロック（装備） */
+  startBlock?: number;
+  /** 毎ターンのドロー枚数の追加（装備） */
+  extraDraw?: number;
+  /** 戦闘開始時の状態異常 */
+  statuses?: Partial<Statuses>;
 }
 
 // ---------- 敵 ----------
@@ -115,7 +150,7 @@ export interface PartyMemberSpec {
 export type EnemyEffect =
   | { kind: 'attack'; amount: number; hits: number; target: 'single' | 'all' }
   | { kind: 'block'; amount: number; target: 'self' | 'otherEnemies' }
-  | { kind: 'debuff'; status: StatusId; amount: number; target: 'single' };
+  | { kind: 'debuff'; status: StatusId; amount: number; target: 'single' | 'all' };
 
 export interface EnemyActionDef {
   id: string;
@@ -139,6 +174,19 @@ export interface EnemyDef {
   maxConsecutive?: number;
   /** 戦場での大きさ（1 = 標準、ボスは大きく） */
   size?: number;
+  /** 倒した時の経験値・ゴールド（baseLevel の時） */
+  exp: number;
+  gold: number;
+  /** ボスの段階（HPが belowHpPct% 以下になると行動が変わる） */
+  phases?: EnemyPhaseDef[];
+}
+
+export interface EnemyPhaseDef {
+  belowHpPct: number;
+  name: string;
+  actions: EnemyActionDef[];
+  pattern: 'sequence' | 'random';
+  maxConsecutive?: number;
 }
 
 export interface EncounterSpec {
@@ -154,6 +202,10 @@ export type Statuses = Record<StatusId, number>;
 export interface CardInstance {
   uid: string;
   cardId: string;
+  /** 強化済み（名前に＋） */
+  upgraded?: boolean;
+  /** 武器から一時的に加わったカード */
+  fromWeapon?: boolean;
 }
 
 export interface AllyState {
@@ -169,6 +221,10 @@ export interface AllyState {
   block: number;
   mana: number;
   focus: number;
+  focusMax: number;
+  /** 装備・成長を反映した能力値 */
+  stats: Stats;
+  extraDraw: number;
   statuses: Statuses;
   drawPile: CardInstance[];
   hand: CardInstance[];
@@ -198,9 +254,11 @@ export interface EnemyState {
   seqIndex: number;
   history: string[];
   dead: boolean;
+  /** ボスの段階（0 = 最初） */
+  phase: number;
 }
 
-export type Phase = 'ally' | 'enemy' | 'victory' | 'defeat';
+export type Phase = 'ally' | 'enemy' | 'victory' | 'defeat' | 'escaped';
 
 export interface BattleStats {
   totalDamage: number;
@@ -249,6 +307,8 @@ export type Command =
       focusUsed: number;
     }
   | { type: 'END_TURN'; playerId: PlayerId }
+  /** 消費アイテムを使う（アイテムの所持の管理は冒険側。ここでは効果だけ） */
+  | { type: 'USE_ITEM'; playerId: PlayerId; characterId: string; targetId: string; itemName: string; effect: ConsumableEffect }
   /** 敵フェーズを1ステップ進める（ホストが発行するシステムコマンド） */
   | { type: 'ENEMY_STEP' };
 
@@ -274,6 +334,8 @@ export type BattleEvent =
   | { type: 'retarget'; enemyUid: string }
   | { type: 'enemyAct'; enemyUid: string; actionName: string; targetIds: string[] }
   | { type: 'death'; unitId: string }
+  | { type: 'enemyPhase'; enemyUid: string; name: string }
+  | { type: 'heal'; unitId: string; amount: number }
   | { type: 'phase'; phase: Phase };
 
 export interface CommandResult {
@@ -281,3 +343,12 @@ export interface CommandResult {
   events: BattleEvent[];
   error?: string;
 }
+
+/** 消費アイテムの効果 */
+export type ConsumableEffect =
+  | { kind: 'heal'; amount: number }
+  | { kind: 'focus'; amount: number }
+  | { kind: 'cleanse' }
+  | { kind: 'escape' };
+
+export * from './game';

@@ -1,3 +1,4 @@
+import { BALANCE } from '../../data/balance';
 import { getEnemy, getEnemyAction } from '../../data/enemies';
 import type { AllyState, BattleEvent, BattleState, EnemyActionDef, EnemyState } from '../../types';
 import type { Rng } from '../rng';
@@ -28,8 +29,16 @@ function pickRandomAlly(state: BattleState, rng: Rng): string | undefined {
 }
 
 /** 次の行動を選ぶ（ルール: 順番 / ランダム・連続制限 / 1ターン目固定 / 単独時の代替） */
-export function chooseAction(enemy: EnemyState, state: BattleState, rng: Rng): EnemyActionDef {
+/** 今の段階の行動の一覧と選び方 */
+export function currentActionSet(enemy: EnemyState) {
   const def = getEnemy(enemy.defId);
+  const ph = enemy.phase > 0 ? def.phases?.[enemy.phase - 1] : undefined;
+  if (ph) return { actions: ph.actions, pattern: ph.pattern, maxConsecutive: ph.maxConsecutive, firstActionId: undefined };
+  return { actions: def.actions, pattern: def.pattern, maxConsecutive: def.maxConsecutive, firstActionId: def.firstActionId };
+}
+
+export function chooseAction(enemy: EnemyState, state: BattleState, rng: Rng): EnemyActionDef {
+  const def = { id: enemy.defId, ...currentActionSet(enemy) };
   const alone = !state.enemies.some((e) => !e.dead && e.uid !== enemy.uid);
   const resolve = (a: EnemyActionDef) =>
     alone && a.fallbackIfAloneId ? getEnemyAction(def.id, a.fallbackIfAloneId) : a;
@@ -40,7 +49,7 @@ export function chooseAction(enemy: EnemyState, state: BattleState, rng: Rng): E
     return resolve(a);
   }
 
-  if (enemy.history.length === 0 && def.firstActionId) {
+  if (enemy.history.length === 0 && enemy.phase === 0 && def.firstActionId) {
     return resolve(getEnemyAction(def.id, def.firstActionId));
   }
 
@@ -111,10 +120,15 @@ export function intentHitsOn(enemy: EnemyState, ally: AllyState): number[] {
   return hits;
 }
 
-/** 被弾予定（インテント合計 − 現在のブロック、0未満にはしない）。かばう（確率）は含めない */
+/** 毒・火傷で次に受けるダメージ（ブロック無視） */
+export function dotDamage(ally: AllyState): number {
+  return ally.statuses.poison + (ally.statuses.burn > 0 ? BALANCE.burnDamage : 0);
+}
+
+/** 被弾予定（インテント合計 − 現在のブロック ＋ 毒・火傷）。かばう（確率）は含めない */
 export function incomingDamage(state: BattleState, ally: AllyState): number {
   if (ally.dead) return 0;
   let total = 0;
   for (const e of state.enemies) for (const h of intentHitsOn(e, ally)) total += h;
-  return Math.max(0, total - ally.block);
+  return Math.max(0, total - ally.block) + (state.phase === 'ally' ? dotDamage(ally) : 0);
 }

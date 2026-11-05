@@ -1,8 +1,9 @@
 import { getEnemyAction } from '../data/enemies';
 import { enemyHitDamage, findAlly } from '../engine';
-import type { BattleState, CardDef, CardEffect, EnemyState } from '../types';
+import type { BattleState, CardDef, CardEffect, EnemyState, StatusId } from '../types';
 
 export const CATEGORY_LABEL = { physical: '物理', magic: '魔法', skill: 'スキル' } as const;
+export const STATUS_LABEL = { vulnerable: '脆弱', weak: '弱体', burn: '火傷', poison: '毒' } as const;
 
 /** Tierがカバーする成功数の範囲表記（例: "0-1", "2"） */
 export function tierRange(card: CardDef, i: number): string {
@@ -25,7 +26,7 @@ export function longEffect(e: CardEffect): string {
     case 'block':
       return `ブロック${e.amount}獲得`;
     case 'applyStatus':
-      return `敵に「${e.status === 'vulnerable' ? '脆弱' : '弱体'}」${e.amount}付与`;
+      return `敵に「${STATUS_LABEL[e.status]}」${e.amount}付与`;
     case 'gainMana':
       return `マナ${e.amount}回復`;
     case 'gainFocus':
@@ -36,6 +37,10 @@ export function longEffect(e: CardEffect): string {
       return '対象の敵の単体攻撃を自分に向ける';
     case 'tauntAll':
       return '敵全体の単体攻撃を自分に向ける';
+    case 'blockAllies':
+      return `味方全員にブロック${e.amount}`;
+    case 'healAllies':
+      return `味方全員のHPを${e.amount}回復`;
   }
 }
 
@@ -43,7 +48,7 @@ export type IntentPart =
   | { kind: 'attack'; damage: number; hits: number; targetId?: string }
   | { kind: 'attackAll'; damage: number; hits: number }
   | { kind: 'block'; amount: number; others: boolean }
-  | { kind: 'debuff'; status: 'weak' | 'vulnerable'; amount: number; targetId?: string };
+  | { kind: 'debuff'; status: StatusId; amount: number; targetId?: string; all: boolean };
 
 export interface IntentView {
   parts: IntentPart[];
@@ -74,8 +79,9 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
       parts.push({ kind: 'block', amount: eff.amount, others: eff.target !== 'self' });
       details.push(eff.target === 'self' ? `自分にブロック${eff.amount}` : `自分以外の敵全員にブロック${eff.amount}`);
     } else if (eff.kind === 'debuff') {
-      parts.push({ kind: 'debuff', status: eff.status, amount: eff.amount, targetId: target?.id });
-      details.push(`${targetName}に「${eff.status === 'weak' ? '弱体' : '脆弱'}」${eff.amount}`);
+      const all = eff.target === 'all';
+      parts.push({ kind: 'debuff', status: eff.status, amount: eff.amount, targetId: all ? undefined : target?.id, all });
+      details.push(`${all ? '味方全員' : targetName}に「${STATUS_LABEL[eff.status]}」${eff.amount}`);
     }
   }
   if (action.effects.some((e) => e.kind === 'attack')) {

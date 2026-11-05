@@ -1,6 +1,6 @@
 // ===== 上部バー・下部バー =====
 import { AnimatePresence, motion } from 'framer-motion';
-import { Layers, Menu, Skull, Trash2 } from 'lucide-react';
+import { Backpack, Layers, Menu, Skull, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { findAlly, isDone } from '../../engine';
 import { LOCAL_PLAYER } from '../../store/battleConfig';
@@ -63,7 +63,8 @@ export function BottomBar() {
     return () => clearTimeout(t);
   }, [hint]);
 
-  const pileBtn = 'btn btn-dark flex h-11 min-w-[54px] items-center justify-center gap-1 rounded-lg px-2 text-[14px] font-bold tabular-nums';
+  const pouch = useBattle((s) => s.game?.pouch.length ?? 0);
+  const pileBtn = 'btn btn-dark flex h-11 min-w-[50px] items-center justify-center gap-1 rounded-lg px-1.5 text-[14px] font-bold tabular-nums';
 
   return (
     <div className="relative flex h-[58px] shrink-0 items-center gap-2 px-2 pb-1" onClick={(e) => e.stopPropagation()}>
@@ -74,6 +75,10 @@ export function BottomBar() {
       <button onClick={() => openSheet('discard')} className={pileBtn} aria-label="捨札を見る">
         <Trash2 size={16} className="text-zinc-400" />
         {ally?.discard.length ?? 0}
+      </button>
+      <button onClick={() => openSheet('pouch')} disabled={battle.phase !== 'ally'} className={pileBtn} aria-label="道具袋">
+        <Backpack size={16} className="text-amber-300" />
+        {pouch}
       </button>
       <div className="min-w-0 flex-1">
         <AnimatePresence>
@@ -87,7 +92,7 @@ export function BottomBar() {
       <button
         onClick={endTurn}
         disabled={battle.phase !== 'ally'}
-        className={`btn ${allDone ? 'btn-gold' : 'btn-dark'} font-display relative h-12 w-[128px] shrink-0 rounded-xl text-[17px]`}
+        className={`btn ${allDone ? 'btn-gold' : 'btn-dark'} font-display relative h-12 w-[116px] shrink-0 rounded-xl text-[16px]`}
       >
         {allDone && <span className="glow-pulse pointer-events-none absolute -inset-1.5 rounded-2xl border-2 border-amber-300" />}
         {battle.phase === 'enemy' ? '敵の行動中' : 'ターン終了'}

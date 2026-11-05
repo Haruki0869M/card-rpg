@@ -6,6 +6,8 @@ export const chaosShaman: EnemyDef = {
   icon: '🧙',
   maxHp: 36,
   baseLevel: 3,
+  exp: 9,
+  gold: 6,
   pattern: 'random',
   firstActionId: 'curse',
   maxConsecutive: 1,

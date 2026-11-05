@@ -1,6 +1,7 @@
 // ===== 長押しで出る詳細（指を離すと閉じる。操作はブロックしない） =====
 import { CharacterArt, EnemyArt } from '../art';
 import { getCard } from '../data/cards';
+import { getItem } from '../data/items';
 import { getClass } from '../data/classes';
 import { getEnemy } from '../data/enemies';
 import { affinityOf, chanceFor, enemyName, findAlly, findEnemy, incomingDamage, statsOf, tierDistribution, toPercents } from '../engine';
@@ -23,7 +24,7 @@ function Title({ children }: { children: React.ReactNode }) {
 function Content({ d, battle }: { d: Detail; battle: BattleState }) {
   switch (d.type) {
     case 'card': {
-      const card = getCard(d.cardId);
+      const card = getCard(d.cardId, d.upgraded);
       const ally = findAlly(battle, d.allyId);
       if (!ally) return null;
       const cls = getClass(ally.classId);
@@ -126,6 +127,15 @@ function Content({ d, battle }: { d: Detail; battle: BattleState }) {
             <div className="mt-0.5 text-[13px] text-red-300">被弾予定 {incomingDamage(battle, a)}（ブロック差し引き後）</div>
           </div>
         </div>
+      );
+    }
+    case 'item': {
+      const it = getItem(d.itemId);
+      return (
+        <>
+          <Title>{it.name}</Title>
+          <div className="text-[13px]">{it.description}</div>
+        </>
       );
     }
     case 'status': {

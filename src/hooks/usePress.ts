@@ -4,11 +4,12 @@ import { TIMING } from '../data/balance';
 
 /** 長押しで表示する詳細ポップアップの内容 */
 export type Detail =
-  | { type: 'card'; cardId: string; allyId: string; focus?: number }
+  | { type: 'card'; cardId: string; upgraded?: boolean; allyId: string; focus?: number }
   | { type: 'enemy'; uid: string }
   | { type: 'intent'; uid: string }
   | { type: 'ally'; id: string }
-  | { type: 'status'; status: 'vulnerable' | 'weak' | 'taunt'; amount: number; side: 'ally' | 'enemy'; by?: string };
+  | { type: 'status'; status: 'vulnerable' | 'weak' | 'burn' | 'poison' | 'taunt'; amount: number; side: 'ally' | 'enemy'; by?: string }
+  | { type: 'item'; itemId: string };
 
 export const useDetail = create<{ detail: Detail | null; show: (d: Detail) => void; hide: () => void }>((set) => ({
   detail: null,

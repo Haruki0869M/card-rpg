@@ -7,6 +7,8 @@ export const goblinScout: EnemyDef = {
   maxHp: 26,
   baseLevel: 2,
   size: 0.9,
+  exp: 6,
+  gold: 4,
   pattern: 'random',
   maxConsecutive: 2,
   actions: [

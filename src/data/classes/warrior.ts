@@ -30,4 +30,9 @@ export const warrior: ClassDef = {
   },
   names: { male: ['レオン', 'ガイル', 'ロラン', 'バルド'], female: ['セリカ', 'アシュリー', 'イリス', 'カーラ'] },
   unlocked: true,
+  hpPerLevel: 6,
+  weaponType: 'sword',
+  startingEquipment: { weapon: 'copperSword', armor: 'leatherArmor' },
+  cardPool: ['mightyBlow', 'ironWall', 'sweep', 'battleCry', 'charge', 'heavySwing', 'shieldBash', 'warCry'],
+  growthWeights: { str: 3, vit: 3, dex: 1, agi: 1 },
 };

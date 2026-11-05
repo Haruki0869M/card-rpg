@@ -16,7 +16,7 @@ async function tapCard(page, locator) {
 
 async function resultText(page) {
   if (await page.getByText('勝利！', { exact: true }).count()) return 'victory';
-  if (await page.getByText('敗北…', { exact: true }).count()) return 'defeat';
+  if (await page.getByText('全滅…', { exact: true }).count()) return 'defeat';
   return null;
 }
 
@@ -72,7 +72,7 @@ async function playToLose(page) {
   for (let turn = 0; turn < 80; turn++) {
     const r = await resultText(page);
     if (r) return r;
-    await page.locator('button:has-text("ターン終了"):not([disabled])').or(page.getByText('敗北…', { exact: true })).first().waitFor({ timeout: 15000 });
+    await page.locator('button:has-text("ターン終了"):not([disabled])').or(page.getByText('全滅…', { exact: true })).first().waitFor({ timeout: 15000 });
     if (await resultText(page)) continue;
     await page.locator('button:has-text("ターン終了")').click();
     await page.waitForTimeout(50);
@@ -90,7 +90,7 @@ for (const party of [1, 2, 3, 4]) {
     let attempts = 0;
     do {
       attempts++;
-      await startBattle(page, party, party === 1 ? '重装兵（1体）' : 'ゴブリンの一団（3体）');
+      await startBattle(page, party, party === 1 ? ['goblinBrute'] : ['goblinBrute', 'chaosShaman', 'goblinScout']);
       result = goal === 'victory' ? await playToWin(page, `${party}p`) : await playToLose(page);
     } while (result !== goal && attempts < 6);
     console.log(`${party}人 ${goal}: ${result === goal ? 'OK' : 'NG(' + result + ')'} (試行${attempts}回)`);
