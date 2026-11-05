@@ -5,7 +5,8 @@
 import { BALANCE } from '../../data/balance';
 import { CARDS } from '../../data/cards';
 import { getClass } from '../../data/classes';
-import { DUNGEONS, RANDOM_DUNGEON, SCENARIO_DUNGEONS } from '../../data/dungeons';
+import { DUNGEONS } from '../../data/dungeons';
+import { getScenario } from '../../data/scenarios';
 import { getEnemy } from '../../data/enemies';
 import { EVENTS } from '../../data/events';
 import { getItem, POUCH_LIMIT } from '../../data/items';
@@ -91,8 +92,11 @@ export function createGame(setup: NewGameSetup): GameState {
     hero.hp = heroMaxHp(hero);
     return hero;
   });
-  // 最初の持ち物
-  game.pouch.push(newItem(game, getItem('potion')), newItem(game, getItem('potion')));
+  // 最初の持ち物（シナリオの開始条件）
+  const start = getScenario(setup.scenarioId).start;
+  game.gold = start.gold ?? 0;
+  for (const p of start.pouch ?? []) for (let i = 0; i < p.count; i++) game.pouch.push(newItem(game, getItem(p.itemId)));
+  for (const p of start.stash ?? []) for (let i = 0; i < p.count; i++) game.stash.push(newItem(game, getItem(p.itemId)));
   addLog(game, '冒険が始まった！');
   return game;
 }
@@ -274,8 +278,8 @@ export function applyGameCommand(input: GameState, cmd: GameCommand): GameResult
 // ---------- 拠点・ダンジョン ----------
 
 /** 拠点で選べるダンジョン */
-export function availableDungeons(_game?: GameState): string[] {
-  return [...SCENARIO_DUNGEONS, RANDOM_DUNGEON];
+export function availableDungeons(game: GameState): string[] {
+  return DUNGEONS.forScenario(game.scenarioId).map((d) => d.id);
 }
 
 function enterDungeon(game: GameState, playerId: string, dungeonId: string, rng: Rng): string | undefined {
@@ -283,10 +287,11 @@ function enterDungeon(game: GameState, playerId: string, dungeonId: string, rng:
   if (game.mode !== 'hub') return '拠点からしか出発できません';
   if (!availableDungeons(game).includes(dungeonId)) return 'そのダンジョンには行けません';
   const levelBonus = BALANCE.difficultyLevel[game.difficulty] ?? 0;
-  const eventIds = EVENTS.all.map((e) => e.id);
+  const eventIds = EVENTS.forScenario(game.scenarioId).map((e) => e.id);
   // ランダムダンジョンは拠点ごとの種で作る（同じ種なら同じ構造）
-  const dRng = dungeonId === RANDOM_DUNGEON ? createRng(game.randomDungeonSeed) : rng;
-  game.dungeon = buildDungeon(dungeonId, dRng, levelBonus + (dungeonId === RANDOM_DUNGEON ? game.clearedDungeons.length : 0), eventIds);
+  const random = !!DUNGEONS.get(dungeonId).random;
+  const dRng = random ? createRng(game.randomDungeonSeed) : rng;
+  game.dungeon = buildDungeon(dungeonId, dRng, levelBonus + (random ? game.clearedDungeons.length : 0), eventIds);
   game.mode = 'dungeon';
   addLog(game, `${game.dungeon.name}に入った`);
   return undefined;

@@ -108,6 +108,8 @@ export interface DungeonDef {
   layout?: { type: RoomType; next: number[]; chest?: ChestSpec; eventId?: string }[][];
   /** 大宝箱の見た目（中身の格の確率を決める） */
   bossChest: Rarity;
+  /** ランダムダンジョン（拠点に戻るたびに形が変わる。layout は使わず自動生成） */
+  random?: boolean;
   /** 自動生成の時の部屋の行数 */
   rows?: number;
 }
@@ -311,4 +313,27 @@ export interface GameResult {
   /** 戦闘中なら戦闘のイベント（演出用） */
   battleEvents: import('./index').BattleEvent[];
   error?: string;
+}
+
+// ---------- シナリオ ----------
+
+export interface ScenarioDef {
+  id: string;
+  /** 一覧での並び順（小さいほど先） */
+  order?: number;
+  name: string;
+  synopsis: string;
+  recommended: string;
+  playTime: string;
+  unlocked: boolean;
+  /** 解放条件の説明（未解放の時に表示） */
+  unlockText?: string;
+  /** 冒険の開始条件 */
+  start: {
+    gold?: number;
+    /** 最初の消費アイテム */
+    pouch?: { itemId: string; count: number }[];
+    /** 最初の持ち物（装備品） */
+    stash?: { itemId: string; count: number }[];
+  };
 }

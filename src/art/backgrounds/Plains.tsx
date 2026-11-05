@@ -94,3 +94,6 @@ export const PlainsBackground = memo(function PlainsBackground({ className }: { 
     </svg>
   );
 });
+
+/** 背景のID（ダンジョンの background で指定する。ファイルを置くだけで自動で登録される） */
+export const background = { plains: PlainsBackground };

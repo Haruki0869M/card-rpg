@@ -74,7 +74,7 @@ function generateLayout(def: DungeonDef, rng: Rng, eventIds: string[]): NonNulla
 
 export function buildDungeon(dungeonId: string, rng: Rng, levelBonus: number, eventIds: string[]): DungeonRun {
   const def = getDungeon(dungeonId);
-  const random = !def.layout;
+  const random = !!def.random || !def.layout;
   const layout = def.layout ?? generateLayout(def, rng, eventIds);
   const id = (r: number, c: number) => `r${r}c${c}`;
   const rooms: Room[] = layout.flatMap((row, r) =>

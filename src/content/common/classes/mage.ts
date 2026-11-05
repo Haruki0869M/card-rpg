@@ -1,7 +1,8 @@
-import type { ClassDef } from '../../types';
+import type { ClassDef } from '../../../types';
 
 export const mage: ClassDef = {
   id: 'mage',
+  order: 2,
   name: '魔道士',
   role: '高火力の博打',
   icon: '🔮',

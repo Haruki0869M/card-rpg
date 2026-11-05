@@ -1,4 +1,4 @@
-import type { EnemyDef } from '../../types';
+import type { EnemyDef } from '../../../types';
 
 export const chaosShaman: EnemyDef = {
   id: 'chaosShaman',

@@ -48,7 +48,7 @@ export function HubScreen() {
           {availableDungeons(game).map((id) => {
             const d = DUNGEONS.get(id);
             const cleared = game.clearedDungeons.includes(id);
-            const random = !d.layout;
+            const random = !!d.random;
             const r = RARITY_STYLE[d.bossChest];
             return (
               <button

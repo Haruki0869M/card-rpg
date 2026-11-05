@@ -1,5 +1,5 @@
 // 職業ごとの報酬カード（各職業の cardPool から報酬で出る）
-import type { CardDef } from '../../types';
+import type { CardDef } from '../../../types';
 
 const d = (amount: number) => ({ kind: 'damage', amount }) as const;
 const b = (amount: number) => ({ kind: 'block', amount }) as const;

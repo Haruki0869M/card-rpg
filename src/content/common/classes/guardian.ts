@@ -1,7 +1,8 @@
-import type { ClassDef } from '../../types';
+import type { ClassDef } from '../../../types';
 
 export const guardian: ClassDef = {
   id: 'guardian',
+  order: 3,
   name: '守護者',
   role: '仲間を守る盾役',
   icon: '🛡️',

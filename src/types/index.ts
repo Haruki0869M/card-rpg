@@ -121,6 +121,8 @@ export interface AbilityDef<T> {
 
 export interface ClassDef {
   id: string;
+  /** 一覧での並び順（小さいほど先） */
+  order?: number;
   name: string;
   role: string;
   /** 小さく表示する時の記号（絵が無い場合の代替にも使う） */

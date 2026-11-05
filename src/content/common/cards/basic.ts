@@ -1,4 +1,4 @@
-import type { CardDef } from '../../types';
+import type { CardDef } from '../../../types';
 
 export const BASIC_CARDS: Record<string, CardDef> = {
   heavySwing: {

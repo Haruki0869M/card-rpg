@@ -1,11 +1,8 @@
 import type { CardDef, CardEffect, CardInstance } from '../../types';
-import { createRegistry } from '../registry';
-import { BASIC_CARDS } from './basic';
-import { CLASS_CARDS } from './classCards';
-import { WEAPON_CARDS } from './weaponCards';
+import { contentRegistry, type ContentModules } from '../content';
 
-/** カードの登録表。カードを増やすときはファイルを追加してここに並べる */
-export const CARDS = createRegistry<CardDef>('card', [...Object.values(BASIC_CARDS), ...CLASS_CARDS, ...WEAPON_CARDS]);
+/** カードの登録表。src/content の cards フォルダ にカードのファイルを置くだけで登場する */
+export const CARDS = contentRegistry<CardDef>('card', import.meta.glob('/src/content/**/cards/*.ts', { eager: true }) as ContentModules);
 
 /** 強化のルール: 成功率+10%（上限95%）、ダメージ・ブロック・回復を25%増し（最低+1） */
 function upgradeEffect(e: CardEffect): CardEffect {

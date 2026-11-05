@@ -7,6 +7,7 @@ import { TIMING, VIBRATION } from '../data/balance';
 import { cardOf } from '../data/cards';
 import { CLASSES } from '../data/classes';
 import { ENCOUNTERS } from '../data/enemies';
+import { SCENARIOS } from '../data/scenarios';
 import {
   applyGameCommand,
   createBattle,
@@ -217,14 +218,16 @@ const EMPTY_BATTLE: BattleState = (() => {
   return { ...b, phase: 'victory' };
 })();
 
-const defaultDraft = (): NewGameDraft => ({
-  scenarioId: 'corruptionKing',
-  difficulty: 'normal',
-  party: [
-    { classId: 'warrior', gender: 'male', name: autoName('warrior', 'male', 0) },
-    { classId: 'mage', gender: 'female', name: autoName('mage', 'female', 1) },
-  ],
-});
+/** 冒険の準備の初期値（最初から遊べる先頭のシナリオ・先頭の職業2つ） */
+const defaultDraft = (): NewGameDraft => {
+  const classes = CLASSES.all.filter((c) => c.unlocked);
+  const party = [0, 1].map((i) => {
+    const c = classes[i % classes.length];
+    const gender = i % 2 ? 'female' : 'male';
+    return { classId: c.id, gender, name: autoName(c.id, gender, i) } as const;
+  });
+  return { scenarioId: SCENARIOS.all.find((s) => s.unlocked)!.id, difficulty: 'normal', party: [...party] };
+};
 
 const saved = loadSave();
 

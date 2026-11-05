@@ -81,3 +81,6 @@ export const GoblinScout = memo(function GoblinScout({ className }: { className?
     </svg>
   );
 });
+
+/** この絵を使う敵のID（ファイルを置くだけで自動で登録される） */
+export const enemyArt = { goblinScout: GoblinScout };

@@ -98,3 +98,6 @@ export const GoblinBrute = memo(function GoblinBrute({ className }: { className?
     </svg>
   );
 });
+
+/** この絵を使う敵のID（ファイルを置くだけで自動で登録される） */
+export const enemyArt = { goblinBrute: GoblinBrute };

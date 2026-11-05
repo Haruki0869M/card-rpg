@@ -1,5 +1,5 @@
 // 翠の森の敵
-import type { EnemyDef } from '../../types';
+import type { EnemyDef } from '../../../../types';
 
 export const forestWolf: EnemyDef = {
   id: 'forestWolf',

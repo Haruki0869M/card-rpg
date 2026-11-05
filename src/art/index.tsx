@@ -8,27 +8,26 @@ import { FallbackEnemy, FallbackHero } from './fallback';
 import { HERO_FACE_VIEWBOX, Hero } from './hero/Hero';
 import { heroLookFor } from './hero/looks';
 import { ArtImage, generateArt, useArtUrl } from './rasterize';
-import { PlainsBackground } from './backgrounds/Plains';
-import { TempleBackground } from './backgrounds/Temple';
-import { CastleBackground } from './backgrounds/Castle';
-
-import { ChaosShaman } from './enemies/ChaosShaman';
-import { GoblinBrute } from './enemies/GoblinBrute';
-import { GoblinScout } from './enemies/GoblinScout';
-import { ForestWolf, ToxicShroom, TreantKing, TreeWarden } from './enemies/Forest';
 
 type EnemyArtComponent = ComponentType<{ className?: string; phase?: number }>;
 
-/** 敵の絵の登録表。敵を増やすときは絵のファイルを作ってここに1行追加する（無ければ汎用の仮の絵） */
-const ENEMY_ART: Record<string, EnemyArtComponent> = {
-  goblinBrute: GoblinBrute,
-  goblinScout: GoblinScout,
-  chaosShaman: ChaosShaman,
-  forestWolf: ForestWolf,
-  toxicShroom: ToxicShroom,
-  treeWarden: TreeWarden,
-  treantKing: TreantKing,
-};
+/** 各ファイルの export（例: export const enemyArt = { 敵ID: 絵 }）を1つの表にまとめる */
+function collectArt<T>(mods: Record<string, Record<string, unknown>>, key: string): Record<string, T> {
+  const out: Record<string, T> = {};
+  for (const path of Object.keys(mods).sort()) {
+    for (const [id, comp] of Object.entries((mods[path][key] ?? {}) as Record<string, T>)) {
+      if (out[id]) throw new Error(`Duplicate art: ${id} (${path})`);
+      out[id] = comp;
+    }
+  }
+  return out;
+}
+
+/** 敵の絵の登録表。src/art/enemies/ に絵のファイルを置き、export const enemyArt = { 敵ID: 絵 } と書くだけで使われる（無ければ汎用の仮の絵） */
+const ENEMY_ART = collectArt<EnemyArtComponent>(import.meta.glob('./enemies/*.tsx', { eager: true }), 'enemyArt');
+
+/** 絵がある敵か（データ検査用） */
+export const hasEnemyArt = (defId: string) => !!ENEMY_ART[defId];
 
 const heroKey = (classId: string, gender: Gender, face?: boolean, weapon?: Rarity) =>
   `hero:${classId}:${gender}:${face ? 'face' : 'full'}:${weapon ?? '-'}`;
@@ -92,12 +91,9 @@ export function EnemyArt({ defId, phase = 0, className }: { defId: string; phase
   return <ArtImage src={src} className={className} />;
 }
 
-/** 背景の登録表（ダンジョンの background の値で選ぶ。無ければ平原） */
-const BACKGROUNDS: Record<string, ComponentType> = {
-  plains: PlainsBackground,
-  temple: TempleBackground,
-  castle: CastleBackground,
-};
+/** 背景の登録表（ダンジョンの background の値で選ぶ。無ければ平原）。src/art/backgrounds/ に置き export const background = { ID: 絵 } と書く */
+const BACKGROUNDS = collectArt<ComponentType>(import.meta.glob('./backgrounds/*.tsx', { eager: true }), 'background');
+export const hasBackground = (id: string) => !!BACKGROUNDS[id];
 
 export function BattleBackground({ kind = 'plains', className }: { kind?: string; className?: string }) {
   const key = BACKGROUNDS[kind] ? kind : 'plains';

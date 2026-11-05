@@ -1,5 +1,5 @@
 // 武器の専用カード（武器を装備している間だけ山札に加わる）
-import type { CardDef } from '../../types';
+import type { CardDef } from '../../../types';
 
 const d = (amount: number) => ({ kind: 'damage', amount }) as const;
 const b = (amount: number) => ({ kind: 'block', amount }) as const;
