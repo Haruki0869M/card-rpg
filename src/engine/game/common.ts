@@ -6,7 +6,7 @@ import type { GameState, Hero, ItemInstance, Loot, SlotResult, StatId } from '..
 import type { Rng } from '../rng';
 import { finalChanceOf } from './checks';
 import { rarityIndex } from './dungeon';
-import { findHero, livingHeroes } from './heroes';
+import { findHero, livingHeroes, sceneHeroes } from './heroes';
 import { heroStats } from './hero';
 
 export function addLog(game: GameState, text: string) {
@@ -25,34 +25,60 @@ export function rollWithFocus(slots: number, focusUsed: number, chance: number, 
 
 export const successes = (r: SlotResult[]) => r.filter((x) => x !== 'miss').length;
 
-/** 持ち物に入れる（消費アイテムは袋。袋が満杯ならゴールドに換える） */
-export function addItem(game: GameState, item: ItemInstance, gainedInDungeon: boolean): string {
+/** そのキャラの持ち物に入れる（消費アイテムは袋。袋が満杯ならゴールドに換える） */
+export function addItem(game: GameState, hero: Hero, item: ItemInstance, gainedInDungeon: boolean): string {
   const def = getItem(item.itemId);
   if (def.slot === 'consumable') {
-    if (game.pouch.length >= POUCH_LIMIT) {
+    if (hero.pouch.length >= POUCH_LIMIT) {
       const g = rarityIndex(def.rarity) * 15 + 10;
-      game.gold += g;
-      return `${def.name}（袋が満杯のため${g}Gに換えた）`;
+      hero.gold += g;
+      return `${def.name}（${hero.name}の袋が満杯のため${g}Gに換えた）`;
     }
-    game.pouch.push(item);
+    hero.pouch.push(item);
   } else {
-    game.stash.push(item);
+    hero.stash.push(item);
     if (gainedInDungeon && game.dungeon) game.dungeon.gained.push(item);
   }
   if (game.stats.bestRarity === undefined || rarityIndex(def.rarity) > rarityIndex(game.stats.bestRarity)) game.stats.bestRarity = def.rarity;
   return def.name;
 }
 
-export function addLoot(game: GameState, loot: Loot[]) {
+/** お金を何人かで山分けする（割り切れない分は先頭の人から1Gずつ） */
+export function splitGold(heroes: Hero[], amount: number) {
+  if (!heroes.length || amount <= 0) return;
+  const each = Math.floor(amount / heroes.length);
+  heroes.forEach((h, i) => (h.gold += each + (i < amount % heroes.length ? 1 : 0)));
+}
+
+/** 持ち物の数が一番少ない人（品物を配る時に、偏らないように） */
+export const leastLoaded = (heroes: Hero[]) => [...heroes].sort((a, b) => a.stash.length + a.pouch.length - (b.stash.length + b.pouch.length))[0];
+
+/**
+ * 手に入れたものを配る。お金は山分け、品物は持ち物の少ない人から、カードはそのキャラへ。
+ * だれが受け取ったかを loot に書き込む（画面で見せる）
+ */
+export function addLoot(game: GameState, loot: Loot[], recipients: Hero[]) {
+  const to = recipients.filter((h) => !h.retired);
+  if (!to.length) return;
   for (const l of loot) {
-    if (l.kind === 'gold') game.gold += l.amount;
-    else if (l.kind === 'item') addItem(game, l.item, true);
-    else if (l.kind === 'card') {
+    if (l.kind === 'gold') {
+      splitGold(to, l.amount);
+      l.to = to.map((h) => h.id);
+    } else if (l.kind === 'item') {
+      const h = to.length === 1 ? to[0] : leastLoaded(to);
+      addItem(game, h, l.item, true);
+      l.to = h.id;
+    } else if (l.kind === 'card') {
       const h = findHero(game, l.heroId);
       if (h) h.deck.push({ uid: `c${game.nextUid++}`, cardId: l.cardId });
     }
   }
 }
+
+/** 今の場面のキャラのお金の合計（表示用） */
+export const partyGold = (game: GameState) => sceneHeroes(game).reduce((n, h) => n + h.gold, 0);
+/** 全員のお金の合計（表示用） */
+export const totalGold = (game: GameState) => game.heroes.reduce((n, h) => n + (h.retired ? 0 : h.gold), 0);
 
 /** 探索の特殊能力: 判定のボーナス */
 export function checkBonus(hero: Hero, tag: string | undefined): number {

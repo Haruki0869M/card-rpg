@@ -117,7 +117,7 @@ describe('操作の同期', () => {
     const { rooms } = await playing(2);
     await drive(rooms, 3);
     // b の状態をわざと壊す
-    rooms[1].game!.gold += 999;
+    rooms[1].game!.heroes[0].gold += 999;
     const reasons: string[] = [];
     rooms[1].on((e) => e.type === 'resync' && reasons.push(e.reason));
     await drive(rooms, SNAPSHOT_EVERY + 5);

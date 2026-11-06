@@ -67,7 +67,8 @@ export function BottomBar() {
     return () => clearTimeout(t);
   }, [hint]);
 
-  const pouch = useBattle((s) => s.game?.pouch.length ?? 0);
+  // 操作中のキャラの道具袋
+  const pouch = useBattle((s) => s.game?.heroes.find((h) => h.id === s.activeId)?.pouch.length ?? 0);
   const pileBtn = 'btn btn-dark flex h-11 min-w-[50px] items-center justify-center gap-1 rounded-lg px-1.5 text-[14px] font-bold tabular-nums';
 
   return (

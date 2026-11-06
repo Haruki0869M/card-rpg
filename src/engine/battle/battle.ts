@@ -35,7 +35,7 @@ import { abilityTriggered, addLog, enemyName, findAlly, findEnemy, healUnit, los
 
 export { enemyName, findAlly, findEnemy, unitName } from './units';
 
-export const STATE_VERSION = 6;
+export const STATE_VERSION = 7;
 
 // ---------- 生成 ----------
 

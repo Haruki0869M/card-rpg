@@ -67,7 +67,7 @@ function worldTarget(g: GameState, at: number): { tile: number; why: 'town' | 'g
     let best: number | undefined;
     w.tiles.forEach((t, i) => {
       if (t.f?.kind !== 'town' || w.fallenTowns.includes(t.f.id) || !t.seen) return;
-      if (g.gold < TOWNS.get(t.f.id).innCost) return;
+      if (heroes.every((h) => h.gold < TOWNS.get(t.f!.id).innCost)) return;
       if (best === undefined || hexDistance(w, at, i) < hexDistance(w, at, best)) best = i;
     });
     if (best !== undefined) return { tile: best, why: 'town' };
@@ -130,15 +130,22 @@ function battleStep(g: GameState, log: BotLog): GameState {
   return send(g, { type: 'FINISH_BATTLE', playerId: pid(g) }, log);
 }
 
-/** 持ち物の装備のうち、格が上のものを装備する */
+/** 持ち物の装備のうち、格が上のものを装備する（使えない人が持っていたら、同じ場所の使える仲間に渡す） */
 function equipBest(g: GameState, log: BotLog): GameState {
-  for (const h of livingHeroes(g)) {
-    for (const inst of g.stash) {
+  const near = (a: string, b: string) => !g.world || g.world.pos[a] === g.world.pos[b];
+  const heroes = livingHeroes(g).filter((h) => !g.party || g.party.includes(h.id));
+  const scene = g.mode === 'world' ? heroes.filter((h) => !g.expeditions?.some((x) => x.heroes.includes(h.id))) : heroes;
+  for (const owner of scene) {
+    for (const inst of owner.stash) {
       const it = getItem(inst.itemId);
-      if (canEquip(h, it)) continue;
-      const cur = h.equipment[it.slot as 'weapon' | 'armor' | 'accessory'];
-      if (cur && rarityIndex(getItem(cur.itemId).rarity) >= rarityIndex(it.rarity)) continue;
-      return send(g, { type: 'EQUIP', playerId: h.playerId, heroId: h.id, itemUid: inst.uid }, log);
+      const better = (h: (typeof scene)[number]) => {
+        if (canEquip(h, it)) return false;
+        const cur = h.equipment[it.slot as 'weapon' | 'armor' | 'accessory'];
+        return !cur || rarityIndex(getItem(cur.itemId).rarity) < rarityIndex(it.rarity);
+      };
+      if (better(owner)) return send(g, { type: 'EQUIP', playerId: owner.playerId, heroId: owner.id, itemUid: inst.uid }, log);
+      const to = scene.find((h) => h !== owner && near(h.id, owner.id) && better(h));
+      if (to) return send(g, { type: 'GIVE', playerId: owner.playerId, fromHeroId: owner.id, toHeroId: to.id, itemUid: inst.uid }, log);
     }
   }
   return g;
@@ -202,12 +209,16 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
       const ev = g.event!;
       if (ev.result) return send(g, { type: 'FINISH_EVENT', playerId: pid(g) }, log);
       const def = EVENTS.get(ev.eventId);
-      const idx = def.options.findIndex((_, i) => {
-        const st = eventOptionState(g, ev.eventId, i);
-        return st.visible && !st.reason;
-      });
-      const h = livingHeroes(g).find((x) => !g.party || g.party.includes(x.id))!;
-      return send(g, { type: 'CHOOSE_EVENT', playerId: h.playerId, optionIndex: idx, heroId: h.id, focusUsed: 0 }, log);
+      const party = livingHeroes(g).filter((x) => !g.party || g.party.includes(x.id));
+      // 選べる選択肢と、選ぶキャラ（お金がいる時は払えるキャラ）
+      for (let i = 0; i < def.options.length; i++) {
+        const h = party.find((x) => {
+          const st = eventOptionState(g, ev.eventId, i, x);
+          return st.visible && !st.reason;
+        });
+        if (h) return send(g, { type: 'CHOOSE_EVENT', playerId: h.playerId, optionIndex: i, heroId: h.id, focusUsed: 0 }, log);
+      }
+      return g;
     }
     case 'rest':
       return send(g, { type: 'REST', playerId: pid(g), kind: 'hp' }, log);
@@ -218,10 +229,10 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
       const key = `${g.world!.worldTurn}:${t.townId}`;
       if (memo.town !== key) {
         memo.town = key;
-        const hurt = livingHeroes(g).some((h) => h.hp < heroMaxHp(h));
-        if (hurt && g.gold >= TOWNS.get(t.townId).innCost) return send(g, { type: 'TOWN_INN', playerId: pid(g) }, log);
+        const v = g.heroes.find((h) => h.id === t.heroId)!;
+        if (v.hp < heroMaxHp(v) && v.gold >= TOWNS.get(t.townId).innCost) return send(g, { type: 'TOWN_INN', playerId: v.playerId }, log);
       }
-      return send(g, { type: 'LEAVE_TOWN', playerId: pid(g) }, log);
+      return send(g, { type: 'LEAVE_TOWN', playerId: pid(g, t.heroId) }, log);
     }
     case 'shrine': {
       const s = g.shrine!;

@@ -72,6 +72,10 @@ export interface Hero {
   retired?: boolean;
   /** 祠の永続の加護の数（上限あり） */
   blessings?: number;
+  /** 自分のお金・持ち物（装備していない装備品）・道具袋（M3-C: キャラごと） */
+  gold: number;
+  stash: ItemInstance[];
+  pouch: ItemInstance[];
 }
 
 // ---------- ダンジョン ----------
@@ -174,8 +178,9 @@ export interface DungeonRun {
 // ---------- 宝箱・イベント・報酬 ----------
 
 export type Loot =
-  | { kind: 'item'; item: ItemInstance }
-  | { kind: 'gold'; amount: number }
+  /** to = 受け取ったキャラ（入れた時に決まる） */
+  | { kind: 'item'; item: ItemInstance; to?: string }
+  | { kind: 'gold'; amount: number; to?: string[] }
   | { kind: 'card'; cardId: string; heroId: string };
 
 export interface ChestState {
@@ -326,11 +331,6 @@ export interface GameState {
   scenarioId: string;
   difficulty: Difficulty;
   heroes: Hero[];
-  gold: number;
-  /** 装備していない装備品（パーティ共有） */
-  stash: ItemInstance[];
-  /** 消費アイテムの袋（パーティ共有・上限あり） */
-  pouch: ItemInstance[];
   mode: GameMode;
   dungeon?: DungeonRun;
   battle?: BattleState;
@@ -415,6 +415,8 @@ export type GameCommand =
   | { type: 'RETURN_TO_HUB'; playerId: PlayerId }
   | { type: 'EQUIP'; playerId: PlayerId; heroId: string; itemUid: string }
   | { type: 'UNEQUIP'; playerId: PlayerId; heroId: string; slot: EquipSlot }
+  /** 同じ場所にいる仲間に、お金か持ち物を渡す */
+  | { type: 'GIVE'; playerId: PlayerId; fromHeroId: string; toHeroId: string; itemUid?: string; gold?: number }
   // ---------- 世界マップ（spec §8） ----------
   /** 移動力の判定 */
   | { type: 'WORLD_ROLL_MOVE'; playerId: PlayerId; heroId: string; focusUsed: number }

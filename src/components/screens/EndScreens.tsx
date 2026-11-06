@@ -1,4 +1,5 @@
 // ===== ダンジョン制覇・全滅の画面 =====
+import { totalGold } from '../../engine';
 import { motion } from 'framer-motion';
 import { Castle, Crown, Skull } from 'lucide-react';
 import { useBattle } from '../../store/battleStore';
@@ -15,7 +16,7 @@ function Stats() {
     ['与えた総ダメージ', st.totalDamage],
     ['完全成功', `${st.perfects}回`],
     ['最高の宝', st.bestRarity ? RARITY_STYLE[st.bestRarity].name : '-'],
-    ['所持金', `${game.gold}G`],
+    ['所持金（全員）', `${totalGold(game)}G`],
   ];
   return (
     <div className="mt-2 flex flex-col text-[14px]">

@@ -8,10 +8,10 @@ import { getDifficulty } from '../../../data/rules';
 import { QUESTS, TERRAINS, TOWNS } from '../../../data/world';
 import type { EncounterState, Expedition, GameCommand, GameState, Hero, QuestState, WorldState } from '../../../types';
 import type { Rng } from '../../rng';
-import { addLog, ownedBy, rollWithFocus, statChance, successes } from '../common';
+import { addLog, ownedBy, rollWithFocus, splitGold, statChance, successes } from '../common';
 import { enterDungeonFromWorld, startBattleWith } from '../game';
 import { heroFocusMax, heroMaxHp } from '../hero';
-import { activeHeroes, findHero, livingHeroes, mapHeroes } from '../heroes';
+import { activeHeroes, findHero, livingHeroes, mapHeroes, sceneHeroes } from '../heroes';
 import { revealAround } from './fog';
 import { hexDistance, pathTo, reachable } from './hex';
 import { objectiveHandler, type QuestSignal } from './objectives';
@@ -349,8 +349,9 @@ export function onWandererDefeated(game: GameState, rng: Rng) {
   if (wd.raidTown) {
     w.raids = w.raids.filter((r) => r.townId !== wd.raidTown);
     w.savedTowns.push(wd.raidTown);
-    game.gold += BALANCE.raidRewardGold;
-    addLog(game, `${TOWNS.get(wd.raidTown).name}を魔物から守った！（${BALANCE.raidRewardGold}G）`);
+    // 戦った全員で山分け
+    splitGold(sceneHeroes(game), BALANCE.raidRewardGold);
+    addLog(game, `${TOWNS.get(wd.raidTown).name}を魔物から守った！（${BALANCE.raidRewardGold}Gを山分け）`);
   }
   void rng;
 }

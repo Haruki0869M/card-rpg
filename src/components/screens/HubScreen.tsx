@@ -2,7 +2,7 @@
 import { Backpack, Castle, Coins, Crown, Menu, Shuffle, Swords, Users } from 'lucide-react';
 import { BattleBackground } from '../../art';
 import { DUNGEONS } from '../../data/dungeons';
-import { availableDungeons, chestOdds } from '../../engine';
+import { availableDungeons, chestOdds, totalGold } from '../../engine';
 import { LOCAL_PLAYER } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
 import { CHEST_NAME, fmtPct } from '../ui/ChestOdds';
@@ -20,7 +20,7 @@ export function HubScreen() {
         <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-[#0b0810]" />
         <div className="absolute inset-x-0 top-2 flex items-center gap-2 px-2">
           <div className="panel flex h-9 items-center gap-1 rounded-full px-3 text-[14px] font-bold text-amber-200 tabular-nums">
-            <Coins size={16} /> {game.gold}G
+            <Coins size={16} /> {totalGold(game)}G
           </div>
           <div className="flex-1" />
           <button onClick={() => openSheet('menu')} aria-label="メニュー" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-lg">
@@ -90,7 +90,7 @@ export function HubScreen() {
           <Users size={18} className="text-amber-300" /> パーティ・装備
         </button>
         <button onClick={() => openSheet('pouch')} className="btn btn-dark flex h-12 items-center justify-center gap-2 rounded-xl text-[15px] font-bold">
-          <Backpack size={18} className="text-amber-300" /> 道具袋（{game.pouch.length}）
+          <Backpack size={18} className="text-amber-300" /> 道具袋
         </button>
       </div>
     </Screen>

@@ -112,7 +112,8 @@ interface StoreState {
   cancel: () => void;
   setActive: (id: string) => void;
   endTurn: () => void;
-  usePouch: (itemUid: string, targetHeroId: string) => void;
+  /** 道具を使う（userId = 袋の持ち主。戦闘中は操作中のキャラ） */
+  usePouch: (itemUid: string, targetHeroId: string, userId?: string) => void;
   setSettings: (s: Partial<Settings>) => void;
   openSheet: (s: Sheet) => void;
   setConfirmAbandon: (v: boolean) => void;
@@ -647,13 +648,10 @@ export const useBattle = create<StoreState>((set, get) => {
       get().dispatch({ type: 'END_TURN', playerId: LOCAL_PLAYER });
     },
 
-    usePouch: (itemUid, targetHeroId) => {
+    usePouch: (itemUid, targetHeroId, userId) => {
       const { game, activeId } = get();
       if (!game) return;
-      const user =
-        game.mode === 'battle'
-          ? activeId
-          : (game.heroes.find((h) => isLocalPlayer(h.playerId) && h.hp > 0)?.id ?? targetHeroId);
+      const user = game.mode === 'battle' ? activeId : (userId ?? game.heroes.find((h) => h.pouch.some((p) => p.uid === itemUid))?.id ?? targetHeroId);
       const err = get().dispatchGame({ type: 'USE_POUCH_ITEM', playerId: LOCAL_PLAYER, itemUid, userId: user, targetId: targetHeroId });
       if (!err) set({ sheet: null });
     },

@@ -173,7 +173,7 @@ export function RewardScreen() {
             勝利！
           </div>
           <div className="flex items-center justify-center gap-1 text-[16px] font-bold text-amber-200">
-            <Coins size={18} /> +{r.gold} G
+            <Coins size={18} /> +{r.gold} G{r.exp.length > 1 ? `（${r.exp.length}人で山分け）` : ''}
           </div>
         </motion.div>
 

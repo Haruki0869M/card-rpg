@@ -5,5 +5,5 @@ import { contentRegistry, type ContentModules } from '../content';
 export const ITEMS = contentRegistry<ItemDef>('item', import.meta.glob('/src/content/**/items/*.ts', { eager: true }) as ContentModules);
 export const getItem = (id: string) => ITEMS.get(id);
 
-/** 消費アイテムの袋の上限 */
-export const POUCH_LIMIT = 8;
+/** 消費アイテムの袋の上限（1人あたり） */
+export const POUCH_LIMIT = 4;

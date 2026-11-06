@@ -87,7 +87,7 @@ export function TitleScreen() {
             <span className="min-w-0 flex-1">
               <span className="font-display block text-[17px]">つづきから</span>
               <span className="block truncate text-[12px] text-zinc-400">
-                {modeText[game.mode] ?? ''}・{game.dungeon?.name ?? '拠点'}・{game.gold}G
+                {modeText[game.mode] ?? ''}・{game.dungeon?.name ?? '拠点'}・{game.heroes.reduce((n, h) => n + (h.gold ?? 0), 0)}G
               </span>
             </span>
             <span className="flex -space-x-2">

@@ -64,9 +64,9 @@ export function WorldTopBar({ game }: { game: GameState }) {
         <span className="flex items-center gap-0.5 text-orange-300" aria-label="命の灯火">
           <Flame size={14} className="fill-orange-500/60" />×{game.lives}
         </span>
-        <span className="flex items-center gap-0.5 text-amber-200">
+        <span className="flex items-center gap-0.5 text-amber-200" aria-label="手番のキャラの所持金">
           <Coins size={14} />
-          {game.gold}G
+          {game.heroes.find((h) => h.id === game.world?.turn)?.gold ?? 0}G
         </span>
       </div>
       <div className="flex shrink-0 flex-col items-center text-[12px] leading-4">

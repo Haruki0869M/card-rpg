@@ -6,7 +6,7 @@ import { BattleBackground, EnemyArt } from '../../art';
 import { getEnemy } from '../../data/enemies';
 import { EVENTS } from '../../data/events';
 import { getItem } from '../../data/items';
-import { chestOdds, reachableRooms, retreatLoss } from '../../engine';
+import { chestOdds, partyGold, reachableRooms, retreatLoss } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
 import { LOCAL_PLAYER } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
@@ -124,7 +124,7 @@ export function DungeonScreen() {
       <div className="flex h-12 shrink-0 items-center gap-2 px-2">
         <div className="font-display text-outline min-w-0 flex-1 truncate text-[18px] text-amber-100">{run.name}</div>
         <div className="panel flex h-9 items-center gap-1 rounded-full px-3 text-[14px] font-bold text-amber-200 tabular-nums">
-          <Coins size={16} /> {game.gold}G
+          <Coins size={16} /> {partyGold(game)}G
         </div>
         <button onClick={() => openSheet('menu')} aria-label="メニュー" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-lg">
           <Menu size={22} />
@@ -250,7 +250,7 @@ export function DungeonScreen() {
           <Users size={17} className="text-amber-300" /> 装備
         </button>
         <button onClick={() => openSheet('pouch')} className="btn btn-dark flex h-12 items-center justify-center gap-1 rounded-xl text-[14px] font-bold">
-          <Backpack size={17} className="text-amber-300" /> 道具（{game.pouch.length}）
+          <Backpack size={17} className="text-amber-300" /> 道具
         </button>
         <button onClick={() => setShowRetreat((v) => !v)} className="btn btn-dark flex h-12 items-center justify-center gap-1 rounded-xl text-[14px] font-bold">
           <LogOut size={17} className="text-red-300" /> 撤退

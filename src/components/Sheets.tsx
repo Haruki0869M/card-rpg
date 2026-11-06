@@ -7,13 +7,31 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { CharacterArt } from '../art';
 import { cardOf } from '../data/cards';
 import { getClass } from '../data/classes';
-import { getItem } from '../data/items';
+import { getItem, POUCH_LIMIT } from '../data/items';
 import { EQUIP_SLOTS, STAT_IDS, affinityFromStats, battleDeck, canEquip, describeAbility, expToNext, findAlly, heroFocusMax, heroMaxHp, heroStats, weaponRarity } from '../engine';
 import { LOCAL_PLAYER, isLocalPlayer } from '../store/battleConfig';
 import { useBattle } from '../store/battleStore';
 import { useOnline } from '../store/onlineStore';
 import { OnlinePanel } from './screens/OnlineScreens';
-import type { CardInstance, EquipSlot, Hero, ItemDef } from '../types';
+import type { CardInstance, EquipSlot, GameState, Hero, ItemDef } from '../types';
+import { ConfirmDialog } from './ui/ConfirmDialog';
+
+/** 同じ場所にいる仲間（ダンジョンの中なら同じパーティ、世界マップなら同じマス） */
+function placeMates(game: GameState, hero: Hero): Hero[] {
+  return game.heroes.filter((h) => {
+    if (h === hero || h.retired) return false;
+    if (game.party) return game.party.includes(h.id) && game.party.includes(hero.id);
+    if (game.expeditions?.some((x) => x.heroes.includes(h.id) || x.heroes.includes(hero.id))) return false;
+    return !game.world || game.world.pos[h.id] === game.world.pos[hero.id];
+  });
+}
+
+/** この端末のキャラのうち、今の場面にいるキャラ */
+function sceneLocalHeroes(game: GameState): Hero[] {
+  return game.heroes.filter(
+    (h) => !h.retired && h.hp > 0 && isLocalPlayer(h.playerId) && (game.party ? game.party.includes(h.id) : !game.expeditions?.some((x) => x.heroes.includes(h.id))),
+  );
+}
 import { Bar, HeroFace, ItemIcon, itemSummary, RARITY_STYLE, STAT_LABEL } from './ui/game';
 import { CATEGORY_STYLE, EffectChip } from './ui/icons';
 
@@ -216,7 +234,11 @@ function PartySheet() {
   const aff = affinityFromStats(stats);
   const inBattle = game.mode === 'battle';
   const mine = isLocalPlayer(hero.playerId);
-  const candidates = slot ? game.stash.filter((s) => getItem(s.itemId).slot === slot) : [];
+  const candidates = slot ? hero.stash.filter((s) => getItem(s.itemId).slot === slot) : [];
+  // 渡せる相手（同じ場所にいる仲間）
+  const mates = inBattle ? [] : placeMates(game, hero);
+  const [give, setGive] = useState<{ itemUid?: string; gold?: number } | null>(null);
+  const [giveTo, setGiveTo] = useState<string | null>(null);
 
   return (
     <BottomSheet title="パーティ・装備" onClose={() => openSheet(null)} tall>
@@ -249,6 +271,7 @@ function PartySheet() {
           <div className="mt-1 text-[13px] tabular-nums">
             HP {hero.hp}/{heroMaxHp(hero)}・フォーカス {hero.focus}/{heroFocusMax(hero)}
           </div>
+          <div className="text-[13px] font-bold text-amber-200 tabular-nums">所持金 {hero.gold}G</div>
           <div className="mt-1 grid grid-cols-4 gap-x-1 gap-y-0.5 text-[12px]">
             {STAT_IDS.map((k) => (
               <span key={k} className="tabular-nums">
@@ -367,8 +390,71 @@ function PartySheet() {
           <div className="mt-1 text-[12px] text-zinc-500">「武」は武器を装備している間だけ加わるカード</div>
         </div>
       )}
-      {game.stash.length > 0 && (
-        <div className="mt-2 text-[12px] text-zinc-400">持ち物の装備品：{game.stash.length}個（装備欄をタップして選ぶ）</div>
+      <div className="font-display mt-2 text-[15px] text-amber-200">
+        {hero.name}の持ち物
+        {mates.length > 0 && mine && <span className="ml-1 text-[12px] text-zinc-400">（同じ場所の仲間に渡せます）</span>}
+      </div>
+      <div className="mt-1 flex flex-col gap-1">
+        {[...hero.stash, ...hero.pouch].length === 0 && <div className="py-1 text-[13px] text-zinc-500">何も持っていません</div>}
+        {[...hero.stash, ...hero.pouch].map((inst) => {
+          const it = getItem(inst.itemId);
+          return (
+            <div key={inst.uid} className="flex items-center gap-2 rounded-lg bg-black/30 p-1">
+              <ItemIcon item={it} size={34} />
+              <span className="min-w-0 flex-1 truncate text-[13px] font-bold" style={{ color: RARITY_STYLE[it.rarity].color }}>
+                {it.name}
+              </span>
+              {mine && mates.length > 0 && (
+                <button onClick={() => setGive({ itemUid: inst.uid })} className="btn btn-dark h-11 shrink-0 rounded-lg px-3 text-[13px] font-bold">
+                  渡す
+                </button>
+              )}
+            </div>
+          );
+        })}
+        {mine && mates.length > 0 && hero.gold > 0 && (
+          <div className="flex gap-1">
+            {[10, 50, hero.gold]
+              .filter((v, i, a) => v <= hero.gold && a.indexOf(v) === i)
+              .map((v) => (
+                <button key={v} onClick={() => setGive({ gold: v })} className="btn btn-dark h-11 flex-1 rounded-lg text-[13px] font-bold">
+                  {v === hero.gold ? `全部（${v}G）` : `${v}G`}を渡す
+                </button>
+              ))}
+          </div>
+        )}
+      </div>
+      {give && (
+        <div className="mt-2 rounded-xl border border-amber-400/40 bg-black/40 p-2">
+          <div className="text-[13px] text-zinc-300">
+            {give.gold ? `${give.gold}G` : `「${getItem([...hero.stash, ...hero.pouch].find((x) => x.uid === give.itemUid)?.itemId ?? 'potion').name}」`}をだれに渡す？
+          </div>
+          <div className="mt-1 grid grid-cols-2 gap-1">
+            {mates.map((m) => (
+              <button key={m.id} onClick={() => setGiveTo(m.id)} className="btn btn-dark flex h-12 items-center gap-1.5 rounded-lg px-2">
+                <HeroFace hero={m} size={30} />
+                <span className="truncate text-[13px] font-bold">{m.name}</span>
+              </button>
+            ))}
+          </div>
+          <button onClick={() => setGive(null)} className="btn btn-dark mt-1 h-11 w-full rounded-lg text-[13px]">
+            やめる
+          </button>
+        </div>
+      )}
+      {give && giveTo && (
+        <ConfirmDialog
+          title="渡しますか？"
+          text={`${hero.name}から${game.heroes.find((h) => h.id === giveTo)?.name}に、${give.gold ? `${give.gold}G` : `「${getItem([...hero.stash, ...hero.pouch].find((x) => x.uid === give.itemUid)?.itemId ?? 'potion').name}」`}を渡します。`}
+          ok="渡す"
+          danger={false}
+          onOk={() => {
+            dispatchGame({ type: 'GIVE', playerId: hero.playerId, fromHeroId: hero.id, toHeroId: giveTo, ...give });
+            setGive(null);
+            setGiveTo(null);
+          }}
+          onCancel={() => setGiveTo(null)}
+        />
       )}
     </BottomSheet>
   );
@@ -379,19 +465,42 @@ function PouchSheet() {
   const battle = useBattle((s) => s.battle);
   const usePouch = useBattle((s) => s.usePouch);
   const openSheet = useBattle((s) => s.openSheet);
+  const activeId = useBattle((s) => s.activeId);
   const [chosen, setChosen] = useState<string | null>(null);
   const inBattle = game.mode === 'battle';
+  // だれの袋か: 戦闘中は操作中のキャラ、それ以外は選べる（この端末のキャラで、今の場面にいる）
+  const own = sceneLocalHeroes(game);
+  const [ownerId, setOwnerId] = useState<string | undefined>(own[0]?.id);
+  const owner = inBattle ? game.heroes.find((h) => h.id === activeId) : (own.find((h) => h.id === ownerId) ?? own[0]);
+  const pouch = owner?.pouch ?? [];
   const groups = new Map<string, string[]>();
-  for (const p of game.pouch) groups.set(p.itemId, [...(groups.get(p.itemId) ?? []), p.uid]);
-  const chosenDef = chosen ? getItem(game.pouch.find((p) => p.uid === chosen)!.itemId) : null;
-  const targets = game.heroes.map((h) => {
+  for (const p of pouch) groups.set(p.itemId, [...(groups.get(p.itemId) ?? []), p.uid]);
+  const chosenDef = chosen ? getItem(pouch.find((p) => p.uid === chosen)?.itemId ?? 'potion') : null;
+  const targets = game.heroes.filter((h) => !h.retired && (!game.party || game.party.includes(h.id)) && (!game.world || game.party || game.world.pos[h.id] === game.world.pos[owner?.id ?? ''])).map((h) => {
     const a = inBattle ? battle.allies.find((x) => x.id === h.id) : undefined;
     const hp = a ? a.hp : h.hp;
     const max = a ? a.maxHp : heroMaxHp(h);
     return { h, hp, max, dead: a ? a.dead : h.hp <= 0 };
   });
   return (
-    <BottomSheet title={`道具袋（${game.pouch.length}）`} onClose={() => openSheet(null)}>
+    <BottomSheet title={`${owner?.name ?? ''}の道具袋（${pouch.length}/${POUCH_LIMIT}）`} onClose={() => openSheet(null)}>
+      {!inBattle && own.length > 1 && (
+        <div className="mb-1 flex gap-1">
+          {own.map((h) => (
+            <button
+              key={h.id}
+              onClick={() => {
+                setOwnerId(h.id);
+                setChosen(null);
+              }}
+              className={`btn flex h-11 min-w-0 flex-1 items-center gap-1 rounded-lg border-b-2 px-1 ${h.id === owner?.id ? 'border-amber-300 bg-amber-500/15' : 'border-transparent bg-black/30'}`}
+            >
+              <HeroFace hero={h} size={26} />
+              <span className="truncate text-[12px] font-bold">{h.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
       {groups.size === 0 && <div className="py-6 text-center text-[13px] text-zinc-500">道具を持っていません</div>}
       <div className="flex flex-col gap-1">
         {[...groups.entries()].map(([itemId, uids]) => {
@@ -425,7 +534,7 @@ function PouchSheet() {
                 key={h.id}
                 disabled={dead}
                 onClick={() => {
-                  usePouch(chosen!, h.id);
+                  usePouch(chosen!, h.id, owner?.id);
                   setChosen(null);
                 }}
                 className="btn btn-dark flex h-12 items-center gap-1.5 rounded-lg px-2 text-left"

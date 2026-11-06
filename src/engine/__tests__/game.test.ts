@@ -56,7 +56,8 @@ describe('冒険の開始', () => {
     expect(getItem(w.equipment.weapon!.itemId).id).toBe('copperSword');
     expect(w.hp).toBe(heroMaxHp(w));
     expect(heroMaxHp(w)).toBe(60 + 5); // 皮の鎧
-    expect(g.pouch).toHaveLength(2);
+    // 最初の道具（回復薬2つ）はキャラに順番に配られる
+    expect(g.heroes.reduce((n, h) => n + h.pouch.length, 0)).toBe(2);
     expect(battleDeck(w).filter((c) => c.fromWeapon).map((c) => c.cardId)).toEqual(['wSlash', 'wSlash']);
     expect(battleDeck(w)).toHaveLength(12);
     expect(g.mode).toBe('hub');
@@ -101,12 +102,12 @@ describe('ダンジョン', () => {
 describe('装備', () => {
   it('武器の種類が合わないと装備できない。入れ替えた装備は持ち物に戻る', () => {
     let g = newGame();
-    g.stash.push({ uid: 'x1', itemId: 'steelSword' }, { uid: 'x2', itemId: 'magusStaff' }, { uid: 'x3', itemId: 'heroCrest' });
+    g.heroes[0].stash.push({ uid: 'x1', itemId: 'steelSword' }, { uid: 'x2', itemId: 'magusStaff' }, { uid: 'x3', itemId: 'heroCrest' });
     expect(applyGameCommand(g, { type: 'EQUIP', playerId: P, heroId: 'h0', itemUid: 'x2' }).error).toBeDefined();
     const before = heroStats(g.heroes[0]).str;
     g = run(g, { type: 'EQUIP', playerId: P, heroId: 'h0', itemUid: 'x1' });
     expect(heroStats(g.heroes[0]).str).toBe(before + 4);
-    expect(g.stash.some((s) => s.itemId === 'copperSword')).toBe(true);
+    expect(g.heroes[0].stash.some((s) => s.itemId === 'copperSword')).toBe(true);
     expect(battleDeck(g.heroes[0]).filter((c) => c.fromWeapon).map((c) => c.cardId)).toEqual(['wSteelCombo', 'wSteelCombo']);
     g = run(g, { type: 'EQUIP', playerId: P, heroId: 'h0', itemUid: 'x3' });
     expect(heroFocusMax(g.heroes[0])).toBe(BALANCE.focusMax + 1);
@@ -204,7 +205,9 @@ describe('戦闘 → 報酬 → 成長', () => {
     g.heroes[0].exp = 19; // あと少しでレベルアップ
     g = run(g, { type: 'FINISH_BATTLE', playerId: P });
     expect(g.mode).toBe('reward');
-    expect(g.gold).toBeGreaterThan(0);
+    // お金は生き残った人（h0）のもの
+    expect(g.heroes[0].gold).toBeGreaterThan(30);
+    expect(g.heroes[1].gold).toBe(30);
     expect(g.heroes[1].hp).toBe(1);
     expect(g.reward!.exp.map((e) => e.heroId)).toEqual(['h0']);
     expect(g.heroes[0].level).toBe(2);
@@ -273,7 +276,7 @@ describe('新しい戦闘の要素', () => {
 
   it('煙玉はボス戦では使えない', () => {
     let g = newGame(2, ['warrior']);
-    g.pouch.push({ uid: 'sm', itemId: 'smokeBomb' });
+    g.heroes[0].pouch.push({ uid: 'sm', itemId: 'smokeBomb' });
     g = run(g, { type: 'ENTER_DUNGEON', playerId: P, dungeonId: 'emeraldTemple' });
     const boss = g.dungeon!.rooms.find((r) => r.type === 'boss')!;
     g.dungeon!.currentRoomId = boss.id;
@@ -287,13 +290,13 @@ describe('撤退', () => {
   it('このダンジョンで最後に手に入れた装備を失って拠点へ（全回復）', () => {
     let g = newGame(4, ['warrior']);
     g = run(g, { type: 'ENTER_DUNGEON', playerId: P, dungeonId: 'emeraldTemple' });
-    g.stash.push({ uid: 'g1', itemId: 'ironArmor' }, { uid: 'g2', itemId: 'steelSword' });
+    g.heroes[0].stash.push({ uid: 'g1', itemId: 'ironArmor' }, { uid: 'g2', itemId: 'steelSword' });
     g.dungeon!.gained.push({ uid: 'g1', itemId: 'ironArmor' }, { uid: 'g2', itemId: 'steelSword' });
     g.heroes[0].hp = 10;
     expect(retreatLoss(g)?.uid).toBe('g2');
     g = run(g, { type: 'RETREAT', playerId: P });
     expect(g.mode).toBe('hub');
-    expect(g.stash.map((s) => s.uid)).toEqual(['g1']);
+    expect(g.heroes[0].stash.map((s) => s.uid)).toEqual(['g1']);
     expect(g.heroes[0].hp).toBe(heroMaxHp(g.heroes[0]));
   });
 });

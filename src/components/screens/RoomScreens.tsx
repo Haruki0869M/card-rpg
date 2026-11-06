@@ -31,6 +31,7 @@ export function LootList({ loot }: { loot: Loot[] }) {
                 <Coins size={24} className="text-amber-300" />
               </span>
               <b className="text-amber-200">{l.amount} ゴールド</b>
+              {l.to && <span className="text-[12px] text-zinc-400">{l.to.length > 1 ? `${l.to.length}人で山分け` : `→ ${game.heroes.find((x) => x.id === l.to![0])?.name}`}</span>}
             </motion.div>
           );
         if (l.kind === 'card') {
@@ -50,6 +51,7 @@ export function LootList({ loot }: { loot: Loot[] }) {
               <span className="block text-[14px] font-bold" style={{ color: r.color }}>
                 {def.name} <span className="text-[12px] font-normal opacity-80">{r.name}</span>
               </span>
+              {l.to && <span className="block text-[12px] text-sky-200">→ {game.heroes.find((x) => x.id === l.to)?.name}が受け取った</span>}
               <span className="block truncate text-[12px] text-zinc-300">{itemSummary(def)}</span>
             </span>
           </motion.div>

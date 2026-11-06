@@ -9,7 +9,7 @@ import { DUNGEONS } from '../../data/dungeons';
 import { getScenario } from '../../data/scenarios';
 import { getEnemy } from '../../data/enemies';
 import { EVENTS } from '../../data/events';
-import { getItem } from '../../data/items';
+import { getItem, POUCH_LIMIT } from '../../data/items';
 import type {
   BattleEvent,
   EventOutcome,
@@ -30,7 +30,7 @@ import { applyCommand, createBattle, STATE_VERSION } from '../battle/battle';
 import { createRng, type Rng } from '../rng';
 import { applyOutcome, checkOutcome, hasOutcomeKind, makeOutcomeCtx } from './outcomes';
 import { expeditionOf, livingHeroes, findHero, sceneHeroes } from './heroes';
-import { addItem, addLog, addLoot, hiddenChestChance, isPartyPlayer, ownedBy, partyHasTag, rollWithFocus, statChance, successes } from './common';
+import { addItem, addLog, addLoot, hiddenChestChance, isPartyPlayer, leastLoaded, ownedBy, partyHasTag, rollWithFocus, splitGold, statChance, successes } from './common';
 import { getDifficulty } from '../../data/rules';
 import { isBossRoom, roomBehavior, roomTypeOf } from './rooms';
 import { growthHandler, growthOptions } from './growth';
@@ -80,9 +80,6 @@ export function createGame(setup: NewGameSetup): GameState {
     scenarioId: setup.scenarioId,
     difficulty: setup.difficulty,
     heroes: [],
-    gold: 0,
-    stash: [],
-    pouch: [],
     mode: 'hub',
     clearedDungeons: [],
     randomDungeonSeed: (setup.seed * 7919 + 13) >>> 0,
@@ -111,6 +108,9 @@ export function createGame(setup: NewGameSetup): GameState {
       deck: cls.deck.flatMap((d) => Array.from({ length: d.count }, () => ({ uid: `c${game.nextUid++}`, cardId: d.cardId }))),
       equipment: {},
       nextBattleStatuses: {},
+      gold: 0,
+      stash: [],
+      pouch: [],
     };
     for (const [slot, itemId] of Object.entries(cls.startingEquipment)) {
       if (itemId) hero.equipment[slot as keyof Hero['equipment']] = newItem(game, getItem(itemId));
@@ -120,9 +120,11 @@ export function createGame(setup: NewGameSetup): GameState {
   });
   // 最初の持ち物（シナリオの開始条件）
   const start = getScenario(setup.scenarioId).start;
-  game.gold = start.gold ?? 0;
-  for (const p of start.pouch ?? []) for (let i = 0; i < p.count; i++) game.pouch.push(newItem(game, getItem(p.itemId)));
-  for (const p of start.stash ?? []) for (let i = 0; i < p.count; i++) game.stash.push(newItem(game, getItem(p.itemId)));
+  // お金は1人ずつ同じだけ。道具・装備は順番に1つずつ配る
+  for (const h of game.heroes) h.gold = start.gold ?? 0;
+  let k = 0;
+  for (const p of start.pouch ?? []) for (let i = 0; i < p.count; i++) game.heroes[k++ % game.heroes.length].pouch.push(newItem(game, getItem(p.itemId)));
+  for (const p of start.stash ?? []) for (let i = 0; i < p.count; i++) game.heroes[k++ % game.heroes.length].stash.push(newItem(game, getItem(p.itemId)));
   addLog(game, '冒険が始まった！');
   // 世界マップのあるシナリオは、世界マップから始まる（地図はシードで作る）
   const sc = getScenario(setup.scenarioId);
@@ -137,7 +139,7 @@ export function createGame(setup: NewGameSetup): GameState {
 // ---------- 小さな道具（common.ts） ----------
 
 export { findHero, livingHeroes } from './heroes';
-export { checkBonus, hiddenChestChance, partyHasTag, statChance } from './common';
+export { checkBonus, hiddenChestChance, partyGold, partyHasTag, statChance, totalGold } from './common';
 
 // ---------- コマンド処理 ----------
 
@@ -269,6 +271,9 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng): { error?: stri
         break;
       case 'UNEQUIP':
         error = unequip(game, cmd.playerId, cmd.heroId, cmd.slot);
+        break;
+      case 'GIVE':
+        error = give(game, cmd);
         break;
       case 'WORLD_ROLL_MOVE':
         error = rollMove(game, cmd, rng);
@@ -473,7 +478,9 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
     exp += Math.max(1, Math.round(def.exp * k));
     gold += Math.max(0, Math.round(def.gold * k * (0.85 + rng.next() * 0.3)));
   }
-  game.gold += gold;
+  // お金は生き残った参加者で山分け
+  const survivorHeroes = survivors.map((id) => findHero(game, id)!).filter(Boolean);
+  splitGold(survivorHeroes, gold);
 
   const cardOdds = cardRewardOdds(rt.battle?.cardOdds ?? 'battle');
   const reward: RewardState = { gold, exp: [], levelUps: [], cardOffers: rollCardOffers(game, survivors, rng, cardOdds), cardOdds, cardPicked: false, loot: [] };
@@ -497,12 +504,18 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
   const drop = rt.battle;
   if (drop?.equipmentDrop) {
     const item = newItem(game, rollEquipment(rng.next() * 100 < drop.equipmentDrop.epicChance ? 'epic' : 'rare', game.heroes, rng));
-    reward.loot.push({ kind: 'item', item });
-    addItem(game, item, true);
+    const to = leastLoaded(survivorHeroes);
+    if (to) {
+      reward.loot.push({ kind: 'item', item, to: to.id });
+      addItem(game, to, item, true);
+    }
   } else if (drop?.consumableDrop && rng.next() * 100 < drop.consumableDrop.chance) {
     const item = newItem(game, rollConsumable('common', rng));
-    reward.loot.push({ kind: 'item', item });
-    addItem(game, item, true);
+    const to = leastLoaded(survivorHeroes);
+    if (to) {
+      reward.loot.push({ kind: 'item', item, to: to.id });
+      addItem(game, to, item, true);
+    }
   }
   if (!drop?.boss && rng.next() * 100 < hiddenChestChance(game)) {
     reward.hiddenChest = { rarity: RARITIES[rng.next() < 0.3 ? 1 : 0], locked: rng.next() < 0.5 };
@@ -617,7 +630,9 @@ function openChest(game: GameState, playerId: string, heroId: string, focusUsed:
   c.grade = grade;
   c.lastRoll = { kind: 'luck', heroId, results, success: n === slots, oddsBefore, odds, grade, gradeChance: odds[rarityIndex(grade)], omen };
   c.contents = rollChestContents(game, grade, !!c.spec.big, rng);
-  addLoot(game, c.contents);
+  // 開けたキャラが受け取る（大宝箱のお金は、その場にいる全員で山分け）
+  addLoot(game, c.contents.filter((l) => l.kind !== 'gold'), [h]);
+  addLoot(game, c.contents.filter((l) => l.kind === 'gold'), c.spec.big ? sceneHeroes(game) : [h]);
   game.stats.chestsOpened += 1;
   addLog(game, `宝箱の中身は${GRADE_NAME[grade]}だった（確率${odds[rarityIndex(grade)].toFixed(1)}%）`);
   return undefined;
@@ -673,20 +688,20 @@ function onDungeonCleared(game: GameState, dungeonId: string, rng: Rng) {
 
 // ---------- イベント・休憩 ----------
 
-/** その選択肢を今選べるか（必要な能力・ゴールド） */
-export function eventOptionState(game: GameState, eventId: string, index: number): { visible: boolean; reason?: string } {
+/** その選択肢を今選べるか（必要な能力・ゴールド）。payer = 払うキャラ（省略すると、場面のだれかが払えればよい） */
+export function eventOptionState(game: GameState, eventId: string, index: number, payer?: Hero): { visible: boolean; reason?: string } {
   const opt = EVENTS.get(eventId).options[index];
   if (!opt) return { visible: false };
   if (opt.requiresTag && !partyHasTag(game, opt.requiresTag)) return { visible: false };
-  if (opt.cost && game.gold < opt.cost) return { visible: true, reason: `ゴールドが足りません（${opt.cost}G）` };
+  if (opt.cost && !(payer ? [payer] : sceneHeroes(game)).some((h) => h.gold >= opt.cost!)) return { visible: true, reason: `ゴールドが足りません（${opt.cost}G）` };
   return { visible: true };
 }
 
-/** 冒険の効果を順に使い、手に入れたものを持ち物に入れる（効果の中身は outcomes/kinds/） */
+/** 冒険の効果を順に使い、手に入れたものを選んだキャラ（いなければ場面の先頭のキャラ）の持ち物に入れる（効果の中身は outcomes/kinds/） */
 function applyOutcomes(game: GameState, outs: EventOutcome[], actor: Hero | undefined, rng: Rng): Loot[] {
   const ctx = makeOutcomeCtx(game, rng, actor);
   for (const o of outs) applyOutcome(ctx, o);
-  addLoot(game, ctx.loot);
+  addLoot(game, ctx.loot, actor ? [actor] : sceneHeroes(game).slice(0, 1));
   return ctx.loot;
 }
 
@@ -703,10 +718,14 @@ function chooseEvent(
   if (ev.result) return 'もう選びました';
   const def = EVENTS.get(ev.eventId);
   const opt = def.options[optionIndex];
-  const st = eventOptionState(game, ev.eventId, optionIndex);
+  // お金がいる選択肢: 選んだキャラ（判定が無ければ、押した人のキャラで払える人）が払う
+  const chosen = heroId ? findHero(game, heroId) : undefined;
+  const payer = opt?.cost ? (chosen ?? sceneHeroes(game).find((h) => ownedBy(h, playerId) && h.gold >= opt.cost!)) : undefined;
+  if (opt?.cost && (!payer || !ownedBy(payer, playerId))) return `ゴールドが足りません（${opt.cost}G）`;
+  const st = eventOptionState(game, ev.eventId, optionIndex, payer);
   if (!opt || !st.visible) return '選択肢がありません';
   if (st.reason) return st.reason;
-  let actor: Hero | undefined;
+  let actor: Hero | undefined = payer;
   let results: SlotResult[] | undefined;
   let ok = true;
   if (opt.check) {
@@ -759,7 +778,7 @@ function rest(game: GameState, playerId: string, kind: 'hp' | 'focus'): string |
 /** 撤退すると失うもの（このダンジョンで最後に手に入れた装備） */
 export function retreatLoss(game: GameState): ItemInstance | undefined {
   const g = game.dungeon?.gained ?? [];
-  for (let i = g.length - 1; i >= 0; i--) if (game.stash.some((s) => s.uid === g[i].uid) || isEquipped(game, g[i].uid)) return g[i];
+  for (let i = g.length - 1; i >= 0; i--) if (game.heroes.some((h) => h.stash.some((s) => s.uid === g[i].uid)) || isEquipped(game, g[i].uid)) return g[i];
   return undefined;
 }
 
@@ -770,7 +789,7 @@ function retreat(game: GameState, playerId: string, rng: Rng): string | undefine
   if (game.mode !== 'dungeon' || !game.dungeon) return 'ダンジョンの通路でのみ撤退できます';
   const lost = retreatLoss(game);
   if (lost) {
-    game.stash = game.stash.filter((s) => s.uid !== lost.uid);
+    for (const h of game.heroes) h.stash = h.stash.filter((s) => s.uid !== lost.uid);
     for (const h of game.heroes) for (const [slot, e] of Object.entries(h.equipment)) if (e?.uid === lost.uid) delete h.equipment[slot as keyof Hero['equipment']];
     for (const h of game.heroes) clampHero(h);
     addLog(game, `撤退の途中で「${getItem(lost.itemId).name}」を落としてしまった…`);
@@ -833,16 +852,16 @@ function equip(game: GameState, playerId: string, heroId: string, itemUid: strin
   const other = otherSceneError(game, heroId);
   if (other) return other;
   if (!ownedBy(h, playerId)) return '担当していないキャラです';
-  const idx = game.stash.findIndex((s) => s.uid === itemUid);
-  if (idx < 0) return '持ち物にありません';
-  const def = getItem(game.stash[idx].itemId);
+  const idx = h.stash.findIndex((s) => s.uid === itemUid);
+  if (idx < 0) return 'そのキャラの持ち物にありません';
+  const def = getItem(h.stash[idx].itemId);
   const why = canEquip(h, def);
   if (why) return why;
   const slot = def.slot as keyof Hero['equipment'];
   const prev = h.equipment[slot];
-  h.equipment[slot] = game.stash[idx];
-  game.stash.splice(idx, 1);
-  if (prev) game.stash.push(prev);
+  h.equipment[slot] = h.stash[idx];
+  h.stash.splice(idx, 1);
+  if (prev) h.stash.push(prev);
   clampHero(h);
   return undefined;
 }
@@ -857,7 +876,7 @@ function unequip(game: GameState, playerId: string, heroId: string, slot: keyof 
   const cur = h.equipment[slot];
   if (!cur) return '何も装備していません';
   delete h.equipment[slot];
-  game.stash.push(cur);
+  h.stash.push(cur);
   clampHero(h);
   return undefined;
 }
@@ -866,9 +885,11 @@ function usePouchItem(
   game: GameState,
   cmd: Extract<GameCommand, { type: 'USE_POUCH_ITEM' }>,
 ): { error?: string; events: BattleEvent[] } {
-  const idx = game.pouch.findIndex((p) => p.uid === cmd.itemUid);
-  if (idx < 0) return { error: '袋にありません', events: [] };
-  const def = getItem(game.pouch[idx].itemId);
+  // 使うキャラ自身の袋から
+  const owner = findHero(game, cmd.userId);
+  const idx = owner ? owner.pouch.findIndex((p) => p.uid === cmd.itemUid) : -1;
+  if (!owner || idx < 0) return { error: 'そのキャラの袋にありません', events: [] };
+  const def = getItem(owner.pouch[idx].itemId);
   if (!def.use) return { error: '使えない道具です', events: [] };
   if (game.mode === 'battle' && game.battle) {
     const room = game.dungeon ? findRoom(game.dungeon, game.dungeon.currentRoomId ?? '') : undefined;
@@ -883,7 +904,7 @@ function usePouchItem(
     });
     if (r.error) return { error: r.error, events: [] };
     game.battle = r.state;
-    game.pouch.splice(idx, 1);
+    owner.pouch.splice(idx, 1);
     return { events: r.events };
   }
   // 戦闘の外（ダンジョン・拠点など）
@@ -902,8 +923,37 @@ function usePouchItem(
     if (why) return { error: why, events: [] };
   }
   for (const o of outs) applyOutcome(octx, o);
-  game.pouch.splice(idx, 1);
+  owner.pouch.splice(idx, 1);
   addLog(game, `${user.name}が${def.name}を使った`);
   return { events: [] };
 }
 
+/** 仲間にお金か持ち物を渡す（同じ場面・世界マップなら同じマスにいる時。戦闘中は不可） */
+function give(game: GameState, cmd: Extract<GameCommand, { type: 'GIVE' }>): string | undefined {
+  if (game.mode === 'battle') return '戦闘中は渡せません';
+  const from = findHero(game, cmd.fromHeroId);
+  const to = findHero(game, cmd.toHeroId);
+  if (!from || !to || from === to || from.retired || to.retired) return '渡す相手がいません';
+  if (!ownedBy(from, cmd.playerId)) return '担当していないキャラです';
+  const other = otherSceneError(game, from.id) ?? otherSceneError(game, to.id);
+  if (other) return other;
+  const w = game.world;
+  if (w && !game.activeScene && w.pos[from.id] !== w.pos[to.id]) return '同じ場所にいる仲間にしか渡せません';
+  if (cmd.gold !== undefined) {
+    if (!Number.isInteger(cmd.gold) || cmd.gold <= 0 || cmd.gold > from.gold) return 'ゴールドの数が不正です';
+    from.gold -= cmd.gold;
+    to.gold += cmd.gold;
+    addLog(game, `${from.name}が${to.name}に${cmd.gold}Gを渡した`);
+    return undefined;
+  }
+  for (const bag of ['stash', 'pouch'] as const) {
+    const i = from[bag].findIndex((x) => x.uid === cmd.itemUid);
+    if (i < 0) continue;
+    if (bag === 'pouch' && to.pouch.length >= POUCH_LIMIT) return `${to.name}の袋がいっぱいです`;
+    const [it] = from[bag].splice(i, 1);
+    to[bag].push(it);
+    addLog(game, `${from.name}が${to.name}に「${getItem(it.itemId).name}」を渡した`);
+    return undefined;
+  }
+  return '持ち物にありません';
+}

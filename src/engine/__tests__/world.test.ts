@@ -201,7 +201,7 @@ describe('町・祠・依頼', () => {
   function inCapital() {
     let g = newWorld(6, ['warrior', 'mage']);
     g = run(g, { type: 'STORY_CONTINUE', playerId: P });
-    g.gold = 1000;
+    g.heroes[0].gold = 1000;
     return run(g, { type: 'WORLD_INTERACT', playerId: P, heroId: 'h0' });
   }
   it('宿屋で全回復。ショップで買える。聖水はいつも売っている', () => {
@@ -213,7 +213,9 @@ describe('町・祠・依頼', () => {
     g = run(g, { type: 'TOWN_BUY', playerId: P, kind: 'item', index: 0 });
     const stock = g.world!.shops.royalCapital;
     expect(getItem(stock.items[0].item.itemId).id).toBe('holyWater');
-    expect(g.pouch.some((i) => i.itemId === 'holyWater')).toBe(true);
+    // 町に入ったキャラ（h0）のお金で買い、h0 の袋に入る
+    expect(findHero(g, 'h0')!.pouch.some((i) => i.itemId === 'holyWater')).toBe(true);
+    expect(findHero(g, 'h1')!.gold).toBe(30);
     expect(applyGameCommand(g, { type: 'TOWN_BUY', playerId: P, kind: 'item', index: 0 }).error).toBeDefined();
   });
   it('カードの削除（最低枚数は残す）・売却', () => {
@@ -222,10 +224,12 @@ describe('町・祠・依頼', () => {
     const n = h.deck.length;
     g = run(g, { type: 'TOWN_REMOVE_CARD', playerId: P, heroId: 'h0', cardUid: h.deck[0].uid });
     expect(findHero(g, 'h0')!.deck.length).toBe(n - 1);
-    g.stash.push({ uid: 'sx', itemId: 'steelSword' });
-    const gold = g.gold;
+    // 町に入っていないキャラ（h1）のカードは消せない
+    expect(applyGameCommand(g, { type: 'TOWN_REMOVE_CARD', playerId: P, heroId: 'h1', cardUid: findHero(g, 'h1')!.deck[0].uid }).error).toBeDefined();
+    findHero(g, 'h0')!.stash.push({ uid: 'sx', itemId: 'steelSword' });
+    const gold = findHero(g, 'h0')!.gold;
     g = run(g, { type: 'TOWN_SELL', playerId: P, itemUid: 'sx' });
-    expect(g.gold).toBeGreaterThan(gold);
+    expect(findHero(g, 'h0')!.gold).toBeGreaterThan(gold);
   });
   it('依頼: 受ける → 目標を達成 → 報告で報酬（届け物は渡す）', () => {
     let g = inCapital();
@@ -233,10 +237,37 @@ describe('町・祠・依頼', () => {
     expect(applyGameCommand(g, { type: 'QUEST_REPORT', playerId: P, questId: 'wolfHunt' }).error).toBeDefined();
     g.world!.quests[0].progress = 3;
     g.world!.quests[0].done = true;
-    const gold = g.gold;
+    const gold = findHero(g, 'h0')!.gold;
     g = run(g, { type: 'QUEST_REPORT', playerId: P, questId: 'wolfHunt' });
-    expect(g.gold).toBe(gold + 60);
+    expect(findHero(g, 'h0')!.gold).toBe(gold + 60);
     expect(g.world!.quests[0].reported).toBe(true);
+  });
+  it('宿屋は町に入ったキャラだけが自分のお金で休む。他の人の担当の町では操作できない', () => {
+    let g = newWorld(6, ['warrior', 'mage'], 'normal');
+    g.heroes[1].playerId = 'P2';
+    g = run(g, { type: 'STORY_CONTINUE', playerId: P });
+    g = run(g, { type: 'WORLD_INTERACT', playerId: P, heroId: 'h0' });
+    findHero(g, 'h0')!.hp = 5;
+    findHero(g, 'h1')!.hp = 5;
+    expect(applyGameCommand(g, { type: 'TOWN_INN', playerId: 'P2' }).error).toMatch(/担当/);
+    expect(applyGameCommand(g, { type: 'LEAVE_TOWN', playerId: 'P2' }).error).toMatch(/担当/);
+    g = run(g, { type: 'TOWN_INN', playerId: P });
+    expect(findHero(g, 'h0')!.hp).toBe(heroMaxHp(findHero(g, 'h0')!));
+    expect(findHero(g, 'h1')!.hp).toBe(5);
+    expect(findHero(g, 'h0')!.gold).toBe(30 - 15);
+    expect(findHero(g, 'h1')!.gold).toBe(30);
+  });
+  it('同じマスの仲間にお金・持ち物を渡せる。離れていると渡せない', () => {
+    let g = newWorld(6, ['warrior', 'mage']);
+    g = run(g, { type: 'STORY_CONTINUE', playerId: P });
+    g.heroes[0].stash.push({ uid: 'gx', itemId: 'magusStaff' });
+    g = run(g, { type: 'GIVE', playerId: P, fromHeroId: 'h0', toHeroId: 'h1', itemUid: 'gx' });
+    expect(findHero(g, 'h1')!.stash.map((i) => i.uid)).toContain('gx');
+    g = run(g, { type: 'GIVE', playerId: P, fromHeroId: 'h0', toHeroId: 'h1', gold: 10 });
+    expect([findHero(g, 'h0')!.gold, findHero(g, 'h1')!.gold]).toEqual([20, 40]);
+    expect(applyGameCommand(g, { type: 'GIVE', playerId: P, fromHeroId: 'h0', toHeroId: 'h1', gold: 999 }).error).toBeDefined();
+    g.world!.pos.h1 = neighbors(g.world!, g.world!.pos.h0)[0];
+    expect(applyGameCommand(g, { type: 'GIVE', playerId: P, fromHeroId: 'h0', toHeroId: 'h1', gold: 1 }).error).toMatch(/同じ場所/);
   });
   it('祠: 永続の加護は1人3つまで', () => {
     let g = newWorld(7, ['warrior']);

@@ -13,7 +13,7 @@ import {
   affinityFromStats,
   canReportQuest,
   finalChance,
-  heroesInTown,
+  townVisitor,
   heroFocusMax,
   heroMaxHp,
   heroStats,
@@ -24,7 +24,12 @@ import {
   sellPrice,
   statChance,
 } from '../../engine';
+import { isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
+import { useOnline } from '../../store/onlineStore';
+import { getClass } from '../../data/classes';
+import { OthersTurnNote } from '../screens/OnlineScreens';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import type { GameState, Hero } from '../../types';
 import { CardFace } from '../ui/CardFace';
 import { CheckPanel, RollStrip } from '../ui/CheckPanel';
@@ -32,6 +37,8 @@ import { Heading, HeroFace, ItemIcon, itemSummary, RARITY_STYLE, Screen } from '
 import { WorldTopBar } from './WorldScreen';
 
 const first = (game: GameState) => game.heroes.find((h) => !h.retired)!.playerId;
+/** 席の名前（オンラインなら参加者の名前、1台なら P1 など） */
+const seatLabel = (p: string) => useOnline.getState().room?.seatName(p as never) ?? p;
 
 // ---------- 遭遇 ----------
 
@@ -184,20 +191,32 @@ export function TownScreen() {
   const game = useBattle((s) => s.game)!;
   const dispatchGame = useBattle((s) => s.dispatchGame);
   const [tab, setTab] = useState<TownTab>('shop');
-  const [removeFor, setRemoveFor] = useState<string | null>(null);
   const t = game.town!;
   const def = TOWNS.get(t.townId);
   const w = game.world!;
   const stock = w.shops[def.id];
-  const here = heroesInTown(game);
-  const p = first(game);
-  const equipped = new Set(game.heroes.flatMap((h) => Object.values(h.equipment).map((e) => e?.uid)));
-  const sellable = game.stash.filter((i) => !equipped.has(i.uid));
+  // 町に入ったキャラ（お金・持ち物はこのキャラのもの。操作できるのはこのキャラの担当だけ）
+  const v = townVisitor(game)!;
+  const mine = isLocalPlayer(v.playerId);
+  const p = v.playerId;
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const sellable = v.stash;
+  const myCards = stock?.cards.map((c, i) => ({ c, i })).filter(({ c }) => getClass(game.heroes.find((x) => x.id === c.heroId)?.classId ?? '').id === v.classId) ?? [];
 
   return (
     <Screen>
       <WorldTopBar game={game} />
       <Heading sub={def.description}>{def.name}</Heading>
+      <div className="mx-3 mt-1 flex shrink-0 items-center gap-2 rounded-lg bg-black/40 px-2 py-1 text-[13px]">
+        <HeroFace hero={v} size={28} />
+        <span className="min-w-0 flex-1 truncate">
+          <b>{v.name}</b>が町にいます
+        </span>
+        <span className="flex items-center gap-0.5 font-bold text-amber-200 tabular-nums">
+          <Coins size={14} />
+          {v.gold}G
+        </span>
+      </div>
       <div className="mt-1 flex shrink-0 gap-1 overflow-x-auto px-2 pb-1">
         {TOWN_TABS.map((x) => (
           <button key={x.id} onClick={() => setTab(x.id)} className={`btn flex h-11 shrink-0 items-center gap-1 rounded-lg px-2.5 text-[13px] font-bold ${tab === x.id ? 'btn-gold' : 'btn-dark'}`}>
@@ -221,7 +240,7 @@ export function TownScreen() {
                     <span className="block truncate text-[12px] text-zinc-400">{itemSummary(it)}</span>
                   </span>
                   <button
-                    disabled={s.sold || game.gold < s.price}
+                    disabled={!mine || s.sold || v.gold < s.price}
                     onClick={() => dispatchGame({ type: 'TOWN_BUY', playerId: p, kind: 'item', index: i })}
                     className="btn btn-gold flex h-11 w-[78px] shrink-0 items-center justify-center gap-0.5 rounded-lg text-[13px] font-bold"
                   >
@@ -235,10 +254,11 @@ export function TownScreen() {
                 </div>
               );
             })}
-            <div className="font-display mt-2 text-[15px] text-amber-200">カード</div>
+            <div className="font-display mt-2 text-[15px] text-amber-200">{getClass(v.classId).name}のカード</div>
+            {myCards.length === 0 && <div className="py-2 text-center text-[13px] text-zinc-500">今は{getClass(v.classId).name}のカードを売っていません</div>}
             <div className="flex flex-wrap justify-center gap-2">
-              {stock.cards.map((c, i) => {
-                const h = game.heroes.find((x) => x.id === c.heroId)!;
+              {myCards.map(({ c, i }) => {
+                const h = v;
                 return (
                   <div key={i} className={`flex flex-col items-center gap-1 ${c.sold ? 'opacity-40' : ''}`}>
                     <CardFace card={getCard(c.cardId)} chance={chanceOf(h, c.cardId)} width={96} height={146} />
@@ -247,7 +267,7 @@ export function TownScreen() {
                       {h.name}
                     </span>
                     <button
-                      disabled={c.sold || game.gold < c.price}
+                      disabled={!mine || c.sold || v.gold < c.price}
                       onClick={() => dispatchGame({ type: 'TOWN_BUY', playerId: h.playerId, kind: 'card', index: i })}
                       className="btn btn-gold flex h-11 w-[96px] items-center justify-center gap-0.5 rounded-lg text-[13px] font-bold"
                     >
@@ -268,9 +288,9 @@ export function TownScreen() {
         {tab === 'inn' && (
           <div className="flex flex-col gap-2">
             <div className="panel rounded-xl p-2 text-[14px]">
-              宿屋に泊まると、町にいるキャラのHPとフォーカスが全回復し、悪い状態異常も治ります。手番は使いません。
+              宿屋に泊まると、{v.name}のHPとフォーカスが全回復し、悪い状態異常も治ります（{v.name}のお金で払います）。手番は使いません。
             </div>
-            {here.map((h) => (
+            {[v].map((h) => (
               <div key={h.id} className="flex items-center gap-2 rounded-lg bg-black/30 p-1.5 text-[13px]">
                 <HeroFace hero={h} size={32} />
                 <span className="flex-1 font-bold">{h.name}</span>
@@ -280,7 +300,7 @@ export function TownScreen() {
               </div>
             ))}
             <button
-              disabled={game.gold < def.innCost}
+              disabled={!mine || v.gold < def.innCost}
               onClick={() => dispatchGame({ type: 'TOWN_INN', playerId: p })}
               className="btn btn-gold font-display flex h-12 items-center justify-center gap-1 rounded-xl text-[18px]"
             >
@@ -304,7 +324,7 @@ export function TownScreen() {
                   <div className="text-[12px] text-amber-200">報酬: {q.rewardText}</div>
                   <div className="mt-1.5">
                     {!st ? (
-                      <button onClick={() => dispatchGame({ type: 'QUEST_ACCEPT', playerId: p, questId: id })} className="btn btn-gold h-11 w-full rounded-lg text-[14px] font-bold">
+                      <button disabled={!mine} onClick={() => dispatchGame({ type: 'QUEST_ACCEPT', playerId: p, questId: id })} className="btn btn-gold h-11 w-full rounded-lg text-[14px] font-bold">
                         依頼を受ける
                       </button>
                     ) : st.reported ? (
@@ -312,7 +332,7 @@ export function TownScreen() {
                         <Check size={16} /> 達成済み
                       </div>
                     ) : canReport ? (
-                      <button onClick={() => dispatchGame({ type: 'QUEST_REPORT', playerId: p, questId: id })} className="btn btn-gold h-11 w-full rounded-lg text-[14px] font-bold">
+                      <button disabled={!mine} onClick={() => dispatchGame({ type: 'QUEST_REPORT', playerId: p, questId: id })} className="btn btn-gold h-11 w-full rounded-lg text-[14px] font-bold">
                         報告して報酬を受け取る
                       </button>
                     ) : (
@@ -331,31 +351,20 @@ export function TownScreen() {
             <div className="text-[13px] text-zinc-300">
               山札からいらないカードを1枚取り除きます（{def.removeCost}G・{BALANCE.minDeckSize}枚より少なくはできません）
             </div>
-            <div className="flex gap-1">
-              {here.map((h) => (
-                <button key={h.id} onClick={() => setRemoveFor(h.id)} className={`btn flex min-h-11 min-w-0 flex-1 items-center gap-1 rounded-lg border-2 p-1 ${removeFor === h.id ? 'border-amber-300 bg-amber-500/15' : 'border-white/10 bg-black/30'}`}>
-                  <HeroFace hero={h} size={28} />
-                  <span className="truncate text-[12px] font-bold">{h.name}</span>
+            <div className="text-[12px] text-zinc-400">{v.name}の山札（タップして選ぶ）</div>
+            <div className="flex flex-wrap justify-center gap-1.5">
+              {v.deck.map((c) => (
+                <button
+                  key={c.uid}
+                  disabled={!mine || v.gold < def.removeCost}
+                  onClick={() => setConfirmRemove(c.uid)}
+                  className="btn"
+                  aria-label={`${cardOf(c).name}を取り除く`}
+                >
+                  <CardFace card={cardOf(c)} width={78} height={120} />
                 </button>
               ))}
             </div>
-            {removeFor && (
-              <div className="flex flex-wrap justify-center gap-1.5">
-                {game.heroes
-                  .find((h) => h.id === removeFor)!
-                  .deck.map((c) => (
-                    <button
-                      key={c.uid}
-                      disabled={game.gold < def.removeCost}
-                      onClick={() => dispatchGame({ type: 'TOWN_REMOVE_CARD', playerId: p, heroId: removeFor, cardUid: c.uid })}
-                      className="btn"
-                      aria-label={`${cardOf(c).name}を取り除く`}
-                    >
-                      <CardFace card={cardOf(c)} width={78} height={120} />
-                    </button>
-                  ))}
-              </div>
-            )}
           </div>
         )}
         {tab === 'sell' && (
@@ -369,7 +378,7 @@ export function TownScreen() {
                   <span className="min-w-0 flex-1 truncate text-[14px] font-bold" style={{ color: RARITY_STYLE[it.rarity].color }}>
                     {it.name}
                   </span>
-                  <button onClick={() => dispatchGame({ type: 'TOWN_SELL', playerId: p, itemUid: s.uid })} className="btn btn-dark flex h-11 w-[84px] items-center justify-center gap-0.5 rounded-lg text-[13px] font-bold">
+                  <button disabled={!mine} onClick={() => dispatchGame({ type: 'TOWN_SELL', playerId: p, itemUid: s.uid })} className="btn btn-dark flex h-11 w-[84px] items-center justify-center gap-0.5 rounded-lg text-[13px] font-bold">
                     <Coins size={14} />
                     {sellPrice(s.itemId)}で売る
                   </button>
@@ -380,10 +389,26 @@ export function TownScreen() {
         )}
       </div>
       <div className="shrink-0 px-3 pt-1 pb-3">
-        <button onClick={() => dispatchGame({ type: 'LEAVE_TOWN', playerId: p })} className="btn btn-dark h-12 w-full rounded-xl text-[15px] font-bold">
-          町を出る
-        </button>
+        {mine ? (
+          <button onClick={() => dispatchGame({ type: 'LEAVE_TOWN', playerId: p })} className="btn btn-dark h-12 w-full rounded-xl text-[15px] font-bold">
+            町を出る
+          </button>
+        ) : (
+          <OthersTurnNote seat={v.playerId} name={`${seatLabel(v.playerId)}さん`} what={`${v.name}で町を見ています`} />
+        )}
       </div>
+      {confirmRemove && (
+        <ConfirmDialog
+          title="カードを取り除きますか？"
+          text={`「${cardOf(v.deck.find((c) => c.uid === confirmRemove) ?? { cardId: v.deck[0].cardId }).name}」を${v.name}の山札から取り除きます（${def.removeCost}G）。元には戻せません。`}
+          ok="取り除く"
+          onOk={() => {
+            dispatchGame({ type: 'TOWN_REMOVE_CARD', playerId: p, heroId: v.id, cardUid: confirmRemove });
+            setConfirmRemove(null);
+          }}
+          onCancel={() => setConfirmRemove(null)}
+        />
+      )}
     </Screen>
   );
 }
