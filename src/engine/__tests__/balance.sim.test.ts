@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { DIFFICULTIES } from '../../data/rules';
 import type { PlayerId } from '../../types';
 import { createGame } from '../index';
-import { playToEnd } from './bot';
+import { playToEnd } from '../bot';
 
 const SEEDS = Number(process.env.SIM_SEEDS ?? 40);
 const PARTIES: Record<string, string[]> = {

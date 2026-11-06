@@ -17,7 +17,7 @@ import {
   reachable,
   timeOfDay,
 } from '../index';
-import { playToEnd } from './bot';
+import { playToEnd } from '../bot';
 
 const P: PlayerId = 'P1';
 const party = (classes: string[], players?: PlayerId[]) => classes.map((c, i) => ({ classId: c, gender: 'male' as const, name: `${c}${i}`, playerId: players?.[i] ?? P }));

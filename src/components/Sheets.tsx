@@ -11,6 +11,8 @@ import { getItem } from '../data/items';
 import { EQUIP_SLOTS, STAT_IDS, affinityFromStats, battleDeck, canEquip, describeAbility, expToNext, findAlly, heroFocusMax, heroMaxHp, heroStats, weaponRarity } from '../engine';
 import { LOCAL_PLAYER, isLocalPlayer } from '../store/battleConfig';
 import { useBattle } from '../store/battleStore';
+import { useOnline } from '../store/onlineStore';
+import { OnlinePanel } from './screens/OnlineScreens';
 import type { CardInstance, EquipSlot, Hero, ItemDef } from '../types';
 import { Bar, HeroFace, ItemIcon, itemSummary, RARITY_STYLE, STAT_LABEL } from './ui/game';
 import { CATEGORY_STYLE, EffectChip } from './ui/icons';
@@ -66,12 +68,14 @@ function MenuSheet() {
   const setSettings = useBattle((s) => s.setSettings);
   const openSheet = useBattle((s) => s.openSheet);
   const setConfirmAbandon = useBattle((s) => s.setConfirmAbandon);
+  const online = useOnline((s) => !!s.room);
   const row = 'btn btn-dark flex h-12 w-full items-center gap-2 rounded-lg px-3 text-[14px] font-bold';
   return (
     <BottomSheet title="メニュー" onClose={() => openSheet(null)}>
       <div className="flex flex-col gap-2">
         <Toggle label="高速モード（演出2倍速）" on={settings.fastMode} onChange={(v) => setSettings({ fastMode: v })} />
         <Toggle label="振動" on={settings.vibration} onChange={(v) => setSettings({ vibration: v })} />
+        {online && <OnlinePanel />}
         {game?.world && game.mode === 'world' && (
           <>
             <button onClick={() => openSheet('party')} className={row}>
@@ -100,9 +104,9 @@ function MenuSheet() {
           </div>
         )}
         <button onClick={() => setConfirmAbandon(true)} className="btn flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-red-400/50 bg-red-950/70 text-[14px] font-bold text-red-100">
-          <DoorOpen size={18} /> 冒険をやめてタイトルへ
+          <DoorOpen size={18} /> {online ? '部屋を出てタイトルへ' : '冒険をやめてタイトルへ'}
         </button>
-        <div className="pt-1 text-center text-[12px] text-zinc-500">冒険は自動で保存されます。長押しで詳細を表示できます。</div>
+        <div className="pt-1 text-center text-[12px] text-zinc-500">{online ? '冒険は部屋に保存されます。同じ合言葉でまた入れます。' : '冒険は自動で保存されます。'}長押しで詳細を表示できます。</div>
       </div>
     </BottomSheet>
   );
@@ -446,7 +450,10 @@ function PouchSheet() {
 
 function ConfirmAbandon() {
   const setConfirmAbandon = useBattle((s) => s.setConfirmAbandon);
-  const abandon = useBattle((s) => s.abandonGame);
+  const abandonLocal = useBattle((s) => s.abandonGame);
+  const room = useOnline((s) => s.room);
+  const leave = useOnline((s) => s.leaveRoom);
+  const abandon = room ? () => void leave() : abandonLocal;
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -460,14 +467,14 @@ function ConfirmAbandon() {
       }}
     >
       <div onClick={(e) => e.stopPropagation()} className="panel panel-gold-edge w-full max-w-xs rounded-2xl p-4">
-        <div className="font-display text-[18px]">冒険をやめますか？</div>
-        <div className="mt-1 text-[13px] text-zinc-400">この冒険の進行は失われ、タイトル画面に戻ります。</div>
+        <div className="font-display text-[18px]">{room ? '部屋を出ますか？' : '冒険をやめますか？'}</div>
+        <div className="mt-1 text-[13px] text-zinc-400">{room ? `冒険は部屋に残ります。「部屋に参加」から合言葉 ${room.code} でまた入れます。` : 'この冒険の進行は失われ、タイトル画面に戻ります。'}</div>
         <div className="mt-4 flex gap-2">
           <button onClick={() => setConfirmAbandon(false)} className="btn btn-dark h-12 flex-1 rounded-lg font-bold">
             続ける
           </button>
           <button onClick={abandon} className="btn h-12 flex-1 rounded-lg border border-red-300/60 bg-red-700 font-bold">
-            やめる
+            {room ? '出る' : 'やめる'}
           </button>
         </div>
       </div>

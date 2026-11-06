@@ -1,11 +1,11 @@
 // ===== テスト用の自動プレイ（シナリオをエンディングまで）=====
 // 画面と同じコマンドだけを使う。上手さより「どの場面でも詰まらずに進めること」を優先した単純な作戦。
-import { cardOf } from '../../data/cards';
-import { DUNGEONS } from '../../data/dungeons';
-import { EVENTS } from '../../data/events';
-import { getItem } from '../../data/items';
-import { TOWNS } from '../../data/world';
-import type { GameCommand, GameState, PlayerId } from '../../types';
+import { cardOf } from '../data/cards';
+import { DUNGEONS } from '../data/dungeons';
+import { EVENTS } from '../data/events';
+import { getItem } from '../data/items';
+import { TOWNS } from '../data/world';
+import type { GameCommand, GameState, PlayerId } from '../types';
 import {
   applyGameCommand,
   canEquip,
@@ -19,7 +19,8 @@ import {
   reachable,
   reachableRooms,
   unusableReason,
-} from '../index';
+  waitingPlayers,
+} from './index';
 
 export interface BotLog {
   steps: number;
@@ -27,7 +28,14 @@ export interface BotLog {
   modes: Record<string, number>;
 }
 
+/** 次の操作を決めるだけの時（オンライン協力のテスト）は、ここに入れて動かさない */
+let capture: GameCommand[] | null = null;
+
 function send(g: GameState, cmd: GameCommand, log: BotLog): GameState {
+  if (capture) {
+    capture.push(cmd);
+    return { ...g };
+  }
   const r = applyGameCommand(g, cmd);
   if (r.error) log.errors.push(`${g.mode}/${cmd.type}: ${r.error}`);
   return r.state;
@@ -113,7 +121,9 @@ function battleStep(g: GameState, log: BotLog): GameState {
       const focus = card.slots >= 3 ? Math.min(card.slots, a.focus) : 0;
       return send(g, { type: 'BATTLE', command: { type: 'PLAY_CARD', playerId: a.playerId, characterId: a.id, cardInstanceId: c.uid, targetId: card.target === 'enemy' ? target : undefined, focusUsed: focus } }, log);
     }
-    return send(g, { type: 'BATTLE', command: { type: 'END_TURN', playerId: b.allies[0].playerId } }, log);
+    // オンライン協力なら、まだ準備完了していないプレイヤーが押す
+    const who = waitingPlayers(b)[0] ?? b.allies[0].playerId;
+    return send(g, { type: 'BATTLE', command: { type: 'END_TURN', playerId: who } }, log);
   }
   if (b.phase === 'enemy') return send(g, { type: 'BATTLE', command: { type: 'ENEMY_STEP' } }, log);
   return send(g, { type: 'FINISH_BATTLE', playerId: pid(g) }, log);
@@ -207,6 +217,17 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
       return send(g, { type: 'ENTER_DUNGEON', playerId: pid(g), dungeonId: goalDungeon(g) }, log);
     default:
       return g;
+  }
+}
+
+/** 次に送る操作を決める（状態は変えない）。何もすることがなければ null */
+export function botNextCommand(g: GameState, memo: { interacted: Set<string>; town?: string }): GameCommand | null {
+  capture = [];
+  try {
+    botStep(g, { steps: 0, errors: [], modes: {} }, memo);
+    return capture[0] ?? null;
+  } finally {
+    capture = null;
   }
 }
 

@@ -18,6 +18,7 @@ import type {
   CommandResult,
   EnemyDef,
   EnemyState,
+  PlayerId,
   SlotResult,
   Statuses,
 } from '../../types';
@@ -129,6 +130,7 @@ export function createBattle(setup: BattleSetup): BattleState {
     nextLogId: 1,
     nextUid: uid,
     encounterId: encounter.id,
+    ...(setup.readyCheck ? { readyCheck: true, ready: [] } : {}),
   };
   addLog(state, `戦闘開始（${party.length}人 / ${encounter.name}）`);
   decideAllIntents(state, rng);
@@ -176,6 +178,13 @@ export function usableCardCount(state: BattleState, ally: AllyState): number {
 }
 
 /** 行動完了（マナ切れ・使えるカードなし・戦闘不能） */
+/** まだ準備完了していないプレイヤー（オンライン協力。生きているキャラの担当だけ） */
+export function waitingPlayers(state: BattleState): PlayerId[] {
+  if (!state.readyCheck || state.phase !== 'ally') return [];
+  const need = [...new Set(state.allies.filter((a) => !a.dead).map((a) => a.playerId))];
+  return need.filter((p) => !(state.ready ?? []).includes(p));
+}
+
 export function isDone(state: BattleState, ally: AllyState): boolean {
   return ally.dead || usableCardCount(state, ally) === 0;
 }
@@ -296,6 +305,8 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   const ally = findAlly(state, cmd.characterId);
   if (!ally) return 'キャラが見つかりません';
   if (ally.playerId !== cmd.playerId) return '担当していないキャラです';
+  // カードを使ったら、そのプレイヤーの準備完了は取り消し
+  if (state.ready) state.ready = state.ready.filter((p) => p !== cmd.playerId);
   const idx = ally.hand.findIndex((c) => c.uid === cmd.cardInstanceId);
   if (idx < 0) return '手札にありません';
   const inst = ally.hand[idx];
@@ -383,6 +394,15 @@ function useItem(state: BattleState, cmd: Extract<Command, { type: 'USE_ITEM' }>
 function endTurn(state: BattleState, playerId: string, rng: Rng, events: BattleEvent[]): string | undefined {
   if (state.phase !== 'ally') return '味方フェーズではありません';
   if (!state.allies.some((a) => a.playerId === playerId)) return 'このパーティのプレイヤーではありません';
+  // オンライン協力: 全員（生きているキャラの担当）が準備完了するまで待つ
+  if (state.readyCheck) {
+    const ready = state.ready ?? [];
+    if (!ready.includes(playerId as PlayerId)) ready.push(playerId as PlayerId);
+    state.ready = ready;
+    events.push({ type: 'ready', playerId: playerId as PlayerId });
+    if (waitingPlayers(state).length > 0) return undefined;
+    state.ready = [];
+  }
   for (const a of state.allies) discardHand(a);
   // きっかけ: ターン終了時 → 継続ダメージ → 状態異常を1減らす
   for (const a of state.allies) if (!a.dead) fireAbilities(state, rng, events, a, 'turnEnd');

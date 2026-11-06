@@ -27,7 +27,9 @@ import {
   timeOfDay,
   turnsUntilNightChange,
 } from '../../engine';
+import { isLocalPlayer, isOnlinePlay } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
+import { useOnline } from '../../store/onlineStore';
 import type { GameState, PlayerId, TimeOfDay } from '../../types';
 import { RollStrip } from '../ui/CheckPanel';
 import { Bar, HeroFace, Screen } from '../ui/game';
@@ -192,7 +194,11 @@ export function WorldScreen() {
   const players = new Set(livingHeroes(game).map((h) => h.playerId));
   const [shownFor, setShownFor] = useState<string>(w.turn);
   const [lastPlayer, setLastPlayer] = useState<PlayerId | undefined>(hero?.playerId);
-  const needHandoff = players.size > 1 && !!hero && shownFor !== w.turn && lastPlayer !== hero.playerId;
+  useOnline((s) => s.tick);
+  const seatName = useOnline((s) => (hero ? s.room?.seatName(hero.playerId) : undefined));
+  // オンライン協力では受け渡しはいらない（自分のスマホで遊ぶ）
+  const needHandoff = !isOnlinePlay() && players.size > 1 && !!hero && shownFor !== w.turn && lastPlayer !== hero.playerId;
+  const mine = !hero || isLocalPlayer(hero.playerId);
   useEffect(() => {
     if (hero && shownFor !== w.turn && !needHandoff) setShownFor(w.turn);
   }, [hero, shownFor, w.turn, needHandoff]);
@@ -223,7 +229,7 @@ export function WorldScreen() {
   const pid = hero.playerId;
 
   const tapTile = (i: number) => {
-    if (reach?.has(i) && i !== here) {
+    if (mine && reach?.has(i) && i !== here) {
       if (selected === i) {
         dispatchGame({ type: 'WORLD_MOVE', playerId: pid, heroId: hero.id, to: i, companions: chosenCompanions });
         setSelected(undefined);
@@ -247,7 +253,18 @@ export function WorldScreen() {
       {info && <div className="shrink-0 bg-black/70 px-3 py-1 text-[12px] leading-4 text-zinc-200">{info}</div>}
 
       {/* 手番のキャラの操作 */}
-      <div className="panel z-10 shrink-0 rounded-t-2xl px-3 pt-2 pb-3">
+      <div className="panel relative z-10 shrink-0 rounded-t-2xl px-3 pt-2 pb-3">
+        {!mine && (
+          <div className="absolute inset-x-0 top-[52px] bottom-0 z-20 flex flex-col items-center justify-center gap-1 rounded-b-none bg-[#0b0910]/90 text-[14px] text-zinc-200">
+            <span className="flex items-center gap-1.5">
+              <span className="rounded px-1 text-[12px] font-bold text-black" style={{ background: PLAYER_COLOR[hero.playerId] }}>
+                {hero.playerId}
+              </span>
+              {seatName ?? hero.playerId}さんが{hero.name}を操作しています
+            </span>
+            <span className="text-[12px] text-zinc-500">地図をタップするとマスの説明が見られます</span>
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <HeroFace hero={hero} size={40} />
           <div className="min-w-0 flex-1">

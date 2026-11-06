@@ -255,3 +255,5 @@ src/content/
 1. `src/engine/battle/battle.ts` の `STATE_VERSION` を1つ上げます。
 2. `src/engine/game/migrations.ts` に「前の版 → 次の版」の直し方を1つ足します。
 3. `src/engine/__tests__/content.test.ts` に、古い版を読むテストを足します。
+
+※ オンライン協力の部屋は、作った時の「保存の版」と「コンテンツの版」を覚えています。どちらかが変わると（カード・敵・数値を変えた時も）、新しい版の端末は前からある部屋に入れません。公開した後は、新しく部屋を作り直してください。

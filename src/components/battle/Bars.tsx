@@ -3,7 +3,7 @@ import { TERMS } from '../../data/terms';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Backpack, Layers, Menu, Skull, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { findAlly, isDone } from '../../engine';
+import { findAlly, isDone, waitingPlayers } from '../../engine';
 import { isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
 
@@ -55,6 +55,9 @@ export function BottomBar() {
   const openSheet = useBattle((s) => s.openSheet);
   const ally = findAlly(battle, activeId);
   const allDone = battle.phase === 'ally' && battle.allies.every((a) => !isLocalPlayer(a.playerId) || isDone(battle, a));
+  // オンライン協力: 自分の分は準備完了して、他の人を待っている
+  const waiting = waitingPlayers(battle);
+  const iAmReady = !!battle.readyCheck && battle.phase === 'ally' && !waiting.some((p) => isLocalPlayer(p));
   const [showHint, setShowHint] = useState(false);
 
   useEffect(() => {
@@ -96,7 +99,16 @@ export function BottomBar() {
         className={`btn ${allDone ? 'btn-gold' : 'btn-dark'} font-display relative h-12 w-[116px] shrink-0 rounded-xl text-[16px]`}
       >
         {allDone && <span className="glow-pulse pointer-events-none absolute -inset-1.5 rounded-2xl border-2 border-amber-300" />}
-        {battle.phase === 'enemy' ? '敵の行動中' : 'ターン終了'}
+        {battle.phase === 'enemy' ? '敵の行動中' : iAmReady ? (
+          <span className="flex flex-col text-[13px] leading-4">
+            準備完了
+            <span className="text-[12px] text-zinc-400">{waiting.join('・')}を待っています</span>
+          </span>
+        ) : battle.readyCheck ? (
+          '準備完了'
+        ) : (
+          'ターン終了'
+        )}
       </button>
     </div>
   );

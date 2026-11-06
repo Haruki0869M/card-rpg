@@ -1,0 +1,187 @@
+// ===== オンライン協力の画面用の状態（部屋とつなぐ。spec §7.2） =====
+// 部屋（src/net/room.ts）の知らせを受けて、冒険の状態（battleStore）に反映する。
+import { create } from 'zustand';
+import type { Backend } from '../net/backend';
+import { connectFirebase, emulatorFromUrl, onlineAvailable } from '../net/firebaseBackend';
+import { normalizeCode, Room, RoomError, type Slot, type Stamp } from '../net/room';
+import type { PlayerId } from '../types';
+import { setLocalPlayers } from './battleConfig';
+import { setStoreRoom, useBattle } from './battleStore';
+
+const ONLINE_KEY = 'card-rpg/online';
+/** 切断した人の手番を、ホストが代わりに操作できるようになるまでの秒数 */
+export const PROXY_WAIT_SEC = 60;
+
+export interface StampFx {
+  id: number;
+  seat: PlayerId;
+  name: string;
+  kind: string;
+}
+
+interface OnlineState {
+  room: Room | null;
+  busy: boolean;
+  error: string | null;
+  /** 部屋の中身が変わるたびに増える（画面の書き直し用） */
+  tick: number;
+  stamp: StampFx | null;
+  /** 最後に入っていた部屋（タイトルの「部屋に戻る」） */
+  lastCode: string | null;
+  playerName: string;
+  /** 席ごとの、切断に気づいた時刻 */
+  offlineSince: Partial<Record<PlayerId, number>>;
+  /** 待合室で作っているキャラの枠 */
+  editingSlot: number | null;
+
+  available: () => boolean;
+  setPlayerName: (n: string) => void;
+  createRoom: (opts: { scenarioId: string; difficulty: string; partySize: number }) => Promise<boolean>;
+  joinRoom: (code: string) => Promise<boolean>;
+  leaveRoom: () => Promise<void>;
+  claimSlot: (index: number, hero: Omit<Slot, 'ownerUid'>) => Promise<void>;
+  releaseSlot: (index: number) => Promise<void>;
+  updateSettings: (s: { scenarioId?: string; difficulty?: string; partySize?: number }) => Promise<void>;
+  start: () => Promise<void>;
+  sendStamp: (kind: string) => void;
+  setProxy: (p: PlayerId, on: boolean) => void;
+}
+
+function loadLast(): { code: string | null; name: string } {
+  try {
+    const d = JSON.parse(localStorage.getItem(ONLINE_KEY) ?? 'null');
+    return { code: d?.code ?? null, name: d?.name ?? '' };
+  } catch {
+    return { code: null, name: '' };
+  }
+}
+function saveLast(code: string | null, name: string) {
+  try {
+    localStorage.setItem(ONLINE_KEY, JSON.stringify({ code, name }));
+  } catch {
+    /* noop */
+  }
+}
+
+let backendPromise: Promise<Backend> | null = null;
+/** Firebase につなぐ（URL の ?emu=1 でエミュレーター。?as=名前 で同じブラウザの別の端末としてつなぐ: テスト用） */
+function backend(): Promise<Backend> {
+  if (!backendPromise) {
+    const as = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('as') : null;
+    backendPromise = connectFirebase({ emulatorHost: emulatorFromUrl(), appName: as ?? undefined });
+    backendPromise.catch(() => (backendPromise = null));
+  }
+  return backendPromise;
+}
+
+const last = loadLast();
+let stampId = 1;
+
+export const useOnline = create<OnlineState>((set, get) => {
+  const bump = () => set((s) => ({ tick: s.tick + 1 }));
+
+  /** 部屋の知らせを受け取り始める */
+  const attach = (room: Room) => {
+    setStoreRoom(room);
+    setLocalPlayers(room.myPlayers());
+    set({ room, lastCode: room.code, error: null });
+    saveLast(room.code, get().playerName);
+    room.on((e) => {
+      switch (e.type) {
+        case 'command':
+          useBattle.getState().applyRemote(e.result);
+          break;
+        case 'resync':
+          if (room.game) useBattle.getState().loadRemote(room.game);
+          break;
+        case 'stamp':
+          set({ stamp: { id: stampId++, seat: e.stamp.seat, name: room.seatName(e.stamp.seat) ?? e.stamp.seat, kind: e.stamp.kind } });
+          break;
+        case 'rejected':
+          useBattle.getState().showToast(e.text);
+          break;
+        case 'members': {
+          // 切断に気づいた時刻を覚える（60秒たったら、ホストが代わりに操作できる）
+          const off: Partial<Record<PlayerId, number>> = {};
+          for (const m of Object.values(room.members)) if (!m.online) off[m.seat] = get().offlineSince[m.seat] ?? Date.now();
+          set({ offlineSince: off });
+          // 戻ってきた人の分の「代わりに操作」は自動でやめる
+          if (room.isHost) for (const p of Object.keys(room.meta?.proxy ?? {}) as PlayerId[]) if (room.seatOnline(p)) void room.setProxy(p, false).catch(() => {});
+          break;
+        }
+      }
+      setLocalPlayers(room.myPlayers());
+      bump();
+    });
+    if (room.game) useBattle.getState().loadRemote(room.game);
+  };
+
+  const run = async (fn: () => Promise<void>): Promise<boolean> => {
+    set({ busy: true, error: null });
+    try {
+      await fn();
+      return true;
+    } catch (e) {
+      set({ error: e instanceof RoomError ? e.message : `つながりませんでした（${e instanceof Error ? e.message : String(e)}）` });
+      return false;
+    } finally {
+      set({ busy: false });
+    }
+  };
+
+  const withRoom = async (fn: (r: Room) => Promise<void>) => {
+    const r = get().room;
+    if (!r) return;
+    try {
+      await fn(r);
+    } catch (e) {
+      useBattle.getState().showToast(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  return {
+    room: null,
+    busy: false,
+    error: null,
+    tick: 0,
+    stamp: null,
+    lastCode: last.code,
+    playerName: last.name,
+    offlineSince: {},
+    editingSlot: null,
+
+    available: onlineAvailable,
+    setPlayerName: (n) => {
+      set({ playerName: n });
+      saveLast(get().lastCode, n);
+    },
+    createRoom: (opts) =>
+      run(async () => {
+        const b = await backend();
+        attach(await Room.create(b, { name: get().playerName || 'プレイヤー', ...opts }));
+      }),
+    joinRoom: (code) =>
+      run(async () => {
+        const b = await backend();
+        attach(await Room.join(b, normalizeCode(code), get().playerName || 'プレイヤー'));
+      }),
+    leaveRoom: async () => {
+      const r = get().room;
+      set({ room: null, offlineSince: {}, editingSlot: null });
+      setStoreRoom(null);
+      setLocalPlayers(null);
+      useBattle.getState().exitOnline();
+      if (r) await r.leave().catch(() => {});
+    },
+    claimSlot: (i, hero) => withRoom((r) => r.claimSlot(i, hero)),
+    releaseSlot: (i) => withRoom((r) => r.releaseSlot(i)),
+    updateSettings: (s) => withRoom((r) => r.updateSettings(s)),
+    start: () => withRoom((r) => r.start()),
+    sendStamp: (kind) => void withRoom((r) => r.sendStamp(kind)),
+    setProxy: (p, on) => void withRoom((r) => r.setProxy(p, on)),
+  };
+});
+
+/** 自分の席 */
+export const mySeat = (): PlayerId | undefined => useOnline.getState().room?.seat;
+export type { Stamp };

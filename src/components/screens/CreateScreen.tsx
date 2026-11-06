@@ -9,6 +9,7 @@ import { affinityOf, describeAbility } from '../../engine';
 import { PLAYER_COLOR } from '../../data/theme';
 import { autoName, PLAYER_IDS } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
+import { useOnline } from '../../store/onlineStore';
 import type { Gender, StatId } from '../../types';
 import { Bar, Heading, ItemIcon, itemSummary, Screen, STAT_LABEL } from '../ui/game';
 
@@ -21,6 +22,10 @@ export function CreateScreen() {
   const startGame = useBattle((s) => s.startGame);
   const toast = useBattle((s) => s.showToast);
   const [tab, setTab] = useState(0);
+  // オンライン協力の待合室から: 1人分だけ作って、その枠に入れる
+  const editing = useOnline((s) => s.editingSlot);
+  const claimSlot = useOnline((s) => s.claimSlot);
+  const online = editing !== null;
   const slot = Math.min(tab, draft.party.length - 1);
   const m = draft.party[slot];
   const cls = getClass(m.classId);
@@ -38,7 +43,7 @@ export function CreateScreen() {
   return (
     <Screen>
       <div className="flex h-12 shrink-0 items-center px-2">
-        <button onClick={() => setScreen('setup')} aria-label="戻る" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-lg">
+        <button onClick={() => setScreen(online ? 'lobby' : 'setup')} aria-label="戻る" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-lg">
           <ChevronLeft size={22} />
         </button>
         <div className="flex-1">
@@ -47,7 +52,7 @@ export function CreateScreen() {
         <div className="w-11" />
       </div>
       {/* 枠のタブ */}
-      <div className="flex shrink-0 gap-1 px-2 pt-1">
+      <div className={`flex shrink-0 gap-1 px-2 pt-1 ${online ? 'hidden' : ''}`}>
         {draft.party.map((p, i) => (
           <button
             key={i}
@@ -82,7 +87,7 @@ export function CreateScreen() {
         </div>
 
         {/* 担当プレイヤー（ローカル協力: 1台を回して遊ぶ。spec §7.3） */}
-        {draft.party.length > 1 && (
+        {draft.party.length > 1 && !online && (
           <div className="mt-2 flex items-center gap-1.5">
             <span className="shrink-0 text-[12px] text-zinc-300">担当</span>
             {PLAYER_IDS.slice(0, draft.party.length).map((p) => {
@@ -100,7 +105,7 @@ export function CreateScreen() {
             })}
           </div>
         )}
-        {draft.party.length > 1 && <div className="text-[12px] text-zinc-500">1台を回して遊ぶ時に、誰がこのキャラを操作するか（1人で全員を操作するなら全員P1のまま）</div>}
+        {draft.party.length > 1 && !online && <div className="text-[12px] text-zinc-500">1台を回して遊ぶ時に、誰がこのキャラを操作するか（1人で全員を操作するなら全員P1のまま）</div>}
 
         {/* 選んだ職業の詳細 */}
         <div className="panel panel-gold-edge mt-2 rounded-xl p-2">
@@ -182,13 +187,20 @@ export function CreateScreen() {
       </div>
       <div className="shrink-0 px-3 pt-1 pb-3">
         <button
-          onClick={() => {
+          onClick={async () => {
             if (draft.party.some((p) => !p.name.trim())) return toast('名前を入力してください');
+            if (online) {
+              const { classId, gender, name } = draft.party[0];
+              await claimSlot(editing, { classId, gender, name: name.trim() });
+              useOnline.setState({ editingSlot: null });
+              setScreen('lobby');
+              return;
+            }
             startGame();
           }}
           className="btn btn-gold font-display flex h-14 w-full items-center justify-center gap-2 rounded-xl text-[19px]"
         >
-          <Swords size={22} /> 冒険に出発
+          <Swords size={22} /> {online ? 'このキャラに決める' : '冒険に出発'}
         </button>
       </div>
     </Screen>

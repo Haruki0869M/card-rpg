@@ -12,6 +12,9 @@ const showData = location.hash === '#data';
 import '@fontsource/zen-antique/400.css';
 import './index.css';
 
+// オンライン協力の確認用（エミュレーターにつないだ時か、?debug を付けた時だけ）
+if (new URLSearchParams(location.search).has('emu') || new URLSearchParams(location.search).has('debug')) void import('./dev/onlineDebug');
+
 // 絵を先に画像化しておく（表示中の再計算・再描画を軽くするため）
 prepareArt();
 

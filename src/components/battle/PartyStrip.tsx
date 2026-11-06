@@ -44,6 +44,9 @@ const AllyCard = memo(function AllyCard({ ally }: { ally: AllyState }) {
       }
     >
       <span className="absolute top-0 left-2 h-[3px] w-6 rounded-b" style={{ background: PLAYER_COLOR[ally.playerId] }} />
+      {battle.readyCheck && battle.phase === 'ally' && !ally.dead && battle.ready?.includes(ally.playerId) && (
+        <span className="absolute -top-2 right-1 z-10 rounded-full bg-emerald-500 px-1.5 text-[12px] leading-4 font-bold text-black">準備完了</span>
+      )}
       <div className="flex items-center gap-1">
         <span
           className="relative h-[28px] w-[28px] shrink-0 overflow-hidden rounded-full border-2 bg-[#1d2440]"

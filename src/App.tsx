@@ -17,6 +17,7 @@ import { WorldScreen } from './components/world/WorldScreen';
 import { EncounterScreen, EndingScreen, ShrineScreen, TownScreen } from './components/world/Places';
 import { EventScreen, RestScreen } from './components/screens/RoomScreens';
 import { SetupScreen } from './components/screens/SetupScreen';
+import { JoinScreen, LobbyScreen, OnlineOverlay } from './components/screens/OnlineScreens';
 import { TitleScreen } from './components/screens/TitleScreen';
 import { Sheets } from './components/Sheets';
 import { findAlly } from './engine';
@@ -78,6 +79,8 @@ function CurrentScreen() {
   if (screen === 'title' || !mode) {
     if (screen === 'setup') return <SetupScreen />;
     if (screen === 'create') return <CreateScreen />;
+    if (screen === 'join') return <JoinScreen />;
+    if (screen === 'lobby') return <LobbyScreen />;
     return <TitleScreen />;
   }
   switch (mode) {
@@ -146,8 +149,13 @@ export default function App() {
   const screen = useBattle((s) => s.screen);
   const closeTop = useBattle((s) => s.closeTop);
 
-  useBackButton(!!selection || !!sheet || confirmAbandon || screen === 'setup' || screen === 'create', closeTop);
+  useBackButton(!!selection || !!sheet || confirmAbandon || screen === 'setup' || screen === 'create' || screen === 'join', closeTop);
   useKeyboard();
+
+  // 招待のリンク（?room=合言葉）で開いたら「部屋に参加」へ
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('room')) useBattle.getState().setScreen('join');
+  }, []);
 
   useEffect(() => {
     // 長押しでのメニュー表示を抑止
@@ -171,6 +179,7 @@ export default function App() {
           <CurrentScreen />
           <Sheets />
           <DetailPopup />
+          <OnlineOverlay />
           <Toast />
         </div>
       </div>

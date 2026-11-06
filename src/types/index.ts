@@ -385,6 +385,10 @@ export interface BattleState {
   nextLogId: number;
   nextUid: number;
   encounterId: string;
+  /** オンライン協力: 全員が「準備完了」を押すまで敵フェーズに進まない（spec §7.1） */
+  readyCheck?: boolean;
+  /** 準備完了を押したプレイヤー */
+  ready?: PlayerId[];
 }
 
 export interface BattleSetup {
@@ -396,6 +400,8 @@ export interface BattleSetup {
   enemyAttackMul?: number;
   /** 奇襲成功（敵は1ターン目に行動しない） */
   surprise?: boolean;
+  /** オンライン協力: 全員の準備完了を待つ */
+  readyCheck?: boolean;
 }
 
 // ===== コマンド（シリアライズ可能・オンライン協力で同期する単位） =====
@@ -438,7 +444,9 @@ export type BattleEvent =
   | { type: 'death'; unitId: string }
   | { type: 'enemyPhase'; enemyUid: string; name: string }
   | { type: 'heal'; unitId: string; amount: number }
-  | { type: 'phase'; phase: Phase };
+  | { type: 'phase'; phase: Phase }
+  /** オンライン協力: 準備完了を押した */
+  | { type: 'ready'; playerId: PlayerId };
 
 export interface CommandResult {
   state: BattleState;
