@@ -229,7 +229,7 @@ function AimMarks({ battle, enemyUid }: { battle: BattleState; enemyUid: string 
   if (!aimers.length && !combo) return null;
   return (
     <div className="flex items-center gap-0.5" data-aims={aimers.map((a) => a.id).join(',')}>
-      {combo && <span className="rounded bg-amber-500/90 px-1 text-[11px] leading-4 font-black text-amber-950">連携+{Math.round(BALANCE.comboBonus * 100)}%</span>}
+      {combo && <span className="rounded bg-amber-500/90 px-1 text-[12px] leading-4 font-black text-amber-950">連携+{Math.round(BALANCE.comboBonus * 100)}%</span>}
       {aimers.map((a) => (
         <span key={a.id} className="overflow-hidden rounded-full border-2" style={{ width: 20, height: 20, borderColor: PLAYER_COLOR[a.playerId] ?? '#ffd76a' }}>
           <CharacterArt classId={a.classId} gender={a.gender} face className="h-full w-full" />

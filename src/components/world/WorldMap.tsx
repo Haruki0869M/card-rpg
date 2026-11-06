@@ -296,7 +296,7 @@ export function WorldMap({
           return (
             <div key={`down-${id}`} data-downed={id} className="pointer-events-none absolute" style={{ left: x - s / 2 + R * 0.35, top: y - s / 2 + R * 0.3, width: s, height: s, zIndex: 1 }}>
               <HeroFace hero={h} size={s} dim />
-              <span className="absolute -right-1 -bottom-1 rounded-full bg-red-900 px-1 text-[11px] leading-4 font-black text-red-100">倒</span>
+              <span className="absolute -right-1 -bottom-1 rounded-full bg-red-900 px-1 text-[12px] leading-4 font-black text-red-100">倒</span>
             </div>
           );
         })}
