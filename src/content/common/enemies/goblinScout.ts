@@ -2,7 +2,7 @@ import type { EnemyDef } from '../../../types';
 
 export const goblinScout: EnemyDef = {
   id: 'goblinScout',
-  name: 'ゴブリン斥候',
+  name: 'カエル族の斥候',
   icon: '👺',
   maxHp: 26,
   baseLevel: 2,

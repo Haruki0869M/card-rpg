@@ -48,7 +48,7 @@ export function TitleScreen() {
             initial={{ opacity: 0, y: -10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.6 }}
-            className="font-display text-[40px] leading-[48px] tracking-wider"
+            className="font-title px-2 text-[44px] leading-[46px] font-bold"
             style={{
               background: 'linear-gradient(180deg,#fff6d0,#f2c24a 55%,#a86a12)',
               WebkitBackgroundClip: 'text',
@@ -57,7 +57,9 @@ export function TitleScreen() {
               filter: 'drop-shadow(0 3px 0 rgba(0,0,0,.85))',
             }}
           >
-            {GAME_TITLE}
+            {/* 「DESTINY OF」は小さく、「CRYSTALIA」を大きく（英字のタイトル用の字体） */}
+            <span className="block text-[20px] leading-[26px] tracking-[0.25em]">{GAME_TITLE.replace(/\s*\S+$/, '')}</span>
+            {GAME_TITLE.split(' ').pop()}
           </motion.div>
           <div className="font-display text-outline mt-1 text-[14px] tracking-[0.3em] text-amber-100/90">― {TERMS.gameSubtitle} ―</div>
         </div>

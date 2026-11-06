@@ -277,7 +277,7 @@ describe('挑発', () => {
 });
 
 describe('敵の行動ルール', () => {
-  it('ゴブリン重装兵は決まった順番', () => {
+  it('獣人の重装兵は決まった順番', () => {
     let s = createBattle(setup(2));
     makeImmortal(s);
     const seen: string[] = [];

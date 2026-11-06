@@ -1,4 +1,7 @@
-# card-rpg
+# DESTINY OF CRYSTALIA
+
+（リポジトリ名: card-rpg）
+
 
 『For The King』のスロット判定 × 『Slay the Spire』のデッキ構築を掛け合わせた、協力ローグライトRPGのプロトタイプです（現在 M3-A: 世界マップ・シナリオ1「侵食の魔王」をエンディングまで遊べる。ローカル協力に対応）。
 Androidスマホのブラウザ（縦画面・タップ操作）を第一に想定しています。仕様は [spec.md](./spec.md) を参照してください。
