@@ -15,11 +15,14 @@ export function sceneNeedsMe(full: GameState, scene: string): boolean {
     const h = full.heroes.find((x) => x.id === id);
     return !!h && isLocalPlayer(h.playerId);
   };
+  const turnInExp = (id: string) => !!full.expeditions?.some((x) => x.heroes.includes(id));
   if (scene === WORLD_SCENE) {
-    if (v.mode === 'world') return !!v.world?.turn && mine(v.world.turn);
+    if (v.mode === 'world') return !!v.world?.turn && mine(v.world.turn) && !turnInExp(v.world.turn);
     return (v.party ?? (v.world ? [v.world.turn] : [])).some(mine) || (!!v.town && mine(v.town.heroId)) || (!!v.shrine && mine(v.shrine.heroId));
   }
   if (v.mode === 'battle' && v.battle?.phase === 'enemy') return false;
+  // 世界マップのあるシナリオ: ダンジョンのパーティの番の時だけ
+  if (full.world && !(v.party ?? []).includes(full.world.turn)) return false;
   return (v.party ?? []).some(mine);
 }
 

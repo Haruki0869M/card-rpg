@@ -11,7 +11,7 @@ import type { Rng } from '../../rng';
 import { addLog, ownedBy, rollWithFocus, splitGold, statChance, successes } from '../common';
 import { enterDungeonFromWorld, startBattleWith } from '../game';
 import { heroFocusMax, heroMaxHp } from '../hero';
-import { activeHeroes, findHero, livingHeroes, mapHeroes, sceneHeroes } from '../heroes';
+import { activeHeroes, expeditionOf, findHero, livingHeroes, mapHeroes, sceneHeroes } from '../heroes';
 import { revealAround } from './fog';
 import { hexDistance, pathTo, reachable } from './hex';
 import { objectiveHandler, type QuestSignal } from './objectives';
@@ -60,6 +60,7 @@ function turnCheck(game: GameState, playerId: string, heroId: string): { w: Worl
   if (!w || game.mode !== 'world') return '世界マップにいません';
   if (w.story) return '物語を読んでから進めてください';
   if (w.turn !== heroId) return 'そのキャラの手番ではありません';
+  if (expeditionOf(game, heroId)) return 'そのキャラはダンジョンの中です';
   const h = findHero(game, heroId);
   if (!h || h.hp <= 0 || h.retired) return 'そのキャラは動けません';
   if (!ownedBy(h, playerId)) return '担当していないキャラです';
@@ -76,19 +77,35 @@ export function advanceTurn(game: GameState, rng: Rng) {
   w.moveRoll = undefined;
   w.invites = undefined;
   w.follow = undefined;
-  const onMap = mapHeroes(game);
-  // 全員がダンジョンの中: 世界マップの時間は止まる（誰かが出てきたら、その人の手番から）
-  if (!onMap.length) {
-    w.turn = '';
-    return;
-  }
-  const next = onMap.find((h) => !w.acted.includes(h.id));
+  // ダンジョンの中のキャラも同じ順番に入る（ダンジョンのパーティは、その中の最初のキャラの番にまとめて動く。M3-D）
+  const next = livingHeroes(game).find((h) => !w.acted.includes(h.id));
   if (next) {
-    w.turn = next.id;
-    w.prevTile = w.pos[next.id];
+    setTurn(game, next.id);
     return;
   }
   endWorldTurn(game, rng);
+}
+
+/** 手番をそのキャラにする（ダンジョンの中なら、そのパーティの探索力の判定から） */
+function setTurn(game: GameState, heroId: string) {
+  const w = game.world!;
+  w.turn = heroId;
+  w.prevTile = w.pos[heroId];
+  const exp = expeditionOf(game, heroId);
+  if (exp?.dungeon) {
+    exp.dungeon.explore = null;
+    exp.dungeon.exploreRoll = undefined;
+  }
+}
+
+/** そのダンジョンのパーティの番か */
+export const isExpeditionTurn = (game: GameState, exp: Expedition) => !!game.world && exp.heroes.includes(game.world.turn);
+
+/** ダンジョンのパーティの手番を終える（全員行動済みにして次へ） */
+export function endExpeditionTurn(game: GameState, heroes: string[], rng: Rng) {
+  const w = game.world!;
+  for (const id of heroes) if (!w.acted.includes(id)) w.acted.push(id);
+  if (heroes.includes(w.turn)) advanceTurn(game, rng);
 }
 
 function endWorldTurn(game: GameState, rng: Rng) {
@@ -114,9 +131,9 @@ function endWorldTurn(game: GameState, rng: Rng) {
     onCorruptionChange(game, rng, b2);
   }
   revealAround(game, w);
-  const first = mapHeroes(game)[0];
-  w.turn = first?.id ?? '';
-  w.prevTile = first ? w.pos[first.id] : undefined;
+  const first = livingHeroes(game)[0];
+  if (first) setTurn(game, first.id);
+  else w.turn = '';
   if (w.corruption >= 100) {
     game.mode = 'gameover';
     addLog(game, '侵食度が100%に達した。世界は侵食に呑まれた…');
@@ -530,19 +547,8 @@ function detachExpedition(game: GameState, rng: Rng) {
 export function rejoinWorld(game: GameState, heroes: string[]) {
   const w = game.world;
   if (!w) return;
-  const back = heroes.filter((id) => mapHeroes(game).some((h) => h.id === id));
-  if (!back.length) return;
-  // 世界マップに誰もいなかった: 出てきたキャラの手番から再開
-  if (!w.turn || !mapHeroes(game).some((h) => h.id === w.turn)) {
-    w.turn = back[0];
-    w.prevTile = w.pos[back[0]];
-    w.move = null;
-    w.moveRoll = undefined;
-    w.acted = w.acted.filter((id) => !back.includes(id));
-    return;
-  }
-  // 世界マップは進行中: 次のワールドターンから動く
-  for (const id of back) if (!w.acted.includes(id)) w.acted.push(id);
+  // 出てきたキャラは、次のワールドターンから世界マップで動く
+  for (const id of heroes) if (!w.acted.includes(id)) w.acted.push(id);
 }
 
 // ---------- 同行の誘い（他の人のキャラ） ----------

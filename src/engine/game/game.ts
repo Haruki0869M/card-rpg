@@ -40,6 +40,8 @@ import { corruptionLevelBonus } from './world/wanderers';
 import {
   backToWorld,
   camp,
+  endExpeditionTurn,
+  isExpeditionTurn,
   rejoinWorld,
   encounterChoose,
   encounterContinue,
@@ -179,6 +181,9 @@ function runInScene(game: GameState, cmd: Extract<GameCommand, { type: 'SCENE' }
   if (!exp) return { error: 'その場面はもう終わりました', battleEvents: [] };
   if (cmd.command.type === 'SCENE') return { error: '場面の指定が不正です', battleEvents: [] };
   if (isOver(game)) return { error: '冒険は終わりました', battleEvents: [] };
+  // ダンジョンのパーティも世界マップの手番の順番で動く（持ち物の整理だけは、いつでもできる。M3-D）
+  const anytime = ['EQUIP', 'UNEQUIP', 'GIVE', 'USE_POUCH_ITEM'].includes(cmd.command.type) && exp.mode !== 'battle';
+  if (game.world && !anytime && !isExpeditionTurn(game, exp)) return { error: 'ほかのキャラの番です（順番が来たら探索できます）', battleEvents: [] };
   const saved = saveSceneFields(game);
   mount(game, exp);
   game.activeScene = exp.id;
@@ -195,8 +200,45 @@ function runInScene(game: GameState, cmd: Extract<GameCommand, { type: 'SCENE' }
     game.mode = endMode;
     return r;
   }
-  if (ended) rejoinWorld(game, exp.heroes);
+  if (ended) {
+    // ダンジョンから出た（撤退・制覇・全滅）: 次のワールドターンから世界マップで動く。この手番は終わり
+    rejoinWorld(game, exp.heroes);
+    if (game.world && exp.heroes.includes(game.world.turn)) endExpeditionTurn(game, exp.heroes, rng);
+    return r;
+  }
+  // 探索力を使い切って、部屋の出来事も終わった（通路に戻った）: 次のキャラの番へ
+  if (game.world && exp.mode === 'dungeon' && exp.dungeon?.explore === 0) {
+    exp.dungeon.explore = null;
+    exp.dungeon.exploreRoll = undefined;
+    endExpeditionTurn(game, exp.heroes, rng);
+  }
   return r;
+}
+
+/** 探索力の判定（ダンジョンのパーティの手番の最初。素早さ。探索力 = exploreBase + 成功数） */
+function exploreRoll(game: GameState, cmd: Extract<GameCommand, { type: 'EXPLORE_ROLL' }>, rng: Rng): string | undefined {
+  const run = game.dungeon;
+  if (!game.world || !game.activeScene || game.mode !== 'dungeon' || !run) return 'ダンジョンの通路でのみ判定できます';
+  if (run.explore != null) return 'もう探索力を決めました';
+  const h = findHero(game, cmd.heroId);
+  if (!h || h.hp <= 0 || !(game.party ?? []).includes(h.id)) return 'このキャラは判定できません';
+  if (!ownedBy(h, cmd.playerId)) return '担当していないキャラです';
+  const slots = BALANCE.exploreSlots;
+  if (!Number.isInteger(cmd.focusUsed) || cmd.focusUsed < 0 || cmd.focusUsed > Math.min(slots, h.focus)) return 'フォーカスの数が不正です';
+  h.focus -= cmd.focusUsed;
+  const results = rollWithFocus(slots, cmd.focusUsed, statChance(h, 'agi', 'move'), rng);
+  run.exploreRoll = results;
+  run.explore = BALANCE.exploreBase + successes(results);
+  addLog(game, `探索力 ${run.explore}（この手番で入れる部屋の数）`);
+  return undefined;
+}
+
+/** ダンジョンのパーティの手番を終える（探索力が残っていても） */
+function exploreEnd(game: GameState): string | undefined {
+  const run = game.dungeon;
+  if (!game.world || !game.activeScene || game.mode !== 'dungeon' || !run) return 'ダンジョンの通路でのみ終えられます';
+  run.explore = 0;
+  return undefined;
 }
 
 /** みんなで決める操作に1票入れる。全員そろったら、決まった操作をそのまま動かす */
@@ -315,6 +357,12 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
       case 'GIVE':
         error = give(game, cmd);
         break;
+      case 'EXPLORE_ROLL':
+        error = exploreRoll(game, cmd, rng);
+        break;
+      case 'EXPLORE_END':
+        error = exploreEnd(game);
+        break;
       case 'WORLD_ROLL_MOVE':
         error = rollMove(game, cmd, rng);
         break;
@@ -418,6 +466,12 @@ function enterRoom(game: GameState, playerId: string, roomId: string, rng: Rng):
   if (game.mode !== 'dungeon' || !run) return 'ダンジョンにいません';
   const room = findRoom(run, roomId);
   if (!room || !reachableRooms(run).some((r) => r.id === roomId)) return 'その部屋には進めません';
+  // 世界マップのあるシナリオ: 部屋に入るたびに探索力を1使う
+  if (game.world && game.activeScene) {
+    if (run.explore == null) return '先に探索力を判定してください';
+    if (run.explore <= 0) return '探索力が残っていません';
+    run.explore -= 1;
+  }
   run.currentRoomId = room.id;
   roomBehavior(roomTypeOf(room).behavior).enter(game, room, rng);
   return undefined;

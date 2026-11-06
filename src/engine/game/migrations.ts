@@ -77,6 +77,20 @@ const MIGRATIONS: Record<number, (g: Loose) => void> = {
     delete g.stash;
     delete g.pouch;
   },
+  // v7 → v8: ダンジョンのパーティも世界マップの手番の順番で動く（探索力）。今の手番がダンジョンなら判定から
+  7(g) {
+    if (g.battle) g.battle.version = 8;
+    for (const x of g.expeditions ?? []) {
+      if (x.battle) x.battle.version = 8;
+      if (x.dungeon) x.dungeon.explore = null;
+    }
+    const w = g.world;
+    if (w && !w.turn) {
+      const first = g.heroes.find((h: Loose) => h.hp > 0 && !h.retired);
+      w.turn = first?.id ?? '';
+      w.acted = [];
+    }
+  },
 };
 
 /** 古い版の冒険を今の版に直す。直せなければ null */

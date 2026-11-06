@@ -172,7 +172,8 @@ function equipBest(g: GameState, log: BotLog): GameState {
 
 export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<string>; town?: string }, inScene = false): GameState {
   // ダンジョンの場面があれば、先にそちらを進める（その場面を載せた冒険で次の操作を決めて、SCENE で送る）
-  const exp = inScene ? undefined : g.expeditions?.[0];
+  // 手番がダンジョンの中のキャラなら、そのダンジョンの場面を進める（世界マップがなければ、最初の場面）
+  const exp = inScene ? undefined : g.world ? g.expeditions?.find((x) => x.heroes.includes(g.world!.turn)) : g.expeditions?.[0];
   if (exp && g.mode !== 'gameover' && g.mode !== 'ending') {
     const outer = capture;
     capture = [];
@@ -215,6 +216,11 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
       return send(g, { type: 'FINISH_REWARD', playerId: pid(g) }, log);
     }
     case 'dungeon': {
+      // 手番の最初に探索力を決める（世界マップのあるシナリオ）
+      if (g.world && g.dungeon!.explore == null) {
+        const h = livingHeroes(g).find((x) => !g.party || g.party.includes(x.id))!;
+        return send(g, { type: 'EXPLORE_ROLL', playerId: h.playerId, heroId: h.id, focusUsed: 0 }, log);
+      }
       const rooms = reachableRooms(g.dungeon!);
       const hurt = livingHeroes(g).some((h) => h.hp < heroMaxHp(h) * 0.5);
       const pick = rooms.find((r) => (hurt ? r.type === 'rest' : r.type === 'chest')) ?? rooms[0];

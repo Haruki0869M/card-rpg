@@ -12,6 +12,8 @@ function run(g: GameState, cmd: GameCommand): GameState {
 }
 const tileOf = (g: GameState, kind: string, id: string) => g.world!.tiles.findIndex((t) => t.f?.kind === kind && t.f.id === id);
 
+const inScene = (x: string, command: GameCommand): GameCommand => ({ type: 'SCENE', scene: x, command });
+
 /** P1・P2 の2人でダンジョンに入る */
 function inTemple() {
   let g = newWorld(['P1', 'P2']);
@@ -25,9 +27,11 @@ function inTemple() {
   g = run(g, { type: 'WORLD_INVITE_ANSWER', playerId: 'P2', heroId: 'h1', accept: true });
   g = run(g, { type: 'WORLD_INTERACT', playerId: 'P1', heroId: 'h0', party: ['h0', 'h1'] });
   expect(g.expeditions![0].heroes).toEqual(['h0', 'h1']);
-  return { g, x: g.expeditions![0].id };
+  // 2人とも入ったので、ワールドターンが進んでダンジョンの番。探索力を決める
+  const x = g.expeditions![0].id;
+  g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: 'P1', heroId: 'h0', focusUsed: 0 }));
+  return { g, x };
 }
-const inScene = (x: string, command: GameCommand): GameCommand => ({ type: 'SCENE', scene: x, command });
 
 describe('みんなで決める（ダンジョンの中）', () => {
   it('次の部屋は、2人とも選ぶまで決まらない。選んだ人が見える', () => {
@@ -65,6 +69,7 @@ describe('みんなで決める（ダンジョンの中）', () => {
     const t = tileOf(g, 'dungeon', 'emeraldTemple');
     g.world!.pos.h0 = g.world!.pos.h1 = t;
     g = run(g, { type: 'WORLD_INTERACT', playerId: 'P1', heroId: 'h0', party: ['h0', 'h1'] });
+    g = run(g, inScene(g.expeditions![0].id, { type: 'EXPLORE_ROLL', playerId: 'P1', heroId: 'h0', focusUsed: 0 }));
     g = run(g, inScene(g.expeditions![0].id, { type: 'ENTER_ROOM', playerId: 'P1', roomId: 'r0c0' }));
     expect(viewOf(g, g.expeditions![0].id).dungeon!.currentRoomId).toBe('r0c0');
   });

@@ -20,6 +20,7 @@ import {
   makeSeed,
   unusableReason,
   needsVote,
+  sceneOfHero,
   unwrapCommand,
   viewOf,
   voters,
@@ -275,13 +276,17 @@ const saved = loadSave();
  * 見る場面を決める。今の場面が終わっていたら世界マップへ。
  * 世界マップに誰もいない（全員ダンジョン）なら、この端末のキャラがいるダンジョンへ
  */
-function pickScene(full: GameState | null, current: string): string {
+function pickScene(full: GameState | null, current: string, follow = false): string {
   const exps = full?.expeditions ?? [];
   if (!full || !exps.length) return WORLD_SCENE;
   let s = current !== WORLD_SCENE && !exps.some((x) => x.id === current) ? WORLD_SCENE : current;
-  if (s === WORLD_SCENE && full.world && !full.world.turn && full.mode === 'world') {
-    const mine = exps.find((x) => x.heroes.some((id) => isLocalPlayer(full.heroes.find((h) => h.id === id)?.playerId ?? 'P1')));
-    s = (mine ?? exps[0]).id;
+  if (s === WORLD_SCENE && full.world) {
+    // 手番がダンジョンの組にあり、その組をこの端末で動かすなら、そのダンジョンを見せる
+    const turn = full.world.turn;
+    const turnExp = exps.find((x) => x.heroes.includes(turn));
+    const local = (id: string) => isLocalPlayer(full.heroes.find((h) => h.id === id)?.playerId ?? 'P1');
+    if (follow && turnExp && local(turn)) s = turnExp.id;
+    else if (!turn && full.mode === 'world') s = (exps.find((x) => x.heroes.some(local)) ?? exps[0]).id;
   }
   return s;
 }
@@ -384,6 +389,9 @@ export const useBattle = create<StoreState>((set, get) => {
     // ダンジョンに入った: この端末のキャラが入ったなら、その場面を見る
     const added = (full.expeditions ?? []).find((x) => !before?.expeditions?.some((y) => y.id === x.id));
     if (added && added.heroes.some((id) => isLocalPlayer(full.heroes.find((h) => h.id === id)?.playerId ?? 'P1'))) scene = added.id;
+    // 手番が移った: この端末のキャラの番なら、そのキャラのいる場面（世界マップかダンジョン）を見る（M3-D）
+    const turn = full.world?.turn;
+    if (turn && turn !== before?.world?.turn && isLocalPlayer(full.heroes.find((h) => h.id === turn)?.playerId ?? 'P1')) scene = sceneOfHero(full, turn);
     scene = pickScene(full, scene);
     const next = viewOf(full, scene);
     const patch: Partial<StoreState> = { full, scene, game: next };
@@ -440,9 +448,9 @@ export const useBattle = create<StoreState>((set, get) => {
     screen: 'title',
     draft: defaultDraft(),
     full: saved?.game ?? null,
-    scene: pickScene(saved?.game ?? null, WORLD_SCENE),
-    game: viewIn(saved?.game ?? null, pickScene(saved?.game ?? null, WORLD_SCENE)),
-    battle: viewIn(saved?.game ?? null, pickScene(saved?.game ?? null, WORLD_SCENE))?.battle ?? EMPTY_BATTLE,
+    scene: pickScene(saved?.game ?? null, WORLD_SCENE, true),
+    game: viewIn(saved?.game ?? null, pickScene(saved?.game ?? null, WORLD_SCENE, true)),
+    battle: viewIn(saved?.game ?? null, pickScene(saved?.game ?? null, WORLD_SCENE, true))?.battle ?? EMPTY_BATTLE,
     settings: loadSettings(),
     activeId: saved?.activeId ?? '',
     selection: null,
@@ -498,7 +506,7 @@ export const useBattle = create<StoreState>((set, get) => {
       enemyTimer = null;
       enemyInFlight = false;
       const local = loadSave();
-      const scene = pickScene(local?.game ?? null, WORLD_SCENE);
+      const scene = pickScene(local?.game ?? null, WORLD_SCENE, true);
       const game = viewIn(local?.game ?? null, scene);
       set({ full: local?.game ?? null, scene, game, activeId: local?.activeId ?? '', screen: 'title', confirmAbandon: false, sheet: null, battle: game?.battle ?? EMPTY_BATTLE, selection: null });
     },
@@ -557,7 +565,7 @@ export const useBattle = create<StoreState>((set, get) => {
       // 自分のキャラが全員ダンジョンの中なら、その場面を見る
       const mine = full.heroes.filter((h) => isLocalPlayer(h.playerId) && h.hp > 0 && !h.retired);
       const exp = full.expeditions?.find((x) => mine.length && mine.every((h) => x.heroes.includes(h.id)));
-      const scene = pickScene(full, exp?.id ?? get().scene);
+      const scene = pickScene(full, exp?.id ?? get().scene, true);
       const game = viewOf(full, scene);
       set({ full, scene, game, screen: 'game', sheet: null, battle: game.battle ?? EMPTY_BATTLE, ...(game.battle ? resetBattleUi(game.battle) : { selection: null }) });
       scheduleEnemy();

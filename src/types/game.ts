@@ -173,6 +173,9 @@ export interface DungeonRun {
   currentRoomId?: string;
   /** このダンジョンで手に入れたもの（撤退時に1つ失う候補） */
   gained: ItemInstance[];
+  /** 探索力（この手番で入れる部屋の残り。判定前は null。世界マップのあるシナリオだけ。M3-D） */
+  explore?: number | null;
+  exploreRoll?: ('focus' | 'hit' | 'miss')[];
 }
 
 // ---------- 宝箱・イベント・報酬 ----------
@@ -455,6 +458,9 @@ export type GameCommand =
   | { type: 'LEAVE_SHRINE'; playerId: PlayerId }
   /** 世界マップと別に進んでいる場面（ダンジョン）の中の操作 */
   | { type: 'SCENE'; scene: string; command: GameCommand }
+  /** ダンジョンのパーティの手番: 探索力の判定（素早さ）/ 手番を終える */
+  | { type: 'EXPLORE_ROLL'; playerId: PlayerId; heroId: string; focusUsed: number }
+  | { type: 'EXPLORE_END'; playerId: PlayerId }
   /** みんなで決める操作に1票入れる（command = 選んだ操作。null で取り消し） */
   | { type: 'VOTE'; playerId: PlayerId; command: GameCommand | null }
   /** 遭遇の戦闘に、自分のキャラを加える / 加えない（近くにいる、手番でない人のキャラ） */

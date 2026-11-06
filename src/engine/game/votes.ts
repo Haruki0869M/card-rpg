@@ -6,7 +6,7 @@ import type { GameCommand, GameState, PlayerId, VoteState } from '../../types';
 import { findHero, sceneHeroes } from './heroes';
 
 /** みんなで決める操作の種類 */
-export const VOTED_COMMANDS = new Set<GameCommand['type']>(['ENTER_ROOM', 'RETREAT', 'CHOOSE_EVENT', 'FINISH_EVENT', 'REST', 'LEAVE_CHEST', 'RETURN_TO_HUB', 'FINISH_REWARD']);
+export const VOTED_COMMANDS = new Set<GameCommand['type']>(['ENTER_ROOM', 'RETREAT', 'CHOOSE_EVENT', 'FINISH_EVENT', 'REST', 'LEAVE_CHEST', 'RETURN_TO_HUB', 'FINISH_REWARD', 'EXPLORE_END']);
 
 /** 選べるプレイヤー（場面にいる、生きているキャラの担当） */
 export const voters = (game: GameState): PlayerId[] => [...new Set(sceneHeroes(game).map((h) => h.playerId))];
