@@ -239,9 +239,11 @@ export function DungeonScreen() {
       </div>
 
       <div className="flex shrink-0 gap-1 px-2 pt-2">
-        {game.heroes.map((h) => (
-          <HeroMini key={h.id} hero={h} onTap={() => openSheet('party')} />
-        ))}
+        {game.heroes
+          .filter((h) => !game.party || game.party.includes(h.id))
+          .map((h) => (
+            <HeroMini key={h.id} hero={h} onTap={() => openSheet('party')} />
+          ))}
       </div>
       <div className="grid shrink-0 grid-cols-3 gap-2 px-2 pt-2 pb-3">
         <button onClick={() => openSheet('party')} className="btn btn-dark flex h-12 items-center justify-center gap-1 rounded-xl text-[14px] font-bold">

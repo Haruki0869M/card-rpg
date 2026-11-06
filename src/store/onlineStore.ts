@@ -89,7 +89,7 @@ export const useOnline = create<OnlineState>((set, get) => {
     room.on((e) => {
       switch (e.type) {
         case 'command':
-          useBattle.getState().applyRemote(e.result);
+          useBattle.getState().applyRemote(e.result, e.cmd);
           break;
         case 'resync':
           if (room.game) useBattle.getState().loadRemote(room.game);

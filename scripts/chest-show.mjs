@@ -31,9 +31,11 @@ async function atChest(page, base, look, seed) {
     ({ k, base, look, seed }) => {
       const d = JSON.parse(base);
       const g = d.game;
-      g.mode = 'chest';
-      g.dungeon.currentRoomId = g.dungeon.rooms[0].id;
-      g.chest = { roomId: g.dungeon.rooms[0].id, spec: { rarity: look, locked: false }, unlocked: true };
+      // ダンジョンは世界マップと別の場面（expeditions）にある
+      const x = g.expeditions?.[0] ?? g;
+      x.mode = 'chest';
+      x.dungeon.currentRoomId = x.dungeon.rooms[0].id;
+      x.chest = { roomId: x.dungeon.rooms[0].id, spec: { rarity: look, locked: false }, unlocked: true };
       g.rngState = seed;
       localStorage.setItem(k, JSON.stringify(d));
     },

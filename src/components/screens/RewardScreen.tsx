@@ -199,7 +199,7 @@ export function RewardScreen() {
             );
           })}
           {game.heroes
-            .filter((h) => !r.exp.some((e) => e.heroId === h.id))
+            .filter((h) => (!game.party || game.party.includes(h.id)) && !r.exp.some((e) => e.heroId === h.id))
             .map((h) => (
               <div key={h.id} className="flex items-center gap-2 rounded-lg bg-black/30 p-1.5 text-[12px] text-zinc-400">
                 <HeroFace hero={h} size={26} dim /> {h.name}は戦闘不能だったため経験値なし（HP1で復帰）

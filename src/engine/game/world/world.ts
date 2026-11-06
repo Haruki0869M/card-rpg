@@ -6,12 +6,12 @@ import { EVENTS } from '../../../data/events';
 import { getScenario } from '../../../data/scenarios';
 import { getDifficulty } from '../../../data/rules';
 import { QUESTS, TERRAINS, TOWNS } from '../../../data/world';
-import type { EncounterState, GameCommand, GameState, Hero, QuestState, WorldState } from '../../../types';
+import type { EncounterState, Expedition, GameCommand, GameState, Hero, QuestState, WorldState } from '../../../types';
 import type { Rng } from '../../rng';
 import { addLog, ownedBy, rollWithFocus, statChance, successes } from '../common';
 import { enterDungeonFromWorld, startBattleWith } from '../game';
 import { heroFocusMax, heroMaxHp } from '../hero';
-import { activeHeroes, findHero, livingHeroes } from '../heroes';
+import { activeHeroes, findHero, livingHeroes, mapHeroes } from '../heroes';
 import { revealAround } from './fog';
 import { hexDistance, pathTo, reachable } from './hex';
 import { objectiveHandler, type QuestSignal } from './objectives';
@@ -24,11 +24,11 @@ type Cmd<T extends GameCommand['type']> = Extract<GameCommand, { type: T }>;
 // ---------- 参照用 ----------
 
 /** 同じマスにいる、生きているキャラ */
-export const heroesAt = (game: GameState, tile: number) => livingHeroes(game).filter((h) => game.world?.pos[h.id] === tile);
+export const heroesAt = (game: GameState, tile: number) => mapHeroes(game).filter((h) => game.world?.pos[h.id] === tile);
 
 /** 遭遇の戦闘に参加できるキャラ（そのマスから joinRange 以内） */
 export const joinCandidates = (game: GameState, tile: number) =>
-  livingHeroes(game).filter((h) => game.world && hexDistance(game.world, game.world.pos[h.id], tile) <= BALANCE.joinRange);
+  mapHeroes(game).filter((h) => game.world && hexDistance(game.world, game.world.pos[h.id], tile) <= BALANCE.joinRange);
 
 /** 夜に野営した時の夜襲の確率（%）。守護者の能力で下がる */
 export function campAmbushChance(game: GameState, heroId: string): number {
@@ -74,7 +74,13 @@ export function advanceTurn(game: GameState, rng: Rng) {
   if (w.turn && !w.acted.includes(w.turn)) w.acted.push(w.turn);
   w.move = null;
   w.moveRoll = undefined;
-  const next = livingHeroes(game).find((h) => !w.acted.includes(h.id));
+  const onMap = mapHeroes(game);
+  // 全員がダンジョンの中: 世界マップの時間は止まる（誰かが出てきたら、その人の手番から）
+  if (!onMap.length) {
+    w.turn = '';
+    return;
+  }
+  const next = onMap.find((h) => !w.acted.includes(h.id));
   if (next) {
     w.turn = next.id;
     w.prevTile = w.pos[next.id];
@@ -106,7 +112,7 @@ function endWorldTurn(game: GameState, rng: Rng) {
     onCorruptionChange(game, rng, b2);
   }
   revealAround(game, w);
-  const first = livingHeroes(game)[0];
+  const first = mapHeroes(game)[0];
   w.turn = first?.id ?? '';
   w.prevTile = first ? w.pos[first.id] : undefined;
   if (w.corruption >= 100) {
@@ -356,6 +362,11 @@ export function backToWorld(game: GameState, rng: Rng, endTurn: boolean) {
   game.battleInfo = undefined;
   game.encounter = undefined;
   game.mode = 'world';
+  // ダンジョンの場面から出た: 世界マップの手番には触らない（出てきたキャラは次のワールドターンから動く）
+  if (game.activeScene) {
+    game.dungeon = undefined;
+    return;
+  }
   if (!livingHeroes(game).length) {
     game.mode = 'gameover';
     return;
@@ -457,10 +468,56 @@ export function interact(game: GameState, cmd: Cmd<'WORLD_INTERACT'>, rng: Rng):
       if (game.mode === 'gameover') return undefined;
       for (const id of party) if (!w.acted.includes(id) && id !== h.id) w.acted.push(id);
       enterDungeonFromWorld(game, f.id, party, rng);
+      detachExpedition(game, rng);
       return undefined;
     }
   }
   return 'ここには入れません';
+}
+
+/**
+ * 入ったダンジョンを「世界マップと別の場面」にする。
+ * 入ったキャラは世界マップの手番から外れ、世界マップは残りのキャラで続く（spec M3-C）
+ */
+function detachExpedition(game: GameState, rng: Rng) {
+  const n = game.nextExpeditionId ?? 1;
+  game.nextExpeditionId = n + 1;
+  const exp: Expedition = {
+    id: `x${n}`,
+    heroes: [...(game.party ?? [])],
+    mode: game.mode,
+    dungeon: game.dungeon,
+    battle: game.battle,
+    reward: game.reward,
+    chest: game.chest,
+    event: game.event,
+    battleInfo: game.battleInfo,
+    battleBackground: game.battleBackground,
+  };
+  (game.expeditions ??= []).push(exp);
+  game.dungeon = game.battle = game.reward = game.chest = game.event = game.battleInfo = game.battleBackground = undefined;
+  game.party = undefined;
+  game.mode = 'world';
+  advanceTurn(game, rng);
+}
+
+/** ダンジョンから出てきたキャラが世界マップに戻る */
+export function rejoinWorld(game: GameState, heroes: string[]) {
+  const w = game.world;
+  if (!w) return;
+  const back = heroes.filter((id) => mapHeroes(game).some((h) => h.id === id));
+  if (!back.length) return;
+  // 世界マップに誰もいなかった: 出てきたキャラの手番から再開
+  if (!w.turn || !mapHeroes(game).some((h) => h.id === w.turn)) {
+    w.turn = back[0];
+    w.prevTile = w.pos[back[0]];
+    w.move = null;
+    w.moveRoll = undefined;
+    w.acted = w.acted.filter((id) => !back.includes(id));
+    return;
+  }
+  // 世界マップは進行中: 次のワールドターンから動く
+  for (const id of back) if (!w.acted.includes(id)) w.acted.push(id);
 }
 
 export function storyContinue(game: GameState): string | undefined {

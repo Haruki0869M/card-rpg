@@ -1,8 +1,7 @@
 // ===== オンライン協力の部屋（テスト用の通信で、複数の端末をまねる） =====
 import { describe, expect, it } from 'vitest';
 import { botNextCommand } from '../../engine/bot';
-import { stateHash } from '../../engine';
-import type { GameCommand, PlayerId } from '../../types';
+import { commandPlayer, stateHash } from '../../engine';
 import { MemoryHub } from '../memoryBackend';
 import { normalizeCode, Room, RoomError, seqKey, SNAPSHOT_EVERY } from '../room';
 
@@ -27,7 +26,7 @@ async function playing(people: number, partySize = people) {
   return { hub, host, rooms };
 }
 
-const playerOf = (cmd: GameCommand): PlayerId | undefined => (cmd.type === 'BATTLE' ? ('playerId' in cmd.command ? cmd.command.playerId : undefined) : cmd.playerId);
+const playerOf = commandPlayer;
 
 /** 自動プレイで steps 手進める（操作は担当の端末から送る。担当のいない操作はホストから） */
 async function drive(rooms: Room[], steps: number, memo = { interacted: new Set<string>() }) {

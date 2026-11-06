@@ -92,21 +92,26 @@ export function WorldTopBar({ game }: { game: GameState }) {
 /** パーティの小さな状態（顔・HP・行動済み） */
 function PartyRow({ game }: { game: GameState }) {
   const openSheet = useBattle((s) => s.openSheet);
+  const setScene = useBattle((s) => s.setScene);
   const w = game.world!;
   return (
     <div className="flex shrink-0 gap-1 bg-black/40 px-2 py-1">
       {game.heroes.map((h) => {
         const max = heroMaxHp(h);
         const active = h.id === w.turn;
+        // ダンジョンの中のキャラ: タップでその場面を見る
+        const exp = game.expeditions?.find((x) => x.heroes.includes(h.id));
         return (
           <button
             key={h.id}
-            onClick={() => openSheet('party')}
+            onClick={() => (exp ? setScene(exp.id) : openSheet('party'))}
             className={`btn flex min-h-11 min-w-0 flex-1 items-center gap-1 rounded-lg border px-1 py-0.5 ${active ? 'border-amber-300 bg-amber-500/15' : 'border-white/10 bg-black/30'}`}
           >
             <HeroFace hero={h} size={26} dim={h.hp <= 0 || !!h.retired} />
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[12px] leading-4 font-bold">{h.retired ? '退場' : w.acted.includes(h.id) && !active ? '行動済' : h.name}</span>
+              <span className="block truncate text-[12px] leading-4 font-bold">
+                {h.retired ? '退場' : exp ? (exp.dungeon?.name ?? 'ダンジョン') : w.acted.includes(h.id) && !active ? '行動済' : h.name}
+              </span>
               <Bar value={h.hp} max={max} color="linear-gradient(90deg,#22b45a,#7dffa8)" height={5} />
             </span>
           </button>

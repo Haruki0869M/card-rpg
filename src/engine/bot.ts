@@ -19,6 +19,7 @@ import {
   reachable,
   reachableRooms,
   unusableReason,
+  viewOf,
   waitingPlayers,
 } from './index';
 
@@ -143,7 +144,21 @@ function equipBest(g: GameState, log: BotLog): GameState {
   return g;
 }
 
-export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<string>; town?: string }): GameState {
+export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<string>; town?: string }, inScene = false): GameState {
+  // ダンジョンの場面があれば、先にそちらを進める（その場面を載せた冒険で次の操作を決めて、SCENE で送る）
+  const exp = inScene ? undefined : g.expeditions?.[0];
+  if (exp && g.mode !== 'gameover' && g.mode !== 'ending') {
+    const outer = capture;
+    capture = [];
+    let inner: GameCommand | undefined;
+    try {
+      botStep(viewOf(g, exp.id), log, memo, true);
+      inner = capture[0];
+    } finally {
+      capture = outer;
+    }
+    if (inner) return send(g, { type: 'SCENE', scene: exp.id, command: inner }, log);
+  }
   log.modes[g.mode] = (log.modes[g.mode] ?? 0) + 1;
   switch (g.mode) {
     case 'world': {

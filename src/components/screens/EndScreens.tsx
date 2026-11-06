@@ -46,9 +46,11 @@ export function ClearedScreen() {
           <div className="font-display text-[18px] text-amber-100">{game.dungeon?.name}</div>
         </motion.div>
         <div className="mt-2 flex -space-x-2">
-          {game.heroes.map((h) => (
-            <HeroFace key={h.id} hero={h} size={44} />
-          ))}
+          {game.heroes
+            .filter((h) => !game.party || game.party.includes(h.id))
+            .map((h) => (
+              <HeroFace key={h.id} hero={h} size={44} />
+            ))}
         </div>
         <div className="panel panel-gold-edge mt-3 w-full rounded-2xl p-3">
           <Stats />

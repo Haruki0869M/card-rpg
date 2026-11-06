@@ -302,6 +302,23 @@ export interface GameLog {
   text: string;
 }
 
+/**
+ * 世界マップと別に進む場面（ダンジョンに入ったキャラたち）。
+ * その場面の操作（SCENE コマンド）の間だけ、冒険の dungeon / battle などに載せて、今までと同じ処理で動かす
+ */
+export interface Expedition {
+  id: string;
+  heroes: string[];
+  mode: GameMode;
+  dungeon?: DungeonRun;
+  battle?: BattleState;
+  reward?: RewardState;
+  chest?: ChestState;
+  event?: EventState;
+  battleInfo?: { roomType: string; wandererId?: string; tile?: number };
+  battleBackground?: string;
+}
+
 export interface GameState {
   version: number;
   seed: number;
@@ -343,6 +360,11 @@ export interface GameState {
   shrine?: ShrineVisit;
   /** オンライン協力の冒険（戦闘で全員の準備完了を待つ） */
   online?: boolean;
+  /** 世界マップと別に進んでいる場面（ダンジョンに入ったキャラたち。M3-C） */
+  expeditions?: Expedition[];
+  nextExpeditionId?: number;
+  /** 内部用: SCENE コマンドを処理している間だけ、その場面のID（保存されない） */
+  activeScene?: string;
 }
 
 /** 難易度のID（src/content の difficulties に登録したもの） */
@@ -416,7 +438,9 @@ export type GameCommand =
   | { type: 'QUEST_REPORT'; playerId: PlayerId; questId: string }
   | { type: 'LEAVE_TOWN'; playerId: PlayerId }
   | { type: 'SHRINE_CHOOSE'; playerId: PlayerId; optionIndex: number; heroId: string }
-  | { type: 'LEAVE_SHRINE'; playerId: PlayerId };
+  | { type: 'LEAVE_SHRINE'; playerId: PlayerId }
+  /** 世界マップと別に進んでいる場面（ダンジョン）の中の操作 */
+  | { type: 'SCENE'; scene: string; command: GameCommand };
 
 export interface GameResult {
   state: GameState;

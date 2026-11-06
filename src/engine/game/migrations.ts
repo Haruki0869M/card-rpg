@@ -32,6 +32,32 @@ const MIGRATIONS: Record<number, (g: Loose) => void> = {
     g.lives = getDifficulty(g.difficulty).lives;
     if (g.battle) g.battle.version = 5;
   },
+  // v5 → v6: ダンジョンは世界マップと別の場面（expeditions）になった。世界マップでダンジョンの中にいた冒険は、場面に移す
+  5(g) {
+    if (g.battle) g.battle.version = 6;
+    if (!g.world || !g.dungeon) return;
+    const heroes: string[] = g.party ?? g.heroes.filter((h: Loose) => h.hp > 0 && !h.retired).map((h: Loose) => h.id);
+    g.expeditions = [
+      {
+        id: 'x1',
+        heroes,
+        mode: g.mode,
+        dungeon: g.dungeon,
+        battle: g.battle,
+        reward: g.reward,
+        chest: g.chest,
+        event: g.event,
+        battleInfo: g.battleInfo,
+        battleBackground: g.battleBackground,
+      },
+    ];
+    g.nextExpeditionId = 2;
+    for (const k of ['dungeon', 'battle', 'reward', 'chest', 'event', 'battleInfo', 'battleBackground', 'party']) delete g[k];
+    g.mode = 'world';
+    // 世界マップに残っているキャラの手番から（全員ダンジョンなら止まる）
+    const onMap = g.heroes.filter((h: Loose) => h.hp > 0 && !h.retired && !heroes.includes(h.id));
+    if (!onMap.some((h: Loose) => h.id === g.world.turn)) g.world.turn = onMap[0]?.id ?? '';
+  },
 };
 
 /** 古い版の冒険を今の版に直す。直せなければ null */
@@ -58,9 +84,10 @@ export function validateGame(g: GameState): boolean {
       if (!Object.values(h.equipment).every((i) => !i || ITEMS.has(i.itemId))) return false;
     }
     if (![...g.stash, ...g.pouch].every((i) => ITEMS.has(i.itemId))) return false;
-    if (g.dungeon) {
-      if (!DUNGEONS.has(g.dungeon.dungeonId)) return false;
-      for (const r of g.dungeon.rooms) {
+    for (const d of [g.dungeon, ...(g.expeditions ?? []).map((x) => x.dungeon)]) {
+      if (!d) continue;
+      if (!DUNGEONS.has(d.dungeonId)) return false;
+      for (const r of d.rooms) {
         getRoomType(r.type);
         if (!(r.enemies ?? []).every((e) => ENEMIES.has(e.defId))) return false;
       }

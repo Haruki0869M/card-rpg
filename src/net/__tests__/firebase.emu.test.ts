@@ -4,8 +4,7 @@
 //   EMU=1 npx vitest run firebase
 import { describe, expect, it } from 'vitest';
 import { botNextCommand } from '../../engine/bot';
-import { stateHash } from '../../engine';
-import type { GameCommand, PlayerId } from '../../types';
+import { commandPlayer, stateHash } from '../../engine';
 import type { Backend } from '../backend';
 import { connectFirebase } from '../firebaseBackend';
 import { Room } from '../room';
@@ -22,7 +21,7 @@ async function until(cond: () => boolean, ms = 10_000, what = '') {
   }
 }
 
-const playerOf = (cmd: GameCommand): PlayerId | undefined => (cmd.type === 'BATTLE' ? ('playerId' in cmd.command ? cmd.command.playerId : undefined) : cmd.playerId);
+const playerOf = commandPlayer;
 
 async function drive(rooms: Room[], steps: number, memo = { interacted: new Set<string>() }) {
   const host = () => rooms.find((r) => r.isHost)!;

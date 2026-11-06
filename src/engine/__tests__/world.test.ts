@@ -16,6 +16,7 @@ import {
   neighbors,
   reachable,
   timeOfDay,
+  viewOf,
 } from '../index';
 import { playToEnd } from '../bot';
 
@@ -259,8 +260,108 @@ describe('町・祠・依頼', () => {
     expect(applyGameCommand(g, { type: 'WORLD_INTERACT', playerId: P, heroId: 'h0' }).error).toMatch(/鍵/);
     g.world!.keys = ['emerald', 'azure', 'crimson'];
     g = run(g, { type: 'WORLD_INTERACT', playerId: P, heroId: 'h0' });
-    expect(g.mode).toBe('dungeon');
+    // ダンジョンは世界マップと別の場面になる
+    expect(g.mode).toBe('world');
+    expect(g.expeditions?.length).toBe(1);
+    expect(viewOf(g, g.expeditions![0].id).mode).toBe('dungeon');
     expect(g.world!.corruption).toBe(BALANCE.corruptionOnDungeonEnter);
+  });
+});
+
+describe('ダンジョンと世界マップが同時に進む（M3-C）', () => {
+  it('ダンジョンに入ったキャラは世界マップの手番から外れ、残りのキャラはそのまま地図で動ける。出てきたら戻る', () => {
+    let g = newWorld(3, ['warrior', 'mage'], 'normal');
+    g = run(g, { type: 'STORY_CONTINUE', playerId: P });
+    const temple = tileOf(g, 'dungeon', 'emeraldTemple');
+    g.world!.pos.h0 = temple;
+    g.world!.turn = 'h0';
+    g = run(g, {
+      type: 'WORLD_INTERACT',
+      playerId: P,
+      heroId: 'h0',
+      party: ['h0'],
+    });
+    const x = g.expeditions![0];
+    expect(x.heroes).toEqual(['h0']);
+    // 地図は h1 の手番
+    expect(g.mode).toBe('world');
+    expect(g.world!.turn).toBe('h1');
+    g = run(g, {
+      type: 'WORLD_ROLL_MOVE',
+      playerId: P,
+      heroId: 'h1',
+      focusUsed: 0,
+    });
+    expect(g.world!.move).not.toBeNull();
+    // ダンジョンの中の操作は SCENE で
+    const room = viewOf(g, x.id).dungeon!.rooms.find((r) => r.id === 'r0c0')!;
+    expect(applyGameCommand(g, { type: 'ENTER_ROOM', playerId: P, roomId: room.id }).error).toBeDefined();
+    g = run(g, {
+      type: 'SCENE',
+      scene: x.id,
+      command: { type: 'ENTER_ROOM', playerId: P, roomId: room.id },
+    });
+    expect(viewOf(g, x.id).mode).toBe('battle');
+    expect(g.mode).toBe('world');
+    // 地図の手番が一巡しても、h0 は手番に入らない
+    g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h1' });
+    expect(g.world!.worldTurn).toBe(2);
+    expect(g.world!.turn).toBe('h1');
+    // 撤退すると、h0 は世界マップに戻る（次のワールドターンから動く）
+    g.expeditions![0].mode = 'dungeon';
+    g.expeditions![0].battle = undefined;
+    g = run(g, {
+      type: 'SCENE',
+      scene: x.id,
+      command: { type: 'RETREAT', playerId: P },
+    });
+    expect(g.expeditions).toEqual([]);
+    expect(g.world!.acted).toContain('h0');
+    g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h1' });
+    expect(g.world!.turn).toBe('h0');
+  });
+
+  it('全員がダンジョンに入ると、世界マップの時間は止まる', () => {
+    let g = newWorld(3, ['warrior'], 'normal');
+    g = run(g, { type: 'STORY_CONTINUE', playerId: P });
+    g.world!.pos.h0 = tileOf(g, 'dungeon', 'emeraldTemple');
+    const turn = g.world!.worldTurn;
+    g = run(g, { type: 'WORLD_INTERACT', playerId: P, heroId: 'h0' });
+    expect(g.world!.turn).toBe('');
+    expect(g.world!.worldTurn).toBe(turn);
+    g = run(g, {
+      type: 'SCENE',
+      scene: g.expeditions![0].id,
+      command: { type: 'RETREAT', playerId: P },
+    });
+    expect(g.world!.turn).toBe('h0');
+  });
+
+  it('別の場面にいるキャラの装備は、その場面からしか変えられない', () => {
+    let g = newWorld(3, ['warrior', 'mage'], 'normal');
+    g = run(g, { type: 'STORY_CONTINUE', playerId: P });
+    g.world!.pos.h0 = tileOf(g, 'dungeon', 'emeraldTemple');
+    g = run(g, {
+      type: 'WORLD_INTERACT',
+      playerId: P,
+      heroId: 'h0',
+      party: ['h0'],
+    });
+    expect(
+      applyGameCommand(g, {
+        type: 'UNEQUIP',
+        playerId: P,
+        heroId: 'h0',
+        slot: 'weapon',
+      }).error,
+    ).toMatch(/ダンジョン/);
+    expect(
+      applyGameCommand(g, {
+        type: 'SCENE',
+        scene: g.expeditions![0].id,
+        command: { type: 'UNEQUIP', playerId: P, heroId: 'h0', slot: 'weapon' },
+      }).error,
+    ).toBeUndefined();
   });
 });
 

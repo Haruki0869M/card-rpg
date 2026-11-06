@@ -29,7 +29,7 @@ import type {
 import { applyCommand, createBattle, STATE_VERSION } from '../battle/battle';
 import { createRng, type Rng } from '../rng';
 import { applyOutcome, checkOutcome, hasOutcomeKind, makeOutcomeCtx } from './outcomes';
-import { livingHeroes, findHero, sceneHeroes } from './heroes';
+import { expeditionOf, livingHeroes, findHero, sceneHeroes } from './heroes';
 import { addItem, addLog, addLoot, hiddenChestChance, isPartyPlayer, ownedBy, partyHasTag, rollWithFocus, statChance, successes } from './common';
 import { getDifficulty } from '../../data/rules';
 import { isBossRoom, roomBehavior, roomTypeOf } from './rooms';
@@ -40,6 +40,7 @@ import { corruptionLevelBonus } from './world/wanderers';
 import {
   backToWorld,
   camp,
+  rejoinWorld,
   encounterChoose,
   encounterContinue,
   handleDefeat,
@@ -63,6 +64,7 @@ import {
   heroMaxHp,
   toPartyMember,
 } from './hero';
+import { EXPEDITION_MODES, findExpedition, mount, restoreSceneFields, saveSceneFields, unmount } from './scenes';
 import { cardRewardOdds, chestOdds, newItem, rollCardOffers, rollChestContents, rollConsumable, rollEquipment, rollGrade } from './loot';
 
 export const GAME_VERSION = STATE_VERSION;
@@ -152,6 +154,53 @@ export function applyGameCommand(input: GameState, cmd: GameCommand): GameResult
   let battleEvents: BattleEvent[] = [];
   let error: string | undefined;
   try {
+    const r = cmd.type === 'SCENE' ? runInScene(game, cmd, rng) : runCommand(game, cmd, rng);
+    error = r.error;
+    battleEvents = r.battleEvents;
+  } catch (e) {
+    error = e instanceof Error ? e.message : String(e);
+  }
+  delete game.activeScene;
+  if (error) return { state: input, battleEvents: [], error };
+  game.rngState = rng.state;
+  return { state: game, battleEvents };
+}
+
+/**
+ * ダンジョンの場面の中の操作: その場面を冒険に載せて、今までと同じ処理で動かす。
+ * 世界マップの場面（町・遭遇など）は、その間よけておいて元に戻す
+ */
+function runInScene(game: GameState, cmd: Extract<GameCommand, { type: 'SCENE' }>, rng: Rng): { error?: string; battleEvents: BattleEvent[] } {
+  const exp = findExpedition(game, cmd.scene);
+  if (!exp) return { error: 'その場面はもう終わりました', battleEvents: [] };
+  if (cmd.command.type === 'SCENE') return { error: '場面の指定が不正です', battleEvents: [] };
+  if (isOver(game)) return { error: '冒険は終わりました', battleEvents: [] };
+  const saved = saveSceneFields(game);
+  mount(game, exp);
+  game.activeScene = exp.id;
+  const r = runCommand(game, cmd.command, rng);
+  delete game.activeScene;
+  if (r.error) return r;
+  const over = isOver(game);
+  const ended = over || !game.dungeon || !EXPEDITION_MODES.has(game.mode);
+  if (!ended) unmount(game, exp);
+  else game.expeditions = (game.expeditions ?? []).filter((x) => x !== exp);
+  const endMode = game.mode;
+  restoreSceneFields(game, saved);
+  if (over) {
+    game.mode = endMode;
+    return r;
+  }
+  if (ended) rejoinWorld(game, exp.heroes);
+  return r;
+}
+
+const isOver = (game: GameState) => game.mode === 'gameover' || game.mode === 'ending';
+
+function runCommand(game: GameState, cmd: GameCommand, rng: Rng): { error?: string; battleEvents: BattleEvent[] } {
+  let battleEvents: BattleEvent[] = [];
+  let error: string | undefined;
+  {
     switch (cmd.type) {
       case 'ENTER_DUNGEON':
         error = enterDungeon(game, cmd.playerId, cmd.dungeonId, rng);
@@ -275,12 +324,8 @@ export function applyGameCommand(input: GameState, cmd: GameCommand): GameResult
       default:
         error = '不明なコマンドです';
     }
-  } catch (e) {
-    error = e instanceof Error ? e.message : String(e);
   }
-  if (error) return { state: input, battleEvents: [], error };
-  game.rngState = rng.state;
-  return { state: game, battleEvents };
+  return { error, battleEvents };
 }
 
 // ---------- 拠点・ダンジョン ----------
@@ -774,10 +819,19 @@ function toHub(game: GameState) {
 
 // ---------- 装備・道具 ----------
 
+/** そのキャラが、今の操作の場面にいるか（別の場面＝ダンジョンの中のキャラは、その場面からしか触れない） */
+function otherSceneError(game: GameState, heroId: string): string | undefined {
+  const exp = expeditionOf(game, heroId);
+  if ((exp?.id ?? undefined) !== game.activeScene) return exp ? 'そのキャラはダンジョンの中です' : 'そのキャラは世界マップにいます';
+  return undefined;
+}
+
 function equip(game: GameState, playerId: string, heroId: string, itemUid: string): string | undefined {
   if (game.mode === 'battle') return '戦闘中は装備を変えられません';
   const h = findHero(game, heroId);
   if (!h) return 'キャラクターが見つかりません';
+  const other = otherSceneError(game, heroId);
+  if (other) return other;
   if (!ownedBy(h, playerId)) return '担当していないキャラです';
   const idx = game.stash.findIndex((s) => s.uid === itemUid);
   if (idx < 0) return '持ち物にありません';
@@ -797,6 +851,8 @@ function unequip(game: GameState, playerId: string, heroId: string, slot: keyof 
   if (game.mode === 'battle') return '戦闘中は装備を変えられません';
   const h = findHero(game, heroId);
   if (!h) return 'キャラクターが見つかりません';
+  const other = otherSceneError(game, heroId);
+  if (other) return other;
   if (!ownedBy(h, playerId)) return '担当していないキャラです';
   const cur = h.equipment[slot];
   if (!cur) return '何も装備していません';
@@ -834,6 +890,8 @@ function usePouchItem(
   const user = findHero(game, cmd.userId);
   const target = findHero(game, cmd.targetId);
   if (!user || !ownedBy(user, cmd.playerId)) return { error: '担当していないキャラです', events: [] };
+  const other = otherSceneError(game, user.id) ?? otherSceneError(game, cmd.targetId);
+  if (other) return { error: other, events: [] };
   if (!target || target.hp <= 0) return { error: '対象が戦闘不能です', events: [] };
   // 戦闘の効果と同じ名前の冒険の効果を使う（無ければ戦闘中にしか使えない）
   if (!def.use.every((e) => hasOutcomeKind(e.kind))) return { error: '戦闘中にしか使えません', events: [] };

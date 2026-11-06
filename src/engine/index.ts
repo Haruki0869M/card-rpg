@@ -28,3 +28,4 @@ export * from './game/world/objectives';
 export { createWorld, regionOfRow } from './game/world/generate';
 export { sceneHeroes, activeHeroes } from './game/heroes';
 export * from './hash';
+export * from './game/scenes';
