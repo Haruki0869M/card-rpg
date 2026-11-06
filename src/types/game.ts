@@ -71,7 +71,38 @@ export interface Hero {
 
 // ---------- ダンジョン ----------
 
-export type RoomType = 'battle' | 'elite' | 'event' | 'rest' | 'chest' | 'boss';
+/** 部屋の種類のID（src/content の roomTypes に登録したもの） */
+export type RoomType = string;
+
+/** 部屋の種類（spec §9）。動き（behavior）は src/engine/game/rooms/ の部品、数値と見た目はこのデータ */
+export interface RoomTypeDef {
+  id: string;
+  order?: number;
+  name: string;
+  /** 見た目（画面側の ROOM_ICONS のキー）と色 */
+  icon: string;
+  color: string;
+  bg: string;
+  /** 部屋に入った時の動き（battle / chest / event / rest） */
+  behavior: string;
+  /** 戦闘の部屋の設定 */
+  battle?: {
+    /** ダンジョンの敵の組み合わせのどれを使うか */
+    pool: 'battle' | 'elite' | 'boss';
+    /** 敵のレベルの加算 */
+    levelBonus: number;
+    /** カード報酬の確率（balance.ts の cardRewardOdds のキー） */
+    cardOdds: string;
+    /** ボス（倒すと大宝箱 → ダンジョン制覇。逃げられない。隠し宝箱は出ない） */
+    boss?: boolean;
+    /** 勝った時に装備を落とす（epicChance% でエピック、それ以外はレア） */
+    equipmentDrop?: { epicChance: number };
+    /** 勝った時に chance% でコモンの消費アイテムを落とす */
+    consumableDrop?: { chance: number };
+  };
+  /** ランダムダンジョンの途中の行での出やすさ（0なら自動生成では出ない） */
+  layoutWeight?: number;
+}
 
 export interface ChestSpec {
   /** 宝箱の見た目（common=木箱 / rare=鉄箱 / epic=装飾箱 / legend=黄金箱）。中身の格の確率を決める */
@@ -172,17 +203,13 @@ export interface EventCheck {
   tag?: string;
 }
 
-export type EventOutcome =
-  | { kind: 'heal'; amount: number; all?: boolean }
-  | { kind: 'damage'; amount: number; all?: boolean }
-  | { kind: 'gold'; amount: number }
-  | { kind: 'loseGold'; amount: number }
-  | { kind: 'item'; rarity: Rarity; slot?: 'equipment' | 'consumable' }
-  | { kind: 'exp'; amount: number }
-  | { kind: 'focus'; amount: number; all?: boolean }
-  | { kind: 'status'; status: StatusId; amount: number }
-  | { kind: 'card' }
-  | { kind: 'nothing' };
+/**
+ * 冒険の効果の種類ごとの数値。冒険の効果のファイル（src/engine/game/outcomes/kinds/）が declare module で種類を足す
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface OutcomeParams {}
+/** イベントの結果・戦闘の外で使うアイテムなど（例: { kind: 'heal', amount: 25, all: true }） */
+export type EventOutcome = { [K in keyof OutcomeParams]: { kind: K } & OutcomeParams[K] }[keyof OutcomeParams];
 
 export interface EventOption {
   label: string;
@@ -213,7 +240,8 @@ export interface EventState {
 }
 
 export interface GrowthOption {
-  kind: 'stat' | 'maxHp' | 'focusMax' | 'upgradeCard';
+  /** 成長ボーナスの種類（src/engine/game/growth/kinds の種類） */
+  kind: string;
   stat?: StatId;
   amount: number;
 }
@@ -279,7 +307,22 @@ export interface GameState {
   nextLogId: number;
 }
 
-export type Difficulty = 'easy' | 'normal' | 'hard';
+/** 難易度のID（src/content の difficulties に登録したもの） */
+export type Difficulty = string;
+
+export interface DifficultyDef {
+  id: string;
+  order?: number;
+  name: string;
+  /** 敵のレベルの加算 */
+  enemyLevel: number;
+  /** 敵のHP・攻撃、戦闘の報酬（経験値・ゴールド）の倍率（省略は1） */
+  enemyHp?: number;
+  enemyAttack?: number;
+  reward?: number;
+  /** 説明文（省略すると数値から自動で作る） */
+  description?: string;
+}
 
 export interface NewGameSetup {
   seed: number;

@@ -14,3 +14,6 @@ export * from './game/loot';
 export * from './battle/statuses';
 export * from './battle/effects';
 export * from './battle/units';
+export * from './game/growth';
+export * from './game/outcomes';
+export * from './game/rooms';

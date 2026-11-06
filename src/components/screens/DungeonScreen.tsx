@@ -10,23 +10,24 @@ import { chestOdds, reachableRooms, retreatLoss } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
 import { LOCAL_PLAYER } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
-import type { Room, RoomType } from '../../types';
+import { getRoomType } from '../../data/rules';
+import type { Room } from '../../types';
 import { CHEST_NAME, OddsBar } from '../ui/ChestOdds';
 import { HeroMini, ItemIcon, RARITY_STYLE, Screen } from '../ui/game';
 
-const ROOM: Record<RoomType, { name: string; Icon: typeof Swords; color: string; bg: string }> = {
-  battle: { name: '戦闘', Icon: Swords, color: '#ff9a7a', bg: '#3a1418' },
-  elite: { name: '強敵', Icon: Skull, color: '#ff5a6a', bg: '#4a0c18' },
-  boss: { name: 'ボス', Icon: Crown, color: '#ffcf4a', bg: '#4a2a06' },
-  chest: { name: '宝箱', Icon: Gift, color: '#ffd76a', bg: '#3a2a0a' },
-  event: { name: 'イベント', Icon: Sparkles, color: '#9ad8ff', bg: '#10304a' },
-  rest: { name: '休憩', Icon: Flame, color: '#7dffa8', bg: '#0f3a24' },
-};
+/** 部屋のアイコン（部屋の種類のデータの icon のキー → アイコン）。新しいアイコンが要る時はここに1行足す */
+const ROOM_ICONS: Record<string, typeof Swords> = { swords: Swords, skull: Skull, crown: Crown, gift: Gift, sparkles: Sparkles, flame: Flame };
+
+/** 部屋の種類の見た目（データから） */
+function roomStyle(type: string) {
+  const t = getRoomType(type);
+  return { name: t.name, Icon: ROOM_ICONS[t.icon] ?? Sparkles, color: t.color, bg: t.bg, behavior: t.behavior, boss: !!t.battle?.boss };
+}
 
 const ROW_H = 92;
 
 function RoomInfo({ room }: { room: Room }) {
-  const t = ROOM[room.type];
+  const t = roomStyle(room.type);
   if (room.enemies) {
     return (
       <div className="flex items-center gap-2">
@@ -42,14 +43,14 @@ function RoomInfo({ room }: { room: Room }) {
           {room.enemies.map((e, i) => (
             <div key={i} className="truncate">
               <span className="text-amber-300">Lv{e.level}</span> {getEnemy(e.defId).name}
-              {room.type === 'boss' && getEnemy(e.defId).phases ? '（HPが減ると姿を変える）' : ''}
+              {t.boss && getEnemy(e.defId).phases ? '（HPが減ると姿を変える）' : ''}
             </div>
           ))}
         </div>
       </div>
     );
   }
-  if (room.type === 'chest' && room.chest) {
+  if (t.behavior === 'chest' && room.chest) {
     const r = RARITY_STYLE[room.chest.rarity];
     return (
       <div className="text-[13px] leading-5">
@@ -70,7 +71,7 @@ function RoomInfo({ room }: { room: Room }) {
       </div>
     );
   }
-  if (room.type === 'event')
+  if (t.behavior === 'event')
     return (
       <div className="text-[13px] leading-5">
         <div className="font-display text-[16px]" style={{ color: t.color }}>
@@ -157,11 +158,11 @@ export function DungeonScreen() {
               )}
             </svg>
             {run.rooms.map((r) => {
-              const t = ROOM[r.type];
+              const t = roomStyle(r.type);
               const p = pos(r);
               const canGo = reach.has(r.id);
               const isCur = r.id === run.currentRoomId;
-              const big = r.type === 'boss';
+              const big = t.boss;
               const s = big ? 66 : 52;
               return (
                 <button
@@ -190,7 +191,7 @@ export function DungeonScreen() {
                       <Check size={14} strokeWidth={3} />
                     </span>
                   )}
-                  {r.type === 'chest' && r.chest?.locked && !r.cleared && (
+                  {t.behavior === 'chest' && r.chest?.locked && !r.cleared && (
                     <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-800 text-amber-200">
                       <Lock size={12} />
                     </span>

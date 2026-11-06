@@ -16,7 +16,6 @@ import type {
   GameCommand,
   GameResult,
   GameState,
-  GrowthOption,
   Hero,
   ItemInstance,
   Loot,
@@ -30,6 +29,11 @@ import type {
 import { applyCommand, createBattle, STATE_VERSION } from '../battle/battle';
 import { finalChanceOf } from './checks';
 import { createRng, type Rng } from '../rng';
+import { applyOutcome, checkOutcome, hasOutcomeKind, makeOutcomeCtx } from './outcomes';
+import { livingHeroes, findHero } from './heroes';
+import { getDifficulty } from '../../data/rules';
+import { isBossRoom, roomBehavior, roomTypeOf } from './rooms';
+import { growthHandler, growthOptions } from './growth';
 import { buildDungeon, findRoom, RARITIES, rarityIndex, reachableRooms } from './dungeon';
 import {
   canEquip,
@@ -38,7 +42,6 @@ import {
   heroFocusMax,
   heroMaxHp,
   heroStats,
-  STAT_IDS,
   toPartyMember,
 } from './hero';
 import { cardRewardOdds, chestOdds, newItem, rollCardOffers, rollChestContents, rollConsumable, rollEquipment, rollGrade } from './loot';
@@ -108,8 +111,7 @@ function addLog(game: GameState, text: string) {
   if (game.log.length > 120) game.log.splice(0, game.log.length - 120);
 }
 
-export const findHero = (game: GameState, id: string) => game.heroes.find((h) => h.id === id);
-export const livingHeroes = (game: GameState) => game.heroes.filter((h) => h.hp > 0);
+export { findHero, livingHeroes } from './heroes';
 const ownedBy = (hero: Hero | undefined, playerId: string) => !!hero && hero.playerId === playerId;
 const isPartyPlayer = (game: GameState, playerId: string) => game.heroes.some((h) => h.playerId === playerId);
 
@@ -286,7 +288,7 @@ function enterDungeon(game: GameState, playerId: string, dungeonId: string, rng:
   if (!isPartyPlayer(game, playerId)) return 'このパーティのプレイヤーではありません';
   if (game.mode !== 'hub') return '拠点からしか出発できません';
   if (!availableDungeons(game).includes(dungeonId)) return 'そのダンジョンには行けません';
-  const levelBonus = BALANCE.difficultyLevel[game.difficulty] ?? 0;
+  const levelBonus = getDifficulty(game.difficulty).enemyLevel;
   const eventIds = EVENTS.forScenario(game.scenarioId).map((e) => e.id);
   // ランダムダンジョンは拠点ごとの種で作る（同じ種なら同じ構造）
   const random = !!DUNGEONS.get(dungeonId).random;
@@ -304,34 +306,21 @@ function enterRoom(game: GameState, playerId: string, roomId: string, rng: Rng):
   const room = findRoom(run, roomId);
   if (!room || !reachableRooms(run).some((r) => r.id === roomId)) return 'その部屋には進めません';
   run.currentRoomId = room.id;
-  switch (room.type) {
-    case 'battle':
-    case 'elite':
-    case 'boss':
-      startBattle(game, room, rng);
-      break;
-    case 'chest':
-      game.chest = { roomId: room.id, spec: room.chest ?? { rarity: 'common', locked: false }, unlocked: !room.chest?.locked };
-      game.mode = 'chest';
-      break;
-    case 'event':
-      game.event = { roomId: room.id, eventId: room.eventId ?? EVENTS.all[0].id };
-      game.mode = 'event';
-      break;
-    case 'rest':
-      game.mode = 'rest';
-      break;
-  }
+  roomBehavior(roomTypeOf(room).behavior).enter(game, room, rng);
   return undefined;
 }
 
-function startBattle(game: GameState, room: Room, rng: Rng) {
+/** 戦闘の部屋の戦闘を始める（部屋の動き battle から呼ばれる） */
+export function startRoomBattle(game: GameState, room: Room, rng: Rng) {
   const party = livingHeroes(game).map(toPartyMember);
   const enemies = room.enemies ?? [];
+  const diff = getDifficulty(game.difficulty);
   game.battle = createBattle({
     seed: rng.int(1_000_000_000),
     party,
-    encounter: { id: room.id, name: room.type === 'boss' ? 'ボス' : room.type === 'elite' ? '強敵' : '戦闘', enemies },
+    encounter: { id: room.id, name: roomTypeOf(room).name, enemies },
+    enemyHpMul: diff.enemyHp,
+    enemyAttackMul: diff.enemyAttack,
   });
   for (const h of game.heroes) h.nextBattleStatuses = {};
   game.mode = 'battle';
@@ -378,15 +367,17 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
 
   let exp = 0;
   let gold = 0;
+  const rt = roomTypeOf(room);
+  const rewardMul = getDifficulty(game.difficulty).reward ?? 1;
   for (const e of b.enemies) {
     const def = getEnemy(e.defId);
-    const k = 1 + BALANCE.rewardPerLevel * (e.level - def.baseLevel);
+    const k = (1 + BALANCE.rewardPerLevel * (e.level - def.baseLevel)) * rewardMul;
     exp += Math.max(1, Math.round(def.exp * k));
     gold += Math.max(0, Math.round(def.gold * k * (0.85 + rng.next() * 0.3)));
   }
   game.gold += gold;
 
-  const cardOdds = cardRewardOdds(room.type);
+  const cardOdds = cardRewardOdds(rt.battle?.cardOdds ?? 'battle');
   const reward: RewardState = { gold, exp: [], levelUps: [], cardOffers: rollCardOffers(game, survivors, rng, cardOdds), cardOdds, cardPicked: false, loot: [] };
   for (const id of survivors) {
     const h = findHero(game, id)!;
@@ -404,17 +395,18 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
     reward.exp.push({ heroId: h.id, gained: exp, fromLevel, toLevel: h.level, fromExp, toExp: h.exp });
   }
 
-  // 強敵は装備を落とす。ボスの大宝箱は報酬の後に開ける
-  if (room.type === 'elite') {
-    const item = newItem(game, rollEquipment(rng.next() * 100 < BALANCE.eliteEpicDrop ? 'epic' : 'rare', game.heroes, rng));
+  // ドロップ（部屋の種類の設定どおり）。ボスの大宝箱は報酬の後に開ける
+  const drop = rt.battle;
+  if (drop?.equipmentDrop) {
+    const item = newItem(game, rollEquipment(rng.next() * 100 < drop.equipmentDrop.epicChance ? 'epic' : 'rare', game.heroes, rng));
     reward.loot.push({ kind: 'item', item });
     addItem(game, item, true);
-  } else if (room.type === 'battle' && rng.next() < 0.25) {
+  } else if (drop?.consumableDrop && rng.next() * 100 < drop.consumableDrop.chance) {
     const item = newItem(game, rollConsumable('common', rng));
     reward.loot.push({ kind: 'item', item });
     addItem(game, item, true);
   }
-  if (room.type !== 'boss' && rng.next() * 100 < hiddenChestChance(game)) {
+  if (!drop?.boss && rng.next() * 100 < hiddenChestChance(game)) {
     reward.hiddenChest = { rarity: RARITIES[rng.next() < 0.3 ? 1 : 0], locked: rng.next() < 0.5 };
   }
   room.cleared = true;
@@ -426,21 +418,7 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
 
 // ---------- 成長と報酬 ----------
 
-/** 成長ボーナスの候補3つ（職業の伸びやすい能力値を優先） */
-export function growthOptions(hero: Hero, rng: Rng): GrowthOption[] {
-  const weights = getClass(hero.classId).growthWeights;
-  const bag: StatId[] = STAT_IDS.flatMap((s) => Array.from({ length: 1 + (weights[s] ?? 0) }, () => s));
-  const stats: StatId[] = [];
-  for (let i = 0; i < 20 && stats.length < 2; i++) {
-    const s = bag[rng.int(bag.length)];
-    if (!stats.includes(s)) stats.push(s);
-  }
-  const opts: GrowthOption[] = stats.map((s) => ({ kind: 'stat', stat: s, amount: BALANCE.growthStat }));
-  const extra: GrowthOption[] = [{ kind: 'maxHp', amount: BALANCE.growthMaxHp }, { kind: 'focusMax', amount: 1 }];
-  if (hero.deck.some((c) => !c.upgraded)) extra.push({ kind: 'upgradeCard', amount: 1 });
-  opts.push(extra[rng.int(extra.length)]);
-  return opts;
-}
+export { growthOptions } from './growth';
 
 function chooseGrowth(game: GameState, playerId: string, optionIndex: number, cardUid?: string): string | undefined {
   const r = game.reward;
@@ -450,26 +428,8 @@ function chooseGrowth(game: GameState, playerId: string, optionIndex: number, ca
   if (!ownedBy(h, playerId)) return '担当していないキャラです';
   const opt = lu.options[optionIndex];
   if (!opt) return '選択肢がありません';
-  switch (opt.kind) {
-    case 'stat':
-      h.bonusStats[opt.stat!] = (h.bonusStats[opt.stat!] ?? 0) + opt.amount;
-      break;
-    case 'maxHp':
-      h.bonusMaxHp += opt.amount;
-      h.hp += opt.amount;
-      break;
-    case 'focusMax':
-      h.bonusFocusMax += opt.amount;
-      h.focus += opt.amount;
-      break;
-    case 'upgradeCard': {
-      const c = h.deck.find((x) => x.uid === cardUid);
-      if (!c || c.upgraded) return '強化するカードを選んでください';
-      c.upgraded = true;
-      addLog(game, `${h.name}の「${CARDS.get(c.cardId).name}」が強化された`);
-      break;
-    }
-  }
+  const err = growthHandler(opt.kind).apply(game, h, opt, cardUid);
+  if (err) return err;
   clampHero(h);
   r.levelUps.shift();
   return undefined;
@@ -498,7 +458,7 @@ function finishReward(game: GameState, playerId: string): string | undefined {
   if (r.levelUps.length) return '成長ボーナスを選んでください';
   const room = findRoom(run, run.currentRoomId ?? '')!;
   game.reward = undefined;
-  if (room.type === 'boss') {
+  if (isBossRoom(room)) {
     const def = DUNGEON_BOSS_CHEST(run.dungeonId);
     game.chest = { roomId: room.id, spec: { rarity: def, locked: false, big: true }, unlocked: true };
     game.mode = 'chest';
@@ -563,7 +523,7 @@ function leaveChest(game: GameState, playerId: string): string | undefined {
   const room = findRoom(run, c.roomId)!;
   room.cleared = true;
   game.chest = undefined;
-  if (room.type === 'boss' && c.spec.big) {
+  if (isBossRoom(room) && c.spec.big) {
     game.mode = 'cleared';
     game.stats.dungeonsCleared += 1;
     if (!game.clearedDungeons.includes(run.dungeonId)) game.clearedDungeons.push(run.dungeonId);
@@ -583,58 +543,12 @@ export function eventOptionState(game: GameState, eventId: string, index: number
   return { visible: true };
 }
 
+/** 冒険の効果を順に使い、手に入れたものを持ち物に入れる（効果の中身は outcomes/kinds/） */
 function applyOutcomes(game: GameState, outs: EventOutcome[], actor: Hero | undefined, rng: Rng): Loot[] {
-  const loot: Loot[] = [];
-  const targets = (all?: boolean) => (all ? livingHeroes(game) : actor ? [actor] : livingHeroes(game).slice(0, 1));
-  for (const o of outs) {
-    switch (o.kind) {
-      case 'heal':
-        for (const h of targets(o.all)) h.hp = Math.min(heroMaxHp(h), h.hp + o.amount);
-        break;
-      case 'damage':
-        for (const h of targets(o.all)) h.hp = Math.max(1, h.hp - o.amount);
-        break;
-      case 'focus':
-        for (const h of targets(o.all)) h.focus = Math.min(heroFocusMax(h), h.focus + o.amount);
-        break;
-      case 'gold':
-        loot.push({ kind: 'gold', amount: o.amount });
-        break;
-      case 'loseGold':
-        game.gold = Math.max(0, game.gold - o.amount);
-        break;
-      case 'item': {
-        const def = o.slot === 'consumable' ? rollConsumable(o.rarity, rng) : rollEquipment(o.rarity, game.heroes, rng);
-        loot.push({ kind: 'item', item: newItem(game, def) });
-        break;
-      }
-      case 'exp':
-        for (const h of livingHeroes(game)) {
-          h.exp += o.amount;
-          while (h.level < BALANCE.maxLevel && h.exp >= expToNext(h.level)) {
-            h.exp -= expToNext(h.level);
-            h.level += 1;
-            h.hp = Math.min(heroMaxHp(h), h.hp + getClass(h.classId).hpPerLevel);
-          }
-        }
-        break;
-      case 'status':
-        for (const h of targets(false)) h.nextBattleStatuses[o.status] = (h.nextBattleStatuses[o.status] ?? 0) + o.amount;
-        break;
-      case 'card': {
-        const h = actor ?? livingHeroes(game)[0];
-        if (h) {
-          const pool = getClass(h.classId).cardPool;
-          loot.push({ kind: 'card', cardId: pool[rng.int(pool.length)], heroId: h.id });
-        }
-        break;
-      }
-      case 'nothing':
-        break;
-    }
-  }
-  addLoot(game, loot);
-  return loot;
+  const ctx = makeOutcomeCtx(game, rng, actor);
+  for (const o of outs) applyOutcome(ctx, o);
+  addLoot(game, ctx.loot);
+  return ctx.loot;
 }
 
 function chooseEvent(
@@ -788,7 +702,7 @@ function usePouchItem(
   if (!def.use) return { error: '使えない道具です', events: [] };
   if (game.mode === 'battle' && game.battle) {
     const room = game.dungeon ? findRoom(game.dungeon, game.dungeon.currentRoomId ?? '') : undefined;
-    if (def.use.some((e) => e.kind === 'escape') && room?.type === 'boss') return { error: 'ボスからは逃げられない！', events: [] };
+    if (def.use.some((e) => e.kind === 'escape') && isBossRoom(room)) return { error: 'ボスからは逃げられない！', events: [] };
     const r = applyCommand(game.battle, {
       type: 'USE_ITEM',
       playerId: cmd.playerId,
@@ -807,26 +721,15 @@ function usePouchItem(
   const target = findHero(game, cmd.targetId);
   if (!user || !ownedBy(user, cmd.playerId)) return { error: '担当していないキャラです', events: [] };
   if (!target || target.hp <= 0) return { error: '対象が戦闘不能です', events: [] };
-  for (const e of def.use) {
-    switch (e.kind) {
-      case 'heal':
-        if (target.hp >= heroMaxHp(target)) return { error: 'HPは満タンです', events: [] };
-        target.hp = Math.min(heroMaxHp(target), target.hp + e.amount);
-        break;
-      case 'gainFocus':
-        if (target.focus >= heroFocusMax(target)) return { error: 'フォーカスは最大です', events: [] };
-        target.focus = Math.min(heroFocusMax(target), target.focus + e.amount);
-        break;
-      case 'cleanse':
-        if (!Object.values(target.nextBattleStatuses).some((v) => v)) return { error: '治す状態異常がありません', events: [] };
-        target.nextBattleStatuses = {};
-        break;
-      case 'escape':
-        return { error: '戦闘中にしか使えません', events: [] };
-      default:
-        return { error: '戦闘中にしか使えません', events: [] };
-    }
+  // 戦闘の効果と同じ名前の冒険の効果を使う（無ければ戦闘中にしか使えない）
+  if (!def.use.every((e) => hasOutcomeKind(e.kind))) return { error: '戦闘中にしか使えません', events: [] };
+  const octx = makeOutcomeCtx(game, createRng(game.rngState), target);
+  const outs = def.use as unknown as EventOutcome[];
+  for (const o of outs) {
+    const why = checkOutcome(octx, o);
+    if (why) return { error: why, events: [] };
   }
+  for (const o of outs) applyOutcome(octx, o);
   game.pouch.splice(idx, 1);
   addLog(game, `${user.name}が${def.name}を使った`);
   return { events: [] };

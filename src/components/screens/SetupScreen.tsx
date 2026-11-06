@@ -6,14 +6,11 @@ import { CLASSES } from '../../data/classes';
 import { SCENARIOS } from '../../data/scenarios';
 import { autoName } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
-import type { Difficulty } from '../../types';
+import { DIFFICULTIES, describeDifficulty } from '../../data/rules';
 import { Heading, Screen } from '../ui/game';
 
-const DIFFICULTY: { id: Difficulty; name: string; text: string }[] = [
-  { id: 'easy', name: 'やさしい', text: '敵のレベル-1' },
-  { id: 'normal', name: 'ふつう', text: '標準' },
-  { id: 'hard', name: 'むずかしい', text: '敵のレベル+1' },
-];
+/** 難易度の一覧（src/content の difficulties から） */
+const DIFFICULTY = DIFFICULTIES.all.map((d) => ({ id: d.id, name: d.name, text: describeDifficulty(d) }));
 
 export function SetupScreen() {
   const draft = useBattle((s) => s.draft);

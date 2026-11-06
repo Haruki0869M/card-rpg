@@ -51,7 +51,7 @@ export const dungeonEvents: EventDef[] = [
       {
         label: '泉の水を飲む',
         check: { stat: 'luk', slots: 2, need: 1 },
-        success: [{ kind: 'heal', amount: 25, all: true }, { kind: 'focus', amount: 1, all: true }],
+        success: [{ kind: 'heal', amount: 25, all: true }, { kind: 'gainFocus', amount: 1, all: true }],
         fail: [{ kind: 'status', status: 'poison', amount: 4 }],
         successText: '体の芯から力が湧いてくる！（全員 HP+25・フォーカス+1）',
         failText: '水に毒が混ざっていた…。次の戦闘で毒4。',

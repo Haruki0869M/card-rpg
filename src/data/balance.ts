@@ -33,6 +33,9 @@ export const BALANCE = {
   /** 成長ボーナスの量 */
   growthStat: 5,
   growthMaxHp: 8,
+  /** 成長ボーナスの候補: 能力値をいくつ出すか / 残り1枠の候補（src/engine/game/growth/kinds の種類） */
+  growthStatPicks: 2,
+  growthExtras: ['maxHp', 'focusMax', 'upgradeCard'] as readonly string[],
   /** 休憩部屋の回復（HPは最大HPの割合） */
   restHpRatio: 0.35,
   restFocus: 2,
@@ -65,8 +68,6 @@ export const BALANCE = {
   chestEquipChance: { common: 60, rare: 65, epic: 100, legend: 100 } as Record<string, number>,
   /** 中身の格がレア以下の時に、おまけの消費アイテムが付く確率（%） */
   chestBonusConsumable: 25,
-  /** 強敵のドロップがエピックになる確率（%。残りはレア） */
-  eliteEpicDrop: 10,
   /** カード報酬の格の確率（%・コモン/レア/エピック）。部屋の種類ごと */
   cardRewardOdds: {
     battle: [72, 24, 4],
@@ -75,8 +76,6 @@ export const BALANCE = {
   } as Record<string, readonly number[]>,
   /** 戦闘後に隠し宝箱を見つける基本確率（%） */
   hiddenChestBase: 5,
-  /** 難易度ごとの敵レベルの補正 */
-  difficultyLevel: { easy: -1, normal: 0, hard: 1 } as Record<string, number>,
   /** 戦闘ログの最大件数 */
   logLimit: 300,
 } as const;

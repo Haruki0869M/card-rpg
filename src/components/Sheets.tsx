@@ -1,3 +1,4 @@
+import { getDifficulty } from '../data/rules';
 // ===== メニュー・戦闘ログ・山札/捨札・パーティ（装備）・道具袋・冒険をやめる確認 =====
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowRight, ChevronRight, DoorOpen, ScrollText, X } from 'lucide-react';
@@ -78,7 +79,7 @@ function MenuSheet() {
         )}
         {game && (
           <div className="rounded-lg bg-black/30 px-3 py-2 text-[13px] text-zinc-400">
-            シード <span className="font-mono text-amber-200 select-text">{game.seed}</span>・難易度 {{ easy: 'やさしい', normal: 'ふつう', hard: 'むずかしい' }[game.difficulty]}
+            シード <span className="font-mono text-amber-200 select-text">{game.seed}</span>・難易度 {getDifficulty(game.difficulty).name}
           </div>
         )}
         <button onClick={() => setConfirmAbandon(true)} className="btn flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-red-400/50 bg-red-950/70 text-[14px] font-bold text-red-100">

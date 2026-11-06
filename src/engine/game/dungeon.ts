@@ -1,19 +1,22 @@
 // ===== ダンジョンの生成と移動 =====
+import { getRoomType, ROOM_TYPES } from '../../data/rules';
 import { getDungeon } from './registry';
 import type { ChestSpec, DungeonDef, DungeonRun, Rarity, Room, RoomType } from '../../types';
 import type { Rng } from '../rng';
 
 export const RARITIES: Rarity[] = ['common', 'rare', 'epic', 'legend'];
 export const rarityIndex = (r: Rarity) => RARITIES.indexOf(r);
+export const RARITY_NAME: Record<Rarity, string> = { common: 'コモン', rare: 'レア', epic: 'エピック', legend: 'レジェンド' };
 export const raiseRarity = (r: Rarity, n = 1): Rarity => RARITIES[Math.min(RARITIES.length - 1, rarityIndex(r) + n)];
 
 const pick = <T,>(list: readonly T[], rng: Rng) => list[rng.int(list.length)];
 
-/** 部屋の敵を決める（レベルはダンジョンの基準 + 深さ + 難易度） */
+/** 部屋の敵を決める（組み合わせと加算レベルは部屋の種類のデータ。レベルはダンジョンの基準 + 深さ + 難易度） */
 function rollEnemies(def: DungeonDef, type: RoomType, row: number, levelBonus: number, rng: Rng) {
-  const ids = type === 'boss' ? def.pools.boss : type === 'elite' ? pick(def.pools.elite, rng) : pick(def.pools.battle, rng);
+  const b = getRoomType(type).battle!;
+  const ids = b.pool === 'boss' ? def.pools.boss : pick(def.pools[b.pool], rng);
   const depthBonus = Math.floor(row / 3);
-  const lv = def.baseLevel + depthBonus + levelBonus + (type === 'elite' ? 1 : type === 'boss' ? 2 : 0);
+  const lv = def.baseLevel + depthBonus + levelBonus + b.levelBonus;
   return ids.map((defId) => ({ defId, level: Math.max(1, lv) }));
 }
 
@@ -25,6 +28,18 @@ function rollChest(row: number, rng: Rng): ChestSpec {
   let i = 0;
   while (i < weights.length - 1 && (x -= weights[i]) >= 0) i++;
   return { rarity: RARITIES[i], locked: rng.next() < 0.4 };
+}
+
+/** 途中の行の部屋の種類（部屋の種類のデータの layoutWeight の割合。x は 0〜1 の乱数） */
+function pickRoomType(x: number): RoomType {
+  const list = ROOM_TYPES.all.filter((t) => (t.layoutWeight ?? 0) > 0);
+  const total = list.reduce((n, t) => n + t.layoutWeight!, 0);
+  let acc = 0;
+  for (const t of list) {
+    acc += t.layoutWeight! / total;
+    if (x < acc) return t.id;
+  }
+  return list[list.length - 1].id;
 }
 
 /** ランダム生成の部屋の並び（1行あたり1〜3部屋。各部屋は次の行の近い部屋につながる） */
@@ -41,11 +56,7 @@ function generateLayout(def: DungeonDef, rng: Rng, eventIds: string[]): NonNulla
       const x = rng.next();
       if (r === 0) type = 'battle';
       else if (r === rows - 1) type = x < 0.6 ? 'rest' : 'chest';
-      else if (x < 0.42) type = 'battle';
-      else if (x < 0.56) type = 'elite';
-      else if (x < 0.72) type = 'event';
-      else if (x < 0.88) type = 'chest';
-      else type = 'rest';
+      else type = pickRoomType(x);
       // 次の行への接続（位置が近い部屋へ。必ず1つ以上）
       const center = nextW === 1 ? 0 : Math.round((c / Math.max(1, w - 1)) * (nextW - 1));
       const next = new Set<number>([center]);
@@ -53,8 +64,8 @@ function generateLayout(def: DungeonDef, rng: Rng, eventIds: string[]): NonNulla
       return {
         type,
         next: [...next].sort(),
-        chest: type === 'chest' ? rollChest(r, rng) : undefined,
-        eventId: type === 'event' ? pick(eventIds, rng) : undefined,
+        chest: getRoomType(type).behavior === 'chest' ? rollChest(r, rng) : undefined,
+        eventId: getRoomType(type).behavior === 'event' ? pick(eventIds, rng) : undefined,
       };
     });
     layout.push(row);
@@ -84,7 +95,7 @@ export function buildDungeon(dungeonId: string, rng: Rng, levelBonus: number, ev
       col: c,
       type: spec.type,
       next: spec.next.map((n) => id(r + 1, n)),
-      enemies: spec.type === 'battle' || spec.type === 'elite' || spec.type === 'boss' ? rollEnemies(def, spec.type, r, levelBonus, rng) : undefined,
+      enemies: getRoomType(spec.type).battle ? rollEnemies(def, spec.type, r, levelBonus, rng) : undefined,
       chest: spec.chest ? { ...spec.chest } : undefined,
       eventId: spec.eventId,
       cleared: false,

@@ -144,7 +144,16 @@ export interface ClassDef {
   growthWeights: Partial<Record<StatId, number>>;
 }
 
-export type WeaponType = 'sword' | 'staff' | 'hammer' | 'bow';
+/** 武器の種類のID（src/content の weaponTypes に登録したもの） */
+export type WeaponType = string;
+
+export interface WeaponTypeDef {
+  id: string;
+  order?: number;
+  name: string;
+  /** アイテムのアイコンの種類 */
+  icon: string;
+}
 export type EquipSlot = 'weapon' | 'armor' | 'accessory';
 
 /** パーティの1枠の指定（キャラクター作成の結果） */
@@ -193,9 +202,13 @@ export interface EnemyDef {
   maxHp: number;
   /** このデータの数値が想定しているレベル */
   baseLevel: number;
-  pattern: 'sequence' | 'random';
+  /** 行動の決め方（src/engine/battle/ai/ のID。sequence = 順番 / random = ランダム） */
+  pattern: string;
   actions: EnemyActionDef[];
   firstActionId?: string;
+  /** レベルが1上がるごとのHP・攻撃の増加率（省略は balance.ts の共通値） */
+  hpPerLevel?: number;
+  attackPerLevel?: number;
   maxConsecutive?: number;
   /** 戦場での大きさ（1 = 標準、ボスは大きく） */
   size?: number;
@@ -212,7 +225,7 @@ export interface EnemyPhaseDef {
   belowHpPct: number;
   name: string;
   actions: EnemyActionDef[];
-  pattern: 'sequence' | 'random';
+  pattern: string;
   maxConsecutive?: number;
 }
 
@@ -346,6 +359,9 @@ export interface BattleSetup {
   seed: number;
   party: PartyMemberSpec[];
   encounter: EncounterSpec;
+  /** 敵のHP・攻撃の倍率（難易度など。省略は1） */
+  enemyHpMul?: number;
+  enemyAttackMul?: number;
 }
 
 // ===== コマンド（シリアライズ可能・オンライン協力で同期する単位） =====

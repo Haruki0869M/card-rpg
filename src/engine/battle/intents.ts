@@ -1,6 +1,7 @@
 import { getEnemy, getEnemyAction } from '../../data/enemies';
 import type { AllyState, BattleEvent, BattleState, EnemyActionDef, EnemyState } from '../../types';
 import type { Rng } from '../rng';
+import type { EnemyAiHandler } from './ai/types';
 import { damageModifiers } from '../abilities';
 import { calcDamage } from './damage';
 import { targetOf } from './effects';
@@ -30,7 +31,6 @@ function pickRandomAlly(state: BattleState, rng: Rng): string | undefined {
   return alive[rng.int(alive.length)].id;
 }
 
-/** 次の行動を選ぶ（ルール: 順番 / ランダム・連続制限 / 1ターン目固定 / 単独時の代替） */
 /** 今の段階の行動の一覧と選び方 */
 export function currentActionSet(enemy: EnemyState) {
   const def = getEnemy(enemy.defId);
@@ -39,31 +39,22 @@ export function currentActionSet(enemy: EnemyState) {
   return { actions: def.actions, pattern: def.pattern, maxConsecutive: def.maxConsecutive, firstActionId: def.firstActionId };
 }
 
+const AIS = new Map<string, EnemyAiHandler>();
+for (const [path, mod] of Object.entries(import.meta.glob('./ai/*.ts', { eager: true }) as Record<string, { ai?: EnemyAiHandler }>)) {
+  if (!mod.ai) continue; // types.ts
+  if (AIS.has(mod.ai.id)) throw new Error(`Duplicate enemy ai: ${mod.ai.id} (${path})`);
+  AIS.set(mod.ai.id, mod.ai);
+}
+export const hasEnemyAi = (id: string) => AIS.has(id);
+
+/** 次の行動を選ぶ（選び方は敵のデータの pattern。ai/ のファイルで増やせる） */
 export function chooseAction(enemy: EnemyState, state: BattleState, rng: Rng): EnemyActionDef {
-  const def = { id: enemy.defId, ...currentActionSet(enemy) };
+  const set = currentActionSet(enemy);
   const alone = !state.enemies.some((e) => !e.dead && e.uid !== enemy.uid);
-  const resolve = (a: EnemyActionDef) =>
-    alone && a.fallbackIfAloneId ? getEnemyAction(def.id, a.fallbackIfAloneId) : a;
-
-  if (def.pattern === 'sequence') {
-    const a = def.actions[enemy.seqIndex % def.actions.length];
-    enemy.seqIndex = (enemy.seqIndex + 1) % def.actions.length;
-    return resolve(a);
-  }
-
-  if (enemy.history.length === 0 && enemy.phase === 0 && def.firstActionId) {
-    return resolve(getEnemyAction(def.id, def.firstActionId));
-  }
-
-  // 単独時の代替を反映した上で、連続制限を満たす候補から選ぶ
-  const max = def.maxConsecutive ?? Infinity;
-  const recent = enemy.history.slice(-max);
-  const blocked = recent.length >= max && recent.every((id) => id === recent[0]) ? recent[0] : undefined;
-  const resolved = def.actions.map(resolve);
-  const unique = resolved.filter((a, i) => resolved.findIndex((b) => b.id === a.id) === i);
-  let candidates = unique.filter((a) => a.id !== blocked);
-  if (candidates.length === 0) candidates = unique;
-  return candidates[rng.int(candidates.length)];
+  const resolve = (a: EnemyActionDef) => (alone && a.fallbackIfAloneId ? getEnemyAction(enemy.defId, a.fallbackIfAloneId) : a);
+  const handler = AIS.get(set.pattern);
+  if (!handler) throw new Error(`Unknown enemy ai: ${set.pattern}`);
+  return handler.choose(enemy, state, rng, set, resolve);
 }
 
 /** インテントを決定する（対象もこの時点でランダムに決めて表示する） */

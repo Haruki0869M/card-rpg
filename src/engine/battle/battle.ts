@@ -16,6 +16,7 @@ import type {
   CardInstance,
   Command,
   CommandResult,
+  EnemyDef,
   EnemyState,
   SlotResult,
   Statuses,
@@ -37,12 +38,12 @@ export const STATE_VERSION = 4;
 
 // ---------- 生成 ----------
 
-/** 敵のレベル補正（HP・攻撃の倍率）。baseLevel で 1.0 */
-export function enemyLevelFactors(baseLevel: number, level: number) {
-  const d = level - baseLevel;
+/** 敵のレベル補正（HP・攻撃の倍率）。baseLevel で 1.0。伸び方は敵ごとに変えられる（省略は共通値） */
+export function enemyLevelFactors(def: Pick<EnemyDef, 'baseLevel' | 'hpPerLevel' | 'attackPerLevel'>, level: number) {
+  const d = level - def.baseLevel;
   return {
-    hp: Math.max(0.3, 1 + BALANCE.enemyHpPerLevel * d),
-    attack: Math.max(0.3, 1 + BALANCE.enemyAttackPerLevel * d),
+    hp: Math.max(0.3, 1 + (def.hpPerLevel ?? BALANCE.enemyHpPerLevel) * d),
+    attack: Math.max(0.3, 1 + (def.attackPerLevel ?? BALANCE.enemyAttackPerLevel) * d),
   };
 }
 
@@ -93,8 +94,8 @@ export function createBattle(setup: BattleSetup): BattleState {
   const enemies: EnemyState[] = encounter.enemies.map((spec, i) => {
     const def = getEnemy(spec.defId);
     const level = spec.level ?? def.baseLevel;
-    const f = enemyLevelFactors(def.baseLevel, level);
-    const hp = Math.max(1, Math.floor(def.maxHp * f.hp * partyMul + 1e-9));
+    const f = enemyLevelFactors(def, level);
+    const hp = Math.max(1, Math.floor(def.maxHp * f.hp * partyMul * (setup.enemyHpMul ?? 1) + 1e-9));
     const n = seen.get(spec.defId) ?? 0;
     seen.set(spec.defId, n + 1);
     return {
@@ -102,7 +103,7 @@ export function createBattle(setup: BattleSetup): BattleState {
       defId: spec.defId,
       nameSuffix: (counts.get(spec.defId) ?? 0) > 1 ? String.fromCharCode(65 + n) : undefined,
       level,
-      attackMul: f.attack,
+      attackMul: f.attack * (setup.enemyAttackMul ?? 1),
       hp,
       maxHp: hp,
       block: 0,

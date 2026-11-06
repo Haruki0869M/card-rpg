@@ -4,27 +4,22 @@ import { ArrowUpCircle, Coins, Gift, Heart, Sparkles, Star, TrendingUp } from 'l
 import { useEffect, useState } from 'react';
 import { REVEAL_TIMING, VIBRATION } from '../../data/balance';
 import { cardOf, getCard } from '../../data/cards';
-import { expToNext, findHero, heroStats } from '../../engine';
+import { expToNext, findHero, growthHandler, heroStats } from '../../engine';
 import { finalChance } from '../../engine';
 import { affinityFromStats } from '../../engine';
 import { LOCAL_PLAYER } from '../../store/battleConfig';
 import { speedFactor, useBattle, vibrate } from '../../store/battleStore';
 import type { GrowthOption, Hero, Rarity } from '../../types';
 import { CardFace } from '../ui/CardFace';
-import { Bar, HeroFace, RARITY_STYLE, Screen, STAT_LABEL } from '../ui/game';
+import { Bar, HeroFace, RARITY_STYLE, Screen } from '../ui/game';
 import { LootList } from './RoomScreens';
 
+/** 成長ボーナスのアイコン（成長の種類の icon のキー → アイコン） */
+const GROWTH_ICONS: Record<string, typeof TrendingUp> = { trendingUp: TrendingUp, heart: Heart, star: Star, arrowUp: ArrowUpCircle };
+
 function growthText(o: GrowthOption) {
-  switch (o.kind) {
-    case 'stat':
-      return { title: `${STAT_LABEL[o.stat!]} +${o.amount}`, Icon: TrendingUp, text: '能力値が上がり、関係する成功率も上がる' };
-    case 'maxHp':
-      return { title: `最大HP +${o.amount}`, Icon: Heart, text: '打たれ強くなる' };
-    case 'focusMax':
-      return { title: 'フォーカス最大 +1', Icon: Star, text: '確定成功をもっと使えるようになる' };
-    case 'upgradeCard':
-      return { title: 'カード強化', Icon: ArrowUpCircle, text: '山札のカード1枚を強化（成功率+10%・効果アップ）' };
-  }
+  const h = growthHandler(o.kind);
+  return { title: h.title(o), Icon: GROWTH_ICONS[h.icon] ?? Sparkles, text: h.text };
 }
 
 const CARD_BACK: Record<string, { color: string; glow: string }> = {
