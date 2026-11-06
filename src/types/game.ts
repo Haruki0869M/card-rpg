@@ -72,6 +72,10 @@ export interface Hero {
   retired?: boolean;
   /** 祠の永続の加護の数（上限あり） */
   blessings?: number;
+  /** 自分のお金・持ち物（装備していない装備品）・道具袋（M3-C: キャラごと） */
+  gold: number;
+  stash: ItemInstance[];
+  pouch: ItemInstance[];
 }
 
 // ---------- ダンジョン ----------
@@ -174,8 +178,9 @@ export interface DungeonRun {
 // ---------- 宝箱・イベント・報酬 ----------
 
 export type Loot =
-  | { kind: 'item'; item: ItemInstance }
-  | { kind: 'gold'; amount: number }
+  /** to = 受け取ったキャラ（入れた時に決まる） */
+  | { kind: 'item'; item: ItemInstance; to?: string }
+  | { kind: 'gold'; amount: number; to?: string[] }
   | { kind: 'card'; cardId: string; heroId: string };
 
 export interface ChestState {
@@ -302,6 +307,33 @@ export interface GameLog {
   text: string;
 }
 
+/**
+ * 世界マップと別に進む場面（ダンジョンに入ったキャラたち）。
+ * その場面の操作（SCENE コマンド）の間だけ、冒険の dungeon / battle などに載せて、今までと同じ処理で動かす
+ */
+export interface Expedition {
+  id: string;
+  heroes: string[];
+  mode: GameMode;
+  dungeon?: DungeonRun;
+  battle?: BattleState;
+  reward?: RewardState;
+  chest?: ChestState;
+  event?: EventState;
+  battleInfo?: { roomType: string; wandererId?: string; tile?: number };
+  battleBackground?: string;
+  vote?: VoteState;
+}
+
+/**
+ * みんなで決める操作（M3-C）: 場面にいるプレイヤーがそれぞれ選び、全員そろったら多数決（同じ数なら先頭のキャラの人）。
+ * ctx = 選んだ時の場面（部屋・イベントが変わったら無効）
+ */
+export interface VoteState {
+  ctx: string;
+  picks: Partial<Record<PlayerId, GameCommand>>;
+}
+
 export interface GameState {
   version: number;
   seed: number;
@@ -309,11 +341,6 @@ export interface GameState {
   scenarioId: string;
   difficulty: Difficulty;
   heroes: Hero[];
-  gold: number;
-  /** 装備していない装備品（パーティ共有） */
-  stash: ItemInstance[];
-  /** 消費アイテムの袋（パーティ共有・上限あり） */
-  pouch: ItemInstance[];
   mode: GameMode;
   dungeon?: DungeonRun;
   battle?: BattleState;
@@ -343,6 +370,13 @@ export interface GameState {
   shrine?: ShrineVisit;
   /** オンライン協力の冒険（戦闘で全員の準備完了を待つ） */
   online?: boolean;
+  /** 世界マップと別に進んでいる場面（ダンジョンに入ったキャラたち。M3-C） */
+  expeditions?: Expedition[];
+  nextExpeditionId?: number;
+  /** 内部用: SCENE コマンドを処理している間だけ、その場面のID（保存されない） */
+  activeScene?: string;
+  /** みんなで決めている途中の選択（世界マップ側の場面。ダンジョンの場面は Expedition に持つ） */
+  vote?: VoteState;
 }
 
 /** 難易度のID（src/content の difficulties に登録したもの） */
@@ -393,6 +427,8 @@ export type GameCommand =
   | { type: 'RETURN_TO_HUB'; playerId: PlayerId }
   | { type: 'EQUIP'; playerId: PlayerId; heroId: string; itemUid: string }
   | { type: 'UNEQUIP'; playerId: PlayerId; heroId: string; slot: EquipSlot }
+  /** 同じ場所にいる仲間に、お金か持ち物を渡す */
+  | { type: 'GIVE'; playerId: PlayerId; fromHeroId: string; toHeroId: string; itemUid?: string; gold?: number }
   // ---------- 世界マップ（spec §8） ----------
   /** 移動力の判定 */
   | { type: 'WORLD_ROLL_MOVE'; playerId: PlayerId; heroId: string; focusUsed: number }
@@ -416,7 +452,16 @@ export type GameCommand =
   | { type: 'QUEST_REPORT'; playerId: PlayerId; questId: string }
   | { type: 'LEAVE_TOWN'; playerId: PlayerId }
   | { type: 'SHRINE_CHOOSE'; playerId: PlayerId; optionIndex: number; heroId: string }
-  | { type: 'LEAVE_SHRINE'; playerId: PlayerId };
+  | { type: 'LEAVE_SHRINE'; playerId: PlayerId }
+  /** 世界マップと別に進んでいる場面（ダンジョン）の中の操作 */
+  | { type: 'SCENE'; scene: string; command: GameCommand }
+  /** みんなで決める操作に1票入れる（command = 選んだ操作。null で取り消し） */
+  | { type: 'VOTE'; playerId: PlayerId; command: GameCommand | null }
+  /** 遭遇の戦闘に、自分のキャラを加える / 加えない（近くにいる、手番でない人のキャラ） */
+  | { type: 'ENCOUNTER_JOIN'; playerId: PlayerId; heroId: string; join: boolean }
+  /** 手番のキャラが、同じマスの他の人のキャラを同行に誘う / 誘われた人が答える */
+  | { type: 'WORLD_INVITE'; playerId: PlayerId; heroId: string; targetId: string }
+  | { type: 'WORLD_INVITE_ANSWER'; playerId: PlayerId; heroId: string; accept: boolean }
 
 export interface GameResult {
   state: GameState;

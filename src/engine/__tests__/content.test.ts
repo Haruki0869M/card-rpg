@@ -198,7 +198,7 @@ describe('保存データの引き継ぎ', () => {
 
   it('消したデータを参照している冒険は読まない', () => {
     const g = fresh();
-    g.stash.push({ uid: 'z', itemId: 'noSuchItem' });
+    g.heroes[0].stash.push({ uid: 'z', itemId: 'noSuchItem' });
     expect(validateGame(g)).toBe(false);
     expect(migrateGame(g)).toBeNull();
   });

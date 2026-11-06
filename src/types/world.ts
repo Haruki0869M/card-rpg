@@ -194,6 +194,9 @@ export interface WorldState {
   shops: Record<string, ShopStock>;
   /** 画面に出す物語（冒頭・地域の紹介・エンディング） */
   story?: { title: string; lines: string[] };
+  /** 同行の誘い（誘われたキャラ → 誘ったキャラ）と、承知した同行（同じ形）。手番が変わると消える */
+  invites?: Record<string, string>;
+  follow?: Record<string, string>;
 }
 
 export interface ShopStock {
@@ -212,6 +215,8 @@ export interface EncounterState {
   candidates: string[];
   /** 夜襲を受けた（戦うしかない） */
   ambushed?: boolean;
+  /** 手番でない人のキャラが「戦闘に加わる」と答えたか */
+  joins?: Record<string, boolean>;
   /** 奇襲・逃走の判定の結果 */
   result?: { choice: 'ambush' | 'flee'; heroId: string; results: ('focus' | 'hit' | 'miss')[]; success: boolean };
 }

@@ -19,7 +19,12 @@ import {
   isDone,
   makeSeed,
   unusableReason,
+  needsVote,
+  unwrapCommand,
+  viewOf,
+  voters,
   waitingPlayers,
+  WORLD_SCENE,
 } from '../engine';
 import type { Room } from '../net/room';
 import type { BattleEvent, BattleState, Command, Difficulty, GameCommand, GameResult, GameState, Gender, PlayerId, SlotResult } from '../types';
@@ -70,6 +75,11 @@ export interface NewGameDraft {
 interface StoreState {
   screen: Screen;
   draft: NewGameDraft;
+  /** 冒険の状態（全部の場面） */
+  full: GameState | null;
+  /** 今見ている場面（'world' か、ダンジョンの場面のID） */
+  scene: string;
+  /** 今見ている場面を載せた冒険（画面の部品はこれを読む） */
   game: GameState | null;
   /** 表示中（または最後）の戦闘。戦闘画面の部品はここを読む */
   battle: BattleState;
@@ -89,6 +99,8 @@ interface StoreState {
   toast: { text: string; id: number } | null;
 
   setScreen: (s: Screen) => void;
+  /** 見る場面を切り替える */
+  setScene: (scene: string) => void;
   setDraft: (d: Partial<NewGameDraft>) => void;
   startGame: () => void;
   continueGame: () => void;
@@ -102,13 +114,16 @@ interface StoreState {
   cancel: () => void;
   setActive: (id: string) => void;
   endTurn: () => void;
-  usePouch: (itemUid: string, targetHeroId: string) => void;
+  /** 道具を使う（userId = 袋の持ち主。戦闘中は操作中のキャラ） */
+  usePouch: (itemUid: string, targetHeroId: string, userId?: string) => void;
   setSettings: (s: Partial<Settings>) => void;
   openSheet: (s: Sheet) => void;
   setConfirmAbandon: (v: boolean) => void;
   showToast: (text: string) => void;
+  /** 確認用: 場面の指定まで済んだ操作をそのまま送る（自動プレイの確認スクリプト用） */
+  dispatchWire: (cmd: GameCommand) => string | undefined;
   /** オンライン協力: 部屋から届いた操作の結果を反映する */
-  applyRemote: (r: GameResult) => void;
+  applyRemote: (r: GameResult, cmd: GameCommand) => void;
   /** オンライン協力: 状態を丸ごと差し替える（参加・取り直し） */
   loadRemote: (game: GameState) => void;
   /** オンライン協力をやめた: この端末の1人用の冒険（保存）に戻す */
@@ -152,12 +167,12 @@ function loadSettings(): Settings {
   return { fastMode: false, vibration: true };
 }
 
-function writeSave(s: Pick<StoreState, 'game' | 'activeId'>) {
+function writeSave(s: Pick<StoreState, 'full' | 'activeId'>) {
   // オンライン協力の冒険は部屋に保存される（この端末の1人用の保存は上書きしない）
   if (room) return;
   try {
-    if (!s.game) localStorage.removeItem(SAVE_KEY);
-    else localStorage.setItem(SAVE_KEY, JSON.stringify({ version: GAME_VERSION, content: contentVersion(), game: s.game, activeId: s.activeId } satisfies SaveData));
+    if (!s.full) localStorage.removeItem(SAVE_KEY);
+    else localStorage.setItem(SAVE_KEY, JSON.stringify({ version: GAME_VERSION, content: contentVersion(), game: s.full, activeId: s.activeId } satisfies SaveData));
   } catch {
     // 保存できなくても普通に遊べる
   }
@@ -256,19 +271,51 @@ const defaultDraft = (): NewGameDraft => {
 
 const saved = loadSave();
 
+/**
+ * 見る場面を決める。今の場面が終わっていたら世界マップへ。
+ * 世界マップに誰もいない（全員ダンジョン）なら、この端末のキャラがいるダンジョンへ
+ */
+function pickScene(full: GameState | null, current: string): string {
+  const exps = full?.expeditions ?? [];
+  if (!full || !exps.length) return WORLD_SCENE;
+  let s = current !== WORLD_SCENE && !exps.some((x) => x.id === current) ? WORLD_SCENE : current;
+  if (s === WORLD_SCENE && full.world && !full.world.turn && full.mode === 'world') {
+    const mine = exps.find((x) => x.heroes.some((id) => isLocalPlayer(full.heroes.find((h) => h.id === id)?.playerId ?? 'P1')));
+    s = (mine ?? exps[0]).id;
+  }
+  return s;
+}
+const viewIn = (full: GameState | null, scene: string) => (full ? viewOf(full, scene) : null);
+
 export const useBattle = create<StoreState>((set, get) => {
   /** 敵フェーズを自動で進める */
+  /** 敵フェーズの戦闘がある場面（見ている場面を優先。見ていない場面の戦闘も進める） */
+  const enemyScene = (): string | undefined => {
+    const { full, scene } = get();
+    if (!full) return undefined;
+    const scenes = [scene, WORLD_SCENE, ...(full.expeditions ?? []).map((x) => x.id)];
+    return scenes.find((s) => {
+      const v = viewOf(full, s);
+      return v.mode === 'battle' && v.battle?.phase === 'enemy';
+    });
+  };
   const scheduleEnemy = () => {
     if (enemyTimer) clearTimeout(enemyTimer);
-    const { game, settings } = get();
-    if (game?.mode !== 'battle' || game.battle?.phase !== 'enemy') return;
+    const { settings } = get();
+    if (!enemyScene()) return;
     // オンライン協力: 敵の行動はホストが代表して進める
     if (room && (!room.isHost || enemyInFlight)) return;
     enemyTimer = setTimeout(
       () => {
         enemyTimer = null;
+        const s = enemyScene();
+        if (!s) return;
         if (room) enemyInFlight = true;
-        get().dispatch({ type: 'ENEMY_STEP' });
+        const step: GameCommand = {
+          type: 'BATTLE',
+          command: { type: 'ENEMY_STEP' },
+        };
+        send(s === WORLD_SCENE ? step : { type: 'SCENE', scene: s, command: step }, true);
       },
       (TIMING.enemyStep * 1000) / speedFactor(settings),
     );
@@ -329,9 +376,17 @@ export const useBattle = create<StoreState>((set, get) => {
   });
 
   /** 操作の結果を画面に反映する（この端末の操作・部屋から届いた操作で共通） */
-  const commit = (r: GameResult, prevBattle: BattleState | undefined) => {
-    const next = r.state;
-    const patch: Partial<StoreState> = { game: next };
+  const commit = (r: GameResult, cmdScene: string) => {
+    const before = get().full;
+    const full = r.state;
+    const prevBattle = get().game?.battle;
+    let scene = get().scene;
+    // ダンジョンに入った: この端末のキャラが入ったなら、その場面を見る
+    const added = (full.expeditions ?? []).find((x) => !before?.expeditions?.some((y) => y.id === x.id));
+    if (added && added.heroes.some((id) => isLocalPlayer(full.heroes.find((h) => h.id === id)?.playerId ?? 'P1'))) scene = added.id;
+    scene = pickScene(full, scene);
+    const next = viewOf(full, scene);
+    const patch: Partial<StoreState> = { full, scene, game: next };
     if (next.battle) {
       patch.battle = next.battle;
       if (next.battle !== prevBattle && (!prevBattle || prevBattle.seed !== next.battle.seed || prevBattle.encounterId !== next.battle.encounterId)) {
@@ -348,16 +403,46 @@ export const useBattle = create<StoreState>((set, get) => {
       if (sel && !findAlly(next.battle, get().activeId)?.hand.some((c) => c.uid === sel.cardUid)) patch.selection = null;
     }
     set(patch);
-    applyEvents(r.battleEvents);
+    // 見ている場面の出来事だけ演出する
+    if (cmdScene === scene) applyEvents(r.battleEvents);
     scheduleSave(get);
     scheduleEnemy();
+  };
+
+  /** 操作を送る（オンラインなら部屋へ、そうでなければこの端末で動かす）。silent = 失敗してもお知らせを出さない */
+  const send = (wire: GameCommand, silent: boolean): string | undefined => {
+    const { full } = get();
+    if (!full) return '冒険が始まっていません';
+    const isEnemyStep = (c: GameCommand): boolean => (c.type === 'SCENE' ? isEnemyStep(c.command) : c.type === 'BATTLE' && c.command.type === 'ENEMY_STEP');
+    if (room) {
+      const dry = applyGameCommand(full, wire);
+      if (dry.error) {
+        if (isEnemyStep(wire)) enemyInFlight = false;
+        else if (!silent) get().showToast(dry.error);
+        return dry.error;
+      }
+      room.send(wire).catch(() => {
+        if (isEnemyStep(wire)) enemyInFlight = false;
+        get().showToast('送れませんでした。通信を確かめてください');
+      });
+      return undefined;
+    }
+    const r = applyGameCommand(full, wire);
+    if (r.error) {
+      if (!silent) get().showToast(r.error);
+      return r.error;
+    }
+    commit(r, unwrapCommand(wire).scene);
+    return undefined;
   };
 
   return {
     screen: 'title',
     draft: defaultDraft(),
-    game: saved?.game ?? null,
-    battle: saved?.game.battle ?? EMPTY_BATTLE,
+    full: saved?.game ?? null,
+    scene: pickScene(saved?.game ?? null, WORLD_SCENE),
+    game: viewIn(saved?.game ?? null, pickScene(saved?.game ?? null, WORLD_SCENE)),
+    battle: viewIn(saved?.game ?? null, pickScene(saved?.game ?? null, WORLD_SCENE))?.battle ?? EMPTY_BATTLE,
     settings: loadSettings(),
     activeId: saved?.activeId ?? '',
     selection: null,
@@ -372,6 +457,19 @@ export const useBattle = create<StoreState>((set, get) => {
     toast: null,
 
     setScreen: (screen) => set({ screen, sheet: null }),
+    setScene: (s) => {
+      const { full } = get();
+      const scene = pickScene(full, s);
+      const game = viewIn(full, scene);
+      set({
+        scene,
+        game,
+        sheet: null,
+        selection: null,
+        battle: game?.battle ?? get().battle,
+        ...(game?.battle ? resetBattleUi(game.battle) : {}),
+      });
+    },
     setDraft: (d) => set({ draft: { ...get().draft, ...d } }),
 
     startGame: () => {
@@ -382,7 +480,7 @@ export const useBattle = create<StoreState>((set, get) => {
         difficulty: d.difficulty,
         party: d.party.map((m) => ({ ...m, playerId: m.playerId ?? LOCAL_PLAYER })),
       });
-      set({ game, screen: 'game', battle: EMPTY_BATTLE, sheet: null, selection: null });
+      set({ full: game, scene: WORLD_SCENE, game, screen: 'game', battle: EMPTY_BATTLE, sheet: null, selection: null });
       scheduleSave(get);
     },
 
@@ -400,23 +498,38 @@ export const useBattle = create<StoreState>((set, get) => {
       enemyTimer = null;
       enemyInFlight = false;
       const local = loadSave();
-      set({ game: local?.game ?? null, activeId: local?.activeId ?? '', screen: 'title', confirmAbandon: false, sheet: null, battle: local?.game.battle ?? EMPTY_BATTLE, selection: null });
+      const scene = pickScene(local?.game ?? null, WORLD_SCENE);
+      const game = viewIn(local?.game ?? null, scene);
+      set({ full: local?.game ?? null, scene, game, activeId: local?.activeId ?? '', screen: 'title', confirmAbandon: false, sheet: null, battle: game?.battle ?? EMPTY_BATTLE, selection: null });
     },
 
     abandonGame: () => {
       if (enemyTimer) clearTimeout(enemyTimer);
       enemyTimer = null;
-      set({ game: null, screen: 'title', confirmAbandon: false, sheet: null, battle: EMPTY_BATTLE, selection: null });
-      writeSave({ game: null, activeId: '' });
+      set({ full: null, scene: WORLD_SCENE, game: null, screen: 'title', confirmAbandon: false, sheet: null, battle: EMPTY_BATTLE, selection: null });
+      writeSave({ full: null, activeId: '' });
     },
 
     dispatchGame: (cmd) => {
-      const { game } = get();
+      const { game, scene } = get();
       if (!game) return '冒険が始まっていません';
-      const prevBattle = game.battle;
       // ローカル協力: そのキャラの担当プレイヤーとして送る
       if ('playerId' in cmd) cmd = { ...cmd, playerId: actorOf(game, cmd) } as GameCommand;
       if (cmd.type === 'BATTLE' && 'playerId' in cmd.command) cmd = { ...cmd, command: { ...cmd.command, playerId: battleActorOf(game, cmd.command) } as Command };
+      const wrap = (c: GameCommand): GameCommand => (scene !== WORLD_SCENE && c.type !== 'SCENE' ? { type: 'SCENE', scene, command: c } : c);
+      // みんなで決める操作: この端末のプレイヤーの票として入れる（1台で全員を操作しているなら、全員分まとめて入れるのですぐ決まる）
+      if (needsVote(game, cmd)) {
+        const mine = voters(game).filter((p) => isLocalPlayer(p));
+        if (!mine.length) {
+          get().showToast('この場面のプレイヤーではありません');
+          return 'この場面のプレイヤーではありません';
+        }
+        for (const p of mine) {
+          const err = send(wrap({ type: 'VOTE', playerId: p, command: { ...cmd, playerId: p } as GameCommand }), false);
+          if (err) return err;
+        }
+        return undefined;
+      }
       // オンライン協力: 自分の担当か・通るかを先に確かめてから、部屋に送る（結果は部屋から届く）
       if (room) {
         const actor = 'playerId' in cmd ? cmd.playerId : cmd.type === 'BATTLE' && 'playerId' in cmd.command ? cmd.command.playerId : undefined;
@@ -425,55 +538,39 @@ export const useBattle = create<StoreState>((set, get) => {
           if (cmd.type !== 'BATTLE' || cmd.command.type !== 'ENEMY_STEP') get().showToast(msg);
           return msg;
         }
-        const dry = applyGameCommand(game, cmd);
-        if (dry.error) {
-          if (cmd.type === 'BATTLE' && cmd.command.type === 'ENEMY_STEP') enemyInFlight = false;
-          else get().showToast(dry.error);
-          return dry.error;
-        }
-        room.send(cmd).catch(() => {
-          if (cmd.type === 'BATTLE' && cmd.command.type === 'ENEMY_STEP') enemyInFlight = false;
-          get().showToast('送れませんでした。通信を確かめてください');
-        });
-        return undefined;
       }
-      const r = applyGameCommand(game, cmd);
-      if (r.error) {
-        get().showToast(r.error);
-        return r.error;
-      }
-      commit(r, prevBattle);
-      return undefined;
+      // 見ている場面がダンジョンなら、その場面の中の操作として送る
+      return send(wrap(cmd), false);
     },
 
-    applyRemote: (r) => {
+    dispatchWire: (cmd) => send(cmd, false),
+
+    applyRemote: (r, cmd) => {
       enemyInFlight = false;
-      commit(r, get().game?.battle);
+      commit(r, unwrapCommand(cmd).scene);
     },
 
-    loadRemote: (game) => {
+    loadRemote: (full) => {
       enemyInFlight = false;
       if (enemyTimer) clearTimeout(enemyTimer);
       enemyTimer = null;
-      set({ game, screen: 'game', sheet: null, battle: game.battle ?? EMPTY_BATTLE, ...(game.battle ? resetBattleUi(game.battle) : { selection: null }) });
+      // 自分のキャラが全員ダンジョンの中なら、その場面を見る
+      const mine = full.heroes.filter((h) => isLocalPlayer(h.playerId) && h.hp > 0 && !h.retired);
+      const exp = full.expeditions?.find((x) => mine.length && mine.every((h) => x.heroes.includes(h.id)));
+      const scene = pickScene(full, exp?.id ?? get().scene);
+      const game = viewOf(full, scene);
+      set({ full, scene, game, screen: 'game', sheet: null, battle: game.battle ?? EMPTY_BATTLE, ...(game.battle ? resetBattleUi(game.battle) : { selection: null }) });
       scheduleEnemy();
     },
 
     dispatch: (cmd) => {
       const { game } = get();
       if (!game || game.mode !== 'battle') return '戦闘中ではありません';
-      if (room) return get().dispatchGame({ type: 'BATTLE', command: cmd });
       if ('playerId' in cmd) cmd = { ...cmd, playerId: battleActorOf(game, cmd) } as Command;
-      const r = applyGameCommand(game, { type: 'BATTLE', command: cmd });
-      if (r.error) return r.error;
-      const b = r.state.battle!;
-      const finished = b.phase !== 'ally' && b.phase !== 'enemy';
-      const activeId = b.phase === 'ally' ? nextActive(b, get().activeId) : get().activeId;
-      set(finished ? { game: r.state, battle: b, activeId, selection: null, sheet: null } : { game: r.state, battle: b, activeId });
-      applyEvents(r.battleEvents);
-      scheduleSave(get);
-      scheduleEnemy();
-      return undefined;
+      if (room && 'playerId' in cmd && !isLocalPlayer(cmd.playerId)) return `${cmd.playerId}の担当です`;
+      const { scene } = get();
+      const inner: GameCommand = { type: 'BATTLE', command: cmd };
+      return send(scene !== WORLD_SCENE ? { type: 'SCENE', scene, command: inner } : inner, true);
     },
 
     tapCard: (cardUid) => {
@@ -570,13 +667,10 @@ export const useBattle = create<StoreState>((set, get) => {
       get().dispatch({ type: 'END_TURN', playerId: LOCAL_PLAYER });
     },
 
-    usePouch: (itemUid, targetHeroId) => {
+    usePouch: (itemUid, targetHeroId, userId) => {
       const { game, activeId } = get();
       if (!game) return;
-      const user =
-        game.mode === 'battle'
-          ? activeId
-          : (game.heroes.find((h) => isLocalPlayer(h.playerId) && h.hp > 0)?.id ?? targetHeroId);
+      const user = game.mode === 'battle' ? activeId : (userId ?? game.heroes.find((h) => h.pouch.some((p) => p.uid === itemUid))?.id ?? targetHeroId);
       const err = get().dispatchGame({ type: 'USE_POUCH_ITEM', playerId: LOCAL_PLAYER, itemUid, userId: user, targetId: targetHeroId });
       if (!err) set({ sheet: null });
     },

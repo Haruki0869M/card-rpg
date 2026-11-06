@@ -6,7 +6,7 @@ import { getItem, ITEMS } from '../../../data/items';
 import { QUESTS, SHRINES, TOWNS } from '../../../data/world';
 import type { GameCommand, GameState, ShopStock } from '../../../types';
 import type { Rng } from '../../rng';
-import { addItem, addLog, addLoot, isPartyPlayer, ownedBy } from '../common';
+import { addItem, addLog, addLoot, ownedBy } from '../common';
 import { rarityIndex } from '../dungeon';
 import { clampHero, heroFocusMax, heroMaxHp } from '../hero';
 import { findHero } from '../heroes';
@@ -72,9 +72,12 @@ export function ensureShop(game: GameState, rng: Rng): ShopStock {
   return stock;
 }
 
+/** 町に入ったキャラ（お金・持ち物はこのキャラのもの。操作できるのはこのキャラの担当だけ） */
+export const townVisitor = (game: GameState) => (game.town ? findHero(game, game.town.heroId) : undefined);
+
 function inTown(game: GameState, playerId: string): string | undefined {
   if (game.mode !== 'town' || !game.town || !game.world) return '町にいません';
-  if (!isPartyPlayer(game, playerId)) return 'このパーティのプレイヤーではありません';
+  if (!ownedBy(townVisitor(game), playerId)) return '町に入ったキャラの担当の人だけが操作できます';
   return undefined;
 }
 
@@ -84,32 +87,33 @@ export function townBuy(game: GameState, cmd: Cmd<'TOWN_BUY'>, rng: Rng): string
   const stock = ensureShop(game, rng);
   const entry = cmd.kind === 'item' ? stock.items[cmd.index] : stock.cards[cmd.index];
   if (!entry || entry.sold) return 'その品物はありません';
-  if (game.gold < entry.price) return 'ゴールドが足りません';
-  game.gold -= entry.price;
+  const v = townVisitor(game)!;
+  // カードは、町に入ったキャラの職業のものだけ買える
+  if (!('item' in entry) && getClass(findHero(game, entry.heroId)?.classId ?? '').id !== v.classId) return `${v.name}の職業のカードではありません`;
+  if (v.gold < entry.price) return 'ゴールドが足りません';
+  v.gold -= entry.price;
   entry.sold = true;
-  if ('item' in entry) addLog(game, `${addItem(game, entry.item, false)}を買った（${entry.price}G）`);
+  if ('item' in entry) addLog(game, `${v.name}が${addItem(game, v, entry.item, false)}を買った（${entry.price}G）`);
   else {
-    const h = findHero(game, entry.heroId);
-    if (!h) return 'そのキャラはいません';
+    const h = v;
     h.deck.push({ uid: `c${game.nextUid++}`, cardId: entry.cardId });
     addLog(game, `${h.name}の山札に「${CARDS.get(entry.cardId).name}」を加えた（${entry.price}G）`);
   }
   return undefined;
 }
 
-/** 宿屋: 町にいるキャラのHP・フォーカスが全回復 */
+/** 宿屋: 町に入ったキャラのHP・フォーカスが全回復（自分のお金で） */
 export function townInn(game: GameState, cmd: Cmd<'TOWN_INN'>): string | undefined {
   const err = inTown(game, cmd.playerId);
   if (err) return err;
   const cost = TOWNS.get(game.town!.townId).innCost;
-  if (game.gold < cost) return 'ゴールドが足りません';
-  game.gold -= cost;
-  for (const h of heroesInTown(game)) {
-    h.hp = heroMaxHp(h);
-    h.focus = heroFocusMax(h);
-    h.nextBattleStatuses = {};
-  }
-  addLog(game, `宿屋で休んだ（${cost}G）`);
+  const h = townVisitor(game)!;
+  if (h.gold < cost) return 'ゴールドが足りません';
+  h.gold -= cost;
+  h.hp = heroMaxHp(h);
+  h.focus = heroFocusMax(h);
+  h.nextBattleStatuses = {};
+  addLog(game, `${h.name}は宿屋で休んだ（${cost}G）`);
   return undefined;
 }
 
@@ -117,14 +121,13 @@ export function townRemoveCard(game: GameState, cmd: Cmd<'TOWN_REMOVE_CARD'>): s
   const err = inTown(game, cmd.playerId);
   if (err) return err;
   const h = findHero(game, cmd.heroId);
-  if (!h || !heroesInTown(game).includes(h)) return 'このキャラは町にいません';
-  if (!ownedBy(h, cmd.playerId)) return '担当していないキャラです';
+  if (!h || h !== townVisitor(game)) return '町に入ったキャラのカードだけ取り除けます';
   const cost = TOWNS.get(game.town!.townId).removeCost;
-  if (game.gold < cost) return 'ゴールドが足りません';
+  if (h.gold < cost) return 'ゴールドが足りません';
   if (h.deck.length <= BALANCE.minDeckSize) return `山札は${BALANCE.minDeckSize}枚より少なくできません`;
   const i = h.deck.findIndex((c) => c.uid === cmd.cardUid);
   if (i < 0) return 'そのカードはありません';
-  game.gold -= cost;
+  h.gold -= cost;
   const [c] = h.deck.splice(i, 1);
   addLog(game, `${h.name}の山札から「${CARDS.get(c.cardId).name}」を取り除いた（${cost}G）`);
   return undefined;
@@ -133,12 +136,13 @@ export function townRemoveCard(game: GameState, cmd: Cmd<'TOWN_REMOVE_CARD'>): s
 export function townSell(game: GameState, cmd: Cmd<'TOWN_SELL'>): string | undefined {
   const err = inTown(game, cmd.playerId);
   if (err) return err;
-  const i = game.stash.findIndex((x) => x.uid === cmd.itemUid);
+  const v = townVisitor(game)!;
+  const i = v.stash.findIndex((x) => x.uid === cmd.itemUid);
   if (i < 0 || isEquipped(game, cmd.itemUid)) return '売れる持ち物ではありません';
-  const [it] = game.stash.splice(i, 1);
+  const [it] = v.stash.splice(i, 1);
   const g = sellPrice(it.itemId);
-  game.gold += g;
-  addLog(game, `${getItem(it.itemId).name}を売った（${g}G）`);
+  v.gold += g;
+  addLog(game, `${v.name}が${getItem(it.itemId).name}を売った（${g}G）`);
   return undefined;
 }
 
@@ -178,7 +182,7 @@ export function questReport(game: GameState, cmd: Cmd<'QUEST_REPORT'>, rng: Rng)
   q.reported = true;
   const ctx = makeOutcomeCtx(game, rng, findHero(game, game.town!.heroId));
   for (const o of def.reward) applyOutcome(ctx, o);
-  addLoot(game, ctx.loot);
+  addLoot(game, ctx.loot, [townVisitor(game)!]);
   for (const h of game.heroes) clampHero(h);
   addLog(game, `依頼「${def.title}」を報告した！（${def.rewardText}）`);
   return undefined;
@@ -201,12 +205,13 @@ export function shrineChoose(game: GameState, cmd: Cmd<'SHRINE_CHOOSE'>, rng: Rn
   const def = SHRINES.get(s.shrineId);
   const opt = def.options[cmd.optionIndex];
   if (!opt) return '選択肢がありません';
+  if (!ownedBy(findHero(game, s.heroId), cmd.playerId)) return '祠に来たキャラの担当の人が選びます';
   const h = findHero(game, cmd.heroId);
   if (!h || h.hp <= 0 || !ownedBy(h, cmd.playerId) || !(game.party ?? []).includes(h.id)) return 'このキャラは祈れません';
   if (opt.permanent && (h.blessings ?? 0) >= BALANCE.maxBlessings) return `永続の加護は1人${BALANCE.maxBlessings}つまでです`;
   const ctx = makeOutcomeCtx(game, rng, h);
   for (const o of opt.outcomes) applyOutcome(ctx, o);
-  addLoot(game, ctx.loot);
+  addLoot(game, ctx.loot, [h]);
   if (opt.permanent) h.blessings = (h.blessings ?? 0) + 1;
   for (const x of game.heroes) clampHero(x);
   game.world.tiles[s.tile].f!.used = true;
@@ -217,7 +222,7 @@ export function shrineChoose(game: GameState, cmd: Cmd<'SHRINE_CHOOSE'>, rng: Rn
 
 export function leaveShrine(game: GameState, cmd: Cmd<'LEAVE_SHRINE'>, rng: Rng): string | undefined {
   if (game.mode !== 'shrine' || !game.shrine) return '祠にいません';
-  if (!isPartyPlayer(game, cmd.playerId)) return 'このパーティのプレイヤーではありません';
+  if (!ownedBy(findHero(game, game.shrine.heroId), cmd.playerId)) return '祠に来たキャラの担当の人が操作します';
   game.shrine = undefined;
   backToWorld(game, rng, false);
   return undefined;

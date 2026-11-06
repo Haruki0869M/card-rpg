@@ -20,6 +20,9 @@ import { SetupScreen } from './components/screens/SetupScreen';
 import { JoinScreen, LobbyScreen, OnlineOverlay } from './components/screens/OnlineScreens';
 import { TitleScreen } from './components/screens/TitleScreen';
 import { Sheets } from './components/Sheets';
+import { SceneTabs } from './components/SceneTabs';
+import { VoteStatus } from './components/ui/Votes';
+import { TurnLock } from './components/ui/TurnLock';
 import { findAlly } from './engine';
 import { useBackButton } from './hooks/useBackButton';
 import { useDetail } from './hooks/usePress';
@@ -175,11 +178,16 @@ export default function App() {
   return (
     <MotionConfig reducedMotion="user">
       <div className="flex h-dvh w-full justify-center bg-[#050407]">
-        <div className="relative flex h-full w-full max-w-[480px] justify-center overflow-hidden">
-          <CurrentScreen />
+        <div className="relative flex h-full w-full max-w-[480px] flex-col overflow-hidden">
+          <SceneTabs />
+          <div className="relative flex min-h-0 w-full flex-1 justify-center">
+            <CurrentScreen />
+          </div>
           <Sheets />
           <DetailPopup />
           <OnlineOverlay />
+          <VoteStatus />
+          <TurnLock />
           <Toast />
         </div>
       </div>

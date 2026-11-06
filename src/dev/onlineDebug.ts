@@ -25,7 +25,7 @@ const api = {
     return g ? botNextCommand(g, memo) : null;
   },
   /** 画面と同じ道で操作を送る */
-  send: (cmd: GameCommand) => useBattle.getState().dispatchGame(cmd) ?? null,
+  send: (cmd: GameCommand) => useBattle.getState().dispatchWire(cmd) ?? null,
   setProxy: (p: 'P1' | 'P2' | 'P3' | 'P4', on: boolean) => useOnline.getState().setProxy(p, on),
   goOffline: () => useOnline.getState().room?.backend.goOffline(),
   goOnline: () => useOnline.getState().room?.backend.goOnline(),

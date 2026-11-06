@@ -10,7 +10,9 @@ declare module '../../../../types' {
 export const outcome: OutcomeHandler<'loseGold'> = {
   kind: 'loseGold',
   apply(ctx, o) {
-    ctx.game.gold = Math.max(0, ctx.game.gold - o.amount);
+    // 選んだキャラ（いなければ場面の先頭のキャラ）が払う
+    const h = ctx.actor ?? ctx.targets(false)[0];
+    if (h) h.gold = Math.max(0, h.gold - o.amount);
   },
   describe: (o) => `${o.amount}ゴールドを失う`,
 };

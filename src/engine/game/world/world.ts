@@ -6,12 +6,12 @@ import { EVENTS } from '../../../data/events';
 import { getScenario } from '../../../data/scenarios';
 import { getDifficulty } from '../../../data/rules';
 import { QUESTS, TERRAINS, TOWNS } from '../../../data/world';
-import type { EncounterState, GameCommand, GameState, Hero, QuestState, WorldState } from '../../../types';
+import type { EncounterState, Expedition, GameCommand, GameState, Hero, QuestState, WorldState } from '../../../types';
 import type { Rng } from '../../rng';
-import { addLog, ownedBy, rollWithFocus, statChance, successes } from '../common';
+import { addLog, ownedBy, rollWithFocus, splitGold, statChance, successes } from '../common';
 import { enterDungeonFromWorld, startBattleWith } from '../game';
 import { heroFocusMax, heroMaxHp } from '../hero';
-import { activeHeroes, findHero, livingHeroes } from '../heroes';
+import { activeHeroes, findHero, livingHeroes, mapHeroes, sceneHeroes } from '../heroes';
 import { revealAround } from './fog';
 import { hexDistance, pathTo, reachable } from './hex';
 import { objectiveHandler, type QuestSignal } from './objectives';
@@ -24,11 +24,11 @@ type Cmd<T extends GameCommand['type']> = Extract<GameCommand, { type: T }>;
 // ---------- 参照用 ----------
 
 /** 同じマスにいる、生きているキャラ */
-export const heroesAt = (game: GameState, tile: number) => livingHeroes(game).filter((h) => game.world?.pos[h.id] === tile);
+export const heroesAt = (game: GameState, tile: number) => mapHeroes(game).filter((h) => game.world?.pos[h.id] === tile);
 
 /** 遭遇の戦闘に参加できるキャラ（そのマスから joinRange 以内） */
 export const joinCandidates = (game: GameState, tile: number) =>
-  livingHeroes(game).filter((h) => game.world && hexDistance(game.world, game.world.pos[h.id], tile) <= BALANCE.joinRange);
+  mapHeroes(game).filter((h) => game.world && hexDistance(game.world, game.world.pos[h.id], tile) <= BALANCE.joinRange);
 
 /** 夜に野営した時の夜襲の確率（%）。守護者の能力で下がる */
 export function campAmbushChance(game: GameState, heroId: string): number {
@@ -74,7 +74,15 @@ export function advanceTurn(game: GameState, rng: Rng) {
   if (w.turn && !w.acted.includes(w.turn)) w.acted.push(w.turn);
   w.move = null;
   w.moveRoll = undefined;
-  const next = livingHeroes(game).find((h) => !w.acted.includes(h.id));
+  w.invites = undefined;
+  w.follow = undefined;
+  const onMap = mapHeroes(game);
+  // 全員がダンジョンの中: 世界マップの時間は止まる（誰かが出てきたら、その人の手番から）
+  if (!onMap.length) {
+    w.turn = '';
+    return;
+  }
+  const next = onMap.find((h) => !w.acted.includes(h.id));
   if (next) {
     w.turn = next.id;
     w.prevTile = w.pos[next.id];
@@ -106,7 +114,7 @@ function endWorldTurn(game: GameState, rng: Rng) {
     onCorruptionChange(game, rng, b2);
   }
   revealAround(game, w);
-  const first = livingHeroes(game)[0];
+  const first = mapHeroes(game)[0];
   w.turn = first?.id ?? '';
   w.prevTile = first ? w.pos[first.id] : undefined;
   if (w.corruption >= 100) {
@@ -196,10 +204,12 @@ export function moveHero(game: GameState, cmd: Cmd<'WORLD_MOVE'>): string | unde
   const from = w.pos[h.id];
   const map = reachable(w, from, w.move);
   if (cmd.to === from || !map.has(cmd.to)) return 'そこへは移動できません';
+  // 同行: 自分（同じ担当）のキャラか、誘いを承知したキャラだけ
   const companions = cmd.companions
     .map((id) => findHero(game, id))
-    .filter((c): c is Hero => !!c && c.id !== h.id && c.hp > 0 && !c.retired && w.pos[c.id] === from && !w.acted.includes(c.id));
-  if (companions.length !== cmd.companions.filter((id) => id !== h.id).length) return '同行できないキャラがいます';
+    .filter((c): c is Hero => !!c && c.id !== h.id && c.hp > 0 && !c.retired && w.pos[c.id] === from && !w.acted.includes(c.id))
+    .filter((c) => c.playerId === h.playerId || w.follow?.[c.id] === h.id);
+  if (companions.length !== cmd.companions.filter((id) => id !== h.id).length) return '同行できないキャラがいます（他の人のキャラは、誘って承知してもらいます）';
   const path = pathTo(map, cmd.to);
   const group = [h, ...companions];
   for (const c of companions) if (!w.acted.includes(c.id)) w.acted.push(c.id);
@@ -271,19 +281,37 @@ function startEncounter(game: GameState, _w: WorldState, wandererId: string, til
 
 function encounterParticipants(game: GameState, e: EncounterState, ids: string[]): string[] | string {
   const list = [...new Set([e.heroId, ...ids.filter((id) => id !== e.heroId)])];
+  const mover = findHero(game, e.heroId);
   for (const id of list) {
     const h = findHero(game, id);
     if (!h || h.hp <= 0 || h.retired || !e.candidates.includes(id)) return '参加できないキャラがいます';
+    // 他の人のキャラは、その人が「加わる」と答えた時だけ（同じマスにいるキャラは必ず参加）
+    if (h.playerId !== mover?.playerId && !e.joins?.[id] && game.world?.pos[id] !== e.tile) return `${h.name}は戦闘に加わっていません`;
   }
   // 移動してきたキャラと同じマスのキャラ（同行していたキャラ）は必ず参加する
   for (const h of heroesAt(game, e.tile)) if (!list.includes(h.id)) list.push(h.id);
   return list;
 }
 
+/** 遭遇した（手番の）キャラの担当か */
+const encounterOwner = (game: GameState, e: EncounterState, playerId: string) => ownedBy(findHero(game, e.heroId), playerId);
+
+/** 近くにいる、手番でない人のキャラ: 戦闘に加わる / 加わらない */
+export function encounterJoin(game: GameState, cmd: Cmd<'ENCOUNTER_JOIN'>): string | undefined {
+  const e = game.encounter;
+  if (game.mode !== 'encounter' || !e || e.result) return '今は答えられません';
+  const h = findHero(game, cmd.heroId);
+  if (!h || !ownedBy(h, cmd.playerId)) return '担当していないキャラです';
+  if (!e.candidates.includes(h.id) || h.id === e.heroId) return 'このキャラは加われません';
+  (e.joins ??= {})[h.id] = cmd.join;
+  return undefined;
+}
+
 export function encounterChoose(game: GameState, cmd: Cmd<'ENCOUNTER_CHOOSE'>, rng: Rng): string | undefined {
   const e = game.encounter;
   if (game.mode !== 'encounter' || !e) return '遭遇していません';
   if (e.result) return 'もう選びました';
+  if (!encounterOwner(game, e, cmd.playerId)) return '遭遇したキャラの担当の人が決めます';
   if (e.ambushed && cmd.choice !== 'fight') return '夜襲を受けた！ 戦うしかない';
   const roller = findHero(game, cmd.heroId);
   if (!roller || !ownedBy(roller, cmd.playerId)) return '担当していないキャラです';
@@ -304,6 +332,7 @@ export function encounterChoose(game: GameState, cmd: Cmd<'ENCOUNTER_CHOOSE'>, r
 export function encounterContinue(game: GameState, cmd: Cmd<'ENCOUNTER_CONTINUE'>, rng: Rng): string | undefined {
   const e = game.encounter;
   if (game.mode !== 'encounter' || !e || !e.result) return '判定をしていません';
+  if (!encounterOwner(game, e, cmd.playerId)) return '遭遇したキャラの担当の人が決めます';
   const parts = encounterParticipants(game, e, cmd.participants);
   if (typeof parts === 'string') return parts;
   const w = game.world!;
@@ -343,8 +372,9 @@ export function onWandererDefeated(game: GameState, rng: Rng) {
   if (wd.raidTown) {
     w.raids = w.raids.filter((r) => r.townId !== wd.raidTown);
     w.savedTowns.push(wd.raidTown);
-    game.gold += BALANCE.raidRewardGold;
-    addLog(game, `${TOWNS.get(wd.raidTown).name}を魔物から守った！（${BALANCE.raidRewardGold}G）`);
+    // 戦った全員で山分け
+    splitGold(sceneHeroes(game), BALANCE.raidRewardGold);
+    addLog(game, `${TOWNS.get(wd.raidTown).name}を魔物から守った！（${BALANCE.raidRewardGold}Gを山分け）`);
   }
   void rng;
 }
@@ -356,6 +386,11 @@ export function backToWorld(game: GameState, rng: Rng, endTurn: boolean) {
   game.battleInfo = undefined;
   game.encounter = undefined;
   game.mode = 'world';
+  // ダンジョンの場面から出た: 世界マップの手番には触らない（出てきたキャラは次のワールドターンから動く）
+  if (game.activeScene) {
+    game.dungeon = undefined;
+    return;
+  }
   if (!livingHeroes(game).length) {
     game.mode = 'gameover';
     return;
@@ -449,7 +484,8 @@ export function interact(game: GameState, cmd: Cmd<'WORLD_INTERACT'>, rng: Rng):
         const names = getScenario(game.scenarioId).story?.keys ?? {};
         return `扉が開かない…（必要: ${missing.map((k) => names[k] ?? k).join('・')}）`;
       }
-      const party = (cmd.party?.length ? cmd.party : here).filter((id) => here.includes(id));
+      // 一緒に入るのは、自分のキャラか、誘いを承知した他の人のキャラ
+      const party = (cmd.party?.length ? cmd.party : here).filter((id) => here.includes(id) && (findHero(game, id)?.playerId === h.playerId || w.follow?.[id] === h.id));
       if (!party.includes(h.id)) party.unshift(h.id);
       const before = w.corruption;
       w.corruption = Math.min(100, w.corruption + BALANCE.corruptionOnDungeonEnter);
@@ -457,10 +493,84 @@ export function interact(game: GameState, cmd: Cmd<'WORLD_INTERACT'>, rng: Rng):
       if (game.mode === 'gameover') return undefined;
       for (const id of party) if (!w.acted.includes(id) && id !== h.id) w.acted.push(id);
       enterDungeonFromWorld(game, f.id, party, rng);
+      detachExpedition(game, rng);
       return undefined;
     }
   }
   return 'ここには入れません';
+}
+
+/**
+ * 入ったダンジョンを「世界マップと別の場面」にする。
+ * 入ったキャラは世界マップの手番から外れ、世界マップは残りのキャラで続く（spec M3-C）
+ */
+function detachExpedition(game: GameState, rng: Rng) {
+  const n = game.nextExpeditionId ?? 1;
+  game.nextExpeditionId = n + 1;
+  const exp: Expedition = {
+    id: `x${n}`,
+    heroes: [...(game.party ?? [])],
+    mode: game.mode,
+    dungeon: game.dungeon,
+    battle: game.battle,
+    reward: game.reward,
+    chest: game.chest,
+    event: game.event,
+    battleInfo: game.battleInfo,
+    battleBackground: game.battleBackground,
+  };
+  (game.expeditions ??= []).push(exp);
+  game.dungeon = game.battle = game.reward = game.chest = game.event = game.battleInfo = game.battleBackground = undefined;
+  game.party = undefined;
+  game.mode = 'world';
+  advanceTurn(game, rng);
+}
+
+/** ダンジョンから出てきたキャラが世界マップに戻る */
+export function rejoinWorld(game: GameState, heroes: string[]) {
+  const w = game.world;
+  if (!w) return;
+  const back = heroes.filter((id) => mapHeroes(game).some((h) => h.id === id));
+  if (!back.length) return;
+  // 世界マップに誰もいなかった: 出てきたキャラの手番から再開
+  if (!w.turn || !mapHeroes(game).some((h) => h.id === w.turn)) {
+    w.turn = back[0];
+    w.prevTile = w.pos[back[0]];
+    w.move = null;
+    w.moveRoll = undefined;
+    w.acted = w.acted.filter((id) => !back.includes(id));
+    return;
+  }
+  // 世界マップは進行中: 次のワールドターンから動く
+  for (const id of back) if (!w.acted.includes(id)) w.acted.push(id);
+}
+
+// ---------- 同行の誘い（他の人のキャラ） ----------
+
+/** 手番のキャラが、同じマスの他の人のキャラを誘う */
+export function worldInvite(game: GameState, cmd: Cmd<'WORLD_INVITE'>): string | undefined {
+  const t = turnCheck(game, cmd.playerId, cmd.heroId);
+  if (typeof t === 'string') return t;
+  const { w, h } = t;
+  const target = findHero(game, cmd.targetId);
+  if (!target || target.hp <= 0 || target.retired || w.pos[target.id] !== w.pos[h.id] || w.acted.includes(target.id)) return '誘えるキャラではありません';
+  if (target.playerId === h.playerId) return '自分のキャラは誘わなくても連れて行けます';
+  (w.invites ??= {})[target.id] = h.id;
+  return undefined;
+}
+
+/** 誘われたキャラの担当が答える（承知すると、この手番の移動に同行できる） */
+export function worldInviteAnswer(game: GameState, cmd: Cmd<'WORLD_INVITE_ANSWER'>): string | undefined {
+  const w = game.world;
+  if (!w || game.mode !== 'world') return '世界マップにいません';
+  const target = findHero(game, cmd.heroId);
+  if (!target || !ownedBy(target, cmd.playerId)) return '担当していないキャラです';
+  const by = w.invites?.[target.id];
+  if (!by) return '誘われていません';
+  delete w.invites![target.id];
+  if (cmd.accept) (w.follow ??= {})[target.id] = by;
+  else if (w.follow) delete w.follow[target.id];
+  return undefined;
 }
 
 export function storyContinue(game: GameState): string | undefined {

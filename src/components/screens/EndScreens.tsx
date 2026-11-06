@@ -1,4 +1,6 @@
 // ===== ダンジョン制覇・全滅の画面 =====
+import { VoteChips } from '../ui/Votes';
+import { totalGold } from '../../engine';
 import { motion } from 'framer-motion';
 import { Castle, Crown, Skull } from 'lucide-react';
 import { useBattle } from '../../store/battleStore';
@@ -15,7 +17,7 @@ function Stats() {
     ['与えた総ダメージ', st.totalDamage],
     ['完全成功', `${st.perfects}回`],
     ['最高の宝', st.bestRarity ? RARITY_STYLE[st.bestRarity].name : '-'],
-    ['所持金', `${game.gold}G`],
+    ['所持金（全員）', `${totalGold(game)}G`],
   ];
   return (
     <div className="mt-2 flex flex-col text-[14px]">
@@ -46,9 +48,11 @@ export function ClearedScreen() {
           <div className="font-display text-[18px] text-amber-100">{game.dungeon?.name}</div>
         </motion.div>
         <div className="mt-2 flex -space-x-2">
-          {game.heroes.map((h) => (
-            <HeroFace key={h.id} hero={h} size={44} />
-          ))}
+          {game.heroes
+            .filter((h) => !game.party || game.party.includes(h.id))
+            .map((h) => (
+              <HeroFace key={h.id} hero={h} size={44} />
+            ))}
         </div>
         <div className="panel panel-gold-edge mt-3 w-full rounded-2xl p-3">
           <Stats />
@@ -57,6 +61,7 @@ export function ClearedScreen() {
       <div className="shrink-0 px-3 pb-3">
         <button onClick={() => dispatchGame({ type: 'RETURN_TO_HUB', playerId: LOCAL_PLAYER })} className="btn btn-gold font-display flex h-14 w-full items-center justify-center gap-2 rounded-xl text-[19px]">
           <Castle size={22} /> {game.world ? '地上に戻る' : '拠点に戻る'}
+          <VoteChips cmd={{ type: 'RETURN_TO_HUB', playerId: LOCAL_PLAYER }} />
         </button>
       </div>
     </Screen>

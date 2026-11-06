@@ -9,7 +9,7 @@ import { SCENARIOS } from '../../data/scenarios';
 import { PLAYER_COLOR } from '../../data/theme';
 import { livingHeroes, waitingPlayers } from '../../engine';
 import { normalizeCode, SEATS } from '../../net/room';
-import { autoName } from '../../store/battleConfig';
+import { autoName, isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
 import { PROXY_WAIT_SEC, useOnline } from '../../store/onlineStore';
 import type { GameState, PlayerId } from '../../types';
@@ -371,6 +371,10 @@ export function OnlineOverlay() {
     return () => clearInterval(t);
   }, []);
   if (!room || screen !== 'game' || !game) return null;
+  // 同行に誘われている（この端末のキャラ）
+  const invites = Object.entries(game.world?.invites ?? {})
+    .map(([target, by]) => ({ target: game.heroes.find((h) => h.id === target)!, by: game.heroes.find((h) => h.id === by)! }))
+    .filter((x) => x.target && x.by && isLocalPlayer(x.target.playerId));
   const offlineAwaited = awaitedSeats(game).filter((p) => !room.seatOnline(p) && !room.meta?.proxy?.[p] && livingHeroes(game).some((h) => h.playerId === p));
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 z-[70] flex flex-col items-center gap-1 px-3 pt-14">
@@ -405,6 +409,22 @@ export function OnlineOverlay() {
           </div>
         );
       })}
+      {invites.map(({ target, by }) => (
+        <div key={target.id} className="pointer-events-auto flex w-full max-w-[400px] flex-col gap-1 rounded-xl border border-sky-300/50 bg-black/90 px-3 py-2 text-[13px] text-sky-50">
+          <div className="flex items-center gap-1.5">
+            <SeatChip p={by.playerId} small /> {room.seatName(by.playerId) ?? by.playerId}さんの{by.name}が、{target.name}を同行に誘っています
+          </div>
+          <div className="text-[12px] text-zinc-400">一緒に行くと、{target.name}はこのワールドターンの行動を終えます</div>
+          <div className="flex gap-1.5">
+            <button onClick={() => useBattle.getState().dispatchGame({ type: 'WORLD_INVITE_ANSWER', playerId: target.playerId, heroId: target.id, accept: true })} className="btn btn-gold h-11 flex-1 rounded-lg text-[13px] font-bold">
+              一緒に行く
+            </button>
+            <button onClick={() => useBattle.getState().dispatchGame({ type: 'WORLD_INVITE_ANSWER', playerId: target.playerId, heroId: target.id, accept: false })} className="btn btn-dark h-11 flex-1 rounded-lg text-[13px] font-bold">
+              行かない
+            </button>
+          </div>
+        </div>
+      ))}
       <AnimatePresence>
         {stamp && shownStamp === stamp.id && (
           <motion.div

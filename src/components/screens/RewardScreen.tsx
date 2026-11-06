@@ -1,4 +1,5 @@
 // ===== 戦闘の報酬（ゴールド → 経験値 → レベルアップ → カード → ドロップ） =====
+import { VoteChips } from '../ui/Votes';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowUpCircle, Coins, Gift, Heart, Sparkles, Star, TrendingUp } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -173,7 +174,7 @@ export function RewardScreen() {
             勝利！
           </div>
           <div className="flex items-center justify-center gap-1 text-[16px] font-bold text-amber-200">
-            <Coins size={18} /> +{r.gold} G
+            <Coins size={18} /> +{r.gold} G{r.exp.length > 1 ? `（${r.exp.length}人で山分け）` : ''}
           </div>
         </motion.div>
 
@@ -199,7 +200,7 @@ export function RewardScreen() {
             );
           })}
           {game.heroes
-            .filter((h) => !r.exp.some((e) => e.heroId === h.id))
+            .filter((h) => (!game.party || game.party.includes(h.id)) && !r.exp.some((e) => e.heroId === h.id))
             .map((h) => (
               <div key={h.id} className="flex items-center gap-2 rounded-lg bg-black/30 p-1.5 text-[12px] text-zinc-400">
                 <HeroFace hero={h} size={26} dim /> {h.name}は戦闘不能だったため経験値なし（HP1で復帰）
@@ -232,6 +233,7 @@ export function RewardScreen() {
         ) : (
           <button onClick={() => dispatchGame({ type: 'FINISH_REWARD', playerId: LOCAL_PLAYER })} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px]">
             {r.hiddenChest ? '隠し宝箱へ' : '先へ進む'}
+            <VoteChips cmd={{ type: 'FINISH_REWARD', playerId: LOCAL_PLAYER }} />
           </button>
         )}
       </div>

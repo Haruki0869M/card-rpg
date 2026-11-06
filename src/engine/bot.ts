@@ -19,7 +19,11 @@ import {
   reachable,
   reachableRooms,
   unusableReason,
+  viewOf,
   waitingPlayers,
+  commandPlayer,
+  needsVote,
+  notVoted,
 } from './index';
 
 export interface BotLog {
@@ -32,6 +36,8 @@ export interface BotLog {
 let capture: GameCommand[] | null = null;
 
 function send(g: GameState, cmd: GameCommand, log: BotLog): GameState {
+  // みんなで決める操作は、まだ選んでいない人の1票として入れる（全員入ると決まる）
+  if (needsVote(g, cmd)) cmd = { type: 'VOTE', playerId: notVoted(g)[0] ?? commandPlayer(cmd)!, command: cmd };
   if (capture) {
     capture.push(cmd);
     return { ...g };
@@ -41,7 +47,11 @@ function send(g: GameState, cmd: GameCommand, log: BotLog): GameState {
   return r.state;
 }
 
-const pid = (g: GameState, heroId?: string): PlayerId => (heroId ? findHero(g, heroId)?.playerId : undefined) ?? g.heroes[0].playerId;
+/** 操作するプレイヤー（キャラの指定が無ければ、世界マップの場面は手番の人、ダンジョンは先頭のキャラの人） */
+const pid = (g: GameState, heroId?: string): PlayerId => {
+  const owner = (id?: string) => (id ? findHero(g, id)?.playerId : undefined);
+  return owner(heroId) ?? (!g.activeScene && g.world?.turn ? owner(g.world.turn) : undefined) ?? owner(g.party?.[0]) ?? g.heroes[0].playerId;
+};
 
 /** 目的のダンジョン（鍵の順。最後は魔王城） */
 function goalDungeon(g: GameState): string {
@@ -66,7 +76,7 @@ function worldTarget(g: GameState, at: number): { tile: number; why: 'town' | 'g
     let best: number | undefined;
     w.tiles.forEach((t, i) => {
       if (t.f?.kind !== 'town' || w.fallenTowns.includes(t.f.id) || !t.seen) return;
-      if (g.gold < TOWNS.get(t.f.id).innCost) return;
+      if (heroes.every((h) => h.gold < TOWNS.get(t.f!.id).innCost)) return;
       if (best === undefined || hexDistance(w, at, i) < hexDistance(w, at, best)) best = i;
     });
     if (best !== undefined) return { tile: best, why: 'town' };
@@ -95,13 +105,23 @@ function worldStep(g: GameState, log: BotLog, memo: { interacted: Set<string> })
     }
   }
   if (w.move === null) return send(g, { type: 'WORLD_ROLL_MOVE', playerId: p, heroId: h.id, focusUsed: 0 }, log);
+  // 同じマスの他の人のキャラは、誘って承知してもらってから一緒に動く（自動プレイは全員の代わりに答える）
+  if (w.move === null) {
+    for (const c of livingHeroes(g)) {
+      if (c.id === h.id || c.playerId === h.playerId || w.pos[c.id] !== at || w.acted.includes(c.id) || w.follow?.[c.id] === h.id) continue;
+      if (g.expeditions?.some((x) => x.heroes.includes(c.id))) continue;
+      if (w.invites?.[c.id] === h.id) return send(g, { type: 'WORLD_INVITE_ANSWER', playerId: c.playerId, heroId: c.id, accept: true }, log);
+      return send(g, { type: 'WORLD_INVITE', playerId: p, heroId: h.id, targetId: c.id }, log);
+    }
+  }
   if (w.move > 0) {
     const reach = reachable(w, at, w.move);
     let best = at;
     for (const [i] of reach) if (hexDistance(w, i, target.tile) < hexDistance(w, best, target.tile)) best = i;
     if (best !== at) {
       const companions = livingHeroes(g)
-        .filter((x) => x.id !== h.id && w.pos[x.id] === at && !w.acted.includes(x.id))
+        .filter((x) => x.id !== h.id && w.pos[x.id] === at && !w.acted.includes(x.id) && !g.expeditions?.some((e) => e.heroes.includes(x.id)))
+        .filter((x) => x.playerId === h.playerId || w.follow?.[x.id] === h.id)
         .map((x) => x.id);
       return send(g, { type: 'WORLD_MOVE', playerId: p, heroId: h.id, to: best, companions }, log);
     }
@@ -129,21 +149,42 @@ function battleStep(g: GameState, log: BotLog): GameState {
   return send(g, { type: 'FINISH_BATTLE', playerId: pid(g) }, log);
 }
 
-/** 持ち物の装備のうち、格が上のものを装備する */
+/** 持ち物の装備のうち、格が上のものを装備する（使えない人が持っていたら、同じ場所の使える仲間に渡す） */
 function equipBest(g: GameState, log: BotLog): GameState {
-  for (const h of livingHeroes(g)) {
-    for (const inst of g.stash) {
+  const near = (a: string, b: string) => !g.world || g.world.pos[a] === g.world.pos[b];
+  const heroes = livingHeroes(g).filter((h) => !g.party || g.party.includes(h.id));
+  const scene = g.mode === 'world' ? heroes.filter((h) => !g.expeditions?.some((x) => x.heroes.includes(h.id))) : heroes;
+  for (const owner of scene) {
+    for (const inst of owner.stash) {
       const it = getItem(inst.itemId);
-      if (canEquip(h, it)) continue;
-      const cur = h.equipment[it.slot as 'weapon' | 'armor' | 'accessory'];
-      if (cur && rarityIndex(getItem(cur.itemId).rarity) >= rarityIndex(it.rarity)) continue;
-      return send(g, { type: 'EQUIP', playerId: h.playerId, heroId: h.id, itemUid: inst.uid }, log);
+      const better = (h: (typeof scene)[number]) => {
+        if (canEquip(h, it)) return false;
+        const cur = h.equipment[it.slot as 'weapon' | 'armor' | 'accessory'];
+        return !cur || rarityIndex(getItem(cur.itemId).rarity) < rarityIndex(it.rarity);
+      };
+      if (better(owner)) return send(g, { type: 'EQUIP', playerId: owner.playerId, heroId: owner.id, itemUid: inst.uid }, log);
+      const to = scene.find((h) => h !== owner && near(h.id, owner.id) && better(h));
+      if (to) return send(g, { type: 'GIVE', playerId: owner.playerId, fromHeroId: owner.id, toHeroId: to.id, itemUid: inst.uid }, log);
     }
   }
   return g;
 }
 
-export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<string>; town?: string }): GameState {
+export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<string>; town?: string }, inScene = false): GameState {
+  // ダンジョンの場面があれば、先にそちらを進める（その場面を載せた冒険で次の操作を決めて、SCENE で送る）
+  const exp = inScene ? undefined : g.expeditions?.[0];
+  if (exp && g.mode !== 'gameover' && g.mode !== 'ending') {
+    const outer = capture;
+    capture = [];
+    let inner: GameCommand | undefined;
+    try {
+      botStep(viewOf(g, exp.id), log, memo, true);
+      inner = capture[0];
+    } finally {
+      capture = outer;
+    }
+    if (inner) return send(g, { type: 'SCENE', scene: exp.id, command: inner }, log);
+  }
   log.modes[g.mode] = (log.modes[g.mode] ?? 0) + 1;
   switch (g.mode) {
     case 'world': {
@@ -153,7 +194,11 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
     }
     case 'encounter': {
       const e = g.encounter!;
-      if (e.result) return send(g, { type: 'ENCOUNTER_CONTINUE', playerId: pid(g), participants: e.candidates }, log);
+      // 近くにいる他の人のキャラは「加わる」と答えてから（自動プレイは全員の代わりに答える）
+      const mover = findHero(g, e.heroId)!;
+      const ask = e.candidates.map((id) => findHero(g, id)!).find((c) => c.playerId !== mover.playerId && g.world!.pos[c.id] !== e.tile && e.joins?.[c.id] === undefined);
+      if (ask && !e.result) return send(g, { type: 'ENCOUNTER_JOIN', playerId: ask.playerId, heroId: ask.id, join: true }, log);
+      if (e.result) return send(g, { type: 'ENCOUNTER_CONTINUE', playerId: pid(g, e.heroId), participants: e.candidates }, log);
       return send(g, { type: 'ENCOUNTER_CHOOSE', playerId: pid(g, e.heroId), choice: 'fight', heroId: e.heroId, focusUsed: 0, participants: e.candidates }, log);
     }
     case 'battle':
@@ -187,12 +232,16 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
       const ev = g.event!;
       if (ev.result) return send(g, { type: 'FINISH_EVENT', playerId: pid(g) }, log);
       const def = EVENTS.get(ev.eventId);
-      const idx = def.options.findIndex((_, i) => {
-        const st = eventOptionState(g, ev.eventId, i);
-        return st.visible && !st.reason;
-      });
-      const h = livingHeroes(g).find((x) => !g.party || g.party.includes(x.id))!;
-      return send(g, { type: 'CHOOSE_EVENT', playerId: h.playerId, optionIndex: idx, heroId: h.id, focusUsed: 0 }, log);
+      const party = livingHeroes(g).filter((x) => !g.party || g.party.includes(x.id));
+      // 選べる選択肢と、選ぶキャラ（お金がいる時は払えるキャラ）
+      for (let i = 0; i < def.options.length; i++) {
+        const h = party.find((x) => {
+          const st = eventOptionState(g, ev.eventId, i, x);
+          return st.visible && !st.reason;
+        });
+        if (h) return send(g, { type: 'CHOOSE_EVENT', playerId: h.playerId, optionIndex: i, heroId: h.id, focusUsed: 0 }, log);
+      }
+      return g;
     }
     case 'rest':
       return send(g, { type: 'REST', playerId: pid(g), kind: 'hp' }, log);
@@ -203,10 +252,10 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
       const key = `${g.world!.worldTurn}:${t.townId}`;
       if (memo.town !== key) {
         memo.town = key;
-        const hurt = livingHeroes(g).some((h) => h.hp < heroMaxHp(h));
-        if (hurt && g.gold >= TOWNS.get(t.townId).innCost) return send(g, { type: 'TOWN_INN', playerId: pid(g) }, log);
+        const v = g.heroes.find((h) => h.id === t.heroId)!;
+        if (v.hp < heroMaxHp(v) && v.gold >= TOWNS.get(t.townId).innCost) return send(g, { type: 'TOWN_INN', playerId: v.playerId }, log);
       }
-      return send(g, { type: 'LEAVE_TOWN', playerId: pid(g) }, log);
+      return send(g, { type: 'LEAVE_TOWN', playerId: pid(g, t.heroId) }, log);
     }
     case 'shrine': {
       const s = g.shrine!;

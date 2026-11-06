@@ -113,6 +113,15 @@ async function drive(list, steps) {
         continue;
       }
       retries = 0;
+      // みんなで決める操作の途中（1人が選んだところ）を、別の端末で撮る
+      if (!shotVote && (cmd.type === 'VOTE' || (cmd.type === 'SCENE' && cmd.command.type === 'VOTE'))) {
+        const other = list.find((p) => p !== sender);
+        if (other) {
+          await wait(600);
+          await shot(other, 'vote');
+          shotVote = true;
+        }
+      }
       await until(async () => (await h.evaluate(() => window.__online.seq())) > before, 15000, `step ${i} ${cmd.type}`);
     }
     if (!shotBattle && mode === 'battle') {
@@ -127,6 +136,7 @@ async function drive(list, steps) {
   // 全員の番号がそろうまで待つ（ホストの敵の自動行動で進み続けることがあるので、そろった時点で比べる）
   await until(async () => new Set(await Promise.all(list.map((p) => p.evaluate(() => window.__online.hash())))).size === 1, 30000, 'all caught up');
 }
+let shotVote = false;
 const sameHash = async (list) => {
   const hs = await Promise.all(list.map((p) => p.evaluate(() => window.__online.hash())));
   return { ok: hs.every((h) => h === hs[0]), hs };

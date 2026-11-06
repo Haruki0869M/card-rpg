@@ -1,4 +1,5 @@
 // ===== 宝箱・イベント・休憩の画面 =====
+import { VoteChips } from '../ui/Votes';
 import { motion } from 'framer-motion';
 import { Coins, Flame, Sparkles, Star } from 'lucide-react';
 import { useState } from 'react';
@@ -31,6 +32,7 @@ export function LootList({ loot }: { loot: Loot[] }) {
                 <Coins size={24} className="text-amber-300" />
               </span>
               <b className="text-amber-200">{l.amount} ゴールド</b>
+              {l.to && <span className="text-[12px] text-zinc-400">{l.to.length > 1 ? `${l.to.length}人で山分け` : `→ ${game.heroes.find((x) => x.id === l.to![0])?.name}`}</span>}
             </motion.div>
           );
         if (l.kind === 'card') {
@@ -50,6 +52,7 @@ export function LootList({ loot }: { loot: Loot[] }) {
               <span className="block text-[14px] font-bold" style={{ color: r.color }}>
                 {def.name} <span className="text-[12px] font-normal opacity-80">{r.name}</span>
               </span>
+              {l.to && <span className="block text-[12px] text-sky-200">→ {game.heroes.find((x) => x.id === l.to)?.name}が受け取った</span>}
               <span className="block truncate text-[12px] text-zinc-300">{itemSummary(def)}</span>
             </span>
           </motion.div>
@@ -107,6 +110,7 @@ export function EventScreen() {
         {ev.result ? (
           <button onClick={() => dispatchGame({ type: 'FINISH_EVENT', playerId: LOCAL_PLAYER })} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px]">
             先へ進む
+            <VoteChips cmd={{ type: 'FINISH_EVENT', playerId: LOCAL_PLAYER }} />
           </button>
         ) : opt?.check ? (
           <>
@@ -147,7 +151,10 @@ export function EventScreen() {
                   onClick={() => choose(i)}
                   className={`btn flex min-h-12 flex-col items-start justify-center rounded-xl px-3 py-1 text-left ${o.requiresTag ? 'border border-sky-300/60 bg-sky-950/60' : 'btn-dark'}`}
                 >
-                  <span className="text-[15px] font-bold">{o.label}</span>
+                  <span className="text-[15px] font-bold">
+                    {o.label}
+                    <VoteChips cmd={{ type: 'CHOOSE_EVENT', playerId: LOCAL_PLAYER, optionIndex: i, focusUsed: 0 }} />
+                  </span>
                   {o.check && <span className="text-[12px] text-zinc-400">能力値で判定（成功率は次の画面で確認できます）</span>}
                   {st.reason && <span className="text-[12px] text-red-300">{st.reason}</span>}
                 </button>
@@ -198,11 +205,17 @@ export function RestScreen() {
       </div>
       <div className="grid shrink-0 grid-cols-2 gap-2 px-3 pt-2 pb-3">
         <button onClick={() => dispatchGame({ type: 'REST', playerId: LOCAL_PLAYER, kind: 'hp' })} className="btn btn-gold flex h-16 flex-col items-center justify-center rounded-xl">
-          <span className="font-display text-[18px]">休む</span>
+          <span className="font-display text-[18px]">
+            休む
+            <VoteChips cmd={{ type: 'REST', playerId: LOCAL_PLAYER, kind: 'hp' }} />
+          </span>
           <span className="text-[12px]">全員のHPを最大の{Math.round(BALANCE.restHpRatio * 100)}%回復</span>
         </button>
         <button onClick={() => dispatchGame({ type: 'REST', playerId: LOCAL_PLAYER, kind: 'focus' })} className="btn btn-dark flex h-16 flex-col items-center justify-center rounded-xl">
-          <span className="font-display text-[18px] text-amber-200">瞑想する</span>
+          <span className="font-display text-[18px] text-amber-200">
+            瞑想する
+            <VoteChips cmd={{ type: 'REST', playerId: LOCAL_PLAYER, kind: 'focus' }} />
+          </span>
           <span className="text-[12px]">全員のフォーカス+{BALANCE.restFocus}</span>
         </button>
       </div>

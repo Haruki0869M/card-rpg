@@ -45,7 +45,7 @@ export async function startBattle(page, partySize, enemies, fast = true) {
   await page.waitForTimeout(200);
   if (enemies) {
     await edit((g, enemies) => {
-      g.dungeon.rooms.find((r) => r.id === 'r0c0').enemies = enemies.map((defId) => ({ defId, level: 3 }));
+      (g.expeditions?.[0]?.dungeon ?? g.dungeon).rooms.find((r) => r.id === 'r0c0').enemies = enemies.map((defId) => ({ defId, level: 3 }));
     }, enemies);
   }
   await page.getByLabel('戦闘').first().click();

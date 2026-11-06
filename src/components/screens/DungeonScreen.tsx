@@ -1,4 +1,5 @@
 // ===== ダンジョンの地図（下から上へ進む。部屋の中身は入る前から見える） =====
+import { VoteChips } from '../ui/Votes';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Backpack, Check, Coins, Crown, Flame, Gift, Lock, LogOut, Menu, Sparkles, Swords, Skull, Users, X } from 'lucide-react';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -6,7 +7,7 @@ import { BattleBackground, EnemyArt } from '../../art';
 import { getEnemy } from '../../data/enemies';
 import { EVENTS } from '../../data/events';
 import { getItem } from '../../data/items';
-import { chestOdds, reachableRooms, retreatLoss } from '../../engine';
+import { chestOdds, partyGold, reachableRooms, retreatLoss } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
 import { LOCAL_PLAYER } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
@@ -124,7 +125,7 @@ export function DungeonScreen() {
       <div className="flex h-12 shrink-0 items-center gap-2 px-2">
         <div className="font-display text-outline min-w-0 flex-1 truncate text-[18px] text-amber-100">{run.name}</div>
         <div className="panel flex h-9 items-center gap-1 rounded-full px-3 text-[14px] font-bold text-amber-200 tabular-nums">
-          <Coins size={16} /> {game.gold}G
+          <Coins size={16} /> {partyGold(game)}G
         </div>
         <button onClick={() => openSheet('menu')} aria-label="メニュー" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-lg">
           <Menu size={22} />
@@ -229,6 +230,7 @@ export function DungeonScreen() {
                   className="btn btn-gold font-display mt-2 h-12 w-full rounded-xl text-[18px]"
                 >
                   この部屋へ進む
+                  <VoteChips cmd={{ type: 'ENTER_ROOM', playerId: LOCAL_PLAYER, roomId: sel.id }} />
                 </button>
               ) : (
                 <div className="mt-1 text-center text-[12px] text-zinc-400">{sel.cleared ? '通過済みの部屋' : 'まだ進めない部屋（光っている部屋から選ぶ）'}</div>
@@ -239,16 +241,18 @@ export function DungeonScreen() {
       </div>
 
       <div className="flex shrink-0 gap-1 px-2 pt-2">
-        {game.heroes.map((h) => (
-          <HeroMini key={h.id} hero={h} onTap={() => openSheet('party')} />
-        ))}
+        {game.heroes
+          .filter((h) => !game.party || game.party.includes(h.id))
+          .map((h) => (
+            <HeroMini key={h.id} hero={h} onTap={() => openSheet('party')} />
+          ))}
       </div>
       <div className="grid shrink-0 grid-cols-3 gap-2 px-2 pt-2 pb-3">
         <button onClick={() => openSheet('party')} className="btn btn-dark flex h-12 items-center justify-center gap-1 rounded-xl text-[14px] font-bold">
           <Users size={17} className="text-amber-300" /> 装備
         </button>
         <button onClick={() => openSheet('pouch')} className="btn btn-dark flex h-12 items-center justify-center gap-1 rounded-xl text-[14px] font-bold">
-          <Backpack size={17} className="text-amber-300" /> 道具（{game.pouch.length}）
+          <Backpack size={17} className="text-amber-300" /> 道具
         </button>
         <button onClick={() => setShowRetreat((v) => !v)} className="btn btn-dark flex h-12 items-center justify-center gap-1 rounded-xl text-[14px] font-bold">
           <LogOut size={17} className="text-red-300" /> 撤退
@@ -289,6 +293,7 @@ export function DungeonScreen() {
                   className="btn h-12 rounded-lg border border-red-300/60 bg-red-800 font-bold"
                 >
                   撤退する
+                  <VoteChips cmd={{ type: 'RETREAT', playerId: LOCAL_PLAYER }} />
                 </button>
               </div>
             </div>
