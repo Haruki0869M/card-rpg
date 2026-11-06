@@ -8,10 +8,12 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "emulators": "firebase emulators:start --only auth,database --project demo-card-rpg"
   },
   "dependencies": {
     "@fontsource/zen-antique": "^5.3.1",
+    "firebase": "^13.2.0",
     "framer-motion": "^14.9.1",
     "lucide-react": "^1.68.0",
     "react": "^19.3.1",

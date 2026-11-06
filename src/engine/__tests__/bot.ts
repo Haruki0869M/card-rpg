@@ -28,7 +28,14 @@ export interface BotLog {
   modes: Record<string, number>;
 }
 
+/** 次の操作を決めるだけの時（オンライン協力のテスト）は、ここに入れて動かさない */
+let capture: GameCommand[] | null = null;
+
 function send(g: GameState, cmd: GameCommand, log: BotLog): GameState {
+  if (capture) {
+    capture.push(cmd);
+    return { ...g };
+  }
   const r = applyGameCommand(g, cmd);
   if (r.error) log.errors.push(`${g.mode}/${cmd.type}: ${r.error}`);
   return r.state;
@@ -210,6 +217,17 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
       return send(g, { type: 'ENTER_DUNGEON', playerId: pid(g), dungeonId: goalDungeon(g) }, log);
     default:
       return g;
+  }
+}
+
+/** 次に送る操作を決める（状態は変えない）。何もすることがなければ null */
+export function botNextCommand(g: GameState, memo: { interacted: Set<string>; town?: string }): GameCommand | null {
+  capture = [];
+  try {
+    botStep(g, { steps: 0, errors: [], modes: {} }, memo);
+    return capture[0] ?? null;
+  } finally {
+    capture = null;
   }
 }
 
