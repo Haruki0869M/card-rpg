@@ -17,6 +17,8 @@ import {
   reachable,
   timeOfDay,
   viewOf,
+  handleDefeat,
+  createRng,
 } from '../index';
 import { playToEnd } from '../bot';
 
@@ -295,104 +297,85 @@ describe('町・祠・依頼', () => {
     expect(g.mode).toBe('world');
     expect(g.expeditions?.length).toBe(1);
     expect(viewOf(g, g.expeditions![0].id).mode).toBe('dungeon');
-    expect(g.world!.corruption).toBe(BALANCE.corruptionOnDungeonEnter);
+    // 入ると手番が終わり、1人なのでワールドターンも進む
+    expect(g.world!.corruption).toBe(BALANCE.corruptionOnDungeonEnter + (getDifficulty(g.difficulty).corruptionPerTurn ?? BALANCE.corruptionPerTurn));
   });
 });
 
-describe('ダンジョンと世界マップが同時に進む（M3-C）', () => {
-  it('ダンジョンに入ったキャラは世界マップの手番から外れ、残りのキャラはそのまま地図で動ける。出てきたら戻る', () => {
-    let g = newWorld(3, ['warrior', 'mage'], 'normal');
+describe('ダンジョンも世界マップの手番の順番で動く（M3-D）', () => {
+  /** h0 だけ翠の神殿に入る（h0 の手番） */
+  function h0InTemple(classes = ['warrior', 'mage']) {
+    let g = newWorld(3, classes, 'normal');
     g = run(g, { type: 'STORY_CONTINUE', playerId: P });
-    const temple = tileOf(g, 'dungeon', 'emeraldTemple');
-    g.world!.pos.h0 = temple;
+    g.world!.pos.h0 = tileOf(g, 'dungeon', 'emeraldTemple');
     g.world!.turn = 'h0';
-    g = run(g, {
-      type: 'WORLD_INTERACT',
-      playerId: P,
-      heroId: 'h0',
-      party: ['h0'],
-    });
-    const x = g.expeditions![0];
-    expect(x.heroes).toEqual(['h0']);
-    // 地図は h1 の手番
-    expect(g.mode).toBe('world');
+    g = run(g, { type: 'WORLD_INTERACT', playerId: P, heroId: 'h0', party: ['h0'] });
+    return { g, x: g.expeditions![0].id };
+  }
+  const inScene = (x: string, command: GameCommand): GameCommand => ({ type: 'SCENE', scene: x, command });
+
+  it('入ると手番は次の人へ。ダンジョンの番が来るまで、ダンジョンの中は動かせない', () => {
+    let { g, x } = h0InTemple();
     expect(g.world!.turn).toBe('h1');
-    g = run(g, {
-      type: 'WORLD_ROLL_MOVE',
-      playerId: P,
-      heroId: 'h1',
-      focusUsed: 0,
-    });
-    expect(g.world!.move).not.toBeNull();
-    // ダンジョンの中の操作は SCENE で
-    const room = viewOf(g, x.id).dungeon!.rooms.find((r) => r.id === 'r0c0')!;
-    expect(applyGameCommand(g, { type: 'ENTER_ROOM', playerId: P, roomId: room.id }).error).toBeDefined();
-    g = run(g, {
-      type: 'SCENE',
-      scene: x.id,
-      command: { type: 'ENTER_ROOM', playerId: P, roomId: room.id },
-    });
-    expect(viewOf(g, x.id).mode).toBe('battle');
-    expect(g.mode).toBe('world');
-    // 地図の手番が一巡しても、h0 は手番に入らない
+    expect(applyGameCommand(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0', focusUsed: 0 })).error).toMatch(/ほかのキャラの番/);
+    // h1 が手番を終えると、ワールドターンが進み、h0（ダンジョン）の番
     g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h1' });
     expect(g.world!.worldTurn).toBe(2);
-    expect(g.world!.turn).toBe('h1');
-    // 撤退すると、h0 は世界マップに戻る（次のワールドターンから動く）
+    expect(g.world!.turn).toBe('h0');
+    // 世界マップの操作はできない
+    expect(applyGameCommand(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0', focusUsed: 0 }).error).toMatch(/ダンジョン/);
+  });
+
+  it('探索力を判定（2〜4）→ 部屋に入るたびに1減る。使い切って通路に戻ると次の人の番', () => {
+    let { g, x } = h0InTemple();
+    g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h1' });
+    expect(applyGameCommand(g, inScene(x, { type: 'ENTER_ROOM', playerId: P, roomId: 'r0c0' })).error).toMatch(/探索力/);
+    // フォーカスを2つ使えば、探索力は必ず4
+    g.heroes[0].focus = 2;
+    g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0', focusUsed: 2 }));
+    expect(viewOf(g, x).dungeon!.explore).toBe(BALANCE.exploreBase + BALANCE.exploreSlots);
+    g = run(g, inScene(x, { type: 'ENTER_ROOM', playerId: P, roomId: 'r0c0' }));
+    expect(viewOf(g, x).dungeon!.explore).toBe(3);
+    // 手番を終える → h1 の番（ワールドターンは同じ）
     g.expeditions![0].mode = 'dungeon';
     g.expeditions![0].battle = undefined;
-    g = run(g, {
-      type: 'SCENE',
-      scene: x.id,
-      command: { type: 'RETREAT', playerId: P },
-    });
-    expect(g.expeditions).toEqual([]);
-    expect(g.world!.acted).toContain('h0');
+    g = run(g, inScene(x, { type: 'EXPLORE_END', playerId: P }));
+    expect(g.world!.turn).toBe('h1');
+    expect(g.world!.worldTurn).toBe(2);
+    // 次にダンジョンの番が来たら、また判定から
     g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h1' });
     expect(g.world!.turn).toBe('h0');
+    expect(viewOf(g, x).dungeon!.explore).toBeNull();
   });
 
-  it('全員がダンジョンに入ると、世界マップの時間は止まる', () => {
-    let g = newWorld(3, ['warrior'], 'normal');
-    g = run(g, { type: 'STORY_CONTINUE', playerId: P });
-    g.world!.pos.h0 = tileOf(g, 'dungeon', 'emeraldTemple');
+  it('撤退すると世界マップに戻り、次のワールドターンから地図で動く', () => {
+    let { g, x } = h0InTemple();
+    g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h1' });
+    g = run(g, inScene(x, { type: 'RETREAT', playerId: P }));
+    expect(g.expeditions).toEqual([]);
+    expect(g.world!.turn).toBe('h1');
+    g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h1' });
+    expect(g.world!.turn).toBe('h0');
+    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0', focusUsed: 0 });
+  });
+
+  it('全員がダンジョンの中でも、時間（ワールドターン・侵食度）は進む', () => {
+    let { g, x } = h0InTemple(['warrior']);
     const turn = g.world!.worldTurn;
-    g = run(g, { type: 'WORLD_INTERACT', playerId: P, heroId: 'h0' });
-    expect(g.world!.turn).toBe('');
-    expect(g.world!.worldTurn).toBe(turn);
-    g = run(g, {
-      type: 'SCENE',
-      scene: g.expeditions![0].id,
-      command: { type: 'RETREAT', playerId: P },
-    });
+    expect(g.world!.turn).toBe('h0');
+    expect(turn).toBe(2);
+    g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0', focusUsed: 0 }));
+    const c = g.world!.corruption;
+    g = run(g, inScene(x, { type: 'EXPLORE_END', playerId: P }));
+    expect(g.world!.worldTurn).toBe(turn + 1);
+    expect(g.world!.corruption).toBeGreaterThan(c);
     expect(g.world!.turn).toBe('h0');
   });
 
-  it('別の場面にいるキャラの装備は、その場面からしか変えられない', () => {
-    let g = newWorld(3, ['warrior', 'mage'], 'normal');
-    g = run(g, { type: 'STORY_CONTINUE', playerId: P });
-    g.world!.pos.h0 = tileOf(g, 'dungeon', 'emeraldTemple');
-    g = run(g, {
-      type: 'WORLD_INTERACT',
-      playerId: P,
-      heroId: 'h0',
-      party: ['h0'],
-    });
-    expect(
-      applyGameCommand(g, {
-        type: 'UNEQUIP',
-        playerId: P,
-        heroId: 'h0',
-        slot: 'weapon',
-      }).error,
-    ).toMatch(/ダンジョン/);
-    expect(
-      applyGameCommand(g, {
-        type: 'SCENE',
-        scene: g.expeditions![0].id,
-        command: { type: 'UNEQUIP', playerId: P, heroId: 'h0', slot: 'weapon' },
-      }).error,
-    ).toBeUndefined();
+  it('持ち物の整理は、自分の番でなくてもできる。別の場面のキャラは、その場面からだけ', () => {
+    const { g, x } = h0InTemple();
+    expect(applyGameCommand(g, { type: 'UNEQUIP', playerId: P, heroId: 'h0', slot: 'weapon' }).error).toMatch(/ダンジョン/);
+    expect(applyGameCommand(g, inScene(x, { type: 'UNEQUIP', playerId: P, heroId: 'h0', slot: 'weapon' })).error).toBeUndefined();
   });
 });
 
@@ -415,4 +398,34 @@ describe('自動プレイ（シナリオ1をエンディングまで）', () => 
     const b = playToEnd(newWorld(11, ['warrior', 'hunter'], 'easy'), 3000).game;
     expect(a).toEqual(b);
   }, 60_000);
+});
+
+describe('倒れた仲間を助け起こす（M3-C5）', () => {
+  it('命の灯火が無い時に負けると、その場に倒れる。仲間が同じマスに来れば手番を使って助け起こせる', () => {
+    let g = createGame({ seed: 7, scenarioId: 'corruptionKing', difficulty: 'normal', party: [
+      { classId: 'warrior', gender: 'male', name: 'a', playerId: 'P1' },
+      { classId: 'mage', gender: 'female', name: 'b', playerId: 'P1' },
+    ] });
+    g = applyGameCommand(g, { type: 'STORY_CONTINUE', playerId: 'P1' }).state;
+    g.lives = 0;
+    const w = g.world!;
+    const tile = w.pos.h1;
+    handleDefeat(g, ['h1'], createRng(1));
+    expect(findHero(g, 'h1')!.retired).toBe(true);
+    expect(g.world!.downed).toEqual({ h1: tile });
+    expect(g.mode).not.toBe('gameover');
+    // 手番のキャラを同じマスへ
+    g.world!.turn = 'h0';
+    g.world!.pos.h0 = tile;
+    const r = applyGameCommand(g, { type: 'WORLD_REVIVE', playerId: 'P1', heroId: 'h0', targetId: 'h1' });
+    expect(r.error).toBeUndefined();
+    const h1 = findHero(r.state, 'h1')!;
+    expect(h1.retired).toBe(false);
+    expect(h1.hp).toBeGreaterThan(0);
+    expect(r.state.world!.pos.h1).toBe(tile);
+    expect(r.state.world!.downed).toEqual({});
+    // 離れたマスからは助け起こせない
+    g.world!.pos.h0 = tile === 0 ? 1 : 0;
+    expect(applyGameCommand(g, { type: 'WORLD_REVIVE', playerId: 'P1', heroId: 'h0', targetId: 'h1' }).error).toMatch(/同じマス/);
+  });
 });

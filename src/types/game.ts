@@ -140,6 +140,8 @@ export interface DungeonDef {
   description: string;
   /** 背景の種類 */
   background: string;
+  /** 部屋を選ぶ画面の背景（無ければ background） */
+  mapBackground?: string;
   /** 敵の基準レベル */
   baseLevel: number;
   /** 出現する敵（戦闘・強敵・ボス） */
@@ -173,6 +175,9 @@ export interface DungeonRun {
   currentRoomId?: string;
   /** このダンジョンで手に入れたもの（撤退時に1つ失う候補） */
   gained: ItemInstance[];
+  /** 探索力（この手番で入れる部屋の残り。判定前は null。世界マップのあるシナリオだけ。M3-D） */
+  explore?: number | null;
+  exploreRoll?: ('focus' | 'hit' | 'miss')[];
 }
 
 // ---------- 宝箱・イベント・報酬 ----------
@@ -280,15 +285,31 @@ export interface RewardState {
   exp: { heroId: string; gained: number; fromLevel: number; toLevel: number; fromExp: number; toExp: number }[];
   /** 未選択のレベルアップ（先頭から順に選ぶ） */
   levelUps: { heroId: string; level: number; options: GrowthOption[] }[];
-  /** カード報酬（3枚から1枚） */
+  /** カード報酬（生き残ったキャラごとに3枚。キャラごとに1枚選べる。M3-C4） */
   cardOffers: { cardId: string; heroId: string }[];
+  /** カードを選んだ（または選ばなかった）キャラ */
+  cardDone?: string[];
   /** カード報酬の格の確率（%・コモン/レア/エピック。表示用） */
   cardOdds?: number[];
+  /** 全員がカードを選び終えた */
   cardPicked: boolean;
   /** ドロップ品（自動で持ち物に入る。表示用） */
   loot: Loot[];
   /** 戦闘後に見つけた隠し宝箱 */
   hiddenChest?: ChestSpec;
+  /** 落とした装備の取り合い（2人以上のプレイヤーが生き残った時。M3-C5） */
+  claim?: LootClaim;
+}
+
+/** 落とした装備の取り合い: 全員が「欲しい / 余れば / いらない」を選び、欲しい人の中で運の判定が一番高い人がもらう */
+export interface LootClaim {
+  item: ItemInstance;
+  /** 選べるキャラ（生き残った参加者） */
+  heroes: string[];
+  choices: Record<string, 'need' | 'greed' | 'pass'>;
+  /** 決まった後: 運の判定（1〜100 ＋ 運の半分）と、もらった人 */
+  rolls?: { heroId: string; roll: number }[];
+  winner?: string;
 }
 
 export type GameMode = 'hub' | 'world' | 'encounter' | 'town' | 'shrine' | 'dungeon' | 'battle' | 'reward' | 'chest' | 'event' | 'rest' | 'gameover' | 'cleared' | 'ending';
@@ -416,8 +437,9 @@ export type GameCommand =
   | { type: 'USE_POUCH_ITEM'; playerId: PlayerId; itemUid: string; userId: string; targetId: string }
   | { type: 'FINISH_BATTLE'; playerId: PlayerId }
   | { type: 'CHOOSE_GROWTH'; playerId: PlayerId; optionIndex: number; cardUid?: string }
-  | { type: 'PICK_CARD'; playerId: PlayerId; offerIndex: number | null }
+  | { type: 'PICK_CARD'; playerId: PlayerId; offerIndex: number | null; /** 選ばない時: どのキャラの分か（省くと、その人のキャラ全員の分） */ heroId?: string }
   | { type: 'FINISH_REWARD'; playerId: PlayerId }
+  | { type: 'CLAIM_LOOT'; playerId: PlayerId; heroId: string; choice: 'need' | 'greed' | 'pass' }
   | { type: 'OPEN_CHEST'; playerId: PlayerId; heroId: string; focusUsed: number }
   | { type: 'LEAVE_CHEST'; playerId: PlayerId }
   | { type: 'CHOOSE_EVENT'; playerId: PlayerId; optionIndex: number; heroId?: string; focusUsed: number }
@@ -435,6 +457,8 @@ export type GameCommand =
   /** 移動（同行するキャラも一緒に動く。同行したキャラはこのワールドターンの行動を終える） */
   | { type: 'WORLD_MOVE'; playerId: PlayerId; heroId: string; to: number; companions: string[] }
   | { type: 'WORLD_WAIT'; playerId: PlayerId; heroId: string }
+  /** 倒れている仲間を助け起こす（同じマスで。手番を使う。M3-C5） */
+  | { type: 'WORLD_REVIVE'; playerId: PlayerId; heroId: string; targetId: string }
   | { type: 'WORLD_CAMP'; playerId: PlayerId; heroId: string }
   /** 今いるマスの町・祠・イベント・宝箱・ダンジョンに入る */
   | { type: 'WORLD_INTERACT'; playerId: PlayerId; heroId: string; party?: string[] }
@@ -455,6 +479,9 @@ export type GameCommand =
   | { type: 'LEAVE_SHRINE'; playerId: PlayerId }
   /** 世界マップと別に進んでいる場面（ダンジョン）の中の操作 */
   | { type: 'SCENE'; scene: string; command: GameCommand }
+  /** ダンジョンのパーティの手番: 探索力の判定（素早さ）/ 手番を終える */
+  | { type: 'EXPLORE_ROLL'; playerId: PlayerId; heroId: string; focusUsed: number }
+  | { type: 'EXPLORE_END'; playerId: PlayerId }
   /** みんなで決める操作に1票入れる（command = 選んだ操作。null で取り消し） */
   | { type: 'VOTE'; playerId: PlayerId; command: GameCommand | null }
   /** 遭遇の戦闘に、自分のキャラを加える / 加えない（近くにいる、手番でない人のキャラ） */

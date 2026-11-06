@@ -31,7 +31,7 @@ export const mireSlime: EnemyDef = {
   id: 'mireSlime',
   weak: ['thunder'],
   resist: ['poison'],
-  name: '泥沼スライム',
+  name: '沼の大ガマ',
   icon: '🟢',
   maxHp: 26,
   baseLevel: 5,

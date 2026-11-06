@@ -108,6 +108,8 @@ export class Room {
   meta: RoomMeta | null = null;
   members: Record<string, Member> = {};
   slots: (Slot | null)[] = [];
+  /** 部屋に保存されている枠（人数で切り出す前） */
+  private rawSlots: Record<string, Slot> = {};
   stamps: Record<string, Stamp> = {};
   game: GameState | null = null;
   /** 最後に動かした操作の番号 */
@@ -250,8 +252,11 @@ export class Room {
         if (!m) return;
         const wasPlaying = this.meta?.status === 'playing';
         const oldHost = this.meta?.hostUid;
+        const sizeChanged = this.meta?.partySize !== m.partySize;
         this.meta = m;
         this.emit({ type: 'meta' });
+        // 人数が変わったら枠も作り直す（増やした時は枠のデータが変わらず、枠の知らせが来ないため）
+        if (sizeChanged) this.rebuildSlots();
         if (m.hostUid !== oldHost) this.onHostChanged();
         if (m.status === 'playing' && (!wasPlaying || !this.game)) void this.resync('start');
       }),
@@ -261,10 +266,8 @@ export class Room {
         this.checkHost();
       }),
       b.onValue<Record<string, Slot>>(p('slots'), (s) => {
-        const arr: (Slot | null)[] = [];
-        for (let i = 0; i < (this.meta?.partySize ?? 0); i++) arr.push(s?.[i] ?? null);
-        this.slots = arr;
-        this.emit({ type: 'slots' });
+        this.rawSlots = s ?? {};
+        this.rebuildSlots();
       }),
       b.onValue<Record<string, Stamp>>(p('stamps'), (s) => {
         for (const [uid, st] of Object.entries(s ?? {})) {
@@ -551,6 +554,14 @@ export class Room {
     if (next?.[0] !== this.uid) return;
     const old = m.hostUid;
     void this.backend.transaction<string>(roomPath(this.code, 'meta', 'hostUid'), (cur) => (cur === old ? this.uid : undefined)).catch(() => {});
+  }
+
+  /** 人数に合わせて枠の一覧を作る */
+  private rebuildSlots() {
+    const arr: (Slot | null)[] = [];
+    for (let i = 0; i < (this.meta?.partySize ?? 0); i++) arr.push(this.rawSlots[i] ?? null);
+    this.slots = arr;
+    this.emit({ type: 'slots' });
   }
 
   private onHostChanged() {

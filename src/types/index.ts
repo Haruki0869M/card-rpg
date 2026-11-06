@@ -353,6 +353,8 @@ export interface EnemyState {
   dead: boolean;
   /** ボスの段階（0 = 最初） */
   phase: number;
+  /** このターンにダメージを与えた味方（連携攻撃の判定。M3-C5） */
+  hitBy?: string[];
 }
 
 export type Phase = 'ally' | 'enemy' | 'victory' | 'defeat' | 'escaped';
@@ -375,6 +377,8 @@ export interface BattleState {
   version: number;
   seed: number;
   rngState: number;
+  /** 味方が狙っている敵（味方ID → 敵の uid。M3-C5） */
+  aims?: Record<string, string>;
   turn: number;
   phase: Phase;
   allies: AllyState[];
@@ -415,6 +419,8 @@ export type Command =
       focusUsed: number;
     }
   | { type: 'END_TURN'; playerId: PlayerId }
+  /** 狙っている敵を仲間に見せる（targetId 無しで取り消し。M3-C5） */
+  | { type: 'AIM'; playerId: PlayerId; characterId: string; targetId?: string }
   /** 消費アイテムを使う（アイテムの所持の管理は冒険側。ここでは効果だけ） */
   | { type: 'USE_ITEM'; playerId: PlayerId; characterId: string; targetId: string; itemName: string; effects: Effect[] }
   /** 敵フェーズを1ステップ進める（ホストが発行するシステムコマンド） */

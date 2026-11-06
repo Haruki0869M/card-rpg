@@ -111,7 +111,8 @@ async function run(party, difficulty) {
       await check(page, 'cleared');
       await page.getByText('地上に戻る').click();
       await page.waitForTimeout(300);
-      if (!(await page.locator('[data-world-map]').count())) issues.add('世界マップに戻れない');
+      // 地上に戻ったあと: 世界マップか、手番が来た別の組のダンジョン（M3-D）
+      if (!(await page.locator('[data-world-map]').count()) && !(await page.getByText('探索力の判定').count())) { issues.add('世界マップに戻れない'); await page.screenshot({ path: `screenshots/adv-${party}p-noworld.png` }); console.log((await page.locator('body').innerText()).slice(0, 300)); }
       break;
     }
     if (await page.getByText('世界の終わり…', { exact: true }).count()) {
@@ -202,10 +203,16 @@ async function run(party, difficulty) {
         seen.add('dungeon');
         await check(page, 'dungeon');
       }
+      // 手番の最初は探索力を決める。使い切ったら「手番を終える」（M3-D）
+      if (await page.getByText('探索力の判定').count()) {
+        await page.getByText('探索力の判定').click();
+        continue;
+      }
       const rooms = page.locator('button[aria-label]').filter({ has: page.locator('.glow-pulse') });
       if (await rooms.count()) {
         await rooms.first().click();
-        await page.getByText('この部屋へ進む').click();
+        if (await page.getByText('この部屋へ進む').count()) await page.getByText('この部屋へ進む').click();
+        else if (await page.getByText('手番を終える').count()) await page.getByText('手番を終える').click();
       }
       continue;
     }
@@ -229,13 +236,13 @@ async function run(party, difficulty) {
       await opts.first().click();
       continue;
     }
-    if (await page.getByText('カードを1枚、山札に加える').count()) {
+    if (await page.getByText(/の山札に1枚加える/).count()) {
       if (!seen.has('reward')) {
         seen.add('reward');
         await check(page, 'reward');
         await page.screenshot({ path: `screenshots/adv-reward.png` });
       }
-      await page.getByText('カードを選ばない').click();
+      await page.getByText(/はカードを選ばない/).click();
       continue;
     }
     // 宝箱の演出中（最初の1回は演出を最後まで見る。以降は飛ばす）

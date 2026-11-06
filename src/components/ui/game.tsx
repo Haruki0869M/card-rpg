@@ -20,7 +20,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { CharacterArt, ItemImage } from '../../art';
+import { artImage, BattleBackground, CharacterArt, ItemImage } from '../../art';
 import { getClass } from '../../data/classes';
 import { getItem } from '../../data/items';
 import { describeAbility, describeEffect, expToNext, heroFocusMax, heroMaxHp } from '../../engine';
@@ -136,8 +136,20 @@ export function HeroMini({ hero, onTap }: { hero: Hero; onTap?: () => void }) {
 }
 
 /** 画面全体の枠（背景・余白） */
-export function Screen({ children }: { children: ReactNode }) {
-  return <div className="game-bg safe-pad relative flex h-full w-full max-w-[480px] flex-col overflow-hidden">{children}</div>;
+export function Screen({ children, bg, bgOpacity = 0.3 }: { children: ReactNode; /** 後ろに薄く敷く背景の絵 */ bg?: string; bgOpacity?: number }) {
+  return (
+    <div className="game-bg safe-pad relative isolate flex h-full w-full max-w-[480px] flex-col overflow-hidden">
+      {bg && <BattleBackground kind={bg} className="pointer-events-none absolute inset-0 -z-10 h-full w-full" style={{ opacity: bgOpacity }} />}
+      {children}
+    </div>
+  );
+}
+
+/** ダイアログの上にのせる金の飾り（親に position が必要。ほとんどを枠の外に出して、中身にかからないようにする） */
+export function Crest() {
+  const src = artImage('ui/ornament-top');
+  if (!src) return null;
+  return <img src={src} alt="" draggable={false} className="pointer-events-none absolute -top-[30px] left-1/2 w-[44px] -translate-x-1/2 drop-shadow-[0_2px_2px_rgba(0,0,0,.8)]" />;
 }
 
 /** 見出し（重厚な文字＋飾り線） */

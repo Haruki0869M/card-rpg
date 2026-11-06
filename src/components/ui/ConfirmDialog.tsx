@@ -1,4 +1,5 @@
 // ===== 確認の画面（取り返しのつかない操作の前に出す） =====
+import { Crest } from './game';
 import { motion } from 'framer-motion';
 
 export function ConfirmDialog({ title, text, ok, onOk, onCancel, danger = true }: { title: string; text: string; ok: string; onOk: () => void; onCancel: () => void; danger?: boolean }) {
@@ -12,7 +13,8 @@ export function ConfirmDialog({ title, text, ok, onOk, onCancel, danger = true }
         onCancel();
       }}
     >
-      <div role="dialog" aria-label={title} onClick={(e) => e.stopPropagation()} className="panel panel-gold-edge w-full max-w-xs rounded-2xl p-4">
+      <div role="dialog" aria-label={title} onClick={(e) => e.stopPropagation()} className="panel panel-gold-edge panel-ornate w-full max-w-xs rounded-2xl p-4 pt-5">
+        <Crest />
         <div className="font-display text-[18px]">{title}</div>
         <div className="mt-1 text-[13px] leading-5 text-zinc-300">{text}</div>
         <div className="mt-4 flex gap-2">

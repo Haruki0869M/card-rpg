@@ -203,7 +203,10 @@ export function WorldScreen() {
   const seatName = useOnline((s) => (hero ? s.room?.seatName(hero.playerId) : undefined));
   // オンライン協力では受け渡しはいらない（自分のスマホで遊ぶ）
   const needHandoff = !isOnlinePlay() && players.size > 1 && !!hero && shownFor !== w.turn && lastPlayer !== hero.playerId;
-  const mine = !hero || isLocalPlayer(hero.playerId);
+  // 手番がダンジョンの中のパーティ（M3-D）: 世界マップでは待つ
+  const turnExp = game.expeditions?.find((x) => x.heroes.includes(w.turn));
+  const setScene = useBattle((s) => s.setScene);
+  const mine = !turnExp && (!hero || isLocalPlayer(hero.playerId));
   useEffect(() => {
     if (hero && shownFor !== w.turn && !needHandoff) setShownFor(w.turn);
   }, [hero, shownFor, w.turn, needHandoff]);
@@ -266,7 +269,24 @@ export function WorldScreen() {
 
       {/* 手番のキャラの操作 */}
       <div className="panel relative z-10 shrink-0 rounded-t-2xl px-3 pt-2 pb-3">
-        {!mine && (
+        {turnExp && (
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 rounded-t-2xl bg-[#0b0910]/95 px-3 text-[14px] text-zinc-100">
+            <span className="flex items-center gap-1.5">
+              <span className="flex -space-x-2">
+                {game.heroes
+                  .filter((h) => turnExp.heroes.includes(h.id))
+                  .map((h) => (
+                    <HeroFace key={h.id} hero={h} size={30} />
+                  ))}
+              </span>
+              {game.heroes.find((h) => h.id === w.turn)?.name}たちが{turnExp.dungeon?.name ?? 'ダンジョン'}を探索中です
+            </span>
+            <button onClick={() => setScene(turnExp.id)} className="btn btn-gold h-11 rounded-lg px-4 text-[14px] font-bold">
+              ダンジョンを見る
+            </button>
+          </div>
+        )}
+        {!mine && !turnExp && (
           <div className="absolute inset-x-0 top-[52px] bottom-0 z-20 flex flex-col items-center justify-center gap-1 rounded-b-none bg-[#0b0910]/90 text-[14px] text-zinc-200">
             <span className="flex items-center gap-1.5">
               <span className="rounded px-1 text-[12px] font-bold text-black" style={{ background: PLAYER_COLOR[hero.playerId] }}>
@@ -380,6 +400,21 @@ export function WorldScreen() {
               移動する（移動力 {reach?.get(selected)}）
             </button>
           ) : null}
+          {/* 同じマスに倒れている仲間（M3-C5）: 手番を使って助け起こす */}
+          {Object.entries(w.downed ?? {})
+            .filter(([, t]) => t === w.pos[hero.id])
+            .map(([id]) => {
+              const d = game.heroes.find((x) => x.id === id);
+              return d ? (
+                <button
+                  key={id}
+                  onClick={() => dispatchGame({ type: 'WORLD_REVIVE', playerId: pid, heroId: hero.id, targetId: id })}
+                  className="btn btn-gold flex h-12 items-center justify-center gap-2 rounded-xl text-[15px] font-bold"
+                >
+                  <HeroFace hero={d} size={30} dim /> {d.name}を助け起こす（手番を使う）
+                </button>
+              ) : null;
+            })}
           <div className="grid grid-cols-3 gap-1.5">
             {label ? (
               <button

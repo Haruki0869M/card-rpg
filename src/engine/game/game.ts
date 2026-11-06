@@ -40,6 +40,8 @@ import { corruptionLevelBonus } from './world/wanderers';
 import {
   backToWorld,
   camp,
+  endExpeditionTurn,
+  isExpeditionTurn,
   rejoinWorld,
   encounterChoose,
   encounterContinue,
@@ -51,6 +53,7 @@ import {
   rollMove,
   storyContinue,
   waitTurn,
+  reviveAlly,
 } from './world/world';
 import { leaveShrine, leaveTown, questAccept, questReport, shrineChoose, townBuy, townInn, townRemoveCard, townSell } from './world/town';
 import { getRoomType } from '../../data/rules';
@@ -62,6 +65,7 @@ import {
   expToNext,
   heroFocusMax,
   heroMaxHp,
+  heroStats,
   toPartyMember,
 } from './hero';
 import { needsVote, tally, VOTED_COMMANDS, voteCtx, voters } from './votes';
@@ -179,6 +183,9 @@ function runInScene(game: GameState, cmd: Extract<GameCommand, { type: 'SCENE' }
   if (!exp) return { error: 'その場面はもう終わりました', battleEvents: [] };
   if (cmd.command.type === 'SCENE') return { error: '場面の指定が不正です', battleEvents: [] };
   if (isOver(game)) return { error: '冒険は終わりました', battleEvents: [] };
+  // ダンジョンのパーティも世界マップの手番の順番で動く（持ち物の整理だけは、いつでもできる。M3-D）
+  const anytime = ['EQUIP', 'UNEQUIP', 'GIVE', 'USE_POUCH_ITEM'].includes(cmd.command.type) && exp.mode !== 'battle';
+  if (game.world && !anytime && !isExpeditionTurn(game, exp)) return { error: 'ほかのキャラの番です（順番が来たら探索できます）', battleEvents: [] };
   const saved = saveSceneFields(game);
   mount(game, exp);
   game.activeScene = exp.id;
@@ -195,8 +202,45 @@ function runInScene(game: GameState, cmd: Extract<GameCommand, { type: 'SCENE' }
     game.mode = endMode;
     return r;
   }
-  if (ended) rejoinWorld(game, exp.heroes);
+  if (ended) {
+    // ダンジョンから出た（撤退・制覇・全滅）: 次のワールドターンから世界マップで動く。この手番は終わり
+    rejoinWorld(game, exp.heroes);
+    if (game.world && exp.heroes.includes(game.world.turn)) endExpeditionTurn(game, exp.heroes, rng);
+    return r;
+  }
+  // 探索力を使い切って、部屋の出来事も終わった（通路に戻った）: 次のキャラの番へ
+  if (game.world && exp.mode === 'dungeon' && exp.dungeon?.explore === 0) {
+    exp.dungeon.explore = null;
+    exp.dungeon.exploreRoll = undefined;
+    endExpeditionTurn(game, exp.heroes, rng);
+  }
   return r;
+}
+
+/** 探索力の判定（ダンジョンのパーティの手番の最初。素早さ。探索力 = exploreBase + 成功数） */
+function exploreRoll(game: GameState, cmd: Extract<GameCommand, { type: 'EXPLORE_ROLL' }>, rng: Rng): string | undefined {
+  const run = game.dungeon;
+  if (!game.world || !game.activeScene || game.mode !== 'dungeon' || !run) return 'ダンジョンの通路でのみ判定できます';
+  if (run.explore != null) return 'もう探索力を決めました';
+  const h = findHero(game, cmd.heroId);
+  if (!h || h.hp <= 0 || !(game.party ?? []).includes(h.id)) return 'このキャラは判定できません';
+  if (!ownedBy(h, cmd.playerId)) return '担当していないキャラです';
+  const slots = BALANCE.exploreSlots;
+  if (!Number.isInteger(cmd.focusUsed) || cmd.focusUsed < 0 || cmd.focusUsed > Math.min(slots, h.focus)) return 'フォーカスの数が不正です';
+  h.focus -= cmd.focusUsed;
+  const results = rollWithFocus(slots, cmd.focusUsed, statChance(h, 'agi', 'move'), rng);
+  run.exploreRoll = results;
+  run.explore = BALANCE.exploreBase + successes(results);
+  addLog(game, `探索力 ${run.explore}（この手番で入れる部屋の数）`);
+  return undefined;
+}
+
+/** ダンジョンのパーティの手番を終える（探索力が残っていても） */
+function exploreEnd(game: GameState): string | undefined {
+  const run = game.dungeon;
+  if (!game.world || !game.activeScene || game.mode !== 'dungeon' || !run) return 'ダンジョンの通路でのみ終えられます';
+  run.explore = 0;
+  return undefined;
 }
 
 /** みんなで決める操作に1票入れる。全員そろったら、決まった操作をそのまま動かす */
@@ -280,10 +324,13 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
         error = chooseGrowth(game, cmd.playerId, cmd.optionIndex, cmd.cardUid);
         break;
       case 'PICK_CARD':
-        error = pickCard(game, cmd.playerId, cmd.offerIndex);
+        error = pickCard(game, cmd.playerId, cmd.offerIndex, cmd.heroId);
         break;
       case 'FINISH_REWARD':
         error = finishReward(game, cmd.playerId, rng);
+        break;
+      case 'CLAIM_LOOT':
+        error = claimLoot(game, cmd.playerId, cmd.heroId, cmd.choice, rng);
         break;
       case 'OPEN_CHEST':
         error = openChest(game, cmd.playerId, cmd.heroId, cmd.focusUsed, rng);
@@ -315,6 +362,12 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
       case 'GIVE':
         error = give(game, cmd);
         break;
+      case 'EXPLORE_ROLL':
+        error = exploreRoll(game, cmd, rng);
+        break;
+      case 'EXPLORE_END':
+        error = exploreEnd(game);
+        break;
       case 'WORLD_ROLL_MOVE':
         error = rollMove(game, cmd, rng);
         break;
@@ -323,6 +376,9 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
         break;
       case 'WORLD_WAIT':
         error = waitTurn(game, cmd, rng);
+        break;
+      case 'WORLD_REVIVE':
+        error = reviveAlly(game, cmd, rng);
         break;
       case 'WORLD_CAMP':
         error = camp(game, cmd, rng);
@@ -418,6 +474,12 @@ function enterRoom(game: GameState, playerId: string, roomId: string, rng: Rng):
   if (game.mode !== 'dungeon' || !run) return 'ダンジョンにいません';
   const room = findRoom(run, roomId);
   if (!room || !reachableRooms(run).some((r) => r.id === roomId)) return 'その部屋には進めません';
+  // 世界マップのあるシナリオ: 部屋に入るたびに探索力を1使う
+  if (game.world && game.activeScene) {
+    if (run.explore == null) return '先に探索力を判定してください';
+    if (run.explore <= 0) return '探索力が残っていません';
+    run.explore -= 1;
+  }
   run.currentRoomId = room.id;
   roomBehavior(roomTypeOf(room).behavior).enter(game, room, rng);
   return undefined;
@@ -523,7 +585,7 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
   splitGold(survivorHeroes, gold);
 
   const cardOdds = cardRewardOdds(rt.battle?.cardOdds ?? 'battle');
-  const reward: RewardState = { gold, exp: [], levelUps: [], cardOffers: rollCardOffers(game, survivors, rng, cardOdds), cardOdds, cardPicked: false, loot: [] };
+  const reward: RewardState = { gold, exp: [], levelUps: [], cardOffers: survivors.flatMap((id) => rollCardOffers(game, [id], rng, cardOdds)), cardOdds, cardDone: [], cardPicked: false, loot: [] };
   for (const id of survivors) {
     const h = findHero(game, id)!;
     const fromLevel = h.level;
@@ -545,7 +607,9 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
   if (drop?.equipmentDrop) {
     const item = newItem(game, rollEquipment(rng.next() * 100 < drop.equipmentDrop.epicChance ? 'epic' : 'rare', game.heroes, rng));
     const to = leastLoaded(survivorHeroes);
-    if (to) {
+    // 2人以上のプレイヤーが生き残ったら、みんなで取り合う（欲しい / 余れば / いらない → 運の判定）
+    if (new Set(survivorHeroes.map((h) => h.playerId)).size > 1) reward.claim = { item, heroes: survivorHeroes.map((h) => h.id), choices: {} };
+    else if (to) {
       reward.loot.push({ kind: 'item', item, to: to.id });
       addItem(game, to, item, true);
     }
@@ -586,18 +650,54 @@ function chooseGrowth(game: GameState, playerId: string, optionIndex: number, ca
   return undefined;
 }
 
-function pickCard(game: GameState, playerId: string, offerIndex: number | null): string | undefined {
+/** 戦利品の取り合い: キャラごとに「欲しい / 余れば / いらない」。全員そろったら運の判定で決める */
+function claimLoot(game: GameState, playerId: string, heroId: string, choice: 'need' | 'greed' | 'pass', rng: Rng): string | undefined {
+  const c = game.reward?.claim;
+  if (game.mode !== 'reward' || !c || c.rolls) return '取り合う戦利品はありません';
+  if (!c.heroes.includes(heroId)) return 'このキャラは選べません';
+  const h = findHero(game, heroId)!;
+  if (!ownedBy(h, playerId)) return '担当していないキャラです';
+  c.choices[heroId] = choice;
+  if (!c.heroes.every((id) => c.choices[id])) return undefined;
+  const want = c.heroes.filter((id) => c.choices[id] === 'need');
+  const cands = want.length ? want : c.heroes.filter((id) => c.choices[id] === 'greed');
+  c.rolls = cands.map((id) => ({ heroId: id, roll: 1 + rng.int(100) + Math.floor(heroStats(findHero(game, id)!).luk / 2) }));
+  const best = [...c.rolls].sort((a, b) => b.roll - a.roll)[0];
+  // 全員いらない時は、持ち物の少ない人へ
+  const to = best ? findHero(game, best.heroId)! : leastLoaded(c.heroes.map((id) => findHero(game, id)!));
+  if (to) {
+    c.winner = to.id;
+    addItem(game, to, c.item, true);
+    game.reward!.loot.push({ kind: 'item', item: c.item, to: to.id });
+    addLog(game, `${to.name}が戦利品を手に入れた${best ? `（運の判定 ${best.roll}）` : ''}`);
+  }
+  return undefined;
+}
+
+/** カード報酬があるキャラ（一覧の順） */
+export const cardOfferHeroes = (r: RewardState): string[] => [...new Set(r.cardOffers.map((o) => o.heroId))];
+
+/** カード報酬: 生き残ったキャラごとに、担当の人が1枚選ぶ（みんな同時に選べる。M3-C4） */
+function pickCard(game: GameState, playerId: string, offerIndex: number | null, heroId?: string): string | undefined {
   const r = game.reward;
   if (game.mode !== 'reward' || !r || r.cardPicked) return 'カードは選べません';
+  const done = (r.cardDone ??= []);
   if (offerIndex !== null) {
     const o = r.cardOffers[offerIndex];
     if (!o) return '選択肢がありません';
+    if (done.includes(o.heroId)) return 'このキャラはもうカードを選びました';
     const h = findHero(game, o.heroId)!;
     if (!ownedBy(h, playerId)) return '担当していないキャラのカードです';
     h.deck.push({ uid: `c${game.nextUid++}`, cardId: o.cardId });
     addLog(game, `${h.name}の山札に「${CARDS.get(o.cardId).name}」が加わった`);
-  } else if (!isPartyPlayer(game, playerId)) return 'このパーティのプレイヤーではありません';
-  r.cardPicked = true;
+    done.push(o.heroId);
+  } else {
+    const pending = cardOfferHeroes(r).filter((id) => !done.includes(id) && (!heroId || id === heroId));
+    const mine = pending.filter((id) => ownedBy(findHero(game, id)!, playerId));
+    if (!mine.length) return heroId && pending.length ? '担当していないキャラのカードです' : 'カードは選べません';
+    done.push(...mine);
+  }
+  r.cardPicked = cardOfferHeroes(r).every((id) => done.includes(id));
   return undefined;
 }
 
@@ -607,6 +707,8 @@ function finishReward(game: GameState, playerId: string, rng: Rng): string | und
   const run = game.dungeon;
   if (game.mode !== 'reward' || !r || (!run && !game.world)) return '報酬画面ではありません';
   if (r.levelUps.length) return '成長ボーナスを選んでください';
+  if (!r.cardPicked && r.cardOffers.length) return 'カードを選んでいない人がいます';
+  if (r.claim && !r.claim.rolls) return '戦利品の取り合いが終わっていません';
   game.reward = undefined;
   // 世界マップの遭遇の戦闘: 隠し宝箱があれば開け、無ければ世界マップへ（遭遇したキャラの手番は終わる）
   if (!run) {

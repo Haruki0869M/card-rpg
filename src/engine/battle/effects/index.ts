@@ -130,6 +130,14 @@ export function elementMultiplier(victim: Unit | undefined, element: string | un
   return 1;
 }
 
+/** 連携攻撃（M3-C5）: このターンに別の味方が攻撃した敵には、ダメージが上乗せされる */
+export const COMBO_NAME = '連携';
+export function comboMultiplier(source: Unit | undefined, victim: Unit | undefined): number {
+  if (!source || !victim || isEnemy(source) || !isEnemy(victim)) return 1;
+  const id = unitIdOf(source);
+  return victim.hitBy?.some((x) => x !== id) ? 1 + BALANCE.comboBonus : 1;
+}
+
 /** その属性に耐性があるか（状態異常が効かない） */
 export const resistsElement = (victim: Unit, element: string) => isEnemy(victim) && !!getEnemy(victim.defId).resist?.includes(element);
 
@@ -144,7 +152,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   if (victim.dead) return 0;
   let v = victim;
   let mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities);
-  let dmg = calcDamage(base, source.statuses, v.statuses, mods.multiplier * elementMultiplier(v, element));
+  let dmg = calcDamage(base, source.statuses, v.statuses, mods.multiplier * elementMultiplier(v, element) * comboMultiplier(source, v));
   // かばう: 相手の攻撃でこのままだとHP0になる場合、同じ側の他の仲間が確率で代わりに受ける
   if (isEnemy(source) !== isEnemy(v) && dmg - (mods.ignoreBlock ? 0 : v.block) >= v.hp) {
     for (const other of sideOf(state, v)) {
@@ -156,12 +164,18 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
         addLog(state, `${nameOf(other)}の「${cov.name}」！ ${nameOf(v)}をかばった`);
         v = other;
         mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities);
-        dmg = calcDamage(base, source.statuses, v.statuses, mods.multiplier * elementMultiplier(v, element));
+        dmg = calcDamage(base, source.statuses, v.statuses, mods.multiplier * elementMultiplier(v, element) * comboMultiplier(source, v));
         break;
       }
     }
   }
   for (const n of mods.active) if (!ctx.fired.includes(n)) ctx.fired.push(n);
+  if (comboMultiplier(source, v) > 1 && !ctx.fired.includes(COMBO_NAME)) ctx.fired.push(COMBO_NAME);
+  // 連携攻撃の記録（このターンにこの敵を攻撃した味方）
+  if (isEnemy(v) && !isEnemy(source)) {
+    const id = unitIdOf(source);
+    if (!(v.hitBy ??= []).includes(id)) v.hitBy.push(id);
+  }
   if (mods.ignoreBlock && v.block > 0 && mods.ignoreBlockName && !ctx.fired.includes(mods.ignoreBlockName)) ctx.fired.push(mods.ignoreBlockName);
   const r = absorb(dmg, mods.ignoreBlock ? 0 : v.block, v.hp);
   if (!mods.ignoreBlock) v.block = r.block;

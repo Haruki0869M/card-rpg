@@ -3,7 +3,7 @@
 import type { CardCategory, PlayerId, Rarity, StatId } from '../types';
 
 export const TERMS = {
-  gameTitle: 'アルセリアの封印',
+  gameTitle: 'DESTINY OF CRYSTALIA',
   gameSubtitle: 'スロット × デッキの冒険譚',
   /** 世界の侵食の度合い（spec §8.7） */
   corruption: '侵食度',

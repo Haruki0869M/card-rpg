@@ -4,7 +4,7 @@ import type { TownDef } from '../../../../types';
 export const towns: TownDef[] = [
   {
     id: 'royalCapital',
-    name: '王都アルセリア',
+    name: '王都クリスタリア',
     description: '大陸でいちばん大きな都。老賢者が旅の無事を祈っている。',
     capital: true,
     shop: { cards: 3, equipment: 3, consumables: 3, maxRarity: 'rare', fixed: ['holyWater'] },

@@ -10,6 +10,7 @@ const DataCatalog = lazy(() => import('./components/DataCatalog'));
 const showArt = location.hash === '#art';
 const showData = location.hash === '#data';
 import '@fontsource/zen-antique/400.css';
+import '@fontsource/cinzel-decorative/latin-700.css';
 import './index.css';
 
 // オンライン協力の確認用（エミュレーターにつないだ時か、?debug を付けた時だけ）

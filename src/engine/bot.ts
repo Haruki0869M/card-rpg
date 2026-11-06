@@ -172,7 +172,8 @@ function equipBest(g: GameState, log: BotLog): GameState {
 
 export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<string>; town?: string }, inScene = false): GameState {
   // ダンジョンの場面があれば、先にそちらを進める（その場面を載せた冒険で次の操作を決めて、SCENE で送る）
-  const exp = inScene ? undefined : g.expeditions?.[0];
+  // 手番がダンジョンの中のキャラなら、そのダンジョンの場面を進める（世界マップがなければ、最初の場面）
+  const exp = inScene ? undefined : g.world ? g.expeditions?.find((x) => x.heroes.includes(g.world!.turn)) : g.expeditions?.[0];
   if (exp && g.mode !== 'gameover' && g.mode !== 'ending') {
     const outer = capture;
     capture = [];
@@ -190,6 +191,10 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
     case 'world': {
       const eq = equipBest(g, log);
       if (eq !== g) return eq;
+      // 同じマスに倒れている仲間がいれば助け起こす
+      const w = g.world!;
+      const down = Object.entries(w.downed ?? {}).find(([, t]) => t === w.pos[w.turn]);
+      if (down && !w.story) return send(g, { type: 'WORLD_REVIVE', playerId: pid(g, w.turn), heroId: w.turn, targetId: down[0] }, log);
       return worldStep(g, log, memo);
     }
     case 'encounter': {
@@ -211,10 +216,24 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
         const i = lu.options.findIndex((o) => o.kind !== 'upgradeCard');
         return send(g, { type: 'CHOOSE_GROWTH', playerId: h.playerId, optionIndex: i >= 0 ? i : 0, cardUid: h.deck.find((c) => !c.upgraded)?.uid }, log);
       }
-      if (!r.cardPicked) return send(g, { type: 'PICK_CARD', playerId: pid(g, r.cardOffers[0]?.heroId), offerIndex: r.cardOffers.length ? 0 : null }, log);
+      if (r.claim && !r.claim.rolls) {
+        // 戦利品の取り合い: 最初のキャラは「欲しい」、ほかは「余れば」
+        const id = r.claim.heroes.find((x) => !r.claim!.choices[x])!;
+        return send(g, { type: 'CLAIM_LOOT', playerId: pid(g, id), heroId: id, choice: id === r.claim.heroes[0] ? 'need' : 'greed' }, log);
+      }
+      if (!r.cardPicked) {
+        // まだ選んでいないキャラの最初のカード（M3-C4: キャラごとに1枚）
+        const i = r.cardOffers.findIndex((o) => !r.cardDone?.includes(o.heroId));
+        return send(g, { type: 'PICK_CARD', playerId: pid(g, r.cardOffers[i]?.heroId), offerIndex: i >= 0 ? i : null }, log);
+      }
       return send(g, { type: 'FINISH_REWARD', playerId: pid(g) }, log);
     }
     case 'dungeon': {
+      // 手番の最初に探索力を決める（世界マップのあるシナリオ）
+      if (g.world && g.dungeon!.explore == null) {
+        const h = livingHeroes(g).find((x) => !g.party || g.party.includes(x.id))!;
+        return send(g, { type: 'EXPLORE_ROLL', playerId: h.playerId, heroId: h.id, focusUsed: 0 }, log);
+      }
       const rooms = reachableRooms(g.dungeon!);
       const hurt = livingHeroes(g).some((h) => h.hp < heroMaxHp(h) * 0.5);
       const pick = rooms.find((r) => (hurt ? r.type === 'rest' : r.type === 'chest')) ?? rooms[0];

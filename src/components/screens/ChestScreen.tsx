@@ -308,6 +308,25 @@ export function ChestScreen() {
             <span className="absolute inset-0 rounded-full" style={{ background: `radial-gradient(closest-side, ${showResult ? r.glow : light >= 0 ? `${LIGHT[light]}88` : RARITY_STYLE[look].glow}, transparent)` }} />
             <div className={`relative h-[150px] w-[184px] ${shakeClass}`}>
               <ChestImage rarity={look} open={showResult} className="h-full w-full" />
+              {/* 開いた瞬間: 中からはじける光（描いた宝箱は閉じた姿だけなので、光で開いたことを見せる） */}
+              {showResult && (
+                <>
+                  <motion.span
+                    className="pointer-events-none absolute inset-0 rounded-full"
+                    style={{ background: `radial-gradient(closest-side, #fff8e0, ${r.glow} 45%, transparent)` }}
+                    initial={{ opacity: 0.95, scale: 0.4 }}
+                    animate={{ opacity: 0, scale: 2.2 }}
+                    transition={{ duration: 0.7, ease: 'easeOut' }}
+                  />
+                  <motion.span
+                    className="pointer-events-none absolute inset-[-10%] rounded-full border-4"
+                    style={{ borderColor: r.glow }}
+                    initial={{ opacity: 0.9, scale: 0.5 }}
+                    animate={{ opacity: 0, scale: 1.8 }}
+                    transition={{ duration: 0.6, ease: 'easeOut', delay: 0.05 }}
+                  />
+                </>
+              )}
               {light >= 0 && !showResult && <LightLeak level={light} hard={light >= 2} />}
               {step?.kind === 'omen' && (
                 <span className="pointer-events-none absolute inset-0">
