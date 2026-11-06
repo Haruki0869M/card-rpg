@@ -17,10 +17,8 @@ export const mage: ClassDef = {
     { cardId: 'meditate', count: 2 },
   ],
   battleAbility: {
-    id: 'manaSurge',
     name: '魔力暴走',
-    description: '魔法カードが完全成功すると、ランダムな敵1体に追加で5ダメージ',
-    effect: { kind: 'onPerfectBonusDamage', category: 'magic', amount: 5 },
+    effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'magic' }], do: [{ kind: 'damage', amount: 5, to: 'randomFoe' }] },
   },
   exploreAbility: {
     id: 'ancientLore',

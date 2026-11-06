@@ -1,7 +1,9 @@
 import { getEnemy, getEnemyAction } from '../../data/enemies';
 import type { AllyState, BattleEvent, BattleState, EnemyActionDef, EnemyState } from '../../types';
 import type { Rng } from '../rng';
+import { damageModifiers } from '../abilities';
 import { calcDamage } from './damage';
+import { targetOf } from './effects';
 import { tickDamageOf } from './statuses';
 
 export function livingAllies(state: BattleState): AllyState[] {
@@ -14,12 +16,12 @@ export function livingEnemies(state: BattleState): EnemyState[] {
 
 /** 単体攻撃を含む行動か（挑発の対象になる） */
 export function isSingleAttack(action: EnemyActionDef): boolean {
-  return action.effects.some((e) => e.kind === 'attack' && e.target === 'single');
+  return action.effects.some((e) => e.kind === 'damage' && targetOf(e) === 'target');
 }
 
-/** 単体対象（攻撃・デバフ）を含む行動か */
+/** 対象（味方1人）を選ぶ効果を含む行動か */
 export function needsTarget(action: EnemyActionDef): boolean {
-  return action.effects.some((e) => (e.kind === 'attack' || e.kind === 'debuff') && e.target === 'single');
+  return action.effects.some((e) => targetOf(e) === 'target');
 }
 
 function pickRandomAlly(state: BattleState, rng: Rng): string | undefined {
@@ -101,9 +103,9 @@ export function retargetAfterDeath(state: BattleState, deadAllyId: string, rng: 
   }
 }
 
-/** 敵の攻撃1回あたりのダメージ（レベル補正・弱体・脆弱を反映。ブロック考慮前） */
+/** 敵の攻撃1回あたりのダメージ（レベル補正・特殊能力・状態異常を反映。ブロック考慮前） */
 export function enemyHitDamage(enemy: EnemyState, base: number, target: AllyState | undefined): number {
-  return calcDamage(base, enemy.statuses, target?.statuses, enemy.attackMul);
+  return calcDamage(base, enemy.statuses, target?.statuses, damageModifiers(undefined, enemy, undefined, target).multiplier);
 }
 
 /** 敵の行動が ally に与える予定ダメージ（1回あたりの値の配列。ブロック考慮前） */
@@ -112,10 +114,11 @@ export function intentHitsOn(enemy: EnemyState, ally: AllyState): number[] {
   const action = getEnemyAction(enemy.defId, enemy.intent.actionId);
   const hits: number[] = [];
   for (const eff of action.effects) {
-    if (eff.kind !== 'attack') continue;
-    if (eff.target === 'single' && enemy.intent.targetId !== ally.id) continue;
+    if (eff.kind !== 'damage') continue;
+    const to = targetOf(eff);
+    if (to === 'target' ? enemy.intent.targetId !== ally.id : to !== 'foes') continue;
     const dmg = enemyHitDamage(enemy, eff.amount, ally);
-    for (let i = 0; i < eff.hits; i++) hits.push(dmg);
+    for (let i = 0; i < (eff.hits ?? 1); i++) hits.push(dmg);
   }
   return hits;
 }

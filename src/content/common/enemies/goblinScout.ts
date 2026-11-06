@@ -12,7 +12,7 @@ export const goblinScout: EnemyDef = {
   pattern: 'random',
   maxConsecutive: 2,
   actions: [
-    { id: 'flurry', name: '乱れ突き', effects: [{ kind: 'attack', amount: 4, hits: 2, target: 'single' }] },
-    { id: 'aimedShot', name: '狙い撃ち', effects: [{ kind: 'attack', amount: 9, hits: 1, target: 'single' }] },
+    { id: 'flurry', name: '乱れ突き', effects: [{ kind: 'damage', amount: 4, hits: 2 }] },
+    { id: 'aimedShot', name: '狙い撃ち', effects: [{ kind: 'damage', amount: 9 }] },
   ],
 };

@@ -74,8 +74,8 @@ export const BASIC_CARDS: Record<string, CardDef> = {
     target: 'enemy',
     tiers: [
       { minSuccesses: 0, effects: [{ kind: 'block', amount: 5 }] },
-      { minSuccesses: 1, effects: [{ kind: 'block', amount: 10 }, { kind: 'tauntTarget' }] },
-      { minSuccesses: 2, effects: [{ kind: 'block', amount: 16 }, { kind: 'tauntAll' }] },
+      { minSuccesses: 1, effects: [{ kind: 'block', amount: 10 }, { kind: 'taunt' }] },
+      { minSuccesses: 2, effects: [{ kind: 'block', amount: 16 }, { kind: 'taunt', to: 'foes' }] },
     ],
   },
   strike: {

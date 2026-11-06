@@ -19,10 +19,8 @@ export const hunter: ClassDef = {
     { cardId: 'meditate', count: 2 },
   ],
   battleAbility: {
-    id: 'weakSpot',
     name: '急所狙い',
-    description: 'ダメージを与えるカードが完全成功すると、対象に脆弱1を付与',
-    effect: { kind: 'onPerfectApplyStatus', status: 'vulnerable', amount: 1 },
+    effect: { when: 'perfect', if: [{ kind: 'cardHasDamage' }], do: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1 }] },
   },
   exploreAbility: {
     id: 'tracking',

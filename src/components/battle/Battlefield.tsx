@@ -14,7 +14,7 @@ import { speedFactor, useBattle, type UnitFx } from '../../store/battleStore';
 import type { AllyState, EnemyState } from '../../types';
 import { intentView, type IntentPart } from '../format';
 import { HpBar } from '../ui/HpBar';
-import { Shield, Skull, statusStyle, Swords } from '../ui/icons';
+import { EffectChip, Shield, Skull, statusStyle, Swords } from '../ui/icons';
 import { StatusChips } from '../ui/StatusChips';
 import { UnitPopups } from './Popups';
 import { SlotOverlay } from './SlotOverlay';
@@ -89,6 +89,8 @@ function IntentPartView({ p }: { p: IntentPart }) {
         </span>
       );
     }
+    case 'other':
+      return <EffectChip e={p.effect} size={14} />;
   }
 }
 

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { applyCommand, createBattle, damageMultiplierFor, tierDamageAgainst } from '../index';
+import { applyCommand, createBattle, damageModifiers, tierDamageAgainst } from '../index';
+import type { AllyState, CardDef } from '../../types';
+
+const damageMultiplierFor = (a: AllyState, c: CardDef) => damageModifiers(undefined, a, c, undefined);
 import { getCard } from '../../data/cards';
 import { END, giveHand, play, setup } from './helpers';
 

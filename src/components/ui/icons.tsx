@@ -19,7 +19,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { getStatus } from '../../data/statuses';
-import { describeStatus } from '../../engine';
+import { describeStatus, effectShort, targetOf } from '../../engine';
 import type { CardCategory, CardEffect } from '../../types';
 
 /** 状態異常のアイコン（状態異常のデータの icon のキー → アイコン）。新しいアイコンが要る時はここに1行足す */
@@ -72,51 +72,32 @@ export const CATEGORY_STYLE: Record<CardCategory, { name: string; Icon: LucideIc
   skill: { name: 'スキル', Icon: Star, frame: '#3aa070', glow: '#7affc0', inner: 'linear-gradient(180deg,#13402e 0%,#0b2a1e 55%,#061710 100%)' },
 };
 
-const EFFECT_ICON: Record<CardEffect['kind'], { Icon: LucideIcon; color: string }> = {
+/** 効果の種類ごとのアイコン（無い種類は汎用のアイコン）。新しい効果を足したらここに1行足すと見た目が付く */
+const EFFECT_ICON: Record<string, { Icon: LucideIcon; color: string }> = {
   damage: { Icon: Swords, color: '#ff9a7a' },
   block: { Icon: Shield, color: '#7ac8ff' },
   applyStatus: { Icon: HeartCrack, color: '#ff8aa0' },
   gainMana: { Icon: Droplet, color: '#6ad0ff' },
   gainFocus: { Icon: Star, color: '#ffd54a' },
   draw: { Icon: Copy, color: '#d8d0ff' },
-  tauntTarget: { Icon: Megaphone, color: '#ffd06a' },
-  tauntAll: { Icon: Megaphone, color: '#ffd06a' },
-  blockAllies: { Icon: ShieldPlus, color: '#7ac8ff' },
-  healAllies: { Icon: HeartPulse, color: '#7dffa8' },
+  taunt: { Icon: Megaphone, color: '#ffd06a' },
+  heal: { Icon: HeartPulse, color: '#7dffa8' },
+  healPctOfDealt: { Icon: HeartPulse, color: '#7dffa8' },
+  cleanse: { Icon: Sparkles, color: '#9affd0' },
 };
+const FALLBACK_EFFECT_ICON = { Icon: Sparkles, color: '#e0d8c0' };
 
-/** カードの効果1つ分の短い表示（アイコン＋数値） */
+/** カードの効果1つ分の短い表示（アイコン＋数値。全体なら「全」） */
 export function EffectChip({ e, size = 12 }: { e: CardEffect; size?: number }) {
   const s = e.kind === 'applyStatus' ? statusStyle(e.status) : null;
-  const { Icon, color } = s ? { Icon: s.Icon, color: s.color } : EFFECT_ICON[e.kind];
-  let text = '';
-  switch (e.kind) {
-    case 'damage':
-    case 'block':
-      text = `${e.amount}`;
-      break;
-    case 'blockAllies':
-    case 'healAllies':
-      text = `全${e.amount}`;
-      break;
-    case 'applyStatus':
-      text = `${e.amount}`;
-      break;
-    case 'gainMana':
-    case 'gainFocus':
-    case 'draw':
-      text = `+${e.amount}`;
-      break;
-    case 'tauntTarget':
-      text = '';
-      break;
-    case 'tauntAll':
-      text = '全';
-      break;
-  }
+  const { Icon, color } = s ? { Icon: s.Icon, color: s.color } : (EFFECT_ICON[e.kind] ?? FALLBACK_EFFECT_ICON);
+  const to = targetOf(e);
+  const all = to === 'allies' || to === 'otherAllies' || (to === 'foes' && e.kind !== 'taunt');
+  const text = `${all ? '全' : ''}${effectShort(e)}`;
+  const Shape = e.kind === 'block' && all ? ShieldPlus : Icon;
   return (
     <span className="inline-flex items-center gap-px whitespace-nowrap" style={{ color }}>
-      <Icon size={size} strokeWidth={2.6} />
+      <Shape size={size} strokeWidth={2.6} />
       <span className="tabular-nums">{text}</span>
     </span>
   );

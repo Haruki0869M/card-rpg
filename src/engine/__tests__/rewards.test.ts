@@ -77,7 +77,7 @@ describe('エピック以上の特殊能力（spec §12.7・§13.1）', () => {
     const h = g.heroes[0];
     h.equipment.armor = { uid: 'x', itemId: 'mithrilMail' };
     const m = toPartyMember(h);
-    expect(m.abilities).toEqual([{ name: '聖銀の守り', effect: { kind: 'turnStartBlock', amount: 5 } }]);
+    expect(m.abilities).toEqual([{ name: '聖銀の守り', effect: { when: 'turnStart', do: [{ kind: 'block', amount: 5 }] } }]);
     const s = createBattle({ ...setup(1, ['warrior']), party: [m] });
     // 開始時ブロック（startBlock 8）+ ターン開始の能力 5
     expect(s.allies[0].block).toBe(8 + 5);
@@ -86,7 +86,7 @@ describe('エピック以上の特殊能力（spec §12.7・§13.1）', () => {
   });
   it('装備の能力: 完全成功でフォーカス+1（見切り）', () => {
     const s = createBattle(setup(5, ['warrior', 'mage']));
-    s.allies[0].abilities = [{ name: '見切り', effect: { kind: 'onPerfectGainFocus', category: 'physical', amount: 1 } }];
+    s.allies[0].abilities = [{ name: '見切り', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'physical' }], do: [{ kind: 'gainFocus', amount: 1 }] } }];
     const focus = s.allies[0].focus;
     const [c] = giveHand(s, 'a0', ['strike']);
     const { state, events } = applyCommand(s, play('a0', c.uid, 'e0', 1));

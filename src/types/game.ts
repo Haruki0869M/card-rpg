@@ -1,6 +1,6 @@
 // ===== 冒険（ゲーム全体）の型 =====
 import type {
-  BattleAbility,
+  AbilityDef,
   BattleState,
   CardInstance,
   Command,
@@ -38,7 +38,7 @@ export interface ItemDef {
   /** 消費アイテムの効果 */
   use?: ConsumableEffect;
   /** 装備の特殊能力（エピック以上は必ず持つ。spec §12.7） */
-  ability?: { name: string; description: string; effect: BattleAbility };
+  ability?: AbilityDef;
 }
 
 export interface ItemInstance {

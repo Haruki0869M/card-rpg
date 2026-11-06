@@ -18,10 +18,8 @@ export const guardian: ClassDef = {
     { cardId: 'meditate', count: 1 },
   ],
   battleAbility: {
-    id: 'cover',
     name: 'かばう',
-    description: '他の味方がHP0になるダメージを受ける時、30%の確率で代わりに受ける（ブロックで防げる）',
-    effect: { kind: 'coverLethal', chance: 30 },
+    effect: { modifier: 'coverLethal', chance: 30 },
   },
   exploreAbility: {
     id: 'nightWatch',

@@ -788,14 +788,14 @@ function usePouchItem(
   if (!def.use) return { error: '使えない道具です', events: [] };
   if (game.mode === 'battle' && game.battle) {
     const room = game.dungeon ? findRoom(game.dungeon, game.dungeon.currentRoomId ?? '') : undefined;
-    if (def.use.kind === 'escape' && room?.type === 'boss') return { error: 'ボスからは逃げられない！', events: [] };
+    if (def.use.some((e) => e.kind === 'escape') && room?.type === 'boss') return { error: 'ボスからは逃げられない！', events: [] };
     const r = applyCommand(game.battle, {
       type: 'USE_ITEM',
       playerId: cmd.playerId,
       characterId: cmd.userId,
       targetId: cmd.targetId,
       itemName: def.name,
-      effect: def.use,
+      effects: def.use,
     });
     if (r.error) return { error: r.error, events: [] };
     game.battle = r.state;
@@ -807,21 +807,25 @@ function usePouchItem(
   const target = findHero(game, cmd.targetId);
   if (!user || !ownedBy(user, cmd.playerId)) return { error: '担当していないキャラです', events: [] };
   if (!target || target.hp <= 0) return { error: '対象が戦闘不能です', events: [] };
-  switch (def.use.kind) {
-    case 'heal':
-      if (target.hp >= heroMaxHp(target)) return { error: 'HPは満タンです', events: [] };
-      target.hp = Math.min(heroMaxHp(target), target.hp + def.use.amount);
-      break;
-    case 'focus':
-      if (target.focus >= heroFocusMax(target)) return { error: 'フォーカスは最大です', events: [] };
-      target.focus = Math.min(heroFocusMax(target), target.focus + def.use.amount);
-      break;
-    case 'cleanse':
-      if (!Object.values(target.nextBattleStatuses).some((v) => v)) return { error: '治す状態異常がありません', events: [] };
-      target.nextBattleStatuses = {};
-      break;
-    case 'escape':
-      return { error: '戦闘中にしか使えません', events: [] };
+  for (const e of def.use) {
+    switch (e.kind) {
+      case 'heal':
+        if (target.hp >= heroMaxHp(target)) return { error: 'HPは満タンです', events: [] };
+        target.hp = Math.min(heroMaxHp(target), target.hp + e.amount);
+        break;
+      case 'gainFocus':
+        if (target.focus >= heroFocusMax(target)) return { error: 'フォーカスは最大です', events: [] };
+        target.focus = Math.min(heroFocusMax(target), target.focus + e.amount);
+        break;
+      case 'cleanse':
+        if (!Object.values(target.nextBattleStatuses).some((v) => v)) return { error: '治す状態異常がありません', events: [] };
+        target.nextBattleStatuses = {};
+        break;
+      case 'escape':
+        return { error: '戦闘中にしか使えません', events: [] };
+      default:
+        return { error: '戦闘中にしか使えません', events: [] };
+    }
   }
   game.pouch.splice(idx, 1);
   addLog(game, `${user.name}が${def.name}を使った`);

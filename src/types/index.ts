@@ -19,21 +19,27 @@ export type Affinity = Record<CardCategory, number>;
 
 export type CardTarget = 'enemy' | 'self' | 'allEnemies';
 
-export type CardEffect =
-  | { kind: 'damage'; amount: number }
-  | { kind: 'block'; amount: number }
-  | { kind: 'applyStatus'; status: StatusId; amount: number }
-  | { kind: 'gainMana'; amount: number }
-  | { kind: 'gainFocus'; amount: number }
-  | { kind: 'draw'; amount: number }
-  /** 対象の敵の単体攻撃を自分に向ける */
-  | { kind: 'tauntTarget' }
-  /** 敵全体の単体攻撃を自分に向ける */
-  | { kind: 'tauntAll' }
-  /** 味方全員にブロック */
-  | { kind: 'blockAllies'; amount: number }
-  /** 味方全員のHP回復 */
-  | { kind: 'healAllies'; amount: number };
+// ---------- 効果（カード・敵の行動・消費アイテム・特殊能力で共通の部品。spec §2.4） ----------
+
+/**
+ * 効果の対象。
+ * target = 選んだ対象（カードの対象の敵 / 敵の行動の対象の味方 / アイテムを使う相手。全体カードなら相手全員）
+ * self = 自分 / allies = 自分の側の全員 / otherAllies = 自分以外の自分の側 / foes = 相手の側の全員 / randomFoe = 相手からランダムに1人
+ */
+export type EffectTarget = 'target' | 'self' | 'allies' | 'otherAllies' | 'foes' | 'randomFoe';
+
+/**
+ * 効果の種類ごとの数値。効果のファイル（src/engine/battle/effects/）が declare module でここに種類を足す。
+ * 新しい効果 = ファイルを1つ置くだけで、カード・敵・アイテム・特殊能力のデータから使える
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface EffectParams {}
+
+/** 効果1つ（例: { kind: 'damage', amount: 6 } / { kind: 'block', amount: 5, to: 'allies' }） */
+export type Effect = { [K in keyof EffectParams]: { kind: K; to?: EffectTarget } & EffectParams[K] }[keyof EffectParams];
+export type EffectKind = keyof EffectParams;
+/** 互換のための別名 */
+export type CardEffect = Effect;
 
 export interface CardTier {
   /** この成功数以上で発動（高い方が優先） */
@@ -54,56 +60,43 @@ export interface CardDef {
   tiers: CardTier[];
   /** 報酬・宝箱での出やすさの格（未指定はコモン扱い） */
   rarity?: Rarity;
-  /** カードの特殊能力（エピック以上は必ず持つ。spec §13.1） */
-  trait?: CardTraitDef;
+  /** カードの特殊能力（エピック以上は必ず持つ。このカードを使っている間だけ働く。spec §13.1） */
+  trait?: AbilityDef;
 }
 
-/** カードの特殊能力の種類。新しい種類が必要になったら、ここに1つ追加する */
-export type CardTrait =
-  /** 貫通: ダメージがブロックを無視する */
-  | { kind: 'pierce' }
-  /** 吸収: HPに与えたダメージの pct% だけ自分のHPを回復 */
-  | { kind: 'drain'; pct: number }
-  /** 魔力還元: 完全成功でマナ+amount */
-  | { kind: 'perfectMana'; amount: number }
-  /** 止め: 対象のHPが belowPct% 以下ならダメージ×multiplier */
-  | { kind: 'execute'; belowPct: number; multiplier: number };
+// ---------- 特殊能力（職業・装備・カード・敵で共通。spec §2.4・§6.2・§12.7・§13.1） ----------
 
-export interface CardTraitDef {
+/**
+ * 発動のきっかけ。戦闘の流れの決まった場面で呼ばれる。
+ * battleStart 戦闘開始時 / turnStart 自分の側のフェーズ開始時 / turnEnd 自分の側のフェーズ終了時 /
+ * afterCard カードを使った後 / perfect カードが完全成功した時 / kill 敵を倒した時 / hurt HPにダメージを受けた時
+ */
+export type AbilityTrigger = 'battleStart' | 'turnStart' | 'turnEnd' | 'afterCard' | 'perfect' | 'kill' | 'hurt';
+
+/** 発動の条件の種類ごとの数値。条件のファイル（src/engine/abilities/conditions/）が declare module で種類を足す */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface ConditionParams {}
+export type AbilityCondition = { [K in keyof ConditionParams]: { kind: K } & ConditionParams[K] }[keyof ConditionParams];
+
+/**
+ * 特殊能力の中身。
+ * - 発動型: きっかけ（when）＋ 条件（if。全部満たすと発動。上から順に判定）＋ 効果（do。効果の部品）
+ * - 常時型（modifier）: damageDealt = 与えるダメージの倍率 / ignoreBlock = ブロックを無視 / coverLethal = 仲間をかばう
+ */
+export type AbilityEffect =
+  | { when: AbilityTrigger; if?: AbilityCondition[]; do: Effect[] }
+  | { modifier: 'damageDealt'; multiplier: number; if?: AbilityCondition[] }
+  | { modifier: 'ignoreBlock'; if?: AbilityCondition[] }
+  | { modifier: 'coverLethal'; chance: number };
+
+export interface AbilityDef {
   name: string;
-  description: string;
-  effect: CardTrait;
+  /** 説明文（省略すると中身から自動で作る。雰囲気の文を足したい時だけ書く） */
+  description?: string;
+  effect: AbilityEffect;
 }
 
-// ---------- 特殊能力（データで定義する共通の部品） ----------
-
-/** 能力の発動条件・効果。新しい種類が必要になったら、ここに1つ追加する */
-export type BattleAbility =
-  /** 常時: 条件を満たす間、自分の与えるダメージを倍率で補正 */
-  | {
-      kind: 'damageMultiplier';
-      category?: CardCategory;
-      multiplier: number;
-      whenSelfHpAtMostPct?: number;
-    }
-  /** カードの完全成功時: ランダムな生存敵に追加ダメージ */
-  | { kind: 'onPerfectBonusDamage'; category?: CardCategory; amount: number; chance?: number }
-  /** カードの完全成功時: ダメージを与えるカードなら対象に状態異常 */
-  | { kind: 'onPerfectApplyStatus'; category?: CardCategory; status: StatusId; amount: number; chance?: number }
-  /** 他の味方がHP0になるダメージを受ける時、確率で代わりに受ける */
-  | { kind: 'coverLethal'; chance: number }
-  /** カードの完全成功時: フォーカス回復 */
-  | { kind: 'onPerfectGainFocus'; category?: CardCategory; amount: number }
-  /** カードの完全成功時: カードを引く */
-  | { kind: 'onPerfectDraw'; category?: CardCategory; amount: number }
-  /** 味方フェーズの開始時: ブロック（allies なら味方全員） */
-  | { kind: 'turnStartBlock'; amount: number; allies?: boolean }
-  /** 味方フェーズの開始時: HP回復 */
-  | { kind: 'turnStartHeal'; amount: number }
-  /** 味方フェーズの開始時: 確率（%）でフォーカス回復 */
-  | { kind: 'turnStartFocus'; amount: number; chance: number };
-
-/** 探索の特殊能力（M2以降で使用。M1ではデータと説明のみ） */
+/** 探索の特殊能力（世界マップ・イベントで効く） */
 export type ExploreAbility =
   | { kind: 'checkBonus'; check: string; bonus: number }
   /** 視界+N（M3）、隠し宝箱を見つける確率+X% */
@@ -111,11 +104,11 @@ export type ExploreAbility =
   | { kind: 'nightAmbushReduction'; multiplier: number }
   | { kind: 'extraEventOption'; tag: string };
 
-export interface AbilityDef<T> {
+export interface ExploreAbilityDef {
   id: string;
   name: string;
   description: string;
-  effect: T;
+  effect: ExploreAbility;
 }
 
 // ---------- 職業 ----------
@@ -133,8 +126,8 @@ export interface ClassDef {
   baseMaxHp: number;
   stats: Stats;
   deck: { cardId: string; count: number }[];
-  battleAbility: AbilityDef<BattleAbility>;
-  exploreAbility: AbilityDef<ExploreAbility>;
+  battleAbility: AbilityDef;
+  exploreAbility: ExploreAbilityDef;
   /** 名前の候補（性別ごと） */
   names: Record<Gender, string[]>;
   /** 最初から選べるか（M4の伝承の書で解放） */
@@ -176,21 +169,13 @@ export interface PartyMemberSpec {
   /** 戦闘開始時の状態異常 */
   statuses?: Partial<Statuses>;
   /** 職業以外から得た戦闘の特殊能力（装備） */
-  abilities?: GrantedAbility[];
-}
-
-/** 装備などから得た戦闘の特殊能力（戦闘の状態に持たせる。シリアライズ可能） */
-export interface GrantedAbility {
-  name: string;
-  effect: BattleAbility;
+  abilities?: AbilityDef[];
 }
 
 // ---------- 敵 ----------
 
-export type EnemyEffect =
-  | { kind: 'attack'; amount: number; hits: number; target: 'single' | 'all' }
-  | { kind: 'block'; amount: number; target: 'self' | 'otherEnemies' }
-  | { kind: 'debuff'; status: StatusId; amount: number; target: 'single' | 'all' };
+/** 敵の行動の効果（カードと同じ部品。target は行動の対象の味方、foes は味方全員） */
+export type EnemyEffect = Effect;
 
 export interface EnemyActionDef {
   id: string;
@@ -219,6 +204,8 @@ export interface EnemyDef {
   gold: number;
   /** ボスの段階（HPが belowHpPct% 以下になると行動が変わる） */
   phases?: EnemyPhaseDef[];
+  /** 敵の特殊能力（味方と同じ書き方） */
+  abilities?: AbilityDef[];
 }
 
 export interface EnemyPhaseDef {
@@ -289,7 +276,7 @@ export interface AllyState {
   stats: Stats;
   extraDraw: number;
   /** 装備から得た戦闘の特殊能力 */
-  abilities?: GrantedAbility[];
+  abilities?: AbilityDef[];
   statuses: Statuses;
   drawPile: CardInstance[];
   hand: CardInstance[];
@@ -373,7 +360,7 @@ export type Command =
     }
   | { type: 'END_TURN'; playerId: PlayerId }
   /** 消費アイテムを使う（アイテムの所持の管理は冒険側。ここでは効果だけ） */
-  | { type: 'USE_ITEM'; playerId: PlayerId; characterId: string; targetId: string; itemName: string; effect: ConsumableEffect }
+  | { type: 'USE_ITEM'; playerId: PlayerId; characterId: string; targetId: string; itemName: string; effects: Effect[] }
   /** 敵フェーズを1ステップ進める（ホストが発行するシステムコマンド） */
   | { type: 'ENEMY_STEP' };
 
@@ -409,11 +396,7 @@ export interface CommandResult {
   error?: string;
 }
 
-/** 消費アイテムの効果 */
-export type ConsumableEffect =
-  | { kind: 'heal'; amount: number }
-  | { kind: 'focus'; amount: number }
-  | { kind: 'cleanse' }
-  | { kind: 'escape' };
+/** 消費アイテムの効果（効果の部品の並び） */
+export type ConsumableEffect = Effect[];
 
 export * from './game';

@@ -5,7 +5,7 @@ import { CharacterArt } from '../../art';
 import { getCard } from '../../data/cards';
 import { CLASSES, getClass } from '../../data/classes';
 import { getItem } from '../../data/items';
-import { affinityOf } from '../../engine';
+import { affinityOf, describeAbility } from '../../engine';
 import { autoName } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
 import type { Gender, StatId } from '../../types';
@@ -114,7 +114,7 @@ export function CreateScreen() {
           <div className="mt-1.5 rounded-lg bg-black/30 p-1.5 text-[12px] leading-4">
             <div>
               <span className="font-display text-amber-200">《{cls.battleAbility.name}》</span>
-              <span className="text-zinc-400">（戦闘）</span> {cls.battleAbility.description}
+              <span className="text-zinc-400">（戦闘）</span> {describeAbility(cls.battleAbility)}
             </div>
             <div className="mt-1">
               <span className="font-display text-sky-200">《{cls.exploreAbility.name}》</span>

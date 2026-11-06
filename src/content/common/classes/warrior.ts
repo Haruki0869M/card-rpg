@@ -18,10 +18,8 @@ export const warrior: ClassDef = {
     { cardId: 'warCry', count: 1 },
   ],
   battleAbility: {
-    id: 'fightingSpirit',
     name: '闘志',
-    description: 'HPが半分以下の間、物理カードのダメージ+25%',
-    effect: { kind: 'damageMultiplier', category: 'physical', multiplier: 1.25, whenSelfHpAtMostPct: 50 },
+    effect: { modifier: 'damageDealt', multiplier: 1.25, if: [{ kind: 'cardCategory', category: 'physical' }, { kind: 'selfHpAtMost', pct: 50 }] },
   },
   exploreAbility: {
     id: 'mightyStrength',

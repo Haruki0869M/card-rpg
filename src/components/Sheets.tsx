@@ -6,19 +6,7 @@ import { CharacterArt } from '../art';
 import { cardOf } from '../data/cards';
 import { getClass } from '../data/classes';
 import { getItem } from '../data/items';
-import {
-  affinityFromStats,
-  battleDeck,
-  canEquip,
-  EQUIP_SLOTS,
-  expToNext,
-  findAlly,
-  heroFocusMax,
-  heroMaxHp,
-  heroStats,
-  STAT_IDS,
-  weaponRarity,
-} from '../engine';
+import { EQUIP_SLOTS, STAT_IDS, affinityFromStats, battleDeck, canEquip, describeAbility, expToNext, findAlly, heroFocusMax, heroMaxHp, heroStats, weaponRarity } from '../engine';
 import { LOCAL_PLAYER } from '../store/battleConfig';
 import { useBattle } from '../store/battleStore';
 import type { CardInstance, EquipSlot, Hero, ItemDef } from '../types';
@@ -256,7 +244,7 @@ function PartySheet() {
       </div>
       <div className="mt-1 rounded-lg bg-black/30 p-1.5 text-[12px] leading-4">
         <span className="font-display text-amber-200">《{cls.battleAbility.name}》</span>
-        {cls.battleAbility.description}
+        {describeAbility(cls.battleAbility)}
         <br />
         <span className="font-display text-sky-200">《{cls.exploreAbility.name}》</span>
         {cls.exploreAbility.description}
@@ -398,7 +386,7 @@ function PouchSheet() {
                 <span className="block text-[14px] font-bold">
                   {it.name} <span className="text-amber-200">×{uids.length}</span>
                 </span>
-                <span className="block text-[12px] text-zinc-400">{it.description}</span>
+                <span className="block text-[12px] text-zinc-400">{itemSummary(it)}</span>
               </span>
             </button>
           );
@@ -407,7 +395,7 @@ function PouchSheet() {
       {chosenDef && (
         <div className="mt-2 rounded-xl border border-amber-400/40 bg-black/40 p-2">
           <div className="text-[13px] text-zinc-300">
-            「{chosenDef.name}」を誰に使う？{chosenDef.use?.kind === 'escape' && '（使うと戦闘から逃げる）'}
+            「{chosenDef.name}」を誰に使う？{chosenDef.use?.some((e) => e.kind === 'escape') && '（使うと戦闘から逃げる）'}
           </div>
           <div className="mt-1 grid grid-cols-2 gap-1">
             {targets.map(({ h, hp, max, dead }) => (

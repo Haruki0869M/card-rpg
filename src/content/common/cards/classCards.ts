@@ -160,9 +160,9 @@ export const CLASS_CARDS: CardDef[] = [
     target: 'self',
     rarity: 'rare',
     tiers: [
-      { minSuccesses: 0, effects: [{ kind: 'blockAllies', amount: 4 }] },
-      { minSuccesses: 1, effects: [{ kind: 'blockAllies', amount: 6 }] },
-      { minSuccesses: 2, effects: [{ kind: 'blockAllies', amount: 9 }] },
+      { minSuccesses: 0, effects: [{ kind: 'block', amount: 4, to: 'allies' }] },
+      { minSuccesses: 1, effects: [{ kind: 'block', amount: 6, to: 'allies' }] },
+      { minSuccesses: 2, effects: [{ kind: 'block', amount: 9, to: 'allies' }] },
     ],
   },
   {
@@ -188,9 +188,9 @@ export const CLASS_CARDS: CardDef[] = [
     target: 'self',
     rarity: 'rare',
     tiers: [
-      { minSuccesses: 0, effects: [{ kind: 'healAllies', amount: 3 }] },
-      { minSuccesses: 1, effects: [{ kind: 'healAllies', amount: 5 }] },
-      { minSuccesses: 2, effects: [{ kind: 'healAllies', amount: 8 }] },
+      { minSuccesses: 0, effects: [{ kind: 'heal', amount: 3, to: 'allies' }] },
+      { minSuccesses: 1, effects: [{ kind: 'heal', amount: 5, to: 'allies' }] },
+      { minSuccesses: 2, effects: [{ kind: 'heal', amount: 8, to: 'allies' }] },
     ],
   },
   {
@@ -308,7 +308,7 @@ export const CLASS_CARDS: CardDef[] = [
     baseChance: 60,
     target: 'enemy',
     rarity: 'epic',
-    trait: { name: '血の渇き', description: 'HPに与えたダメージの25%だけHP回復', effect: { kind: 'drain', pct: 25 } },
+    trait: { name: '血の渇き', effect: { when: 'afterCard', if: [{ kind: 'dealtDamage' }], do: [{ kind: 'healPctOfDealt', pct: 25 }] } },
     tiers: [
       { minSuccesses: 0, effects: [d(8)] },
       { minSuccesses: 1, effects: [d(15)] },
@@ -325,7 +325,7 @@ export const CLASS_CARDS: CardDef[] = [
     baseChance: 70,
     target: 'enemy',
     rarity: 'epic',
-    trait: { name: '貫通', description: 'ダメージが敵のブロックを無視する', effect: { kind: 'pierce' } },
+    trait: { name: '貫通', effect: { modifier: 'ignoreBlock' } },
     tiers: [
       { minSuccesses: 0, effects: [d(6)] },
       { minSuccesses: 1, effects: [d(10)] },
@@ -341,7 +341,7 @@ export const CLASS_CARDS: CardDef[] = [
     baseChance: 55,
     target: 'allEnemies',
     rarity: 'epic',
-    trait: { name: '魔力循環', description: '完全成功でマナ+2', effect: { kind: 'perfectMana', amount: 2 } },
+    trait: { name: '魔力循環', effect: { when: 'perfect', do: [{ kind: 'gainMana', amount: 2 }] } },
     tiers: [
       { minSuccesses: 0, effects: [d(6)] },
       { minSuccesses: 1, effects: [d(11)] },
@@ -358,7 +358,7 @@ export const CLASS_CARDS: CardDef[] = [
     baseChance: 70,
     target: 'enemy',
     rarity: 'epic',
-    trait: { name: '吸収', description: 'HPに与えたダメージの50%だけHP回復', effect: { kind: 'drain', pct: 50 } },
+    trait: { name: '吸収', effect: { when: 'afterCard', if: [{ kind: 'dealtDamage' }], do: [{ kind: 'healPctOfDealt', pct: 50 }] } },
     tiers: [
       { minSuccesses: 0, effects: [d(5)] },
       { minSuccesses: 1, effects: [d(9)] },
@@ -374,7 +374,7 @@ export const CLASS_CARDS: CardDef[] = [
     baseChance: 65,
     target: 'enemy',
     rarity: 'epic',
-    trait: { name: '止め', description: '対象のHPが40%以下ならダメージ1.5倍', effect: { kind: 'execute', belowPct: 40, multiplier: 1.5 } },
+    trait: { name: '止め', effect: { modifier: 'damageDealt', multiplier: 1.5, if: [{ kind: 'targetHpAtMost', pct: 40 }] } },
     tiers: [
       { minSuccesses: 0, effects: [d(8)] },
       { minSuccesses: 1, effects: [d(14)] },
@@ -390,11 +390,11 @@ export const CLASS_CARDS: CardDef[] = [
     baseChance: 70,
     target: 'self',
     rarity: 'epic',
-    trait: { name: '魔力還元', description: '完全成功でマナ+1', effect: { kind: 'perfectMana', amount: 1 } },
+    trait: { name: '魔力還元', effect: { when: 'perfect', do: [{ kind: 'gainMana', amount: 1 }] } },
     tiers: [
-      { minSuccesses: 0, effects: [{ kind: 'blockAllies', amount: 5 }] },
-      { minSuccesses: 1, effects: [{ kind: 'blockAllies', amount: 9 }, { kind: 'healAllies', amount: 3 }] },
-      { minSuccesses: 2, effects: [{ kind: 'blockAllies', amount: 13 }, { kind: 'healAllies', amount: 6 }] },
+      { minSuccesses: 0, effects: [{ kind: 'block', amount: 5, to: 'allies' }] },
+      { minSuccesses: 1, effects: [{ kind: 'block', amount: 9, to: 'allies' }, { kind: 'heal', amount: 3, to: 'allies' }] },
+      { minSuccesses: 2, effects: [{ kind: 'block', amount: 13, to: 'allies' }, { kind: 'heal', amount: 6, to: 'allies' }] },
     ],
   },
   {
@@ -406,7 +406,7 @@ export const CLASS_CARDS: CardDef[] = [
     baseChance: 55,
     target: 'enemy',
     rarity: 'epic',
-    trait: { name: '止め', description: '対象のHPが30%以下ならダメージ2倍', effect: { kind: 'execute', belowPct: 30, multiplier: 2 } },
+    trait: { name: '止め', effect: { modifier: 'damageDealt', multiplier: 2, if: [{ kind: 'targetHpAtMost', pct: 30 }] } },
     tiers: [
       { minSuccesses: 0, effects: [d(7)] },
       { minSuccesses: 1, effects: [d(13)] },
@@ -423,7 +423,7 @@ export const CLASS_CARDS: CardDef[] = [
     baseChance: 70,
     target: 'enemy',
     rarity: 'epic',
-    trait: { name: '貫通', description: 'ダメージが敵のブロックを無視する', effect: { kind: 'pierce' } },
+    trait: { name: '貫通', effect: { modifier: 'ignoreBlock' } },
     tiers: [
       { minSuccesses: 0, effects: [d(5)] },
       { minSuccesses: 1, effects: [d(8), { kind: 'applyStatus', status: 'weak', amount: 1 }] },

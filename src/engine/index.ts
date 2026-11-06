@@ -12,3 +12,5 @@ export * from './game/game';
 export * from './game/hero';
 export * from './game/loot';
 export * from './battle/statuses';
+export * from './battle/effects';
+export * from './battle/units';

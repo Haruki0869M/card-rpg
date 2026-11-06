@@ -21,7 +21,7 @@ import type { ReactNode } from 'react';
 import { CharacterArt, ItemImage } from '../../art';
 import { getClass } from '../../data/classes';
 import { getItem } from '../../data/items';
-import { expToNext, heroFocusMax, heroMaxHp } from '../../engine';
+import { describeAbility, describeEffect, expToNext, heroFocusMax, heroMaxHp } from '../../engine';
 import type { Hero, ItemDef, Rarity, StatId } from '../../types';
 
 export const RARITY_STYLE: Record<Rarity, { name: string; color: string; glow: string; bg: string }> = {
@@ -79,8 +79,8 @@ export function itemSummary(item: ItemDef): string {
   if (item.startBlock) parts.push(`開始時ブロック${item.startBlock}`);
   if (item.extraDraw) parts.push(`毎ターン+${item.extraDraw}枚`);
   for (const c of item.cards ?? []) parts.push(`カード追加×${c.count}`);
-  if (item.use) parts.push(item.description);
-  if (item.ability) parts.unshift(`《${item.ability.name}》${item.ability.description}`);
+  for (const e of item.use ?? []) parts.push(describeEffect(e).replace('対象', '味方1人'));
+  if (item.ability) parts.unshift(`《${item.ability.name}》${describeAbility(item.ability)}`);
   return parts.join('・') || item.description;
 }
 

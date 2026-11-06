@@ -3,7 +3,7 @@ import type { CardDef } from '../../../types';
 
 const d = (amount: number) => ({ kind: 'damage', amount }) as const;
 const b = (amount: number) => ({ kind: 'block', amount }) as const;
-const ba = (amount: number) => ({ kind: 'blockAllies', amount }) as const;
+const ba = (amount: number) => ({ kind: 'block', amount, to: 'allies' }) as const;
 
 export const WEAPON_CARDS: CardDef[] = [
   // ---------- 剣 ----------
@@ -22,7 +22,7 @@ export const WEAPON_CARDS: CardDef[] = [
   {
     id: 'wMithrilSlash',
     rarity: 'epic',
-    trait: { name: '貫通', description: 'ダメージが敵のブロックを無視する', effect: { kind: 'pierce' } },
+    trait: { name: '貫通', effect: { modifier: 'ignoreBlock' } },
     name: 'ミスリル斬り',
     category: 'physical',
     cost: 1,
@@ -34,7 +34,7 @@ export const WEAPON_CARDS: CardDef[] = [
   {
     id: 'wFlameSlash',
     rarity: 'legend',
-    trait: { name: '焼き尽くし', description: '対象のHPが30%以下ならダメージ1.5倍', effect: { kind: 'execute', belowPct: 30, multiplier: 1.5 } },
+    trait: { name: '焼き尽くし', effect: { modifier: 'damageDealt', multiplier: 1.5, if: [{ kind: 'targetHpAtMost', pct: 30 }] } },
     name: '火炎斬り',
     category: 'physical',
     cost: 2,
@@ -64,7 +64,7 @@ export const WEAPON_CARDS: CardDef[] = [
   {
     id: 'wLightning',
     rarity: 'epic',
-    trait: { name: '魔力還元', description: '完全成功でマナ+1', effect: { kind: 'perfectMana', amount: 1 } },
+    trait: { name: '魔力還元', effect: { when: 'perfect', do: [{ kind: 'gainMana', amount: 1 }] } },
     name: '落雷',
     category: 'magic',
     cost: 2,
@@ -76,7 +76,7 @@ export const WEAPON_CARDS: CardDef[] = [
   {
     id: 'wStarfall',
     rarity: 'legend',
-    trait: { name: '星の貫き', description: 'ダメージが敵のブロックを無視する', effect: { kind: 'pierce' } },
+    trait: { name: '星の貫き', effect: { modifier: 'ignoreBlock' } },
     name: '星降り',
     category: 'magic',
     cost: 2,
@@ -110,7 +110,7 @@ export const WEAPON_CARDS: CardDef[] = [
   {
     id: 'wHolyHammer',
     rarity: 'epic',
-    trait: { name: '聖なる癒し', description: 'HPに与えたダメージの25%だけHP回復', effect: { kind: 'drain', pct: 25 } },
+    trait: { name: '聖なる癒し', effect: { when: 'afterCard', if: [{ kind: 'dealtDamage' }], do: [{ kind: 'healPctOfDealt', pct: 25 }] } },
     name: '聖槌',
     category: 'physical',
     cost: 2,
@@ -122,7 +122,7 @@ export const WEAPON_CARDS: CardDef[] = [
   {
     id: 'wEarthGuard',
     rarity: 'legend',
-    trait: { name: '大地の恵み', description: 'HPに与えたダメージの40%だけHP回復', effect: { kind: 'drain', pct: 40 } },
+    trait: { name: '大地の恵み', effect: { when: 'afterCard', if: [{ kind: 'dealtDamage' }], do: [{ kind: 'healPctOfDealt', pct: 40 }] } },
     name: '大地の守護',
     category: 'physical',
     cost: 2,
@@ -152,7 +152,7 @@ export const WEAPON_CARDS: CardDef[] = [
   {
     id: 'wGaleArrow',
     rarity: 'epic',
-    trait: { name: '止め', description: '対象のHPが30%以下ならダメージ1.5倍', effect: { kind: 'execute', belowPct: 30, multiplier: 1.5 } },
+    trait: { name: '止め', effect: { modifier: 'damageDealt', multiplier: 1.5, if: [{ kind: 'targetHpAtMost', pct: 30 }] } },
     name: '疾風の矢',
     category: 'physical',
     cost: 1,
@@ -168,7 +168,7 @@ export const WEAPON_CARDS: CardDef[] = [
   {
     id: 'wSkyPiercer',
     rarity: 'legend',
-    trait: { name: '天穿の貫き', description: 'ダメージが敵のブロックを無視する', effect: { kind: 'pierce' } },
+    trait: { name: '天穿の貫き', effect: { modifier: 'ignoreBlock' } },
     name: '天穿',
     category: 'physical',
     cost: 2,
