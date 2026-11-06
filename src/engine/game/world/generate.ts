@@ -116,12 +116,14 @@ export function createWorld(game: GameState, rng: Rng): WorldState {
     for (const d of reg.randomDungeons ?? []) place(1, () => ({ kind: 'dungeon', id: d }));
   });
 
+  // キャラの位置（徘徊する敵はキャラの近くには置かない）
+  const alive = game.heroes.filter((h) => !h.retired);
+  for (const h of alive) w.pos[h.id] = start;
+
   // 徘徊する敵
   for (let ri = 0; ri < def.regions.length; ri++) for (let k = 0; k < def.regions[ri].wanderers; k++) spawnWanderer(game, w, rng, ri);
 
-  // キャラの位置と最初の手番
-  const alive = game.heroes.filter((h) => !h.retired);
-  for (const h of alive) w.pos[h.id] = start;
+  // 最初の手番
   w.turn = alive[0]?.id ?? '';
   w.prevTile = start;
   // スタートの地域は冒頭の物語で紹介済み

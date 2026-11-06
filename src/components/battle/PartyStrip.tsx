@@ -6,7 +6,7 @@ import { CharacterArt } from '../../art';
 import { getClass } from '../../data/classes';
 import { incomingDamage, isDone, usableCardCount } from '../../engine';
 import { usePress } from '../../hooks/usePress';
-import { LOCAL_PLAYER } from '../../store/battleConfig';
+import { isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
 import type { AllyState } from '../../types';
 import { HpBar } from '../ui/HpBar';
@@ -22,7 +22,7 @@ const AllyCard = memo(function AllyCard({ ally }: { ally: AllyState }) {
   const press = usePress(() => setActive(ally.id), { type: 'ally', id: ally.id });
   const cls = getClass(ally.classId);
   const active = activeId === ally.id && battle.phase === 'ally';
-  const mine = ally.playerId === LOCAL_PLAYER;
+  const mine = isLocalPlayer(ally.playerId);
   const done = battle.phase === 'ally' && isDone(battle, ally);
   const incoming = incomingDamage(battle, ally);
   const lethal = !ally.dead && incoming >= ally.hp && incoming > 0;

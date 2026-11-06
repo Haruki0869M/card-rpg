@@ -26,3 +26,4 @@ export * from './game/world/world';
 export * from './game/world/town';
 export * from './game/world/objectives';
 export { createWorld, regionOfRow } from './game/world/generate';
+export { sceneHeroes, activeHeroes } from './game/heroes';

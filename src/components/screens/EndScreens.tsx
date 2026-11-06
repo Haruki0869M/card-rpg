@@ -56,7 +56,7 @@ export function ClearedScreen() {
       </div>
       <div className="shrink-0 px-3 pb-3">
         <button onClick={() => dispatchGame({ type: 'RETURN_TO_HUB', playerId: LOCAL_PLAYER })} className="btn btn-gold font-display flex h-14 w-full items-center justify-center gap-2 rounded-xl text-[19px]">
-          <Castle size={22} /> 拠点に戻る
+          <Castle size={22} /> {game.world ? '地上に戻る' : '拠点に戻る'}
         </button>
       </div>
     </Screen>
@@ -71,9 +71,11 @@ export function GameOverScreen() {
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-5">
         <Skull size={56} className="text-red-400" />
         <div className="font-display text-[38px] leading-[46px] text-red-300" style={{ filter: 'drop-shadow(0 2px 0 rgba(0,0,0,.8))' }}>
-          全滅…
+          {game.world && game.world.corruption >= 100 ? '世界の終わり…' : '全滅…'}
         </div>
-        <div className="text-[13px] text-zinc-400">パーティは力尽きた。命の灯火（残機）は M3 で追加されます。</div>
+        <div className="text-[13px] text-zinc-400">
+          {game.world && game.world.corruption >= 100 ? '侵食度が100%に達し、世界は侵食に呑まれた。' : 'パーティは力尽きた。命の灯火も残っていなかった。'}
+        </div>
         <div className="mt-2 flex -space-x-2">
           {game.heroes.map((h) => (
             <HeroFace key={h.id} hero={h} size={44} dim />

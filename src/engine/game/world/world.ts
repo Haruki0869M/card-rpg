@@ -4,7 +4,7 @@ import { getClass } from '../../../data/classes';
 import { DUNGEONS } from '../../../data/dungeons';
 import { EVENTS } from '../../../data/events';
 import { getScenario } from '../../../data/scenarios';
-import { QUESTS, TOWNS } from '../../../data/world';
+import { QUESTS, TERRAINS, TOWNS } from '../../../data/world';
 import type { EncounterState, GameCommand, GameState, Hero, QuestState, WorldState } from '../../../types';
 import type { Rng } from '../../rng';
 import { addLog, ownedBy, rollWithFocus, statChance, successes } from '../common';
@@ -15,6 +15,7 @@ import { revealAround } from './fog';
 import { hexDistance, pathTo, reachable } from './hex';
 import { objectiveHandler, type QuestSignal } from './objectives';
 import { timeOfDay } from './time';
+import { ensureShop } from './town';
 import { moveWanderers, spawnWanderer } from './wanderers';
 
 type Cmd<T extends GameCommand['type']> = Extract<GameCommand, { type: T }>;
@@ -421,6 +422,7 @@ export function interact(game: GameState, cmd: Cmd<'WORLD_INTERACT'>, rng: Rng):
       if (w.fallenTowns.includes(f.id)) return 'この町は陥落している…';
       game.town = { townId: f.id, heroId: h.id };
       game.mode = 'town';
+      ensureShop(game, rng);
       return undefined;
     case 'shrine':
       game.party = here;
@@ -469,3 +471,13 @@ export function storyContinue(game: GameState): string | undefined {
 
 /** 世界マップのイベントで出るイベント（名所・普通のイベント） */
 export const isMapEvent = (id: string) => EVENTS.tryGet(id)?.where === 'map';
+
+/** 今の場面の背景（ダンジョンならダンジョン、世界マップならそのマスの地形） */
+export function sceneBackground(game: GameState): string {
+  if (game.dungeon) return game.dungeon.background;
+  if (game.battleBackground && game.mode === 'battle') return game.battleBackground;
+  const w = game.world;
+  if (!w) return 'plains';
+  const tile = game.chest?.tile ?? game.event?.tile ?? game.shrine?.tile ?? game.encounter?.tile ?? w.pos[w.turn];
+  return tile !== undefined ? TERRAINS.get(w.tiles[tile].t).background : 'plains';
+}

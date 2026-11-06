@@ -1,14 +1,15 @@
 import { getDifficulty } from '../data/rules';
+import { QuestList } from './world/Places';
 // ===== メニュー・戦闘ログ・山札/捨札・パーティ（装備）・道具袋・冒険をやめる確認 =====
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowRight, ChevronRight, DoorOpen, ScrollText, X } from 'lucide-react';
+import { ArrowRight, Backpack, ChevronRight, DoorOpen, ScrollText, Users, X } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { CharacterArt } from '../art';
 import { cardOf } from '../data/cards';
 import { getClass } from '../data/classes';
 import { getItem } from '../data/items';
 import { EQUIP_SLOTS, STAT_IDS, affinityFromStats, battleDeck, canEquip, describeAbility, expToNext, findAlly, heroFocusMax, heroMaxHp, heroStats, weaponRarity } from '../engine';
-import { LOCAL_PLAYER } from '../store/battleConfig';
+import { LOCAL_PLAYER, isLocalPlayer } from '../store/battleConfig';
 import { useBattle } from '../store/battleStore';
 import type { CardInstance, EquipSlot, Hero, ItemDef } from '../types';
 import { Bar, HeroFace, ItemIcon, itemSummary, RARITY_STYLE, STAT_LABEL } from './ui/game';
@@ -71,6 +72,22 @@ function MenuSheet() {
       <div className="flex flex-col gap-2">
         <Toggle label="高速モード（演出2倍速）" on={settings.fastMode} onChange={(v) => setSettings({ fastMode: v })} />
         <Toggle label="振動" on={settings.vibration} onChange={(v) => setSettings({ vibration: v })} />
+        {game?.world && game.mode === 'world' && (
+          <>
+            <button onClick={() => openSheet('party')} className={row}>
+              <Users size={18} className="text-amber-300" /> パーティ・装備
+              <ChevronRight size={18} className="ml-auto" />
+            </button>
+            <button onClick={() => openSheet('pouch')} className={row}>
+              <Backpack size={18} className="text-amber-300" /> 道具の袋
+              <ChevronRight size={18} className="ml-auto" />
+            </button>
+            <button onClick={() => openSheet('quests')} className={row}>
+              <ScrollText size={18} className="text-amber-300" /> 依頼と封印の鍵
+              <ChevronRight size={18} className="ml-auto" />
+            </button>
+          </>
+        )}
         {game?.mode === 'battle' && (
           <button onClick={() => openSheet('log')} className={row}>
             <ScrollText size={18} className="text-amber-300" /> 戦闘ログ
@@ -194,7 +211,7 @@ function PartySheet() {
   const stats = heroStats(hero);
   const aff = affinityFromStats(stats);
   const inBattle = game.mode === 'battle';
-  const mine = hero.playerId === LOCAL_PLAYER;
+  const mine = isLocalPlayer(hero.playerId);
   const candidates = slot ? game.stash.filter((s) => getItem(s.itemId).slot === slot) : [];
 
   return (
@@ -462,6 +479,7 @@ export function Sheets() {
   const sheet = useBattle((s) => s.sheet);
   const confirm = useBattle((s) => s.confirmAbandon);
   const hasGame = useBattle((s) => !!s.game);
+  const openSheet = useBattle((s) => s.openSheet);
   return (
     <>
       <AnimatePresence>
@@ -470,6 +488,11 @@ export function Sheets() {
         {(sheet === 'draw' || sheet === 'discard') && <PileSheet key={sheet} kind={sheet} />}
         {sheet === 'party' && hasGame && <PartySheet key="party" />}
         {sheet === 'pouch' && hasGame && <PouchSheet key="pouch" />}
+        {sheet === 'quests' && hasGame && (
+          <BottomSheet key="quests" title="依頼と封印の鍵" onClose={() => openSheet(null)}>
+            <QuestList />
+          </BottomSheet>
+        )}
       </AnimatePresence>
       <AnimatePresence>{confirm && <ConfirmAbandon />}</AnimatePresence>
     </>

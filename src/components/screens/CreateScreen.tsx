@@ -6,7 +6,8 @@ import { getCard } from '../../data/cards';
 import { CLASSES, getClass } from '../../data/classes';
 import { getItem } from '../../data/items';
 import { affinityOf, describeAbility } from '../../engine';
-import { autoName } from '../../store/battleConfig';
+import { PLAYER_COLOR } from '../../data/theme';
+import { autoName, PLAYER_IDS } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
 import type { Gender, StatId } from '../../types';
 import { Bar, Heading, ItemIcon, itemSummary, Screen, STAT_LABEL } from '../ui/game';
@@ -79,6 +80,27 @@ export function CreateScreen() {
             </button>
           ))}
         </div>
+
+        {/* 担当プレイヤー（ローカル協力: 1台を回して遊ぶ。spec §7.3） */}
+        {draft.party.length > 1 && (
+          <div className="mt-2 flex items-center gap-1.5">
+            <span className="shrink-0 text-[12px] text-zinc-300">担当</span>
+            {PLAYER_IDS.slice(0, draft.party.length).map((p) => {
+              const on = (m.playerId ?? 'P1') === p;
+              return (
+                <button
+                  key={p}
+                  onClick={() => update({ playerId: p })}
+                  className={`btn h-11 min-w-0 flex-1 rounded-lg border-2 text-[14px] font-bold ${on ? 'text-black' : 'bg-black/30 text-zinc-300'}`}
+                  style={on ? { background: PLAYER_COLOR[p], borderColor: '#fff' } : { borderColor: `${PLAYER_COLOR[p]}88` }}
+                >
+                  {p}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {draft.party.length > 1 && <div className="text-[12px] text-zinc-500">1台を回して遊ぶ時に、誰がこのキャラを操作するか（1人で全員を操作するなら全員P1のまま）</div>}
 
         {/* 選んだ職業の詳細 */}
         <div className="panel panel-gold-edge mt-2 rounded-xl p-2">
