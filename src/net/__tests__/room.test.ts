@@ -1,6 +1,6 @@
 // ===== オンライン協力の部屋（テスト用の通信で、複数の端末をまねる） =====
 import { describe, expect, it } from 'vitest';
-import { botNextCommand } from '../../engine/__tests__/bot';
+import { botNextCommand } from '../../engine/bot';
 import { stateHash } from '../../engine';
 import type { GameCommand, PlayerId } from '../../types';
 import { MemoryHub } from '../memoryBackend';

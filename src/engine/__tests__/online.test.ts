@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BattleState, Command } from '../../types';
 import { applyCommand, createBattle, createGame, stableStringify, stateHash, waitingPlayers } from '../index';
-import { playToEnd } from './bot';
+import { playToEnd } from '../bot';
 import { giveHand, setup } from './helpers';
 
 function twoPlayers(): BattleState {

@@ -19,8 +19,10 @@ import {
   isDone,
   makeSeed,
   unusableReason,
+  waitingPlayers,
 } from '../engine';
-import type { BattleEvent, BattleState, Command, Difficulty, GameCommand, GameState, Gender, PlayerId, SlotResult } from '../types';
+import type { Room } from '../net/room';
+import type { BattleEvent, BattleState, Command, Difficulty, GameCommand, GameResult, GameState, Gender, PlayerId, SlotResult } from '../types';
 import { actorOf, autoName, battleActorOf, isLocalPlayer, LOCAL_PLAYER } from './battleConfig';
 
 export interface Settings {
@@ -55,7 +57,7 @@ export interface UnitFx {
 }
 
 export type Sheet = null | 'menu' | 'log' | 'draw' | 'discard' | 'party' | 'pouch' | 'quests';
-export type Screen = 'title' | 'setup' | 'create' | 'game';
+export type Screen = 'title' | 'setup' | 'create' | 'game' | 'join' | 'lobby';
 
 /** 冒険の準備〜キャラクター作成の下書き */
 export interface NewGameDraft {
@@ -105,6 +107,12 @@ interface StoreState {
   openSheet: (s: Sheet) => void;
   setConfirmAbandon: (v: boolean) => void;
   showToast: (text: string) => void;
+  /** オンライン協力: 部屋から届いた操作の結果を反映する */
+  applyRemote: (r: GameResult) => void;
+  /** オンライン協力: 状態を丸ごと差し替える（参加・取り直し） */
+  loadRemote: (game: GameState) => void;
+  /** オンライン協力をやめた: この端末の1人用の冒険（保存）に戻す */
+  exitOnline: () => void;
   /** 戻る操作などで一番上のものを閉じる。閉じたら true */
   closeTop: () => boolean;
 }
@@ -145,6 +153,8 @@ function loadSettings(): Settings {
 }
 
 function writeSave(s: Pick<StoreState, 'game' | 'activeId'>) {
+  // オンライン協力の冒険は部屋に保存される（この端末の1人用の保存は上書きしない）
+  if (room) return;
   try {
     if (!s.game) localStorage.removeItem(SAVE_KEY);
     else localStorage.setItem(SAVE_KEY, JSON.stringify({ version: GAME_VERSION, content: contentVersion(), game: s.game, activeId: s.activeId } satisfies SaveData));
@@ -179,9 +189,17 @@ export function speedFactor(settings: Pick<Settings, 'fastMode'>): number {
 let fxId = 1;
 let enemyTimer: ReturnType<typeof setTimeout> | null = null;
 
+/** オンライン協力の部屋（null = 1台で遊ぶ） */
+let room: Room | null = null;
+export const setStoreRoom = (r: Room | null) => {
+  room = r;
+};
+/** ホストが送った「敵の行動」がまだ戻ってきていない */
+let enemyInFlight = false;
+
 /** 次に操作するキャラ（この端末の担当キャラだけが対象） */
 function nextActive(battle: BattleState, current: string): string {
-  const mine = battle.allies.filter((a) => a.playerId === LOCAL_PLAYER);
+  const mine = battle.allies.filter((a) => isLocalPlayer(a.playerId));
   const cur = mine.find((a) => a.id === current);
   if (cur && !isDone(battle, cur)) return current;
   const start = Math.max(0, mine.findIndex((a) => a.id === current));
@@ -244,9 +262,12 @@ export const useBattle = create<StoreState>((set, get) => {
     if (enemyTimer) clearTimeout(enemyTimer);
     const { game, settings } = get();
     if (game?.mode !== 'battle' || game.battle?.phase !== 'enemy') return;
+    // オンライン協力: 敵の行動はホストが代表して進める
+    if (room && (!room.isHost || enemyInFlight)) return;
     enemyTimer = setTimeout(
       () => {
         enemyTimer = null;
+        if (room) enemyInFlight = true;
         get().dispatch({ type: 'ENEMY_STEP' });
       },
       (TIMING.enemyStep * 1000) / speedFactor(settings),
@@ -304,8 +325,33 @@ export const useBattle = create<StoreState>((set, get) => {
     retargets: {},
     flash: null,
     hint: null,
-    activeId: nextActive(b, b.allies.find((a) => a.playerId === LOCAL_PLAYER)?.id ?? b.allies[0].id),
+    activeId: nextActive(b, b.allies.find((a) => isLocalPlayer(a.playerId))?.id ?? b.allies[0].id),
   });
+
+  /** 操作の結果を画面に反映する（この端末の操作・部屋から届いた操作で共通） */
+  const commit = (r: GameResult, prevBattle: BattleState | undefined) => {
+    const next = r.state;
+    const patch: Partial<StoreState> = { game: next };
+    if (next.battle) {
+      patch.battle = next.battle;
+      if (next.battle !== prevBattle && (!prevBattle || prevBattle.seed !== next.battle.seed || prevBattle.encounterId !== next.battle.encounterId)) {
+        Object.assign(patch, resetBattleUi(next.battle));
+      } else if (next.battle.phase === 'ally') {
+        patch.activeId = nextActive(next.battle, get().activeId);
+      }
+      if (next.battle.phase !== 'ally' && next.battle.phase !== 'enemy') {
+        patch.selection = null;
+        patch.sheet = null;
+      }
+      // 選んでいたカードが手札から無くなった（他の人の操作で状況が変わった）
+      const sel = get().selection;
+      if (sel && !findAlly(next.battle, get().activeId)?.hand.some((c) => c.uid === sel.cardUid)) patch.selection = null;
+    }
+    set(patch);
+    applyEvents(r.battleEvents);
+    scheduleSave(get);
+    scheduleEnemy();
+  };
 
   return {
     screen: 'title',
@@ -349,6 +395,14 @@ export const useBattle = create<StoreState>((set, get) => {
       setTimeout(scheduleEnemy, 300);
     },
 
+    exitOnline: () => {
+      if (enemyTimer) clearTimeout(enemyTimer);
+      enemyTimer = null;
+      enemyInFlight = false;
+      const local = loadSave();
+      set({ game: local?.game ?? null, activeId: local?.activeId ?? '', screen: 'title', confirmAbandon: false, sheet: null, battle: local?.game.battle ?? EMPTY_BATTLE, selection: null });
+    },
+
     abandonGame: () => {
       if (enemyTimer) clearTimeout(enemyTimer);
       enemyTimer = null;
@@ -363,35 +417,52 @@ export const useBattle = create<StoreState>((set, get) => {
       // ローカル協力: そのキャラの担当プレイヤーとして送る
       if ('playerId' in cmd) cmd = { ...cmd, playerId: actorOf(game, cmd) } as GameCommand;
       if (cmd.type === 'BATTLE' && 'playerId' in cmd.command) cmd = { ...cmd, command: { ...cmd.command, playerId: battleActorOf(game, cmd.command) } as Command };
+      // オンライン協力: 自分の担当か・通るかを先に確かめてから、部屋に送る（結果は部屋から届く）
+      if (room) {
+        const actor = 'playerId' in cmd ? cmd.playerId : cmd.type === 'BATTLE' && 'playerId' in cmd.command ? cmd.command.playerId : undefined;
+        if (actor && !isLocalPlayer(actor)) {
+          const msg = `${actor}${room.seatName(actor) ? `（${room.seatName(actor)}）` : ''}の担当です`;
+          if (cmd.type !== 'BATTLE' || cmd.command.type !== 'ENEMY_STEP') get().showToast(msg);
+          return msg;
+        }
+        const dry = applyGameCommand(game, cmd);
+        if (dry.error) {
+          if (cmd.type === 'BATTLE' && cmd.command.type === 'ENEMY_STEP') enemyInFlight = false;
+          else get().showToast(dry.error);
+          return dry.error;
+        }
+        room.send(cmd).catch(() => {
+          if (cmd.type === 'BATTLE' && cmd.command.type === 'ENEMY_STEP') enemyInFlight = false;
+          get().showToast('送れませんでした。通信を確かめてください');
+        });
+        return undefined;
+      }
       const r = applyGameCommand(game, cmd);
       if (r.error) {
         get().showToast(r.error);
         return r.error;
       }
-      const next = r.state;
-      const patch: Partial<StoreState> = { game: next };
-      if (next.battle) {
-        patch.battle = next.battle;
-        if (next.battle !== prevBattle && (!prevBattle || prevBattle.seed !== next.battle.seed || prevBattle.encounterId !== next.battle.encounterId)) {
-          Object.assign(patch, resetBattleUi(next.battle));
-        } else if (next.battle.phase === 'ally') {
-          patch.activeId = nextActive(next.battle, get().activeId);
-        }
-        if (next.battle.phase !== 'ally' && next.battle.phase !== 'enemy') {
-          patch.selection = null;
-          patch.sheet = null;
-        }
-      }
-      set(patch);
-      applyEvents(r.battleEvents);
-      scheduleSave(get);
-      scheduleEnemy();
+      commit(r, prevBattle);
       return undefined;
+    },
+
+    applyRemote: (r) => {
+      enemyInFlight = false;
+      commit(r, get().game?.battle);
+    },
+
+    loadRemote: (game) => {
+      enemyInFlight = false;
+      if (enemyTimer) clearTimeout(enemyTimer);
+      enemyTimer = null;
+      set({ game, screen: 'game', sheet: null, battle: game.battle ?? EMPTY_BATTLE, ...(game.battle ? resetBattleUi(game.battle) : { selection: null }) });
+      scheduleEnemy();
     },
 
     dispatch: (cmd) => {
       const { game } = get();
       if (!game || game.mode !== 'battle') return '戦闘中ではありません';
+      if (room) return get().dispatchGame({ type: 'BATTLE', command: cmd });
       if ('playerId' in cmd) cmd = { ...cmd, playerId: battleActorOf(game, cmd) } as Command;
       const r = applyGameCommand(game, { type: 'BATTLE', command: cmd });
       if (r.error) return r.error;
@@ -489,8 +560,13 @@ export const useBattle = create<StoreState>((set, get) => {
     endTurn: () => {
       const { battle } = get();
       if (battle.phase !== 'ally') return;
-      const canAct = battle.allies.some((a) => a.playerId === LOCAL_PLAYER && !isDone(battle, a));
+      const canAct = battle.allies.some((a) => isLocalPlayer(a.playerId) && !isDone(battle, a));
       set({ selection: null, hint: canAct ? { text: 'まだ行動できるキャラがいます', id: fxId++ } : null });
+      // オンライン協力: この端末の担当のうち、まだ準備完了していない席の分を押す
+      if (room) {
+        for (const p of waitingPlayers(battle).filter((x) => isLocalPlayer(x))) get().dispatch({ type: 'END_TURN', playerId: p });
+        return;
+      }
       get().dispatch({ type: 'END_TURN', playerId: LOCAL_PLAYER });
     },
 
@@ -500,7 +576,7 @@ export const useBattle = create<StoreState>((set, get) => {
       const user =
         game.mode === 'battle'
           ? activeId
-          : (game.heroes.find((h) => h.playerId === LOCAL_PLAYER && h.hp > 0)?.id ?? targetHeroId);
+          : (game.heroes.find((h) => isLocalPlayer(h.playerId) && h.hp > 0)?.id ?? targetHeroId);
       const err = get().dispatchGame({ type: 'USE_POUCH_ITEM', playerId: LOCAL_PLAYER, itemUid, userId: user, targetId: targetHeroId });
       if (!err) set({ sheet: null });
     },
@@ -525,8 +601,8 @@ export const useBattle = create<StoreState>((set, get) => {
       if (s.sheet === 'log') return set({ sheet: 'menu' }), true;
       if (s.sheet) return set({ sheet: null }), true;
       if (s.selection) return set({ selection: null }), true;
-      if (s.screen === 'create') return set({ screen: 'setup' }), true;
-      if (s.screen === 'setup') return set({ screen: 'title' }), true;
+      if (s.screen === 'create') return set({ screen: room ? 'lobby' : 'setup' }), true;
+      if (s.screen === 'setup' || s.screen === 'join') return set({ screen: 'title' }), true;
       return false;
     },
   };

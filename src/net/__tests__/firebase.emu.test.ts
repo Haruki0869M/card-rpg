@@ -3,7 +3,7 @@
 //   npm run emulators &        （別の画面で）
 //   EMU=1 npx vitest run firebase
 import { describe, expect, it } from 'vitest';
-import { botNextCommand } from '../../engine/__tests__/bot';
+import { botNextCommand } from '../../engine/bot';
 import { stateHash } from '../../engine';
 import type { GameCommand, PlayerId } from '../../types';
 import type { Backend } from '../backend';

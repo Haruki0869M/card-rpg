@@ -6,6 +6,7 @@ import { BookOpen, Play, Settings2, UserPlus, Users } from 'lucide-react';
 import { useState } from 'react';
 import { BattleBackground, CharacterArt } from '../../art';
 import { useBattle } from '../../store/battleStore';
+import { useOnline } from '../../store/onlineStore';
 import { HeroFace, Screen } from '../ui/game';
 
 export const GAME_TITLE = TERMS.gameTitle;
@@ -24,6 +25,7 @@ export function TitleScreen() {
   const setSettings = useBattle((s) => s.setSettings);
   const toast = useBattle((s) => s.showToast);
   const [showSettings, setShowSettings] = useState(false);
+  const onlineOk = useOnline((s) => s.available)();
   const modeText: Record<string, string> = {
     hub: '冒険の拠点',
     dungeon: 'ダンジョン探索中',
@@ -96,7 +98,7 @@ export function TitleScreen() {
           </button>
         )}
         <div className="grid grid-cols-3 gap-2">
-          <button onClick={() => toast('部屋に参加（オンライン協力）は M3 で追加します')} className="btn btn-dark flex h-12 flex-col items-center justify-center rounded-lg text-[12px]">
+          <button onClick={() => (onlineOk ? setScreen('join') : toast('オンライン協力は準備中です（Firebase の設定が入ると遊べます）'))} className="btn btn-dark flex h-12 flex-col items-center justify-center rounded-lg text-[12px]">
             <Users size={16} className="text-sky-300" /> 部屋に参加
           </button>
           <button onClick={() => toast('伝承の書は M4 で追加します')} className="btn btn-dark flex h-12 flex-col items-center justify-center rounded-lg text-[12px]">

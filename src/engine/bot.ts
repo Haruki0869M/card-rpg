@@ -1,11 +1,11 @@
 // ===== テスト用の自動プレイ（シナリオをエンディングまで）=====
 // 画面と同じコマンドだけを使う。上手さより「どの場面でも詰まらずに進めること」を優先した単純な作戦。
-import { cardOf } from '../../data/cards';
-import { DUNGEONS } from '../../data/dungeons';
-import { EVENTS } from '../../data/events';
-import { getItem } from '../../data/items';
-import { TOWNS } from '../../data/world';
-import type { GameCommand, GameState, PlayerId } from '../../types';
+import { cardOf } from '../data/cards';
+import { DUNGEONS } from '../data/dungeons';
+import { EVENTS } from '../data/events';
+import { getItem } from '../data/items';
+import { TOWNS } from '../data/world';
+import type { GameCommand, GameState, PlayerId } from '../types';
 import {
   applyGameCommand,
   canEquip,
@@ -20,7 +20,7 @@ import {
   reachableRooms,
   unusableReason,
   waitingPlayers,
-} from '../index';
+} from './index';
 
 export interface BotLog {
   steps: number;

@@ -6,6 +6,8 @@ import { CLASSES } from '../../data/classes';
 import { SCENARIOS } from '../../data/scenarios';
 import { autoName } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
+import { useOnline } from '../../store/onlineStore';
+import { useState } from 'react';
 import { DIFFICULTIES, describeDifficulty } from '../../data/rules';
 import { Heading, Screen } from '../ui/game';
 
@@ -17,6 +19,13 @@ export function SetupScreen() {
   const setDraft = useBattle((s) => s.setDraft);
   const setScreen = useBattle((s) => s.setScreen);
   const toast = useBattle((s) => s.showToast);
+  const onlineOk = useOnline((s) => s.available)();
+  const createRoom = useOnline((s) => s.createRoom);
+  const busy = useOnline((s) => s.busy);
+  const error = useOnline((s) => s.error);
+  const playerName = useOnline((s) => s.playerName);
+  const setPlayerName = useOnline((s) => s.setPlayerName);
+  const [online, setOnline] = useState(false);
   const setSize = (n: number) => {
     const party = draft.party.slice(0, n);
     const classes = CLASSES.all.filter((c) => c.unlocked);
@@ -99,16 +108,49 @@ export function SetupScreen() {
 
         <div className="font-display mt-3 text-[15px] text-amber-200">遊び方</div>
         <div className="mt-1 grid grid-cols-2 gap-2">
-          <button className="btn btn-gold h-12 rounded-lg text-[14px] font-bold">ひとりで（全員を操作）</button>
-          <button onClick={() => toast('オンライン協力は M3 で追加します')} className="btn btn-dark h-12 rounded-lg text-[14px] text-zinc-400">
+          <button onClick={() => setOnline(false)} className={`btn h-12 rounded-lg text-[14px] font-bold ${online ? 'btn-dark' : 'btn-gold'}`}>
+            この端末で遊ぶ
+          </button>
+          <button
+            onClick={() => (onlineOk ? setOnline(true) : toast('オンライン協力は準備中です（Firebase の設定が入ると遊べます）'))}
+            className={`btn h-12 rounded-lg text-[14px] font-bold ${online ? 'btn-gold' : 'btn-dark'} ${onlineOk ? '' : 'text-zinc-500'}`}
+          >
             オンライン協力
           </button>
         </div>
+        <div className="mt-1 text-[12px] text-zinc-500">
+          {online ? '部屋を作って、合言葉を仲間に教えます。仲間は自分のスマホで「部屋に参加」から入り、自分のキャラを作ります。' : '1人で全員を操作するか、1台を回して遊びます。'}
+        </div>
+        {online && (
+          <label className="mt-2 flex items-center gap-2">
+            <span className="shrink-0 text-[13px] text-zinc-300">あなたの名前</span>
+            <input
+              value={playerName}
+              maxLength={10}
+              placeholder="プレイヤー"
+              onChange={(e) => setPlayerName(e.target.value)}
+              className="h-11 min-w-0 flex-1 rounded-lg border border-amber-500/40 bg-black/50 px-2 text-[16px] text-amber-50 outline-none focus:border-amber-300"
+            />
+          </label>
+        )}
+        {online && error && <div className="mt-2 rounded-lg bg-red-950/70 px-3 py-2 text-[13px] text-red-100">{error}</div>}
       </div>
       <div className="shrink-0 px-3 pt-1 pb-3">
-        <button onClick={() => setScreen('create')} className="btn btn-gold font-display flex h-14 w-full items-center justify-center gap-2 rounded-xl text-[19px]">
-          キャラクター作成へ <ChevronRight size={22} />
-        </button>
+        {online ? (
+          <button
+            disabled={busy}
+            onClick={async () => {
+              if (await createRoom({ scenarioId: draft.scenarioId, difficulty: draft.difficulty, partySize: draft.party.length })) setScreen('lobby');
+            }}
+            className="btn btn-gold font-display flex h-14 w-full items-center justify-center gap-2 rounded-xl text-[19px] disabled:opacity-50"
+          >
+            <Users size={22} /> {busy ? 'つないでいます…' : '部屋を作る'}
+          </button>
+        ) : (
+          <button onClick={() => setScreen('create')} className="btn btn-gold font-display flex h-14 w-full items-center justify-center gap-2 rounded-xl text-[19px]">
+            キャラクター作成へ <ChevronRight size={22} />
+          </button>
+        )}
       </div>
     </Screen>
   );
