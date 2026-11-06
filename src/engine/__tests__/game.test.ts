@@ -29,13 +29,18 @@ import {
 import { party } from './helpers';
 
 const P: PlayerId = 'P1';
-const newGame = (seed = 1, classes = ['warrior', 'mage', 'guardian', 'hunter'], difficulty: GameState['difficulty'] = 'normal') =>
-  createGame({
+/** ダンジョンの流れを確かめるため、世界マップを外して仮の拠点から始める（世界マップは world.test.ts で確かめる） */
+const newGame = (seed = 1, classes = ['warrior', 'mage', 'guardian', 'hunter'], difficulty: GameState['difficulty'] = 'normal') => {
+  const g = createGame({
     seed,
     scenarioId: 'corruptionKing',
     difficulty,
     party: classes.map((c, i) => ({ classId: c, gender: i % 2 ? 'female' : 'male', name: `${c}${i}`, playerId: P })),
   });
+  g.world = undefined;
+  g.mode = 'hub';
+  return g;
+};
 
 function run(g: GameState, cmd: GameCommand): GameState {
   const r = applyGameCommand(g, cmd);

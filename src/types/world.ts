@@ -1,0 +1,229 @@
+// ===== 世界マップ・町・祠・依頼の型（spec §8・§16・§17） =====
+import type { EventOutcome, ItemInstance } from './game';
+import type { EncounterSpec, Rarity } from './index';
+
+// ---------- データ（src/content） ----------
+
+/** 地形（spec §8.1）。moveCost 0 は通れない */
+export interface TerrainDef {
+  id: string;
+  order?: number;
+  name: string;
+  moveCost: number;
+  /** マスの色（昼） */
+  color: string;
+  /** 模様の種類（画面側の TERRAIN_DECOR のキー） */
+  decor?: string;
+  /** この地形で戦った時の戦闘の背景 */
+  background: string;
+}
+
+/** 地域（マップの行の範囲。奥ほど敵が強い） */
+export interface RegionDef {
+  id: string;
+  name: string;
+  /** 初めて入った時の文章 */
+  intro?: string;
+  /** マップの行の範囲（0 = 一番上） */
+  rows: [number, number];
+  /** 地形の出やすさ（地形ID → 重み） */
+  terrain: Record<string, number>;
+  /** 徘徊する敵の基準レベルと組み合わせ（敵IDの並び） */
+  enemyLevel: number;
+  encounters: string[][];
+  /** 最初に置く徘徊する敵の数 */
+  wanderers: number;
+  /** ランダムに置くもの（数） */
+  chests?: number;
+  events?: number;
+  shrines?: number;
+  /** ランダムダンジョン（このダンジョンIDを置く） */
+  randomDungeons?: string[];
+}
+
+/** マップに固定で置くもの */
+export interface FixedFeature {
+  kind: FeatureKind;
+  /** 町ID・ダンジョンID・祠ID・イベントID など */
+  id: string;
+  at: [col: number, row: number];
+}
+
+export type FeatureKind = 'town' | 'dungeon' | 'shrine' | 'event' | 'chest' | 'landmark';
+
+/** 侵食度の段階（spec §8.7） */
+export interface CorruptionStage {
+  at: number;
+  text: string;
+  /** 徘徊する敵を何体増やすか / 敵のレベルの加算 / 町を襲撃するか */
+  spawn?: number;
+  enemyLevel?: number;
+  raid?: boolean;
+}
+
+export interface ScenarioMapDef {
+  width: number;
+  height: number;
+  start: [col: number, row: number];
+  regions: RegionDef[];
+  features: FixedFeature[];
+  /** 町と町・ダンジョンを結ぶ道の地形（必ず通れる道を作る） */
+  roadTerrain: string;
+  corruptionStages: CorruptionStage[];
+}
+
+export interface ScenarioStory {
+  opening: string[];
+  ending: string[];
+  /** 封印の鍵の名前（鍵ID → 名前） */
+  keys?: Record<string, string>;
+}
+
+/** 町（spec §17） */
+export interface TownDef {
+  id: string;
+  name: string;
+  description: string;
+  /** 王都など、襲撃されない町 */
+  capital?: boolean;
+  /** ショップの品揃え（数と格の上限） */
+  shop: { cards: number; equipment: number; consumables: number; maxRarity: Rarity; /** いつも売っているもの（アイテムID） */ fixed?: string[] };
+  /** 宿屋の値段 / カード削除の値段 */
+  innCost: number;
+  removeCost: number;
+  /** この町の掲示板の依頼 */
+  quests?: string[];
+}
+
+/** 祠（spec §8.4） */
+export interface ShrineDef {
+  id: string;
+  name: string;
+  text: string;
+  options: { label: string; outcomes: EventOutcome[]; /** 永続の加護（1人が持てる数に上限） */ permanent?: boolean }[];
+}
+
+/** 依頼の目標の種類ごとの数値（src/engine/game/world/objectives/ のファイルが declare module で足す） */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface ObjectiveParams {}
+export type QuestObjective = { [K in keyof ObjectiveParams]: { kind: K } & ObjectiveParams[K] }[keyof ObjectiveParams];
+
+/** 依頼（spec §17） */
+export interface QuestDef {
+  id: string;
+  title: string;
+  text: string;
+  /** 達成したら報告する町（省略は受けた町） */
+  reportTown?: string;
+  objective: QuestObjective;
+  reward: EventOutcome[];
+  rewardText: string;
+}
+
+// ---------- 冒険の状態 ----------
+
+export type TimeOfDay = 'morning' | 'noon' | 'evening' | 'night';
+
+export interface MapFeature {
+  kind: FeatureKind;
+  id: string;
+  /** 使い終わった（宝箱・イベント・祠） */
+  used?: boolean;
+  /** ランダムに置いた宝箱の見た目 */
+  chest?: { rarity: Rarity; locked: boolean };
+}
+
+export interface Tile {
+  /** 地形ID */
+  t: string;
+  /** 地域の番号（ScenarioMapDef.regions の index） */
+  r: number;
+  f?: MapFeature;
+  /** 霧が晴れている */
+  seen: boolean;
+}
+
+/** 徘徊する敵（マップ上に見えている） */
+export interface Wanderer {
+  id: string;
+  tile: number;
+  enemies: EncounterSpec['enemies'];
+  /** 襲撃の敵（倒せば町を守れる） */
+  raidTown?: string;
+}
+
+export interface Raid {
+  townId: string;
+  deadline: number;
+}
+
+export interface QuestState {
+  id: string;
+  /** 受けた町 */
+  town: string;
+  progress: number;
+  done: boolean;
+  reported: boolean;
+}
+
+export interface WorldState {
+  width: number;
+  height: number;
+  tiles: Tile[];
+  /** キャラの位置（キャラID → マスの番号） */
+  pos: Record<string, number>;
+  /** 今の手番のキャラ / このワールドターンで行動を終えたキャラ */
+  turn: string;
+  acted: string[];
+  /** 移動力（判定前は null）と判定の結果 */
+  move: number | null;
+  moveRoll?: ('focus' | 'hit' | 'miss')[];
+  /** 移動の前にいたマス（逃走で戻る先） */
+  prevTile?: number;
+  worldTurn: number;
+  corruption: number;
+  wanderers: Wanderer[];
+  nextWandererId: number;
+  raids: Raid[];
+  fallenTowns: string[];
+  savedTowns: string[];
+  keys: string[];
+  quests: QuestState[];
+  visitedRegions: number[];
+  /** 町の品揃え（町ID → 売り物）。訪れた時に作り、ワールドターンが一定進むと入れ替わる */
+  shops: Record<string, ShopStock>;
+  /** 画面に出す物語（冒頭・地域の紹介・エンディング） */
+  story?: { title: string; lines: string[] };
+}
+
+export interface ShopStock {
+  refreshedAt: number;
+  items: { kind: 'item'; item: ItemInstance; price: number; sold?: boolean }[];
+  cards: { cardId: string; heroId: string; price: number; sold?: boolean }[];
+}
+
+/** 遭遇（spec §8.5）: 敵のいるマスに入った時の選択 */
+export interface EncounterState {
+  wandererId: string;
+  tile: number;
+  /** 移動してきたキャラ */
+  heroId: string;
+  /** 参加できるキャラ（そのマスと1マス以内） */
+  candidates: string[];
+  /** 夜襲を受けた（戦うしかない） */
+  ambushed?: boolean;
+  /** 奇襲・逃走の判定の結果 */
+  result?: { choice: 'ambush' | 'flee'; heroId: string; results: ('focus' | 'hit' | 'miss')[]; success: boolean };
+}
+
+/** 町・祠の中にいる時 */
+export interface TownVisit {
+  townId: string;
+  heroId: string;
+}
+export interface ShrineVisit {
+  shrineId: string;
+  tile: number;
+  heroId: string;
+  result?: { optionIndex: number; text: string };
+}

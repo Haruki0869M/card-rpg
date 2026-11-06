@@ -9,7 +9,7 @@ import { DUNGEONS } from '../../data/dungeons';
 import { getScenario } from '../../data/scenarios';
 import { getEnemy } from '../../data/enemies';
 import { EVENTS } from '../../data/events';
-import { getItem, POUCH_LIMIT } from '../../data/items';
+import { getItem } from '../../data/items';
 import type {
   BattleEvent,
   EventOutcome,
@@ -24,17 +24,36 @@ import type {
   RewardState,
   Room,
   SlotResult,
-  StatId,
+  EncounterSpec,
 } from '../../types';
 import { applyCommand, createBattle, STATE_VERSION } from '../battle/battle';
-import { finalChanceOf } from './checks';
 import { createRng, type Rng } from '../rng';
 import { applyOutcome, checkOutcome, hasOutcomeKind, makeOutcomeCtx } from './outcomes';
-import { livingHeroes, findHero } from './heroes';
+import { livingHeroes, findHero, sceneHeroes } from './heroes';
+import { addItem, addLog, addLoot, hiddenChestChance, isPartyPlayer, ownedBy, partyHasTag, rollWithFocus, statChance, successes } from './common';
 import { getDifficulty } from '../../data/rules';
 import { isBossRoom, roomBehavior, roomTypeOf } from './rooms';
 import { growthHandler, growthOptions } from './growth';
 import { RARITY_NAME } from '../../data/terms';
+import { createWorld } from './world/generate';
+import { corruptionLevelBonus } from './world/wanderers';
+import {
+  backToWorld,
+  camp,
+  encounterChoose,
+  encounterContinue,
+  handleDefeat,
+  interact,
+  moveHero,
+  onWandererDefeated,
+  questSignal,
+  rollMove,
+  storyContinue,
+  waitTurn,
+} from './world/world';
+import { leaveShrine, leaveTown, questAccept, questReport, shrineChoose, townBuy, townInn, townRemoveCard, townSell } from './world/town';
+import { getRoomType } from '../../data/rules';
+import { TERRAINS } from '../../data/world';
 import { buildDungeon, findRoom, RARITIES, rarityIndex, reachableRooms } from './dungeon';
 import {
   canEquip,
@@ -42,7 +61,6 @@ import {
   expToNext,
   heroFocusMax,
   heroMaxHp,
-  heroStats,
   toPartyMember,
 } from './hero';
 import { cardRewardOdds, chestOdds, newItem, rollCardOffers, rollChestContents, rollConsumable, rollEquipment, rollGrade } from './loot';
@@ -70,6 +88,7 @@ export function createGame(setup: NewGameSetup): GameState {
     log: [],
     nextUid: 1,
     nextLogId: 1,
+    lives: getDifficulty(setup.difficulty).lives,
   };
   game.heroes = setup.party.map((m, i) => {
     const cls = getClass(m.classId);
@@ -102,86 +121,20 @@ export function createGame(setup: NewGameSetup): GameState {
   for (const p of start.pouch ?? []) for (let i = 0; i < p.count; i++) game.pouch.push(newItem(game, getItem(p.itemId)));
   for (const p of start.stash ?? []) for (let i = 0; i < p.count; i++) game.stash.push(newItem(game, getItem(p.itemId)));
   addLog(game, '冒険が始まった！');
+  // 世界マップのあるシナリオは、世界マップから始まる（地図はシードで作る）
+  const sc = getScenario(setup.scenarioId);
+  if (sc.map) {
+    game.world = createWorld(game, createRng((setup.seed ^ 0x5eed5eed) >>> 0));
+    if (sc.story?.opening.length) game.world.story = { title: sc.name, lines: sc.story.opening };
+    game.mode = 'world';
+  }
   return game;
 }
 
-// ---------- 小さな道具 ----------
-
-function addLog(game: GameState, text: string) {
-  game.log.push({ id: game.nextLogId++, text });
-  if (game.log.length > 120) game.log.splice(0, game.log.length - 120);
-}
+// ---------- 小さな道具（common.ts） ----------
 
 export { findHero, livingHeroes } from './heroes';
-const ownedBy = (hero: Hero | undefined, playerId: string) => !!hero && hero.playerId === playerId;
-const isPartyPlayer = (game: GameState, playerId: string) => game.heroes.some((h) => h.playerId === playerId);
-
-function rollWithFocus(slots: number, focusUsed: number, chance: number, rng: Rng): SlotResult[] {
-  const out: SlotResult[] = [];
-  for (let i = 0; i < slots; i++) out.push(i < focusUsed ? 'focus' : rng.next() < chance / 100 ? 'hit' : 'miss');
-  return out;
-}
-
-const successes = (r: SlotResult[]) => r.filter((x) => x !== 'miss').length;
-
-/** 持ち物に入れる（消費アイテムは袋。袋が満杯ならゴールドに換える） */
-function addItem(game: GameState, item: ItemInstance, gainedInDungeon: boolean): string {
-  const def = getItem(item.itemId);
-  if (def.slot === 'consumable') {
-    if (game.pouch.length >= POUCH_LIMIT) {
-      const g = rarityIndex(def.rarity) * 15 + 10;
-      game.gold += g;
-      return `${def.name}（袋が満杯のため${g}Gに換えた）`;
-    }
-    game.pouch.push(item);
-  } else {
-    game.stash.push(item);
-    if (gainedInDungeon && game.dungeon) game.dungeon.gained.push(item);
-  }
-  if (game.stats.bestRarity === undefined || rarityIndex(def.rarity) > rarityIndex(game.stats.bestRarity)) game.stats.bestRarity = def.rarity;
-  return def.name;
-}
-
-function addLoot(game: GameState, loot: Loot[]) {
-  for (const l of loot) {
-    if (l.kind === 'gold') game.gold += l.amount;
-    else if (l.kind === 'item') addItem(game, l.item, true);
-    else if (l.kind === 'card') {
-      const h = findHero(game, l.heroId);
-      if (h) h.deck.push({ uid: `c${game.nextUid++}`, cardId: l.cardId });
-    }
-  }
-}
-
-/** 探索の特殊能力: 判定のボーナス */
-export function checkBonus(hero: Hero, tag: string | undefined): number {
-  if (!tag) return 0;
-  const e = getClass(hero.classId).exploreAbility.effect;
-  return e.kind === 'checkBonus' && e.check === tag ? e.bonus : 0;
-}
-
-/** 探索の特殊能力: 選択肢が増える（パーティの誰かが持っていればよい） */
-export function partyHasTag(game: GameState, tag: string): boolean {
-  return livingHeroes(game).some((h) => {
-    const e = getClass(h.classId).exploreAbility.effect;
-    return e.kind === 'extraEventOption' && e.tag === tag;
-  });
-}
-
-/** 隠し宝箱を見つける確率（%） */
-export function hiddenChestChance(game: GameState): number {
-  let bonus = 0;
-  for (const h of livingHeroes(game)) {
-    const e = getClass(h.classId).exploreAbility.effect;
-    if (e.kind === 'tracking') bonus = Math.max(bonus, e.hiddenFindBonus);
-  }
-  return BALANCE.hiddenChestBase + bonus;
-}
-
-/** 能力値による判定の成功率 */
-export function statChance(hero: Hero, stat: StatId, tag?: string): number {
-  return finalChanceOf(heroStats(hero)[stat] + checkBonus(hero, tag));
-}
+export { checkBonus, hiddenChestChance, partyHasTag, statChance } from './common';
 
 // ---------- コマンド処理 ----------
 
@@ -238,34 +191,85 @@ export function applyGameCommand(input: GameState, cmd: GameCommand): GameResult
         error = pickCard(game, cmd.playerId, cmd.offerIndex);
         break;
       case 'FINISH_REWARD':
-        error = finishReward(game, cmd.playerId);
+        error = finishReward(game, cmd.playerId, rng);
         break;
       case 'OPEN_CHEST':
         error = openChest(game, cmd.playerId, cmd.heroId, cmd.focusUsed, rng);
         break;
       case 'LEAVE_CHEST':
-        error = leaveChest(game, cmd.playerId);
+        error = leaveChest(game, cmd.playerId, rng);
         break;
       case 'CHOOSE_EVENT':
         error = chooseEvent(game, cmd.playerId, cmd.optionIndex, cmd.heroId, cmd.focusUsed, rng);
         break;
       case 'FINISH_EVENT':
-        error = finishEvent(game, cmd.playerId);
+        error = finishEvent(game, cmd.playerId, rng);
         break;
       case 'REST':
         error = rest(game, cmd.playerId, cmd.kind);
         break;
       case 'RETREAT':
-        error = retreat(game, cmd.playerId);
+        error = retreat(game, cmd.playerId, rng);
         break;
       case 'RETURN_TO_HUB':
-        error = returnToHub(game, cmd.playerId);
+        error = returnToHub(game, cmd.playerId, rng);
         break;
       case 'EQUIP':
         error = equip(game, cmd.playerId, cmd.heroId, cmd.itemUid);
         break;
       case 'UNEQUIP':
         error = unequip(game, cmd.playerId, cmd.heroId, cmd.slot);
+        break;
+      case 'WORLD_ROLL_MOVE':
+        error = rollMove(game, cmd, rng);
+        break;
+      case 'WORLD_MOVE':
+        error = moveHero(game, cmd);
+        break;
+      case 'WORLD_WAIT':
+        error = waitTurn(game, cmd, rng);
+        break;
+      case 'WORLD_CAMP':
+        error = camp(game, cmd, rng);
+        break;
+      case 'WORLD_INTERACT':
+        error = interact(game, cmd, rng);
+        break;
+      case 'ENCOUNTER_CHOOSE':
+        error = encounterChoose(game, cmd, rng);
+        break;
+      case 'ENCOUNTER_CONTINUE':
+        error = encounterContinue(game, cmd, rng);
+        break;
+      case 'STORY_CONTINUE':
+        error = storyContinue(game);
+        break;
+      case 'TOWN_BUY':
+        error = townBuy(game, cmd, rng);
+        break;
+      case 'TOWN_INN':
+        error = townInn(game, cmd);
+        break;
+      case 'TOWN_REMOVE_CARD':
+        error = townRemoveCard(game, cmd);
+        break;
+      case 'TOWN_SELL':
+        error = townSell(game, cmd);
+        break;
+      case 'QUEST_ACCEPT':
+        error = questAccept(game, cmd);
+        break;
+      case 'QUEST_REPORT':
+        error = questReport(game, cmd, rng);
+        break;
+      case 'LEAVE_TOWN':
+        error = leaveTown(game, cmd, rng);
+        break;
+      case 'SHRINE_CHOOSE':
+        error = shrineChoose(game, cmd, rng);
+        break;
+      case 'LEAVE_SHRINE':
+        error = leaveShrine(game, cmd, rng);
         break;
       default:
         error = '不明なコマンドです';
@@ -290,7 +294,9 @@ function enterDungeon(game: GameState, playerId: string, dungeonId: string, rng:
   if (game.mode !== 'hub') return '拠点からしか出発できません';
   if (!availableDungeons(game).includes(dungeonId)) return 'そのダンジョンには行けません';
   const levelBonus = getDifficulty(game.difficulty).enemyLevel;
-  const eventIds = EVENTS.forScenario(game.scenarioId).map((e) => e.id);
+  const eventIds = EVENTS.forScenario(game.scenarioId)
+    .filter((e) => e.where !== 'map')
+    .map((e) => e.id);
   // ランダムダンジョンは拠点ごとの種で作る（同じ種なら同じ構造）
   const random = !!DUNGEONS.get(dungeonId).random;
   const dRng = random ? createRng(game.randomDungeonSeed) : rng;
@@ -298,6 +304,21 @@ function enterDungeon(game: GameState, playerId: string, dungeonId: string, rng:
   game.mode = 'dungeon';
   addLog(game, `${game.dungeon.name}に入った`);
   return undefined;
+}
+
+/** 世界マップのダンジョンの入口から入る（そのマスにいて参加するキャラだけ。spec §9.1） */
+export function enterDungeonFromWorld(game: GameState, dungeonId: string, party: string[], rng: Rng) {
+  const levelBonus = getDifficulty(game.difficulty).enemyLevel + (game.world ? corruptionLevelBonus(game, game.world) : 0);
+  const eventIds = EVENTS.forScenario(game.scenarioId)
+    .filter((e) => e.where !== 'map')
+    .map((e) => e.id);
+  const random = !!DUNGEONS.get(dungeonId).random;
+  const dRng = random ? createRng(game.randomDungeonSeed) : rng;
+  if (random) game.randomDungeonSeed = (Math.imul(game.randomDungeonSeed, 1103515245) + 12345) >>> 0;
+  game.dungeon = buildDungeon(dungeonId, dRng, levelBonus + (random ? game.clearedDungeons.length : 0), eventIds);
+  game.party = party;
+  game.mode = 'dungeon';
+  addLog(game, `${game.dungeon.name}に入った`);
 }
 
 function enterRoom(game: GameState, playerId: string, roomId: string, rng: Rng): string | undefined {
@@ -313,18 +334,32 @@ function enterRoom(game: GameState, playerId: string, roomId: string, rng: Rng):
 
 /** 戦闘の部屋の戦闘を始める（部屋の動き battle から呼ばれる） */
 export function startRoomBattle(game: GameState, room: Room, rng: Rng) {
-  const party = livingHeroes(game).map(toPartyMember);
-  const enemies = room.enemies ?? [];
+  game.battleInfo = { roomType: room.type };
+  startBattleWith(game, room.enemies ?? [], room.type, rng, { background: game.dungeon?.background });
+}
+
+/** 戦闘を始める（今の場面の参加者で）。surprise = 奇襲成功（敵は1ターン目に動けない） */
+export function startBattleWith(game: GameState, enemies: EncounterSpec['enemies'], roomType: string, rng: Rng, opts: { surprise?: boolean; background?: string } = {}) {
+  const party = sceneHeroes(game).map(toPartyMember);
   const diff = getDifficulty(game.difficulty);
   game.battle = createBattle({
     seed: rng.int(1_000_000_000),
     party,
-    encounter: { id: room.id, name: roomTypeOf(room).name, enemies },
+    encounter: { id: game.battleInfo?.wandererId ?? game.dungeon?.currentRoomId ?? 'battle', name: getRoomType(roomType).name, enemies },
     enemyHpMul: diff.enemyHp,
     enemyAttackMul: diff.enemyAttack,
+    surprise: opts.surprise,
   });
-  for (const h of game.heroes) h.nextBattleStatuses = {};
+  game.battleBackground = opts.background ?? worldBackground(game);
+  for (const h of sceneHeroes(game)) h.nextBattleStatuses = {};
   game.mode = 'battle';
+}
+
+/** 世界マップで戦った時の背景（そのマスの地形） */
+function worldBackground(game: GameState): string | undefined {
+  const w = game.world;
+  const tile = game.battleInfo?.tile;
+  return w && tile !== undefined ? TERRAINS.get(w.tiles[tile].t).background : undefined;
 }
 
 /** 戦闘の結果をキャラに戻す（戦闘不能のキャラは勝てばHP1で復帰） */
@@ -342,19 +377,33 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
   if (!isPartyPlayer(game, playerId)) return 'このパーティのプレイヤーではありません';
   const b = game.battle;
   const run = game.dungeon;
-  if (game.mode !== 'battle' || !b || !run) return '戦闘中ではありません';
-  const room = findRoom(run, run.currentRoomId ?? '')!;
+  if (game.mode !== 'battle' || !b || (!run && !game.world)) return '戦闘中ではありません';
+  // ダンジョンの部屋の戦闘 / 世界マップの遭遇の戦闘（部屋が無い）
+  const room = run ? findRoom(run, run.currentRoomId ?? '') : undefined;
   if (b.phase === 'defeat') {
     syncHeroesFromBattle(game, false);
-    game.mode = 'gameover';
-    addLog(game, 'パーティは全滅した…');
+    const participants = b.allies.map((a) => a.id);
+    game.battle = undefined;
+    // 命の灯火（spec §11.4）。世界マップが無い時は今までどおりゲームオーバー
+    if (game.world) handleDefeat(game, participants, rng);
+    else {
+      game.mode = 'gameover';
+      addLog(game, 'パーティは全滅した…');
+    }
     return undefined;
   }
   if (b.phase === 'escaped') {
     syncHeroesFromBattle(game, true);
-    room.cleared = true;
     game.battle = undefined;
-    game.mode = 'dungeon';
+    if (room) {
+      room.cleared = true;
+      game.mode = 'dungeon';
+    } else {
+      // 世界マップ: 前のマスへ下がる
+      const w = game.world!;
+      for (const a of b.allies) if (!a.dead && w.prevTile !== undefined) w.pos[a.id] = w.prevTile;
+      backToWorld(game, rng, true);
+    }
     return undefined;
   }
   if (b.phase !== 'victory') return '戦闘はまだ終わっていません';
@@ -368,7 +417,8 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
 
   let exp = 0;
   let gold = 0;
-  const rt = roomTypeOf(room);
+  const rt = getRoomType(room?.type ?? game.battleInfo?.roomType ?? 'battle');
+  if (!room) onWandererDefeated(game, rng);
   const rewardMul = getDifficulty(game.difficulty).reward ?? 1;
   for (const e of b.enemies) {
     const def = getEnemy(e.defId);
@@ -410,7 +460,7 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
   if (!drop?.boss && rng.next() * 100 < hiddenChestChance(game)) {
     reward.hiddenChest = { rarity: RARITIES[rng.next() < 0.3 ? 1 : 0], locked: rng.next() < 0.5 };
   }
-  room.cleared = true;
+  if (room) room.cleared = true;
   game.reward = reward;
   game.battle = undefined;
   game.mode = 'reward';
@@ -451,14 +501,24 @@ function pickCard(game: GameState, playerId: string, offerIndex: number | null):
   return undefined;
 }
 
-function finishReward(game: GameState, playerId: string): string | undefined {
+function finishReward(game: GameState, playerId: string, rng: Rng): string | undefined {
   if (!isPartyPlayer(game, playerId)) return 'このパーティのプレイヤーではありません';
   const r = game.reward;
   const run = game.dungeon;
-  if (game.mode !== 'reward' || !r || !run) return '報酬画面ではありません';
+  if (game.mode !== 'reward' || !r || (!run && !game.world)) return '報酬画面ではありません';
   if (r.levelUps.length) return '成長ボーナスを選んでください';
-  const room = findRoom(run, run.currentRoomId ?? '')!;
   game.reward = undefined;
+  // 世界マップの遭遇の戦闘: 隠し宝箱があれば開け、無ければ世界マップへ（遭遇したキャラの手番は終わる）
+  if (!run) {
+    const tile = game.battleInfo?.tile;
+    if (r.hiddenChest && tile !== undefined) {
+      game.chest = { tile, spec: r.hiddenChest, unlocked: !r.hiddenChest.locked, hidden: true };
+      addLog(game, '隠し宝箱を見つけた！');
+      game.mode = 'chest';
+    } else backToWorld(game, rng, true);
+    return undefined;
+  }
+  const room = findRoom(run, run.currentRoomId ?? '')!;
   if (isBossRoom(room)) {
     const def = DUNGEON_BOSS_CHEST(run.dungeonId);
     game.chest = { roomId: room.id, spec: { rarity: def, locked: false, big: true }, unlocked: true };
@@ -516,11 +576,20 @@ function openChest(game: GameState, playerId: string, heroId: string, focusUsed:
   return undefined;
 }
 
-function leaveChest(game: GameState, playerId: string): string | undefined {
+function leaveChest(game: GameState, playerId: string, rng: Rng): string | undefined {
   if (!isPartyPlayer(game, playerId)) return 'このパーティのプレイヤーではありません';
   const c = game.chest;
   const run = game.dungeon;
-  if (game.mode !== 'chest' || !c || !run) return '宝箱がありません';
+  if (game.mode !== 'chest' || !c) return '宝箱がありません';
+  // 世界マップの宝箱（マスの宝箱は使い終わり。隠し宝箱はそのまま）
+  if (c.tile !== undefined && !run) {
+    const f = game.world?.tiles[c.tile].f;
+    if (f && !c.hidden && c.contents) f.used = true;
+    game.chest = undefined;
+    backToWorld(game, rng, !!c.hidden);
+    return undefined;
+  }
+  if (!run || !c.roomId) return '宝箱がありません';
   const room = findRoom(run, c.roomId)!;
   room.cleared = true;
   game.chest = undefined;
@@ -529,8 +598,30 @@ function leaveChest(game: GameState, playerId: string): string | undefined {
     game.stats.dungeonsCleared += 1;
     if (!game.clearedDungeons.includes(run.dungeonId)) game.clearedDungeons.push(run.dungeonId);
     addLog(game, `${run.name}を制覇した！`);
+    if (game.world) onDungeonCleared(game, run.dungeonId, rng);
   } else game.mode = 'dungeon';
   return undefined;
+}
+
+/** 世界マップのダンジョンを制覇した時（封印の鍵・侵食度・依頼・最終ダンジョンならエンディング） */
+function onDungeonCleared(game: GameState, dungeonId: string, rng: Rng) {
+  const w = game.world!;
+  const def = DUNGEONS.get(dungeonId);
+  if (def.rewardKey && !w.keys.includes(def.rewardKey)) {
+    w.keys.push(def.rewardKey);
+    addLog(game, `${getScenario(game.scenarioId).story?.keys?.[def.rewardKey] ?? def.rewardKey}を手に入れた！`);
+  }
+  if (def.corruptionOnClear) {
+    w.corruption = Math.max(0, w.corruption - def.corruptionOnClear);
+    addLog(game, `侵食度が${def.corruptionOnClear}%下がった`);
+  }
+  questSignal(game, { kind: 'clearDungeon', dungeonId });
+  if (def.finale) {
+    const story = getScenario(game.scenarioId).story;
+    w.story = { title: 'エンディング', lines: story?.ending ?? ['魔王は封じられた。'] };
+    game.mode = 'ending';
+  }
+  void rng;
 }
 
 // ---------- イベント・休憩 ----------
@@ -586,12 +677,19 @@ function chooseEvent(
   return undefined;
 }
 
-function finishEvent(game: GameState, playerId: string): string | undefined {
+function finishEvent(game: GameState, playerId: string, rng: Rng): string | undefined {
   if (!isPartyPlayer(game, playerId)) return 'このパーティのプレイヤーではありません';
   const ev = game.event;
-  if (game.mode !== 'event' || !ev || !ev.result || !game.dungeon) return 'まだ選んでいません';
-  findRoom(game.dungeon, ev.roomId)!.cleared = true;
+  if (game.mode !== 'event' || !ev || !ev.result) return 'まだ選んでいません';
   game.event = undefined;
+  if (ev.tile !== undefined && !game.dungeon) {
+    const f = game.world?.tiles[ev.tile].f;
+    if (f) f.used = true;
+    backToWorld(game, rng, false);
+    return undefined;
+  }
+  if (!game.dungeon || !ev.roomId) return 'まだ選んでいません';
+  findRoom(game.dungeon, ev.roomId)!.cleared = true;
   game.mode = 'dungeon';
   return undefined;
 }
@@ -599,8 +697,7 @@ function finishEvent(game: GameState, playerId: string): string | undefined {
 function rest(game: GameState, playerId: string, kind: 'hp' | 'focus'): string | undefined {
   if (!isPartyPlayer(game, playerId)) return 'このパーティのプレイヤーではありません';
   if (game.mode !== 'rest' || !game.dungeon) return '休憩できる場所ではありません';
-  for (const h of game.heroes) {
-    if (h.hp <= 0) continue;
+  for (const h of sceneHeroes(game)) {
     if (kind === 'hp') h.hp = Math.min(heroMaxHp(h), h.hp + Math.ceil(heroMaxHp(h) * BALANCE.restHpRatio));
     else h.focus = Math.min(heroFocusMax(h), h.focus + BALANCE.restFocus);
   }
@@ -621,7 +718,7 @@ export function retreatLoss(game: GameState): ItemInstance | undefined {
 
 const isEquipped = (game: GameState, uid: string) => game.heroes.some((h) => Object.values(h.equipment).some((e) => e?.uid === uid));
 
-function retreat(game: GameState, playerId: string): string | undefined {
+function retreat(game: GameState, playerId: string, rng: Rng): string | undefined {
   if (!isPartyPlayer(game, playerId)) return 'このパーティのプレイヤーではありません';
   if (game.mode !== 'dungeon' || !game.dungeon) return 'ダンジョンの通路でのみ撤退できます';
   const lost = retreatLoss(game);
@@ -632,15 +729,29 @@ function retreat(game: GameState, playerId: string): string | undefined {
     addLog(game, `撤退の途中で「${getItem(lost.itemId).name}」を落としてしまった…`);
   }
   addLog(game, `${game.dungeon.name}から撤退した`);
-  toHub(game);
+  leaveDungeon(game, rng);
   return undefined;
 }
 
-function returnToHub(game: GameState, playerId: string): string | undefined {
+function returnToHub(game: GameState, playerId: string, rng: Rng): string | undefined {
   if (!isPartyPlayer(game, playerId)) return 'このパーティのプレイヤーではありません';
   if (game.mode !== 'cleared') return 'まだ帰還できません';
-  toHub(game);
+  leaveDungeon(game, rng);
   return undefined;
+}
+
+/** ダンジョンを出る（世界マップがあれば入口のマスへ戻り、入ったキャラの手番は終わる。無ければ仮の拠点へ） */
+function leaveDungeon(game: GameState, rng: Rng) {
+  if (!game.world) {
+    toHub(game);
+    return;
+  }
+  game.dungeon = undefined;
+  game.battle = undefined;
+  game.chest = undefined;
+  game.event = undefined;
+  game.reward = undefined;
+  backToWorld(game, rng, true);
 }
 
 /** 拠点に戻る（仮の拠点: HP・フォーカス全回復。ランダムダンジョンが入れ替わる） */

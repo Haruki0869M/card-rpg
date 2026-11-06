@@ -12,6 +12,7 @@ import { ITEMS } from '../../data/items';
 import { DIFFICULTIES, ROOM_TYPES, WEAPON_TYPES } from '../../data/rules';
 import { SCENARIOS } from '../../data/scenarios';
 import { STATUSES } from '../../data/statuses';
+import { QUESTS, SHRINES, TERRAINS, TOWNS } from '../../data/world';
 import type { AbilityDef, Effect, EventOutcome, GameState } from '../../types';
 import {
   conditionHandler,
@@ -25,7 +26,9 @@ import {
   hasEffectKind,
   hasEnemyAi,
   hasOutcomeKind,
+  hasObjectiveKind,
   hasRoomBehavior,
+  objectiveHandler,
   migrateGame,
   validateGame,
 } from '../index';
@@ -125,6 +128,36 @@ describe('コンテンツの検査', () => {
 
   it('シナリオ: 開始の持ち物が存在する', () => {
     for (const s of SCENARIOS.all) for (const p of [...(s.start.pouch ?? []), ...(s.start.stash ?? [])]) expect(ITEMS.has(p.itemId), `scenario ${s.id}`).toBe(true);
+  });
+
+  it('世界マップ: 地形・施設・町・依頼・祠・侵食度の段階が正しい', () => {
+    for (const sc of SCENARIOS.all) {
+      const m = sc.map;
+      if (!m) continue;
+      for (const r of m.regions) {
+        for (const t of Object.keys(r.terrain)) expect(TERRAINS.has(t), `${sc.id} region ${r.id} terrain ${t}`).toBe(true);
+        for (const grp of r.encounters) for (const e of grp) expect(ENEMIES.has(e), `${sc.id} region ${r.id} enemy ${e}`).toBe(true);
+        for (const d of r.randomDungeons ?? []) expect(DUNGEONS.has(d), d).toBe(true);
+      }
+      expect(TERRAINS.has(m.roadTerrain)).toBe(true);
+      for (const f of m.features) {
+        const reg = { town: TOWNS, dungeon: DUNGEONS, shrine: SHRINES, event: EVENTS, landmark: EVENTS, chest: undefined }[f.kind];
+        if (reg) expect(reg.has(f.id), `${sc.id} feature ${f.kind}:${f.id}`).toBe(true);
+        expect(f.at[0] < m.width && f.at[1] < m.height, `${f.id} は地図の中`).toBe(true);
+      }
+      for (const k of DUNGEONS.forScenario(sc.id).flatMap((d) => [...(d.requiresKeys ?? []), d.rewardKey ?? []].flat()))
+        expect(sc.story?.keys?.[k], `鍵 ${k} の名前`).toBeDefined();
+    }
+    for (const t of TOWNS.all) {
+      for (const q of t.quests ?? []) expect(QUESTS.has(q), `town ${t.id} quest ${q}`).toBe(true);
+      for (const i of t.shop.fixed ?? []) expect(ITEMS.has(i), `town ${t.id} item ${i}`).toBe(true);
+    }
+    for (const q of QUESTS.all) {
+      expect(hasObjectiveKind(q.objective.kind), `quest ${q.id}`).toBe(true);
+      expect(() => objectiveHandler(q.objective).describe(q.objective as never)).not.toThrow();
+      for (const o of q.reward) checkOutcome(o, `quest ${q.id}`);
+    }
+    for (const s of SHRINES.all) for (const o of s.options) for (const x of o.outcomes) checkOutcome(x, `shrine ${s.id}`);
   });
 
   it('シナリオ専用のデータは、そのシナリオでだけ使われる', () => {

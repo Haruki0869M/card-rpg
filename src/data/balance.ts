@@ -76,6 +76,45 @@ export const BALANCE = {
   } as Record<string, readonly number[]>,
   /** 戦闘後に隠し宝箱を見つける基本確率（%） */
   hiddenChestBase: 5,
+  // ---------- 世界マップ（spec §8） ----------
+  /** 視界（マス）と夜の減少 */
+  visionRange: 2,
+  nightVisionPenalty: 1,
+  /** 1つの時間帯（朝・昼・夕方・夜）が何ワールドターン続くか */
+  turnsPerTimeOfDay: 2,
+  /** 移動力の判定: 素早さの枠数。移動力 = moveBase + 成功数 */
+  moveSlots: 4,
+  moveBase: 2,
+  /** 侵食度: 1ワールドターンごと / ダンジョンに入る時 / 町が陥落した時 */
+  corruptionPerTurn: 1,
+  corruptionOnDungeonEnter: 2,
+  corruptionOnTownFall: 5,
+  /** 野営の回復（HPは最大HPの割合）と、夜に野営した時の夜襲の確率（%） */
+  campHpRatio: 0.2,
+  campFocus: 1,
+  nightAmbushChance: 35,
+  /** 遭遇: 奇襲（感知）・逃走（素早さ）の枠数と必要成功数、戦闘に参加できる距離 */
+  encounterSlots: 3,
+  encounterNeed: 2,
+  joinRange: 1,
+  /** 夜の敵のレベルの加算 / 夜に敵が増える確率（%） / 敵が動く間隔（ワールドターン） */
+  nightEnemyLevel: 1,
+  nightSpawnChance: 40,
+  wandererMoveEvery: 2,
+  /** 町への襲撃: 陥落までのワールドターン / 守った時の報酬 */
+  raidTurns: 8,
+  raidRewardGold: 80,
+  /** 祠の永続の加護の上限（1人あたり） */
+  maxBlessings: 3,
+  /** ショップ: 品揃えが入れ替わる間隔（ワールドターン）、格ごとの値段、売値の割合 */
+  shopRefreshTurns: 8,
+  itemPrice: { common: 30, rare: 70, epic: 160, legend: 400 } as Record<string, number>,
+  cardPrice: { common: 40, rare: 75, epic: 140, legend: 300 } as Record<string, number>,
+  sellRatio: 0.5,
+  /** カードの削除で残す最低の枚数 */
+  minDeckSize: 5,
+  /** 戦闘に負けて命の灯火で復活した時のHP（最大HPの割合） */
+  reviveHpRatio: 0.5,
   /** 戦闘ログの最大件数 */
   logLimit: 300,
 } as const;

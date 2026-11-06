@@ -9,7 +9,7 @@ export interface OutcomeCtx {
   actor?: Hero;
   /** 手に入れたもの（最後にまとめて持ち物へ入れる） */
   loot: Loot[];
-  /** 対象（all なら生存者全員、そうでなければ actor。actor が無ければ先頭の生存者） */
+  /** 対象（all なら今の場面にいる生存者全員、そうでなければ actor。actor が無ければ先頭の生存者） */
   targets(all?: boolean): Hero[];
 }
 

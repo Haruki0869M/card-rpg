@@ -362,6 +362,8 @@ export interface BattleSetup {
   /** 敵のHP・攻撃の倍率（難易度など。省略は1） */
   enemyHpMul?: number;
   enemyAttackMul?: number;
+  /** 奇襲成功（敵は1ターン目に行動しない） */
+  surprise?: boolean;
 }
 
 // ===== コマンド（シリアライズ可能・オンライン協力で同期する単位） =====
@@ -416,3 +418,4 @@ export interface CommandResult {
 export type ConsumableEffect = Effect[];
 
 export * from './game';
+export * from './world';

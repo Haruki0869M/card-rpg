@@ -10,6 +10,8 @@ export const emeraldTemple: DungeonDef = {
   baseLevel: 3,
   pools: FOREST_POOLS,
   bossChest: 'epic',
+  rewardKey: 'emerald',
+  corruptionOnClear: 5,
   // 行ごとの部屋。next は次の行の何番目の部屋につながるか
   layout: [
     [{ type: 'battle', next: [0, 1] }],

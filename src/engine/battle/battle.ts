@@ -34,7 +34,7 @@ import { abilityTriggered, addLog, enemyName, findAlly, findEnemy, loseHp, nameO
 
 export { enemyName, findAlly, findEnemy, unitName } from './units';
 
-export const STATE_VERSION = 4;
+export const STATE_VERSION = 5;
 
 // ---------- 生成 ----------
 
@@ -132,6 +132,11 @@ export function createBattle(setup: BattleSetup): BattleState {
   };
   addLog(state, `戦闘開始（${party.length}人 / ${encounter.name}）`);
   decideAllIntents(state, rng);
+  // 奇襲成功: 敵は最初のターンに行動しない（インテントを出さない）
+  if (setup.surprise) {
+    for (const e of state.enemies) e.intent = undefined;
+    addLog(state, '奇襲成功！ 敵は最初のターンに動けない');
+  }
   startAllyPhase(state, rng, []);
   // 装備による戦闘開始時のブロック（味方フェーズ開始のリセットの後に入れる）
   party.forEach((m, i) => {

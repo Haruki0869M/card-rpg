@@ -1,7 +1,7 @@
 // ===== 冒険の効果の登録表 =====
 // 新しい結果の種類: kinds/ にファイルを1つ置くだけで、イベント・祠・依頼のデータから使える。
 // 戦闘の効果と同じ名前の種類（heal / gainFocus / cleanse）は、消費アイテムを戦闘の外で使った時にも使われる。
-import { livingHeroes } from '../heroes';
+import { sceneHeroes } from '../heroes';
 import type { EventOutcome, GameState, Hero, Loot } from '../../../types';
 import type { Rng } from '../../rng';
 import type { OutcomeCtx, OutcomeHandler } from './types';
@@ -31,7 +31,7 @@ export function makeOutcomeCtx(game: GameState, rng: Rng, actor?: Hero): Outcome
     rng,
     actor,
     loot: [],
-    targets: (all) => (all ? livingHeroes(game) : actor ? [actor] : livingHeroes(game).slice(0, 1)),
+    targets: (all) => (all ? sceneHeroes(game) : actor ? [actor] : sceneHeroes(game).slice(0, 1)),
   };
 }
 
