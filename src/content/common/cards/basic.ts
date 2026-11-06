@@ -45,10 +45,10 @@ export const BASIC_CARDS: Record<string, CardDef> = {
     baseChance: 50,
     target: 'enemy',
     tiers: [
-      { minSuccesses: 0, effects: [{ kind: 'damage', amount: 4 }] },
-      { minSuccesses: 2, effects: [{ kind: 'damage', amount: 12 }] },
-      { minSuccesses: 3, effects: [{ kind: 'damage', amount: 20 }] },
-      { minSuccesses: 4, effects: [{ kind: 'damage', amount: 40 }, { kind: 'gainMana', amount: 1 }] },
+      { minSuccesses: 0, effects: [{ kind: 'damage', element: 'thunder', amount: 4 }] },
+      { minSuccesses: 2, effects: [{ kind: 'damage', element: 'thunder', amount: 12 }] },
+      { minSuccesses: 3, effects: [{ kind: 'damage', element: 'thunder', amount: 20 }] },
+      { minSuccesses: 4, effects: [{ kind: 'damage', element: 'thunder', amount: 40 }, { kind: 'gainMana', amount: 1 }] },
     ],
   },
   meditate: {

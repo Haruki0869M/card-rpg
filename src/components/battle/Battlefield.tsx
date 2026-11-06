@@ -14,7 +14,8 @@ import { speedFactor, useBattle, type UnitFx } from '../../store/battleStore';
 import type { AllyState, EnemyState } from '../../types';
 import { intentView, type IntentPart } from '../format';
 import { HpBar } from '../ui/HpBar';
-import { EffectChip, Shield, Skull, statusStyle, Swords } from '../ui/icons';
+import { EffectChip, ELEMENT_ICONS, Shield, Skull, statusStyle, Swords } from '../ui/icons';
+import { getElement } from '../../data/elements';
 import { StatusChips } from '../ui/StatusChips';
 import { UnitPopups } from './Popups';
 import { SlotOverlay } from './SlotOverlay';
@@ -55,22 +56,28 @@ function TargetFace({ allyId }: { allyId?: string }) {
 
 function IntentPartView({ p }: { p: IntentPart }) {
   switch (p.kind) {
-    case 'attack':
+    case 'attack': {
+      const el = p.element ? getElement(p.element) : undefined;
+      const Icon = el ? (ELEMENT_ICONS[el.icon] ?? Swords) : Swords;
       return (
-        <span className="flex items-center gap-0.5 text-red-300">
-          <Swords size={14} strokeWidth={2.6} />
+        <span className="flex items-center gap-0.5 text-red-300" style={el ? { color: el.color } : undefined}>
+          <Icon size={14} strokeWidth={2.6} />
           <TargetFace allyId={p.targetId} />
           <span className="tabular-nums">{p.hits > 1 ? `${p.damage}×${p.hits}` : p.damage}</span>
         </span>
       );
-    case 'attackAll':
+    }
+    case 'attackAll': {
+      const el = p.element ? getElement(p.element) : undefined;
+      const Icon = el ? (ELEMENT_ICONS[el.icon] ?? Skull) : Skull;
       return (
-        <span className="flex items-center gap-0.5 text-red-300">
-          <Skull size={14} strokeWidth={2.6} />
+        <span className="flex items-center gap-0.5 text-red-300" style={el ? { color: el.color } : undefined}>
+          <Icon size={14} strokeWidth={2.6} />
           <span className="text-[12px]">全</span>
           <span className="tabular-nums">{p.hits > 1 ? `${p.damage}×${p.hits}` : p.damage}</span>
         </span>
       );
+    }
     case 'block':
       return (
         <span className="flex items-center gap-0.5 text-sky-300">

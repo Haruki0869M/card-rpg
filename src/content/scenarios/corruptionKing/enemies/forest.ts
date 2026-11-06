@@ -3,6 +3,7 @@ import type { EnemyDef } from '../../../../types';
 
 export const forestWolf: EnemyDef = {
   id: 'forestWolf',
+  weak: ['fire'],
   name: '森の狼',
   icon: '🐺',
   maxHp: 22,
@@ -28,6 +29,8 @@ export const forestWolf: EnemyDef = {
 
 export const toxicShroom: EnemyDef = {
   id: 'toxicShroom',
+  weak: ['fire'],
+  resist: ['poison'],
   name: '毒キノコ',
   icon: '🍄',
   maxHp: 18,
@@ -38,7 +41,7 @@ export const toxicShroom: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'spore', name: '毒の胞子', effects: [{ kind: 'applyStatus', status: 'poison', amount: 3 }] },
-    { id: 'headbutt', name: '頭突き', effects: [{ kind: 'damage', amount: 6 }] },
+    { id: 'headbutt', name: '頭突き', effects: [{ kind: 'damage', element: 'poison', amount: 6 }] },
     {
       id: 'burst',
       name: '胞子の破裂',
@@ -52,6 +55,8 @@ export const toxicShroom: EnemyDef = {
 
 export const treeWarden: EnemyDef = {
   id: 'treeWarden',
+  weak: ['fire'],
+  resist: ['poison'],
   name: '樹木の番人',
   icon: '🌳',
   maxHp: 70,
@@ -76,6 +81,8 @@ export const treeWarden: EnemyDef = {
 
 export const treantKing: EnemyDef = {
   id: 'treantKing',
+  weak: ['fire'],
+  resist: ['poison'],
   name: '樹魔トレントキング',
   icon: '🌲',
   maxHp: 150,
@@ -90,7 +97,7 @@ export const treantKing: EnemyDef = {
       id: 'sapCurse',
       name: '樹液の呪い',
       effects: [
-        { kind: 'damage', amount: 6 },
+        { kind: 'damage', element: 'poison', amount: 6 },
         { kind: 'applyStatus', status: 'poison', amount: 4 },
       ],
     },
@@ -115,7 +122,7 @@ export const treantKing: EnemyDef = {
           id: 'rotSpores',
           name: '腐蝕の胞子',
           effects: [
-            { kind: 'damage', amount: 5, to: 'foes' },
+            { kind: 'damage', element: 'poison', amount: 5, to: 'foes' },
             { kind: 'applyStatus', status: 'poison', amount: 3, to: 'foes' },
           ],
         },

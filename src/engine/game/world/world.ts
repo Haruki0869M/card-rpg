@@ -4,6 +4,7 @@ import { getClass } from '../../../data/classes';
 import { DUNGEONS } from '../../../data/dungeons';
 import { EVENTS } from '../../../data/events';
 import { getScenario } from '../../../data/scenarios';
+import { getDifficulty } from '../../../data/rules';
 import { QUESTS, TERRAINS, TOWNS } from '../../../data/world';
 import type { EncounterState, GameCommand, GameState, Hero, QuestState, WorldState } from '../../../types';
 import type { Rng } from '../../rng';
@@ -87,7 +88,7 @@ function endWorldTurn(game: GameState, rng: Rng) {
   const before = w.corruption;
   w.worldTurn += 1;
   w.acted = [];
-  w.corruption = Math.min(100, w.corruption + BALANCE.corruptionPerTurn);
+  w.corruption = Math.min(100, w.corruption + (getDifficulty(game.difficulty).corruptionPerTurn ?? BALANCE.corruptionPerTurn));
   onCorruptionChange(game, rng, before);
   // 夜は魔物が増える
   const def = getScenario(game.scenarioId).map!;

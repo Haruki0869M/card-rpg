@@ -6,6 +6,7 @@ import { CARDS } from '../data/cards';
 import { CLASSES } from '../data/classes';
 import { contentVersion } from '../data/contentVersion';
 import { DUNGEONS } from '../data/dungeons';
+import { ELEMENTS, getElement } from '../data/elements';
 import { ENEMIES } from '../data/enemies';
 import { ITEMS } from '../data/items';
 import { DIFFICULTIES, describeDifficulty, ROOM_TYPES, WEAPON_TYPES } from '../data/rules';
@@ -81,7 +82,7 @@ function EnemiesTab() {
   const lv = [0, 2, 4];
   return (
     <Table
-      head={['敵', 'シナリオ', '基準Lv', ...lv.map((d) => `HP(+${d}Lv)`), ...lv.map((d) => `攻撃×(+${d}Lv)`), '経験値', 'G', '行動', '決め方']}
+      head={['敵', 'シナリオ', '基準Lv', ...lv.map((d) => `HP(+${d}Lv)`), ...lv.map((d) => `攻撃×(+${d}Lv)`), '経験値', 'G', '弱点', '耐性', '行動', '決め方']}
       rows={ENEMIES.all.map((e) => [
         <b>{e.name}</b>,
         scenarioName(ENEMIES.scenarioOf(e.id)),
@@ -90,6 +91,8 @@ function EnemiesTab() {
         ...lv.map((d) => enemyLevelFactors(e, e.baseLevel + d).attack.toFixed(2)),
         e.exp,
         e.gold,
+        (e.weak ?? []).map((x) => getElement(x).name).join('・'),
+        (e.resist ?? []).map((x) => getElement(x).name).join('・'),
         <span>
           {[...e.actions, ...(e.phases ?? []).flatMap((p) => p.actions)].map((a) => (
             <div key={a.id}>
@@ -143,14 +146,20 @@ function ItemsTab() {
 
 function StatusesTab() {
   return (
-    <Table
+    <div className="flex flex-col gap-3">
+      <Table
+        head={['属性', '与える状態異常', '確率', '量']}
+        rows={ELEMENTS.all.map((e) => [<b style={{ color: e.color }}>{e.name}</b>, e.status ? STATUSES.get(e.status).name : '', e.status ? `${e.chance ?? 0}%（完全成功なら必ず）` : '', e.status ? (e.amount ?? 1) : ''])}
+      />
+      <Table
       head={['状態異常', '悪い効果', '説明']}
       rows={STATUSES.all.map((s) => [
         <b style={{ color: s.color }}>{s.name}</b>,
         s.harmful ? '○' : '',
         describeStatus(s),
       ])}
-    />
+      />
+    </div>
   );
 }
 

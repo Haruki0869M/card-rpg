@@ -14,12 +14,16 @@ import {
   Shield,
   Skull,
   Snowflake,
+  Sun,
+  Moon,
+  Zap,
   Sparkles,
   Star,
   Sword,
   Swords,
   type LucideIcon,
 } from 'lucide-react';
+import { getElement } from '../../data/elements';
 import { getStatus } from '../../data/statuses';
 import { describeStatus, effectShort, targetOf } from '../../engine';
 import type { CardCategory, CardEffect } from '../../types';
@@ -36,7 +40,23 @@ export const STATUS_ICONS: Record<string, LucideIcon> = {
   heartPulse: HeartPulse,
   shield: Shield,
   sparkles: Sparkles,
+  zap: Zap,
 };
+
+/** 属性のアイコン（属性のデータの icon のキー → アイコン） */
+export const ELEMENT_ICONS: Record<string, LucideIcon> = { flame: Flame, snowflake: Snowflake, zap: Zap, biohazard: Biohazard, moon: Moon, sun: Sun };
+
+/** 属性の小さな印（アイコン＋名前） */
+export function ElementTag({ id, size = 12 }: { id: string; size?: number }) {
+  const el = getElement(id);
+  const Icon = ELEMENT_ICONS[el.icon] ?? Sparkles;
+  return (
+    <span className="inline-flex items-center gap-px font-bold" style={{ color: el.color }}>
+      <Icon size={size} strokeWidth={2.6} />
+      {el.name}
+    </span>
+  );
+}
 
 export interface StatusStyle {
   Icon: LucideIcon;
@@ -92,7 +112,12 @@ const FALLBACK_EFFECT_ICON = { Icon: Sparkles, color: '#e0d8c0' };
 /** カードの効果1つ分の短い表示（アイコン＋数値。全体なら「全」） */
 export function EffectChip({ e, size = 12 }: { e: CardEffect; size?: number }) {
   const s = e.kind === 'applyStatus' ? statusStyle(e.status) : null;
-  const { Icon, color } = s ? { Icon: s.Icon, color: s.color } : (EFFECT_ICON[e.kind] ?? FALLBACK_EFFECT_ICON);
+  const el = e.kind === 'damage' && e.element ? getElement(e.element) : undefined;
+  const { Icon, color } = s
+    ? { Icon: s.Icon, color: s.color }
+    : el
+      ? { Icon: ELEMENT_ICONS[el.icon] ?? Swords, color: el.color }
+      : (EFFECT_ICON[e.kind] ?? FALLBACK_EFFECT_ICON);
   const to = targetOf(e);
   const all = to === 'allies' || to === 'otherAllies' || (to === 'foes' && e.kind !== 'taunt');
   const text = `${all ? '全' : ''}${effectShort(e)}`;

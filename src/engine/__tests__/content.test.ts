@@ -6,6 +6,7 @@ import { CARDS } from '../../data/cards';
 import { CLASSES } from '../../data/classes';
 import { contentVersion } from '../../data/contentVersion';
 import { DUNGEONS } from '../../data/dungeons';
+import { ELEMENTS } from '../../data/elements';
 import { ENCOUNTERS, ENEMIES } from '../../data/enemies';
 import { EVENTS } from '../../data/events';
 import { ITEMS } from '../../data/items';
@@ -40,6 +41,7 @@ function checkEffect(e: Effect, where: string) {
   expect(hasEffectKind(e.kind), `${where}: 未登録の効果 ${e.kind}`).toBe(true);
   if (e.to) expect(TARGETS, `${where}: 対象 ${e.to}`).toContain(e.to);
   if (e.kind === 'applyStatus') expect(STATUSES.has(e.status), `${where}: 未登録の状態異常 ${e.status}`).toBe(true);
+  if (e.kind === 'damage' && e.element) expect(ELEMENTS.has(e.element), `${where}: 未登録の属性 ${e.element}`).toBe(true);
   expect(() => describeEffect(e), where).not.toThrow();
 }
 
@@ -100,11 +102,14 @@ describe('コンテンツの検査', () => {
         for (const a of s.actions) for (const x of a.effects) checkEffect(x, `enemy ${e.id}.${a.id}`);
       }
       for (const ab of e.abilities ?? []) checkAbility(ab, `enemy ${e.id}`);
+      for (const x of [...(e.weak ?? []), ...(e.resist ?? [])]) expect(ELEMENTS.has(x), `enemy ${e.id}: 未登録の属性 ${x}`).toBe(true);
+      expect((e.weak ?? []).filter((x) => e.resist?.includes(x)), `enemy ${e.id}: 弱点と耐性が重なっている`).toEqual([]);
     }
   });
 
-  it('状態異常: 説明文が作れる', () => {
+  it('状態異常: 説明文が作れる。属性の与える状態異常が登録されている', () => {
     for (const s of STATUSES.all) expect(describeStatus(s), s.id).toBeTruthy();
+    for (const el of ELEMENTS.all) if (el.status) expect(STATUSES.has(el.status), `element ${el.id}`).toBe(true);
   });
 
   it('部屋の種類・難易度: 動きが登録されている', () => {

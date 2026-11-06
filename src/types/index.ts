@@ -19,6 +19,22 @@ export type Affinity = Record<CardCategory, number>;
 
 export type CardTarget = 'enemy' | 'self' | 'allEnemies';
 
+// ---------- 属性（spec §14。火・氷・雷・毒・闇・聖 など） ----------
+
+/** 属性。属性のダメージがHPに当たると、確率で状態異常を与える（完全成功なら必ず） */
+export interface ElementDef {
+  id: string;
+  order?: number;
+  name: string;
+  color: string;
+  /** アイコンの種類（画面側の ELEMENT_ICONS のキー） */
+  icon: string;
+  /** 与える状態異常と確率（%）・数 */
+  status?: string;
+  chance?: number;
+  amount?: number;
+}
+
 // ---------- 効果（カード・敵の行動・消費アイテム・特殊能力で共通の部品。spec §2.4） ----------
 
 /**
@@ -219,6 +235,9 @@ export interface EnemyDef {
   phases?: EnemyPhaseDef[];
   /** 敵の特殊能力（味方と同じ書き方） */
   abilities?: AbilityDef[];
+  /** 弱点の属性（ダメージ×1.5）・耐性のある属性（ダメージ×0.5・状態異常が効かない） */
+  weak?: string[];
+  resist?: string[];
 }
 
 export interface EnemyPhaseDef {
@@ -258,6 +277,19 @@ export interface StatusDef {
   /** 付いている間、与えるダメージ・受けるダメージにかかる倍率 */
   dealtMultiplier?: number;
   takenMultiplier?: number;
+  /** 持ち主のフェーズの始めに回復する量（'stacks' = 数値分、数 = 固定値。再生など） */
+  tickHeal?: 'stacks' | number;
+  /** 受ける回復量の倍率（呪いなど） */
+  healMultiplier?: number;
+  /** 味方: カードの成功率がこれだけ下がる（%。痺れなど） */
+  chancePenalty?: number;
+  /** 敵: 行動がこの確率（%）で失敗する（痺れなど） */
+  actionFailChance?: number;
+  /** 敵: 次の行動を1回休む / 味方: 次のフェーズのマナが減る（凍結など）。どちらも起きた時に1減る */
+  skipAction?: boolean;
+  manaPenalty?: number;
+  /** 重ねられる上限（省略は上限なし） */
+  maxStacks?: number;
   /** 説明文（省略すると数値から自動で作る） */
   description?: string;
 }

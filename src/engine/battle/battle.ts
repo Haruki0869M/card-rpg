@@ -26,11 +26,11 @@ import { createRng, type Rng, shuffle } from '../rng';
 import { affinityOf } from '../stats';
 import { calcDamage } from './damage';
 import { discardHand, drawCards } from './deck';
-import { applyEffect, checkEffect, makeCtx, targetOf } from './effects';
+import { applyEffect, checkEffect, elementMultiplier, makeCtx, targetOf } from './effects';
 import { decideAllIntents } from './intents';
 import { finalChance, selectTier } from './probability';
-import { applyTick, decayStatuses, emptyStatuses } from './statuses';
-import { abilityTriggered, addLog, enemyName, findAlly, findEnemy, loseHp, nameOf, unitIdOf } from './units';
+import { activeStatuses, actionFailChanceOf, applyTick, chancePenaltyOf, consumeStatus, decayStatuses, emptyStatuses, skipActionStatus, takeManaPenalty, tickHealOf } from './statuses';
+import { abilityTriggered, addLog, enemyName, findAlly, findEnemy, healUnit, loseHp, nameOf, unitIdOf } from './units';
 
 export { enemyName, findAlly, findEnemy, unitName } from './units';
 
@@ -150,8 +150,11 @@ export function createBattle(setup: BattleSetup): BattleState {
 
 // ---------- 参照用ヘルパー ----------
 
+/** カードの成功率（適性・痺れなどの状態異常を反映） */
 export function chanceFor(ally: AllyState, card: CardDef): number {
-  return finalChance(card, affinityOf(ally));
+  const base = finalChance(card, affinityOf(ally));
+  const pen = chancePenaltyOf(ally.statuses);
+  return pen ? Math.max(BALANCE.chanceMin, base - pen) : base;
 }
 
 /** 対象として敵を選ぶ必要があるカードか */
@@ -183,7 +186,7 @@ export function tierDamageAgainst(ally: AllyState, card: CardDef, target: EnemyS
   return card.tiers.map((t) =>
     t.effects.reduce((sum, e) => {
       if (e.kind !== 'damage' || (targetOf(e) !== 'target' && targetOf(e) !== 'foes')) return sum;
-      return sum + calcDamage(e.amount, ally.statuses, target.statuses, multiplier) * (e.hits ?? 1);
+      return sum + calcDamage(e.amount, ally.statuses, target.statuses, multiplier * elementMultiplier(target, e.element)) * (e.hits ?? 1);
     }, 0),
   );
 }
@@ -199,9 +202,16 @@ function startAllyPhase(state: BattleState, rng: Rng, events: BattleEvent[]) {
     if (a.dead) continue;
     a.block = 0;
     a.mana = BALANCE.manaPerTurn;
+    // 凍結など: マナが減る（効いたら1減る）
+    const pen = takeManaPenalty(a.statuses);
+    if (pen.amount) {
+      a.mana = Math.max(0, a.mana - pen.amount);
+      addLog(state, `${a.name}は${pen.names.join('・')}でマナ-${pen.amount}`);
+    }
     const { reshuffled } = drawCards(a, BALANCE.drawPerTurn + a.extraDraw, rng);
     if (reshuffled) addLog(state, `${a.name}: 捨札をシャッフルして山札に戻した`);
   }
+  for (const a of state.allies) if (!a.dead) applyTickHeal(state, a, events);
   // きっかけ: ターン開始時（ブロックのリセットの後）
   for (const a of state.allies) if (!a.dead) fireAbilities(state, rng, events, a, 'turnStart');
   events.push({ type: 'phase', phase: 'ally' });
@@ -222,6 +232,14 @@ function checkEnd(state: BattleState, events: BattleEvent[]): boolean {
     return true;
   }
   return false;
+}
+
+/** フェーズの始めの回復（再生など） */
+function applyTickHeal(state: BattleState, u: AllyState | EnemyState, events: BattleEvent[]) {
+  const { amount, names } = tickHealOf(u.statuses);
+  if (amount <= 0) return;
+  const h = healUnit(u, amount, events);
+  if (h > 0) addLog(state, `${nameOf(u)}は${names.join('・')}でHP+${h}`);
 }
 
 /** 継続ダメージの状態異常（毒・火傷など。ブロックを無視）→ その状態異常は減る */
@@ -309,7 +327,7 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
 
   // 効果（効果の部品を順に使う）
   const cardAbilities = card.trait ? [card.trait] : undefined;
-  const ctx = makeCtx(state, rng, events, ally, { target, card, cardAbilities });
+  const ctx = makeCtx(state, rng, events, ally, { target, card, cardAbilities, perfect });
   for (const eff of tier.effects) applyEffect(ctx, eff);
   const parts = ctx.parts;
   const hasDamage = tier.effects.some((e) => e.kind === 'damage');
@@ -377,6 +395,7 @@ function endTurn(state: BattleState, playerId: string, rng: Rng, events: BattleE
   state.enemyCursor = 0;
   addLog(state, `--- 敵フェーズ ---`);
   events.push({ type: 'phase', phase: 'enemy' });
+  for (const e of state.enemies) if (!e.dead) applyTickHeal(state, e, events);
   for (const e of state.enemies) if (!e.dead) fireAbilities(state, rng, events, e, 'turnStart');
   checkEnd(state, events);
   return undefined;
@@ -413,6 +432,17 @@ function executeIntent(state: BattleState, enemy: EnemyState, rng: Rng, events: 
   const intent = enemy.intent;
   if (!intent) return;
   const action = getEnemyAction(enemy.defId, intent.actionId);
+  // 凍結: 次の行動を休む（効いたら1減る） / 痺れ: 確率で行動に失敗する
+  const frozen = skipActionStatus(enemy.statuses);
+  const fail = frozen ? 0 : actionFailChanceOf(enemy.statuses);
+  if (frozen || (fail > 0 && rng.next() * 100 < fail)) {
+    const why = frozen ? frozen.name : activeStatuses(enemy.statuses).find(({ def }) => def.actionFailChance)!.def.name;
+    if (frozen) consumeStatus(enemy.statuses, frozen.id);
+    events.push({ type: 'enemyAct', enemyUid: enemy.uid, actionName: `${why}で動けない`, targetIds: [] });
+    addLog(state, `${enemyName(enemy)}は${why}で動けない！（「${action.name}」は失敗）`);
+    enemy.intent = undefined;
+    return;
+  }
   const ctx = makeCtx(state, rng, events, enemy);
   // 演出用のイベントは先に積み、対象の一覧は効果を使った後に埋まる
   events.push({ type: 'enemyAct', enemyUid: enemy.uid, actionName: action.name, targetIds: ctx.hitIds });

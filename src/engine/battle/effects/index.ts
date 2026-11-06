@@ -4,7 +4,12 @@
 import type { AbilityDef, BattleEvent, BattleState, CardDef, Effect, EffectKind, EffectTarget } from '../../../types';
 import { coverChance, damageModifiers, fireAbilities } from '../../abilities';
 import type { Rng } from '../../rng';
+import { BALANCE } from '../../../data/balance';
+import { getElement } from '../../../data/elements';
+import { getEnemy } from '../../../data/enemies';
+import { getStatus } from '../../../data/statuses';
 import { absorb, calcDamage } from '../damage';
+import { addStatus } from '../statuses';
 import { abilityTriggered, addLog, afterHpLoss, findAlly, foesOf, isEnemy, nameOf, sideOf, type Unit, unitIdOf } from '../units';
 import type { EffectCtx, EffectHandler } from './types';
 
@@ -35,7 +40,7 @@ export function makeCtx(
   rng: Rng,
   events: BattleEvent[],
   source: Unit,
-  opts: { target?: Unit; card?: CardDef; cardAbilities?: AbilityDef[]; dealt?: number; depth?: number } = {},
+  opts: { target?: Unit; card?: CardDef; cardAbilities?: AbilityDef[]; dealt?: number; depth?: number; perfect?: boolean } = {},
 ): EffectCtx {
   return {
     state,
@@ -45,6 +50,7 @@ export function makeCtx(
     target: opts.target,
     card: opts.card,
     cardAbilities: opts.cardAbilities,
+    perfect: opts.perfect,
     dealt: opts.dealt ?? 0,
     parts: [],
     hitIds: [],
@@ -113,18 +119,32 @@ export function upgradeEffect(e: Effect): Effect {
   return h.upgrade ? (h.upgrade(e as never) as Effect) : e;
 }
 
+// ---------- 属性（弱点・耐性。spec §14） ----------
+
+/** 属性のダメージ倍率（敵の弱点×1.5・耐性×0.5。無属性・味方は1） */
+export function elementMultiplier(victim: Unit | undefined, element: string | undefined): number {
+  if (!element || !victim || !isEnemy(victim)) return 1;
+  const def = getEnemy(victim.defId);
+  if (def.resist?.includes(element)) return BALANCE.elementResistMul;
+  if (def.weak?.includes(element)) return BALANCE.elementWeakMul;
+  return 1;
+}
+
+/** その属性に耐性があるか（状態異常が効かない） */
+export const resistsElement = (victim: Unit, element: string) => isEnemy(victim) && !!getEnemy(victim.defId).resist?.includes(element);
+
 // ---------- ダメージ（ダメージの効果・特殊能力から使う） ----------
 
 /**
  * victim にダメージを与える。倍率（敵のレベル・特殊能力・状態異常）、ブロック、かばう、戦闘不能まで処理する。
  * HPに入った量を返す
  */
-export function dealDamage(ctx: EffectCtx, victim: Unit, base: number): number {
+export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?: string): number {
   const { state, rng, events, source } = ctx;
   if (victim.dead) return 0;
   let v = victim;
   let mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities);
-  let dmg = calcDamage(base, source.statuses, v.statuses, mods.multiplier);
+  let dmg = calcDamage(base, source.statuses, v.statuses, mods.multiplier * elementMultiplier(v, element));
   // かばう: 相手の攻撃でこのままだとHP0になる場合、同じ側の他の仲間が確率で代わりに受ける
   if (isEnemy(source) !== isEnemy(v) && dmg - (mods.ignoreBlock ? 0 : v.block) >= v.hp) {
     for (const other of sideOf(state, v)) {
@@ -136,7 +156,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number): number {
         addLog(state, `${nameOf(other)}の「${cov.name}」！ ${nameOf(v)}をかばった`);
         v = other;
         mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities);
-        dmg = calcDamage(base, source.statuses, v.statuses, mods.multiplier);
+        dmg = calcDamage(base, source.statuses, v.statuses, mods.multiplier * elementMultiplier(v, element));
         break;
       }
     }
@@ -151,6 +171,15 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number): number {
   ctx.dealt += r.hpLoss;
   if (isEnemy(source) !== isEnemy(v) && !ctx.hitIds.includes(unitIdOf(v))) ctx.hitIds.push(unitIdOf(v));
   afterHpLoss(state, v, rng, events);
+  // 属性の状態異常（HPに当たった時。完全成功なら必ず。耐性があれば効かない）
+  if (element && r.hpLoss > 0 && !v.dead) {
+    const el = getElement(element);
+    if (el.status && !resistsElement(v, element) && (ctx.perfect || rng.next() * 100 < (el.chance ?? 0))) {
+      addStatus(v.statuses, el.status, el.amount ?? 1);
+      events.push({ type: 'status', unitId: unitIdOf(v), status: el.status, amount: el.amount ?? 1 });
+      ctx.parts.push(`${getStatus(el.status).name}${el.amount ?? 1}`);
+    }
+  }
   // きっかけ: ダメージを受けた / 倒した
   if (ctx.depth < 3) {
     if (r.hpLoss > 0 && !v.dead) fireAbilities(state, rng, events, v, 'hurt', { depth: ctx.depth + 1 });

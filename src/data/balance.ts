@@ -17,6 +17,9 @@ export const BALANCE = {
   /** 敵のレベルが baseLevel より1上がるごとの増加率 */
   enemyHpPerLevel: 0.1,
   enemyAttackPerLevel: 0.08,
+  /** 属性: 弱点のダメージ倍率・耐性のダメージ倍率（spec §14） */
+  elementWeakMul: 1.5,
+  elementResistMul: 0.5,
   /** 能力値 → 戦闘の適性補正: (能力値 - statPivot) / statDivisor（端数切り捨て） */
   statPivot: 60,
   statDivisor: 2,
@@ -27,7 +30,7 @@ export const BALANCE = {
   /** 冒険: レベル上限・次のレベルまでの経験値（20 + 15×(レベル-1)） */
   maxLevel: 20,
   expBase: 20,
-  expPerLevel: 15,
+  expPerLevel: 25,
   /** 敵のレベルが1上がるごとの経験値・ゴールドの増加率 */
   rewardPerLevel: 0.15,
   /** 成長ボーナスの量 */

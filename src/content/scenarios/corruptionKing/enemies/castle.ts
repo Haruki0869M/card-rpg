@@ -3,6 +3,8 @@ import type { EnemyDef } from '../../../../types';
 
 export const darkKnight: EnemyDef = {
   id: 'darkKnight',
+  weak: ['holy', 'thunder'],
+  resist: ['dark'],
   name: '魔王軍の騎士',
   icon: '🛡',
   maxHp: 60,
@@ -13,7 +15,7 @@ export const darkKnight: EnemyDef = {
   pattern: 'random',
   maxConsecutive: 2,
   actions: [
-    { id: 'slash', name: '闇の剣', effects: [{ kind: 'damage', amount: 15 }] },
+    { id: 'slash', name: '闇の剣', effects: [{ kind: 'damage', element: 'dark', amount: 15 }] },
     { id: 'guard', name: '鉄壁', effects: [{ kind: 'block', amount: 14 }, { kind: 'damage', amount: 6 }] },
     { id: 'cleave', name: 'なぎ払い', effects: [{ kind: 'damage', amount: 9, to: 'foes' }] },
   ],
@@ -21,6 +23,7 @@ export const darkKnight: EnemyDef = {
 
 export const gatekeeper: EnemyDef = {
   id: 'gatekeeper',
+  weak: ['thunder'],
   name: '門番ガルザ',
   icon: '👹',
   maxHp: 170,
@@ -32,13 +35,15 @@ export const gatekeeper: EnemyDef = {
   actions: [
     { id: 'roar', name: '威圧の咆哮', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 2, to: 'foes' }] },
     { id: 'crush', name: '大斧の一撃', effects: [{ kind: 'damage', amount: 24 }] },
-    { id: 'whirl', name: '大旋風', effects: [{ kind: 'damage', amount: 11, to: 'foes' }] },
+    { id: 'whirl', name: '大旋風', effects: [{ kind: 'damage', element: 'thunder', amount: 11, to: 'foes' }] },
     { id: 'brace', name: '構え', effects: [{ kind: 'block', amount: 25 }] },
   ],
 };
 
 export const valgrim: EnemyDef = {
   id: 'valgrim',
+  weak: ['holy'],
+  resist: ['dark', 'poison'],
   name: '侵食の魔王ヴァルグリム',
   icon: '😈',
   maxHp: 400,
@@ -48,8 +53,8 @@ export const valgrim: EnemyDef = {
   gold: 300,
   pattern: 'sequence',
   actions: [
-    { id: 'erosion', name: '侵食', effects: [{ kind: 'damage', amount: 9, to: 'foes' }, { kind: 'applyStatus', status: 'weak', amount: 1, to: 'foes' }] },
-    { id: 'darkLance', name: '闇の槍', effects: [{ kind: 'damage', amount: 24 }] },
+    { id: 'erosion', name: '侵食', effects: [{ kind: 'damage', element: 'dark', amount: 9, to: 'foes' }, { kind: 'applyStatus', status: 'weak', amount: 1, to: 'foes' }] },
+    { id: 'darkLance', name: '闇の槍', effects: [{ kind: 'damage', element: 'dark', amount: 24 }] },
     { id: 'abyssGuard', name: '深淵の守り', effects: [{ kind: 'block', amount: 25 }, { kind: 'damage', amount: 8 }] },
   ],
   phases: [
@@ -58,8 +63,8 @@ export const valgrim: EnemyDef = {
       name: '真の姿のヴァルグリム',
       pattern: 'sequence',
       actions: [
-        { id: 'corruptWave', name: '侵食の波動', effects: [{ kind: 'damage', amount: 13, to: 'foes' }, { kind: 'applyStatus', status: 'poison', amount: 2, to: 'foes' }] },
-        { id: 'devour', name: '喰らう', effects: [{ kind: 'damage', amount: 28 }, { kind: 'heal', amount: 15, to: 'self' }] },
+        { id: 'corruptWave', name: '侵食の波動', effects: [{ kind: 'damage', element: 'dark', amount: 13, to: 'foes' }, { kind: 'applyStatus', status: 'poison', amount: 2, to: 'foes' }] },
+        { id: 'devour', name: '喰らう', effects: [{ kind: 'damage', element: 'dark', amount: 28 }, { kind: 'heal', amount: 15, to: 'self' }] },
         { id: 'despair', name: '絶望', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 2, to: 'foes' }, { kind: 'block', amount: 20 }] },
       ],
     },
@@ -68,9 +73,9 @@ export const valgrim: EnemyDef = {
       name: '最後の抵抗',
       pattern: 'sequence',
       actions: [
-        { id: 'apocalypse', name: '終焉', effects: [{ kind: 'damage', amount: 18, to: 'foes' }] },
+        { id: 'apocalypse', name: '終焉', effects: [{ kind: 'damage', element: 'dark', amount: 18, to: 'foes' }] },
         { id: 'shadowBarrier', name: '影の障壁', effects: [{ kind: 'block', amount: 30 }, { kind: 'damage', amount: 12, to: 'foes' }] },
-        { id: 'annihilate', name: '消滅の一撃', effects: [{ kind: 'damage', amount: 34 }] },
+        { id: 'annihilate', name: '消滅の一撃', effects: [{ kind: 'damage', element: 'dark', amount: 34 }] },
       ],
     },
   ],

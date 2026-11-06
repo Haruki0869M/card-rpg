@@ -2,6 +2,8 @@
 import type { CardDef } from '../../../types';
 
 const d = (amount: number) => ({ kind: 'damage', amount }) as const;
+/** 属性のダメージ */
+const el = (element: string, amount: number) => ({ kind: 'damage', amount, element }) as const;
 const b = (amount: number) => ({ kind: 'block', amount }) as const;
 const ba = (amount: number) => ({ kind: 'block', amount, to: 'allies' }) as const;
 
@@ -42,10 +44,10 @@ export const WEAPON_CARDS: CardDef[] = [
     baseChance: 75,
     target: 'enemy',
     tiers: [
-      { minSuccesses: 0, effects: [d(6)] },
-      { minSuccesses: 1, effects: [d(12)] },
-      { minSuccesses: 2, effects: [d(20)] },
-      { minSuccesses: 3, effects: [d(30), { kind: 'applyStatus', status: 'burn', amount: 2 }] },
+      { minSuccesses: 0, effects: [el('fire', 6)] },
+      { minSuccesses: 1, effects: [el('fire', 12)] },
+      { minSuccesses: 2, effects: [el('fire', 20)] },
+      { minSuccesses: 3, effects: [el('fire', 30), { kind: 'applyStatus', status: 'burn', amount: 2 }] },
     ],
   },
   // ---------- 杖 ----------
@@ -59,7 +61,7 @@ export const WEAPON_CARDS: CardDef[] = [
     slots: 2,
     baseChance: 70,
     target: 'enemy',
-    tiers: [{ minSuccesses: 0, effects: [d(4)] }, { minSuccesses: 1, effects: [d(9)] }, { minSuccesses: 2, effects: [d(14)] }],
+    tiers: [{ minSuccesses: 0, effects: [el('ice', 4)] }, { minSuccesses: 1, effects: [el('ice', 9)] }, { minSuccesses: 2, effects: [el('ice', 14)] }],
   },
   {
     id: 'wLightning',
@@ -71,7 +73,7 @@ export const WEAPON_CARDS: CardDef[] = [
     slots: 2,
     baseChance: 70,
     target: 'allEnemies',
-    tiers: [{ minSuccesses: 0, effects: [d(5)] }, { minSuccesses: 1, effects: [d(9)] }, { minSuccesses: 2, effects: [d(14)] }],
+    tiers: [{ minSuccesses: 0, effects: [el('thunder', 5)] }, { minSuccesses: 1, effects: [el('thunder', 9)] }, { minSuccesses: 2, effects: [el('thunder', 14)] }],
   },
   {
     id: 'wStarfall',
@@ -84,10 +86,10 @@ export const WEAPON_CARDS: CardDef[] = [
     baseChance: 65,
     target: 'allEnemies',
     tiers: [
-      { minSuccesses: 0, effects: [d(5)] },
-      { minSuccesses: 1, effects: [d(10)] },
-      { minSuccesses: 2, effects: [d(16)] },
-      { minSuccesses: 3, effects: [d(24), { kind: 'gainFocus', amount: 1 }] },
+      { minSuccesses: 0, effects: [el('holy', 5)] },
+      { minSuccesses: 1, effects: [el('holy', 10)] },
+      { minSuccesses: 2, effects: [el('holy', 16)] },
+      { minSuccesses: 3, effects: [el('holy', 24), { kind: 'gainFocus', amount: 1 }] },
     ],
   },
   // ---------- 槌 ----------
@@ -117,7 +119,7 @@ export const WEAPON_CARDS: CardDef[] = [
     slots: 2,
     baseChance: 75,
     target: 'enemy',
-    tiers: [{ minSuccesses: 0, effects: [d(8)] }, { minSuccesses: 1, effects: [d(14), ba(4)] }, { minSuccesses: 2, effects: [d(20), ba(6)] }],
+    tiers: [{ minSuccesses: 0, effects: [el('holy', 8)] }, { minSuccesses: 1, effects: [el('holy', 14), ba(4)] }, { minSuccesses: 2, effects: [el('holy', 20), ba(6)] }],
   },
   {
     id: 'wEarthGuard',

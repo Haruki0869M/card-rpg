@@ -10,8 +10,9 @@ export const stacks = (s: Statuses | undefined, id: string): number => s?.[id] ?
 
 /** 状態異常を付ける（未登録のIDはエラー） */
 export function addStatus(s: Statuses, id: string, amount: number) {
-  getStatus(id);
-  s[id] = stacks(s, id) + amount;
+  const def = getStatus(id);
+  const next = stacks(s, id) + amount;
+  s[id] = def.maxStacks !== undefined ? Math.min(def.maxStacks, next) : next;
 }
 
 /** 付いている状態異常（登録順） */
@@ -81,7 +82,71 @@ export function describeStatus(def: StatusDef): string {
   if (def.dealtMultiplier !== undefined) parts.push(`与えるダメージ${pct(def.dealtMultiplier)}（端数切り捨て）`);
   if (def.tickDamage !== undefined)
     parts.push(`フェーズ終了時に${def.tickDamage === 'stacks' ? '数値分の' : `${def.tickDamage}`}ダメージ（ブロック無視）`);
+  if (def.tickHeal !== undefined) parts.push(`フェーズの始めに${def.tickHeal === 'stacks' ? '数値分' : def.tickHeal}HP回復`);
+  if (def.healMultiplier !== undefined) parts.push(`受ける回復量${pct(def.healMultiplier)}`);
+  if (def.chancePenalty) parts.push(`味方はカードの成功率-${def.chancePenalty}%`);
+  if (def.actionFailChance) parts.push(`敵は${def.actionFailChance}%の確率で行動に失敗する`);
+  if (def.skipAction) parts.push('敵は次の行動を1回休む');
+  if (def.manaPenalty) parts.push(`味方は次のターンのマナ-${def.manaPenalty}`);
+  if (def.skipAction || def.manaPenalty) parts.push('効いたら消える');
   const decay = def.decay ?? 1;
-  parts.push(decay > 0 ? `フェーズ終了時に${decay}減る` : '戦闘中は減らない');
+  if (!(def.skipAction || def.manaPenalty)) parts.push(decay > 0 ? `フェーズ終了時に${decay}減る` : '戦闘中は減らない');
+  if (!def.harmful) parts.push('良い効果（万能薬では消えない）');
   return parts.join('。');
+}
+
+// ---------- 痺れ・凍結・呪い・再生など（データの項目ごとの効き方） ----------
+
+/** 受ける回復量の倍率 */
+export function healMultiplier(s: Statuses | undefined): number {
+  let m = 1;
+  for (const { def } of activeStatuses(s)) if (def.healMultiplier !== undefined) m *= def.healMultiplier;
+  return m;
+}
+
+/** 味方のカードの成功率の低下（%） */
+export function chancePenaltyOf(s: Statuses | undefined): number {
+  let n = 0;
+  for (const { def } of activeStatuses(s)) n += def.chancePenalty ?? 0;
+  return n;
+}
+
+/** 敵の行動が失敗する確率（%。複数あれば一番高いもの） */
+export function actionFailChanceOf(s: Statuses | undefined): number {
+  let n = 0;
+  for (const { def } of activeStatuses(s)) n = Math.max(n, def.actionFailChance ?? 0);
+  return n;
+}
+
+/** 次の行動を休む状態異常（凍結など）。付いていればその定義 */
+export const skipActionStatus = (s: Statuses | undefined) => activeStatuses(s).find(({ def }) => def.skipAction)?.def;
+
+/** 1つ減らす（凍結が効いた時など） */
+export function consumeStatus(s: Statuses, id: string) {
+  s[id] = Math.max(0, stacks(s, id) - 1);
+}
+
+/** 次のフェーズで減るマナと、その状態異常（使った分は1減らす） */
+export function takeManaPenalty(s: Statuses): { amount: number; names: string[] } {
+  let amount = 0;
+  const names: string[] = [];
+  for (const { def } of activeStatuses(s)) {
+    if (!def.manaPenalty) continue;
+    amount += def.manaPenalty;
+    names.push(def.name);
+    consumeStatus(s, def.id);
+  }
+  return { amount, names };
+}
+
+/** フェーズの始めに回復する量（再生など） */
+export function tickHealOf(s: Statuses | undefined): { amount: number; names: string[] } {
+  let amount = 0;
+  const names: string[] = [];
+  for (const { def, amount: n } of activeStatuses(s)) {
+    if (def.tickHeal === undefined) continue;
+    amount += def.tickHeal === 'stacks' ? n : def.tickHeal;
+    names.push(def.name);
+  }
+  return { amount, names };
 }
