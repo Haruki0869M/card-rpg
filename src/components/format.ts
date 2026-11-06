@@ -1,10 +1,11 @@
+import { CATEGORY_LABEL } from '../data/terms';
 import { getStatus } from '../data/statuses';
 import { activeStatuses } from '../engine';
 import { getEnemyAction } from '../data/enemies';
 import { describeEffect, enemyHitDamage, findAlly, targetOf } from '../engine';
 import type { BattleState, CardDef, CardEffect, EnemyState, StatusId } from '../types';
 
-export const CATEGORY_LABEL = { physical: '物理', magic: '魔法', skill: 'スキル' } as const;
+export { CATEGORY_LABEL };
 /** 状態異常の名前 */
 export const STATUS_LABEL = (id: string) => getStatus(id).name;
 

@@ -1,3 +1,5 @@
+import { CATEGORY_LABEL } from '../../data/terms';
+import { CATEGORY_COLOR } from '../../data/theme';
 // アイコン（絵文字は端末で見た目が変わるため、SVGアイコンに統一する）
 import {
   ArrowBigDown,
@@ -66,11 +68,11 @@ export function statusStyle(id: string): StatusStyle {
   return st;
 }
 
-export const CATEGORY_STYLE: Record<CardCategory, { name: string; Icon: LucideIcon; frame: string; glow: string; inner: string }> = {
-  physical: { name: '物理', Icon: Sword, frame: '#c24a3a', glow: '#ff7a5a', inner: 'linear-gradient(180deg,#4a1a1a 0%,#2a0e10 55%,#170809 100%)' },
-  magic: { name: '魔法', Icon: Sparkles, frame: '#6a5cf0', glow: '#a99bff', inner: 'linear-gradient(180deg,#24205a 0%,#141038 55%,#0a0820 100%)' },
-  skill: { name: 'スキル', Icon: Star, frame: '#3aa070', glow: '#7affc0', inner: 'linear-gradient(180deg,#13402e 0%,#0b2a1e 55%,#061710 100%)' },
-};
+const CATEGORY_ICON: Record<CardCategory, LucideIcon> = { physical: Sword, magic: Sparkles, skill: Star };
+/** カードの種類の見た目（名前は terms.ts、色は theme.ts） */
+export const CATEGORY_STYLE: Record<CardCategory, { name: string; Icon: LucideIcon; frame: string; glow: string; inner: string }> = Object.fromEntries(
+  (Object.keys(CATEGORY_COLOR) as CardCategory[]).map((c) => [c, { name: CATEGORY_LABEL[c], Icon: CATEGORY_ICON[c], ...CATEGORY_COLOR[c] }]),
+) as Record<CardCategory, { name: string; Icon: LucideIcon; frame: string; glow: string; inner: string }>;
 
 /** 効果の種類ごとのアイコン（無い種類は汎用のアイコン）。新しい効果を足したらここに1行足すと見た目が付く */
 const EFFECT_ICON: Record<string, { Icon: LucideIcon; color: string }> = {

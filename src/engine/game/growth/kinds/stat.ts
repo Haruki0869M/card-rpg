@@ -1,9 +1,8 @@
 // 能力値（どの能力値かは職業の伸びやすさで選ぶ）
 import { BALANCE } from '../../../../data/balance';
-import type { StatId } from '../../../../types';
+import { STAT_LABEL } from '../../../../data/terms';
 import type { GrowthHandler } from '../types';
 
-const STAT_LABEL: Record<StatId, string> = { str: '力', vit: '体力', int: '知力', per: '感知', dex: '器用', agi: '素早さ', luk: '運' };
 
 export const growth: GrowthHandler = {
   kind: 'stat',

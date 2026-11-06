@@ -1,3 +1,4 @@
+import { RARITY_NAME } from '../../data/terms';
 // ===== ダンジョンの生成と移動 =====
 import { getRoomType, ROOM_TYPES } from '../../data/rules';
 import { getDungeon } from './registry';
@@ -6,7 +7,7 @@ import type { Rng } from '../rng';
 
 export const RARITIES: Rarity[] = ['common', 'rare', 'epic', 'legend'];
 export const rarityIndex = (r: Rarity) => RARITIES.indexOf(r);
-export const RARITY_NAME: Record<Rarity, string> = { common: 'コモン', rare: 'レア', epic: 'エピック', legend: 'レジェンド' };
+export { RARITY_NAME };
 export const raiseRarity = (r: Rarity, n = 1): Rarity => RARITIES[Math.min(RARITIES.length - 1, rarityIndex(r) + n)];
 
 const pick = <T,>(list: readonly T[], rng: Rng) => list[rng.int(list.length)];

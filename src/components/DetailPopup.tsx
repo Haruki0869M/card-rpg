@@ -1,3 +1,4 @@
+import { STAT_LABEL } from '../data/terms';
 // ===== 長押しで出る詳細（指を離すと閉じる。操作はブロックしない） =====
 import { CharacterArt, EnemyArt } from '../art';
 import { getCard } from '../data/cards';
@@ -16,7 +17,6 @@ function signed(n: number) {
   return n > 0 ? `+${n}%` : n < 0 ? `${n}%` : '±0%';
 }
 
-const STAT_LABEL: Record<StatId, string> = { str: '力', vit: '体力', int: '知力', per: '感知', dex: '器用', agi: '素早さ', luk: '運' };
 
 function Title({ children }: { children: React.ReactNode }) {
   return <div className="font-display text-[17px] leading-6 text-amber-100">{children}</div>;

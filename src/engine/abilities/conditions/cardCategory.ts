@@ -1,5 +1,5 @@
 // カードの種類（物理・魔法・スキル）
-import type { CardCategory } from '../../../types';
+import { CATEGORY_LABEL } from '../../../data/terms';
 import type { ConditionHandler } from './types';
 
 declare module '../../../types' {
@@ -8,10 +8,9 @@ declare module '../../../types' {
   }
 }
 
-const NAME: Record<CardCategory, string> = { physical: '物理', magic: '魔法', skill: 'スキル' };
 
 export const condition: ConditionHandler<'cardCategory'> = {
   kind: 'cardCategory',
   test: (c, cond) => c.card?.category === cond.category,
-  describe: (cond) => `${NAME[cond.category]}カード`,
+  describe: (cond) => `${CATEGORY_LABEL[cond.category]}カード`,
 };

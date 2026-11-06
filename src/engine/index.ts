@@ -17,3 +17,4 @@ export * from './battle/units';
 export * from './game/growth';
 export * from './game/outcomes';
 export * from './game/rooms';
+export * from './game/migrations';

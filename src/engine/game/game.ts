@@ -34,6 +34,7 @@ import { livingHeroes, findHero } from './heroes';
 import { getDifficulty } from '../../data/rules';
 import { isBossRoom, roomBehavior, roomTypeOf } from './rooms';
 import { growthHandler, growthOptions } from './growth';
+import { RARITY_NAME } from '../../data/terms';
 import { buildDungeon, findRoom, RARITIES, rarityIndex, reachableRooms } from './dungeon';
 import {
   canEquip,
@@ -475,7 +476,7 @@ const DUNGEON_BOSS_CHEST = (id: string): Rarity => DUNGEONS.get(id).bossChest;
 // ---------- 宝箱 ----------
 
 export const LOCK_TRAP_DAMAGE = 5;
-const GRADE_NAME: Record<Rarity, string> = { common: 'コモン', rare: 'レア', epic: 'エピック', legend: 'レジェンド' };
+const GRADE_NAME = RARITY_NAME;
 
 function openChest(game: GameState, playerId: string, heroId: string, focusUsed: number, rng: Rng): string | undefined {
   const c = game.chest;

@@ -33,29 +33,24 @@ npm run build      # 型チェック + 本番ビルド（dist/）
 
 ```
 src/
-  types/       型定義（職業・カード・敵・状態・コマンド）
-  data/        データ（balance.ts に調整用の数値を集約）
-    classes/   職業（1職業 = 1ファイル。index.ts の登録表に並べるだけで登場）
-    enemies/   敵と遭遇の組み合わせ（同上）
-    cards/     カード（基本・職業ごとの報酬・武器の専用カード）
-    items/     装備品・消費アイテム
-    dungeons/  ダンジョン（固定の並び / 自動生成）   events/  イベント   scenarios/  シナリオ
-  engine/      ロジック（Reactに依存しない純粋関数。applyCommand(state, command)）
-    battle/    戦闘   abilities/  職業の特殊能力   stats.ts  能力値
-    game/      冒険（applyGameCommand: ダンジョン・宝箱・イベント・報酬・成長・装備）
-  art/         SVGの絵（味方は共通の部品＋職業ごとの見た目、敵は1体ずつ）。起動時に画像化して軽く表示
+  content/     ゲームの中身（ファイルを置くだけで自動で登場する）
+    common/    どのシナリオでも使うもの: classes/ cards/ items/ enemies/ statuses/ weaponTypes/ difficulties/ roomTypes/ encounters/
+    scenarios/<シナリオID>/  scenario.ts（説明・開始条件）と、そのシナリオ専用の enemies/ dungeons/ events/
+  data/        登録表（src/content を自動で読み込む）・balance.ts（全体の数値）・terms.ts（用語）・theme.ts（色）・contentVersion.ts
+  types/       型定義
+  engine/      ロジック（Reactに依存しない純粋関数）
+    battle/    戦闘の流れ。effects/kinds/ = 効果の部品（1種類1ファイル）、ai/ = 敵の行動の決め方、statuses.ts = 状態異常
+    abilities/ 特殊能力（きっかけ＋条件＋効果）。conditions/ = 条件の部品
+    game/      冒険（applyGameCommand）。outcomes/kinds/ = イベントの結果の部品、rooms/behaviors/ = 部屋の動き、growth/kinds/ = 成長ボーナス、migrations.ts = 保存データの引き継ぎ
+  art/         SVGの絵（enemies/・backgrounds/ はファイルを置くだけで登録）。起動時に画像化して軽く表示
   store/       Zustand ストア（エンジンを呼ぶだけ + 保存 + 敵フェーズのタイマー）
-  components/  画面部品（screens/ が各画面、battle/ が戦闘画面）
-  hooks/       長押し・戻るボタン・要素の大きさ
+  components/  画面部品（screens/ が各画面、battle/ が戦闘画面、DataCatalog.tsx がデータ一覧）
+docs/          追加・変更の手順書（adding-content.md）・絵柄の基準
 scripts/       アイコン生成・アート一覧の撮影・レイアウト確認・自動プレイ・性能計測（Playwright）
-docs/art/      絵柄の基準（試作）
 ```
 
-- 職業や敵を増やすときは、データのファイルを足して登録表に1行追加するだけです。絵が無い場合は仮の絵が自動で使われます（絵は `src/art` に追加）。
-- 乱数はシード付き（mulberry32）で、`Math.random()` は使っていません。
-- プレイヤーの操作は `{ type: 'PLAY_CARD', playerId, characterId, cardInstanceId, targetId, focusUsed }` のようなシリアライズ可能なコマンドです。
-- 冒険の途中状態は `localStorage` に保存され、タイトルの「つづきから」で再開できます。
-
+- **職業・敵・カード・装備・状態異常・シナリオなどの足し方・変え方は [docs/adding-content.md](./docs/adding-content.md) にまとめています。** 足したら `npm test` で、参照切れや書き間違いを自動で検査できます。
+- 数値の一覧: URL の末尾に `#data` を付けると、全職業・全敵・カード・装備・状態異常・ルールを表で見比べられます（バランス調整用）。
 ### 画面の確認スクリプト（任意）
 
 ```bash
