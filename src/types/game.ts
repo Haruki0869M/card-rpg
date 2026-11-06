@@ -341,6 +341,8 @@ export interface GameState {
   encounter?: EncounterState;
   town?: TownVisit;
   shrine?: ShrineVisit;
+  /** オンライン協力の冒険（戦闘で全員の準備完了を待つ） */
+  online?: boolean;
 }
 
 /** 難易度のID（src/content の difficulties に登録したもの） */
@@ -369,6 +371,7 @@ export interface NewGameSetup {
   scenarioId: string;
   difficulty: Difficulty;
   party: { classId: string; gender: Gender; name: string; playerId: PlayerId }[];
+  online?: boolean;
 }
 
 /** 冒険のコマンド（すべて「誰の操作か」を含む） */

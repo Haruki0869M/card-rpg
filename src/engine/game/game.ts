@@ -90,6 +90,7 @@ export function createGame(setup: NewGameSetup): GameState {
     nextLogId: 1,
     lives: getDifficulty(setup.difficulty).lives,
   };
+  if (setup.online) game.online = true;
   game.heroes = setup.party.map((m, i) => {
     const cls = getClass(m.classId);
     const hero: Hero = {
@@ -349,6 +350,7 @@ export function startBattleWith(game: GameState, enemies: EncounterSpec['enemies
     enemyHpMul: diff.enemyHp,
     enemyAttackMul: diff.enemyAttack,
     surprise: opts.surprise,
+    readyCheck: game.online,
   });
   game.battleBackground = opts.background ?? worldBackground(game);
   for (const h of sceneHeroes(game)) h.nextBattleStatuses = {};

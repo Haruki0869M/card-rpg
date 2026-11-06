@@ -19,6 +19,7 @@ import {
   reachable,
   reachableRooms,
   unusableReason,
+  waitingPlayers,
 } from '../index';
 
 export interface BotLog {
@@ -113,7 +114,9 @@ function battleStep(g: GameState, log: BotLog): GameState {
       const focus = card.slots >= 3 ? Math.min(card.slots, a.focus) : 0;
       return send(g, { type: 'BATTLE', command: { type: 'PLAY_CARD', playerId: a.playerId, characterId: a.id, cardInstanceId: c.uid, targetId: card.target === 'enemy' ? target : undefined, focusUsed: focus } }, log);
     }
-    return send(g, { type: 'BATTLE', command: { type: 'END_TURN', playerId: b.allies[0].playerId } }, log);
+    // オンライン協力なら、まだ準備完了していないプレイヤーが押す
+    const who = waitingPlayers(b)[0] ?? b.allies[0].playerId;
+    return send(g, { type: 'BATTLE', command: { type: 'END_TURN', playerId: who } }, log);
   }
   if (b.phase === 'enemy') return send(g, { type: 'BATTLE', command: { type: 'ENEMY_STEP' } }, log);
   return send(g, { type: 'FINISH_BATTLE', playerId: pid(g) }, log);
