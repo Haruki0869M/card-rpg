@@ -322,7 +322,7 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
         error = chooseGrowth(game, cmd.playerId, cmd.optionIndex, cmd.cardUid);
         break;
       case 'PICK_CARD':
-        error = pickCard(game, cmd.playerId, cmd.offerIndex);
+        error = pickCard(game, cmd.playerId, cmd.offerIndex, cmd.heroId);
         break;
       case 'FINISH_REWARD':
         error = finishReward(game, cmd.playerId, rng);
@@ -577,7 +577,7 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
   splitGold(survivorHeroes, gold);
 
   const cardOdds = cardRewardOdds(rt.battle?.cardOdds ?? 'battle');
-  const reward: RewardState = { gold, exp: [], levelUps: [], cardOffers: rollCardOffers(game, survivors, rng, cardOdds), cardOdds, cardPicked: false, loot: [] };
+  const reward: RewardState = { gold, exp: [], levelUps: [], cardOffers: survivors.flatMap((id) => rollCardOffers(game, [id], rng, cardOdds)), cardOdds, cardDone: [], cardPicked: false, loot: [] };
   for (const id of survivors) {
     const h = findHero(game, id)!;
     const fromLevel = h.level;
@@ -640,18 +640,30 @@ function chooseGrowth(game: GameState, playerId: string, optionIndex: number, ca
   return undefined;
 }
 
-function pickCard(game: GameState, playerId: string, offerIndex: number | null): string | undefined {
+/** カード報酬があるキャラ（一覧の順） */
+export const cardOfferHeroes = (r: RewardState): string[] => [...new Set(r.cardOffers.map((o) => o.heroId))];
+
+/** カード報酬: 生き残ったキャラごとに、担当の人が1枚選ぶ（みんな同時に選べる。M3-C4） */
+function pickCard(game: GameState, playerId: string, offerIndex: number | null, heroId?: string): string | undefined {
   const r = game.reward;
   if (game.mode !== 'reward' || !r || r.cardPicked) return 'カードは選べません';
+  const done = (r.cardDone ??= []);
   if (offerIndex !== null) {
     const o = r.cardOffers[offerIndex];
     if (!o) return '選択肢がありません';
+    if (done.includes(o.heroId)) return 'このキャラはもうカードを選びました';
     const h = findHero(game, o.heroId)!;
     if (!ownedBy(h, playerId)) return '担当していないキャラのカードです';
     h.deck.push({ uid: `c${game.nextUid++}`, cardId: o.cardId });
     addLog(game, `${h.name}の山札に「${CARDS.get(o.cardId).name}」が加わった`);
-  } else if (!isPartyPlayer(game, playerId)) return 'このパーティのプレイヤーではありません';
-  r.cardPicked = true;
+    done.push(o.heroId);
+  } else {
+    const pending = cardOfferHeroes(r).filter((id) => !done.includes(id) && (!heroId || id === heroId));
+    const mine = pending.filter((id) => ownedBy(findHero(game, id)!, playerId));
+    if (!mine.length) return heroId && pending.length ? '担当していないキャラのカードです' : 'カードは選べません';
+    done.push(...mine);
+  }
+  r.cardPicked = cardOfferHeroes(r).every((id) => done.includes(id));
   return undefined;
 }
 
@@ -661,6 +673,7 @@ function finishReward(game: GameState, playerId: string, rng: Rng): string | und
   const run = game.dungeon;
   if (game.mode !== 'reward' || !r || (!run && !game.world)) return '報酬画面ではありません';
   if (r.levelUps.length) return '成長ボーナスを選んでください';
+  if (!r.cardPicked && r.cardOffers.length) return 'カードを選んでいない人がいます';
   game.reward = undefined;
   // 世界マップの遭遇の戦闘: 隠し宝箱があれば開け、無ければ世界マップへ（遭遇したキャラの手番は終わる）
   if (!run) {

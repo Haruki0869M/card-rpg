@@ -10,6 +10,7 @@ import {
   applyGameCommand,
   battleDeck,
   buildDungeon,
+  cardOfferHeroes,
   chestOdds,
   createBattle,
   createGame,
@@ -217,8 +218,15 @@ describe('戦闘 → 報酬 → 成長', () => {
     expect(applyGameCommand(g, { type: 'FINISH_REWARD', playerId: P }).error).toBeDefined();
     const opt = g.reward!.levelUps[0].options.findIndex((o) => o.kind === 'stat');
     g = run(g, { type: 'CHOOSE_GROWTH', playerId: P, optionIndex: opt });
+    // 生き残ったキャラごとに3枚から1枚（M3-C4）。全員が選ぶまで終われない
+    const pickers = cardOfferHeroes(g.reward!);
+    expect(pickers).toEqual(g.reward!.exp.map((e) => e.heroId)); // 戦闘不能だったキャラには無い
+    expect(applyGameCommand(g, { type: 'FINISH_REWARD', playerId: P }).error).toBeDefined();
     g = run(g, { type: 'PICK_CARD', playerId: P, offerIndex: 0 });
-    expect(g.heroes.reduce((n, h) => n + h.deck.length, 0)).toBe(21);
+    expect(applyGameCommand(g, { type: 'PICK_CARD', playerId: P, offerIndex: 0 }).error).toBeDefined();
+    for (const id of pickers.slice(1)) g = run(g, { type: 'PICK_CARD', playerId: P, offerIndex: g.reward!.cardOffers.findIndex((o) => o.heroId === id) });
+    expect(g.reward!.cardPicked).toBe(true);
+    expect(g.heroes.reduce((n, h) => n + h.deck.length, 0)).toBe(20 + pickers.length);
     g = run(g, { type: 'FINISH_REWARD', playerId: P });
     expect(['dungeon', 'chest']).toContain(g.mode);
   });
@@ -353,7 +361,10 @@ function autoPlay(g: GameState, dungeonId: string, maxSteps = 4000): GameState {
           const h = findHero(g, lu.heroId)!;
           const i = lu.options.findIndex((o) => o.kind !== 'upgradeCard');
           g = run(g, { type: 'CHOOSE_GROWTH', playerId: P, optionIndex: i >= 0 ? i : 0, cardUid: h.deck.find((c) => !c.upgraded)?.uid });
-        } else if (!r.cardPicked) g = run(g, { type: 'PICK_CARD', playerId: P, offerIndex: r.cardOffers.length ? 0 : null });
+        } else if (!r.cardPicked) {
+          const i = r.cardOffers.findIndex((o) => !r.cardDone?.includes(o.heroId));
+          g = run(g, { type: 'PICK_CARD', playerId: P, offerIndex: i >= 0 ? i : null });
+        }
         else g = run(g, { type: 'FINISH_REWARD', playerId: P });
         break;
       }

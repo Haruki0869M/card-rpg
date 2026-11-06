@@ -285,10 +285,13 @@ export interface RewardState {
   exp: { heroId: string; gained: number; fromLevel: number; toLevel: number; fromExp: number; toExp: number }[];
   /** 未選択のレベルアップ（先頭から順に選ぶ） */
   levelUps: { heroId: string; level: number; options: GrowthOption[] }[];
-  /** カード報酬（3枚から1枚） */
+  /** カード報酬（生き残ったキャラごとに3枚。キャラごとに1枚選べる。M3-C4） */
   cardOffers: { cardId: string; heroId: string }[];
+  /** カードを選んだ（または選ばなかった）キャラ */
+  cardDone?: string[];
   /** カード報酬の格の確率（%・コモン/レア/エピック。表示用） */
   cardOdds?: number[];
+  /** 全員がカードを選び終えた */
   cardPicked: boolean;
   /** ドロップ品（自動で持ち物に入る。表示用） */
   loot: Loot[];
@@ -421,7 +424,7 @@ export type GameCommand =
   | { type: 'USE_POUCH_ITEM'; playerId: PlayerId; itemUid: string; userId: string; targetId: string }
   | { type: 'FINISH_BATTLE'; playerId: PlayerId }
   | { type: 'CHOOSE_GROWTH'; playerId: PlayerId; optionIndex: number; cardUid?: string }
-  | { type: 'PICK_CARD'; playerId: PlayerId; offerIndex: number | null }
+  | { type: 'PICK_CARD'; playerId: PlayerId; offerIndex: number | null; /** 選ばない時: どのキャラの分か（省くと、その人のキャラ全員の分） */ heroId?: string }
   | { type: 'FINISH_REWARD'; playerId: PlayerId }
   | { type: 'OPEN_CHEST'; playerId: PlayerId; heroId: string; focusUsed: number }
   | { type: 'LEAVE_CHEST'; playerId: PlayerId }

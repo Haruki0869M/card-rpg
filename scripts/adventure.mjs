@@ -236,13 +236,13 @@ async function run(party, difficulty) {
       await opts.first().click();
       continue;
     }
-    if (await page.getByText('カードを1枚、山札に加える').count()) {
+    if (await page.getByText(/の山札に1枚加える/).count()) {
       if (!seen.has('reward')) {
         seen.add('reward');
         await check(page, 'reward');
         await page.screenshot({ path: `screenshots/adv-reward.png` });
       }
-      await page.getByText('カードを選ばない').click();
+      await page.getByText(/はカードを選ばない/).click();
       continue;
     }
     // 宝箱の演出中（最初の1回は演出を最後まで見る。以降は飛ばす）

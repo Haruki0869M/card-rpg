@@ -212,7 +212,11 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
         const i = lu.options.findIndex((o) => o.kind !== 'upgradeCard');
         return send(g, { type: 'CHOOSE_GROWTH', playerId: h.playerId, optionIndex: i >= 0 ? i : 0, cardUid: h.deck.find((c) => !c.upgraded)?.uid }, log);
       }
-      if (!r.cardPicked) return send(g, { type: 'PICK_CARD', playerId: pid(g, r.cardOffers[0]?.heroId), offerIndex: r.cardOffers.length ? 0 : null }, log);
+      if (!r.cardPicked) {
+        // まだ選んでいないキャラの最初のカード（M3-C4: キャラごとに1枚）
+        const i = r.cardOffers.findIndex((o) => !r.cardDone?.includes(o.heroId));
+        return send(g, { type: 'PICK_CARD', playerId: pid(g, r.cardOffers[i]?.heroId), offerIndex: i >= 0 ? i : null }, log);
+      }
       return send(g, { type: 'FINISH_REWARD', playerId: pid(g) }, log);
     }
     case 'dungeon': {

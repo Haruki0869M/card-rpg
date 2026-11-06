@@ -5,10 +5,10 @@ import { ArrowUpCircle, Coins, Gift, Heart, Sparkles, Star, TrendingUp } from 'l
 import { useEffect, useState } from 'react';
 import { REVEAL_TIMING, VIBRATION } from '../../data/balance';
 import { cardOf, getCard } from '../../data/cards';
-import { expToNext, findHero, growthHandler, heroStats } from '../../engine';
+import { cardOfferHeroes, expToNext, findHero, growthHandler, heroStats } from '../../engine';
 import { finalChance } from '../../engine';
 import { affinityFromStats } from '../../engine';
-import { LOCAL_PLAYER } from '../../store/battleConfig';
+import { isLocalPlayer, LOCAL_PLAYER } from '../../store/battleConfig';
 import { speedFactor, useBattle, vibrate } from '../../store/battleStore';
 import type { GrowthOption, Hero, Rarity } from '../../types';
 import { CardFace } from '../ui/CardFace';
@@ -52,20 +52,23 @@ function CardBack({ width, height, charge }: { width: number; height: number; ch
 }
 
 /** カード報酬: 裏向きで並び、左から順にめくれる。レア以上は格の色で溜めてからめくれ、エピックは光の柱が立つ */
-function RewardCards() {
+function RewardCards({ heroId }: { heroId: string }) {
   const game = useBattle((s) => s.game)!;
   const settings = useBattle((s) => s.settings);
   const dispatchGame = useBattle((s) => s.dispatchGame);
   const r = game.reward!;
   const speed = speedFactor(settings);
-  const n = r.cardOffers.length;
+  // このキャラの分のカード（元の番号を覚えておく）
+  const offers = r.cardOffers.map((o, index) => ({ ...o, index })).filter((o) => o.heroId === heroId);
+  const hero = findHero(game, heroId)!;
+  const n = offers.length;
   const [shown, setShown] = useState(0);
   const [charging, setCharging] = useState(-1);
   const done = shown >= n;
 
   useEffect(() => {
     if (shown >= n) return;
-    const rarity = getCard(r.cardOffers[shown].cardId).rarity ?? 'common';
+    const rarity = getCard(offers[shown].cardId).rarity ?? 'common';
     const special = rarity !== 'common';
     if (special && charging !== shown) {
       const t = setTimeout(() => setCharging(shown), (REVEAL_TIMING.cardFlip * 1000) / speed);
@@ -85,7 +88,10 @@ function RewardCards() {
   const odds = r.cardOdds;
   return (
     <div className="mt-3" onClick={() => !done && setShown(n)}>
-      <div className="font-display text-center text-[17px] text-amber-100">カードを1枚、山札に加える</div>
+      <div className="font-display flex items-center justify-center gap-1.5 text-center text-[17px] text-amber-100">
+        <HeroFace hero={hero} size={26} />
+        {hero.name}の山札に1枚加える
+      </div>
       {odds && (
         <div className="text-center text-[12px] text-zinc-400">
           1枚ごとの格の確率：
@@ -98,8 +104,8 @@ function RewardCards() {
         </div>
       )}
       <div className="mt-2 flex justify-center gap-1.5">
-        {r.cardOffers.map((o, i) => {
-          const h = findHero(game, o.heroId)!;
+        {offers.map((o, i) => {
+          const h = hero;
           const card = getCard(o.cardId);
           const rarity = card.rarity ?? 'common';
           const open = i < shown;
@@ -110,7 +116,7 @@ function RewardCards() {
               disabled={!done}
               onClick={(e) => {
                 e.stopPropagation();
-                if (done) dispatchGame({ type: 'PICK_CARD', playerId: LOCAL_PLAYER, offerIndex: i });
+                if (done) dispatchGame({ type: 'PICK_CARD', playerId: LOCAL_PLAYER, offerIndex: o.index });
                 else setShown(n);
               }}
               className="btn relative flex flex-col items-center gap-1 disabled:opacity-100 disabled:filter-none"
@@ -135,9 +141,6 @@ function RewardCards() {
                   </motion.div>
                 )}
               </AnimatePresence>
-              <span className="flex items-center gap-1 text-[12px]">
-                <HeroFace hero={h} size={20} /> {h.name}
-              </span>
               {open && rarity !== 'common' && (
                 <span className="font-display text-[13px] leading-4" style={{ color: RARITY_STYLE[rarity].color }}>
                   {RARITY_STYLE[rarity].name}
@@ -162,6 +165,11 @@ export function RewardScreen() {
   const [upgradeFor, setUpgradeFor] = useState<number | null>(null);
   const lu = r.levelUps[0];
   const luHero = lu ? findHero(game, lu.heroId) : undefined;
+  // カード報酬（M3-C4）: 生き残ったキャラごとに、担当の人が同時に選ぶ。この端末のキャラから順に
+  const pending = cardOfferHeroes(r).filter((id) => !r.cardDone?.includes(id));
+  const minePending = pending.filter((id) => isLocalPlayer(findHero(game, id)?.playerId ?? LOCAL_PLAYER));
+  const cardHero = minePending[0];
+  const othersPicking = pending.filter((id) => !minePending.includes(id)).map((id) => findHero(game, id)!);
 
   return (
     <Screen>
@@ -209,7 +217,17 @@ export function RewardScreen() {
         </div>
 
         {/* カード報酬（裏向きで並び、1枚ずつめくれる。spec §13） */}
-        {!lu && !r.cardPicked && r.cardOffers.length > 0 && <RewardCards />}
+        {!lu && cardHero && <RewardCards key={cardHero} heroId={cardHero} />}
+        {!lu && othersPicking.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5 text-[13px] text-zinc-300">
+            {othersPicking.map((h) => (
+              <span key={h.id} className="flex items-center gap-1 rounded-full bg-black/40 px-2 py-0.5">
+                <HeroFace hero={h} size={20} /> {h.name}
+              </span>
+            ))}
+            がカードを選んでいます
+          </div>
+        )}
 
         {/* ドロップ */}
         {r.loot.length > 0 && (
@@ -226,10 +244,12 @@ export function RewardScreen() {
       </div>
 
       <div className="shrink-0 px-3 pt-1 pb-3">
-        {lu ? null : !r.cardPicked && r.cardOffers.length > 0 ? (
-          <button onClick={() => dispatchGame({ type: 'PICK_CARD', playerId: LOCAL_PLAYER, offerIndex: null })} className="btn btn-dark h-12 w-full rounded-xl text-[15px] font-bold">
-            カードを選ばない
+        {lu ? null : cardHero ? (
+          <button onClick={() => dispatchGame({ type: 'PICK_CARD', playerId: LOCAL_PLAYER, offerIndex: null, heroId: cardHero })} className="btn btn-dark h-12 w-full rounded-xl text-[15px] font-bold">
+            {findHero(game, cardHero)?.name}はカードを選ばない
           </button>
+        ) : pending.length ? (
+          <div className="flex h-12 items-center justify-center rounded-xl bg-black/40 text-[14px] text-zinc-300">ほかの人がカードを選び終えるのを待っています</div>
         ) : (
           <button onClick={() => dispatchGame({ type: 'FINISH_REWARD', playerId: LOCAL_PLAYER })} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px]">
             {r.hiddenChest ? '隠し宝箱へ' : '先へ進む'}
