@@ -140,6 +140,8 @@ export interface DungeonDef {
   description: string;
   /** 背景の種類 */
   background: string;
+  /** 部屋を選ぶ画面の背景（無ければ background） */
+  mapBackground?: string;
   /** 敵の基準レベル */
   baseLevel: number;
   /** 出現する敵（戦闘・強敵・ボス） */

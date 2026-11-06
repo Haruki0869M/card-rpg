@@ -87,7 +87,7 @@ src/content/
    - 能力値（`stats`）、最大HP、初期デッキ、初期装備、`weaponType`（武器の種類のID）
    - `battleAbility`（下の「特殊能力」）、`exploreAbility`
    - `cardPool`（報酬で出るカード）、`growthWeights`（伸びやすい能力値）
-2. 見た目は `src/art/hero/looks.ts` に1件足します。無ければ仮の絵が出ます。
+2. 見た目は、描いた絵を `src/assets/art/hero/<職業ID>-male.webp` / `-female.webp`（全身）と `-male-face.webp` / `-female-face.webp`（顔）に置きます（下の「絵を足す」）。無ければ `src/art/hero/looks.ts` の SVG の絵、それも無ければ仮の絵が出ます。
 
 ## 敵を足す
 
@@ -102,7 +102,7 @@ src/content/
    - `weak` / `resist`: 弱点・耐性の属性ID（例 `weak: ['fire']`）。弱点はダメージ×1.5、耐性はダメージ×0.5で、その属性の状態異常も効かない
    - 行動のダメージにも属性を付けられます（`{ kind: 'damage', amount: 8, element: 'fire' }`）
 3. 出す場所はダンジョンの `pools` に ID を書きます。
-4. 絵は `src/art/enemies/` にファイルを置き、`export const enemyArt = { 敵ID: 絵 }` と書きます。無ければ仮の絵が出ます。
+4. **絵が必要です。** 描いた絵を `src/assets/art/enemy/<敵ID>.webp` に置きます（ボスの第2段階は `<敵ID>-1.webp`）。無ければ `src/art/enemies/` の SVG の絵（`export const enemyArt = { 敵ID: 絵 }`）、それも無ければ仮の絵（頭文字の丸）が出ます。敵どうしの大きさの差は、敵のデータの `size` で決めます。
 
 ## 武器・防具・装飾品・消費アイテムを足す
 
@@ -226,6 +226,36 @@ src/content/
 
 - 新しい効果・条件・冒険の効果を作る時は、ファイルの中の `declare module` で数値の型を足します。これでデータの書き間違いが型チェックで見つかります。
 - 効果の見た目のアイコンは、`src/components/ui/icons.tsx` の `EFFECT_ICON` に1行足すと付きます。無ければ汎用のアイコンになります。
+
+## 絵を足す（描いた絵・Midjourney など）
+
+画像は `src/assets/art/<種類>/<ID>.webp` に置くだけで使われます（無い物は今までの SVG の絵で描きます）。
+
+| 種類 | ファイル | 大きさの目安 |
+|---|---|---|
+| 主人公（全身・顔） | `hero/<職業ID>-<male/female>.webp`・`-face.webp` | 480×660（下をそろえる）・192×192 |
+| 敵 | `enemy/<敵ID>.webp`（第2段階は `-1`） | 520×620（下をそろえる） |
+| 背景 | `bg/<背景ID>.webp`（ダンジョン・地形の `background`。部屋を選ぶ画面だけ別にするなら `mapBackground`） | 600×1071（暗く・少しぼかす） |
+| 地形の模様 | `terrain/<地形ID>.webp` | 256×256（つなぎ目無し） |
+| 道具・宝箱・地図の場所 | `item/<アイコン>.webp`・`chest/<レア度>.webp`・`place/<town/capital/dungeon/shrine/landmark>.webp` | 192・320・224 の正方形 |
+| 画面の枠 | `ui/corner-*.webp`・`ui/ornament-top.webp`・`ui/panel.webp` | |
+
+元の画像からの加工（背景の切り抜き・顔の切り出し・地形の模様のつなぎ目消し・背景を暗く）は、まとめてスクリプトで行います:
+
+```bash
+pip install "rembg[cpu]" opencv-python-headless pillow numpy
+SRC=元画像のフォルダ python3 scripts/art/build_art.py            # 全部
+SRC=元画像のフォルダ python3 scripts/art/build_art.py enemy/ bg/  # 名前の一部でしぼる
+```
+
+どの番号の元画像を何に使うかは、`scripts/art/build_art.py` の表（HEROES・ENEMIES・BGS など）に書きます。顔の位置は FACES で直せます。
+
+読みやすさのための決まり:
+- 背景は暗く・少しぼかし・まわりを暗くする（上に文字やカードが乗るため）。
+- 敵と主人公は細い暗いふちを付ける（背景にまぎれないように）。
+- 道具・地図の場所は薄く光るふちを付ける（暗い画面で形が分かるように）。
+- 細長い道具（剣・杖・弓・槌・お守り）は斜めにして枠いっぱいに見せる。
+- 宝箱は閉じた姿だけ。全部左向きにそろえる。開く時は「揺れ→光→はじける」で見せる。
 
 ## 数値・言葉・色を変える
 

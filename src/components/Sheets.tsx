@@ -32,7 +32,7 @@ function sceneLocalHeroes(game: GameState): Hero[] {
     (h) => !h.retired && h.hp > 0 && isLocalPlayer(h.playerId) && (game.party ? game.party.includes(h.id) : !game.expeditions?.some((x) => x.heroes.includes(h.id))),
   );
 }
-import { Bar, HeroFace, ItemIcon, itemSummary, RARITY_STYLE, STAT_LABEL } from './ui/game';
+import { Bar, Crest, HeroFace, ItemIcon, itemSummary, RARITY_STYLE, STAT_LABEL } from './ui/game';
 import { CATEGORY_STYLE, EffectChip } from './ui/icons';
 
 function BottomSheet({ title, onClose, children, tall }: { title: string; onClose: () => void; children: ReactNode; tall?: boolean }) {
@@ -54,7 +54,7 @@ function BottomSheet({ title, onClose, children, tall }: { title: string; onClos
         exit={{ y: 40 }}
         transition={{ duration: 0.12 }}
         onClick={(e) => e.stopPropagation()}
-        className={`panel safe-pad flex flex-col rounded-t-2xl border-b-0 ${tall ? 'h-[92%]' : 'max-h-[86%]'}`}
+        className={`panel panel-ornate safe-pad flex flex-col rounded-t-2xl border-b-0 ${tall ? 'h-[92%]' : 'max-h-[86%]'}`}
       >
         <div className="flex items-center justify-between px-3 pt-1">
           <div className="font-display text-[18px] text-amber-100">{title}</div>
@@ -575,7 +575,8 @@ function ConfirmAbandon() {
         setConfirmAbandon(false);
       }}
     >
-      <div onClick={(e) => e.stopPropagation()} className="panel panel-gold-edge w-full max-w-xs rounded-2xl p-4">
+      <div onClick={(e) => e.stopPropagation()} className="panel panel-gold-edge panel-ornate w-full max-w-xs rounded-2xl p-4 pt-5">
+        <Crest />
         <div className="font-display text-[18px]">{room ? '部屋を出ますか？' : '冒険をやめますか？'}</div>
         <div className="mt-1 text-[13px] text-zinc-400">{room ? `冒険は部屋に残ります。「部屋に参加」から合言葉 ${room.code} でまた入れます。` : 'この冒険の進行は失われ、タイトル画面に戻ります。'}</div>
         <div className="mt-4 flex gap-2">

@@ -1,21 +1,14 @@
 import { TERMS } from '../../data/terms';
 // ===== タイトル画面 =====
-import { CLASSES } from '../../data/classes';
 import { motion } from 'framer-motion';
 import { BookOpen, Play, Settings2, UserPlus, Users } from 'lucide-react';
 import { useState } from 'react';
-import { BattleBackground, CharacterArt } from '../../art';
+import { BattleBackground } from '../../art';
 import { useBattle } from '../../store/battleStore';
 import { useOnline } from '../../store/onlineStore';
 import { HeroFace, Screen } from '../ui/game';
 
 export const GAME_TITLE = TERMS.gameTitle;
-
-/** タイトルに並ぶキャラ（最初から選べる職業を最大4人。中央を少し大きく） */
-const TITLE_LINEUP = CLASSES.all
-  .filter((c) => c.unlocked)
-  .slice(0, 4)
-  .map((c, i, all) => [c.id, i % 2 ? 'female' : 'male', i === Math.floor(all.length / 2) ? 1.12 : i === 0 ? 0.92 : 1] as const);
 
 export function TitleScreen() {
   const game = useBattle((s) => s.game);
@@ -41,42 +34,29 @@ export function TitleScreen() {
   return (
     <Screen>
       <div className="relative min-h-0 flex-1 overflow-hidden">
-        <BattleBackground kind="castle" className="absolute inset-0 h-full w-full" />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-[#0b0810]" />
+        <BattleBackground kind="title" className="absolute inset-0 h-full w-full" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/75 via-transparent via-35% to-[#0b0810]" />
         <div className="absolute inset-x-0 top-[8%] text-center">
+          {/* 月の明るい所でも文字が読めるように、文字の後ろを暗く */}
+          <div className="pointer-events-none absolute inset-x-0 -top-6 -bottom-6" style={{ background: 'radial-gradient(ellipse 60% 55% at 50% 50%, rgba(8,6,12,.82), rgba(8,6,12,.45) 60%, transparent)' }} />
           <motion.div
             initial={{ opacity: 0, y: -10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.6 }}
-            className="font-title px-2 text-[44px] leading-[46px] font-bold"
+            className="font-title relative px-2 text-[44px] leading-[46px] font-bold"
             style={{
               background: 'linear-gradient(180deg,#fff6d0,#f2c24a 55%,#a86a12)',
               WebkitBackgroundClip: 'text',
               backgroundClip: 'text',
               color: 'transparent',
-              filter: 'drop-shadow(0 3px 0 rgba(0,0,0,.85))',
+              filter: 'drop-shadow(0 3px 0 rgba(0,0,0,.9)) drop-shadow(0 0 8px rgba(0,0,0,.8))',
             }}
           >
             {/* 「DESTINY OF」は小さく、「CRYSTALIA」を大きく（英字のタイトル用の字体） */}
             <span className="block text-[20px] leading-[26px] tracking-[0.25em]">{GAME_TITLE.replace(/\s*\S+$/, '')}</span>
             {GAME_TITLE.split(' ').pop()}
           </motion.div>
-          <div className="font-display text-outline mt-1 text-[14px] tracking-[0.3em] text-amber-100/90">― {TERMS.gameSubtitle} ―</div>
-        </div>
-        {/* 職業のキャラたち */}
-        <div className="absolute inset-x-0 bottom-2 flex items-end justify-center">
-          {TITLE_LINEUP.map(([c, g, k], i) => (
-            <motion.div
-              key={c}
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 + i * 0.1, duration: 0.4 }}
-              className="idle-breathe -mx-2"
-              style={{ animationDelay: `${-i * 0.7}s` }}
-            >
-              <CharacterArt classId={c} gender={g} className="block" style={{ width: 92 * k }} />
-            </motion.div>
-          ))}
+          <div className="font-display text-outline relative mt-1 text-[14px] tracking-[0.3em] text-amber-100/90">― {TERMS.gameSubtitle} ―</div>
         </div>
       </div>
       <div className="flex flex-col gap-2 px-4 pt-3 pb-4">

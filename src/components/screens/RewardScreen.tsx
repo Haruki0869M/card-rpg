@@ -12,7 +12,7 @@ import { LOCAL_PLAYER } from '../../store/battleConfig';
 import { speedFactor, useBattle, vibrate } from '../../store/battleStore';
 import type { GrowthOption, Hero, Rarity } from '../../types';
 import { CardFace } from '../ui/CardFace';
-import { Bar, HeroFace, RARITY_STYLE, Screen } from '../ui/game';
+import { Bar, Crest, HeroFace, RARITY_STYLE, Screen } from '../ui/game';
 import { LootList } from './RoomScreens';
 
 /** 成長ボーナスのアイコン（成長の種類の icon のキー → アイコン） */
@@ -242,7 +242,8 @@ export function RewardScreen() {
       <AnimatePresence>
         {lu && luHero && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-40 flex flex-col justify-center bg-black/75 px-3">
-            <motion.div initial={{ scale: 0.85 }} animate={{ scale: 1 }} className="panel panel-gold-edge rounded-2xl p-3">
+            <motion.div initial={{ scale: 0.85 }} animate={{ scale: 1 }} className="panel panel-gold-edge panel-ornate rounded-2xl p-3 pt-4">
+              <Crest />
               <div className="flex items-center gap-2">
                 <HeroFace hero={luHero} size={46} />
                 <div>

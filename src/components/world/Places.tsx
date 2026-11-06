@@ -216,7 +216,7 @@ export function TownScreen() {
   const myCards = stock?.cards.map((c, i) => ({ c, i })).filter(({ c }) => getClass(game.heroes.find((x) => x.id === c.heroId)?.classId ?? '').id === v.classId) ?? [];
 
   return (
-    <Screen>
+    <Screen bg="town" bgOpacity={0.28}>
       <WorldTopBar game={game} />
       <Heading sub={def.description}>{def.name}</Heading>
       <div className="mx-3 mt-1 flex shrink-0 items-center gap-2 rounded-lg bg-black/40 px-2 py-1 text-[13px]">
@@ -438,7 +438,7 @@ export function ShrineScreen() {
     <Screen>
       <WorldTopBar game={game} />
       <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        <BattleBackground kind={sceneBackground(game)} className="absolute inset-0 h-full w-full opacity-30" />
+        <BattleBackground kind="shrine" className="absolute inset-0 h-full w-full opacity-40" />
         <div className="relative px-3 pt-4">
           <div className="flex items-center gap-2">
             <span className="flex h-12 w-12 items-center justify-center rounded-xl border-2 border-emerald-300 bg-emerald-950/60">

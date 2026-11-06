@@ -2,9 +2,9 @@
 // 地形・霧・施設・移動できる範囲は SVG、キャラと敵は上に重ねた画像。タップしたマスを親に知らせる。
 import { Castle, CircleHelp, DoorOpen, Flag, Gift, House, Landmark, Sparkles, TriangleAlert, type LucideIcon } from 'lucide-react';
 import { memo, useLayoutEffect, useMemo, useRef } from 'react';
-import { EnemyArt } from '../../art';
+import { artImage, EnemyArt } from '../../art';
 import { DUNGEONS } from '../../data/dungeons';
-import { getTerrain, QUESTS } from '../../data/world';
+import { getTerrain, QUESTS, TERRAINS, TOWNS } from '../../data/world';
 import { colOf, objectiveHandler, rowOf, timeOfDay } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
 import type { GameState, WorldState } from '../../types';
@@ -26,6 +26,14 @@ const TERRAIN_DECOR: Record<string, { d: string; stroke: string; fill?: string }
 
 const FEATURE_ICON: Record<string, LucideIcon> = { town: House, dungeon: DoorOpen, shrine: Sparkles, event: CircleHelp, chest: Gift, landmark: Landmark };
 const FEATURE_COLOR: Record<string, string> = { town: '#ffe9a8', dungeon: '#ff9a7a', shrine: '#9affd0', event: '#9ad8ff', chest: '#ffd76a', landmark: '#d8c8ff' };
+
+/** 地図の場所の絵（無ければ undefined → アイコンで描く） */
+function placeImage(f: NonNullable<WorldState['tiles'][number]['f']>): string | undefined {
+  if (f.kind === 'town') return artImage(TOWNS.tryGet(f.id)?.capital ? 'place/capital' : 'place/town');
+  if (f.kind === 'chest') return artImage(`chest/${f.chest?.rarity ?? 'common'}`);
+  if (f.kind === 'dungeon' || f.kind === 'shrine' || f.kind === 'landmark') return artImage(`place/${f.kind}`);
+  return undefined;
+}
 
 export interface MapGeom {
   R: number;
@@ -66,16 +74,31 @@ const hexPoints = (x: number, y: number, R: number) =>
 const TerrainLayer = memo(function TerrainLayer({ tiles, geom }: { tiles: WorldState['tiles']; geom: MapGeom }) {
   const { R, center } = geom;
   const s = R / 24;
+  // 地形の模様（描いた絵）。並べてもつなぎ目が出ない絵を、マス2つ分くらいの大きさで敷く
+  const size = R * 4;
   return (
     <g>
+      <defs>
+        {TERRAINS.all.map((t) => {
+          const url = artImage(`terrain/${t.id}`);
+          return url ? (
+            <pattern key={t.id} id={`ter-${t.id}`} patternUnits="userSpaceOnUse" width={size} height={size}>
+              <rect width={size} height={size} fill={t.color} />
+              <image href={url} width={size} height={size} preserveAspectRatio="none" opacity={0.68} />
+            </pattern>
+          ) : null;
+        })}
+      </defs>
       {tiles.map((t, i) => {
         const { x, y } = center(i);
         if (!t.seen) return <polygon key={i} points={hexPoints(x, y, R - 0.5)} fill="#141019" stroke="#221c2a" strokeWidth={1} />;
         const ter = getTerrain(t.t);
-        const dec = ter.decor ? TERRAIN_DECOR[ter.decor] : undefined;
+        const tex = !!artImage(`terrain/${ter.id}`);
+        // 絵がある地形は模様で分かるので、小さな印は出さない
+        const dec = !tex && ter.decor ? TERRAIN_DECOR[ter.decor] : undefined;
         return (
           <g key={i}>
-            <polygon points={hexPoints(x, y, R - 0.5)} fill={ter.color} stroke="rgba(0,0,0,.35)" strokeWidth={1} />
+            <polygon points={hexPoints(x, y, R - 0.5)} fill={tex ? `url(#ter-${ter.id})` : ter.color} stroke="rgba(0,0,0,.5)" strokeWidth={1.2} />
             {dec && <path d={dec.d} transform={`translate(${x},${y}) scale(${s})`} stroke={dec.stroke} fill={dec.fill ?? 'none'} strokeWidth={1.6} strokeLinecap="round" opacity={0.85} />}
           </g>
         );
@@ -165,6 +188,11 @@ export function WorldMap({
     <div ref={box} className="absolute inset-0 overflow-auto overscroll-contain bg-[#0b0910]" data-world-map>
       <div className="relative" style={{ width: W, height: H }} onClick={tap}>
         <svg width={W} height={H} className="absolute inset-0 block">
+          <defs>
+            <filter id="place-shadow" x="-30%" y="-30%" width="160%" height="160%">
+              <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#000" floodOpacity=".85" />
+            </filter>
+          </defs>
           <TerrainLayer tiles={tilesRef.current} geom={geom} />
           {/* 移動できるマス */}
           {reach &&
@@ -203,6 +231,18 @@ export function WorldMap({
             const used = f.used && f.kind !== 'town' && f.kind !== 'dungeon';
             const sz = R * (f.kind === 'town' || finale ? 1.15 : 0.95);
             const color = fallen ? '#7a6a7a' : f.kind === 'chest' && f.chest?.rarity ? undefined : FEATURE_COLOR[f.kind];
+            const img = finale ? undefined : placeImage(f);
+            if (img) {
+              // 描いた絵の場所: マスより少し大きく、影をつけて地形から浮かせる
+              const big = R * (f.kind === 'town' ? 1.75 : f.kind === 'chest' ? 1.25 : 1.55);
+              return (
+                <g key={`f${i}`} opacity={used ? 0.4 : 1} data-feature={`${f.kind}:${f.id}`} data-used={used || undefined}>
+                  <ellipse cx={x} cy={y + big * 0.33} rx={big * 0.42} ry={big * 0.13} fill="rgba(0,0,0,.55)" />
+                  <image href={img} x={x - big / 2} y={y - big * 0.58} width={big} height={big} filter="url(#place-shadow)" style={fallen ? { filter: 'grayscale(1) brightness(.6)' } : undefined} />
+                  {questTargets.has(f.id) && <Flag x={x + big * 0.12} y={y - big * 0.75} width={R * 0.6} height={R * 0.6} color="#ff6a8a" fill="#ff6a8a" />}
+                </g>
+              );
+            }
             return (
               <g key={`f${i}`} opacity={used ? 0.35 : 1} data-feature={`${f.kind}:${f.id}`} data-used={used || undefined}>
                 <circle cx={x} cy={y} r={sz * 0.62} fill="rgba(0,0,0,.55)" />
@@ -230,7 +270,7 @@ export function WorldMap({
         {w.wanderers.map((wd) => {
           if (!w.tiles[wd.tile].seen) return null;
           const { x, y } = center(wd.tile);
-          const s = R * 1.5;
+          const s = R * 1.6;
           return (
             <div
               key={wd.id}
@@ -238,7 +278,9 @@ export function WorldMap({
               data-wanderer={wd.id}
               style={{ left: x - s / 2, top: y - s * 0.62, width: s, height: s, filter: wd.raidTown ? 'drop-shadow(0 0 6px #ff3a3a)' : 'drop-shadow(0 2px 2px #000)' }}
             >
-              <EnemyArt defId={wd.enemies[0].defId} className="h-full w-full" />
+              {/* 地形の模様の上でも見えるように、暗い円と赤い縁を敷く */}
+              <span className="absolute inset-[8%] rounded-full border-2 border-red-500/80 bg-[#140a10]/80" />
+              <EnemyArt defId={wd.enemies[0].defId} className="relative h-full w-full" />
               <span className="absolute -right-1 bottom-0 rounded-full border border-red-300 bg-red-950/90 px-1 text-[12px] leading-4 font-black text-red-200">
                 {wd.enemies.length > 1 ? `×${wd.enemies.length}` : `Lv${wd.enemies[0].level ?? 1}`}
               </span>

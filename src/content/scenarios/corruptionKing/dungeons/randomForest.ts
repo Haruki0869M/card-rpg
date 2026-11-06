@@ -6,7 +6,7 @@ export const randomForest: DungeonDef = {
   id: 'randomForest',
   name: '迷いの森の洞窟',
   description: '訪れるたびに姿を変える洞窟。危険だが、奥には豪華な財宝が眠る。',
-  background: 'temple',
+  background: 'forestCave',
   baseLevel: 4,
   pools: { ...FOREST_POOLS, boss: ['treeWarden', 'toxicShroom'] },
   bossChest: 'legend',

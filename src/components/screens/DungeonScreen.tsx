@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Backpack, Check, Coins, Crown, Flame, Gift, Lock, LogOut, Menu, Sparkles, Swords, Skull, Users, X } from 'lucide-react';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { BattleBackground, EnemyArt } from '../../art';
+import { DUNGEONS } from '../../data/dungeons';
 import { getEnemy } from '../../data/enemies';
 import { EVENTS } from '../../data/events';
 import { getItem } from '../../data/items';
@@ -141,7 +142,7 @@ export function DungeonScreen() {
       </div>
 
       <div className="relative min-h-0 flex-1 overflow-hidden border-y border-amber-500/30">
-        <BattleBackground kind={run.background} className="absolute inset-0 h-full w-full opacity-40" />
+        <BattleBackground kind={DUNGEONS.tryGet(run.dungeonId)?.mapBackground ?? run.background} className="absolute inset-0 h-full w-full opacity-40" />
         <div ref={scrollRef} className="absolute inset-0 overflow-y-auto overscroll-contain" onClick={() => setSelected(null)}>
           <div ref={mapRef} className="relative mx-auto w-full" style={{ height: H }}>
             <svg className="absolute inset-0" width={W} height={H}>
