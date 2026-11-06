@@ -6,7 +6,7 @@ import { CARDS } from '../data/cards';
 import { CLASSES } from '../data/classes';
 import { contentVersion } from '../data/contentVersion';
 import { DUNGEONS } from '../data/dungeons';
-import { getElement } from '../data/elements';
+import { ELEMENTS, getElement } from '../data/elements';
 import { ENEMIES } from '../data/enemies';
 import { ITEMS } from '../data/items';
 import { DIFFICULTIES, describeDifficulty, ROOM_TYPES, WEAPON_TYPES } from '../data/rules';
@@ -146,14 +146,20 @@ function ItemsTab() {
 
 function StatusesTab() {
   return (
-    <Table
+    <div className="flex flex-col gap-3">
+      <Table
+        head={['属性', '与える状態異常', '確率', '量']}
+        rows={ELEMENTS.all.map((e) => [<b style={{ color: e.color }}>{e.name}</b>, e.status ? STATUSES.get(e.status).name : '', e.status ? `${e.chance ?? 0}%（完全成功なら必ず）` : '', e.status ? (e.amount ?? 1) : ''])}
+      />
+      <Table
       head={['状態異常', '悪い効果', '説明']}
       rows={STATUSES.all.map((s) => [
         <b style={{ color: s.color }}>{s.name}</b>,
         s.harmful ? '○' : '',
         describeStatus(s),
       ])}
-    />
+      />
+    </div>
   );
 }
 

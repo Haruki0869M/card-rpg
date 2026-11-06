@@ -17,5 +17,6 @@ export function describeDifficulty(d: DifficultyDef): string {
   if (d.enemyHp && d.enemyHp !== 1) parts.push(`敵のHP×${d.enemyHp}`);
   if (d.enemyAttack && d.enemyAttack !== 1) parts.push(`敵の攻撃×${d.enemyAttack}`);
   if (d.reward && d.reward !== 1) parts.push(`報酬×${d.reward}`);
+  if (d.corruptionPerTurn !== undefined) parts.push(`侵食度+${d.corruptionPerTurn}%/巡`);
   return parts.join('・') || '標準';
 }

@@ -22,8 +22,9 @@ src/content/
     enemies/       どこでも出る敵
     encounters/    テスト戦闘の敵の組み合わせ
     statuses/      状態異常
+    elements/      属性（炎・氷・雷・毒・闇・聖。当たった時に付く状態異常もここ）
     weaponTypes/   武器の種類
-    difficulties/  難易度（命の灯火の数もここ）
+    difficulties/  難易度（命の灯火の数・敵の強さの倍率・侵食度の速さもここ）
     roomTypes/     ダンジョンの部屋の種類
     terrains/      世界マップの地形
   scenarios/
@@ -98,6 +99,8 @@ src/content/
    - `hpPerLevel` / `attackPerLevel`: レベルごとの伸び方をこの敵だけ変える
    - `phases`: ボスの段階（HPが減ると行動が変わる）
    - `abilities`: 特殊能力（味方と同じ書き方）
+   - `weak` / `resist`: 弱点・耐性の属性ID（例 `weak: ['fire']`）。弱点はダメージ×1.5、耐性はダメージ×0.5で、その属性の状態異常も効かない
+   - 行動のダメージにも属性を付けられます（`{ kind: 'damage', amount: 8, element: 'fire' }`）
 3. 出す場所はダンジョンの `pools` に ID を書きます。
 4. 絵は `src/art/enemies/` にファイルを置き、`export const enemyArt = { 敵ID: 絵 }` と書きます。無ければ仮の絵が出ます。
 
@@ -127,8 +130,23 @@ src/content/
   - `tickDamage`: フェーズ終了時のダメージ。`'stacks'` なら数値分
   - `decay`: 1回で減る数
   - `dealtMultiplier` / `takenMultiplier`: 与える・受けるダメージの倍率
-  - `harmful`: 悪い効果か（万能薬で治る）
+  - `harmful`: 悪い効果か（万能薬で治る）。良い効果（再生など）は `false`
+  - `tickHeal`: フェーズの始めの回復。`'stacks'` なら数値分（再生）
+  - `healMultiplier`: 受ける回復量の倍率（呪い）
+  - `chancePenalty`: 味方のカードの成功率を下げる%（痺れ）
+  - `actionFailChance`: 敵が行動に失敗する確率%（痺れ）
+  - `skipAction`: 敵は次の行動を1回休む（凍結。休んだら1減る）
+  - `manaPenalty`: 味方の次のターンのマナが減る（凍結）
+  - `maxStacks`: 重ねられる上限
 - 説明文は自動で作られます。アイコンは `src/components/ui/icons.tsx` の `STATUS_ICONS` のキーです。
+
+## 属性を足す・変える
+
+- `src/content/common/elements/basic.ts` に1件足します。
+  - `status` / `chance` / `amount`: HPに当たった時に、`chance`%で状態異常 `status` を `amount` 付ける（完全成功なら必ず）。付けない属性は省略
+  - `color` / `icon`: 表示の色とアイコン（`src/components/ui/icons.tsx` の `ELEMENT_ICONS` のキー）
+- カード・敵の行動のダメージに `element: '属性ID'` と書くと、その属性の攻撃になります。説明文（「8の雷属性ダメージ（30%で痺れ1…）」）は自動で作られます。
+- 弱点・耐性の倍率は `src/data/balance.ts` の `elementWeakMul` / `elementResistMul` で変えます。
 
 ## 特殊能力の書き方（職業・装備・カード・敵で共通）
 
@@ -172,7 +190,7 @@ src/content/
 
 | kind | 内容 | 主な数値 | 対象の既定 |
 |---|---|---|---|
-| `damage` | ダメージ | `amount`, `hits` | target |
+| `damage` | ダメージ | `amount`, `hits`, `element` | target |
 | `block` | ブロック | `amount` | self |
 | `heal` | HP回復 | `amount` | target |
 | `applyStatus` | 状態異常を付ける | `status`, `amount` | target |
@@ -220,6 +238,17 @@ src/content/
 | 部屋の種類（敵の強さ・ドロップ・カード報酬の確率・自動生成での出やすさ） | `src/content/common/roomTypes/` |
 | 用語（侵食度・ゴールドなど）・能力値の名前 | `src/data/terms.ts` |
 | 色（レア度・カードの種類・プレイヤー） | `src/data/theme.ts` |
+
+## 難易度を調整する
+
+- `src/content/common/difficulties/basic.ts` の `enemyLevel`（敵のレベル加算）・`enemyHp` / `enemyAttack`（敵の倍率）・`reward`（報酬の倍率）・`lives`（命の灯火）・`corruptionPerTurn`（1巡ごとの侵食度）を変えます。
+- 変えたら、自動プレイでクリア率を確かめます（40回×難易度×人数。数十秒）:
+
+  ```bash
+  SIM=1 npx vitest run balance          # 結果は screenshots/balance.md
+  SIM=1 SIM_SEEDS=20 SIM_PARTY=4人 SIM_DIFF=normal npx vitest run balance   # 回数・人数・難易度をしぼる
+  ```
+- 目安（4人・自動プレイ）: やさしい 約45%・ふつう 約20%・むずかしい 約10%。人が遊ぶと自動プレイより上手なので、もう少し勝てます。
 
 ## 保存データの形を変える時
 

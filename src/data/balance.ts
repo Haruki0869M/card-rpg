@@ -30,7 +30,7 @@ export const BALANCE = {
   /** 冒険: レベル上限・次のレベルまでの経験値（20 + 15×(レベル-1)） */
   maxLevel: 20,
   expBase: 20,
-  expPerLevel: 15,
+  expPerLevel: 25,
   /** 敵のレベルが1上がるごとの経験値・ゴールドの増加率 */
   rewardPerLevel: 0.15,
   /** 成長ボーナスの量 */
