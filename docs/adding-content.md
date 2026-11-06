@@ -23,12 +23,14 @@ src/content/
     encounters/    テスト戦闘の敵の組み合わせ
     statuses/      状態異常
     weaponTypes/   武器の種類
-    difficulties/  難易度
+    difficulties/  難易度（命の灯火の数もここ）
     roomTypes/     ダンジョンの部屋の種類
+    terrains/      世界マップの地形
   scenarios/
     corruptionKing/
-      scenario.ts  シナリオの説明と開始条件
-      enemies/  dungeons/  events/
+      scenario.ts  シナリオの説明・開始条件・物語（冒頭・エンディング・封印の鍵の名前）
+      map.ts       世界マップ（地域・町やダンジョンの位置・侵食度の段階）
+      enemies/  dungeons/  events/  towns/  shrines/  quests/
 ```
 
 ---
@@ -38,6 +40,45 @@ src/content/
 1. `src/content/scenarios/<新しいID>/scenario.ts` を作ります。`corruptionKing/scenario.ts` を写して、`id`・`name`・`synopsis`・`start` を書き換えてください。
 2. 同じフォルダの `enemies/`・`dungeons/`・`events/` に、そのシナリオ専用のデータを置きます。
 3. まだ遊べない場合は `unlocked: false` と `unlockText` を書きます。
+
+## 世界マップを作る・変える（spec §8）
+
+- シナリオのフォルダの `map.ts` に書きます。scenario.ts の `map` に入れると、そのシナリオは世界マップから始まります。`map` が無いシナリオは仮の拠点から始まります。
+- `regions`（地域）: マップの行の範囲、地形の出やすさ、徘徊する敵の基準レベルと組み合わせ、最初に置く敵の数を書きます。宝箱・イベント・祠・ランダムダンジョンの数も書けます。
+- `features`（固定の施設）: 町・ダンジョン・名所を `at: [列, 行]` で置きます（0,0 が左上）。スタートからこれらまでは、自動で道（`roadTerrain`）が引かれます。
+- `corruptionStages`（侵食度の段階）: 何%で何が起きるかを書きます。
+  - `spawn`: 敵を増やす数
+  - `enemyLevel`: 敵のレベルの加算
+  - `raid`: 町への襲撃を始めるか
+- 地形は `src/content/common/terrains/` に書きます。`moveCost` が 0 なら通れません。`background` は、そのマスで戦った時の背景です。
+- 地図の形はシードで決まります。同じシードなら同じ地図です。
+
+## 町・祠・依頼を足す（spec §17・§8.4）
+
+- **町**: シナリオの `towns/` に書き、`map.ts` の `features` に `{ kind: 'town', id, at }` で置きます。書く項目は次のとおりです。
+  - ショップの品揃え（数・格の上限・いつも売っているもの `fixed`）
+  - 宿屋の値段、カード削除の値段
+  - 掲示板の依頼（`quests`）
+- **祠**: シナリオの `shrines/` に書きます。選択肢の結果は、イベントと同じ「冒険の効果」です。永続の加護には `permanent: true` を付けます（1人が持てる数は balance.ts の `maxBlessings`）。祠はランダムに置かれます（地域の `shrines` の数）。
+- **依頼**: シナリオの `quests/` に書きます。`objective`（目標）の種類は次のとおりです。
+
+| 種類 | 内容 |
+|---|---|
+| `defeatWanderers` | 徘徊する敵を○組倒す |
+| `visitLandmark` | 名所を調べる |
+| `clearDungeon` | ダンジョンを制覇する |
+| `deliverItem` | アイテムを届ける |
+
+  新しい目標は `src/engine/game/world/objectives/` にファイルを1つ置けば作れます。報酬はイベントと同じ「冒険の効果」です。
+- **名所**: `map.ts` に `{ kind: 'landmark', id: イベントID }` で置き、`events/` に `where: 'map'` のイベントとして書きます。調べると依頼の `visitLandmark` が進みます。
+- **世界マップのイベント**: `where: 'map'` を付けたイベントは、地図のランダムなマスに置かれます。付けないイベントはダンジョンの部屋で出ます。
+- **ダンジョンと封印の鍵**: ダンジョンに書ける項目は次のとおりです。
+  - `rewardKey`: 制覇で手に入る鍵
+  - `requiresKeys`: 入るのに必要な鍵
+  - `corruptionOnClear`: 制覇で侵食度が下がる量
+  - `finale: true`: 制覇でエンディング
+  
+  鍵の名前は scenario.ts の `story.keys` に書きます。
 
 ## 職業を足す
 
@@ -160,6 +201,7 @@ src/content/
 | 効果の種類 | `src/engine/battle/effects/kinds/` | `export const effect`（`damage.ts` を写す） |
 | 条件の種類 | `src/engine/abilities/conditions/` | `export const condition` |
 | 冒険の効果（イベントの結果など） | `src/engine/game/outcomes/kinds/` | `export const outcome` |
+| 依頼の目標 | `src/engine/game/world/objectives/` | `export const objective` |
 | 部屋の動き | `src/engine/game/rooms/behaviors/` | `export const behavior` |
 | 敵の行動の決め方 | `src/engine/battle/ai/` | `export const ai` |
 | 成長ボーナスの種類 | `src/engine/game/growth/kinds/` | `export const growth`（`balance.ts` の `growthExtras` にも足す） |
@@ -172,6 +214,7 @@ src/content/
 | 変えたいもの | 場所 |
 |---|---|
 | 全体のルール（マナ・手札・確率表・宝箱・演出時間・敵のレベルの伸び） | `src/data/balance.ts` |
+| 世界マップのルール（視界・移動力・時間帯の長さ・侵食度の増え方・野営・夜襲・襲撃・ショップの値段） | `src/data/balance.ts` の「世界マップ」の部分 |
 | 職業・敵・装備・カードの数値 | それぞれのファイル |
 | 難易度 | `src/content/common/difficulties/` |
 | 部屋の種類（敵の強さ・ドロップ・カード報酬の確率・自動生成での出やすさ） | `src/content/common/roomTypes/` |
