@@ -1,6 +1,7 @@
 import { usePress } from '../../hooks/usePress';
 import type { Statuses } from '../../types';
-import { STATUS_STYLE } from './icons';
+import { activeStatuses } from '../../engine';
+import { statusStyle } from './icons';
 
 function Chip({
   status,
@@ -9,14 +10,15 @@ function Chip({
   by,
   onTap,
 }: {
-  status: 'vulnerable' | 'weak' | 'burn' | 'poison' | 'taunt';
+  /** 状態異常のID、または 'taunt'（挑発） */
+  status: string;
   amount: number;
   side: 'ally' | 'enemy';
   by?: string;
   onTap?: () => void;
 }) {
   const press = usePress(onTap, { type: 'status', status, amount, side, by });
-  const st = STATUS_STYLE[status];
+  const st = statusStyle(status);
   return (
     <span
       {...press}
@@ -40,13 +42,13 @@ export function StatusChips({
   onTap?: () => void;
   tauntedBy?: string;
 }) {
-  if (!s.vulnerable && !s.weak && !s.burn && !s.poison && !tauntedBy) return null;
+  const list = activeStatuses(s);
+  if (!list.length && !tauntedBy) return null;
   return (
     <div className="flex flex-wrap justify-center gap-0.5">
-      {s.vulnerable > 0 && <Chip status="vulnerable" amount={s.vulnerable} side={side} onTap={onTap} />}
-      {s.weak > 0 && <Chip status="weak" amount={s.weak} side={side} onTap={onTap} />}
-      {s.poison > 0 && <Chip status="poison" amount={s.poison} side={side} onTap={onTap} />}
-      {s.burn > 0 && <Chip status="burn" amount={s.burn} side={side} onTap={onTap} />}
+      {list.map(({ def, amount }) => (
+        <Chip key={def.id} status={def.id} amount={amount} side={side} onTap={onTap} />
+      ))}
       {tauntedBy && <Chip status="taunt" amount={1} side={side} by={tauntedBy} onTap={onTap} />}
     </div>
   );

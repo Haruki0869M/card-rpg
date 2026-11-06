@@ -1,22 +1,22 @@
+import { STAT_LABEL } from '../data/terms';
 // ===== 長押しで出る詳細（指を離すと閉じる。操作はブロックしない） =====
 import { CharacterArt, EnemyArt } from '../art';
 import { getCard } from '../data/cards';
 import { getItem } from '../data/items';
 import { getClass } from '../data/classes';
 import { getEnemy } from '../data/enemies';
-import { affinityOf, chanceFor, enemyName, findAlly, findEnemy, incomingDamage, statsOf, tierDistribution, toPercents } from '../engine';
+import { affinityOf, chanceFor, describeAbility, enemyName, findAlly, findEnemy, incomingDamage, statsOf, tierDistribution, toPercents } from '../engine';
 import { type Detail, useDetail } from '../hooks/usePress';
 import { useBattle } from '../store/battleStore';
 import type { BattleState, StatId } from '../types';
 import { CATEGORY_LABEL, intentView, longEffect, tierTitle } from './format';
-import { RARITY_STYLE } from './ui/game';
-import { CATEGORY_STYLE, STATUS_STYLE } from './ui/icons';
+import { itemSummary, RARITY_STYLE } from './ui/game';
+import { CATEGORY_STYLE, statusStyle } from './ui/icons';
 
 function signed(n: number) {
   return n > 0 ? `+${n}%` : n < 0 ? `${n}%` : '±0%';
 }
 
-const STAT_LABEL: Record<StatId, string> = { str: '力', vit: '体力', int: '知力', per: '感知', dex: '器用', agi: '素早さ', luk: '運' };
 
 function Title({ children }: { children: React.ReactNode }) {
   return <div className="font-display text-[17px] leading-6 text-amber-100">{children}</div>;
@@ -54,7 +54,7 @@ function Content({ d, battle }: { d: Detail; battle: BattleState }) {
               <span className="font-display" style={{ color: RARITY_STYLE[card.rarity ?? 'epic'].color }}>
                 《{card.trait.name}》
               </span>{' '}
-              {card.trait.description}
+              {describeAbility(card.trait)}
             </div>
           )}
           {focus > 0 && <div className="text-[12px] text-amber-300">★フォーカス{focus}使用時の確率</div>}
@@ -64,7 +64,7 @@ function Content({ d, battle }: { d: Detail; battle: BattleState }) {
                 <tr key={i} className={t.minSuccesses === card.slots ? 'text-amber-300' : ''}>
                   <td className="py-0.5 pr-2 align-top whitespace-nowrap">{tierTitle(card, i)}</td>
                   <td className="py-0.5 pr-2 text-right align-top font-bold tabular-nums">{pcts[i]}%</td>
-                  <td className="py-0.5 align-top">{t.effects.map(longEffect).join('＋')}</td>
+                  <td className="py-0.5 align-top">{t.effects.map((x) => longEffect(x, card)).join('＋')}</td>
                 </tr>
               ))}
             </tbody>
@@ -131,7 +131,7 @@ function Content({ d, battle }: { d: Detail; battle: BattleState }) {
               適性：物理{signed(aff.physical)} 魔法{signed(aff.magic)} スキル{signed(aff.skill)}
             </div>
             <div className="mt-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-[12px]">
-              <span className="font-display text-amber-200">《{cls.battleAbility.name}》</span> {cls.battleAbility.description}
+              <span className="font-display text-amber-200">《{cls.battleAbility.name}》</span> {describeAbility(cls.battleAbility)}
             </div>
             {a.abilities?.map((ab) => (
               <div key={ab.name} className="mt-0.5 rounded bg-fuchsia-500/10 px-1.5 py-0.5 text-[12px]">
@@ -148,20 +148,21 @@ function Content({ d, battle }: { d: Detail; battle: BattleState }) {
       return (
         <>
           <Title>{it.name}</Title>
-          <div className="text-[13px]">{it.description}</div>
+          <div className="text-[13px]">{itemSummary(it)}</div>
+          <div className="text-[12px] text-zinc-400">{it.description}</div>
           {it.ability && (
             <div className="mt-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-[12px]">
               <span className="font-display" style={{ color: RARITY_STYLE[it.rarity].color }}>
                 《{it.ability.name}》
               </span>{' '}
-              {it.ability.description}
+              {describeAbility(it.ability)}
             </div>
           )}
         </>
       );
     }
     case 'status': {
-      const st = STATUS_STYLE[d.status];
+      const st = statusStyle(d.status);
       const by = d.by ? findAlly(battle, d.by) : undefined;
       return (
         <>

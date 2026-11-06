@@ -1,4 +1,6 @@
+import { TERMS } from '../../data/terms';
 // ===== タイトル画面 =====
+import { CLASSES } from '../../data/classes';
 import { motion } from 'framer-motion';
 import { BookOpen, Play, Settings2, UserPlus, Users } from 'lucide-react';
 import { useState } from 'react';
@@ -6,7 +8,13 @@ import { BattleBackground, CharacterArt } from '../../art';
 import { useBattle } from '../../store/battleStore';
 import { HeroFace, Screen } from '../ui/game';
 
-export const GAME_TITLE = 'アルセリアの封印';
+export const GAME_TITLE = TERMS.gameTitle;
+
+/** タイトルに並ぶキャラ（最初から選べる職業を最大4人。中央を少し大きく） */
+const TITLE_LINEUP = CLASSES.all
+  .filter((c) => c.unlocked)
+  .slice(0, 4)
+  .map((c, i, all) => [c.id, i % 2 ? 'female' : 'male', i === Math.floor(all.length / 2) ? 1.12 : i === 0 ? 0.92 : 1] as const);
 
 export function TitleScreen() {
   const game = useBattle((s) => s.game);
@@ -49,18 +57,11 @@ export function TitleScreen() {
           >
             {GAME_TITLE}
           </motion.div>
-          <div className="font-display text-outline mt-1 text-[14px] tracking-[0.3em] text-amber-100/90">― スロット × デッキの冒険譚 ―</div>
+          <div className="font-display text-outline mt-1 text-[14px] tracking-[0.3em] text-amber-100/90">― {TERMS.gameSubtitle} ―</div>
         </div>
         {/* 職業のキャラたち */}
         <div className="absolute inset-x-0 bottom-2 flex items-end justify-center">
-          {(
-            [
-              ['guardian', 'male', 0.92],
-              ['mage', 'female', 1],
-              ['warrior', 'male', 1.12],
-              ['hunter', 'female', 1],
-            ] as const
-          ).map(([c, g, k], i) => (
+          {TITLE_LINEUP.map(([c, g, k], i) => (
             <motion.div
               key={c}
               initial={{ opacity: 0, y: 30 }}

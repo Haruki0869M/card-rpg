@@ -1,11 +1,7 @@
+// 職業の登録表。src/content の classes フォルダ に職業のファイルを置くだけで登場する
 import type { ClassDef } from '../../types';
-import { createRegistry } from '../registry';
-import { guardian } from './guardian';
-import { hunter } from './hunter';
-import { mage } from './mage';
-import { warrior } from './warrior';
+import { contentRegistry, type ContentModules } from '../content';
 
-/** 職業の登録表。職業を増やすときはファイルを追加してここに並べるだけでよい */
-export const CLASSES = createRegistry<ClassDef>('class', [warrior, mage, guardian, hunter]);
+export const CLASSES = contentRegistry<ClassDef>('class', import.meta.glob('/src/content/**/classes/*.ts', { eager: true }) as ContentModules);
 
 export const getClass = (id: string) => CLASSES.get(id);

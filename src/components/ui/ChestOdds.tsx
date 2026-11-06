@@ -1,9 +1,10 @@
+import { CHEST_NAME } from '../../data/terms';
 // ===== 宝箱の中身の格の確率（4色の帯グラフ）。spec §10.2 =====
 import type { Rarity } from '../../types';
 import { RARITY_STYLE } from './game';
 
 export const GRADES: Rarity[] = ['common', 'rare', 'epic', 'legend'];
-export const CHEST_NAME: Record<Rarity, string> = { common: '木箱', rare: '鉄箱', epic: '装飾箱', legend: '黄金箱' };
+export { CHEST_NAME };
 
 /** 確率の表示（小さい値ほど細かく: 0.2% / 6.4% / 38%） */
 export function fmtPct(v: number): string {

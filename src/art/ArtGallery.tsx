@@ -2,11 +2,11 @@
 import '@fontsource/zen-antique/400.css';
 import { CLASSES } from '../data/classes';
 import { ENEMIES } from '../data/enemies';
+import { RARITY_NAME } from '../data/terms';
 import type { Rarity } from '../types';
 import { BattleBackground, CharacterArt, ChestImage, EnemyArt, ItemImage } from './index';
 
 const RARITIES: Rarity[] = ['common', 'rare', 'epic', 'legend'];
-const RARITY_NAME = { common: 'コモン', rare: 'レア', epic: 'エピック', legend: 'レジェンド' };
 const ICONS = ['sword', 'staff', 'hammer', 'bow', 'armor', 'robe', 'ring', 'amulet', 'charm', 'crest', 'boots', 'potion', 'ether', 'antidote', 'smoke'];
 
 function H({ children }: { children: React.ReactNode }) {

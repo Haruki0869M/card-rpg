@@ -1,3 +1,5 @@
+import { RARITY_NAME, STAT_LABEL } from '../../data/terms';
+import { RARITY_COLOR } from '../../data/theme';
 // ===== 冒険の画面で共通に使う部品 =====
 import {
   CloudFog,
@@ -21,17 +23,15 @@ import type { ReactNode } from 'react';
 import { CharacterArt, ItemImage } from '../../art';
 import { getClass } from '../../data/classes';
 import { getItem } from '../../data/items';
-import { expToNext, heroFocusMax, heroMaxHp } from '../../engine';
+import { describeAbility, describeEffect, expToNext, heroFocusMax, heroMaxHp } from '../../engine';
 import type { Hero, ItemDef, Rarity, StatId } from '../../types';
 
-export const RARITY_STYLE: Record<Rarity, { name: string; color: string; glow: string; bg: string }> = {
-  common: { name: 'コモン', color: '#d8dce6', glow: 'rgba(220,225,235,.35)', bg: 'linear-gradient(160deg,#3a3d46,#1c1d22)' },
-  rare: { name: 'レア', color: '#5ab0ff', glow: 'rgba(80,170,255,.55)', bg: 'linear-gradient(160deg,#173a66,#0b1830)' },
-  epic: { name: 'エピック', color: '#c58bff', glow: 'rgba(190,120,255,.6)', bg: 'linear-gradient(160deg,#3d1c66,#170a2c)' },
-  legend: { name: 'レジェンド', color: '#ffcf4a', glow: 'rgba(255,200,70,.7)', bg: 'linear-gradient(160deg,#5a3a08,#22140a)' },
-};
+/** レア度の見た目（名前は terms.ts、色は theme.ts） */
+export const RARITY_STYLE: Record<Rarity, { name: string; color: string; glow: string; bg: string }> = Object.fromEntries(
+  (Object.keys(RARITY_COLOR) as Rarity[]).map((r) => [r, { name: RARITY_NAME[r], ...RARITY_COLOR[r] }]),
+) as Record<Rarity, { name: string; color: string; glow: string; bg: string }>;
 
-export const STAT_LABEL: Record<StatId, string> = { str: '力', vit: '体力', int: '知力', per: '感知', dex: '器用', agi: '素早さ', luk: '運' };
+export { STAT_LABEL };
 
 const ITEM_ICON: Record<string, LucideIcon> = {
   sword: Sword,
@@ -79,8 +79,8 @@ export function itemSummary(item: ItemDef): string {
   if (item.startBlock) parts.push(`開始時ブロック${item.startBlock}`);
   if (item.extraDraw) parts.push(`毎ターン+${item.extraDraw}枚`);
   for (const c of item.cards ?? []) parts.push(`カード追加×${c.count}`);
-  if (item.use) parts.push(item.description);
-  if (item.ability) parts.unshift(`《${item.ability.name}》${item.ability.description}`);
+  for (const e of item.use ?? []) parts.push(describeEffect(e).replace('対象', '味方1人'));
+  if (item.ability) parts.unshift(`《${item.ability.name}》${describeAbility(item.ability)}`);
   return parts.join('・') || item.description;
 }
 

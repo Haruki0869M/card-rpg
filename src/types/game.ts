@@ -1,6 +1,6 @@
 // ===== 冒険（ゲーム全体）の型 =====
 import type {
-  BattleAbility,
+  AbilityDef,
   BattleState,
   CardInstance,
   Command,
@@ -38,7 +38,7 @@ export interface ItemDef {
   /** 消費アイテムの効果 */
   use?: ConsumableEffect;
   /** 装備の特殊能力（エピック以上は必ず持つ。spec §12.7） */
-  ability?: { name: string; description: string; effect: BattleAbility };
+  ability?: AbilityDef;
 }
 
 export interface ItemInstance {
@@ -71,7 +71,38 @@ export interface Hero {
 
 // ---------- ダンジョン ----------
 
-export type RoomType = 'battle' | 'elite' | 'event' | 'rest' | 'chest' | 'boss';
+/** 部屋の種類のID（src/content の roomTypes に登録したもの） */
+export type RoomType = string;
+
+/** 部屋の種類（spec §9）。動き（behavior）は src/engine/game/rooms/ の部品、数値と見た目はこのデータ */
+export interface RoomTypeDef {
+  id: string;
+  order?: number;
+  name: string;
+  /** 見た目（画面側の ROOM_ICONS のキー）と色 */
+  icon: string;
+  color: string;
+  bg: string;
+  /** 部屋に入った時の動き（battle / chest / event / rest） */
+  behavior: string;
+  /** 戦闘の部屋の設定 */
+  battle?: {
+    /** ダンジョンの敵の組み合わせのどれを使うか */
+    pool: 'battle' | 'elite' | 'boss';
+    /** 敵のレベルの加算 */
+    levelBonus: number;
+    /** カード報酬の確率（balance.ts の cardRewardOdds のキー） */
+    cardOdds: string;
+    /** ボス（倒すと大宝箱 → ダンジョン制覇。逃げられない。隠し宝箱は出ない） */
+    boss?: boolean;
+    /** 勝った時に装備を落とす（epicChance% でエピック、それ以外はレア） */
+    equipmentDrop?: { epicChance: number };
+    /** 勝った時に chance% でコモンの消費アイテムを落とす */
+    consumableDrop?: { chance: number };
+  };
+  /** ランダムダンジョンの途中の行での出やすさ（0なら自動生成では出ない） */
+  layoutWeight?: number;
+}
 
 export interface ChestSpec {
   /** 宝箱の見た目（common=木箱 / rare=鉄箱 / epic=装飾箱 / legend=黄金箱）。中身の格の確率を決める */
@@ -108,6 +139,8 @@ export interface DungeonDef {
   layout?: { type: RoomType; next: number[]; chest?: ChestSpec; eventId?: string }[][];
   /** 大宝箱の見た目（中身の格の確率を決める） */
   bossChest: Rarity;
+  /** ランダムダンジョン（拠点に戻るたびに形が変わる。layout は使わず自動生成） */
+  random?: boolean;
   /** 自動生成の時の部屋の行数 */
   rows?: number;
 }
@@ -170,17 +203,13 @@ export interface EventCheck {
   tag?: string;
 }
 
-export type EventOutcome =
-  | { kind: 'heal'; amount: number; all?: boolean }
-  | { kind: 'damage'; amount: number; all?: boolean }
-  | { kind: 'gold'; amount: number }
-  | { kind: 'loseGold'; amount: number }
-  | { kind: 'item'; rarity: Rarity; slot?: 'equipment' | 'consumable' }
-  | { kind: 'exp'; amount: number }
-  | { kind: 'focus'; amount: number; all?: boolean }
-  | { kind: 'status'; status: 'weak' | 'vulnerable' | 'poison' | 'burn'; amount: number }
-  | { kind: 'card' }
-  | { kind: 'nothing' };
+/**
+ * 冒険の効果の種類ごとの数値。冒険の効果のファイル（src/engine/game/outcomes/kinds/）が declare module で種類を足す
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface OutcomeParams {}
+/** イベントの結果・戦闘の外で使うアイテムなど（例: { kind: 'heal', amount: 25, all: true }） */
+export type EventOutcome = { [K in keyof OutcomeParams]: { kind: K } & OutcomeParams[K] }[keyof OutcomeParams];
 
 export interface EventOption {
   label: string;
@@ -211,7 +240,8 @@ export interface EventState {
 }
 
 export interface GrowthOption {
-  kind: 'stat' | 'maxHp' | 'focusMax' | 'upgradeCard';
+  /** 成長ボーナスの種類（src/engine/game/growth/kinds の種類） */
+  kind: string;
   stat?: StatId;
   amount: number;
 }
@@ -277,7 +307,22 @@ export interface GameState {
   nextLogId: number;
 }
 
-export type Difficulty = 'easy' | 'normal' | 'hard';
+/** 難易度のID（src/content の difficulties に登録したもの） */
+export type Difficulty = string;
+
+export interface DifficultyDef {
+  id: string;
+  order?: number;
+  name: string;
+  /** 敵のレベルの加算 */
+  enemyLevel: number;
+  /** 敵のHP・攻撃、戦闘の報酬（経験値・ゴールド）の倍率（省略は1） */
+  enemyHp?: number;
+  enemyAttack?: number;
+  reward?: number;
+  /** 説明文（省略すると数値から自動で作る） */
+  description?: string;
+}
 
 export interface NewGameSetup {
   seed: number;
@@ -311,4 +356,27 @@ export interface GameResult {
   /** 戦闘中なら戦闘のイベント（演出用） */
   battleEvents: import('./index').BattleEvent[];
   error?: string;
+}
+
+// ---------- シナリオ ----------
+
+export interface ScenarioDef {
+  id: string;
+  /** 一覧での並び順（小さいほど先） */
+  order?: number;
+  name: string;
+  synopsis: string;
+  recommended: string;
+  playTime: string;
+  unlocked: boolean;
+  /** 解放条件の説明（未解放の時に表示） */
+  unlockText?: string;
+  /** 冒険の開始条件 */
+  start: {
+    gold?: number;
+    /** 最初の消費アイテム */
+    pouch?: { itemId: string; count: number }[];
+    /** 最初の持ち物（装備品） */
+    stash?: { itemId: string; count: number }[];
+  };
 }

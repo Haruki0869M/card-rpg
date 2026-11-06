@@ -83,3 +83,6 @@ export const TempleBackground = memo(function TempleBackground({ className }: { 
     </svg>
   );
 });
+
+/** 背景のID（ダンジョンの background で指定する。ファイルを置くだけで自動で登録される） */
+export const background = { temple: TempleBackground };

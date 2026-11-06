@@ -1,8 +1,8 @@
-import { BALANCE } from '../../data/balance';
 import type { Statuses } from '../../types';
+import { dealtMultiplier, takenMultiplier } from './statuses';
 
 /**
- * ダメージ計算: 基礎値 × 攻撃側の倍率（特殊能力・レベル）→ 攻撃側の弱体 → 防御側の脆弱 → 端数切り捨て
+ * ダメージ計算: 基礎値 × 攻撃側の倍率（特殊能力・レベル）× 攻撃側の状態異常（弱体など）× 防御側の状態異常（脆弱など）→ 端数切り捨て
  * （ブロック吸収前の値）。切り捨ては最後に1回だけ行う。
  */
 export function calcDamage(
@@ -12,8 +12,8 @@ export function calcDamage(
   attackerMultiplier = 1,
 ): number {
   let v = base * attackerMultiplier;
-  if (attacker && attacker.weak > 0) v *= BALANCE.weakMultiplier;
-  if (defender && defender.vulnerable > 0) v *= BALANCE.vulnerableMultiplier;
+  v *= dealtMultiplier(attacker);
+  v *= takenMultiplier(defender);
   // 浮動小数の誤差（例: 11.999999）で1減らないように微小値を足す
   return Math.max(0, Math.floor(v + 1e-9));
 }

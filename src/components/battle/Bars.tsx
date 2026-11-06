@@ -1,3 +1,4 @@
+import { TERMS } from '../../data/terms';
 // ===== 上部バー・下部バー =====
 import { AnimatePresence, motion } from 'framer-motion';
 import { Backpack, Layers, Menu, Skull, Trash2 } from 'lucide-react';
@@ -21,7 +22,7 @@ export function TopBar() {
         <Skull size={16} className="shrink-0 text-fuchsia-300" />
         <div className="min-w-0 flex-1">
           <div className="flex justify-between text-[12px] leading-[13px]">
-            <span className="font-display text-fuchsia-200">侵食度</span>
+            <span className="font-display text-fuchsia-200">{TERMS.corruption}</span>
             <span className="font-bold text-fuchsia-200 tabular-nums">{corruption}%</span>
           </div>
           <div className="mt-0.5 h-[7px] overflow-hidden rounded-full border border-fuchsia-900 bg-black/70">

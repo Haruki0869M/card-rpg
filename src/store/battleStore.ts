@@ -6,13 +6,16 @@ import { create } from 'zustand';
 import { TIMING, VIBRATION } from '../data/balance';
 import { cardOf } from '../data/cards';
 import { CLASSES } from '../data/classes';
+import { contentVersion } from '../data/contentVersion';
 import { ENCOUNTERS } from '../data/enemies';
+import { SCENARIOS } from '../data/scenarios';
 import {
   applyGameCommand,
   createBattle,
   createGame,
   findAlly,
   GAME_VERSION,
+  migrateGame,
   isDone,
   makeSeed,
   unusableReason,
@@ -110,6 +113,8 @@ const SETTINGS_KEY = 'card-rpg/settings';
 
 interface SaveData {
   version: number;
+  /** 保存した時のコンテンツの版（参考。違っても、読めるなら読み込む） */
+  content?: string;
   game: GameState;
   activeId: string;
 }
@@ -119,8 +124,10 @@ function loadSave(): SaveData | null {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw) as SaveData;
-    if (data.version !== GAME_VERSION || data.game?.version !== GAME_VERSION) return null;
-    return data;
+    // 古い版は直してから読む（直せない・今のデータで読めない時は読まない）
+    const game = migrateGame(data.game);
+    if (!game) return null;
+    return { ...data, version: GAME_VERSION, game };
   } catch {
     return null;
   }
@@ -139,7 +146,7 @@ function loadSettings(): Settings {
 function writeSave(s: Pick<StoreState, 'game' | 'activeId'>) {
   try {
     if (!s.game) localStorage.removeItem(SAVE_KEY);
-    else localStorage.setItem(SAVE_KEY, JSON.stringify({ version: GAME_VERSION, game: s.game, activeId: s.activeId } satisfies SaveData));
+    else localStorage.setItem(SAVE_KEY, JSON.stringify({ version: GAME_VERSION, content: contentVersion(), game: s.game, activeId: s.activeId } satisfies SaveData));
   } catch {
     // 保存できなくても普通に遊べる
   }
@@ -217,14 +224,16 @@ const EMPTY_BATTLE: BattleState = (() => {
   return { ...b, phase: 'victory' };
 })();
 
-const defaultDraft = (): NewGameDraft => ({
-  scenarioId: 'corruptionKing',
-  difficulty: 'normal',
-  party: [
-    { classId: 'warrior', gender: 'male', name: autoName('warrior', 'male', 0) },
-    { classId: 'mage', gender: 'female', name: autoName('mage', 'female', 1) },
-  ],
-});
+/** 冒険の準備の初期値（最初から遊べる先頭のシナリオ・先頭の職業2つ） */
+const defaultDraft = (): NewGameDraft => {
+  const classes = CLASSES.all.filter((c) => c.unlocked);
+  const party = [0, 1].map((i) => {
+    const c = classes[i % classes.length];
+    const gender = i % 2 ? 'female' : 'male';
+    return { classId: c.id, gender, name: autoName(c.id, gender, i) } as const;
+  });
+  return { scenarioId: SCENARIOS.all.find((s) => s.unlocked)!.id, difficulty: 'normal', party: [...party] };
+};
 
 const saved = loadSave();
 

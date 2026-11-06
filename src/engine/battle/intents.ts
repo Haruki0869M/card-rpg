@@ -1,8 +1,11 @@
-import { BALANCE } from '../../data/balance';
 import { getEnemy, getEnemyAction } from '../../data/enemies';
 import type { AllyState, BattleEvent, BattleState, EnemyActionDef, EnemyState } from '../../types';
 import type { Rng } from '../rng';
+import type { EnemyAiHandler } from './ai/types';
+import { damageModifiers } from '../abilities';
 import { calcDamage } from './damage';
+import { targetOf } from './effects';
+import { tickDamageOf } from './statuses';
 
 export function livingAllies(state: BattleState): AllyState[] {
   return state.allies.filter((a) => !a.dead);
@@ -14,12 +17,12 @@ export function livingEnemies(state: BattleState): EnemyState[] {
 
 /** 単体攻撃を含む行動か（挑発の対象になる） */
 export function isSingleAttack(action: EnemyActionDef): boolean {
-  return action.effects.some((e) => e.kind === 'attack' && e.target === 'single');
+  return action.effects.some((e) => e.kind === 'damage' && targetOf(e) === 'target');
 }
 
-/** 単体対象（攻撃・デバフ）を含む行動か */
+/** 対象（味方1人）を選ぶ効果を含む行動か */
 export function needsTarget(action: EnemyActionDef): boolean {
-  return action.effects.some((e) => (e.kind === 'attack' || e.kind === 'debuff') && e.target === 'single');
+  return action.effects.some((e) => targetOf(e) === 'target');
 }
 
 function pickRandomAlly(state: BattleState, rng: Rng): string | undefined {
@@ -28,7 +31,6 @@ function pickRandomAlly(state: BattleState, rng: Rng): string | undefined {
   return alive[rng.int(alive.length)].id;
 }
 
-/** 次の行動を選ぶ（ルール: 順番 / ランダム・連続制限 / 1ターン目固定 / 単独時の代替） */
 /** 今の段階の行動の一覧と選び方 */
 export function currentActionSet(enemy: EnemyState) {
   const def = getEnemy(enemy.defId);
@@ -37,31 +39,22 @@ export function currentActionSet(enemy: EnemyState) {
   return { actions: def.actions, pattern: def.pattern, maxConsecutive: def.maxConsecutive, firstActionId: def.firstActionId };
 }
 
+const AIS = new Map<string, EnemyAiHandler>();
+for (const [path, mod] of Object.entries(import.meta.glob('./ai/*.ts', { eager: true }) as Record<string, { ai?: EnemyAiHandler }>)) {
+  if (!mod.ai) continue; // types.ts
+  if (AIS.has(mod.ai.id)) throw new Error(`Duplicate enemy ai: ${mod.ai.id} (${path})`);
+  AIS.set(mod.ai.id, mod.ai);
+}
+export const hasEnemyAi = (id: string) => AIS.has(id);
+
+/** 次の行動を選ぶ（選び方は敵のデータの pattern。ai/ のファイルで増やせる） */
 export function chooseAction(enemy: EnemyState, state: BattleState, rng: Rng): EnemyActionDef {
-  const def = { id: enemy.defId, ...currentActionSet(enemy) };
+  const set = currentActionSet(enemy);
   const alone = !state.enemies.some((e) => !e.dead && e.uid !== enemy.uid);
-  const resolve = (a: EnemyActionDef) =>
-    alone && a.fallbackIfAloneId ? getEnemyAction(def.id, a.fallbackIfAloneId) : a;
-
-  if (def.pattern === 'sequence') {
-    const a = def.actions[enemy.seqIndex % def.actions.length];
-    enemy.seqIndex = (enemy.seqIndex + 1) % def.actions.length;
-    return resolve(a);
-  }
-
-  if (enemy.history.length === 0 && enemy.phase === 0 && def.firstActionId) {
-    return resolve(getEnemyAction(def.id, def.firstActionId));
-  }
-
-  // 単独時の代替を反映した上で、連続制限を満たす候補から選ぶ
-  const max = def.maxConsecutive ?? Infinity;
-  const recent = enemy.history.slice(-max);
-  const blocked = recent.length >= max && recent.every((id) => id === recent[0]) ? recent[0] : undefined;
-  const resolved = def.actions.map(resolve);
-  const unique = resolved.filter((a, i) => resolved.findIndex((b) => b.id === a.id) === i);
-  let candidates = unique.filter((a) => a.id !== blocked);
-  if (candidates.length === 0) candidates = unique;
-  return candidates[rng.int(candidates.length)];
+  const resolve = (a: EnemyActionDef) => (alone && a.fallbackIfAloneId ? getEnemyAction(enemy.defId, a.fallbackIfAloneId) : a);
+  const handler = AIS.get(set.pattern);
+  if (!handler) throw new Error(`Unknown enemy ai: ${set.pattern}`);
+  return handler.choose(enemy, state, rng, set, resolve);
 }
 
 /** インテントを決定する（対象もこの時点でランダムに決めて表示する） */
@@ -101,9 +94,9 @@ export function retargetAfterDeath(state: BattleState, deadAllyId: string, rng: 
   }
 }
 
-/** 敵の攻撃1回あたりのダメージ（レベル補正・弱体・脆弱を反映。ブロック考慮前） */
+/** 敵の攻撃1回あたりのダメージ（レベル補正・特殊能力・状態異常を反映。ブロック考慮前） */
 export function enemyHitDamage(enemy: EnemyState, base: number, target: AllyState | undefined): number {
-  return calcDamage(base, enemy.statuses, target?.statuses, enemy.attackMul);
+  return calcDamage(base, enemy.statuses, target?.statuses, damageModifiers(undefined, enemy, undefined, target).multiplier);
 }
 
 /** 敵の行動が ally に与える予定ダメージ（1回あたりの値の配列。ブロック考慮前） */
@@ -112,17 +105,18 @@ export function intentHitsOn(enemy: EnemyState, ally: AllyState): number[] {
   const action = getEnemyAction(enemy.defId, enemy.intent.actionId);
   const hits: number[] = [];
   for (const eff of action.effects) {
-    if (eff.kind !== 'attack') continue;
-    if (eff.target === 'single' && enemy.intent.targetId !== ally.id) continue;
+    if (eff.kind !== 'damage') continue;
+    const to = targetOf(eff);
+    if (to === 'target' ? enemy.intent.targetId !== ally.id : to !== 'foes') continue;
     const dmg = enemyHitDamage(enemy, eff.amount, ally);
-    for (let i = 0; i < eff.hits; i++) hits.push(dmg);
+    for (let i = 0; i < (eff.hits ?? 1); i++) hits.push(dmg);
   }
   return hits;
 }
 
-/** 毒・火傷で次に受けるダメージ（ブロック無視） */
+/** 継続ダメージの状態異常（毒・火傷など）で次に受けるダメージ（ブロック無視） */
 export function dotDamage(ally: AllyState): number {
-  return ally.statuses.poison + (ally.statuses.burn > 0 ? BALANCE.burnDamage : 0);
+  return tickDamageOf(ally.statuses);
 }
 
 /** 被弾予定（インテント合計 − 現在のブロック ＋ 毒・火傷）。かばう（確率）は含めない */

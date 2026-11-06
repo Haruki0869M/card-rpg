@@ -92,12 +92,7 @@ describe('拡張性: データを1件足すだけで戦闘に登場する', () =
       id: 'testPaladin',
       name: '聖騎士',
       stats: { str: 66, vit: 70, int: 50, per: 50, dex: 64, agi: 40, luk: 50 },
-      battleAbility: {
-        id: 'holy',
-        name: '聖なる怒り',
-        description: 'test',
-        effect: { kind: 'damageMultiplier', multiplier: 2 },
-      },
+      battleAbility: { name: '聖なる怒り', effect: { modifier: 'damageDealt', multiplier: 2 } },
     };
     const golem: EnemyDef = {
       id: 'testGolem',
@@ -108,7 +103,7 @@ describe('拡張性: データを1件足すだけで戦闘に登場する', () =
       exp: 1,
       gold: 1,
       pattern: 'sequence',
-      actions: [{ id: 'punch', name: '殴る', effects: [{ kind: 'attack', amount: 3, hits: 1, target: 'all' }] }],
+      actions: [{ id: 'punch', name: '殴る', effects: [{ kind: 'damage', amount: 3, to: 'foes' }] }],
     };
     CLASSES.register(paladin);
     ENEMIES.register(golem);

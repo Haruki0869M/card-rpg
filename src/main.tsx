@@ -4,9 +4,11 @@ import { lazy, Suspense } from 'react';
 import App from './App';
 import { prepareArt } from './art';
 
-// 確認用: URL の末尾が #art ならアートの一覧を表示する
+// 確認用: URL の末尾が #art ならアートの一覧、#data ならデータの一覧を表示する
 const ArtGallery = lazy(() => import('./art/ArtGallery'));
+const DataCatalog = lazy(() => import('./components/DataCatalog'));
 const showArt = location.hash === '#art';
+const showData = location.hash === '#data';
 import '@fontsource/zen-antique/400.css';
 import './index.css';
 
@@ -15,10 +17,8 @@ prepareArt();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {showArt ? (
-      <Suspense fallback={null}>
-        <ArtGallery />
-      </Suspense>
+    {showArt || showData ? (
+      <Suspense fallback={null}>{showArt ? <ArtGallery /> : <DataCatalog />}</Suspense>
     ) : (
       <App />
     )}

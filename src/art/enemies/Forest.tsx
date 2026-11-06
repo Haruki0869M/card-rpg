@@ -278,3 +278,6 @@ export const TreantKing = memo(function TreantKing({ className, phase = 0 }: { c
     </Svg>
   );
 });
+
+/** この絵を使う敵のID（ファイルを置くだけで自動で登録される） */
+export const enemyArt = { forestWolf: ForestWolf, toxicShroom: ToxicShroom, treeWarden: TreeWarden, treantKing: TreantKing };

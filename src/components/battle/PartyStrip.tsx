@@ -1,3 +1,4 @@
+import { PLAYER_COLOR } from '../../data/theme';
 // ===== 味方のステータス枠（顔・HP・マナ・フォーカス・被弾予定・担当プレイヤー） =====
 import { Droplet, Star } from 'lucide-react';
 import { memo } from 'react';
@@ -7,11 +8,11 @@ import { incomingDamage, isDone, usableCardCount } from '../../engine';
 import { usePress } from '../../hooks/usePress';
 import { LOCAL_PLAYER } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
-import type { AllyState, PlayerId } from '../../types';
+import type { AllyState } from '../../types';
 import { HpBar } from '../ui/HpBar';
 import { StatusChips } from '../ui/StatusChips';
 
-export const PLAYER_COLOR: Record<PlayerId, string> = { P1: '#4a8cff', P2: '#ff5a5a', P3: '#46d27a', P4: '#ffd04a' };
+export { PLAYER_COLOR };
 
 const AllyCard = memo(function AllyCard({ ally }: { ally: AllyState }) {
   const battle = useBattle((s) => s.battle);

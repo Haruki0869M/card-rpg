@@ -1,9 +1,13 @@
+import { CATEGORY_LABEL } from '../data/terms';
+import { getStatus } from '../data/statuses';
+import { activeStatuses } from '../engine';
 import { getEnemyAction } from '../data/enemies';
-import { enemyHitDamage, findAlly } from '../engine';
+import { describeEffect, enemyHitDamage, findAlly, targetOf } from '../engine';
 import type { BattleState, CardDef, CardEffect, EnemyState, StatusId } from '../types';
 
-export const CATEGORY_LABEL = { physical: '物理', magic: '魔法', skill: 'スキル' } as const;
-export const STATUS_LABEL = { vulnerable: '脆弱', weak: '弱体', burn: '火傷', poison: '毒' } as const;
+export { CATEGORY_LABEL };
+/** 状態異常の名前 */
+export const STATUS_LABEL = (id: string) => getStatus(id).name;
 
 /** Tierがカバーする成功数の範囲表記（例: "0-1", "2"） */
 export function tierRange(card: CardDef, i: number): string {
@@ -18,37 +22,16 @@ export function tierTitle(card: CardDef, i: number): string {
   return `${tierRange(card, i).replace('-', '〜')}成功`;
 }
 
-/** 詳細表示用の全文 */
-export function longEffect(e: CardEffect): string {
-  switch (e.kind) {
-    case 'damage':
-      return `${e.amount}ダメージ`;
-    case 'block':
-      return `ブロック${e.amount}獲得`;
-    case 'applyStatus':
-      return `敵に「${STATUS_LABEL[e.status]}」${e.amount}付与`;
-    case 'gainMana':
-      return `マナ${e.amount}回復`;
-    case 'gainFocus':
-      return `フォーカス${e.amount}回復`;
-    case 'draw':
-      return `カードを${e.amount}枚引く`;
-    case 'tauntTarget':
-      return '対象の敵の単体攻撃を自分に向ける';
-    case 'tauntAll':
-      return '敵全体の単体攻撃を自分に向ける';
-    case 'blockAllies':
-      return `味方全員にブロック${e.amount}`;
-    case 'healAllies':
-      return `味方全員のHPを${e.amount}回復`;
-  }
-}
+/** 詳細表示用の全文（効果の部品の説明文。全体カードなら「敵全員に」） */
+export const longEffect = (e: CardEffect, card?: CardDef): string => describeEffect(e, 'ally', card);
 
 export type IntentPart =
   | { kind: 'attack'; damage: number; hits: number; targetId?: string }
   | { kind: 'attackAll'; damage: number; hits: number }
   | { kind: 'block'; amount: number; others: boolean }
-  | { kind: 'debuff'; status: StatusId; amount: number; targetId?: string; all: boolean };
+  | { kind: 'debuff'; status: StatusId; amount: number; targetId?: string; all: boolean }
+  /** その他の効果（効果の種類のアイコン＋短い数値） */
+  | { kind: 'other'; effect: CardEffect };
 
 export interface IntentView {
   parts: IntentPart[];
@@ -65,28 +48,34 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
   const parts: IntentPart[] = [];
   const details: string[] = [];
   for (const eff of action.effects) {
-    if (eff.kind === 'attack') {
-      if (eff.target === 'single') {
+    const to = targetOf(eff);
+    if (eff.kind === 'damage') {
+      const hits = eff.hits ?? 1;
+      if (to === 'target') {
         const dmg = enemyHitDamage(enemy, eff.amount, target);
-        parts.push({ kind: 'attack', damage: dmg, hits: eff.hits, targetId: target?.id });
-        details.push(`${targetName}に${dmg}ダメージ${eff.hits > 1 ? `×${eff.hits}回` : ''}`);
+        parts.push({ kind: 'attack', damage: dmg, hits, targetId: target?.id });
+        details.push(`${targetName}に${dmg}ダメージ${hits > 1 ? `×${hits}回` : ''}`);
       } else {
         const dmg = enemyHitDamage(enemy, eff.amount, undefined);
-        parts.push({ kind: 'attackAll', damage: dmg, hits: eff.hits });
-        details.push(`味方全員に${dmg}ダメージ${eff.hits > 1 ? `×${eff.hits}回` : ''}（脆弱の味方には×1.5）`);
+        parts.push({ kind: 'attackAll', damage: dmg, hits });
+        details.push(`味方全員に${dmg}ダメージ${hits > 1 ? `×${hits}回` : ''}（状態異常で増減あり）`);
       }
-    } else if (eff.kind === 'block') {
-      parts.push({ kind: 'block', amount: eff.amount, others: eff.target !== 'self' });
-      details.push(eff.target === 'self' ? `自分にブロック${eff.amount}` : `自分以外の敵全員にブロック${eff.amount}`);
-    } else if (eff.kind === 'debuff') {
-      const all = eff.target === 'all';
+    } else if (eff.kind === 'block' && (to === 'self' || to === 'otherAllies' || to === 'allies')) {
+      parts.push({ kind: 'block', amount: eff.amount, others: to !== 'self' });
+      details.push(describeEffect(eff, 'enemy'));
+    } else if (eff.kind === 'applyStatus' && (to === 'target' || to === 'foes')) {
+      const all = to === 'foes';
       parts.push({ kind: 'debuff', status: eff.status, amount: eff.amount, targetId: all ? undefined : target?.id, all });
-      details.push(`${all ? '味方全員' : targetName}に「${STATUS_LABEL[eff.status]}」${eff.amount}`);
+      details.push(`${all ? '味方全員' : targetName}に「${STATUS_LABEL(eff.status)}」${eff.amount}`);
+    } else {
+      parts.push({ kind: 'other', effect: eff });
+      details.push(describeEffect(eff, 'enemy').replace('対象に', `${targetName}に`));
     }
   }
-  if (action.effects.some((e) => e.kind === 'attack')) {
+  if (action.effects.some((e) => e.kind === 'damage')) {
     if (enemy.attackMul !== 1) details.push(`（Lv${enemy.level}の攻撃力補正 ×${enemy.attackMul.toFixed(2)} 反映済み）`);
-    if (enemy.statuses.weak > 0) details.push('（弱体によりダメージ×0.75 反映済み）');
+    for (const { def } of activeStatuses(enemy.statuses))
+      if (def.dealtMultiplier !== undefined) details.push(`（${def.name}によりダメージ×${def.dealtMultiplier} 反映済み）`);
   }
   return { parts, name: action.name, details };
 }
