@@ -4,7 +4,7 @@ export const FIREBASE_CONFIG = {
   apiKey: 'AIzaSyBOnG0IOLACzhY-reWJ8B62ynVbWGRG51c',
   authDomain: 'card-rpg-1aa60.firebaseapp.com',
   // Realtime Database のアドレス（コンソールの Realtime Database の画面の上に出ている）
-  databaseURL: '',
+  databaseURL: 'https://card-rpg-1aa60-default-rtdb.asia-southeast1.firebasedatabase.app',
   projectId: 'card-rpg-1aa60',
   storageBucket: 'card-rpg-1aa60.firebasestorage.app',
   messagingSenderId: '261305671905',
