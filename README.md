@@ -69,7 +69,7 @@ scripts/       アイコン生成・アート一覧の撮影・レイアウト�
 - Firebase の設定値は `src/net/firebaseConfig.ts`、セキュリティルールは `database.rules.json`（Firebase のコンソールの Realtime Database →「ルール」に貼る）。
 - 手元の練習用サーバー（エミュレーター）: `npm i -g firebase-tools` のあと `npm run emulators`。URL に `?emu=1` を付けると、そちらにつながる（本番のデータには触らない）。
 - テスト: `npm test`（テスト用の通信で3台をまねる）、`EMU=1 npx vitest run firebase`（エミュレーターで、本物の Firebase の部品とルール）。
-- 画面での確認: `node scripts/online.mjs`（3つのブラウザで部屋を作って参加し、自動プレイ・切断・ホストの引き継ぎで全員の状態が一致するか）。
+- 画面での確認: `node scripts/online.mjs`（3つのブラウザで部屋を作って参加し、自動プレイ・切断・ホストの引き継ぎで全員の状態が一致するか）。`REAL=1` を付けると本物の Firebase で確かめる（URL の `?debug=1` で確認用の部品を読み込む）。
 
 ### 画面の確認スクリプト（任意）
 

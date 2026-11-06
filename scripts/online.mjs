@@ -3,9 +3,11 @@
 // 事前に: npm run build && npx vite preview --port 4173 &   と   npm run emulators &
 import { chromium, URL } from './lib.mjs';
 
+// REAL=1 なら本物の Firebase（この環境の通信の中継を通す）
+const REAL = !!process.env.REAL;
 const EMU = process.env.EMU_HOST ?? '127.0.0.1';
 const STEPS = Number(process.env.STEPS ?? 150);
-const base = (extra = '') => `${URL}?emu=${EMU}${extra}`;
+const base = (extra = '') => `${URL}?${REAL ? 'debug=1' : `emu=${EMU}`}${extra}`;
 const shot = (page, name) => page.screenshot({ path: `screenshots/online-${name}.png` });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -18,9 +20,10 @@ async function until(fn, ms = 15000, what = '') {
   }
 }
 
-const browser = await chromium.launch();
+const proxy = REAL && process.env.HTTPS_PROXY ? { server: process.env.HTTPS_PROXY, bypass: 'localhost,127.0.0.1' } : undefined;
+const browser = await chromium.launch(proxy ? { proxy } : {});
 async function device(name) {
-  const ctx = await browser.newContext({ viewport: { width: 412, height: 860 }, deviceScaleFactor: 2 });
+  const ctx = await browser.newContext({ viewport: { width: 412, height: 860 }, deviceScaleFactor: 2, ignoreHTTPSErrors: REAL });
   await ctx.addInitScript(() => {
     if (!localStorage.getItem('card-rpg/settings')) localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true, vibration: false }));
   });
@@ -84,11 +87,14 @@ async function drive(list, steps) {
     throw new Error('no host');
   };
   let shotBattle = false;
+  let retries = 0;
   for (let i = 0; i < steps; i++) {
     const h = await host();
     const mode = await h.evaluate(() => window.__online.mode());
     if (mode === 'ending' || mode === 'gameover') break;
     const before = await h.evaluate(() => window.__online.seq());
+    // 全員が今の状態まで追いついてから、次の操作を送る（人が画面を見て操作するのと同じ）
+    await until(async () => (await Promise.all(list.map((p) => p.evaluate(() => window.__online.seq())))).every((x) => x >= before), 15000, `sync before ${i}`);
     const cmd = await h.evaluate(() => window.__online.next());
     if (!cmd) break;
     if (cmd.type === 'BATTLE' && cmd.command.type === 'ENEMY_STEP') {
@@ -99,7 +105,14 @@ async function drive(list, steps) {
       let sender = h;
       for (const p of list) if (who && (await p.evaluate((w) => window.__online.myPlayers().includes(w), who))) sender = p;
       const err = await sender.evaluate((c) => window.__online.send(c), cmd);
-      if (err) throw new Error(`step ${i} ${cmd.type}: ${err}`);
+      if (err) {
+        // 送る直前に状態が進んだ（ホストの敵の自動行動など）→ 少し待ってやり直す
+        if (++retries > 10) throw new Error(`step ${i} ${cmd.type}: ${err}`);
+        await wait(300);
+        i--;
+        continue;
+      }
+      retries = 0;
       await until(async () => (await h.evaluate(() => window.__online.seq())) > before, 15000, `step ${i} ${cmd.type}`);
     }
     if (!shotBattle && mode === 'battle') {
@@ -111,8 +124,8 @@ async function drive(list, steps) {
       }
     }
   }
-  const target = await (await host()).evaluate(() => window.__online.seq());
-  await until(async () => (await Promise.all(list.map((p) => p.evaluate(() => window.__online.seq())))).every((s) => s === target), 15000, 'all caught up');
+  // 全員の番号がそろうまで待つ（ホストの敵の自動行動で進み続けることがあるので、そろった時点で比べる）
+  await until(async () => new Set(await Promise.all(list.map((p) => p.evaluate(() => window.__online.hash())))).size === 1, 30000, 'all caught up');
 }
 const sameHash = async (list) => {
   const hs = await Promise.all(list.map((p) => p.evaluate(() => window.__online.hash())));
