@@ -4,7 +4,7 @@ import { getEnemy } from '../../data/enemies';
 import type { AllyState, BattleEvent, BattleState, EnemyState } from '../../types';
 import type { Rng } from '../rng';
 import { retargetAfterDeath } from './intents';
-import { emptyStatuses } from './statuses';
+import { emptyStatuses, healMultiplier } from './statuses';
 
 export type Unit = AllyState | EnemyState;
 
@@ -106,7 +106,9 @@ export function loseHp(state: BattleState, u: Unit, amount: number, rng: Rng, ev
 
 export function healUnit(u: Unit, amount: number, events: BattleEvent[]): number {
   if (u.dead) return 0;
-  const healed = Math.max(0, Math.min(amount, u.maxHp - u.hp));
+  // 呪いなど: 受ける回復量の倍率
+  const amt = Math.floor(amount * healMultiplier(u.statuses) + 1e-9);
+  const healed = Math.max(0, Math.min(amt, u.maxHp - u.hp));
   u.hp += healed;
   if (healed > 0) events.push({ type: 'heal', unitId: unitIdOf(u), amount: healed });
   return healed;

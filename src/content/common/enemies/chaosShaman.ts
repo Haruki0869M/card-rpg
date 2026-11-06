@@ -2,6 +2,8 @@ import type { EnemyDef } from '../../../types';
 
 export const chaosShaman: EnemyDef = {
   id: 'chaosShaman',
+  weak: ['holy'],
+  resist: ['thunder'],
   name: 'カオスシャーマン',
   icon: '🧙',
   maxHp: 36,
@@ -12,7 +14,7 @@ export const chaosShaman: EnemyDef = {
   firstActionId: 'curse',
   maxConsecutive: 1,
   actions: [
-    { id: 'chaosWave', name: '混沌の波', effects: [{ kind: 'damage', amount: 6, to: 'foes' }] },
+    { id: 'chaosWave', name: '混沌の波', effects: [{ kind: 'damage', element: 'thunder', amount: 6, to: 'foes' }] },
     { id: 'curse', name: '呪い', effects: [{ kind: 'applyStatus', status: 'weak', amount: 2 }] },
     {
       id: 'ward',

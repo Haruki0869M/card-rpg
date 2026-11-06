@@ -11,7 +11,8 @@ import { useBattle } from '../store/battleStore';
 import type { BattleState, StatId } from '../types';
 import { CATEGORY_LABEL, intentView, longEffect, tierTitle } from './format';
 import { itemSummary, RARITY_STYLE } from './ui/game';
-import { CATEGORY_STYLE, statusStyle } from './ui/icons';
+import { CATEGORY_STYLE, ElementTag, statusStyle } from './ui/icons';
+import { BALANCE } from '../data/balance';
 
 function signed(n: number) {
   return n > 0 ? `+${n}%` : n < 0 ? `${n}%` : '±0%';
@@ -99,6 +100,30 @@ function Content({ d, battle }: { d: Detail; battle: BattleState }) {
               <div className="mt-1 text-[13px] text-zinc-400">{e.dead ? '撃破済み' : '行動済み'}</div>
             )}
             {e.tauntedBy && <div className="text-[13px] text-amber-300">{findAlly(battle, e.tauntedBy)?.name}に挑発されている</div>}
+            {(def.weak?.length || def.resist?.length) && (
+              <div className="mt-1 flex flex-wrap gap-x-2 text-[12px]">
+                {def.weak?.length ? (
+                  <span>
+                    弱点（×{BALANCE.elementWeakMul}）：
+                    {def.weak.map((x) => (
+                      <span key={x} className="mr-1">
+                        <ElementTag id={x} />
+                      </span>
+                    ))}
+                  </span>
+                ) : null}
+                {def.resist?.length ? (
+                  <span className="text-zinc-300">
+                    耐性（×{BALANCE.elementResistMul}・状態異常なし）：
+                    {def.resist.map((x) => (
+                      <span key={x} className="mr-1">
+                        <ElementTag id={x} />
+                      </span>
+                    ))}
+                  </span>
+                ) : null}
+              </div>
+            )}
             <div className="mt-1 text-[12px] text-zinc-500">
               {def.pattern === 'sequence'
                 ? `行動順：${def.actions.map((a) => a.name).join(' → ')} → 最初に戻る`

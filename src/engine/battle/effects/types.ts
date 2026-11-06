@@ -16,6 +16,8 @@ export interface EffectCtx {
   card?: CardDef;
   /** このカードだけで働く特殊能力（カードの特殊能力） */
   cardAbilities?: AbilityDef[];
+  /** カードが完全成功した（属性の状態異常は必ず付く） */
+  perfect?: boolean;
   /** HPに与えたダメージの合計（吸収などが読む） */
   dealt: number;
   /** 結果の短い表示（ログ・カードの結果の表示） */

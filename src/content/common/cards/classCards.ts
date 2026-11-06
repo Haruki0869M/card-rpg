@@ -2,6 +2,8 @@
 import type { CardDef } from '../../../types';
 
 const d = (amount: number) => ({ kind: 'damage', amount }) as const;
+/** 属性のダメージ */
+const el = (element: string, amount: number) => ({ kind: 'damage', amount, element }) as const;
 const b = (amount: number) => ({ kind: 'block', amount }) as const;
 
 export const CLASS_CARDS: CardDef[] = [
@@ -87,10 +89,10 @@ export const CLASS_CARDS: CardDef[] = [
     target: 'enemy',
     rarity: 'rare',
     tiers: [
-      { minSuccesses: 0, effects: [d(5)] },
-      { minSuccesses: 1, effects: [d(10)] },
-      { minSuccesses: 2, effects: [d(16)] },
-      { minSuccesses: 3, effects: [d(24), { kind: 'applyStatus', status: 'burn', amount: 2 }] },
+      { minSuccesses: 0, effects: [el('fire', 5)] },
+      { minSuccesses: 1, effects: [el('fire', 10)] },
+      { minSuccesses: 2, effects: [el('fire', 16)] },
+      { minSuccesses: 3, effects: [el('fire', 24), { kind: 'applyStatus', status: 'burn', amount: 2 }] },
     ],
   },
   {
@@ -102,9 +104,9 @@ export const CLASS_CARDS: CardDef[] = [
     baseChance: 70,
     target: 'enemy',
     tiers: [
-      { minSuccesses: 0, effects: [d(4)] },
-      { minSuccesses: 1, effects: [d(8), { kind: 'applyStatus', status: 'weak', amount: 1 }] },
-      { minSuccesses: 2, effects: [d(12), { kind: 'applyStatus', status: 'weak', amount: 2 }] },
+      { minSuccesses: 0, effects: [el('ice', 4)] },
+      { minSuccesses: 1, effects: [el('ice', 8)] },
+      { minSuccesses: 2, effects: [el('ice', 12)] },
     ],
   },
   {
@@ -117,9 +119,9 @@ export const CLASS_CARDS: CardDef[] = [
     target: 'allEnemies',
     rarity: 'rare',
     tiers: [
-      { minSuccesses: 0, effects: [d(4)] },
-      { minSuccesses: 1, effects: [d(8)] },
-      { minSuccesses: 2, effects: [d(12)] },
+      { minSuccesses: 0, effects: [el('thunder', 4)] },
+      { minSuccesses: 1, effects: [el('thunder', 8)] },
+      { minSuccesses: 2, effects: [el('thunder', 12)] },
     ],
   },
   {
@@ -189,8 +191,8 @@ export const CLASS_CARDS: CardDef[] = [
     rarity: 'rare',
     tiers: [
       { minSuccesses: 0, effects: [{ kind: 'heal', amount: 3, to: 'allies' }] },
-      { minSuccesses: 1, effects: [{ kind: 'heal', amount: 5, to: 'allies' }] },
-      { minSuccesses: 2, effects: [{ kind: 'heal', amount: 8, to: 'allies' }] },
+      { minSuccesses: 1, effects: [{ kind: 'heal', amount: 4, to: 'allies' }, { kind: 'applyStatus', status: 'regen', amount: 2, to: 'allies' }] },
+      { minSuccesses: 2, effects: [{ kind: 'heal', amount: 6, to: 'allies' }, { kind: 'applyStatus', status: 'regen', amount: 3, to: 'allies' }] },
     ],
   },
   {
@@ -230,9 +232,9 @@ export const CLASS_CARDS: CardDef[] = [
     baseChance: 75,
     target: 'enemy',
     tiers: [
-      { minSuccesses: 0, effects: [d(3)] },
-      { minSuccesses: 1, effects: [d(4), { kind: 'applyStatus', status: 'poison', amount: 3 }] },
-      { minSuccesses: 2, effects: [d(6), { kind: 'applyStatus', status: 'poison', amount: 5 }] },
+      { minSuccesses: 0, effects: [el('poison', 3)] },
+      { minSuccesses: 1, effects: [el('poison', 4), { kind: 'applyStatus', status: 'poison', amount: 3 }] },
+      { minSuccesses: 2, effects: [el('poison', 6), { kind: 'applyStatus', status: 'poison', amount: 5 }] },
     ],
   },
   {
@@ -343,10 +345,10 @@ export const CLASS_CARDS: CardDef[] = [
     rarity: 'epic',
     trait: { name: '魔力循環', effect: { when: 'perfect', do: [{ kind: 'gainMana', amount: 2 }] } },
     tiers: [
-      { minSuccesses: 0, effects: [d(6)] },
-      { minSuccesses: 1, effects: [d(11)] },
-      { minSuccesses: 2, effects: [d(17)] },
-      { minSuccesses: 3, effects: [d(26), { kind: 'applyStatus', status: 'burn', amount: 1 }] },
+      { minSuccesses: 0, effects: [el('fire', 6)] },
+      { minSuccesses: 1, effects: [el('fire', 11)] },
+      { minSuccesses: 2, effects: [el('fire', 17)] },
+      { minSuccesses: 3, effects: [el('fire', 26), { kind: 'applyStatus', status: 'burn', amount: 1 }] },
     ],
   },
   {
@@ -360,9 +362,9 @@ export const CLASS_CARDS: CardDef[] = [
     rarity: 'epic',
     trait: { name: '吸収', effect: { when: 'afterCard', if: [{ kind: 'dealtDamage' }], do: [{ kind: 'healPctOfDealt', pct: 50 }] } },
     tiers: [
-      { minSuccesses: 0, effects: [d(5)] },
-      { minSuccesses: 1, effects: [d(9)] },
-      { minSuccesses: 2, effects: [d(14), { kind: 'applyStatus', status: 'weak', amount: 1 }] },
+      { minSuccesses: 0, effects: [el('dark', 5)] },
+      { minSuccesses: 1, effects: [el('dark', 9)] },
+      { minSuccesses: 2, effects: [el('dark', 14), { kind: 'applyStatus', status: 'weak', amount: 1 }] },
     ],
   },
   {
@@ -376,9 +378,9 @@ export const CLASS_CARDS: CardDef[] = [
     rarity: 'epic',
     trait: { name: '止め', effect: { modifier: 'damageDealt', multiplier: 1.5, if: [{ kind: 'targetHpAtMost', pct: 40 }] } },
     tiers: [
-      { minSuccesses: 0, effects: [d(8)] },
-      { minSuccesses: 1, effects: [d(14)] },
-      { minSuccesses: 2, effects: [d(21), { kind: 'applyStatus', status: 'weak', amount: 1 }] },
+      { minSuccesses: 0, effects: [el('holy', 8)] },
+      { minSuccesses: 1, effects: [el('holy', 14)] },
+      { minSuccesses: 2, effects: [el('holy', 21), { kind: 'applyStatus', status: 'weak', amount: 1 }] },
     ],
   },
   {
@@ -425,11 +427,11 @@ export const CLASS_CARDS: CardDef[] = [
     rarity: 'epic',
     trait: { name: '貫通', effect: { modifier: 'ignoreBlock' } },
     tiers: [
-      { minSuccesses: 0, effects: [d(5)] },
-      { minSuccesses: 1, effects: [d(8), { kind: 'applyStatus', status: 'weak', amount: 1 }] },
+      { minSuccesses: 0, effects: [el('dark', 5)] },
+      { minSuccesses: 1, effects: [el('dark', 8), { kind: 'applyStatus', status: 'weak', amount: 1 }] },
       {
         minSuccesses: 2,
-        effects: [d(12), { kind: 'applyStatus', status: 'weak', amount: 1 }, { kind: 'applyStatus', status: 'vulnerable', amount: 1 }],
+        effects: [el('dark', 12), { kind: 'applyStatus', status: 'weak', amount: 1 }, { kind: 'applyStatus', status: 'vulnerable', amount: 1 }],
       },
     ],
   },

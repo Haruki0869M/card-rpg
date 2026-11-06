@@ -242,7 +242,9 @@ describe('新しい戦闘の要素', () => {
     r = applyCommand(s2, { type: 'PLAY_CARD', playerId: 'P1', characterId: 'a1', cardInstanceId: 'z2', focusUsed: 2 });
     expect(r.state.allies.map((a) => a.block)).toEqual([9, 9]);
     r = applyCommand(r.state, { type: 'PLAY_CARD', playerId: 'P1', characterId: 'a1', cardInstanceId: 'z3', focusUsed: 2 });
-    expect(r.state.allies[0].hp).toBe(38);
+    // 聖なる光（完全成功）: 全員HP+6 と 再生3
+    expect(r.state.allies[0].hp).toBe(36);
+    expect(r.state.allies.map((a) => a.statuses.regen)).toEqual([3, 3]);
   });
 
   it('毒: ターン終了時にダメージ（ブロック無視）して1減る', () => {
