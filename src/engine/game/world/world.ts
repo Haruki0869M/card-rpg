@@ -263,6 +263,25 @@ export function waitTurn(game: GameState, cmd: Cmd<'WORLD_WAIT'>, rng: Rng): str
   return undefined;
 }
 
+/** 倒れている仲間を助け起こす（M3-C5）: 同じマスで手番を使う。HPは命の灯火と同じだけ戻る */
+export function reviveAlly(game: GameState, cmd: Cmd<'WORLD_REVIVE'>, rng: Rng): string | undefined {
+  const t = turnCheck(game, cmd.playerId, cmd.heroId);
+  if (typeof t === 'string') return t;
+  const { w, h } = t;
+  const tile = w.downed?.[cmd.targetId];
+  const target = findHero(game, cmd.targetId);
+  if (tile === undefined || !target) return 'その仲間は倒れていません';
+  if (tile !== w.pos[h.id]) return '同じマスにいる仲間しか助け起こせません';
+  delete w.downed![cmd.targetId];
+  target.retired = false;
+  target.hp = Math.max(1, Math.ceil(heroMaxHp(target) * BALANCE.reviveHpRatio));
+  target.nextBattleStatuses = {};
+  w.pos[target.id] = tile;
+  addLog(game, `${h.name}が${target.name}を助け起こした！`);
+  advanceTurn(game, rng);
+  return undefined;
+}
+
 /** 野営（spec §8.6）: 少し回復して手番を終える。夜は夜襲の確率がある */
 export function camp(game: GameState, cmd: Cmd<'WORLD_CAMP'>, rng: Rng): string | undefined {
   const t = turnCheck(game, cmd.playerId, cmd.heroId);
@@ -433,12 +452,14 @@ export function handleDefeat(game: GameState, participants: string[], rng: Rng) 
     }
     addLog(game, `命の灯火が1つ消えた…（残り${game.lives}）${w ? ' 最寄りの町で目を覚ました' : ''}`);
   } else {
+    // 命の灯火が無い: その場に倒れる。仲間が同じマスに来れば助け起こせる（M3-C5。世界マップが無い時は退場）
     for (const h of heroes) {
       h.retired = true;
       h.hp = 0;
+      if (w && w.pos[h.id] !== undefined) (w.downed ??= {})[h.id] = w.pos[h.id];
       if (w) delete w.pos[h.id];
     }
-    addLog(game, `${heroes.map((h) => h.name).join('・')}は力尽き、冒険から退場した…`);
+    addLog(game, `${heroes.map((h) => h.name).join('・')}は力尽きて倒れた…${w ? '（仲間が同じマスに行けば助け起こせる）' : ''}`);
   }
   if (!activeHeroes(game).length) {
     game.mode = 'gameover';

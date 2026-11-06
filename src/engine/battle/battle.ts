@@ -27,7 +27,7 @@ import { createRng, type Rng, shuffle } from '../rng';
 import { affinityOf } from '../stats';
 import { calcDamage } from './damage';
 import { discardHand, drawCards } from './deck';
-import { applyEffect, checkEffect, elementMultiplier, makeCtx, targetOf } from './effects';
+import { applyEffect, checkEffect, comboMultiplier, elementMultiplier, makeCtx, targetOf } from './effects';
 import { decideAllIntents } from './intents';
 import { finalChance, selectTier } from './probability';
 import { activeStatuses, actionFailChanceOf, applyTick, chancePenaltyOf, consumeStatus, decayStatuses, emptyStatuses, skipActionStatus, takeManaPenalty, tickHealOf } from './statuses';
@@ -195,7 +195,7 @@ export function tierDamageAgainst(ally: AllyState, card: CardDef, target: EnemyS
   return card.tiers.map((t) =>
     t.effects.reduce((sum, e) => {
       if (e.kind !== 'damage' || (targetOf(e) !== 'target' && targetOf(e) !== 'foes')) return sum;
-      return sum + calcDamage(e.amount, ally.statuses, target.statuses, multiplier * elementMultiplier(target, e.element)) * (e.hits ?? 1);
+      return sum + calcDamage(e.amount, ally.statuses, target.statuses, multiplier * elementMultiplier(target, e.element) * comboMultiplier(ally, target)) * (e.hits ?? 1);
     }, 0),
   );
 }
@@ -207,6 +207,9 @@ const SLOT_ICON: Record<SlotResult, string> = { focus: '🌟', hit: '⭕', miss:
 function startAllyPhase(state: BattleState, rng: Rng, events: BattleEvent[]) {
   state.turn += 1;
   state.phase = 'ally';
+  // 連携攻撃の記録と、狙いの表示は、ターンごとに消す
+  state.aims = {};
+  for (const e of state.enemies) e.hitBy = [];
   for (const a of state.allies) {
     if (a.dead) continue;
     a.block = 0;
@@ -283,6 +286,19 @@ export function applyCommand(input: BattleState, cmd: Command): CommandResult {
     case 'USE_ITEM':
       error = useItem(state, cmd, rng, events);
       break;
+    case 'AIM': {
+      // 狙っている敵を仲間に見せるだけ（結果は変わらない）
+      const a = state.allies.find((x) => x.id === cmd.characterId);
+      if (state.phase !== 'ally' || !a || a.dead) error = '今は狙えません';
+      else if (a.playerId !== cmd.playerId) error = '担当していないキャラです';
+      else if (cmd.targetId && !state.enemies.some((e) => e.uid === cmd.targetId && !e.dead)) error = 'その敵は狙えません';
+      else {
+        state.aims ??= {};
+        if (cmd.targetId) state.aims[a.id] = cmd.targetId;
+        else delete state.aims[a.id];
+      }
+      break;
+    }
     default:
       error = '不明なコマンドです';
   }
@@ -307,6 +323,7 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   if (ally.playerId !== cmd.playerId) return '担当していないキャラです';
   // カードを使ったら、そのプレイヤーの準備完了は取り消し
   if (state.ready) state.ready = state.ready.filter((p) => p !== cmd.playerId);
+  if (state.aims) delete state.aims[ally.id];
   const idx = ally.hand.findIndex((c) => c.uid === cmd.cardInstanceId);
   if (idx < 0) return '手札にありません';
   const inst = ally.hand[idx];

@@ -614,6 +614,8 @@ export const useBattle = create<StoreState>((set, get) => {
       const enemy = battle.enemies.find((e) => e.uid === uid);
       if (!enemy || enemy.dead) return;
       set({ selection: { ...selection, targetId: uid } });
+      // 狙っている敵を仲間に見せる（M3-C5。戦闘の結果は変わらない）
+      if (ally && battle.aims?.[ally.id] !== uid) get().dispatch({ type: 'AIM', playerId: LOCAL_PLAYER, characterId: ally.id, targetId: uid });
     },
 
     setFocus: (n) => {

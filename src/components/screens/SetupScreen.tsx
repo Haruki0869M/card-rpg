@@ -85,12 +85,15 @@ export function SetupScreen() {
             <button
               key={d.id}
               onClick={() => setDraft({ difficulty: d.id })}
-              className={`btn flex h-14 flex-col items-center justify-center rounded-lg ${draft.difficulty === d.id ? 'btn-gold' : 'btn-dark'}`}
+              className={`btn flex h-12 items-center justify-center rounded-lg ${draft.difficulty === d.id ? 'btn-gold' : 'btn-dark'}`}
             >
-              <span className="font-display text-[15px]">{d.name}</span>
-              <span className="text-[12px] opacity-80">{d.text}</span>
+              <span className="font-display text-[16px]">{d.name}</span>
             </button>
           ))}
+        </div>
+        {/* 説明はボタンの下に（ボタンの中だと長い文がはみ出すため） */}
+        <div className="mt-1 rounded-lg bg-black/30 px-2 py-1 text-[13px] leading-5 text-zinc-300" data-difficulty-text>
+          {DIFFICULTY.find((d) => d.id === draft.difficulty)?.text}
         </div>
 
         <div className="font-display mt-3 text-[15px] text-amber-200">人数</div>

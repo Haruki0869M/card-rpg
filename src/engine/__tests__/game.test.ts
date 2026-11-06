@@ -56,7 +56,7 @@ describe('冒険の開始', () => {
     const w = g.heroes[0];
     expect(getItem(w.equipment.weapon!.itemId).id).toBe('copperSword');
     expect(w.hp).toBe(heroMaxHp(w));
-    expect(heroMaxHp(w)).toBe(60 + 5); // 皮の鎧
+    expect(heroMaxHp(w)).toBe(60 + 5 + 5); // 皮の鎧＋体力70（60を超えた分の半分。M3-C6）
     // 最初の道具（回復薬2つ）はキャラに順番に配られる
     expect(g.heroes.reduce((n, h) => n + h.pouch.length, 0)).toBe(2);
     expect(battleDeck(w).filter((c) => c.fromWeapon).map((c) => c.cardId)).toEqual(['wSlash', 'wSlash']);

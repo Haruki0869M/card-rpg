@@ -191,6 +191,10 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
     case 'world': {
       const eq = equipBest(g, log);
       if (eq !== g) return eq;
+      // 同じマスに倒れている仲間がいれば助け起こす
+      const w = g.world!;
+      const down = Object.entries(w.downed ?? {}).find(([, t]) => t === w.pos[w.turn]);
+      if (down && !w.story) return send(g, { type: 'WORLD_REVIVE', playerId: pid(g, w.turn), heroId: w.turn, targetId: down[0] }, log);
       return worldStep(g, log, memo);
     }
     case 'encounter': {
@@ -211,6 +215,11 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
         const h = findHero(g, lu.heroId)!;
         const i = lu.options.findIndex((o) => o.kind !== 'upgradeCard');
         return send(g, { type: 'CHOOSE_GROWTH', playerId: h.playerId, optionIndex: i >= 0 ? i : 0, cardUid: h.deck.find((c) => !c.upgraded)?.uid }, log);
+      }
+      if (r.claim && !r.claim.rolls) {
+        // 戦利品の取り合い: 最初のキャラは「欲しい」、ほかは「余れば」
+        const id = r.claim.heroes.find((x) => !r.claim!.choices[x])!;
+        return send(g, { type: 'CLAIM_LOOT', playerId: pid(g, id), heroId: id, choice: id === r.claim.heroes[0] ? 'need' : 'greed' }, log);
       }
       if (!r.cardPicked) {
         // まだ選んでいないキャラの最初のカード（M3-C4: キャラごとに1枚）

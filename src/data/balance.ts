@@ -88,6 +88,11 @@ export const BALANCE = {
   /** 移動力の判定: 素早さの枠数。移動力 = moveBase + 成功数 */
   moveSlots: 4,
   moveBase: 2,
+  /** 体力と最大HP: 体力が vitHpBase を超えた分 × vitHpRate だけ最大HPが増える（M3-C6） */
+  vitHpBase: 60,
+  vitHpRate: 0.5,
+  /** 連携攻撃: このターンに別の味方が攻撃した敵へのダメージの倍率の上乗せ（M3-C5） */
+  comboBonus: 0.2,
   /** ダンジョンの探索力（手番に入れる部屋の数）= exploreBase + 素早さの判定の成功数（exploreSlots 枠）。M3-D */
   exploreSlots: 2,
   exploreBase: 2,

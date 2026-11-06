@@ -22,7 +22,9 @@ export function heroStats(hero: Hero): Stats {
 
 export function heroMaxHp(hero: Hero): number {
   const c = getClass(hero.classId);
-  return c.baseMaxHp + c.hpPerLevel * (hero.level - 1) + hero.bonusMaxHp + equippedItems(hero).reduce((n, i) => n + (i.maxHp ?? 0), 0);
+  // 体力が高いほど最大HPも増える（基準を超えた分の半分。M3-C6）
+  const vit = Math.floor(Math.max(0, heroStats(hero).vit - BALANCE.vitHpBase) * BALANCE.vitHpRate);
+  return c.baseMaxHp + c.hpPerLevel * (hero.level - 1) + hero.bonusMaxHp + vit + equippedItems(hero).reduce((n, i) => n + (i.maxHp ?? 0), 0);
 }
 
 export function heroFocusMax(hero: Hero): number {

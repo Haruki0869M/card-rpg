@@ -287,6 +287,19 @@ export function WorldMap({
             </div>
           );
         })}
+        {/* 倒れている仲間（M3-C5）: 灰色の顔と×印。同じマスに行けば助け起こせる */}
+        {Object.entries(w.downed ?? {}).map(([id, tile]) => {
+          const h = game.heroes.find((x) => x.id === id);
+          if (!h || !w.tiles[tile]?.seen) return null;
+          const { x, y } = center(tile);
+          const s = R * 0.95;
+          return (
+            <div key={`down-${id}`} data-downed={id} className="pointer-events-none absolute" style={{ left: x - s / 2 + R * 0.35, top: y - s / 2 + R * 0.3, width: s, height: s, zIndex: 1 }}>
+              <HeroFace hero={h} size={s} dim />
+              <span className="absolute -right-1 -bottom-1 rounded-full bg-red-900 px-1 text-[11px] leading-4 font-black text-red-100">倒</span>
+            </div>
+          );
+        })}
         {/* キャラ */}
         {[...heroSpots].map(([tile, ids]) =>
           ids.map((id, k) => {

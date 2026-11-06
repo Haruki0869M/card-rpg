@@ -68,6 +68,21 @@ describe('部屋を作る・入る', () => {
     expect(b2.seat).toBe('P2');
     expect(normalizeCode(' kx-7p ')).toBe('KX7P');
   });
+  it('人数を変えると、全員の画面の枠の数がすぐ変わる（増やした時も。M3-C6）', async () => {
+    const hub = new MemoryHub();
+    const host = await Room.create(hub.client('u0'), { name: 'A', scenarioId: 'corruptionKing', difficulty: 'normal', partySize: 2 });
+    const b = await Room.join(hub.client('u1'), host.code, 'B');
+    await host.claimSlot(0, { classId: 'warrior', gender: 'male', name: 'レオン' });
+    await settle();
+    await host.updateSettings({ partySize: 4 });
+    await settle();
+    expect(host.slots).toHaveLength(4);
+    expect(b.slots).toHaveLength(4);
+    expect(b.slots[0]?.name).toBe('レオン');
+    await host.updateSettings({ partySize: 1 });
+    await settle();
+    expect(b.slots).toHaveLength(1);
+  });
   it('キャラの枠は先に取った人のもの。全部うまるまで出発できない。ホストだけが出発できる', async () => {
     const hub = new MemoryHub();
     const host = await Room.create(hub.client('u0'), { name: 'A', scenarioId: 'corruptionKing', difficulty: 'normal', partySize: 2 });

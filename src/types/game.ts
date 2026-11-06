@@ -297,6 +297,19 @@ export interface RewardState {
   loot: Loot[];
   /** 戦闘後に見つけた隠し宝箱 */
   hiddenChest?: ChestSpec;
+  /** 落とした装備の取り合い（2人以上のプレイヤーが生き残った時。M3-C5） */
+  claim?: LootClaim;
+}
+
+/** 落とした装備の取り合い: 全員が「欲しい / 余れば / いらない」を選び、欲しい人の中で運の判定が一番高い人がもらう */
+export interface LootClaim {
+  item: ItemInstance;
+  /** 選べるキャラ（生き残った参加者） */
+  heroes: string[];
+  choices: Record<string, 'need' | 'greed' | 'pass'>;
+  /** 決まった後: 運の判定（1〜100 ＋ 運の半分）と、もらった人 */
+  rolls?: { heroId: string; roll: number }[];
+  winner?: string;
 }
 
 export type GameMode = 'hub' | 'world' | 'encounter' | 'town' | 'shrine' | 'dungeon' | 'battle' | 'reward' | 'chest' | 'event' | 'rest' | 'gameover' | 'cleared' | 'ending';
@@ -426,6 +439,7 @@ export type GameCommand =
   | { type: 'CHOOSE_GROWTH'; playerId: PlayerId; optionIndex: number; cardUid?: string }
   | { type: 'PICK_CARD'; playerId: PlayerId; offerIndex: number | null; /** 選ばない時: どのキャラの分か（省くと、その人のキャラ全員の分） */ heroId?: string }
   | { type: 'FINISH_REWARD'; playerId: PlayerId }
+  | { type: 'CLAIM_LOOT'; playerId: PlayerId; heroId: string; choice: 'need' | 'greed' | 'pass' }
   | { type: 'OPEN_CHEST'; playerId: PlayerId; heroId: string; focusUsed: number }
   | { type: 'LEAVE_CHEST'; playerId: PlayerId }
   | { type: 'CHOOSE_EVENT'; playerId: PlayerId; optionIndex: number; heroId?: string; focusUsed: number }
@@ -443,6 +457,8 @@ export type GameCommand =
   /** 移動（同行するキャラも一緒に動く。同行したキャラはこのワールドターンの行動を終える） */
   | { type: 'WORLD_MOVE'; playerId: PlayerId; heroId: string; to: number; companions: string[] }
   | { type: 'WORLD_WAIT'; playerId: PlayerId; heroId: string }
+  /** 倒れている仲間を助け起こす（同じマスで。手番を使う。M3-C5） */
+  | { type: 'WORLD_REVIVE'; playerId: PlayerId; heroId: string; targetId: string }
   | { type: 'WORLD_CAMP'; playerId: PlayerId; heroId: string }
   /** 今いるマスの町・祠・イベント・宝箱・ダンジョンに入る */
   | { type: 'WORLD_INTERACT'; playerId: PlayerId; heroId: string; party?: string[] }

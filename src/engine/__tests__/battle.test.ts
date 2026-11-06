@@ -343,3 +343,32 @@ describe('全遭遇 × 1〜4人で最後まで進む（無限ループ・例外�
     }
   }
 });
+
+describe('連携攻撃と狙いの印（M3-C5）', () => {
+  const hit = (s: ReturnType<typeof createBattle>, who: string) => {
+    const [card] = giveHand(s, who, ['heavySwing']);
+    return applyCommand(s, play(who, card.uid, 'e0', 3));
+  };
+  it('このターンに別の味方が攻撃した敵には、ダメージが上乗せされる（自分の2回目には付かない）', () => {
+    const s = createBattle(setup(5));
+    s.enemies[0].hp = s.enemies[0].maxHp = 999;
+    const alone = 999 - hit(structuredClone(s), 'a0').state.enemies[0].hp;
+    const after = structuredClone(s);
+    after.enemies[0].hitBy = ['a1'];
+    const r = hit(after, 'a0');
+    expect(999 - r.state.enemies[0].hp).toBe(Math.round(alone * 1.2));
+    expect(r.events.some((e) => e.type === 'ability' && e.name === '連携')).toBe(true);
+    const self = structuredClone(s);
+    self.enemies[0].hitBy = ['a0'];
+    expect(999 - hit(self, 'a0').state.enemies[0].hp).toBe(alone);
+    // 攻撃した味方が記録され、次のターンで消える
+    expect(r.state.enemies[0].hitBy).toEqual(['a1', 'a0']);
+  });
+  it('狙っている敵を見せられる。カードを使うと消える。他人のキャラは狙わせられない', () => {
+    const s = createBattle(setup(5));
+    const r = applyCommand(s, { type: 'AIM', playerId: 'P1', characterId: 'a0', targetId: 'e1' });
+    expect(r.state.aims).toEqual({ a0: 'e1' });
+    expect(applyCommand(s, { type: 'AIM', playerId: 'P2', characterId: 'a0', targetId: 'e1' }).error).toBeDefined();
+    expect(hit(r.state, 'a0').state.aims).toEqual({});
+  });
+});

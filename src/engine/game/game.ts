@@ -53,6 +53,7 @@ import {
   rollMove,
   storyContinue,
   waitTurn,
+  reviveAlly,
 } from './world/world';
 import { leaveShrine, leaveTown, questAccept, questReport, shrineChoose, townBuy, townInn, townRemoveCard, townSell } from './world/town';
 import { getRoomType } from '../../data/rules';
@@ -64,6 +65,7 @@ import {
   expToNext,
   heroFocusMax,
   heroMaxHp,
+  heroStats,
   toPartyMember,
 } from './hero';
 import { needsVote, tally, VOTED_COMMANDS, voteCtx, voters } from './votes';
@@ -327,6 +329,9 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
       case 'FINISH_REWARD':
         error = finishReward(game, cmd.playerId, rng);
         break;
+      case 'CLAIM_LOOT':
+        error = claimLoot(game, cmd.playerId, cmd.heroId, cmd.choice, rng);
+        break;
       case 'OPEN_CHEST':
         error = openChest(game, cmd.playerId, cmd.heroId, cmd.focusUsed, rng);
         break;
@@ -371,6 +376,9 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
         break;
       case 'WORLD_WAIT':
         error = waitTurn(game, cmd, rng);
+        break;
+      case 'WORLD_REVIVE':
+        error = reviveAlly(game, cmd, rng);
         break;
       case 'WORLD_CAMP':
         error = camp(game, cmd, rng);
@@ -599,7 +607,9 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
   if (drop?.equipmentDrop) {
     const item = newItem(game, rollEquipment(rng.next() * 100 < drop.equipmentDrop.epicChance ? 'epic' : 'rare', game.heroes, rng));
     const to = leastLoaded(survivorHeroes);
-    if (to) {
+    // 2人以上のプレイヤーが生き残ったら、みんなで取り合う（欲しい / 余れば / いらない → 運の判定）
+    if (new Set(survivorHeroes.map((h) => h.playerId)).size > 1) reward.claim = { item, heroes: survivorHeroes.map((h) => h.id), choices: {} };
+    else if (to) {
       reward.loot.push({ kind: 'item', item, to: to.id });
       addItem(game, to, item, true);
     }
@@ -640,6 +650,30 @@ function chooseGrowth(game: GameState, playerId: string, optionIndex: number, ca
   return undefined;
 }
 
+/** 戦利品の取り合い: キャラごとに「欲しい / 余れば / いらない」。全員そろったら運の判定で決める */
+function claimLoot(game: GameState, playerId: string, heroId: string, choice: 'need' | 'greed' | 'pass', rng: Rng): string | undefined {
+  const c = game.reward?.claim;
+  if (game.mode !== 'reward' || !c || c.rolls) return '取り合う戦利品はありません';
+  if (!c.heroes.includes(heroId)) return 'このキャラは選べません';
+  const h = findHero(game, heroId)!;
+  if (!ownedBy(h, playerId)) return '担当していないキャラです';
+  c.choices[heroId] = choice;
+  if (!c.heroes.every((id) => c.choices[id])) return undefined;
+  const want = c.heroes.filter((id) => c.choices[id] === 'need');
+  const cands = want.length ? want : c.heroes.filter((id) => c.choices[id] === 'greed');
+  c.rolls = cands.map((id) => ({ heroId: id, roll: 1 + rng.int(100) + Math.floor(heroStats(findHero(game, id)!).luk / 2) }));
+  const best = [...c.rolls].sort((a, b) => b.roll - a.roll)[0];
+  // 全員いらない時は、持ち物の少ない人へ
+  const to = best ? findHero(game, best.heroId)! : leastLoaded(c.heroes.map((id) => findHero(game, id)!));
+  if (to) {
+    c.winner = to.id;
+    addItem(game, to, c.item, true);
+    game.reward!.loot.push({ kind: 'item', item: c.item, to: to.id });
+    addLog(game, `${to.name}が戦利品を手に入れた${best ? `（運の判定 ${best.roll}）` : ''}`);
+  }
+  return undefined;
+}
+
 /** カード報酬があるキャラ（一覧の順） */
 export const cardOfferHeroes = (r: RewardState): string[] => [...new Set(r.cardOffers.map((o) => o.heroId))];
 
@@ -674,6 +708,7 @@ function finishReward(game: GameState, playerId: string, rng: Rng): string | und
   if (game.mode !== 'reward' || !r || (!run && !game.world)) return '報酬画面ではありません';
   if (r.levelUps.length) return '成長ボーナスを選んでください';
   if (!r.cardPicked && r.cardOffers.length) return 'カードを選んでいない人がいます';
+  if (r.claim && !r.claim.rolls) return '戦利品の取り合いが終わっていません';
   game.reward = undefined;
   // 世界マップの遭遇の戦闘: 隠し宝箱があれば開け、無ければ世界マップへ（遭遇したキャラの手番は終わる）
   if (!run) {

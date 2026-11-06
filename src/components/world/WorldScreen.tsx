@@ -400,6 +400,21 @@ export function WorldScreen() {
               移動する（移動力 {reach?.get(selected)}）
             </button>
           ) : null}
+          {/* 同じマスに倒れている仲間（M3-C5）: 手番を使って助け起こす */}
+          {Object.entries(w.downed ?? {})
+            .filter(([, t]) => t === w.pos[hero.id])
+            .map(([id]) => {
+              const d = game.heroes.find((x) => x.id === id);
+              return d ? (
+                <button
+                  key={id}
+                  onClick={() => dispatchGame({ type: 'WORLD_REVIVE', playerId: pid, heroId: hero.id, targetId: id })}
+                  className="btn btn-gold flex h-12 items-center justify-center gap-2 rounded-xl text-[15px] font-bold"
+                >
+                  <HeroFace hero={d} size={30} dim /> {d.name}を助け起こす（手番を使う）
+                </button>
+              ) : null;
+            })}
           <div className="grid grid-cols-3 gap-1.5">
             {label ? (
               <button

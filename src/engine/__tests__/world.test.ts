@@ -17,6 +17,8 @@ import {
   reachable,
   timeOfDay,
   viewOf,
+  handleDefeat,
+  createRng,
 } from '../index';
 import { playToEnd } from '../bot';
 
@@ -396,4 +398,34 @@ describe('自動プレイ（シナリオ1をエンディングまで）', () => 
     const b = playToEnd(newWorld(11, ['warrior', 'hunter'], 'easy'), 3000).game;
     expect(a).toEqual(b);
   }, 60_000);
+});
+
+describe('倒れた仲間を助け起こす（M3-C5）', () => {
+  it('命の灯火が無い時に負けると、その場に倒れる。仲間が同じマスに来れば手番を使って助け起こせる', () => {
+    let g = createGame({ seed: 7, scenarioId: 'corruptionKing', difficulty: 'normal', party: [
+      { classId: 'warrior', gender: 'male', name: 'a', playerId: 'P1' },
+      { classId: 'mage', gender: 'female', name: 'b', playerId: 'P1' },
+    ] });
+    g = applyGameCommand(g, { type: 'STORY_CONTINUE', playerId: 'P1' }).state;
+    g.lives = 0;
+    const w = g.world!;
+    const tile = w.pos.h1;
+    handleDefeat(g, ['h1'], createRng(1));
+    expect(findHero(g, 'h1')!.retired).toBe(true);
+    expect(g.world!.downed).toEqual({ h1: tile });
+    expect(g.mode).not.toBe('gameover');
+    // 手番のキャラを同じマスへ
+    g.world!.turn = 'h0';
+    g.world!.pos.h0 = tile;
+    const r = applyGameCommand(g, { type: 'WORLD_REVIVE', playerId: 'P1', heroId: 'h0', targetId: 'h1' });
+    expect(r.error).toBeUndefined();
+    const h1 = findHero(r.state, 'h1')!;
+    expect(h1.retired).toBe(false);
+    expect(h1.hp).toBeGreaterThan(0);
+    expect(r.state.world!.pos.h1).toBe(tile);
+    expect(r.state.world!.downed).toEqual({});
+    // 離れたマスからは助け起こせない
+    g.world!.pos.h0 = tile === 0 ? 1 : 0;
+    expect(applyGameCommand(g, { type: 'WORLD_REVIVE', playerId: 'P1', heroId: 'h0', targetId: 'h1' }).error).toMatch(/同じマス/);
+  });
 });

@@ -167,6 +167,8 @@ export interface QuestState {
 }
 
 export interface WorldState {
+  /** 倒れているキャラ（キャラID → マス）。同じマスに来た仲間が助け起こせる（M3-C5） */
+  downed?: Record<string, number>;
   width: number;
   height: number;
   tiles: Tile[];

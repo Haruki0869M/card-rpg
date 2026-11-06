@@ -4,14 +4,15 @@
 import { motion, useAnimate } from 'framer-motion';
 import { memo, useEffect, useMemo } from 'react';
 import { BattleBackground, CharacterArt, EnemyArt } from '../../art';
-import { TIMING } from '../../data/balance';
+import { BALANCE, TIMING } from '../../data/balance';
+import { PLAYER_COLOR } from '../../data/theme';
 import { cardOf } from '../../data/cards';
 import { getEnemy } from '../../data/enemies';
 import { enemyName, findAlly, tierDamageAgainst, tierIndex, weaponRarity, sceneBackground } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
 import { usePress } from '../../hooks/usePress';
 import { speedFactor, useBattle, type UnitFx } from '../../store/battleStore';
-import type { AllyState, EnemyState } from '../../types';
+import type { AllyState, BattleState, EnemyState } from '../../types';
 import { intentView, type IntentPart } from '../format';
 import { HpBar } from '../ui/HpBar';
 import { EffectChip, ELEMENT_ICONS, Shield, Skull, statusStyle, Swords } from '../ui/icons';
@@ -212,12 +213,31 @@ const EnemyUnit = memo(function EnemyUnit({
             <span className="text-amber-300">Lv{enemy.level}</span> {enemyName(enemy)}
           </div>
           <HpBar hp={enemy.hp} max={enemy.maxHp} block={enemy.block} tone="enemy" height={12} />
+          <AimMarks battle={battle} enemyUid={enemy.uid} />
           <StatusChips s={enemy.statuses} side="enemy" onTap={onTap} tauntedBy={enemy.tauntedBy} />
         </div>
       )}
     </div>
   );
 });
+
+/** 仲間が狙っている敵の印（狙っている味方の顔。M3-C5）。このターンに攻撃した味方は「連携」の印 */
+function AimMarks({ battle, enemyUid }: { battle: BattleState; enemyUid: string }) {
+  const aimers = battle.allies.filter((a) => !a.dead && battle.aims?.[a.id] === enemyUid);
+  const enemy = battle.enemies.find((e) => e.uid === enemyUid);
+  const combo = !!enemy?.hitBy?.length;
+  if (!aimers.length && !combo) return null;
+  return (
+    <div className="flex items-center gap-0.5" data-aims={aimers.map((a) => a.id).join(',')}>
+      {combo && <span className="rounded bg-amber-500/90 px-1 text-[11px] leading-4 font-black text-amber-950">連携+{Math.round(BALANCE.comboBonus * 100)}%</span>}
+      {aimers.map((a) => (
+        <span key={a.id} className="overflow-hidden rounded-full border-2" style={{ width: 20, height: 20, borderColor: PLAYER_COLOR[a.playerId] ?? '#ffd76a' }}>
+          <CharacterArt classId={a.classId} gender={a.gender} face className="h-full w-full" />
+        </span>
+      ))}
+    </div>
+  );
+}
 
 const AllySprite = memo(function AllySprite({ ally, left, bottom, h, active }: { ally: AllyState; left: number; bottom: number; h: number; active: boolean }) {
   const scope = useUnitMotion(ally.id, 'ally');

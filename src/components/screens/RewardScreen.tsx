@@ -12,7 +12,8 @@ import { isLocalPlayer, LOCAL_PLAYER } from '../../store/battleConfig';
 import { speedFactor, useBattle, vibrate } from '../../store/battleStore';
 import type { GrowthOption, Hero, Rarity } from '../../types';
 import { CardFace } from '../ui/CardFace';
-import { Bar, Crest, HeroFace, RARITY_STYLE, Screen } from '../ui/game';
+import { Bar, Crest, HeroFace, ItemIcon, itemSummary, RARITY_STYLE, Screen } from '../ui/game';
+import { getItem } from '../../data/items';
 import { LootList } from './RoomScreens';
 
 /** 成長ボーナスのアイコン（成長の種類の icon のキー → アイコン） */
@@ -156,6 +157,65 @@ function RewardCards({ heroId }: { heroId: string }) {
   );
 }
 
+const CLAIM_LABEL = { need: '欲しい', greed: '余れば', pass: 'いらない' } as const;
+
+/** 落とした装備の取り合い（M3-C5）: 全員が選んだら、欲しい人の中で運の判定が一番高い人へ */
+function ClaimPanel() {
+  const game = useBattle((s) => s.game)!;
+  const dispatchGame = useBattle((s) => s.dispatchGame);
+  const c = game.reward!.claim!;
+  const def = getItem(c.item.itemId);
+  const roll = (id: string) => c.rolls?.find((x) => x.heroId === id)?.roll;
+  return (
+    <div className="panel panel-gold-edge mt-3 rounded-xl p-2" data-claim>
+      <div className="font-display text-center text-[16px] text-amber-100">戦利品を取り合う</div>
+      <div className="mt-1 flex items-center gap-2">
+        <ItemIcon item={def} size={52} />
+        <div className="min-w-0">
+          <div className="font-bold" style={{ color: RARITY_STYLE[def.rarity].color }}>
+            {def.name}
+          </div>
+          <div className="text-[12px] leading-4 text-zinc-300">{itemSummary(def)}</div>
+        </div>
+      </div>
+      <div className="mt-1 text-[12px] text-zinc-400">「欲しい」人がいればその中で、いなければ「余れば」の人の中で、運の判定（1〜100＋運の半分）が一番高い人がもらう</div>
+      <div className="mt-1.5 flex flex-col gap-1">
+        {c.heroes.map((id) => {
+          const h = findHero(game, id)!;
+          const mine = isLocalPlayer(h.playerId);
+          const ch = c.choices[id];
+          const win = c.winner === id;
+          return (
+            <div key={id} className={`flex items-center gap-1.5 rounded-lg p-1 ${win ? 'bg-amber-500/25 ring-1 ring-amber-300' : 'bg-black/30'}`}>
+              <HeroFace hero={h} size={30} />
+              <span className="min-w-0 flex-1 truncate text-[13px] font-bold">{h.name}</span>
+              {c.rolls ? (
+                <span className="text-[13px] tabular-nums text-zinc-200">
+                  {CLAIM_LABEL[ch]}
+                  {roll(id) !== undefined && <b className="ml-1 text-amber-200">運 {roll(id)}</b>}
+                  {win && <b className="ml-1 text-amber-300">獲得！</b>}
+                </span>
+              ) : mine ? (
+                (['need', 'greed', 'pass'] as const).map((k) => (
+                  <button
+                    key={k}
+                    onClick={() => dispatchGame({ type: 'CLAIM_LOOT', playerId: LOCAL_PLAYER, heroId: id, choice: k })}
+                    className={`btn h-11 rounded-lg px-2 text-[13px] font-bold ${ch === k ? 'btn-gold' : 'btn-dark'}`}
+                  >
+                    {CLAIM_LABEL[k]}
+                  </button>
+                ))
+              ) : (
+                <span className="text-[12px] text-zinc-400">{ch ? '選んだ' : '選んでいます…'}</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 const chanceOf = (hero: Hero, cardId: string, upgraded?: boolean) => finalChance(getCard(cardId, upgraded), affinityFromStats(heroStats(hero)));
 
 export function RewardScreen() {
@@ -229,6 +289,8 @@ export function RewardScreen() {
           </div>
         )}
 
+        {!lu && r.claim && <ClaimPanel />}
+
         {/* ドロップ */}
         {r.loot.length > 0 && (
           <div className="mt-3">
@@ -248,6 +310,8 @@ export function RewardScreen() {
           <button onClick={() => dispatchGame({ type: 'PICK_CARD', playerId: LOCAL_PLAYER, offerIndex: null, heroId: cardHero })} className="btn btn-dark h-12 w-full rounded-xl text-[15px] font-bold">
             {findHero(game, cardHero)?.name}はカードを選ばない
           </button>
+        ) : r.claim && !r.claim.rolls ? (
+          <div className="flex h-12 items-center justify-center rounded-xl bg-black/40 text-[14px] text-zinc-300">戦利品の取り合いが終わるのを待っています</div>
         ) : pending.length ? (
           <div className="flex h-12 items-center justify-center rounded-xl bg-black/40 text-[14px] text-zinc-300">ほかの人がカードを選び終えるのを待っています</div>
         ) : (

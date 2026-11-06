@@ -126,3 +126,45 @@ describe('遭遇の戦闘への参加', () => {
     expect(findHero(g, 'h1')).toBeDefined();
   });
 });
+
+describe('報酬はみんなに（M3-C4・C5）', () => {
+  /** 2人で最初の部屋の戦闘に勝って、報酬の画面へ */
+  function wonBattle() {
+    let { g, x } = inTemple();
+    const enter: GameCommand = { type: 'ENTER_ROOM', playerId: 'P1', roomId: 'r0c0' };
+    g = run(g, inScene(x, { type: 'VOTE', playerId: 'P1', command: enter }));
+    g = run(g, inScene(x, { type: 'VOTE', playerId: 'P2', command: { ...enter, playerId: 'P2' } }));
+    const b = g.expeditions![0].battle!;
+    b.enemies.forEach((e) => ((e.dead = true), (e.hp = 0)));
+    b.phase = 'victory';
+    g = run(g, inScene(x, { type: 'FINISH_BATTLE', playerId: 'P1' }));
+    expect(viewOf(g, x).mode).toBe('reward');
+    return { g, x };
+  }
+
+  it('カードは生き残ったキャラごとに3枚。2人とも自分のキャラの分を選べ、他人の分は選べない', () => {
+    let { g, x } = wonBattle();
+    const r = viewOf(g, x).reward!;
+    expect(new Set(r.cardOffers.map((o) => o.heroId))).toEqual(new Set(['h0', 'h1']));
+    const h1Offer = r.cardOffers.findIndex((o) => o.heroId === 'h1');
+    expect(applyGameCommand(g, inScene(x, { type: 'PICK_CARD', playerId: 'P1', offerIndex: h1Offer })).error).toMatch(/担当/);
+    g = run(g, inScene(x, { type: 'PICK_CARD', playerId: 'P2', offerIndex: h1Offer }));
+    g = run(g, inScene(x, { type: 'PICK_CARD', playerId: 'P1', offerIndex: null }));
+    expect(viewOf(g, x).reward!.cardPicked).toBe(true);
+    expect(findHero(g, 'h1')!.deck.length).toBe(findHero(newWorld(['P1', 'P2']), 'h1')!.deck.length + 1);
+  });
+
+  it('戦利品は取り合い: 欲しい人がいればその人へ（運の判定）。全員そろうまで決まらない', () => {
+    let { g, x } = wonBattle();
+    const item = { uid: 'loot1', itemId: findHero(g, 'h0')!.equipment.weapon!.itemId };
+    g.expeditions![0].reward!.claim = { item, heroes: ['h0', 'h1'], choices: {} };
+    g = run(g, inScene(x, { type: 'CLAIM_LOOT', playerId: 'P1', heroId: 'h0', choice: 'greed' }));
+    expect(viewOf(g, x).reward!.claim!.winner).toBeUndefined();
+    expect(applyGameCommand(g, inScene(x, { type: 'CLAIM_LOOT', playerId: 'P1', heroId: 'h1', choice: 'pass' })).error).toMatch(/担当/);
+    g = run(g, inScene(x, { type: 'CLAIM_LOOT', playerId: 'P2', heroId: 'h1', choice: 'need' }));
+    const c = viewOf(g, x).reward!.claim!;
+    expect(c.winner).toBe('h1');
+    expect(c.rolls!.map((r) => r.heroId)).toEqual(['h1']);
+    expect(findHero(g, 'h1')!.stash.some((i) => i.uid === 'loot1')).toBe(true);
+  });
+});
