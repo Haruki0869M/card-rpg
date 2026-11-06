@@ -7,7 +7,7 @@ import { DUNGEONS } from '../../data/dungeons';
 import { ENEMIES } from '../../data/enemies';
 import { ITEMS } from '../../data/items';
 import { SCENARIOS } from '../../data/scenarios';
-import { getRoomType } from '../../data/rules';
+import { getDifficulty, getRoomType } from '../../data/rules';
 import type { GameState } from '../../types';
 import { STATE_VERSION } from '../battle/battle';
 import { heroAbilities } from './hero';
@@ -26,6 +26,11 @@ const MIGRATIONS: Record<number, (g: Loose) => void> = {
       }
       g.battle.version = 4;
     }
+  },
+  // v4 → v5: 命の灯火（spec §11.4）が増えた。M2 までの冒険は仮の拠点のまま続ける
+  4(g) {
+    g.lives = getDifficulty(g.difficulty).lives;
+    if (g.battle) g.battle.version = 5;
   },
 };
 

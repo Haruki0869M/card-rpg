@@ -20,8 +20,8 @@ import {
   makeSeed,
   unusableReason,
 } from '../engine';
-import type { BattleEvent, BattleState, Command, Difficulty, GameCommand, GameState, Gender, SlotResult } from '../types';
-import { LOCAL_PLAYER, autoName } from './battleConfig';
+import type { BattleEvent, BattleState, Command, Difficulty, GameCommand, GameState, Gender, PlayerId, SlotResult } from '../types';
+import { actorOf, autoName, battleActorOf, isLocalPlayer, LOCAL_PLAYER } from './battleConfig';
 
 export interface Settings {
   fastMode: boolean;
@@ -54,14 +54,15 @@ export interface UnitFx {
   id: number;
 }
 
-export type Sheet = null | 'menu' | 'log' | 'draw' | 'discard' | 'party' | 'pouch';
+export type Sheet = null | 'menu' | 'log' | 'draw' | 'discard' | 'party' | 'pouch' | 'quests';
 export type Screen = 'title' | 'setup' | 'create' | 'game';
 
 /** 冒険の準備〜キャラクター作成の下書き */
 export interface NewGameDraft {
   scenarioId: string;
   difficulty: Difficulty;
-  party: { classId: string; gender: Gender; name: string }[];
+  /** playerId: 担当プレイヤー（ローカル協力。初期値は全員P1） */
+  party: { classId: string; gender: Gender; name: string; playerId?: PlayerId }[];
 }
 
 interface StoreState {
@@ -333,7 +334,7 @@ export const useBattle = create<StoreState>((set, get) => {
         seed: makeSeed(),
         scenarioId: d.scenarioId,
         difficulty: d.difficulty,
-        party: d.party.map((m) => ({ ...m, playerId: LOCAL_PLAYER })),
+        party: d.party.map((m) => ({ ...m, playerId: m.playerId ?? LOCAL_PLAYER })),
       });
       set({ game, screen: 'game', battle: EMPTY_BATTLE, sheet: null, selection: null });
       scheduleSave(get);
@@ -359,6 +360,9 @@ export const useBattle = create<StoreState>((set, get) => {
       const { game } = get();
       if (!game) return '冒険が始まっていません';
       const prevBattle = game.battle;
+      // ローカル協力: そのキャラの担当プレイヤーとして送る
+      if ('playerId' in cmd) cmd = { ...cmd, playerId: actorOf(game, cmd) } as GameCommand;
+      if (cmd.type === 'BATTLE' && 'playerId' in cmd.command) cmd = { ...cmd, command: { ...cmd.command, playerId: battleActorOf(game, cmd.command) } as Command };
       const r = applyGameCommand(game, cmd);
       if (r.error) {
         get().showToast(r.error);
@@ -388,6 +392,7 @@ export const useBattle = create<StoreState>((set, get) => {
     dispatch: (cmd) => {
       const { game } = get();
       if (!game || game.mode !== 'battle') return '戦闘中ではありません';
+      if ('playerId' in cmd) cmd = { ...cmd, playerId: battleActorOf(game, cmd) } as Command;
       const r = applyGameCommand(game, { type: 'BATTLE', command: cmd });
       if (r.error) return r.error;
       const b = r.state.battle!;
@@ -403,7 +408,7 @@ export const useBattle = create<StoreState>((set, get) => {
     tapCard: (cardUid) => {
       const { battle, activeId, selection } = get();
       const ally = findAlly(battle, activeId);
-      if (!ally || ally.playerId !== LOCAL_PLAYER) return;
+      if (!ally || !isLocalPlayer(ally.playerId)) return;
       const inst = ally.hand.find((c) => c.uid === cardUid);
       if (!inst) return;
       if (selection?.cardUid === cardUid) {
@@ -475,7 +480,7 @@ export const useBattle = create<StoreState>((set, get) => {
 
     setActive: (id) => {
       const ally = findAlly(get().battle, id);
-      if (!ally || ally.dead || ally.playerId !== LOCAL_PLAYER) return;
+      if (!ally || ally.dead || !isLocalPlayer(ally.playerId)) return;
       if (get().activeId === id && !get().selection) return;
       set({ activeId: id, selection: null });
       scheduleSave(get);

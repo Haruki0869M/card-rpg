@@ -2,7 +2,7 @@
 import { motion } from 'framer-motion';
 import { Check, Minus, Plus, Star, X } from 'lucide-react';
 import { successDistribution, statChance } from '../../engine';
-import { LOCAL_PLAYER } from '../../store/battleConfig';
+import { isLocalPlayer } from '../../store/battleConfig';
 import type { Hero, SlotResult, StatId } from '../../types';
 import { HeroFace, STAT_LABEL } from './game';
 
@@ -50,7 +50,7 @@ export function CheckPanel({
       <div className="flex gap-1">
         {heroes.map((h) => {
           const c = statChance(h, stat, tag);
-          const mine = h.playerId === LOCAL_PLAYER;
+          const mine = isLocalPlayer(h.playerId);
           return (
             <button
               key={h.id}

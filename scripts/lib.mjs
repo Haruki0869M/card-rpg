@@ -6,7 +6,7 @@ export const { chromium } = require('playwright');
 export const URL = process.env.URL ?? 'http://localhost:4173/card-rpg/';
 
 /**
- * 新しい冒険を始めて（人数を指定）、翠の神殿の最初の部屋で戦闘を始める。
+ * 新しい冒険を始めて（人数を指定）、世界マップの翠の神殿の入口から入り、最初の部屋で戦闘を始める。
  * enemies を渡すと、最初の部屋の敵をその組み合わせに差し替える（敵1〜4体の確認用）。
  */
 export async function startBattle(page, partySize, enemies, fast = true) {
@@ -20,17 +20,33 @@ export async function startBattle(page, partySize, enemies, fast = true) {
   await page.getByText(`${partySize}人`, { exact: true }).click();
   await page.getByText('キャラクター作成へ').click();
   await page.getByText('冒険に出発').click();
-  await page.getByText('翠の神殿').first().click();
   await page.waitForTimeout(300);
-  if (enemies) {
-    await page.evaluate((enemies) => {
-      const k = 'card-rpg/adventure';
-      const d = JSON.parse(localStorage.getItem(k));
-      d.game.dungeon.rooms.find((r) => r.id === 'r0c0').enemies = enemies.map((defId) => ({ defId, level: 3 }));
-      localStorage.setItem(k, JSON.stringify(d));
-    }, enemies);
+  // 保存データを書き換えて、全員を翠の神殿の入口へ（物語も閉じる）
+  const edit = async (fn, arg) => {
+    await page.evaluate(
+      ({ src, arg }) => {
+        const k = 'card-rpg/adventure';
+        const d = JSON.parse(localStorage.getItem(k));
+        (0, eval)(src)(d.game, arg);
+        localStorage.setItem(k, JSON.stringify(d));
+      },
+      { src: fn.toString(), arg },
+    );
     await page.reload();
     await page.getByText('つづきから').click();
+  };
+  await edit((g) => {
+    const w = g.world;
+    const t = w.tiles.findIndex((x) => x.f && x.f.kind === 'dungeon' && x.f.id === 'emeraldTemple');
+    for (const id of Object.keys(w.pos)) w.pos[id] = t;
+    w.story = undefined;
+  });
+  await page.getByText('翠の神殿に入る').click();
+  await page.waitForTimeout(200);
+  if (enemies) {
+    await edit((g, enemies) => {
+      g.dungeon.rooms.find((r) => r.id === 'r0c0').enemies = enemies.map((defId) => ({ defId, level: 3 }));
+    }, enemies);
   }
   await page.getByLabel('戦闘').first().click();
   await page.getByText('この部屋へ進む').click();

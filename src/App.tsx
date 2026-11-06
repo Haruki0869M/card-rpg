@@ -13,6 +13,8 @@ import { ClearedScreen, GameOverScreen } from './components/screens/EndScreens';
 import { HubScreen } from './components/screens/HubScreen';
 import { RewardScreen } from './components/screens/RewardScreen';
 import { ChestScreen } from './components/screens/ChestScreen';
+import { WorldScreen } from './components/world/WorldScreen';
+import { EncounterScreen, EndingScreen, ShrineScreen, TownScreen } from './components/world/Places';
 import { EventScreen, RestScreen } from './components/screens/RoomScreens';
 import { SetupScreen } from './components/screens/SetupScreen';
 import { TitleScreen } from './components/screens/TitleScreen';
@@ -81,6 +83,16 @@ function CurrentScreen() {
   switch (mode) {
     case 'hub':
       return <HubScreen />;
+    case 'world':
+      return <WorldScreen />;
+    case 'encounter':
+      return <EncounterScreen />;
+    case 'town':
+      return <TownScreen />;
+    case 'shrine':
+      return <ShrineScreen />;
+    case 'ending':
+      return <EndingScreen />;
     case 'dungeon':
       return <DungeonScreen />;
     case 'battle':

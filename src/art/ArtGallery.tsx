@@ -38,7 +38,7 @@ export default function ArtGallery() {
           </div>
         ))}
       </div>
-      <H>敵（ボスは2形態）</H>
+      <H>敵（ボスは形態ごと）</H>
       <div className="grid grid-cols-4 gap-2">
         {ENEMIES.all.flatMap((e) =>
           Array.from({ length: 1 + (e.phases?.length ?? 0) }, (_, ph) => (
@@ -53,9 +53,9 @@ export default function ArtGallery() {
           <div className="text-[13px] font-bold">絵が未作成の敵</div>
         </div>
       </div>
-      <H>背景（平原・翠の神殿・タイトルの魔王城）</H>
+      <H>背景</H>
       <div className="grid grid-cols-3 gap-2">
-        {['plains', 'temple', 'castle'].map((k) => (
+        {['plains', 'forest', 'temple', 'swamp', 'volcano', 'castle'].map((k) => (
           <div key={k} className="h-[150px] overflow-hidden rounded-lg">
             <BattleBackground kind={k} className="h-full w-full" />
           </div>

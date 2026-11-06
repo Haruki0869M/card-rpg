@@ -5,8 +5,8 @@ import { Check, ChevronsRight, Lock, Sparkles, Star, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BattleBackground, ChestImage } from '../../art';
 import { BALANCE, REVEAL_TIMING, VIBRATION } from '../../data/balance';
-import { chestOdds, expectedChestOdds, rarityIndex, statChance } from '../../engine';
-import { LOCAL_PLAYER } from '../../store/battleConfig';
+import { chestOdds, expectedChestOdds, rarityIndex, statChance, sceneBackground, sceneHeroes } from '../../engine';
+import { LOCAL_PLAYER, isLocalPlayer } from '../../store/battleConfig';
 import { speedFactor, useBattle, vibrate } from '../../store/battleStore';
 import type { ChestRoll, Hero, Rarity, SlotResult } from '../../types';
 import { CheckPanel, RollStrip } from '../ui/CheckPanel';
@@ -50,7 +50,7 @@ function buildTimeline(roll: ChestRoll): Step[] {
 
 /** 判定に一番向いている、この端末のキャラ */
 function bestHero(heroes: Hero[], score: (h: Hero) => number): string {
-  const mine = heroes.filter((h) => h.hp > 0 && h.playerId === LOCAL_PLAYER);
+  const mine = heroes.filter((h) => h.hp > 0 && isLocalPlayer(h.playerId));
   return [...mine].sort((a, b) => score(b) - score(a))[0]?.id ?? heroes[0].id;
 }
 
@@ -198,7 +198,7 @@ export function ChestScreen() {
   const chest = game.chest!;
   const locked = !chest.unlocked;
   const look = chest.spec.rarity;
-  const [heroId, setHeroId] = useState(() => bestHero(game.heroes, (h) => statChance(h, locked ? 'dex' : 'luk')));
+  const [heroId, setHeroId] = useState(() => bestHero(sceneHeroes(game), (h) => statChance(h, locked ? 'dex' : 'luk')));
   const [focus, setFocus] = useState(0);
   const opened = !!chest.contents;
   const roll = chest.lastRoll?.kind === 'luck' ? chest.lastRoll : undefined;
@@ -240,7 +240,7 @@ export function ChestScreen() {
   const showResult = opened && !animating;
 
   // 帯グラフ: 開ける前 = 今の設定での確率 / 演出中 = スロット後にずれる / 結果 = 当たった格を強調
-  const hero = game.heroes.find((h) => h.id === heroId) ?? game.heroes[0];
+  const hero = sceneHeroes(game).find((h) => h.id === heroId) ?? sceneHeroes(game)[0];
   const chance = statChance(hero, 'luk', 'luck');
   const slots = BALANCE.chestLuckSlots;
   const expected = useMemo(() => expectedChestOdds(look, slots, Math.min(focus, slots, hero.focus), chance), [look, slots, focus, hero.focus, chance]);
@@ -256,7 +256,7 @@ export function ChestScreen() {
   return (
     <Screen>
       <div className="relative min-h-0 flex-1 overflow-hidden" onClick={skip}>
-        <BattleBackground kind={game.dungeon?.background} className="absolute inset-0 h-full w-full opacity-35" />
+        <BattleBackground kind={sceneBackground(game)} className="absolute inset-0 h-full w-full opacity-35" />
         {premium && <PremiumLayer dim={showResult} />}
         <AnimatePresence>{reach && <ReachLayer key="reach" />}</AnimatePresence>
         {/* 光が上がった瞬間のフラッシュ */}
@@ -399,7 +399,7 @@ export function ChestScreen() {
         ) : !opened ? (
           <>
             <CheckPanel
-              heroes={game.heroes}
+              heroes={sceneHeroes(game)}
               heroId={heroId}
               setHeroId={setHeroId}
               focus={focus}

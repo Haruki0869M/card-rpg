@@ -6,8 +6,8 @@ import { BattleBackground } from '../../art';
 import { BALANCE } from '../../data/balance';
 import { EVENTS } from '../../data/events';
 import { getItem } from '../../data/items';
-import { eventOptionState, heroFocusMax, heroMaxHp, statChance } from '../../engine';
-import { LOCAL_PLAYER } from '../../store/battleConfig';
+import { eventOptionState, heroFocusMax, heroMaxHp, statChance, sceneBackground, sceneHeroes } from '../../engine';
+import { LOCAL_PLAYER, isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
 import type { Hero, Loot } from '../../types';
 import { CheckPanel, RollStrip } from '../ui/CheckPanel';
@@ -15,7 +15,7 @@ import { HeroFace, ItemIcon, itemSummary, RARITY_STYLE, Screen } from '../ui/gam
 
 /** 判定に一番向いている、この端末のキャラ */
 function bestHero(heroes: Hero[], score: (h: Hero) => number): string {
-  const mine = heroes.filter((h) => h.hp > 0 && h.playerId === LOCAL_PLAYER);
+  const mine = heroes.filter((h) => h.hp > 0 && isLocalPlayer(h.playerId));
   return [...mine].sort((a, b) => score(b) - score(a))[0]?.id ?? heroes[0].id;
 }
 
@@ -66,14 +66,14 @@ export function EventScreen() {
   const def = EVENTS.get(ev.eventId);
   const [chosen, setChosen] = useState<number | null>(null);
   const opt = chosen !== null ? def.options[chosen] : undefined;
-  const [heroId, setHeroId] = useState(game.heroes[0].id);
+  const [heroId, setHeroId] = useState(sceneHeroes(game)[0].id);
   const [focus, setFocus] = useState(0);
 
   const choose = (i: number) => {
     const o = def.options[i];
     if (o.check) {
       setChosen(i);
-      setHeroId(bestHero(game.heroes, (h) => statChance(h, o.check!.stat, o.check!.tag)));
+      setHeroId(bestHero(sceneHeroes(game), (h) => statChance(h, o.check!.stat, o.check!.tag)));
       setFocus(0);
     } else dispatchGame({ type: 'CHOOSE_EVENT', playerId: LOCAL_PLAYER, optionIndex: i, focusUsed: 0 });
   };
@@ -81,7 +81,7 @@ export function EventScreen() {
   return (
     <Screen>
       <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        <BattleBackground kind={game.dungeon?.background} className="absolute inset-0 h-full w-full opacity-30" />
+        <BattleBackground kind={sceneBackground(game)} className="absolute inset-0 h-full w-full opacity-30" />
         <div className="relative px-3 pt-4">
           <div className="flex items-center gap-2">
             <span className="flex h-12 w-12 items-center justify-center rounded-xl border-2 border-sky-300 bg-sky-950/60">
@@ -112,7 +112,7 @@ export function EventScreen() {
           <>
             <div className="font-display mb-1 text-[16px] text-amber-100">「{opt.label}」</div>
             <CheckPanel
-              heroes={game.heroes}
+              heroes={sceneHeroes(game)}
               heroId={heroId}
               setHeroId={setHeroId}
               focus={focus}
@@ -166,7 +166,7 @@ export function RestScreen() {
   return (
     <Screen>
       <div className="relative min-h-0 flex-1 overflow-hidden">
-        <BattleBackground kind={game.dungeon?.background} className="absolute inset-0 h-full w-full opacity-40" />
+        <BattleBackground kind={sceneBackground(game)} className="absolute inset-0 h-full w-full opacity-40" />
         <div className="relative flex flex-col items-center px-3 pt-6">
           <motion.span
             animate={{ scale: [1, 1.08, 1] }}
@@ -179,7 +179,7 @@ export function RestScreen() {
           <div className="font-display text-outline mt-2 text-[26px] text-amber-100">休憩所</div>
           <div className="text-[13px] text-zinc-300">焚き火の前で、ひと息つける。どちらか1つを選ぼう。</div>
           <div className="mt-4 flex w-full flex-col gap-2">
-            {game.heroes.map((h) => (
+            {sceneHeroes(game).map((h) => (
               <div key={h.id} className="panel flex items-center gap-2 rounded-lg p-1.5 text-[13px]">
                 <HeroFace hero={h} size={32} dim={h.hp <= 0} />
                 <span className="w-16 truncate font-bold">{h.name}</span>

@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Backpack, Layers, Menu, Skull, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { findAlly, isDone } from '../../engine';
-import { LOCAL_PLAYER } from '../../store/battleConfig';
+import { isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
 
 export function TopBar() {
@@ -54,7 +54,7 @@ export function BottomBar() {
   const endTurn = useBattle((s) => s.endTurn);
   const openSheet = useBattle((s) => s.openSheet);
   const ally = findAlly(battle, activeId);
-  const allDone = battle.phase === 'ally' && battle.allies.every((a) => a.playerId !== LOCAL_PLAYER || isDone(battle, a));
+  const allDone = battle.phase === 'ally' && battle.allies.every((a) => !isLocalPlayer(a.playerId) || isDone(battle, a));
   const [showHint, setShowHint] = useState(false);
 
   useEffect(() => {

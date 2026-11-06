@@ -2,7 +2,7 @@
 import type { DifficultyDef } from '../../../types';
 
 export const difficulties: DifficultyDef[] = [
-  { id: 'easy', order: 1, name: 'やさしい', enemyLevel: -1 },
-  { id: 'normal', order: 2, name: 'ふつう', enemyLevel: 0 },
-  { id: 'hard', order: 3, name: 'むずかしい', enemyLevel: 1 },
+  { id: 'easy', order: 1, name: 'やさしい', enemyLevel: -1, lives: 5 },
+  { id: 'normal', order: 2, name: 'ふつう', enemyLevel: 0, lives: 3 },
+  { id: 'hard', order: 3, name: 'むずかしい', enemyLevel: 1, lives: 2 },
 ];

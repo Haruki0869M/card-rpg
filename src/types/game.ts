@@ -1,4 +1,5 @@
 // ===== 冒険（ゲーム全体）の型 =====
+import type { EncounterState, ScenarioMapDef, ScenarioStory, ShrineVisit, TownVisit, WorldState } from './world';
 import type {
   AbilityDef,
   BattleState,
@@ -67,6 +68,10 @@ export interface Hero {
   equipment: Partial<Record<EquipSlot, ItemInstance>>;
   /** 次の戦闘の開始時に付く状態異常（イベントの失敗など） */
   nextBattleStatuses: Partial<Record<StatusId, number>>;
+  /** 命の灯火が無い時に戦闘に負けて、冒険から退場した（spec §11.4） */
+  retired?: boolean;
+  /** 祠の永続の加護の数（上限あり） */
+  blessings?: number;
 }
 
 // ---------- ダンジョン ----------
@@ -139,6 +144,14 @@ export interface DungeonDef {
   layout?: { type: RoomType; next: number[]; chest?: ChestSpec; eventId?: string }[][];
   /** 大宝箱の見た目（中身の格の確率を決める） */
   bossChest: Rarity;
+  /** 制覇すると手に入る封印の鍵（シナリオの story.keys のID） */
+  rewardKey?: string;
+  /** 入るのに必要な鍵 */
+  requiresKeys?: string[];
+  /** 制覇すると侵食度がこれだけ下がる */
+  corruptionOnClear?: number;
+  /** 制覇するとシナリオのクリア（ラスボスのダンジョン） */
+  finale?: boolean;
   /** ランダムダンジョン（拠点に戻るたびに形が変わる。layout は使わず自動生成） */
   random?: boolean;
   /** 自動生成の時の部屋の行数 */
@@ -166,7 +179,9 @@ export type Loot =
   | { kind: 'card'; cardId: string; heroId: string };
 
 export interface ChestState {
-  roomId: string;
+  /** ダンジョンの部屋の宝箱なら部屋ID、世界マップの宝箱ならマスの番号 */
+  roomId?: string;
+  tile?: number;
   spec: ChestSpec;
   /** 鍵開け済み */
   unlocked: boolean;
@@ -176,6 +191,8 @@ export interface ChestState {
   grade?: Rarity;
   /** 判定の結果（演出用） */
   lastRoll?: ChestRoll;
+  /** 戦闘の後に見つけた隠し宝箱（マスには残らない） */
+  hidden?: boolean;
 }
 
 export interface ChestRoll {
@@ -226,6 +243,10 @@ export interface EventOption {
 
 export interface EventDef {
   id: string;
+  /** どこで起きるか（省略はダンジョンの部屋） */
+  where?: 'dungeon' | 'map';
+  /** 夜だけ起きる */
+  night?: boolean;
   title: string;
   text: string;
   icon: string;
@@ -233,7 +254,9 @@ export interface EventDef {
 }
 
 export interface EventState {
-  roomId: string;
+  /** ダンジョンの部屋のイベントなら部屋ID、世界マップのイベントならマスの番号 */
+  roomId?: string;
+  tile?: number;
   eventId: string;
   /** 選んだ結果（選ぶ前は undefined） */
   result?: { optionIndex: number; heroId?: string; results?: ('focus' | 'hit' | 'miss')[]; success: boolean; text: string; loot: Loot[] };
@@ -263,7 +286,7 @@ export interface RewardState {
   hiddenChest?: ChestSpec;
 }
 
-export type GameMode = 'hub' | 'dungeon' | 'battle' | 'reward' | 'chest' | 'event' | 'rest' | 'gameover' | 'cleared';
+export type GameMode = 'hub' | 'world' | 'encounter' | 'town' | 'shrine' | 'dungeon' | 'battle' | 'reward' | 'chest' | 'event' | 'rest' | 'gameover' | 'cleared' | 'ending';
 
 export interface AdventureStats {
   battlesWon: number;
@@ -305,6 +328,19 @@ export interface GameState {
   log: GameLog[];
   nextUid: number;
   nextLogId: number;
+  /** 命の灯火（パーティ共有の残機。spec §11.4） */
+  lives: number;
+  /** 世界マップ（シナリオにマップがある時） */
+  world?: WorldState;
+  /** 今の場面に参加しているキャラ（ダンジョン・遭遇の戦闘。無ければ全員） */
+  party?: string[];
+  /** 今の戦闘の背景 */
+  battleBackground?: string;
+  /** 今の戦闘の情報（どこで・何と） */
+  battleInfo?: { roomType: string; wandererId?: string; tile?: number };
+  encounter?: EncounterState;
+  town?: TownVisit;
+  shrine?: ShrineVisit;
 }
 
 /** 難易度のID（src/content の difficulties に登録したもの） */
@@ -316,6 +352,8 @@ export interface DifficultyDef {
   name: string;
   /** 敵のレベルの加算 */
   enemyLevel: number;
+  /** 命の灯火の数（spec §11.4） */
+  lives: number;
   /** 敵のHP・攻撃、戦闘の報酬（経験値・ゴールド）の倍率（省略は1） */
   enemyHp?: number;
   enemyAttack?: number;
@@ -349,7 +387,31 @@ export type GameCommand =
   | { type: 'RETREAT'; playerId: PlayerId }
   | { type: 'RETURN_TO_HUB'; playerId: PlayerId }
   | { type: 'EQUIP'; playerId: PlayerId; heroId: string; itemUid: string }
-  | { type: 'UNEQUIP'; playerId: PlayerId; heroId: string; slot: EquipSlot };
+  | { type: 'UNEQUIP'; playerId: PlayerId; heroId: string; slot: EquipSlot }
+  // ---------- 世界マップ（spec §8） ----------
+  /** 移動力の判定 */
+  | { type: 'WORLD_ROLL_MOVE'; playerId: PlayerId; heroId: string; focusUsed: number }
+  /** 移動（同行するキャラも一緒に動く。同行したキャラはこのワールドターンの行動を終える） */
+  | { type: 'WORLD_MOVE'; playerId: PlayerId; heroId: string; to: number; companions: string[] }
+  | { type: 'WORLD_WAIT'; playerId: PlayerId; heroId: string }
+  | { type: 'WORLD_CAMP'; playerId: PlayerId; heroId: string }
+  /** 今いるマスの町・祠・イベント・宝箱・ダンジョンに入る */
+  | { type: 'WORLD_INTERACT'; playerId: PlayerId; heroId: string; party?: string[] }
+  /** 遭遇: 戦う / 奇襲を狙う / 逃げる */
+  | { type: 'ENCOUNTER_CHOOSE'; playerId: PlayerId; choice: 'fight' | 'ambush' | 'flee'; heroId: string; focusUsed: number; participants: string[] }
+  /** 遭遇の判定の結果を見た後に進む */
+  | { type: 'ENCOUNTER_CONTINUE'; playerId: PlayerId; participants: string[] }
+  | { type: 'STORY_CONTINUE'; playerId: PlayerId }
+  // ---------- 町・祠 ----------
+  | { type: 'TOWN_BUY'; playerId: PlayerId; kind: 'item' | 'card'; index: number }
+  | { type: 'TOWN_INN'; playerId: PlayerId }
+  | { type: 'TOWN_REMOVE_CARD'; playerId: PlayerId; heroId: string; cardUid: string }
+  | { type: 'TOWN_SELL'; playerId: PlayerId; itemUid: string }
+  | { type: 'QUEST_ACCEPT'; playerId: PlayerId; questId: string }
+  | { type: 'QUEST_REPORT'; playerId: PlayerId; questId: string }
+  | { type: 'LEAVE_TOWN'; playerId: PlayerId }
+  | { type: 'SHRINE_CHOOSE'; playerId: PlayerId; optionIndex: number; heroId: string }
+  | { type: 'LEAVE_SHRINE'; playerId: PlayerId };
 
 export interface GameResult {
   state: GameState;
@@ -372,6 +434,9 @@ export interface ScenarioDef {
   /** 解放条件の説明（未解放の時に表示） */
   unlockText?: string;
   /** 冒険の開始条件 */
+  /** 世界マップ（無ければ仮の拠点から遊ぶ） */
+  map?: ScenarioMapDef;
+  story?: ScenarioStory;
   start: {
     gold?: number;
     /** 最初の消費アイテム */

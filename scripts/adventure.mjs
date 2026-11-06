@@ -1,4 +1,5 @@
-// 実際の画面をタップして、キャラ作成 → ダンジョン → 宝箱 → レベルアップ → ボス撃破 → 大宝箱 → 拠点 まで進める
+// 実際の画面をタップして、キャラ作成 → 世界マップ（物語・移動・遭遇）→ 翠の神殿 → 宝箱 → レベルアップ → ボス撃破 → 大宝箱 → 地上 まで進める
+// 2人以上は担当プレイヤーを分けて、手番の受け渡しの画面も確かめる
 // npm run build && npx vite preview --port 4173 を起動した状態で: node scripts/adventure.mjs
 import { mkdirSync } from 'node:fs';
 import { chromium, layoutIssues, URL } from './lib.mjs';
@@ -15,7 +16,12 @@ async function check(page, tag) {
 async function clickText(page, text, opts = {}) {
   const l = page.getByText(text, { exact: true, ...opts }).first();
   if (await l.count()) {
-    await l.click();
+    try {
+      await l.click({ timeout: 4000 });
+    } catch {
+      // 消えていく途中のボタンなど（次の回でやり直す）
+      return false;
+    }
     return true;
   }
   return false;
@@ -79,26 +85,108 @@ async function run(party, difficulty) {
   await clickText(page, `${party}人`);
   await check(page, 'setup');
   await page.getByText('キャラクター作成へ').click();
+  // 2人目以降は別のプレイヤーが担当（ローカル協力の手番の受け渡しを確かめる）
+  if (party > 1) {
+    await page.getByText('2人目').click();
+    await page.getByText('P2', { exact: true }).click();
+    await page.getByText('1人目').click();
+  }
   await check(page, 'create');
   await page.getByText('冒険に出発').click();
+  // 冒頭の物語
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: `screenshots/adv-story.png` });
+  await page.getByText('つづける').click();
   // 高速モード
   await page.getByLabel('メニュー').click();
   await page.getByText('高速モード（演出2倍速）').click();
   await page.getByLabel('閉じる').click();
-  await check(page, 'hub');
-  await page.getByText('翠の神殿').first().click();
 
   let result = 'timeout';
-  for (let step = 0; step < 300; step++) {
+  for (let step = 0; step < 900; step++) {
     await page.waitForTimeout(60);
-    if (await page.getByText('拠点に戻る', { exact: true }).count()) {
+    if (await page.getByText('地上に戻る', { exact: true }).count()) {
       result = 'cleared';
       await page.screenshot({ path: `screenshots/adv-${party}p-cleared.png` });
       await check(page, 'cleared');
-      await page.getByText('拠点に戻る').click();
-      await page.waitForTimeout(200);
-      if (!(await page.getByText('冒険の拠点').count())) issues.add('拠点に戻れない');
+      await page.getByText('地上に戻る').click();
+      await page.waitForTimeout(300);
+      if (!(await page.locator('[data-world-map]').count())) issues.add('世界マップに戻れない');
       break;
+    }
+    if (await page.getByText('世界の終わり…', { exact: true }).count()) {
+      result = 'gameover';
+      break;
+    }
+    // 物語・手番の受け渡し
+    if (await clickText(page, 'つづける')) continue;
+    if (await page.getByLabel('手番を始める').count()) {
+      if (!seen.has('handoff')) {
+        seen.add('handoff');
+        await page.screenshot({ path: `screenshots/adv-handoff.png` });
+      }
+      await page.getByLabel('手番を始める').click({ timeout: 3000 }).catch(() => {});
+      continue;
+    }
+    // 遭遇
+    if (await page.getByText('奇襲を狙う').count() && (await page.getByText('戦う', { exact: true }).count())) {
+      if (!seen.has('encounter')) {
+        seen.add('encounter');
+        await check(page, 'encounter');
+        await page.screenshot({ path: `screenshots/adv-encounter.png` });
+      }
+      await page.getByText('戦う', { exact: true }).click({ timeout: 3000 }).catch(() => {});
+      continue;
+    }
+    if (await clickText(page, '戦闘開始')) continue;
+    if (await clickText(page, '町を出る')) continue;
+    if (await clickText(page, '祈らずに去る')) continue;
+    // 世界マップ: 翠の神殿へ向かう
+    if (await page.locator('[data-world-map]').count() && !(await page.getByText('撤退', { exact: true }).count())) {
+      if (!seen.has('world')) {
+        seen.add('world');
+        await check(page, 'world');
+        await page.screenshot({ path: `screenshots/adv-world.png` });
+      }
+      if (await clickText(page, '翠の神殿に入る')) continue;
+      if (await page.getByText('移動力の判定').count()) {
+        await page.getByText('移動力の判定').click({ timeout: 3000 }).catch(() => {});
+        continue;
+      }
+      const reach = page.locator('[data-reach]');
+      const n = await reach.count();
+      if (n) {
+        const goal = page.locator('[data-feature="dungeon:emeraldTemple"]');
+        const gb = (await goal.count()) ? await goal.boundingBox() : null;
+        const target = gb ? { x: gb.x + gb.width / 2, y: gb.y + gb.height / 2 } : { x: 180, y: -100000 };
+        let best = null;
+        let bestD = Infinity;
+        for (let i = 0; i < n; i++) {
+          const b = await reach.nth(i).boundingBox();
+          if (!b) continue;
+          const d = (b.x + b.width / 2 - target.x) ** 2 + (b.y + b.height / 2 - target.y) ** 2;
+          if (d < bestD) (bestD = d), (best = i);
+        }
+        const hb = await page.locator('[data-hero].glow-pulse').boundingBox();
+        const hd = hb ? (hb.x + hb.width / 2 - target.x) ** 2 + (hb.y + hb.height / 2 - target.y) ** 2 : Infinity;
+        if (best !== null && bestD < hd) {
+          await reach.nth(best).scrollIntoViewIfNeeded();
+          const b = await reach.nth(best).boundingBox();
+          await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+          await page.waitForTimeout(80);
+          if (await page.locator('button:has-text("移動する")').count()) {
+            if (!seen.has('move')) {
+              seen.add('move');
+              await page.screenshot({ path: `screenshots/adv-move.png` });
+            }
+            await page.locator('button:has-text("移動する")').click({ timeout: 3000 }).catch(() => {});
+            await page.waitForTimeout(250);
+            continue;
+          }
+        }
+      }
+      await clickText(page, '手番を終える') || (await clickText(page, '待機'));
+      continue;
     }
     if (await page.getByText('全滅…', { exact: true }).count()) {
       if (await page.locator('button:has-text("冒険の結果へ")').count()) {

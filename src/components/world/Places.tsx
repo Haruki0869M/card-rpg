@@ -1,0 +1,539 @@
+// ===== 世界マップの場面: 遭遇（spec §8.5）・町（§17）・祠（§8.4）・エンディング =====
+import { motion } from 'framer-motion';
+import { BedDouble, Check, Coins, Eye, HandCoins, ScrollText, Sparkles, Store, Swords, Trash2, Wind } from 'lucide-react';
+import { useState } from 'react';
+import { BattleBackground, EnemyArt } from '../../art';
+import { BALANCE } from '../../data/balance';
+import { cardOf, getCard } from '../../data/cards';
+import { getEnemy } from '../../data/enemies';
+import { getItem } from '../../data/items';
+import { getScenario } from '../../data/scenarios';
+import { QUESTS, SHRINES, TOWNS } from '../../data/world';
+import {
+  affinityFromStats,
+  canReportQuest,
+  finalChance,
+  heroesInTown,
+  heroFocusMax,
+  heroMaxHp,
+  heroStats,
+  objectiveHandler,
+  questProgress,
+  sceneBackground,
+  sceneHeroes,
+  sellPrice,
+  statChance,
+} from '../../engine';
+import { useBattle } from '../../store/battleStore';
+import type { GameState, Hero } from '../../types';
+import { CardFace } from '../ui/CardFace';
+import { CheckPanel, RollStrip } from '../ui/CheckPanel';
+import { Heading, HeroFace, ItemIcon, itemSummary, RARITY_STYLE, Screen } from '../ui/game';
+import { WorldTopBar } from './WorldScreen';
+
+const first = (game: GameState) => game.heroes.find((h) => !h.retired)!.playerId;
+
+// ---------- 遭遇 ----------
+
+export function EncounterScreen() {
+  const game = useBattle((s) => s.game)!;
+  const dispatchGame = useBattle((s) => s.dispatchGame);
+  const e = game.encounter!;
+  const w = game.world!;
+  const wd = w.wanderers.find((x) => x.id === e.wandererId);
+  const cands = e.candidates.map((id) => game.heroes.find((h) => h.id === id)!).filter(Boolean);
+  const forced = new Set(cands.filter((h) => w.pos[h.id] === e.tile).map((h) => h.id));
+  const [joined, setJoined] = useState<Record<string, boolean>>({});
+  const participants = cands.filter((h) => forced.has(h.id) || (joined[h.id] ?? true)).map((h) => h.id);
+  const [mode, setMode] = useState<'ambush' | 'flee' | null>(null);
+  const [heroId, setHeroId] = useState(e.heroId);
+  const [focus, setFocus] = useState(0);
+  const roller = cands.find((h) => h.id === heroId) ?? cands[0];
+  const r = e.result;
+
+  return (
+    <Screen>
+      <WorldTopBar game={game} />
+      <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <BattleBackground kind={sceneBackground(game)} className="absolute inset-0 h-full w-full opacity-50" />
+        <div className="relative px-3 pt-3">
+          <div className="font-display text-outline text-center text-[24px] text-red-200">{e.ambushed ? '夜襲だ！' : wd?.raidTown ? '町を襲う魔物！' : '魔物に遭遇した！'}</div>
+          <div className="mt-1 flex items-end justify-center gap-1">
+            {wd?.enemies.map((en, i) => (
+              <div key={i} className="flex flex-col items-center">
+                <EnemyArt defId={en.defId} className="h-[110px] w-[92px]" />
+                <span className="text-outline text-[12px] font-bold">
+                  {getEnemy(en.defId).name} <span className="text-amber-300">Lv{en.level ?? 1}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="panel mt-2 rounded-xl p-2">
+            <div className="text-[12px] text-zinc-300">戦闘に参加するキャラ（{BALANCE.joinRange}マス以内の仲間も参加できる）</div>
+            <div className="mt-1 flex gap-1">
+              {cands.map((h) => {
+                const on = participants.includes(h.id);
+                return (
+                  <button
+                    key={h.id}
+                    disabled={forced.has(h.id) || !!r}
+                    onClick={() => setJoined({ ...joined, [h.id]: !on })}
+                    className={`btn flex min-w-0 flex-1 flex-col items-center rounded-lg border-2 py-1 disabled:opacity-100 disabled:filter-none ${on ? 'border-amber-300 bg-amber-500/15' : 'border-white/10 bg-black/30'}`}
+                  >
+                    <HeroFace hero={h} size={32} dim={!on} />
+                    <span className="truncate text-[12px] font-bold">{h.name}</span>
+                    <span className="text-[12px] text-zinc-400">{forced.has(h.id) ? 'このマス' : on ? '参加する' : '参加しない'}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          {r && (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-3 flex flex-col items-center gap-1">
+              <RollStrip results={r.results} />
+              <div className={`text-[16px] font-bold ${r.success ? 'text-emerald-300' : 'text-red-300'}`}>
+                {r.choice === 'ambush' ? (r.success ? '奇襲成功！ 敵は最初のターンに動けない' : '奇襲は失敗。普通に戦闘が始まる') : r.success ? '逃げ切った！' : '逃げられなかった！ 戦闘が始まる'}
+              </div>
+            </motion.div>
+          )}
+        </div>
+      </div>
+      <div className="panel shrink-0 rounded-t-2xl px-3 pt-2 pb-3">
+        {r ? (
+          <button onClick={() => dispatchGame({ type: 'ENCOUNTER_CONTINUE', playerId: first(game), participants })} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px]">
+            {r.choice === 'flee' && r.success ? '世界マップへ' : '戦闘開始'}
+          </button>
+        ) : mode ? (
+          <>
+            <CheckPanel
+              heroes={cands.filter((h) => participants.includes(h.id))}
+              heroId={roller.id}
+              setHeroId={setHeroId}
+              focus={focus}
+              setFocus={setFocus}
+              stat={mode === 'ambush' ? 'per' : 'agi'}
+              tag={mode}
+              slots={BALANCE.encounterSlots}
+              need={BALANCE.encounterNeed}
+              successLabel={mode === 'ambush' ? '奇襲成功（失敗しても普通に戦うだけ）' : '逃走成功（失敗すると戦闘）'}
+            />
+            <div className="mt-2 grid grid-cols-[1fr_2fr] gap-2">
+              <button onClick={() => setMode(null)} className="btn btn-dark h-12 rounded-xl text-[14px] font-bold">
+                戻る
+              </button>
+              <button
+                onClick={() => dispatchGame({ type: 'ENCOUNTER_CHOOSE', playerId: roller.playerId, choice: mode, heroId: roller.id, focusUsed: focus, participants })}
+                className="btn btn-gold font-display h-12 rounded-xl text-[18px]"
+              >
+                {mode === 'ambush' ? '奇襲を狙う' : '逃げる'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="grid grid-cols-3 gap-1.5">
+            <button
+              onClick={() => dispatchGame({ type: 'ENCOUNTER_CHOOSE', playerId: first(game), choice: 'fight', heroId: e.heroId, focusUsed: 0, participants })}
+              className="btn btn-gold font-display flex h-14 flex-col items-center justify-center rounded-xl text-[16px]"
+            >
+              <Swords size={20} />
+              戦う
+            </button>
+            <button
+              disabled={e.ambushed}
+              onClick={() => {
+                setMode('ambush');
+                setHeroId([...cands].filter((h) => participants.includes(h.id)).sort((a, b) => statChance(b, 'per', 'ambush') - statChance(a, 'per', 'ambush'))[0].id);
+              }}
+              className="btn btn-dark flex h-14 flex-col items-center justify-center rounded-xl text-[13px] font-bold"
+            >
+              <Eye size={18} />
+              奇襲を狙う
+            </button>
+            <button
+              disabled={e.ambushed}
+              onClick={() => {
+                setMode('flee');
+                setHeroId([...cands].filter((h) => participants.includes(h.id)).sort((a, b) => statChance(b, 'agi', 'flee') - statChance(a, 'agi', 'flee'))[0].id);
+              }}
+              className="btn btn-dark flex h-14 flex-col items-center justify-center rounded-xl text-[13px] font-bold"
+            >
+              <Wind size={18} />
+              逃げる
+            </button>
+          </div>
+        )}
+      </div>
+    </Screen>
+  );
+}
+
+// ---------- 町 ----------
+
+type TownTab = 'shop' | 'inn' | 'quests' | 'remove' | 'sell';
+const TOWN_TABS: { id: TownTab; name: string; Icon: typeof Store }[] = [
+  { id: 'shop', name: 'ショップ', Icon: Store },
+  { id: 'inn', name: '宿屋', Icon: BedDouble },
+  { id: 'quests', name: '依頼', Icon: ScrollText },
+  { id: 'remove', name: 'カード削除', Icon: Trash2 },
+  { id: 'sell', name: '売却', Icon: HandCoins },
+];
+
+const chanceOf = (hero: Hero, cardId: string) => finalChance(getCard(cardId), affinityFromStats(heroStats(hero)));
+
+export function TownScreen() {
+  const game = useBattle((s) => s.game)!;
+  const dispatchGame = useBattle((s) => s.dispatchGame);
+  const [tab, setTab] = useState<TownTab>('shop');
+  const [removeFor, setRemoveFor] = useState<string | null>(null);
+  const t = game.town!;
+  const def = TOWNS.get(t.townId);
+  const w = game.world!;
+  const stock = w.shops[def.id];
+  const here = heroesInTown(game);
+  const p = first(game);
+  const equipped = new Set(game.heroes.flatMap((h) => Object.values(h.equipment).map((e) => e?.uid)));
+  const sellable = game.stash.filter((i) => !equipped.has(i.uid));
+
+  return (
+    <Screen>
+      <WorldTopBar game={game} />
+      <Heading sub={def.description}>{def.name}</Heading>
+      <div className="mt-1 flex shrink-0 gap-1 overflow-x-auto px-2 pb-1">
+        {TOWN_TABS.map((x) => (
+          <button key={x.id} onClick={() => setTab(x.id)} className={`btn flex h-11 shrink-0 items-center gap-1 rounded-lg px-2.5 text-[13px] font-bold ${tab === x.id ? 'btn-gold' : 'btn-dark'}`}>
+            <x.Icon size={16} />
+            {x.name}
+          </button>
+        ))}
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-2">
+        {tab === 'shop' && stock && (
+          <div className="flex flex-col gap-1">
+            {stock.items.map((s, i) => {
+              const it = getItem(s.item.itemId);
+              return (
+                <div key={s.item.uid} className={`flex items-center gap-2 rounded-lg bg-black/30 p-1.5 ${s.sold ? 'opacity-40' : ''}`}>
+                  <ItemIcon item={it} size={42} />
+                  <span className="min-w-0 flex-1 leading-4">
+                    <span className="block text-[14px] font-bold" style={{ color: RARITY_STYLE[it.rarity].color }}>
+                      {it.name}
+                    </span>
+                    <span className="block truncate text-[12px] text-zinc-400">{itemSummary(it)}</span>
+                  </span>
+                  <button
+                    disabled={s.sold || game.gold < s.price}
+                    onClick={() => dispatchGame({ type: 'TOWN_BUY', playerId: p, kind: 'item', index: i })}
+                    className="btn btn-gold flex h-11 w-[78px] shrink-0 items-center justify-center gap-0.5 rounded-lg text-[13px] font-bold"
+                  >
+                    {s.sold ? '売り切れ' : (
+                      <>
+                        <Coins size={14} />
+                        {s.price}
+                      </>
+                    )}
+                  </button>
+                </div>
+              );
+            })}
+            <div className="font-display mt-2 text-[15px] text-amber-200">カード</div>
+            <div className="flex flex-wrap justify-center gap-2">
+              {stock.cards.map((c, i) => {
+                const h = game.heroes.find((x) => x.id === c.heroId)!;
+                return (
+                  <div key={i} className={`flex flex-col items-center gap-1 ${c.sold ? 'opacity-40' : ''}`}>
+                    <CardFace card={getCard(c.cardId)} chance={chanceOf(h, c.cardId)} width={96} height={146} />
+                    <span className="flex items-center gap-1 text-[12px]">
+                      <HeroFace hero={h} size={18} />
+                      {h.name}
+                    </span>
+                    <button
+                      disabled={c.sold || game.gold < c.price}
+                      onClick={() => dispatchGame({ type: 'TOWN_BUY', playerId: h.playerId, kind: 'card', index: i })}
+                      className="btn btn-gold flex h-11 w-[96px] items-center justify-center gap-0.5 rounded-lg text-[13px] font-bold"
+                    >
+                      {c.sold ? '売り切れ' : (
+                        <>
+                          <Coins size={14} />
+                          {c.price}
+                        </>
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-1 text-center text-[12px] text-zinc-500">品揃えは{BALANCE.shopRefreshTurns}ワールドターンごとに入れ替わります</div>
+          </div>
+        )}
+        {tab === 'inn' && (
+          <div className="flex flex-col gap-2">
+            <div className="panel rounded-xl p-2 text-[14px]">
+              宿屋に泊まると、町にいるキャラのHPとフォーカスが全回復し、悪い状態異常も治ります。手番は使いません。
+            </div>
+            {here.map((h) => (
+              <div key={h.id} className="flex items-center gap-2 rounded-lg bg-black/30 p-1.5 text-[13px]">
+                <HeroFace hero={h} size={32} />
+                <span className="flex-1 font-bold">{h.name}</span>
+                <span className="tabular-nums text-zinc-300">
+                  HP {h.hp}/{heroMaxHp(h)}・★{h.focus}/{heroFocusMax(h)}
+                </span>
+              </div>
+            ))}
+            <button
+              disabled={game.gold < def.innCost}
+              onClick={() => dispatchGame({ type: 'TOWN_INN', playerId: p })}
+              className="btn btn-gold font-display flex h-12 items-center justify-center gap-1 rounded-xl text-[18px]"
+            >
+              <BedDouble size={20} /> 泊まる（{def.innCost}G）
+            </button>
+          </div>
+        )}
+        {tab === 'quests' && (
+          <div className="flex flex-col gap-2">
+            {(def.quests ?? []).length === 0 && <div className="py-4 text-center text-[13px] text-zinc-500">この町に依頼はありません</div>}
+            {[...new Set([...(def.quests ?? []), ...w.quests.filter((q) => (QUESTS.get(q.id).reportTown ?? q.town) === def.id).map((q) => q.id)])].map((id) => {
+              const q = QUESTS.get(id);
+              const st = w.quests.find((x) => x.id === id);
+              const prog = st ? questProgress(st) : undefined;
+              const canReport = st ? canReportQuest(game, id) : false;
+              return (
+                <div key={id} className="panel panel-gold-edge rounded-xl p-2">
+                  <div className="font-display text-[17px] text-amber-100">{q.title}</div>
+                  <div className="text-[13px] leading-5 text-zinc-200">{q.text}</div>
+                  <div className="mt-1 text-[12px] text-sky-200">目標: {objectiveHandler(q.objective).describe(q.objective as never)}</div>
+                  <div className="text-[12px] text-amber-200">報酬: {q.rewardText}</div>
+                  <div className="mt-1.5">
+                    {!st ? (
+                      <button onClick={() => dispatchGame({ type: 'QUEST_ACCEPT', playerId: p, questId: id })} className="btn btn-gold h-11 w-full rounded-lg text-[14px] font-bold">
+                        依頼を受ける
+                      </button>
+                    ) : st.reported ? (
+                      <div className="flex items-center justify-center gap-1 text-[14px] font-bold text-emerald-300">
+                        <Check size={16} /> 達成済み
+                      </div>
+                    ) : canReport ? (
+                      <button onClick={() => dispatchGame({ type: 'QUEST_REPORT', playerId: p, questId: id })} className="btn btn-gold h-11 w-full rounded-lg text-[14px] font-bold">
+                        報告して報酬を受け取る
+                      </button>
+                    ) : (
+                      <div className="text-center text-[13px] text-zinc-300">
+                        進行中 {prog?.now}/{prog?.goal}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {tab === 'remove' && (
+          <div className="flex flex-col gap-2">
+            <div className="text-[13px] text-zinc-300">
+              山札からいらないカードを1枚取り除きます（{def.removeCost}G・{BALANCE.minDeckSize}枚より少なくはできません）
+            </div>
+            <div className="flex gap-1">
+              {here.map((h) => (
+                <button key={h.id} onClick={() => setRemoveFor(h.id)} className={`btn flex min-h-11 min-w-0 flex-1 items-center gap-1 rounded-lg border-2 p-1 ${removeFor === h.id ? 'border-amber-300 bg-amber-500/15' : 'border-white/10 bg-black/30'}`}>
+                  <HeroFace hero={h} size={28} />
+                  <span className="truncate text-[12px] font-bold">{h.name}</span>
+                </button>
+              ))}
+            </div>
+            {removeFor && (
+              <div className="flex flex-wrap justify-center gap-1.5">
+                {game.heroes
+                  .find((h) => h.id === removeFor)!
+                  .deck.map((c) => (
+                    <button
+                      key={c.uid}
+                      disabled={game.gold < def.removeCost}
+                      onClick={() => dispatchGame({ type: 'TOWN_REMOVE_CARD', playerId: p, heroId: removeFor, cardUid: c.uid })}
+                      className="btn"
+                      aria-label={`${cardOf(c).name}を取り除く`}
+                    >
+                      <CardFace card={cardOf(c)} width={78} height={120} />
+                    </button>
+                  ))}
+              </div>
+            )}
+          </div>
+        )}
+        {tab === 'sell' && (
+          <div className="flex flex-col gap-1">
+            {sellable.length === 0 && <div className="py-4 text-center text-[13px] text-zinc-500">売れる装備がありません（装備中のものは売れません）</div>}
+            {sellable.map((s) => {
+              const it = getItem(s.itemId);
+              return (
+                <div key={s.uid} className="flex items-center gap-2 rounded-lg bg-black/30 p-1.5">
+                  <ItemIcon item={it} size={40} />
+                  <span className="min-w-0 flex-1 truncate text-[14px] font-bold" style={{ color: RARITY_STYLE[it.rarity].color }}>
+                    {it.name}
+                  </span>
+                  <button onClick={() => dispatchGame({ type: 'TOWN_SELL', playerId: p, itemUid: s.uid })} className="btn btn-dark flex h-11 w-[84px] items-center justify-center gap-0.5 rounded-lg text-[13px] font-bold">
+                    <Coins size={14} />
+                    {sellPrice(s.itemId)}で売る
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      <div className="shrink-0 px-3 pt-1 pb-3">
+        <button onClick={() => dispatchGame({ type: 'LEAVE_TOWN', playerId: p })} className="btn btn-dark h-12 w-full rounded-xl text-[15px] font-bold">
+          町を出る
+        </button>
+      </div>
+    </Screen>
+  );
+}
+
+// ---------- 祠 ----------
+
+export function ShrineScreen() {
+  const game = useBattle((s) => s.game)!;
+  const dispatchGame = useBattle((s) => s.dispatchGame);
+  const s = game.shrine!;
+  const def = SHRINES.get(s.shrineId);
+  const heroes = sceneHeroes(game);
+  const [heroId, setHeroId] = useState(s.heroId);
+  return (
+    <Screen>
+      <WorldTopBar game={game} />
+      <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <BattleBackground kind={sceneBackground(game)} className="absolute inset-0 h-full w-full opacity-30" />
+        <div className="relative px-3 pt-4">
+          <div className="flex items-center gap-2">
+            <span className="flex h-12 w-12 items-center justify-center rounded-xl border-2 border-emerald-300 bg-emerald-950/60">
+              <Sparkles size={26} className="text-emerald-200" />
+            </span>
+            <div className="font-display text-outline text-[24px] text-amber-100">{def.name}</div>
+          </div>
+          <div className="panel mt-3 rounded-xl p-3 text-[15px] leading-6">{def.text}どれか1つの恵みを受けられる。</div>
+          {!s.result && (
+            <>
+              <div className="mt-2 text-[12px] text-zinc-300">祈るキャラ（永続の加護は1人{BALANCE.maxBlessings}つまで）</div>
+              <div className="mt-1 flex gap-1">
+                {heroes.map((h) => (
+                  <button key={h.id} onClick={() => setHeroId(h.id)} className={`btn flex min-w-0 flex-1 flex-col items-center rounded-lg border-2 py-1 ${heroId === h.id ? 'border-amber-300 bg-amber-500/15' : 'border-white/10 bg-black/30'}`}>
+                    <HeroFace hero={h} size={30} />
+                    <span className="truncate text-[12px] font-bold">{h.name}</span>
+                    <span className="text-[12px] text-zinc-400">加護 {h.blessings ?? 0}/{BALANCE.maxBlessings}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 flex flex-col gap-1.5">
+                {def.options.map((o, i) => (
+                  <button key={i} onClick={() => dispatchGame({ type: 'SHRINE_CHOOSE', playerId: first(game), optionIndex: i, heroId })} className="btn btn-dark min-h-12 rounded-xl px-3 text-left text-[14px] font-bold">
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          {s.result && <div className="mt-3 text-center text-[16px] font-bold text-emerald-300">{s.result.text}</div>}
+        </div>
+      </div>
+      <div className="shrink-0 px-3 pt-1 pb-3">
+        <button onClick={() => dispatchGame({ type: 'LEAVE_SHRINE', playerId: first(game) })} className={`btn h-12 w-full rounded-xl text-[15px] font-bold ${s.result ? 'btn-gold' : 'btn-dark'}`}>
+          {s.result ? '世界マップへ' : '祈らずに去る'}
+        </button>
+      </div>
+    </Screen>
+  );
+}
+
+// ---------- エンディング ----------
+
+export function EndingScreen() {
+  const game = useBattle((s) => s.game)!;
+  const abandon = useBattle((s) => s.abandonGame);
+  const story = game.world?.story;
+  const st = game.stats;
+  return (
+    <Screen>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-6">
+        <div className="font-display text-outline text-center text-[30px] text-amber-100">{getScenario(game.scenarioId).name}</div>
+        <div className="font-display text-center text-[16px] text-amber-300">クリア！</div>
+        <div className="mt-3 flex flex-col gap-2">
+          {(story?.lines ?? []).map((l, i) => (
+            <motion.p key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 + i * 0.7 }} className="text-[15px] leading-7 text-zinc-100">
+              {l}
+            </motion.p>
+          ))}
+        </div>
+        <div className="panel mt-4 grid grid-cols-2 gap-1 rounded-xl p-3 text-[13px]">
+          <span>かかった日数</span>
+          <b className="text-right">{Math.ceil((game.world?.worldTurn ?? 1) / (BALANCE.turnsPerTimeOfDay * 4))}日</b>
+          <span>最後の侵食度</span>
+          <b className="text-right">{game.world?.corruption ?? 0}%</b>
+          <span>残った命の灯火</span>
+          <b className="text-right">{game.lives}</b>
+          <span>戦闘の勝利</span>
+          <b className="text-right">{st.battlesWon}回</b>
+          <span>開けた宝箱</span>
+          <b className="text-right">{st.chestsOpened}個</b>
+          <span>最高の宝</span>
+          <b className="text-right">{st.bestRarity ? RARITY_STYLE[st.bestRarity].name : '-'}</b>
+        </div>
+        <div className="mt-3 flex justify-center gap-2">
+          {game.heroes.map((h) => (
+            <div key={h.id} className="flex flex-col items-center text-[12px]">
+              <HeroFace hero={h} size={44} dim={!!h.retired} />
+              <span className="font-bold">{h.name}</span>
+              <span className="text-amber-300">Lv{h.level}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="shrink-0 px-3 pt-1 pb-3">
+        <button onClick={abandon} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px]">
+          タイトルへ
+        </button>
+      </div>
+    </Screen>
+  );
+}
+
+// ---------- 依頼の一覧（メニューから） ----------
+
+export function QuestList() {
+  const game = useBattle((s) => s.game)!;
+  const w = game.world;
+  if (!w) return <div className="p-3 text-[13px] text-zinc-400">依頼はありません</div>;
+  if (!w.quests.length) return <div className="p-3 text-[13px] text-zinc-400">受けている依頼はありません。町の掲示板で受けられます。</div>;
+  return (
+    <div className="flex flex-col gap-1.5">
+      {w.quests.map((q) => {
+        const def = QUESTS.get(q.id);
+        const prog = questProgress(q);
+        return (
+          <div key={q.id} className="rounded-lg bg-black/30 p-2">
+            <div className="flex items-center justify-between">
+              <span className="font-display text-[15px] text-amber-100">{def.title}</span>
+              <span className={`text-[12px] font-bold ${q.reported ? 'text-emerald-300' : q.done ? 'text-amber-300' : 'text-zinc-300'}`}>
+                {q.reported ? '達成済み' : q.done ? '報告できる' : `${prog.now}/${prog.goal}`}
+              </span>
+            </div>
+            <div className="text-[12px] text-sky-200">{objectiveHandler(def.objective).describe(def.objective as never)}</div>
+            <div className="text-[12px] text-zinc-400">
+              報告先: {TOWNS.get(def.reportTown ?? q.town).name}・報酬: {def.rewardText}
+            </div>
+          </div>
+        );
+      })}
+      {Object.keys(getScenario(game.scenarioId).story?.keys ?? {}).length > 0 && (
+        <div className="mt-1 rounded-lg bg-black/30 p-2 text-[12px]">
+          <div className="font-display text-[15px] text-amber-100">封印の鍵</div>
+          {Object.entries(getScenario(game.scenarioId).story!.keys!).map(([k, name]) => (
+            <div key={k} className={w.keys.includes(k) ? 'text-amber-200' : 'text-zinc-500'}>
+              {w.keys.includes(k) ? '✓' : '・'} {name}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+

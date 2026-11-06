@@ -7,7 +7,7 @@ import { BattleBackground, CharacterArt, EnemyArt } from '../../art';
 import { TIMING } from '../../data/balance';
 import { cardOf } from '../../data/cards';
 import { getEnemy } from '../../data/enemies';
-import { enemyName, findAlly, tierDamageAgainst, tierIndex, weaponRarity } from '../../engine';
+import { enemyName, findAlly, tierDamageAgainst, tierIndex, weaponRarity, sceneBackground } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
 import { usePress } from '../../hooks/usePress';
 import { speedFactor, useBattle, type UnitFx } from '../../store/battleStore';
@@ -266,7 +266,7 @@ export function Battlefield() {
   const allies = useBattle((s) => s.battle.allies);
   const activeId = useBattle((s) => s.activeId);
   const phase = useBattle((s) => s.battle.phase);
-  const bgKind = useBattle((s) => s.game?.dungeon?.background ?? 'plains');
+  const bgKind = useBattle((s) => (s.game ? sceneBackground(s.game) : 'plains'));
   const W = size.width;
   const H = size.height;
 
