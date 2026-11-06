@@ -1,4 +1,5 @@
 // ===== ダンジョンの地図（下から上へ進む。部屋の中身は入る前から見える） =====
+import { VoteChips } from '../ui/Votes';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Backpack, Check, Coins, Crown, Flame, Gift, Lock, LogOut, Menu, Sparkles, Swords, Skull, Users, X } from 'lucide-react';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -229,6 +230,7 @@ export function DungeonScreen() {
                   className="btn btn-gold font-display mt-2 h-12 w-full rounded-xl text-[18px]"
                 >
                   この部屋へ進む
+                  <VoteChips cmd={{ type: 'ENTER_ROOM', playerId: LOCAL_PLAYER, roomId: sel.id }} />
                 </button>
               ) : (
                 <div className="mt-1 text-center text-[12px] text-zinc-400">{sel.cleared ? '通過済みの部屋' : 'まだ進めない部屋（光っている部屋から選ぶ）'}</div>
@@ -291,6 +293,7 @@ export function DungeonScreen() {
                   className="btn h-12 rounded-lg border border-red-300/60 bg-red-800 font-bold"
                 >
                   撤退する
+                  <VoteChips cmd={{ type: 'RETREAT', playerId: LOCAL_PLAYER }} />
                 </button>
               </div>
             </div>

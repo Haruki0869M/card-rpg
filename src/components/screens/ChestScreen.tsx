@@ -1,5 +1,6 @@
 // ===== 宝箱の画面: 運のスロット → 確率が上へずれる → 揺れと光の段階アップ → リーチ → レジェンド演出（spec §10.3） =====
 // 格はエンジンが1回だけ抽選済み。ここは結果を「段階的に見せる」だけ（ガセ演出なし: 光・リーチ・予告は本当の格のときだけ出る）
+import { VoteChips } from '../ui/Votes';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, ChevronsRight, Lock, Sparkles, Star, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -414,6 +415,7 @@ export function ChestScreen() {
             <div className="mt-2 grid grid-cols-[1fr_2fr] gap-2">
               <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} className="btn btn-dark h-12 rounded-xl text-[14px] font-bold">
                 {chest.spec.big ? '開けずに去る' : '立ち去る'}
+                <VoteChips cmd={{ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER }} />
               </button>
               <button
                 onClick={() => {
@@ -430,6 +432,7 @@ export function ChestScreen() {
         ) : (
           <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px]">
             {chest.spec.big ? 'ダンジョン制覇！' : '先へ進む'}
+            <VoteChips cmd={{ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER }} />
           </button>
         )}
       </div>

@@ -6,7 +6,7 @@ import { getItem, ITEMS } from '../../../data/items';
 import { QUESTS, SHRINES, TOWNS } from '../../../data/world';
 import type { GameCommand, GameState, ShopStock } from '../../../types';
 import type { Rng } from '../../rng';
-import { addItem, addLog, addLoot, isPartyPlayer, ownedBy } from '../common';
+import { addItem, addLog, addLoot, ownedBy } from '../common';
 import { rarityIndex } from '../dungeon';
 import { clampHero, heroFocusMax, heroMaxHp } from '../hero';
 import { findHero } from '../heroes';
@@ -205,6 +205,7 @@ export function shrineChoose(game: GameState, cmd: Cmd<'SHRINE_CHOOSE'>, rng: Rn
   const def = SHRINES.get(s.shrineId);
   const opt = def.options[cmd.optionIndex];
   if (!opt) return '選択肢がありません';
+  if (!ownedBy(findHero(game, s.heroId), cmd.playerId)) return '祠に来たキャラの担当の人が選びます';
   const h = findHero(game, cmd.heroId);
   if (!h || h.hp <= 0 || !ownedBy(h, cmd.playerId) || !(game.party ?? []).includes(h.id)) return 'このキャラは祈れません';
   if (opt.permanent && (h.blessings ?? 0) >= BALANCE.maxBlessings) return `永続の加護は1人${BALANCE.maxBlessings}つまでです`;
@@ -221,7 +222,7 @@ export function shrineChoose(game: GameState, cmd: Cmd<'SHRINE_CHOOSE'>, rng: Rn
 
 export function leaveShrine(game: GameState, cmd: Cmd<'LEAVE_SHRINE'>, rng: Rng): string | undefined {
   if (game.mode !== 'shrine' || !game.shrine) return '祠にいません';
-  if (!isPartyPlayer(game, cmd.playerId)) return 'このパーティのプレイヤーではありません';
+  if (!ownedBy(findHero(game, game.shrine.heroId), cmd.playerId)) return '祠に来たキャラの担当の人が操作します';
   game.shrine = undefined;
   backToWorld(game, rng, false);
   return undefined;

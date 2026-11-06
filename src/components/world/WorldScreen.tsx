@@ -222,7 +222,14 @@ export function WorldScreen() {
 
   if (!hero || here === undefined) return null;
   const companions = heroesAt(game, here).filter((h) => h.id !== hero.id && !w.acted.includes(h.id));
-  const chosenCompanions = companions.filter((h) => withMe[h.id] ?? true).map((h) => h.id);
+  // 同行: 自分（同じ担当）のキャラはタップで選ぶ。他の人のキャラは誘って、承知してもらった時だけ
+  const ownMate = (h: { playerId: PlayerId }) => h.playerId === hero.playerId;
+  const chosenCompanions = companions.filter((h) => (ownMate(h) ? (withMe[h.id] ?? true) : w.follow?.[h.id] === hero.id)).map((h) => h.id);
+  const invite = (c: { id: string; playerId: PlayerId }) => {
+    dispatchGame({ type: 'WORLD_INVITE', playerId: hero.playerId, heroId: hero.id, targetId: c.id });
+    // 誘われた人もこの端末で遊んでいる（1台を回して遊ぶ）なら、その場で答えてもらう
+    if (isLocalPlayer(c.playerId) && !isOnlinePlay()) dispatchGame({ type: 'WORLD_INVITE_ANSWER', playerId: c.playerId, heroId: c.id, accept: true });
+  };
   const label = interactLabel(game, here);
   const chance = statChance(hero, 'agi', 'move');
   const maxFocus = Math.min(BALANCE.moveSlots, hero.focus);
@@ -309,20 +316,35 @@ export function WorldScreen() {
               同行
             </span>
             {companions.map((c) => {
+              if (!ownMate(c)) {
+                const st = w.follow?.[c.id] === hero.id ? 'yes' : w.invites?.[c.id] === hero.id ? 'wait' : 'no';
+                return (
+                  <button
+                    key={c.id}
+                    disabled={!mine || st !== 'no'}
+                    onClick={() => invite(c)}
+                    aria-label={`${c.name}を誘う`}
+                    className={`btn relative flex h-11 min-w-11 shrink-0 items-center gap-1 rounded-full border-2 px-1 disabled:opacity-100 ${st === 'yes' ? 'border-amber-300 bg-amber-500/20' : 'border-sky-300/50 bg-black/30'}`}
+                  >
+                    <HeroFace hero={c} size={30} dim={st !== 'yes'} />
+                    <span className="pr-1 text-[12px] font-bold text-sky-200">{st === 'yes' ? '同行' : st === 'wait' ? '返事待ち' : '誘う'}</span>
+                  </button>
+                );
+              }
               const on = withMe[c.id] ?? true;
               return (
                 <button
                   key={c.id}
                   onClick={() => setWithMe({ ...withMe, [c.id]: !on })}
                   aria-label={`${c.name}を${on ? '残す' : '連れて行く'}`}
-                  className={`btn relative flex h-11 w-11 items-center justify-center rounded-full border-2 ${on ? 'border-amber-300 bg-amber-500/20' : 'border-white/10 bg-black/30'}`}
+                  className={`btn relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 ${on ? 'border-amber-300 bg-amber-500/20' : 'border-white/10 bg-black/30'}`}
                 >
                   <HeroFace hero={c} size={34} dim={!on} />
                   {on && <span className="absolute -right-1 -bottom-1 rounded-full bg-amber-300 px-1 text-[12px] leading-4 font-black text-black">✓</span>}
                 </button>
               );
             })}
-            <span className="truncate text-[12px] text-zinc-500">タップで一緒に行くか選ぶ</span>
+            <span className="truncate text-[12px] text-zinc-500">{companions.some((c) => !ownMate(c)) ? '他の人のキャラは誘って承知してもらう' : 'タップで一緒に行くか選ぶ'}</span>
           </div>
         )}
 

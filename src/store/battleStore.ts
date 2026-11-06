@@ -19,8 +19,10 @@ import {
   isDone,
   makeSeed,
   unusableReason,
+  needsVote,
   unwrapCommand,
   viewOf,
+  voters,
   waitingPlayers,
   WORLD_SCENE,
 } from '../engine';
@@ -118,6 +120,8 @@ interface StoreState {
   openSheet: (s: Sheet) => void;
   setConfirmAbandon: (v: boolean) => void;
   showToast: (text: string) => void;
+  /** 確認用: 場面の指定まで済んだ操作をそのまま送る（自動プレイの確認スクリプト用） */
+  dispatchWire: (cmd: GameCommand) => string | undefined;
   /** オンライン協力: 部屋から届いた操作の結果を反映する */
   applyRemote: (r: GameResult, cmd: GameCommand) => void;
   /** オンライン協力: 状態を丸ごと差し替える（参加・取り直し） */
@@ -512,6 +516,20 @@ export const useBattle = create<StoreState>((set, get) => {
       // ローカル協力: そのキャラの担当プレイヤーとして送る
       if ('playerId' in cmd) cmd = { ...cmd, playerId: actorOf(game, cmd) } as GameCommand;
       if (cmd.type === 'BATTLE' && 'playerId' in cmd.command) cmd = { ...cmd, command: { ...cmd.command, playerId: battleActorOf(game, cmd.command) } as Command };
+      const wrap = (c: GameCommand): GameCommand => (scene !== WORLD_SCENE && c.type !== 'SCENE' ? { type: 'SCENE', scene, command: c } : c);
+      // みんなで決める操作: この端末のプレイヤーの票として入れる（1台で全員を操作しているなら、全員分まとめて入れるのですぐ決まる）
+      if (needsVote(game, cmd)) {
+        const mine = voters(game).filter((p) => isLocalPlayer(p));
+        if (!mine.length) {
+          get().showToast('この場面のプレイヤーではありません');
+          return 'この場面のプレイヤーではありません';
+        }
+        for (const p of mine) {
+          const err = send(wrap({ type: 'VOTE', playerId: p, command: { ...cmd, playerId: p } as GameCommand }), false);
+          if (err) return err;
+        }
+        return undefined;
+      }
       // オンライン協力: 自分の担当か・通るかを先に確かめてから、部屋に送る（結果は部屋から届く）
       if (room) {
         const actor = 'playerId' in cmd ? cmd.playerId : cmd.type === 'BATTLE' && 'playerId' in cmd.command ? cmd.command.playerId : undefined;
@@ -522,9 +540,10 @@ export const useBattle = create<StoreState>((set, get) => {
         }
       }
       // 見ている場面がダンジョンなら、その場面の中の操作として送る
-      const wire: GameCommand = scene !== WORLD_SCENE && cmd.type !== 'SCENE' ? { type: 'SCENE', scene, command: cmd } : cmd;
-      return send(wire, false);
+      return send(wrap(cmd), false);
     },
+
+    dispatchWire: (cmd) => send(cmd, false),
 
     applyRemote: (r, cmd) => {
       enemyInFlight = false;

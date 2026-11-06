@@ -1,4 +1,5 @@
 // ===== ダンジョン制覇・全滅の画面 =====
+import { VoteChips } from '../ui/Votes';
 import { totalGold } from '../../engine';
 import { motion } from 'framer-motion';
 import { Castle, Crown, Skull } from 'lucide-react';
@@ -60,6 +61,7 @@ export function ClearedScreen() {
       <div className="shrink-0 px-3 pb-3">
         <button onClick={() => dispatchGame({ type: 'RETURN_TO_HUB', playerId: LOCAL_PLAYER })} className="btn btn-gold font-display flex h-14 w-full items-center justify-center gap-2 rounded-xl text-[19px]">
           <Castle size={22} /> {game.world ? '地上に戻る' : '拠点に戻る'}
+          <VoteChips cmd={{ type: 'RETURN_TO_HUB', playerId: LOCAL_PLAYER }} />
         </button>
       </div>
     </Screen>

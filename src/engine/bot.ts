@@ -21,6 +21,9 @@ import {
   unusableReason,
   viewOf,
   waitingPlayers,
+  commandPlayer,
+  needsVote,
+  notVoted,
 } from './index';
 
 export interface BotLog {
@@ -33,6 +36,8 @@ export interface BotLog {
 let capture: GameCommand[] | null = null;
 
 function send(g: GameState, cmd: GameCommand, log: BotLog): GameState {
+  // みんなで決める操作は、まだ選んでいない人の1票として入れる（全員入ると決まる）
+  if (needsVote(g, cmd)) cmd = { type: 'VOTE', playerId: notVoted(g)[0] ?? commandPlayer(cmd)!, command: cmd };
   if (capture) {
     capture.push(cmd);
     return { ...g };
@@ -42,7 +47,11 @@ function send(g: GameState, cmd: GameCommand, log: BotLog): GameState {
   return r.state;
 }
 
-const pid = (g: GameState, heroId?: string): PlayerId => (heroId ? findHero(g, heroId)?.playerId : undefined) ?? g.heroes[0].playerId;
+/** 操作するプレイヤー（キャラの指定が無ければ、世界マップの場面は手番の人、ダンジョンは先頭のキャラの人） */
+const pid = (g: GameState, heroId?: string): PlayerId => {
+  const owner = (id?: string) => (id ? findHero(g, id)?.playerId : undefined);
+  return owner(heroId) ?? (!g.activeScene && g.world?.turn ? owner(g.world.turn) : undefined) ?? owner(g.party?.[0]) ?? g.heroes[0].playerId;
+};
 
 /** 目的のダンジョン（鍵の順。最後は魔王城） */
 function goalDungeon(g: GameState): string {
@@ -96,13 +105,23 @@ function worldStep(g: GameState, log: BotLog, memo: { interacted: Set<string> })
     }
   }
   if (w.move === null) return send(g, { type: 'WORLD_ROLL_MOVE', playerId: p, heroId: h.id, focusUsed: 0 }, log);
+  // 同じマスの他の人のキャラは、誘って承知してもらってから一緒に動く（自動プレイは全員の代わりに答える）
+  if (w.move === null) {
+    for (const c of livingHeroes(g)) {
+      if (c.id === h.id || c.playerId === h.playerId || w.pos[c.id] !== at || w.acted.includes(c.id) || w.follow?.[c.id] === h.id) continue;
+      if (g.expeditions?.some((x) => x.heroes.includes(c.id))) continue;
+      if (w.invites?.[c.id] === h.id) return send(g, { type: 'WORLD_INVITE_ANSWER', playerId: c.playerId, heroId: c.id, accept: true }, log);
+      return send(g, { type: 'WORLD_INVITE', playerId: p, heroId: h.id, targetId: c.id }, log);
+    }
+  }
   if (w.move > 0) {
     const reach = reachable(w, at, w.move);
     let best = at;
     for (const [i] of reach) if (hexDistance(w, i, target.tile) < hexDistance(w, best, target.tile)) best = i;
     if (best !== at) {
       const companions = livingHeroes(g)
-        .filter((x) => x.id !== h.id && w.pos[x.id] === at && !w.acted.includes(x.id))
+        .filter((x) => x.id !== h.id && w.pos[x.id] === at && !w.acted.includes(x.id) && !g.expeditions?.some((e) => e.heroes.includes(x.id)))
+        .filter((x) => x.playerId === h.playerId || w.follow?.[x.id] === h.id)
         .map((x) => x.id);
       return send(g, { type: 'WORLD_MOVE', playerId: p, heroId: h.id, to: best, companions }, log);
     }
@@ -175,7 +194,11 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
     }
     case 'encounter': {
       const e = g.encounter!;
-      if (e.result) return send(g, { type: 'ENCOUNTER_CONTINUE', playerId: pid(g), participants: e.candidates }, log);
+      // 近くにいる他の人のキャラは「加わる」と答えてから（自動プレイは全員の代わりに答える）
+      const mover = findHero(g, e.heroId)!;
+      const ask = e.candidates.map((id) => findHero(g, id)!).find((c) => c.playerId !== mover.playerId && g.world!.pos[c.id] !== e.tile && e.joins?.[c.id] === undefined);
+      if (ask && !e.result) return send(g, { type: 'ENCOUNTER_JOIN', playerId: ask.playerId, heroId: ask.id, join: true }, log);
+      if (e.result) return send(g, { type: 'ENCOUNTER_CONTINUE', playerId: pid(g, e.heroId), participants: e.candidates }, log);
       return send(g, { type: 'ENCOUNTER_CHOOSE', playerId: pid(g, e.heroId), choice: 'fight', heroId: e.heroId, focusUsed: 0, participants: e.candidates }, log);
     }
     case 'battle':

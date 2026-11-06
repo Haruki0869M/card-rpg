@@ -64,6 +64,8 @@ import {
   heroMaxHp,
   toPartyMember,
 } from './hero';
+import { needsVote, tally, VOTED_COMMANDS, voteCtx, voters } from './votes';
+import { encounterJoin, worldInvite, worldInviteAnswer } from './world/world';
 import { EXPEDITION_MODES, findExpedition, mount, restoreSceneFields, saveSceneFields, unmount } from './scenes';
 import { cardRewardOdds, chestOdds, newItem, rollCardOffers, rollChestContents, rollConsumable, rollEquipment, rollGrade } from './loot';
 
@@ -197,13 +199,51 @@ function runInScene(game: GameState, cmd: Extract<GameCommand, { type: 'SCENE' }
   return r;
 }
 
+/** みんなで決める操作に1票入れる。全員そろったら、決まった操作をそのまま動かす */
+function castVote(game: GameState, cmd: Extract<GameCommand, { type: 'VOTE' }>, rng: Rng): { error?: string; battleEvents: BattleEvent[] } {
+  const none = { battleEvents: [] as BattleEvent[] };
+  if (!voters(game).includes(cmd.playerId)) return { error: 'この場面のプレイヤーではありません', ...none };
+  const ctx = voteCtx(game);
+  if (!game.vote || game.vote.ctx !== ctx) game.vote = { ctx, picks: {} };
+  if (cmd.command === null) {
+    delete game.vote.picks[cmd.playerId];
+    return none;
+  }
+  if (!VOTED_COMMANDS.has(cmd.command.type)) return { error: 'みんなで決める操作ではありません', ...none };
+  // 判定するキャラを選ぶ選択肢は、そのキャラの担当として動かす（だれのキャラを選んでもよい）
+  const heroId = (cmd.command as { heroId?: string }).heroId;
+  const actor = heroId ? findHero(game, heroId)?.playerId : undefined;
+  const inner = { ...cmd.command, playerId: actor ?? cmd.playerId } as GameCommand;
+  // 通る操作か、先に確かめる（状態は変えない）
+  const probe = runCommand(structuredClone(game), inner, createRng(game.rngState), true);
+  if (probe.error) return { error: probe.error, ...none };
+  game.vote.picks[cmd.playerId] = inner;
+  const win = tally(game, game.vote);
+  if (!win) return none;
+  game.vote = undefined;
+  return runCommand(game, win, rng, true);
+}
+
 const isOver = (game: GameState) => game.mode === 'gameover' || game.mode === 'ending';
 
-function runCommand(game: GameState, cmd: GameCommand, rng: Rng): { error?: string; battleEvents: BattleEvent[] } {
+function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false): { error?: string; battleEvents: BattleEvent[] } {
   let battleEvents: BattleEvent[] = [];
   let error: string | undefined;
+  // みんなで決める操作は、VOTE で全員が選んでから（M3-C）
+  if (!voteOk && needsVote(game, cmd)) return { error: 'みんなで決めます（全員が選ぶと決まります）', battleEvents };
   {
     switch (cmd.type) {
+      case 'VOTE':
+        return castVote(game, cmd, rng);
+      case 'ENCOUNTER_JOIN':
+        error = encounterJoin(game, cmd);
+        break;
+      case 'WORLD_INVITE':
+        error = worldInvite(game, cmd);
+        break;
+      case 'WORLD_INVITE_ANSWER':
+        error = worldInviteAnswer(game, cmd);
+        break;
       case 'ENTER_DUNGEON':
         error = enterDungeon(game, cmd.playerId, cmd.dungeonId, rng);
         break;
@@ -598,9 +638,20 @@ const DUNGEON_BOSS_CHEST = (id: string): Rarity => DUNGEONS.get(id).bossChest;
 export const LOCK_TRAP_DAMAGE = 5;
 const GRADE_NAME = RARITY_NAME;
 
+/**
+ * 世界マップのマスの場面（宝箱・イベント）は、手番のキャラの担当の人だけが操作する（M3-C）。
+ * ダンジョンの中の場面は undefined（みんなで決める）
+ */
+function worldTurnError(game: GameState, playerId: string, onTile: boolean): string | undefined {
+  if (!onTile || game.activeScene || !game.world) return undefined;
+  return ownedBy(findHero(game, game.world.turn), playerId) ? undefined : '手番のキャラの担当の人が操作します';
+}
+
 function openChest(game: GameState, playerId: string, heroId: string, focusUsed: number, rng: Rng): string | undefined {
   const c = game.chest;
   if (game.mode !== 'chest' || !c) return '宝箱がありません';
+  const te = worldTurnError(game, playerId, c.tile !== undefined);
+  if (te) return te;
   if (c.contents) return 'もう開けました';
   const h = findHero(game, heroId);
   if (!h || h.hp <= 0) return 'そのキャラは動けません';
@@ -643,6 +694,8 @@ function leaveChest(game: GameState, playerId: string, rng: Rng): string | undef
   const c = game.chest;
   const run = game.dungeon;
   if (game.mode !== 'chest' || !c) return '宝箱がありません';
+  const te = worldTurnError(game, playerId, c.tile !== undefined);
+  if (te) return te;
   // 世界マップの宝箱（マスの宝箱は使い終わり。隠し宝箱はそのまま）
   if (c.tile !== undefined && !run) {
     const f = game.world?.tiles[c.tile].f;
@@ -716,6 +769,8 @@ function chooseEvent(
   const ev = game.event;
   if (game.mode !== 'event' || !ev) return 'イベント中ではありません';
   if (ev.result) return 'もう選びました';
+  const te = worldTurnError(game, playerId, ev.tile !== undefined);
+  if (te) return te;
   const def = EVENTS.get(ev.eventId);
   const opt = def.options[optionIndex];
   // お金がいる選択肢: 選んだキャラ（判定が無ければ、押した人のキャラで払える人）が払う
@@ -747,6 +802,8 @@ function finishEvent(game: GameState, playerId: string, rng: Rng): string | unde
   if (!isPartyPlayer(game, playerId)) return 'このパーティのプレイヤーではありません';
   const ev = game.event;
   if (game.mode !== 'event' || !ev || !ev.result) return 'まだ選んでいません';
+  const te = worldTurnError(game, playerId, ev.tile !== undefined);
+  if (te) return te;
   game.event = undefined;
   if (ev.tile !== undefined && !game.dungeon) {
     const f = game.world?.tiles[ev.tile].f;

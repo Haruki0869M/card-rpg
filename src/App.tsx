@@ -21,6 +21,8 @@ import { JoinScreen, LobbyScreen, OnlineOverlay } from './components/screens/Onl
 import { TitleScreen } from './components/screens/TitleScreen';
 import { Sheets } from './components/Sheets';
 import { SceneTabs } from './components/SceneTabs';
+import { VoteStatus } from './components/ui/Votes';
+import { TurnLock } from './components/ui/TurnLock';
 import { findAlly } from './engine';
 import { useBackButton } from './hooks/useBackButton';
 import { useDetail } from './hooks/usePress';
@@ -184,6 +186,8 @@ export default function App() {
           <Sheets />
           <DetailPopup />
           <OnlineOverlay />
+          <VoteStatus />
+          <TurnLock />
           <Toast />
         </div>
       </div>

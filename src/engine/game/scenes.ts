@@ -4,20 +4,7 @@
 import type { Expedition, GameCommand, GameState, PlayerId } from '../../types';
 
 /** 場面ごとに持つ項目 */
-export const SCENE_FIELDS = [
-  'mode',
-  'party',
-  'dungeon',
-  'battle',
-  'reward',
-  'chest',
-  'event',
-  'battleInfo',
-  'battleBackground',
-  'encounter',
-  'town',
-  'shrine',
-] as const;
+export const SCENE_FIELDS = ['mode', 'party', 'dungeon', 'battle', 'reward', 'chest', 'event', 'battleInfo', 'battleBackground', 'encounter', 'town', 'shrine', 'vote'] as const;
 type SceneField = (typeof SCENE_FIELDS)[number];
 
 /** ダンジョンの場面にいる時の mode（これ以外になったら場面は終わり） */
@@ -32,7 +19,10 @@ export const findExpedition = (game: GameState, id: string) => game.expeditions?
 export function viewOf(game: GameState, scene: string): GameState {
   const exp = scene === WORLD_SCENE ? undefined : findExpedition(game, scene);
   if (!exp) return game;
-  return mount({ ...game }, exp);
+  const v = mount({ ...game }, exp);
+  // 表示・判断用に「どの場面か」も付ける（保存はしない）
+  v.activeScene = exp.id;
+  return v;
 }
 
 /** 場面を冒険に載せる（場面の項目を差し替える） */
@@ -47,6 +37,7 @@ export function mount(game: GameState, exp: Expedition): GameState {
   game.event = exp.event;
   game.battleInfo = exp.battleInfo;
   game.battleBackground = exp.battleBackground;
+  game.vote = exp.vote;
   return game;
 }
 
@@ -61,6 +52,7 @@ export function unmount(game: GameState, exp: Expedition) {
   exp.event = game.event;
   exp.battleInfo = game.battleInfo;
   exp.battleBackground = game.battleBackground;
+  exp.vote = game.vote;
 }
 
 export const saveSceneFields = (game: GameState) => Object.fromEntries(SCENE_FIELDS.map((f) => [f, game[f]])) as Pick<GameState, SceneField>;

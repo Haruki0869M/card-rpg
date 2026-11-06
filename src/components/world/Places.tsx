@@ -50,12 +50,18 @@ export function EncounterScreen() {
   const wd = w.wanderers.find((x) => x.id === e.wandererId);
   const cands = e.candidates.map((id) => game.heroes.find((h) => h.id === id)!).filter(Boolean);
   const forced = new Set(cands.filter((h) => w.pos[h.id] === e.tile).map((h) => h.id));
+  // 遭遇したキャラの担当が決める。他の人のキャラは、その人が「加わる」と答えた時だけ参加
+  const mover = game.heroes.find((h) => h.id === e.heroId)!;
+  const moverLocal = isLocalPlayer(mover.playerId);
+  const others = (h: Hero) => h.playerId !== mover.playerId;
   const [joined, setJoined] = useState<Record<string, boolean>>({});
-  const participants = cands.filter((h) => forced.has(h.id) || (joined[h.id] ?? true)).map((h) => h.id);
+  const participants = cands.filter((h) => forced.has(h.id) || (others(h) ? e.joins?.[h.id] === true : (joined[h.id] ?? true))).map((h) => h.id);
   const [mode, setMode] = useState<'ambush' | 'flee' | null>(null);
   const [heroId, setHeroId] = useState(e.heroId);
   const [focus, setFocus] = useState(0);
-  const roller = cands.find((h) => h.id === heroId) ?? cands[0];
+  // 判定するキャラは、遭遇したキャラの担当のキャラから
+  const rollers = cands.filter((h) => participants.includes(h.id) && !others(h));
+  const roller = rollers.find((h) => h.id === heroId) ?? rollers[0] ?? mover;
   const r = e.result;
 
   return (
@@ -80,16 +86,20 @@ export function EncounterScreen() {
             <div className="mt-1 flex gap-1">
               {cands.map((h) => {
                 const on = participants.includes(h.id);
+                const other = others(h) && !forced.has(h.id);
+                // 自分のキャラ（遭遇した人）は手元で選ぶ。他の人のキャラは、その人が答える
+                const canTap = !r && !forced.has(h.id) && (other ? isLocalPlayer(h.playerId) : moverLocal);
+                const label = forced.has(h.id) ? 'このマス' : other ? (e.joins?.[h.id] === undefined ? '返事待ち' : on ? '加わる' : '加わらない') : on ? '参加する' : '参加しない';
                 return (
                   <button
                     key={h.id}
-                    disabled={forced.has(h.id) || !!r}
-                    onClick={() => setJoined({ ...joined, [h.id]: !on })}
+                    disabled={!canTap}
+                    onClick={() => (other ? dispatchGame({ type: 'ENCOUNTER_JOIN', playerId: h.playerId, heroId: h.id, join: !on }) : setJoined({ ...joined, [h.id]: !on }))}
                     className={`btn flex min-w-0 flex-1 flex-col items-center rounded-lg border-2 py-1 disabled:opacity-100 disabled:filter-none ${on ? 'border-amber-300 bg-amber-500/15' : 'border-white/10 bg-black/30'}`}
                   >
                     <HeroFace hero={h} size={32} dim={!on} />
                     <span className="truncate text-[12px] font-bold">{h.name}</span>
-                    <span className="text-[12px] text-zinc-400">{forced.has(h.id) ? 'このマス' : on ? '参加する' : '参加しない'}</span>
+                    <span className={`text-[12px] ${other && canTap ? 'text-sky-200' : 'text-zinc-400'}`}>{other && canTap ? `${label}（タップで変える）` : label}</span>
                   </button>
                 );
               })}
@@ -106,14 +116,16 @@ export function EncounterScreen() {
         </div>
       </div>
       <div className="panel shrink-0 rounded-t-2xl px-3 pt-2 pb-3">
-        {r ? (
-          <button onClick={() => dispatchGame({ type: 'ENCOUNTER_CONTINUE', playerId: first(game), participants })} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px]">
+        {!moverLocal ? (
+          <OthersTurnNote seat={mover.playerId} name={`${seatLabel(mover.playerId)}さん`} what={`${mover.name}でどうするか選んでいます`} />
+        ) : r ? (
+          <button onClick={() => dispatchGame({ type: 'ENCOUNTER_CONTINUE', playerId: mover.playerId, participants })} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px]">
             {r.choice === 'flee' && r.success ? '世界マップへ' : '戦闘開始'}
           </button>
         ) : mode ? (
           <>
             <CheckPanel
-              heroes={cands.filter((h) => participants.includes(h.id))}
+              heroes={rollers}
               heroId={roller.id}
               setHeroId={setHeroId}
               focus={focus}
@@ -139,7 +151,7 @@ export function EncounterScreen() {
         ) : (
           <div className="grid grid-cols-3 gap-1.5">
             <button
-              onClick={() => dispatchGame({ type: 'ENCOUNTER_CHOOSE', playerId: first(game), choice: 'fight', heroId: e.heroId, focusUsed: 0, participants })}
+              onClick={() => dispatchGame({ type: 'ENCOUNTER_CHOOSE', playerId: mover.playerId, choice: 'fight', heroId: e.heroId, focusUsed: 0, participants })}
               className="btn btn-gold font-display flex h-14 flex-col items-center justify-center rounded-xl text-[16px]"
             >
               <Swords size={20} />
@@ -149,7 +161,7 @@ export function EncounterScreen() {
               disabled={e.ambushed}
               onClick={() => {
                 setMode('ambush');
-                setHeroId([...cands].filter((h) => participants.includes(h.id)).sort((a, b) => statChance(b, 'per', 'ambush') - statChance(a, 'per', 'ambush'))[0].id);
+                setHeroId([...rollers].sort((a, b) => statChance(b, 'per', 'ambush') - statChance(a, 'per', 'ambush'))[0].id);
               }}
               className="btn btn-dark flex h-14 flex-col items-center justify-center rounded-xl text-[13px] font-bold"
             >
@@ -160,7 +172,7 @@ export function EncounterScreen() {
               disabled={e.ambushed}
               onClick={() => {
                 setMode('flee');
-                setHeroId([...cands].filter((h) => participants.includes(h.id)).sort((a, b) => statChance(b, 'agi', 'flee') - statChance(a, 'agi', 'flee'))[0].id);
+                setHeroId([...rollers].sort((a, b) => statChance(b, 'agi', 'flee') - statChance(a, 'agi', 'flee'))[0].id);
               }}
               className="btn btn-dark flex h-14 flex-col items-center justify-center rounded-xl text-[13px] font-bold"
             >
