@@ -278,7 +278,7 @@ SRC=元画像のフォルダ python3 scripts/art/build_art.py enemy/ bg/  # 名�
   SIM=1 npx vitest run balance          # 結果は screenshots/balance.md
   SIM=1 SIM_SEEDS=20 SIM_PARTY=4人 SIM_DIFF=normal npx vitest run balance   # 回数・人数・難易度をしぼる
   ```
-- 目安（4人・自動プレイ）: やさしい 約45%・ふつう 約20%・むずかしい 約10%。人が遊ぶと自動プレイより上手なので、もう少し勝てます。
+- 目安（4人・自動プレイ）: やさしい 約65%・ふつう 約20〜25%・むずかしい 約10〜15%。人が遊ぶと自動プレイより上手なので、もう少し勝てます。
 
 ## 保存データの形を変える時
 
