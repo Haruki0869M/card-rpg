@@ -14,15 +14,31 @@ import { nextTurn, play } from './helpers';
 /** 4段階（コモン〜レジェンド）がそろっている武器の種類 */
 const FULL_WEAPON_TYPES = ['sword', 'staff', 'hammer', 'bow'];
 
+// ジョブの最初の武器は、そのジョブで使える種類
+const STARTER_WEAPON = (c: { weaponType: string; subWeapons?: string[]; startingEquipment: { weapon?: string } }) =>
+  !c.startingEquipment.weapon || [c.weaponType, ...(c.subWeapons ?? [])].includes(ITEMS.get(c.startingEquipment.weapon).weaponType ?? '');
+
 describe('データの整合性', () => {
   it('職業: デッキのカードが存在し、能力値・名前がそろっている', () => {
     for (const c of CLASSES.all) {
       for (const d of c.deck) expect(CARDS.has(d.cardId), `${c.id}: ${d.cardId}`).toBe(true);
-      expect(c.deck.reduce((n, d) => n + d.count, 0)).toBeGreaterThanOrEqual(BALANCE.drawPerTurn);
+      // 最初から選べる基本ジョブだけが最初の山札を持つ（中位以上は転職でなる）
+      if ((c.tier ?? 'base') === 'base') expect(c.deck.reduce((n, d) => n + d.count, 0)).toBeGreaterThanOrEqual(BALANCE.drawPerTurn);
       for (const v of Object.values(c.stats)) expect(v).toBeGreaterThan(0);
       expect(c.names.male.length).toBeGreaterThan(0);
       expect(c.names.female.length).toBeGreaterThan(0);
       expect(c.baseMaxHp).toBeGreaterThan(0);
+    }
+  });
+  it('転職: 中位以上のジョブは転職元があり、専用カード3枚と6枚以上の候補を持つ', () => {
+    for (const c of CLASSES.all) {
+      if ((c.tier ?? 'base') === 'base') continue;
+      expect(c.from?.length, c.id).toBeGreaterThan(0);
+      for (const f of c.from ?? []) expect(CLASSES.has(f), `${c.id} from ${f}`).toBe(true);
+      expect(c.signature?.length, c.id).toBe(3);
+      for (const id of c.signature ?? []) expect(c.cardPool, `${c.id}: ${id}`).toContain(id);
+      expect(c.cardPool.length, c.id).toBeGreaterThanOrEqual(6);
+      expect(STARTER_WEAPON(c), c.id).toBe(true);
     }
   });
   it('カード: Tierが昇順で0成功から始まり、スロット数を超えない', () => {

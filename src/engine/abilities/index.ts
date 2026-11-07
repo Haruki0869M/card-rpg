@@ -5,7 +5,8 @@
 //  - 職業IDや能力名による分岐は書かない
 import { getClass } from '../../data/classes';
 import { getEnemy } from '../../data/enemies';
-import type { AbilityCondition, AbilityDef, AbilityEffect, AbilityTrigger, BattleEvent, BattleState, CardDef } from '../../types';
+import { getStatus } from '../../data/statuses';
+import type { AbilityCondition, AbilityDef, AbilityEffect, AbilityTrigger, BattleEvent, BattleState, CardDef, DamageScale } from '../../types';
 import { applyEffect, describeEffect, makeCtx } from '../battle/effects';
 import { abilityTriggered, addLog, isEnemy, nameOf, type Unit, unitIdOf } from '../battle/units';
 import type { Rng } from '../rng';
@@ -62,10 +63,12 @@ export function damageModifiers(state: BattleState | undefined, source: Unit, ca
   const c: CondCtx = { state, self: source, card, target: victim, perfect };
   for (const ab of cardAbilities?.length ? [...abilitiesOf(source), ...cardAbilities] : abilitiesOf(source)) {
     const e = ab.effect;
-    if (!('modifier' in e) || e.modifier === 'coverLethal') continue;
+    if (!('modifier' in e) || (e.modifier !== 'damageDealt' && e.modifier !== 'ignoreBlock')) continue;
     if (!testConditions(e.if, c)) continue;
     if (e.modifier === 'damageDealt') {
-      out.multiplier *= e.multiplier;
+      const m = e.multiplier * scaleOf(e.scale, source, victim);
+      if (m === 1) continue;
+      out.multiplier *= m;
       out.active.push(ab.name);
     } else if (e.modifier === 'ignoreBlock') {
       out.ignoreBlock = true;
@@ -73,6 +76,37 @@ export function damageModifiers(state: BattleState | undefined, source: Unit, ca
     }
   }
   return out;
+}
+
+/** 倍率の上乗せ（状況で増える分。1 = 上乗せ無し） */
+function scaleOf(sc: DamageScale | undefined, self: Unit, target: Unit | undefined): number {
+  if (!sc) return 1;
+  let v = 0;
+  if (sc.by === 'missingHp') v = 1 - Math.max(0, self.hp) / Math.max(1, self.maxHp);
+  else if (sc.by === 'targetStatuses') v = target ? Object.entries(target.statuses).filter(([id, n]) => (n ?? 0) > 0 && getStatus(id).harmful).length : 0;
+  else if (sc.by === 'selfStatus') v = sc.status ? (self.statuses[sc.status] ?? 0) : 0;
+  const add = sc.per * v;
+  return 1 + (sc.max !== undefined ? Math.min(sc.max, add) : add);
+}
+
+/** カードの成功率の上乗せ（狙い撃ちなど。常時型 cardChance の合計） */
+export function cardChanceBonus(u: Unit, card: CardDef): number {
+  let n = 0;
+  for (const ab of abilitiesOf(u)) {
+    const e = ab.effect;
+    if ('modifier' in e && e.modifier === 'cardChance' && testConditions(e.if, { self: u, card })) n += e.bonus;
+  }
+  return n;
+}
+
+/** 自分が付ける状態異常の量の上乗せ（呪詛など） */
+export function statusBonusOf(u: Unit, status: string, card?: CardDef): number {
+  let n = 0;
+  for (const ab of abilitiesOf(u)) {
+    const e = ab.effect;
+    if ('modifier' in e && e.modifier === 'statusBonus' && e.statuses.includes(status) && testConditions(e.if, { self: u, card })) n += e.amount;
+  }
+  return n;
 }
 
 /** かばう能力の発動確率（複数あれば一番高いもの。持っていなければ null） */
@@ -152,8 +186,19 @@ export function describeAbility(ab: AbilityDef, side: 'ally' | 'enemy' = 'ally')
     if (e.modifier === 'coverLethal') return `他の味方がHP0になるダメージを受ける時、${e.chance}%の確率で代わりに受ける（ブロックで防げる）`;
     const cs = condText(e.if);
     const head = cs.length ? `${cs.join('・')}：` : '';
-    return e.modifier === 'damageDealt' ? `${head}与えるダメージ×${e.multiplier}` : `${head}ダメージが敵のブロックを無視する`;
+    if (e.modifier === 'cardChance') return `${head}成功率+${e.bonus}%`;
+    if (e.modifier === 'statusBonus') return `${head}自分が付ける${e.statuses.map((x) => `「${getStatus(x).name}」`).join('')}+${e.amount}`;
+    if (e.modifier === 'damageDealt') return `${head}与えるダメージ${e.multiplier !== 1 ? `×${e.multiplier}` : ''}${e.scale ? scaleText(e.scale) : ''}`;
+    return `${head}ダメージが敵のブロックを無視する`;
   }
   const cs = condText(e.if);
   return `${TRIGGER_TEXT[e.when]}${cs.length ? `（${cs.join('・')}）` : ''}：${e.do.map((x) => describeEffect(x, side)).join('、')}`;
+}
+
+function scaleText(sc: DamageScale): string {
+  const pct = Math.round(sc.per * 100);
+  const cap = sc.max !== undefined ? `（最大+${Math.round(sc.max * 100)}%）` : '';
+  if (sc.by === 'missingHp') return `、減ったHPの割合×${pct}%増える${cap}`;
+  if (sc.by === 'targetStatuses') return `、対象の悪い状態異常1種類につき+${pct}%${cap}`;
+  return `、自分の「${sc.status ? getStatus(sc.status).name : ''}」1につき+${pct}%${cap}`;
 }

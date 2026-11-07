@@ -1,13 +1,14 @@
 // ===== 宝箱・ドロップ・報酬カード =====
 import { BALANCE } from '../../data/balance';
 import { CARDS } from '../../data/cards';
-import { getClass } from '../../data/classes';
 import { ITEMS } from '../../data/items';
 import type { GameState, Hero, ItemDef, Loot, Rarity } from '../../types';
 import { successDistribution } from '../battle/probability';
 import type { Rng } from '../rng';
 import { RARITIES, rarityIndex } from './dungeon';
+import { pickCard } from './cardTags';
 import { jobWeapons } from './hero';
+import { heroCardPool } from './jobs';
 
 const pick = <T,>(list: readonly T[], rng: Rng) => list[rng.int(list.length)];
 
@@ -90,13 +91,14 @@ export function rollCardOffers(game: GameState, heroIds: string[], rng: Rng, odd
   if (!heroes.length) return offers;
   for (let tries = 0; offers.length < 3 && tries < 30; tries++) {
     const h = heroes[(offers.length + tries) % heroes.length];
-    const pool = getClass(h.classId).cardPool.filter((id) => CARDS.has(id));
+    const pool = heroCardPool(h);
     if (!pool.length) continue;
     // 抽選した格のカード。その格が無ければ1つ下の格へ
     let grade = pickWeighted(odds, rng);
     let cands: string[] = [];
     for (; grade >= 0 && !cands.length; grade--) cands = pool.filter((id) => rarityIndex(CARDS.get(id).rarity ?? 'common') === grade);
-    const cardId = pick(cands.length ? cands : pool, rng);
+    // 3枚のうち最後の1枚は完全ランダム、ほかは今の山札・装備と相性の良いカードが出やすい（スマート抽選）
+    const cardId = pickCard(cands.length ? cands : pool, h, rng, offers.length < 2);
     if (!offers.some((o) => o.cardId === cardId && o.heroId === h.id)) offers.push({ cardId, heroId: h.id });
   }
   return offers;

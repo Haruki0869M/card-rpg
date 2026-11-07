@@ -13,4 +13,8 @@ export const weaponTypes: WeaponTypeDef[] = [
   { id: 'dagger', order: 8, name: '短剣', icon: 'dagger' },
   { id: 'spear', order: 9, name: '槍', icon: 'spear' },
   { id: 'katana', order: 10, name: '刀', icon: 'katana' },
+  // 中位ジョブ（J3a）で増えた種類
+  { id: 'axe', order: 11, name: '斧', icon: 'axe' },
+  { id: 'scythe', order: 12, name: '鎌', icon: 'scythe' },
+  { id: 'whip', order: 13, name: '鞭', icon: 'whip' },
 ];

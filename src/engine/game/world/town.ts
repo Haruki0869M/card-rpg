@@ -6,10 +6,12 @@ import { getItem, ITEMS } from '../../../data/items';
 import { QUESTS, SHRINES, TOWNS } from '../../../data/world';
 import type { GameCommand, GameState, ShopStock } from '../../../types';
 import type { Rng } from '../../rng';
-import { addItem, addLog, addLoot, ownedBy } from '../common';
+import { addItem, addLog, addLoot, ownedBy, shopPriceFor } from '../common';
 import { rarityIndex } from '../dungeon';
+import { pickCard } from '../cardTags';
 import { clampHero, heroFocusMax, heroMaxHp, jobWeapons } from '../hero';
 import { findHero } from '../heroes';
+import { heroCardPool } from '../jobs';
 import { cardRewardOdds, newItem, pickWeighted } from '../loot';
 import { applyOutcome, makeOutcomeCtx } from '../outcomes';
 import { objectiveHandler } from './objectives';
@@ -60,11 +62,11 @@ export function ensureShop(game: GameState, rng: Rng): ShopStock {
   const odds = cardRewardOdds('elite');
   for (let k = 0; k < town.shop.cards && heroes.length; k++) {
     const h = heroes[k % heroes.length];
-    const pool = getClass(h.classId).cardPool.filter((id) => CARDS.has(id));
+    const pool = heroCardPool(h);
     let g = pickWeighted(odds, rng);
     let cand: string[] = [];
     for (; g >= 0 && !cand.length; g--) cand = pool.filter((id) => rarityIndex(CARDS.get(id).rarity ?? 'common') === g);
-    const cardId = cand[rng.int(cand.length)] ?? pool[0];
+    const cardId = cand.length ? pickCard(cand, h, rng, true, BALANCE.smartDraw.shopStrength) : pool[0];
     cards.push({ cardId, heroId: h.id, price: BALANCE.cardPrice[CARDS.get(cardId).rarity ?? 'common'] ?? 40 });
   }
   const stock = { refreshedAt: w.worldTurn, items, cards };
@@ -90,14 +92,15 @@ export function townBuy(game: GameState, cmd: Cmd<'TOWN_BUY'>, rng: Rng): string
   const v = townVisitor(game)!;
   // カードは、町に入ったキャラの職業のものだけ買える
   if (!('item' in entry) && getClass(findHero(game, entry.heroId)?.classId ?? '').id !== v.classId) return `${v.name}の職業のカードではありません`;
-  if (v.gold < entry.price) return 'ゴールドが足りません';
-  v.gold -= entry.price;
+  const price = shopPriceFor(v, entry.price);
+  if (v.gold < price) return 'ゴールドが足りません';
+  v.gold -= price;
   entry.sold = true;
-  if ('item' in entry) addLog(game, `${v.name}が${addItem(game, v, entry.item, false)}を買った（${entry.price}G）`);
+  if ('item' in entry) addLog(game, `${v.name}が${addItem(game, v, entry.item, false)}を買った（${price}G）`);
   else {
     const h = v;
     h.deck.push({ uid: `c${game.nextUid++}`, cardId: entry.cardId });
-    addLog(game, `${h.name}の山札に「${CARDS.get(entry.cardId).name}」を加えた（${entry.price}G）`);
+    addLog(game, `${h.name}の山札に「${CARDS.get(entry.cardId).name}」を加えた（${price}G）`);
   }
   return undefined;
 }

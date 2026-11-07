@@ -7,7 +7,6 @@ import type { GrowthOption, Hero, StatId } from '../../../types';
 import type { Rng } from '../../rng';
 import { STAT_IDS } from '../hero';
 import type { GrowthHandler } from './types';
-import { jobOptions } from '../jobs';
 
 export type { GrowthHandler } from './types';
 
@@ -35,7 +34,5 @@ export function growthOptions(hero: Hero, rng: Rng): GrowthOption[] {
   const opts: GrowthOption[] = stats.map((s) => ({ ...growthHandler('stat').make(hero), stat: s }));
   const extra = BALANCE.growthExtras.map(growthHandler).filter((h) => h.available?.(hero) ?? true);
   if (extra.length) opts.push(extra[rng.int(extra.length)].make(hero));
-  // 転職できるジョブがあれば、その候補も出す（spec §6.4）
-  for (const o of jobOptions(hero)) if (o.ready) opts.push({ kind: 'jobChange', amount: 0, jobId: o.job.id });
   return opts;
 }

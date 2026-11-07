@@ -122,5 +122,17 @@ export function restMultiplierOf(hero: Hero): number {
   return e.kind === 'restBonus' ? e.multiplier : 1;
 }
 
+/** 探索の特殊能力: 野営で追加で回復するフォーカス（闘士など） */
+export function campFocusOf(hero: Hero): number {
+  const e = getClass(hero.classId).exploreAbility.effect;
+  return e.kind === 'campFocus' ? e.amount : 0;
+}
+
+/** 探索の特殊能力: 町の買い物の値段（怪盗の変装など。値引きは切り捨て） */
+export function shopPriceFor(hero: Hero | undefined, price: number): number {
+  const e = hero ? getClass(hero.classId).exploreAbility.effect : undefined;
+  return e?.kind === 'shopDiscount' ? Math.max(1, Math.floor((price * (100 - e.percent)) / 100)) : price;
+}
+
 /** 探索の特殊能力: 祠とイベントのマスが霧の中でも見えるキャラがいるか（召喚士など） */
 export const partySenses = (game: GameState) => game.heroes.some((h) => !h.retired && getClass(h.classId).exploreAbility.effect.kind === 'sense');

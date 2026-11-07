@@ -144,6 +144,19 @@ export function comboMultiplier(source: Unit | undefined, victim: Unit | undefin
   return victim.hitBy?.some((x) => x !== id) ? 1 + BALANCE.comboBonus : 1;
 }
 
+/** 属性を強める状態異常（聖光など）の倍率。使った分は消す */
+function elementBoost(source: Unit, element: string): number {
+  let m = 1;
+  for (const [id, n] of Object.entries(source.statuses)) {
+    if (!n) continue;
+    const b = getStatus(id).boostElement;
+    if (b?.element !== element) continue;
+    m *= 1 + b.per * n;
+    source.statuses[id] = 0;
+  }
+  return m;
+}
+
 /** その属性に耐性があるか（状態異常が効かない） */
 export const resistsElement = (victim: Unit, element: string) => isEnemy(victim) && !!getEnemy(victim.defId).resist?.includes(element);
 
@@ -158,6 +171,9 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   if (victim.dead) return 0;
   let v = victim;
   let mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities, ctx.perfect);
+  // 属性を強める状態異常（聖光など）: この一撃で使い切る
+  const boost = element ? elementBoost(source, element) : 1;
+  base = Math.round(base * boost);
   let dmg = calcDamage(base, source.statuses, v.statuses, mods.multiplier * elementMultiplier(v, element) * comboMultiplier(source, v));
   // かばう: 相手の攻撃でこのままだとHP0になる場合、同じ側の他の仲間が確率で代わりに受ける
   if (isEnemy(source) !== isEnemy(v) && dmg - (mods.ignoreBlock ? 0 : v.block) >= v.hp) {

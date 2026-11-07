@@ -12,4 +12,6 @@ export const statuses: StatusDef[] = [
   { id: 'curse', name: '呪い', icon: 'skull', color: '#d08aff', bg: '#2a0a3a', harmful: true, healMultiplier: 0.5 },
   // 良い効果（万能薬では消えない）
   { id: 'regen', name: '再生', icon: 'heartPulse', color: '#6ad8ff', bg: '#0a2e4a', harmful: false, tickHeal: 'stacks' },
+  // 聖騎士の聖光: 次の聖属性の攻撃が1つにつき+15%（その攻撃で消える。減らない・最大5）
+  { id: 'holyLight', name: '聖光', icon: 'sun', color: '#fff2a0', bg: '#4a3e0a', harmful: false, decay: 0, maxStacks: 5, boostElement: { element: 'holy', per: 0.15 } },
 ];

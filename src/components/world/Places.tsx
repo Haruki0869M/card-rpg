@@ -22,6 +22,7 @@ import {
   sceneBackground,
   sceneHeroes,
   sellPrice,
+  shopPriceFor,
   statChance,
 } from '../../engine';
 import { isLocalPlayer } from '../../store/battleConfig';
@@ -252,14 +253,14 @@ export function TownScreen() {
                     <span className="block truncate text-[12px] text-zinc-400">{itemSummary(it)}</span>
                   </span>
                   <button
-                    disabled={!mine || s.sold || v.gold < s.price}
+                    disabled={!mine || s.sold || v.gold < shopPriceFor(v, s.price)}
                     onClick={() => dispatchGame({ type: 'TOWN_BUY', playerId: p, kind: 'item', index: i })}
                     className="btn btn-gold flex h-11 w-[78px] shrink-0 items-center justify-center gap-0.5 rounded-lg text-[13px] font-bold"
                   >
                     {s.sold ? '売り切れ' : (
                       <>
                         <Coins size={14} />
-                        {s.price}
+                        {shopPriceFor(v, s.price)}
                       </>
                     )}
                   </button>
@@ -279,14 +280,14 @@ export function TownScreen() {
                       {h.name}
                     </span>
                     <button
-                      disabled={!mine || c.sold || v.gold < c.price}
+                      disabled={!mine || c.sold || v.gold < shopPriceFor(v, c.price)}
                       onClick={() => dispatchGame({ type: 'TOWN_BUY', playerId: h.playerId, kind: 'card', index: i })}
                       className="btn btn-gold flex h-11 w-[96px] items-center justify-center gap-0.5 rounded-lg text-[13px] font-bold"
                     >
                       {c.sold ? '売り切れ' : (
                         <>
                           <Coins size={14} />
-                          {c.price}
+                          {shopPriceFor(v, c.price)}
                         </>
                       )}
                     </button>

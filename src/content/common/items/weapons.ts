@@ -29,4 +29,7 @@ export const weapons: ItemDef[] = [
   { id: 'rustyDagger', name: '古びた短剣', slot: 'weapon', weaponType: 'dagger', rarity: 'common', icon: 'dagger', description: '刃こぼれした、よく手になじむ短剣。', cards: [{ cardId: 'wQuickStab', count: 2 }] },
   { id: 'ironSpear', name: '鉄の槍', slot: 'weapon', weaponType: 'spear', rarity: 'common', icon: 'spear', description: '長くまっすぐな鉄の槍。', cards: [{ cardId: 'wThrust', count: 2 }] },
   { id: 'plainKatana', name: '無銘の刀', slot: 'weapon', weaponType: 'katana', rarity: 'common', icon: 'katana', description: '銘の無い、よく斬れる刀。', cards: [{ cardId: 'wIaiCut', count: 2 }] },
+  { id: 'woodAxe', name: '木こりの斧', slot: 'weapon', weaponType: 'axe', rarity: 'common', icon: 'axe', description: '分厚い刃の、重たい斧。', cards: [{ cardId: 'wCleave', count: 2 }] },
+  { id: 'rustyScythe', name: '錆びた大鎌', slot: 'weapon', weaponType: 'scythe', rarity: 'common', icon: 'scythe', description: '刃に黒い染みの残る、不吉な大鎌。', cards: [{ cardId: 'wReap', count: 2 }], tags: ['curse'] },
+  { id: 'leatherWhip', name: '革の鞭', slot: 'weapon', weaponType: 'whip', rarity: 'common', icon: 'whip', description: '獣を導くための、しなやかな革の鞭。', cards: [{ cardId: 'wLash', count: 2 }] },
 ];

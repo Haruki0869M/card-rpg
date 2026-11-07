@@ -22,12 +22,12 @@ import type {
   SlotResult,
   Statuses,
 } from '../../types';
-import { damageModifiers, fireAbilities } from '../abilities';
+import { cardChanceBonus, damageModifiers, fireAbilities } from '../abilities';
 import { createRng, type Rng, shuffle } from '../rng';
 import { affinityOf } from '../stats';
 import { calcDamage } from './damage';
 import { discardHand, drawCards } from './deck';
-import { applyEffect, checkEffect, comboMultiplier, elementMultiplier, makeCtx, targetOf } from './effects';
+import { applyEffect, checkEffect, comboMultiplier, dealDamage, elementMultiplier, makeCtx, targetOf } from './effects';
 import { decideAllIntents } from './intents';
 import { finalChance, selectTier } from './probability';
 import { activeStatuses, actionFailChanceOf, applyTick, chancePenaltyOf, consumeStatus, decayStatuses, emptyStatuses, skipActionStatus, takeManaPenalty, tickHealOf } from './statuses';
@@ -154,7 +154,8 @@ export function createBattle(setup: BattleSetup): BattleState {
 
 /** カードの成功率（適性・痺れなどの状態異常を反映） */
 export function chanceFor(ally: AllyState, card: CardDef): number {
-  const base = finalChance(card, affinityOf(ally));
+  const bonus = cardChanceBonus(ally, card);
+  const base = bonus ? Math.min(BALANCE.chanceMax, finalChance(card, affinityOf(ally)) + bonus) : finalChance(card, affinityOf(ally));
   const pen = chancePenaltyOf(ally.statuses);
   return pen ? Math.max(BALANCE.chanceMin, base - pen) : base;
 }
@@ -401,6 +402,22 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   return undefined;
 }
 
+/** 呼び出したお供（幻獣・獣など）の攻撃。ターン終了時にランダムな敵へ。残りターンが0になったら帰る */
+function summonsAttack(state: BattleState, ally: AllyState, rng: Rng, events: BattleEvent[]) {
+  if (!ally.summons?.length) return;
+  for (const s of ally.summons) {
+    const foes = state.enemies.filter((e) => !e.dead);
+    if (!foes.length) break;
+    const t = foes[rng.int(foes.length)];
+    const ctx = makeCtx(state, rng, events, ally, { target: t });
+    const loss = dealDamage(ctx, t, s.damage, s.element);
+    abilityTriggered(state, ally.id, s.name, events);
+    addLog(state, `${ally.name}の${s.name}が${enemyName(t)}を攻撃！ ${loss}ダメージ`);
+    s.turns -= 1;
+  }
+  ally.summons = ally.summons.filter((s) => s.turns > 0);
+}
+
 /** 消費アイテム（効果の部品を使う。所持の管理は冒険側） */
 function useItem(state: BattleState, cmd: Extract<Command, { type: 'USE_ITEM' }>, rng: Rng, events: BattleEvent[]): string | undefined {
   if (state.phase !== 'ally') return '味方フェーズではありません';
@@ -435,6 +452,7 @@ function endTurn(state: BattleState, playerId: string, rng: Rng, events: BattleE
   for (const a of state.allies) discardHand(a);
   // きっかけ: ターン終了時 → 継続ダメージ → 状態異常を1減らす
   for (const a of state.allies) if (!a.dead) fireAbilities(state, rng, events, a, 'turnEnd');
+  for (const a of state.allies) if (!a.dead) summonsAttack(state, a, rng, events);
   tickDamageOverTime(state, 'ally', rng, events);
   for (const a of state.allies) decayStatuses(a.statuses);
   if (checkEnd(state, events)) return undefined;

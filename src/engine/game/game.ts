@@ -72,7 +72,7 @@ import {
 import { needsVote, tally, VOTED_COMMANDS, voteCtx, voters } from './votes';
 import { encounterJoin, worldInvite, worldInviteAnswer } from './world/world';
 import { EXPEDITION_MODES, findExpedition, mount, restoreSceneFields, saveSceneFields, unmount } from './scenes';
-import { addFeat, changeJob } from './jobs';
+import { addFeat, announceJobs, changeJob, pickJobCard } from './jobs';
 import { cardRewardOdds, chestOdds, newItem, rollCardOffers, rollChestContents, rollConsumable, rollEquipment, rollGrade } from './loot';
 
 export const GAME_VERSION = STATE_VERSION;
@@ -334,12 +334,13 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
       case 'CHANGE_JOB': {
         const h = findHero(game, cmd.heroId);
         if (!h || !ownedBy(h, cmd.playerId)) error = '担当していないキャラです';
-        else if (game.mode === 'battle') error = '戦闘中は転職できません';
-        else {
-          error = changeJob(game, h, cmd.jobId);
-          // 待っているレベルアップの転職の候補は、もう使えない
-          if (!error) for (const lu of game.reward?.levelUps ?? []) if (lu.heroId === h.id) lu.options = lu.options.filter((o) => o.kind !== 'jobChange');
-        }
+        else if (h.jobPick?.length) error = '先に転職のカードを選んでください';
+        else error = changeJob(game, h, cmd.jobId);
+        break;
+      }
+      case 'PICK_JOB_CARD': {
+        const h = findHero(game, cmd.heroId);
+        error = !h || !ownedBy(h, cmd.playerId) ? '担当していないキャラです' : pickJobCard(game, h, cmd.cardId);
         break;
       }
       case 'CLAIM_LOOT':
@@ -592,6 +593,7 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
   const rt = getRoomType(room?.type ?? game.battleInfo?.roomType ?? 'battle');
   if (!room) onWandererDefeated(game, rng);
   const rewardMul = getDifficulty(game.difficulty).reward ?? 1;
+  gold += b.bonusGold ?? 0;
   for (const e of b.enemies) {
     const def = getEnemy(e.defId);
     const k = (1 + BALANCE.rewardPerLevel * (e.level - def.baseLevel)) * rewardMul;
@@ -615,6 +617,7 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
       h.hp = Math.min(heroMaxHp(h), h.hp + getClass(h.classId).hpPerLevel);
       reward.levelUps.push({ heroId: h.id, level: h.level, options: growthOptions(h, rng) });
       addLog(game, `${h.name}はレベル${h.level}に上がった！`);
+      announceJobs(game, h);
     }
     if (h.level >= BALANCE.maxLevel) h.exp = 0;
     reward.exp.push({ heroId: h.id, gained: exp, fromLevel, toLevel: h.level, fromExp, toExp: h.exp });
@@ -666,7 +669,6 @@ function chooseGrowth(game: GameState, playerId: string, optionIndex: number, ca
   clampHero(h);
   r.levelUps.shift();
   // 転職したら、同じキャラの残りのレベルアップから転職の候補を外す
-  if (opt.kind === 'jobChange') for (const lu of r.levelUps) if (lu.heroId === h.id) lu.options = lu.options.filter((o) => o.kind !== 'jobChange');
   return undefined;
 }
 

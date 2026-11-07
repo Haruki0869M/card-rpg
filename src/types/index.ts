@@ -81,6 +81,8 @@ export interface CardDef {
   trait?: AbilityDef;
   /** 成功率の基準にする能力値（例: 刀の見切り＝感知）。無ければカードの種類（物理＝力・魔法＝知力・スキル＝器用） */
   stat?: StatId;
+  /** 報酬のスマート抽選に使う印（効果から自動で付く印に足す。例: 'combo'） */
+  tags?: string[];
 }
 
 // ---------- 特殊能力（職業・装備・カード・敵で共通。spec §2.4・§6.2・§12.7・§13.1） ----------
@@ -104,9 +106,19 @@ export type AbilityCondition = { [K in keyof ConditionParams]: { kind: K } & Con
  */
 export type AbilityEffect =
   | { when: AbilityTrigger; if?: AbilityCondition[]; do: Effect[] }
-  | { modifier: 'damageDealt'; multiplier: number; if?: AbilityCondition[] }
+  | { modifier: 'damageDealt'; multiplier: number; if?: AbilityCondition[]; scale?: DamageScale }
   | { modifier: 'ignoreBlock'; if?: AbilityCondition[] }
-  | { modifier: 'coverLethal'; chance: number };
+  | { modifier: 'coverLethal'; chance: number }
+  /** カードの成功率+bonus（狙い撃ちなど） */
+  | { modifier: 'cardChance'; bonus: number; if?: AbilityCondition[] }
+  /** 自分が付ける状態異常の量+amount（呪詛など） */
+  | { modifier: 'statusBonus'; statuses: string[]; amount: number; if?: AbilityCondition[] };
+
+/**
+ * ダメージの倍率を状況で増やす（倍率 × (1 + per × 値)。max は上乗せの上限）。
+ * missingHp = 自分の減ったHPの割合（0〜1） / targetStatuses = 対象の悪い状態異常の種類の数 / selfStatus = 自分の状態異常 status の量
+ */
+export type DamageScale = { by: 'missingHp' | 'targetStatuses' | 'selfStatus'; per: number; max?: number; status?: string };
 
 export interface AbilityDef {
   name: string;
@@ -127,7 +139,11 @@ export type ExploreAbility =
   /** 野営・休憩の回復の倍率（僧侶など） */
   | { kind: 'restBonus'; multiplier: number }
   /** 祠とイベントのマスが、霧の中でも見える（召喚士など） */
-  | { kind: 'sense' };
+  | { kind: 'sense' }
+  /** 野営でフォーカスも回復する（闘士など） */
+  | { kind: 'campFocus'; amount: number }
+  /** 町の買い物の値引き（%。怪盗など） */
+  | { kind: 'shopDiscount'; percent: number };
 
 export interface ExploreAbilityDef {
   id: string;
@@ -173,6 +189,8 @@ export interface ClassDef {
   requires?: { feat: string; count: number; text: string };
   /** 転職した時に山札へ加わるカード（1回きりの決め技など） */
   jobCards?: string[];
+  /** 転職した時に3枚から1枚選べる、そのジョブを象徴する専用カード（残りは報酬に出る） */
+  signature?: string[];
   /** 初期装備（アイテムID） */
   startingEquipment: Partial<Record<EquipSlot, string>>;
   /** 報酬で出るカードの候補（カードID） */
@@ -316,6 +334,8 @@ export interface StatusDef {
   manaPenalty?: number;
   /** 重ねられる上限（省略は上限なし） */
   maxStacks?: number;
+  /** 持ち主の element 属性の攻撃のダメージ +per×数。その攻撃で消える（聖光など） */
+  boostElement?: { element: string; per: number };
   /** 説明文（省略すると数値から自動で作る） */
   description?: string;
 }
@@ -336,6 +356,8 @@ export interface AllyState {
   played?: number;
   /** 能力の数え（幻獣ゲージなど。キーは能力ごと） */
   counters?: Record<string, number>;
+  /** 呼び出したお供（幻獣・獣など。ターン終了時に攻撃する。足元のトークンで表示） */
+  summons?: SummonState[];
   /** 戦闘内で一意のID（a0, a1, ...）。同じ職業が複数いても区別できる */
   id: string;
   classId: string;
@@ -425,6 +447,18 @@ export interface BattleState {
   readyCheck?: boolean;
   /** 準備完了を押したプレイヤー */
   ready?: PlayerId[];
+  /** 戦闘中に手に入れたお金（掠め取りなど。勝った時の報酬に足す） */
+  bonusGold?: number;
+}
+
+/** 呼び出したお供（turns = 残りのターン数。0になったら帰る） */
+export interface SummonState {
+  id: string;
+  name: string;
+  icon: string;
+  damage: number;
+  turns: number;
+  element?: string;
 }
 
 export interface BattleSetup {
