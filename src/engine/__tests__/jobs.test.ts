@@ -19,7 +19,13 @@ import { rollChanceFor, tierDamageAgainst } from '../battle/battle';
 
 const P: PlayerId = 'P1';
 ENEMIES.register({ id: 'topJobDummy', name: '検証用の敵', icon: 'T', maxHp: 10000, baseLevel: 1, exp: 1, gold: 1, size: 1.5,
-  weak: ['fire'], resist: ['ice'], pattern: 'sequence', actions: [{ id: 'hit', name: '打撃', effects: [{ kind: 'damage', amount: 10 }] }, { id: 'guard', name: '防御', effects: [{ kind: 'block', amount: 12 }] }] });
+  weak: ['fire'], resist: ['ice'], pattern: 'sequence', actions: [{ id: 'hit', name: '打撃', effects: [{ kind: 'damage', amount: 10 }] }, { id: 'guard', name: '防御', effects: [{ kind: 'block', amount: 12 }] },
+    { id: 'multi', name: '連撃', effects: [{ kind: 'damage', amount: 10, hits: 3 }] },
+    { id: 'area', name: '全体攻撃', effects: [{ kind: 'damage', amount: 10, to: 'foes' }] },
+    { id: 'fire', name: '炎', effects: [{ kind: 'damage', amount: 10, element: 'fire' }] },
+    { id: 'ice', name: '氷', effects: [{ kind: 'damage', amount: 10, element: 'ice' }] },
+    { id: 'strengthen', name: '強化', effects: [{ kind: 'applyStatus', status: 'holyLight', amount: 4, to: 'self' }] },
+  ] });
 function topBattle(classes: string[]): BattleState {
   return createBattle({ seed: 19, party: classes.map(classId => ({ classId, gender: 'male', name: classId, playerId: P })), encounter: { id: 'testTop', name: '検証', enemies: [{ defId: 'topJobDummy' }] } });
 }
@@ -365,10 +371,45 @@ describe('最上位の戦闘能力', () => {
     let s = topPlay(topBattle(['warrior']), 'jump'); const hp = s.allies[0].hp, foeHp = s.enemies[0].hp;
     s = nextTurn(s); expect(s.allies[0].hp).toBe(hp); expect(s.allies[0].airborne).toBeUndefined(); expect(foeHp - s.enemies[0].hp).toBe(40);
   });
-  it('強奪: 次の攻撃だけ半減し、自分に半分のブロックを得る', () => {
-    let s = topPlay(topBattle(['warrior']), 'plunder'); const a = s.allies[0];
-    expect(s.enemies[0].nextActionMultiplier).toBe(0.5); expect(a.block).toBe(5);
-    const hp = a.hp; s = nextTurn(s); expect(s.allies[0].hp).toBe(hp); expect(s.enemies[0].nextActionMultiplier).toBeUndefined();
+  it('強奪: 攻撃の半分を敵に与え、ブロックは増えず、敵の次の攻撃だけ半減する', () => {
+    let s = topBattle(['warrior']); const foeHp = s.enemies[0].hp, block = s.allies[0].block;
+    s = topPlay(s, 'plunder'); const a = s.allies[0];
+    expect(foeHp - s.enemies[0].hp).toBe(5);
+    expect(s.enemies[0].nextActionMultiplier).toBe(0.5); expect(a.block).toBe(block);
+    a.block = 0;
+    const hp = a.hp; s = nextTurn(s); expect(hp - s.allies[0].hp).toBe(5); expect(s.enemies[0].nextActionMultiplier).toBeUndefined();
+  });
+  it('強奪: 連撃は同じ3回で攻撃し、敵の連撃も各回半減する', () => {
+    let s = topBattle(['warrior']); const e = s.enemies[0];
+    e.intent = { actionId: 'multi', targetId: s.allies[0].id }; e.block = 6;
+    const events: import('../../types').BattleEvent[] = [];
+    const ctx = makeCtx(s, createRng(1), events, s.allies[0], { target: e, card: getCard('plunder') });
+    const hp = e.hp;
+    applyEffect(ctx, { kind: 'stealIntent', multiplier: 0.5 });
+    expect(events.filter(x => x.type === 'damage').map(x => [x.amount, x.blocked])).toEqual([[0, 5], [4, 1], [5, 0]]);
+    expect(hp - e.hp).toBe(9); expect(ctx.dealt).toBe(9); expect(s.allies[0].block).toBe(0);
+    const allyHp = s.allies[0].hp;
+    s = nextTurn(s); expect(allyHp - s.allies[0].hp).toBe(15);
+    expect(s.enemies[0].nextActionMultiplier).toBeUndefined();
+  });
+  it.each([['fire', 12], ['ice', 2]] as const)('強奪: %s属性の弱点・耐性、自分の倍率、敵のブロックを通常どおり計算する', (actionId, loss) => {
+    const s = topBattle(['warrior']), a = s.allies[0], e = s.enemies[0];
+    a.damageBonus = 1; e.block = 3; e.intent = { actionId };
+    const hp = e.hp;
+    applyEffect(makeCtx(s, createRng(1), [], a, { target: e, card: getCard('plunder') }), { kind: 'stealIntent', multiplier: 0.5 });
+    expect(hp - e.hp).toBe(loss); expect(e.block).toBe(0); expect(a.block).toBe(0);
+  });
+  it('強奪: 全体攻撃を盗んでも選んだ敵1体にだけダメージを与える', () => {
+    const s = topBattle(['warrior', 'mage']); const e = s.enemies[0];
+    s.enemies.push({ ...structuredClone(e), uid: 'otherEnemy' }); e.intent = { actionId: 'area' };
+    const hp = e.hp, otherHp = s.enemies[1].hp, allyHp = s.allies.map(a => a.hp);
+    applyEffect(makeCtx(s, createRng(1), [], s.allies[0], { target: e, card: getCard('plunder') }), { kind: 'stealIntent', multiplier: 0.5 });
+    expect(hp - e.hp).toBe(5); expect(s.enemies[1].hp).toBe(otherHp); expect(s.allies.map(a => a.hp)).toEqual(allyHp);
+  });
+  it('強奪: 強化は今までどおり自分が半分を受け取る', () => {
+    const s = topBattle(['warrior']); s.enemies[0].intent = { actionId: 'strengthen' };
+    applyEffect(makeCtx(s, createRng(1), [], s.allies[0], { target: s.enemies[0] }), { kind: 'stealIntent', multiplier: 0.5 });
+    expect(s.allies[0].statuses.holyLight).toBe(2); expect(s.enemies[0].nextActionMultiplier).toBe(0.5);
   });
   it('強奪: 防御行動も半減し、同じ種類の効果を受け取る', () => {
     const s = topBattle(['warrior']); s.enemies[0].intent = { actionId: 'guard' };

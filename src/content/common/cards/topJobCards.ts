@@ -92,5 +92,5 @@ export const TOP_JOB_CARDS: CardDef[] = [
   c('thiefDecoy', '華麗な囮', 'skill', 1, 'self', [[b(4)], [b(7)], [b(9), draw(1)]], { stat: 'agi' }),
   c('treasureBlade', '財宝の短剣', 'physical', 2, 'enemy', [[d(6)], [d(11)], [d(17), { kind: 'gainGold', amount: 8 }]], { rarity: 'epic', trait: { name: '大入り', effect: { when: 'kill', do: [{ kind: 'gainGold', amount: 10 }] } }, stat: 'luk' }),
   c('thiefFortune', '幸運の仕込み', 'skill', 0, 'self', [[f(1)], [f(1), draw(1)]], { stat: 'luk' }),
-  c('plunder', '強奪', 'skill', 1, 'enemy', [[{ kind: 'stealIntent', multiplier: 0.5 }], [{ kind: 'stealIntent', multiplier: 0.5 }]], { rarity: 'legend', exhaust: true, trait: { name: '一世一代の強奪', description: '1戦闘1回。敵の次の行動の半分を奪う。攻撃は自分のブロックに換える', effect: { modifier: 'exhaust' } }, stat: 'luk' }),
+  c('plunder', '強奪', 'skill', 1, 'enemy', [[{ kind: 'stealIntent', multiplier: 0.5 }], [{ kind: 'stealIntent', multiplier: 0.5 }]], { rarity: 'legend', exhaust: true, trait: { name: '一世一代の強奪', description: '1戦闘1回。敵の次の行動の半分を奪う。攻撃は同じ回数・属性でその敵1体にダメージ、それ以外は自分が受け取る', effect: { modifier: 'exhaust' } }, stat: 'luk' }),
 ];
