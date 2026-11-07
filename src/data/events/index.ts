@@ -2,4 +2,4 @@
 import type { EventDef } from '../../types';
 import { contentRegistry, type ContentModules } from '../content';
 
-export const EVENTS = contentRegistry<EventDef>('event', import.meta.glob('/src/content/**/events/*.ts', { eager: true }) as ContentModules);
+export const EVENTS = contentRegistry<EventDef>('event', import.meta.glob(['/src/content/**/events/*.ts', '/src/content/**/randomEvents/*.ts'], { eager: true }) as ContentModules);

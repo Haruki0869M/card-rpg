@@ -35,6 +35,15 @@ export const BALANCE = {
   jobChange: { base: 5, mid: 4, special: 3 },
   /** 段が上がるごとの、次のレベルに必要な経験値の倍率（基本1・中位×1.2・最上位と特殊×1.44） */
   tierExpMul: 1.2,
+  /** お供: 懐き度の段階（♡1〜5）に必要な点数・撫でた時の点数・戦闘に勝った時の点数・めったに出ない子の出やすさ（%）・名前の長さ */
+  petLove: [0, 15, 40, 80, 130],
+  petLovePat: 2,
+  petLoveBattle: 3,
+  petRareChance: 15,
+  petNameMax: 8,
+  /** 突発イベント: 何もないマスに移動し終えた時に起きる確率（%）。夜・侵食度50%以上では悪いイベントの重み×1.5 */
+  randomEventChance: 20,
+  randomEventBadMul: 1.5,
   /** 報酬のスマート抽選: 重なった印1つごとの重みの上乗せ・重みの上限・ショップの係数（設計 v2 §2） */
   smartDraw: { perTag: 0.5, maxWeight: 3, shopStrength: 0.5 },
   /** 転職した直後の Lv1→2 は軽く（成長ボーナスをすぐ選べるように） */

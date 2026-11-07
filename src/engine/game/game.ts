@@ -11,6 +11,7 @@ import { getEnemy } from '../../data/enemies';
 import { EVENTS } from '../../data/events';
 import { getItem, POUCH_LIMIT } from '../../data/items';
 import type {
+  EventBattle,
   BattleEvent,
   EventOutcome,
   GameCommand,
@@ -36,7 +37,7 @@ import { isBossRoom, roomBehavior, roomTypeOf } from './rooms';
 import { growthHandler, growthOptions } from './growth';
 import { RARITY_NAME } from '../../data/terms';
 import { createWorld } from './world/generate';
-import { corruptionLevelBonus } from './world/wanderers';
+import { corruptionLevelBonus, wandererLevel } from './world/wanderers';
 import {
   backToWorld,
   camp,
@@ -55,6 +56,7 @@ import {
   waitTurn,
   reviveAlly,
   agreeMove,
+  heroesAt,
 } from './world/world';
 import { leaveShrine, leaveTown, questAccept, questReport, shrineChoose, townBuy, townInn, townRemoveCard, townSell } from './world/town';
 import { getRoomType } from '../../data/rules';
@@ -73,6 +75,8 @@ import { needsVote, tally, VOTED_COMMANDS, voteCtx, voters } from './votes';
 import { encounterJoin, worldInvite, worldInviteAnswer } from './world/world';
 import { EXPEDITION_MODES, findExpedition, mount, restoreSceneFields, saveSceneFields, unmount } from './scenes';
 import { addFeat, announceJobs, changeJob, pickJobCard } from './jobs';
+import { addPetActs, addPetLove, adoptPet, patPet } from './pets';
+import { doCardTask, peddlerBuy } from './tasks';
 import { cardRewardOdds, chestOdds, newItem, rollCardOffers, rollChestContents, rollConsumable, rollEquipment, rollGrade } from './loot';
 
 export const GAME_VERSION = STATE_VERSION;
@@ -338,6 +342,18 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
         else error = changeJob(game, h, cmd.jobId);
         break;
       }
+      case 'ADOPT_PET':
+      case 'PET_PAT':
+      case 'CARD_TASK':
+      case 'PEDDLER_BUY': {
+        const h = findHero(game, cmd.heroId);
+        if (!h || !ownedBy(h, cmd.playerId)) error = '担当していないキャラです';
+        else if (cmd.type === 'ADOPT_PET') error = adoptPet(game, h, cmd.petId, cmd.color, cmd.name);
+        else if (cmd.type === 'PET_PAT') error = patPet(game, h);
+        else if (cmd.type === 'CARD_TASK') error = doCardTask(game, h, cmd.cardUid, rng);
+        else error = peddlerBuy(game, h, cmd.kind, cmd.index);
+        break;
+      }
       case 'PICK_JOB_CARD': {
         const h = findHero(game, cmd.heroId);
         error = !h || !ownedBy(h, cmd.playerId) ? '担当していないキャラです' : pickJobCard(game, h, cmd.cardId);
@@ -386,10 +402,10 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
         error = rollMove(game, cmd, rng);
         break;
       case 'WORLD_MOVE_AGREE':
-        error = agreeMove(game, cmd);
+        error = agreeMove(game, cmd, rng);
         break;
       case 'WORLD_MOVE':
-        error = moveHero(game, cmd);
+        error = moveHero(game, cmd, rng);
         break;
       case 'WORLD_WAIT':
         error = waitTurn(game, cmd, rng);
@@ -526,6 +542,22 @@ export function startBattleWith(game: GameState, enemies: EncounterSpec['enemies
   game.mode = 'battle';
 }
 
+/** イベントから始まる戦闘（敵の指定が無ければ、今いる地域の敵の組） */
+function startEventBattle(game: GameState, spec: EventBattle, tile: number, rng: Rng) {
+  const w = game.world!;
+  const region = w.tiles[tile].r;
+  const level = wandererLevel(game, w, region);
+  const reg = getScenario(game.scenarioId).map!.regions[region];
+  const enemies = spec.enemies?.length
+    ? spec.enemies.map((e) => ({ defId: e.defId, level: e.level ?? level }))
+    : reg.encounters[rng.int(reg.encounters.length)].map((defId) => ({ defId, level }));
+  game.party ??= heroesAt(game, tile).map((h) => h.id);
+  game.battleInfo = { roomType: 'battle', tile, goldMul: spec.goldMul, onWin: spec.onWin, random: true };
+  w.prevTile ??= tile;
+  startBattleWith(game, enemies, 'battle', rng, { surprise: spec.surprise });
+  if (spec.surprise) addLog(game, '先制！ 敵は最初のターンに動けない');
+}
+
 /** 世界マップで戦った時の背景（そのマスの地形） */
 function worldBackground(game: GameState): string | undefined {
   const w = game.world;
@@ -541,6 +573,8 @@ function syncHeroesFromBattle(game: GameState, revive: boolean) {
     if (!h) continue;
     // 戦闘の記録（転職の条件）
     for (const [k, n] of Object.entries(a.feats ?? {})) addFeat(h, k, n);
+    // お供の活躍の回数
+    addPetActs(h, a.counters?.petActs ?? 0);
     h.hp = a.dead ? (revive ? 1 : 0) : a.hp;
     h.focus = a.focus;
   }
@@ -593,16 +627,24 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
   const rt = getRoomType(room?.type ?? game.battleInfo?.roomType ?? 'battle');
   if (!room) onWandererDefeated(game, rng);
   const rewardMul = getDifficulty(game.difficulty).reward ?? 1;
-  gold += b.bonusGold ?? 0;
   for (const e of b.enemies) {
+    // 逃げた敵（黄金のコソ泥など）は倒していないので報酬なし
+    if (e.fled) continue;
     const def = getEnemy(e.defId);
     const k = (1 + BALANCE.rewardPerLevel * (e.level - def.baseLevel)) * rewardMul;
     exp += Math.max(1, Math.round(def.exp * k));
     gold += Math.max(0, Math.round(def.gold * k * (0.85 + rng.next() * 0.3)));
   }
+  // 待ち伏せを迎え撃った時などのお金の倍率・戦闘中に手に入れたお金
+  gold = Math.round(gold * (game.battleInfo?.goldMul ?? 1)) + (b.bonusGold ?? 0);
   // お金は生き残った参加者で山分け
   const survivorHeroes = survivors.map((id) => findHero(game, id)!).filter(Boolean);
   splitGold(survivorHeroes, gold);
+  // お供: 一緒に勝つと懐く
+  for (const h of survivorHeroes) addPetLove(game, h, BALANCE.petLoveBattle);
+  // 勝った時に起きること（護衛を倒してお供を保護するなど）
+  const onWin = game.battleInfo?.onWin;
+  if (onWin?.length) applyOutcomes(game, onWin, survivorHeroes[0], rng);
 
   const cardOdds = cardRewardOdds(rt.battle?.cardOdds ?? 'battle');
   const reward: RewardState = { gold, exp: [], levelUps: [], cardOffers: survivors.flatMap((id) => rollCardOffers(game, [id], rng, cardOdds)), cardOdds, cardDone: [], cardPicked: false, loot: [] };
@@ -871,6 +913,8 @@ export function eventOptionState(game: GameState, eventId: string, index: number
   if (!opt) return { visible: false };
   if (opt.requiresTag && !partyHasTag(game, opt.requiresTag)) return { visible: false };
   if (opt.cost && !(payer ? [payer] : sceneHeroes(game)).some((h) => h.gold >= opt.cost!)) return { visible: true, reason: `ゴールドが足りません（${opt.cost}G）` };
+  if (opt.costFocus && !sceneHeroes(game).some((h) => h.focus >= opt.costFocus!)) return { visible: true, reason: `フォーカスが足りません（${opt.costFocus}）` };
+  if (opt.costItem && !sceneHeroes(game).some((h) => h.pouch.some((i) => i.itemId === opt.costItem))) return { visible: true, reason: `${getItem(opt.costItem).name}を持っていません` };
   return { visible: true };
 }
 
@@ -913,9 +957,20 @@ function chooseEvent(
     if (!ownedBy(actor, playerId)) return '担当していないキャラです';
     if (!Number.isInteger(focusUsed) || focusUsed < 0 || focusUsed > Math.min(opt.check.slots, actor.focus)) return 'フォーカスの数が不正です';
     actor.focus -= focusUsed;
-    results = rollWithFocus(opt.check.slots, focusUsed, statChance(actor, opt.check.stat, opt.check.tag), rng);
+    results = rollWithFocus(opt.check.slots, focusUsed, statChance(actor, opt.check.stat, opt.check.tag, true), rng);
     ok = successes(results) >= opt.check.need;
   } else if (!isPartyPlayer(game, playerId)) return 'このパーティのプレイヤーではありません';
+  // フォーカス・道具を払う選択肢（押した人のキャラで払える人）
+  if (opt.costFocus || opt.costItem) {
+    const mine = sceneHeroes(game).filter((h) => ownedBy(h, playerId));
+    const by = (chosen && mine.includes(chosen) ? [chosen] : mine).find(
+      (h) => (!opt.costFocus || h.focus >= opt.costFocus) && (!opt.costItem || h.pouch.some((i) => i.itemId === opt.costItem)),
+    );
+    if (!by) return opt.costFocus ? `フォーカスが足りません（${opt.costFocus}）` : `${getItem(opt.costItem!).name}を持っていません`;
+    if (opt.costFocus) by.focus -= opt.costFocus;
+    if (opt.costItem) by.pouch.splice(by.pouch.findIndex((i) => i.itemId === opt.costItem), 1);
+    actor ??= by;
+  }
   const outs = ok ? opt.success : (opt.fail ?? []);
   const loot = applyOutcomes(game, outs, actor, rng);
   ev.result = { optionIndex, heroId: actor?.id, results, success: ok, text: ok ? opt.successText : (opt.failText ?? ''), loot };
@@ -932,6 +987,11 @@ function finishEvent(game: GameState, playerId: string, rng: Rng): string | unde
   if (ev.tile !== undefined && !game.dungeon) {
     const f = game.world?.tiles[ev.tile].f;
     if (f) f.used = true;
+    // イベントから始まる戦闘（待ち伏せ・黄金のコソ泥など）
+    if (ev.battle) {
+      startEventBattle(game, ev.battle, ev.tile, rng);
+      return undefined;
+    }
     backToWorld(game, rng, false);
     return undefined;
   }

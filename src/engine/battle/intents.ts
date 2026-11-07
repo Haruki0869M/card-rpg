@@ -63,7 +63,10 @@ export function decideIntent(enemy: EnemyState, state: BattleState, rng: Rng): v
     enemy.intent = undefined;
     return;
   }
-  const action = chooseAction(enemy, state, rng);
+  // 先読みで次の行動が決まっていれば、それを使う（段階が変わって使えない行動なら選び直す）
+  const queued = enemy.queuedActionId && currentActionSet(enemy).actions.find((a) => a.id === enemy.queuedActionId);
+  enemy.queuedActionId = undefined;
+  const action = queued || chooseAction(enemy, state, rng);
   enemy.history = [...enemy.history, action.id].slice(-5);
   enemy.intent = { actionId: action.id, targetId: needsTarget(action) ? pickRandomAlly(state, rng) : undefined };
 }

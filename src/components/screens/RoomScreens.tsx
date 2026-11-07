@@ -78,7 +78,7 @@ export function EventScreen() {
     const o = def.options[i];
     if (o.check) {
       setChosen(i);
-      setHeroId(bestHero(sceneHeroes(game), (h) => statChance(h, o.check!.stat, o.check!.tag)));
+      setHeroId(bestHero(sceneHeroes(game), (h) => statChance(h, o.check!.stat, o.check!.tag, true)));
       setFocus(0);
     } else dispatchGame({ type: 'CHOOSE_EVENT', playerId: LOCAL_PLAYER, optionIndex: i, focusUsed: 0 });
   };
@@ -88,8 +88,8 @@ export function EventScreen() {
     const c = def.options[i].check;
     if (!c) return null;
     const heroes = sceneHeroes(game);
-    const h = heroes.find((x) => x.id === bestHero(heroes, (y) => statChance(y, c.stat, c.tag)))!;
-    const dist = successDistribution(c.slots, 0, statChance(h, c.stat, c.tag));
+    const h = heroes.find((x) => x.id === bestHero(heroes, (y) => statChance(y, c.stat, c.tag, true)))!;
+    const dist = successDistribution(c.slots, 0, statChance(h, c.stat, c.tag, true));
     const p = dist.slice(c.need).reduce((n, x) => n + x, 0);
     return { stat: STAT_LABEL[c.stat], pct: Math.round(p * 100), hero: h };
   };
@@ -177,6 +177,7 @@ export function EventScreen() {
                   slots={opt.check.slots}
                   need={opt.check.need}
                   successLabel="成功"
+                  event
                 />
                 <div className="mt-2 grid grid-cols-[1fr_2fr] gap-2">
                   <button onClick={() => setChosen(null)} className="btn btn-dark h-12 rounded-xl text-[14px] font-bold">

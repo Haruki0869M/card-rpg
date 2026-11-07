@@ -35,6 +35,7 @@ export const hunter: ClassDef = {
   subWeapons: ['dagger'],
   tier: 'base',
   lineage: 'gi',
+  tags: ['scout'],
   startingEquipment: { weapon: 'hunterBow', armor: 'travelerClothes' },
   cardPool: ['poisonArrow', 'rapidShot', 'vitalShot', 'setTrap', 'evade', 'gambleBolt', 'heavySwing', 'meditate', 'snipe', 'shadowArrow'],
   growthWeights: { dex: 3, per: 3, agi: 2, luk: 1 },

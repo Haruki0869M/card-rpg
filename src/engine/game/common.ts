@@ -2,12 +2,14 @@
 import { BALANCE } from '../../data/balance';
 import { getClass } from '../../data/classes';
 import { getItem, POUCH_LIMIT } from '../../data/items';
+import { getPet } from '../../data/pets';
 import type { GameState, Hero, ItemInstance, Loot, SlotResult, StatId } from '../../types';
 import type { Rng } from '../rng';
 import { finalChanceOf } from './checks';
 import { rarityIndex } from './dungeon';
 import { findHero, livingHeroes, sceneHeroes } from './heroes';
 import { heroStats } from './hero';
+import { petExplore } from './pets';
 
 export function addLog(game: GameState, text: string) {
   game.log.push({ id: game.nextLogId++, text });
@@ -84,14 +86,19 @@ export const totalGold = (game: GameState) => game.heroes.reduce((n, h) => n + (
 export function checkBonus(hero: Hero, tag: string | undefined): number {
   if (!tag) return 0;
   const e = getClass(hero.classId).exploreAbility.effect;
-  return e.kind === 'checkBonus' && e.check === tag ? e.bonus : 0;
+  // お供（黒猫）: 宝箱の運の判定
+  const pet = tag === 'luck' ? (petExplore(hero).luckBonus ?? 0) : 0;
+  return (e.kind === 'checkBonus' && e.check === tag ? e.bonus : 0) + pet;
 }
 
 /** 探索の特殊能力: 選択肢が増える（パーティの誰かが持っていればよい） */
 export function partyHasTag(game: GameState, tag: string): boolean {
-  return livingHeroes(game).some((h) => {
-    const e = getClass(h.classId).exploreAbility.effect;
-    return e.kind === 'extraEventOption' && e.tag === tag;
+  return sceneHeroes(game).some((h) => {
+    if (h.hp <= 0) return false;
+    const c = getClass(h.classId);
+    const e = c.exploreAbility.effect;
+    // 探索の能力・ジョブの印・お供の印（狩人の道やオカメインコは 'scout'）
+    return (e.kind === 'extraEventOption' && e.tag === tag) || !!c.tags?.includes(tag) || (!!h.pet && !!getPet(h.pet.petId).tags?.includes(tag));
   });
 }
 
@@ -106,8 +113,9 @@ export function hiddenChestChance(game: GameState): number {
 }
 
 /** 能力値による判定の成功率 */
-export function statChance(hero: Hero, stat: StatId, tag?: string): number {
-  return finalChanceOf(heroStats(hero)[stat] + checkBonus(hero, tag));
+export function statChance(hero: Hero, stat: StatId, tag?: string, event?: boolean): number {
+  // イベントの判定: お供（子狐）の上乗せ
+  return finalChanceOf(heroStats(hero)[stat] + checkBonus(hero, tag) + (event ? (petExplore(hero).eventBonus ?? 0) : 0));
 }
 
 /** 探索の特殊能力: 移動力の判定のスロット（武闘家など） */

@@ -2,6 +2,7 @@
 import { BALANCE } from '../../../data/balance';
 import { getClass } from '../../../data/classes';
 import type { GameState, WorldState } from '../../../types';
+import { petExplore } from '../pets';
 import { hexDistance } from './hex';
 import { timeOfDay } from './time';
 
@@ -9,8 +10,10 @@ import { timeOfDay } from './time';
 export function visionOf(game: GameState, w: WorldState, heroId: string): number {
   const h = game.heroes.find((x) => x.id === heroId);
   const e = h ? getClass(h.classId).exploreAbility.effect : undefined;
-  const bonus = e?.kind === 'tracking' ? e.vision : 0;
-  return Math.max(1, BALANCE.visionRange + bonus - (timeOfDay(w.worldTurn) === 'night' ? BALANCE.nightVisionPenalty : 0));
+  const pe = petExplore(h);
+  const bonus = (e?.kind === 'tracking' ? e.vision : 0) + (pe.vision ?? 0);
+  const night = timeOfDay(w.worldTurn) === 'night' && !pe.nightVision;
+  return Math.max(1, BALANCE.visionRange + bonus - (night ? BALANCE.nightVisionPenalty : 0));
 }
 
 export function revealAround(game: GameState, w: WorldState) {

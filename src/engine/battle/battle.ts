@@ -7,6 +7,7 @@ import { BALANCE } from '../../data/balance';
 import { cardOf } from '../../data/cards';
 import { getClass } from '../../data/classes';
 import { getEnemy, getEnemyAction } from '../../data/enemies';
+import { getStatus } from '../../data/statuses';
 import type {
   AllyState,
   BattleEvent,
@@ -79,6 +80,8 @@ export function createBattle(setup: BattleSetup): BattleState {
       stats: m.stats ?? def.stats,
       extraDraw: m.extraDraw ?? 0,
       ...(m.abilities?.length ? { abilities: structuredClone(m.abilities) } : {}),
+      ...(m.pet ? { pet: { ...m.pet } } : {}),
+      ...(m.weaponElement ? { weaponElement: m.weaponElement } : {}),
       statuses: { ...emptyStatuses(), ...(m.statuses as Statuses) },
       drawPile: shuffle(cards, rng),
       hand: [],
@@ -154,10 +157,21 @@ export function createBattle(setup: BattleSetup): BattleState {
 
 /** カードの成功率（適性・痺れなどの状態異常を反映） */
 export function chanceFor(ally: AllyState, card: CardDef): number {
-  const bonus = cardChanceBonus(ally, card);
+  const bonus = cardChanceBonus(ally, card) + statusChanceBonus(ally.statuses);
   const base = bonus ? Math.min(BALANCE.chanceMax, finalChance(card, affinityOf(ally)) + bonus) : finalChance(card, affinityOf(ally));
   const pen = chancePenaltyOf(ally.statuses);
   return pen ? Math.max(BALANCE.chanceMin, base - pen) : base;
+}
+
+/** 次のカードの成功率の上乗せ（状態異常の chanceBonus × 数） */
+export function statusChanceBonus(st: Statuses): number {
+  let n = 0;
+  for (const [id, v] of Object.entries(st)) if (v) n += (getStatus(id).chanceBonus ?? 0) * v;
+  return n;
+}
+
+function consumeChanceBonus(st: Statuses) {
+  for (const [id, v] of Object.entries(st)) if (v && getStatus(id).chanceBonus) st[id] = 0;
 }
 
 /** 対象として敵を選ぶ必要があるカードか */
@@ -211,7 +225,10 @@ function startAllyPhase(state: BattleState, rng: Rng, events: BattleEvent[]) {
   // 連携攻撃の記録と、狙いの表示は、ターンごとに消す
   state.aims = {};
   for (const e of state.enemies) e.hitBy = [];
-  for (const a of state.allies) a.played = 0;
+  for (const a of state.allies) {
+    a.played = 0;
+    a.playedBy = {};
+  }
   for (const a of state.allies) {
     if (a.dead) continue;
     a.block = 0;
@@ -350,6 +367,8 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   // 判定
   const chance = chanceFor(ally, card);
   const results = rollSlots(card.slots, focusUsed, chance, rng);
+  // 次のカードの成功率が上がる状態異常（応援など）は、使ったら消える
+  consumeChanceBonus(ally.statuses);
   const successes = results.filter((r) => r !== 'miss').length;
   const perfect = successes === card.slots;
   if (perfect) state.stats.perfects += 1;
@@ -375,7 +394,7 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   for (const n of ctx.fired) abilityTriggered(state, ally.id, n, events);
 
   // きっかけ: カードの特殊能力 → 自分の能力（カードを使った後 → 完全成功時）
-  const fireOpts = { card, target, dealt: ctx.dealt };
+  const fireOpts = { card, target, dealt: ctx.dealt, focusUsed };
   if (cardAbilities) {
     parts.push(...fireAbilities(state, rng, events, ally, 'afterCard', { ...fireOpts, list: cardAbilities }));
     if (perfect) parts.push(...fireAbilities(state, rng, events, ally, 'perfect', { ...fireOpts, list: cardAbilities }));
@@ -387,6 +406,7 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   ally.discard.push(inst);
   // このターンに使った枚数（連撃などの条件。カードの効果の後に数える）
   ally.played = (ally.played ?? 0) + 1;
+  (ally.playedBy ??= {})[card.category] = (ally.playedBy[card.category] ?? 0) + 1;
 
   const resultLabel = perfect ? '完全成功' : `${successes}成功`;
   const summary = `${resultLabel}！ ${parts.join(' ')}`;

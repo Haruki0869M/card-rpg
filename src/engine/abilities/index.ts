@@ -143,20 +143,25 @@ export function fireAbilities(
   events: BattleEvent[],
   owner: Unit,
   when: AbilityTrigger,
-  opts: { card?: CardDef; target?: Unit; dealt?: number; list?: AbilityDef[]; depth?: number } = {},
+  opts: { card?: CardDef; target?: Unit; dealt?: number; list?: AbilityDef[]; depth?: number; focusUsed?: number } = {},
 ): string[] {
   const out: string[] = [];
   if (owner.dead && when !== 'hurt') return out;
   for (const ab of opts.list ?? abilitiesOf(owner)) {
     const e = ab.effect;
     if (!isTriggered(e) || e.when !== when) continue;
-    if (!testConditions(e.if, { state, rng, self: owner, card: opts.card, target: opts.target, dealt: opts.dealt })) continue;
+    if (!testConditions(e.if, { state, rng, self: owner, card: opts.card, target: opts.target, dealt: opts.dealt, focusUsed: opts.focusUsed })) continue;
     const ctx = makeCtx(state, rng, events, owner, { target: opts.target, card: opts.card, dealt: opts.dealt, depth: opts.depth });
     let any = false;
     for (const eff of e.do) any = applyEffect(ctx, eff) || any;
     if (!any) continue;
     abilityTriggered(state, unitIdOf(owner), ab.name, events);
     for (const n of ctx.fired) abilityTriggered(state, unitIdOf(owner), n, events);
+    // お供の活躍の回数（戦績に出す）
+    if (ab.pet) {
+      const c = ((owner as { counters?: Record<string, number> }).counters ??= {});
+      c.petActs = (c.petActs ?? 0) + 1;
+    }
     const res = ctx.parts.join(' ');
     out.push(res ? `${ab.name}（${res}）` : ab.name);
     addLog(state, `${nameOf(owner)}の「${ab.name}」！ ${res}`);

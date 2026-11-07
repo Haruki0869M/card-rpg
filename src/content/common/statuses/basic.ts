@@ -12,6 +12,8 @@ export const statuses: StatusDef[] = [
   { id: 'curse', name: '呪い', icon: 'skull', color: '#d08aff', bg: '#2a0a3a', harmful: true, healMultiplier: 0.5 },
   // 良い効果（万能薬では消えない）
   { id: 'regen', name: '再生', icon: 'heartPulse', color: '#6ad8ff', bg: '#0a2e4a', harmful: false, tickHeal: 'stacks' },
+  // 応援: 次に使うカードの成功率+10%（1つにつき。カードを使うと消える。セキセイインコ）
+  { id: 'inspired', name: '応援', icon: 'sparkles', color: '#9affc8', bg: '#0a3a24', harmful: false, decay: 0, maxStacks: 3, chanceBonus: 10, description: '次に使うカードの成功率+10%（1つにつき。カードを使うと消える）' },
   // 聖騎士の聖光: 次の聖属性の攻撃が1つにつき+15%（その攻撃で消える。減らない・最大5）
   { id: 'holyLight', name: '聖光', icon: 'sun', color: '#fff2a0', bg: '#4a3e0a', harmful: false, decay: 0, maxStacks: 5, boostElement: { element: 'holy', per: 0.15 } },
 ];

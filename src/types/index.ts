@@ -43,7 +43,7 @@ export interface ElementDef {
  * target = 選んだ対象（カードの対象の敵 / 敵の行動の対象の味方 / アイテムを使う相手。全体カードなら相手全員）
  * self = 自分 / allies = 自分の側の全員 / otherAllies = 自分以外の自分の側 / foes = 相手の側の全員 / randomFoe = 相手からランダムに1人
  */
-export type EffectTarget = 'target' | 'self' | 'allies' | 'otherAllies' | 'foes' | 'randomFoe' | 'lowestAlly';
+export type EffectTarget = 'target' | 'self' | 'allies' | 'otherAllies' | 'foes' | 'randomFoe' | 'lowestAlly' | 'randomAlly';
 
 /**
  * 効果の種類ごとの数値。効果のファイル（src/engine/battle/effects/）が declare module でここに種類を足す。
@@ -122,6 +122,8 @@ export type DamageScale = { by: 'missingHp' | 'targetStatuses' | 'selfStatus'; p
 
 export interface AbilityDef {
   name: string;
+  /** お供の能力（活躍回数を数える） */
+  pet?: boolean;
   /** 説明文（省略すると中身から自動で作る。雰囲気の文を足したい時だけ書く） */
   description?: string;
   effect: AbilityEffect;
@@ -191,12 +193,57 @@ export interface ClassDef {
   jobCards?: string[];
   /** 転職した時に3枚から1枚選べる、そのジョブを象徴する専用カード（残りは報酬に出る） */
   signature?: string[];
+  /** お供の扱いが得意（お供の効果が2倍。獣使い系統） */
+  petMaster?: boolean;
+  /** イベントの選択肢の条件に使う印（例: 'scout' = 待ち伏せを見抜ける） */
+  tags?: string[];
   /** 初期装備（アイテムID） */
   startingEquipment: Partial<Record<EquipSlot, string>>;
   /** 報酬で出るカードの候補（カードID） */
   cardPool: string[];
   /** 成長ボーナスで伸びやすい能力値（重み） */
   growthWeights: Partial<Record<StatId, number>>;
+}
+
+// ---------- お供（ペット。設計 v2.1 §4） ----------
+
+/** お供の探索の効果（獣使い系統は数値が2倍） */
+export interface PetExplore {
+  /** 世界マップの視界+N */
+  vision?: number;
+  /** 夜でも視界が狭くならない */
+  nightVision?: boolean;
+  /** 移動力の判定の成功数+N */
+  moveBonus?: number;
+  /** 宝箱の運の判定の成功率+N% */
+  luckBonus?: number;
+  /** イベントの判定の成功率+N% */
+  eventBonus?: number;
+  /** 野営のHP回復+N（割合。0.2 = +20%） */
+  campHeal?: number;
+}
+
+export interface PetDef {
+  id: string;
+  order?: number;
+  name: string;
+  /** 絵が無い時の記号 */
+  icon: string;
+  /** 表示する場所: 肩（鳥）/ 足元 / 浮く（小竜） */
+  perch: 'shoulder' | 'feet' | 'float';
+  /** めったに出ない */
+  rare?: boolean;
+  colors: { id: string; name: string; color: string }[];
+  /** 名前の候補（入れなかった時） */
+  names: string[];
+  description: string;
+  /** 戦闘の能力（ふつう） */
+  abilities: AbilityDef[];
+  /** 戦闘の能力（獣使い系統: 数値が2倍） */
+  masterAbilities: AbilityDef[];
+  explore?: PetExplore;
+  /** イベントの選択肢の条件に使う印（例: 'scout' = 待ち伏せを見抜ける） */
+  tags?: string[];
 }
 
 /** ジョブの段: 基本 / 中位 / 最上位 / 特殊（中位からの脇道） */
@@ -237,8 +284,12 @@ export interface PartyMemberSpec {
   extraDraw?: number;
   /** 戦闘開始時の状態異常 */
   statuses?: Partial<Statuses>;
-  /** 職業以外から得た戦闘の特殊能力（装備） */
+  /** 職業以外から得た戦闘の特殊能力（装備・お供・持ち越し） */
   abilities?: AbilityDef[];
+  /** 連れているお供（足元・肩の表示用） */
+  pet?: { petId: string; color: string; name: string; love: number };
+  /** 武器に宿った属性（属性の無い物理攻撃がこの属性になる） */
+  weaponElement?: string;
 }
 
 // ---------- 敵 ----------
@@ -336,6 +387,8 @@ export interface StatusDef {
   maxStacks?: number;
   /** 持ち主の element 属性の攻撃のダメージ +per×数。その攻撃で消える（聖光など） */
   boostElement?: { element: string; per: number };
+  /** 味方: 次に使うカードの成功率 +数×この値。カードを使うと消える（応援など） */
+  chanceBonus?: number;
   /** 説明文（省略すると数値から自動で作る） */
   description?: string;
 }
@@ -358,6 +411,12 @@ export interface AllyState {
   counters?: Record<string, number>;
   /** 呼び出したお供（幻獣・獣など。ターン終了時に攻撃する。足元のトークンで表示） */
   summons?: SummonState[];
+  /** このターンに使ったカードの枚数（種類ごと。子狼など） */
+  playedBy?: Partial<Record<CardCategory, number>>;
+  /** 連れているお供（表示用） */
+  pet?: { petId: string; color: string; name: string; love: number };
+  /** 武器に宿った属性 */
+  weaponElement?: string;
   /** 戦闘内で一意のID（a0, a1, ...）。同じ職業が複数いても区別できる */
   id: string;
   classId: string;
@@ -405,6 +464,10 @@ export interface EnemyState {
   seqIndex: number;
   history: string[];
   dead: boolean;
+  /** 先読みで決まっている次の次の行動（オカメインコの先読み。次のインテントを決める時に使う） */
+  queuedActionId?: string;
+  /** 戦闘から逃げた（倒したことにならない。報酬なし） */
+  fled?: boolean;
   /** ボスの段階（0 = 最初） */
   phase: number;
   /** このターンにダメージを与えた味方（連携攻撃の判定。M3-C5） */

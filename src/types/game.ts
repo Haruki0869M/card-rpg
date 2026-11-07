@@ -18,6 +18,20 @@ import type {
 
 // ---------- アイテム ----------
 
+/** 連れているお供 */
+export interface HeroPet {
+  petId: string;
+  /** 色違いのID */
+  color: string;
+  name: string;
+  /** 懐き度の点数（一緒に歩いたマス・戦闘で増える。♡1〜5の段階は petLoveLevel） */
+  love: number;
+  /** 戦闘で活躍した回数（戦績に出す） */
+  acts: number;
+  /** この冒険でもう撫でた（フォーカス+1は1回だけ） */
+  patted?: boolean;
+}
+
 export interface ItemDef {
   id: string;
   name: string;
@@ -82,6 +96,18 @@ export interface Hero {
   feats?: Record<string, number>;
   /** 転職した直後に選べる専用カード（PICK_JOB_CARD で1枚選ぶ） */
   jobPick?: string[];
+  /** 連れているお供（1匹まで） */
+  pet?: HeroPet;
+  /** 迎えられるお供の候補（イベントの後。ADOPT_PET で選ぶ） */
+  petOffer?: string[];
+  /** イベントでカードを1枚選ぶ作業（強化 / 削除 / 変異。CARD_TASK で選ぶ） */
+  cardTask?: 'upgrade' | 'remove' | 'mutate';
+  /** さすらいの行商人の品物（PEDDLER_BUY で買う） */
+  peddler?: { items: { item: ItemInstance; price: number; sold?: boolean }[]; cards: { cardId: string; price: number; sold?: boolean }[] };
+  /** 武器に宿った属性（その武器を持っている間だけ） */
+  weaponElement?: { uid: string; element: string };
+  /** 最後に突発イベントが起きたワールドターン（2手番続けては起きない） */
+  lastRandomEvent?: number;
   /** 自分のお金・持ち物（装備していない装備品）・道具袋（M3-C: キャラごと） */
   gold: number;
   stash: ItemInstance[];
@@ -254,6 +280,10 @@ export interface EventOption {
   requiresTag?: string;
   /** 必要なゴールド */
   cost?: number;
+  /** 必要なフォーカス（選んだキャラが払う） */
+  costFocus?: number;
+  /** 使う消費アイテム（アイテムのID。持っているキャラが1つ使う） */
+  costItem?: string;
   check?: EventCheck;
   success: EventOutcome[];
   fail?: EventOutcome[];
@@ -263,8 +293,12 @@ export interface EventOption {
 
 export interface EventDef {
   id: string;
-  /** どこで起きるか（省略はダンジョンの部屋） */
-  where?: 'dungeon' | 'map';
+  /** どこで起きるか（省略はダンジョンの部屋。random = 世界マップの何もないマスで突然起きる） */
+  where?: 'dungeon' | 'map' | 'random';
+  /** 突発イベントの出やすさ（省略は10） */
+  weight?: number;
+  /** 突発イベントの種類（bad = 夜・侵食度が高い時に出やすい） */
+  tone?: 'good' | 'bad' | 'pet' | 'shop' | 'battle';
   /** 夜だけ起きる */
   night?: boolean;
   title: string;
@@ -273,11 +307,25 @@ export interface EventDef {
   options: EventOption[];
 }
 
+/** イベントから始まる戦闘（待ち伏せ・黄金のコソ泥・護衛など） */
+export interface EventBattle {
+  /** 出てくる敵（無ければ今いる地域の敵） */
+  enemies?: { defId: string; level?: number }[];
+  /** 先制（敵は1ターン目に動けない） */
+  surprise?: boolean;
+  goldMul?: number;
+  onWin?: EventOutcome[];
+}
+
 export interface EventState {
   /** ダンジョンの部屋のイベントなら部屋ID、世界マップのイベントならマスの番号 */
   roomId?: string;
   tile?: number;
   eventId: string;
+  /** 突発イベント（世界マップを移動中に起きた。終わっても手番は続く） */
+  random?: boolean;
+  /** イベントの結果で始まる戦闘（「つづける」で始まる） */
+  battle?: EventBattle;
   /** 選んだ結果（選ぶ前は undefined） */
   result?: { optionIndex: number; heroId?: string; results?: ('focus' | 'hit' | 'miss')[]; success: boolean; text: string; loot: Loot[] };
 }
@@ -351,7 +399,7 @@ export interface Expedition {
   reward?: RewardState;
   chest?: ChestState;
   event?: EventState;
-  battleInfo?: { roomType: string; wandererId?: string; tile?: number };
+  battleInfo?: BattleInfo;
   battleBackground?: string;
   vote?: VoteState;
 }
@@ -363,6 +411,19 @@ export interface Expedition {
 export interface VoteState {
   ctx: string;
   picks: Partial<Record<PlayerId, GameCommand>>;
+}
+
+/** 今の戦闘の情報（どこで・何と） */
+export interface BattleInfo {
+  roomType: string;
+  wandererId?: string;
+  tile?: number;
+  /** 勝った時のお金の倍率（待ち伏せを迎え撃つなど） */
+  goldMul?: number;
+  /** 勝った時に起きること（護衛を倒してお供を保護するなど） */
+  onWin?: EventOutcome[];
+  /** 突発イベントの戦闘（終わっても手番は続く） */
+  random?: boolean;
 }
 
 export interface GameState {
@@ -395,7 +456,7 @@ export interface GameState {
   /** 今の戦闘の背景 */
   battleBackground?: string;
   /** 今の戦闘の情報（どこで・何と） */
-  battleInfo?: { roomType: string; wandererId?: string; tile?: number };
+  battleInfo?: BattleInfo;
   encounter?: EncounterState;
   town?: TownVisit;
   shrine?: ShrineVisit;
@@ -452,6 +513,14 @@ export type GameCommand =
   /** 転職する（戦闘中以外。spec §6.4） */
   | { type: 'CHANGE_JOB'; playerId: PlayerId; heroId: string; jobId: string }
   | { type: 'PICK_JOB_CARD'; playerId: PlayerId; heroId: string; cardId: string }
+  /** お供を迎える（petId を空にすると見送る） */
+  | { type: 'ADOPT_PET'; playerId: PlayerId; heroId: string; petId?: string; color?: string; name?: string }
+  /** お供を撫でる（野営・休憩部屋。1回の冒険で最初の1回はフォーカス+1） */
+  | { type: 'PET_PAT'; playerId: PlayerId; heroId: string }
+  /** イベントのカードの作業（cardUid を空にするとやめる） */
+  | { type: 'CARD_TASK'; playerId: PlayerId; heroId: string; cardUid?: string }
+  /** 行商人の品物を買う（index を省くと店を閉じる） */
+  | { type: 'PEDDLER_BUY'; playerId: PlayerId; heroId: string; kind?: 'item' | 'card'; index?: number }
   | { type: 'CLAIM_LOOT'; playerId: PlayerId; heroId: string; choice: 'need' | 'greed' | 'pass' }
   | { type: 'OPEN_CHEST'; playerId: PlayerId; heroId: string; focusUsed: number }
   | { type: 'LEAVE_CHEST'; playerId: PlayerId }

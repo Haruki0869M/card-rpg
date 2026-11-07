@@ -8,6 +8,7 @@ import { getDifficulty } from '../../../data/rules';
 import { QUESTS, TERRAINS, TOWNS } from '../../../data/world';
 import type { EncounterState, Expedition, GameCommand, GameState, Hero, QuestState, WorldState } from '../../../types';
 import type { Rng } from '../../rng';
+import { addPetLove, petExplore } from '../pets';
 import { addLog, campFocusOf, moveSlotsOf, ownedBy, restMultiplierOf, rollWithFocus, splitGold, statChance, successes } from '../common';
 import { enterDungeonFromWorld, startBattleWith } from '../game';
 import { heroFocusMax, heroMaxHp } from '../hero';
@@ -215,13 +216,14 @@ export function rollMove(game: GameState, cmd: Cmd<'WORLD_ROLL_MOVE'>, rng: Rng)
   h.focus -= cmd.focusUsed;
   const results = rollWithFocus(slots, cmd.focusUsed, statChance(h, 'agi', 'move'), rng);
   w.moveRoll = results;
-  w.move = BALANCE.moveBase + successes(results);
+  // お供（うさぎ）: 移動力の判定の成功数+N
+  w.move = BALANCE.moveBase + successes(results) + (petExplore(h).moveBonus ?? 0);
   w.prevTile = w.pos[h.id];
   return undefined;
 }
 
 /** 移動（経路はエンジンが決める。敵のいるマスに入ったら遭遇） */
-export function moveHero(game: GameState, cmd: Cmd<'WORLD_MOVE'>): string | undefined {
+export function moveHero(game: GameState, cmd: Cmd<'WORLD_MOVE'>, rng: Rng): string | undefined {
   const t = turnCheck(game, cmd.playerId, cmd.heroId);
   if (typeof t === 'string') return t;
   const { w, h } = t;
@@ -243,12 +245,12 @@ export function moveHero(game: GameState, cmd: Cmd<'WORLD_MOVE'>): string | unde
   }
   // 一人で動いたら、この人について来ていた同行はそのまま、この人が誰かについて行っていたらやめる
   if (w.follow?.[h.id]) delete w.follow[h.id];
-  doMove(game, w, h, companions, cmd.to, map);
+  doMove(game, w, h, companions, cmd.to, map, rng);
   return undefined;
 }
 
 /** 移動先の提案への返事（同行しているキャラの担当の人）。全員が同意したら動く。断ったらその人のキャラは同行をやめる */
-export function agreeMove(game: GameState, cmd: Cmd<'WORLD_MOVE_AGREE'>): string | undefined {
+export function agreeMove(game: GameState, cmd: Cmd<'WORLD_MOVE_AGREE'>, rng: Rng): string | undefined {
   const w = game.world;
   const pr = w?.moveProposal;
   if (!w || !pr) return '移動の提案はありません';
@@ -266,11 +268,11 @@ export function agreeMove(game: GameState, cmd: Cmd<'WORLD_MOVE_AGREE'>): string
   const map = reachable(w, w.pos[h.id], w.move);
   if (!map.has(pr.to)) return 'そこへは移動できません';
   const companions = pr.companions.map((id) => findHero(game, id)!).filter((c) => c && w.pos[c.id] === w.pos[h.id]);
-  doMove(game, w, h, companions, pr.to, map);
+  doMove(game, w, h, companions, pr.to, map, rng);
   return undefined;
 }
 
-function doMove(game: GameState, w: WorldState, h: Hero, companions: Hero[], to: number, map: ReturnType<typeof reachable>) {
+function doMove(game: GameState, w: WorldState, h: Hero, companions: Hero[], to: number, map: ReturnType<typeof reachable>, rng: Rng) {
   const from = w.pos[h.id];
   const path = pathTo(map, to);
   const group = [h, ...companions];
@@ -294,6 +296,40 @@ function doMove(game: GameState, w: WorldState, h: Hero, companions: Hero[], to:
     prev = step;
   }
   w.move = Math.max(0, (w.move ?? 0) - map.get(to)!.cost);
+  // お供: 一緒に歩いたマスの数だけ懐く
+  for (const g of group) addPetLove(game, g, path.length);
+  maybeRandomEvent(game, w, h, group, to, rng);
+}
+
+/**
+ * 突発イベント（設計 v2 §5）: 何もないマスに移動し終えた時、確率で起きる。
+ * 同じキャラに2手番続けては起きない。夜・侵食度が高い時は悪いイベントが出やすい。終わっても手番は続く
+ */
+function maybeRandomEvent(game: GameState, w: WorldState, h: Hero, group: Hero[], tile: number, rng: Rng) {
+  if (w.tiles[tile].f || w.story) return;
+  if (h.lastRandomEvent !== undefined && h.lastRandomEvent >= w.worldTurn - 1) return;
+  if (rng.next() * 100 >= BALANCE.randomEventChance) return;
+  const ev = pickRandomEvent(game, rng);
+  if (!ev) return;
+  h.lastRandomEvent = w.worldTurn;
+  game.party = group.map((g) => g.id);
+  game.event = { tile, eventId: ev, random: true };
+  game.mode = 'event';
+}
+
+/** 突発イベントを1つ選ぶ（重み付き。夜・侵食度50%以上なら悪いイベントの重みが上がる） */
+export function pickRandomEvent(game: GameState, rng: Rng): string | undefined {
+  const w = game.world!;
+  const list = EVENTS.forScenario(game.scenarioId).filter((e) => e.where === 'random' && (!e.night || timeOfDay(w.worldTurn) === 'night'));
+  if (!list.length) return undefined;
+  const harsh = timeOfDay(w.worldTurn) === 'night' || w.corruption >= 50;
+  const weights = list.map((e) => (e.weight ?? 10) * (harsh && e.tone === 'bad' ? BALANCE.randomEventBadMul : 1));
+  let x = rng.next() * weights.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < list.length; i++) {
+    x -= weights[i];
+    if (x < 0) return list[i].id;
+  }
+  return list[list.length - 1].id;
 }
 
 function visitRegion(game: GameState, w: WorldState, tile: number) {
@@ -339,7 +375,7 @@ export function camp(game: GameState, cmd: Cmd<'WORLD_CAMP'>, rng: Rng): string 
   if (w.tiles[tile].f?.kind === 'town') return '町の中では野営できません（宿屋を使えます）';
   if (w.move !== null && w.move < (BALANCE.moveBase as number)) return '移動した後は野営できません';
   const chance = campAmbushChance(game, h.id);
-  h.hp = Math.min(heroMaxHp(h), h.hp + Math.ceil(heroMaxHp(h) * BALANCE.campHpRatio * restMultiplierOf(h)));
+  h.hp = Math.min(heroMaxHp(h), h.hp + Math.ceil(heroMaxHp(h) * BALANCE.campHpRatio * (restMultiplierOf(h) + (petExplore(h).campHeal ?? 0))));
   h.focus = Math.min(heroFocusMax(h), h.focus + BALANCE.campFocus + campFocusOf(h));
   addLog(game, `${h.name}は野営して体を休めた`);
   if (chance > 0 && rng.next() * 100 < chance) {

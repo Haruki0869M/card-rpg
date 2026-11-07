@@ -247,7 +247,10 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
     case 'chest': {
       const c = g.chest!;
       if (c.contents) return send(g, { type: 'LEAVE_CHEST', playerId: pid(g) }, log);
-      const h = livingHeroes(g).find((x) => !g.party || g.party.includes(x.id))!;
+      // 世界マップの宝箱は、手番のキャラの担当の人のキャラで開ける
+      const turnOwner = g.world && c.tile !== undefined && !g.activeScene ? findHero(g, g.world.turn)?.playerId : undefined;
+      const inParty = livingHeroes(g).filter((x) => !g.party || g.party.includes(x.id));
+      const h = inParty.find((x) => !turnOwner || x.playerId === turnOwner) ?? inParty[0];
       const ng = send(g, { type: 'OPEN_CHEST', playerId: h.playerId, heroId: h.id, focusUsed: 0 }, log);
       if (ng.chest && !ng.chest.unlocked && ng.chest.lastRoll?.success === false) return send(ng, { type: 'LEAVE_CHEST', playerId: pid(g) }, log);
       return ng;

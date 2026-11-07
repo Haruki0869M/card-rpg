@@ -24,6 +24,7 @@ export function CheckPanel({
   need,
   successLabel,
   bonusOnly,
+  event,
 }: {
   heroes: Hero[];
   heroId: string;
@@ -37,9 +38,11 @@ export function CheckPanel({
   successLabel: string;
   /** 失敗しても損の無い判定（成功率を「〜の確率」と中立の色で出す） */
   bonusOnly?: boolean;
+  /** イベントの判定（お供の上乗せが入る） */
+  event?: boolean;
 }) {
   const hero = heroes.find((h) => h.id === heroId) ?? heroes[0];
-  const chance = hero ? statChance(hero, stat, tag) : 0;
+  const chance = hero ? statChance(hero, stat, tag, event) : 0;
   const max = hero ? Math.min(slots, hero.focus) : 0;
   const p = Math.round(chanceAtLeast(slots, Math.min(focus, max), chance, need) * 100);
   return (
@@ -49,7 +52,7 @@ export function CheckPanel({
       </div>
       <div className="flex gap-1">
         {heroes.map((h) => {
-          const c = statChance(h, stat, tag);
+          const c = statChance(h, stat, tag, event);
           const mine = isLocalPlayer(h.playerId);
           return (
             <button

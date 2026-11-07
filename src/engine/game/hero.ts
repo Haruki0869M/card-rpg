@@ -1,5 +1,6 @@
 // ===== 冒険中のキャラ（装備・成長を反映した能力値など） =====
 import { BALANCE } from '../../data/balance';
+import { petAbilities } from './pets';
 import { getClass } from '../../data/classes';
 import { getItem } from '../../data/items';
 import type { CardInstance, EquipSlot, Hero, ItemDef, JobTier, PartyMemberSpec, StatId, Stats } from '../../types';
@@ -41,7 +42,12 @@ export const heroAbilities = (hero: Hero) => [
   ...equippedItems(hero)
     .filter((i) => i.ability)
     .map((i) => ({ name: i.ability!.name, effect: i.ability!.effect })),
+  // お供の能力（獣使い系統は2倍）
+  ...petAbilities(hero),
 ];
+
+/** 武器に宿った属性（その武器を持っている間だけ） */
+export const heroWeaponElement = (hero: Hero) => (hero.weaponElement && hero.equipment.weapon?.uid === hero.weaponElement.uid ? hero.weaponElement.element : undefined);
 
 /** そのジョブが装備できる武器の種類（得意な武器＋使える武器） */
 export const jobWeapons = (classId: string): string[] => {
@@ -95,6 +101,8 @@ export function toPartyMember(hero: Hero): PartyMemberSpec {
     extraDraw: heroExtraDraw(hero),
     abilities: heroAbilities(hero),
     statuses: hero.nextBattleStatuses,
+    ...(hero.pet ? { pet: { petId: hero.pet.petId, color: hero.pet.color, name: hero.pet.name, love: hero.pet.love } } : {}),
+    ...(heroWeaponElement(hero) ? { weaponElement: heroWeaponElement(hero) } : {}),
   };
 }
 

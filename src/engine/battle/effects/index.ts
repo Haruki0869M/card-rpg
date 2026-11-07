@@ -80,6 +80,10 @@ export function resolveTargets(ctx: EffectCtx, to: EffectTarget): Unit[] {
       const alive = foesOf(state, source);
       return alive.length ? [alive[ctx.rng.int(alive.length)]] : [];
     }
+    case 'randomAlly': {
+      const alive = sideOf(state, source).filter((u) => !u.dead);
+      return alive.length ? [alive[ctx.rng.int(alive.length)]] : [];
+    }
     case 'target': {
       if (ctx.card?.target === 'allEnemies') return foesOf(state, source);
       // 敵の行動: 挑発や味方の戦闘不能で対象が変わるので、毎回インテントを読み直す
@@ -107,6 +111,7 @@ const WHO: Record<EffectTarget, { ally: string; enemy: string }> = {
   foes: { ally: '敵全員に', enemy: '味方全員に' },
   randomFoe: { ally: 'ランダムな敵1体に', enemy: 'ランダムな味方1人に' },
   lowestAlly: { ally: 'HPが一番低い味方に', enemy: 'HPが一番低い敵に' },
+  randomAlly: { ally: 'ランダムな味方1人に', enemy: 'ランダムな敵1体に' },
 };
 
 /** 効果の説明文（side = 使う側。味方なら「敵全員に」、敵なら「味方全員に」） */
@@ -169,6 +174,8 @@ export const resistsElement = (victim: Unit, element: string) => isEnemy(victim)
 export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?: string): number {
   const { state, rng, events, source } = ctx;
   if (victim.dead) return 0;
+  // 武器に宿った属性: 属性の無い物理攻撃がその属性になる（妖精の泉）
+  if (!element && !isEnemy(source) && source.weaponElement && ctx.card?.category === 'physical') element = source.weaponElement;
   let v = victim;
   let mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities, ctx.perfect);
   // 属性を強める状態異常（聖光など）: この一撃で使い切る

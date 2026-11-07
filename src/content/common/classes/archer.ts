@@ -24,6 +24,7 @@ export const archer: ClassDef = {
   subWeapons: ['dagger'],
   tier: 'mid',
   lineage: 'gi',
+  tags: ['scout'],
   from: ['hunter'],
   signature: ['aimedShot', 'arrowRain', 'piercingArrow'],
   startingEquipment: { weapon: 'hunterBow', armor: 'travelerClothes' },
