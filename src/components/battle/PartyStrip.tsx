@@ -80,6 +80,18 @@ const AllyCard = memo(function AllyCard({ ally }: { ally: AllyState }) {
       <div className="absolute -top-2 right-0.5">
         <StatusChips s={ally.statuses} side="ally" onTap={() => setActive(ally.id)} />
       </div>
+      {/* 呼び出したお供（幻獣・獣など）: 枠の左上に小さく。ターン終了時に攻撃する */}
+      {!ally.dead && !!ally.summons?.length && (
+        <div className="absolute -top-3 left-7 flex gap-0.5" data-summons>
+          {ally.summons.slice(0, 2).map((m) => (
+            <span key={m.id} className="summon-bob flex h-[20px] items-center gap-px rounded-full bg-black/80 px-1 text-[12px] leading-none ring-1 ring-violet-300/60" aria-label={`${m.name}（あと${m.turns >= 99 ? 'ずっと' : `${m.turns}ターン`}）`}>
+              <span aria-hidden>{m.icon}</span>
+              {m.turns < 99 && <span className="font-bold text-violet-200 tabular-nums">{m.turns}</span>}
+            </span>
+          ))}
+          {ally.summons.length > 2 && <span className="flex h-[20px] items-center rounded-full bg-black/80 px-1 text-[12px] font-bold text-violet-200">×{ally.summons.length}</span>}
+        </div>
+      )}
     </div>
   );
 });

@@ -29,6 +29,6 @@ export const thief: ClassDef = {
   tier: 'base',
   lineage: 'gi',
   startingEquipment: { weapon: 'rustyDagger', armor: 'travelerClothes' },
-  cardPool: ['pilfer', 'smokeStep', 'poisonBlade', 'backstab', 'strike', 'shadowSteal', 'venomRain'],
+  cardPool: ['pilfer', 'smokeStep', 'poisonBlade', 'backstab', 'strike', 'shadowSteal', 'venomRain', 'dirtyTrick', 'quickFingers'],
   growthWeights: { agi: 3, dex: 2, luk: 2 },
 };

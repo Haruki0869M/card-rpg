@@ -35,6 +35,7 @@ import type { GameState, PlayerId, TimeOfDay } from '../../types';
 import { RollStrip } from '../ui/CheckPanel';
 import { Bar, HeroFace, Screen } from '../ui/game';
 import { WorldMap } from './WorldMap';
+import { canChangeNow } from '../JobSheet';
 
 const TIME_ICON: Record<TimeOfDay, typeof Sun> = { morning: Sunrise, noon: Sun, evening: Sunset, night: Moon };
 
@@ -158,6 +159,11 @@ function PartyRow({ game }: { game: GameState }) {
               <Bar value={h.hp} max={max} color="linear-gradient(90deg,#22b45a,#7dffa8)" height={4} />
             </span>
             {exp && <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full border border-black bg-sky-400" />}
+            {!exp && canChangeNow(game, h) && (
+              <span className="absolute -top-1 -left-1 flex h-[18px] w-[18px] items-center justify-center rounded-full border border-black bg-amber-300 text-[12px] font-bold text-black" aria-label="転職できます">
+                ↑
+              </span>
+            )}
           </button>
         );
       })}

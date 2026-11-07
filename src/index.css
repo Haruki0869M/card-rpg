@@ -411,3 +411,11 @@ textarea {
 @media (prefers-reduced-motion: reduce) {
   .token-hop, .footprint { animation: none; }
 }
+
+/* 呼び出したお供のトークン: ふわふわ浮く */
+@keyframes summon-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+.summon-bob { animation: summon-bob 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .summon-bob { animation: none; } }

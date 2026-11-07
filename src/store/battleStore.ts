@@ -62,7 +62,7 @@ export interface UnitFx {
   id: number;
 }
 
-export type Sheet = null | 'menu' | 'log' | 'draw' | 'discard' | 'party' | 'pouch' | 'quests';
+export type Sheet = null | 'menu' | 'log' | 'draw' | 'discard' | 'party' | 'pouch' | 'quests' | 'jobs';
 export type Screen = 'title' | 'setup' | 'create' | 'game' | 'join' | 'lobby';
 
 /** 冒険の準備〜キャラクター作成の下書き */

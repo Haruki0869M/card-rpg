@@ -188,7 +188,7 @@ export function describeAbility(ab: AbilityDef, side: 'ally' | 'enemy' = 'ally')
     const head = cs.length ? `${cs.join('・')}：` : '';
     if (e.modifier === 'cardChance') return `${head}成功率+${e.bonus}%`;
     if (e.modifier === 'statusBonus') return `${head}自分が付ける${e.statuses.map((x) => `「${getStatus(x).name}」`).join('')}+${e.amount}`;
-    if (e.modifier === 'damageDealt') return `${head}与えるダメージ${e.multiplier !== 1 ? `×${e.multiplier}` : ''}${e.scale ? scaleText(e.scale) : ''}`;
+    if (e.modifier === 'damageDealt') return `${head}${e.multiplier !== 1 ? `与えるダメージ×${e.multiplier}${e.scale ? '、さらに' : ''}` : ''}${e.scale ? scaleText(e.scale) : ''}`;
     return `${head}ダメージが敵のブロックを無視する`;
   }
   const cs = condText(e.if);
@@ -198,7 +198,7 @@ export function describeAbility(ab: AbilityDef, side: 'ally' | 'enemy' = 'ally')
 function scaleText(sc: DamageScale): string {
   const pct = Math.round(sc.per * 100);
   const cap = sc.max !== undefined ? `（最大+${Math.round(sc.max * 100)}%）` : '';
-  if (sc.by === 'missingHp') return `、減ったHPの割合×${pct}%増える${cap}`;
-  if (sc.by === 'targetStatuses') return `、対象の悪い状態異常1種類につき+${pct}%${cap}`;
-  return `、自分の「${sc.status ? getStatus(sc.status).name : ''}」1につき+${pct}%${cap}`;
+  if (sc.by === 'missingHp') return `減ったHPが多いほど与えるダメージが増える${cap}`;
+  if (sc.by === 'targetStatuses') return `対象の悪い状態異常1種類につき与えるダメージ+${pct}%${cap}`;
+  return `自分の「${sc.status ? getStatus(sc.status).name : ''}」1つにつき与えるダメージ+${pct}%${cap}`;
 }

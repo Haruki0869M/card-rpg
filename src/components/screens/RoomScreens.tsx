@@ -1,7 +1,7 @@
 // ===== 宝箱・イベント・休憩の画面 =====
 import { VoteChips } from '../ui/Votes';
 import { motion } from 'framer-motion';
-import { Coins, Flame, Sparkles, Star } from 'lucide-react';
+import { ArrowUpCircle, Coins, Flame, Sparkles, Star } from 'lucide-react';
 import { useState } from 'react';
 import { BattleBackground } from '../../art';
 import { BALANCE } from '../../data/balance';
@@ -14,6 +14,7 @@ import { useBattle } from '../../store/battleStore';
 import type { Hero, Loot } from '../../types';
 import { CheckPanel, RollStrip } from '../ui/CheckPanel';
 import { Crest, HeroFace, ItemIcon, itemSummary, RARITY_STYLE, Screen } from '../ui/game';
+import { canChangeNow } from '../JobSheet';
 
 /** 判定に一番向いている、この端末のキャラ */
 function bestHero(heroes: Hero[], score: (h: Hero) => number): string {
@@ -200,6 +201,7 @@ export function EventScreen() {
 export function RestScreen() {
   const game = useBattle((s) => s.game)!;
   const dispatchGame = useBattle((s) => s.dispatchGame);
+  const openSheet = useBattle((s) => s.openSheet);
   return (
     <Screen>
       <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -228,6 +230,12 @@ export function RestScreen() {
                   <Star size={13} />
                   {h.focus}/{heroFocusMax(h)}
                 </span>
+                {canChangeNow(game, h) && (
+                  <button onClick={() => openSheet('jobs')} className="btn btn-gold flex h-9 shrink-0 items-center gap-0.5 rounded-lg px-2 text-[12px] font-bold">
+                    <ArrowUpCircle size={14} />
+                    転職
+                  </button>
+                )}
               </div>
             ))}
           </div>

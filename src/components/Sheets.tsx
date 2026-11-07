@@ -2,19 +2,20 @@ import { getDifficulty } from '../data/rules';
 import { QuestList } from './world/Places';
 // ===== メニュー・戦闘ログ・山札/捨札・パーティ（装備）・道具袋・冒険をやめる確認 =====
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowRight, Backpack, ChevronRight, DoorOpen, ScrollText, Users, X } from 'lucide-react';
+import { ArrowRight, ArrowUpCircle, Backpack, ChevronRight, DoorOpen, ScrollText, Users, X } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { CharacterArt } from '../art';
 import { cardOf } from '../data/cards';
 import { getClass } from '../data/classes';
 import { getItem, POUCH_LIMIT } from '../data/items';
-import { EQUIP_SLOTS, STAT_IDS, affinityFromStats, battleDeck, canEquip, describeAbility, expToNext, findAlly, heroFocusMax, heroMaxHp, heroStats, weaponRarity } from '../engine';
+import { EQUIP_SLOTS, STAT_IDS, affinityFromStats, jobOptions, battleDeck, canEquip, describeAbility, expToNext, findAlly, heroFocusMax, heroMaxHp, heroStats, weaponRarity } from '../engine';
 import { LOCAL_PLAYER, isLocalPlayer } from '../store/battleConfig';
 import { useBattle } from '../store/battleStore';
 import { useOnline } from '../store/onlineStore';
 import { OnlinePanel } from './screens/OnlineScreens';
 import type { CardInstance, EquipSlot, GameState, Hero, ItemDef } from '../types';
 import { ConfirmDialog } from './ui/ConfirmDialog';
+import { canChangeNow, JobSheetBody } from './JobSheet';
 
 /** 同じ場所にいる仲間（ダンジョンの中なら同じパーティ、世界マップなら同じマス） */
 function placeMates(game: GameState, hero: Hero): Hero[] {
@@ -106,6 +107,10 @@ function MenuSheet() {
             </button>
             <button onClick={() => openSheet('quests')} className={row}>
               <ScrollText size={18} className="text-amber-300" /> 依頼と封印の鍵
+              <ChevronRight size={18} className="ml-auto" />
+            </button>
+            <button onClick={() => openSheet('jobs')} className={row}>
+              <ArrowUpCircle size={18} className="text-amber-300" /> 転職
               <ChevronRight size={18} className="ml-auto" />
             </button>
           </>
@@ -293,7 +298,19 @@ function PartySheet() {
         <br />
         <span className="font-display text-sky-200">《{cls.exploreAbility.name}》</span>
         {cls.exploreAbility.description}
+        {hero.carried && (
+          <>
+            <br />
+            <span className="font-display text-violet-200">《{getClass(hero.carried).battleAbility.name}》</span>
+            {describeAbility(getClass(hero.carried).battleAbility)}（{getClass(hero.carried).name}から持ち越し）
+          </>
+        )}
       </div>
+      {!inBattle && mine && jobOptions(hero).length > 0 && (
+        <button onClick={() => openSheet('jobs')} className={`btn mt-1 flex h-11 w-full items-center justify-center gap-1.5 rounded-lg text-[14px] font-bold ${canChangeNow(game, hero) ? 'btn-gold' : 'btn-dark'}`}>
+          <ArrowUpCircle size={17} /> 転職先を見る{canChangeNow(game, hero) ? '（転職できます）' : ''}
+        </button>
+      )}
 
       <div className="font-display mt-2 text-[15px] text-amber-200">装備{inBattle && <span className="ml-1 text-[12px] text-zinc-400">（戦闘中は変えられません）</span>}</div>
       <div className="mt-1 flex flex-col gap-1">
@@ -605,6 +622,11 @@ export function Sheets() {
         {(sheet === 'draw' || sheet === 'discard') && <PileSheet key={sheet} kind={sheet} />}
         {sheet === 'party' && hasGame && <PartySheet key="party" />}
         {sheet === 'pouch' && hasGame && <PouchSheet key="pouch" />}
+        {sheet === 'jobs' && hasGame && (
+          <BottomSheet key="jobs" title="転職" onClose={() => openSheet(null)} tall>
+            <JobSheetBody />
+          </BottomSheet>
+        )}
         {sheet === 'quests' && hasGame && (
           <BottomSheet key="quests" title="依頼と封印の鍵" onClose={() => openSheet(null)}>
             <QuestList />

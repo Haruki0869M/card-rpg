@@ -29,6 +29,6 @@ export const monk: ClassDef = {
   tier: 'base',
   lineage: 'bu',
   startingEquipment: { weapon: 'clothWraps', armor: 'travelerClothes' },
-  cardPool: ['flurry', 'risingKick', 'ironBody', 'focusBreath', 'palmStrike', 'sweep', 'charge', 'thousandFists', 'diamondStance'],
+  cardPool: ['flurry', 'risingKick', 'ironBody', 'focusBreath', 'palmStrike', 'sweep', 'charge', 'thousandFists', 'diamondStance', 'counterPalm'],
   growthWeights: { agi: 3, str: 2, dex: 2 },
 };

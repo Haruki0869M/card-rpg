@@ -1,6 +1,6 @@
 // ===== 世界マップの場面: 遭遇（spec §8.5）・町（§17）・祠（§8.4）・エンディング =====
 import { motion } from 'framer-motion';
-import { BedDouble, Check, Coins, Eye, HandCoins, ScrollText, Sparkles, Store, Swords, Trash2, Wind } from 'lucide-react';
+import { ArrowUpCircle, BedDouble, Check, Coins, Eye, HandCoins, ScrollText, Sparkles, Store, Swords, Trash2, Wind } from 'lucide-react';
 import { useState } from 'react';
 import { BattleBackground, EnemyArt } from '../../art';
 import { BALANCE } from '../../data/balance';
@@ -9,6 +9,7 @@ import { getEnemy } from '../../data/enemies';
 import { getItem } from '../../data/items';
 import { getScenario } from '../../data/scenarios';
 import { QUESTS, SHRINES, TOWNS } from '../../data/world';
+import { canChangeNow } from '../JobSheet';
 import {
   affinityFromStats,
   canReportQuest,
@@ -17,6 +18,7 @@ import {
   heroFocusMax,
   heroMaxHp,
   heroStats,
+  jobOptions,
   objectiveHandler,
   questProgress,
   sceneBackground,
@@ -203,6 +205,7 @@ const chanceOf = (hero: Hero, cardId: string) => finalChance(getCard(cardId), af
 export function TownScreen() {
   const game = useBattle((s) => s.game)!;
   const dispatchGame = useBattle((s) => s.dispatchGame);
+  const openSheet = useBattle((s) => s.openSheet);
   const [tab, setTab] = useState<TownTab>('shop');
   const t = game.town!;
   const def = TOWNS.get(t.townId);
@@ -229,6 +232,12 @@ export function TownScreen() {
           <Coins size={14} />
           {v.gold}G
         </span>
+        {mine && jobOptions(v).length > 0 && (
+          <button onClick={() => openSheet('jobs')} className={`btn flex h-9 shrink-0 items-center gap-1 rounded-lg px-2 text-[12px] font-bold ${canChangeNow(game, v) ? 'btn-gold' : 'btn-dark'}`}>
+            <ArrowUpCircle size={15} />
+            聖堂（転職）
+          </button>
+        )}
       </div>
       <div className="mt-1 flex shrink-0 gap-1 overflow-x-auto px-2 pb-1">
         {TOWN_TABS.map((x) => (
