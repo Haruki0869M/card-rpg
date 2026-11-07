@@ -506,6 +506,8 @@ export interface ScenarioDef {
   name: string;
   synopsis: string;
   recommended: string;
+  /** 選ぶ画面の一枚絵（背景のID。無ければ title） */
+  art?: string;
   playTime: string;
   unlocked: boolean;
   /** 解放条件の説明（未解放の時に表示） */

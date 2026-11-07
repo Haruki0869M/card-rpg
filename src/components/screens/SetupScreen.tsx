@@ -1,5 +1,5 @@
 // ===== 冒険の準備（シナリオ・難易度・人数） =====
-import { ChevronLeft, ChevronRight, Lock, Users } from 'lucide-react';
+import { ChevronRight, Feather, Globe, Lock, Skull, Smartphone, Swords, UserRound, Users, type LucideIcon } from 'lucide-react';
 import { BattleBackground } from '../../art';
 import { BALANCE } from '../../data/balance';
 import { CLASSES } from '../../data/classes';
@@ -9,7 +9,8 @@ import { useBattle } from '../../store/battleStore';
 import { useOnline } from '../../store/onlineStore';
 import { useState } from 'react';
 import { DIFFICULTIES, describeDifficulty } from '../../data/rules';
-import { Heading, Screen } from '../ui/game';
+import { Screen } from '../ui/game';
+import { ChoiceTile, Motes, SectionTitle, TopBar } from '../ui/fancy';
 
 /** 難易度の一覧（src/content の difficulties から） */
 const DIFFICULTY = DIFFICULTIES.all.map((d) => ({ id: d.id, name: d.name, text: describeDifficulty(d) }));
@@ -38,90 +39,106 @@ export function SetupScreen() {
     setDraft({ party });
   };
 
+  const DIFF_LOOK: Record<string, { Icon: LucideIcon; accent: string }> = {
+    easy: { Icon: Feather, accent: '#8ae0a0' },
+    normal: { Icon: Swords, accent: '#ffd06a' },
+    hard: { Icon: Skull, accent: '#ff7a7a' },
+  };
+
   return (
     <Screen>
-      <div className="flex h-12 shrink-0 items-center px-2">
-        <button onClick={() => setScreen('title')} aria-label="戻る" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-lg">
-          <ChevronLeft size={22} />
-        </button>
-        <div className="flex-1">
-          <Heading>冒険の準備</Heading>
-        </div>
-        <div className="w-11" />
-      </div>
+      {/* 背景: 一枚絵をぼかして暗く敷き、光の粒を舞わせる */}
+      <BattleBackground kind="title" className="pointer-events-none absolute inset-0 -z-10 h-full w-full scale-110 opacity-25 blur-[3px]" />
+      <Motes count={12} />
+      <TopBar title="冒険の準備" onBack={() => setScreen('title')} />
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
-        <div className="font-display mt-2 text-[15px] text-amber-200">シナリオ</div>
-        <div className="-mx-3 mt-1 flex snap-x gap-2 overflow-x-auto px-3 pb-1">
+        <SectionTitle right={<span className="text-[12px] text-zinc-400">横にスワイプ</span>}>シナリオ</SectionTitle>
+        <div className="-mx-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-[9%] pt-1 pb-2" data-scenarios>
           {SCENARIOS.all.map((sc) => {
             const sel = draft.scenarioId === sc.id;
             return (
               <button
                 key={sc.id}
                 onClick={() => (sc.unlocked ? setDraft({ scenarioId: sc.id }) : toast(sc.unlockText ?? 'まだ遊べません'))}
-                className={`btn relative w-[78%] shrink-0 snap-center overflow-hidden rounded-xl border-2 text-left ${sel ? 'border-amber-300' : 'border-white/10'}`}
-                style={sel ? { boxShadow: '0 0 16px rgba(255,200,90,.45)' } : undefined}
+                className="btn relative h-[214px] w-[82%] shrink-0 snap-center overflow-hidden rounded-2xl text-left"
+                style={{
+                  border: '2px solid transparent',
+                  background: sel ? 'linear-gradient(#000,#000) padding-box, linear-gradient(160deg,#fff2c0,#d9a33a 45%,#7a4a0a) border-box' : 'linear-gradient(#000,#000) padding-box, linear-gradient(160deg,#6a5a3a,#2a2418) border-box',
+                  boxShadow: sel ? '0 0 22px rgba(255,200,90,.5), 0 6px 14px rgba(0,0,0,.6)' : '0 6px 14px rgba(0,0,0,.6)',
+                }}
               >
-                <div className="relative h-[92px]">
-                  <BattleBackground kind="castle" className={`absolute inset-0 h-full w-full ${sc.unlocked ? '' : 'grayscale brightness-50'}`} />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 to-transparent" />
-                  <div className="font-display text-outline absolute bottom-1 left-2 text-[20px] text-amber-50">{sc.name}</div>
-                  {!sc.unlocked && <Lock size={28} className="absolute top-2 right-2 text-zinc-300" />}
-                </div>
-                <div className="bg-black/60 p-2 text-[12px] leading-4">
-                  <div className="text-zinc-200">{sc.synopsis}</div>
-                  <div className="mt-1 text-zinc-400">
-                    推奨 {sc.recommended}・{sc.playTime}
+                <BattleBackground kind={sc.art ?? 'title'} className={`absolute inset-0 h-full w-full ${sc.unlocked ? '' : 'blur-[2px] grayscale brightness-[.35]'}`} />
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-transparent" />
+                {!sc.unlocked && (
+                  <div className="absolute inset-x-0 top-[22%] flex flex-col items-center gap-1 text-zinc-200">
+                    <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-zinc-400/70 bg-black/60">
+                      <Lock size={24} />
+                    </span>
+                    <span className="rounded-full bg-black/70 px-2 text-[12px] text-amber-200">{sc.unlockText}</span>
                   </div>
-                  {!sc.unlocked && <div className="mt-0.5 text-amber-300">{sc.unlockText}</div>}
+                )}
+                <div className="absolute inset-x-0 bottom-0 p-3">
+                  <div className="font-display text-outline text-[24px] leading-8 text-amber-50">{sc.name}</div>
+                  <div className="mt-0.5 line-clamp-2 text-[13px] leading-[18px] text-zinc-200">{sc.synopsis}</div>
+                  <div className="mt-1.5 flex gap-1.5 text-[12px]">
+                    <span className="rounded-full border border-amber-300/40 bg-black/60 px-2 text-amber-100">推奨 {sc.recommended}</span>
+                    <span className="rounded-full border border-amber-300/40 bg-black/60 px-2 text-amber-100">{sc.playTime}</span>
+                  </div>
                 </div>
               </button>
             );
           })}
         </div>
+        <div className="flex justify-center gap-1.5">
+          {SCENARIOS.all.map((sc) => (
+            <span key={sc.id} className={`h-1.5 rounded-full transition-all ${draft.scenarioId === sc.id ? 'w-5 bg-amber-300' : 'w-1.5 bg-zinc-600'}`} />
+          ))}
+        </div>
 
-        <div className="font-display mt-3 text-[15px] text-amber-200">難易度</div>
-        <div className="mt-1 grid grid-cols-3 gap-2">
+        <SectionTitle>難易度</SectionTitle>
+        <div className="grid grid-cols-3 gap-2">
           {DIFFICULTY.map((d) => (
-            <button
-              key={d.id}
-              onClick={() => setDraft({ difficulty: d.id })}
-              className={`btn flex h-12 items-center justify-center rounded-lg ${draft.difficulty === d.id ? 'btn-gold' : 'btn-dark'}`}
-            >
-              <span className="font-display text-[16px]">{d.name}</span>
-            </button>
+            <ChoiceTile key={d.id} selected={draft.difficulty === d.id} onClick={() => setDraft({ difficulty: d.id })} Icon={DIFF_LOOK[d.id]?.Icon ?? Swords} accent={DIFF_LOOK[d.id]?.accent} label={d.name} />
           ))}
         </div>
         {/* 説明はボタンの下に（ボタンの中だと長い文がはみ出すため） */}
-        <div className="mt-1 rounded-lg bg-black/30 px-2 py-1 text-[13px] leading-5 text-zinc-300" data-difficulty-text>
+        <div className="mt-1.5 rounded-lg border border-amber-300/15 bg-black/40 px-2 py-1 text-[13px] leading-5 text-zinc-300" data-difficulty-text>
           {DIFFICULTY.find((d) => d.id === draft.difficulty)?.text}
         </div>
 
-        <div className="font-display mt-3 text-[15px] text-amber-200">人数</div>
-        <div className="mt-1 grid grid-cols-4 gap-2">
+        <SectionTitle>人数</SectionTitle>
+        <div className="grid grid-cols-4 gap-2">
           {Array.from({ length: BALANCE.maxPartySize }, (_, i) => i + 1).map((n) => (
-            <button
+            <ChoiceTile
               key={n}
+              selected={draft.party.length === n}
               onClick={() => setSize(n)}
-              className={`btn flex h-12 items-center justify-center gap-1 rounded-lg text-[16px] font-bold ${draft.party.length === n ? 'btn-gold' : 'btn-dark'}`}
-            >
-              <Users size={16} /> {n}人
-            </button>
+              icon={
+                <span className="flex h-[22px] items-end -space-x-1">
+                  {Array.from({ length: n }, (_, k) => (
+                    <UserRound key={k} size={n > 2 ? 15 : 18} strokeWidth={2.4} className={draft.party.length === n ? 'text-amber-200' : 'text-zinc-400'} />
+                  ))}
+                </span>
+              }
+              label={`${n}人`}
+            />
           ))}
         </div>
 
-        <div className="font-display mt-3 text-[15px] text-amber-200">遊び方</div>
-        <div className="mt-1 grid grid-cols-2 gap-2">
-          <button onClick={() => setOnline(false)} className={`btn h-12 rounded-lg text-[14px] font-bold ${online ? 'btn-dark' : 'btn-gold'}`}>
-            この端末で遊ぶ
-          </button>
-          <button
+        <SectionTitle>遊び方</SectionTitle>
+        <div className="grid grid-cols-2 gap-2">
+          <ChoiceTile selected={!online} onClick={() => setOnline(false)} Icon={Smartphone} accent="#9ad8ff" label="この端末で遊ぶ" sub="1人で全員 / 1台を回す" />
+          <ChoiceTile
+            selected={online}
             onClick={() => (onlineOk ? setOnline(true) : toast('オンライン協力は準備中です（Firebase の設定が入ると遊べます）'))}
-            className={`btn h-12 rounded-lg text-[14px] font-bold ${online ? 'btn-gold' : 'btn-dark'} ${onlineOk ? '' : 'text-zinc-500'}`}
-          >
-            オンライン協力
-          </button>
+            disabled={!onlineOk}
+            Icon={Globe}
+            accent="#b8a0ff"
+            label="オンライン協力"
+            sub="各自のスマホで"
+          />
         </div>
-        <div className="mt-1 text-[12px] text-zinc-500">
+        <div className="mt-1.5 text-[12px] leading-4 text-zinc-400">
           {online ? '部屋を作って、合言葉を仲間に教えます。仲間は自分のスマホで「部屋に参加」から入り、自分のキャラを作ります。' : '1人で全員を操作するか、1台を回して遊びます。'}
         </div>
         {online && (

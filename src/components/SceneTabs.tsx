@@ -47,7 +47,7 @@ export function SceneTabs() {
     })),
   ].filter((t) => t.id !== WORLD_SCENE || t.heroes.length > 0);
   return (
-    <div role="tablist" aria-label="場面の切り替え" className="flex shrink-0 gap-1 border-b border-amber-300/30 bg-[#0b0910] px-1 pt-1">
+    <div role="tablist" aria-label="場面の切り替え" className="flex shrink-0 gap-1 border-b border-amber-300/40 bg-gradient-to-b from-[#07060c] to-[#120f20] px-1 pt-1">
       {tabs.map((t) => {
         const on = t.id === scene;
         const need = !on && sceneNeedsMe(full, t.id);
@@ -57,7 +57,7 @@ export function SceneTabs() {
             role="tab"
             aria-selected={on}
             onClick={() => setScene(t.id)}
-            className={`btn relative flex h-11 min-w-0 flex-1 items-center gap-1 rounded-t-lg px-1.5 text-[12px] font-bold ${on ? 'bg-amber-500/25 text-amber-100' : 'bg-black/40 text-zinc-300'}`}
+            className={`btn relative flex h-11 min-w-0 flex-1 items-center gap-1 rounded-t-xl border-x border-t px-1.5 text-[12px] font-bold ${on ? 'border-amber-300/80 bg-gradient-to-b from-[#3a3258] to-[#1c1830] text-amber-50 shadow-[0_-2px_10px_rgba(255,200,90,.25)]' : 'border-white/10 bg-black/40 text-zinc-400'}`}
           >
             {t.id === WORLD_SCENE && <MapIcon size={14} className="shrink-0 text-emerald-300" />}
             <span className="min-w-0 truncate">{t.label}</span>

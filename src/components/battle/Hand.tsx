@@ -7,9 +7,7 @@ import { chanceFor, findAlly, unusableReason } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
 import { usePress } from '../../hooks/usePress';
 import { useBattle } from '../../store/battleStore';
-import { tierRange } from '../format';
-import { CardTitle, RarityAura } from '../ui/CardFace';
-import { CATEGORY_STYLE, EffectChip } from '../ui/icons';
+import { CardBody } from '../ui/CardBody';
 
 export const CARD_H = 160;
 const MIN_STEP = 46; // 重なっても指で押せる幅（44px以上）
@@ -50,7 +48,6 @@ const CardView = memo(function CardView({
   const flash = useBattle((s) => (s.flash?.cardUid === uid ? s.flash : null));
   const tapCard = useBattle((s) => s.tapCard);
   const press = usePress(() => tapCard(uid), () => ({ type: 'card', cardId: card.id, upgraded, allyId, focus }));
-  const cat = CATEGORY_STYLE[card.category];
   const [showFlash, setShowFlash] = useState(false);
 
   useEffect(() => {
@@ -77,65 +74,8 @@ const CardView = memo(function CardView({
         willChange: 'transform',
       }}
     >
-    <div
-      className="card-enter relative h-full w-full rounded-[10px] p-[2px] transition-[filter] duration-100 active:scale-[.95]"
-      style={{
-        background: selected
-          ? 'linear-gradient(160deg,#fff3c4,#f2c24a 40%,#a86a12)'
-          : `linear-gradient(160deg,${cat.glow},${cat.frame} 35%,#1a1018)`,
-        boxShadow: selected ? '0 0 18px rgba(255,210,100,.75)' : '0 3px 6px rgba(0,0,0,.6)',
-        filter: reason && !selected ? 'grayscale(.85) brightness(.7)' : undefined,
-      }}
-    >
-      {!selected && <RarityAura rarity={card.rarity} />}
-      <div className="relative flex h-full flex-col overflow-hidden rounded-[8px] px-1 pt-0.5 pb-1" style={{ background: cat.inner }}>
-        {/* 透かしのカテゴリアイコン */}
-        <cat.Icon size={64} strokeWidth={1.5} className="pointer-events-none absolute right-[-10px] bottom-[-8px] opacity-[0.09]" style={{ color: cat.glow }} />
-        <div className="relative flex h-[22px] shrink-0 items-center justify-between">
-          <span
-            className="font-display flex h-[22px] w-[22px] items-center justify-center rounded-full border text-[14px] leading-none text-white"
-            style={{ background: 'radial-gradient(circle at 35% 30%,#bfe6ff,#2a7ad8 55%,#0c2a6a)', borderColor: '#cfeaff' }}
-          >
-            {card.cost}
-          </span>
-          <span className="flex gap-[3px] pr-0.5">
-            {Array.from({ length: card.slots }, (_, i) => (
-              <span
-                key={i}
-                className="h-[8px] w-[8px] rotate-45 border"
-                style={
-                  i < focus
-                    ? { background: '#ffd54a', borderColor: '#fff3c4', boxShadow: '0 0 5px #ffd54a' }
-                    : { background: 'rgba(0,0,0,.45)', borderColor: '#cfc6b0' }
-                }
-              />
-            ))}
-          </span>
-        </div>
-        <CardTitle card={card} compact />
-        <div className="relative flex shrink-0 items-baseline gap-0.5">
-          <cat.Icon size={12} strokeWidth={2.6} style={{ color: cat.glow }} />
-          <span className="font-display text-outline text-[19px] leading-[22px] text-amber-200 tabular-nums">{chance}</span>
-          <span className="text-[12px] font-bold text-amber-200/80">%</span>
-        </div>
-        <div className="relative mt-0.5 flex min-h-0 flex-col gap-[1px]">
-          {card.tiers.map((t, i) => {
-            const perfect = t.minSuccesses === card.slots;
-            return (
-              <div
-                key={i}
-                className={`flex items-center gap-0.5 rounded-sm px-0.5 text-[12px] leading-[15px] font-bold ${perfect ? 'bg-amber-400/15' : ''}`}
-              >
-                <span className={`shrink-0 tabular-nums ${perfect ? 'text-amber-300' : 'text-zinc-400'}`}>{tierRange(card, i)}</span>
-                <span className="flex min-w-0 flex-wrap gap-x-1">
-                  {t.effects.map((e, j) => (
-                    <EffectChip key={j} e={e} />
-                  ))}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+    <div className="card-enter relative h-full w-full transition-[filter] duration-100 active:scale-[.95]">
+      <CardBody card={card} chance={chance} width={width} height={CARD_H} focus={focus} selected={selected} dim={!!reason}>
         <AnimatePresence>
           {showFlash && flash && (
             <motion.div
@@ -143,13 +83,13 @@ const CardView = memo(function CardView({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.08 }}
-              className="absolute inset-x-0 top-12 border-y border-red-400/60 bg-black/90 px-1 py-1 text-center text-[12px] leading-4 font-bold text-red-300"
+              className="absolute inset-x-0 top-12 z-20 border-y border-red-400/60 bg-black/90 px-1 py-1 text-center text-[12px] leading-4 font-bold text-red-300"
             >
               {flash.text}
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+      </CardBody>
     </div>
     </div>
   );

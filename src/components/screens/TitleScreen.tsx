@@ -7,6 +7,7 @@ import { BattleBackground } from '../../art';
 import { useBattle } from '../../store/battleStore';
 import { useOnline } from '../../store/onlineStore';
 import { HeroFace, Screen } from '../ui/game';
+import { Motes } from '../ui/fancy';
 
 export const GAME_TITLE = TERMS.gameTitle;
 
@@ -34,8 +35,11 @@ export function TitleScreen() {
   return (
     <Screen>
       <div className="relative min-h-0 flex-1 overflow-hidden">
-        <BattleBackground kind="title" className="absolute inset-0 h-full w-full" />
+        <BattleBackground kind="title" className="ken-burns absolute inset-0 h-full w-full" />
+        {/* 月のゆらぐ光 */}
+        <div className="moon-glow pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(circle at 50% 33%, rgba(255,236,170,.55), transparent 42%)', mixBlendMode: 'screen' }} />
         <div className="absolute inset-0 bg-gradient-to-b from-black/75 via-transparent via-35% to-[#0b0810]" />
+        <Motes count={22} />
         <div className="absolute inset-x-0 top-[8%] text-center">
           {/* 月の明るい所でも文字が読めるように、文字の後ろを暗く */}
           <div className="pointer-events-none absolute inset-x-0 -top-6 -bottom-6" style={{ background: 'radial-gradient(ellipse 60% 55% at 50% 50%, rgba(8,6,12,.82), rgba(8,6,12,.45) 60%, transparent)' }} />
@@ -43,9 +47,9 @@ export function TitleScreen() {
             initial={{ opacity: 0, y: -10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.6 }}
-            className="font-title relative px-2 text-[44px] leading-[46px] font-bold"
+            className="font-title title-sheen relative px-2 text-[44px] leading-[46px] font-bold"
             style={{
-              background: 'linear-gradient(180deg,#fff6d0,#f2c24a 55%,#a86a12)',
+              background: 'linear-gradient(105deg,#f2c24a 0%,#ffe9a0 30%,#fffdf0 45%,#ffe9a0 55%,#e0a42a 75%,#a86a12 100%)',
               WebkitBackgroundClip: 'text',
               backgroundClip: 'text',
               color: 'transparent',
@@ -59,36 +63,51 @@ export function TitleScreen() {
           <div className="font-display text-outline relative mt-1 text-[14px] tracking-[0.3em] text-amber-100/90">― {TERMS.gameSubtitle} ―</div>
         </div>
       </div>
-      <div className="flex flex-col gap-2 px-4 pt-3 pb-4">
-        <button onClick={() => setScreen('setup')} className="btn btn-gold font-display flex h-14 items-center justify-center gap-2 rounded-xl text-[20px]">
-          <UserPlus size={22} /> 新しい冒険
+      <div className="relative flex flex-col gap-2.5 px-4 pt-2 pb-4">
+        <button onClick={() => setScreen('setup')} className="btn btn-gold font-display flex h-[60px] items-center justify-center gap-2 rounded-2xl text-[22px] tracking-wider">
+          <UserPlus size={24} /> 新しい冒険
         </button>
         {game && (
-          <button onClick={continueGame} className="btn btn-dark flex min-h-14 items-center gap-2 rounded-xl px-3 text-left">
-            <Play size={20} className="shrink-0 text-amber-300" />
+          <button onClick={continueGame} className="btn btn-dark flex min-h-[58px] items-center gap-2 rounded-2xl px-3 text-left">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-amber-300/60 bg-black/40">
+              <Play size={18} className="text-amber-300" />
+            </span>
             <span className="min-w-0 flex-1">
-              <span className="font-display block text-[17px]">つづきから</span>
+              <span className="font-display block text-[18px] text-amber-50">つづきから</span>
               <span className="block truncate text-[12px] text-zinc-400">
                 {modeText[game.mode] ?? ''}・{game.dungeon?.name ?? '拠点'}・{game.heroes.reduce((n, h) => n + (h.gold ?? 0), 0)}G
               </span>
             </span>
             <span className="flex -space-x-2">
               {game.heroes.map((h) => (
-                <HeroFace key={h.id} hero={h} size={26} dim={h.hp <= 0} />
+                <HeroFace key={h.id} hero={h} size={28} dim={h.hp <= 0} />
               ))}
             </span>
           </button>
         )}
-        <div className="grid grid-cols-3 gap-2">
-          <button onClick={() => (onlineOk ? setScreen('join') : toast('オンライン協力は準備中です（Firebase の設定が入ると遊べます）'))} className="btn btn-dark flex h-12 flex-col items-center justify-center rounded-lg text-[12px]">
-            <Users size={16} className="text-sky-300" /> 部屋に参加
-          </button>
-          <button onClick={() => toast('伝承の書は M4 で追加します')} className="btn btn-dark flex h-12 flex-col items-center justify-center rounded-lg text-[12px]">
-            <BookOpen size={16} className="text-amber-300" /> 伝承の書
-          </button>
-          <button onClick={() => setShowSettings((v) => !v)} className="btn btn-dark flex h-12 flex-col items-center justify-center rounded-lg text-[12px]">
-            <Settings2 size={16} className="text-zinc-300" /> 設定
-          </button>
+        {/* 小さなメニュー: 宝石の丸いボタン */}
+        <div className="mt-1 flex justify-around">
+          {(
+            [
+              { label: '部屋に参加', Icon: Users, color: '#7ac8ff', on: () => (onlineOk ? setScreen('join') : toast('オンライン協力は準備中です（Firebase の設定が入ると遊べます）')) },
+              { label: '伝承の書', Icon: BookOpen, color: '#ffd06a', on: () => toast('伝承の書は M4 で追加します') },
+              { label: '設定', Icon: Settings2, color: '#c8c0e0', on: () => setShowSettings((v) => !v) },
+            ] as const
+          ).map((m) => (
+            <button key={m.label} onClick={m.on} className="btn flex min-w-[76px] flex-col items-center gap-1">
+              <span
+                className="flex h-[50px] w-[50px] items-center justify-center rounded-full"
+                style={{
+                  background: `radial-gradient(circle at 50% 35%, ${m.color}44, transparent 65%), linear-gradient(180deg,#3a3258,#17142a) padding-box, linear-gradient(180deg,#fff0b8,#a87a2a 55%,#5a3a0e) border-box`,
+                  border: '2px solid transparent',
+                  boxShadow: `0 3px 0 #07060c, 0 0 10px ${m.color}33`,
+                }}
+              >
+                <m.Icon size={22} style={{ color: m.color }} />
+              </span>
+              <span className="text-[12px] font-bold text-zinc-200">{m.label}</span>
+            </button>
+          ))}
         </div>
         {showSettings && (
           <div className="panel flex flex-col gap-1 rounded-lg p-2 text-[14px]">
