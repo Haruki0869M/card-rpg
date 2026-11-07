@@ -95,7 +95,7 @@ export function EncounterScreen() {
                     key={h.id}
                     disabled={!canTap}
                     onClick={() => (other ? dispatchGame({ type: 'ENCOUNTER_JOIN', playerId: h.playerId, heroId: h.id, join: !on }) : setJoined({ ...joined, [h.id]: !on }))}
-                    className={`btn flex min-w-0 flex-1 flex-col items-center rounded-lg border-2 py-1 disabled:opacity-100 disabled:filter-none ${on ? 'border-amber-300 bg-amber-500/15' : 'border-white/10 bg-black/30'}`}
+                    className={`btn flex min-w-0 flex-1 flex-col items-center rounded-lg border-2 py-1 disabled:opacity-100 disabled:filter-none ${on ? 'sel-on' : 'border-white/10 bg-black/30'}`}
                   >
                     <HeroFace hero={h} size={32} dim={!on} />
                     <span className="truncate text-[12px] font-bold">{h.name}</span>
@@ -452,7 +452,7 @@ export function ShrineScreen() {
               <div className="mt-2 text-[12px] text-zinc-300">祈るキャラ（永続の加護は1人{BALANCE.maxBlessings}つまで）</div>
               <div className="mt-1 flex gap-1">
                 {heroes.map((h) => (
-                  <button key={h.id} onClick={() => setHeroId(h.id)} className={`btn flex min-w-0 flex-1 flex-col items-center rounded-lg border-2 py-1 ${heroId === h.id ? 'border-amber-300 bg-amber-500/15' : 'border-white/10 bg-black/30'}`}>
+                  <button key={h.id} onClick={() => setHeroId(h.id)} className={`btn flex min-w-0 flex-1 flex-col items-center rounded-lg border-2 py-1 ${heroId === h.id ? 'sel-on' : 'border-white/10 bg-black/30'}`}>
                     <HeroFace hero={h} size={30} />
                     <span className="truncate text-[12px] font-bold">{h.name}</span>
                     <span className="text-[12px] text-zinc-400">加護 {h.blessings ?? 0}/{BALANCE.maxBlessings}</span>

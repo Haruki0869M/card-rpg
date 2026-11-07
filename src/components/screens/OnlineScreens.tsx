@@ -1,6 +1,7 @@
 // ===== オンライン協力の画面（部屋に参加・待合室・遊んでいる間の表示。spec §7.2） =====
+import { TopBar } from '../ui/fancy';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronLeft, Copy, Crown, LogIn, Share2, Swords, Users, Wifi, WifiOff } from 'lucide-react';
+import { Copy, Crown, LogIn, Share2, Swords, Users, Wifi, WifiOff } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { BALANCE } from '../../data/balance';
 import { CLASSES } from '../../data/classes';
@@ -13,7 +14,7 @@ import { autoName, isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
 import { PROXY_WAIT_SEC, useOnline } from '../../store/onlineStore';
 import type { GameState, PlayerId } from '../../types';
-import { Heading, HeroFace, Screen } from '../ui/game';
+import { HeroFace, Screen } from '../ui/game';
 
 /** 定型のスタンプ（spec §7.1） */
 export const STAMPS = ['いいね！', '待って！', 'ここ行こう', 'ありがとう', 'まかせて', 'ごめん！'];
@@ -64,15 +65,7 @@ export function JoinScreen() {
   };
   return (
     <Screen>
-      <div className="flex h-12 shrink-0 items-center px-2">
-        <button onClick={() => setScreen('title')} aria-label="戻る" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-lg">
-          <ChevronLeft size={22} />
-        </button>
-        <div className="flex-1">
-          <Heading>部屋に参加</Heading>
-        </div>
-        <div className="w-11" />
-      </div>
+      <TopBar title="部屋に参加" onBack={() => setScreen('title')} />
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-4">
         <NameInput />
         <div>
@@ -148,22 +141,13 @@ export function LobbyScreen() {
   const members = Object.entries(room.members).sort((a, b) => a[1].seat.localeCompare(b[1].seat));
   return (
     <Screen>
-      <div className="flex h-12 shrink-0 items-center px-2">
-        <button
-          onClick={async () => {
-            await leave();
-            setScreen('title');
-          }}
-          aria-label="部屋を出る"
-          className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-lg"
-        >
-          <ChevronLeft size={22} />
-        </button>
-        <div className="flex-1">
-          <Heading>待合室</Heading>
-        </div>
-        <div className="w-11" />
-      </div>
+      <TopBar
+        title="待合室"
+        onBack={async () => {
+          await leave();
+          setScreen('title');
+        }}
+      />
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
         <div className="panel panel-gold-edge mt-2 flex items-center gap-3 rounded-xl p-3">
           <div className="min-w-0 flex-1">

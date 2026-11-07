@@ -250,7 +250,7 @@ function PartySheet() {
               setIdx(i);
               setSlot(null);
             }}
-            className={`btn flex min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border-b-2 py-1 ${i === idx ? 'border-amber-300 bg-amber-500/15' : 'border-transparent bg-black/30'}`}
+            className={`btn flex min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border-b-2 py-1 ${i === idx ? 'sel-on' : 'border-transparent bg-black/30'}`}
           >
             <HeroFace hero={h} size={30} dim={h.hp <= 0} />
             <span className="truncate text-[12px] font-bold">{h.name}</span>
@@ -493,7 +493,7 @@ function PouchSheet() {
                 setOwnerId(h.id);
                 setChosen(null);
               }}
-              className={`btn flex h-11 min-w-0 flex-1 items-center gap-1 rounded-lg border-b-2 px-1 ${h.id === owner?.id ? 'border-amber-300 bg-amber-500/15' : 'border-transparent bg-black/30'}`}
+              className={`btn flex h-11 min-w-0 flex-1 items-center gap-1 rounded-lg border-b-2 px-1 ${h.id === owner?.id ? 'sel-on' : 'border-transparent bg-black/30'}`}
             >
               <HeroFace hero={h} size={26} />
               <span className="truncate text-[12px] font-bold">{h.name}</span>

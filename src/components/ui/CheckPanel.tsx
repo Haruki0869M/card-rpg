@@ -59,7 +59,7 @@ export function CheckPanel({
                 setHeroId(h.id);
                 setFocus(0);
               }}
-              className={`btn flex min-w-0 flex-1 flex-col items-center rounded-lg border-2 py-1 ${h.id === hero?.id ? 'border-amber-300 bg-amber-500/15' : 'border-white/10 bg-black/30'}`}
+              className={`btn flex min-w-0 flex-1 flex-col items-center rounded-lg border-2 py-1 ${h.id === hero?.id ? 'sel-on' : 'border-white/10 bg-black/30'}`}
             >
               <HeroFace hero={h} size={30} dim={h.hp <= 0} />
               <span className="text-[12px] font-bold tabular-nums">{c}%</span>

@@ -152,13 +152,18 @@ export function Crest() {
   return <img src={src} alt="" draggable={false} className="pointer-events-none absolute -top-[30px] left-1/2 w-[44px] -translate-x-1/2 drop-shadow-[0_2px_2px_rgba(0,0,0,.8)]" />;
 }
 
-/** 見出し（重厚な文字＋飾り線） */
+/** 見出し（重厚な文字＋宝石と金の飾り線） */
 export function Heading({ children, sub }: { children: ReactNode; sub?: ReactNode }) {
   return (
     <div className="px-3 pt-2 text-center">
-      <div className="font-display text-outline text-[22px] leading-7 text-amber-100">{children}</div>
-      {sub && <div className="text-[12px] text-zinc-400">{sub}</div>}
-      <div className="mx-auto mt-1 h-px w-2/3 bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
+      <div className="flex items-center justify-center gap-2">
+        <span className="h-px w-8 bg-gradient-to-r from-transparent to-amber-300/80" />
+        <span className="h-[7px] w-[7px] rotate-45 bg-amber-300 shadow-[0_0_6px_rgba(255,200,90,.9)]" />
+        <span className="font-display text-outline text-[22px] leading-7 tracking-wider text-amber-50">{children}</span>
+        <span className="h-[7px] w-[7px] rotate-45 bg-amber-300 shadow-[0_0_6px_rgba(255,200,90,.9)]" />
+        <span className="h-px w-8 bg-gradient-to-l from-transparent to-amber-300/80" />
+      </div>
+      {sub && <div className="mt-0.5 text-[12px] leading-4 text-zinc-400">{sub}</div>}
     </div>
   );
 }

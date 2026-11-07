@@ -348,7 +348,7 @@ export function WorldScreen() {
                     disabled={!mine || st !== 'no'}
                     onClick={() => invite(c)}
                     aria-label={`${c.name}を誘う`}
-                    className={`btn relative flex h-11 min-w-11 shrink-0 items-center gap-1 rounded-full border-2 px-1 disabled:opacity-100 ${st === 'yes' ? 'border-amber-300 bg-amber-500/20' : 'border-sky-300/50 bg-black/30'}`}
+                    className={`btn relative flex h-11 min-w-11 shrink-0 items-center gap-1 rounded-full border-2 px-1 disabled:opacity-100 ${st === 'yes' ? 'sel-on' : 'border-sky-300/50 bg-black/30'}`}
                   >
                     <HeroFace hero={c} size={30} dim={st !== 'yes'} />
                     <span className="pr-1 text-[12px] font-bold text-sky-200">{st === 'yes' ? '同行' : st === 'wait' ? '返事待ち' : '誘う'}</span>
@@ -361,7 +361,7 @@ export function WorldScreen() {
                   key={c.id}
                   onClick={() => setWithMe({ ...withMe, [c.id]: !on })}
                   aria-label={`${c.name}を${on ? '残す' : '連れて行く'}`}
-                  className={`btn relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 ${on ? 'border-amber-300 bg-amber-500/20' : 'border-white/10 bg-black/30'}`}
+                  className={`btn relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 ${on ? 'sel-on' : 'border-white/10 bg-black/30'}`}
                 >
                   <HeroFace hero={c} size={34} dim={!on} />
                   {on && <span className="absolute -right-1 -bottom-1 rounded-full bg-amber-300 px-1 text-[12px] leading-4 font-black text-black">✓</span>}
