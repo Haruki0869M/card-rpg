@@ -33,6 +33,15 @@ export function actorOf(game: GameState, cmd: GameCommand): PlayerId {
   if (cmd.type === 'PICK_CARD' && cmd.offerIndex !== null) id = game.reward?.cardOffers[cmd.offerIndex]?.heroId;
   // オンライン協力: キャラを指さない操作（物語を進める・報酬を閉じるなど）は、押した人の操作
   if (!id && localPlayers) return myPlayer();
+  // ローカル協力では、世界マップから開いた画面でも担当者を引き継ぐ。
+  // ダンジョン内の操作と投票は従来の経路に任せる。
+  if (!id && game.world && !game.activeScene) {
+    if (game.mode === 'town') id = game.town?.heroId;
+    else if (game.mode === 'shrine') id = game.shrine?.heroId;
+    else if (game.mode === 'encounter') id = game.encounter?.heroId;
+    else if ((game.mode === 'event' && game.event?.tile !== undefined)
+      || (game.mode === 'chest' && game.chest?.tile !== undefined)) id = game.world.turn;
+  }
   if (!id && game.world && game.mode === 'world') id = game.world.turn;
   return heroPlayer(id) ?? first;
 }

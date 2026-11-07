@@ -1,10 +1,18 @@
 // 実際の画面をタップして、キャラ作成 → 世界マップ（物語・移動・遭遇）→ 翠の神殿 → 宝箱 → レベルアップ → ボス撃破 → 大宝箱 → 地上 まで進める
 // 2人以上は担当プレイヤーを分けて、手番の受け渡しの画面も確かめる
 // npm run build && npx vite preview --port 4173 を起動した状態で: node scripts/adventure.mjs
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { chromium, layoutIssues, URL } from './lib.mjs';
 
 mkdirSync('screenshots', { recursive: true });
+const output = process.env.ADVENTURE_OUTPUT ?? 'screenshots/adventure';
+mkdirSync(output, { recursive: true });
+async function record(page, party, result) {
+  const data = await page.evaluate(() => ({ text: document.body.innerText, saved: JSON.parse(localStorage.getItem('card-rpg/adventure')) }));
+  await page.screenshot({ path: `${output}/${party}p-${result}.png` });
+  writeFileSync(`${output}/${party}p-${result}.json`, JSON.stringify(data, null, 2));
+  console.log(`${party}人 ${result}: ${data.text.replace(/\n/g, ' ').slice(-700)}`);
+}
 const browser = await chromium.launch();
 const issues = new Set();
 const seen = new Set();
@@ -73,6 +81,11 @@ async function playBattle(page) {
 async function run(party, difficulty) {
   const ctx = await browser.newContext({ viewport: { width: 360, height: 640 }, hasTouch: true, isMobile: true });
   const page = await ctx.newPage();
+  // 前後の版を同じ冒険で比較するため、開始時の種だけを固定できるようにする。
+  if (process.env.ADVENTURE_SEED) await page.addInitScript(seed => {
+    const random = crypto.getRandomValues.bind(crypto);
+    crypto.getRandomValues = array => array instanceof Uint32Array && array.length === 1 ? (array[0] = seed, array) : random(array);
+  }, Number(process.env.ADVENTURE_SEED));
   page.on('pageerror', (e) => issues.add(`pageerror: ${e.message}`));
   await page.goto(URL);
   await page.evaluate(() => localStorage.clear());
@@ -103,8 +116,18 @@ async function run(party, difficulty) {
   await page.getByLabel('閉じる').click();
 
   let result = 'timeout';
+  let previous = '';
+  let unchanged = 0;
   for (let step = 0; step < 900; step++) {
     await page.waitForTimeout(60);
+    const { signature, text } = await page.evaluate(() => ({ signature: localStorage.getItem('card-rpg/adventure'), text: document.body.innerText }));
+    unchanged = signature === previous ? unchanged + 1 : 0;
+    previous = signature;
+    if (step % 25 === 0) console.log(`${party}人 step=${step}: ${text.replace(/\n/g, ' ').slice(-180)}`);
+    if (unchanged >= 25) {
+      console.log(`${party}人: 同じ画面のまま25回操作しても進まないため記録して停止`);
+      break;
+    }
     if (await page.getByText('地上に戻る', { exact: true }).count()) {
       result = 'cleared';
       await page.screenshot({ path: `screenshots/adv-${party}p-cleared.png` });
@@ -333,13 +356,14 @@ async function run(party, difficulty) {
     }
   }
   console.log(`${party}人・${difficulty}: ${result}`);
+  await record(page, party, result);
   await ctx.close();
   return result;
 }
 
 const results = [];
-results.push(await run(4, 'やさしい'));
-results.push(await run(2, 'やさしい'));
+for (const party of (process.env.ADVENTURE_PARTIES ?? '4,2').split(',').map(Number)) results.push(await run(party, 'やさしい'));
 await browser.close();
 if (issues.size) console.log('issues:', [...issues]);
-process.exit(issues.size || !results.includes('cleared') ? 1 : 0);
+// 一方の人数だけ通っても成功にしない。
+process.exit(issues.size || results.some(result => result !== 'cleared') ? 1 : 0);
