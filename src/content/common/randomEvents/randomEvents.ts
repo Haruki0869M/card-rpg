@@ -47,7 +47,7 @@ export const randomEvents: EventDef[] = [
     options: [
       {
         label: '鉄の罠を力づくでこじ開ける',
-        check: { stat: 'str', slots: 3, need: 2 },
+        check: { stat: 'str', slots: 3, need: 2, purpose: 'mechanism' },
         success: [{ kind: 'pet', species: CRITTERS }],
         fail: [{ kind: 'damage', amount: 8 }],
         successText: '罠が外れた！ 小さな影は、すり寄ってきた。',

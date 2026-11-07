@@ -38,6 +38,7 @@ export function actorOf(game: GameState, cmd: GameCommand): PlayerId {
   if (!id && game.world && !game.activeScene) {
     if (game.mode === 'town') id = game.town?.heroId;
     else if (game.mode === 'shrine') id = game.shrine?.heroId;
+    else if (game.mode === 'sanctuary') id = game.sanctuary?.heroId;
     else if (game.mode === 'encounter') id = game.encounter?.heroId;
     else if ((game.mode === 'event' && game.event?.tile !== undefined)
       || (game.mode === 'chest' && game.chest?.tile !== undefined)) id = game.world.turn;

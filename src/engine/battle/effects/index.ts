@@ -239,6 +239,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
     const f = (source.feats ??= {});
     const add = (k: string) => (f[k] = (f[k] ?? 0) + 1);
     add('kills');
+    if (source.equippedWeaponType) add(`kills:weapon:${source.equippedWeaponType}`);
     if (element) add('kills:element');
     if ((v.statuses.curse ?? 0) > 0) add('kills:cursed');
     if (Object.entries(v.statuses).some(([id, n]) => n > 0 && getStatus(id).harmful)) add('kills:status');

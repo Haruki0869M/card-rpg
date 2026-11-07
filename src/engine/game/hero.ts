@@ -103,6 +103,7 @@ export function toPartyMember(hero: Hero): PartyMemberSpec {
     statuses: hero.nextBattleStatuses,
     ...(hero.pet ? { pet: { petId: hero.pet.petId, color: hero.pet.color, name: hero.pet.name, love: hero.pet.love } } : {}),
     ...(heroWeaponElement(hero) ? { weaponElement: heroWeaponElement(hero) } : {}),
+      ...(hero.equipment.weapon ? { equippedWeaponType: getItem(hero.equipment.weapon.itemId).weaponType } : {}),
   };
 }
 

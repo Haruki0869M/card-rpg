@@ -31,12 +31,13 @@ import { discardHand, drawCards } from './deck';
 import { applyEffect, checkEffect, comboMultiplier, dealDamage, elementMultiplier, makeCtx, targetOf } from './effects';
 import { decideAllIntents } from './intents';
 import { finalChance, selectTier } from './probability';
+import { recordSupport, supportSnapshot } from './support';
 import { activeStatuses, actionFailChanceOf, applyTick, chancePenaltyOf, consumeStatus, decayStatuses, emptyStatuses, skipActionStatus, takeManaPenalty, tickHealOf } from './statuses';
 import { abilityTriggered, addLog, enemyName, findAlly, findEnemy, healUnit, loseHp, nameOf, unitIdOf } from './units';
 
 export { enemyName, findAlly, findEnemy, unitName } from './units';
 
-export const STATE_VERSION = 8;
+export const STATE_VERSION = 9;
 
 // ---------- 生成 ----------
 
@@ -82,6 +83,7 @@ export function createBattle(setup: BattleSetup): BattleState {
       ...(m.abilities?.length ? { abilities: structuredClone(m.abilities) } : {}),
       ...(m.pet ? { pet: { ...m.pet } } : {}),
       ...(m.weaponElement ? { weaponElement: m.weaponElement } : {}),
+      ...(m.equippedWeaponType ? { equippedWeaponType: m.equippedWeaponType } : {}),
       statuses: { ...emptyStatuses(), ...(m.statuses as Statuses) },
       drawPile: shuffle(cards, rng),
       hand: [],
@@ -397,12 +399,14 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
     if (card.target === 'self' && card.tiers.some((t) => t.effects.some((e) => e.kind === 'block' || e.kind === 'heal' || e.kind === 'applyStatus'))) add('support');
   }
   const tier = selectTier(card, successes);
+  const supportBefore = supportSnapshot(state.allies, ally);
 
   // 効果（効果の部品を順に使う）
   const cardAbilities = card.trait ? [card.trait] : undefined;
   const ctx = makeCtx(state, rng, events, ally, { target, card, cardAbilities, perfect, tierEffects: tier.effects });
   if (target && tier.effects.some(e => e.kind === 'damage')) ally.lastTargetId = target.uid;
   for (const eff of tier.effects) applyEffect(ctx, eff);
+  recordSupport(ally, state.allies, supportBefore);
   const parts = ctx.parts;
   const hasDamage = tier.effects.some((e) => e.kind === 'damage');
   if (hasDamage) parts.unshift(`${ctx.dealt} DMG`);

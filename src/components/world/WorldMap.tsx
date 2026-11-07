@@ -26,8 +26,8 @@ const TERRAIN_DECOR: Record<string, { d: string; stroke: string; fill?: string }
   waves: { d: 'M-10 -2 Q-6 -6 -2 -2 T6 -2 M-6 5 Q-2 1 2 5 T10 5', stroke: '#8ac8ff' },
 };
 
-const FEATURE_ICON: Record<string, LucideIcon> = { town: House, dungeon: DoorOpen, shrine: Sparkles, event: CircleHelp, chest: Gift, landmark: Landmark };
-const FEATURE_COLOR: Record<string, string> = { town: '#ffe9a8', dungeon: '#ff9a7a', shrine: '#9affd0', event: '#9ad8ff', chest: '#ffd76a', landmark: '#d8c8ff' };
+const FEATURE_ICON: Record<string, LucideIcon> = { town: House, dungeon: DoorOpen, shrine: Sparkles, event: CircleHelp, chest: Gift, landmark: Landmark, temple: Landmark, altar: Sparkles };
+const FEATURE_COLOR: Record<string, string> = { town: '#ffe9a8', dungeon: '#ff9a7a', shrine: '#9affd0', event: '#9ad8ff', chest: '#ffd76a', landmark: '#d8c8ff', temple: '#ffe9a8', altar: '#c8a0ff' };
 
 /** 地図の場所の絵（無ければ undefined → アイコンで描く） */
 function placeImage(f: NonNullable<WorldState['tiles'][number]['f']>): string | undefined {

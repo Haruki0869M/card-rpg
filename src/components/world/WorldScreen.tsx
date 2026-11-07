@@ -10,7 +10,7 @@ import { EVENTS } from '../../data/events';
 import { getScenario } from '../../data/scenarios';
 import { TERMS } from '../../data/terms';
 import { PLAYER_COLOR } from '../../data/theme';
-import { getTerrain, SHRINES, TOWNS } from '../../data/world';
+import { getTerrain, SANCTUARIES, SHRINES, TOWNS } from '../../data/world';
 import {
   campAmbushChance,
   dayOf,
@@ -219,6 +219,7 @@ function tileInfo(game: GameState, i: number): string {
   const f = t.f;
   if (f?.kind === 'town') parts.push(TOWNS.get(f.id).name + (w.fallenTowns.includes(f.id) ? '（陥落）' : ''));
   if (f?.kind === 'dungeon') parts.push(DUNGEONS.get(f.id).name);
+  if (f?.kind === 'temple' || f?.kind === 'altar') parts.push(SANCTUARIES.get(f.id).name);
   if (f?.kind === 'shrine') parts.push(SHRINES.get(f.id).name + (f.used ? '（祈り済み）' : ''));
   if (f?.kind === 'event' || f?.kind === 'landmark') parts.push((EVENTS.tryGet(f.id)?.title ?? '何かがある') + (f.used ? '（調べた）' : ''));
   if (f?.kind === 'chest') parts.push(f.used ? '空の宝箱' : '宝箱');
@@ -233,6 +234,7 @@ function interactLabel(game: GameState, tile: number): string | undefined {
   if (!f) return undefined;
   if (f.kind === 'town') return game.world!.fallenTowns.includes(f.id) ? undefined : `${TOWNS.get(f.id).name}に入る`;
   if (f.kind === 'dungeon') return `${DUNGEONS.get(f.id).name}に入る`;
+  if (f.kind === 'temple' || f.kind === 'altar') return `${SANCTUARIES.get(f.id).name}に入る`;
   if (f.used) return undefined;
   return { shrine: '祠で祈る', event: '調べる', landmark: '調べる', chest: '宝箱を開ける' }[f.kind];
 }

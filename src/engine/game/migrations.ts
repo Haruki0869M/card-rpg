@@ -7,14 +7,29 @@ import { DUNGEONS } from '../../data/dungeons';
 import { ENEMIES } from '../../data/enemies';
 import { ITEMS } from '../../data/items';
 import { SCENARIOS } from '../../data/scenarios';
+import { SANCTUARIES } from '../../data/world';
 import { getDifficulty, getRoomType } from '../../data/rules';
 import type { GameState } from '../../types';
 import { STATE_VERSION } from '../battle/battle';
 import { heroAbilities } from './hero';
+import { addSanctuaries } from './world/sanctuaries';
 
 type Loose = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 const MIGRATIONS: Record<number, (g: Loose) => void> = {
+  // v8 → v9: 地図を再生成せず空きマスに神殿・祭壇だけ追加する。
+  8(g) {
+    if (g.world) addSanctuaries(g as GameState, g.world);
+    for (const battle of [g.battle, ...(g.expeditions ?? []).map((x: Loose) => x.battle)]) {
+      if (!battle) continue;
+      battle.version = 9;
+      for (const a of battle.allies) {
+        const weapon = g.heroes.find((h: Loose) => h.id === a.id)?.equipment?.weapon;
+        const type = weapon && ITEMS.tryGet(weapon.itemId)?.weaponType;
+        if (type) a.equippedWeaponType = type;
+      }
+    }
+  },
   // v3 → v4: 特殊能力の書き方が「きっかけ＋条件＋効果」に変わった。戦闘中のキャラの装備の能力を作り直す
   3(g) {
     if (g.battle) {
@@ -111,6 +126,11 @@ export function migrateGame(raw: unknown): GameState | null {
 export function validateGame(g: GameState): boolean {
   try {
     if (!SCENARIOS.has(g.scenarioId)) return false;
+    for (const tile of g.world?.tiles ?? []) {
+      if (tile.f?.kind === 'temple' || tile.f?.kind === 'altar') {
+        if (SANCTUARIES.tryGet(tile.f.id)?.kind !== tile.f.kind) return false;
+      }
+    }
     for (const h of g.heroes) {
       if (!CLASSES.has(h.classId)) return false;
       if (!h.deck.every((c) => CARDS.has(c.cardId))) return false;

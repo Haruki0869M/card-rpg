@@ -165,6 +165,7 @@ async function run(party, difficulty) {
     if (await clickText(page, '戦闘開始')) continue;
     if (await clickText(page, '町を出る')) continue;
     if (await clickText(page, '祈らずに去る')) continue;
+    if (await page.locator('[data-sanctuary]').count() && await clickText(page, '世界マップへ')) continue;
     // 世界マップ: 翠の神殿へ向かう
     if (await page.locator('[data-world-map]').count() && !(await page.getByText('撤退', { exact: true }).count())) {
       if (!seen.has('world')) {

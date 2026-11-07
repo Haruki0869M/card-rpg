@@ -31,6 +31,7 @@ import { applyCommand, createBattle, STATE_VERSION } from '../battle/battle';
 import { createRng, type Rng } from '../rng';
 import { applyOutcome, checkOutcome, hasOutcomeKind, makeOutcomeCtx } from './outcomes';
 import { expeditionOf, livingHeroes, findHero, sceneHeroes } from './heroes';
+import { recordCheck } from './checks';
 import { addItem, addLog, addLoot, restMultiplierOf, hiddenChestChance, isPartyPlayer, leastLoaded, ownedBy, partyHasTag, rollWithFocus, splitGold, statChance, successes } from './common';
 import { getDifficulty } from '../../data/rules';
 import { isBossRoom, roomBehavior, roomTypeOf } from './rooms';
@@ -58,7 +59,7 @@ import {
   agreeMove,
   heroesAt,
 } from './world/world';
-import { leaveShrine, leaveTown, questAccept, questReport, shrineChoose, townBuy, townInn, townRemoveCard, townSell } from './world/town';
+import { leaveSanctuary, leaveShrine, leaveTown, questAccept, questReport, shrineChoose, townBuy, townInn, townRemoveCard, townSell } from './world/town';
 import { getRoomType } from '../../data/rules';
 import { TERRAINS } from '../../data/world';
 import { buildDungeon, findRoom, RARITIES, rarityIndex, reachableRooms } from './dungeon';
@@ -452,6 +453,9 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
       case 'SHRINE_CHOOSE':
         error = shrineChoose(game, cmd, rng);
         break;
+      case 'LEAVE_SANCTUARY':
+        error = leaveSanctuary(game, cmd, rng);
+        break;
       case 'LEAVE_SHRINE':
         error = leaveShrine(game, cmd, rng);
         break;
@@ -828,6 +832,7 @@ function openChest(game: GameState, playerId: string, heroId: string, focusUsed:
   if (!c.unlocked) {
     const results = rollWithFocus(slots, focusUsed, statChance(h, 'dex', 'lock'), rng);
     const ok = successes(results) >= BALANCE.lockNeed;
+    recordCheck(h, 'dex', results, BALANCE.lockNeed, 'mechanism');
     if (ok) {
       c.unlocked = true;
       c.lastRoll = { kind: 'lock', heroId, results, success: true };
@@ -840,6 +845,7 @@ function openChest(game: GameState, playerId: string, heroId: string, focusUsed:
   // 運のスロット → 成功数で確率が上の格へずれる → 格を1回だけ抽選（spec §10.3）
   const results = rollWithFocus(slots, focusUsed, statChance(h, 'luk', 'luck'), rng);
   const n = successes(results);
+  recordCheck(h, 'luk', results, 1);
   const oddsBefore = chestOdds(c.spec.rarity, 0);
   const odds = chestOdds(c.spec.rarity, n);
   const grade = rollGrade(odds, rng);
@@ -971,6 +977,7 @@ function chooseEvent(
     if (opt.costItem) by.pouch.splice(by.pouch.findIndex((i) => i.itemId === opt.costItem), 1);
     actor ??= by;
   }
+  if (opt.check && actor && results) recordCheck(actor, opt.check.stat, results, opt.check.need, opt.check.purpose);
   const outs = ok ? opt.success : (opt.fail ?? []);
   const loot = applyOutcomes(game, outs, actor, rng);
   ev.result = { optionIndex, heroId: actor?.id, results, success: ok, text: ok ? opt.successText : (opt.failText ?? ''), loot };

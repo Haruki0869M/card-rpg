@@ -15,7 +15,7 @@ import { HubScreen } from './components/screens/HubScreen';
 import { RewardScreen } from './components/screens/RewardScreen';
 import { ChestScreen } from './components/screens/ChestScreen';
 import { WorldScreen } from './components/world/WorldScreen';
-import { EncounterScreen, EndingScreen, ShrineScreen, TownScreen } from './components/world/Places';
+import { EncounterScreen, EndingScreen, SanctuaryScreen, ShrineScreen, TownScreen } from './components/world/Places';
 import { EventScreen, RestScreen } from './components/screens/RoomScreens';
 import { SetupScreen } from './components/screens/SetupScreen';
 import { JoinScreen, LobbyScreen, OnlineOverlay } from './components/screens/OnlineScreens';
@@ -108,6 +108,8 @@ function CurrentScreen() {
       return <EncounterScreen />;
     case 'town':
       return <TownScreen />;
+    case 'sanctuary':
+      return <SanctuaryScreen />;
     case 'shrine':
       return <ShrineScreen />;
     case 'ending':

@@ -47,7 +47,7 @@ export const mapEvents: EventDef[] = [
     options: [
       {
         label: '荷物を探る',
-        check: { stat: 'dex', slots: 3, need: 2 },
+        check: { stat: 'dex', slots: 3, need: 2, purpose: 'mechanism' },
         success: [{ kind: 'item', rarity: 'rare', slot: 'equipment' }],
         fail: [{ kind: 'status', status: 'poison', amount: 3 }],
         successText: '良い装備が残されていた！',

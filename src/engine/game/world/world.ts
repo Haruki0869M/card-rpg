@@ -6,7 +6,7 @@ import { DUNGEONS } from '../../../data/dungeons';
 import { EVENTS } from '../../../data/events';
 import { getScenario } from '../../../data/scenarios';
 import { getDifficulty } from '../../../data/rules';
-import { QUESTS, TERRAINS, TOWNS } from '../../../data/world';
+import { QUESTS, SANCTUARIES, TERRAINS, TOWNS } from '../../../data/world';
 import type { EncounterState, Expedition, GameCommand, GameState, Hero, QuestState, WorldState } from '../../../types';
 import type { Rng } from '../../rng';
 import { addPetLove, petExplore } from '../pets';
@@ -577,6 +577,15 @@ export function interact(game: GameState, cmd: Cmd<'WORLD_INTERACT'>, rng: Rng):
   if (f.used && f.kind !== 'town' && f.kind !== 'dungeon') return 'もう調べました';
   const here = heroesAt(game, tile).map((x) => x.id);
   switch (f.kind) {
+    case 'temple':
+    case 'altar': {
+      const def = SANCTUARIES.tryGet(f.id);
+      if (!def || def.kind !== f.kind) return 'この施設には入れません';
+      game.party = here;
+      game.sanctuary = { sanctuaryId: f.id, tile, heroId: h.id };
+      game.mode = 'sanctuary';
+      return undefined;
+    }
     case 'town':
       if (w.fallenTowns.includes(f.id)) return 'この町は陥落している…';
       game.town = { townId: f.id, heroId: h.id };
@@ -703,6 +712,6 @@ export function sceneBackground(game: GameState): string {
   if (game.battleBackground && game.mode === 'battle') return game.battleBackground;
   const w = game.world;
   if (!w) return 'plains';
-  const tile = game.chest?.tile ?? game.event?.tile ?? game.shrine?.tile ?? game.encounter?.tile ?? w.pos[w.turn];
+  const tile = game.chest?.tile ?? game.event?.tile ?? game.shrine?.tile ?? game.sanctuary?.tile ?? game.encounter?.tile ?? w.pos[w.turn];
   return tile !== undefined ? TERRAINS.get(w.tiles[tile].t).background : 'plains';
 }

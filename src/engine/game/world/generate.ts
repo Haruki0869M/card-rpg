@@ -11,6 +11,7 @@ import { pickWeighted } from '../loot';
 import { hexDistance, idxOf, neighbors, rowOf } from './hex';
 import { revealAround } from './fog';
 import { spawnWanderer } from './wanderers';
+import { addSanctuaries } from './sanctuaries';
 
 const pick = <T,>(list: readonly T[], rng: Rng) => list[rng.int(list.length)];
 
@@ -129,6 +130,7 @@ export function createWorld(game: GameState, rng: Rng): WorldState {
   // スタートの地域は冒頭の物語で紹介済み
   w.visitedRegions.push(tiles[start].r);
   revealAround(game, w);
+  addSanctuaries(game, w);
   return w;
 }
 

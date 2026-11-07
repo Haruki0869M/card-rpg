@@ -11,7 +11,7 @@ import { rarityIndex } from '../dungeon';
 import { pickCard } from '../cardTags';
 import { clampHero, heroFocusMax, heroMaxHp, jobWeapons } from '../hero';
 import { findHero } from '../heroes';
-import { heroCardPool } from '../jobs';
+import { addFeat, heroCardPool } from '../jobs';
 import { cardRewardOdds, newItem, pickWeighted } from '../loot';
 import { applyOutcome, makeOutcomeCtx } from '../outcomes';
 import { objectiveHandler } from './objectives';
@@ -219,6 +219,7 @@ export function shrineChoose(game: GameState, cmd: Cmd<'SHRINE_CHOOSE'>, rng: Rn
   for (const x of game.heroes) clampHero(x);
   game.world.tiles[s.tile].f!.used = true;
   s.result = { optionIndex: cmd.optionIndex, text: `${h.name}は「${opt.label}」を受けた` };
+  addFeat(h, 'prayers');
   addLog(game, s.result.text);
   return undefined;
 }
@@ -227,6 +228,14 @@ export function leaveShrine(game: GameState, cmd: Cmd<'LEAVE_SHRINE'>, rng: Rng)
   if (game.mode !== 'shrine' || !game.shrine) return '祠にいません';
   if (!ownedBy(findHero(game, game.shrine.heroId), cmd.playerId)) return '祠に来たキャラの担当の人が操作します';
   game.shrine = undefined;
+  backToWorld(game, rng, false);
+  return undefined;
+}
+
+export function leaveSanctuary(game: GameState, cmd: Cmd<'LEAVE_SANCTUARY'>, rng: Rng): string | undefined {
+  if (game.mode !== 'sanctuary' || !game.sanctuary) return '神殿・祭壇にいません';
+  if (!ownedBy(findHero(game, game.sanctuary.heroId), cmd.playerId)) return '施設に来たキャラの担当の人が操作します';
+  game.sanctuary = undefined;
   backToWorld(game, rng, false);
   return undefined;
 }

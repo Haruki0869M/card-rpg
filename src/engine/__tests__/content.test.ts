@@ -13,7 +13,7 @@ import { ITEMS } from '../../data/items';
 import { DIFFICULTIES, ROOM_TYPES, WEAPON_TYPES } from '../../data/rules';
 import { SCENARIOS } from '../../data/scenarios';
 import { STATUSES } from '../../data/statuses';
-import { QUESTS, SHRINES, TERRAINS, TOWNS } from '../../data/world';
+import { QUESTS, SANCTUARIES, SHRINES, TERRAINS, TOWNS } from '../../data/world';
 import type { AbilityDef, Effect, EventOutcome, GameState } from '../../types';
 import {
   conditionHandler,
@@ -146,7 +146,7 @@ describe('コンテンツの検査', () => {
       }
       expect(TERRAINS.has(m.roadTerrain)).toBe(true);
       for (const f of m.features) {
-        const reg = { town: TOWNS, dungeon: DUNGEONS, shrine: SHRINES, event: EVENTS, landmark: EVENTS, chest: undefined }[f.kind];
+        const reg = { town: TOWNS, dungeon: DUNGEONS, shrine: SHRINES, temple: SANCTUARIES, altar: SANCTUARIES, event: EVENTS, landmark: EVENTS, chest: undefined }[f.kind];
         if (reg) expect(reg.has(f.id), `${sc.id} feature ${f.kind}:${f.id}`).toBe(true);
         expect(f.at[0] < m.width && f.at[1] < m.height, `${f.id} は地図の中`).toBe(true);
       }

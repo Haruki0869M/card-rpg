@@ -1,5 +1,5 @@
 // ===== 冒険（ゲーム全体）の型 =====
-import type { EncounterState, ScenarioMapDef, ScenarioStory, ShrineVisit, TownVisit, WorldState } from './world';
+import type { EncounterState, ScenarioMapDef, ScenarioStory, ShrineVisit, SanctuaryVisit, TownVisit, WorldState } from './world';
 import type {
   AbilityDef,
   BattleState,
@@ -258,6 +258,8 @@ export interface ChestRoll {
 }
 
 export interface EventCheck {
+  /** 実績を数える用途。能力ボーナスのtagとは分ける。 */
+  purpose?: 'mechanism';
   stat: StatId;
   slots: number;
   /** 成功に必要な成功数 */
@@ -370,7 +372,7 @@ export interface LootClaim {
   winner?: string;
 }
 
-export type GameMode = 'hub' | 'world' | 'encounter' | 'town' | 'shrine' | 'dungeon' | 'battle' | 'reward' | 'chest' | 'event' | 'rest' | 'gameover' | 'cleared' | 'ending';
+export type GameMode = 'hub' | 'world' | 'encounter' | 'town' | 'shrine' | 'sanctuary' | 'dungeon' | 'battle' | 'reward' | 'chest' | 'event' | 'rest' | 'gameover' | 'cleared' | 'ending';
 
 export interface AdventureStats {
   battlesWon: number;
@@ -460,6 +462,7 @@ export interface GameState {
   encounter?: EncounterState;
   town?: TownVisit;
   shrine?: ShrineVisit;
+  sanctuary?: SanctuaryVisit;
   /** オンライン協力の冒険（戦闘で全員の準備完了を待つ） */
   online?: boolean;
   /** 世界マップと別に進んでいる場面（ダンジョンに入ったキャラたち。M3-C） */
@@ -561,6 +564,7 @@ export type GameCommand =
   | { type: 'LEAVE_TOWN'; playerId: PlayerId }
   | { type: 'SHRINE_CHOOSE'; playerId: PlayerId; optionIndex: number; heroId: string }
   | { type: 'LEAVE_SHRINE'; playerId: PlayerId }
+  | { type: 'LEAVE_SANCTUARY'; playerId: PlayerId }
   /** 世界マップと別に進んでいる場面（ダンジョン）の中の操作 */
   | { type: 'SCENE'; scene: string; command: GameCommand }
   /** ダンジョンのパーティの手番: 探索力の判定（素早さ）/ 手番を終える */

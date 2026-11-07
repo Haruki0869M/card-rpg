@@ -284,6 +284,8 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
       }
       return send(g, { type: 'LEAVE_TOWN', playerId: pid(g, t.heroId) }, log);
     }
+    case 'sanctuary':
+      return send(g, { type: 'LEAVE_SANCTUARY', playerId: pid(g, g.sanctuary!.heroId) }, log);
     case 'shrine': {
       const s = g.shrine!;
       if (s.result) return send(g, { type: 'LEAVE_SHRINE', playerId: pid(g) }, log);

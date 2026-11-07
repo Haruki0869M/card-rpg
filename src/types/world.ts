@@ -49,7 +49,24 @@ export interface FixedFeature {
   at: [col: number, row: number];
 }
 
-export type FeatureKind = 'town' | 'dungeon' | 'shrine' | 'event' | 'chest' | 'landmark';
+export type FeatureKind = 'town' | 'dungeon' | 'shrine' | 'event' | 'chest' | 'landmark' | 'temple' | 'altar';
+
+/** 転職の施設。祭壇の対応先は職の altar と照合する印で指定する。 */
+export interface SanctuaryDef {
+  id: string;
+  kind: 'temple' | 'altar';
+  name: string;
+  text: string;
+  altar?: string;
+  /** 地図の下から上への進行度（0〜1）。近い通り道の空きマスへ置く。 */
+  progress: number;
+}
+
+export interface SanctuaryVisit {
+  sanctuaryId: string;
+  tile: number;
+  heroId: string;
+}
 
 /** 侵食度の段階（spec §8.7） */
 export interface CorruptionStage {

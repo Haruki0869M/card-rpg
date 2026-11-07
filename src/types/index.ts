@@ -197,6 +197,8 @@ export interface ClassDef {
   from?: string[];
   /** 転職の条件（その冒険の中で達成する。feat はキャラの記録のキー） */
   requires?: { feat: string; count: number; text: string };
+  /** この特殊職へ転職できる祭壇の印（施設のデータと照合する）。 */
+  altar?: string;
   /** 転職した時に山札へ加わるカード（1回きりの決め技など） */
   jobCards?: string[];
   /** 転職した時に3枚から1枚選べる、そのジョブを象徴する専用カード（残りは報酬に出る） */
@@ -298,6 +300,8 @@ export interface PartyMemberSpec {
   pet?: { petId: string; color: string; name: string; love: number };
   /** 武器に宿った属性（属性の無い物理攻撃がこの属性になる） */
   weaponElement?: string;
+  /** 装備中の武器種（撃破実績にも使う）。 */
+  equippedWeaponType?: string;
 }
 
 // ---------- 敵 ----------
@@ -432,6 +436,8 @@ export interface AllyState {
   pet?: { petId: string; color: string; name: string; love: number };
   /** 武器に宿った属性 */
   weaponElement?: string;
+  /** 装備中の武器種（撃破実績用）。 */
+  equippedWeaponType?: string;
   /** 戦闘内で一意のID（a0, a1, ...）。同じ職業が複数いても区別できる */
   id: string;
   classId: string;

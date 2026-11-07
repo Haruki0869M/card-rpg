@@ -8,7 +8,7 @@ import { cardOf, getCard } from '../../data/cards';
 import { getEnemy } from '../../data/enemies';
 import { getItem } from '../../data/items';
 import { getScenario } from '../../data/scenarios';
-import { QUESTS, SHRINES, TOWNS } from '../../data/world';
+import { QUESTS, SANCTUARIES, SHRINES, TOWNS } from '../../data/world';
 import { canChangeNow } from '../JobSheet';
 import { PetAwards } from '../ui/PetToken';
 import {
@@ -432,6 +432,30 @@ export function TownScreen() {
           onCancel={() => setConfirmRemove(null)}
         />
       )}
+    </Screen>
+  );
+}
+
+// ---------- 神殿・祭壇 ----------
+
+export function SanctuaryScreen() {
+  const game = useBattle(s => s.game)!;
+  const dispatchGame = useBattle(s => s.dispatchGame);
+  const openSheet = useBattle(s => s.openSheet);
+  const visit = game.sanctuary!;
+  const def = SANCTUARIES.get(visit.sanctuaryId);
+  return (
+    <Screen>
+      <WorldTopBar game={game} />
+      <div data-sanctuary={def.kind} className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+        <h1 className="font-display text-[24px] text-amber-100">{def.name}</h1>
+        <p className="panel mt-3 rounded-xl p-3 text-[15px] leading-6">{def.text}</p>
+        <p className="mt-3 text-[14px] leading-6">{def.kind === 'temple' ? '中位Lv3と条件を満たすと特殊職、中位Lv4と条件を満たすと最上位職へ進めます。' : '中位Lv3と条件を満たすと、この祭壇に対応する特殊職へ進めます。'}</p>
+        <button onClick={() => openSheet('jobs')} className="btn btn-gold mt-4 min-h-12 w-full rounded-xl px-3 text-[15px] font-bold">転職先を見る</button>
+      </div>
+      <div className="shrink-0 px-3 pb-3">
+        <button disabled={!isLocalPlayer(game.heroes.find(h => h.id === visit.heroId)!.playerId)} onClick={() => dispatchGame({ type: 'LEAVE_SANCTUARY', playerId: first(game) })} className="btn btn-dark min-h-12 w-full rounded-xl text-[15px] font-bold">世界マップへ</button>
+      </div>
     </Screen>
   );
 }

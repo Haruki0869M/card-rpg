@@ -1,11 +1,12 @@
 // ===== 転職（spec §6.4） =====
 // 段は 基本 → 中位 → 最上位。中位からは、条件を満たすと特殊ジョブ（脇道）にも転職できる。
 // 転職するとLv1に戻る。成長ボーナス・山札・装備は引き継ぎ、前のジョブの戦闘の特殊能力を1つ持ち越す。
-// 転職できる場所は段で分かれる: 基本→中位 = 世界マップ・町・休憩部屋など（戦闘・探索中以外） / 中位→最上位・特殊 = 町の聖堂・神殿など
+// 基本→中位 = 戦闘・探索中以外 / 中位→最上位 = 町の聖堂・祠・神殿 / 中位→特殊 = 神殿・対応する祭壇
 import { BALANCE } from '../../data/balance';
 import { CARDS } from '../../data/cards';
 import { CLASSES, getClass } from '../../data/classes';
 import { getItem } from '../../data/items';
+import { SANCTUARIES } from '../../data/world';
 import type { ClassDef, GameState, Hero } from '../../types';
 import { addLog } from './common';
 import { clampHero, expToNext, heroMaxHp, jobWeapons } from './hero';
@@ -32,7 +33,7 @@ export const featOf = (hero: Pick<Hero, 'feats'>, key: string) => hero.feats?.[k
  * キャラが今いる所（転職できるかの判定用）。
  * map 世界マップ / town 町 / shrine 祠 / rest 休憩部屋 / hub 拠点 / busy 戦闘・探索・遭遇の途中
  */
-export type HeroPlace = 'map' | 'town' | 'shrine' | 'rest' | 'hub' | 'busy';
+export type HeroPlace = 'map' | 'town' | 'shrine' | 'temple' | 'altar' | 'rest' | 'hub' | 'busy';
 
 export function heroPlace(game: GameState, hero: Hero): HeroPlace {
   const scene = sceneOfHero(game, hero.id);
@@ -43,6 +44,12 @@ export function heroPlace(game: GameState, hero: Hero): HeroPlace {
   }
   if (game.activeScene && game.activeScene !== WORLD_SCENE) return 'busy';
   switch (game.mode) {
+    case 'sanctuary': {
+      const s = game.sanctuary, w = game.world;
+      if (!s || !w || w.pos[hero.id] !== s.tile || !(game.party ?? []).includes(hero.id)) return 'map';
+      const def = SANCTUARIES.tryGet(s.sanctuaryId), feature = w.tiles[s.tile]?.f;
+      return def && feature?.id === def.id && feature.kind === def.kind ? def.kind : 'busy';
+    }
     case 'town':
       return game.town?.heroId === hero.id ? 'town' : 'map';
     case 'shrine':
@@ -65,13 +72,22 @@ export function heroPlace(game: GameState, hero: Hero): HeroPlace {
   }
 }
 
-/** 中位→最上位・特殊の転職ができる「聖なる場所」（町の聖堂・祠・拠点。神殿と祭壇は J3d で足す） */
-const SACRED: HeroPlace[] = ['town', 'shrine', 'hub'];
+/** 中位→最上位の転職場所。特殊職は神殿か対応する祭壇のみ。 */
+const SACRED: HeroPlace[] = ['town', 'shrine', 'temple'];
 /** 基本→中位の転職ができる場所 */
-const ANYWHERE: HeroPlace[] = ['map', 'town', 'shrine', 'rest', 'hub'];
+const ANYWHERE: HeroPlace[] = ['map', 'town', 'shrine', 'temple', 'altar', 'rest', 'hub'];
 
 /** そのジョブへ転職できる場所の説明 */
-export const jobPlaceText = (job: ClassDef) => (job.tier === 'mid' ? '世界マップ・町・休憩部屋' : '町の聖堂・祠');
+export const jobPlaceText = (job: ClassDef) => job.tier === 'mid' ? '世界マップ・町・休憩部屋' : job.tier === 'special' ? '神殿・この職の祭壇' : '町の聖堂・祠・神殿';
+
+export function jobPlaceAllows(game: GameState, hero: Hero, job: ClassDef): boolean {
+  const place = heroPlace(game, hero);
+  if (job.tier === 'mid') return ANYWHERE.includes(place);
+  if (job.tier !== 'special') return SACRED.includes(place);
+  if (place === 'temple') return true;
+  const def = game.sanctuary && SANCTUARIES.tryGet(game.sanctuary.sanctuaryId);
+  return place === 'altar' && !!job.altar && !!def && def.altar === job.altar;
+}
 
 export interface JobOption {
   progress?: number;
@@ -86,15 +102,14 @@ export interface JobOption {
 
 /** 今のジョブから転職できるジョブ（できるかどうかと、できない理由つき）。game を渡すと場所も確かめる */
 export function jobOptions(hero: Hero, game?: GameState): JobOption[] {
-  const place = game ? heroPlace(game, hero) : undefined;
   return CLASSES.all
-    .filter((c) => c.from?.includes(hero.classId))
+    .filter((c) => getClass(hero.classId).tier !== 'special' && c.from?.includes(hero.classId))
     .map((job) => {
       const lv = jobChangeLevel(job);
       if (hero.level < lv) return { job, ready: false, qualified: false, reason: `Lv${lv}で転職できる` };
       const r = job.requires;
       if (r && featOf(hero, r.feat) < r.count) return { job, ready: false, qualified: false, reason: `条件: ${r.text}（${featOf(hero, r.feat)}/${r.count}）` };
-      if (place && !(job.tier === 'mid' ? ANYWHERE : SACRED).includes(place)) return { job, ready: false, qualified: true, reason: `${jobPlaceText(job)}で転職できる` };
+      if (game && !jobPlaceAllows(game, hero, job)) return { job, ready: false, qualified: true, reason: `${jobPlaceText(job)}で転職できる` };
       return { job, ready: true, qualified: true };
     }).map(o => ({ ...o, progress: o.job.requires ? featOf(hero, o.job.requires.feat) : undefined }));
 }
