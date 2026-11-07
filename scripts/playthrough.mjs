@@ -24,11 +24,19 @@ async function playToWin(page, tag) {
   for (let turn = 0; turn < 40; turn++) {
     let r = await resultText(page);
     if (r) return r;
-    await page.waitForSelector('button:has-text("ターン終了"):not([disabled])', { timeout: 15000 });
+    try {
+      await page.waitForSelector('button:has-text("ターン終了"):not([disabled])', { timeout: 15000 });
+    } catch (e) {
+      // 止まった時の画面を残す（原因を調べるため）
+      await page.screenshot({ path: `screenshots/play-timeout-${tag}.png` });
+      throw e;
+    }
     for (let guard = 0; guard < 40; guard++) {
       if ((r = await resultText(page))) return r;
       const allies = page.locator('[data-ally]:not([data-done]):not([data-dead])');
       if ((await allies.count()) === 0) break;
+      // 選んだままのカード（大きく浮いて味方の枠に重なる）を取り消してから
+      await page.keyboard.press('Escape');
       await allies.first().click();
       const cards = page.locator('[data-card-index][data-usable]');
       if ((await cards.count()) === 0) break;

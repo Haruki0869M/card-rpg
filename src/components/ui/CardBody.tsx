@@ -2,7 +2,7 @@
 // 構成: 枠（レア度の金属）→ 絵の枠（種類・属性の色の光と大きなアイコン。描いた絵があれば差し替え）
 //       → 名前の帯 → 成功率 → 成功数ごとの効果
 // 描いた絵は src/assets/art/card/<カードID>.webp に置くと使われる
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Star } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { artImage } from '../../art';
 import { getElement } from '../../data/elements';
@@ -94,6 +94,7 @@ export function CardBody({
   focus,
   selected,
   dim,
+  compact,
   children,
 }: {
   card: CardDef;
@@ -105,13 +106,16 @@ export function CardBody({
   selected?: boolean;
   /** 使えない時は暗く */
   dim?: boolean;
+  /** 手札の通常時: 段階ごとの一覧を隠し、完全成功の数値だけを出す（タップで大きなカードに詳細） */
+  compact?: boolean;
   /** 上に重ねる物（使えない理由の表示など） */
   children?: ReactNode;
 }) {
   const cat = CATEGORY_STYLE[card.category];
   const rarity = card.rarity ?? 'common';
   const metal = CARD_METAL[rarity];
-  const artH = Math.round(height * 0.33);
+  const artH = Math.round(height * (compact ? 0.42 : 0.27));
+  const best = card.tiers[card.tiers.length - 1];
   const strong = rarity === 'epic' || rarity === 'legend';
   return (
     <div
@@ -137,7 +141,10 @@ export function CardBody({
           className="relative -mt-[13px] flex min-h-[26px] shrink-0 items-center justify-center px-[3px] text-center"
           style={{ background: `linear-gradient(90deg, transparent, rgba(8,6,12,.92) 12%, rgba(8,6,12,.92) 88%, transparent)`, borderTop: `1px solid ${cat.glow}88`, borderBottom: `1px solid ${cat.glow}88` }}
         >
-          <span className="font-display line-clamp-2 text-[12.5px] leading-[13px] text-amber-50">{card.name}</span>
+          {/* 長い名前は2行に。行の長さをそろえて、変な所で切れないように */}
+          <span className="font-display line-clamp-2 text-[12.5px] leading-[13px] text-amber-50" style={{ textWrap: 'balance' }}>
+            {card.name}
+          </span>
           {card.trait && <Sparkles size={11} className="absolute top-[-6px] right-[2px]" style={{ color: metal.edge, filter: `drop-shadow(0 0 3px ${metal.edge})` }} />}
         </div>
         <div className="flex shrink-0 items-center justify-between px-[4px] pt-[1px]">
@@ -149,6 +156,17 @@ export function CardBody({
             <span className="text-[12px] font-bold text-amber-200/80">%</span>
           </span>
         </div>
+        {compact ? (
+          // 完全成功の時の数値（一番強い段階）
+          <div className="mx-[3px] mt-auto mb-[3px] flex items-center justify-center gap-1 rounded-md bg-amber-400/15 px-0.5 py-[1px] text-[12px] leading-[16px] font-bold" data-best>
+            <Star size={11} className="shrink-0 fill-amber-300 text-amber-300" />
+            <span className="flex min-w-0 flex-wrap justify-center gap-x-1">
+              {best.effects.map((e, j) => (
+                <EffectChip key={j} e={e} />
+              ))}
+            </span>
+          </div>
+        ) : (
         <div className="flex min-h-0 flex-col gap-[1px] px-[2px] pb-[2px]">
           {card.tiers.map((t, i) => {
             const perfect = t.minSuccesses === card.slots;
@@ -163,7 +181,14 @@ export function CardBody({
               </div>
             );
           })}
+          {card.trait && (
+            <div className="mt-0.5 rounded-sm bg-black/40 px-1 text-[12px] leading-[15px]" style={{ color: metal.edge }}>
+              <Sparkles size={10} className="mr-0.5 inline" />
+              {card.trait.name}
+            </div>
+          )}
         </div>
+        )}
         {children}
       </div>
     </div>

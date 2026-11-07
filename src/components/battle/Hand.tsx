@@ -6,10 +6,13 @@ import { cardOf } from '../../data/cards';
 import { chanceFor, findAlly, unusableReason } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
 import { usePress } from '../../hooks/usePress';
+import { useTallScreen } from '../../hooks/useTallScreen';
 import { useBattle } from '../../store/battleStore';
 import { CardBody } from '../ui/CardBody';
 
-export const CARD_H = 160;
+export const CARD_H = 128;
+/** 選んだカード（大きく浮き上がって、段階ごとの効果まで見せる） */
+const BIG_H = 172;
 const MIN_STEP = 46; // 重なっても指で押せる幅（44px以上）
 
 interface Pos {
@@ -31,6 +34,8 @@ const CardView = memo(function CardView({
   selected,
   focus,
   reason,
+  containerW,
+  tall,
 }: {
   uid: string;
   cardId: string;
@@ -43,12 +48,21 @@ const CardView = memo(function CardView({
   selected: boolean;
   focus: number;
   reason: string | null;
+  containerW: number;
+  /** 画面が高い時だけ、選んだカードを大きく浮かせる（低い画面では敵が隠れないように少し上げるだけ） */
+  tall: boolean;
 }) {
   const card = cardOf({ cardId, upgraded });
   const flash = useBattle((s) => (s.flash?.cardUid === uid ? s.flash : null));
   const tapCard = useBattle((s) => s.tapCard);
   const press = usePress(() => tapCard(uid), () => ({ type: 'card', cardId: card.id, upgraded, allyId, focus }));
   const [showFlash, setShowFlash] = useState(false);
+  // 選んだカードは、ひと回り大きく手前に浮き上がる（画面の外にはみ出さないように左右を寄せる）
+  const big = selected && tall;
+  const w = big ? Math.min(Math.round(width * 1.5), 150) : width;
+  const h = big ? BIG_H : CARD_H;
+  const x = big ? Math.max(2, Math.min(containerW - w - 2, pos.left + width / 2 - w / 2)) : pos.left;
+  const y = big ? CARD_H - BIG_H - 10 : selected ? pos.top - 14 : pos.top;
 
   useEffect(() => {
     if (!flash) return;
@@ -65,17 +79,19 @@ const CardView = memo(function CardView({
       data-usable={!reason || undefined}
       className="absolute top-0 left-0"
       style={{
-        width,
-        height: CARD_H,
-        zIndex: pos.z,
+        width: w,
+        height: h,
+        zIndex: selected ? 100 : pos.z,
         // 位置は CSS の transform + transition で動かす（軽く、確実に最新の位置へ移動する）
-        transform: `translate3d(${pos.left}px, ${pos.top + (selected ? -20 : 0)}px, 0) rotate(${selected ? 0 : pos.rotate}deg) scale(${selected ? 1.05 : 1})`,
-        transition: 'transform 110ms ease-out',
+        transform: `translate3d(${x}px, ${y}px, 0) rotate(${selected ? 0 : pos.rotate}deg)`,
+        transformOrigin: '50% 100%',
+        // 選んだカードはその場で大きくなる（移動のアニメーションは浮き上がりの演出に任せる）
+        transition: selected ? 'none' : 'transform 120ms ease-out',
         willChange: 'transform',
       }}
     >
-    <div className="card-enter relative h-full w-full transition-[filter] duration-100 active:scale-[.95]">
-      <CardBody card={card} chance={chance} width={width} height={CARD_H} focus={focus} selected={selected} dim={!!reason}>
+    <div className={`relative h-full w-full transition-[filter] duration-100 active:scale-[.96] ${selected ? 'card-pop' : 'card-enter'}`}>
+      <CardBody card={card} chance={chance} width={w} height={h} focus={focus} selected={selected} dim={!!reason} compact={!big}>
         <AnimatePresence>
           {showFlash && flash && (
             <motion.div
@@ -95,23 +111,24 @@ const CardView = memo(function CardView({
   );
 });
 
-/** 手札のレイアウト計算（重ならずに並ぶ幅を優先。押せる幅が足りなければ2段にする） */
+/** 手札のレイアウト計算: 少し重ねてゆるい扇形に並べる。押せる幅が足りなければ2段にする */
 function layout(n: number, W: number) {
-  const GAP = 3;
-  const cardW = Math.max(68, Math.min(98, Math.floor((W - GAP * (n - 1)) / Math.max(n, 1))));
-  const oneRowStep = n > 1 ? Math.min(cardW + GAP, (W - cardW) / (n - 1)) : 0;
+  const cardW = Math.max(76, Math.min(94, Math.floor(W / Math.max(n, 1) + 12)));
+  // 傾けると外側の角がはみ出すので、左右に余白をとる
+  const PAD = 12;
+  const fanStep = (m: number) => (m > 1 ? Math.min(cardW * 0.86, (W - PAD * 2 - cardW) / (m - 1)) : 0);
   const rows: number[][] = [];
-  if (n <= 1 || oneRowStep >= MIN_STEP) rows.push([...Array(n).keys()]);
+  if (n <= 1 || fanStep(n) >= MIN_STEP) rows.push([...Array(n).keys()]);
   else {
     const first = Math.ceil(n / 2);
     rows.push([...Array(first).keys()]);
     rows.push([...Array(n - first).keys()].map((i) => i + first));
   }
-  const rowOffset = 64;
+  const rowOffset = 58;
   const positions: Pos[] = [];
   rows.forEach((row, r) => {
     const m = row.length;
-    const step = m > 1 ? Math.min(cardW + GAP, (W - cardW) / (m - 1)) : 0;
+    const step = fanStep(m);
     const total = cardW + step * (m - 1);
     const startX = (W - total) / 2;
     row.forEach((cardIdx, i) => {
@@ -119,13 +136,14 @@ function layout(n: number, W: number) {
       const off = m > 1 ? (i - center) / Math.max(center, 1) : 0;
       positions[cardIdx] = {
         left: startX + step * i,
-        top: r * rowOffset + 10 + Math.abs(off) * 5,
-        rotate: off * (step > cardW ? 1.5 : 3),
+        // 扇形: 外側ほど下がって、外へ傾く
+        top: r * rowOffset + 6 + off * off * 12,
+        rotate: off * 6,
         z: r * 20 + i + 1,
       };
     });
   });
-  return { cardW, positions, height: CARD_H + (rows.length - 1) * rowOffset + 14 };
+  return { cardW, positions, height: CARD_H + (rows.length - 1) * rowOffset + 20 };
 }
 
 export function Hand() {
@@ -135,6 +153,7 @@ export function Hand() {
   const ally = findAlly(battle, activeId);
   const [ref, size] = useElementSize<HTMLDivElement>();
   const W = size.width || 340;
+  const tall = useTallScreen();
 
   const hand = ally && !ally.dead && battle.phase !== 'victory' && battle.phase !== 'defeat' ? ally.hand : [];
   const { cardW, positions, height } = useMemo(() => layout(hand.length, W), [hand.length, W]);
@@ -161,6 +180,8 @@ export function Hand() {
               selected={selection?.cardUid === c.uid}
               focus={selection?.cardUid === c.uid ? selection.focus : 0}
               reason={unusableReason(battle, ally, cardOf(c))}
+              containerW={W}
+              tall={tall}
             />
           ))}
     </div>

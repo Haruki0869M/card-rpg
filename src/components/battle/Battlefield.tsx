@@ -49,7 +49,7 @@ function TargetFace({ allyId }: { allyId?: string }) {
   const ally = useBattle((s) => (allyId ? findAlly(s.battle, allyId) : undefined));
   if (!ally) return null;
   return (
-    <span className="inline-block h-[18px] w-[18px] overflow-hidden rounded-full border border-amber-200/80 bg-[#1d2440]">
+    <span className="inline-block h-[22px] w-[22px] overflow-hidden rounded-full border-2 bg-[#1d2440] shadow-[0_0_6px_rgba(255,80,80,.8)]" style={{ borderColor: '#ff6a6a' }} data-intent-target={ally.id}>
       <CharacterArt classId={ally.classId} gender={ally.gender} face className="h-full w-full" />
     </span>
   );
@@ -108,7 +108,7 @@ function IntentBubble({ enemy, onTap }: { enemy: EnemyState; onTap: () => void }
   const press = usePress(onTap, { type: 'intent', uid: enemy.uid });
   const view = intentView(battle, enemy);
   return (
-    <div {...press} className="flex h-[30px] items-end justify-center">
+    <div {...press} className="flex min-h-[24px] items-center justify-center">
       {view && (
         <motion.div
           key={retargetKey}
@@ -120,7 +120,6 @@ function IntentBubble({ enemy, onTap }: { enemy: EnemyState; onTap: () => void }
           {view.parts.map((p, i) => (
             <IntentPartView key={i} p={p} />
           ))}
-          <span className="absolute -bottom-[5px] left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-r border-b border-red-300/50 bg-[#1c0a10]" />
         </motion.div>
       )}
     </div>
@@ -178,7 +177,6 @@ const EnemyUnit = memo(function EnemyUnit({
       data-dead={enemy.dead || undefined}
       data-hp={enemy.hp}
     >
-      <IntentBubble enemy={enemy} onTap={onTap} />
       <div className="relative flex w-full justify-center" style={{ height: spriteH }}>
         {(isTarget || waiting) && (
           <div
@@ -213,6 +211,8 @@ const EnemyUnit = memo(function EnemyUnit({
             <span className="text-amber-300">Lv{enemy.level}</span> {enemyName(enemy)}
           </div>
           <HpBar hp={enemy.hp} max={enemy.maxHp} block={enemy.block} tone="enemy" height={12} />
+          {/* 次の行動の予告（HPのすぐ下。誰を狙っているかの顔つき） */}
+          <IntentBubble enemy={enemy} onTap={onTap} />
           <AimMarks battle={battle} enemyUid={enemy.uid} />
           <StatusChips s={enemy.statuses} side="enemy" onTap={onTap} tauntedBy={enemy.tauntedBy} />
         </div>
@@ -249,6 +249,9 @@ const AllySprite = memo(function AllySprite({ ally, left, bottom, h, active }: {
   const press = usePress(() => setActive(ally.id), { type: 'ally', id: ally.id });
   return (
     <div {...press} className="absolute" style={{ left: left - h * 0.4, bottom, width: h * 0.8, height: h }}>
+      {/* 足もとの影と陣形の円（敵と向き合う奥行き） */}
+      <div className="pointer-events-none absolute -bottom-[6px] left-1/2 h-[22px] w-[105%] -translate-x-1/2 rounded-[50%]" style={{ background: 'radial-gradient(closest-side, rgba(0,0,0,.75), rgba(0,0,0,.35) 60%, transparent)' }} />
+      <div className="pointer-events-none absolute -bottom-[4px] left-1/2 h-[16px] w-[88%] -translate-x-1/2 rounded-[50%] border border-sky-200/25" style={{ boxShadow: 'inset 0 0 8px rgba(140,190,255,.25)' }} />
       {active && (
         <div className="glow-pulse absolute -bottom-1 left-1/2 h-[16px] w-[90%] -translate-x-1/2 rounded-[50%] border-2 border-amber-300 bg-amber-300/20" />
       )}
@@ -300,18 +303,19 @@ export function Battlefield() {
   // 敵: 上側 58%。味方: 下側。人数が増えたら小さくする
   const nE = enemies.length;
   const enemySlotW = W / nE;
-  const enemyTop = 2;
-  const enemyInfoH = 30 + 14 + 14 + 22; // 吹き出し + 名前 + HP + 状態異常
+  const enemyTop = 4;
+  const enemyInfoH = 14 + 14 + 26 + 18; // 名前 + HP + 行動の予告 + 状態異常
   const enemySpriteH = Math.max(40, Math.min(H * 0.58 - enemyInfoH, enemySlotW * 1.15));
   const nA = allies.length;
   const allyAreaW = nA <= 2 ? W * 0.62 : W;
   const allyH = Math.max(48, Math.min(H * 0.42, (allyAreaW / nA) * 1.25));
 
   return (
-    <div ref={ref} className="relative min-h-[190px] flex-1 overflow-hidden border-y border-amber-500/30">
+    <div ref={ref} className="relative min-h-[190px] flex-1 overflow-hidden">
       <BattleBackground kind={bgKind} className="absolute inset-0 h-full w-full" />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/45" />
       <Embers />
+      {W > 0 && phase === 'ally' && <TargetLines W={W} H={H} enemySlotW={enemySlotW} enemyTop={enemyTop} enemySpriteH={enemySpriteH} allyAreaW={allyAreaW} allyH={allyH} />}
       {W > 0 && (
         <>
           {enemies.map((e, i) => (
@@ -340,7 +344,45 @@ export function Battlefield() {
         <SlotOverlay />
       </div>
       <PhaseBanner />
+      {/* 上下の画面との境目: 影でなじませ、金の飾り線を引く */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-[#0d0b16] to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-[#0d0b16] via-[#0d0b16]/60 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-center">
+        <span className="h-px flex-1 bg-gradient-to-r from-transparent to-amber-400/60" />
+        <span className="mx-1 h-[7px] w-[7px] rotate-45 bg-amber-300 shadow-[0_0_6px_rgba(255,200,90,.9)]" />
+        <span className="h-px flex-1 bg-gradient-to-l from-transparent to-amber-400/60" />
+      </div>
     </div>
+  );
+}
+
+/** 敵が狙っている味方への赤い破線（味方のフェーズの間。どの敵が誰を狙っているかを一目で） */
+function TargetLines({ W, H, enemySlotW, enemyTop, enemySpriteH, allyAreaW, allyH }: { W: number; H: number; enemySlotW: number; enemyTop: number; enemySpriteH: number; allyAreaW: number; allyH: number }) {
+  const battle = useBattle((s) => s.battle);
+  const nA = battle.allies.length;
+  const lines: { x1: number; y1: number; x2: number; y2: number; key: string }[] = [];
+  battle.enemies.forEach((e, i) => {
+    if (e.dead || !e.intent?.targetId) return;
+    const view = intentView(battle, e);
+    if (!view?.parts.some((p) => p.kind === 'attack')) return;
+    const ai = battle.allies.findIndex((a) => a.id === e.intent!.targetId);
+    if (ai < 0) return;
+    const ax = (allyAreaW / nA) * (ai + 0.5) + (nA <= 2 ? W * 0.02 : 0);
+    const ay = H - 6 - allyH * 0.7;
+    lines.push({ key: e.uid, x1: enemySlotW * (i + 0.5), y1: enemyTop + enemySpriteH * 0.75, x2: ax, y2: ay });
+  });
+  if (!lines.length) return null;
+  return (
+    <svg className="pointer-events-none absolute inset-0 z-[5]" width={W} height={H} data-target-lines>
+      <defs>
+        <marker id="tl-arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+          <path d="M0 0 L10 5 L0 10 Z" fill="#ff5a5a" />
+        </marker>
+      </defs>
+      {lines.map((l) => (
+        <line key={l.key} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="#ff4a4a" strokeWidth={2} strokeDasharray="6 5" opacity={0.6} markerEnd="url(#tl-arrow)" className="target-dash" />
+      ))}
+    </svg>
   );
 }
 

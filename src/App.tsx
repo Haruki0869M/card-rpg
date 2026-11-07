@@ -4,6 +4,7 @@ import { BottomBar, TopBar } from './components/battle/Bars';
 import { Battlefield } from './components/battle/Battlefield';
 import { FocusPanel } from './components/battle/FocusPanel';
 import { Hand } from './components/battle/Hand';
+import { useTallScreen } from './hooks/useTallScreen';
 import { PartyStrip } from './components/battle/PartyStrip';
 import { DetailPopup } from './components/DetailPopup';
 import { ResultScreen } from './components/ResultScreen';
@@ -57,17 +58,27 @@ function useKeyboard() {
 function BattleScreen() {
   const selection = useBattle((s) => s.selection);
   const cancel = useBattle((s) => s.cancel);
+  const tall = useTallScreen();
+  const focus = (
+    <AnimatePresence>{selection && <FocusPanel key="focus" />}</AnimatePresence>
+  );
   return (
     <div className="game-bg safe-pad relative flex h-full w-full max-w-[480px] flex-col overflow-hidden" onClick={() => selection && cancel()}>
       <TopBar />
       <Battlefield />
-      <PartyStrip />
-      {/* フォーカス注入パネル: 手札のすぐ上に重ねて出す */}
-      <div className="relative z-40 h-0">
-        <div className="absolute inset-x-0 bottom-1">
-          <AnimatePresence>{selection && <FocusPanel key="focus" />}</AnimatePresence>
+      {/* フォーカス注入パネル: 高い画面では選んだカードが大きく浮き上がるので、その上（味方の枠の上）に出す。
+          低い画面では敵が隠れないように、手札のすぐ上（味方の枠に重ねる） */}
+      {tall && (
+        <div className="relative z-[120] h-0">
+          <div className="absolute inset-x-0 bottom-0">{focus}</div>
         </div>
-      </div>
+      )}
+      <PartyStrip />
+      {!tall && (
+        <div className="relative z-[120] h-0">
+          <div className="absolute inset-x-0 bottom-1">{focus}</div>
+        </div>
+      )}
       <Hand />
       <BottomBar />
       <ResultScreen />

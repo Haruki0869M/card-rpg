@@ -1,6 +1,6 @@
 // ===== キャラクター作成（職業・性別・名前） =====
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronDown, ChevronLeft, ChevronRight, Compass, Dices, Lock, Swords } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Compass, Dices, Lock, Swords } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { CharacterArt } from '../../art';
 import { getCard } from '../../data/cards';
@@ -24,6 +24,12 @@ export function CreateScreen() {
   const startGame = useBattle((s) => s.startGame);
   const toast = useBattle((s) => s.showToast);
   const [tab, setTab] = useState(0);
+  // 見て決めたキャラ（タブにチェック。まだ見ていないキャラには「未設定」）
+  const [seen, setSeen] = useState<Set<number>>(() => new Set([0]));
+  const openTab = (i: number) => {
+    setTab(i);
+    setSeen((x) => new Set(x).add(i));
+  };
   // オンライン協力の待合室から: 1人分だけ作って、その枠に入れる
   const editing = useOnline((s) => s.editingSlot);
   const claimSlot = useOnline((s) => s.claimSlot);
@@ -61,13 +67,21 @@ export function CreateScreen() {
           {draft.party.map((p, i) => (
             <button
               key={i}
-              onClick={() => setTab(i)}
-              className={`btn flex h-11 min-w-0 flex-1 items-center justify-center gap-1 rounded-full px-1 ${i === slot ? 'btn-gold' : 'btn-dark'}`}
+              onClick={() => openTab(i)}
+              className={`btn relative flex h-11 min-w-0 flex-1 items-center justify-center gap-1 rounded-full px-1 ${i === slot ? 'btn-gold' : 'btn-dark'}`}
+              data-tab-done={seen.has(i) || undefined}
             >
               <span className="h-7 w-7 shrink-0 overflow-hidden rounded-full border border-black/40 bg-[#1d2440]">
                 <CharacterArt classId={p.classId} gender={p.gender} face className="h-full w-full" />
               </span>
               <span className="truncate text-[12px] font-bold">{i + 1}人目</span>
+              {seen.has(i) ? (
+                <span className="absolute -top-1.5 -right-1 flex h-[18px] w-[18px] items-center justify-center rounded-full border border-emerald-100 bg-emerald-500 shadow-[0_0_6px_rgba(80,220,140,.8)]">
+                  <Check size={12} strokeWidth={3.5} className="text-emerald-950" />
+                </span>
+              ) : (
+                <span className="absolute -top-1.5 -right-1 rounded-full bg-red-600 px-1.5 text-[12px] leading-4 font-bold text-white">未設定</span>
+              )}
             </button>
           ))}
         </div>
@@ -145,9 +159,10 @@ export function CreateScreen() {
                   <button
                     key={p}
                     onClick={() => update({ playerId: p })}
-                    className={`btn h-11 min-w-0 flex-1 rounded-full border-2 text-[14px] font-bold ${on ? 'text-black' : 'bg-black/30 text-zinc-300'}`}
-                    style={on ? { background: PLAYER_COLOR[p], borderColor: '#fff', boxShadow: `0 0 10px ${PLAYER_COLOR[p]}` } : { borderColor: `${PLAYER_COLOR[p]}88` }}
+                    className={`btn flex h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full text-[14px] font-bold ${on ? 'btn-gold' : 'btn-dark text-zinc-300'}`}
                   >
+                    {/* 席の色は小さな宝石で（世界観から浮かないように） */}
+                    <span className="h-[10px] w-[10px] rotate-45 border border-white/70" style={{ background: PLAYER_COLOR[p], boxShadow: `0 0 6px ${PLAYER_COLOR[p]}` }} />
                     {p}
                   </button>
                 );
@@ -193,7 +208,14 @@ export function CreateScreen() {
         </button>
         {showDeck && (
           <div className="panel rounded-xl p-2 text-[12px]">
-            <div className="text-zinc-300">{cls.deck.map((d) => `${getCard(d.cardId).name}×${d.count}`).join('・')}</div>
+            <div className="flex flex-wrap gap-1" data-deck-tags>
+              {cls.deck.map((d) => (
+                <span key={d.cardId} className="rounded-full border border-amber-300/40 bg-black/50 px-2 py-0.5 text-[12px] leading-4 text-amber-50">
+                  {getCard(d.cardId).name}
+                  <b className="ml-1 text-amber-300">×{d.count}</b>
+                </span>
+              ))}
+            </div>
             <div className="mt-1.5 flex flex-col gap-1">
               {Object.values(cls.startingEquipment).map((id) => {
                 const it = getItem(id!);
@@ -271,7 +293,7 @@ function StatRadar({ values, labels, color }: { values: number[]; labels: string
   };
   const poly = (r: (i: number) => number) => values.map((_, i) => pt(i, r(i)).join(',')).join(' ');
   return (
-    <svg viewBox="-22 -4 194 160" className="h-[150px] w-[182px] shrink-0" data-radar>
+    <svg viewBox="-30 -6 210 164" className="h-[154px] w-[196px] shrink-0" data-radar>
       {[0.25, 0.5, 0.75, 1].map((k) => (
         <polygon key={k} points={poly(() => R * k)} fill="none" stroke="rgba(255,220,150,.18)" strokeWidth={1} />
       ))}
@@ -283,9 +305,9 @@ function StatRadar({ values, labels, color }: { values: number[]; labels: string
       {labels.map((l, i) => {
         const [x, y] = pt(i, R + 14);
         return (
-          <text key={i} x={x} y={y + 4} textAnchor="middle" fontSize={11} fontWeight={700} fill="#e8dcc0">
+          <text key={i} x={x} y={y + 4} textAnchor="middle" fontSize={12} fontWeight={700} fill="#e8dcc0">
             {l}
-            <tspan fill={color} fontSize={10}>
+            <tspan fill={color} fontSize={12}>
               {values[i]}
             </tspan>
           </text>
