@@ -57,9 +57,9 @@ export interface DamageMods {
  * source が victim に与えるダメージの倍率（敵のレベル × 常時型の能力）とブロック無視。
  * cardAbilities = 使っているカードの特殊能力（そのカードだけで働く）。予測表示でも同じ関数を使う
  */
-export function damageModifiers(state: BattleState | undefined, source: Unit, card: CardDef | undefined, victim: Unit | undefined, cardAbilities?: AbilityDef[]): DamageMods {
+export function damageModifiers(state: BattleState | undefined, source: Unit, card: CardDef | undefined, victim: Unit | undefined, cardAbilities?: AbilityDef[], perfect?: boolean): DamageMods {
   const out: DamageMods = { multiplier: isEnemy(source) ? source.attackMul : 1, active: [], ignoreBlock: false };
-  const c: CondCtx = { state, self: source, card, target: victim };
+  const c: CondCtx = { state, self: source, card, target: victim, perfect };
   for (const ab of cardAbilities?.length ? [...abilitiesOf(source), ...cardAbilities] : abilitiesOf(source)) {
     const e = ab.effect;
     if (!('modifier' in e) || e.modifier === 'coverLethal') continue;

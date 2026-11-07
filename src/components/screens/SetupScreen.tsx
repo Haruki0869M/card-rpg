@@ -29,7 +29,7 @@ export function SetupScreen() {
   const [online, setOnline] = useState(false);
   const setSize = (n: number) => {
     const party = draft.party.slice(0, n);
-    const classes = CLASSES.all.filter((c) => c.unlocked);
+    const classes = CLASSES.all.filter((c) => c.unlocked && (c.tier ?? 'base') === 'base');
     while (party.length < n) {
       const i = party.length;
       const c = classes[i % classes.length].id;

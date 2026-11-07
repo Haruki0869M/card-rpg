@@ -11,6 +11,9 @@ import type { ClassDef, EnemyDef } from '../../types';
 import { applyCommand, createBattle } from '../index';
 import { nextTurn, play } from './helpers';
 
+/** 4段階（コモン〜レジェンド）がそろっている武器の種類 */
+const FULL_WEAPON_TYPES = ['sword', 'staff', 'hammer', 'bow'];
+
 describe('データの整合性', () => {
   it('職業: デッキのカードが存在し、能力値・名前がそろっている', () => {
     for (const c of CLASSES.all) {
@@ -49,8 +52,10 @@ describe('データの整合性', () => {
     for (const c of CLASSES.all) {
       for (const id of c.cardPool) expect(CARDS.has(id), `${c.id}: ${id}`).toBe(true);
       for (const id of Object.values(c.startingEquipment)) expect(ITEMS.has(id!), `${c.id}: ${id}`).toBe(true);
-      if (c.startingEquipment.weapon) expect(ITEMS.get(c.startingEquipment.weapon).weaponType).toBe(c.weaponType);
-      // 各職業の武器が4段階そろっている
+      // 最初の武器は、そのジョブが装備できる種類（得意か、使える）
+      if (c.startingEquipment.weapon) expect([c.weaponType, ...(c.subWeapons ?? [])]).toContain(ITEMS.get(c.startingEquipment.weapon).weaponType);
+      // 武器が4段階そろっている（転職で増えた種類は、武器を増やす第3弾でそろえる）
+      if (!FULL_WEAPON_TYPES.includes(c.weaponType)) continue;
       const rar = ITEMS.all.filter((i) => i.weaponType === c.weaponType).map((i) => i.rarity);
       expect(new Set(rar)).toEqual(new Set(['common', 'rare', 'epic', 'legend']));
     }

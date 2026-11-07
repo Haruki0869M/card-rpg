@@ -26,6 +26,7 @@ import {
   TIME_NAME,
   timeOfDay,
   turnsUntilNightChange,
+  moveSlotsOf,
 } from '../../engine';
 import { isLocalPlayer, isOnlinePlay } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
@@ -279,8 +280,9 @@ export function WorldScreen() {
   };
   const label = interactLabel(game, here);
   const chance = statChance(hero, 'agi', 'move');
-  const maxFocus = Math.min(BALANCE.moveSlots, hero.focus);
-  const dist = successDistribution(BALANCE.moveSlots, Math.min(focus, maxFocus), chance);
+  const moveSlots = moveSlotsOf(hero);
+  const maxFocus = Math.min(moveSlots, hero.focus);
+  const dist = successDistribution(moveSlots, Math.min(focus, maxFocus), chance);
   const avg = BALANCE.moveBase + dist.reduce((n, p, k) => n + p * k, 0);
   const ambush = campAmbushChance(game, hero.id);
   const onTown = w.tiles[here].f?.kind === 'town';
@@ -430,10 +432,10 @@ export function WorldScreen() {
             </button>
             <div className="flex flex-1 flex-col items-center leading-4">
               <span className="text-[12px] text-zinc-300">
-                素早さ{chance}%×{BALANCE.moveSlots}枠・フォーカス<b className="text-amber-200">{Math.min(focus, maxFocus)}</b>
+                素早さ{chance}%×{moveSlots}枠・フォーカス<b className="text-amber-200">{Math.min(focus, maxFocus)}</b>
               </span>
               <span className="text-[12px] text-zinc-400">
-                移動力 {BALANCE.moveBase + Math.min(focus, maxFocus)}〜{BALANCE.moveBase + BALANCE.moveSlots}（平均{avg.toFixed(1)}）
+                移動力 {BALANCE.moveBase + Math.min(focus, maxFocus)}〜{BALANCE.moveBase + moveSlots}（平均{avg.toFixed(1)}）
               </span>
             </div>
             <button onClick={() => setFocus(Math.min(maxFocus, focus + 1))} disabled={focus >= maxFocus} aria-label="フォーカスを増やす" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-lg">

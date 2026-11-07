@@ -246,7 +246,7 @@ describe('新しい戦闘の要素', () => {
     s.allies[0].hand = [{ uid: 'z1', cardId: 'sweep' }];
     let r = applyCommand(s, { type: 'PLAY_CARD', playerId: 'P1', characterId: 'a0', cardInstanceId: 'z1', focusUsed: 2 });
     expect(r.error).toBeUndefined();
-    expect(r.state.enemies.every((e) => e.hp === e.maxHp - 8)).toBe(true);
+    expect(r.state.enemies.every((e) => e.hp === e.maxHp - 10)).toBe(true); // 8 × 剣の心得（完全成功で1.3倍）
     const s2 = r.state;
     s2.allies[1].hand = [{ uid: 'z2', cardId: 'guardFormation' }, { uid: 'z3', cardId: 'holyLight' }];
     s2.allies[0].hp = 30;

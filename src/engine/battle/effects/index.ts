@@ -71,6 +71,11 @@ export function resolveTargets(ctx: EffectCtx, to: EffectTarget): Unit[] {
       return sideOf(state, source).filter((u) => u !== source);
     case 'foes':
       return foesOf(state, source);
+    case 'lowestAlly': {
+      // 味方で、HPの割合が一番低い1人
+      const alive = sideOf(state, source).filter((u) => !u.dead);
+      return alive.length ? [alive.reduce((a, b) => (b.hp / b.maxHp < a.hp / a.maxHp ? b : a))] : [];
+    }
     case 'randomFoe': {
       const alive = foesOf(state, source);
       return alive.length ? [alive[ctx.rng.int(alive.length)]] : [];
@@ -101,6 +106,7 @@ const WHO: Record<EffectTarget, { ally: string; enemy: string }> = {
   otherAllies: { ally: '他の味方全員に', enemy: '他の敵全員に' },
   foes: { ally: '敵全員に', enemy: '味方全員に' },
   randomFoe: { ally: 'ランダムな敵1体に', enemy: 'ランダムな味方1人に' },
+  lowestAlly: { ally: 'HPが一番低い味方に', enemy: 'HPが一番低い敵に' },
 };
 
 /** 効果の説明文（side = 使う側。味方なら「敵全員に」、敵なら「味方全員に」） */
@@ -151,7 +157,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   const { state, rng, events, source } = ctx;
   if (victim.dead) return 0;
   let v = victim;
-  let mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities);
+  let mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities, ctx.perfect);
   let dmg = calcDamage(base, source.statuses, v.statuses, mods.multiplier * elementMultiplier(v, element) * comboMultiplier(source, v));
   // かばう: 相手の攻撃でこのままだとHP0になる場合、同じ側の他の仲間が確率で代わりに受ける
   if (isEnemy(source) !== isEnemy(v) && dmg - (mods.ignoreBlock ? 0 : v.block) >= v.hp) {
@@ -163,7 +169,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
         abilityTriggered(state, unitIdOf(other), cov.name, events);
         addLog(state, `${nameOf(other)}の「${cov.name}」！ ${nameOf(v)}をかばった`);
         v = other;
-        mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities);
+        mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities, ctx.perfect);
         dmg = calcDamage(base, source.statuses, v.statuses, mods.multiplier * elementMultiplier(v, element) * comboMultiplier(source, v));
         break;
       }

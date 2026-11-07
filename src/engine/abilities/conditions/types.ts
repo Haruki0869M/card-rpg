@@ -13,6 +13,8 @@ export interface CondCtx {
   target?: Unit;
   /** HPに与えたダメージ（カードを使った後など） */
   dealt?: number;
+  /** 今のカードが完全成功か（ダメージの計算の時） */
+  perfect?: boolean;
 }
 
 /** 条件の種類1つ分。src/engine/abilities/conditions/ に1ファイル1種類で置く（export const condition = ...） */

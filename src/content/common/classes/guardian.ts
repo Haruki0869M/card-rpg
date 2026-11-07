@@ -31,7 +31,11 @@ export const guardian: ClassDef = {
   unlocked: true,
   hpPerLevel: 7,
   weaponType: 'hammer',
-  startingEquipment: { weapon: 'oakHammer', armor: 'leatherArmor' },
+  // 絵（槍と盾）に合わせて、最初の武器は槍。槌も得意（spec §6.4）
+  subWeapons: ['spear', 'sword'],
+  tier: 'base',
+  lineage: 'sei',
+  startingEquipment: { weapon: 'ironSpear', armor: 'leatherArmor' },
   cardPool: ['guardFormation', 'shieldStance', 'holyLight', 'counterShield', 'rally', 'shieldBash', 'warCry', 'guard', 'judgment', 'sanctuary'],
   growthWeights: { vit: 4, dex: 2, str: 2 },
 };

@@ -8,7 +8,7 @@ import { getDifficulty } from '../../../data/rules';
 import { QUESTS, TERRAINS, TOWNS } from '../../../data/world';
 import type { EncounterState, Expedition, GameCommand, GameState, Hero, QuestState, WorldState } from '../../../types';
 import type { Rng } from '../../rng';
-import { addLog, ownedBy, rollWithFocus, splitGold, statChance, successes } from '../common';
+import { addLog, moveSlotsOf, ownedBy, restMultiplierOf, rollWithFocus, splitGold, statChance, successes } from '../common';
 import { enterDungeonFromWorld, startBattleWith } from '../game';
 import { heroFocusMax, heroMaxHp } from '../hero';
 import { activeHeroes, expeditionOf, findHero, livingHeroes, mapHeroes, sceneHeroes } from '../heroes';
@@ -210,7 +210,7 @@ export function rollMove(game: GameState, cmd: Cmd<'WORLD_ROLL_MOVE'>, rng: Rng)
   if (typeof t === 'string') return t;
   const { w, h } = t;
   if (w.move !== null) return 'もう移動力を決めました';
-  const slots = BALANCE.moveSlots;
+  const slots = moveSlotsOf(h);
   if (!Number.isInteger(cmd.focusUsed) || cmd.focusUsed < 0 || cmd.focusUsed > Math.min(slots, h.focus)) return 'フォーカスの数が不正です';
   h.focus -= cmd.focusUsed;
   const results = rollWithFocus(slots, cmd.focusUsed, statChance(h, 'agi', 'move'), rng);
@@ -339,7 +339,7 @@ export function camp(game: GameState, cmd: Cmd<'WORLD_CAMP'>, rng: Rng): string 
   if (w.tiles[tile].f?.kind === 'town') return '町の中では野営できません（宿屋を使えます）';
   if (w.move !== null && w.move < (BALANCE.moveBase as number)) return '移動した後は野営できません';
   const chance = campAmbushChance(game, h.id);
-  h.hp = Math.min(heroMaxHp(h), h.hp + Math.ceil(heroMaxHp(h) * BALANCE.campHpRatio));
+  h.hp = Math.min(heroMaxHp(h), h.hp + Math.ceil(heroMaxHp(h) * BALANCE.campHpRatio * restMultiplierOf(h)));
   h.focus = Math.min(heroFocusMax(h), h.focus + BALANCE.campFocus);
   addLog(game, `${h.name}は野営して体を休めた`);
   if (chance > 0 && rng.next() * 100 < chance) {

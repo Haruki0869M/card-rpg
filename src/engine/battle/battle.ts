@@ -210,6 +210,7 @@ function startAllyPhase(state: BattleState, rng: Rng, events: BattleEvent[]) {
   // 連携攻撃の記録と、狙いの表示は、ターンごとに消す
   state.aims = {};
   for (const e of state.enemies) e.hitBy = [];
+  for (const a of state.allies) a.played = 0;
   for (const a of state.allies) {
     if (a.dead) continue;
     a.block = 0;
@@ -383,6 +384,8 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
 
   state.stats.maxDamage = Math.max(state.stats.maxDamage, ctx.dealt);
   ally.discard.push(inst);
+  // このターンに使った枚数（連撃などの条件。カードの効果の後に数える）
+  ally.played = (ally.played ?? 0) + 1;
 
   const resultLabel = perfect ? '完全成功' : `${successes}成功`;
   const summary = `${resultLabel}！ ${parts.join(' ')}`;

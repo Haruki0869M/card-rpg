@@ -30,7 +30,7 @@ import { applyCommand, createBattle, STATE_VERSION } from '../battle/battle';
 import { createRng, type Rng } from '../rng';
 import { applyOutcome, checkOutcome, hasOutcomeKind, makeOutcomeCtx } from './outcomes';
 import { expeditionOf, livingHeroes, findHero, sceneHeroes } from './heroes';
-import { addItem, addLog, addLoot, hiddenChestChance, isPartyPlayer, leastLoaded, ownedBy, partyHasTag, rollWithFocus, splitGold, statChance, successes } from './common';
+import { addItem, addLog, addLoot, restMultiplierOf, hiddenChestChance, isPartyPlayer, leastLoaded, ownedBy, partyHasTag, rollWithFocus, splitGold, statChance, successes } from './common';
 import { getDifficulty } from '../../data/rules';
 import { isBossRoom, roomBehavior, roomTypeOf } from './rooms';
 import { growthHandler, growthOptions } from './growth';
@@ -943,7 +943,7 @@ function rest(game: GameState, playerId: string, kind: 'hp' | 'focus'): string |
   if (!isPartyPlayer(game, playerId)) return 'このパーティのプレイヤーではありません';
   if (game.mode !== 'rest' || !game.dungeon) return '休憩できる場所ではありません';
   for (const h of sceneHeroes(game)) {
-    if (kind === 'hp') h.hp = Math.min(heroMaxHp(h), h.hp + Math.ceil(heroMaxHp(h) * BALANCE.restHpRatio));
+    if (kind === 'hp') h.hp = Math.min(heroMaxHp(h), h.hp + Math.ceil(heroMaxHp(h) * BALANCE.restHpRatio * restMultiplierOf(h)));
     else h.focus = Math.min(heroFocusMax(h), h.focus + BALANCE.restFocus);
   }
   findRoom(game.dungeon, game.dungeon.currentRoomId ?? '')!.cleared = true;

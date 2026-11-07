@@ -22,4 +22,11 @@ export const weapons: ItemDef[] = [
   { id: 'steelBow', name: '鋼の弓', slot: 'weapon', weaponType: 'bow', rarity: 'rare', icon: 'bow', description: '張りの強い鋼の弓。', stats: { dex: 4 }, cards: [{ cardId: 'wDoubleShot', count: 2 }] },
   { id: 'galeBow', name: '疾風の弓', slot: 'weapon', weaponType: 'bow', rarity: 'epic', icon: 'bow', description: '風の精霊の加護を受けた弓。', stats: { agi: 8, dex: 4 }, cards: [{ cardId: 'wGaleArrow', count: 2 }] , ability: { name: '追い風', effect: { when: 'perfect', do: [{ kind: 'draw', amount: 1 }] } } },
   { id: 'skyBow', name: '天穿つ弓', slot: 'weapon', weaponType: 'bow', rarity: 'legend', icon: 'bow', description: '天をも射抜くと伝わる神弓。', stats: { dex: 10, per: 8 }, cards: [{ cardId: 'wSkyPiercer', count: 2 }] , ability: { name: '天眼', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'physical' }], do: [{ kind: 'damage', amount: 10, to: 'randomFoe' }] } } },
+  // ---- 転職システムで増えた武器の種類の、最初の武器（spec §6.4）----
+  { id: 'clothWraps', name: '布の手甲', slot: 'weapon', weaponType: 'fist', rarity: 'common', icon: 'fist', description: '拳を守る、使い込んだ布の手甲。', cards: [{ cardId: 'wJab', count: 2 }] },
+  { id: 'apprenticeTome', name: '見習いの魔導書', slot: 'weapon', weaponType: 'tome', rarity: 'common', icon: 'tome', description: '召喚の呪文が記された古い魔導書。', cards: [{ cardId: 'wSpiritSpark', count: 2 }] },
+  { id: 'woodScepter', name: '木の錫杖', slot: 'weapon', weaponType: 'scepter', rarity: 'common', icon: 'scepter', description: '鈴の付いた、祈りのための錫杖。', cards: [{ cardId: 'wChime', count: 2 }] },
+  { id: 'rustyDagger', name: '古びた短剣', slot: 'weapon', weaponType: 'dagger', rarity: 'common', icon: 'dagger', description: '刃こぼれした、よく手になじむ短剣。', cards: [{ cardId: 'wQuickStab', count: 2 }] },
+  { id: 'ironSpear', name: '鉄の槍', slot: 'weapon', weaponType: 'spear', rarity: 'common', icon: 'spear', description: '長くまっすぐな鉄の槍。', cards: [{ cardId: 'wThrust', count: 2 }] },
+  { id: 'plainKatana', name: '無銘の刀', slot: 'weapon', weaponType: 'katana', rarity: 'common', icon: 'katana', description: '銘の無い、よく斬れる刀。', cards: [{ cardId: 'wIaiCut', count: 2 }] },
 ];

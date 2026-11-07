@@ -3,7 +3,7 @@ import type { ClassDef } from '../../../types';
 export const warrior: ClassDef = {
   id: 'warrior',
   order: 1,
-  name: '戦士',
+  name: '剣士',
   role: '攻撃と防御の両立',
   icon: '🪓',
   color: '#e0563b',
@@ -17,9 +17,10 @@ export const warrior: ClassDef = {
     { cardId: 'shieldBash', count: 1 },
     { cardId: 'warCry', count: 1 },
   ],
+  // 剣士 → 剣豪 → 剣聖 / 剣士 → 狂戦士 → 覇王（spec §6.4）。完全成功が強い
   battleAbility: {
-    name: '闘志',
-    effect: { modifier: 'damageDealt', multiplier: 1.25, if: [{ kind: 'cardCategory', category: 'physical' }, { kind: 'selfHpAtMost', pct: 50 }] },
+    name: '剣の心得',
+    effect: { modifier: 'damageDealt', multiplier: 1.3, if: [{ kind: 'cardCategory', category: 'physical' }, { kind: 'perfect' }] },
   },
   exploreAbility: {
     id: 'mightyStrength',
@@ -31,6 +32,9 @@ export const warrior: ClassDef = {
   unlocked: true,
   hpPerLevel: 6,
   weaponType: 'sword',
+  subWeapons: ['katana'],
+  tier: 'base',
+  lineage: 'bu',
   startingEquipment: { weapon: 'copperSword', armor: 'leatherArmor' },
   cardPool: ['mightyBlow', 'ironWall', 'sweep', 'battleCry', 'charge', 'heavySwing', 'shieldBash', 'warCry', 'berserkSlash', 'armorBreak'],
   growthWeights: { str: 3, vit: 3, dex: 1, agi: 1 },

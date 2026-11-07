@@ -109,3 +109,18 @@ export function hiddenChestChance(game: GameState): number {
 export function statChance(hero: Hero, stat: StatId, tag?: string): number {
   return finalChanceOf(heroStats(hero)[stat] + checkBonus(hero, tag));
 }
+
+/** 探索の特殊能力: 移動力の判定のスロット（武闘家など） */
+export function moveSlotsOf(hero: Hero): number {
+  const e = getClass(hero.classId).exploreAbility.effect;
+  return BALANCE.moveSlots + (e.kind === 'moveSlots' ? e.slots : 0);
+}
+
+/** 探索の特殊能力: 野営・休憩の回復の倍率（僧侶など） */
+export function restMultiplierOf(hero: Hero): number {
+  const e = getClass(hero.classId).exploreAbility.effect;
+  return e.kind === 'restBonus' ? e.multiplier : 1;
+}
+
+/** 探索の特殊能力: 祠とイベントのマスが霧の中でも見えるキャラがいるか（召喚士など） */
+export const partySenses = (game: GameState) => game.heroes.some((h) => !h.retired && getClass(h.classId).exploreAbility.effect.kind === 'sense');

@@ -50,7 +50,8 @@ export function CreateScreen() {
   };
 
   // 職業を左右に切り替える（スワイプ・矢印。解放済みの職業だけ）
-  const unlocked = CLASSES.all.filter((c) => c.unlocked);
+  // 作る時に選べるのは基本ジョブだけ（ほかは冒険の中で転職してなる。spec §6.4）
+  const unlocked = CLASSES.all.filter((c) => c.unlocked && (c.tier ?? 'base') === 'base');
   const step = (d: number) => {
     const i = unlocked.findIndex((c) => c.id === m.classId);
     const next = unlocked[(i + d + unlocked.length) % unlocked.length];
@@ -124,7 +125,7 @@ export function CreateScreen() {
 
         {/* 職業の一覧（顔のチップ。数が増えても横にスクロール） */}
         <div className="-mx-3 mt-2 flex gap-1.5 overflow-x-auto px-3 pb-1" data-class-list>
-          {CLASSES.all.map((c) => {
+          {CLASSES.all.filter((c) => (c.tier ?? 'base') === 'base').map((c) => {
             const on = m.classId === c.id;
             return (
               <button

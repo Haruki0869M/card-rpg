@@ -184,4 +184,11 @@ export const WEAPON_CARDS: CardDef[] = [
       { minSuccesses: 3, effects: [d(36), { kind: 'applyStatus', status: 'vulnerable', amount: 2 }] },
     ],
   },
+  // ---- 転職システムで増えた武器の種類（spec §6.4）----
+  { id: 'wJab', name: '連打', category: 'physical', stat: 'agi', cost: 1, slots: 2, baseChance: 75, target: 'enemy', tiers: [{ minSuccesses: 0, effects: [d(2)] }, { minSuccesses: 1, effects: [d(3), d(3)] }, { minSuccesses: 2, effects: [d(4), d(4)] }] },
+  { id: 'wSpiritSpark', name: '精霊の火花', category: 'magic', cost: 1, slots: 2, baseChance: 75, target: 'enemy', tiers: [{ minSuccesses: 0, effects: [d(3)] }, { minSuccesses: 1, effects: [d(6)] }, { minSuccesses: 2, effects: [{ kind: 'damage', amount: 9, element: 'fire' }] }] },
+  { id: 'wChime', name: '鈴の音', category: 'skill', stat: 'per', cost: 1, slots: 2, baseChance: 80, target: 'self', tiers: [{ minSuccesses: 0, effects: [{ kind: 'heal', amount: 2, to: 'lowestAlly' }] }, { minSuccesses: 1, effects: [{ kind: 'heal', amount: 4, to: 'lowestAlly' }] }, { minSuccesses: 2, effects: [{ kind: 'heal', amount: 6, to: 'lowestAlly' }, { kind: 'block', amount: 3 }] }] },
+  { id: 'wQuickStab', name: '早業', category: 'physical', stat: 'dex', cost: 0, slots: 1, baseChance: 80, target: 'enemy', tiers: [{ minSuccesses: 0, effects: [d(2)] }, { minSuccesses: 1, effects: [d(4)] }] },
+  { id: 'wThrust', name: '突き', category: 'physical', cost: 1, slots: 2, baseChance: 75, target: 'enemy', tiers: [{ minSuccesses: 0, effects: [d(4)] }, { minSuccesses: 1, effects: [d(7)] }, { minSuccesses: 2, effects: [d(10), b(3)] }] },
+  { id: 'wIaiCut', name: '居合斬り', category: 'physical', stat: 'per', cost: 1, slots: 2, baseChance: 70, target: 'enemy', tiers: [{ minSuccesses: 0, effects: [d(3)] }, { minSuccesses: 1, effects: [d(7)] }, { minSuccesses: 2, effects: [d(13)] }] },
 ];

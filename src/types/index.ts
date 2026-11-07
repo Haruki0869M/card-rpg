@@ -43,7 +43,7 @@ export interface ElementDef {
  * target = 選んだ対象（カードの対象の敵 / 敵の行動の対象の味方 / アイテムを使う相手。全体カードなら相手全員）
  * self = 自分 / allies = 自分の側の全員 / otherAllies = 自分以外の自分の側 / foes = 相手の側の全員 / randomFoe = 相手からランダムに1人
  */
-export type EffectTarget = 'target' | 'self' | 'allies' | 'otherAllies' | 'foes' | 'randomFoe';
+export type EffectTarget = 'target' | 'self' | 'allies' | 'otherAllies' | 'foes' | 'randomFoe' | 'lowestAlly';
 
 /**
  * 効果の種類ごとの数値。効果のファイル（src/engine/battle/effects/）が declare module でここに種類を足す。
@@ -121,7 +121,13 @@ export type ExploreAbility =
   /** 視界+N（M3）、隠し宝箱を見つける確率+X% */
   | { kind: 'tracking'; vision: number; hiddenFindBonus: number }
   | { kind: 'nightAmbushReduction'; multiplier: number }
-  | { kind: 'extraEventOption'; tag: string };
+  | { kind: 'extraEventOption'; tag: string }
+  /** 移動力の判定のスロット+N（武闘家など） */
+  | { kind: 'moveSlots'; slots: number }
+  /** 野営・休憩の回復の倍率（僧侶など） */
+  | { kind: 'restBonus'; multiplier: number }
+  /** 祠とイベントのマスが、霧の中でも見える（召喚士など） */
+  | { kind: 'sense' };
 
 export interface ExploreAbilityDef {
   id: string;
@@ -326,6 +332,10 @@ export interface CardInstance {
 export interface AllyState {
   /** この戦闘の記録（転職の条件。敵を倒した数など。戦闘の後でキャラの記録に足す） */
   feats?: Record<string, number>;
+  /** このターンに使ったカードの枚数（連撃など） */
+  played?: number;
+  /** 能力の数え（幻獣ゲージなど。キーは能力ごと） */
+  counters?: Record<string, number>;
   /** 戦闘内で一意のID（a0, a1, ...）。同じ職業が複数いても区別できる */
   id: string;
   classId: string;

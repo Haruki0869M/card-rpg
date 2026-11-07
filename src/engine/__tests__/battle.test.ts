@@ -198,7 +198,7 @@ describe('カードの使用', () => {
     const s = createBattle(setup(5));
     const [card] = giveHand(s, 'a0', ['heavySwing']);
     const { state } = applyCommand(s, play('a0', card.uid, 'e0', 3));
-    expect(state.enemies[0].hp).toBe(52 - 26);
+    expect(state.enemies[0].hp).toBe(52 - 33); // 26 × 剣の心得（完全成功で1.3倍）
     expect(state.enemies[0].statuses.vulnerable).toBe(2);
   });
   it('不正な操作はエラーで状態不変', () => {

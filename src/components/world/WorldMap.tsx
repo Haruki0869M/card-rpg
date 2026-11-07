@@ -5,7 +5,7 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'rea
 import { artImage, EnemyArt } from '../../art';
 import { DUNGEONS } from '../../data/dungeons';
 import { getTerrain, QUESTS, TERRAINS, TOWNS } from '../../data/world';
-import { colOf, objectiveHandler, rowOf, timeOfDay } from '../../engine';
+import { colOf, objectiveHandler, partySenses, rowOf, timeOfDay } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
 import { useBattle } from '../../store/battleStore';
 import type { GameState, WorldState } from '../../types';
@@ -226,6 +226,7 @@ export function WorldMap({
     if (best >= 0 && bd <= R * R) onTapTile(best);
   };
 
+  const senses = partySenses(game);
   const night = timeOfDay(w.worldTurn);
   const tint =
     night === 'night' ? 'rgba(12,18,60,.42)' : night === 'evening' ? 'rgba(255,110,40,.14)' : night === 'morning' ? 'rgba(255,230,180,.06)' : 'transparent';
@@ -274,9 +275,14 @@ export function WorldMap({
             />
           )}
           {selected !== undefined && <polygon points={hexPoints(center(selected).x, center(selected).y, R - 2)} fill="none" stroke="#fff" strokeWidth={3} />}
-          {/* 施設 */}
+          {/* 施設（霊感のキャラがいれば、祠とイベントは霧の中でも光って見える） */}
           {w.tiles.map((t, i) => {
-            if (!t.seen || !t.f) return null;
+            if (!t.f) return null;
+            if (!t.seen) {
+              if (!senses || (t.f.kind !== 'shrine' && t.f.kind !== 'event')) return null;
+              const { x, y } = center(i);
+              return <circle key={`sense${i}`} cx={x} cy={y} r={R * 0.32} fill={t.f.kind === 'shrine' ? '#9affd0' : '#9ad8ff'} opacity={0.75} filter="url(#place-shadow)" data-sensed={t.f.kind} />;
+            }
             const { x, y } = center(i);
             const f = t.f;
             const finale = f.kind === 'dungeon' && DUNGEONS.tryGet(f.id)?.finale;
