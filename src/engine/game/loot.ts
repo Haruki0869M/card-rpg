@@ -7,6 +7,7 @@ import type { GameState, Hero, ItemDef, Loot, Rarity } from '../../types';
 import { successDistribution } from '../battle/probability';
 import type { Rng } from '../rng';
 import { RARITIES, rarityIndex } from './dungeon';
+import { jobWeapons } from './hero';
 
 const pick = <T,>(list: readonly T[], rng: Rng) => list[rng.int(list.length)];
 
@@ -41,7 +42,7 @@ export const rollGrade = (odds: readonly number[], rng: Rng): Rarity => RARITIES
 
 /** レア度に合う装備（パーティの誰かが使える武器を優先） */
 export function rollEquipment(rarity: Rarity, heroes: Hero[], rng: Rng): ItemDef {
-  const types = new Set(heroes.map((h) => getClass(h.classId).weaponType));
+  const types = new Set(heroes.flatMap((h) => jobWeapons(h.classId)));
   const pool = ITEMS.all.filter((i) => i.slot !== 'consumable' && i.rarity === rarity && (i.slot !== 'weapon' || types.has(i.weaponType!)));
   const fallback = ITEMS.all.filter((i) => i.slot !== 'consumable' && rarityIndex(i.rarity) <= rarityIndex(rarity));
   return pick(pool.length ? pool : fallback, rng);

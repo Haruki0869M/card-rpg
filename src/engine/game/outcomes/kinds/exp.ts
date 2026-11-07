@@ -16,8 +16,8 @@ export const outcome: OutcomeHandler<'exp'> = {
   apply(ctx, o) {
     for (const h of livingHeroes(ctx.game)) {
       h.exp += o.amount;
-      while (h.level < BALANCE.maxLevel && h.exp >= expToNext(h.level)) {
-        h.exp -= expToNext(h.level);
+      while (h.level < BALANCE.maxLevel && h.exp >= expToNext(h.level, h.classId)) {
+        h.exp -= expToNext(h.level, h.classId);
         h.level += 1;
         h.hp = Math.min(heroMaxHp(h), h.hp + getClass(h.classId).hpPerLevel);
       }

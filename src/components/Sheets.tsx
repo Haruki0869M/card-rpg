@@ -265,9 +265,9 @@ function PartySheet() {
             {hero.name} <span className="text-[13px]" style={{ color: cls.color }}>{cls.name}</span>
           </div>
           <div className="text-[13px] text-amber-300">
-            Lv{hero.level} <span className="text-zinc-400">EXP {hero.exp}/{expToNext(hero.level)}</span>
+            Lv{hero.level} <span className="text-zinc-400">EXP {hero.exp}/{expToNext(hero.level, hero.classId)}</span>
           </div>
-          <Bar value={hero.exp} max={expToNext(hero.level)} color="linear-gradient(90deg,#8a6aff,#c8b0ff)" height={5} />
+          <Bar value={hero.exp} max={expToNext(hero.level, hero.classId)} color="linear-gradient(90deg,#8a6aff,#c8b0ff)" height={5} />
           <div className="mt-1 text-[13px] tabular-nums">
             HP {hero.hp}/{heroMaxHp(hero)}・フォーカス {hero.focus}/{heroFocusMax(hero)}
           </div>

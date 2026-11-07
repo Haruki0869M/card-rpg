@@ -130,7 +130,7 @@ export function HeroMini({ hero, onTap }: { hero: Hero; onTap?: () => void }) {
           {hero.focus}/{heroFocusMax(hero)}
         </span>
       </div>
-      <Bar value={hero.exp} max={expToNext(hero.level)} color="linear-gradient(90deg,#8a6aff,#c8b0ff)" height={4} />
+      <Bar value={hero.exp} max={expToNext(hero.level, hero.classId)} color="linear-gradient(90deg,#8a6aff,#c8b0ff)" height={4} />
     </button>
   );
 }

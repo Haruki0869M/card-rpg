@@ -72,6 +72,12 @@ export interface Hero {
   retired?: boolean;
   /** 祠の永続の加護の数（上限あり） */
   blessings?: number;
+  /** 今までのジョブ（転職した順。spec §6.4） */
+  jobs?: string[];
+  /** 持ち越している戦闘の特殊能力（そのジョブのID） */
+  carried?: string;
+  /** 転職の条件のための記録（敵を倒した数など。キーは feats の種類） */
+  feats?: Record<string, number>;
   /** 自分のお金・持ち物（装備していない装備品）・道具袋（M3-C: キャラごと） */
   gold: number;
   stash: ItemInstance[];
@@ -276,6 +282,8 @@ export interface GrowthOption {
   /** 成長ボーナスの種類（src/engine/game/growth/kinds の種類） */
   kind: string;
   stat?: StatId;
+  /** 転職の時: 転職先のジョブ */
+  jobId?: string;
   amount: number;
 }
 
@@ -439,6 +447,8 @@ export type GameCommand =
   | { type: 'CHOOSE_GROWTH'; playerId: PlayerId; optionIndex: number; cardUid?: string }
   | { type: 'PICK_CARD'; playerId: PlayerId; offerIndex: number | null; /** 選ばない時: どのキャラの分か（省くと、その人のキャラ全員の分） */ heroId?: string }
   | { type: 'FINISH_REWARD'; playerId: PlayerId }
+  /** 転職する（戦闘中以外。spec §6.4） */
+  | { type: 'CHANGE_JOB'; playerId: PlayerId; heroId: string; jobId: string }
   | { type: 'CLAIM_LOOT'; playerId: PlayerId; heroId: string; choice: 'need' | 'greed' | 'pass' }
   | { type: 'OPEN_CHEST'; playerId: PlayerId; heroId: string; focusUsed: number }
   | { type: 'LEAVE_CHEST'; playerId: PlayerId }

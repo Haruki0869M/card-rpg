@@ -262,7 +262,7 @@ export function RewardScreen() {
                       {up && <span className="font-display ml-1 text-amber-300">Lv{e.toLevel}！</span>}
                     </span>
                   </div>
-                  <Bar value={e.toExp} max={expToNext(e.toLevel)} color="linear-gradient(90deg,#8a6aff,#c8b0ff)" height={7} />
+                  <Bar value={e.toExp} max={expToNext(e.toLevel, h.classId)} color="linear-gradient(90deg,#8a6aff,#c8b0ff)" height={7} />
                 </div>
               </motion.div>
             );

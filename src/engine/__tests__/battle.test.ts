@@ -27,8 +27,8 @@ describe('成功率計算（能力値から適性補正）', () => {
     expect(finalChance(getCard('heavySwing'), affinityOf({ classId: 'warrior' }))).toBe(75);
     expect(finalChance(getCard('heavySwing'), affinityOf({ classId: 'mage' }))).toBe(55);
     expect(finalChance(getCard('gambleBolt'), affinityOf({ classId: 'mage' }))).toBe(60);
-    expect(affinityOf({ classId: 'guardian' })).toEqual({ physical: 0, magic: -20, skill: 10 });
-    expect(affinityOf({ classId: 'hunter' })).toEqual({ physical: 0, magic: 0, skill: 5 });
+    expect(affinityOf({ classId: 'guardian' })).toMatchObject({ physical: 0, magic: -20, skill: 10 });
+    expect(affinityOf({ classId: 'hunter' })).toMatchObject({ physical: 0, magic: 0, skill: 5 });
   });
   it('5%〜95%に制限される', () => {
     const card = { ...getCard('guard'), baseChance: 95 };

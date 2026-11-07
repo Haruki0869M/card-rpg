@@ -351,6 +351,15 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   const successes = results.filter((r) => r !== 'miss').length;
   const perfect = successes === card.slots;
   if (perfect) state.stats.perfects += 1;
+  // 転職の条件の記録: 使ったマナ・完全成功・カードの種類・仲間を助けるカード
+  {
+    const f = (ally.feats ??= {});
+    const add = (k: string, n = 1) => (f[k] = (f[k] ?? 0) + n);
+    add('mana', card.cost);
+    if (perfect) add('perfects');
+    if (successes > 0) add(`success:${card.category}`);
+    if (card.target === 'self' && card.tiers.some((t) => t.effects.some((e) => e.kind === 'block' || e.kind === 'heal' || e.kind === 'applyStatus'))) add('support');
+  }
   const tier = selectTier(card, successes);
 
   // 効果（効果の部品を順に使う）

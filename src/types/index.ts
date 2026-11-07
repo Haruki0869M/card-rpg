@@ -13,7 +13,8 @@ export type PlayerId = 'P1' | 'P2' | 'P3' | 'P4';
 export type StatId = 'str' | 'vit' | 'int' | 'per' | 'dex' | 'agi' | 'luk';
 export type Stats = Record<StatId, number>;
 /** カテゴリごとの成功率補正（%） */
-export type Affinity = Record<CardCategory, number>;
+/** 成功率の補正。カードの種類ごと＋能力値ごと（カードが参照する能力値を決めている時に使う） */
+export type Affinity = Record<CardCategory, number> & { byStat?: Partial<Record<StatId, number>> };
 
 // ---------- カード ----------
 
@@ -78,6 +79,8 @@ export interface CardDef {
   rarity?: Rarity;
   /** カードの特殊能力（エピック以上は必ず持つ。このカードを使っている間だけ働く。spec §13.1） */
   trait?: AbilityDef;
+  /** 成功率の基準にする能力値（例: 刀の見切り＝感知）。無ければカードの種類（物理＝力・魔法＝知力・スキル＝器用） */
+  stat?: StatId;
 }
 
 // ---------- 特殊能力（職業・装備・カード・敵で共通。spec §2.4・§6.2・§12.7・§13.1） ----------
@@ -150,8 +153,20 @@ export interface ClassDef {
   unlocked: boolean;
   /** レベルが1上がるごとの最大HP */
   hpPerLevel: number;
-  /** 装備できる武器の種類 */
+  /** 得意な武器の種類（初期装備。専用カードが出やすい） */
   weaponType: WeaponType;
+  /** 装備できるほかの武器の種類（専用カードは出にくい） */
+  subWeapons?: WeaponType[];
+  /** ジョブの段（無ければ基本）。転職システム（spec §6.4） */
+  tier?: JobTier;
+  /** 系統（武・魔・聖・技） */
+  lineage?: Lineage;
+  /** 転職元のジョブ（このジョブになれる元） */
+  from?: string[];
+  /** 転職の条件（その冒険の中で達成する。feat はキャラの記録のキー） */
+  requires?: { feat: string; count: number; text: string };
+  /** 転職した時に山札へ加わるカード（1回きりの決め技など） */
+  jobCards?: string[];
   /** 初期装備（アイテムID） */
   startingEquipment: Partial<Record<EquipSlot, string>>;
   /** 報酬で出るカードの候補（カードID） */
@@ -159,6 +174,11 @@ export interface ClassDef {
   /** 成長ボーナスで伸びやすい能力値（重み） */
   growthWeights: Partial<Record<StatId, number>>;
 }
+
+/** ジョブの段: 基本 / 中位 / 最上位 / 特殊（中位からの脇道） */
+export type JobTier = 'base' | 'mid' | 'top' | 'special';
+/** 系統: 武・魔・聖・技 */
+export type Lineage = 'bu' | 'ma' | 'sei' | 'gi';
 
 /** 武器の種類のID（src/content の weaponTypes に登録したもの） */
 export type WeaponType = string;
@@ -304,6 +324,8 @@ export interface CardInstance {
 }
 
 export interface AllyState {
+  /** この戦闘の記録（転職の条件。敵を倒した数など。戦闘の後でキャラの記録に足す） */
+  feats?: Record<string, number>;
   /** 戦闘内で一意のID（a0, a1, ...）。同じ職業が複数いても区別できる */
   id: string;
   classId: string;

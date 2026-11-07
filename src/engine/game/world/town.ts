@@ -8,7 +8,7 @@ import type { GameCommand, GameState, ShopStock } from '../../../types';
 import type { Rng } from '../../rng';
 import { addItem, addLog, addLoot, ownedBy } from '../common';
 import { rarityIndex } from '../dungeon';
-import { clampHero, heroFocusMax, heroMaxHp } from '../hero';
+import { clampHero, heroFocusMax, heroMaxHp, jobWeapons } from '../hero';
 import { findHero } from '../heroes';
 import { cardRewardOdds, newItem, pickWeighted } from '../loot';
 import { applyOutcome, makeOutcomeCtx } from '../outcomes';
@@ -36,7 +36,7 @@ export function ensureShop(game: GameState, rng: Rng): ShopStock {
   const items: ShopStock['items'] = [];
   const price = (id: string) => BALANCE.itemPrice[getItem(id).rarity] ?? 30;
   for (const id of town.shop.fixed ?? []) items.push({ kind: 'item', item: newItem(game, getItem(id)), price: price(id) });
-  const types = new Set(game.heroes.filter((h) => !h.retired).map((h) => getClass(h.classId).weaponType));
+  const types = new Set(game.heroes.filter((h) => !h.retired).flatMap((h) => jobWeapons(h.classId)));
   const equip = ITEMS.all.filter((i) => i.slot !== 'consumable' && (i.slot !== 'weapon' || types.has(i.weaponType!)));
   const cons = ITEMS.all.filter((i) => i.slot === 'consumable' && !(town.shop.fixed ?? []).includes(i.id));
   const pickByRarity = (pool: typeof ITEMS.all) => {

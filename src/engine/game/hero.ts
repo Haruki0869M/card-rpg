@@ -2,7 +2,7 @@
 import { BALANCE } from '../../data/balance';
 import { getClass } from '../../data/classes';
 import { getItem } from '../../data/items';
-import type { CardInstance, EquipSlot, Hero, ItemDef, PartyMemberSpec, StatId, Stats } from '../../types';
+import type { CardInstance, EquipSlot, Hero, ItemDef, JobTier, PartyMemberSpec, StatId, Stats } from '../../types';
 
 export const STAT_IDS: StatId[] = ['str', 'vit', 'int', 'per', 'dex', 'agi', 'luk'];
 export const EQUIP_SLOTS: EquipSlot[] = ['weapon', 'armor', 'accessory'];
@@ -35,10 +35,19 @@ export const heroStartBlock = (hero: Hero) => equippedItems(hero).reduce((n, i) 
 export const heroExtraDraw = (hero: Hero) => equippedItems(hero).reduce((n, i) => n + (i.extraDraw ?? 0), 0);
 
 /** 装備の特殊能力（エピック以上。spec §12.7） */
-export const heroAbilities = (hero: Hero) =>
-  equippedItems(hero)
+export const heroAbilities = (hero: Hero) => [
+  // 転職で持ち越した、前のジョブの戦闘の特殊能力（spec §6.4）
+  ...(hero.carried && hero.carried !== hero.classId ? [getClass(hero.carried).battleAbility] : []),
+  ...equippedItems(hero)
     .filter((i) => i.ability)
-    .map((i) => ({ name: i.ability!.name, effect: i.ability!.effect }));
+    .map((i) => ({ name: i.ability!.name, effect: i.ability!.effect })),
+];
+
+/** そのジョブが装備できる武器の種類（得意な武器＋使える武器） */
+export const jobWeapons = (classId: string): string[] => {
+  const c = getClass(classId);
+  return [c.weaponType, ...(c.subWeapons ?? [])];
+};
 
 /** 武器の専用カード（戦闘時に山札へ加わる） */
 export function weaponCards(hero: Hero): CardInstance[] {
@@ -56,7 +65,16 @@ export function battleDeck(hero: Hero): CardInstance[] {
 }
 
 /** 次のレベルまでに必要な経験値 */
-export const expToNext = (level: number) => BALANCE.expBase + BALANCE.expPerLevel * (level - 1);
+/** 次のレベルに必要な経験値。段が上がるほど多く、転職直後の Lv1→2 は軽い（spec §6.4） */
+export function expToNext(level: number, classId?: string): number {
+  const base = BALANCE.expBase + BALANCE.expPerLevel * (level - 1);
+  const tier = classId ? jobTierIndex(getClass(classId).tier) : 0;
+  const first = tier > 0 && level === 1 ? BALANCE.firstLevelExpMul : 1;
+  return Math.round(base * BALANCE.tierExpMul ** tier * first);
+}
+
+/** 段の高さ（基本0・中位1・最上位と特殊2） */
+export const jobTierIndex = (tier: JobTier | undefined) => (tier === 'mid' ? 1 : tier === 'top' || tier === 'special' ? 2 : 0);
 
 /** 戦闘に参加する時の設定 */
 export function toPartyMember(hero: Hero): PartyMemberSpec {
@@ -83,7 +101,7 @@ export function toPartyMember(hero: Hero): PartyMemberSpec {
 /** 装備できるか（武器は職業ごとの種類だけ） */
 export function canEquip(hero: Hero, item: ItemDef): string | null {
   if (item.slot === 'consumable') return '装備品ではありません';
-  if (item.slot === 'weapon' && item.weaponType !== getClass(hero.classId).weaponType) return `${getClass(hero.classId).name}は装備できません`;
+  if (item.slot === 'weapon' && !jobWeapons(hero.classId).includes(item.weaponType ?? '')) return `${getClass(hero.classId).name}は装備できません`;
   return null;
 }
 

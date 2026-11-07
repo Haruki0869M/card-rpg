@@ -31,6 +31,12 @@ export const BALANCE = {
   maxLevel: 20,
   expBase: 20,
   expPerLevel: 25,
+  /** 転職（spec §6.4）: 転職できるレベル（基本→中位 / 中位→最上位 / 中位→特殊） */
+  jobChange: { base: 5, mid: 4, special: 3 },
+  /** 段が上がるごとの、次のレベルに必要な経験値の倍率（基本1・中位×1.2・最上位と特殊×1.44） */
+  tierExpMul: 1.2,
+  /** 転職した直後の Lv1→2 は軽く（成長ボーナスをすぐ選べるように） */
+  firstLevelExpMul: 0.6,
   /** 敵のレベルが1上がるごとの経験値・ゴールドの増加率 */
   rewardPerLevel: 0.15,
   /** 成長ボーナスの量 */

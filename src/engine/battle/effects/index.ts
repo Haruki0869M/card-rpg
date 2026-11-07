@@ -194,6 +194,16 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
       ctx.parts.push(`${getStatus(el.status).name}${el.amount ?? 1}`);
     }
   }
+  // 転職の条件の記録: 味方が敵を倒した（属性・呪い・自分のHPが少ない時）
+  if (v.dead && isEnemy(v) && !isEnemy(source)) {
+    const f = (source.feats ??= {});
+    const add = (k: string) => (f[k] = (f[k] ?? 0) + 1);
+    add('kills');
+    if (element) add('kills:element');
+    if ((v.statuses.curse ?? 0) > 0) add('kills:cursed');
+    if (source.hp <= source.maxHp * 0.3) add('kills:lowHp');
+    if (getEnemy(v.defId).size !== undefined && getEnemy(v.defId).size! >= 1.3) add('kills:big');
+  }
   // きっかけ: ダメージを受けた / 倒した
   if (ctx.depth < 3) {
     if (r.hpLoss > 0 && !v.dead) fireAbilities(state, rng, events, v, 'hurt', { depth: ctx.depth + 1 });
