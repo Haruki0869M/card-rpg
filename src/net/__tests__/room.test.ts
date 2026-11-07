@@ -1,13 +1,17 @@
 // ===== オンライン協力の部屋（テスト用の通信で、複数の端末をまねる） =====
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { botNextCommand } from '../../engine/bot';
 import { commandPlayer, stateHash } from '../../engine';
 import { MemoryHub } from '../memoryBackend';
 import { normalizeCode, Room, RoomError, seqKey, SNAPSHOT_EVERY } from '../room';
 
 /** 通知と非同期の処理が落ち着くまで待つ */
+// Windowsでは0msタイマーも約15ms待つため、400手分の待機が制限時間を超える。
+// 通知の非同期順序は維持し、待ち時間だけを仮想時計で進める。
+beforeEach(() => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }));
+afterEach(() => vi.useRealTimers());
 async function settle(n = 12) {
-  for (let i = 0; i < n; i++) await new Promise((r) => setTimeout(r, 0));
+  for (let i = 0; i < n; i++) await vi.advanceTimersByTimeAsync(1);
 }
 
 const classes = ['warrior', 'mage', 'guardian', 'hunter'];

@@ -18,6 +18,7 @@ export interface EffectCtx {
   cardAbilities?: AbilityDef[];
   /** カードが完全成功した（属性の状態異常は必ず付く） */
   perfect?: boolean;
+  tierEffects?: Effect[];
   /** HPに与えたダメージの合計（吸収などが読む） */
   dealt: number;
   /** 結果の短い表示（ログ・カードの結果の表示） */

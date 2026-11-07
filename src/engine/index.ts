@@ -9,7 +9,7 @@ export * from './stats';
 export * from './game/checks';
 export * from './game/dungeon';
 export * from './game/game';
-export { campFocusOf, moveSlotsOf, partySenses, restMultiplierOf, shopPriceFor } from './game/common';
+export { campFocusOf, moveSlotsOf, moveBonusOf, partySenses, restMultiplierOf, shopPriceFor } from './game/common';
 export * from './game/jobs';
 export * from './game/pets';
 export { cardTags, heroTagProfile, synergyWeight } from './game/cardTags';

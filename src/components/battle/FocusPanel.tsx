@@ -2,7 +2,7 @@
 import { motion } from 'framer-motion';
 import { Minus, Plus, Star, X } from 'lucide-react';
 import { cardOf } from '../../data/cards';
-import { chanceFor, findAlly, tierDistribution, toPercents } from '../../engine';
+import { rollChanceFor, findAlly, tierDistribution, toPercents } from '../../engine';
 import { useBattle } from '../../store/battleStore';
 import { CATEGORY_STYLE, EffectChip } from '../ui/icons';
 
@@ -21,7 +21,7 @@ export function FocusPanel() {
   if (!selection || !ally || !inst) return null;
   const card = cardOf(inst);
   const cat = CATEGORY_STYLE[card.category];
-  const chance = chanceFor(ally, card);
+  const chance = rollChanceFor(ally, card, selection.focus);
   const max = Math.min(card.slots, ally.focus);
   const probs = tierDistribution(card, selection.focus, chance);
   const pcts = toPercents(probs);

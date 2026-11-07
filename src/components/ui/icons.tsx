@@ -106,6 +106,10 @@ const EFFECT_ICON: Record<string, { Icon: LucideIcon; color: string }> = {
   heal: { Icon: HeartPulse, color: '#7dffa8' },
   healPctOfDealt: { Icon: HeartPulse, color: '#7dffa8' },
   cleanse: { Icon: Sparkles, color: '#9affd0' },
+  jump: { Icon: Swords, color: '#b4e7ff' },
+  fullRestore: { Icon: HeartPulse, color: '#7dffa8' },
+  stealIntent: { Icon: Sparkles, color: '#ffd06a' },
+  payHp: { Icon: HeartCrack, color: '#ff8aa0' },
 };
 const FALLBACK_EFFECT_ICON = { Icon: Sparkles, color: '#e0d8c0' };
 

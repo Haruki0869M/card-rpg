@@ -1,5 +1,6 @@
 // ===== 戦闘のユニット（味方・敵）の共通処理: 名前・ログ・ダメージ・回復・戦闘不能 =====
 import { BALANCE } from '../../data/balance';
+import { fireAbilities } from '../abilities';
 import { getEnemy } from '../../data/enemies';
 import type { AllyState, BattleEvent, BattleState, EnemyState } from '../../types';
 import type { Rng } from '../rng';
@@ -58,6 +59,8 @@ function killAlly(state: BattleState, ally: AllyState, rng: Rng, events: BattleE
   ally.statuses = emptyStatuses();
   addLog(state, `${ally.name}が戦闘不能になった`);
   events.push({ type: 'death', unitId: ally.id });
+  for (const a of state.allies) if (!a.dead || a === ally) fireAbilities(state, rng, events, a, 'allyDown', { target: ally });
+  if (!ally.dead) return;
   retargetAfterDeath(state, ally.id, rng, events);
 }
 

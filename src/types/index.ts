@@ -83,6 +83,8 @@ export interface CardDef {
   stat?: StatId;
   /** 報酬のスマート抽選に使う印（効果から自動で付く印に足す。例: 'combo'） */
   tags?: string[];
+  /** 使用後はこの戦闘の間だけ山札から除く（冒険の山札は変えない） */
+  exhaust?: boolean;
 }
 
 // ---------- 特殊能力（職業・装備・カード・敵で共通。spec §2.4・§6.2・§12.7・§13.1） ----------
@@ -92,7 +94,7 @@ export interface CardDef {
  * battleStart 戦闘開始時 / turnStart 自分の側のフェーズ開始時 / turnEnd 自分の側のフェーズ終了時 /
  * afterCard カードを使った後 / perfect カードが完全成功した時 / kill 敵を倒した時 / hurt HPにダメージを受けた時
  */
-export type AbilityTrigger = 'battleStart' | 'turnStart' | 'turnEnd' | 'afterCard' | 'perfect' | 'kill' | 'hurt';
+export type AbilityTrigger = 'battleStart' | 'turnStart' | 'turnEnd' | 'afterCard' | 'perfect' | 'kill' | 'hurt' | 'allyKill' | 'allyDown';
 
 /** 発動の条件の種類ごとの数値。条件のファイル（src/engine/abilities/conditions/）が declare module で種類を足す */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -111,6 +113,10 @@ export type AbilityEffect =
   | { modifier: 'coverLethal'; chance: number }
   /** カードの成功率+bonus（狙い撃ちなど） */
   | { modifier: 'cardChance'; bonus: number; if?: AbilityCondition[] }
+  | { modifier: 'completeSlots'; if?: AbilityCondition[] }
+  | { modifier: 'exhaust'; if?: AbilityCondition[] }
+  | { modifier: 'chestChance'; bonus: number; if?: AbilityCondition[] }
+  | { modifier: 'weaknessDamage'; multiplier: number; if?: AbilityCondition[] }
   /** 自分が付ける状態異常の量+amount（呪詛など） */
   | { modifier: 'statusBonus'; statuses: string[]; amount: number; if?: AbilityCondition[] };
 
@@ -131,6 +137,8 @@ export interface AbilityDef {
 
 /** 探索の特殊能力（世界マップ・イベントで効く） */
 export type ExploreAbility =
+  | { kind: 'combined'; effects: ExploreAbility[] }
+  | { kind: 'travel'; moveBonus: number; nightVision: boolean }
   | { kind: 'checkBonus'; check: string; bonus: number }
   /** 視界+N（M3）、隠し宝箱を見つける確率+X% */
   | { kind: 'tracking'; vision: number; hiddenFindBonus: number }
@@ -403,6 +411,13 @@ export interface CardInstance {
 }
 
 export interface AllyState {
+  exhaustedCards?: string[];
+  /** 最後に攻撃した敵（ターン終了時の追撃用） */
+  lastTargetId?: string;
+  /** 次の味方ターンに着地する跳躍 */
+  airborne?: { targetId: string; amount: number; turn: number };
+  /** この戦闘中だけ有効な与ダメージの上乗せ */
+  damageBonus?: number;
   /** この戦闘の記録（転職の条件。敵を倒した数など。戦闘の後でキャラの記録に足す） */
   feats?: Record<string, number>;
   /** このターンに使ったカードの枚数（連撃など） */
@@ -448,6 +463,8 @@ export interface Intent {
 }
 
 export interface EnemyState {
+  /** 次の行動の数値にかかる倍率（行動後に消える） */
+  nextActionMultiplier?: number;
   uid: string;
   defId: string;
   /** 同じ敵が複数いる時の区別（A, B, ...） */
@@ -516,6 +533,9 @@ export interface BattleState {
 
 /** 呼び出したお供（turns = 残りのターン数。0になったら帰る） */
 export interface SummonState {
+  /** カード攻撃への追撃と、被弾の身代わりをする召喚 */
+  echoPct?: number;
+  intercept?: boolean;
   id: string;
   name: string;
   icon: string;

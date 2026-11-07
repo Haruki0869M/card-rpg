@@ -53,6 +53,7 @@ function JobCard({ opt, onPick }: { opt: JobOption; onPick: () => void }) {
         <span className="font-display text-sky-200">《{j.exploreAbility.name}》</span>
         {j.exploreAbility.description}
       </div>
+      {j.requires && <div className="mt-1 text-[12px] text-amber-100">条件：{j.requires.text}（{opt.progress ?? 0}/{j.requires.count}）</div>}
       {opt.ready ? (
         <button onClick={onPick} className="btn btn-gold mt-1.5 flex h-11 w-full items-center justify-center gap-1.5 rounded-lg text-[15px] font-bold">
           <ArrowUpCircle size={18} /> {j.name}に転職する

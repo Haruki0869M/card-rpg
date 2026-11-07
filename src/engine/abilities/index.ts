@@ -6,7 +6,7 @@
 import { getClass } from '../../data/classes';
 import { getEnemy } from '../../data/enemies';
 import { getStatus } from '../../data/statuses';
-import type { AbilityCondition, AbilityDef, AbilityEffect, AbilityTrigger, BattleEvent, BattleState, CardDef, DamageScale } from '../../types';
+import type { AbilityCondition, AbilityDef, AbilityEffect, AbilityTrigger, BattleEvent, BattleState, CardDef, DamageScale, Effect } from '../../types';
 import { applyEffect, describeEffect, makeCtx } from '../battle/effects';
 import { abilityTriggered, addLog, isEnemy, nameOf, type Unit, unitIdOf } from '../battle/units';
 import type { Rng } from '../rng';
@@ -58,12 +58,21 @@ export interface DamageMods {
  * source が victim に与えるダメージの倍率（敵のレベル × 常時型の能力）とブロック無視。
  * cardAbilities = 使っているカードの特殊能力（そのカードだけで働く）。予測表示でも同じ関数を使う
  */
-export function damageModifiers(state: BattleState | undefined, source: Unit, card: CardDef | undefined, victim: Unit | undefined, cardAbilities?: AbilityDef[], perfect?: boolean): DamageMods {
-  const out: DamageMods = { multiplier: isEnemy(source) ? source.attackMul : 1, active: [], ignoreBlock: false };
+export function damageModifiers(state: BattleState | undefined, source: Unit, card: CardDef | undefined, victim: Unit | undefined, cardAbilities?: AbilityDef[], perfect?: boolean, element?: string): DamageMods {
+  const out: DamageMods = { multiplier: isEnemy(source) ? source.attackMul : 1 + (source.damageBonus ?? 0), active: [], ignoreBlock: false };
   const c: CondCtx = { state, self: source, card, target: victim, perfect };
   for (const ab of cardAbilities?.length ? [...abilitiesOf(source), ...cardAbilities] : abilitiesOf(source)) {
     const e = ab.effect;
-    if (!('modifier' in e) || (e.modifier !== 'damageDealt' && e.modifier !== 'ignoreBlock')) continue;
+    if (!('modifier' in e)) continue;
+    if (e.modifier === 'weaknessDamage') {
+      const el = element ?? (card?.category === 'physical' && !isEnemy(source) ? source.weaponElement : undefined);
+      if (el && victim && isEnemy(victim) && getEnemy(victim.defId).weak?.includes(el) && !getEnemy(victim.defId).resist?.includes(el) && testConditions(e.if, c)) {
+        out.multiplier *= e.multiplier;
+        out.active.push(ab.name);
+      }
+      continue;
+    }
+    if (e.modifier !== 'damageDealt' && e.modifier !== 'ignoreBlock') continue;
     if (!testConditions(e.if, c)) continue;
     if (e.modifier === 'damageDealt') {
       const m = e.multiplier * scaleOf(e.scale, source, victim);
@@ -143,15 +152,15 @@ export function fireAbilities(
   events: BattleEvent[],
   owner: Unit,
   when: AbilityTrigger,
-  opts: { card?: CardDef; target?: Unit; dealt?: number; list?: AbilityDef[]; depth?: number; focusUsed?: number } = {},
+  opts: { card?: CardDef; target?: Unit; dealt?: number; list?: AbilityDef[]; depth?: number; focusUsed?: number; tierEffects?: Effect[]; perfect?: boolean } = {},
 ): string[] {
   const out: string[] = [];
-  if (owner.dead && when !== 'hurt') return out;
+  if (owner.dead && when !== 'hurt' && !(when === 'allyDown' && opts.target === owner)) return out;
   for (const ab of opts.list ?? abilitiesOf(owner)) {
     const e = ab.effect;
     if (!isTriggered(e) || e.when !== when) continue;
     if (!testConditions(e.if, { state, rng, self: owner, card: opts.card, target: opts.target, dealt: opts.dealt, focusUsed: opts.focusUsed })) continue;
-    const ctx = makeCtx(state, rng, events, owner, { target: opts.target, card: opts.card, dealt: opts.dealt, depth: opts.depth });
+    const ctx = makeCtx(state, rng, events, owner, { target: opts.target, card: opts.card, dealt: opts.dealt, depth: opts.depth, tierEffects: opts.tierEffects, perfect: opts.perfect, cardAbilities: opts.card?.trait ? [opts.card.trait] : undefined });
     let any = false;
     for (const eff of e.do) any = applyEffect(ctx, eff) || any;
     if (!any) continue;
@@ -179,6 +188,8 @@ const TRIGGER_TEXT: Record<AbilityTrigger, string> = {
   perfect: '完全成功時',
   kill: '敵を倒した時',
   hurt: 'ダメージを受けた時',
+  allyKill: '味方が敵を倒した時',
+  allyDown: '味方が倒れた時',
 };
 
 const condText = (conds?: AbilityCondition[]) => (conds ?? []).map((c) => conditionHandler(c.kind).describe(c as never));
@@ -192,6 +203,10 @@ export function describeAbility(ab: AbilityDef, side: 'ally' | 'enemy' = 'ally')
     const cs = condText(e.if);
     const head = cs.length ? `${cs.join('・')}：` : '';
     if (e.modifier === 'cardChance') return `${head}成功率+${e.bonus}%`;
+    if (e.modifier === 'completeSlots') return `${head}残りの枠も全て成功する`;
+    if (e.modifier === 'exhaust') return '1戦闘1回。使ったカードは戦闘が終わるまで山札から除く';
+    if (e.modifier === 'chestChance') return `宝箱の運の判定+${e.bonus}%`;
+    if (e.modifier === 'weaknessDamage') return `${head}弱点属性のダメージ×${e.multiplier}`;
     if (e.modifier === 'statusBonus') return `${head}自分が付ける${e.statuses.map((x) => `「${getStatus(x).name}」`).join('')}+${e.amount}`;
     if (e.modifier === 'damageDealt') return `${head}${e.multiplier !== 1 ? `与えるダメージ×${e.multiplier}${e.scale ? '、さらに' : ''}` : ''}${e.scale ? scaleText(e.scale) : ''}`;
     return `${head}ダメージが敵のブロックを無視する`;

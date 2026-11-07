@@ -6,7 +6,7 @@ import { getItem, ITEMS } from '../../../data/items';
 import { QUESTS, SHRINES, TOWNS } from '../../../data/world';
 import type { GameCommand, GameState, ShopStock } from '../../../types';
 import type { Rng } from '../../rng';
-import { addItem, addLog, addLoot, ownedBy, shopPriceFor } from '../common';
+import { addItem, addLog, addLoot, earnGold, ownedBy, shopPriceFor } from '../common';
 import { rarityIndex } from '../dungeon';
 import { pickCard } from '../cardTags';
 import { clampHero, heroFocusMax, heroMaxHp, jobWeapons } from '../hero';
@@ -144,7 +144,7 @@ export function townSell(game: GameState, cmd: Cmd<'TOWN_SELL'>): string | undef
   if (i < 0 || isEquipped(game, cmd.itemUid)) return '売れる持ち物ではありません';
   const [it] = v.stash.splice(i, 1);
   const g = sellPrice(it.itemId);
-  v.gold += g;
+  earnGold(v, g);
   addLog(game, `${v.name}が${getItem(it.itemId).name}を売った（${g}G）`);
   return undefined;
 }

@@ -56,4 +56,48 @@ if (await page.locator('[data-job-pick]').count()) await fail('3択が閉じな�
 const hero = await page.evaluate(() => JSON.parse(localStorage.getItem('card-rpg/adventure')).game.heroes[0]);
 if (hero.classId !== 'swordmaster' || hero.level !== 1 || !hero.deck.some((c) => c.cardId === 'flashCut')) await fail(`転職の結果がおかしい: ${hero.classId} Lv${hero.level}`);
 console.log(`OK: ${hero.name} 剣豪 Lv${hero.level} EXP${hero.exp}・一閃を獲得・持ち越し=${hero.carried}`);
+
+// 最上位: レベル不足でも条件7/15が見え、聖堂で剣聖へ転職して専用カードを選べる。
+const baseSave = await page.evaluate(() => JSON.parse(localStorage.getItem('card-rpg/adventure')));
+for (const width of [360, 390, 480]) {
+  await page.setViewportSize({ width, height: 780 });
+  const seed = structuredClone(baseSave);
+  seed.game.heroes[0].level = 3;
+  seed.game.heroes[0].feats = { perfects: 7 };
+  await page.evaluate((d) => localStorage.setItem('card-rpg/adventure', JSON.stringify(d)), seed);
+  await page.reload();
+  await page.getByText('つづきから', { exact: true }).click();
+  await page.locator('[data-party-row] button').first().click();
+  await page.getByText('転職先を見る', { exact: true }).click();
+  if (!(await page.getByText('条件：完全成功15回（7/15）', { exact: true }).isVisible())) await fail(`${width}px: 条件の進捗が見えない`);
+  await page.waitForTimeout(250);
+  await shot(`top-progress-${width}`);
+  seed.game.heroes[0].level = 4;
+  seed.game.heroes[0].feats.perfects = 15;
+  await page.evaluate((d) => localStorage.setItem('card-rpg/adventure', JSON.stringify(d)), seed);
+  await page.reload();
+  await page.getByText('つづきから', { exact: true }).click();
+  await page.getByText('王都クリスタリアに入る', { exact: true }).click();
+  await page.getByText('聖堂（転職）', { exact: true }).click();
+  await page.getByText('剣聖に転職する', { exact: true }).click();
+  await page.getByRole('dialog').getByText('転職する', { exact: true }).click();
+  await page.getByRole('button', { name: '天剣', exact: true }).click();
+  await page.waitForTimeout(250);
+  const issues = await page.locator('[data-job-pick]').evaluate((el) => {
+    const out = [];
+    for (const button of el.querySelectorAll('button')) {
+      const r = button.getBoundingClientRect();
+      if (r.left < 0 || r.right > innerWidth || r.top < 0 || r.bottom > innerHeight) out.push('選択ボタンのはみ出し');
+    }
+    for (const e of el.querySelectorAll('*')) if ([...e.childNodes].some(c => c.nodeType === 3 && c.textContent.trim()) && parseFloat(getComputedStyle(e).fontSize) < 12) out.push('12px未満の文字');
+    return out;
+  });
+  if (issues.length) await fail(`${width}px: ${issues.join('・')}`);
+  await shot(`top-pick-${width}`);
+  await page.getByText('このカードにする', { exact: true }).click();
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('card-rpg/adventure')).game.heroes[0].deck.some(c => c.cardId === 'heavenBlade'));
+  const top = await page.evaluate(() => JSON.parse(localStorage.getItem('card-rpg/adventure')).game.heroes[0]);
+  if (top.classId !== 'swordSaint' || top.level !== 1 || !top.deck.some(c => c.cardId === 'heavenBlade') || top.carried !== 'swordmaster') await fail(`${width}px: 最上位への転職結果が不正`);
+  console.log(`OK: ${width}px 条件7/15・聖堂で剣聖へ転職・天剣を獲得`);
+}
 await browser.close();

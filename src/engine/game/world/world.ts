@@ -1,5 +1,6 @@
 // ===== 世界マップの進行（spec §8）: 手番・移動・遭遇・野営・侵食度・町への襲撃・命の灯火 =====
 import { BALANCE } from '../../../data/balance';
+import { moveBonusOf } from '../common';
 import { getClass } from '../../../data/classes';
 import { DUNGEONS } from '../../../data/dungeons';
 import { EVENTS } from '../../../data/events';
@@ -217,7 +218,7 @@ export function rollMove(game: GameState, cmd: Cmd<'WORLD_ROLL_MOVE'>, rng: Rng)
   const results = rollWithFocus(slots, cmd.focusUsed, statChance(h, 'agi', 'move'), rng);
   w.moveRoll = results;
   // お供（うさぎ）: 移動力の判定の成功数+N
-  w.move = BALANCE.moveBase + successes(results) + (petExplore(h).moveBonus ?? 0);
+  w.move = BALANCE.moveBase + successes(results) + moveBonusOf(h);
   w.prevTile = w.pos[h.id];
   return undefined;
 }

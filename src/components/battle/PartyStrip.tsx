@@ -81,6 +81,7 @@ const AllyCard = memo(function AllyCard({ ally }: { ally: AllyState }) {
         <StatusChips s={ally.statuses} side="ally" onTap={() => setActive(ally.id)} />
       </div>
       {/* 呼び出したお供（幻獣・獣など）: 枠の左上に小さく。ターン終了時に攻撃する */}
+      {!ally.dead && ally.airborne && <span className="absolute -top-3 left-7 rounded-full bg-sky-950 px-1 text-[12px] text-sky-100" data-airborne>跳躍中</span>}
       {!ally.dead && !!ally.summons?.length && (
         <div className="absolute -top-3 left-7 flex gap-0.5" data-summons>
           {ally.summons.slice(0, 2).map((m) => (

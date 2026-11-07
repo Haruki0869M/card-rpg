@@ -113,7 +113,7 @@ export function intentHitsOn(enemy: EnemyState, ally: AllyState): number[] {
     if (eff.kind !== 'damage') continue;
     const to = targetOf(eff);
     if (to === 'target' ? enemy.intent.targetId !== ally.id : to !== 'foes') continue;
-    const dmg = enemyHitDamage(enemy, eff.amount, ally);
+    const dmg = enemyHitDamage(enemy, Math.floor(eff.amount * (enemy.nextActionMultiplier ?? 1)), ally);
     for (let i = 0; i < (eff.hits ?? 1); i++) hits.push(dmg);
   }
   return hits;
@@ -128,6 +128,10 @@ export function dotDamage(ally: AllyState): number {
 export function incomingDamage(state: BattleState, ally: AllyState): number {
   if (ally.dead) return 0;
   let total = 0;
-  for (const e of state.enemies) for (const h of intentHitsOn(e, ally)) total += h;
+  let shields = ally.summons?.filter(s => s.intercept).length ?? 0;
+  for (const e of state.enemies) for (const h of intentHitsOn(e, ally)) {
+    if (ally.airborne || (h > 0 && shields-- > 0)) continue;
+    total += h;
+  }
   return Math.max(0, total - ally.block) + (state.phase === 'ally' ? dotDamage(ally) : 0);
 }

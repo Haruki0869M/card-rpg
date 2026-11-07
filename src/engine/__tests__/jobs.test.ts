@@ -7,8 +7,29 @@ import { applyCommand, applyGameCommand, createBattle, createGame, createRng, da
 import { cardTags, heroTagProfile, synergyWeight } from '../game/cardTags';
 import { chanceFor } from '../battle/battle';
 import { giveHand, nextTurn, play, setup } from './helpers';
+import { ENEMIES } from '../../data/enemies';
+import { applyEffect, dealDamage, makeCtx } from '../battle/effects';
+import { loseHp } from '../battle/units';
+import { checkBonus, earnGold, restMultiplierOf, statChance } from '../game/common';
+import { moveBonusOf, moveSlotsOf } from '../game/common';
+import { visionOf } from '../game/world/fog';
+import { BALANCE } from '../../data/balance';
+import type { BattleState } from '../../types';
+import { rollChanceFor, tierDamageAgainst } from '../battle/battle';
 
 const P: PlayerId = 'P1';
+ENEMIES.register({ id: 'topJobDummy', name: '検証用の敵', icon: 'T', maxHp: 10000, baseLevel: 1, exp: 1, gold: 1, size: 1.5,
+  weak: ['fire'], resist: ['ice'], pattern: 'sequence', actions: [{ id: 'hit', name: '打撃', effects: [{ kind: 'damage', amount: 10 }] }, { id: 'guard', name: '防御', effects: [{ kind: 'block', amount: 12 }] }] });
+function topBattle(classes: string[]): BattleState {
+  return createBattle({ seed: 19, party: classes.map(classId => ({ classId, gender: 'male', name: classId, playerId: P })), encounter: { id: 'testTop', name: '検証', enemies: [{ defId: 'topJobDummy' }] } });
+}
+function topPlay(state: BattleState, cardId: string, focus?: number): BattleState {
+  const a = state.allies[0];
+  giveHand(state, a.id, [cardId]); a.mana = 20; a.focus = 6;
+  const r = applyCommand(state, play(a.id, 't0', state.enemies[0].uid, focus ?? getCard(cardId).slots));
+  expect(r.error).toBeUndefined();
+  return r.state;
+}
 const newGame = (classes = ['warrior', 'mage']) =>
   createGame({ seed: 3, scenarioId: 'corruptionKing', difficulty: 'normal', party: classes.map((c, i) => ({ classId: c, gender: 'male', name: `${c}${i}`, playerId: P })) });
 
@@ -211,5 +232,177 @@ describe('中位ジョブの能力の部品', () => {
   it('乱数の種が同じなら結果も同じ', () => {
     const a = createRng(9).next();
     expect(createRng(9).next()).toBe(a);
+  });
+});
+
+describe('最上位13職の転職とカード', () => {
+  const topJobs = CLASSES.all.filter(c => c.tier === 'top');
+  it('13職それぞれが専用5枚・代表3枚を持つ', () => {
+    expect(topJobs).toHaveLength(13);
+    expect(new Set(topJobs.flatMap(j => j.cardPool)).size).toBe(65);
+    for (const j of topJobs) { expect(j.cardPool).toHaveLength(5); expect(j.signature).toEqual(j.cardPool.slice(0, 3)); }
+  });
+  it.each(topJobs.map(j => [j.id, j] as const))('%s: レベル・実績・場所を満たした時だけ転職できる', (_, j) => {
+    let g = newGame(['warrior']);
+    const h = g.heroes[0]; h.classId = j.from![0]; h.level = 3;
+    expect(jobOptions(h, g).find(o => o.job.id === j.id)?.ready).toBe(false);
+    h.level = 4; h.feats = { [j.requires!.feat]: j.requires!.count - 1 };
+    expect(jobOptions(h, g).find(o => o.job.id === j.id)?.progress).toBe(j.requires!.count - 1);
+    expect(jobOptions(h, g).find(o => o.job.id === j.id)?.qualified).toBe(false);
+    h.feats[j.requires!.feat]++;
+    expect(jobOptions(h, g).find(o => o.job.id === j.id)?.qualified).toBe(true);
+    expect(jobOptions(h, g).find(o => o.job.id === j.id)?.ready).toBe(false);
+    g.mode = 'shrine'; g.shrine = { heroId: h.id, shrineId: 'unused' } as GameState['shrine'];
+    const before = h.deck.length;
+    g = run(g, { type: 'CHANGE_JOB', playerId: P, heroId: h.id, jobId: j.id });
+    expect(g.heroes[0].level).toBe(1); expect(g.heroes[0].carried).toBe(j.from![0]);
+    expect(g.heroes[0].deck.length).toBe(before + (j.jobCards?.length ?? 0));
+    expect(g.heroes[0].jobPick).toEqual(j.signature);
+  });
+  it.each(['miracle', 'plunder', 'jump'])('%s: 同名の複数枚も含め1戦闘1回、次の戦闘で使える', id => {
+    let s = topBattle(['warrior']);
+    s.allies[0].drawPile.push({ uid: 'duplicate', cardId: id });
+    s = topPlay(s, id);
+    const a = s.allies[0];
+    expect(a.exhaustedCards).toContain(id);
+    expect([...a.hand, ...a.drawPile, ...a.discard].some(c => c.cardId === id)).toBe(false);
+    giveHand(s, a.id, [id]);
+    expect(applyCommand(s, play(a.id, 't0', s.enemies[0].uid, 0)).error).toContain('もう使いました');
+    expect(topPlay(topBattle(['warrior']), id).allies[0].exhaustedCards).toContain(id);
+  });
+});
+
+describe('最上位の戦闘能力', () => {
+  it('剣聖: 同じ成功段の効果を再発動し、支払い・使用枚数・実績は1回分', () => {
+    let s = topBattle(['swordSaint']);
+    s = topPlay(s, 'saintSlash');
+    expect(10000 * 0.6 - s.enemies[0].hp).toBe(18);
+    expect(s.allies[0].block).toBe(6); expect(s.allies[0].mana).toBe(19);
+    expect(s.allies[0].played).toBe(1); expect(s.allies[0].feats?.perfects).toBe(1);
+    const hp = s.enemies[0].hp;
+    s = topPlay(s, 'saintSlash');
+    expect(hp - s.enemies[0].hp).toBe(9);
+    s = nextTurn(s);
+    const hp2 = s.enemies[0].hp;
+    s = topPlay(s, 'saintSlash'); expect(hp2 - s.enemies[0].hp).toBe(18);
+  });
+  it('覇王: 仲間の撃破でも全員が強まり、最大50%で止まる', () => {
+    const s = topBattle(['overlord', 'warrior']);
+    const ctx = makeCtx(s, createRng(1), [], s.allies[1]);
+    for (let i = 0; i < 8; i++) { const e = s.enemies[0]; e.dead = false; e.hp = 1; dealDamage(ctx, e, 1); }
+    for (const a of s.allies) expect(a.damageBonus).toBeCloseTo(0.5);
+  });
+  it('拳王: 最後の攻撃対象へ使ったカード数×2の追撃', () => {
+    let s = topBattle(['fistKing']); s = topPlay(s, 'saintSlash'); s = topPlay(s, 'breathControl');
+    const hp = s.enemies[0].hp;
+    s = applyCommand(s, { type: 'END_TURN', playerId: P }).state;
+    expect(hp - s.enemies[0].hp).toBe(4);
+  });
+  it('大賢者: 弱点だけ1.3倍、予測値と実ダメージが一致する', () => {
+    const s = topBattle(['greatSage']); const a = s.allies[0], e = s.enemies[0];
+    const ctx = makeCtx(s, createRng(1), [], a);
+    expect(dealDamage(ctx, e, 10, 'fire')).toBe(19);
+    expect(dealDamage(ctx, e, 10, 'ice')).toBe(5);
+    expect(dealDamage(ctx, e, 10)).toBe(10);
+    const predicted = tierDamageAgainst(a, getCard('sageFlame'), e).at(-1)!;
+    const hp = e.hp; const n = topPlay(s, 'sageFlame'); expect(hp - n.enemies[0].hp).toBe(predicted);
+  });
+  it('冥王: ターン開始にHP3を払いマナ1を得る', () => {
+    const s = topBattle(['hadesLord']); expect(s.allies[0].hp).toBe(s.allies[0].maxHp - 3); expect(s.allies[0].mana).toBe(BALANCE.manaPerTurn + 1);
+  });
+  it('幻獣王とビーストマスター: 常駐召喚は99ターンで消えない', () => {
+    let s = topBattle(['phantomKing', 'beastMaster']);
+    expect(s.allies[0].summons?.map(x => x.damage)).toEqual([8]); expect(s.allies[1].summons?.map(x => x.damage)).toEqual([4, 4, 4]);
+    s = nextTurn(s); expect(s.allies[0].summons?.[0].turns).toBe(99);
+    expect(s.enemies[0].hp).toBeLessThan(10000);
+  });
+  it('聖王: 味方が倒れると30%で復活、2回目は復活しない（継続ダメージも対象）', () => {
+    const s = topBattle(['holyKing', 'warrior']); const a = s.allies[1];
+    loseHp(s, a, a.hp, createRng(1), []);
+    expect(a.dead).toBe(false); expect(a.hp).toBe(Math.round(a.maxHp * 0.3));
+    loseHp(s, a, a.hp, createRng(1), []); expect(a.dead).toBe(true);
+  });
+  it('聖王: 自分が倒れた時も1度だけ復活できる', () => {
+    const s = topBattle(['holyKing']); const a = s.allies[0];
+    loseHp(s, a, a.hp, createRng(1), []); expect(a.dead).toBe(false);
+    loseHp(s, a, a.hp, createRng(1), []); expect(a.dead).toBe(true);
+  });
+  it('聖王が2人いても同時に復活回数を使い切らない', () => {
+    const s = topBattle(['holyKing', 'holyKing', 'warrior']); const a = s.allies[2];
+    for (let i = 0; i < 2; i++) { loseHp(s, a, a.hp, createRng(1), []); expect(a.dead).toBe(false); }
+    loseHp(s, a, a.hp, createRng(1), []); expect(a.dead).toBe(true);
+  });
+  it('竜騎士: ターン終了時に敵全員へ4ダメージ', () => {
+    let s = topBattle(['dragoon']); const hp = s.enemies[0].hp;
+    s = applyCommand(s, { type: 'END_TURN', playerId: P }).state; expect(hp - s.enemies[0].hp).toBe(4);
+  });
+  it('教皇: ターン開始に味方全員を2回復', () => {
+    const spec = setup(7, ['pope', 'warrior']);
+    spec.party.forEach(a => { a.hp = 10; }); const s = createBattle(spec);
+    expect(s.allies.map(a => a.hp)).toEqual([12, 12]);
+  });
+  it('弓聖: フォーカス1でも単体攻撃は全成功、全体攻撃は対象外', () => {
+    let s = topBattle(['bowSaint']); s.allies[0].statuses.paralysis = 100;
+    expect(rollChanceFor(s.allies[0], getCard('skyPiercer'), 1)).toBe(100);
+    expect(rollChanceFor(s.allies[0], getCard('skyPiercer'), 0)).toBeLessThan(100);
+    const r = topPlay(s, 'skyPiercer', 1); expect(r.stats.perfects).toBe(1);
+    const baseline = structuredClone(s); baseline.allies[0].classId = 'archer';
+    const n = topPlay(s, 'heavenRain', 1); expect(n.stats.perfects).toBe(topPlay(baseline, 'heavenRain', 1).stats.perfects);
+  });
+  it('忍者: 分身2体が各半分で追撃し、被弾ごとに1体消える', () => {
+    let s = topBattle(['ninja']); s = topPlay(s, 'shadowShuriken');
+    expect(6000 - s.enemies[0].hp).toBe(16);
+    const a = s.allies[0], hp = a.hp; const ctx = makeCtx(s, createRng(1), [], s.enemies[0]);
+    dealDamage(ctx, a, 10); expect(a.hp).toBe(hp); expect(a.summons).toHaveLength(1);
+    dealDamage(ctx, a, 10); expect(a.hp).toBe(hp); expect(a.summons).toHaveLength(0);
+    dealDamage(ctx, a, 10); expect(a.hp).toBe(hp - 10);
+  });
+  it('奇跡: 呪いによる回復減少も残さず、全員を全回復する', () => {
+    let s = topBattle(['pope', 'warrior']); s.allies.forEach(a => { a.hp = 1; a.statuses.curse = 3; a.statuses.poison = 2; });
+    s = topPlay(s, 'miracle'); for (const a of s.allies) { expect(a.hp).toBe(a.maxHp); expect(a.statuses.curse).toBe(0); expect(a.statuses.poison).toBe(0); }
+  });
+  it('跳躍: 敵の攻撃を受けず、次のターンに着地して攻撃する', () => {
+    let s = topPlay(topBattle(['warrior']), 'jump'); const hp = s.allies[0].hp, foeHp = s.enemies[0].hp;
+    s = nextTurn(s); expect(s.allies[0].hp).toBe(hp); expect(s.allies[0].airborne).toBeUndefined(); expect(foeHp - s.enemies[0].hp).toBe(40);
+  });
+  it('強奪: 次の攻撃だけ半減し、自分に半分のブロックを得る', () => {
+    let s = topPlay(topBattle(['warrior']), 'plunder'); const a = s.allies[0];
+    expect(s.enemies[0].nextActionMultiplier).toBe(0.5); expect(a.block).toBe(5);
+    const hp = a.hp; s = nextTurn(s); expect(s.allies[0].hp).toBe(hp); expect(s.enemies[0].nextActionMultiplier).toBeUndefined();
+  });
+  it('強奪: 防御行動も半減し、同じ種類の効果を受け取る', () => {
+    const s = topBattle(['warrior']); s.enemies[0].intent = { actionId: 'guard' };
+    const ctx = makeCtx(s, createRng(1), [], s.allies[0], { target: s.enemies[0] });
+    applyEffect(ctx, { kind: 'stealIntent', multiplier: 0.5 }); expect(s.allies[0].block).toBe(6);
+  });
+  it('同じコマンドと種なら分身・召喚を含め結果が一致し、入力は変わらない', () => {
+    const s = topBattle(['ninja', 'phantomKing']); giveHand(s, 'a0', ['shadowShuriken']); const copy = structuredClone(s);
+    const cmd = play('a0', 't0', s.enemies[0].uid, 1);
+    expect(applyCommand(s, cmd)).toEqual(applyCommand(s, cmd)); expect(s).toEqual(copy);
+  });
+});
+
+describe('最上位の探索能力と実績', () => {
+  it('大賢者のイベント補正、弓聖の複合能力、大怪盗の宝箱と値引き', () => {
+    const g = newGame(); const h = g.heroes[0]; h.classId = 'greatSage';
+    expect(statChance(h, 'luk', undefined, true) - statChance(h, 'luk')).toBe(20);
+    h.classId = 'bowSaint'; expect(checkBonus(h, 'ambush')).toBe(15); expect(visionOf(g, g.world!, h.id)).toBe(BALANCE.visionRange + 2);
+    h.classId = 'grandThief'; expect(checkBonus(h, 'luck')).toBe(20); expect(shopPriceFor(h, 100)).toBe(75);
+    h.classId = 'dragoon'; expect(moveSlotsOf(h)).toBe(BALANCE.moveSlots + 2);
+    h.classId = 'pope'; expect(restMultiplierOf(h)).toBe(2);
+  });
+  it('ビーストマスターは夜も視界が狭まらない', () => {
+    const g = newGame(); const h = g.heroes[0]; h.classId = 'beastMaster'; g.world!.worldTurn = BALANCE.turnsPerTimeOfDay * 3 + 1;
+    expect(visionOf(g, g.world!, h.id)).toBe(BALANCE.visionRange);
+    expect(moveBonusOf(h)).toBe(1);
+  });
+  it('稼いだ金額は支出後も残り、初期所持金を含めない', () => {
+    const g = newGame(); const h = g.heroes[0]; expect(h.feats?.goldEarned ?? 0).toBe(0);
+    earnGold(h, 150); h.gold -= 100; earnGold(h, 150); expect(h.feats?.goldEarned).toBe(300);
+  });
+  it('状態異常の敵の撃破と回復カードの成功を記録する', () => {
+    let s = topBattle(['warrior']); s.enemies[0].hp = 1; s.enemies[0].statuses.weak = 1;
+    s = topPlay(s, 'saintSlash'); expect(s.allies[0].feats?.['kills:status']).toBe(1);
+    s = topPlay(topBattle(['priest']), 'papalPrayer'); expect(s.allies[0].feats?.['success:heal']).toBe(1);
   });
 });

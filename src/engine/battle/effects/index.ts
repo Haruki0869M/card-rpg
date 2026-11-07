@@ -40,7 +40,7 @@ export function makeCtx(
   rng: Rng,
   events: BattleEvent[],
   source: Unit,
-  opts: { target?: Unit; card?: CardDef; cardAbilities?: AbilityDef[]; dealt?: number; depth?: number; perfect?: boolean } = {},
+  opts: { target?: Unit; card?: CardDef; cardAbilities?: AbilityDef[]; dealt?: number; depth?: number; perfect?: boolean; tierEffects?: Effect[] } = {},
 ): EffectCtx {
   return {
     state,
@@ -51,6 +51,7 @@ export function makeCtx(
     card: opts.card,
     cardAbilities: opts.cardAbilities,
     perfect: opts.perfect,
+    tierEffects: opts.tierEffects,
     dealt: opts.dealt ?? 0,
     parts: [],
     hitIds: [],
@@ -177,7 +178,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   // 武器に宿った属性: 属性の無い物理攻撃がその属性になる（妖精の泉）
   if (!element && !isEnemy(source) && source.weaponElement && ctx.card?.category === 'physical') element = source.weaponElement;
   let v = victim;
-  let mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities, ctx.perfect);
+  let mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities, ctx.perfect, element);
   // 属性を強める状態異常（聖光など）: この一撃で使い切る
   const boost = element ? elementBoost(source, element) : 1;
   base = Math.round(base * boost);
@@ -192,7 +193,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
         abilityTriggered(state, unitIdOf(other), cov.name, events);
         addLog(state, `${nameOf(other)}の「${cov.name}」！ ${nameOf(v)}をかばった`);
         v = other;
-        mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities, ctx.perfect);
+        mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities, ctx.perfect, element);
         dmg = calcDamage(base, source.statuses, v.statuses, mods.multiplier * elementMultiplier(v, element) * comboMultiplier(source, v));
         break;
       }
@@ -206,6 +207,16 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
     if (!(v.hitBy ??= []).includes(id)) v.hitBy.push(id);
   }
   if (mods.ignoreBlock && v.block > 0 && mods.ignoreBlockName && !ctx.fired.includes(mods.ignoreBlockName)) ctx.fired.push(mods.ignoreBlockName);
+  if (!isEnemy(v) && dmg > 0 && isEnemy(source)) {
+    if (v.airborne) return 0;
+    const shield = v.summons?.findIndex(s => s.intercept) ?? -1;
+    if (shield >= 0) {
+      const [s] = v.summons!.splice(shield, 1);
+      abilityTriggered(state, v.id, s.name, events);
+      events.push({ type: 'damage', unitId: v.id, amount: 0, blocked: dmg, sourceId: unitIdOf(source) });
+      return 0;
+    }
+  }
   const r = absorb(dmg, mods.ignoreBlock ? 0 : v.block, v.hp);
   if (!mods.ignoreBlock) v.block = r.block;
   v.hp = r.hp;
@@ -230,6 +241,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
     add('kills');
     if (element) add('kills:element');
     if ((v.statuses.curse ?? 0) > 0) add('kills:cursed');
+    if (Object.entries(v.statuses).some(([id, n]) => n > 0 && getStatus(id).harmful)) add('kills:status');
     if (source.hp <= source.maxHp * 0.3) add('kills:lowHp');
     if (getEnemy(v.defId).size !== undefined && getEnemy(v.defId).size! >= 1.3) add('kills:big');
   }
@@ -237,6 +249,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   if (ctx.depth < 3) {
     if (r.hpLoss > 0 && !v.dead) fireAbilities(state, rng, events, v, 'hurt', { depth: ctx.depth + 1 });
     if (v.dead && isEnemy(source) !== isEnemy(v) && !source.dead) fireAbilities(state, rng, events, source, 'kill', { target: v, depth: ctx.depth + 1 });
+    if (v.dead && isEnemy(v) && !isEnemy(source)) for (const a of state.allies) if (!a.dead) fireAbilities(state, rng, events, a, 'allyKill', { target: v, depth: ctx.depth + 1 });
   }
   return r.hpLoss;
 }

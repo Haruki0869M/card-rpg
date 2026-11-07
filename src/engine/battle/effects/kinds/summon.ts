@@ -5,7 +5,7 @@ import type { EffectHandler } from '../types';
 
 declare module '../../../../types' {
   interface EffectParams {
-    summon: { id: string; name: string; icon: string; damage: number; turns: number; element?: string };
+    summon: { id: string; name: string; icon: string; damage: number; turns: number; element?: string; echoPct?: number; intercept?: boolean };
   }
 }
 
@@ -19,12 +19,12 @@ export const effect: EffectHandler<'summon'> = {
     if (cur) {
       cur.turns = Math.max(cur.turns, e.turns);
       cur.damage = Math.max(cur.damage, e.damage);
-    } else list.push({ id: e.id, name: e.name, icon: e.icon, damage: e.damage, turns: e.turns, element: e.element });
+    } else list.push({ id: e.id, name: e.name, icon: e.icon, damage: e.damage, turns: e.turns, element: e.element, echoPct: e.echoPct, intercept: e.intercept });
     ctx.events.push({ type: 'ability', unitId: unitIdOf(ctx.source), name: e.name });
     ctx.parts.push(`${e.name}を呼んだ`);
     return true;
   },
   describe: (e) =>
-    `${e.name}を呼ぶ（${e.turns >= 99 ? '戦闘の間ずっと' : `${e.turns}ターン`}、ターン終了時にランダムな敵へ${e.damage}の${e.element ? `${getElement(e.element).name}属性` : ''}ダメージ）`,
+    e.echoPct ? `${e.name}を呼ぶ（攻撃時に${e.echoPct}%の威力で追撃、被弾時に消えてダメージを0に）` : `${e.name}を呼ぶ（${e.turns >= 99 ? '戦闘の間ずっと' : `${e.turns}ターン`}、ターン終了時にランダムな敵へ${e.damage}の${e.element ? `${getElement(e.element).name}属性` : ''}ダメージ）`,
   short: (e) => `${e.damage}`,
 };

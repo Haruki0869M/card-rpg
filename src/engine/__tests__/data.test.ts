@@ -30,14 +30,14 @@ describe('データの整合性', () => {
       expect(c.baseMaxHp).toBeGreaterThan(0);
     }
   });
-  it('転職: 中位以上のジョブは転職元があり、専用カード3枚と6枚以上の候補を持つ', () => {
+  it('転職: 中位以上は転職元・代表3枚・候補を持つ（最上位5枚、その他6枚以上）', () => {
     for (const c of CLASSES.all) {
       if ((c.tier ?? 'base') === 'base') continue;
       expect(c.from?.length, c.id).toBeGreaterThan(0);
       for (const f of c.from ?? []) expect(CLASSES.has(f), `${c.id} from ${f}`).toBe(true);
       expect(c.signature?.length, c.id).toBe(3);
       for (const id of c.signature ?? []) expect(c.cardPool, `${c.id}: ${id}`).toContain(id);
-      expect(c.cardPool.length, c.id).toBeGreaterThanOrEqual(6);
+      expect(c.cardPool.length, c.id).toBeGreaterThanOrEqual(c.tier === 'top' ? 5 : 6);
       expect(STARTER_WEAPON(c), c.id).toBe(true);
     }
   });

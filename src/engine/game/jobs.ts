@@ -74,6 +74,7 @@ const ANYWHERE: HeroPlace[] = ['map', 'town', 'shrine', 'rest', 'hub'];
 export const jobPlaceText = (job: ClassDef) => (job.tier === 'mid' ? '世界マップ・町・休憩部屋' : '町の聖堂・祠');
 
 export interface JobOption {
+  progress?: number;
   job: ClassDef;
   /** 今すぐ転職できるか（場所も含む） */
   ready: boolean;
@@ -95,7 +96,7 @@ export function jobOptions(hero: Hero, game?: GameState): JobOption[] {
       if (r && featOf(hero, r.feat) < r.count) return { job, ready: false, qualified: false, reason: `条件: ${r.text}（${featOf(hero, r.feat)}/${r.count}）` };
       if (place && !(job.tier === 'mid' ? ANYWHERE : SACRED).includes(place)) return { job, ready: false, qualified: true, reason: `${jobPlaceText(job)}で転職できる` };
       return { job, ready: true, qualified: true };
-    });
+    }).map(o => ({ ...o, progress: o.job.requires ? featOf(hero, o.job.requires.feat) : undefined }));
 }
 
 /** 転職した時に選べる専用カード（3枚。無ければ報酬の候補の先頭から） */
