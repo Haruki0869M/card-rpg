@@ -1,7 +1,7 @@
 import { TERMS } from '../../data/terms';
 // ===== 上部バー・下部バー =====
 import { AnimatePresence, motion } from 'framer-motion';
-import { Backpack, Layers, Menu, Skull, Trash2 } from 'lucide-react';
+import { Backpack, Flame, Layers, Menu, Skull, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { findAlly, isDone, waitingPlayers } from '../../engine';
 import { isLocalPlayer } from '../../store/battleConfig';
@@ -10,8 +10,9 @@ import { useBattle } from '../../store/battleStore';
 export function TopBar() {
   const turn = useBattle((s) => s.battle.turn);
   const openSheet = useBattle((s) => s.openSheet);
-  // 侵食度（M3で世界マップと連動。M1では表示のみ）
-  const corruption = 0;
+  // 侵食度と命の灯火（冒険の状態から）
+  const corruption = useBattle((s) => s.full?.world?.corruption ?? 0);
+  const lives = useBattle((s) => s.full?.lives);
   return (
     <div className="flex h-11 shrink-0 items-center gap-2 px-2">
       <div className="font-display flex items-baseline gap-1 whitespace-nowrap text-amber-200">
@@ -33,6 +34,11 @@ export function TopBar() {
           </div>
         </div>
       </div>
+      {lives !== undefined && (
+        <span className="flex shrink-0 items-center gap-0.5 rounded-full border border-orange-400/40 bg-black/50 px-1.5 text-[13px] font-bold text-orange-200 tabular-nums" aria-label="命の灯火" data-lives={lives}>
+          <Flame size={14} className="fill-orange-500/60 text-orange-300" />×{lives}
+        </span>
+      )}
       <button
         onClick={(e) => {
           e.stopPropagation();

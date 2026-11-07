@@ -280,18 +280,6 @@ export function ChestScreen() {
             {locked && <Lock size={18} className="ml-1 inline text-amber-200" />}
           </div>
 
-          {/* 確率の帯 */}
-          {!showResult && (
-            <div className="mt-1 w-full max-w-[380px] rounded-xl bg-black/45 px-2 py-1.5">
-              <OddsBar odds={shownOdds} label={!opened ? (locked ? '中身の格の確率（鍵を開けた後に運で上げられる）' : `${hero.name}・フォーカス${focus}で開けた時の確率`) : passed('shift') ? 'スロットの結果で確率が上がった！' : '中身の格の確率'} duration={REVEAL_TIMING.oddsShift / speed} />
-              {!opened && !locked && (
-                <div className="mt-1 opacity-80">
-                  <OddsBar odds={perfectOdds} label="完全成功（3つ全部成功）なら" height={8} />
-                </div>
-              )}
-            </div>
-          )}
-
           {/* 演出中のリール */}
           {roll && stepIdx !== null && animating && (
             <div className="mt-2">
@@ -306,6 +294,14 @@ export function ChestScreen() {
             className="relative my-2 flex h-[150px] w-[184px] shrink-0 items-center justify-center"
           >
             <span className="absolute inset-0 rounded-full" style={{ background: `radial-gradient(closest-side, ${showResult ? r.glow : light >= 0 ? `${LIGHT[light]}88` : RARITY_STYLE[look].glow}, transparent)` }} />
+            {/* レア以上: 格の色の後光（光の筋がゆっくり回る） */}
+            {showResult && rarityIndex(grade) >= 1 && (
+              <span
+                className="speed-lines pointer-events-none absolute -inset-[60%] rounded-full opacity-70"
+                style={{ background: `repeating-conic-gradient(from 0deg, ${r.glow} 0deg 6deg, transparent 6deg 18deg)`, maskImage: 'radial-gradient(closest-side, #000 30%, transparent 75%)', WebkitMaskImage: 'radial-gradient(closest-side, #000 30%, transparent 75%)' }}
+                data-halo
+              />
+            )}
             <div className={`relative h-[150px] w-[184px] ${shakeClass}`}>
               <ChestImage rarity={look} open={showResult} className="h-full w-full" />
               {/* 開いた瞬間: 中からはじける光（描いた宝箱は閉じた姿だけなので、光で開いたことを見せる） */}
@@ -346,6 +342,18 @@ export function ChestScreen() {
             </div>
             {locked && !opened && <Lock size={28} className="absolute bottom-0 rounded-full bg-zinc-900 p-1 text-amber-200" />}
           </motion.div>
+
+          {/* 確率の帯 */}
+          {!showResult && (
+            <div className="mt-2 w-full max-w-[380px] rounded-xl border border-amber-300/25 bg-black/55 px-2 py-1.5" data-chest-odds>
+              <OddsBar odds={shownOdds} label={!opened ? (locked ? '中身の格の確率（鍵を開けた後に運で上げられる）' : `${hero.name}・フォーカス${focus}で開けた時の確率`) : passed('shift') ? 'スロットの結果で確率が上がった！' : '中身の格の確率'} duration={REVEAL_TIMING.oddsShift / speed} height={18} />
+              {!opened && !locked && (
+                <div className="mt-1 opacity-80">
+                  <OddsBar odds={perfectOdds} label="完全成功（3つ全部成功）なら" height={12} />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* レジェンドの文字 */}
           <AnimatePresence>
@@ -402,7 +410,8 @@ export function ChestScreen() {
                 </div>
               )}
               {roll?.odds && <OddsBar odds={roll.odds} highlight={grade} height={8} />}
-              <div className="mt-1 w-full">
+              {/* 手に入れた物: 格の色の縁と金の四隅 */}
+              <div className="panel-ornate mt-1 w-full rounded-xl border-2 p-1.5" style={{ borderColor: r.color, background: 'rgba(0,0,0,.55)', boxShadow: `0 0 14px ${r.glow}` }} data-loot-frame>
                 <LootList loot={chest.contents!} />
                 <div className="mt-1 text-center text-[12px] text-zinc-400">装備品は「パーティ・装備」から誰にでも装備できます</div>
               </div>

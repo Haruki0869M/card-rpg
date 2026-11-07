@@ -8,7 +8,7 @@ import { DUNGEONS } from '../../data/dungeons';
 import { getEnemy } from '../../data/enemies';
 import { EVENTS } from '../../data/events';
 import { getItem } from '../../data/items';
-import { chestOdds, partyGold, reachableRooms, retreatLoss, statChance } from '../../engine';
+import { chestOdds, heroMaxHp, partyGold, reachableRooms, retreatLoss, statChance } from '../../engine';
 import { BALANCE } from '../../data/balance';
 import { PLAYER_COLOR } from '../../data/theme';
 import { isLocalPlayer } from '../../store/battleConfig';
@@ -23,7 +23,7 @@ import { useBattle } from '../../store/battleStore';
 import { getRoomType } from '../../data/rules';
 import type { Room } from '../../types';
 import { CHEST_NAME, OddsBar } from '../ui/ChestOdds';
-import { HeroMini, ItemIcon, RARITY_STYLE, Screen } from '../ui/game';
+import { Bar, ItemIcon, RARITY_STYLE, Screen } from '../ui/game';
 
 /** 部屋のアイコン（部屋の種類のデータの icon のキー → アイコン）。新しいアイコンが要る時はここに1行足す */
 const ROOM_ICONS: Record<string, typeof Swords> = { swords: Swords, skull: Skull, crown: Crown, gift: Gift, sparkles: Sparkles, flame: Flame };
@@ -118,6 +118,8 @@ export function DungeonScreen() {
     return { x: ((r.col + 0.5) / w) * W, y: H - 40 - r.row * ROW_H };
   };
   const current = run.rooms.find((r) => r.id === run.currentRoomId);
+  const hasTabs = useBattle((s) => (s.full?.expeditions?.length ?? 0) > 0);
+  const partyHeroes = game.heroes.filter((h) => !game.party || game.party.includes(h.id));
   const sel = selected ? run.rooms.find((r) => r.id === selected) : undefined;
   const loss = retreatLoss(game);
 
@@ -132,7 +134,8 @@ export function DungeonScreen() {
   return (
     <Screen>
       <div className="flex h-12 shrink-0 items-center gap-2 px-2">
-        <div className="font-display text-outline min-w-0 flex-1 truncate text-[18px] text-amber-100">{run.name}</div>
+        {/* 名前は上の場面のタブに出ているので、タブがある時は出さない（2回出さない） */}
+        <div className="font-display text-outline min-w-0 flex-1 truncate text-[18px] text-amber-100">{hasTabs ? '' : run.name}</div>
         <div className="panel flex h-9 items-center gap-1 rounded-full px-3 text-[14px] font-bold text-amber-200 tabular-nums">
           <Coins size={16} /> {partyGold(game)}G
         </div>
@@ -151,7 +154,9 @@ export function DungeonScreen() {
                   const n = run.rooms.find((x) => x.id === nid)!;
                   const a = pos(r);
                   const b = pos(n);
-                  const lit = r.cleared && (n.cleared || reach.has(n.id));
+                  // 進める道: 太く明るい実線と光 / 通った道: 落ち着いた金 / それ以外: 暗い破線
+                  const next = r.cleared && reach.has(n.id);
+                  const walked = r.cleared && n.cleared;
                   return (
                     <line
                       key={r.id + nid}
@@ -159,9 +164,10 @@ export function DungeonScreen() {
                       y1={a.y}
                       x2={b.x}
                       y2={b.y}
-                      stroke={lit ? '#ffd36a' : 'rgba(220,200,170,.35)'}
-                      strokeWidth={lit ? 3.5 : 2.5}
-                      strokeDasharray={lit ? undefined : '6 6'}
+                      stroke={next ? '#ffe08a' : walked ? '#a8853e' : 'rgba(220,200,170,.25)'}
+                      strokeWidth={next ? 5 : walked ? 3 : 2}
+                      strokeDasharray={next || walked ? undefined : '5 7'}
+                      style={next ? { filter: 'drop-shadow(0 0 4px #ffd36a)' } : undefined}
                     />
                   );
                 }),
@@ -188,13 +194,22 @@ export function DungeonScreen() {
                     width: s,
                     height: s,
                     background: t.bg,
-                    borderColor: isCur ? '#ffffff' : canGo ? t.color : 'rgba(255,255,255,.2)',
-                    opacity: r.cleared && !isCur ? 0.55 : canGo || isCur ? 1 : 0.75,
-                    boxShadow: canGo ? `0 0 16px ${t.color}` : selected === r.id ? '0 0 0 3px #fff' : undefined,
+                    borderColor: isCur ? '#fff3c4' : canGo ? t.color : 'rgba(255,255,255,.2)',
+                    opacity: r.cleared && !isCur ? 0.45 : canGo || isCur ? 1 : 0.6,
+                    filter: r.cleared && !isCur ? 'grayscale(.6)' : undefined,
+                    boxShadow: isCur ? '0 0 0 3px rgba(255,220,140,.5), 0 0 22px #ffd36a' : canGo ? `0 0 16px ${t.color}` : selected === r.id ? '0 0 0 3px #fff' : undefined,
                   }}
                   aria-label={t.name}
                 >
                   {canGo && <span className="glow-pulse absolute -inset-1.5 rounded-full border-2" style={{ borderColor: t.color }} />}
+                  {/* 今いる部屋: パーティの顔 */}
+                  {isCur && (
+                    <span className="absolute -top-[22px] left-1/2 flex -translate-x-1/2 -space-x-2" data-party-here>
+                      {partyHeroes.map((h) => (
+                        <HeroFace key={h.id} hero={h} size={24} dim={h.hp <= 0} />
+                      ))}
+                    </span>
+                  )}
                   <t.Icon size={big ? 32 : 24} strokeWidth={2.4} style={{ color: t.color }} />
                   {r.cleared && (
                     <span className="absolute -right-1 -bottom-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white">
@@ -251,24 +266,31 @@ export function DungeonScreen() {
         </AnimatePresence>
       </div>
 
-      <div className="flex shrink-0 gap-1 px-2 pt-2">
-        {game.heroes
-          .filter((h) => !game.party || game.party.includes(h.id))
-          .map((h) => (
-            <HeroMini key={h.id} hero={h} onTap={() => openSheet('party')} />
-          ))}
-      </div>
       <ExplorePanel />
-      <div className="grid shrink-0 grid-cols-3 gap-2 px-2 pt-2 pb-3">
-        <button onClick={() => openSheet('party')} className="btn btn-dark flex h-12 items-center justify-center gap-1 rounded-xl text-[14px] font-bold">
-          <Users size={17} className="text-amber-300" /> 装備
-        </button>
-        <button onClick={() => openSheet('pouch')} className="btn btn-dark flex h-12 items-center justify-center gap-1 rounded-xl text-[14px] font-bold">
-          <Backpack size={17} className="text-amber-300" /> 道具
-        </button>
-        <button onClick={() => setShowRetreat((v) => !v)} className="btn btn-dark flex h-12 items-center justify-center gap-1 rounded-xl text-[14px] font-bold">
-          <LogOut size={17} className="text-red-300" /> 撤退
-        </button>
+      {/* パーティ（顔と細いHP）と、装備・道具・撤退を1行に */}
+      <div className="flex shrink-0 items-center gap-1 px-2 pt-1.5 pb-3" data-dungeon-bar>
+        <div className="flex min-w-0 flex-1 gap-0.5 overflow-x-auto">
+          {partyHeroes.map((h) => (
+            <button key={h.id} onClick={() => openSheet('party')} aria-label={`${h.name} HP${h.hp}/${heroMaxHp(h)}`} className="btn flex h-11 w-11 shrink-0 flex-col items-center justify-center">
+              <HeroFace hero={h} size={30} dim={h.hp <= 0} />
+              <span className="mt-[2px] block w-[32px]">
+                <Bar value={h.hp} max={heroMaxHp(h)} color="linear-gradient(90deg,#22b45a,#7dffa8)" height={4} />
+              </span>
+            </button>
+          ))}
+        </div>
+        {(
+          [
+            ['装備', Users, 'text-amber-300', () => openSheet('party')],
+            ['道具', Backpack, 'text-amber-300', () => openSheet('pouch')],
+            ['撤退', LogOut, 'text-red-300', () => setShowRetreat((v) => !v)],
+          ] as const
+        ).map(([label, Icon, color, on]) => (
+          <button key={label} onClick={on} className="btn btn-dark flex h-12 w-[52px] shrink-0 flex-col items-center justify-center rounded-xl text-[12px] leading-4 font-bold">
+            <Icon size={17} className={color} />
+            {label}
+          </button>
+        ))}
       </div>
       <AnimatePresence>
         {showRetreat && (
@@ -362,32 +384,30 @@ function ExplorePanel() {
     const max = Math.min(BALANCE.exploreSlots, roller.focus);
     const f = Math.min(focus, max);
     return (
-      <div className="mx-2 mt-2 flex shrink-0 flex-col gap-1.5 rounded-xl border border-amber-300/40 bg-black/50 px-2 py-2">
-        <div className="flex items-center gap-2">
-          <button onClick={() => setFocus(Math.max(0, f - 1))} disabled={f <= 0} aria-label="フォーカスを減らす" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-lg">
+      <div className="mx-2 mt-1.5 flex shrink-0 flex-col gap-0.5" data-explore-roll>
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => setFocus(Math.max(0, f - 1))} disabled={f <= 0} aria-label="フォーカスを減らす" className="btn btn-dark flex h-12 w-11 shrink-0 items-center justify-center rounded-xl">
             <Minus size={18} />
           </button>
-          <div className="flex flex-1 flex-col items-center text-[12px] leading-4">
-            <span className="text-zinc-300">
-              {roller.name}の素早さ{chance}%×{BALANCE.exploreSlots}枠・フォーカス<b className="text-amber-200">{f}</b>
+          <button
+            onClick={() => {
+              dispatchGame({ type: 'EXPLORE_ROLL', playerId: roller.playerId, heroId: roller.id, focusUsed: f });
+              setFocus(0);
+            }}
+            className="btn btn-gold font-display flex h-12 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl text-[17px]"
+          >
+            <Footprints size={19} /> 探索力の判定
+            <span className="text-[13px] tabular-nums">
+              {BALANCE.exploreBase + f}〜{BALANCE.exploreBase + BALANCE.exploreSlots}
             </span>
-            <span className="text-zinc-400">
-              探索力 {BALANCE.exploreBase + f}〜{BALANCE.exploreBase + BALANCE.exploreSlots}（入れる部屋の数）
-            </span>
-          </div>
-          <button onClick={() => setFocus(Math.min(max, f + 1))} disabled={f >= max} aria-label="フォーカスを増やす" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-lg">
+          </button>
+          <button onClick={() => setFocus(Math.min(max, f + 1))} disabled={f >= max} aria-label="フォーカスを増やす" className="btn btn-dark flex h-12 w-11 shrink-0 items-center justify-center rounded-xl">
             <Plus size={18} />
           </button>
         </div>
-        <button
-          onClick={() => {
-            dispatchGame({ type: 'EXPLORE_ROLL', playerId: roller.playerId, heroId: roller.id, focusUsed: f });
-            setFocus(0);
-          }}
-          className="btn btn-gold font-display flex h-12 items-center justify-center gap-2 rounded-xl text-[18px]"
-        >
-          <Footprints size={20} /> 探索力の判定
-        </button>
+        <span className="text-center text-[12px] leading-4 text-zinc-400">
+          {roller.name}の素早さ{chance}%×{BALANCE.exploreSlots}枠・フォーカス<b className="text-amber-200">{f}</b>（探索力＝入れる部屋の数）
+        </span>
       </div>
     );
   }

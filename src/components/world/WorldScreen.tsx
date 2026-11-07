@@ -58,7 +58,8 @@ export function WorldTopBar({ game }: { game: GameState }) {
           <b className="tabular-nums text-fuchsia-100">{w.corruption}%</b>
         </span>
         <Bar value={w.corruption} max={100} color="linear-gradient(90deg,#6a2a9a,#e04aff)" height={6} />
-        <span className="truncate text-[12px] leading-4 text-zinc-400">{next ? `次: ${next.at}%で${next.text}` : ''}</span>
+        {/* 次の段階は省略せずに全文（2行まで） */}
+        <span className="text-[12px] leading-[15px] text-zinc-400">{next ? `次: ${next.at}%で${next.text}` : ''}</span>
       </button>
       <div className="flex shrink-0 flex-col items-end gap-0.5 text-[12px] leading-4 font-bold tabular-nums">
         <span className="flex items-center gap-0.5 text-orange-300" aria-label="命の灯火">
@@ -89,34 +90,37 @@ export function WorldTopBar({ game }: { game: GameState }) {
   );
 }
 
-/** パーティの小さな状態（顔・HP・行動済み） */
+/** パーティの小さな状態（顔のアイコンと細いHP。地図を広くとるため小さく） */
 function PartyRow({ game }: { game: GameState }) {
   const openSheet = useBattle((s) => s.openSheet);
   const setScene = useBattle((s) => s.setScene);
   const w = game.world!;
   return (
-    <div className="flex shrink-0 gap-1 bg-black/40 px-2 py-1">
+    <div className="flex shrink-0 items-center gap-1.5 bg-black/50 px-2 py-0.5" data-party-row>
       {game.heroes.map((h) => {
         const max = heroMaxHp(h);
         const active = h.id === w.turn;
         // ダンジョンの中のキャラ: タップでその場面を見る
         const exp = game.expeditions?.find((x) => x.heroes.includes(h.id));
+        const status = h.retired ? '退場' : exp ? (exp.dungeon?.name ?? 'ダンジョン') : w.acted.includes(h.id) && !active ? '行動済' : '';
         return (
           <button
             key={h.id}
             onClick={() => (exp ? setScene(exp.id) : openSheet('party'))}
-            className={`btn flex min-h-11 min-w-0 flex-1 items-center gap-1 rounded-lg border px-1 py-0.5 ${active ? 'border-amber-300 bg-amber-500/15' : 'border-white/10 bg-black/30'}`}
+            aria-label={`${h.name}${status ? `（${status}）` : ''} HP${h.hp}/${max}`}
+            className={`btn relative flex h-11 w-11 shrink-0 flex-col items-center justify-center ${w.acted.includes(h.id) && !active ? 'opacity-55' : ''}`}
           >
-            <HeroFace hero={h} size={26} dim={h.hp <= 0 || !!h.retired} />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[12px] leading-4 font-bold">
-                {h.retired ? '退場' : exp ? (exp.dungeon?.name ?? 'ダンジョン') : w.acted.includes(h.id) && !active ? '行動済' : h.name}
-              </span>
-              <Bar value={h.hp} max={max} color="linear-gradient(90deg,#22b45a,#7dffa8)" height={5} />
+            <span className={`rounded-full ${active ? 'shadow-[0_0_0_2px_#ffd76a,0_0_10px_#ffd76a]' : ''}`}>
+              <HeroFace hero={h} size={32} dim={h.hp <= 0 || !!h.retired} />
             </span>
+            <span className="mt-[2px] block w-[34px]">
+              <Bar value={h.hp} max={max} color="linear-gradient(90deg,#22b45a,#7dffa8)" height={4} />
+            </span>
+            {exp && <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full border border-black bg-sky-400" />}
           </button>
         );
       })}
+      <span className="ml-auto truncate text-[12px] text-zinc-400">タップで詳しく</span>
     </div>
   );
 }
@@ -368,6 +372,16 @@ export function WorldScreen() {
           </div>
         )}
 
+        {/* その場の施設に入る（省略せずに全文で、広いボタン） */}
+        {label && (
+            <button
+              onClick={() => dispatchGame({ type: 'WORLD_INTERACT', playerId: pid, heroId: hero.id, party: [hero.id, ...chosenCompanions] })}
+              className="btn btn-dark font-display mt-1.5 flex min-h-12 w-full items-center justify-center gap-1.5 rounded-xl px-2 text-[16px] leading-5 text-amber-100 shadow-[0_0_12px_rgba(255,200,90,.35)]"
+              data-interact
+            >
+              {label}
+            </button>
+          )}
         {w.move === null && (
           <div className="mt-1.5 flex items-center gap-2">
             <button onClick={() => setFocus(Math.max(0, focus - 1))} disabled={focus <= 0} aria-label="フォーカスを減らす" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-lg">
@@ -415,17 +429,7 @@ export function WorldScreen() {
                 </button>
               ) : null;
             })}
-          <div className="grid grid-cols-3 gap-1.5">
-            {label ? (
-              <button
-                onClick={() => dispatchGame({ type: 'WORLD_INTERACT', playerId: pid, heroId: hero.id, party: [hero.id, ...chosenCompanions] })}
-                className="btn btn-gold h-11 truncate rounded-lg px-1 text-[12px] font-bold"
-              >
-                {label}
-              </button>
-            ) : (
-              <span />
-            )}
+          <div className="grid grid-cols-2 gap-1.5">
             <button
               onClick={() => canCamp && dispatchGame({ type: 'WORLD_CAMP', playerId: pid, heroId: hero.id })}
               disabled={!canCamp}

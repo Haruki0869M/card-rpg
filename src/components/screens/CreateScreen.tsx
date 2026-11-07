@@ -14,6 +14,7 @@ import { useOnline } from '../../store/onlineStore';
 import type { Gender, StatId } from '../../types';
 import { ItemIcon, itemSummary, Screen, STAT_LABEL } from '../ui/game';
 import { Motes, SectionTitle, TopBar } from '../ui/fancy';
+import { CATEGORY_STYLE } from '../ui/icons';
 
 const STATS: StatId[] = ['str', 'vit', 'int', 'per', 'dex', 'agi', 'luk'];
 
@@ -210,7 +211,7 @@ export function CreateScreen() {
           <div className="panel rounded-xl p-2 text-[12px]">
             <div className="flex flex-wrap gap-1" data-deck-tags>
               {cls.deck.map((d) => (
-                <span key={d.cardId} className="rounded-full border border-amber-300/40 bg-black/50 px-2 py-0.5 text-[12px] leading-4 text-amber-50">
+                <span key={d.cardId} className="rounded-full border bg-black/50 px-2 py-0.5 text-[12px] leading-4 text-amber-50" style={{ borderColor: CATEGORY_STYLE[getCard(d.cardId).category].glow, boxShadow: `inset 0 0 6px ${CATEGORY_STYLE[getCard(d.cardId).category].frame}88` }}>
                   {getCard(d.cardId).name}
                   <b className="ml-1 text-amber-300">×{d.count}</b>
                 </span>

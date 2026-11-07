@@ -156,6 +156,13 @@ export function CardBody({
             <span className="text-[12px] font-bold text-amber-200/80">%</span>
           </span>
         </div>
+        {compact && card.trait && (
+          // エピック以上: 特殊能力の名前の帯（詳細はタップで）
+          <div className="mx-[3px] mt-[1px] flex h-[15px] items-center justify-center gap-[2px] overflow-hidden rounded-sm bg-black/50 px-[2px] text-[12px] leading-[15px] font-bold whitespace-nowrap" style={{ color: metal.edge, boxShadow: `inset 0 0 0 1px ${metal.edge}66` }} data-trait>
+            <Sparkles size={10} className="shrink-0" />
+            <span className="truncate">{card.trait.name}</span>
+          </div>
+        )}
         {compact ? (
           // 完全成功の時の数値（一番強い段階）
           <div className="mx-[3px] mt-auto mb-[3px] flex items-center justify-center gap-1 rounded-md bg-amber-400/15 px-0.5 py-[1px] text-[12px] leading-[16px] font-bold" data-best>

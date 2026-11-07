@@ -211,6 +211,7 @@ const EnemyUnit = memo(function EnemyUnit({
             <span className="text-amber-300">Lv{enemy.level}</span> {enemyName(enemy)}
           </div>
           <HpBar hp={enemy.hp} max={enemy.maxHp} block={enemy.block} tone="enemy" height={12} />
+          <ElementMarks defId={enemy.defId} />
           {/* 次の行動の予告（HPのすぐ下。誰を狙っているかの顔つき） */}
           <IntentBubble enemy={enemy} onTap={onTap} />
           <AimMarks battle={battle} enemyUid={enemy.uid} />
@@ -220,6 +221,35 @@ const EnemyUnit = memo(function EnemyUnit({
     </div>
   );
 });
+
+/** 敵の弱点（▲ 属性の色）と耐性（▼ 灰色）。長押しの詳細を見なくても分かるように */
+function ElementMarks({ defId }: { defId: string }) {
+  const def = getEnemy(defId);
+  const weak = def.weak ?? [];
+  const resist = def.resist ?? [];
+  if (!weak.length && !resist.length) return null;
+  const mark = (id: string, kind: 'weak' | 'resist') => {
+    const el = getElement(id);
+    const Icon = ELEMENT_ICONS[el.icon] ?? Swords;
+    return (
+      <span
+        key={`${kind}${id}`}
+        className={`flex items-center rounded-full px-1 text-[12px] leading-4 font-black ${kind === 'weak' ? 'bg-black/70 ring-1' : 'bg-black/60 text-zinc-400'}`}
+        style={kind === 'weak' ? { color: el.color, boxShadow: `0 0 0 1px ${el.color}` } : undefined}
+        title={`${el.name}${kind === 'weak' ? 'に弱い' : 'に強い'}`}
+      >
+        {kind === 'weak' ? '▲' : '▼'}
+        <Icon size={12} strokeWidth={2.6} />
+      </span>
+    );
+  };
+  return (
+    <div className="flex flex-wrap justify-center gap-0.5" data-elements>
+      {weak.map((id) => mark(id, 'weak'))}
+      {resist.map((id) => mark(id, 'resist'))}
+    </div>
+  );
+}
 
 /** 仲間が狙っている敵の印（狙っている味方の顔。M3-C5）。このターンに攻撃した味方は「連携」の印 */
 function AimMarks({ battle, enemyUid }: { battle: BattleState; enemyUid: string }) {

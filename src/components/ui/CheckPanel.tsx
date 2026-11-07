@@ -116,7 +116,7 @@ export function RollStrip({ results, neutral, small }: { results: SlotResult[]; 
           initial={{ opacity: 0, scale: 1.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: i * 0.05, duration: 0.06 }}
-          className={`flex ${size} items-center justify-center rounded-lg border-2`}
+          className={`flex ${size} items-center justify-center rounded-full border-2`}
           style={
             r === 'focus'
               ? { background: 'linear-gradient(180deg,#ffe9a8,#e2a72a)', borderColor: '#fff3c4', color: '#5a3a06' }

@@ -7,12 +7,13 @@ import { BattleBackground } from '../../art';
 import { BALANCE } from '../../data/balance';
 import { EVENTS } from '../../data/events';
 import { getItem } from '../../data/items';
-import { eventOptionState, heroFocusMax, heroMaxHp, statChance, sceneBackground, sceneHeroes } from '../../engine';
+import { eventOptionState, heroFocusMax, heroMaxHp, statChance, sceneBackground, sceneHeroes, successDistribution } from '../../engine';
+import { STAT_LABEL } from '../../data/terms';
 import { LOCAL_PLAYER, isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
 import type { Hero, Loot } from '../../types';
 import { CheckPanel, RollStrip } from '../ui/CheckPanel';
-import { HeroFace, ItemIcon, itemSummary, RARITY_STYLE, Screen } from '../ui/game';
+import { Crest, HeroFace, ItemIcon, itemSummary, RARITY_STYLE, Screen } from '../ui/game';
 
 /** 判定に一番向いている、この端末のキャラ */
 function bestHero(heroes: Hero[], score: (h: Hero) => number): string {
@@ -81,19 +82,64 @@ export function EventScreen() {
     } else dispatchGame({ type: 'CHOOSE_EVENT', playerId: LOCAL_PLAYER, optionIndex: i, focusUsed: 0 });
   };
 
+  // 選択肢の成功率（一番得意なキャラ・フォーカス0の時）。行動の前に確率が見えるように（spec §2.1）
+  const optionChance = (i: number) => {
+    const c = def.options[i].check;
+    if (!c) return null;
+    const heroes = sceneHeroes(game);
+    const h = heroes.find((x) => x.id === bestHero(heroes, (y) => statChance(y, c.stat, c.tag)))!;
+    const dist = successDistribution(c.slots, 0, statChance(h, c.stat, c.tag));
+    const p = dist.slice(c.need).reduce((n, x) => n + x, 0);
+    return { stat: STAT_LABEL[c.stat], pct: Math.round(p * 100), hero: h };
+  };
+  const options = (
+    <div className="mt-3 flex flex-col gap-2">
+      {def.options.map((o, i) => {
+        const st = eventOptionState(game, ev.eventId, i);
+        if (!st.visible) return null;
+        const ch = optionChance(i);
+        return (
+          <button
+            key={i}
+            disabled={!!st.reason}
+            onClick={() => choose(i)}
+            className={`btn flex min-h-12 items-center gap-2 rounded-xl px-3 py-1 text-left ${o.requiresTag ? 'border border-sky-300/60 bg-sky-950/60' : 'btn-dark'}`}
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] leading-5 font-bold">
+                {o.label}
+                <VoteChips cmd={{ type: 'CHOOSE_EVENT', playerId: LOCAL_PLAYER, optionIndex: i, focusUsed: 0 }} />
+              </span>
+              {st.reason && <span className="block text-[12px] text-red-300">{st.reason}</span>}
+            </span>
+            {ch && (
+              <span className="flex shrink-0 flex-col items-end leading-4" data-option-chance={ch.pct}>
+                <span className="text-[12px] text-zinc-400">{ch.stat}</span>
+                <b className={`text-[16px] tabular-nums ${ch.pct >= 70 ? 'text-emerald-300' : ch.pct >= 40 ? 'text-amber-200' : 'text-red-300'}`}>{ch.pct}%</b>
+              </span>
+            )}
+          </button>
+        );
+      })}
+      {def.options.some((o) => o.check) && <div className="text-[12px] leading-4 text-zinc-500">％は一番得意なキャラ・フォーカス0の時。選ぶとキャラとフォーカスを変えられます</div>}
+    </div>
+  );
+
   return (
     <Screen>
-      <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
+      <div className="relative flex min-h-0 flex-1 flex-col justify-center overflow-y-auto overscroll-contain px-3 py-4">
         <BattleBackground kind={sceneBackground(game)} className="absolute inset-0 h-full w-full opacity-30" />
-        <div className="relative px-3 pt-4">
+        {/* イベントの窓: 絵・本文・選択肢（または結果）を中央の1枚にまとめる */}
+        <div className="panel panel-ornate relative rounded-2xl p-3 pt-4" data-event-window>
+          <Crest />
           <div className="flex items-center gap-2">
-            <span className="flex h-12 w-12 items-center justify-center rounded-xl border-2 border-sky-300 bg-sky-950/60">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border-2 border-sky-300 bg-sky-950/60 shadow-[0_0_10px_rgba(120,200,255,.35)]">
               <Sparkles size={26} className="text-sky-200" />
             </span>
-            <div className="font-display text-outline text-[24px] text-amber-100">{def.title}</div>
+            <div className="font-display text-outline text-[22px] leading-7 text-amber-100">{def.title}</div>
           </div>
-          <div className="panel mt-3 rounded-xl p-3 text-[15px] leading-6">{def.text}</div>
-          {ev.result && (
+          <div className="mt-2 rounded-xl bg-black/35 p-2.5 text-[15px] leading-6">{def.text}</div>
+          {ev.result ? (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-3 flex flex-col items-center gap-2">
               {ev.result.results && <RollStrip results={ev.result.results} />}
               <div className={`text-center text-[15px] font-bold ${ev.result.success ? 'text-emerald-300' : 'text-red-300'}`}>{ev.result.text}</div>
@@ -103,66 +149,50 @@ export function EventScreen() {
                 </div>
               )}
             </motion.div>
+          ) : (
+            !opt?.check && options
           )}
         </div>
       </div>
-      <div className="panel shrink-0 rounded-t-2xl px-3 pt-2 pb-3">
-        {ev.result ? (
-          <button onClick={() => dispatchGame({ type: 'FINISH_EVENT', playerId: LOCAL_PLAYER })} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px]">
-            先へ進む
-            <VoteChips cmd={{ type: 'FINISH_EVENT', playerId: LOCAL_PLAYER }} />
-          </button>
-        ) : opt?.check ? (
-          <>
-            <div className="font-display mb-1 text-[16px] text-amber-100">「{opt.label}」</div>
-            <CheckPanel
-              heroes={sceneHeroes(game)}
-              heroId={heroId}
-              setHeroId={setHeroId}
-              focus={focus}
-              setFocus={setFocus}
-              stat={opt.check.stat}
-              tag={opt.check.tag}
-              slots={opt.check.slots}
-              need={opt.check.need}
-              successLabel="成功"
-            />
-            <div className="mt-2 grid grid-cols-[1fr_2fr] gap-2">
-              <button onClick={() => setChosen(null)} className="btn btn-dark h-12 rounded-xl text-[14px] font-bold">
-                戻る
-              </button>
-              <button
-                onClick={() => dispatchGame({ type: 'CHOOSE_EVENT', playerId: LOCAL_PLAYER, optionIndex: chosen!, heroId, focusUsed: focus })}
-                className="btn btn-gold font-display h-12 rounded-xl text-[18px]"
-              >
-                挑戦する
-              </button>
-            </div>
-          </>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {def.options.map((o, i) => {
-              const st = eventOptionState(game, ev.eventId, i);
-              if (!st.visible) return null;
-              return (
-                <button
-                  key={i}
-                  disabled={!!st.reason}
-                  onClick={() => choose(i)}
-                  className={`btn flex min-h-12 flex-col items-start justify-center rounded-xl px-3 py-1 text-left ${o.requiresTag ? 'border border-sky-300/60 bg-sky-950/60' : 'btn-dark'}`}
-                >
-                  <span className="text-[15px] font-bold">
-                    {o.label}
-                    <VoteChips cmd={{ type: 'CHOOSE_EVENT', playerId: LOCAL_PLAYER, optionIndex: i, focusUsed: 0 }} />
-                  </span>
-                  {o.check && <span className="text-[12px] text-zinc-400">能力値で判定（成功率は次の画面で確認できます）</span>}
-                  {st.reason && <span className="text-[12px] text-red-300">{st.reason}</span>}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      {(ev.result || opt?.check) && (
+        <div className="panel shrink-0 rounded-t-2xl px-3 pt-2 pb-3">
+          {ev.result ? (
+            <button onClick={() => dispatchGame({ type: 'FINISH_EVENT', playerId: LOCAL_PLAYER })} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px]">
+              先へ進む
+              <VoteChips cmd={{ type: 'FINISH_EVENT', playerId: LOCAL_PLAYER }} />
+            </button>
+          ) : (
+            opt?.check && (
+              <>
+                <div className="font-display mb-1 text-[16px] text-amber-100">「{opt.label}」</div>
+                <CheckPanel
+                  heroes={sceneHeroes(game)}
+                  heroId={heroId}
+                  setHeroId={setHeroId}
+                  focus={focus}
+                  setFocus={setFocus}
+                  stat={opt.check.stat}
+                  tag={opt.check.tag}
+                  slots={opt.check.slots}
+                  need={opt.check.need}
+                  successLabel="成功"
+                />
+                <div className="mt-2 grid grid-cols-[1fr_2fr] gap-2">
+                  <button onClick={() => setChosen(null)} className="btn btn-dark h-12 rounded-xl text-[14px] font-bold">
+                    戻る
+                  </button>
+                  <button
+                    onClick={() => dispatchGame({ type: 'CHOOSE_EVENT', playerId: LOCAL_PLAYER, optionIndex: chosen!, heroId, focusUsed: focus })}
+                    className="btn btn-gold font-display h-12 rounded-xl text-[18px]"
+                  >
+                    挑戦する
+                  </button>
+                </div>
+              </>
+            )
+          )}
+        </div>
+      )}
     </Screen>
   );
 }

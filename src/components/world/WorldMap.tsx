@@ -1,6 +1,6 @@
 // ===== 世界マップの地図（六角形のマス。spec §8.1）=====
 // 地形・霧・施設・移動できる範囲は SVG、キャラと敵は上に重ねた画像。タップしたマスを親に知らせる。
-import { Castle, CircleHelp, DoorOpen, Flag, Gift, House, Landmark, Sparkles, TriangleAlert, type LucideIcon } from 'lucide-react';
+import { Castle, CircleHelp, DoorOpen, Flag, Gift, House, Landmark, LocateFixed, Sparkles, TriangleAlert, type LucideIcon } from 'lucide-react';
 import { memo, useLayoutEffect, useMemo, useRef } from 'react';
 import { artImage, EnemyArt } from '../../art';
 import { DUNGEONS } from '../../data/dungeons';
@@ -91,7 +91,7 @@ const TerrainLayer = memo(function TerrainLayer({ tiles, geom }: { tiles: WorldS
       </defs>
       {tiles.map((t, i) => {
         const { x, y } = center(i);
-        if (!t.seen) return <polygon key={i} points={hexPoints(x, y, R - 0.5)} fill="#141019" stroke="#221c2a" strokeWidth={1} />;
+        if (!t.seen) return null;
         const ter = getTerrain(t.t);
         const tex = !!artImage(`terrain/${ter.id}`);
         // 絵がある地形は模様で分かるので、小さな印は出さない
@@ -103,6 +103,24 @@ const TerrainLayer = memo(function TerrainLayer({ tiles, geom }: { tiles: WorldS
           </g>
         );
       })}
+      {/* 霧: まだ見ていないマスを、少しにじませて重ねる（見えている所との境目がぼける）。濃さはマスごとに少し変える */}
+      <defs>
+        <filter id="fog-blur" x="-10%" y="-10%" width="120%" height="120%">
+          <feGaussianBlur stdDeviation={R * 0.28} />
+        </filter>
+        <radialGradient id="fog-fill" cx="50%" cy="45%" r="60%">
+          <stop offset="0%" stopColor="#2a2540" />
+          <stop offset="100%" stopColor="#0e0b16" />
+        </radialGradient>
+      </defs>
+      <g filter="url(#fog-blur)" data-fog>
+        {tiles.map((t, i) => {
+          if (t.seen) return null;
+          const { x, y } = center(i);
+          const shade = 0.82 + ((i * 2654435761) % 1000) / 1000 * 0.18;
+          return <polygon key={i} points={hexPoints(x, y, R * 1.22)} fill="url(#fog-fill)" opacity={shade} />;
+        })}
+      </g>
     </g>
   );
 });
@@ -332,6 +350,22 @@ export function WorldMap({
         )}
       </div>
     </div>
+      {/* 手番のキャラへ戻る（地図をスクロールして見失った時） */}
+      {here !== undefined && (
+        <button
+          onClick={() => {
+            const el = box.current;
+            if (!el) return;
+            const { x, y } = center(here);
+            el.scrollTo({ top: y - el.clientHeight / 2, left: x - el.clientWidth / 2, behavior: 'smooth' });
+          }}
+          aria-label="手番のキャラへ戻る"
+          className="btn btn-dark absolute right-2 bottom-2 z-10 flex h-11 w-11 items-center justify-center rounded-full"
+          data-recenter
+        >
+          <LocateFixed size={20} className="text-amber-200" />
+        </button>
+      )}
       {/* 時間帯と侵食度の色（地図の上に重ねる。タップは通す） */}
       <div className="pointer-events-none absolute inset-0" style={{ background: tint }} />
       <div
