@@ -1,12 +1,13 @@
 // ===== 世界マップの地図（六角形のマス。spec §8.1）=====
 // 地形・霧・施設・移動できる範囲は SVG、キャラと敵は上に重ねた画像。タップしたマスを親に知らせる。
 import { Castle, CircleHelp, DoorOpen, Flag, Gift, House, Landmark, LocateFixed, Sparkles, TriangleAlert, type LucideIcon } from 'lucide-react';
-import { memo, useLayoutEffect, useMemo, useRef } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { artImage, EnemyArt } from '../../art';
 import { DUNGEONS } from '../../data/dungeons';
 import { getTerrain, QUESTS, TERRAINS, TOWNS } from '../../data/world';
 import { colOf, objectiveHandler, rowOf, timeOfDay } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
+import { useBattle } from '../../store/battleStore';
 import type { GameState, WorldState } from '../../types';
 import { HeroFace } from '../ui/game';
 
@@ -155,8 +156,43 @@ export function WorldMap({
     tilesRef.current = w.tiles;
   }
 
-  // 手番のキャラが見えるようにスクロール
-  const here = w.pos[w.turn];
+  // 移動の演出（指摘2）: 通ったマスを1マスずつ跳ねながら進む。足あとを残し、カメラもついていく。タップで飛ばせる
+  const fast = useBattle((st) => st.settings.fastMode);
+  const [anim, setAnim] = useState<{ heroes: string[]; i: number; path: number[] } | null>(null);
+  const lastSeq = useRef(w.lastMove?.seq);
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stopAnim = () => {
+    if (timer.current) clearInterval(timer.current);
+    timer.current = null;
+    setAnim(null);
+  };
+  useEffect(() => {
+    const lm = w.lastMove;
+    if (!lm || lm.seq === lastSeq.current) return;
+    lastSeq.current = lm.seq;
+    if (lm.path.length < 2) return;
+    const stepMs = fast ? 90 : 170;
+    let i = 0;
+    setAnim({ heroes: lm.heroes, i, path: lm.path });
+    if (timer.current) clearInterval(timer.current);
+    timer.current = setInterval(() => {
+      i += 1;
+      if (i >= lm.path.length) return stopAnim();
+      setAnim({ heroes: lm.heroes, i, path: lm.path });
+    }, stepMs);
+    return () => {
+      if (timer.current) clearInterval(timer.current);
+    };
+  }, [w.lastMove?.seq]);
+  const shownPos = useMemo(() => {
+    if (!anim) return w.pos;
+    const out = { ...w.pos };
+    for (const id of anim.heroes) if (out[id] !== undefined) out[id] = anim.path[anim.i];
+    return out;
+  }, [w.pos, anim]);
+
+  // 手番のキャラが見えるようにスクロール（動いている間は、動いているキャラについていく）
+  const here = anim ? anim.path[anim.i] : w.pos[w.turn];
   useLayoutEffect(() => {
     const el = box.current;
     if (!el || here === undefined || !size.width) return;
@@ -197,14 +233,14 @@ export function WorldMap({
   // 同じマスのキャラは少しずらして並べる
   const heroSpots = useMemo(() => {
     const byTile = new Map<number, string[]>();
-    for (const [id, t] of Object.entries(w.pos)) byTile.set(t, [...(byTile.get(t) ?? []), id]);
+    for (const [id, t] of Object.entries(shownPos)) byTile.set(t, [...(byTile.get(t) ?? []), id]);
     return byTile;
-  }, [w.pos]);
+  }, [shownPos]);
 
   return (
     <div className="relative min-h-0 flex-1">
     <div ref={box} className="absolute inset-0 overflow-auto overscroll-contain bg-[#0b0910]" data-world-map>
-      <div className="relative" style={{ width: W, height: H }} onClick={tap}>
+      <div className="relative" style={{ width: W, height: H }} onClick={(e) => (anim ? stopAnim() : tap(e))}>
         <svg width={W} height={H} className="absolute inset-0 block">
           <defs>
             <filter id="place-shadow" x="-30%" y="-30%" width="160%" height="160%">
@@ -318,6 +354,12 @@ export function WorldMap({
             </div>
           );
         })}
+        {/* 足あと（移動の演出中） */}
+        {anim &&
+          anim.path.slice(0, anim.i).map((t, k) => {
+            const { x, y } = center(t);
+            return <span key={`fp${k}`} className="footprint pointer-events-none absolute rounded-full" style={{ left: x - 5, top: y - 5, width: 10, height: 10 }} />;
+          })}
         {/* キャラ */}
         {[...heroSpots].map(([tile, ids]) =>
           ids.map((id, k) => {
@@ -340,10 +382,12 @@ export function WorldMap({
                   zIndex: active ? 3 : 2,
                   boxShadow: active ? '0 0 0 3px #ffd76a, 0 0 12px #ffd76a' : '0 2px 4px #000',
                   opacity: w.acted.includes(id) && !active ? 0.7 : 1,
-                  transition: 'left .35s ease-out, top .35s ease-out',
+                  transition: anim?.heroes.includes(id) ? `left ${fast ? 80 : 150}ms ease-out, top ${fast ? 80 : 150}ms ease-out` : 'left .35s ease-out, top .35s ease-out',
                 }}
               >
-                <HeroFace hero={h} size={s} />
+                <span key={anim?.heroes.includes(id) ? `hop${anim.i}` : 'still'} className={`block ${anim?.heroes.includes(id) ? 'token-hop' : ''}`}>
+                  <HeroFace hero={h} size={s} />
+                </span>
               </div>
             );
           }),

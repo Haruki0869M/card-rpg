@@ -8,7 +8,7 @@ import { DUNGEONS } from '../../data/dungeons';
 import { getEnemy } from '../../data/enemies';
 import { EVENTS } from '../../data/events';
 import { getItem } from '../../data/items';
-import { chestOdds, heroMaxHp, partyGold, reachableRooms, retreatLoss, statChance } from '../../engine';
+import { chestOdds, currentVote, heroMaxHp, notVoted, partyGold, reachableRooms, retreatLoss, statChance, voters, votesFor } from '../../engine';
 import { BALANCE } from '../../data/balance';
 import { PLAYER_COLOR } from '../../data/theme';
 import { isLocalPlayer } from '../../store/battleConfig';
@@ -202,6 +202,14 @@ export function DungeonScreen() {
                   aria-label={t.name}
                 >
                   {canGo && <span className="glow-pulse absolute -inset-1.5 rounded-full border-2" style={{ borderColor: t.color }} />}
+                  {/* みんなが選んでいる部屋（席の色の印）。全員が同じ部屋を選ぶと進む */}
+                  {canGo && (
+                    <span className="absolute -bottom-[14px] left-1/2 flex -translate-x-1/2 gap-0.5" data-room-votes={votesFor(game, { type: 'ENTER_ROOM', playerId: LOCAL_PLAYER, roomId: r.id }).join(',')}>
+                      {votesFor(game, { type: 'ENTER_ROOM', playerId: LOCAL_PLAYER, roomId: r.id }).map((p) => (
+                        <span key={p} className="h-[11px] w-[11px] rotate-45 border border-white/80" style={{ background: PLAYER_COLOR[p], boxShadow: `0 0 6px ${PLAYER_COLOR[p]}` }} />
+                      ))}
+                    </span>
+                  )}
                   {/* 今いる部屋: パーティの顔 */}
                   {isCur && (
                     <span className="absolute -top-[22px] left-1/2 flex -translate-x-1/2 -space-x-2" data-party-here>
@@ -226,6 +234,14 @@ export function DungeonScreen() {
             })}
           </div>
         </div>
+        {/* 2人以上で遊ぶ時: 部屋は全員一致で決まる */}
+        {voters(game).length > 1 && (
+          <div className="pointer-events-none absolute inset-x-0 top-1 z-10 flex justify-center">
+            <span className="rounded-full bg-black/70 px-3 py-0.5 text-[12px] text-zinc-200" data-vote-hint>
+              {currentVote(game) && notVoted(game).length === 0 ? '意見が分かれています。同じ部屋を選び直してください' : '全員が同じ部屋を選ぶと進みます'}
+            </span>
+          </div>
+        )}
         {/* 選んだ部屋の情報と「進む」 */}
         <AnimatePresence>
           {sel && (

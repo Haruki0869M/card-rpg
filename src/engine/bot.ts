@@ -191,8 +191,13 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
     case 'world': {
       const eq = equipBest(g, log);
       if (eq !== g) return eq;
-      // 同じマスに倒れている仲間がいれば助け起こす
       const w = g.world!;
+      // 一緒に動く移動先の提案: 同行している人の分は同意する
+      if (w.moveProposal) {
+        const p = w.moveProposal.owners.find((o) => !w.moveProposal!.agreed.includes(o))!;
+        return send(g, { type: 'WORLD_MOVE_AGREE', playerId: p, accept: true }, log);
+      }
+      // 同じマスに倒れている仲間がいれば助け起こす
       const down = Object.entries(w.downed ?? {}).find(([, t]) => t === w.pos[w.turn]);
       if (down && !w.story) return send(g, { type: 'WORLD_REVIVE', playerId: pid(g, w.turn), heroId: w.turn, targetId: down[0] }, log);
       return worldStep(g, log, memo);

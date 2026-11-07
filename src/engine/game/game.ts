@@ -54,6 +54,7 @@ import {
   storyContinue,
   waitTurn,
   reviveAlly,
+  agreeMove,
 } from './world/world';
 import { leaveShrine, leaveTown, questAccept, questReport, shrineChoose, townBuy, townInn, townRemoveCard, townSell } from './world/town';
 import { getRoomType } from '../../data/rules';
@@ -370,6 +371,9 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
         break;
       case 'WORLD_ROLL_MOVE':
         error = rollMove(game, cmd, rng);
+        break;
+      case 'WORLD_MOVE_AGREE':
+        error = agreeMove(game, cmd);
         break;
       case 'WORLD_MOVE':
         error = moveHero(game, cmd);

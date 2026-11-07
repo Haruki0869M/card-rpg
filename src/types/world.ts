@@ -1,6 +1,6 @@
 // ===== 世界マップ・町・祠・依頼の型（spec §8・§16・§17） =====
 import type { EventOutcome, ItemInstance } from './game';
-import type { EncounterSpec, Rarity } from './index';
+import type { EncounterSpec, PlayerId, Rarity } from './index';
 
 // ---------- データ（src/content） ----------
 
@@ -167,6 +167,10 @@ export interface QuestState {
 }
 
 export interface WorldState {
+  /** 最後の移動（画面で1マスずつ動かす演出用）。seq が変わったら新しい移動 */
+  lastMove?: { seq: number; heroes: string[]; path: number[] };
+  /** 他の人のキャラと一緒に動く時の、移動先の提案（同行しているキャラの担当が全員同意したら動く） */
+  moveProposal?: { heroId: string; to: number; companions: string[]; owners: PlayerId[]; agreed: PlayerId[] };
   /** 倒れているキャラ（キャラID → マス）。同じマスに来た仲間が助け起こせる（M3-C5） */
   downed?: Record<string, number>;
   width: number;

@@ -76,7 +76,15 @@ export function advanceTurn(game: GameState, rng: Rng) {
   w.move = null;
   w.moveRoll = undefined;
   w.invites = undefined;
-  w.follow = undefined;
+  w.moveProposal = undefined;
+  // 同行は、同じマスにいる間は続く（手番が変わっても。ダンジョンに入る時も一緒に入る。指摘1）
+  if (w.follow) {
+    for (const [id, leader] of Object.entries(w.follow)) {
+      const a = findHero(game, id);
+      const b = findHero(game, leader);
+      if (!a || !b || a.retired || b.retired || a.hp <= 0 || b.hp <= 0 || w.pos[id] === undefined || w.pos[id] !== w.pos[leader]) delete w.follow[id];
+    }
+  }
   // ダンジョンの中のキャラも同じ順番に入る（ダンジョンのパーティは、その中の最初のキャラの番にまとめて動く。M3-D）
   const next = livingHeroes(game).find((h) => !w.acted.includes(h.id));
   if (next) {
@@ -227,11 +235,52 @@ export function moveHero(game: GameState, cmd: Cmd<'WORLD_MOVE'>): string | unde
     .filter((c): c is Hero => !!c && c.id !== h.id && c.hp > 0 && !c.retired && w.pos[c.id] === from && !w.acted.includes(c.id))
     .filter((c) => c.playerId === h.playerId || w.follow?.[c.id] === h.id);
   if (companions.length !== cmd.companions.filter((id) => id !== h.id).length) return '同行できないキャラがいます（他の人のキャラは、誘って承知してもらいます）';
-  const path = pathTo(map, cmd.to);
+  // 他の人のキャラが一緒なら、移動先を提案して、その人たちの同意を待つ（全員一致で動く）
+  const owners = [...new Set(companions.map((c) => c.playerId).filter((p) => p !== h.playerId))];
+  if (owners.length) {
+    w.moveProposal = { heroId: h.id, to: cmd.to, companions: companions.map((c) => c.id), owners, agreed: [] };
+    return undefined;
+  }
+  // 一人で動いたら、この人について来ていた同行はそのまま、この人が誰かについて行っていたらやめる
+  if (w.follow?.[h.id]) delete w.follow[h.id];
+  doMove(game, w, h, companions, cmd.to, map);
+  return undefined;
+}
+
+/** 移動先の提案への返事（同行しているキャラの担当の人）。全員が同意したら動く。断ったらその人のキャラは同行をやめる */
+export function agreeMove(game: GameState, cmd: Cmd<'WORLD_MOVE_AGREE'>): string | undefined {
+  const w = game.world;
+  const pr = w?.moveProposal;
+  if (!w || !pr) return '移動の提案はありません';
+  if (!pr.owners.includes(cmd.playerId)) return 'この提案に答える人ではありません';
+  if (!cmd.accept) {
+    for (const id of pr.companions) if (findHero(game, id)?.playerId === cmd.playerId && w.follow) delete w.follow[id];
+    w.moveProposal = undefined;
+    return undefined;
+  }
+  if (!pr.agreed.includes(cmd.playerId)) pr.agreed.push(cmd.playerId);
+  if (!pr.owners.every((p) => pr.agreed.includes(p))) return undefined;
+  w.moveProposal = undefined;
+  const h = findHero(game, pr.heroId)!;
+  if (w.move === null) return '先に移動力を判定してください';
+  const map = reachable(w, w.pos[h.id], w.move);
+  if (!map.has(pr.to)) return 'そこへは移動できません';
+  const companions = pr.companions.map((id) => findHero(game, id)!).filter((c) => c && w.pos[c.id] === w.pos[h.id]);
+  doMove(game, w, h, companions, pr.to, map);
+  return undefined;
+}
+
+function doMove(game: GameState, w: WorldState, h: Hero, companions: Hero[], to: number, map: ReturnType<typeof reachable>) {
+  const from = w.pos[h.id];
+  const path = pathTo(map, to);
   const group = [h, ...companions];
   for (const c of companions) if (!w.acted.includes(c.id)) w.acted.push(c.id);
+  // 画面の演出用: 通ったマス（敵に会ったら、そこまで）
+  const trail = [from];
+  w.lastMove = { seq: (w.lastMove?.seq ?? 0) + 1, heroes: group.map((g) => g.id), path: trail };
   let prev = from;
   for (const step of path) {
+    trail.push(step);
     for (const g of group) w.pos[g.id] = step;
     revealAround(game, w);
     visitRegion(game, w, step);
@@ -240,12 +289,11 @@ export function moveHero(game: GameState, cmd: Cmd<'WORLD_MOVE'>): string | unde
       w.prevTile = prev;
       w.move = 0;
       startEncounter(game, w, wd.id, step, h.id);
-      return undefined;
+      return;
     }
     prev = step;
   }
-  w.move = Math.max(0, w.move - map.get(cmd.to)!.cost);
-  return undefined;
+  w.move = Math.max(0, (w.move ?? 0) - map.get(to)!.cost);
 }
 
 function visitRegion(game: GameState, w: WorldState, tile: number) {
@@ -525,6 +573,8 @@ export function interact(game: GameState, cmd: Cmd<'WORLD_INTERACT'>, rng: Rng):
       // 一緒に入るのは、自分のキャラか、誘いを承知した他の人のキャラ
       const party = (cmd.party?.length ? cmd.party : here).filter((id) => here.includes(id) && (findHero(game, id)?.playerId === h.playerId || w.follow?.[id] === h.id));
       if (!party.includes(h.id)) party.unshift(h.id);
+      // 同行しているキャラ（他の人のキャラも）は、必ず一緒に入る（指摘1）
+      for (const id of here) if (w.follow?.[id] === h.id && !party.includes(id)) party.push(id);
       const before = w.corruption;
       w.corruption = Math.min(100, w.corruption + BALANCE.corruptionOnDungeonEnter);
       onCorruptionChange(game, rng, before);

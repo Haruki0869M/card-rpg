@@ -389,3 +389,25 @@ textarea {
 @media (prefers-reduced-motion: reduce) {
   .target-dash { animation: none; }
 }
+
+/* 世界マップの移動: 足あと（ふっと消える）と、駒が跳ねる */
+@keyframes footprint {
+  0% { opacity: 0.95; transform: scale(1.2); }
+  100% { opacity: 0.25; transform: scale(0.8); }
+}
+.footprint {
+  background: radial-gradient(circle, #fff3c4, #ffc84a 55%, transparent 70%);
+  box-shadow: 0 0 8px #ffc84a;
+  animation: footprint 0.9s ease-out forwards;
+}
+@keyframes token-hop {
+  0% { transform: translateY(0); }
+  45% { transform: translateY(-9px); }
+  100% { transform: translateY(0); }
+}
+.token-hop {
+  animation: token-hop 0.16s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .token-hop, .footprint { animation: none; }
+}

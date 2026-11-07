@@ -90,6 +90,46 @@ export function WorldTopBar({ game }: { game: GameState }) {
   );
 }
 
+/**
+ * 他の人のキャラと一緒に動く時の、移動先の提案（指摘1）。
+ * 同行しているキャラの担当の人が全員「一緒に行く」を押したら動く。「同行をやめる」でその人のキャラは残る
+ */
+function MoveProposal({ game }: { game: GameState }) {
+  const dispatchGame = useBattle((s) => s.dispatchGame);
+  const w = game.world!;
+  const pr = w.moveProposal!;
+  const leader = game.heroes.find((h) => h.id === pr.heroId)!;
+  const mineToAnswer = pr.owners.filter((p) => !pr.agreed.includes(p) && isLocalPlayer(p));
+  return (
+    <div className="panel panel-gold-edge relative z-20 mx-2 -mt-2 shrink-0 rounded-xl p-2" data-move-proposal>
+      <div className="flex items-center gap-2 text-[13px]">
+        <HeroFace hero={leader} size={28} />
+        <span className="min-w-0 flex-1 leading-4">
+          <b>{leader.name}</b>が光っているマスへ一緒に動こうとしています（同行している人が全員同意したら動きます）
+        </span>
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-1 text-[12px]">
+        {pr.owners.map((p) => (
+          <span key={p} className="flex items-center gap-1 rounded-full bg-black/50 px-2 py-0.5">
+            <span className="h-[9px] w-[9px] rotate-45" style={{ background: PLAYER_COLOR[p as PlayerId] }} />
+            {p} {pr.agreed.includes(p) ? <b className="text-emerald-300">同意</b> : <span className="text-zinc-400">返事待ち</span>}
+          </span>
+        ))}
+      </div>
+      {mineToAnswer.map((p) => (
+        <div key={p} className="mt-1.5 grid grid-cols-2 gap-1.5">
+          <button onClick={() => dispatchGame({ type: 'WORLD_MOVE_AGREE', playerId: p as PlayerId, accept: false })} className="btn btn-dark h-11 rounded-lg text-[13px] font-bold">
+            {p}: 同行をやめる
+          </button>
+          <button onClick={() => dispatchGame({ type: 'WORLD_MOVE_AGREE', playerId: p as PlayerId, accept: true })} className="btn btn-gold h-11 rounded-lg text-[14px] font-bold">
+            {p}: 一緒に行く
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** パーティの小さな状態（顔のアイコンと細いHP。地図を広くとるため小さく） */
 function PartyRow({ game }: { game: GameState }) {
   const openSheet = useBattle((s) => s.openSheet);
@@ -268,7 +308,8 @@ export function WorldScreen() {
     <Screen>
       <WorldTopBar game={game} />
       <PartyRow game={game} />
-      <WorldMap game={game} reach={reach} selected={selected} path={path} onTapTile={tapTile} />
+      <WorldMap game={game} reach={reach} selected={w.moveProposal?.to ?? selected} path={path} onTapTile={tapTile} />
+      {w.moveProposal && <MoveProposal game={game} />}
       {info && <div className="shrink-0 bg-black/70 px-3 py-1 text-[12px] leading-4 text-zinc-200">{info}</div>}
 
       {/* 手番のキャラの操作 */}

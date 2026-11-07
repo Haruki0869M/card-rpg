@@ -6,6 +6,9 @@ import type { GameCommand, GameState, PlayerId, VoteState } from '../../types';
 import { findHero, sceneHeroes } from './heroes';
 
 /** みんなで決める操作の種類 */
+/** 全員一致で決める操作（多数決にしない） */
+export const UNANIMOUS = new Set<GameCommand['type']>(['ENTER_ROOM']);
+
 export const VOTED_COMMANDS = new Set<GameCommand['type']>(['ENTER_ROOM', 'RETREAT', 'CHOOSE_EVENT', 'FINISH_EVENT', 'REST', 'LEAVE_CHEST', 'RETURN_TO_HUB', 'FINISH_REWARD', 'EXPLORE_END']);
 
 /** 選べるプレイヤー（場面にいる、生きているキャラの担当） */
@@ -58,6 +61,8 @@ export function tally(game: GameState, v: VoteState): GameCommand | undefined {
     const k = voteKey(v.picks[p]!);
     groups.set(k, [...(groups.get(k) ?? []), p]);
   }
+  // 部屋の選択は全員一致（意見が分かれたら決まらず、選び直しを待つ。指摘1）
+  if (groups.size > 1 && vs.some((p) => UNANIMOUS.has(v.picks[p]!.type))) return undefined;
   const max = Math.max(...[...groups.values()].map((g) => g.length));
   const top = [...groups.entries()].filter(([, g]) => g.length === max);
   const lead = voteLead(game);
