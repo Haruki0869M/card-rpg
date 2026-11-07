@@ -261,6 +261,35 @@ async function run(party, difficulty) {
       await page.screenshot({ path: `screenshots/adv-chest-result.png` });
     }
     if (await clickText(page, '先へ進む')) continue;
+    if (await clickText(page, '戦闘を始める')) continue;
+    // イベントの後の作業（お供・カード・行商人）と転職のカード選び（J3a・J3b）
+    if (await page.locator('[data-hero-task]').count()) {
+      if (!seen.has('hero-task')) {
+        seen.add('hero-task');
+        await check(page, 'hero-task');
+        await page.screenshot({ path: `screenshots/adv-hero-task.png` });
+      }
+      for (const t of ['お供にする', 'やめる', '行商人と別れる']) if (await clickText(page, t)) break;
+      continue;
+    }
+    if (await page.locator('[data-job-pick]').count()) {
+      await page.locator('[data-job-pick] button[aria-pressed]').first().click();
+      await clickText(page, 'このカードにする');
+      continue;
+    }
+    // 突発イベント: 選べる選択肢の先頭（お金・フォーカスの足りない選択肢は押せない）
+    if (await page.locator('[data-event-window]').count() && !(await page.getByText('先へ進む').count()) && !(await page.getByText('戦闘を始める').count())) {
+      const opts = page.locator('[data-event-window] button:not([disabled])');
+      if (await opts.count()) {
+        if (!seen.has('random-event')) {
+          seen.add('random-event');
+          await check(page, 'random-event');
+          await page.screenshot({ path: `screenshots/adv-random-event.png` });
+        }
+        await opts.last().click();
+        continue;
+      }
+    }
     if (await page.locator('button:has-text("ダンジョン制覇！")').count()) {
       await page.screenshot({ path: `screenshots/adv-bigchest.png` });
       await page.locator('button:has-text("ダンジョン制覇！")').click();

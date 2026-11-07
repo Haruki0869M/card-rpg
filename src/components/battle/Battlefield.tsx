@@ -4,10 +4,12 @@
 import { motion, useAnimate } from 'framer-motion';
 import { memo, useEffect, useMemo } from 'react';
 import { BattleBackground, CharacterArt, EnemyArt } from '../../art';
+import { getPet } from '../../data/pets';
+import { PetToken } from '../ui/PetToken';
 import { BALANCE, TIMING } from '../../data/balance';
 import { PLAYER_COLOR } from '../../data/theme';
 import { cardOf } from '../../data/cards';
-import { getEnemy } from '../../data/enemies';
+import { getEnemy, getEnemyAction } from '../../data/enemies';
 import { enemyName, findAlly, tierDamageAgainst, tierIndex, weaponRarity, sceneBackground } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
 import { usePress } from '../../hooks/usePress';
@@ -120,6 +122,12 @@ function IntentBubble({ enemy, onTap }: { enemy: EnemyState; onTap: () => void }
           {view.parts.map((p, i) => (
             <IntentPartView key={i} p={p} />
           ))}
+          {/* お供の先読み: 次のターンの行動の名前 */}
+          {enemy.queuedActionId && (
+            <span className="absolute -bottom-[18px] left-1/2 -translate-x-1/2 rounded-full bg-sky-950/95 px-1.5 text-[12px] leading-4 font-bold text-sky-200 ring-1 ring-sky-300/60" data-foresee>
+              次: {getEnemyAction(enemy.defId, enemy.queuedActionId).name}
+            </span>
+          )}
         </motion.div>
       )}
     </div>
@@ -290,10 +298,23 @@ const AllySprite = memo(function AllySprite({ ally, left, bottom, h, active }: {
           <CharacterArt classId={ally.classId} gender={ally.gender} weapon={weapon} className="h-full w-full" />
         </div>
       </div>
+      {/* お供: 鳥は肩、小竜は浮く、それ以外は足元 */}
+      {ally.pet && !ally.dead && <AllyPet pet={ally.pet} h={h} />}
       <UnitPopups unitId={ally.id} top="5%" />
     </div>
   );
 });
+
+function AllyPet({ pet, h }: { pet: NonNullable<AllyState['pet']>; h: number }) {
+  const perch = getPet(pet.petId).perch;
+  const size = Math.round(h * (perch === 'feet' ? 0.3 : 0.24));
+  const pos = perch === 'shoulder' ? { right: '-2%', top: '20%' } : perch === 'float' ? { left: '-22%', top: '8%' } : { left: '-26%', bottom: '-2%' };
+  return (
+    <div className="pointer-events-none absolute" style={pos}>
+      <PetToken pet={pet} size={size} />
+    </div>
+  );
+}
 
 const Embers = memo(function Embers() {
   const list = useMemo(

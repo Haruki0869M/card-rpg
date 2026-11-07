@@ -15,6 +15,7 @@ import type { Hero, Loot } from '../../types';
 import { CheckPanel, RollStrip } from '../ui/CheckPanel';
 import { Crest, HeroFace, ItemIcon, itemSummary, RARITY_STYLE, Screen } from '../ui/game';
 import { canChangeNow } from '../JobSheet';
+import { PetToken } from '../ui/PetToken';
 
 /** 判定に一番向いている、この端末のキャラ */
 function bestHero(heroes: Hero[], score: (h: Hero) => number): string {
@@ -111,6 +112,11 @@ export function EventScreen() {
                 {o.label}
                 <VoteChips cmd={{ type: 'CHOOSE_EVENT', playerId: LOCAL_PLAYER, optionIndex: i, focusUsed: 0 }} />
               </span>
+              {(o.cost || o.costFocus || o.costItem) && (
+                <span className="block text-[12px] text-amber-300">
+                  {[o.cost && `${o.cost}G`, o.costFocus && `フォーカス${o.costFocus}`, o.costItem && getItem(o.costItem).name].filter(Boolean).join('・')}を払う
+                </span>
+              )}
               {st.reason && <span className="block text-[12px] text-red-300">{st.reason}</span>}
             </span>
             {ch && (
@@ -130,6 +136,18 @@ export function EventScreen() {
     <Screen>
       <div className="relative flex min-h-0 flex-1 flex-col justify-center overflow-y-auto overscroll-contain px-3 py-4">
         <BattleBackground kind={sceneBackground(game)} className="absolute inset-0 h-full w-full opacity-30" />
+        {/* 突発イベント: 「！」の短いカットイン（0.3秒） */}
+        {ev.random && !ev.result && (
+          <motion.div
+            initial={{ opacity: 1, scale: 0.4 }}
+            animate={{ opacity: 0, scale: 1.6 }}
+            transition={{ duration: 0.35, ease: 'easeOut' }}
+            className="font-display text-outline pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-[96px] text-amber-300"
+            aria-hidden
+          >
+            ！
+          </motion.div>
+        )}
         {/* イベントの窓: 絵・本文・選択肢（または結果）を中央の1枚にまとめる */}
         <div className="panel panel-ornate relative rounded-2xl p-3 pt-4" data-event-window>
           <Crest />
@@ -137,7 +155,10 @@ export function EventScreen() {
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border-2 border-sky-300 bg-sky-950/60 shadow-[0_0_10px_rgba(120,200,255,.35)]">
               <Sparkles size={26} className="text-sky-200" />
             </span>
-            <div className="font-display text-outline text-[22px] leading-7 text-amber-100">{def.title}</div>
+            <div className="font-display text-outline text-[22px] leading-7 text-amber-100">
+              {ev.random && <span className="mr-1 rounded-full bg-amber-500 px-1.5 align-middle text-[12px] text-black">突発</span>}
+              {def.title}
+            </div>
           </div>
           <div className="mt-2 rounded-xl bg-black/35 p-2.5 text-[15px] leading-6">{def.text}</div>
           {ev.result ? (
@@ -159,7 +180,7 @@ export function EventScreen() {
         <div className="panel shrink-0 rounded-t-2xl px-3 pt-2 pb-3">
           {ev.result ? (
             <button onClick={() => dispatchGame({ type: 'FINISH_EVENT', playerId: LOCAL_PLAYER })} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px]">
-              先へ進む
+              {ev.battle ? '戦闘を始める' : '先へ進む'}
               <VoteChips cmd={{ type: 'FINISH_EVENT', playerId: LOCAL_PLAYER }} />
             </button>
           ) : (
@@ -231,6 +252,12 @@ export function RestScreen() {
                   <Star size={13} />
                   {h.focus}/{heroFocusMax(h)}
                 </span>
+                {h.pet && isLocalPlayer(h.playerId) && (
+                  <button onClick={() => dispatchGame({ type: 'PET_PAT', playerId: h.playerId, heroId: h.id })} className="btn btn-dark flex h-9 shrink-0 items-center gap-0.5 rounded-lg px-1.5 text-[12px] font-bold text-pink-100" aria-label={`${h.pet.name}を撫でる`}>
+                    <PetToken pet={h.pet} size={20} />
+                    {h.pet.patted ? '' : '+1'}
+                  </button>
+                )}
                 {canChangeNow(game, h) && (
                   <button onClick={() => openSheet('jobs')} className="btn btn-gold flex h-9 shrink-0 items-center gap-0.5 rounded-lg px-2 text-[12px] font-bold">
                     <ArrowUpCircle size={14} />

@@ -10,6 +10,7 @@ import { getItem } from '../../data/items';
 import { getScenario } from '../../data/scenarios';
 import { QUESTS, SHRINES, TOWNS } from '../../data/world';
 import { canChangeNow } from '../JobSheet';
+import { PetAwards } from '../ui/PetToken';
 import {
   affinityFromStats,
   canReportQuest,
@@ -532,6 +533,7 @@ export function EndingScreen() {
             </div>
           ))}
         </div>
+        <PetAwards heroes={game.heroes} />
       </div>
       <div className="shrink-0 px-3 pt-1 pb-3">
         <button onClick={abandon} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px]">

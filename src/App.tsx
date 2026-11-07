@@ -22,6 +22,7 @@ import { JoinScreen, LobbyScreen, OnlineOverlay } from './components/screens/Onl
 import { TitleScreen } from './components/screens/TitleScreen';
 import { Sheets } from './components/Sheets';
 import { JobPickOverlay } from './components/JobSheet';
+import { HeroTaskOverlay } from './components/HeroTasks';
 import { SceneTabs } from './components/SceneTabs';
 import { VoteStatus } from './components/ui/Votes';
 import { TurnLock } from './components/ui/TurnLock';
@@ -197,6 +198,7 @@ export default function App() {
           </div>
           <Sheets />
           <JobPickOverlay />
+          <HeroTaskOverlay />
           <DetailPopup />
           <OnlineOverlay />
           <VoteStatus />

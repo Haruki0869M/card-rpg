@@ -11,6 +11,7 @@ export * from './game/dungeon';
 export * from './game/game';
 export { campFocusOf, moveSlotsOf, partySenses, restMultiplierOf, shopPriceFor } from './game/common';
 export * from './game/jobs';
+export * from './game/pets';
 export { cardTags, heroTagProfile, synergyWeight } from './game/cardTags';
 export * from './game/hero';
 export * from './game/loot';

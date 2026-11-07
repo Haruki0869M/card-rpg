@@ -15,6 +15,7 @@ import { isLocalPlayer } from '../../store/battleConfig';
 import { useOnline } from '../../store/onlineStore';
 import { RollStrip } from '../ui/CheckPanel';
 import { HeroFace } from '../ui/game';
+import { PetToken } from '../ui/PetToken';
 import { Footprints, Minus, Plus } from 'lucide-react';
 import type { GameState } from '../../types';
 import { useElementSize } from '../../hooks/useElementSize';
@@ -216,6 +217,15 @@ export function DungeonScreen() {
                       {partyHeroes.map((h) => (
                         <HeroFace key={h.id} hero={h} size={24} dim={h.hp <= 0} />
                       ))}
+                      {/* お供は顔の横にちょこんと座る（2匹まで） */}
+                      {partyHeroes
+                        .filter((h) => h.pet)
+                        .slice(0, 2)
+                        .map((h) => (
+                          <span key={`pet${h.id}`} className="ml-2.5 self-end">
+                            <PetToken pet={h.pet!} size={16} />
+                          </span>
+                        ))}
                     </span>
                   )}
                   <t.Icon size={big ? 32 : 24} strokeWidth={2.4} style={{ color: t.color }} />

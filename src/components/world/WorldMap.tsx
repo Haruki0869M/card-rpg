@@ -10,6 +10,7 @@ import { useElementSize } from '../../hooks/useElementSize';
 import { useBattle } from '../../store/battleStore';
 import type { GameState, WorldState } from '../../types';
 import { HeroFace } from '../ui/game';
+import { petSpot, PetToken } from '../ui/PetToken';
 
 const SQRT3 = Math.sqrt(3);
 
@@ -394,6 +395,15 @@ export function WorldMap({
                 <span key={anim?.heroes.includes(id) ? `hop${anim.i}` : 'still'} className={`block ${anim?.heroes.includes(id) ? 'token-hop' : ''}`}>
                   <HeroFace hero={h} size={s} />
                 </span>
+                {/* お供: 肩に乗る・足元で1歩遅れてぴょこぴょこ付いてくる */}
+                {h.pet && (() => {
+                  const sp = petSpot(h.pet.petId, s);
+                  return (
+                    <span className="absolute" style={{ left: sp.left, top: sp.top }}>
+                      <PetToken pet={h.pet} size={sp.size} hop={!!anim?.heroes.includes(id)} hopKey={anim?.heroes.includes(id) ? `p${anim.i}` : 'still'} />
+                    </span>
+                  );
+                })()}
               </div>
             );
           }),

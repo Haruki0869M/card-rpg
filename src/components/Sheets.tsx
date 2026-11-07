@@ -16,6 +16,7 @@ import { OnlinePanel } from './screens/OnlineScreens';
 import type { CardInstance, EquipSlot, GameState, Hero, ItemDef } from '../types';
 import { ConfirmDialog } from './ui/ConfirmDialog';
 import { canChangeNow, JobSheetBody } from './JobSheet';
+import { PetPanel } from './ui/PetToken';
 
 /** 同じ場所にいる仲間（ダンジョンの中なら同じパーティ、世界マップなら同じマス） */
 function placeMates(game: GameState, hero: Hero): Hero[] {
@@ -306,6 +307,7 @@ function PartySheet() {
           </>
         )}
       </div>
+      {hero.pet && <PetPanel hero={hero} canPat={!inBattle && mine} onPat={() => dispatchGame({ type: 'PET_PAT', playerId: hero.playerId, heroId: hero.id })} />}
       {!inBattle && mine && jobOptions(hero).length > 0 && (
         <button onClick={() => openSheet('jobs')} className={`btn mt-1 flex h-11 w-full items-center justify-center gap-1.5 rounded-lg text-[14px] font-bold ${canChangeNow(game, hero) ? 'btn-gold' : 'btn-dark'}`}>
           <ArrowUpCircle size={17} /> 転職先を見る{canChangeNow(game, hero) ? '（転職できます）' : ''}

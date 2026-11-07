@@ -6,6 +6,7 @@ import { Castle, Crown, Skull } from 'lucide-react';
 import { useBattle } from '../../store/battleStore';
 import { LOCAL_PLAYER } from '../../store/battleConfig';
 import { HeroFace, RARITY_STYLE, Screen } from '../ui/game';
+import { PetAwards } from '../ui/PetToken';
 
 function Stats() {
   const game = useBattle((s) => s.game)!;
@@ -27,6 +28,7 @@ function Stats() {
           <span className="font-bold tabular-nums">{v}</span>
         </div>
       ))}
+      <PetAwards heroes={game.heroes} />
     </div>
   );
 }
