@@ -74,7 +74,7 @@ a single antique flintlock musket shown in full side profile, laid diagonally, w
 - `scripts/art/build_art.py` の `ITEMS` に `'axe': 'icon-axe'` のように名前で足す。
 - 傾け（`TILT`）は、元画像の向きを見て決める。1回目（2026-11-08）は「縦に」と書いても、斧・槍・刀は最初から斜めに描かれたので傾けない。短剣だけ縦なので `TILT` に足す（-45 くらい）。鎌・錫杖・銃は、できた絵を見て決める。
 - 拳の絵は、下に水色の影が描かれている。切り抜きで残ったら消す。
-- **11枚の元画像は 2026-11-08 にすべてそろった**（`C:\dev\card-rpg-assets\j4\icon-*.png`）。銃は2回目（横向きで肩当てが見える形）を採用。斧・槍・刀・鎌・錫杖・銃・短剣以外の楽器も斜めに描かれているので、傾けが要るのは短剣だけ。
+- **11枚の元画像は 2026-11-08 にすべてそろった**（`C:\dev\card-rpg-assets\j4\icon-*.png`）。銃は2回目（横向きで肩当てが見える形）を採用。斧・槍・刀・鎌・錫杖・銃・楽器は最初から斜めに描かれたので、傾けが要るのは短剣だけ。
 - 書き出し先は `src/assets/art/item/<アイコンID>.webp`。置けばゲームが読む（`src/art/index.tsx` の `artImage('item/…')`）。
 
 ## 確認表
