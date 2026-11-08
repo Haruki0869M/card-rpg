@@ -16,7 +16,7 @@ export const sandDynastyMap: ScenarioMapDef = {
       rows: [0, 2],
       terrain: { desert: 4, mountain: 2, hills: 1 },
       enemyLevel: 9,
-      encounters: [['venomJackalWarrior', 'cursedPriest'], ['colossusStatue', 'cursedPriest'], ['venomJackalWarrior', 'mummyArcher'], ['cursedMummy', 'clayGolem']],
+      encounters: [['stoneCat', 'cursedPriest'], ['stoneCat', 'mummyArcher'], ['colossusStatue', 'cursedPriest'], ['venomJackalWarrior', 'mummyArcher'], ['cursedMummy', 'clayGolem']],
       wanderers: 2,
     },
     {
