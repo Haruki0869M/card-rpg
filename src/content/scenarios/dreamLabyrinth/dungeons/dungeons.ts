@@ -18,15 +18,15 @@ const SAND_POOLS: DungeonDef['pools'] = {
 
 /** 幽霊船の悪夢: 空と海の記憶の敵。ボスは夢の亡霊提督 */
 const GHOST_POOLS: DungeonDef['pools'] = {
-  battle: [['echoShark', 'echoAngelStatue'], ['echoDrownedSailor', 'lostMemory'], ['echoMoonRabbit', 'echoDrownedSailor'], ['lostMemory', 'echoShark'], ['echoAngelStatue', 'echoMoonRabbit', 'lostMemory']],
-  elite: [['echoSeaWitch'], ['dreamWeaver', 'lostMemory']],
+  battle: [['echoShark', 'echoAngelStatue'], ['echoDrownedSailor', 'lostMemory'], ['echoMoonRabbit', 'echoDrownedSailor'], ['lostMemory', 'echoShark']],
+  elite: [['echoSeaWitch'], ['dreamWeaver']],
   boss: ['echoGhostAdmiral'],
 };
 
 /** 夢喰いの巣: 夢の敵の総力戦。ボスは夢喰い（3段階） */
 const LAIR_POOLS: DungeonDef['pools'] = {
-  battle: [['shadowChild', 'lostMemory', 'nightmareMote'], ['echoAngelStatue', 'echoMummy'], ['pillowGolem', 'lullabyBird', 'shadowChild'], ['echoWrenchGolem', 'lostMemory'], ['echoMoonRabbit', 'echoDrownedSailor', 'shadowChild']],
-  elite: [['memoryEater'], ['dreamWeaver', 'mirrorKnight']],
+  battle: [['shadowChild', 'nightmareMote'], ['echoAngelStatue', 'echoMummy'], ['pillowGolem', 'lullabyBird'], ['echoWrenchGolem', 'lostMemory'], ['echoMoonRabbit', 'echoDrownedSailor']],
+  elite: [['memoryEater'], ['dreamWeaver']],
   boss: ['dreamEater'],
 };
 
@@ -144,7 +144,7 @@ export const echoGhostShip: DungeonDef = {
   name: '幽霊船の悪夢',
   description: '霧の海の記憶が残る幽霊船。蘇った亡霊提督の影が、夢の欠片（希望）を抱えている。',
   background: 'forestCave',
-  baseLevel: 8,
+  baseLevel: 7,
   pools: GHOST_POOLS,
   bossChest: 'legend',
   rewardKey: 'shardHope',
@@ -158,7 +158,7 @@ export const dreamEaterLair: DungeonDef = {
   name: '夢喰いの巣',
   description: '夢喰いの住処。三つの夢の欠片がなければ、記憶の扉は開かない。',
   background: 'castle',
-  baseLevel: 10,
+  baseLevel: 9,
   pools: LAIR_POOLS,
   bossChest: 'legend',
   requiresKeys: ['shardMemory', 'shardFear', 'shardHope'],

@@ -21,7 +21,7 @@ describe('夢幻の大迷宮の敵', () => {
 
   it('通常18・エリート6・ボス4。ボスは夢喰い（3段階）と過去のボスの再来3体', () => {
     const sc = getScenario('dreamLabyrinth');
-    expect(sc.wip).toBe(true);
+    expect(sc.wip).toBeUndefined(); // 登録済み（敵と数値がそろった）
     const bosses = DUNGEONS.forScenario('dreamLabyrinth').flatMap((d) => d.pools.boss);
     expect(new Set(bosses)).toEqual(new Set(['echoWhiteQueen', 'echoSandPharaoh', 'echoGhostAdmiral', 'dreamEater', 'mirrorKnight', 'memoryEater']));
     expect(ENEMIES.get('dreamEater').phases?.length).toBe(2);

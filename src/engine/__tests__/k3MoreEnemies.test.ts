@@ -67,7 +67,9 @@ describe('K3追加の敵・侵食の魔王', () => {
  it('亜種は3体、元の敵は非亜種で、属性か開幕特性を変える。全体の2割以下', () => {
   const variants = added.map(id => ENEMIES.get(id)).filter(e => e.variantOf);
   expect(variants).toHaveLength(3);
-  expect(ENEMIES.all.filter(e => e.variantOf).length / ENEMIES.all.length).toBeLessThanOrEqual(0.2);
+  // 夢幻の大迷宮（7本目・総集編）の「夢の再来」は、過去の敵の絵を使い回す例外（オーナー承認済み）なので、2割の数に入れない
+  const counted = ENEMIES.all.filter(e => !(ENEMIES.scenarioOf(e.id) === 'dreamLabyrinth' && e.variantOf));
+  expect(counted.filter(e => e.variantOf).length / counted.length).toBeLessThanOrEqual(0.2);
   for (const v of variants) {
    const base = ENEMIES.get(v.variantOf!);
    expect(base.variantOf).toBeUndefined(); expect(v.aura).toBeTruthy();
