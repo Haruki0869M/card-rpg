@@ -86,7 +86,7 @@ export function jobPlaceAllows(game: GameState, hero: Hero, job: ClassDef): bool
   if (job.tier !== 'special') return SACRED.includes(place);
   if (place === 'temple') return true;
   const def = game.sanctuary && SANCTUARIES.tryGet(game.sanctuary.sanctuaryId);
-  return place === 'altar' && !!job.altar && !!def && def.altar === job.altar;
+  return place === 'altar' && !!job.altar && !!def && (def.altar === job.altar || !!def.altars?.includes(job.altar));
 }
 
 export interface JobOption {

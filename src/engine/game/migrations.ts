@@ -12,11 +12,16 @@ import { getDifficulty, getRoomType } from '../../data/rules';
 import type { GameState } from '../../types';
 import { STATE_VERSION } from '../battle/battle';
 import { heroAbilities } from './hero';
-import { addSanctuaries } from './world/sanctuaries';
+import { addSanctuaries, consolidateSanctuaries } from './world/sanctuaries';
 
 type Loose = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 const MIGRATIONS: Record<number, (g: Loose) => void> = {
+  // v9 → v10: 祭壇を2職で共用し、10か所から5か所に統合する。
+  9(g) {
+    consolidateSanctuaries(g as GameState);
+    for (const b of [g.battle, ...(g.expeditions ?? []).map((x: Loose) => x.battle)]) if (b) b.version = 10;
+  },
   // v8 → v9: 地図を再生成せず空きマスに神殿・祭壇だけ追加する。
   8(g) {
     if (g.world) addSanctuaries(g as GameState, g.world);

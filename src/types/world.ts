@@ -58,6 +58,9 @@ export interface SanctuaryDef {
   name: string;
   text: string;
   altar?: string;
+  /** 共用する祭壇の印。旧保存で統合する施設IDもデータで指定する。 */
+  altars?: string[];
+  legacyIds?: string[];
   /** 地図の下から上への進行度（0〜1）。近い通り道の空きマスへ置く。 */
   progress: number;
 }

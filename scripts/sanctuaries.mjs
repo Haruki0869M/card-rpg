@@ -35,8 +35,8 @@ try {
   // 保存は操作後に更新されるため、メニューではなく世界マップの待機を実行する。
   await page.getByText('王都クリスタリアに入る', { exact: true }).click();
   const migrated = await save();
-  check(migrated.game.version === 9, '旧保存の版が更新されない');
-  check(migrated.game.world.tiles.filter(t => ['temple', 'altar'].includes(t.f?.kind)).length === 12, '旧地図に施設が追加されない');
+  check(migrated.game.version === 10, '旧保存の版が更新されない');
+  check(migrated.game.world.tiles.filter(t => ['temple', 'altar'].includes(t.f?.kind)).length === 7, '旧地図に施設が追加されない');
   check(migrated.game.rngState !== undefined, '乱数状態がない');
   old.game.world.tiles.forEach((t, i) => {
     const n = migrated.game.world.tiles[i];
@@ -53,7 +53,7 @@ try {
       w.pos.h1 = tile; w.tiles[tile].seen = true;
       g.heroes[1].classId = 'swordmaster'; g.heroes[1].level = 4; g.heroes[1].feats = { perfects: 15 };
       await resume(d);
-      const name = id === 'pilgrimTemple' ? '巡礼の神殿' : '侍の祭壇';
+      const name = id === 'pilgrimTemple' ? '巡礼の神殿' : '剣の誓いの祭壇';
       await page.getByText(`${name}に入る`, { exact: true }).click();
       check((await save()).game.sanctuary?.heroId === 'h1', `${width}px P2の担当が引き継がれない`);
       await page.waitForTimeout(250);

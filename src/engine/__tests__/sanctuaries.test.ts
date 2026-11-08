@@ -33,7 +33,7 @@ const special: ClassDef = { ...CLASSES.get('swordmaster'), id: 'testSpecialPath'
 CLASSES.register(special);
 
 describe('神殿と祭壇の配置・旧保存の引き継ぎ', () => {
-  it('20種類の種で全12施設に徒歩で到達でき、道から2マス以内に置かれる', () => {
+  it('20種類の種で全7施設に徒歩で到達でき、道から2マス以内に置かれる', () => {
     for (let seed = 1; seed <= 20; seed++) {
       const g = fresh(seed), w = g.world!, map = getScenario(g.scenarioId).map!;
       const reached = new Set([w.pos.h0]), q = [w.pos.h0];
@@ -60,12 +60,12 @@ describe('神殿と祭壇の配置・旧保存の引き継ぎ', () => {
     old.event = { eventId: 'rStrayBird', tile: old.world!.pos.h1, random: true };
     const before = structuredClone(old);
     const m = migrateGame(structuredClone(old))!;
-    expect(m).not.toBeNull(); expect(m.version).toBe(9);
+    expect(m).not.toBeNull(); expect(m.version).toBe(10);
     expect(m.rngState).toBe(before.rngState); expect(m.event).toEqual(before.event); expect(m.party).toEqual(before.party); expect(m.mode).toBe('event');
     const withoutFeatures = (g: GameState) => ({ ...g.world!, tiles: g.world!.tiles.map(({ f: _f, ...t }) => t) });
     expect(withoutFeatures(m)).toEqual(withoutFeatures(before));
     before.world!.tiles.forEach((t, i) => { if (t.f) expect(m.world!.tiles[i].f).toEqual(t.f); });
-    expect(m.world!.tiles.filter(t => t.f?.kind === 'temple' || t.f?.kind === 'altar')).toHaveLength(12);
+    expect(m.world!.tiles.filter(t => t.f?.kind === 'temple' || t.f?.kind === 'altar')).toHaveLength(7);
     expect(migrateGame(structuredClone(m))).toEqual(m);
     const again = structuredClone(m); expect(addSanctuaries(again, again.world!)).toEqual([]); expect(again).toEqual(m);
   });
@@ -76,7 +76,7 @@ describe('神殿と祭壇の配置・旧保存の引き継ぎ', () => {
     old.expeditions = [{ id: 'x1', heroes: ['h0'], mode: 'battle', battle: b }];
     const before = structuredClone(old);
     const m = migrateGame(old)!;
-    expect(m.expeditions?.[0].battle?.version).toBe(9);
+    expect(m.expeditions?.[0].battle?.version).toBe(10);
     expect(m.expeditions?.[0].battle?.rngState).toBe(before.expeditions![0].battle!.rngState);
     expect(m.expeditions?.[0].battle?.allies[0].equippedWeaponType).toBe('sword');
     expect(m.expeditions?.[0].heroes).toEqual(['h0']);
@@ -85,7 +85,7 @@ describe('神殿と祭壇の配置・旧保存の引き継ぎ', () => {
     const g = fresh(), w = g.world!;
     for (const t of w.tiles) t.f = { kind: 'chest', id: 'occupied' };
     const before = structuredClone(g);
-    expect(addSanctuaries(g, w)).toHaveLength(12); expect(g).toEqual(before);
+    expect(addSanctuaries(g, w)).toHaveLength(7); expect(g).toEqual(before);
   });
 });
 
@@ -112,7 +112,7 @@ describe('施設の担当者と転職場所', () => {
     let g = enter(fresh(), 'samuraiAltar'), h = g.heroes[0];
     expect(jobPlaceAllows(g, h, special)).toBe(true);
     expect(jobPlaceAllows(g, h, CLASSES.get('swordSaint'))).toBe(false);
-    g = enter(fresh(), 'bardAltar'); h = g.heroes[0];
+    g = enter(fresh(), 'machinistAltar'); h = g.heroes[0];
     expect(jobPlaceAllows(g, h, special)).toBe(false);
     g = enter(fresh()); h = g.heroes[0];
     expect(jobPlaceAllows(g, h, special)).toBe(true); expect(jobPlaceAllows(g, h, CLASSES.get('swordSaint'))).toBe(true);

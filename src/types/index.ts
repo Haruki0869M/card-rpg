@@ -415,6 +415,10 @@ export interface CardInstance {
 }
 
 export interface AllyState {
+  /** 次の攻撃カードへ蓄えた倍率。戦闘を越えて持ち越さない。 */
+  attackCharge?: { multiplier: number; category: CardCategory };
+  /** 次の物理攻撃へ宿す属性。 */
+  imbuedElement?: string;
   exhaustedCards?: string[];
   /** 最後に攻撃した敵（ターン終了時の追撃用） */
   lastTargetId?: string;
@@ -469,6 +473,8 @@ export interface Intent {
 }
 
 export interface EnemyState {
+  /** 次のインテントだけ休む（状態異常とは別の行動休止）。 */
+  skipNextAction?: boolean;
   /** 次の行動の数値にかかる倍率（行動後に消える） */
   nextActionMultiplier?: number;
   uid: string;
@@ -539,6 +545,8 @@ export interface BattleState {
 
 /** 呼び出したお供（turns = 残りのターン数。0になったら帰る） */
 export interface SummonState {
+  /** 同じ上限で数える召喚の印。 */
+  group?: string;
   /** カード攻撃への追撃と、被弾の身代わりをする召喚 */
   echoPct?: number;
   intercept?: boolean;

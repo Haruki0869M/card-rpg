@@ -7,7 +7,7 @@ export const effect: EffectHandler<'repeatCard'> = {
   apply(ctx) {
     if (!ctx.card || !ctx.tierEffects || ctx.depth >= 3) return false;
     const repeated = { ...ctx, depth: ctx.depth + 1 };
-    for (const e of ctx.tierEffects) if (e.kind !== 'repeatCard') applyEffect(repeated, e);
+    for (const e of ctx.tierEffects) if (e.kind !== 'repeatCard' && e.kind !== 'payHp') applyEffect(repeated, e);
     return true;
   },
   describe: () => '使ったカードの効果をもう一度発動',

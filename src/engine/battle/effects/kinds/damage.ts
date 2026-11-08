@@ -3,6 +3,7 @@ import { dealDamage, resolveTargets, targetOf } from '..';
 import { getElement } from '../../../../data/elements';
 import { getStatus } from '../../../../data/statuses';
 import { isEnemy, nameOf } from '../../units';
+import { chargedMultiplier } from '../../cardState';
 import { type EffectHandler, upgradeAmount } from '../types';
 
 declare module '../../../../types' {
@@ -19,7 +20,9 @@ export const effect: EffectHandler<'damage'> = {
     let any = false;
     for (let h = 0; h < (e.hits ?? 1); h++) {
       for (const t of resolveTargets(ctx, targetOf(e))) {
-        const loss = dealDamage(ctx, t, e.amount, e.element);
+        const charge = chargedMultiplier(ctx.source, ctx.card);
+        if (charge > 1 && !ctx.fired.includes('蓄えた力')) ctx.fired.push('蓄えた力');
+        const loss = dealDamage(ctx, t, e.amount, e.element, charge);
         any = true;
         if (isEnemy(ctx.source)) ctx.parts.push(`${nameOf(t)}に${loss}`);
       }

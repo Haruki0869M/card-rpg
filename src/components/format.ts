@@ -43,6 +43,7 @@ export interface IntentView {
 /** インテントの表示（敵のレベル・弱体・味方の脆弱を反映した実際の値） */
 export function intentView(state: BattleState, enemy: EnemyState): IntentView | null {
   if (!enemy.intent || enemy.dead) return null;
+  if (enemy.skipNextAction) return { parts: [{ kind: 'other', effect: { kind: 'skipIntent' } }], name: '時間停止で休み', details: ['次の行動は休み。その後は通常の行動順へ戻る'] };
   const action = getEnemyAction(enemy.defId, enemy.intent.actionId);
   const target = enemy.intent.targetId ? findAlly(state, enemy.intent.targetId) : undefined;
   const targetName = target ? target.name : '（対象なし）';

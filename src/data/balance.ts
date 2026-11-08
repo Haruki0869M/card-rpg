@@ -3,6 +3,12 @@
 export const BALANCE = {
   /** 転職施設は通り道から徒歩で最大2マス以内に置く。 */
   sanctuaryRoadDistance: 2,
+  /** 特殊職の能力とHP支払い。 */
+  specialJobs: {
+    chargeFactor: 2, chargeMax: 4, firstTurnMana: 1,
+    minionDamage: 3, minionLimit: 3, missingHpPer: 1, missingHpMax: 1,
+    bloodCost: 3, offeringCost: 5, abyssCost: 8,
+  },
   /** 味方フェーズ開始時に回復するマナ */
   manaPerTurn: 3,
   /** フォーカス初期値 / 最大値 */

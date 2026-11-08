@@ -1,4 +1,5 @@
 import { PLAYER_COLOR } from '../../data/theme';
+import { getElement } from '../../data/elements';
 // ===== 味方のステータス枠（顔・HP・マナ・フォーカス・被弾予定・担当プレイヤー） =====
 import { Star } from 'lucide-react';
 import { memo } from 'react';
@@ -82,15 +83,17 @@ const AllyCard = memo(function AllyCard({ ally }: { ally: AllyState }) {
       </div>
       {/* 呼び出したお供（幻獣・獣など）: 枠の左上に小さく。ターン終了時に攻撃する */}
       {!ally.dead && ally.airborne && <span className="absolute -top-3 left-7 rounded-full bg-sky-950 px-1 text-[12px] text-sky-100" data-airborne>跳躍中</span>}
-      {!ally.dead && !!ally.summons?.length && (
-        <div className="absolute -top-3 left-7 flex gap-0.5" data-summons>
-          {ally.summons.slice(0, 2).map((m) => (
+      {!ally.dead && (!!ally.summons?.length || !!ally.attackCharge || !!ally.imbuedElement) && (
+        <div className="absolute -top-3 right-1 left-1 flex items-center gap-0.5 overflow-hidden" data-summons>
+          {ally.attackCharge && <span className="rounded-full bg-amber-950 px-1 text-[12px] font-bold text-amber-100" data-attack-charge>居合×{ally.attackCharge.multiplier}</span>}
+          {ally.imbuedElement && <span className="rounded-full bg-sky-950 px-1 text-[12px] font-bold text-sky-100" data-imbued-element>{getElement(ally.imbuedElement).name}剣</span>}
+          {ally.summons?.slice(0, 2).map((m) => (
             <span key={m.id} className="summon-bob flex h-[20px] items-center gap-px rounded-full bg-black/80 px-1 text-[12px] leading-none ring-1 ring-violet-300/60" aria-label={`${m.name}（あと${m.turns >= 99 ? 'ずっと' : `${m.turns}ターン`}）`}>
               <span aria-hidden>{m.icon}</span>
               {m.turns < 99 && <span className="font-bold text-violet-200 tabular-nums">{m.turns}</span>}
             </span>
           ))}
-          {ally.summons.length > 2 && <span className="flex h-[20px] items-center rounded-full bg-black/80 px-1 text-[12px] font-bold text-violet-200">×{ally.summons.length}</span>}
+          {(ally.summons?.length ?? 0) > 2 && <span className="flex h-[20px] items-center rounded-full bg-black/80 px-1 text-[12px] font-bold text-violet-200">×{ally.summons!.length}</span>}
         </div>
       )}
     </div>

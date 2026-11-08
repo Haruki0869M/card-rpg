@@ -105,6 +105,7 @@ export function enemyHitDamage(enemy: EnemyState, base: number, target: AllyStat
 /** 敵の行動が ally に与える予定ダメージ（1回あたりの値の配列。ブロック考慮前） */
 export function intentHitsOn(enemy: EnemyState, ally: AllyState): number[] {
   if (enemy.dead || !enemy.intent || ally.dead) return [];
+  if (enemy.skipNextAction) return [];
   // 凍結で次の行動を休む敵は攻撃しない
   if (skipActionStatus(enemy.statuses)) return [];
   const action = getEnemyAction(enemy.defId, enemy.intent.actionId);

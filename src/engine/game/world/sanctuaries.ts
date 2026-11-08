@@ -4,6 +4,26 @@ import { SANCTUARIES, TERRAINS } from '../../../data/world';
 import type { GameState, WorldState } from '../../../types';
 import { idxOf, neighbors, rowOf } from './hex';
 
+/** 旧10祭壇を5つの共用祭壇へ統合する。滞在中なら、そのマスを優先して残す。 */
+export function consolidateSanctuaries(game: GameState) {
+  const w = game.world;
+  if (!w) return;
+  for (const def of SANCTUARIES.forScenario(game.scenarioId)) {
+    if (def.kind !== 'altar') continue;
+    const ids = [def.id, ...(def.legacyIds ?? [])];
+    const tiles = w.tiles.flatMap((t, i) => t.f?.kind === 'altar' && ids.includes(t.f.id) ? [i] : []);
+    if (!tiles.length) continue;
+    const visit = game.sanctuary;
+    const staying = visit && tiles.includes(visit.tile);
+    const canonical = tiles.find(i => w.tiles[i].f!.id === def.id);
+    const keep = staying ? visit.tile : (canonical !== undefined && w.tiles[canonical].seen ? canonical : tiles.find(i => w.tiles[i].seen) ?? canonical ?? tiles[0]);
+    // 地形・マス番号・霧は変えず、施設だけを整理する。
+    for (const tile of tiles) if (tile !== keep) delete w.tiles[tile].f;
+    w.tiles[keep].f = { kind: 'altar', id: def.id };
+    if (staying) visit.sanctuaryId = def.id;
+  }
+}
+
 /** 新規・旧保存に共通の施設配置。地形・既存施設・位置・乱数には触れない。 */
 export function addSanctuaries(game: GameState, w: WorldState): string[] {
   const map = getScenario(game.scenarioId).map;

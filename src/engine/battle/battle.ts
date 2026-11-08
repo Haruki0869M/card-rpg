@@ -32,12 +32,13 @@ import { applyEffect, checkEffect, comboMultiplier, dealDamage, elementMultiplie
 import { decideAllIntents } from './intents';
 import { finalChance, selectTier } from './probability';
 import { recordSupport, supportSnapshot } from './support';
+import { afterAttackCard, attackElement, cardHpCost, chargedMultiplier, tierHpCost } from './cardState';
 import { activeStatuses, actionFailChanceOf, applyTick, chancePenaltyOf, consumeStatus, decayStatuses, emptyStatuses, skipActionStatus, takeManaPenalty, tickHealOf } from './statuses';
 import { abilityTriggered, addLog, enemyName, findAlly, findEnemy, healUnit, loseHp, nameOf, unitIdOf } from './units';
 
 export { enemyName, findAlly, findEnemy, unitName } from './units';
 
-export const STATE_VERSION = 9;
+export const STATE_VERSION = 10;
 
 // ---------- 生成 ----------
 
@@ -191,6 +192,7 @@ export function unusableReason(state: BattleState, ally: AllyState, card: CardDe
   if (ally.dead) return '戦闘不能です';
   if (ally.exhaustedCards?.includes(card.id)) return 'この戦闘ではもう使いました';
   if (ally.mana < card.cost) return 'マナが足りません';
+  if (ally.hp <= cardHpCost(card)) return 'HPを払うと戦闘不能になります';
   if ((card.target === 'enemy' || card.target === 'allEnemies') && !state.enemies.some((e) => !e.dead)) return '対象がいません';
   return null;
 }
@@ -215,13 +217,15 @@ export function isDone(state: BattleState, ally: AllyState): boolean {
 
 /** カードのダメージ効果が対象に与える実際の値（Tierごとの合計。特殊能力の倍率・状態異常も反映） */
 export function tierDamageAgainst(ally: AllyState, card: CardDef, target: EnemyState): number[] {
-  return card.tiers.map((t) =>
-    t.effects.reduce((sum, e) => {
+  return card.tiers.map((t) => {
+    const source = { ...ally, hp: ally.hp - tierHpCost(t) };
+    return t.effects.reduce((sum, e) => {
       if (e.kind !== 'damage' || (targetOf(e) !== 'target' && targetOf(e) !== 'foes')) return sum;
-      const { multiplier } = damageModifiers(undefined, ally, card, target, card.trait ? [card.trait] : undefined, t.minSuccesses === card.slots, e.element);
-      return sum + calcDamage(e.amount, ally.statuses, target.statuses, multiplier * elementMultiplier(target, e.element) * comboMultiplier(ally, target)) * (e.hits ?? 1);
-    }, 0),
-  );
+      const element = attackElement(source, card, e.element);
+      const { multiplier } = damageModifiers(undefined, source, card, target, card.trait ? [card.trait] : undefined, t.minSuccesses === card.slots, element);
+      return sum + calcDamage(e.amount, source.statuses, target.statuses, chargedMultiplier(source, card) * multiplier * elementMultiplier(target, element) * comboMultiplier(source, target)) * (e.hits ?? 1);
+    }, 0);
+  });
 }
 
 const SLOT_ICON: Record<SlotResult, string> = { focus: '🌟', hit: '⭕', miss: '❌' };
@@ -438,6 +442,7 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   } else ally.discard.push(inst);
   // このターンに使った枚数（連撃などの条件。カードの効果の後に数える）
   ally.played = (ally.played ?? 0) + 1;
+  afterAttackCard(ally, card, tier);
   (ally.playedBy ??= {})[card.category] = (ally.playedBy[card.category] ?? 0) + 1;
 
   const resultLabel = perfect ? '完全成功' : `${successes}成功`;
@@ -457,7 +462,7 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
 /** 呼び出したお供（幻獣・獣など）の攻撃。ターン終了時にランダムな敵へ。残りターンが0になったら帰る */
 function summonsAttack(state: BattleState, ally: AllyState, rng: Rng, events: BattleEvent[]) {
   if (!ally.summons?.length) return;
-  for (const s of ally.summons) {
+  for (const s of [...ally.summons]) {
     if (s.echoPct) continue;
     const foes = state.enemies.filter((e) => !e.dead);
     if (!foes.length) break;
@@ -553,6 +558,14 @@ function executeIntent(state: BattleState, enemy: EnemyState, rng: Rng, events: 
   const intent = enemy.intent;
   if (!intent) return;
   const action = getEnemyAction(enemy.defId, intent.actionId);
+  if (enemy.skipNextAction) {
+    delete enemy.skipNextAction;
+    delete enemy.nextActionMultiplier;
+    enemy.intent = undefined;
+    events.push({ type: 'enemyAct', enemyUid: enemy.uid, actionName: '時間停止で休み', targetIds: [] });
+    addLog(state, `${enemyName(enemy)}は時間停止で休んだ`);
+    return;
+  }
   // 凍結: 次の行動を休む（効いたら1減る） / 痺れ: 確率で行動に失敗する
   const frozen = skipActionStatus(enemy.statuses);
   const fail = frozen ? 0 : actionFailChanceOf(enemy.statuses);

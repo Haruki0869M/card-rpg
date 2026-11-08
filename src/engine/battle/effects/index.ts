@@ -10,6 +10,7 @@ import { getEnemy } from '../../../data/enemies';
 import { getStatus } from '../../../data/statuses';
 import { absorb, calcDamage } from '../damage';
 import { addStatus } from '../statuses';
+import { attackElement } from '../cardState';
 import { abilityTriggered, addLog, afterHpLoss, findAlly, foesOf, isEnemy, nameOf, sideOf, type Unit, unitIdOf } from '../units';
 import type { EffectCtx, EffectHandler } from './types';
 
@@ -172,17 +173,17 @@ export const resistsElement = (victim: Unit, element: string) => isEnemy(victim)
  * victim にダメージを与える。倍率（敵のレベル・特殊能力・状態異常）、ブロック、かばう、戦闘不能まで処理する。
  * HPに入った量を返す
  */
-export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?: string): number {
+export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?: string, extraMultiplier = 1): number {
   const { state, rng, events, source } = ctx;
   if (victim.dead) return 0;
   // 武器に宿った属性: 属性の無い物理攻撃がその属性になる（妖精の泉）
-  if (!element && !isEnemy(source) && source.weaponElement && ctx.card?.category === 'physical') element = source.weaponElement;
+  element = attackElement(source, ctx.card, element);
   let v = victim;
   let mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities, ctx.perfect, element);
   // 属性を強める状態異常（聖光など）: この一撃で使い切る
   const boost = element ? elementBoost(source, element) : 1;
   base = Math.round(base * boost);
-  let dmg = calcDamage(base, source.statuses, v.statuses, mods.multiplier * elementMultiplier(v, element) * comboMultiplier(source, v));
+  let dmg = calcDamage(base, source.statuses, v.statuses, extraMultiplier * mods.multiplier * elementMultiplier(v, element) * comboMultiplier(source, v));
   // かばう: 相手の攻撃でこのままだとHP0になる場合、同じ側の他の仲間が確率で代わりに受ける
   if (isEnemy(source) !== isEnemy(v) && dmg - (mods.ignoreBlock ? 0 : v.block) >= v.hp) {
     for (const other of sideOf(state, v)) {
@@ -194,7 +195,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
         addLog(state, `${nameOf(other)}の「${cov.name}」！ ${nameOf(v)}をかばった`);
         v = other;
         mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities, ctx.perfect, element);
-        dmg = calcDamage(base, source.statuses, v.statuses, mods.multiplier * elementMultiplier(v, element) * comboMultiplier(source, v));
+        dmg = calcDamage(base, source.statuses, v.statuses, extraMultiplier * mods.multiplier * elementMultiplier(v, element) * comboMultiplier(source, v));
         break;
       }
     }
