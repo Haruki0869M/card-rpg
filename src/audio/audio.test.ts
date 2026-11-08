@@ -7,7 +7,8 @@ import { applyGameCommand, createGame } from '../engine';
 import { tapSound } from './uiSounds';
 import { BGM_LOOP, bgmFor } from './bgm';
 import type { BattleEvent, CardDef } from '../types';
-import { cardSound, damageSound, dungeonStepSound, footstepSound, hitSize, PET_CRY, perfectSound, rollResultSound, statusSound } from './cues';
+import { DUNGEONS } from '../data/dungeons';
+import { cardSound, damageSound, dungeonStepSound, dungeonStepSoundOf, footstepSound, hitSize, PET_CRY, perfectSound, rollResultSound, statusSound } from './cues';
 import { BGM_IDS, JINGLE_IDS, PET_SOUND_IDS, PRELOAD_IDS, SFX_IDS } from './ids';
 import { createLimiter } from './limiter';
 import { audioReady, hasSound, playBgm, playSound, playSounds, setAudioVolumes } from './player';
@@ -189,6 +190,23 @@ describe('探索・画面の操作・BGM の音（K6②）', () => {
     expect(dungeonStepSound('forestCave')).toBe('sfx_step_dirt');
     expect(dungeonStepSound('volcano')).toBe('sfx_step_rock');
     expect(dungeonStepSound('temple')).toBe('sfx_step_stone');
+  });
+  it('ダンジョンの足音は、ダンジョンIDの表で決まる（庭は草・島と船は土・墓所は砂・氷の洞窟は雪・鉱山は岩・城や機械は石）', () => {
+    expect(dungeonStepSound('moonlitGarden', 'moonlitGarden')).toBe('sfx_step_grass');
+    expect(dungeonStepSound('pirateIsland', 'pirateIsland')).toBe('sfx_step_dirt');
+    expect(dungeonStepSound('ghostFlagship', 'ghostFlagship')).toBe('sfx_step_dirt');
+    expect(dungeonStepSound('scorpionTomb', 'scorpionTomb')).toBe('sfx_step_sand');
+    expect(dungeonStepSound('crystalCave', 'crystalCave')).toBe('sfx_step_snow');
+    expect(dungeonStepSound('giantMine', 'giantMine')).toBe('sfx_step_rock');
+    expect(dungeonStepSound('iceCastle', 'iceCastle')).toBe('sfx_step_stone');
+    expect(dungeonStepSound('machineHeart', 'machineHeart')).toBe('sfx_step_stone');
+    // 表に無いダンジョンは、背景の名前
+    expect(dungeonStepSound('newOne', 'forestCave')).toBe('sfx_step_dirt');
+    expect(dungeonStepSound('newOne', 'volcano')).toBe('sfx_step_rock');
+    expect(dungeonStepSound('newOne', 'temple')).toBe('sfx_step_stone');
+  });
+  it('すべてのダンジョンが、足音の表に載っている（新しいダンジョンを足したら表にも足す）', () => {
+    for (const d of DUNGEONS.all) expect(dungeonStepSoundOf(d.id), `${d.id}`).toBeDefined();
   });
 });
 
