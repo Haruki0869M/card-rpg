@@ -1,5 +1,5 @@
-// シナリオ3のダンジョン。敵の組み合わせと部屋の並びは仮（手順2・3で作り込む）。
-// 制覇すると鍵（灯）が手に入り、3つそろうと最終ダンジョンに入れる
+// シナリオ3のダンジョン。敵の組み合わせ（POOLS）は仮（手順2で作り込む）。
+// 制覇すると鍵（灯）が手に入り、3つそろうと最終ダンジョンに入れる。ボスの手前に「物語の部屋」（event）を置く
 import type { DungeonDef } from '../../../../types';
 
 const POOLS: DungeonDef['pools'] = {
@@ -8,19 +8,84 @@ const POOLS: DungeonDef['pools'] = {
   boss: ['goblinBrute'],
 };
 
-/** 仮の部屋の並び（戦闘→宝箱/戦闘→休憩→強敵→休憩→ボス） */
-const baseLayout: NonNullable<DungeonDef['layout']> = [
+type Layout = NonNullable<DungeonDef['layout']>;
+
+/** 難破船の洞窟（8行。入門。潮と沈んだ宝箱） */
+const wreckCaveLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
-    { type: 'battle', next: [0] },
-    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [0] },
+    { type: 'battle', next: [0, 1] },
+    { type: 'event', eventId: 'seaCaveTide', next: [1, 2] },
   ],
-  [{ type: 'rest', next: [0, 1] }],
   [
-    { type: 'elite', next: [0] },
+    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [0] },
+    { type: 'battle', next: [0, 1] },
+    { type: 'rest', next: [1] },
+  ],
+  [
+    { type: 'event', eventId: 'sunkenChest', next: [0] },
+    { type: 'elite', next: [0, 1] },
+  ],
+  [
+    { type: 'battle', next: [0] },
     { type: 'chest', chest: { rarity: 'rare', locked: true }, next: [0] },
   ],
   [{ type: 'rest', next: [0] }],
+  [{ type: 'event', eventId: 'serpentNest', next: [0] }],
+  [{ type: 'boss', next: [] }],
+];
+
+/** 海賊の隠れ島（8行。海賊の財宝と罠。強敵が2回） */
+const pirateIslandLayout: Layout = [
+  [{ type: 'battle', next: [0, 1] }],
+  [
+    { type: 'event', eventId: 'pirateStash', next: [0, 1] },
+    { type: 'battle', next: [1] },
+  ],
+  [
+    { type: 'battle', next: [0, 1] },
+    { type: 'rest', next: [1, 2] },
+  ],
+  [
+    { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
+    { type: 'elite', next: [0, 1] },
+    { type: 'event', eventId: 'castawayCamp', next: [1] },
+  ],
+  [
+    { type: 'battle', next: [0] },
+    { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
+  ],
+  [{ type: 'rest', next: [0] }],
+  [{ type: 'event', eventId: 'captainCabin', next: [0] }],
+  [{ type: 'boss', next: [] }],
+];
+
+/** 沈んだ神殿（9行。霧の歌と潮の祭壇。分かれ道が多い） */
+const sunkenTempleLayout: Layout = [
+  [{ type: 'battle', next: [0, 1] }],
+  [
+    { type: 'battle', next: [0, 1] },
+    { type: 'battle', next: [1, 2] },
+  ],
+  [
+    { type: 'event', eventId: 'ghostSong', next: [0] },
+    { type: 'battle', next: [0, 1] },
+    { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [1] },
+  ],
+  [
+    { type: 'elite', next: [0, 1] },
+    { type: 'rest', next: [1] },
+  ],
+  [
+    { type: 'battle', next: [0] },
+    { type: 'event', eventId: 'seaTrader', next: [0, 1] },
+  ],
+  [
+    { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
+    { type: 'elite', next: [0] },
+  ],
+  [{ type: 'rest', next: [0] }],
+  [{ type: 'event', eventId: 'tideAltar', next: [0] }],
   [{ type: 'boss', next: [] }],
 ];
 
@@ -35,7 +100,7 @@ export const wreckCave: DungeonDef = {
   rewardKey: 'lightStar',
   corruptionOnClear: 5,
   clearStory: ['海蛇の女王が、静かに海へ沈んでいった。', '洞窟に、星の灯がともった。', '星の灯を手に入れた！'],
-  layout: baseLayout,
+  layout: wreckCaveLayout,
 };
 
 export const pirateIsland: DungeonDef = {
@@ -49,7 +114,7 @@ export const pirateIsland: DungeonDef = {
   rewardKey: 'lightMoon',
   corruptionOnClear: 5,
   clearStory: ['海賊船長ガルドが、剣を落とした。', '「…灯台を、頼む」', '月の灯を手に入れた！'],
-  layout: baseLayout,
+  layout: pirateIslandLayout,
 };
 
 export const sunkenTemple: DungeonDef = {
@@ -63,7 +128,7 @@ export const sunkenTemple: DungeonDef = {
   rewardKey: 'lightSun',
   corruptionOnClear: 5,
   clearStory: ['潮の神官が、祈りを止めて微笑んだ。', '「提督は、悲しんでおられる」', '日の灯を手に入れた！'],
-  layout: baseLayout,
+  layout: sunkenTempleLayout,
 };
 
 export const ghostFlagship: DungeonDef = {
@@ -91,7 +156,7 @@ export const ghostFlagship: DungeonDef = {
     [{ type: 'battle', next: [0] }],
     [{ type: 'rest', next: [0] }],
     [{ type: 'battle', next: [0] }],
-    [{ type: 'rest', next: [0] }],
+    [{ type: 'event', eventId: 'admiralBridge', next: [0] }],
     [{ type: 'boss', next: [] }],
   ],
 };
