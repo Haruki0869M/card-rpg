@@ -13,6 +13,7 @@ const PACKS: [string, number, string, string[]][] = [
   ['frozenKingdom', 13, 'corruptionKing', ['frozenBlizzard', 'frozenTraveler', 'frozenIceTreasure', 'frozenWolfPup', 'frozenPetShiver']],
   ['cursedArchipelago', 13, 'frozenKingdom', ['seaStorm', 'seaDriftingSailor', 'seaFloatingChest', 'seaDolphin', 'mistPetSeasick']],
   ['sandDynasty', 13, 'cursedArchipelago', ['sandStorm', 'sandLostCaravan', 'sandMirage', 'sandFennec', 'sandPetHeat']],
+  ['starCastle', 13, 'sandDynasty', ['skyGust', 'starShower', 'starLostAstronomer', 'starBirdOnCloud', 'skyPetStarGazer']],
 ];
 
 describe.each(PACKS)('追加シナリオ %s', (sid, gearCount, prev, randomIds) => {
