@@ -1,5 +1,4 @@
 import { cardTargets, isAllyCard, needsCardTarget, selectedCardTarget, targetGuide, secondaryCard, secondaryCardTarget } from '../engine/battle/targets';
-import { unitIdOf } from '../engine/battle/units';
 // ===== Zustand ストア =====
 // ロジックは src/engine（冒険: applyGameCommand / 戦闘: applyCommand）を呼ぶだけ。
 // ここでは画面の切り替え・UI 用の一時状態（選択中のカード・演出）・保存・敵フェーズのタイマーを扱う。
@@ -36,6 +35,7 @@ import {
 } from '../engine';
 import type { Room } from '../net/room';
 import type { BattleEvent, BattleState, Command, Difficulty, DungeonRun, GameCommand, GameResult, GameState, Gender, PlayerId, SlotResult } from '../types';
+import { pickAllyTarget } from './healTarget';
 import { actorOf, autoName, battleActorOf, isLocalPlayer, LOCAL_PLAYER } from './battleConfig';
 
 export interface Selection {
@@ -136,6 +136,9 @@ interface StoreState {
   sheet: Sheet;
   /** 冒険の放棄・リセットの確認 */
   confirmAbandon: boolean;
+  /** 「ターン終了」の確認（この端末の担当で、まだ行動できる仲間がいる時だけ出す） */
+  confirmEndTurn: boolean;
+  setConfirmEndTurn: (v: boolean) => void;
   rollFx: RollFx | null;
   popups: Popup[];
   unitFx: Record<string, UnitFx>;
@@ -161,7 +164,8 @@ interface StoreState {
   preview: () => void;
   cancel: () => void;
   setActive: (id: string) => void;
-  endTurn: () => void;
+  /** force = 確認なしで終える（確認の窓の「ターンを終了する」） */
+  endTurn: (force?: boolean) => void;
   /** 道具を使う（userId = 袋の持ち主。戦闘中は操作中のキャラ） */
   usePouch: (itemUid: string, targetHeroId: string, userId?: string) => string | undefined;
   setSettings: (s: Partial<Settings>) => void;
@@ -279,6 +283,13 @@ export const setStoreRoom = (r: Room | null) => {
 };
 /** ホストが送った「敵の行動」がまだ戻ってきていない */
 let enemyInFlight = false;
+
+/** この端末の担当で、まだ行動できる（使えるカードが残っている）仲間がいるか。オンラインで準備完了した席は数えない */
+export function canStillAct(battle: BattleState): boolean {
+  if (battle.phase !== 'ally') return false;
+  const waiting = battle.readyCheck ? new Set(waitingPlayers(battle)) : undefined;
+  return battle.allies.some((a) => isLocalPlayer(a.playerId) && (!waiting || waiting.has(a.playerId)) && !isDone(battle, a));
+}
 
 /** 次に操作するキャラ（この端末の担当キャラだけが対象） */
 function nextActive(battle: BattleState, current: string): string {
@@ -625,6 +636,7 @@ export const useBattle = create<StoreState>((set, get) => {
     selection: null,
     sheet: null,
     confirmAbandon: false,
+    confirmEndTurn: false,
     rollFx: null,
     popups: [],
     unitFx: {},
@@ -783,12 +795,9 @@ export const useBattle = create<StoreState>((set, get) => {
         const alive = battle.enemies.filter((e) => !e.dead);
         if (alive.length === 1) targetId = alive[0].uid;
       }
-      if (isAllyCard(card)) {
-        const choices = cardTargets(battle, ally, card);
-        choices.sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp);
-        if (choices[0]) targetId = unitIdOf(choices[0]);
-      }
-      const allyTargetId = card.secondaryTarget ? cardTargets(battle, ally, secondaryCard(card)).sort((a,b) => a.hp/a.maxHp-b.hp/b.maxHp).map(unitIdOf)[0] : undefined;
+      // 回復・支援の最初の相手: HPが減っている味方（割合が一番低い）→ 全員満タンなら、敵の予告のダメージの合計が一番大きい味方
+      if (isAllyCard(card)) targetId = pickAllyTarget(battle, cardTargets(battle, ally, card)) ?? targetId;
+      const allyTargetId = card.secondaryTarget ? pickAllyTarget(battle, cardTargets(battle, ally, secondaryCard(card))) : undefined;
       set({ selection: { cardUid, targetId, allyTargetId, focus: 0 }, flash: null });
     },
 
@@ -872,11 +881,15 @@ export const useBattle = create<StoreState>((set, get) => {
       scheduleSave(get);
     },
 
-    endTurn: () => {
+    endTurn: (force = false) => {
       const { battle } = get();
+      set({ confirmEndTurn: false });
       if (battle.phase !== 'ally') return;
-      const canAct = battle.allies.some((a) => isLocalPlayer(a.playerId) && !isDone(battle, a));
-      set({ selection: null, hint: canAct ? { text: 'まだ行動できるキャラがいます', id: fxId++ } : null });
+      // この端末の担当のキャラだけで判断する（1台で全員を動かす時も、オンラインで自分の分だけの時も同じ）。
+      // 使えるカード（マナが足りる）が残っている仲間がいれば、押し間違いを防ぐために確認する
+      const canAct = canStillAct(battle);
+      if (canAct && !force) { set({ selection: null, confirmEndTurn: true }); return; }
+      set({ selection: null, hint: null });
       // オンライン協力: この端末の担当のうち、まだ準備完了していない席の分を押す
       if (room) {
         for (const p of waitingPlayers(battle).filter((x) => isLocalPlayer(x))) get().dispatch({ type: 'END_TURN', playerId: p });
@@ -907,6 +920,7 @@ export const useBattle = create<StoreState>((set, get) => {
 
     openSheet: (sheet) => set({ sheet, selection: sheet ? null : get().selection }),
     setConfirmAbandon: (v) => set({ confirmAbandon: v }),
+    setConfirmEndTurn: (v) => set({ confirmEndTurn: v }),
     showToast: (text, tone = 'info') => {
       playSound(tone === 'error' ? 'sfx_ui_deny' : tone === 'offline' ? 'sfx_ui_error' : 'sfx_ui_notice');
       set({ toast: { text, id: fxId++ } });
@@ -915,6 +929,7 @@ export const useBattle = create<StoreState>((set, get) => {
     closeTop: () => {
       const s = get();
       if (s.confirmAbandon) return set({ confirmAbandon: false }), true;
+      if (s.confirmEndTurn) return set({ confirmEndTurn: false }), true;
       if (s.sheet === 'log') return set({ sheet: 'menu' }), true;
       if (s.sheet) return set({ sheet: null }), true;
       if (s.selection) return set({ selection: null }), true;

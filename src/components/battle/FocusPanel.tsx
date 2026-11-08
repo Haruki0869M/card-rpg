@@ -1,9 +1,10 @@
 import { needsCardTarget, selectedCardTarget, secondaryCardTarget, targetGuide } from '../../engine/battle/targets';
 import { unitName } from '../../engine/battle/units';
-import { predictCard } from '../../engine/battle/battle';
+import { predictCardTotals, predictTexts, rangeText, type PredictTotals } from '../../engine/battle/battle';
 import { nameOf } from '../../engine/battle/units';
 // ===== フォーカス注入パネル（カード選択時に手札のすぐ上に出る） =====
 import { motion } from 'framer-motion';
+import { useMemo } from 'react';
 import { Minus, Plus, Star, X } from 'lucide-react';
 import { cardOf } from '../../data/cards';
 import { rollChanceFor, findAlly, tierDistribution, toPercents, slotPreviewLimitOf } from '../../engine';
@@ -11,6 +12,15 @@ import { useBattle } from '../../store/battleStore';
 import { CATEGORY_STYLE, EffectChip } from '../ui/icons';
 
 const TIER_COLORS = ['#5a4a5e', '#7a6a8a', '#4a8cff', '#3ad08a', '#ffc94a'];
+
+type Range = [number, number];
+const maxRange = (list: Range[]): Range | undefined => (list.length ? list.reduce((a, b) => (b[1] > a[1] ? b : a)) : undefined);
+/** 予測の合計から、その種類の効果の値（相手に対する計算後の値）を選ぶ */
+function pickValue(totals: PredictTotals[], kind: 'damage' | 'block' | 'heal', targetId?: string): Range | undefined {
+  const own = targetId ? totals.find((t) => t.id === targetId) : undefined;
+  if (own && own[kind][1] > 0) return own[kind];
+  return maxRange(totals.map((t) => t[kind]).filter((r) => r[1] > 0));
+}
 
 export function FocusPanel() {
   const selection = useBattle((s) => s.selection);
@@ -23,6 +33,17 @@ export function FocusPanel() {
 
   const ally = findAlly(battle, activeId);
   const inst = selection && ally?.hand.find((c) => c.uid === selection.cardUid);
+  // 成功数ごとの予測（今の相手に対する計算後の値）。hurt = 回復の相手のHPを1にして試した値（満タンでも回復の力を見せる）
+  const preds = useMemo(() => {
+    if (!selection || !ally || !inst) return null;
+    const c = cardOf(inst);
+    if ((needsCardTarget(c) && !selectedCardTarget(battle, ally, c, selection.targetId)) || (c.secondaryTarget && !secondaryCardTarget(battle, ally, c, selection.allyTargetId))) return null;
+    const heals = c.tiers.some((t) => t.effects.some((e) => e.kind === 'heal'));
+    return c.tiers.map((_, i) => ({
+      now: predictCardTotals(battle, ally.id, inst.uid, selection.targetId, selection.focus, i, selection.allyTargetId),
+      hurt: heals ? predictCardTotals(battle, ally.id, inst.uid, selection.targetId, selection.focus, i, selection.allyTargetId, true) : [],
+    }));
+  }, [battle, ally, inst, selection]);
   if (!selection || !ally || !inst) return null;
   const card = cardOf(inst);
   const cat = CATEGORY_STYLE[card.category];
@@ -41,6 +62,31 @@ export function FocusPanel() {
     const hi = i + 1 < card.tiers.length ? card.tiers[i + 1].minSuccesses - 1 : card.slots;
     return t.minSuccesses === hi ? `${hi}成功` : `${t.minSuccesses}-${hi}`;
   };
+
+  // 確率の帯の下の数字: 下の詳しい予測と同じ「今の相手に対する計算後の値」。同じ種類の効果が2つ以上ある時は、最初の1つに合計を出す
+  const chipsOf = (i: number) => {
+    const p = preds?.[i];
+    const used = new Set<string>();
+    return card.tiers[i].effects.flatMap((e) => {
+      if (!p || (e.kind !== 'damage' && e.kind !== 'block' && e.kind !== 'heal')) return [{ e, value: undefined as string | undefined }];
+      const r = pickValue(e.kind === 'heal' ? p.hurt : p.now, e.kind, e.kind === 'heal' ? selection.allyTargetId ?? selection.targetId : selection.targetId);
+      if (!r) return [{ e, value: undefined }];
+      if (used.has(e.kind)) return [];
+      used.add(e.kind);
+      return [{ e, value: rangeText(r) }];
+    });
+  };
+  // 下の詳しい予測の行。回復の相手が満タンの時は「HP回復 +4／+7／+10（今は満タン）」の1行で回復の力を見せる
+  const healOnly = !!preds && card.tiers.some((t) => t.effects.some((e) => e.kind === 'heal'));
+  const fullHeal = healOnly && preds!.every((p) => !p.now.some((t) => t.heal[1] > 0)) && preds!.some((p) => p.hurt.some((t) => t.heal[1] > 0));
+  const lines = !preds ? [] : fullHeal
+    ? [`HP回復 ${preds.map((p) => { const r = maxRange(p.hurt.map((t) => t.heal).filter((x) => x[1] > 0)); return r ? `+${rangeText(r)}` : '0'; }).join('／')}（今は満タン）`]
+    : card.tiers.flatMap((t, i) => {
+      if (!(pcts[i] > 0)) return [];
+      const text = predictTexts(preds[i].now).map((p) => `${unitName(battle, p.id)} ${p.text}`).join('／');
+      if (text) return [`${label(i)}：${text}`];
+      return t.effects.length ? [] : [`${label(i)}：効果なし`];
+    });
 
   return (
     <motion.div
@@ -128,20 +174,20 @@ export function FocusPanel() {
         )}
       </div>
       <div className="mt-1 grid gap-x-1 gap-y-0.5" style={{ gridTemplateColumns: `repeat(${card.tiers.length}, minmax(0,1fr))` }}>
-        {card.tiers.map((t, i) => (
-          <div key={i} className={`flex flex-col items-center leading-4 ${pcts[i] === 0 && probs[i] === 0 ? 'opacity-35' : ''}`}>
+        {card.tiers.map((_, i) => (
+          <div key={i} className={`flex flex-col items-center leading-4 ${pcts[i] === 0 && probs[i] === 0 ? 'opacity-35' : ''}`} data-tier-label={label(i)} data-tier-values={chipsOf(i).map((c) => c.value ?? '').join(',')}>
             <span className="flex items-center gap-0.5 text-[12px] font-bold whitespace-nowrap" style={{ color: colorOf(i) === '#5a4a5e' ? '#b8a8c0' : colorOf(i) }}>
               {label(i)} <span className="tabular-nums text-zinc-100">{pcts[i] === 0 && probs[i] > 0 ? '<1' : pcts[i]}%</span>
             </span>
             <span className="flex flex-wrap justify-center gap-x-1 text-[12px]">
-              {t.effects.map((e, j) => (
-                <EffectChip key={j} e={e} size={11} />
+              {chipsOf(i).map(({ e, value }, j) => (
+                <EffectChip key={j} e={e} size={11} value={value} />
               ))}
             </span>
           </div>
         ))}
       </div>
-      {!needsTarget && <div className="mt-1 max-h-[88px] overflow-y-auto rounded bg-black/30 px-1 text-[12px]" data-card-predictions>{card.tiers.map((_, i) => pcts[i] > 0 && <div key={i}>{label(i)}：{predictCard(battle, ally.id, inst.uid, selection.targetId, selection.focus, i, selection.allyTargetId).map(p => `${unitName(battle, p.id)} ${p.text}`).join('／') || '効果は上の表示を確認'}</div>)}</div>}
+      {!needsTarget && lines.length > 0 && <div className="mt-1 max-h-[88px] overflow-y-auto rounded bg-black/30 px-1 text-[12px]" data-card-predictions>{lines.map((l, i) => <div key={i}>{l}</div>)}</div>}
       <div className="mt-0.5 text-center text-[12px] leading-4 text-zinc-500">
         予測は成功数ごとの目安です（抽選・追加効果で変動）。残りフォーカス {ally.focus - selection.focus} / {ally.focus}
       </div>

@@ -512,8 +512,14 @@ export function resultSummary(resultLabel: string, parts: string[]): string {
   return list.length ? `${resultLabel}！ ${list.join('・')}` : `${resultLabel}！`;
 }
 
-/** 実際のカード処理を複製上で試す。元の状態・乱数・予約は一切進めない。抽選を伴う値は目安として示す。 */
-export function predictCard(state: BattleState, characterId: string, cardInstanceId: string, targetId: string | undefined, focusUsed: number, tier: number, allyTargetId?: string) {
+/** 予測の合計（1体ぶん）。値は [低い方, 高い方]（抽選のある攻撃は倍率の最小・最大） */
+export interface PredictTotals { id: string; damage: [number, number]; hpLoss: [number, number]; heal: [number, number]; block: [number, number]; hits: [number, number] }
+
+/**
+ * 実際のカード処理を複製上で試し、キャラごとの合計を返す。元の状態・乱数・予約は一切進めない。
+ * hurtTargets = 回復の相手のHPを1にして試す（満タンの相手にも「回復の力」を見せるため。表示だけ）
+ */
+export function predictCardTotals(state: BattleState, characterId: string, cardInstanceId: string, targetId: string | undefined, focusUsed: number, tier: number, allyTargetId?: string, hurtTargets = false): PredictTotals[] {
   const original = findAlly(state, characterId), inst = original?.hand.find(c => c.uid === cardInstanceId);
   if (!original || !inst) return [];
   const card = cardOf(inst);
@@ -523,6 +529,7 @@ export function predictCard(state: BattleState, characterId: string, cardInstanc
   for (const high of [false, true]) {
     const copy = structuredClone(state), a = findAlly(copy, characterId)!;
     delete copy.slotPreview;
+    if (hurtTargets) for (const u of copy.allies) if (!u.dead && (u.id === targetId || u.id === allyTargetId || card.target === 'self')) u.hp = 1;
     const modified = structuredClone(card);
     for (const t of modified.tiers) for (const e of t.effects) if (e.kind === 'damage' && e.outcomes?.length) {
       e.outcomes = [{ weight: 1, multiplier: (high ? Math.max : Math.min)(...e.outcomes.map(o => o.multiplier)) }];
@@ -536,7 +543,7 @@ export function predictCard(state: BattleState, characterId: string, cardInstanc
     samples.push(events);
   }
   const ids = [...new Set(samples.flat().flatMap(e => 'unitId' in e ? [e.unitId] : []))];
-  return ids.flatMap(id => {
+  return ids.map(id => {
     const totals = samples.map(events => {
       let damage = 0, hpLoss = 0, heal = 0, block = 0, hits = 0;
       for (const e of events) {
@@ -547,15 +554,27 @@ export function predictCard(state: BattleState, characterId: string, cardInstanc
       }
       return { damage, hpLoss, heal, block, hits };
     });
-    const range = (k: keyof typeof totals[0]) => {
-      const lo = Math.min(...totals.map(t => t[k])), hi = Math.max(...totals.map(t => t[k]));
-      return lo === hi ? `${lo}` : `${lo}〜${hi}`;
-    };
+    const range = (k: keyof typeof totals[0]): [number, number] => [Math.min(...totals.map(t => t[k])), Math.max(...totals.map(t => t[k]))];
+    return { id, damage: range('damage'), hpLoss: range('hpLoss'), heal: range('heal'), block: range('block'), hits: range('hits') };
+  });
+}
+
+/** 予測の値の書き方（同じなら1つ、違えば「7〜9」） */
+export const rangeText = ([lo, hi]: [number, number]) => (lo === hi ? `${lo}` : `${lo}〜${hi}`);
+
+/** 実際のカード処理を複製上で試す。元の状態・乱数・予約は一切進めない。抽選を伴う値は目安として示す。 */
+export function predictCard(state: BattleState, characterId: string, cardInstanceId: string, targetId: string | undefined, focusUsed: number, tier: number, allyTargetId?: string) {
+  return predictTexts(predictCardTotals(state, characterId, cardInstanceId, targetId, focusUsed, tier, allyTargetId));
+}
+
+/** 予測の合計を「ダメージ9（1回・HP減少9）・ブロック+7」の文にする */
+export function predictTexts(list: PredictTotals[]): { id: string; text: string }[] {
+  return list.flatMap(t => {
     const parts: string[] = [];
-    if (totals.some(t => t.damage || t.hits)) parts.push(`ダメージ${range('damage')}（${range('hits')}回・HP減少${range('hpLoss')}）`);
-    if (totals.some(t => t.heal)) parts.push(`HP回復${range('heal')}`);
-    if (totals.some(t => t.block)) parts.push(`ブロック+${range('block')}`);
-    return parts.length ? [{ id, text: parts.join('・') }] : [];
+    if (t.damage[1] || t.hits[1]) parts.push(`ダメージ${rangeText(t.damage)}（${rangeText(t.hits)}回・HP減少${rangeText(t.hpLoss)}）`);
+    if (t.heal[1]) parts.push(`HP回復${rangeText(t.heal)}`);
+    if (t.block[1]) parts.push(`ブロック+${rangeText(t.block)}`);
+    return parts.length ? [{ id: t.id, text: parts.join('・') }] : [];
   });
 }
 

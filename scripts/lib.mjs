@@ -118,3 +118,11 @@ export async function waitForWorldMovement(page) {
 export async function waitForBattlePresentation(page) {
   await page.locator('[data-battle-presenting]').waitFor({ state: 'detached', timeout: 15000 });
 }
+
+/** 「ターン終了」の確認の窓（まだ行動できる仲間がいる時だけ出る）が出たら「ターンを終了する」を押す */
+export async function confirmEndTurn(page) {
+  const yes = page.getByRole('button', { name: 'ターンを終了する' });
+  try { await yes.waitFor({ timeout: 400 }); } catch { return false; }
+  await yes.click();
+  return true;
+}

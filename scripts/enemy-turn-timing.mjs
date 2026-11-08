@@ -19,6 +19,7 @@ async function runOnce(width, party, enemies) {
   await page.locator('[data-enemy]').first().waitFor();
   // 開始の「ターン 1」の帯が終わるまで待つ
   await page.waitForTimeout(2500);
+  await targeting(page, width, party);
   // 0.1秒おきに記録（ページの中で測る。撮る時間の遅れに左右されない）
   await page.evaluate(() => {
     const rows = []; window.timingRows = rows;
@@ -58,6 +59,35 @@ async function runOnce(width, party, enemies) {
   const issues = await layoutIssues(page);
   await page.close();
   return { rows, issues };
+}
+
+/** 狙いの表示（フェーズ1の2回目）: 札で敵の絵を隠さない・矢印と光で示す・帯の下の数字と下の予測が同じ・宛先は名前 */
+async function targeting(page, width, party) {
+  const names = await page.$$eval('[data-intent-name]', (els) => els.map((e) => e.textContent));
+  check(names.length > 0 && names.every((t) => !/P\d/.test(t)), `${width}px: 予告の宛先が名前でない ${names}`);
+  // 敵を狙うカードを探す（手札は種で変わる）
+  const cards = page.locator('[data-card-index][data-usable]');
+  let found = false;
+  for (let i = 0; i < await cards.count() && !found; i++) {
+    const box = await cards.nth(i).boundingBox();
+    await page.mouse.click(box.x + 14, box.y + 70); await page.waitForTimeout(80);
+    if (await page.getByText('敵をタップ').count()) found = true;
+    else { await page.keyboard.press('Escape'); await page.waitForTimeout(80); }
+  }
+  check(found, `${width}px: 敵を狙うカードが手札に無い`);
+  const enemy = page.locator('[data-enemy]:not([data-dead])').first();
+  const eb = await enemy.boundingBox(); await page.mouse.click(eb.x + eb.width / 2, eb.y + 60); await page.waitForTimeout(150);
+  check(!(await page.getByText('下の一覧へ').count()), `${width}px: 「予測 下の一覧へ」の札が残っている`);
+  check(await page.locator('[data-target-arrow]').count() === 1, `${width}px: 狙う敵の矢印が無い`);
+  const col = await page.$$eval('[data-tier-label="完全"]', (els) => els.map((e) => e.getAttribute('data-tier-values')));
+  const pred = await page.locator('[data-card-predictions]').textContent();
+  // 「完全」の列の数字（ダメージ・ブロック・回復）が、下の予測の「完全：」の行にすべて出ている
+  const line = (await page.locator('[data-card-predictions] > div').allTextContents()).find((t) => t.startsWith('完全：')) ?? '';
+  const values = (col[0] ?? '').split(',').filter(Boolean);
+  const said = [...line.matchAll(/(?:ダメージ|ブロック\+|HP回復)(\d+(?:〜\d+)?)/g)].map((x) => x[1]);
+  check(col.length === 1 && values.length > 0 && values.every((v) => said.includes(v)), `${width}px: 帯の下の数字（${values}）と下の予測（${line}）が違う`);
+  await page.screenshot({ path: `${dir}/${width}-${party}p-target.png` });
+  await page.keyboard.press('Escape'); await page.waitForTimeout(100);
 }
 
 function analyze(label, rows) {

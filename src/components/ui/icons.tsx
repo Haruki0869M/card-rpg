@@ -121,7 +121,8 @@ const EFFECT_ICON: Record<string, { Icon: LucideIcon; color: string }> = {
 const FALLBACK_EFFECT_ICON = { Icon: Sparkles, color: '#e0d8c0' };
 
 /** カードの効果1つ分の短い表示（アイコン＋数値。全体なら「全」） */
-export function EffectChip({ e, size = 12 }: { e: CardEffect; size?: number }) {
+/** value = 今の相手に対する計算後の値（予測。あれば数字の代わりに出す） */
+export function EffectChip({ e, size = 12, value }: { e: CardEffect; size?: number; value?: string }) {
   const s = e.kind === 'applyStatus' ? statusStyle(e.status) : null;
   const el = e.kind === 'damage' && e.element ? getElement(e.element) : undefined;
   const { Icon, color } = s
@@ -131,7 +132,7 @@ export function EffectChip({ e, size = 12 }: { e: CardEffect; size?: number }) {
       : (EFFECT_ICON[e.kind] ?? FALLBACK_EFFECT_ICON);
   const to = targetOf(e);
   const all = to === 'allies' || to === 'otherAllies' || (to === 'foes' && e.kind !== 'taunt');
-  const text = `${all ? '全' : ''}${effectShort(e)}`;
+  const text = `${all ? '全' : ''}${value ?? effectShort(e)}`;
   const Shape = e.kind === 'block' && all ? ShieldPlus : Icon;
   return (
     <span className="inline-flex items-center gap-px whitespace-nowrap" style={{ color }}>

@@ -102,7 +102,7 @@ export function BottomBar() {
         </AnimatePresence>
       </div>
       <button
-        onClick={endTurn}
+        onClick={() => endTurn()}
         disabled={battle.phase !== 'ally'}
         className={`btn ${allDone ? 'btn-gold' : 'btn-dark'} font-display relative h-12 w-[116px] shrink-0 rounded-xl text-[16px]`}
       >

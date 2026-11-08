@@ -22,6 +22,7 @@ import { getElement } from '../../data/elements';
 import { StatusChips } from '../ui/StatusChips';
 import { UnitPopups } from './Popups';
 import { SlotOverlay } from './SlotOverlay';
+import { isAllyCard } from '../../engine/battle/targets';
 
 /** 動きの演出（攻撃・被弾・詠唱）。fx.id が変わった時だけ再生する */
 function useUnitMotion(unitId: string, side: 'ally' | 'enemy') {
@@ -56,12 +57,14 @@ function TargetFace({ allyId }: { allyId?: string }) {
   );
 }
 
+/** 予告の宛先に出す短い名前（長い名前は4文字＋「…」）。担当（P1など）は全員同じことがあるので出さない */
+export const shortName = (name: string) => ([...name].length > 5 ? `${[...name].slice(0, 4).join('')}…` : name);
+
 function IntentTargetName({ id }: { id?: string }) {
   const a = useBattle(s => s.battle.allies.find(a => a.id === id));
-  // 予告の枠の中の一番上の行に出す（枠の下にはみ出して味方の頭と重ならないように）
-  // 敵が3体以上で枠が狭い時は「→P1」だけにして、隣の敵の予告と重ならないようにする（顔の印で誰かは分かる）
-  const narrow = useBattle(s => s.battle.enemies.length >= 3);
-  return a ? <span className="order-first w-full truncate text-center text-[12px] leading-4" data-intent-name>→{a.playerId}{narrow ? '' : `・${a.name}`}</span> : null;
+  // 予告の枠の中の一番上の行に出す（枠の下にはみ出して味方の頭と重ならないように）。
+  // 敵が3体以上で枠が狭い時も、短い名前で出す（「→P1」だと、2人とも P1 の時に誰か分からない）
+  return a ? <span className="order-first w-full truncate text-center text-[12px] leading-4" data-intent-name>→{shortName(a.name)}</span> : null;
 }
 function IntentPartView({ p }: { p: IntentPart }) {
   switch (p.kind) {
@@ -175,7 +178,6 @@ const EnemyUnit = memo(function EnemyUnit({
   const targetable = !!card && (card.target === 'enemy' || aoe) && !enemy.dead;
   const isTarget = aoe || (targetable && selection?.targetId === enemy.uid);
   const waiting = targetable && !aoe && !selection?.targetId;
-  const prediction = isTarget && ally && card ? '下の一覧へ' : null;
   const h = spriteH * (def.size ?? 1);
   const barW = Math.min(slotW - 6, 104);
 
@@ -204,16 +206,23 @@ const EnemyUnit = memo(function EnemyUnit({
           style={{ width: h * 0.85, height: h }}
           data-enemy-sprite={enemy.uid}
         >
-          <div ref={scope} className="h-full w-full will-change-transform">
+          <div ref={scope} className="h-full w-full will-change-transform" style={isTarget ? { filter: 'drop-shadow(0 0 6px rgba(255,210,90,.95))' } : undefined}>
             <div className="idle-bob h-full w-full" style={{ animationDelay: `${(enemy.uid.charCodeAt(1) % 4) * -0.7}s` }}>
               <EnemyArt defId={enemy.defId} phase={enemy.phase} className="h-full w-full" />
             </div>
           </div>
         </motion.div>
-        {prediction && (
-          <div className="pointer-events-none absolute top-[30%] z-20 rounded-md border border-red-300 bg-[#3a0610]/95 px-1.5 text-[13px] leading-5 font-black text-amber-100 tabular-nums">
-            予測 {prediction}
-          </div>
+        {/* 狙う敵: 足元の光る輪・絵の発光・頭の上の矢印（予測の数字は下の操作パネルに出す。絵は隠さない） */}
+        {isTarget && (
+          <motion.div
+            className="pointer-events-none absolute z-20 text-[18px] leading-none font-black text-amber-300 drop-shadow-[0_0_4px_rgba(0,0,0,.9)]"
+            style={{ top: Math.max(0, boxH - h - 20) }}
+            animate={{ y: [0, 4, 0] }}
+            transition={{ duration: 0.8, repeat: Infinity }}
+            data-target-arrow={enemy.uid}
+          >
+            ▼
+          </motion.div>
         )}
         {/* 数字は、その敵の絵の頭のすぐ上に出す（箱の上の空きではなく、絵の上の端に合わせる） */}
         <UnitPopups unitId={enemy.uid} top={`${Math.max(0, boxH - h - 6)}px`} />
@@ -291,6 +300,18 @@ const AllySprite = memo(function AllySprite({ ally, left, bottom, h, active, fie
     return h ? weaponRarity(h) : undefined;
   });
   const press = usePress(() => setActive(ally.id), { type: 'ally', id: ally.id });
+  // カードを選んでいる時: 使う人と、回復・支援の相手に印を出す（枠の色だけでなく、立ち絵の上でも分かるように）
+  const role = useBattle((s) => {
+    const sel = s.selection;
+    if (!sel) return null;
+    const user = findAlly(s.battle, s.activeId);
+    const inst = user?.hand.find((c) => c.uid === sel.cardUid);
+    if (!inst) return null;
+    const card = cardOf(inst);
+    if ((isAllyCard(card) && sel.targetId === ally.id) || (card.secondaryTarget && sel.allyTargetId === ally.id)) return 'target';
+    if (s.activeId === ally.id && (isAllyCard(card) || !!card.secondaryTarget)) return 'user';
+    return null;
+  });
   return (
     <div {...press} className="absolute" style={{ left: left - h * 0.4, bottom, width: h * 0.8, height: h }} data-ally-sprite={ally.id}>
       {/* 足もとの影と陣形の円（敵と向き合う奥行き） */}
@@ -306,6 +327,13 @@ const AllySprite = memo(function AllySprite({ ally, left, bottom, h, active, fie
       </div>
       {/* お供: 鳥は肩、小竜は浮く、それ以外は足元 */}
       {ally.pet && !ally.dead && <AllyPet ownerId={ally.id} pet={ally.pet} h={h} spriteLeft={left - h * 0.4} fieldW={fieldW} />}
+      {role && (
+        <div className="pointer-events-none absolute inset-x-0 -top-[22px] z-20 flex justify-center" data-ally-role={role}>
+          <span className={`rounded-full px-1.5 text-[12px] leading-[18px] font-black whitespace-nowrap shadow ${role === 'target' ? 'bg-sky-300 text-sky-950' : 'bg-amber-300 text-amber-950'}`}>
+            {role === 'target' ? '▼対象' : '使う人'}
+          </span>
+        </div>
+      )}
       {/* 数字は、そのキャラの頭のすぐ上に出す */}
       <UnitPopups unitId={ally.id} top="-6px" />
     </div>
@@ -373,7 +401,8 @@ export function Battlefield() {
   // 名前 + HP + 行動の予告（狙いの名前の行を含む）+ 先読みの行 + 状態異常
   const foresee = enemies.some((e) => !e.dead && e.queuedActionId);
   // 属性の印の行（16）・各行の間（0.5×5）・3体以上の時に互い違いにずらす分（10）も数える
-  const enemyInfoH = 14 + 14 + 16 + 26 + 16 + (foresee ? 18 : 0) + 18 + 10 + (nE >= 3 ? 10 : 0);
+  // 予告の枠は「→名前」の行（16）＋数字の行（20）＋枠の余白（6）の2行ぶん
+  const enemyInfoH = 14 + 14 + 16 + 42 + 16 + (foresee ? 18 : 0) + 18 + 10 + (nE >= 3 ? 10 : 0);
   // 敵の列の下端と味方の頭の間に少し余白を残す（予告の枠が立ち絵の頭に重ならないように）
   const enemySpriteH = Math.max(40, Math.min(H * 0.56 - enemyInfoH, enemySlotW * 1.15));
   // 大きな敵（size > 1）は、絵の箱より上へはみ出して描かれ、戦場の上の端（上の帯）で体が切れていた。

@@ -1,6 +1,6 @@
 // 後半③〜⑥: 設定・開幕のお供・追撃/継承・支援・4人のトークンと短い表示を確認する。
 import { mkdir, writeFile } from 'node:fs/promises';
-import { chromium, layoutIssues, startBattle, URL } from './lib.mjs';
+import { chromium, confirmEndTurn, layoutIssues, startBattle, URL } from './lib.mjs';
 const dir = 'screenshots/battle-feedback'; await mkdir(dir, { recursive: true });
 const browser = await chromium.launch(), page = await browser.newPage({ viewport: { width: 390, height: 780 } });
 page.setDefaultTimeout(10000);
@@ -115,7 +115,7 @@ try {
     end.game.heroes[0].pet = a.pet = { petId: 'wolfPup', color: 'gray', name: 'ロウ', love: 0, acts: 0 };
     a.abilities = [{ name: 'ロウの噛みつき', pet: true, source: { kind: 'pet', id: 'wolfPup', label: 'ロウ', effectName: '噛みつき' }, effect: { when: 'turnEnd', do: [{ kind: 'damageByPlays', per: 2, category: 'physical' }] } }]; a.playedBy = { physical: 2 };
     end.game.expeditions[0].battle.allies.forEach(a => { a.mana = 0; a.hand = []; });
-    await resume(end, true, 'simple'); await observe(); await page.locator('button:has-text("ターン終了")').click();
+    await resume(end, true, 'simple'); await observe(); await page.locator('button:has-text("ターン終了")').click(); await confirmEndTurn(page);
     await page.waitForFunction(() => window.feedback.cutinTexts.some(t => t.includes('噛みつき') && t.includes('ロウ'))); await shot(`simple-pet-followup-${width}`);
     console.log(`OK: ${width}px 設定保存・4人の開幕/お供/屍兵/砲台/罠・攻撃/継承/歌・簡易高速の追撃`);
   }
