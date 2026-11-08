@@ -131,6 +131,17 @@
 | 種未指定 | 2人 | 953146605 | cleared |
 | 種未指定 | 4人 | 915560251 | cleared |
 
+## Firebase Hosting公開設定（2026-11-08）
+
+- オーナーの指示で https://card-rpg-1aa60.web.app へHostingのみ公開済み。J4には未着手。J3d第3段階と独自判断3点はオーナー承認済み。
+- .firebasercのdefaultはcard-rpg-1aa60。firebase.jsonのdatabase/emulatorsをそのまま保ち、hostingのみ追加（public: dist、指定ignore、全パスから/index.htmlへのSPA rewrites）。
+- build:firebaseは `tsc --noEmit && vite build --base /`。既存buildと同じ型チェック方法に合わせた。deploy:firebaseは `npm run build:firebase && firebase deploy --only hosting`。
+- **維持するルール**: vite.config.tsのbase '/card-rpg/'、src/net/firebaseConfig.ts、package-lock.json、originは変更しない。git pushは禁止。Firebaseへは必ずdeploy:firebaseを使う（通常buildのdistを直接公開しない）。databaseルールやemulatorsの設定を消さず、デプロイもhostingだけを対象にする。
+- 確認: build:firebase成功、dist/index.htmlの参照がすべて/基準で/card-rpg/なし。通常npm run buildも成功し、全参照が従来の/card-rpg/基準であることを確認。その後deploy:firebaseで再ビルドして公開した。
+- Firebase CLIは既存のグローバル導入・ログインを使用。依存追加やlockfile変更なし。生成された.firebaseキャッシュは.gitignoreへ追加。
+- 全テスト397件成功・3件スキップ・失敗0件。公開URLのHTTP200、390pxのタイトル表示、/assets/参照、未登録パスのSPA転送HTTP200、ブラウザー例外なしを確認。画像はscreenshots/firebase-hosting/title-390.png（Git管理外）。2台の実スマホでの協力プレイはオーナーが続けて確認する範囲。
+- 次回の公開はPowerShellで `cd C:\dev\card-rpg` → `npm run deploy:firebase`。ログインが切れた場合は先に `firebase login` を行う。
+
 ## 2. オーナーと決めたこと（未反映の決定が優先）
 
 | 項目 | 決定 | 現在の実装・次の対応 |

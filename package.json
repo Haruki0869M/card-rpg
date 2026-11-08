@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "build:firebase": "tsc --noEmit && vite build --base /",
+    "deploy:firebase": "npm run build:firebase && firebase deploy --only hosting",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "test": "vitest run",
