@@ -22,7 +22,7 @@ export const outcome: OutcomeHandler<'peddler'> = {
     const { rng, game } = ctx;
     const k = (100 - o.discount) / 100;
     const goods = ITEMS.all.filter(
-      (i) => (i.slot === 'weapon' ? jobWeapons(h.classId).includes(i.weaponType ?? '') : i.slot === 'accessory') && rarityIndex(i.rarity) >= 1 && rarityIndex(i.rarity) <= 2,
+      (i) => (!i.scenario || i.scenario === game.scenarioId) && (i.slot === 'weapon' ? jobWeapons(h.classId).includes(i.weaponType ?? '') : i.slot === 'accessory') && rarityIndex(i.rarity) >= 1 && rarityIndex(i.rarity) <= 2,
     );
     const items = [];
     for (let n = 0; n < 2 && goods.length; n++) {

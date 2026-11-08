@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { corruptionName, getScenario } from '../../data/scenarios';
 import { TERMS } from '../../data/terms';
 import { DUNGEONS } from '../../data/dungeons';
+import { ITEMS } from '../../data/items';
+import { createRng } from '../rng';
 import { QUESTS, TOWNS } from '../../data/world';
-import { climateAt, createGame } from '../index';
+import { climateAt, createGame, rollEquipment } from '../index';
 
 const newWorld = (seed = 5) =>
   createGame({ seed, scenarioId: 'frozenKingdom', difficulty: 'normal', party: ['warrior', 'mage'].map((c, i) => ({ classId: c, gender: 'male' as const, name: `${c}${i}`, playerId: 'P1' })) });
@@ -41,6 +43,21 @@ describe('凍てつく王国', () => {
     expect(climateAt(g, start)).toBeUndefined();
     const north = w.tiles.findIndex((t, i) => !t.f && Math.floor(i / w.width) <= 20 && Math.floor(i / w.width) >= 16);
     expect(climateAt(g, north)?.kind).toBe('cold');
+  });
+
+  it('固有装備13個は、凍てつく王国の宝箱にだけ出る', () => {
+    const gear = ITEMS.all.filter((i) => i.scenario === 'frozenKingdom');
+    expect(gear.length).toBe(13);
+    const g = newWorld();
+    const seen = new Set<string>();
+    for (let n = 0; n < 300; n++) {
+      const rng = createRng(n + 1);
+      for (const r of ['rare', 'epic', 'legend'] as const) {
+        seen.add(rollEquipment(r, g.heroes, rng, { scenario: 'frozenKingdom' }).id);
+        expect(rollEquipment(r, g.heroes, rng, { scenario: 'corruptionKing' }).scenario).not.toBe('frozenKingdom');
+      }
+    }
+    expect([...seen].some((id) => gear.some((i) => i.id === id))).toBe(true);
   });
 
   it('「侵食度」は「冬の深さ」と呼ぶ。侵食の魔王は今までどおり', () => {
