@@ -195,9 +195,24 @@ FROZEN_ENEMIES = ['snowHare', 'frostWolf', 'frostSprite', 'iceBat', 'frozenSoldi
                   'blizzardSnake', 'yeti', 'frostDrakeling', 'blizzardBeast', 'frostGiant', 'frostGiant-1',
                   'iceKnight', 'iceSwordsman', 'frostGuardian', 'whiteQueen', 'whiteQueen-1', 'whiteQueen-2']
 # 共通の敵（docs/art/prompts-enemies-common.md）
-COMMON_ENEMIES = ['goldenThief', 'guardDog']
+COMMON_ENEMIES = ['goldenThief', 'guardDog', 'banditThug', 'banditArcher', 'banditChief', 'wildBoar', 'giantSpider', 'caveBat',
+                  'stoneTortoise', 'greatBear', 'shambler', 'wanderingGhost', 'imp', 'hauntedKnight']
 # 隅に文字・サインがある絵（元画像のフォルダの _corner-text.txt）。サインが内側寄りにもあるので、離れた小さなかたまりを場所に関係なく消す
 CORNER_TEXT = {'iceBat', 'frozenSoldier', 'whiteQueen-2'}
+# 足元に地面（白っぽい灰色）が描かれている絵
+GROUND = {'stoneTortoise'}
+
+def deground(im, band=0.22):
+    """足元の地面を消す: 体の下から band の高さの中で、白っぽく色の薄い所と、半透明の所を透明にする"""
+    a = np.array(im).astype(int)
+    ys = np.where(a[..., 3].max(1) > 24)[0]
+    top, bot = ys.min(), ys.max()
+    rgb = a[..., :3]
+    mx, mn = rgb.max(2), rgb.min(2)
+    g = ((mn > 150) & ((mx - mn) < 28)) | (a[..., 3] < 170)
+    g[:int(bot - (bot - top) * band)] = False
+    a[..., 3][g] = 0
+    return despeckle(Image.fromarray(a.astype(np.uint8)), m=0.5)
 for _k in FROZEN_ENEMIES + COMMON_ENEMIES:
     ENEMIES[_k] = (f'enemy/{_k}', 1.0)
 
@@ -222,7 +237,10 @@ def build_enemies():
         name = f'enemy/{key}'
         if not want(name) or not has_src(n): continue
         # 名前の絵は、隅の文字・サイン（_corner-text.txt の iceBat・frozenSoldier・whiteQueen-2）も消す
-        fig = trim(despeckle(cutout(n), m=0.5 if key in CORNER_TEXT else 0.18) if isinstance(n, str) else cutout(n))
+        if key in GROUND:
+            fig = trim(deground(cutout(n)))
+        else:
+            fig = trim(despeckle(cutout(n), m=0.5 if key in CORNER_TEXT else 0.18) if isinstance(n, str) else cutout(n))
         if key == 'ignavarl-1':
             fig = flame_tint(fig)
         save(rim(place(fig, 520, 620, fill=0.97 * size, bottom=0.98), (8, 6, 12), 0.8, 3), f'{name}.webp')
