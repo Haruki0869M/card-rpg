@@ -1,4 +1,4 @@
-// 敵の絵の確認（凍てつく王国の23体＋共通の14体）: 戦闘に3体ずつ出して、描いた絵（webp）が出ているかを調べ、写真を撮る。
+// 敵の絵の確認（凍てつく王国・共通・侵食の魔王の新しい敵・機械仕掛けの帝国）: 戦闘に3体ずつ出して、描いた絵（webp）が出ているかを調べ、写真を撮る。
 // 変身するボス（crystalLord・frozenBishop・frostGiant・whiteQueen）は、保存データで段階を進めて、変身後の絵（<ID>-<段階>）に変わるかも調べる。
 // 使い方: URL=http://127.0.0.1:<番号>/card-rpg/ node scripts/enemy-art.mjs
 import { mkdirSync } from 'node:fs';
@@ -10,8 +10,14 @@ const ENEMIES = ['snowHare', 'frostWolf', 'frostSprite', 'iceBat', 'frozenSoldie
   'iceSlime', 'frozenGhoul', 'iceArcher', 'frostMage', 'frozenBishop', 'blizzardSnake', 'yeti', 'frostDrakeling', 'blizzardBeast',
   'frostGiant', 'iceKnight', 'iceSwordsman', 'frostGuardian', 'whiteQueen', 'goldenThief', 'guardDog',
   'banditThug', 'banditArcher', 'banditChief', 'wildBoar', 'giantSpider', 'caveBat', 'stoneTortoise', 'greatBear', 'shambler',
-  'wanderingGhost', 'imp', 'hauntedKnight'];
-const PHASES = { crystalLord: [1], frozenBishop: [1], frostGiant: [1], whiteQueen: [1, 2] };
+  'wanderingGhost', 'imp', 'hauntedKnight',
+  // 侵食の魔王の新しい10体
+  'thornBoar', 'mossCarapace', 'rootImp', 'reedStalker', 'fenGuardian', 'cinderHound', 'basaltCrawler', 'chainWraith', 'siegeImp', 'cursedHound',
+  // 機械仕掛けの帝国
+  'gearBug', 'steamRat', 'brokenAutomaton', 'conveyorBot', 'riveter', 'oilSlime', 'sparkTurret', 'foremanBot', 'foremanGolem', 'steamSprite',
+  'boilerCrab', 'wrenchGolem', 'clockworkDog', 'steamTurretLord', 'runawayBoiler', 'pistonFist', 'furnaceImp', 'ironButler', 'chainSaw',
+  'clockworkSage', 'copperKnight', 'furnaceGolem', 'greatMachine'];
+const PHASES = { crystalLord: [1], frozenBishop: [1], frostGiant: [1], whiteQueen: [1, 2], foremanGolem: [1], runawayBoiler: [1], clockworkSage: [1], greatMachine: [1, 2] };
 const problems = [];
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
@@ -73,4 +79,4 @@ if (problems.length) {
   console.log('NG:\n' + problems.join('\n'));
   process.exit(1);
 }
-console.log(`OK: 敵の絵 ${ENEMIES.length}体・変身後5枚（360/390/480）`);
+console.log(`OK: 敵の絵 ${ENEMIES.length}体・変身後${Object.values(PHASES).flat().length}枚（360/390/480）`);

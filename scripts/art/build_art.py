@@ -197,10 +197,20 @@ FROZEN_ENEMIES = ['snowHare', 'frostWolf', 'frostSprite', 'iceBat', 'frozenSoldi
 # 共通の敵（docs/art/prompts-enemies-common.md）
 COMMON_ENEMIES = ['goldenThief', 'guardDog', 'banditThug', 'banditArcher', 'banditChief', 'wildBoar', 'giantSpider', 'caveBat',
                   'stoneTortoise', 'greatBear', 'shambler', 'wanderingGhost', 'imp', 'hauntedKnight']
+# 侵食の魔王の新しい敵（Codex の T7）
+CORRUPTION_ENEMIES = ['thornBoar', 'mossCarapace', 'rootImp', 'reedStalker', 'fenGuardian', 'cinderHound', 'basaltCrawler',
+                      'chainWraith', 'siegeImp', 'cursedHound']
+# 機械仕掛けの帝国（docs/art/prompts-enemies-clockworkEmpire.md）: 新規23体＋変身後5枚
+CLOCKWORK_ENEMIES = ['gearBug', 'steamRat', 'brokenAutomaton', 'conveyorBot', 'riveter', 'oilSlime', 'sparkTurret', 'foremanBot',
+                     'foremanGolem', 'foremanGolem-1', 'steamSprite', 'boilerCrab', 'wrenchGolem', 'clockworkDog', 'steamTurretLord',
+                     'runawayBoiler', 'runawayBoiler-1', 'pistonFist', 'furnaceImp', 'ironButler', 'chainSaw', 'clockworkSage',
+                     'clockworkSage-1', 'copperKnight', 'furnaceGolem', 'greatMachine', 'greatMachine-1', 'greatMachine-2']
+for _k in CORRUPTION_ENEMIES + CLOCKWORK_ENEMIES:
+    ENEMIES[_k] = (f'enemy/{_k}', 1.0)
 # 隅に文字・サインがある絵（元画像のフォルダの _corner-text.txt）。サインが内側寄りにもあるので、離れた小さなかたまりを場所に関係なく消す
-CORNER_TEXT = {'iceBat', 'frozenSoldier', 'whiteQueen-2'}
+CORNER_TEXT = {'iceBat', 'frozenSoldier', 'whiteQueen-2', 'foremanGolem-1'}
 # 足元に地面（白っぽい灰色）が描かれている絵
-GROUND = {'stoneTortoise'}
+GROUND = {'stoneTortoise', 'fenGuardian', 'riveter', 'pistonFist'}
 
 def deground(im, band=0.22):
     """足元の地面を消す: 体の下から band の高さの中で、白っぽく色の薄い所と、半透明の所を透明にする"""
