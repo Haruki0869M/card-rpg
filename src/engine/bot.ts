@@ -38,6 +38,8 @@ export interface BotLog {
   steps: number;
   errors: string[];
   modes: Record<string, number>;
+  /** 入った部屋の数（ENTER_ROOM）。数えるだけで動きは変えない */
+  rooms?: number;
 }
 
 /** 次の操作を決めるだけの時（オンライン協力のテスト）は、ここに入れて動かさない */
@@ -50,6 +52,7 @@ function send(g: GameState, cmd: GameCommand, log: BotLog): GameState {
     capture.push(cmd);
     return { ...g };
   }
+  if ((cmd.type === 'SCENE' ? cmd.command : cmd).type === 'ENTER_ROOM') log.rooms = (log.rooms ?? 0) + 1;
   const r = applyGameCommand(g, cmd);
   if (r.error) log.errors.push(`${g.mode}/${cmd.type}: ${r.error}`);
   return r.state;

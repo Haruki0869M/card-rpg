@@ -620,6 +620,8 @@ export interface ScenarioDef {
   unlocked: boolean;
   /** 解放条件の説明（未解放の時に表示） */
   unlockText?: string;
+  /** 解放の条件（クリア記録で決まる。無ければ従来の unlocked だけで決まる）。K4 */
+  unlockRequires?: { cleared: string[] };
   /** 冒険の開始条件 */
   /** 世界マップ（無ければ仮の拠点から遊ぶ） */
   map?: ScenarioMapDef;
