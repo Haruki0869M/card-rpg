@@ -13,7 +13,7 @@
 元画像: `C:\dev\card-rpg-assets\enemy\snowHare.png`
 
 ```
-full body creature illustration of a small white snow hare, long frost tipped ears, stout hind legs raised for one kick, bare paws, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no clothes, weapons, shield, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of a small white snow hare, long frost tipped ears, stout hind legs raised for one kick, fluffy paws, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no weapons, shield, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### frostWolf 雪狼（凍てつく王国・麓・通常・size 0.95）
@@ -21,7 +21,7 @@ full body creature illustration of a small white snow hare, long frost tipped ea
 元画像: `C:\dev\card-rpg-assets\enemy\frostWolf.png`
 
 ```
-full body creature illustration of a lean white frost wolf, pale blue eyes, thick winter fur and bare fangs, four visible paws, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no armor, weapons, rider, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of a lean white frost wolf, pale blue eyes, thick winter fur and small fangs, four visible paws, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no armor, weapons, rider, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### frostSprite 霜の精（凍てつく王国・麓・通常・size 0.8）
@@ -53,7 +53,7 @@ full body creature illustration of one frozen human soldier, weathered steel hel
 元画像: `C:\dev\card-rpg-assets\enemy\snowOwl.png`
 
 ```
-full body creature illustration of one compact snowy owl with white feathered wings partly spread and black speckles, round amber eyes, large talons, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no clothing, weapon, perch, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one compact snowy owl with white feathered wings partly spread and black speckles, round amber eyes, large talons, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no weapon, perch, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### icicleBug 氷柱の虫（凍てつく王国・雪林・通常・size 0.85）
