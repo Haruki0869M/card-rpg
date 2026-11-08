@@ -15,6 +15,7 @@ import { HubScreen } from './components/screens/HubScreen';
 import { RewardScreen } from './components/screens/RewardScreen';
 import { ChestScreen } from './components/screens/ChestScreen';
 import { WorldMoveScene } from './components/world/WorldMoveScene';
+import { DoorOpenScene } from './components/dungeon/DungeonAnim';
 import { WorldScreen } from './components/world/WorldScreen';
 import { EncounterScreen, EndingScreen, SanctuaryScreen, ShrineScreen, TownScreen } from './components/world/Places';
 import { EventScreen, RestScreen } from './components/screens/RoomScreens';
@@ -91,6 +92,7 @@ function CurrentScreen() {
   const screen = useBattle((s) => s.screen);
   const mode = useBattle((s) => s.game?.mode);
   const movement = useBattle(s => s.worldMoves[0]);
+  const door = useBattle((s) => (s.doorOpen && s.doorOpen.scene === s.scene ? s.doorOpen : null));
   if (screen !== 'game' || !mode) {
     if (screen === 'setup') return <SetupScreen />;
     if (screen === 'create') return <CreateScreen />;
@@ -99,6 +101,8 @@ function CurrentScreen() {
     return <TitleScreen />;
   }
   if (movement) return <WorldMoveScene key={movement.id} move={movement} />;
+  // 扉が開く演出の間は、部屋の画面（戦闘など）への切り替えを待つ（第3段階B2）
+  if (door) return <DoorOpenScene key={door.id} door={door} />;
   switch (mode) {
     case 'hub':
       return <HubScreen />;

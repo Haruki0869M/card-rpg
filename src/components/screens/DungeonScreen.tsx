@@ -4,7 +4,7 @@ import { VoteChips } from '../ui/Votes';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, ArrowRight, ArrowUp, Backpack, Check, Coins, Compass, Crown, DoorClosed, DoorClosedLocked, Flame, Gift, LogOut, Menu, Sparkles, Swords, Skull, Undo2, Users, X } from 'lucide-react';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { DungeonView } from '../dungeon/DungeonView';
+import { AnimatedDungeonView } from '../dungeon/DungeonAnim';
 import { DUNGEONS } from '../../data/dungeons';
 import { getItem } from '../../data/items';
 import {
@@ -307,7 +307,7 @@ export function DungeonScreen() {
       </div>
       <div className="relative min-h-[200px] flex-1 overflow-hidden border-y border-amber-500/30">
         {/* 一人称の通路 */}
-        <DungeonView run={run} background={background} />
+        <AnimatedDungeonView run={run} background={background} />
         <MiniMap run={run} onOpen={() => setShowMap(true)} />
         {/* 2人以上で遊ぶ時: 扉は全員一致で開く */}
         {voters(game).length > 1 && (

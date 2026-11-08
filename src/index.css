@@ -482,3 +482,17 @@ textarea {
 @media (prefers-reduced-motion: reduce) {
   .dungeon-torch { animation: none; }
 }
+
+/* ダンジョンの扉が開く（第3段階B2）。左右の扉板が外へ */
+@keyframes door-open-left {
+  from { transform: perspective(200px) rotateY(0deg); }
+  to { transform: perspective(200px) rotateY(80deg); }
+}
+@keyframes door-open-right {
+  from { transform: perspective(200px) rotateY(0deg); }
+  to { transform: perspective(200px) rotateY(-80deg); }
+}
+.door-leaf {
+  animation-timing-function: ease-in;
+  animation-fill-mode: forwards;
+}

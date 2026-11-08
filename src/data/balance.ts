@@ -192,6 +192,12 @@ export const TIMING = {
   turnCutin: 1.2,
   turnCutinShort: 0.6,
   turnNotice: 1.0,
+  /** ダンジョンの演出（第3段階B2）: 1歩・ここまで歩くの1歩・向きを変える・扉が開く・簡易の時の切り替え。秒 */
+  dungeonStep: 0.25,
+  dungeonWalkStep: 0.15,
+  dungeonTurn: 0.25,
+  dungeonDoor: 0.45,
+  dungeonSimple: 0.1,
 } as const;
 
 /** 宝箱・カード報酬の演出時間（秒）。高速モードでは fastModeFactor で割る。spec §10.3 */

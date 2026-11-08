@@ -16,9 +16,9 @@ const SIZES = [
 const browser = await chromium.launch();
 const problems = [];
 
-async function run(width, height) {
-  const tag = `${width}x${height}`;
-  const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
+async function run(width, height, reduced = false) {
+  const tag = `${width}x${height}${reduced ? '-reduced' : ''}`;
+  const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1, reducedMotion: reduced ? 'reduce' : 'no-preference' });
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   const shot = (n) => page.screenshot({ path: `${OUT}/${tag}-${n}.png` });
@@ -46,7 +46,7 @@ async function run(width, height) {
   await page.goto(URL);
   await page.evaluate(() => {
     localStorage.clear();
-    localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true, vibration: false }));
+    localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: false, vibration: false }));
   });
   await page.reload();
   await page.getByText('新しい冒険').click();
@@ -69,7 +69,18 @@ async function run(width, height) {
   await page.getByText('探索力の判定').click();
   await page.waitForTimeout(200);
   await page.getByRole('button', { name: /^扉を開ける/ }).click();
-  await page.waitForTimeout(400);
+  // 段階B2: 扉が開く演出 → 戦闘の画面（動作軽減では演出なし）
+  const doorScene = page.locator('[data-door-open]');
+  if (reduced) {
+    if (await doorScene.count()) problems.push(`${tag}: 動作軽減なのに扉の演出が出た`);
+  } else {
+    await doorScene.waitFor({ timeout: 1000 }).catch(() => problems.push(`${tag}: 扉が開く演出が出ない`));
+    await page.waitForTimeout(150);
+    await shot('2a-door-opening');
+    await doorScene.waitFor({ state: 'detached', timeout: 3000 }).catch(() => problems.push(`${tag}: 扉の演出が終わらない`));
+  }
+  await page.getByText('ターン終了').waitFor({ timeout: 5000 }).catch(() => problems.push(`${tag}: 扉の後に戦闘の画面にならない`));
+  await page.waitForTimeout(400); // 保存が書かれるのを待つ（次で保存を書き換えるため）
   // 戦闘は確認の対象外: 保存を書き換えて「勝った後」にする
   await edit((g) => {
     const x = g.expeditions[0];
@@ -82,15 +93,25 @@ async function run(width, height) {
   await check('部屋の中');
   await shot('2-room');
   await page.getByRole('button', { name: '前進', exact: true }).click();
-  await page.waitForTimeout(200);
+  const anim = page.locator('[data-dungeon-anim]');
+  if (reduced) {
+    if (await anim.count()) problems.push(`${tag}: 動作軽減なのに歩く演出が出た`);
+  } else {
+    if ((await anim.getAttribute('data-dungeon-anim', { timeout: 500 }).catch(() => null)) !== 'forward') problems.push(`${tag}: 前進のズームが出ない`);
+    await shot('3a-forward-anim');
+    await anim.waitFor({ state: 'detached', timeout: 2000 }).catch(() => problems.push(`${tag}: 前進の演出が終わらない`));
+  }
+  await page.waitForTimeout(100);
   await expectEnd('wall', '通路（前は壁）');
   await check('通路');
   await shot('3-hall');
   await page.getByRole('button', { name: '右へ', exact: true }).click();
-  await page.waitForTimeout(200);
+  await page.locator('[data-dungeon-anim]').waitFor({ state: 'detached', timeout: 2000 }).catch(() => {});
+  await page.waitForTimeout(100);
   await shot('4-right');
   await page.getByRole('button', { name: '扉を向く', exact: true }).click();
-  await page.waitForTimeout(200);
+  if (!reduced && (await page.locator('[data-dungeon-anim]').getAttribute('data-dungeon-anim', { timeout: 500 }).catch(() => null)) !== 'left') problems.push(`${tag}: 扉を向く（左）の回転が出ない`);
+  await page.locator('[data-dungeon-anim]').waitFor({ state: 'detached', timeout: 2000 }).catch(() => problems.push(`${tag}: 回転の演出が終わらない`));
   await expectEnd('door', '扉を向いた');
   await check('扉の前');
   await shot('5-door');
@@ -107,7 +128,8 @@ async function run(width, height) {
     const walk = page.getByRole('button', { name: '歩く', exact: true });
     if (await walk.isEnabled()) {
       await walk.click();
-      await page.waitForTimeout(300);
+      await page.locator('[data-dungeon-anim]').waitFor({ state: 'detached', timeout: 3000 }).catch(() => problems.push(`${tag}: ここまで歩くの演出が終わらない`));
+      await page.waitForTimeout(100);
       if (await page.locator('[data-map-overlay]').count()) problems.push(`${tag}: 歩いた後に地図が閉じない`);
       await shot('8-walked');
     }
@@ -118,9 +140,10 @@ async function run(width, height) {
 }
 
 for (const [w, h] of SIZES) await run(w, h);
+await run(390, 844, true);
 await browser.close();
 if (problems.length) {
   console.log('NG:\n' + problems.join('\n'));
   process.exit(1);
 }
-console.log('OK: 通路の絵・ミニマップ・大きな地図・歩くボタン（360/390/480・360×560）');
+console.log('OK: 通路の絵・ミニマップ・大きな地図・歩くボタン・歩く/向く/扉の演出（360/390/480・360×560・動作軽減）');

@@ -39,11 +39,36 @@ function surface(bg: string, part: Part, shade: number): CSSProperties {
 }
 
 /** 扉（壁の面の中に描く） */
-function Door({ bg, face, shade }: { bg: string; face: ViewFace; shade: number }) {
+function Door({ bg, face, shade, opening }: { bg: string; face: ViewFace; shade: number; opening?: number }) {
   const t = themeOf(bg);
   const img = artImage(`dungeon/${bg}-door`);
   const boss = face === 'boss';
   if (face === 'arch') return <div className="absolute inset-x-[22%] top-[22%] bottom-0 rounded-t-[40%] bg-black/85" style={{ boxShadow: 'inset 0 0 12px #000' }} />;
+  // 扉が開く（第3段階B2）: 左右の扉板が外へ開き、奥の暗がりが見える
+  if (opening) {
+    const leaf = (side: 'left' | 'right') => (
+      <div
+        className="door-leaf absolute inset-y-0 w-1/2"
+        style={{
+          [side]: 0,
+          transformOrigin: side,
+          animationName: `door-open-${side}`,
+          animationDuration: `${opening}s`,
+          backgroundColor: t.door,
+          backgroundImage: img ? `url(${img})` : 'repeating-linear-gradient(90deg, rgba(0,0,0,.35) 0 2px, transparent 2px 50%)',
+          backgroundSize: img ? '200% 100%' : undefined,
+          backgroundPosition: side === 'left' ? 'left' : 'right',
+          borderRight: side === 'left' ? '2px solid #1a0e08' : undefined,
+        }}
+      />
+    );
+    return (
+      <div className="absolute bottom-0 overflow-hidden rounded-t-[30%] bg-black" style={{ left: boss ? '12%' : '22%', right: boss ? '12%' : '22%', top: boss ? '10%' : '22%', border: `3px solid ${boss ? '#d8a830' : '#2a1a10'}` }}>
+        {leaf('left')}
+        {leaf('right')}
+      </div>
+    );
+  }
   return (
     <div
       className="absolute bottom-0 flex items-center justify-center rounded-t-[30%]"
@@ -81,7 +106,7 @@ function Torch({ bg }: { bg: string }) {
 }
 
 /** 一人称の通路 */
-export function DungeonView({ run, background }: { run: DungeonRun; background: string }) {
+export function DungeonView({ run, background, opening }: { run: DungeonRun; background: string; /** 正面の扉が開く演出の秒数（扉が開く演出の時だけ） */ opening?: number }) {
   const [ref, size] = useElementSize<HTMLDivElement>();
   const { slices, end } = viewSlices(run);
   // 1マスの大きさ（通路の幅・高さ・奥行き）。画面の小さい方の辺に合わせる
@@ -159,7 +184,7 @@ export function DungeonView({ run, background }: { run: DungeonRun; background: 
   const endZ = -end.depth * U;
   const endShade = shade(end.depth);
   if (end.face === 'far' || end.face === 'dark') face('end', `translate3d(0, 0, ${endZ}px)`, { background: '#030303' }, undefined, 99);
-  else face('end', `translate3d(0, 0, ${endZ}px)`, surface(background, 'wall', endShade), end.face === 'wall' ? null : <Door bg={background} face={end.face} shade={endShade} />, 99);
+  else face('end', `translate3d(0, 0, ${endZ}px)`, surface(background, 'wall', endShade), end.face === 'wall' ? null : <Door bg={background} face={end.face} shade={endShade} opening={opening} />, 99);
   return (
     <div ref={ref} className="absolute inset-0 overflow-hidden bg-black" data-dungeon-view data-end={end.face}>
       {[...faces].sort((a, b) => b.dist - a.dist).map((f) => f.node)}
