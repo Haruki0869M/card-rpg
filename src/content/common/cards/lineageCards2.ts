@@ -41,10 +41,10 @@ export const LINEAGE_CARDS_2: CardDef[] = [
   c('lnMaChainBolt', '連鎖雷', 'magic', 1, 70, 'enemy', [[el('thunder', 2)], [elh('thunder', 3, 2)], [elh('thunder', 3, 3)]], { ...L('ma'), rarity: 'rare', tags: ['combo'] }),
   c('lnMaWither', '衰弱の呪い', 'magic', 1, 75, 'enemy', [[st('weak', 1)], [d(2), st('weak', 1)], [d(3), st('weak', 2), st('vulnerable', 1)]], { ...L('ma'), rarity: 'rare' }),
   c('lnMaMeditate', '瞑想', 'skill', 1, 80, 'self', [[mana(1)], [mana(2)], [mana(2), draw(1)]], { ...L('ma'), rarity: 'rare' }),
-  c('lnMaCataclysm', '大破壊', 'magic', 3, 50, 'allEnemies', [[d(5)], [d(9)], [d(13)], [d(18)]], { ...L('ma'), rarity: 'epic', trait: { name: '破滅の余波', effect: { when: 'kill', do: [mana(1)] } } }),
-  c('lnMaOverload', '魔力過負荷', 'magic', 2, 60, 'enemy', [[d(6)], [d(11)], [d(17)]], { ...L('ma'), rarity: 'epic', trait: { name: '溢れる魔力', effect: { when: 'perfect', do: [mana(2)] } } }),
+  c('lnMaCataclysm', '大破壊', 'magic', 3, 50, 'allEnemies', [[d(4)], [d(7)], [d(11)], [d(15)]], { ...L('ma'), rarity: 'epic', trait: { name: '破滅の余波', effect: { when: 'kill', do: [mana(1)] } } }),
+  c('lnMaOverload', '魔力過負荷', 'magic', 2, 60, 'enemy', [[d(5)], [d(9)], [d(14)]], { ...L('ma'), rarity: 'epic', trait: { name: '溢れる魔力', effect: { when: 'perfect', do: [mana(2)] } } }),
   c('lnMaStarGuide', '星の導き', 'skill', 1, 85, 'self', [[mana(2)], [mana(2), draw(1)], [mana(3), draw(2)]], { ...L('ma'), rarity: 'epic', trait: { name: '天啓', effect: { when: 'perfect', do: [focus(1)] } } }),
-  c('lnMaArcana', '大魔導の秘奥', 'magic', 3, 55, 'enemy', [[d(9)], [d(17)], [d(25)], [d(36)]], { ...L('ma'), rarity: 'epic', tags: ['heavy'], trait: pierce('魔貫') }),
+  c('lnMaArcana', '大魔導の秘奥', 'magic', 3, 55, 'enemy', [[d(7)], [d(14)], [d(21)], [d(30)]], { ...L('ma'), rarity: 'epic', tags: ['heavy'], trait: pierce('魔貫') }),
 
   // ===== 聖（回復と守り。仲間を支える） =====
   c('lnSeiLight', '聖なる光', 'magic', 1, 80, 'enemy', [[el('holy', 3)], [el('holy', 6)], [el('holy', 8)]], L('sei')),
@@ -58,10 +58,10 @@ export const LINEAGE_CARDS_2: CardDef[] = [
   c('lnSeiGroupBless', '集団の加護', 'skill', 1, 80, 'self', [[ba(3)], [ba(5)], [ba(7)]], { ...L('sei'), rarity: 'rare', tags: ['support'] }),
   c('lnSeiPurify', '浄化', 'skill', 1, 80, 'ally', [[cleanse], [cleanse, heal(3)], [cleanse, heal(6)]], { ...L('sei'), rarity: 'rare', tags: ['support'] }),
   c('lnSeiWrath', '聖なる怒り', 'magic', 2, 65, 'enemy', [[el('holy', 6)], [el('holy', 11)], [el('holy', 16)]], { ...L('sei'), rarity: 'rare' }),
-  c('lnSeiRain', '慈雨', 'skill', 2, 60, 'self', [[healAll(3)], [healAll(5)], [healAll(8)]], { ...L('sei'), rarity: 'epic', tags: ['support'], trait: { name: '恵みの余韻', effect: { when: 'perfect', do: [ba(2)] } } }),
-  c('lnSeiGuardian', '天使の守り', 'skill', 2, 60, 'self', [[ba(4)], [ba(7)], [ba(10)]], { ...L('sei'), rarity: 'epic', tags: ['support'], trait: { name: '光の護り', effect: { when: 'hurt', do: [b(3)] } } }),
-  c('lnSeiDivinePunish', '神罰', 'magic', 3, 50, 'enemy', [[el('holy', 9)], [el('holy', 17)], [el('holy', 25)], [el('holy', 36)]], { ...L('sei'), rarity: 'epic', tags: ['heavy'], trait: { name: '裁きの余光', effect: { when: 'kill', do: [healAll(4)] } } }),
-  c('lnSeiMartyr', '殉教者の祈り', 'skill', 1, 80, 'self', [[pay(3), healAll(4)], [pay(3), healAll(7)], [pay(3), healAll(10)]], { ...L('sei'), rarity: 'epic', tags: ['support'], trait: { name: '献身', effect: { when: 'perfect', do: [healAll(3)] } } }),
+  c('lnSeiRain', '慈雨', 'skill', 2, 60, 'self', [[healAll(2)], [healAll(4)], [healAll(6)]], { ...L('sei'), rarity: 'epic', tags: ['support'], trait: { name: '恵みの余韻', effect: { when: 'perfect', do: [ba(2)] } } }),
+  c('lnSeiGuardian', '天使の守り', 'skill', 2, 60, 'self', [[ba(3)], [ba(5)], [ba(8)]], { ...L('sei'), rarity: 'epic', tags: ['support'], trait: { name: '光の護り', effect: { when: 'hurt', do: [b(3)] } } }),
+  c('lnSeiDivinePunish', '神罰', 'magic', 3, 50, 'enemy', [[el('holy', 7)], [el('holy', 14)], [el('holy', 21)], [el('holy', 30)]], { ...L('sei'), rarity: 'epic', tags: ['heavy'], trait: { name: '裁きの余光', effect: { when: 'kill', do: [healAll(4)] } } }),
+  c('lnSeiMartyr', '殉教者の祈り', 'skill', 1, 80, 'self', [[pay(3), healAll(3)], [pay(3), healAll(5)], [pay(3), healAll(8)]], { ...L('sei'), rarity: 'epic', tags: ['support'], trait: { name: '献身', effect: { when: 'perfect', do: [healAll(3)] } } }),
 
   // ===== 技（器用さと素早さ。手数・状態異常・手札のやりくり） =====
   c('lnGiStab', '素早い一突き', 'physical', 0, 85, 'enemy', [[d(2)], [d(3)]], { ...L('gi'), stat: 'dex' }),
@@ -75,8 +75,8 @@ export const LINEAGE_CARDS_2: CardDef[] = [
   c('lnGiSnare', '罠設置', 'skill', 1, 75, 'enemy', [[st('vulnerable', 1)], [d(2), st('vulnerable', 1)], [d(3), st('vulnerable', 2)]], { ...L('gi'), rarity: 'rare', stat: 'per' }),
   c('lnGiWeakpoint', '急所狙い', 'physical', 1, 70, 'enemy', [[d(3)], [d(6), st('vulnerable', 1)], [d(9), st('vulnerable', 2)]], { ...L('gi'), rarity: 'rare', stat: 'per' }),
   c('lnGiAmbush', '奇襲', 'physical', 2, 65, 'enemy', [[d(5)], [d(10)], [d(15)]], { ...L('gi'), rarity: 'rare', stat: 'agi' }),
-  c('lnGiShadowBlade', '影の刃', 'physical', 2, 60, 'enemy', [[d(6)], [d(11)], [d(17)]], { ...L('gi'), rarity: 'epic', stat: 'dex', trait: pierce('影走り') }),
-  c('lnGiShadowDance', '影の舞', 'physical', 2, 60, 'enemy', [[dh(2, 3)], [dh(3, 4)], [dh(4, 5)]], { ...L('gi'), rarity: 'epic', stat: 'agi', tags: ['combo'], trait: { name: '舞い続ける', effect: { when: 'kill', do: [draw(1)] } } }),
+  c('lnGiShadowBlade', '影の刃', 'physical', 2, 60, 'enemy', [[d(5)], [d(9)], [d(14)]], { ...L('gi'), rarity: 'epic', stat: 'dex', trait: pierce('影走り') }),
+  c('lnGiShadowDance', '影の舞', 'physical', 2, 60, 'enemy', [[dh(1, 3)], [dh(2, 4)], [dh(3, 5)]], { ...L('gi'), rarity: 'epic', stat: 'agi', tags: ['combo'], trait: { name: '舞い続ける', effect: { when: 'kill', do: [draw(1)] } } }),
   c('lnGiPerfectPlan', '完璧な計画', 'skill', 1, 85, 'self', [[draw(1), focus(1)], [draw(2), focus(1)], [draw(2), focus(2)]], { ...L('gi'), rarity: 'epic', stat: 'per', trait: { name: '計算通り', effect: { when: 'perfect', do: [mana(1)] } } }),
-  c('lnGiMaster', '千変万化', 'physical', 3, 55, 'enemy', [[d(8)], [d(15)], [d(23)], [d(33)]], { ...L('gi'), rarity: 'epic', stat: 'dex', tags: ['heavy'], trait: { name: '見切りの一撃', effect: { modifier: 'damageDealt', multiplier: 1.5, if: [{ kind: 'targetHpAtMost', pct: 30 }] } } }),
+  c('lnGiMaster', '千変万化', 'physical', 3, 55, 'enemy', [[d(6)], [d(12)], [d(19)], [d(28)]], { ...L('gi'), rarity: 'epic', stat: 'dex', tags: ['heavy'], trait: { name: '見切りの一撃', effect: { modifier: 'damageDealt', multiplier: 1.5, if: [{ kind: 'targetHpAtMost', pct: 30 }] } } }),
 ];

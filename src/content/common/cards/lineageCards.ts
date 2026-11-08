@@ -33,8 +33,8 @@ export const LINEAGE_CARDS: CardDef[] = [
   c('lnBuFlurry', '連続突き', 'physical', 1, 70, 'enemy', [[d(2)], [dh(3, 2)], [dh(3, 3)]], { ...L('bu'), rarity: 'rare', stat: 'dex', tags: ['combo'] }),
   c('lnBuCounter', '見切り反撃', 'physical', 1, 75, 'enemy', [[b(3)], [d(5), b(4)], [d(8), b(6)]], { ...L('bu'), rarity: 'rare', stat: 'per' }),
   c('lnBuRoar', '気迫の咆哮', 'skill', 1, 80, 'allEnemies', [[all('weak', 1)], [d(2), all('weak', 1)], [d(3), all('weak', 2)]], { ...L('bu'), rarity: 'rare', stat: 'vit' }),
-  c('lnBuUnyielding', '不屈', 'skill', 1, 85, 'self', [[b(6)], [b(9), heal(4)], [b(12), heal(6)]], { ...L('bu'), rarity: 'epic', stat: 'vit', trait: { name: '不屈', effect: { when: 'hurt', do: [b(2)] } } }),
-  c('lnBuThousand', '一騎当千', 'physical', 3, 55, 'allEnemies', [[d(4)], [d(7)], [d(10)], [d(14), all('vulnerable', 1)]], { ...L('bu'), rarity: 'epic', stat: 'str', trait: { name: '無双', effect: { when: 'kill', do: [mana(1)] } } }),
-  c('lnBuGodStrike', '武神の一撃', 'physical', 3, 55, 'enemy', [[d(9)], [d(16)], [d(24)], [d(34)]], { ...L('bu'), rarity: 'epic', stat: 'str', tags: ['heavy'], trait: { name: '神威', effect: { modifier: 'ignoreBlock' } } }),
-  c('lnBuConqueror', '戦場の覇者', 'physical', 2, 65, 'enemy', [[d(5), b(3)], [d(10), b(5)], [d(15), b(7)]], { ...L('bu'), rarity: 'epic', trait: { name: '覇気', effect: { modifier: 'damageDealt', multiplier: 1.25, if: [{ kind: 'selfHpAtMost', pct: 50 }] } } }),
+  c('lnBuUnyielding', '不屈', 'skill', 1, 85, 'self', [[b(5)], [b(7), heal(3)], [b(10), heal(5)]], { ...L('bu'), rarity: 'epic', stat: 'vit', trait: { name: '不屈', effect: { when: 'hurt', do: [b(2)] } } }),
+  c('lnBuThousand', '一騎当千', 'physical', 3, 55, 'allEnemies', [[d(3)], [d(5)], [d(8)], [d(11), all('vulnerable', 1)]], { ...L('bu'), rarity: 'epic', stat: 'str', trait: { name: '無双', effect: { when: 'kill', do: [mana(1)] } } }),
+  c('lnBuGodStrike', '武神の一撃', 'physical', 3, 55, 'enemy', [[d(7)], [d(13)], [d(20)], [d(28)]], { ...L('bu'), rarity: 'epic', stat: 'str', tags: ['heavy'], trait: { name: '神威', effect: { modifier: 'ignoreBlock' } } }),
+  c('lnBuConqueror', '戦場の覇者', 'physical', 2, 65, 'enemy', [[d(4), b(2)], [d(8), b(4)], [d(12), b(5)]], { ...L('bu'), rarity: 'epic', trait: { name: '覇気', effect: { modifier: 'damageDealt', multiplier: 1.25, if: [{ kind: 'selfHpAtMost', pct: 50 }] } } }),
 ];

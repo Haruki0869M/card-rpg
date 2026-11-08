@@ -24,6 +24,6 @@ export const WEAPON_TYPE_CARDS: CardDef[] = [
   c('wtSwordGuard', '剣の構え', 'skill', 1, 80, 'self', [[b(4)], [b(6), focus(1)], [b(8), focus(1)]], W('sword')),
   c('wtSwordWhirl', '大回転斬り', 'physical', 2, 65, 'allEnemies', [[d(3)], [d(6)], [d(9)]], { ...W('sword'), rarity: 'rare' }),
   c('wtSwordNotch', '刃こぼし', 'physical', 1, 75, 'enemy', [[d(3)], [d(5), st('vulnerable', 1)], [d(7), st('vulnerable', 2)]], { ...W('sword'), rarity: 'rare' }),
-  c('wtSwordAura', '剣気解放', 'physical', 2, 60, 'enemy', [[d(6)], [d(11)], [d(17)]], { ...W('sword'), rarity: 'epic', trait: { name: '剣気', effect: { when: 'perfect', do: [focus(1)] } } }),
-  c('wtSwordHelmSplit', '兜割り', 'physical', 3, 55, 'enemy', [[d(8)], [d(15)], [d(22)], [d(32), st('vulnerable', 2)]], { ...W('sword'), rarity: 'epic', stat: 'str', tags: ['heavy'], trait: { name: '止めの一太刀', effect: { modifier: 'damageDealt', multiplier: 1.5, if: [{ kind: 'targetHpAtMost', pct: 30 }] } } }),
+  c('wtSwordAura', '剣気解放', 'physical', 2, 60, 'enemy', [[d(5)], [d(9)], [d(14)]], { ...W('sword'), rarity: 'epic', trait: { name: '剣気', effect: { when: 'perfect', do: [focus(1)] } } }),
+  c('wtSwordHelmSplit', '兜割り', 'physical', 3, 55, 'enemy', [[d(6)], [d(12)], [d(18)], [d(27), st('vulnerable', 2)]], { ...W('sword'), rarity: 'epic', stat: 'str', tags: ['heavy'], trait: { name: '止めの一太刀', effect: { modifier: 'damageDealt', multiplier: 1.5, if: [{ kind: 'targetHpAtMost', pct: 30 }] } } }),
 ];

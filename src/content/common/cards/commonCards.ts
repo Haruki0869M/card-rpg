@@ -45,10 +45,10 @@ export const COMMON_CARDS: CardDef[] = [
   c('cmResonance', '属性共鳴', 'magic', 2, 65, 'enemy', [[el('fire', 5)], [el('ice', 9)], [el('thunder', 14)]], { rarity: 'rare' }),
 
   // ===== エピック =====
-  c('cmLastStand', '起死回生', 'skill', 2, 55, 'self', [[heal(6), b(4)], [heal(10), b(6)], [heal(15), b(8)]], { rarity: 'epic', trait: { name: '底力', effect: { when: 'hurt', do: [heal(2)] } } }),
-  c('cmAllOrNothing', '乾坤一擲', 'physical', 3, 50, 'enemy', [[d(9)], [d(17)], [d(25)], [d(36)]], { rarity: 'epic', tags: ['heavy'], trait: { name: '決死', effect: { modifier: 'damageDealt', multiplier: 1.5, if: [{ kind: 'targetHpAtMost', pct: 30 }] } } }),
+  c('cmLastStand', '起死回生', 'skill', 2, 55, 'self', [[heal(5), b(3)], [heal(8), b(5)], [heal(12), b(6)]], { rarity: 'epic', trait: { name: '底力', effect: { when: 'hurt', do: [heal(2)] } } }),
+  c('cmAllOrNothing', '乾坤一擲', 'physical', 3, 50, 'enemy', [[d(7)], [d(14)], [d(21)], [d(30)]], { rarity: 'epic', tags: ['heavy'], trait: { name: '決死', effect: { modifier: 'damageDealt', multiplier: 1.5, if: [{ kind: 'targetHpAtMost', pct: 30 }] } } }),
   c('cmSage', '賢者の叡智', 'skill', 1, 85, 'self', [[draw(1), mana(1)], [draw(2), mana(1)], [draw(2), mana(2), focus(1)]], { rarity: 'epic', trait: { name: '深謀', effect: { when: 'perfect', do: [draw(1)] } } }),
-  c('cmCharge', '全軍突撃', 'physical', 3, 55, 'allEnemies', [[d(4)], [d(8)], [d(12)], [d(16)]], { rarity: 'epic', trait: { name: '勢い', effect: { when: 'kill', do: [mana(1)] } } }),
-  c('cmOath', '守護の誓い', 'skill', 2, 60, 'self', [[ba(4)], [ba(6)], [ba(9)]], { rarity: 'epic', tags: ['support'], trait: { name: '誓いの盾', effect: { when: 'hurt', do: [b(2)] } } }),
+  c('cmCharge', '全軍突撃', 'physical', 3, 55, 'allEnemies', [[d(3)], [d(6)], [d(10)], [d(13)]], { rarity: 'epic', trait: { name: '勢い', effect: { when: 'kill', do: [mana(1)] } } }),
+  c('cmOath', '守護の誓い', 'skill', 2, 60, 'self', [[ba(3)], [ba(5)], [ba(7)]], { rarity: 'epic', tags: ['support'], trait: { name: '誓いの盾', effect: { when: 'hurt', do: [b(2)] } } }),
   c('cmFate', '運命の一手', 'skill', 1, 80, 'self', [[focus(2)], [focus(2), mana(1)], [focus(3), mana(2)]], { rarity: 'epic', trait: { name: '巡り合わせ', effect: { when: 'perfect', do: [draw(1)] } } }),
 ];
