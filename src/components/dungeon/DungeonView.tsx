@@ -3,6 +3,7 @@
 // 絵（src/assets/art/dungeon/<背景>-<wall|floor|ceiling|door>.webp）があれば使い、無ければダンジョンごとの色の仮の見た目。
 import { Crown, Flame, Gem, Gift, Leaf, Lock, Skull, Sparkles, Swords } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
+import { DUNGEON_TONE } from '../../art/dungeonTone';
 import { artImage } from '../../art/images';
 import { getRoomType } from '../../data/rules';
 import { OMEN_INFO, viewSlices, type DoorOmen, type ViewFace } from '../../engine';
@@ -38,11 +39,32 @@ function surface(bg: string, part: Part, shade: number): CSSProperties {
   return { backgroundColor: t.ceil, backgroundImage: dark };
 }
 
+/**
+ * 暗い絵のダンジョンでの扉の縁の明るさ（0〜1）。壁の絵の平均の明るさ（DUNGEON_TONE、build_art.py が測る）が
+ * 90 より暗いほど強くする（溶岩の洞窟の壁53 → 約0.74）。明るい壁（翠の神殿・地下墓所）や、絵が無い時は 0。
+ */
+export function doorRimStrength(bg: string) {
+  const wall = artImage(`dungeon/${bg}-wall`) ? DUNGEON_TONE[bg]?.wall : undefined;
+  if (wall === undefined) return 0;
+  return Math.max(0, Math.min(1, (90 - wall) / 50));
+}
+
+/** 扉の縁（ふつうの扉）: 暗いダンジョンでは、松明に照らされたような明るい縁と淡い光にする */
+function doorRim(bg: string) {
+  const k = doorRimStrength(bg);
+  if (!k) return { border: '#2a1a10', glow: undefined as string | undefined };
+  return {
+    border: `rgba(255,214,150,${(0.35 + 0.55 * k).toFixed(2)})`,
+    glow: `0 0 ${Math.round(6 + 10 * k)}px rgba(255,180,100,${(0.5 * k).toFixed(2)}), inset 0 0 ${Math.round(4 + 6 * k)}px rgba(255,190,120,${(0.35 * k).toFixed(2)})`,
+  };
+}
+
 /** 扉（壁の面の中に描く） */
 function Door({ bg, face, shade, opening, omen }: { bg: string; face: ViewFace; shade: number; opening?: number; omen?: DoorOmen }) {
   const t = themeOf(bg);
   const img = artImage(`dungeon/${bg}-door`);
   const boss = face === 'boss';
+  const rim = doorRim(bg);
   if (face === 'arch') return <div className="absolute inset-x-[22%] top-[22%] bottom-0 rounded-t-[40%] bg-black/85" style={{ boxShadow: 'inset 0 0 12px #000' }} />;
   // 扉が開く（第3段階B2）: 奥へ開いて暗がりが見える。ふつうの扉は片開き（左の蝶番・右に取っ手）、ボスの扉は両開きの門
   if (opening) {
@@ -65,7 +87,7 @@ function Door({ bg, face, shade, opening, omen }: { bg: string; face: ViewFace; 
       </div>
     );
     return (
-      <div className="absolute bottom-0 overflow-hidden rounded-t-[30%] bg-black" style={{ left: boss ? '12%' : '22%', right: boss ? '12%' : '22%', top: boss ? '10%' : '22%', border: `3px solid ${boss ? '#d8a830' : '#2a1a10'}` }}>
+      <div className="absolute bottom-0 overflow-hidden rounded-t-[30%] bg-black" style={{ left: boss ? '12%' : '22%', right: boss ? '12%' : '22%', top: boss ? '10%' : '22%', border: `3px solid ${boss ? '#d8a830' : rim.border}`, boxShadow: boss ? undefined : rim.glow }}>
         {boss ? (
           <>
             {leaf('left')}
@@ -84,13 +106,13 @@ function Door({ bg, face, shade, opening, omen }: { bg: string; face: ViewFace; 
         left: boss ? '12%' : '22%',
         right: boss ? '12%' : '22%',
         top: boss ? '10%' : '22%',
-        border: `3px solid ${boss ? '#d8a830' : omen ? OMEN_INFO[omen].color : '#2a1a10'}`,
+        border: `3px solid ${boss ? '#d8a830' : omen ? OMEN_INFO[omen].color : rim.border}`,
         backgroundColor: t.door,
         backgroundImage: img
           ? `linear-gradient(rgba(0,0,0,${shade}), rgba(0,0,0,${shade})), url(${img})`
           : `linear-gradient(rgba(0,0,0,${shade}), rgba(0,0,0,${shade})), repeating-linear-gradient(90deg, rgba(0,0,0,.35) 0 2px, transparent 2px 25%)`,
         backgroundSize: 'cover',
-        boxShadow: boss ? '0 0 18px rgba(255,200,80,.45)' : omen ? `0 0 16px ${OMEN_INFO[omen].color}, inset 0 0 10px ${OMEN_INFO[omen].color}` : undefined,
+        boxShadow: boss ? '0 0 18px rgba(255,200,80,.45)' : omen ? `0 0 16px ${OMEN_INFO[omen].color}, inset 0 0 10px ${OMEN_INFO[omen].color}` : rim.glow,
         filter: face === 'locked' ? 'grayscale(.7) brightness(.6)' : undefined,
       }}
     >

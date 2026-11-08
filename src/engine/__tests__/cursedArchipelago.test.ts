@@ -2,6 +2,8 @@
 import { describe, expect, it } from 'vitest';
 import { corruptionName, getScenario } from '../../data/scenarios';
 import { DUNGEONS } from '../../data/dungeons';
+import { EVENTS } from '../../data/events';
+import { ITEMS } from '../../data/items';
 import { QUESTS, TERRAINS, TOWNS } from '../../data/world';
 import { applyGameCommand, canReportQuest, createGame, neighbors } from '../index';
 
@@ -73,5 +75,33 @@ describe('呪われた群島', () => {
     expect(canReportQuest(g, 'borrowShip')).toBe(true);
     run({ type: 'QUEST_REPORT', playerId: 'P1', questId: 'borrowShip' });
     expect(g.world!.ship).toBe(true);
+  });
+});
+
+describe('呪われた群島の中身（手順4）', () => {
+  it('固有装備13個・突発イベント5つは、このシナリオだけで使われる', () => {
+    const gear = ITEMS.all.filter((i) => i.scenario === 'cursedArchipelago');
+    expect(gear.length).toBe(13);
+    const own = ['seaStorm', 'seaDriftingSailor', 'seaFloatingChest', 'seaDolphin', 'mistPetSeasick'];
+    const mine = EVENTS.forScenario('cursedArchipelago').map((e) => e.id);
+    for (const id of own) {
+      expect(mine).toContain(id);
+      expect(EVENTS.forScenario('corruptionKing').map((e) => e.id)).not.toContain(id);
+      expect(EVENTS.forScenario('frozenKingdom').map((e) => e.id)).not.toContain(id);
+    }
+  });
+
+  it('鍵のダンジョンの制覇後の物語は2〜3行・1行30字まで。ボス手前は物語の部屋', () => {
+    const ds = DUNGEONS.forScenario('cursedArchipelago');
+    for (const d of ds.filter((x) => x.rewardKey)) {
+      expect(d.clearStory!.length).toBeGreaterThanOrEqual(2);
+      expect(d.clearStory!.length).toBeLessThanOrEqual(3);
+      for (const l of d.clearStory!) expect([...l].length, l).toBeLessThanOrEqual(30);
+    }
+    for (const d of ds.filter((x) => x.layout)) {
+      const rows = d.layout!;
+      const before = rows[rows.length - 2];
+      expect(before.some((r) => r.type === 'event'), d.id).toBe(true);
+    }
   });
 });

@@ -28,8 +28,8 @@ _session = None
 def cutout(n):
     """背景を切り抜いた RGBA（結果は保存して使い回す）"""
     global _session
-    os.makedirs(CACHE, exist_ok=True)
     p = os.path.join(CACHE, f'{n}.png')
+    os.makedirs(os.path.dirname(p), exist_ok=True)
     if os.path.exists(p):
         return Image.open(p).convert('RGBA')
     from rembg import remove, new_session
@@ -383,6 +383,93 @@ def build_pets():
         fig = trim(despeckle(cutout(f'pet-{key}')), 24)
         save(rim(square(fig, 160, 0.04), (8, 6, 12), 0.6, 2), f'{name}.webp', 82)
 
+# ---------------- ワールドマップの駒（ちびキャラのミニチュア） ----------------
+# 元画像は piece/<職ID>-<male|female>.(webp|png)（台座なし・白い背景。指示文は docs/art/prompts-pieces.md）。
+# HeroPiece.tsx が、ゲームで描く金の台座の上に立たせる。絵は正方形（幅・高さとも 1.25s。下端＝台座の上面の中ほど）。
+# ここでは: 切り抜く → 床の影を落とす → 足の裏を下端に、体の中心を左右の真ん中にそろえる。
+# 大きさは「高さ」でそろえる。正方形なので、横に長い武器（剣・鎌・槍）も体を小さくせずに収まる
+PIECE_W, PIECE_H = 180, 180
+
+def sole_row(fig, th=160, frac=0.04):
+    """足の裏の高さ: 濃い（不透明な）部分が、ある程度の幅で残っている一番下の行。
+    その下に残る薄い床の影は切り捨てる"""
+    a = np.array(fig.getchannel('A'))
+    rows = (a > th).sum(1)
+    need = max(2, fig.width * frac)
+    ys = np.where(rows >= need)[0]
+    return int(ys.max()) + 1 if len(ys) else fig.height
+
+def mass_center(fig):
+    """左右の中心: 不透明な部分の量を左右半分ずつに分ける位置（中央値）。
+    ちびキャラは頭と体が大きいので、細い武器が片側に長く伸びていても、ほぼ体の真ん中になる"""
+    col = np.array(fig.getchannel('A')).astype(float).sum(0)
+    c = np.cumsum(col)
+    return float(np.searchsorted(c, c[-1] / 2))
+
+def build_pieces():
+    import glob, re
+    for f in sorted(glob.glob(os.path.join(SRC, 'piece', '*'))):
+        m = re.match(r'(.+)-(male|female)\.(webp|png|jpg)$', os.path.basename(f))
+        if not m: continue
+        key = f'{m.group(1)}-{m.group(2)}'
+        name = f'piece/{key}'
+        if not want(name): continue
+        fig = trim(despeckle(cutout(f'piece/{key}')), 24)
+        fig = fig.crop((0, 0, fig.width, sole_row(fig)))
+        fig = trim(fig, 24)
+        cx = mass_center(fig)
+        # 高さで合わせる。左右は体の中心を真ん中にした時に、はみ出さない大きさまで縮める
+        k = PIECE_H * 0.98 / fig.height
+        half = max(cx, fig.width - cx)
+        k = min(k, PIECE_W / 2 * 0.99 / half)
+        f2 = fig.resize((max(1, round(fig.width * k)), max(1, round(fig.height * k))), Image.LANCZOS)
+        c = Image.new('RGBA', (PIECE_W, PIECE_H))
+        c.alpha_composite(f2, (round(PIECE_W / 2 - cx * k), PIECE_H - f2.height))
+        save(c, f'{name}.webp', 80)
+
+# ---------------- ダンジョンの通路（第3段階。指示文は docs/art/prompts-dungeon.md） ----------------
+# 元画像は dungeon/<背景>-<wall|floor|ceiling|door>.webp（SRC の下。切り抜きは不要）。
+# 通路の面は1マス＝画面の短い辺くらい（スマホで最大 450px 前後）で、奥へ行くほど小さく暗くなるので、512px で足りる。
+# 扉は壁の面の中の 56%×78% に描くので、3:4 の 384×512。暗さはゲーム側（DungeonView の shade）で合わせる
+DUNGEON_FACE, DUNGEON_DOOR = 512, (384, 512)
+
+def build_dungeon():
+    import glob, re
+    for f in sorted(glob.glob(os.path.join(SRC, 'dungeon', '*'))):
+        m = re.match(r'(.+)-(wall|floor|ceiling|door)\.(webp|png|jpg)$', os.path.basename(f))
+        if not m: continue
+        name = f'dungeon/{m.group(1)}-{m.group(2)}'
+        if not want(name): continue
+        im = Image.open(f).convert('RGB')
+        if m.group(2) == 'door':
+            im = ImageOps.fit(im, DUNGEON_DOOR, Image.LANCZOS)
+        else:
+            im = im.resize((DUNGEON_FACE, DUNGEON_FACE), Image.LANCZOS)
+        save(im, f'{name}.webp', 78)
+    write_dungeon_tone()
+
+def write_dungeon_tone():
+    """置いてある通路の絵の明るさ（0〜255 の平均）を src/art/dungeonTone.ts に書く。
+    暗い絵のダンジョンで、扉の縁を明るくして見つけやすくするのに使う（DungeonView）"""
+    import glob, re
+    from PIL import ImageStat
+    tone = {}
+    for f in sorted(glob.glob(os.path.join(OUT, 'dungeon', '*.webp'))):
+        m = re.match(r'(.+)-(wall|floor|ceiling|door)\.webp$', os.path.basename(f))
+        if not m: continue
+        v = round(ImageStat.Stat(Image.open(f).convert('L')).mean[0])
+        tone.setdefault(m.group(1), {})[m.group(2)] = v
+    lines = ['// 自動で作るファイル（scripts/art/build_art.py の write_dungeon_tone）。手で直さない。',
+             '// 通路の絵の明るさ（0〜255 の平均）。暗い絵のダンジョンで扉の縁を明るくするのに使う。',
+             'export const DUNGEON_TONE: Record<string, { wall?: number; floor?: number; ceiling?: number; door?: number }> = {']
+    for bg, v in tone.items():
+        lines.append(f'  {bg}: {{ ' + ', '.join(f'{k}: {v[k]}' for k in ('wall', 'floor', 'ceiling', 'door') if k in v) + ' },')
+    lines.append('};')
+    p = os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'art', 'dungeonTone.ts')
+    with open(p, 'w', encoding='utf-8', newline='\n') as fp:
+        fp.write('\n'.join(lines) + '\n')
+    print('src/art/dungeonTone.ts', tone)
+
 # ---------------- 画面の枠（UIの部品集 6 から切り出す） ----------------
 def key_out(im, bg=(60, 52, 55), tol=26):
     """部品集の無地の背景色を透明にする"""
@@ -431,4 +518,4 @@ def build_ui():
         save(seamless(im), 'ui/panel.webp', 70)
 
 if __name__ == '__main__':
-    build_heroes(); build_enemies(); build_bgs(); build_terrains(); build_items(); build_ui(); build_pets()
+    build_heroes(); build_enemies(); build_bgs(); build_terrains(); build_items(); build_ui(); build_pets(); build_pieces(); build_dungeon()

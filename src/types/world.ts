@@ -27,6 +27,8 @@ export interface TerrainDef {
 export interface ClimateDef {
   kind: 'cold' | 'hot';
   ratio?: number;
+  /** 夜だけの設定（K4。砂漠は昼は暑く夜は寒い）。'none' なら夜は何も起きない。省略は昼夜とも同じ */
+  night?: Omit<ClimateDef, 'night'> | 'none';
 }
 
 /** 地域（マップの行の範囲。奥ほど敵が強い） */

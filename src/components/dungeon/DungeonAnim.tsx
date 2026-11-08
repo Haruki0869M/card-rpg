@@ -2,7 +2,9 @@
 // 見た目だけ。ゲームの結果はもう決まっていて、ここは「前の景色」から「今の景色」へのつなぎを端末の中で見せるだけ。
 // 時間は balance.ts の TIMING。高速は半分、カットイン「簡易」は短い切り替えだけ、OS の動作軽減では演出なし。
 import { motion, useReducedMotion, type TargetAndTransition } from 'framer-motion';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { dungeonStepSound } from '../../audio/cues';
+import { playSound } from '../../audio/player';
 import { TIMING } from '../../data/balance';
 import { DUNGEONS } from '../../data/dungeons';
 import { findPath, posOf } from '../../engine';
@@ -84,12 +86,28 @@ export function AnimatedDungeonView({ run, background, omens }: { run: DungeonRu
   useLayoutEffect(() => {
     const from = prev.current;
     prev.current = run;
-    if (from === run || !timing) return;
+    if (from === run) return;
+    if (!timing) {
+      // 動作軽減: 動きは出さないが、音は鳴らす（K6）
+      const a = posOf(from), b = posOf(run);
+      if (from.dungeonId === run.dungeonId && (a.x !== b.x || a.y !== b.y)) playSound(dungeonStepSound(run.dungeonId, background));
+      else if (from.dungeonId === run.dungeonId && a.facing !== b.facing) playSound('sfx_dungeon_turn');
+      return;
+    }
     const frames = framesBetween(from, run, timing.factor, timing.simple);
     // 演出の途中で次の操作が来たら、残りは飛ばして新しいつなぎから
     setSeq(frames.length ? { id: ++ids.current, frames, i: 0 } : null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run]);
+  // 音（K6）: 1コマずつ、前進は足音、向きを変えるのは衣ずれ。簡易（fade）は位置が変わったかで決める
+  const fr = seq?.frames[seq.i];
+  useEffect(() => {
+    if (!fr) return;
+    // 簡易のコマは移動前の景色（fr.run）なので、今の位置と比べる
+    const moved = fr.kind === 'forward' || (fr.kind === 'fade' && (posOf(fr.run).x !== posOf(run).x || posOf(fr.run).y !== posOf(run).y));
+    playSound(moved ? dungeonStepSound(run.dungeonId, background) : 'sfx_dungeon_turn');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seq?.id, seq?.i]);
   if (!seq) return <DungeonView run={run} background={background} omens={omens} />;
   const f = seq.frames[seq.i];
   const base = seq.frames[seq.i + 1]?.run ?? run;

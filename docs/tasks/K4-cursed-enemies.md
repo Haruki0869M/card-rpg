@@ -65,7 +65,16 @@
 
 ## 4. 絵の指示文
 
-`docs/art/prompts-enemies-cursedArchipelago.md` に書く（亜種は絵を使い回すので不要。**23体分**）。書き方は K3-enemies.md の §5 に従う。このシナリオの雰囲気: 青緑の霧、濡れた木と錆びた金具、幽霊は半透明で青白い。持たせる物・持たせない物を必ず書く（例: 海賊の下っ端は「サーベルを1本だけ。銃・帽子の羽は無し」）。
+`docs/art/prompts-enemies-cursedArchipelago.md` に書く（亜種は絵を使い回すので不要。**23体分**）。
+
+**書き方（絵の担当が直した形に合わせる。見本は `prompts-enemies-frozenKingdom-mj.md`）**:
+- 1体1ブロック。見出し `### 敵ID 名前（呪われた群島・地域・通常/エリート/ボス・size 値）`、`置き場所: src/assets/art/enemy/<敵ID>.webp`、`元画像: C:\dev\card-rpg-assets\enemy\<敵ID>.png`、その下にコードブロック1つ。
+- 文は英語で、最後に **`--ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no <持たせない物>, ground shadow, scenery, pedestal, second creature, signature, text, watermark`** を付ける（今ゲームに入っている敵の絵に合わせるため）。`docs/art/style-reference.png` は使わない。
+- 文のひな形: `full body creature illustration of <1体の特徴>, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with <このシナリオの色>, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting`。このシナリオの色は「青緑の霧、濡れた木と錆びた金具。幽霊は半透明で青白い」。
+- 持たせない物は、文の中ではなく `--no` にまとめる。持たせる武器・体の特徴は文の中に具体的に書く。
+- ボスの第2段階以降の姿も1枚ずつ書く。
+
+その他の決まりは K3-enemies.md の §5 に従う。このシナリオの雰囲気: 青緑の霧、濡れた木と錆びた金具、幽霊は半透明で青白い。持たせる物・持たせない物を必ず書く（例: 海賊の下っ端は「サーベルを1本だけ。銃・帽子の羽は無し」）。
 
 ## 5. 確認と報告
 

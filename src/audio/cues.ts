@@ -100,3 +100,19 @@ export const PET_CRY: Record<string, PetSoundId> = {
 };
 
 export const petCry = (petId: string): PetSoundId | undefined => PET_CRY[petId];
+
+/** 地形 → 世界マップの足音（提案: 草原・森・沼・丘→草、砂漠・灰→砂、雪・氷→雪、それ以外→石） */
+const TERRAIN_STEP: Record<string, SfxId> = {
+  plains: 'sfx_step_grass', forest: 'sfx_step_grass', swamp: 'sfx_step_grass', hills: 'sfx_step_grass', blight: 'sfx_step_grass',
+  desert: 'sfx_step_sand', ash: 'sfx_step_sand',
+  snow: 'sfx_step_snow', ice: 'sfx_step_snow',
+};
+export const footstepSound = (terrain: string | undefined): SfxId => (terrain && TERRAIN_STEP[terrain]) || 'sfx_step_stone';
+
+/** ダンジョン → 一人称の通路の足音（stage3 §11: 森の洞窟は土、溶岩の洞窟は岩、ほかは石） */
+export function dungeonStepSound(dungeonId: string | undefined, background?: string): SfxId {
+  const key = `${dungeonId ?? ''} ${background ?? ''}`.toLowerCase();
+  if (key.includes('forest')) return 'sfx_step_dirt';
+  if (key.includes('volcano') || key.includes('lava')) return 'sfx_step_rock';
+  return 'sfx_step_stone';
+}
