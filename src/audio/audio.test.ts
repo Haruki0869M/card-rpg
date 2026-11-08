@@ -5,7 +5,7 @@ import { PETS } from '../data/pets';
 import { battleFrames, explorationSounds } from '../store/presentation';
 import { applyGameCommand, createGame } from '../engine';
 import { tapSound } from './uiSounds';
-import { bgmFor } from './bgm';
+import { BGM_LOOP, bgmFor } from './bgm';
 import type { BattleEvent, CardDef } from '../types';
 import { cardSound, damageSound, dungeonStepSound, footstepSound, hitSize, PET_CRY, perfectSound, rollResultSound, statusSound } from './cues';
 import { BGM_IDS, JINGLE_IDS, PET_SOUND_IDS, PRELOAD_IDS, SFX_IDS } from './ids';
@@ -73,6 +73,13 @@ describe('同時に鳴る数の制限', () => {
     expect(l.tryStart('a', 120, 300)).toBe(false);
     expect(l.tryStart('a', 310, 300)).toBe(true);
   });
+  it('お供の鳴き声は、同じ声を3秒空ける（ほかの音は今までどおり）', () => {
+    const l = createLimiter();
+    expect(l.tryStart('pet_okame', 0, 500, 3000)).toBe(true);
+    expect(l.tryStart('pet_okame', 1000, 500, 3000)).toBe(false);
+    expect(l.tryStart('pet_owl', 1000, 500, 3000)).toBe(true);
+    expect(l.tryStart('pet_okame', 3001, 500, 3000)).toBe(true);
+  });
   it('全体で12まで。鳴り終わった分は数えない', () => {
     const l = createLimiter();
     for (let i = 0; i < 12; i++) expect(l.tryStart(`s${i}`, 0, 100)).toBe(true);
@@ -89,7 +96,7 @@ describe('音のファイルが無い・音が使えない時', () => {
     expect(hasSound('sfx_world_camp')).toBe(false);
     expect(audioReady()).toBe(false);
     expect(() => {
-      setAudioVolumes({ sfxVolume: 7, bgmVolume: 5 });
+      setAudioVolumes({ sfxVolume: 5, bgmVolume: 4, petVolume: 3 });
       playSound('sfx_world_camp');
       playSounds(['sfx_hit_big', 'jgl_victory'], { quiet: true });
       playBgm('bgm_battle');
@@ -169,6 +176,8 @@ describe('探索・画面の操作・BGM の音（K6②）', () => {
     expect(bgmFor('game', { ...g, mode: 'town' })).toBe('bgm_town');
     expect(['bgm_world_day', 'bgm_world_night']).toContain(bgmFor('game', { ...g, mode: 'world' }));
     expect(bgmFor('game', { ...g, mode: 'reward' })).toBeNull();
+    expect(bgmFor('game', { ...g, mode: 'ending' })).toBe('bgm_ending');
+    for (const k of Object.keys(BGM_LOOP)) expect(BGM_IDS).toContain(k);
     for (const s of [bgmFor('game', { ...g, mode: 'dungeon' }), bgmFor('game', { ...g, mode: 'chest' })]) expect(BGM_IDS).toContain(s);
   });
   it('地形とダンジョンで足音を選ぶ', () => {
@@ -188,8 +197,8 @@ describe('置いた音のファイル', () => {
     const { readdirSync } = await import('node:fs');
     const ids = new Set<string>([...SFX_IDS, ...PET_SOUND_IDS, ...BGM_IDS, ...JINGLE_IDS]);
     for (const dir of ['sfx', 'pet', 'bgm']) {
-      for (const f of readdirSync(`src/assets/audio/${dir}`).filter((f) => !f.startsWith('.'))) {
-        const id = f.replace(/\.(mp3|ogg|m4a|wav)$/, '');
+      for (const f of readdirSync(`src/assets/audio/${dir}`).filter((f) => /\.(aac|webm|mp3|ogg|m4a|wav)$/.test(f))) {
+        const id = f.replace(/\.(aac|webm|mp3|ogg|m4a|wav)$/, '');
         expect(ids.has(id), f).toBe(true);
         expect(dir === 'pet' ? id.startsWith('pet_') : dir === 'bgm' ? id.startsWith('bgm_') : id.startsWith('sfx_') || id.startsWith('jgl_'), f).toBe(true);
       }
