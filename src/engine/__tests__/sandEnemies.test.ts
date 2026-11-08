@@ -9,6 +9,8 @@ const normal = ['sandScarab', 'desertViper', 'jackalWarrior', 'tombRobber', 'san
 const elite = ['royalGuardMummy', 'scribeShade', 'sandSerpentLord', 'colossusStatue', 'cursedScribeShade'];
 const bosses = ['sandScorpionKing', 'shadowVizier', 'stoneGuardianBeast', 'sandPharaoh'];
 const ids = new Set([...normal, ...elite, ...bosses]);
+// K3 D で足した追加の敵（extra.ts）。28体の内訳とは別に数え、配置は確かめる
+const extra = ['desertFennec', 'obeliskSentinel', 'venomMummyArcher'];
 const dungeons = () => DUNGEONS.forScenario('sandDynasty');
 const waves = () => [
   ...dungeons().flatMap(d => [...d.pools.battle, ...d.pools.elite, d.pools.boss]),
@@ -27,7 +29,7 @@ describe('砂塵の王朝の専用の敵', () => {
 
   it('専用の敵をすべて配置し、仮の共通敵を残さない', () => {
     const placed = new Set(waves().flat());
-    expect([...placed].sort()).toEqual([...ids].sort());
+    expect([...placed].sort()).toEqual([...ids, ...extra].sort());
     for (const r of getScenario('sandDynasty').map!.regions) {
       for (const wave of r.encounters ?? []) {
         expect(wave.length).toBeGreaterThanOrEqual(2);

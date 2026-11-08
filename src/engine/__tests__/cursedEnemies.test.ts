@@ -8,6 +8,8 @@ const normal = ['seaCrab', 'jellyfish', 'seaSerpentFry', 'merfolkSpearman', 'pir
 const elite = ['pirateQuartermaster', 'coralGolem', 'drownedKnight', 'seaWitch', 'krakenTentacle', 'stormSeaWitch'];
 const bosses = ['seaSerpentQueen', 'pirateCaptainGuld', 'tideHighPriest', 'ghostAdmiral'];
 const ids = new Set([...normal, ...elite, ...bosses]);
+// K3 D で足した追加の敵（extra.ts）。28体の内訳とは別に数え、配置は確かめる
+const extra = ['driftwoodSpirit', 'lanternAngler', 'cursedPirateGrunt'];
 const map = () => getScenario('cursedArchipelago').map!;
 const dungeons = () => DUNGEONS.forScenario('cursedArchipelago');
 const waves = () => [
@@ -32,7 +34,7 @@ describe('呪われた群島の専用の敵', () => {
 
   it('28体とも配置し、仮の共通敵を残さない。組は2〜3体で、弱点が全員同じにならない', () => {
     const placed = new Set(waves().flat());
-    expect([...placed].sort()).toEqual([...ids].sort());
+    expect([...placed].sort()).toEqual([...ids, ...extra].sort());
     for (const r of map().regions) {
       for (const wave of [...(r.encounters ?? []), ...(r.seaEncounters ?? [])]) {
         expect(wave.length, wave.join(',')).toBeGreaterThanOrEqual(2);

@@ -3,7 +3,7 @@
 import type { DungeonDef } from '../../../../types';
 
 const FACTORY_POOLS: DungeonDef['pools'] = {
-  battle: [['smokeStackCrow', 'conveyorBot'], ['conveyorBot', 'oilSlime'], ['riveter', 'sparkTurret'], ['voltGearBug', 'brokenAutomaton'], ['gearBug', 'conveyorBot', 'oilSlime']],
+  battle: [['smokeStackCrow', 'brokenAutomaton'], ['conveyorBot', 'oilSlime'], ['riveter', 'sparkTurret'], ['voltGearBug', 'brokenAutomaton'], ['gearBug', 'conveyorBot', 'oilSlime']],
   elite: [['foremanBot', 'brokenAutomaton'], ['stormForemanBot', 'oilSlime']],
   boss: ['foremanGolem'],
 };

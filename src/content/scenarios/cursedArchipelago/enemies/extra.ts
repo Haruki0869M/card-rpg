@@ -26,7 +26,7 @@ export const lanternAngler: EnemyDef = {
   id: 'lanternAngler',
   name: '提灯鮟鱇',
   icon: '🐟',
-  maxHp: 60,
+  maxHp: 54,
   baseLevel: 9,
   size: 1.1,
   exp: 16,
@@ -34,9 +34,9 @@ export const lanternAngler: EnemyDef = {
   weak: ['thunder'],
   pattern: 'sequence',
   actions: [
-    { id: 'lure', name: '妖しい灯り', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'foes' }, { kind: 'block', amount: 6 }] },
-    { id: 'gulp', name: '大口の丸呑み', effects: [{ kind: 'damage', amount: 16 }] },
-    { id: 'fangs', name: '並んだ牙', effects: [{ kind: 'damage', amount: 6, hits: 2 }] },
+    { id: 'lure', name: '妖しい灯り', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1 }, { kind: 'block', amount: 6 }] },
+    { id: 'gulp', name: '大口の丸呑み', effects: [{ kind: 'damage', amount: 14 }] },
+    { id: 'fangs', name: '並んだ牙', effects: [{ kind: 'damage', amount: 5, hits: 2 }] },
   ],
 };
 
