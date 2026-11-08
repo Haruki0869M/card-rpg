@@ -649,6 +649,12 @@ export function startRoomBattle(game: GameState, room: Room, rng: Rng) {
   startBattleWith(game, room.enemies ?? [], room.type, rng, { background: game.dungeon?.background });
 }
 
+/** 参加人数ごとの敵の攻撃倍率（4人は、シナリオごとの合わせ値があればそれを使う） */
+function partyAttackMul(game: GameState, n: number): number {
+  if (n === 4) return getScenario(game.scenarioId).fourPlayerAttack ?? BALANCE.enemyAttackByPartySize[4] ?? 1;
+  return BALANCE.enemyAttackByPartySize[n] ?? 1;
+}
+
 /** 戦闘を始める（今の場面の参加者で）。surprise = 奇襲成功（敵は1ターン目に動けない） */
 export function startBattleWith(game: GameState, enemies: EncounterSpec['enemies'], roomType: string, rng: Rng, opts: { surprise?: boolean; background?: string } = {}) {
   const party = sceneHeroes(game).map(toPartyMember);
@@ -658,7 +664,7 @@ export function startBattleWith(game: GameState, enemies: EncounterSpec['enemies
     party,
     encounter: { id: game.battleInfo?.wandererId ?? game.dungeon?.currentRoomId ?? 'battle', name: getRoomType(roomType).name, enemies },
     enemyHpMul: diff.enemyHp,
-    enemyAttackMul: diff.enemyAttack,
+    enemyAttackMul: (diff.enemyAttack ?? 1) * partyAttackMul(game, party.length),
     surprise: opts.surprise,
     readyCheck: game.online,
   });

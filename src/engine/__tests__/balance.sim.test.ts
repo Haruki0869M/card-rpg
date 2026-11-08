@@ -12,6 +12,7 @@ const SCENARIO = process.env.SIM_SCENARIO ?? 'corruptionKing';
 const SEEDS = Number(process.env.SIM_SEEDS ?? 40);
 const PARTIES: Record<string, string[]> = {
   '4人': ['warrior', 'mage', 'guardian', 'hunter'],
+  '3人': ['warrior', 'mage', 'hunter'],
   '2人': ['warrior', 'mage'],
 };
 

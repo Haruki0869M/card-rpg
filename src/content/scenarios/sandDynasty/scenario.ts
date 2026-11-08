@@ -14,6 +14,7 @@ export const sandDynasty: ScenarioDef = {
   unlocked: true,
   unlockText: '「呪われた群島」をクリアすると遊べる',
   unlockRequires: { cleared: ['cursedArchipelago'] },
+  fourPlayerAttack: 2.2,
   // 世界の悪化の名前（画面の「侵食度」の代わりに出る言葉）
   corruptionName: '砂の侵食',
   start: { gold: 40, pouch: [{ itemId: 'potion', count: 2 }] },

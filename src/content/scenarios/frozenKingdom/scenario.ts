@@ -14,6 +14,7 @@ export const frozenKingdom: ScenarioDef = {
   unlocked: true,
   unlockText: '「侵食の魔王」をクリアすると遊べる',
   unlockRequires: { cleared: ['corruptionKing'] },
+  fourPlayerAttack: 1.95,
   // 世界の悪化の名前（画面の「侵食度」の代わりに出る言葉）
   corruptionName: '冬の深さ',
   start: { gold: 40, pouch: [{ itemId: 'potion', count: 2 }] },

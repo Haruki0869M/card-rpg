@@ -25,7 +25,9 @@ export const BALANCE = {
   chanceMin: 5,
   chanceMax: 95,
   /** 戦闘に参加した味方の人数ごとの敵HP倍率（index = 人数。端数切り捨て） */
-  enemyHpByPartySize: [0, 0.6, 1.0, 1.35, 1.7] as readonly number[],
+  enemyHpByPartySize: [0, 0.6, 1.0, 1.35, 2.2] as readonly number[],
+  /** 戦闘に参加した味方の人数ごとの敵の攻撃倍率（4人の時だけ少し強くする。2人・3人は変えない） */
+  enemyAttackByPartySize: [1, 1, 1, 1.4, 1.8] as readonly number[],
   /** 敵のレベルが baseLevel より1上がるごとの増加率 */
   enemyHpPerLevel: 0.1,
   enemyAttackPerLevel: 0.08,

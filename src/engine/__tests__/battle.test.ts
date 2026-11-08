@@ -151,7 +151,7 @@ describe('戦闘の生成', () => {
     expect(hp(1)).toEqual([31, 21, 15]);
     expect(hp(2)).toEqual([52, 36, 26]);
     expect(hp(3)).toEqual([70, 48, 35]);
-    expect(hp(4)).toEqual([88, 61, 44]);
+    expect(hp(4)).toEqual([114, 79, 57]);
   });
   it('人数・敵の数が範囲外ならエラー', () => {
     expect(() => createBattle({ ...setup(1), party: [] })).toThrow();

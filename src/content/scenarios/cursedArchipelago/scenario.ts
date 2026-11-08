@@ -14,6 +14,7 @@ export const cursedArchipelago: ScenarioDef = {
   unlocked: true,
   unlockText: '「凍てつく王国」をクリアすると遊べる',
   unlockRequires: { cleared: ['frozenKingdom'] },
+  fourPlayerAttack: 1.7,
   // 世界の悪化の名前（画面の「侵食度」の代わりに出る言葉）
   corruptionName: '霧の濃さ',
   start: { gold: 40, pouch: [{ itemId: 'potion', count: 2 }] },
