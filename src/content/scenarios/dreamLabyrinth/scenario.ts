@@ -7,6 +7,7 @@ export const dreamLabyrinth: ScenarioDef = {
   id: 'dreamLabyrinth',
   order: 7,
   name: '夢幻の大迷宮',
+  art: 'card-dreamLabyrinth',
   synopsis: '六つの世界の記憶が混ざった、夢の迷宮。蘇った過去の悪を越え、三つの夢の欠片を集めて、夢喰いを止めよ。',
   recommended: '2〜4人',
   playTime: '60〜90分',
