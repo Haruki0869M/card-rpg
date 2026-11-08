@@ -41,12 +41,12 @@ export function PetToken({ pet, size, hop, hopKey, hopDuration, ownerId }: { pet
       {/* 色違いの印（絵がある時は絵そのものが色を表すので付けない） */}
       {!img && <span className="absolute rounded-full border border-black/70" style={{ right: 0, bottom: 0, width: size * 0.3, height: size * 0.3, background: col.color }} />}
       {lv >= 3 && (
-        <span className="absolute" style={{ left: -size * 0.08, top: -size * 0.12, fontSize: size * 0.38, lineHeight: 1 }} aria-hidden>
+        <span className="absolute" style={{ left: -size * 0.08, top: -size * 0.12, fontSize: Math.max(12, size * 0.38), lineHeight: 1 }} aria-hidden>
           🎀
         </span>
       )}
       {lv >= 5 && (
-        <span className="pet-heart absolute text-pink-300" style={{ left: size * 0.35, top: -size * 0.35, fontSize: size * 0.36, lineHeight: 1 }} aria-hidden>
+        <span className="pet-heart absolute text-pink-300" style={{ left: size * 0.35, top: -size * 0.35, fontSize: Math.max(12, size * 0.36), lineHeight: 1 }} aria-hidden>
           ♥
         </span>
       )}

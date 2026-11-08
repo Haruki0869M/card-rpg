@@ -8,6 +8,7 @@ import { useBattle } from '../../store/battleStore';
 import { LOCAL_PLAYER } from '../../store/battleConfig';
 import { HeroFace, RARITY_STYLE, Screen } from '../ui/game';
 import { PetAwards } from '../ui/PetToken';
+import { EndPetRecord } from '../lorebook/MyPets';
 
 function Stats() {
   const game = useBattle((s) => s.game)!;
@@ -30,6 +31,7 @@ function Stats() {
         </div>
       ))}
       <PetAwards heroes={game.heroes} />
+      <EndPetRecord game={game} />
     </div>
   );
 }

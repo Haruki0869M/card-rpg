@@ -61,7 +61,7 @@ import {
   agreeMove,
   heroesAt,
 } from './world/world';
-import { leaveSanctuary, leaveShrine, leaveTown, questAccept, questReport, shrineChoose, townBuy, townInn, townRemoveCard, townSell } from './world/town';
+import { leaveSanctuary, leaveShrine, leaveTown, questAccept, questReport, shrineChoose, bringMyPet, townBuy, townInn, townRemoveCard, townSell } from './world/town';
 import { getRoomType } from '../../data/rules';
 import { TERRAINS } from '../../data/world';
 import { buildDungeon, findRoom, RARITIES, rarityIndex, reachableRooms } from './dungeon';
@@ -548,6 +548,9 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
       case 'TOWN_INN':
         error = townInn(game, cmd);
         break;
+      case 'BRING_MY_PET':
+        error = bringMyPet(game, cmd);
+        break;
       case 'TOWN_REMOVE_CARD':
         error = townRemoveCard(game, cmd);
         break;
@@ -1004,6 +1007,8 @@ function leaveChest(game: GameState, playerId: string, rng: Rng): string | undef
   if (isBossRoom(room) && c.spec.big) {
     game.mode = 'cleared';
     game.stats.dungeonsCleared += 1;
+    // 一緒にダンジョンをクリアしたお供（伝承の書のマイペットの登録の条件。K5）
+    for (const h of sceneHeroes(game)) if (h.pet) h.pet.dungeonClears = (h.pet.dungeonClears ?? 0) + 1;
     if (!game.clearedDungeons.includes(run.dungeonId)) game.clearedDungeons.push(run.dungeonId);
     addLog(game, `${run.name}を制覇した！`);
     if (game.world) onDungeonCleared(game, run.dungeonId, rng);

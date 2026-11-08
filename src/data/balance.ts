@@ -55,6 +55,9 @@ export const BALANCE = {
   /** 通常色2種と珍しい色2種の出現率（%） */
   petColorWeights: [35, 35, 15, 15],
   petNameMax: 8,
+  /** 伝承の書（K5）: マイペットをスタートの町で呼ぶお金。マイペットに登録できる「一緒にダンジョンをクリアした回数」 */
+  myPetCost: 30,
+  myPetDungeonClears: 3,
   /** 突発イベント: 何もないマスに移動し終えた時に起きる確率（%）。夜・侵食度50%以上では悪いイベントの重み×1.5 */
   randomEventChance: 20,
   randomEventBadMul: 1.5,

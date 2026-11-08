@@ -30,6 +30,10 @@ export interface HeroPet {
   acts: number;
   /** この冒険でもう撫でた（フォーカス+1は1回だけ） */
   patted?: boolean;
+  /** 伝承の書のマイペットから呼んだ子（その端末の記録の ID。K5） */
+  myPetUid?: string;
+  /** この冒険で一緒にダンジョンをクリアした回数（マイペットの登録の条件。K5） */
+  dungeonClears?: number;
 }
 
 export interface ItemDef {
@@ -102,6 +106,8 @@ export interface Hero {
   jobPick?: string[];
   /** 連れているお供（1匹まで） */
   pet?: HeroPet;
+  /** この冒険で、もうマイペットを呼んだ（1人1回。K5） */
+  myPetCalled?: boolean;
   /** 迎えられるお供の候補（イベントの後。ADOPT_PET で選ぶ） */
   petOffer?: string[];
   /** 候補を出した時点で抽選・保存する毛色。採用時には引き直さない。 */
@@ -582,6 +588,8 @@ export type GameCommand =
   // ---------- 町・祠 ----------
   | { type: 'TOWN_BUY'; playerId: PlayerId; heroId?: string; kind: 'item' | 'card'; index: number }
   | { type: 'TOWN_INN'; playerId: PlayerId; heroId?: string }
+  /** 伝承の書のマイペットを呼ぶ（スタートの町で1人1回・お金。中身はその端末の記録から送る。乱数は使わない。K5） */
+  | { type: 'BRING_MY_PET'; playerId: PlayerId; heroId: string; pet: { uid: string; petId: string; color: string; name: string; love: number } }
   | { type: 'TOWN_REMOVE_CARD'; playerId: PlayerId; heroId: string; cardUid: string }
   | { type: 'TOWN_SELL'; playerId: PlayerId; heroId?: string; itemUid: string }
   | { type: 'QUEST_ACCEPT'; playerId: PlayerId; heroId?: string; questId: string }
