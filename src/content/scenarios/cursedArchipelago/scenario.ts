@@ -10,10 +10,8 @@ export const cursedArchipelago: ScenarioDef = {
   synopsis: '百年前の呪いで、海は深い霧に閉ざされた。船で島々を渡って三つの灯台に灯をともし、幽霊船団の亡霊提督を止めよ。',
   recommended: '2〜4人',
   playTime: '60〜90分',
-  unlocked: false,
-  // 作成中: 敵・数値がそろうまで遊べない。仕上げる時に wip を消し、unlockText を「「凍てつく王国」をクリアすると遊べる」にする
-  wip: true,
-  unlockText: '準備中（もうすぐ遊べます）',
+  unlocked: true,
+  unlockText: '「凍てつく王国」をクリアすると遊べる',
   unlockRequires: { cleared: ['frozenKingdom'] },
   // 世界の悪化の名前（画面の「侵食度」の代わりに出る言葉）
   corruptionName: '霧の濃さ',
