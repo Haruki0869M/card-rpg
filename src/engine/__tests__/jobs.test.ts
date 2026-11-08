@@ -32,7 +32,7 @@ function topBattle(classes: string[]): BattleState {
 function topPlay(state: BattleState, cardId: string, focus?: number): BattleState {
   const a = state.allies[0];
   giveHand(state, a.id, [cardId]); a.mana = 20; a.focus = 6;
-  const r = applyCommand(state, play(a.id, 't0', state.enemies[0].uid, focus ?? getCard(cardId).slots));
+  const r = applyCommand(state, play(a.id, 't0', getCard(cardId).target === 'ally' ? a.id : state.enemies[0].uid, focus ?? getCard(cardId).slots));
   expect(r.error).toBeUndefined();
   return r.state;
 }

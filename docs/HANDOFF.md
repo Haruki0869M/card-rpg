@@ -71,7 +71,7 @@ scripts/           画面の自動確認（Playwright）・絵の加工（art/bu
 
 ## 3. 今の進み具合と残っている作業（この順番で進める）
 
-**最新の進み具合・会話の決定・実装との差は [STATUS.md](./STATUS.md) を先に確認する。** 強奪の修正、J3d第1〜第3段階（特殊10職・専用60枚・神殿2/共用祭壇5・銃/楽器・星読み）は実装済み。跳躍と聖王の再臨は現状維持。J4前の操作改善を優先中。前半（移動完了後の画面切替・毛色抽選）と後半（お供/能力/戦闘の演出・設定）は実装済み。後半は453件成功・3件スキップ。詳細はSTATUSとdocs/tasks/interaction-feel.md。次はJ4の計画を説明してOKを待つ。Hosting再公開は含めない。
+**最新の進み具合・会話の決定・実装との差は [STATUS.md](./STATUS.md) を先に確認する。** 強奪の修正、J3d第1〜第3段階（特殊10職・専用60枚・神殿2/共用祭壇5・銃/楽器・星読み）は実装済み。跳躍と聖王の再臨は現状維持。J4前の操作改善を優先中。前半（移動完了後の画面切替・毛色抽選）と後半（お供/能力/戦闘の演出・設定）は実装済み。後半は453件成功・3件スキップ。詳細はSTATUSとdocs/tasks/interaction-feel.md。その後の操作総点検8項目も第1〜第3段階まで実装済み。保存v14、493件成功・3件スキップ。対象/副対象、交代運転、共同施設、予測、タップ詳細を追加。詳細はSTATUSとdocs/tasks/interaction-safety.mdを読む。次はJ4の計画を説明してOKを待つ。Hosting再公開は含めない。
 
 各段階の終わりに: 確認を全部通す（§4）→ spec.md を更新 → コミット → bundle（§5）→ オーナーに日本語で報告。
 
@@ -153,7 +153,7 @@ scripts/           画面の自動確認（Playwright）・絵の加工（art/bu
 
 ```
 npx tsc --noEmit          # 型チェック（エラー0）
-npx vitest run            # テスト（直近453件成功・任意3件スキップ）
+npx vitest run            # テスト（直近493件成功・任意3件スキップ）
 npx vite build            # ビルドが通る
 ```
 画面の確認（Playwright が入っていれば）:
@@ -163,6 +163,7 @@ node scripts/check-layout.mjs   # 8通りの画面サイズで、はみ出し・
 node scripts/playthrough.mjs    # 1〜4人の戦闘が最後まで進む
 node scripts/adventure.mjs      # 2人・4人で冒険をクリアまで進む
 node scripts/jobchange.mjs      # 転職の流れ
+node scripts/interaction-safety.mjs # 新規開始・味方/敵/複合カードと星読み・P2施設・タップ詳細（3幅）
 node scripts/battle-feedback.mjs # お供/能力/戦闘の表示、設定保存、4人トークン（360/390/480px）
 node scripts/movement-pet-colors.mjs # 移動の全マス/到着/画面切替順序、通常/高速、毛色保存再開（360/390/480px）
 node scripts/final-special-jobs.mjs # 後半5職・星読み保存再開・4人の砲台/罠/お供（360/390/480px）

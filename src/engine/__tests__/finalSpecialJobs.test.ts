@@ -278,8 +278,8 @@ describe('v10保存の互換性', () => {
   it('進行中の戦闘に先読み回数0を補い、カード・トークン・乱数を維持する', () => {
     const g = fresh(), b = battle(['machinist']); g.version = 10; b.version = 10; delete b.allies[0].slotPreviewUsed;
     g.expeditions = [{ id: 'x1', mode: 'battle', heroes: ['h0'], battle: b }]; const before = structuredClone(g);
-    const next = migrateGame(JSON.parse(JSON.stringify(g)))!; expect(next.version).toBe(13);
-    const after = next.expeditions![0].battle!; expect(after.version).toBe(13); expect(after.allies[0].slotPreviewUsed).toBe(0); expect(after.slotPreview).toBeUndefined();
+    const next = migrateGame(JSON.parse(JSON.stringify(g)))!; expect(next.version).toBe(14);
+    const after = next.expeditions![0].battle!; expect(after.version).toBe(14); expect(after.allies[0].slotPreviewUsed).toBe(0); expect(after.slotPreview).toBeUndefined();
     expect(after.rngState).toBe(before.expeditions![0].battle!.rngState); expect(after.allies[0].summons).toEqual(before.expeditions![0].battle!.allies[0].summons);
   });
   it('罠の対象・効果・残り期間と強化状態は保存再開でも保持される', () => {

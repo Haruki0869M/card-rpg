@@ -4,7 +4,7 @@ import { getElement } from '../../data/elements';
 import { Star } from 'lucide-react';
 import { memo } from 'react';
 import { incomingDamage, isDone, usableCardCount } from '../../engine';
-import { usePress } from '../../hooks/usePress';
+import { useDetail, usePress } from '../../hooks/usePress';
 import { isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
 import type { AllyState } from '../../types';
@@ -18,6 +18,8 @@ const AllyCard = memo(function AllyCard({ ally }: { ally: AllyState }) {
   const activeId = useBattle((s) => s.activeId);
   const spend = useBattle((s) => (s.selection && s.activeId === ally.id ? s.selection.focus : 0));
   const setActive = useBattle((s) => s.setActive);
+  const selection = useBattle(s => s.selection);
+  const chosen = (selection?.targetId === ally.id || selection?.allyTargetId === ally.id);
   const press = usePress(() => setActive(ally.id), { type: 'ally', id: ally.id });
   const active = activeId === ally.id && battle.phase === 'ally';
   const mine = isLocalPlayer(ally.playerId);
@@ -30,9 +32,10 @@ const AllyCard = memo(function AllyCard({ ally }: { ally: AllyState }) {
     <div
       {...press}
       data-ally={ally.id}
+      data-selected-target={chosen || undefined}
       data-dead={ally.dead || undefined}
       data-done={done || undefined}
-      className={`panel relative flex min-w-0 flex-1 flex-col gap-[3px] rounded-xl px-1.5 pt-1 pb-1 transition-[transform,opacity,filter,box-shadow] duration-150 active:scale-[.97] ${
+      className={`panel ${chosen ? 'ring-2 ring-sky-300' : ''} relative flex min-w-0 flex-1 flex-col gap-[3px] rounded-xl px-1.5 pt-1 pb-1 transition-[transform,opacity,filter,box-shadow] duration-150 active:scale-[.97] ${
         ally.dead ? 'opacity-50 grayscale' : done && !active ? 'opacity-60' : ''
       }`}
       style={
@@ -78,13 +81,13 @@ const AllyCard = memo(function AllyCard({ ally }: { ally: AllyState }) {
         </span>
         <span className={`ml-auto ${usable > 0 ? 'text-zinc-200' : 'text-zinc-500'}`}>{ally.dead ? '戦闘不能' : !mine ? '' : done ? '済' : `${usable}枚`}</span>
       </div>
-      <div className="absolute -top-2 right-0.5">
+      <div className="relative mt-1">
         <StatusChips s={ally.statuses} side="ally" onTap={() => setActive(ally.id)} />
       </div>
       {/* 呼び出したお供（幻獣・獣など）: 枠の左上に小さく。ターン終了時に攻撃する */}
       {!ally.dead && ally.airborne && <span className="absolute -top-3 left-7 rounded-full bg-sky-950 px-1 text-[12px] text-sky-100" data-airborne>跳躍中</span>}
       {!ally.dead && (!!ally.summons?.length || !!ally.attackCharge || !!ally.imbuedElement) && (
-        <div className="absolute -top-3 right-1 left-1 flex items-center gap-0.5 overflow-hidden" data-summons>
+        <div role="button" aria-label={`${ally.name}の特殊効果・召喚の詳細`} onClick={e => { e.stopPropagation(); useDetail.getState().show({ type: 'tokens', allyId: ally.id }); }} className="absolute -top-3 right-1 left-1 flex min-h-6 cursor-pointer items-center gap-0.5 overflow-hidden" data-summons>
           {ally.attackCharge && <span className="rounded-full bg-amber-950 px-1 text-[12px] font-bold text-amber-100" data-attack-charge>居合×{ally.attackCharge.multiplier}</span>}
           {ally.imbuedElement && <span className="rounded-full bg-sky-950 px-1 text-[12px] font-bold text-sky-100" data-imbued-element>{getElement(ally.imbuedElement).name}剣</span>}
           {ally.summons?.slice(0, 2).map((m) => (

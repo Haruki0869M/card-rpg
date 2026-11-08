@@ -19,6 +19,20 @@ import { addSanctuaries, consolidateSanctuaries } from './world/sanctuaries';
 type Loose = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 const MIGRATIONS: Record<number, (g: Loose) => void> = {
+  // v13 → v14: 手動の味方対象が必要になった旧予約だけ、従来の最低HP割合の対象を固定する。
+  13(g) {
+    for (const b of [g.battle, ...(g.expeditions ?? []).map((x: Loose) => x.battle)]) {
+      if (!b) continue;
+      b.version = 14;
+      const p = b.slotPreview;
+      if (!p) continue;
+      const a = b.allies.find((a: Loose) => a.id === p.characterId);
+      const inst = a?.hand.find((c: Loose) => c.uid === p.cardInstanceId);
+      const card = inst && CARDS.tryGet(inst.cardId);
+      if (!p.targetId && card?.target === 'ally') p.targetId = [...b.allies].filter((a: Loose) => !a.dead).sort((a: Loose, b: Loose) => a.hp / a.maxHp - b.hp / b.maxHp)[0]?.id;
+      if (!p.allyTargetId && card?.secondaryTarget) p.allyTargetId = [...b.allies].filter((a: Loose) => !a.dead).sort((a: Loose, b: Loose) => a.hp / a.maxHp - b.hp / b.maxHp)[0]?.id;
+    }
+  },
   // v12 → v13: 能力の効果を変えず演出用の出所だけ補う。開始演出は作り直さない。
   12(g) {
     for (const b of [g.battle, ...(g.expeditions ?? []).map((x: Loose) => x.battle)]) {

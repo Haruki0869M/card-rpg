@@ -1,3 +1,4 @@
+import { detachFollower } from './world/group';
 // ===== 冒険のエンジン（Reactに依存しない純粋関数） =====
 // applyGameCommand(game, command) => { state, battleEvents }
 // 戦闘中の操作は BATTLE コマンドで戦闘エンジン（applyCommand）に渡す。
@@ -289,6 +290,12 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
       case 'ENCOUNTER_JOIN':
         error = encounterJoin(game, cmd);
         break;
+      case 'WORLD_UNFOLLOW': {
+        const h = findHero(game, cmd.heroId);
+        if (game.mode !== 'world' || game.world?.turn !== cmd.heroId || !ownedBy(h, cmd.playerId)) error = '自分の手番に解除してください';
+        else detachFollower(game, cmd.heroId);
+        break;
+      }
       case 'WORLD_INVITE':
         error = worldInvite(game, cmd);
         break;
@@ -364,7 +371,7 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
         error = claimLoot(game, cmd.playerId, cmd.heroId, cmd.choice, rng);
         break;
       case 'OPEN_CHEST':
-        error = openChest(game, cmd.playerId, cmd.heroId, cmd.focusUsed, rng);
+        error = openChest(game, cmd.playerId, cmd.heroId, cmd.focusUsed, rng, cmd.recipientId);
         break;
       case 'LEAVE_CHEST':
         error = leaveChest(game, cmd.playerId, rng);
@@ -817,14 +824,14 @@ function worldTurnError(game: GameState, playerId: string, onTile: boolean): str
   return ownedBy(findHero(game, game.world.turn), playerId) ? undefined : '手番のキャラの担当の人が操作します';
 }
 
-function openChest(game: GameState, playerId: string, heroId: string, focusUsed: number, rng: Rng): string | undefined {
+function openChest(game: GameState, playerId: string, heroId: string, focusUsed: number, rng: Rng, recipientId?: string): string | undefined {
   const c = game.chest;
   if (game.mode !== 'chest' || !c) return '宝箱がありません';
   const te = worldTurnError(game, playerId, c.tile !== undefined);
   if (te) return te;
   if (c.contents) return 'もう開けました';
   const h = findHero(game, heroId);
-  if (!h || h.hp <= 0) return 'そのキャラは動けません';
+  if (!h || h.hp <= 0 || !sceneHeroes(game).some(x => x.id === h.id)) return 'そのキャラは動けません';
   if (!ownedBy(h, playerId)) return '担当していないキャラです';
   const slots = c.unlocked ? BALANCE.chestLuckSlots : BALANCE.lockSlots;
   if (!Number.isInteger(focusUsed) || focusUsed < 0 || focusUsed > Math.min(slots, h.focus)) return 'フォーカスの数が不正です';
@@ -842,6 +849,8 @@ function openChest(game: GameState, playerId: string, heroId: string, focusUsed:
     }
     return undefined;
   }
+  const recipient = recipientId ? sceneHeroes(game).find(x => x.id === recipientId && x.hp > 0 && !x.retired) : h;
+  if (!recipient) return '報酬を受け取る仲間がいません';
   // 運のスロット → 成功数で確率が上の格へずれる → 格を1回だけ抽選（spec §10.3）
   const results = rollWithFocus(slots, focusUsed, statChance(h, 'luk', 'luck'), rng);
   const n = successes(results);
@@ -853,9 +862,10 @@ function openChest(game: GameState, playerId: string, heroId: string, focusUsed:
   c.grade = grade;
   c.lastRoll = { kind: 'luck', heroId, results, success: n === slots, oddsBefore, odds, grade, gradeChance: odds[rarityIndex(grade)], omen };
   c.contents = rollChestContents(game, grade, !!c.spec.big, rng);
-  // 開けたキャラが受け取る（大宝箱のお金は、その場にいる全員で山分け）
-  addLoot(game, c.contents.filter((l) => l.kind !== 'gold'), [h]);
-  addLoot(game, c.contents.filter((l) => l.kind === 'gold'), c.spec.big ? sceneHeroes(game) : [h]);
+  // 指定した受取人へ。判定と実績は開けたキャラのまま。大宝箱のお金は従来どおり山分け。
+  if (recipientId) for (const loot of c.contents) if (loot.kind === 'card') loot.heroId = recipient.id;
+  addLoot(game, c.contents.filter((l) => l.kind !== 'gold'), [recipient]);
+  addLoot(game, c.contents.filter((l) => l.kind === 'gold'), c.spec.big ? sceneHeroes(game) : [recipient]);
   game.stats.chestsOpened += 1;
   addLog(game, `宝箱の中身は${GRADE_NAME[grade]}だった（確率${odds[rarityIndex(grade)].toFixed(1)}%）`);
   return undefined;
@@ -948,13 +958,13 @@ function chooseEvent(
   const def = EVENTS.get(ev.eventId);
   const opt = def.options[optionIndex];
   // お金がいる選択肢: 選んだキャラ（判定が無ければ、押した人のキャラで払える人）が払う
-  const chosen = heroId ? findHero(game, heroId) : undefined;
+  const chosen = heroId ? findHero(game, heroId) : !game.activeScene && ev.tile !== undefined && game.world ? findHero(game, game.world.turn) : undefined;
   const payer = opt?.cost ? (chosen ?? sceneHeroes(game).find((h) => ownedBy(h, playerId) && h.gold >= opt.cost!)) : undefined;
   if (opt?.cost && (!payer || !ownedBy(payer, playerId))) return `ゴールドが足りません（${opt.cost}G）`;
   const st = eventOptionState(game, ev.eventId, optionIndex, payer);
   if (!opt || !st.visible) return '選択肢がありません';
   if (st.reason) return st.reason;
-  let actor: Hero | undefined = payer;
+  let actor: Hero | undefined = payer ?? chosen;
   let results: SlotResult[] | undefined;
   let ok = true;
   if (opt.check) {

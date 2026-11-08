@@ -56,6 +56,7 @@ async function playBattle(page) {
       await endBtn.click();
       continue;
     }
+    const availableCards = await cards.count();
     const card = cards.first();
     const box = await card.boundingBox();
     await page.mouse.click(box.x + 14, box.y + 70);
@@ -67,7 +68,7 @@ async function playBattle(page) {
     }
     for (let i = 0; i < 3; i++) {
       const plus = page.getByLabel('フォーカスを増やす');
-      if ((await plus.count()) && (await plus.isEnabled()) && (await page.locator('[data-card-index][data-usable]').count()) <= 2) await plus.click();
+      if ((await plus.count()) && (await plus.isEnabled()) && availableCards <= 2) await plus.click();
     }
     if (!seen.has('focus')) {
       seen.add('focus');
@@ -168,6 +169,7 @@ async function run(party, difficulty) {
       continue;
     }
     if (await clickText(page, '戦闘開始')) continue;
+    if (await page.getByText('全員の利用終了後に地図へ戻ります', { exact: true }).count() && await clickText(page, '世界マップへ')) continue;
     if (await clickText(page, '町を出る')) continue;
     if (await clickText(page, '祈らずに去る')) continue;
     if (await page.locator('[data-sanctuary]').count() && await clickText(page, '世界マップへ')) continue;

@@ -12,6 +12,7 @@ export interface EffectCtx {
   source: Unit;
   /** 選んだ対象（カードの対象の敵 / アイテムを使う相手）。敵の行動ではインテントの対象を毎回読み直す */
   target?: Unit;
+  allyTarget?: Unit;
   /** カードから使った時のカード（全体カードなら target は相手全員） */
   card?: CardDef;
   /** このカードだけで働く特殊能力（カードの特殊能力） */

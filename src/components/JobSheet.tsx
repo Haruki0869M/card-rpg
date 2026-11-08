@@ -74,7 +74,8 @@ export function JobSheetBody() {
   const dispatchGame = useBattle((s) => s.dispatchGame);
   const openSheet = useBattle((s) => s.openSheet);
   const heroes = sceneLocalHeroes(game).filter((h) => jobOptions(h).length);
-  const [heroId, setHeroId] = useState(heroes.find((h) => canChangeNow(game, h))?.id ?? heroes[0]?.id);
+  const activeId = useBattle(s => s.activeId);
+  const [heroId, setHeroId] = useState(heroes.find(h => h.id === activeId)?.id ?? heroes.find((h) => canChangeNow(game, h))?.id ?? heroes[0]?.id);
   const [pick, setPick] = useState<string | null>(null);
   const hero = heroes.find((h) => h.id === heroId) ?? heroes[0];
   if (!hero) return <div className="py-6 text-center text-[14px] text-zinc-400">今の場面に、転職できるキャラはいません</div>;

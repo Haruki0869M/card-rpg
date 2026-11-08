@@ -34,7 +34,7 @@ export const SPECIAL_JOB_CARDS: CardDef[] = [
   c('timeShield', '時間の盾', 'skill', 1, 'self', [[b(4)], [b(7)], [b(10)]], { stat: 'int' }),
   c('timeHaste', '加速', 'skill', 1, 'self', [[draw(1)], [draw(1), f(1)], [draw(2), f(1)]], { stat: 'int' }),
   c('timeStop', '時間停止', 'skill', 2, 'enemy', [[{ kind: 'skipIntent' }], [{ kind: 'skipIntent' }]], { stat: 'int', rarity: 'legend', exhaust: true, trait: { name: '止まった時', effect: { modifier: 'exhaust' } } }),
-  c('timeMend', '時の回復', 'magic', 2, 'self', [[{ kind: 'heal', amount: 6, to: 'lowestAlly' }], [{ kind: 'heal', amount: 11, to: 'lowestAlly' }], [{ kind: 'heal', amount: 17, to: 'lowestAlly' }]], { rarity: 'epic', trait: focus }),
+  c('timeMend', '時の回復', 'magic', 2, 'ally', [[{ kind: 'heal', amount: 6, to: 'target' }], [{ kind: 'heal', amount: 11, to: 'target' }], [{ kind: 'heal', amount: 17, to: 'target' }]], { rarity: 'epic', trait: focus }),
   c('timeCollapse', '時空崩壊', 'magic', 3, 'allEnemies', [[d(5)], [d(9)], [d(14)], [d(19)]], { rarity: 'epic', trait: pierce }),
 
   c('graveBolt', '冥府の矢', 'magic', 1, 'enemy', [[d(3, 'dark')], [d(6, 'dark')], [d(9, 'dark')]]),

@@ -1,3 +1,5 @@
+import { FacilityRoster, FacilityExit } from './FacilityControls';
+import { facilityMembers, facilityVisit } from '../../engine/game/world/facilities';
 // ===== 世界マップの場面: 遭遇（spec §8.5）・町（§17）・祠（§8.4）・エンディング =====
 import { motion } from 'framer-motion';
 import { ArrowUpCircle, BedDouble, Check, Coins, Eye, HandCoins, ScrollText, Sparkles, Store, Swords, Trash2, Wind } from 'lucide-react';
@@ -34,13 +36,12 @@ import { useOnline } from '../../store/onlineStore';
 import { getClass } from '../../data/classes';
 import { OthersTurnNote } from '../screens/OnlineScreens';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
-import type { GameState, Hero } from '../../types';
+import type { Hero } from '../../types';
 import { CardFace } from '../ui/CardFace';
 import { CheckPanel, RollStrip } from '../ui/CheckPanel';
 import { Heading, HeroFace, ItemIcon, itemSummary, RARITY_STYLE, Screen } from '../ui/game';
 import { WorldTopBar } from './WorldScreen';
 
-const first = (game: GameState) => game.heroes.find((h) => !h.retired)!.playerId;
 /** 席の名前（オンラインなら参加者の名前、1台なら P1 など） */
 const seatLabel = (p: string) => useOnline.getState().room?.seatName(p as never) ?? p;
 
@@ -213,8 +214,10 @@ export function TownScreen() {
   const w = game.world!;
   const stock = w.shops[def.id];
   // 町に入ったキャラ（お金・持ち物はこのキャラのもの。操作できるのはこのキャラの担当だけ）
-  const v = townVisitor(game)!;
-  const mine = isLocalPlayer(v.playerId);
+  const [visitorId, setVisitorId] = useState<string>();
+  const visitors = game.heroes.filter(h => facilityMembers(game).includes(h.id));
+  const v = visitors.find(h => h.id === visitorId) ?? visitors.find(h => isLocalPlayer(h.playerId) && !game.town?.finished?.includes(h.id)) ?? townVisitor(game)!;
+  const mine = isLocalPlayer(v.playerId) && !game.town?.finished?.includes(v.id);
   const p = v.playerId;
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const sellable = v.stash;
@@ -223,6 +226,7 @@ export function TownScreen() {
   return (
     <Screen bg="town" bgOpacity={0.28}>
       <WorldTopBar game={game} />
+      <FacilityRoster game={game} selected={v.id} onSelect={setVisitorId} />
       <Heading sub={def.description}>{def.name}</Heading>
       <div className="mx-3 mt-1 flex shrink-0 items-center gap-2 rounded-lg bg-black/40 px-2 py-1 text-[13px]">
         <HeroFace hero={v} size={28} />
@@ -234,7 +238,7 @@ export function TownScreen() {
           {v.gold}G
         </span>
         {mine && jobOptions(v).length > 0 && (
-          <button onClick={() => openSheet('jobs')} className={`btn flex h-9 shrink-0 items-center gap-1 rounded-lg px-2 text-[12px] font-bold ${canChangeNow(game, v) ? 'btn-gold' : 'btn-dark'}`}>
+          <button onClick={() => { useBattle.setState({ activeId: v.id }); openSheet('jobs'); }} className={`btn flex h-11 shrink-0 items-center gap-1 rounded-lg px-2 text-[12px] font-bold ${canChangeNow(game, v) ? 'btn-gold' : 'btn-dark'}`}>
             <ArrowUpCircle size={15} />
             聖堂（転職）
           </button>
@@ -264,7 +268,7 @@ export function TownScreen() {
                   </span>
                   <button
                     disabled={!mine || s.sold || v.gold < shopPriceFor(v, s.price)}
-                    onClick={() => dispatchGame({ type: 'TOWN_BUY', playerId: p, kind: 'item', index: i })}
+                    onClick={() => dispatchGame({ type: 'TOWN_BUY', heroId: v.id, playerId: p, kind: 'item', index: i })}
                     className="btn btn-gold flex h-11 w-[78px] shrink-0 items-center justify-center gap-0.5 rounded-lg text-[13px] font-bold"
                   >
                     {s.sold ? '売り切れ' : (
@@ -291,7 +295,7 @@ export function TownScreen() {
                     </span>
                     <button
                       disabled={!mine || c.sold || v.gold < shopPriceFor(v, c.price)}
-                      onClick={() => dispatchGame({ type: 'TOWN_BUY', playerId: h.playerId, kind: 'card', index: i })}
+                      onClick={() => dispatchGame({ type: 'TOWN_BUY', heroId: v.id, playerId: v.playerId, kind: 'card', index: i })}
                       className="btn btn-gold flex h-11 w-[96px] items-center justify-center gap-0.5 rounded-lg text-[13px] font-bold"
                     >
                       {c.sold ? '売り切れ' : (
@@ -324,7 +328,7 @@ export function TownScreen() {
             ))}
             <button
               disabled={!mine || v.gold < def.innCost}
-              onClick={() => dispatchGame({ type: 'TOWN_INN', playerId: p })}
+              onClick={() => dispatchGame({ type: 'TOWN_INN', heroId: v.id, playerId: p })}
               className="btn btn-gold font-display flex h-12 items-center justify-center gap-1 rounded-xl text-[18px]"
             >
               <BedDouble size={20} /> 泊まる（{def.innCost}G）
@@ -347,7 +351,7 @@ export function TownScreen() {
                   <div className="text-[12px] text-amber-200">報酬: {q.rewardText}</div>
                   <div className="mt-1.5">
                     {!st ? (
-                      <button disabled={!mine} onClick={() => dispatchGame({ type: 'QUEST_ACCEPT', playerId: p, questId: id })} className="btn btn-gold h-11 w-full rounded-lg text-[14px] font-bold">
+                      <button disabled={!mine} onClick={() => dispatchGame({ type: 'QUEST_ACCEPT', heroId: v.id, playerId: p, questId: id })} className="btn btn-gold h-11 w-full rounded-lg text-[14px] font-bold">
                         依頼を受ける
                       </button>
                     ) : st.reported ? (
@@ -355,7 +359,7 @@ export function TownScreen() {
                         <Check size={16} /> 達成済み
                       </div>
                     ) : canReport ? (
-                      <button disabled={!mine} onClick={() => dispatchGame({ type: 'QUEST_REPORT', playerId: p, questId: id })} className="btn btn-gold h-11 w-full rounded-lg text-[14px] font-bold">
+                      <button disabled={!mine} onClick={() => dispatchGame({ type: 'QUEST_REPORT', heroId: v.id, playerId: p, questId: id })} className="btn btn-gold h-11 w-full rounded-lg text-[14px] font-bold">
                         報告して報酬を受け取る
                       </button>
                     ) : (
@@ -401,7 +405,7 @@ export function TownScreen() {
                   <span className="min-w-0 flex-1 truncate text-[14px] font-bold" style={{ color: RARITY_STYLE[it.rarity].color }}>
                     {it.name}
                   </span>
-                  <button disabled={!mine} onClick={() => dispatchGame({ type: 'TOWN_SELL', playerId: p, itemUid: s.uid })} className="btn btn-dark flex h-11 w-[84px] items-center justify-center gap-0.5 rounded-lg text-[13px] font-bold">
+                  <button disabled={!mine} onClick={() => dispatchGame({ type: 'TOWN_SELL', heroId: v.id, playerId: p, itemUid: s.uid })} className="btn btn-dark flex h-11 w-[84px] items-center justify-center gap-0.5 rounded-lg text-[13px] font-bold">
                     <Coins size={14} />
                     {sellPrice(s.itemId)}で売る
                   </button>
@@ -412,13 +416,7 @@ export function TownScreen() {
         )}
       </div>
       <div className="shrink-0 px-3 pt-1 pb-3">
-        {mine ? (
-          <button onClick={() => dispatchGame({ type: 'LEAVE_TOWN', playerId: p })} className="btn btn-dark h-12 w-full rounded-xl text-[15px] font-bold">
-            町を出る
-          </button>
-        ) : (
-          <OthersTurnNote seat={v.playerId} name={`${seatLabel(v.playerId)}さん`} what={`${v.name}で町を見ています`} />
-        )}
+        <FacilityExit game={game} />
       </div>
       {confirmRemove && (
         <ConfirmDialog
@@ -440,7 +438,6 @@ export function TownScreen() {
 
 export function SanctuaryScreen() {
   const game = useBattle(s => s.game)!;
-  const dispatchGame = useBattle(s => s.dispatchGame);
   const openSheet = useBattle(s => s.openSheet);
   const visit = game.sanctuary!;
   const def = SANCTUARIES.get(visit.sanctuaryId);
@@ -448,13 +445,14 @@ export function SanctuaryScreen() {
     <Screen>
       <WorldTopBar game={game} />
       <div data-sanctuary={def.kind} className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+        <FacilityRoster game={game} />
         <h1 className="font-display text-[24px] text-amber-100">{def.name}</h1>
         <p className="panel mt-3 rounded-xl p-3 text-[15px] leading-6">{def.text}</p>
         <p className="mt-3 text-[14px] leading-6">{def.kind === 'temple' ? '中位Lv3と条件を満たすと特殊職、中位Lv4と条件を満たすと最上位職へ進めます。' : '中位Lv3と条件を満たすと、この祭壇に対応する特殊職へ進めます。'}</p>
         <button onClick={() => openSheet('jobs')} className="btn btn-gold mt-4 min-h-12 w-full rounded-xl px-3 text-[15px] font-bold">転職先を見る</button>
       </div>
       <div className="shrink-0 px-3 pb-3">
-        <button disabled={!isLocalPlayer(game.heroes.find(h => h.id === visit.heroId)!.playerId)} onClick={() => dispatchGame({ type: 'LEAVE_SANCTUARY', playerId: first(game) })} className="btn btn-dark min-h-12 w-full rounded-xl text-[15px] font-bold">世界マップへ</button>
+        <FacilityExit game={game} />
       </div>
     </Screen>
   );
@@ -467,8 +465,8 @@ export function ShrineScreen() {
   const dispatchGame = useBattle((s) => s.dispatchGame);
   const s = game.shrine!;
   const def = SHRINES.get(s.shrineId);
-  const heroes = sceneHeroes(game);
-  const [heroId, setHeroId] = useState(s.heroId);
+  const heroes = sceneHeroes(game).filter(h => facilityMembers(game).includes(h.id));
+  const [heroId, setHeroId] = useState(heroes.find(h => isLocalPlayer(h.playerId))?.id ?? s.heroId);
   return (
     <Screen>
       <WorldTopBar game={game} />
@@ -487,7 +485,7 @@ export function ShrineScreen() {
               <div className="mt-2 text-[12px] text-zinc-300">祈るキャラ（永続の加護は1人{BALANCE.maxBlessings}つまで）</div>
               <div className="mt-1 flex gap-1">
                 {heroes.map((h) => (
-                  <button key={h.id} onClick={() => setHeroId(h.id)} className={`btn flex min-w-0 flex-1 flex-col items-center rounded-lg border-2 py-1 ${heroId === h.id ? 'sel-on' : 'border-white/10 bg-black/30'}`}>
+                  <button key={h.id} disabled={!isLocalPlayer(h.playerId) || facilityVisit(game)?.finished?.includes(h.id)} onClick={() => setHeroId(h.id)} className={`btn flex min-w-0 flex-1 flex-col items-center rounded-lg border-2 py-1 ${heroId === h.id ? 'sel-on' : 'border-white/10 bg-black/30'}`}>
                     <HeroFace hero={h} size={30} />
                     <span className="truncate text-[12px] font-bold">{h.name}</span>
                     <span className="text-[12px] text-zinc-400">加護 {h.blessings ?? 0}/{BALANCE.maxBlessings}</span>
@@ -496,7 +494,7 @@ export function ShrineScreen() {
               </div>
               <div className="mt-2 flex flex-col gap-1.5">
                 {def.options.map((o, i) => (
-                  <button key={i} onClick={() => dispatchGame({ type: 'SHRINE_CHOOSE', playerId: first(game), optionIndex: i, heroId })} className="btn btn-dark min-h-12 rounded-xl px-3 text-left text-[14px] font-bold">
+                  <button key={i} disabled={!isLocalPlayer(game.heroes.find(h => h.id === heroId)!.playerId) || facilityVisit(game)?.finished?.includes(heroId)} onClick={() => dispatchGame({ type: 'SHRINE_CHOOSE', playerId: game.heroes.find(h => h.id === heroId)!.playerId, optionIndex: i, heroId })} className="btn btn-dark min-h-12 rounded-xl px-3 text-left text-[14px] font-bold">
                     {o.label}
                   </button>
                 ))}
@@ -507,9 +505,7 @@ export function ShrineScreen() {
         </div>
       </div>
       <div className="shrink-0 px-3 pt-1 pb-3">
-        <button onClick={() => dispatchGame({ type: 'LEAVE_SHRINE', playerId: first(game) })} className={`btn h-12 w-full rounded-xl text-[15px] font-bold ${s.result ? 'btn-gold' : 'btn-dark'}`}>
-          {s.result ? '世界マップへ' : '祈らずに去る'}
-        </button>
+        <FacilityExit game={game} />
       </div>
     </Screen>
   );

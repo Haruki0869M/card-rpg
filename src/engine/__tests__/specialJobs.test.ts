@@ -211,7 +211,7 @@ describe('祭壇の半減と保存再開', () => {
     const tile = w.tiles.findIndex(t => t.f?.id === 'necromancerAltar'); old.mode = 'sanctuary'; old.party = ['h0'];
     old.sanctuary = { sanctuaryId: 'necromancerAltar', heroId: 'h0', tile }; w.pos.h0 = tile;
     const before = structuredClone(old), next = migrateGame(structuredClone(old))!;
-    expect(next.version).toBe(13); expect(next.world!.tiles.filter(t => t.f?.kind === 'altar')).toHaveLength(5);
+    expect(next.version).toBe(14); expect(next.world!.tiles.filter(t => t.f?.kind === 'altar')).toHaveLength(5);
     expect(next.sanctuary).toEqual({ sanctuaryId: 'timeMageAltar', heroId: 'h0', tile }); expect(next.world!.tiles[tile].f?.id).toBe('timeMageAltar');
     expect(next.rngState).toBe(before.rngState); expect(next.world!.pos).toEqual(before.world!.pos);
     next.world!.tiles.forEach((t, i) => { expect(t.t).toBe(before.world!.tiles[i].t); expect(t.seen).toBe(before.world!.tiles[i].seen); });

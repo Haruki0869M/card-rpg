@@ -1,3 +1,7 @@
+import { followingGroup } from './game/world/group';
+import { facilityMembers, facilityVisit } from './game/world/facilities';
+import { isAllyCard, cardTargets, secondaryCard } from './battle/targets';
+import { unitIdOf } from './battle/units';
 // ===== テスト用の自動プレイ（シナリオをエンディングまで）=====
 // 画面と同じコマンドだけを使う。上手さより「どの場面でも詰まらずに進めること」を優先した単純な作戦。
 import { cardOf } from '../data/cards';
@@ -49,6 +53,8 @@ function send(g: GameState, cmd: GameCommand, log: BotLog): GameState {
 
 /** 操作するプレイヤー（キャラの指定が無ければ、世界マップの場面は手番の人、ダンジョンは先頭のキャラの人） */
 const pid = (g: GameState, heroId?: string): PlayerId => {
+  const facility = facilityVisit(g);
+  if (!heroId && facility) heroId = facilityMembers(g).find(id => !facility.finished?.includes(id));
   const owner = (id?: string) => (id ? findHero(g, id)?.playerId : undefined);
   return owner(heroId) ?? (!g.activeScene && g.world?.turn ? owner(g.world.turn) : undefined) ?? owner(g.party?.[0]) ?? g.heroes[0].playerId;
 };
@@ -106,9 +112,9 @@ function worldStep(g: GameState, log: BotLog, memo: { interacted: Set<string> })
   }
   if (w.move === null) return send(g, { type: 'WORLD_ROLL_MOVE', playerId: p, heroId: h.id, focusUsed: 0 }, log);
   // 同じマスの他の人のキャラは、誘って承知してもらってから一緒に動く（自動プレイは全員の代わりに答える）
-  if (w.move === null) {
+  {
     for (const c of livingHeroes(g)) {
-      if (c.id === h.id || c.playerId === h.playerId || w.pos[c.id] !== at || w.acted.includes(c.id) || w.follow?.[c.id] === h.id) continue;
+      if (c.id === h.id || c.playerId === h.playerId || w.pos[c.id] !== at || followingGroup(g, h.id).includes(c.id)) continue;
       if (g.expeditions?.some((x) => x.heroes.includes(c.id))) continue;
       if (w.invites?.[c.id] === h.id) return send(g, { type: 'WORLD_INVITE_ANSWER', playerId: c.playerId, heroId: c.id, accept: true }, log);
       return send(g, { type: 'WORLD_INVITE', playerId: p, heroId: h.id, targetId: c.id }, log);
@@ -120,8 +126,8 @@ function worldStep(g: GameState, log: BotLog, memo: { interacted: Set<string> })
     for (const [i] of reach) if (hexDistance(w, i, target.tile) < hexDistance(w, best, target.tile)) best = i;
     if (best !== at) {
       const companions = livingHeroes(g)
-        .filter((x) => x.id !== h.id && w.pos[x.id] === at && !w.acted.includes(x.id) && !g.expeditions?.some((e) => e.heroes.includes(x.id)))
-        .filter((x) => x.playerId === h.playerId || w.follow?.[x.id] === h.id)
+        .filter((x) => x.id !== h.id && w.pos[x.id] === at && !g.expeditions?.some((e) => e.heroes.includes(x.id)))
+        .filter((x) => x.playerId === h.playerId || followingGroup(g, h.id).includes(x.id))
         .map((x) => x.id);
       return send(g, { type: 'WORLD_MOVE', playerId: p, heroId: h.id, to: best, companions }, log);
     }
@@ -139,7 +145,7 @@ function battleStep(g: GameState, log: BotLog): GameState {
       const card = cardOf(c);
       const target = b.enemies.find((e) => !e.dead)?.uid;
       const focus = card.slots >= 3 ? Math.min(card.slots, a.focus) : 0;
-      return send(g, { type: 'BATTLE', command: { type: 'PLAY_CARD', playerId: a.playerId, characterId: a.id, cardInstanceId: c.uid, targetId: card.target === 'enemy' ? target : undefined, focusUsed: focus } }, log);
+      return send(g, { type: 'BATTLE', command: { type: 'PLAY_CARD', playerId: a.playerId, characterId: a.id, cardInstanceId: c.uid, targetId: card.target === 'enemy' ? target : isAllyCard(card) ? cardTargets(g.battle!, a, card).sort((x,y) => x.hp/x.maxHp-y.hp/y.maxHp).map(unitIdOf)[0] : undefined, allyTargetId: card.secondaryTarget ? cardTargets(b, a, secondaryCard(card)).sort((x,y) => x.hp/x.maxHp-y.hp/y.maxHp).map(unitIdOf)[0] : undefined, focusUsed: focus } }, log);
     }
     // オンライン協力なら、まだ準備完了していないプレイヤーが押す
     const who = waitingPlayers(b)[0] ?? b.allies[0].playerId;
@@ -259,7 +265,7 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
       const ev = g.event!;
       if (ev.result) return send(g, { type: 'FINISH_EVENT', playerId: pid(g) }, log);
       const def = EVENTS.get(ev.eventId);
-      const party = livingHeroes(g).filter((x) => !g.party || g.party.includes(x.id));
+      const party = livingHeroes(g).filter((x) => (!g.party || g.party.includes(x.id)) && (g.activeScene || ev.tile === undefined || !g.world || x.id === g.world.turn));
       // 選べる選択肢と、選ぶキャラ（お金がいる時は払えるキャラ）
       for (let i = 0; i < def.options.length; i++) {
         const h = party.find((x) => {
@@ -282,10 +288,10 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
         const v = g.heroes.find((h) => h.id === t.heroId)!;
         if (v.hp < heroMaxHp(v) && v.gold >= TOWNS.get(t.townId).innCost) return send(g, { type: 'TOWN_INN', playerId: v.playerId }, log);
       }
-      return send(g, { type: 'LEAVE_TOWN', playerId: pid(g, t.heroId) }, log);
+      return send(g, { type: 'LEAVE_TOWN', playerId: pid(g) }, log);
     }
     case 'sanctuary':
-      return send(g, { type: 'LEAVE_SANCTUARY', playerId: pid(g, g.sanctuary!.heroId) }, log);
+      return send(g, { type: 'LEAVE_SANCTUARY', playerId: pid(g) }, log);
     case 'shrine': {
       const s = g.shrine!;
       if (s.result) return send(g, { type: 'LEAVE_SHRINE', playerId: pid(g) }, log);

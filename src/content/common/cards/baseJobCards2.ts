@@ -62,11 +62,11 @@ export const BASE_JOB_CARDS_2: CardDef[] = [
     cost: 1,
     slots: 2,
     baseChance: 80,
-    target: 'self',
+    target: 'ally',
     tiers: [
       { minSuccesses: 0, effects: [b(4)] },
-      { minSuccesses: 1, effects: [b(5), { kind: 'block', amount: 3, to: 'lowestAlly' }] },
-      { minSuccesses: 2, effects: [b(6), { kind: 'block', amount: 5, to: 'lowestAlly' }] },
+      { minSuccesses: 1, effects: [b(5), { kind: 'block', amount: 3, to: 'target' }] },
+      { minSuccesses: 2, effects: [b(6), { kind: 'block', amount: 5, to: 'target' }] },
     ],
   },
   {
@@ -77,11 +77,11 @@ export const BASE_JOB_CARDS_2: CardDef[] = [
     cost: 1,
     slots: 2,
     baseChance: 75,
-    target: 'self',
+    target: 'ally',
     rarity: 'rare',
     tiers: [
       { minSuccesses: 0, effects: [st('regen', 1)] },
-      { minSuccesses: 1, effects: [{ kind: 'applyStatus', status: 'regen', amount: 2, to: 'lowestAlly' }] },
+      { minSuccesses: 1, effects: [{ kind: 'applyStatus', status: 'regen', amount: 2, to: 'target' }] },
       { minSuccesses: 2, effects: [{ kind: 'applyStatus', status: 'regen', amount: 3, to: 'allies' }] },
     ],
   },

@@ -1,3 +1,4 @@
+import { followingGroup } from '../../engine/game/world/group';
 // ===== 世界マップの画面（spec §8・§20.3）=====
 // 上: 侵食度・命の灯火・ゴールド・時間帯 / 中: 地図 / 下: 手番のキャラの操作（移動力の判定・移動・入る・野営・待機）
 import { AnimatePresence, motion } from 'framer-motion';
@@ -278,10 +279,10 @@ export function WorldScreen() {
   const path = useMemo(() => (selected !== undefined && here !== undefined && w.move ? pathTo(reachable(w, here, w.move), selected) : undefined), [selected, here, w]);
 
   if (!hero || here === undefined) return null;
-  const companions = heroesAt(game, here).filter((h) => h.id !== hero.id && !w.acted.includes(h.id));
+  const companions = heroesAt(game, here).filter((h) => h.id !== hero.id);
   // 同行: 自分（同じ担当）のキャラはタップで選ぶ。他の人のキャラは誘って、承知してもらった時だけ
   const ownMate = (h: { playerId: PlayerId }) => h.playerId === hero.playerId;
-  const chosenCompanions = companions.filter((h) => (ownMate(h) ? (withMe[h.id] ?? true) : w.follow?.[h.id] === hero.id)).map((h) => h.id);
+  const chosenCompanions = companions.filter((h) => (ownMate(h) ? (withMe[h.id] ?? true) : followingGroup(game, hero.id).includes(h.id))).map((h) => h.id);
   const invite = (c: { id: string; playerId: PlayerId }) => {
     dispatchGame({ type: 'WORLD_INVITE', playerId: hero.playerId, heroId: hero.id, targetId: c.id });
     // 誘われた人もこの端末で遊んでいる（1台を回して遊ぶ）なら、その場で答えてもらう
@@ -324,6 +325,7 @@ export function WorldScreen() {
       {w.moveProposal && <MoveProposal game={game} />}
       {info && <div className="shrink-0 bg-black/70 px-3 py-1 text-[12px] leading-4 text-zinc-200">{info}</div>}
 
+      <div className="shrink-0 bg-sky-950 px-3 py-1 text-center text-[14px] font-bold" data-current-turn>現在は {hero.playerId}（{hero.name}）の手番です</div>
       {/* 手番のキャラの操作 */}
       <div className="panel relative z-10 shrink-0 rounded-t-2xl px-3 pt-2 pb-3">
         {turnExp && (
@@ -386,6 +388,7 @@ export function WorldScreen() {
           </div>
         )}
 
+        {mine && followingGroup(game, hero.id).length > 1 && <button className="btn btn-dark my-1 min-h-11 w-full rounded-lg text-[13px]" onClick={() => { dispatchGame({ type: 'WORLD_UNFOLLOW', playerId: pid, heroId: hero.id }); setWithMe(Object.fromEntries(companions.map(h => [h.id, false]))); }}>同行を解除して単独行動する</button>}
         {companions.length > 0 && (w.move === null || (w.move ?? 0) > 0) && (
           <div className="mt-1 flex items-center gap-1">
             <span className="flex shrink-0 items-center gap-0.5 text-[12px] text-zinc-300">
@@ -394,7 +397,7 @@ export function WorldScreen() {
             </span>
             {companions.map((c) => {
               if (!ownMate(c)) {
-                const st = w.follow?.[c.id] === hero.id ? 'yes' : w.invites?.[c.id] === hero.id ? 'wait' : 'no';
+                const st = followingGroup(game, hero.id).includes(c.id) ? 'yes' : w.invites?.[c.id] === hero.id ? 'wait' : 'no';
                 return (
                   <button
                     key={c.id}

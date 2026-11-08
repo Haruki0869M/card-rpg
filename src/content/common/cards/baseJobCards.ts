@@ -155,11 +155,11 @@ export const BASE_JOB_CARDS: CardDef[] = [
     cost: 1,
     slots: 2,
     baseChance: 80,
-    target: 'self',
+    target: 'ally',
     tiers: [
-      { minSuccesses: 0, effects: [{ kind: 'heal', amount: 4, to: 'lowestAlly' }] },
-      { minSuccesses: 1, effects: [{ kind: 'heal', amount: 7, to: 'lowestAlly' }] },
-      { minSuccesses: 2, effects: [{ kind: 'heal', amount: 10, to: 'lowestAlly' }, { kind: 'cleanse', to: 'lowestAlly' }] },
+      { minSuccesses: 0, effects: [{ kind: 'heal', amount: 4, to: 'target' }] },
+      { minSuccesses: 1, effects: [{ kind: 'heal', amount: 7, to: 'target' }] },
+      { minSuccesses: 2, effects: [{ kind: 'heal', amount: 10, to: 'target' }, { kind: 'cleanse', to: 'target' }] },
     ],
   },
   {

@@ -1,3 +1,4 @@
+import { needsCardTarget } from '../../engine/battle/targets';
 // ===== 手札とカード =====
 import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useEffect, useMemo, useState } from 'react';
@@ -58,11 +59,11 @@ const CardView = memo(function CardView({
   const press = usePress(() => tapCard(uid), () => ({ type: 'card', cardId: card.id, upgraded, allyId, focus }));
   const [showFlash, setShowFlash] = useState(false);
   // 選んだカードは、ひと回り大きく手前に浮き上がる（画面の外にはみ出さないように左右を寄せる）
-  const big = selected && tall;
+  const big = selected && tall && !needsCardTarget(card);
   const w = big ? Math.min(Math.round(width * 1.5), 150) : width;
   const h = big ? BIG_H : CARD_H;
   const x = big ? Math.max(2, Math.min(containerW - w - 2, pos.left + width / 2 - w / 2)) : pos.left;
-  const y = big ? CARD_H - BIG_H - 10 : selected ? pos.top - 14 : pos.top;
+  const y = selected && needsCardTarget(card) ? pos.top : big ? CARD_H - BIG_H - 10 : selected ? pos.top - 14 : pos.top;
 
   useEffect(() => {
     if (!flash) return;

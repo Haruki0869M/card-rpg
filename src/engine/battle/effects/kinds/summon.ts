@@ -15,7 +15,7 @@ export const effect: EffectHandler<'summon'> = {
   defaultTo: 'self',
   apply(ctx, e) {
     if (isEnemy(ctx.source)) return false;
-    const targetId = e.targeted ? (ctx.target && isEnemy(ctx.target) && !ctx.target.dead ? ctx.target.uid : ctx.state.enemies.find(t => !t.dead)?.uid) : undefined;
+    const targetId = e.targeted ? (ctx.target && isEnemy(ctx.target) && !ctx.target.dead ? ctx.target.uid : ctx.card ? undefined : ctx.state.enemies.find(t => !t.dead)?.uid) : undefined;
     if (e.targeted && !targetId) return false;
     const list = (ctx.source.summons ??= []);
     if (e.stackLimit && list.filter(s => s.group === e.id).length >= e.stackLimit) return false;

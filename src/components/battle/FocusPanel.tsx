@@ -1,3 +1,7 @@
+import { needsCardTarget, selectedCardTarget, secondaryCardTarget, targetGuide } from '../../engine/battle/targets';
+import { unitName } from '../../engine/battle/units';
+import { predictCard } from '../../engine/battle/battle';
+import { nameOf } from '../../engine/battle/units';
 // ===== フォーカス注入パネル（カード選択時に手札のすぐ上に出る） =====
 import { motion } from 'framer-motion';
 import { Minus, Plus, Star, X } from 'lucide-react';
@@ -26,7 +30,9 @@ export function FocusPanel() {
   const max = Math.min(card.slots, ally.focus);
   const probs = tierDistribution(card, selection.focus, chance);
   const pcts = toPercents(probs);
-  const needsTarget = card.target === 'enemy' && !selection.targetId;
+  const selected = selectedCardTarget(battle, ally, card, selection.targetId);
+  const secondary = secondaryCardTarget(battle, ally, card, selection.allyTargetId);
+  const needsTarget = (needsCardTarget(card) && !selected) || (!!card.secondaryTarget && !secondary);
   // 色は「最上位Tier = 金」になるよう後ろから割り当てる
   const colorOf = (i: number) => TIER_COLORS[TIER_COLORS.length - (card.tiers.length - i)] ?? TIER_COLORS[0];
   const label = (i: number) => {
@@ -43,7 +49,7 @@ export function FocusPanel() {
       exit={{ y: 28, opacity: 0 }}
       transition={{ duration: 0.1 }}
       onClick={(e) => e.stopPropagation()}
-      className="panel panel-gold-edge mx-1.5 rounded-xl p-1.5"
+      className="panel panel-gold-edge mx-1.5 max-h-[44dvh] min-h-0 overflow-y-auto rounded-xl p-1.5"
     >
       <div className="flex items-center gap-1.5">
         <button onClick={cancel} aria-label="キャンセル" className="btn btn-dark flex h-11 w-11 shrink-0 items-center justify-center rounded-lg">
@@ -63,10 +69,12 @@ export function FocusPanel() {
           className={`btn ${needsTarget ? 'btn-dark' : 'btn-gold'} flex h-12 w-[112px] shrink-0 flex-col items-center justify-center rounded-xl leading-5`}
         >
           <span className="font-display text-[19px]">発動</span>
-          <span className="text-[12px] leading-4 font-bold">{needsTarget ? '敵をタップ' : selection.focus ? `★${selection.focus} 確定` : '運に任せる'}</span>
+          <span className="text-[12px] leading-4 font-bold">{needsTarget ? (card.target === 'enemy' ? '敵をタップ' : '味方をタップ') : selection.focus ? `★${selection.focus} 確定` : '運に任せる'}</span>
         </button>
       </div>
 
+      {needsCardTarget(card) && <div className="mt-1 text-center text-[12px] text-sky-100" data-target-guide>{targetGuide(card)}{selected && `（選択中：${nameOf(selected)}）`}</div>}
+      {card.secondaryTarget && <div className="text-center text-[12px] text-sky-100" data-secondary-target-guide>回復・支援する味方をタップしてください{secondary && `（選択中：${nameOf(secondary)}）`}</div>}
       {(ally.slotPreviewUsed ?? 0) < slotPreviewLimitOf(ally) && <button onClick={preview} disabled={needsTarget} className="btn btn-dark mt-1 min-h-11 w-full rounded-lg text-[14px] font-bold" data-preview-start>星読みで結果を見る（1戦闘1回）</button>}
 
       <div className="mt-1.5 flex items-center gap-2">
@@ -133,8 +141,9 @@ export function FocusPanel() {
           </div>
         ))}
       </div>
+      {!needsTarget && <div className="mt-1 max-h-[88px] overflow-y-auto rounded bg-black/30 px-1 text-[12px]" data-card-predictions>{card.tiers.map((_, i) => pcts[i] > 0 && <div key={i}>{label(i)}：{predictCard(battle, ally.id, inst.uid, selection.targetId, selection.focus, i, selection.allyTargetId).map(p => `${unitName(battle, p.id)} ${p.text}`).join('／') || '効果は上の表示を確認'}</div>)}</div>}
       <div className="mt-0.5 text-center text-[12px] leading-4 text-zinc-500">
-        残りフォーカス {ally.focus - selection.focus} / {ally.focus}
+        予測は成功数ごとの目安です（抽選・追加効果で変動）。残りフォーカス {ally.focus - selection.focus} / {ally.focus}
       </div>
     </motion.div>
   );

@@ -5,7 +5,6 @@ import { Battlefield } from './components/battle/Battlefield';
 import { FocusPanel } from './components/battle/FocusPanel';
 import { SlotPreviewDialog } from './components/battle/SlotPreviewDialog';
 import { Hand } from './components/battle/Hand';
-import { useTallScreen } from './hooks/useTallScreen';
 import { PartyStrip } from './components/battle/PartyStrip';
 import { DetailPopup } from './components/DetailPopup';
 import { ResultScreen } from './components/ResultScreen';
@@ -40,6 +39,10 @@ function useKeyboard() {
     const onKey = (e: KeyboardEvent) => {
       const s = useBattle.getState();
       if (s.worldMoves.length) return;
+      if (useDetail.getState().detail) {
+        if (e.key === 'Escape') useDetail.getState().hide();
+        return;
+      }
       if (s.sheet || s.confirmAbandon) {
         if (e.key === 'Escape') s.closeTop();
         return;
@@ -65,7 +68,6 @@ function BattleScreen() {
   const presenting = useBattle(s => s.presentationBusy);
   const selection = useBattle((s) => s.selection);
   const cancel = useBattle((s) => s.cancel);
-  const tall = useTallScreen();
   const focus = (
     <AnimatePresence>{selection && <FocusPanel key="focus" />}</AnimatePresence>
   );
@@ -73,20 +75,9 @@ function BattleScreen() {
     <div className="game-bg safe-pad relative flex h-full w-full max-w-[480px] flex-col overflow-hidden" onClick={() => selection && cancel()} data-battle-presenting={presenting || undefined}>
       <TopBar />
       <Battlefield />
-      {/* フォーカス注入パネル: 高い画面では選んだカードが大きく浮き上がるので、その上（味方の枠の上）に出す。
-          低い画面では敵が隠れないように、手札のすぐ上（味方の枠に重ねる） */}
-      {tall && (
-        <div className="relative z-[120] h-0">
-          <div className="absolute inset-x-0 bottom-0">{focus}</div>
-        </div>
-      )}
       <PartyStrip />
-      {!tall && (
-        <div className="relative z-[120] h-0">
-          <div className="absolute inset-x-0 bottom-1">{focus}</div>
-        </div>
-      )}
-      <Hand />
+      {/* 対象を押せるよう、操作パネルは手札と入れ替えて通常の配置に置く。 */}
+      {selection ? focus : <Hand />}
       <BottomBar />
       {!presenting && <ResultScreen />}
       <SlotPreviewDialog />
@@ -99,7 +90,7 @@ function CurrentScreen() {
   const screen = useBattle((s) => s.screen);
   const mode = useBattle((s) => s.game?.mode);
   const movement = useBattle(s => s.worldMoves[0]);
-  if (screen === 'title' || !mode) {
+  if (screen !== 'game' || !mode) {
     if (screen === 'setup') return <SetupScreen />;
     if (screen === 'create') return <CreateScreen />;
     if (screen === 'join') return <JoinScreen />;
@@ -175,8 +166,13 @@ export default function App() {
   const moving = useBattle(s => s.worldMoves.length > 0);
   const screen = useBattle((s) => s.screen);
   const closeTop = useBattle((s) => s.closeTop);
+  const detail = useDetail(s => s.detail);
+  useEffect(() => { if (screen !== 'game') useDetail.getState().hide(); }, [screen]);
 
-  useBackButton(!!selection || !!sheet || confirmAbandon || screen === 'setup' || screen === 'create' || screen === 'join', closeTop);
+  useBackButton(!!detail || !!selection || !!sheet || confirmAbandon || screen === 'setup' || screen === 'create' || screen === 'join', () => {
+    if (useDetail.getState().detail) { useDetail.getState().hide(); return true; }
+    return closeTop();
+  });
   useKeyboard();
 
   // 招待のリンク（?room=合言葉）で開いたら「部屋に参加」へ
@@ -203,18 +199,18 @@ export default function App() {
     <MotionConfig reducedMotion="user">
       <div className="flex h-dvh w-full justify-center bg-[#050407]">
         <div className="relative flex h-full w-full max-w-[480px] flex-col overflow-hidden">
-          {!moving && <SceneTabs />}
+          {!moving && screen === 'game' && <SceneTabs />}
           <div className="relative flex min-h-0 w-full flex-1 justify-center">
             <CurrentScreen />
           </div>
           {!moving && <>
             <Sheets />
-            <JobPickOverlay />
+            {screen === 'game' && <JobPickOverlay />}
             <HeroTaskOverlay />
             <DetailPopup />
             <OnlineOverlay />
-            <VoteStatus />
-            <TurnLock />
+            {screen === 'game' && <VoteStatus />}
+            {screen === 'game' && <TurnLock />}
             {screen === 'game' && <AbilityCutins />}
           </>}
           <Toast />

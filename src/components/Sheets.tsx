@@ -117,7 +117,7 @@ function MenuSheet() {
         <button onClick={() => setConfirmAbandon(true)} className="btn flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-red-400/50 bg-red-950/70 text-[14px] font-bold text-red-100">
           <DoorOpen size={18} /> {online ? '部屋を出てタイトルへ' : '冒険をやめてタイトルへ'}
         </button>
-        <div className="pt-1 text-center text-[12px] text-zinc-500">{online ? '冒険は部屋に保存されます。同じ合言葉でまた入れます。' : '冒険は自動で保存されます。'}長押しで詳細を表示できます。</div>
+        <div className="pt-1 text-center text-[12px] text-zinc-500">{online ? '冒険は部屋に保存されます。同じ合言葉でまた入れます。' : '冒険は自動で保存されます。'}状態アイコンをタップ、カードを長押しすると詳細を確認できます。</div>
       </div>
     </BottomSheet>
   );
@@ -218,7 +218,11 @@ function PartySheet() {
   const game = useBattle((s) => s.game)!;
   const dispatchGame = useBattle((s) => s.dispatchGame);
   const openSheet = useBattle((s) => s.openSheet);
-  const [idx, setIdx] = useState(0);
+  const [idx, setIdx] = useState(() => {
+    const preferred = game.mode === 'world' ? game.world?.turn : useBattle.getState().activeId;
+    const i = game.heroes.findIndex(h => isLocalPlayer(h.playerId) && (h.id === preferred));
+    return i >= 0 ? i : Math.max(0, game.heroes.findIndex(h => isLocalPlayer(h.playerId)));
+  });
   const [slot, setSlot] = useState<EquipSlot | null>(null);
   const [showDeck, setShowDeck] = useState(false);
   const hero = game.heroes[Math.min(idx, game.heroes.length - 1)];
@@ -398,7 +402,7 @@ function PartySheet() {
       )}
       <div className="font-display mt-2 text-[15px] text-amber-200">
         {hero.name}の持ち物
-        {mates.length > 0 && mine && <span className="ml-1 text-[12px] text-zinc-400">（同じ場所の仲間に渡せます）</span>}
+        {mates.length > 0 && mine && <span className="ml-1 text-[12px] text-zinc-400">（同じ場所の仲間に渡せます。装備中の物は外してから）</span>}
       </div>
       <div className="mt-1 flex flex-col gap-1">
         {[...hero.stash, ...hero.pouch].length === 0 && <div className="py-1 text-[13px] text-zinc-500">何も持っていません</div>}
@@ -455,7 +459,9 @@ function PartySheet() {
           ok="渡す"
           danger={false}
           onOk={() => {
-            dispatchGame({ type: 'GIVE', playerId: hero.playerId, fromHeroId: hero.id, toHeroId: giveTo, ...give });
+            const error = dispatchGame({ type: 'GIVE', playerId: hero.playerId, fromHeroId: hero.id, toHeroId: giveTo, ...give });
+            if (error) return;
+            useBattle.getState().showToast('仲間に渡しました');
             setGive(null);
             setGiveTo(null);
           }}
@@ -538,10 +544,10 @@ function PouchSheet() {
             {targets.map(({ h, hp, max, dead }) => (
               <button
                 key={h.id}
-                disabled={dead}
+                disabled={chosenDef.use?.some(e => e.kind === 'revive') ? !dead : dead}
                 onClick={() => {
-                  usePouch(chosen!, h.id, owner?.id);
-                  setChosen(null);
+                  const error = usePouch(chosen!, h.id, owner?.id);
+                  if (!error) setChosen(null);
                 }}
                 className="btn btn-dark flex h-12 items-center gap-1.5 rounded-lg px-2 text-left"
               >

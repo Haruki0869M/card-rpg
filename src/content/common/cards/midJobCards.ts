@@ -10,7 +10,7 @@ const b = (amount: number): Effect => ({ kind: 'block', amount });
 const st = (status: string, amount: number): Effect => ({ kind: 'applyStatus', status, amount });
 const me = (status: string, amount: number): Effect => ({ kind: 'applyStatus', status, amount, to: 'self' });
 const all = (status: string, amount: number): Effect => ({ kind: 'applyStatus', status, amount, to: 'foes' });
-const heal = (amount: number, to: 'self' | 'lowestAlly' | 'allies' = 'self'): Effect => ({ kind: 'heal', amount, to });
+const heal = (amount: number, to: 'self' | 'lowestAlly' | 'allies' | 'target' | 'allyTarget' = 'self'): Effect => ({ kind: 'heal', amount, to });
 const focus = (amount: number): Effect => ({ kind: 'gainFocus', amount });
 const mana = (amount: number): Effect => ({ kind: 'gainMana', amount });
 const draw = (amount: number): Effect => ({ kind: 'draw', amount });
@@ -26,7 +26,7 @@ function c(
   baseChance: number,
   target: CardTarget,
   tiers: Effect[][],
-  o: { rarity?: Rarity; stat?: StatId; trait?: AbilityDef; tags?: string[] } = {},
+  o: { secondaryTarget?: CardDef['secondaryTarget']; rarity?: Rarity; stat?: StatId; trait?: AbilityDef; tags?: string[] } = {},
 ): CardDef {
   return { id, name, category, cost, slots: tiers.length - 1, baseChance, target, tiers: tiers.map((effects, i) => ({ minSuccesses: i, effects })), ...o };
 }
@@ -86,7 +86,7 @@ export const MID_JOB_CARDS: CardDef[] = [
   c('divineJudgment', '断罪の光', 'physical', 2, 60, 'allEnemies', [[el('holy', 4)], [el('holy', 7)], [el('holy', 10), all('weak', 1)]], { rarity: 'epic', stat: 'vit', trait: { name: '聖別', effect: { when: 'perfect', do: [heal(4, 'allies')] } } }),
   c('oath', '誓い', 'skill', 0, 85, 'self', [[b(3)], [b(4), me('holyLight', 1)]], { stat: 'vit' }),
   c('lightHammer', '光の鉄槌', 'physical', 2, 65, 'enemy', [[el('holy', 6)], [el('holy', 11)], [el('holy', 16), st('vulnerable', 1)]]),
-  c('martyr', '殉教の祈り', 'skill', 2, 70, 'self', [[b(8)], [b(12), heal(4, 'lowestAlly')], [b(16), heal(6, 'lowestAlly'), { kind: 'taunt' }]], { rarity: 'epic', trait: { name: '殉教', effect: { when: 'perfect', do: [{ kind: 'applyStatus', status: 'holyLight', amount: 2, to: 'self' }] } }, stat: 'vit' }),
+  c('martyr', '殉教の祈り', 'skill', 2, 70, 'ally', [[b(8)], [b(12), heal(4, 'target')], [b(16), heal(6, 'target'), { kind: 'taunt' }]], { rarity: 'epic', trait: { name: '殉教', effect: { when: 'perfect', do: [{ kind: 'applyStatus', status: 'holyLight', amount: 2, to: 'self' }] } }, stat: 'vit' }),
 
   // ===== 槍騎士（槍。初手の突撃と貫き） =====
   c('lanceCharge', '突進突き', 'physical', 2, 65, 'enemy', [[d(6)], [d(12)], [d(18), st('vulnerable', 1)]], { rarity: 'rare', stat: 'str', tags: ['heavy'] }),
@@ -97,11 +97,11 @@ export const MID_JOB_CARDS: CardDef[] = [
   c('dragonFang', '竜牙', 'physical', 3, 55, 'enemy', [[d(10)], [d(18)], [d(26)], [d(34), st('vulnerable', 2)]], { rarity: 'epic', trait: { name: '竜殺し', effect: { modifier: 'damageDealt', multiplier: 1.3, if: [{ kind: 'targetHpAtMost', pct: 50 }] } }, stat: 'str' }),
 
   // ===== 司祭（錫杖。回復をためて全体回復） =====
-  c('greaterHeal', '大いなる癒し', 'magic', 2, 75, 'self', [[heal(5, 'lowestAlly')], [heal(9, 'lowestAlly')], [heal(14, 'lowestAlly'), { kind: 'cleanse', to: 'lowestAlly' }]], { rarity: 'rare', stat: 'per' }),
-  c('sanctify', '聖別の光', 'magic', 1, 75, 'enemy', [[el('holy', 4)], [el('holy', 6), heal(2, 'lowestAlly')], [el('holy', 9), heal(4, 'lowestAlly')]], { rarity: 'rare', stat: 'per' }),
+  c('greaterHeal', '大いなる癒し', 'magic', 2, 75, 'ally', [[heal(5, 'target')], [heal(9, 'target')], [heal(14, 'target'), { kind: 'cleanse', to: 'target' }]], { rarity: 'rare', stat: 'per' }),
+  c('sanctify', '聖別の光', 'magic', 1, 75, 'enemy', [[el('holy', 4)], [el('holy', 6), heal(2, 'allyTarget')], [el('holy', 9), heal(4, 'allyTarget')]], { secondaryTarget: 'ally', rarity: 'rare', stat: 'per' }),
   c('massHeal', '慈雨', 'magic', 2, 65, 'self', [[heal(3, 'allies')], [heal(5, 'allies')], [heal(7, 'allies'), me('regen', 2)]], { rarity: 'epic', stat: 'per', trait: { name: '恩寵', effect: { when: 'perfect', do: [{ kind: 'applyStatus', status: 'regen', amount: 2, to: 'allies' }] } } }),
-  c('purify', '浄化', 'skill', 1, 80, 'self', [[{ kind: 'cleanse', to: 'lowestAlly' }], [{ kind: 'cleanse', to: 'lowestAlly' }, heal(3, 'lowestAlly')]], { stat: 'per' }),
-  c('wardOfFaith', '信仰の守り', 'skill', 1, 80, 'self', [[b(4)], [b(6), heal(2, 'lowestAlly')], [b(8), heal(3, 'lowestAlly')]], { stat: 'per' }),
+  c('purify', '浄化', 'skill', 1, 80, 'ally', [[{ kind: 'cleanse', to: 'target' }], [{ kind: 'cleanse', to: 'target' }, heal(3, 'target')]], { stat: 'per' }),
+  c('wardOfFaith', '信仰の守り', 'skill', 1, 80, 'ally', [[b(4)], [b(6), heal(2, 'target')], [b(8), heal(3, 'target')]], { stat: 'per' }),
   c('resurgence', '再起の祈り', 'magic', 3, 60, 'self', [[heal(6, 'allies')], [heal(9, 'allies')], [heal(12, 'allies')], [heal(16, 'allies'), { kind: 'cleanse', to: 'allies' }]], { rarity: 'epic', trait: { name: '奇跡の兆し', effect: { when: 'perfect', do: [focus(1)] } }, stat: 'per' }),
 
   // ===== 弓術士（弓。1体を狙い撃つ） =====

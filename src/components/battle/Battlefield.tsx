@@ -10,9 +10,9 @@ import { BALANCE, TIMING } from '../../data/balance';
 import { PLAYER_COLOR } from '../../data/theme';
 import { cardOf } from '../../data/cards';
 import { getEnemy, getEnemyAction } from '../../data/enemies';
-import { enemyName, findAlly, tierDamageAgainst, tierIndex, weaponRarity, sceneBackground } from '../../engine';
+import { enemyName, findAlly, weaponRarity, sceneBackground } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
-import { usePress } from '../../hooks/usePress';
+import { useDetail, usePress } from '../../hooks/usePress';
 import { speedFactor, useBattle, type UnitFx } from '../../store/battleStore';
 import type { AllyState, BattleState, EnemyState } from '../../types';
 import { intentView, type IntentPart } from '../format';
@@ -50,21 +50,25 @@ function TargetFace({ allyId }: { allyId?: string }) {
   const ally = useBattle((s) => (allyId ? findAlly(s.battle, allyId) : undefined));
   if (!ally) return null;
   return (
-    <span className="inline-block h-[22px] w-[22px] overflow-hidden rounded-full border-2 bg-[#1d2440] shadow-[0_0_6px_rgba(255,80,80,.8)]" style={{ borderColor: '#ff6a6a' }} data-intent-target={ally.id}>
+    <span className="inline-flex h-[22px] w-[22px] overflow-hidden rounded-full border-2 bg-[#1d2440] shadow-[0_0_6px_rgba(255,80,80,.8)]" style={{ borderColor: '#ff6a6a' }} data-intent-target={ally.id}>
       <CharacterArt classId={ally.classId} gender={ally.gender} face className="h-full w-full" />
     </span>
   );
 }
 
+function IntentTargetName({ id }: { id?: string }) {
+  const a = useBattle(s => s.battle.allies.find(a => a.id === id));
+  return a ? <span className="order-last w-full truncate text-center text-[12px]" data-intent-name>→{a.playerId}・{a.name}</span> : null;
+}
 function IntentPartView({ p }: { p: IntentPart }) {
   switch (p.kind) {
     case 'attack': {
       const el = p.element ? getElement(p.element) : undefined;
       const Icon = el ? (ELEMENT_ICONS[el.icon] ?? Swords) : Swords;
       return (
-        <span className="flex items-center gap-0.5 text-red-300" style={el ? { color: el.color } : undefined}>
+        <span className="flex max-w-full flex-wrap items-center justify-center gap-0.5 text-red-300" style={el ? { color: el.color } : undefined}>
           <Icon size={14} strokeWidth={2.6} />
-          <TargetFace allyId={p.targetId} />
+          <TargetFace allyId={p.targetId} /><IntentTargetName id={p.targetId} />
           <span className="tabular-nums">{p.hits > 1 ? `${p.damage}×${p.hits}` : p.damage}</span>
         </span>
       );
@@ -73,9 +77,9 @@ function IntentPartView({ p }: { p: IntentPart }) {
       const el = p.element ? getElement(p.element) : undefined;
       const Icon = el ? (ELEMENT_ICONS[el.icon] ?? Skull) : Skull;
       return (
-        <span className="flex items-center gap-0.5 text-red-300" style={el ? { color: el.color } : undefined}>
+        <span className="flex max-w-full flex-wrap items-center justify-center gap-0.5 text-red-300" style={el ? { color: el.color } : undefined}>
           <Icon size={14} strokeWidth={2.6} />
-          <span className="text-[12px]">全</span>
+          <span className="text-[12px]">味方全員</span>
           <span className="tabular-nums">{p.hits > 1 ? `${p.damage}×${p.hits}` : p.damage}</span>
         </span>
       );
@@ -93,7 +97,7 @@ function IntentPartView({ p }: { p: IntentPart }) {
       return (
         <span className="flex items-center gap-0.5" style={{ color: st.color }}>
           <st.Icon size={14} strokeWidth={2.6} />
-          {p.all ? <span className="text-[12px]">全</span> : <TargetFace allyId={p.targetId} />}
+          {p.all ? <span className="text-[12px]">味方全員</span> : <><TargetFace allyId={p.targetId} /><IntentTargetName id={p.targetId} /></>}
           <span className="tabular-nums">{p.amount}</span>
         </span>
       );
@@ -116,7 +120,7 @@ function IntentBubble({ enemy, onTap }: { enemy: EnemyState; onTap: () => void }
           initial={retargetKey ? { scale: 1.45 } : false}
           animate={{ scale: 1 }}
           transition={{ type: 'spring', stiffness: 500, damping: 18 }}
-          className="relative flex items-center gap-1 rounded-lg border border-red-300/50 bg-[#1c0a10]/90 px-1.5 py-0.5 text-[14px] leading-5 font-black whitespace-nowrap shadow-[0_2px_0_rgba(0,0,0,.6)]"
+          className="relative flex max-w-full flex-wrap items-center justify-center gap-1 rounded-lg border border-red-300/50 bg-[#1c0a10]/90 px-1.5 py-0.5 text-[14px] leading-5 font-black shadow-[0_2px_0_rgba(0,0,0,.6)]"
         >
           {view.parts.map((p, i) => (
             <IntentPartView key={i} p={p} />
@@ -163,15 +167,7 @@ const EnemyUnit = memo(function EnemyUnit({
   const targetable = !!card && (card.target === 'enemy' || aoe) && !enemy.dead;
   const isTarget = aoe || (targetable && selection?.targetId === enemy.uid);
   const waiting = targetable && !aoe && !selection?.targetId;
-  let prediction: string | null = null;
-  if (targetable && ally && card && card.tiers.some((t) => t.effects.some((e) => e.kind === 'damage'))) {
-    const dmg = tierDamageAgainst(ally, card, enemy).slice(tierIndex(card, selection!.focus)).filter((d) => d > 0);
-    if (dmg.length) {
-      const lo = Math.min(...dmg);
-      const hi = Math.max(...dmg);
-      prediction = lo === hi ? `${lo}` : `${lo}〜${hi}`;
-    }
-  }
+  const prediction = isTarget && ally && card ? '下の一覧へ' : null;
   const h = spriteH * (def.size ?? 1);
   const barW = Math.min(slotW - 6, 104);
 
@@ -276,7 +272,7 @@ function AimMarks({ battle, enemyUid }: { battle: BattleState; enemyUid: string 
   );
 }
 
-const AllySprite = memo(function AllySprite({ ally, left, bottom, h, active }: { ally: AllyState; left: number; bottom: number; h: number; active: boolean }) {
+const AllySprite = memo(function AllySprite({ ally, left, bottom, h, active, fieldW }: { fieldW: number; ally: AllyState; left: number; bottom: number; h: number; active: boolean }) {
   const scope = useUnitMotion(ally.id, 'ally');
   const setActive = useBattle((s) => s.setActive);
   const weapon = useBattle((s) => {
@@ -298,19 +294,21 @@ const AllySprite = memo(function AllySprite({ ally, left, bottom, h, active }: {
         </div>
       </div>
       {/* お供: 鳥は肩、小竜は浮く、それ以外は足元 */}
-      {ally.pet && !ally.dead && <AllyPet ownerId={ally.id} pet={ally.pet} h={h} />}
+      {ally.pet && !ally.dead && <AllyPet ownerId={ally.id} pet={ally.pet} h={h} spriteLeft={left - h * 0.4} fieldW={fieldW} />}
       <UnitPopups unitId={ally.id} top="5%" />
     </div>
   );
 });
 
-function AllyPet({ pet, h, ownerId }: { ownerId: string; pet: NonNullable<AllyState['pet']>; h: number }) {
+function AllyPet({ pet, h, ownerId, spriteLeft, fieldW }: { spriteLeft: number; fieldW: number; ownerId: string; pet: NonNullable<AllyState['pet']>; h: number }) {
   const perch = getPet(pet.petId).perch;
   const size = Math.round(h * (perch === 'feet' ? 0.3 : 0.24));
-  const pos = perch === 'shoulder' ? { right: '-2%', top: '20%' } : perch === 'float' ? { left: '-22%', top: '8%' } : { left: '-26%', bottom: '-2%' };
+  const preferred = perch === 'shoulder' ? h * 0.8 * 1.02 - 44 : -h * 0.8 * (perch === 'float' ? 0.22 : 0.26);
+  const left = Math.max(4 - spriteLeft, Math.min(preferred, fieldW - 48 - spriteLeft));
+  const pos = perch === 'feet' ? { left, bottom: '-2%' } : { left, top: perch === 'shoulder' ? '20%' : '8%' };
   return (
     <div className="pointer-events-none absolute" style={pos}>
-      <PetToken ownerId={ownerId} pet={pet} size={size} />
+      <button aria-label={`${pet.name}の詳細`} className="pointer-events-auto flex min-h-11 min-w-11 items-center justify-center" onClick={e => { e.stopPropagation(); useDetail.getState().show({ type: 'pet', allyId: ownerId }); }}><PetToken ownerId={ownerId} pet={pet} size={size} /></button>
     </div>
   );
 }
@@ -382,6 +380,7 @@ export function Battlefield() {
             <AllySprite
               key={a.id}
               ally={a}
+              fieldW={W}
               left={(allyAreaW / nA) * (i + 0.5) + (nA <= 2 ? W * 0.02 : 0)}
               bottom={6 + (nA >= 3 && i % 2 === 1 ? 8 : 0)}
               h={allyH}

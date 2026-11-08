@@ -63,7 +63,11 @@ export function TitleScreen() {
         </div>
       </div>
       <div className="relative flex flex-col gap-2.5 px-4 pt-2 pb-4">
-        <button onClick={() => setScreen('setup')} className="btn btn-gold font-display flex h-[60px] items-center justify-center gap-2 rounded-2xl text-[22px] tracking-wider">
+        <button onClick={() => {
+          if (game && !window.confirm('中断データがあります。新しく始めると現在の冒険データは上書きされますがよろしいですか？')) return;
+          if (game) useBattle.getState().abandonGame();
+          setScreen('setup');
+        }} className="btn btn-gold font-display flex h-[60px] items-center justify-center gap-2 rounded-2xl text-[22px] tracking-wider">
           <UserPlus size={24} /> 新しい冒険
         </button>
         {game && (

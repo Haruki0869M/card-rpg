@@ -527,7 +527,7 @@ export type GameCommand =
   /** 行商人の品物を買う（index を省くと店を閉じる） */
   | { type: 'PEDDLER_BUY'; playerId: PlayerId; heroId: string; kind?: 'item' | 'card'; index?: number }
   | { type: 'CLAIM_LOOT'; playerId: PlayerId; heroId: string; choice: 'need' | 'greed' | 'pass' }
-  | { type: 'OPEN_CHEST'; playerId: PlayerId; heroId: string; focusUsed: number }
+  | { type: 'OPEN_CHEST'; playerId: PlayerId; heroId: string; recipientId?: string; focusUsed: number }
   | { type: 'LEAVE_CHEST'; playerId: PlayerId }
   | { type: 'CHOOSE_EVENT'; playerId: PlayerId; optionIndex: number; heroId?: string; focusUsed: number }
   | { type: 'FINISH_EVENT'; playerId: PlayerId }
@@ -557,16 +557,16 @@ export type GameCommand =
   | { type: 'ENCOUNTER_CONTINUE'; playerId: PlayerId; participants: string[] }
   | { type: 'STORY_CONTINUE'; playerId: PlayerId }
   // ---------- 町・祠 ----------
-  | { type: 'TOWN_BUY'; playerId: PlayerId; kind: 'item' | 'card'; index: number }
-  | { type: 'TOWN_INN'; playerId: PlayerId }
+  | { type: 'TOWN_BUY'; playerId: PlayerId; heroId?: string; kind: 'item' | 'card'; index: number }
+  | { type: 'TOWN_INN'; playerId: PlayerId; heroId?: string }
   | { type: 'TOWN_REMOVE_CARD'; playerId: PlayerId; heroId: string; cardUid: string }
-  | { type: 'TOWN_SELL'; playerId: PlayerId; itemUid: string }
-  | { type: 'QUEST_ACCEPT'; playerId: PlayerId; questId: string }
-  | { type: 'QUEST_REPORT'; playerId: PlayerId; questId: string }
-  | { type: 'LEAVE_TOWN'; playerId: PlayerId }
+  | { type: 'TOWN_SELL'; playerId: PlayerId; heroId?: string; itemUid: string }
+  | { type: 'QUEST_ACCEPT'; playerId: PlayerId; heroId?: string; questId: string }
+  | { type: 'QUEST_REPORT'; playerId: PlayerId; heroId?: string; questId: string }
+  | { type: 'LEAVE_TOWN'; playerId: PlayerId; heroId?: string }
   | { type: 'SHRINE_CHOOSE'; playerId: PlayerId; optionIndex: number; heroId: string }
-  | { type: 'LEAVE_SHRINE'; playerId: PlayerId }
-  | { type: 'LEAVE_SANCTUARY'; playerId: PlayerId }
+  | { type: 'LEAVE_SHRINE'; playerId: PlayerId; heroId?: string }
+  | { type: 'LEAVE_SANCTUARY'; playerId: PlayerId; heroId?: string }
   /** 世界マップと別に進んでいる場面（ダンジョン）の中の操作 */
   | { type: 'SCENE'; scene: string; command: GameCommand }
   /** ダンジョンのパーティの手番: 探索力の判定（素早さ）/ 手番を終える */
@@ -577,6 +577,7 @@ export type GameCommand =
   /** 遭遇の戦闘に、自分のキャラを加える / 加えない（近くにいる、手番でない人のキャラ） */
   | { type: 'ENCOUNTER_JOIN'; playerId: PlayerId; heroId: string; join: boolean }
   /** 手番のキャラが、同じマスの他の人のキャラを同行に誘う / 誘われた人が答える */
+  | { type: 'WORLD_UNFOLLOW'; playerId: PlayerId; heroId: string }
   | { type: 'WORLD_INVITE'; playerId: PlayerId; heroId: string; targetId: string }
   | { type: 'WORLD_INVITE_ANSWER'; playerId: PlayerId; heroId: string; accept: boolean }
 

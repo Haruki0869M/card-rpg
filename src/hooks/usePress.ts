@@ -10,7 +10,9 @@ export type Detail =
   | { type: 'ally'; id: string }
   /** status: 状態異常のID、または 'taunt'（挑発） */
   | { type: 'status'; status: string; amount: number; side: 'ally' | 'enemy'; by?: string }
-  | { type: 'item'; itemId: string };
+  | { type: 'item'; itemId: string }
+  | { type: 'tokens'; allyId: string }
+  | { type: 'pet'; allyId: string };
 
 export const useDetail = create<{ detail: Detail | null; show: (d: Detail) => void; hide: () => void }>((set) => ({
   detail: null,

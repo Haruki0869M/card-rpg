@@ -41,7 +41,7 @@ export function makeCtx(
   rng: Rng,
   events: BattleEvent[],
   source: Unit,
-  opts: { target?: Unit; card?: CardDef; cardAbilities?: AbilityDef[]; dealt?: number; depth?: number; perfect?: boolean; tierEffects?: Effect[] } = {},
+  opts: { target?: Unit; allyTarget?: Unit; card?: CardDef; cardAbilities?: AbilityDef[]; dealt?: number; depth?: number; perfect?: boolean; tierEffects?: Effect[] } = {},
 ): EffectCtx {
   return {
     state,
@@ -49,6 +49,7 @@ export function makeCtx(
     events,
     source,
     target: opts.target,
+    allyTarget: opts.allyTarget,
     card: opts.card,
     cardAbilities: opts.cardAbilities,
     perfect: opts.perfect,
@@ -65,6 +66,8 @@ export function makeCtx(
 export function resolveTargets(ctx: EffectCtx, to: EffectTarget): Unit[] {
   const { state, source } = ctx;
   switch (to) {
+    case 'allyTarget':
+      return ctx.allyTarget && !ctx.allyTarget.dead ? [ctx.allyTarget] : [];
     case 'self':
       return source.dead ? [] : [source];
     case 'allies':
@@ -107,6 +110,7 @@ export function checkEffect(ctx: EffectCtx, e: Effect): string | null {
 
 const WHO: Record<EffectTarget, { ally: string; enemy: string }> = {
   target: { ally: '対象に', enemy: '対象に' },
+  allyTarget: { ally: '選んだ味方に', enemy: '選んだ敵に' },
   self: { ally: '自分に', enemy: '自分に' },
   allies: { ally: '味方全員に', enemy: '敵全員に' },
   otherAllies: { ally: '他の味方全員に', enemy: '他の敵全員に' },
@@ -119,7 +123,7 @@ const WHO: Record<EffectTarget, { ally: string; enemy: string }> = {
 /** 効果の説明文（side = 使う側。味方なら「敵全員に」、敵なら「味方全員に」） */
 export function describeEffect(e: Effect, side: 'ally' | 'enemy' = 'ally', card?: CardDef): string {
   const to = targetOf(e);
-  const who = to === 'target' && card?.target === 'allEnemies' ? WHO.foes[side] : WHO[to][side];
+  const who = to === 'target' && card?.target === 'allEnemies' ? WHO.foes[side] : to === 'target' && card && ['ally', 'otherAlly', 'fallenAlly'].includes(card.target) ? '選んだ味方に' : WHO[to][side];
   return effectHandler(e.kind).describe(e as never, who);
 }
 
@@ -221,7 +225,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   const r = absorb(dmg, mods.ignoreBlock ? 0 : v.block, v.hp);
   if (!mods.ignoreBlock) v.block = r.block;
   v.hp = r.hp;
-  events.push({ type: 'damage', unitId: unitIdOf(v), amount: r.hpLoss, blocked: r.blocked, sourceId: unitIdOf(source) });
+  events.push({ type: 'damage', unitId: unitIdOf(v), amount: r.hpLoss, rawAmount: dmg, blocked: r.blocked, sourceId: unitIdOf(source) });
   if (isEnemy(v)) state.stats.totalDamage += r.hpLoss;
   ctx.dealt += r.hpLoss;
   if (isEnemy(source) !== isEnemy(v) && !ctx.hitIds.includes(unitIdOf(v))) ctx.hitIds.push(unitIdOf(v));

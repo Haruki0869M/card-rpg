@@ -77,7 +77,7 @@ describe('移動と手番', () => {
     g = run(g, { type: 'STORY_CONTINUE', playerId: P });
     return g;
   }
-  it('移動力を判定 → 経路の移動力だけ減る。同行したキャラは一緒に動き、行動を終える', () => {
+  it('移動力を判定 → 経路の移動力だけ減る。同行したキャラは一緒に動き、自分の手番も持つ', () => {
     let g = started();
     g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0', focusUsed: 2 });
     const w = g.world!;
@@ -89,9 +89,11 @@ describe('移動と手番', () => {
     expect(g.world!.pos.h0).toBe(to);
     expect(g.world!.pos.h1).toBe(to);
     expect(g.world!.move).toBe(before - info.cost);
-    expect(g.world!.acted).toContain('h1');
-    // 待機 → 同行したキャラは行動済みなので、ワールドターンが進む
+    expect(g.world!.acted).not.toContain('h1');
+    // 運転者が待機すると同行者の手番。全員終わってからワールドターンが進む
     g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h0' });
+    expect(g.world!.turn).toBe('h1');
+    g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h1' });
     expect(g.world!.worldTurn).toBe(2);
     expect(g.world!.corruption).toBe(getDifficulty(g.difficulty).corruptionPerTurn ?? BALANCE.corruptionPerTurn);
     expect(g.world!.turn).toBe('h0');
@@ -226,7 +228,8 @@ describe('町・祠・依頼', () => {
     const n = h.deck.length;
     g = run(g, { type: 'TOWN_REMOVE_CARD', playerId: P, heroId: 'h0', cardUid: h.deck[0].uid });
     expect(findHero(g, 'h0')!.deck.length).toBe(n - 1);
-    // 町に入っていないキャラ（h1）のカードは消せない
+    // 滞在メンバーから外れたキャラのカードは消せない
+    g.town!.members = ['h0'];
     expect(applyGameCommand(g, { type: 'TOWN_REMOVE_CARD', playerId: P, heroId: 'h1', cardUid: findHero(g, 'h1')!.deck[0].uid }).error).toBeDefined();
     findHero(g, 'h0')!.stash.push({ uid: 'sx', itemId: 'steelSword' });
     const gold = findHero(g, 'h0')!.gold;

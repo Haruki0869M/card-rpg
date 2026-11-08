@@ -28,7 +28,7 @@ export function actorOf(game: GameState, cmd: GameCommand): PlayerId {
   const heroPlayer = (id?: string) => (id ? game.heroes.find((h) => h.id === id)?.playerId : undefined);
   const first = localPlayers ? myPlayer() : (game.heroes.find((h) => !h.retired)?.playerId ?? LOCAL_PLAYER);
   const c = cmd as Record<string, unknown>;
-  let id = (c.heroId ?? c.userId) as string | undefined;
+  let id = (c.heroId ?? c.userId ?? c.fromHeroId) as string | undefined;
   if (cmd.type === 'CHOOSE_GROWTH') id = game.reward?.levelUps[0]?.heroId;
   if (cmd.type === 'PICK_CARD' && cmd.offerIndex !== null) id = game.reward?.cardOffers[cmd.offerIndex]?.heroId;
   // オンライン協力: キャラを指さない操作（物語を進める・報酬を閉じるなど）は、押した人の操作

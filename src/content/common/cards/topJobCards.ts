@@ -2,7 +2,7 @@
 import type { AbilityDef, CardDef, CardCategory, CardTarget, Effect } from '../../../types';
 const d = (amount: number, element?: string, hits?: number): Effect => ({ kind: 'damage', amount, element, hits });
 const b = (amount: number, to: 'self' | 'allies' = 'self'): Effect => ({ kind: 'block', amount, to });
-const h = (amount: number, to: 'self' | 'allies' | 'lowestAlly' = 'lowestAlly'): Effect => ({ kind: 'heal', amount, to });
+const h = (amount: number, to: 'self' | 'allies' | 'lowestAlly' | 'target' | 'allyTarget' = 'lowestAlly'): Effect => ({ kind: 'heal', amount, to });
 const s = (status: string, amount: number, to: 'target' | 'self' | 'foes' | 'allies' = 'target'): Effect => ({ kind: 'applyStatus', status, amount, to });
 const f = (amount: number): Effect => ({ kind: 'gainFocus', amount });
 const m = (amount: number): Effect => ({ kind: 'gainMana', amount });
@@ -11,7 +11,7 @@ const summon = (id: string, name: string, icon: string, damage: number, turns: n
 const pierce: AbilityDef = { name: '貫通', effect: { modifier: 'ignoreBlock' } };
 const focusTrait: AbilityDef = { name: '研ぎ澄まし', effect: { when: 'perfect', do: [f(1)] } };
 const cursed: AbilityDef = { name: '深まる呪い', effect: { modifier: 'damageDealt', multiplier: 1, scale: { by: 'targetStatuses', per: 0.15, max: 0.6 } } };
-function c(id: string, name: string, category: CardCategory, cost: number, target: CardTarget, tiers: Effect[][], options: Partial<Pick<CardDef, 'trait' | 'rarity' | 'exhaust' | 'stat' | 'tags'>> = {}): CardDef {
+function c(id: string, name: string, category: CardCategory, cost: number, target: CardTarget, tiers: Effect[][], options: Partial<Pick<CardDef, 'trait' | 'rarity' | 'exhaust' | 'stat' | 'tags' | 'secondaryTarget'>> = {}): CardDef {
   return { id, name, category, cost, target, slots: tiers.length - 1, baseChance: cost >= 3 ? 55 : cost === 0 ? 85 : 70, tiers: tiers.map((effects, minSuccesses) => ({ minSuccesses, effects })), rarity: 'rare', ...options };
 }
 export const TOP_JOB_CARDS: CardDef[] = [
@@ -65,9 +65,9 @@ export const TOP_JOB_CARDS: CardDef[] = [
   c('jump', '跳躍', 'physical', 2, 'enemy', [[{ kind: 'jump', amount: 24 }], [{ kind: 'jump', amount: 32 }], [{ kind: 'jump', amount: 40 }]], { rarity: 'legend', exhaust: true, trait: { name: '空からの一撃', description: '1戦闘1回。次の敵フェーズの攻撃を避け、次のターンに着地して攻撃する', effect: { modifier: 'exhaust' } } }),
   // 教皇: 回復と浄化。
   c('papalBlessing', '大いなる祝福', 'magic', 2, 'self', [[h(4, 'allies')], [h(6, 'allies')], [h(8, 'allies')]], { stat: 'per' }),
-  c('papalLight', '教皇の聖光', 'magic', 2, 'enemy', [[d(5, 'holy')], [d(10, 'holy'), h(2)], [d(15, 'holy'), h(4)]], { rarity: 'epic', trait: focusTrait, stat: 'per' }),
+  c('papalLight', '教皇の聖光', 'magic', 2, 'enemy', [[d(5, 'holy')], [d(10, 'holy'), h(2, 'allyTarget')], [d(15, 'holy'), h(4, 'allyTarget')]], { secondaryTarget: 'ally', rarity: 'epic', trait: focusTrait, stat: 'per' }),
   c('papalSanctuary', '聖域', 'magic', 2, 'self', [[b(3, 'allies')], [b(5, 'allies'), h(2, 'allies')], [b(7, 'allies'), h(3, 'allies')]], { rarity: 'epic', trait: focusTrait, stat: 'per' }),
-  c('papalPrayer', '慈愛の祈り', 'magic', 1, 'self', [[h(3)], [h(6)], [h(9), { kind: 'cleanse', to: 'lowestAlly' }]], { stat: 'per' }),
+  c('papalPrayer', '慈愛の祈り', 'magic', 1, 'ally', [[h(3, 'target')], [h(6, 'target')], [h(9, 'target'), { kind: 'cleanse', to: 'target' }]], { stat: 'per' }),
   c('miracle', '奇跡', 'magic', 0, 'self', [[{ kind: 'fullRestore' }], [{ kind: 'fullRestore' }]], { rarity: 'legend', exhaust: true, trait: { name: 'ただ一度の奇跡', description: '1戦闘1回。成功数にかかわらず味方全員を全回復する', effect: { modifier: 'exhaust' } }, stat: 'per' }),
   // 弓聖: フォーカスを使った単体攻撃が必中。
   c('saintArrow', '天弓の一矢', 'physical', 2, 'enemy', [[d(6)], [d(12)], [d(19)]], { stat: 'per' }),

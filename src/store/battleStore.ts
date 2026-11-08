@@ -1,3 +1,5 @@
+import { cardTargets, isAllyCard, needsCardTarget, selectedCardTarget, targetGuide, secondaryCard, secondaryCardTarget } from '../engine/battle/targets';
+import { unitIdOf } from '../engine/battle/units';
 // ===== Zustand ストア =====
 // ロジックは src/engine（冒険: applyGameCommand / 戦闘: applyCommand）を呼ぶだけ。
 // ここでは画面の切り替え・UI 用の一時状態（選択中のカード・演出）・保存・敵フェーズのタイマーを扱う。
@@ -37,6 +39,7 @@ import { actorOf, autoName, battleActorOf, isLocalPlayer, LOCAL_PLAYER } from '.
 export interface Selection {
   cardUid: string;
   targetId?: string;
+  allyTargetId?: string;
   focus: number;
 }
 
@@ -126,7 +129,7 @@ interface StoreState {
   setActive: (id: string) => void;
   endTurn: () => void;
   /** 道具を使う（userId = 袋の持ち主。戦闘中は操作中のキャラ） */
-  usePouch: (itemUid: string, targetHeroId: string, userId?: string) => void;
+  usePouch: (itemUid: string, targetHeroId: string, userId?: string) => string | undefined;
   setSettings: (s: Partial<Settings>) => void;
   openSheet: (s: Sheet) => void;
   setConfirmAbandon: (v: boolean) => void;
@@ -563,7 +566,10 @@ export const useBattle = create<StoreState>((set, get) => {
       clearPresentation();
       if (enemyTimer) clearTimeout(enemyTimer);
       enemyTimer = null;
-      set({ worldMoves: [], full: null, scene: WORLD_SCENE, game: null, screen: 'title', confirmAbandon: false, sheet: null, battle: EMPTY_BATTLE, selection: null });
+      set({ worldMoves: [], activeId: '', draft: defaultDraft(), full: null, scene: WORLD_SCENE, game: null, screen: 'title', confirmAbandon: false, sheet: null, battle: EMPTY_BATTLE, selection: null });
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = null;
+      enemyInFlight = false;
       writeSave({ full: null, activeId: '' });
     },
 
@@ -638,7 +644,7 @@ export const useBattle = create<StoreState>((set, get) => {
       const inst = ally.hand.find((c) => c.uid === cardUid);
       if (!inst) return;
       if (selection?.cardUid === cardUid) {
-        get().confirm();
+        get().cancel();
         return;
       }
       const card = cardOf(inst);
@@ -652,7 +658,13 @@ export const useBattle = create<StoreState>((set, get) => {
         const alive = battle.enemies.filter((e) => !e.dead);
         if (alive.length === 1) targetId = alive[0].uid;
       }
-      set({ selection: { cardUid, targetId, focus: 0 }, flash: null });
+      if (isAllyCard(card)) {
+        const choices = cardTargets(battle, ally, card);
+        choices.sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp);
+        if (choices[0]) targetId = unitIdOf(choices[0]);
+      }
+      const allyTargetId = card.secondaryTarget ? cardTargets(battle, ally, secondaryCard(card)).sort((a,b) => a.hp/a.maxHp-b.hp/b.maxHp).map(unitIdOf)[0] : undefined;
+      set({ selection: { cardUid, targetId, allyTargetId, focus: 0 }, flash: null });
     },
 
     tapEnemy: (uid) => {
@@ -686,8 +698,8 @@ export const useBattle = create<StoreState>((set, get) => {
       const inst = ally?.hand.find((c) => c.uid === selection.cardUid);
       if (!inst) return set({ selection: null });
       const card = cardOf(inst);
-      if (card.target === 'enemy' && !selection.targetId) {
-        set({ flash: { cardUid: selection.cardUid, text: '敵をタップして対象を選んでください', id: fxId++ } });
+      if (needsCardTarget(card) && (!ally || !selectedCardTarget(battle, ally, card, selection.targetId))) {
+        set({ flash: { cardUid: selection.cardUid, text: targetGuide(card), id: fxId++ } });
         return;
       }
       const err = get().dispatch({
@@ -695,7 +707,8 @@ export const useBattle = create<StoreState>((set, get) => {
         playerId: LOCAL_PLAYER,
         characterId: activeId,
         cardInstanceId: selection.cardUid,
-        targetId: card.target === 'enemy' ? selection.targetId : undefined,
+        targetId: needsCardTarget(card) ? selection.targetId : undefined,
+        allyTargetId: selection.allyTargetId,
         focusUsed: selection.focus,
       });
       if (err) set({ flash: { cardUid: selection.cardUid, text: err, id: fxId++ } });
@@ -707,7 +720,7 @@ export const useBattle = create<StoreState>((set, get) => {
       if (!selection || battle.slotPreview) return;
       const ally = findAlly(battle, activeId), inst = ally?.hand.find(c => c.uid === selection.cardUid);
       if (!ally || !inst) return;
-      const err = get().dispatch({ type: 'PREVIEW_CARD', playerId: LOCAL_PLAYER, characterId: activeId, cardInstanceId: selection.cardUid, targetId: selection.targetId, focusUsed: selection.focus });
+      const err = get().dispatch({ type: 'PREVIEW_CARD', playerId: LOCAL_PLAYER, characterId: activeId, cardInstanceId: selection.cardUid, targetId: selection.targetId, allyTargetId: selection.allyTargetId, focusUsed: selection.focus });
       if (err) set({ flash: { cardUid: selection.cardUid, text: err, id: fxId++ } });
       else set({ selection: null });
     },
@@ -717,6 +730,16 @@ export const useBattle = create<StoreState>((set, get) => {
     },
 
     setActive: (id) => {
+      const { selection, battle, activeId } = get();
+      const source = findAlly(battle, activeId);
+      const inst = source?.hand.find(c => c.uid === selection?.cardUid);
+      if (selection && source && inst && (isAllyCard(cardOf(inst)) || cardOf(inst).secondaryTarget)) {
+        const card = cardOf(inst);
+        if (card.secondaryTarget && secondaryCardTarget(battle, source, card, id)) set({ selection: { ...selection, allyTargetId: id } });
+        else if (!card.secondaryTarget && selectedCardTarget(battle, source, card, id)) set({ selection: { ...selection, targetId: id } });
+        else get().showToast(targetGuide(card.secondaryTarget ? secondaryCard(card) : card));
+        return;
+      }
       const ally = findAlly(get().battle, id);
       if (!ally || ally.dead || !isLocalPlayer(ally.playerId)) return;
       if (get().activeId === id && !get().selection) return;
@@ -742,7 +765,8 @@ export const useBattle = create<StoreState>((set, get) => {
       if (!game) return;
       const user = game.mode === 'battle' ? activeId : (userId ?? game.heroes.find((h) => h.pouch.some((p) => p.uid === itemUid))?.id ?? targetHeroId);
       const err = get().dispatchGame({ type: 'USE_POUCH_ITEM', playerId: LOCAL_PLAYER, itemUid, userId: user, targetId: targetHeroId });
-      if (!err) set({ sheet: null });
+      if (!err) { set({ sheet: null }); get().showToast('道具を使いました'); }
+      return err;
     },
 
     setSettings: (s) => {

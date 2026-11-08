@@ -72,14 +72,15 @@ export function EventScreen() {
   const def = EVENTS.get(ev.eventId);
   const [chosen, setChosen] = useState<number | null>(null);
   const opt = chosen !== null ? def.options[chosen] : undefined;
-  const [heroId, setHeroId] = useState(sceneHeroes(game)[0].id);
+  const candidates = sceneHeroes(game).filter(h => !game.world || game.activeScene || ev.tile === undefined || h.id === game.world.turn);
+  const [heroId, setHeroId] = useState(candidates[0].id);
   const [focus, setFocus] = useState(0);
 
   const choose = (i: number) => {
     const o = def.options[i];
     if (o.check) {
       setChosen(i);
-      setHeroId(bestHero(sceneHeroes(game), (h) => statChance(h, o.check!.stat, o.check!.tag, true)));
+      setHeroId(bestHero(candidates, (h) => statChance(h, o.check!.stat, o.check!.tag, true)));
       setFocus(0);
     } else dispatchGame({ type: 'CHOOSE_EVENT', playerId: LOCAL_PLAYER, optionIndex: i, focusUsed: 0 });
   };
@@ -88,7 +89,7 @@ export function EventScreen() {
   const optionChance = (i: number) => {
     const c = def.options[i].check;
     if (!c) return null;
-    const heroes = sceneHeroes(game);
+    const heroes = candidates;
     const h = heroes.find((x) => x.id === bestHero(heroes, (y) => statChance(y, c.stat, c.tag, true)))!;
     const dist = successDistribution(c.slots, 0, statChance(h, c.stat, c.tag, true));
     const p = dist.slice(c.need).reduce((n, x) => n + x, 0);
@@ -188,7 +189,7 @@ export function EventScreen() {
               <>
                 <div className="font-display mb-1 text-[16px] text-amber-100">「{opt.label}」</div>
                 <CheckPanel
-                  heroes={sceneHeroes(game)}
+                  heroes={candidates}
                   heroId={heroId}
                   setHeroId={setHeroId}
                   focus={focus}

@@ -18,7 +18,7 @@ export type Affinity = Record<CardCategory, number> & { byStat?: Partial<Record<
 
 // ---------- カード ----------
 
-export type CardTarget = 'enemy' | 'self' | 'allEnemies';
+export type CardTarget = 'enemy' | 'self' | 'allEnemies' | 'ally' | 'otherAlly' | 'fallenAlly';
 
 // ---------- 属性（spec §14。火・氷・雷・毒・闇・聖 など） ----------
 
@@ -43,7 +43,7 @@ export interface ElementDef {
  * target = 選んだ対象（カードの対象の敵 / 敵の行動の対象の味方 / アイテムを使う相手。全体カードなら相手全員）
  * self = 自分 / allies = 自分の側の全員 / otherAllies = 自分以外の自分の側 / foes = 相手の側の全員 / randomFoe = 相手からランダムに1人
  */
-export type EffectTarget = 'target' | 'self' | 'allies' | 'otherAllies' | 'foes' | 'randomFoe' | 'lowestAlly' | 'randomAlly';
+export type EffectTarget = 'target' | 'self' | 'allies' | 'otherAllies' | 'foes' | 'randomFoe' | 'lowestAlly' | 'randomAlly' | 'allyTarget';
 
 /**
  * 効果の種類ごとの数値。効果のファイル（src/engine/battle/effects/）が declare module でここに種類を足す。
@@ -73,6 +73,8 @@ export interface CardDef {
   /** 基礎成功率（%） */
   baseChance: number;
   target: CardTarget;
+  /** 攻撃と単体支援を組み合わせるカードの、別に選ぶ味方。 */
+  secondaryTarget?: 'ally' | 'otherAlly' | 'fallenAlly';
   /** minSuccesses 昇順 */
   tiers: CardTier[];
   /** 報酬・宝箱での出やすさの格（未指定はコモン扱い） */
@@ -594,7 +596,7 @@ export interface BattleSetup {
 
 // ===== コマンド（シリアライズ可能・オンライン協力で同期する単位） =====
 export type Command =
-  | { type: 'PREVIEW_CARD'; playerId: PlayerId; characterId: string; cardInstanceId: string; targetId?: string; focusUsed: number }
+  | { type: 'PREVIEW_CARD'; playerId: PlayerId; characterId: string; cardInstanceId: string; targetId?: string; allyTargetId?: string; focusUsed: number }
   | { type: 'REROLL_PREVIEW'; playerId: PlayerId; characterId: string }
   | { type: 'CONFIRM_PREVIEW'; playerId: PlayerId; characterId: string }
   | {
@@ -603,6 +605,7 @@ export type Command =
       characterId: string;
       cardInstanceId: string;
       targetId?: string;
+      allyTargetId?: string;
       focusUsed: number;
     }
   | { type: 'END_TURN'; playerId: PlayerId }
@@ -619,6 +622,7 @@ export interface SlotPreview {
   characterId: string;
   cardInstanceId: string;
   targetId?: string;
+  allyTargetId?: string;
   focusUsed: number;
   chance: number;
   results: SlotResult[];
@@ -639,7 +643,7 @@ export type BattleEvent =
       perfect: boolean;
       summary: string;
     }
-  | { type: 'damage'; unitId: string; amount: number; blocked: number; sourceId?: string }
+  | { type: 'damage'; unitId: string; amount: number; rawAmount?: number; blocked: number; sourceId?: string }
   | { type: 'resource'; unitId: string; resource: 'focus' | 'mana'; amount: number }
   | { type: 'block'; unitId: string; amount: number }
   | { type: 'status'; unitId: string; status: StatusId; amount: number }

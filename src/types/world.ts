@@ -65,7 +65,7 @@ export interface SanctuaryDef {
   progress: number;
 }
 
-export interface SanctuaryVisit {
+export interface SanctuaryVisit extends FacilityVisit {
   sanctuaryId: string;
   tile: number;
   heroId: string;
@@ -248,11 +248,15 @@ export interface EncounterState {
 }
 
 /** 町・祠の中にいる時 */
-export interface TownVisit {
+export interface FacilityVisit {
+  members?: string[];
+  finished?: string[];
+}
+export interface TownVisit extends FacilityVisit {
   townId: string;
   heroId: string;
 }
-export interface ShrineVisit {
+export interface ShrineVisit extends FacilityVisit {
   shrineId: string;
   tile: number;
   heroId: string;

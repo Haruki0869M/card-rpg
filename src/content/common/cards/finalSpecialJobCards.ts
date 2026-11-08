@@ -4,7 +4,7 @@ import type { AbilityDef, CardDef, CardCategory, CardTarget, Effect } from '../.
 const v = BALANCE.specialJobs;
 const d = (amount: number, element?: string): Effect => ({ kind: 'damage', amount, element });
 const b = (amount: number, to: 'self' | 'allies' = 'self'): Effect => ({ kind: 'block', amount, to });
-const h = (amount: number, to: 'allies' | 'lowestAlly' = 'lowestAlly'): Effect => ({ kind: 'heal', amount, to });
+const h = (amount: number, to: 'allies' | 'lowestAlly' | 'target' = 'lowestAlly'): Effect => ({ kind: 'heal', amount, to });
 const f = (amount: number, to: 'self' | 'allies' | 'otherAllies' = 'self'): Effect => ({ kind: 'gainFocus', amount, to });
 const draw = (amount: number): Effect => ({ kind: 'draw', amount });
 const song = (): Effect => ({ kind: 'applyStatus', status: 'songInspired', amount: 1, to: 'allies' });
@@ -18,7 +18,7 @@ function c(id: string, name: string, category: CardCategory, cost: number, targe
     tiers: tiers.map((effects, minSuccesses) => ({ minSuccesses, effects })), ...options };
 }
 export const FINAL_SPECIAL_CARDS: CardDef[] = [
-  c('maidenHeal', '癒やしの祝詞', 'magic', 1, 'self', [[h(3)], [h(6)], [h(9)]], { stat: 'per' }),
+  c('maidenHeal', '癒やしの祝詞', 'magic', 1, 'ally', [[h(3, 'target')], [h(6, 'target')], [h(9, 'target')]], { stat: 'per' }),
   c('maidenPurify', '清めの鈴', 'magic', 1, 'self', [[{ kind: 'reduceStatus', amount: 1, statuses: ['weak', 'vulnerable'], to: 'allies' }], [{ kind: 'cleanse', to: 'allies' }], [{ kind: 'cleanse', to: 'allies' }, h(2, 'allies')]], { stat: 'per', rarity: 'epic', trait: focus }),
   c('maidenWard', '守りの御札', 'skill', 1, 'self', [[b(2, 'allies')], [b(3, 'allies')], [b(5, 'allies')]], { stat: 'per' }),
   c('maidenFocus', '鎮めの祈り', 'skill', 0, 'self', [[f(1)], [f(2)]], { stat: 'per' }),

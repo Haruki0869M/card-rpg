@@ -1,3 +1,4 @@
+import { facilityMembers, facilityVisit } from './world/facilities';
 // ===== 転職（spec §6.4） =====
 // 段は 基本 → 中位 → 最上位。中位からは、条件を満たすと特殊ジョブ（脇道）にも転職できる。
 // 転職するとLv1に戻る。成長ボーナス・山札・装備は引き継ぎ、前のジョブの戦闘の特殊能力を1つ持ち越す。
@@ -46,14 +47,14 @@ export function heroPlace(game: GameState, hero: Hero): HeroPlace {
   switch (game.mode) {
     case 'sanctuary': {
       const s = game.sanctuary, w = game.world;
-      if (!s || !w || w.pos[hero.id] !== s.tile || !(game.party ?? []).includes(hero.id)) return 'map';
+      if (!s || !w || s.finished?.includes(hero.id) || w.pos[hero.id] !== s.tile || !(game.party ?? []).includes(hero.id)) return 'map';
       const def = SANCTUARIES.tryGet(s.sanctuaryId), feature = w.tiles[s.tile]?.f;
       return def && feature?.id === def.id && feature.kind === def.kind ? def.kind : 'busy';
     }
     case 'town':
-      return game.town?.heroId === hero.id ? 'town' : 'map';
+      return facilityMembers(game).includes(hero.id) && !facilityVisit(game)?.finished?.includes(hero.id) ? 'town' : 'map';
     case 'shrine':
-      return game.shrine?.heroId === hero.id ? 'shrine' : 'map';
+      return facilityMembers(game).includes(hero.id) && !facilityVisit(game)?.finished?.includes(hero.id) ? 'shrine' : 'map';
     case 'world':
       return 'map';
     case 'hub':

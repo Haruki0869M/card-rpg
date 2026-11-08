@@ -1,3 +1,4 @@
+import { cardTargets, isAllyCard, needsCardTarget, selectedCardTarget, secondaryCardTarget } from './targets';
 // ===== 戦闘エンジン（Reactに依存しない純粋関数） =====
 // applyCommand(state, command) => { state, events }
 // 入力の state は変更しない（内部で複製してから書き換える）。
@@ -35,11 +36,11 @@ import { recordSupport, supportSnapshot } from './support';
 import { afterAttackCard, attackElement, cardHpCost, chargedMultiplier, tierHpCost } from './cardState';
 import { slotPreviewLimitOf } from './preview';
 import { activeStatuses, actionFailChanceOf, applyTick, chancePenaltyOf, consumeStatus, decayStatuses, emptyStatuses, skipActionStatus, takeManaPenalty, tickHealOf } from './statuses';
-import { abilityTriggered, addLog, enemyName, findAlly, findEnemy, healUnit, loseHp, nameOf, unitIdOf } from './units';
+import { abilityTriggered, addLog, enemyName, findAlly, healUnit, loseHp, nameOf, unitIdOf } from './units';
 
 export { enemyName, findAlly, findEnemy, unitName } from './units';
 
-export const STATE_VERSION = 13;
+export const STATE_VERSION = 14;
 export { slotPreviewLimitOf } from './preview';
 
 // ---------- 生成 ----------
@@ -199,6 +200,7 @@ export function unusableReason(state: BattleState, ally: AllyState, card: CardDe
   if (ally.exhaustedCards?.includes(card.id)) return 'この戦闘ではもう使いました';
   if (ally.mana < card.cost) return 'マナが足りません';
   if (ally.hp <= cardHpCost(card)) return 'HPを払うと戦闘不能になります';
+  if (needsCardTarget(card) && !cardTargets(state, ally, card).length) return '対象がいません';
   if ((card.target === 'enemy' || card.target === 'allEnemies') && !state.enemies.some((e) => !e.dead)) return '対象がいません';
   return null;
 }
@@ -334,7 +336,7 @@ export function applyCommand(input: BattleState, cmd: Command): CommandResult {
         else p.rerolled = true;
       } else {
         delete state.slotPreview;
-        error = playCard(state, { type: 'PLAY_CARD', playerId: a.playerId, characterId: a.id, cardInstanceId: p.cardInstanceId, targetId: p.targetId, focusUsed: p.focusUsed }, rng, events,
+        error = playCard(state, { type: 'PLAY_CARD', playerId: a.playerId, characterId: a.id, cardInstanceId: p.cardInstanceId, targetId: p.targetId, allyTargetId: p.allyTargetId, focusUsed: p.focusUsed }, rng, events,
           { chance: p.chance, results: p.rerolled ? p.rerollResults : p.results });
       }
       break;
@@ -391,17 +393,18 @@ function reserveCard(state: BattleState, cmd: Extract<Command, { type: 'PREVIEW_
   const card = cardOf(inst), reason = unusableReason(state, ally, card);
   if (reason) return reason;
   if (!Number.isInteger(cmd.focusUsed) || cmd.focusUsed < 0 || cmd.focusUsed > Math.min(card.slots, ally.focus)) return 'フォーカスの数が不正です';
-  if (card.target === 'enemy' && !state.enemies.some(e => !e.dead && e.uid === cmd.targetId)) return '対象を選んでください';
+  if (needsCardTarget(card) && !selectedCardTarget(state, ally, card, cmd.targetId)) return '対象を選んでください';
+  if (card.secondaryTarget && !secondaryCardTarget(state, ally, card, cmd.allyTargetId)) return '回復・支援する味方を選んでください';
   const chance = rollChanceFor(ally, card, cmd.focusUsed);
   const results = rollSlots(card.slots, cmd.focusUsed, chance, rng);
   const rerollResults = rollSlots(card.slots, cmd.focusUsed, chance, rng);
-  state.slotPreview = { characterId: ally.id, cardInstanceId: inst.uid, targetId: card.target === 'enemy' ? cmd.targetId : undefined, focusUsed: cmd.focusUsed, chance, results, rerollResults, rerolled: false };
+  state.slotPreview = { allyTargetId: cmd.allyTargetId, characterId: ally.id, cardInstanceId: inst.uid, targetId: needsCardTarget(card) ? cmd.targetId : undefined, focusUsed: cmd.focusUsed, chance, results, rerollResults, rerolled: false };
   ally.slotPreviewUsed = (ally.slotPreviewUsed ?? 0) + 1;
   if (state.ready) state.ready = state.ready.filter(p => p !== ally.playerId);
   return undefined;
 }
 
-function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' }>, rng: Rng, events: BattleEvent[], reserved?: { chance: number; results: SlotResult[] }): string | undefined {
+function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' }>, rng: Rng, events: BattleEvent[], reserved?: { chance: number; results: SlotResult[]; card?: CardDef }): string | undefined {
   const ally = findAlly(state, cmd.characterId);
   if (!ally) return 'キャラが見つかりません';
   if (ally.playerId !== cmd.playerId) return '担当していないキャラです';
@@ -411,17 +414,17 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   const idx = ally.hand.findIndex((c) => c.uid === cmd.cardInstanceId);
   if (idx < 0) return '手札にありません';
   const inst = ally.hand[idx];
-  const card = cardOf(inst);
+  const card = reserved?.card ?? cardOf(inst);
   const reason = unusableReason(state, ally, card);
   if (reason) return reason;
   const focusUsed = cmd.focusUsed;
   if (!Number.isInteger(focusUsed) || focusUsed < 0 || focusUsed > Math.min(card.slots, ally.focus)) return 'フォーカスの数が不正です';
 
-  let target: EnemyState | undefined;
-  if (card.target === 'enemy') {
-    target = cmd.targetId ? findEnemy(state, cmd.targetId) : undefined;
-    if (!target || target.dead) return '対象を選んでください';
-  }
+  const target = selectedCardTarget(state, ally, card, cmd.targetId);
+  if (needsCardTarget(card) && !target) return '対象を選び直してください';
+
+  const allyTarget = secondaryCardTarget(state, ally, card, cmd.allyTargetId);
+  if (card.secondaryTarget && !allyTarget) return '回復・支援する味方を選び直してください';
 
   // 支払い
   ally.mana -= card.cost;
@@ -445,15 +448,15 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
     if (perfect) add('perfects');
     if (successes > 0) add(`success:${card.category}`);
     if (successes > 0 && card.tiers.some(t => t.effects.some(e => e.kind === 'heal'))) add('success:heal');
-    if (card.target === 'self' && card.tiers.some((t) => t.effects.some((e) => e.kind === 'block' || e.kind === 'heal' || e.kind === 'applyStatus'))) add('support');
+    if ((card.target === 'self' || isAllyCard(card)) && card.tiers.some((t) => t.effects.some((e) => e.kind === 'block' || e.kind === 'heal' || e.kind === 'applyStatus'))) add('support');
   }
   const tier = selectTier(card, successes);
   const supportBefore = supportSnapshot(state.allies, ally);
 
   // 効果（効果の部品を順に使う）
   const cardAbilities = card.trait ? [card.trait] : undefined;
-  const ctx = makeCtx(state, rng, events, ally, { target, card, cardAbilities, perfect, tierEffects: tier.effects });
-  if (target && tier.effects.some(e => e.kind === 'damage')) ally.lastTargetId = target.uid;
+  const ctx = makeCtx(state, rng, events, ally, { target, allyTarget, card, cardAbilities, perfect, tierEffects: tier.effects });
+  if (target && tier.effects.some(e => e.kind === 'damage')) ally.lastTargetId = unitIdOf(target);
   for (const eff of tier.effects) applyEffect(ctx, eff);
   const supportedOthers = recordSupport(ally, state.allies, supportBefore);
   const parts = ctx.parts;
@@ -463,7 +466,7 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   for (const n of ctx.fired) abilityTriggered(state, ally.id, n.name, events, n.source);
 
   // きっかけ: カードの特殊能力 → 自分の能力（カードを使った後 → 完全成功時）
-  const fireOpts = { card, target, dealt: ctx.dealt, focusUsed, tierEffects: tier.effects, perfect, successes, supportedOthers };
+  const fireOpts = { card, target, allyTarget, dealt: ctx.dealt, focusUsed, tierEffects: tier.effects, perfect, successes, supportedOthers };
   if (cardAbilities) {
     parts.push(...fireAbilities(state, rng, events, ally, 'afterCard', { ...fireOpts, list: cardAbilities }));
     if (perfect) parts.push(...fireAbilities(state, rng, events, ally, 'perfect', { ...fireOpts, list: cardAbilities }));
@@ -492,16 +495,63 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
 
   const resultLabel = perfect ? '完全成功' : `${successes}成功`;
   const summary = `${resultLabel}！ ${parts.join(' ')}`;
-  const targetText = card.target === 'allEnemies' ? ' → 敵全体' : target ? ` → ${enemyName(target)}` : '';
+  const targetText = card.target === 'allEnemies' ? ' → 敵全体' : target ? ` → ${nameOf(target)}` : '';
   addLog(
     state,
     `${ally.name} ${card.name}${targetText} 成功率${chance}%${focusUsed ? `（🌟${focusUsed}）` : ''} → ${results
       .map((r) => SLOT_ICON[r])
       .join('')} = ${resultLabel}：${parts.join(' ')}`,
   );
-  events.unshift({ type: 'roll', characterId: ally.id, cardId: card.id, targetId: target?.uid, chance, results, successes, perfect, summary });
+  events.unshift({ type: 'roll', characterId: ally.id, cardId: card.id, targetId: target ? unitIdOf(target) : undefined, chance, results, successes, perfect, summary });
   checkEnd(state, events);
   return undefined;
+}
+
+/** 実際のカード処理を複製上で試す。元の状態・乱数・予約は一切進めない。抽選を伴う値は目安として示す。 */
+export function predictCard(state: BattleState, characterId: string, cardInstanceId: string, targetId: string | undefined, focusUsed: number, tier: number, allyTargetId?: string) {
+  const original = findAlly(state, characterId), inst = original?.hand.find(c => c.uid === cardInstanceId);
+  if (!original || !inst) return [];
+  const card = cardOf(inst);
+  const success = card.tiers[tier]?.minSuccesses;
+  if (success === undefined) return [];
+  const samples: BattleEvent[][] = [];
+  for (const high of [false, true]) {
+    const copy = structuredClone(state), a = findAlly(copy, characterId)!;
+    delete copy.slotPreview;
+    const modified = structuredClone(card);
+    for (const t of modified.tiers) for (const e of t.effects) if (e.kind === 'damage' && e.outcomes?.length) {
+      e.outcomes = [{ weight: 1, multiplier: (high ? Math.max : Math.min)(...e.outcomes.map(o => o.multiplier)) }];
+    }
+    const rng = createRng(state.rngState);
+    if (!state.slotPreview) rollSlots(card.slots, focusUsed, rollChanceFor(a, card, focusUsed), rng);
+    const results: SlotResult[] = Array.from({ length: card.slots }, (_, i) => i < success ? 'hit' : 'miss');
+    const events: BattleEvent[] = [];
+    const error = playCard(copy, { type: 'PLAY_CARD', playerId: a.playerId, characterId, cardInstanceId, targetId, allyTargetId, focusUsed }, rng, events, { chance: rollChanceFor(a, card, focusUsed), results, card: modified });
+    if (error) return [];
+    samples.push(events);
+  }
+  const ids = [...new Set(samples.flat().flatMap(e => 'unitId' in e ? [e.unitId] : []))];
+  return ids.flatMap(id => {
+    const totals = samples.map(events => {
+      let damage = 0, hpLoss = 0, heal = 0, block = 0, hits = 0;
+      for (const e of events) {
+        if (!('unitId' in e) || e.unitId !== id) continue;
+        if (e.type === 'damage') { damage += e.rawAmount ?? (e.amount + e.blocked); hpLoss += e.amount; hits++; }
+        if (e.type === 'heal') heal += e.amount;
+        if (e.type === 'block') block += e.amount;
+      }
+      return { damage, hpLoss, heal, block, hits };
+    });
+    const range = (k: keyof typeof totals[0]) => {
+      const lo = Math.min(...totals.map(t => t[k])), hi = Math.max(...totals.map(t => t[k]));
+      return lo === hi ? `${lo}` : `${lo}〜${hi}`;
+    };
+    const parts: string[] = [];
+    if (totals.some(t => t.damage || t.hits)) parts.push(`ダメージ${range('damage')}（${range('hits')}回・HP減少${range('hpLoss')}）`);
+    if (totals.some(t => t.heal)) parts.push(`HP回復${range('heal')}`);
+    if (totals.some(t => t.block)) parts.push(`ブロック+${range('block')}`);
+    return parts.length ? [{ id, text: parts.join('・') }] : [];
+  });
 }
 
 /** 呼び出したお供（幻獣・獣など）の攻撃。ターン終了時にランダムな敵へ。残りターンが0になったら帰る */
@@ -528,7 +578,7 @@ function useItem(state: BattleState, cmd: Extract<Command, { type: 'USE_ITEM' }>
   if (!user || user.dead) return '使うキャラが戦闘不能です';
   if (user.playerId !== cmd.playerId) return '担当していないキャラです';
   const target = findAlly(state, cmd.targetId);
-  if (!target || target.dead) return '対象が戦闘不能です';
+  if (!target || (cmd.effects.some(e => e.kind === 'revive') ? !target.dead : target.dead)) return '道具の対象を選び直してください';
   const ctx = makeCtx(state, rng, events, user, { target });
   for (const e of cmd.effects) {
     const why = checkEffect(ctx, e);

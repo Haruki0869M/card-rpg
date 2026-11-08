@@ -199,8 +199,9 @@ export function ChestScreen() {
   const chest = game.chest!;
   const locked = !chest.unlocked;
   const look = chest.spec.rarity;
-  const [heroId, setHeroId] = useState(() => bestHero(sceneHeroes(game), (h) => statChance(h, locked ? 'dex' : 'luk')));
+  const [heroId, setHeroId] = useState(() => (!game.activeScene && game.world?.turn) || bestHero(sceneHeroes(game), (h) => statChance(h, locked ? 'dex' : 'luk')));
   const [focus, setFocus] = useState(0);
+  const [recipientId, setRecipientId] = useState<string>();
   const opened = !!chest.contents;
   const roll = chest.lastRoll?.kind === 'luck' ? chest.lastRoll : undefined;
   const grade: Rarity = chest.grade ?? roll?.grade ?? look;
@@ -287,6 +288,7 @@ export function ChestScreen() {
             </div>
           )}
 
+          {!opened && <label className="flex items-center gap-2 text-[13px]">報酬を受け取る人<select aria-label="報酬を受け取る人" value={recipientId ?? heroId} onChange={e => setRecipientId(e.target.value)} className="min-h-11 max-w-[180px] rounded bg-zinc-900 px-2 text-[13px]">{sceneHeroes(game).map(h => <option key={h.id} value={h.id}>{h.playerId}・{h.name}</option>)}</select></label>}
           {/* 宝箱 */}
           <motion.div
             animate={reach || step?.kind === 'premium' ? { y: -14, scale: 1.12 } : showResult ? { y: 0, scale: [0.85, 1.15, 1] } : { y: 0, scale: 1 }}
@@ -428,7 +430,7 @@ export function ChestScreen() {
         ) : !opened ? (
           <>
             <CheckPanel
-              heroes={sceneHeroes(game)}
+              heroes={sceneHeroes(game).filter(h => !game.world || game.activeScene || chest.tile === undefined || h.id === game.world.turn)}
               heroId={heroId}
               setHeroId={setHeroId}
               focus={focus}
@@ -448,7 +450,7 @@ export function ChestScreen() {
               <button
                 onClick={() => {
                   if (!locked) pendingOpen.current = true;
-                  dispatchGame({ type: 'OPEN_CHEST', playerId: LOCAL_PLAYER, heroId, focusUsed: focus });
+                  dispatchGame({ type: 'OPEN_CHEST', playerId: LOCAL_PLAYER, heroId, recipientId: recipientId ?? heroId, focusUsed: focus });
                   setFocus(0);
                 }}
                 className="btn btn-gold font-display h-12 rounded-xl text-[18px]"

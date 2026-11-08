@@ -152,7 +152,7 @@ export function fireAbilities(
   events: BattleEvent[],
   owner: Unit,
   when: AbilityTrigger,
-  opts: { card?: CardDef; target?: Unit; dealt?: number; list?: AbilityDef[]; depth?: number; focusUsed?: number; tierEffects?: Effect[]; perfect?: boolean; successes?: number; supportedOthers?: boolean } = {},
+  opts: { card?: CardDef; target?: Unit; allyTarget?: Unit; dealt?: number; list?: AbilityDef[]; depth?: number; focusUsed?: number; tierEffects?: Effect[]; perfect?: boolean; successes?: number; supportedOthers?: boolean } = {},
 ): string[] {
   const out: string[] = [];
   if (owner.dead && when !== 'hurt' && !(when === 'allyDown' && opts.target === owner)) return out;
@@ -160,7 +160,7 @@ export function fireAbilities(
     const e = ab.effect;
     if (!isTriggered(e) || e.when !== when) continue;
     if (!testConditions(e.if, { state, rng, self: owner, card: opts.card, target: opts.target, dealt: opts.dealt, focusUsed: opts.focusUsed, perfect: opts.perfect, successes: opts.successes, supportedOthers: opts.supportedOthers })) continue;
-    const ctx = makeCtx(state, rng, events, owner, { target: opts.target, card: opts.card, dealt: opts.dealt, depth: opts.depth, tierEffects: opts.tierEffects, perfect: opts.perfect, cardAbilities: opts.card?.trait ? [opts.card.trait] : undefined });
+    const ctx = makeCtx(state, rng, events, owner, { target: opts.target, allyTarget: opts.allyTarget, card: opts.card, dealt: opts.dealt, depth: opts.depth, tierEffects: opts.tierEffects, perfect: opts.perfect, cardAbilities: opts.card?.trait ? [opts.card.trait] : undefined });
     let any = false;
     for (const eff of e.do) any = applyEffect(ctx, eff) || any;
     if (!any) continue;
