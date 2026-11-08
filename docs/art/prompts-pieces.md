@@ -23,7 +23,7 @@
 - 立ち絵の特徴: 赤茶の髪、赤いマント・赤い布、銀の鎧に赤の飾り
 
 ```
-chibi tabletop miniature figurine of a young male swordsman, short reddish-brown hair, silver plate armor with red trim, flowing red cape and red scarf, holding a single plain copper one-handed sword pointed down at his side, confident gentle expression, standing on its own feet with no base, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, shield, second weapon, bow, arrows, quiver, spear, signature, text, watermark, scenery
+chibi tabletop miniature figurine of a young male swordsman, short reddish-brown hair, silver plate armor with red trim, flowing red cape and red scarf, holding a single plain copper one-handed sword pointed down at his side, confident gentle expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, shield, second weapon, second sword, sheathed sword, scabbard, bow, arrows, quiver, spear, signature, text, watermark, scenery
 ```
 
 ### 2. 魔道士・女（ルーシア）`piece/mage-female`
@@ -31,7 +31,7 @@ chibi tabletop miniature figurine of a young male swordsman, short reddish-brown
 - 立ち絵の特徴: 黒髪のショート、つばの広いとんがり帽子、紫と淡いピンクのローブ
 
 ```
-chibi tabletop miniature figurine of a young female mage, short dark hair, wide-brimmed pointed witch hat, layered purple and dusty pink robes with gold embroidery, holding a tall gnarled oak wooden staff topped with a small violet crystal in one hand, calm kind expression, standing on its own feet with no base, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, sword, shield, book, second weapon, bow, arrows, quiver, spear, signature, text, watermark, scenery
+chibi tabletop miniature figurine of a young female mage, short dark hair, wide-brimmed pointed witch hat, layered purple and dusty pink robes with gold embroidery, holding a tall gnarled oak wooden staff topped with a small violet crystal in one hand, calm kind expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, sword, shield, book, second weapon, bow, arrows, quiver, spear, signature, text, watermark, scenery
 ```
 
 ## できた絵の渡し方（オーナー → Claude）
@@ -43,3 +43,4 @@ chibi tabletop miniature figurine of a young female mage, short dark hair, wide-
 
 ## 試しの結果（2026-11-08）
 - 1回目: 剣士・男、魔道士・女とも、立ち絵と同じ服・武器のかわいいミニチュアになった（`C:\dev\card-rpg-assets\j4\piece-trial1\`）。ただし金の台座まで描かれ、ゲームの台座と2重になるため、**台座なし**に変えて作り直す。
+- 2回目: 魔道士・女は台座なしで**合格**（`C:\dev\card-rpg-assets\j4\piece\mage-female.webp`）。剣士・男は白い薄い円盤の台が残り、剣も2本（手と腰）になった → 「足が白い背景に直接つく」を足し、`--no` に円盤・2本目の剣・鞘を追加。
