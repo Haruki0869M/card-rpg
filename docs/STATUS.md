@@ -2,6 +2,15 @@
 
 更新日: 2026-11-08。第3段階（A・B1・B2・C1・C2）と手番のカットインまで完了・**保存v15**（K5 のブランチでは **v16**）。以下の古い節の「v14」は当時の記録。新規作業は停止。最新状態は先頭の9項目を優先し、下部の段階別記録は履歴として読む。
 
+
+## 本番へ再公開（2026-11-09 01:4x・まとめ役 Claude）
+
+オーナーのOKで、確認済みの 82563f0 を `npm run deploy:firebase` で Hosting に公開（https://card-rpg-1aa60.web.app 、index-Bf1pG80j.js）。保存は v16。
+- 公開前の確認（自分専用ポート4199で、配信中のビルドが自分の dist と一致することを確かめてから）: 型チェック・vitest 696件成功/3件スキップ・ビルド・lorebook・check-layout・world-move-stability・interaction-safety・pets・battle-feedback・dungeon-view・turn-cutin・playthrough・sanctuaries・jobchange・weapon-icons・piece-art・movement-pet-colors・adventure（固定種874651857と種なし×2人・4人）すべて成功。オンラインは別セッションでエミュレーター（2〜4台×400手）成功。
+- 公開後の本番での確認: lorebook・world-move-stability・dungeon-view・adventure 2人 成功。
+- 入っているもの: 第3段階（一人称ダンジョン・通路の絵5種）・駒88体・手番のカットイン・K5 伝承の書／マイペット・K6 音（効果音98・鳴き声12・BGM10）・K7 突発イベント20・K1/K2 の量・凍てつく王国（侵食の魔王クリアで解放）。3〜7本目は「作成中」で遊べない。
+- 入っていないもの（次の公開）: 宝箱の動画、凍てつく王国・共通の敵の絵、Codex T7（侵食の魔王の敵+13）、呪われた群島以降の敵。
+
 ## 最新（Claude）：K5 伝承の書 ③うちの子図鑑・マイペット（2026-11-08）
 
 オーナー決定: 「一緒に3回クリア」は**ダンジョンを一緒に3回クリア（1回の冒険の中でもよい）**。マイペットは**スタート地点の町で1人1回・30G**。伝承ポイントは入れず spec §18 を「記録と愛着の本」に書き直した。
