@@ -66,28 +66,28 @@ chibi tabletop miniature figurine of a young female swordswoman, short dark brow
 - 持たせる物: 鉄の槍　／　見た目: 青い鋼の鎧・クリーム色の前垂れ・大きな丸い木の盾
 
 ```
-chibi tabletop miniature figurine of a young male guardian knight, short black hair, blue steel plate armor with a cream tabard, a large round brown wooden shield on the other arm, holding a long plain straight iron spear, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, sword, axe, bow, arrows, second spear, second weapon, signature, text, watermark, scenery
+chibi tabletop miniature figurine of a young male guardian knight, short black hair, blue steel plate armor with a cream tabard, a large round brown wooden shield on the other arm, holding a long spear with a clearly visible leaf-shaped iron spearhead on a long wooden shaft, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, sword, axe, bow, arrows, second spear, second weapon, signature, text, watermark, scenery
 ```
 
 #### 守護者・女（`piece/guardian-female`）→ 元画像 `piece/guardian-female.png`
 - 持たせる物: 鉄の槍　／　見た目: 銀と青の鎧・青いスカート・大きな丸い赤い盾
 
 ```
-chibi tabletop miniature figurine of a young female guardian knight, long wavy light blue hair, silver and blue armor with a blue skirt and armored boots, a large round red shield on the other arm, holding a long plain straight iron spear, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, sword, axe, bow, arrows, second spear, second weapon, signature, text, watermark, scenery
+chibi tabletop miniature figurine of a young female guardian knight, long wavy light blue hair, silver and blue armor with a blue skirt and armored boots, a large round red shield on the other arm, holding a long spear with a clearly visible leaf-shaped iron spearhead on a long wooden shaft, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, sword, axe, bow, arrows, second spear, second weapon, signature, text, watermark, scenery
 ```
 
 #### 狩人・男（`piece/hunter-male`）→ 元画像 `piece/hunter-male.png`
 - 持たせる物: 狩人の弓　／　見た目: 緑のフード付きの長いマント・赤茶の服・背中に矢筒
 
 ```
-chibi tabletop miniature figurine of a young male hunter, short silver-gray hair, long green hooded cloak over a reddish-brown outfit with a red sash, quiver of arrows on the back, holding a simple wooden hunting bow, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, sword, dagger in hand, shield, spear, second bow, second weapon, signature, text, watermark, scenery
+chibi tabletop miniature figurine of a young male hunter, short silver-gray hair, long green hooded cloak over a reddish-brown outfit with a red sash, quiver of arrows on the back, holding a simple wooden longbow in one hand, the other hand empty, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, sword, dagger in hand, shield, spear, second bow, slingshot, stick in hand, second weapon, signature, text, watermark, scenery
 ```
 
 #### 狩人・女（`piece/hunter-female`）→ 元画像 `piece/hunter-female.png`
 - 持たせる物: 狩人の弓　／　見た目: 緑のフードとマント・緑の短い上着・背中に矢筒
 
 ```
-chibi tabletop miniature figurine of a young female hunter, short brown hair under a green hood, green hooded cloak and short green tunic with a red sash, quiver of arrows on the back, holding a simple wooden hunting bow, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, sword, dagger in hand, shield, spear, second bow, second weapon, signature, text, watermark, scenery
+chibi tabletop miniature figurine of a young female hunter, short brown hair under a green hood, green hooded cloak and short green tunic with a red sash, quiver of arrows on the back, holding a simple wooden longbow in one hand, the other hand empty, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, sword, dagger in hand, shield, spear, second bow, slingshot, stick in hand, second weapon, signature, text, watermark, scenery
 ```
 
 #### 魔道士・男（`piece/mage-male`）→ 元画像 `piece/mage-male.png`
@@ -257,14 +257,14 @@ chibi tabletop miniature figurine of a young female holy paladin knight, long go
 - 持たせる物: 鉄の槍　／　見た目: 青と鋼の半鎧・短い青いマント
 
 ```
-chibi tabletop miniature figurine of a young male lance knight, short dark blue hair, blue and steel half-plate armor over leather, short blue cape, winged ornaments, holding a long plain straight iron spear, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, shield, sword, bow, arrows, quiver, second spear, second weapon, signature, text, watermark, scenery
+chibi tabletop miniature figurine of a young male lance knight, short dark blue hair, blue and steel half-plate armor over leather, short blue cape, winged ornaments, holding a long spear with a clearly visible leaf-shaped iron spearhead on a long wooden shaft, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, shield, sword, bow, arrows, quiver, second spear, second weapon, signature, text, watermark, scenery
 ```
 
 #### 槍騎士・女（`piece/lancer-female`）→ 元画像 `piece/lancer-female.png`
 - 持たせる物: 鉄の槍　／　見た目: 青と鋼の半鎧・短い青いマント
 
 ```
-chibi tabletop miniature figurine of a young female lance knight, long blue hair with a winged hair ornament, blue and steel half-plate armor over leather, short blue cape, winged ornaments, holding a long plain straight iron spear, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, shield, sword, bow, arrows, quiver, second spear, second weapon, signature, text, watermark, scenery
+chibi tabletop miniature figurine of a young female lance knight, long blue hair with a winged hair ornament, blue and steel half-plate armor over leather, short blue cape, winged ornaments, holding a long spear with a clearly visible leaf-shaped iron spearhead on a long wooden shaft, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, shield, sword, bow, arrows, quiver, second spear, second weapon, signature, text, watermark, scenery
 ```
 
 #### 司祭・男（`piece/bishop-male`）→ 元画像 `piece/bishop-male.png`
@@ -285,14 +285,14 @@ chibi tabletop miniature figurine of a young female high priest bishop, long sil
 - 持たせる物: 狩人の弓　／　見た目: 緑の上着・革の腕当て・背中に矢筒
 
 ```
-chibi tabletop miniature figurine of a young male skilled archer, short blond hair, fitted forest green tunic, leather bracers, quiver of arrows on the back, holding a simple wooden hunting bow, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, sword, dagger in hand, shield, second bow, second weapon, signature, text, watermark, scenery
+chibi tabletop miniature figurine of a young male skilled archer, short blond hair, fitted forest green tunic, leather bracers, quiver of arrows on the back, holding a simple wooden longbow in one hand, the other hand empty, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, sword, dagger in hand, shield, second bow, second weapon, signature, text, watermark, scenery
 ```
 
 #### 弓術士・女（`piece/archer-female`）→ 元画像 `piece/archer-female.png`
 - 持たせる物: 狩人の弓　／　見た目: 緑の上着・革の腕当て・背中に矢筒
 
 ```
-chibi tabletop miniature figurine of a young female skilled archer, long light blonde hair in a side braid, fitted forest green tunic, leather bracers, quiver of arrows on the back, holding a simple wooden hunting bow, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, sword, dagger in hand, shield, second bow, second weapon, signature, text, watermark, scenery
+chibi tabletop miniature figurine of a young female skilled archer, long light blonde hair in a side braid, fitted forest green tunic, leather bracers, quiver of arrows on the back, holding a simple wooden longbow in one hand, the other hand empty, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, sword, dagger in hand, shield, second bow, second weapon, signature, text, watermark, scenery
 ```
 
 #### 獣使い・男（`piece/tamer-male`）→ 元画像 `piece/tamer-male.png`
@@ -441,14 +441,14 @@ chibi tabletop miniature figurine of a young female radiant holy king, long gold
 - 持たせる物: 鉄の槍　／　見た目: 濃い青の竜の鱗の鎧・竜の兜は脇に抱える
 
 ```
-chibi tabletop miniature figurine of a young male dragon knight dragoon, short dark blue hair, dark blue dragon-scale armor with spiky pauldrons, dragon-head helmet held under the arm so the face is visible, holding a long plain straight iron spear, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, shield, sword, dragon creature, bow, arrows, quiver, second spear, second weapon, signature, text, watermark, scenery
+chibi tabletop miniature figurine of a young male dragon knight dragoon, short dark blue hair, dark blue dragon-scale armor with spiky pauldrons, dragon-head helmet held under the arm so the face is visible, holding a long spear with a clearly visible leaf-shaped iron spearhead on a long wooden shaft, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, shield, sword, dragon creature, bow, arrows, quiver, second spear, second weapon, signature, text, watermark, scenery
 ```
 
 #### 竜騎士・女（`piece/dragoon-female`）→ 元画像 `piece/dragoon-female.png`
 - 持たせる物: 鉄の槍　／　見た目: 濃い青の竜の鱗の鎧・竜の兜は脇に抱える
 
 ```
-chibi tabletop miniature figurine of a young female dragon knight dragoon, long blue hair, dark blue dragon-scale armor with spiky pauldrons, dragon-head helmet held under the arm so the face is visible, holding a long plain straight iron spear, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, shield, sword, dragon creature, bow, arrows, quiver, second spear, second weapon, signature, text, watermark, scenery
+chibi tabletop miniature figurine of a young female dragon knight dragoon, long blue hair, dark blue dragon-scale armor with spiky pauldrons, dragon-head helmet held under the arm so the face is visible, holding a long spear with a clearly visible leaf-shaped iron spearhead on a long wooden shaft, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, shield, sword, dragon creature, bow, arrows, quiver, second spear, second weapon, signature, text, watermark, scenery
 ```
 
 #### 教皇・男（`piece/pope-male`）→ 元画像 `piece/pope-male.png`
@@ -469,14 +469,14 @@ chibi tabletop miniature figurine of a young female holy pope, long silver-blond
 - 持たせる物: 狩人の弓　／　見た目: 緑と白の上品な狩装束・金の葉の刺繍・羽根のマント
 
 ```
-chibi tabletop miniature figurine of a young male legendary bow saint, short blond hair, elegant green and white hunter attire with gold leaf embroidery, feathered cape, quiver on the back, holding a simple wooden hunting bow, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, sword, dagger in hand, shield, second bow, second weapon, signature, text, watermark, scenery
+chibi tabletop miniature figurine of a young male legendary bow saint, short blond hair, elegant green and white hunter attire with gold leaf embroidery, feathered cape, quiver on the back, holding a simple wooden longbow in one hand, the other hand empty, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, sword, dagger in hand, shield, second bow, second weapon, signature, text, watermark, scenery
 ```
 
 #### 弓聖・女（`piece/bowSaint-female`）→ 元画像 `piece/bowSaint-female.png`
 - 持たせる物: 狩人の弓　／　見た目: 緑と白の上品な狩装束・金の葉の刺繍・羽根のマント
 
 ```
-chibi tabletop miniature figurine of a young female legendary bow saint, long light blonde hair in a side braid, elegant green and white hunter attire with gold leaf embroidery, feathered cape, quiver on the back, holding a simple wooden hunting bow, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, sword, dagger in hand, shield, second bow, second weapon, signature, text, watermark, scenery
+chibi tabletop miniature figurine of a young female legendary bow saint, long light blonde hair in a side braid, elegant green and white hunter attire with gold leaf embroidery, feathered cape, quiver on the back, holding a simple wooden longbow in one hand, the other hand empty, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, sword, dagger in hand, shield, second bow, second weapon, signature, text, watermark, scenery
 ```
 
 #### ビーストマスター・男（`piece/beastMaster-male`）→ 元画像 `piece/beastMaster-male.png`
