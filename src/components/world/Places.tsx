@@ -9,7 +9,7 @@ import { BALANCE } from '../../data/balance';
 import { cardOf, getCard } from '../../data/cards';
 import { getEnemy } from '../../data/enemies';
 import { getItem } from '../../data/items';
-import { getScenario } from '../../data/scenarios';
+import { corruptionName, getScenario } from '../../data/scenarios';
 import { QUESTS, SANCTUARIES, SHRINES, TOWNS } from '../../data/world';
 import { canChangeNow } from '../JobSheet';
 import { PetAwards } from '../ui/PetToken';
@@ -533,7 +533,7 @@ export function EndingScreen() {
         <div className="panel mt-4 grid grid-cols-2 gap-1 rounded-xl p-3 text-[13px]">
           <span>かかった日数</span>
           <b className="text-right">{Math.ceil((game.world?.worldTurn ?? 1) / (BALANCE.turnsPerTimeOfDay * 4))}日</b>
-          <span>最後の侵食度</span>
+          <span>最後の{corruptionName(game.scenarioId)}</span>
           <b className="text-right">{game.world?.corruption ?? 0}%</b>
           <span>残った命の灯火</span>
           <b className="text-right">{game.lives}</b>

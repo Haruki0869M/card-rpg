@@ -636,6 +636,8 @@ export interface ScenarioDef {
   unlockText?: string;
   /** 解放の条件（クリア記録で決まる。無ければ従来の unlocked だけで決まる）。K4 */
   unlockRequires?: { cleared: string[] };
+  /** 世界の悪化の名前（画面の「侵食度」の代わりに出る言葉。無ければ TERMS.corruption）。K4 */
+  corruptionName?: string;
   /** 冒険の開始条件 */
   /** 世界マップ（無ければ仮の拠点から遊ぶ） */
   map?: ScenarioMapDef;

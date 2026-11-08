@@ -1,4 +1,4 @@
-import { TERMS } from '../../data/terms';
+import { corruptionName } from '../../data/scenarios';
 // ===== 上部バー・下部バー =====
 import { AnimatePresence, motion } from 'framer-motion';
 import { Backpack, Flame, Layers, Menu, Skull, Trash2 } from 'lucide-react';
@@ -13,6 +13,7 @@ export function TopBar() {
   // 侵食度と命の灯火（冒険の状態から）
   const corruption = useBattle((s) => s.full?.world?.corruption ?? 0);
   const lives = useBattle((s) => s.full?.lives);
+  const corruptionLabel = useBattle((s) => corruptionName(s.full?.scenarioId));
   return (
     <div className="flex h-11 shrink-0 items-center gap-2 px-2">
       <div className="font-display flex items-baseline gap-1 whitespace-nowrap text-amber-200">
@@ -23,7 +24,7 @@ export function TopBar() {
         <Skull size={16} className="shrink-0 text-fuchsia-300" />
         <div className="min-w-0 flex-1">
           <div className="flex justify-between text-[12px] leading-[13px]">
-            <span className="font-display text-fuchsia-200">{TERMS.corruption}</span>
+            <span className="font-display text-fuchsia-200">{corruptionLabel}</span>
             <span className="font-bold text-fuchsia-200 tabular-nums">{corruption}%</span>
           </div>
           <div className="mt-0.5 h-[7px] overflow-hidden rounded-full border border-fuchsia-900 bg-black/70">

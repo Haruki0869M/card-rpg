@@ -68,8 +68,10 @@ const pid = (g: GameState, heroId?: string): PlayerId => {
 
 /** 目的のダンジョン（鍵の順。最後は魔王城） */
 function goalDungeon(g: GameState): string {
-  const order = ['emeraldTemple', 'silentCatacomb', 'lavaCavern', 'demonCastle'];
-  return order.find((d) => !g.clearedDungeons.includes(d)) ?? 'demonCastle';
+  // シナリオのダンジョンを、鍵のダンジョン（敵のレベルが低い順）→最終ダンジョンの順に回る
+  const list = DUNGEONS.forScenario(g.scenarioId).filter((d) => !d.random && (d.rewardKey || d.finale));
+  const order = [...list.filter((d) => !d.finale).sort((a, b) => a.baseLevel - b.baseLevel), ...list.filter((d) => d.finale)].map((d) => d.id);
+  return order.find((d) => !g.clearedDungeons.includes(d)) ?? order[order.length - 1];
 }
 
 function tileOf(g: GameState, kind: string, id: string): number | undefined {
@@ -82,7 +84,7 @@ function worldTarget(g: GameState, at: number): { tile: number; why: 'town' | 'g
   const w = g.world!;
   const heroes = livingHeroes(g);
   const goal = goalDungeon(g);
-  const need = DUNGEONS.get(goal).baseLevel + (goal === 'demonCastle' ? 1 : 0);
+  const need = DUNGEONS.get(goal).baseLevel + (DUNGEONS.get(goal).finale ? 1 : 0);
   const avgLv = heroes.reduce((n, h) => n + h.level, 0) / heroes.length;
   const hurt = heroes.some((h) => h.hp < heroMaxHp(h) * 0.5);
   if (hurt) {

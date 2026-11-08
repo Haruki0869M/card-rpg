@@ -7,7 +7,7 @@ import { BALANCE } from '../../data/balance';
 import { CARDS } from '../../data/cards';
 import { getClass } from '../../data/classes';
 import { DUNGEONS } from '../../data/dungeons';
-import { getScenario } from '../../data/scenarios';
+import { corruptionName, getScenario } from '../../data/scenarios';
 import { getEnemy } from '../../data/enemies';
 import { EVENTS } from '../../data/events';
 import { getItem, POUCH_LIMIT } from '../../data/items';
@@ -1021,7 +1021,7 @@ function onDungeonCleared(game: GameState, dungeonId: string, rng: Rng) {
   }
   if (def.corruptionOnClear) {
     w.corruption = Math.max(0, w.corruption - def.corruptionOnClear);
-    addLog(game, `侵食度が${def.corruptionOnClear}%下がった`);
+    addLog(game, `${corruptionName(game.scenarioId)}が${def.corruptionOnClear}%下がった`);
   }
   questSignal(game, { kind: 'clearDungeon', dungeonId });
   if (def.finale) {
