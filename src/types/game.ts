@@ -299,6 +299,8 @@ export interface EventOption {
   label: string;
   /** この選択肢を出すのに必要な探索の特殊能力のタグ */
   requiresTag?: string;
+  /** 場面のだれかがお供を連れている時だけ出す（K7） */
+  requiresPet?: boolean;
   /** 必要なゴールド */
   cost?: number;
   /** 必要なフォーカス（選んだキャラが払う） */
@@ -322,6 +324,10 @@ export interface EventDef {
   tone?: 'good' | 'bad' | 'pet' | 'shop' | 'battle';
   /** 夜だけ起きる */
   night?: boolean;
+  /** 突発イベント: この地形（TerrainDef の id）のマスでだけ起きる（K7） */
+  terrain?: string[];
+  /** 突発イベント: 移動した仲間のだれかがお供を連れている時だけ起きる（K7） */
+  needsPet?: boolean;
   title: string;
   text: string;
   icon: string;

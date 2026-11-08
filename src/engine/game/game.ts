@@ -1039,6 +1039,7 @@ export function eventOptionState(game: GameState, eventId: string, index: number
   const opt = EVENTS.get(eventId).options[index];
   if (!opt) return { visible: false };
   if (opt.requiresTag && !partyHasTag(game, opt.requiresTag)) return { visible: false };
+  if (opt.requiresPet && !sceneHeroes(game).some((h) => h.hp > 0 && h.pet)) return { visible: false };
   if (opt.cost && !(payer ? [payer] : sceneHeroes(game)).some((h) => h.gold >= opt.cost!)) return { visible: true, reason: `ゴールドが足りません（${opt.cost}G）` };
   if (opt.costFocus && !sceneHeroes(game).some((h) => h.focus >= opt.costFocus!)) return { visible: true, reason: `フォーカスが足りません（${opt.costFocus}）` };
   if (opt.costItem && !sceneHeroes(game).some((h) => h.pouch.some((i) => i.itemId === opt.costItem))) return { visible: true, reason: `${getItem(opt.costItem).name}を持っていません` };

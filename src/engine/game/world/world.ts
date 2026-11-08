@@ -316,7 +316,7 @@ function maybeRandomEvent(game: GameState, w: WorldState, h: Hero, group: Hero[]
   if (w.tiles[tile].f || w.story) return;
   if (h.lastRandomEvent !== undefined && h.lastRandomEvent >= w.worldTurn - 1) return;
   if (rng.next() * 100 >= BALANCE.randomEventChance) return;
-  const ev = pickRandomEvent(game, rng);
+  const ev = pickRandomEvent(game, rng, tile, group);
   if (!ev) return;
   h.lastRandomEvent = w.worldTurn;
   game.party = group.map((g) => g.id);
@@ -324,10 +324,21 @@ function maybeRandomEvent(game: GameState, w: WorldState, h: Hero, group: Hero[]
   game.mode = 'event';
 }
 
-/** 突発イベントを1つ選ぶ（重み付き。夜・侵食度50%以上なら悪いイベントの重みが上がる） */
-export function pickRandomEvent(game: GameState, rng: Rng): string | undefined {
+/**
+ * 突発イベントを1つ選ぶ（重み付き。夜・侵食度50%以上なら悪いイベントの重みが上がる）。
+ * tile を渡すと地形の条件（terrain）、group を渡すとお供の条件（needsPet）で絞り込む。絞り込みでは乱数を引かない
+ */
+export function pickRandomEvent(game: GameState, rng: Rng, tile?: number, group?: Hero[]): string | undefined {
   const w = game.world!;
-  const list = EVENTS.forScenario(game.scenarioId).filter((e) => e.where === 'random' && (!e.night || timeOfDay(w.worldTurn) === 'night'));
+  const terrain = tile === undefined ? undefined : w.tiles[tile]?.t;
+  const hasPet = (group ?? []).some((g) => g.hp > 0 && g.pet);
+  const list = EVENTS.forScenario(game.scenarioId).filter(
+    (e) =>
+      e.where === 'random' &&
+      (!e.night || timeOfDay(w.worldTurn) === 'night') &&
+      (!e.terrain || (terrain !== undefined && e.terrain.includes(terrain))) &&
+      (!e.needsPet || hasPet),
+  );
   if (!list.length) return undefined;
   const harsh = timeOfDay(w.worldTurn) === 'night' || w.corruption >= 50;
   const weights = list.map((e) => (e.weight ?? 10) * (harsh && e.tone === 'bad' ? BALANCE.randomEventBadMul : 1));
