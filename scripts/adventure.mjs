@@ -2,7 +2,7 @@
 // 2人以上は担当プレイヤーを分けて、手番の受け渡しの画面も確かめる
 // npm run build && npx vite preview --port 4173 を起動した状態で: node scripts/adventure.mjs
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { chromium, layoutIssues, URL, waitForWorldMovement } from './lib.mjs';
+import { chromium, layoutIssues, URL, waitForWorldMovement, waitForBattlePresentation } from './lib.mjs';
 
 mkdirSync('screenshots', { recursive: true });
 const output = process.env.ADVENTURE_OUTPUT ?? 'screenshots/adventure';
@@ -37,6 +37,7 @@ async function clickText(page, text, opts = {}) {
 
 async function playBattle(page) {
   for (let guard = 0; guard < 60; guard++) {
+    await waitForBattlePresentation(page);
     if (await page.locator('button:has-text("報酬を受け取る"), button:has-text("冒険の結果へ"), button:has-text("ダンジョンへ戻る")').count()) return;
     const endBtn = page.locator('button:has-text("ターン終了"):not([disabled])');
     if (!(await endBtn.count())) {
@@ -112,7 +113,7 @@ async function run(party, difficulty) {
   await page.getByText('つづける').click();
   // 高速モード
   await page.getByLabel('メニュー').click();
-  await page.getByText('高速モード（演出2倍速）').click();
+  await page.getByRole('button', { name: '高速', exact: true }).click();
   await page.getByLabel('閉じる').click();
 
   let result = 'timeout';

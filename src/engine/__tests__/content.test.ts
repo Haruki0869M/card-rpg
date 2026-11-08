@@ -193,7 +193,7 @@ describe('保存データの引き継ぎ', () => {
     old.battle = { version: 3, allies: [{ id: 'h0', abilities: [{ name: '聖銀の守り', effect: { kind: 'turnStartBlock', amount: 5 } }] }] };
     const m = migrateGame(old)!;
     expect(m.version).toBe(g.version);
-    expect(m.battle!.allies[0].abilities).toEqual([{ name: '聖銀の守り', effect: { when: 'turnStart', do: [{ kind: 'block', amount: 5 }] } }]);
+    expect(m.battle!.allies[0].abilities).toEqual([{ name: '聖銀の守り', effect: { when: 'turnStart', do: [{ kind: 'block', amount: 5 }] }, source: { kind: 'equipment', id: 'mithrilMail', label: 'ミスリルメイル' } }]);
   });
 
   it('消したデータを参照している冒険は読まない', () => {

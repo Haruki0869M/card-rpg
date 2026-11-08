@@ -19,6 +19,23 @@ import { addSanctuaries, consolidateSanctuaries } from './world/sanctuaries';
 type Loose = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 const MIGRATIONS: Record<number, (g: Loose) => void> = {
+  // v12 → v13: 能力の効果を変えず演出用の出所だけ補う。開始演出は作り直さない。
+  12(g) {
+    for (const b of [g.battle, ...(g.expeditions ?? []).map((x: Loose) => x.battle)]) {
+      if (!b) continue;
+      b.version = 13;
+      for (const a of b.allies) {
+        const hero = g.heroes.find((h: Loose) => h.id === a.id);
+        if (!hero) continue;
+        const list = heroAbilities(hero);
+        for (const ability of a.abilities ?? []) {
+          if (ability.source) continue;
+          const current = list.find(n => n.name === ability.name && JSON.stringify(n.effect) === JSON.stringify(ability.effect));
+          if (current?.source) ability.source = current.source;
+        }
+      }
+    }
+  },
   // v11 → v12: 未選択のお供候補だけ毛色を抽選。既存のお供と地図は維持する。
   11(g) {
     const rng = createRng(g.rngState);

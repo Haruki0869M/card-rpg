@@ -113,3 +113,8 @@ export async function layoutIssues(page) {
 export async function waitForWorldMovement(page) {
   await page.locator('[data-world-moving]').waitFor({ state: 'detached', timeout: 15000 });
 }
+
+/** 戦闘の表示順を保ったまま結果画面まで待つ。入力や判定は変更しない。 */
+export async function waitForBattlePresentation(page) {
+  await page.locator('[data-battle-presenting]').waitFor({ state: 'detached', timeout: 15000 });
+}

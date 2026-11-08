@@ -6,7 +6,7 @@
 import { getClass } from '../../data/classes';
 import { getEnemy } from '../../data/enemies';
 import { getStatus } from '../../data/statuses';
-import type { AbilityCondition, AbilityDef, AbilityEffect, AbilityTrigger, BattleEvent, BattleState, CardDef, DamageScale, Effect } from '../../types';
+import type { AbilityCondition, AbilityDef, AbilityNotice, AbilitySource, AbilityEffect, AbilityTrigger, BattleEvent, BattleState, CardDef, DamageScale, Effect } from '../../types';
 import { applyEffect, describeEffect, makeCtx } from '../battle/effects';
 import { abilityTriggered, addLog, isEnemy, nameOf, type Unit, unitIdOf } from '../battle/units';
 import type { Rng } from '../rng';
@@ -37,9 +37,9 @@ export function testConditions(conds: AbilityCondition[] | undefined, c: CondCtx
 
 /** ユニットが持つ戦闘の特殊能力（味方 = 職業 + 装備、敵 = 敵のデータ） */
 export function abilitiesOf(u: Unit): AbilityDef[] {
-  if (isEnemy(u)) return getEnemy(u.defId).abilities ?? [];
-  const own = getClass(u.classId).battleAbility;
-  return u.abilities?.length ? [own, ...u.abilities] : [own];
+  if (isEnemy(u)) return (getEnemy(u.defId).abilities ?? []).map(a => ({ ...a, source: { kind: 'enemy', id: u.defId, label: getEnemy(u.defId).name } }));
+  const def = getClass(u.classId), own: AbilityDef = { ...def.battleAbility, source: { kind: 'job', id: def.id, label: def.name } };
+  return [own, ...(u.abilities ?? []).map(a => a.source ? a : { ...a, source: a.pet && u.pet ? { kind: 'pet' as const, id: u.pet.petId, label: u.pet.name } : { kind: 'other' as const } })];
 }
 
 const isTriggered = (e: AbilityEffect): e is Extract<AbilityEffect, { when: AbilityTrigger }> => 'when' in e;
@@ -49,9 +49,9 @@ const isTriggered = (e: AbilityEffect): e is Extract<AbilityEffect, { when: Abil
 export interface DamageMods {
   multiplier: number;
   /** 働いた倍率の能力の名前 */
-  active: string[];
+  active: AbilityNotice[];
   ignoreBlock: boolean;
-  ignoreBlockName?: string;
+  ignoreBlockNotice?: AbilityNotice;
 }
 
 /**
@@ -68,7 +68,7 @@ export function damageModifiers(state: BattleState | undefined, source: Unit, ca
       const el = element ?? (card?.category === 'physical' && !isEnemy(source) ? source.weaponElement : undefined);
       if (el && victim && isEnemy(victim) && getEnemy(victim.defId).weak?.includes(el) && !getEnemy(victim.defId).resist?.includes(el) && testConditions(e.if, c)) {
         out.multiplier *= e.multiplier;
-        out.active.push(ab.name);
+        out.active.push({ name: ab.name, source: ab.source ?? { kind: 'card', id: card?.id, label: card?.name } });
       }
       continue;
     }
@@ -78,10 +78,10 @@ export function damageModifiers(state: BattleState | undefined, source: Unit, ca
       const m = e.multiplier * scaleOf(e.scale, source, victim);
       if (m === 1) continue;
       out.multiplier *= m;
-      out.active.push(ab.name);
+      out.active.push({ name: ab.name, source: ab.source ?? { kind: 'card', id: card?.id, label: card?.name } });
     } else if (e.modifier === 'ignoreBlock') {
       out.ignoreBlock = true;
-      out.ignoreBlockName ??= ab.name;
+      out.ignoreBlockNotice ??= { name: ab.name, source: ab.source ?? { kind: 'card', id: card?.id, label: card?.name } };
     }
   }
   return out;
@@ -119,11 +119,11 @@ export function statusBonusOf(u: Unit, status: string, card?: CardDef): number {
 }
 
 /** かばう能力の発動確率（複数あれば一番高いもの。持っていなければ null） */
-export function coverChance(u: Unit): { chance: number; name: string } | null {
-  let best: { chance: number; name: string } | null = null;
+export function coverChance(u: Unit): { chance: number; name: string; source?: AbilitySource } | null {
+  let best: { chance: number; name: string; source?: AbilitySource } | null = null;
   for (const ab of abilitiesOf(u)) {
     const e = ab.effect;
-    if ('modifier' in e && e.modifier === 'coverLethal' && (!best || e.chance > best.chance)) best = { chance: e.chance, name: ab.name };
+    if ('modifier' in e && e.modifier === 'coverLethal' && (!best || e.chance > best.chance)) best = { chance: e.chance, name: ab.name, source: ab.source };
   }
   return best;
 }
@@ -164,8 +164,8 @@ export function fireAbilities(
     let any = false;
     for (const eff of e.do) any = applyEffect(ctx, eff) || any;
     if (!any) continue;
-    abilityTriggered(state, unitIdOf(owner), ab.name, events);
-    for (const n of ctx.fired) abilityTriggered(state, unitIdOf(owner), n, events);
+    abilityTriggered(state, unitIdOf(owner), ab.name, events, ab.source ?? (opts.list ? { kind: 'card', id: opts.card?.id, label: opts.card?.name } : undefined));
+    for (const n of ctx.fired) abilityTriggered(state, unitIdOf(owner), n.name, events, n.source);
     // お供の活躍の回数（戦績に出す）
     if (ab.pet) {
       const c = ((owner as { counters?: Record<string, number> }).counters ??= {});

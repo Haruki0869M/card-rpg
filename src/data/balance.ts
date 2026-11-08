@@ -168,6 +168,14 @@ export const TIMING = {
   /** 世界マップの1マスと到着演出（秒） */
   worldMoveStep: 0.17,
   worldArrival: 0.3,
+  /** 表示だけの段取り。ゲームの結果・乱数は待たせない。 */
+  actionLead: 0.16,
+  effectStep: 0.08,
+  abilityCutin: 0.7,
+  petPulse: 0.6,
+  popupRows: 3,
+  cutinVisible: 2,
+  presentationFramesMax: 48,
   /** 結果ポップアップの表示時間 */
   resultPopup: 0.6,
   /** 敵1体の行動間隔 */

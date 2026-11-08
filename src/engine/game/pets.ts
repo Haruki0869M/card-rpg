@@ -18,7 +18,7 @@ export function petAbilities(hero: Hero): AbilityDef[] {
   if (!hero.pet) return [];
   const def = getPet(hero.pet.petId);
   const list = isPetMaster(hero) ? def.masterAbilities : def.abilities;
-  return list.map((a) => ({ ...a, name: `${hero.pet!.name}の${a.name}`, pet: true }));
+  return list.map((a) => ({ ...a, name: `${hero.pet!.name}の${a.name}`, pet: true, source: { kind: 'pet', id: def.id, label: hero.pet!.name, effectName: a.name } }));
 }
 
 /** お供の探索の効果（獣使い系統は数値が2倍） */

@@ -127,7 +127,17 @@ export type AbilityEffect =
  */
 export type DamageScale = { by: 'missingHp' | 'targetStatuses' | 'selfStatus'; per: number; max?: number; status?: string };
 
+/** 演出用の出所。効果の判定には使わない。 */
+export interface AbilitySource {
+  kind: 'job' | 'inherited' | 'equipment' | 'pet' | 'card' | 'summon' | 'enemy' | 'other';
+  id?: string;
+  label?: string;
+  effectName?: string;
+}
+export interface AbilityNotice { name: string; source?: AbilitySource }
+
 export interface AbilityDef {
+  source?: AbilitySource;
   name: string;
   /** お供の能力（活躍回数を数える） */
   pet?: boolean;
@@ -524,6 +534,8 @@ export interface LogEntry {
 }
 
 export interface BattleState {
+  /** 戦闘開始直後だけ表示する結果。保存読込では再生しない。 */
+  openingEvents?: BattleEvent[];
   /** 先読みで予約した結果。描画・読込では抽選しない。 */
   slotPreview?: SlotPreview;
   version: number;
@@ -628,9 +640,10 @@ export type BattleEvent =
       summary: string;
     }
   | { type: 'damage'; unitId: string; amount: number; blocked: number; sourceId?: string }
+  | { type: 'resource'; unitId: string; resource: 'focus' | 'mana'; amount: number }
   | { type: 'block'; unitId: string; amount: number }
   | { type: 'status'; unitId: string; status: StatusId; amount: number }
-  | { type: 'ability'; unitId: string; name: string }
+  | { type: 'ability'; unitId: string; name: string; source?: AbilitySource }
   | { type: 'retarget'; enemyUid: string }
   | { type: 'enemyAct'; enemyUid: string; actionName: string; targetIds: string[] }
   | { type: 'death'; unitId: string }

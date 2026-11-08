@@ -1,3 +1,4 @@
+import { SettingsControls } from '../ui/SettingsControls';
 import { TERMS } from '../../data/terms';
 // ===== タイトル画面 =====
 import { motion } from 'framer-motion';
@@ -15,8 +16,6 @@ export function TitleScreen() {
   const game = useBattle((s) => s.game);
   const setScreen = useBattle((s) => s.setScreen);
   const continueGame = useBattle((s) => s.continueGame);
-  const settings = useBattle((s) => s.settings);
-  const setSettings = useBattle((s) => s.setSettings);
   const toast = useBattle((s) => s.showToast);
   const [showSettings, setShowSettings] = useState(false);
   const onlineOk = useOnline((s) => s.available)();
@@ -111,19 +110,7 @@ export function TitleScreen() {
         </div>
         {showSettings && (
           <div className="panel flex flex-col gap-1 rounded-lg p-2 text-[14px]">
-            {(
-              [
-                ['高速モード（演出2倍速）', 'fastMode'],
-                ['振動', 'vibration'],
-              ] as const
-            ).map(([label, key]) => (
-              <button key={key} onClick={() => setSettings({ [key]: !settings[key] })} className="flex h-11 items-center justify-between">
-                <span>{label}</span>
-                <span className={`flex h-7 w-12 items-center rounded-full p-0.5 ${settings[key] ? 'bg-amber-500' : 'bg-zinc-700'}`}>
-                  <span className={`h-6 w-6 rounded-full bg-white transition-transform ${settings[key] ? 'translate-x-5' : ''}`} />
-                </span>
-              </button>
-            ))}
+            <SettingsControls />
           </div>
         )}
       </div>

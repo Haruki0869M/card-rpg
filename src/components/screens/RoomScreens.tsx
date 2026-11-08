@@ -254,7 +254,7 @@ export function RestScreen() {
                 </span>
                 {h.pet && isLocalPlayer(h.playerId) && (
                   <button onClick={() => dispatchGame({ type: 'PET_PAT', playerId: h.playerId, heroId: h.id })} className="btn btn-dark flex h-9 shrink-0 items-center gap-0.5 rounded-lg px-1.5 text-[12px] font-bold text-pink-100" aria-label={`${h.pet.name}を撫でる`}>
-                    <PetToken pet={h.pet} size={20} />
+                    <PetToken ownerId={h.id} pet={h.pet} size={20} />
                     {h.pet.patted ? '' : '+1'}
                   </button>
                 )}

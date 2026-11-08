@@ -2,7 +2,7 @@
 import { BALANCE } from '../../data/balance';
 import { fireAbilities } from '../abilities';
 import { getEnemy } from '../../data/enemies';
-import type { AllyState, BattleEvent, BattleState, EnemyState } from '../../types';
+import type { AbilitySource, AllyState, BattleEvent, BattleState, EnemyState } from '../../types';
 import type { Rng } from '../rng';
 import { retargetAfterDeath } from './intents';
 import { emptyStatuses, healMultiplier } from './statuses';
@@ -46,9 +46,9 @@ export function addLog(state: BattleState, text: string) {
 }
 
 /** 特殊能力の発動（演出・集計用） */
-export function abilityTriggered(state: BattleState, unitId: string, name: string, events: BattleEvent[]) {
+export function abilityTriggered(state: BattleState, unitId: string, name: string, events: BattleEvent[], source?: AbilitySource) {
   state.stats.abilityTriggers += 1;
-  events.push({ type: 'ability', unitId, name });
+  events.push({ type: 'ability', unitId, name, ...(source ? { source } : {}) });
 }
 
 // ---------- 戦闘不能・ボスの段階 ----------

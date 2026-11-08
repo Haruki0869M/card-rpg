@@ -31,7 +31,7 @@ export const effect: EffectHandler<'summon'> = {
       }
       list.push({ id, group: e.stackLimit ? e.id : undefined, name: e.name, icon: e.icon, damage: e.damage, turns: e.turns, element: e.element, echoPct: e.echoPct, intercept: e.intercept, targetId, trigger: e.trigger, effects: e.effects });
     }
-    ctx.events.push({ type: 'ability', unitId: unitIdOf(ctx.source), name: e.name });
+    ctx.events.push({ type: 'ability', unitId: unitIdOf(ctx.source), name: e.name, source: { kind: 'summon', id: e.id, label: e.name } });
     ctx.parts.push(`${e.name}を呼んだ`);
     return true;
   },

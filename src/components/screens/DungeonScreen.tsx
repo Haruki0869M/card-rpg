@@ -223,7 +223,7 @@ export function DungeonScreen() {
                         .slice(0, 2)
                         .map((h) => (
                           <span key={`pet${h.id}`} className="ml-2.5 self-end">
-                            <PetToken pet={h.pet!} size={16} />
+                            <PetToken ownerId={h.id} pet={h.pet!} size={16} />
                           </span>
                         ))}
                     </span>

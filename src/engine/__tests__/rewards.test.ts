@@ -77,7 +77,7 @@ describe('エピック以上の特殊能力（spec §12.7・§13.1）', () => {
     const h = g.heroes[0];
     h.equipment.armor = { uid: 'x', itemId: 'mithrilMail' };
     const m = toPartyMember(h);
-    expect(m.abilities).toEqual([{ name: '聖銀の守り', effect: { when: 'turnStart', do: [{ kind: 'block', amount: 5 }] } }]);
+    expect(m.abilities).toEqual([{ name: '聖銀の守り', effect: { when: 'turnStart', do: [{ kind: 'block', amount: 5 }] }, source: { kind: 'equipment', id: 'mithrilMail', label: 'ミスリルメイル' } }]);
     const s = createBattle({ ...setup(1, ['warrior']), party: [m] });
     // 開始時ブロック（startBlock 8）+ ターン開始の能力 5
     expect(s.allies[0].block).toBe(8 + 5);

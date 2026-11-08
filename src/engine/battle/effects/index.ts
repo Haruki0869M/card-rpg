@@ -12,7 +12,7 @@ import { absorb, calcDamage } from '../damage';
 import { addStatus } from '../statuses';
 import { attackElement } from '../cardState';
 import { abilityTriggered, addLog, afterHpLoss, findAlly, foesOf, isEnemy, nameOf, sideOf, type Unit, unitIdOf } from '../units';
-import type { EffectCtx, EffectHandler } from './types';
+import { recordActivation, type EffectCtx, type EffectHandler } from './types';
 
 export type { EffectCtx, EffectHandler } from './types';
 
@@ -191,7 +191,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
       const cov = coverChance(other);
       if (!cov) continue;
       if (rng.next() * 100 < cov.chance) {
-        abilityTriggered(state, unitIdOf(other), cov.name, events);
+        abilityTriggered(state, unitIdOf(other), cov.name, events, cov.source);
         addLog(state, `${nameOf(other)}の「${cov.name}」！ ${nameOf(v)}をかばった`);
         v = other;
         mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities, ctx.perfect, element);
@@ -200,20 +200,20 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
       }
     }
   }
-  for (const n of mods.active) if (!ctx.fired.includes(n)) ctx.fired.push(n);
-  if (comboMultiplier(source, v) > 1 && !ctx.fired.includes(COMBO_NAME)) ctx.fired.push(COMBO_NAME);
+  for (const n of mods.active) recordActivation(ctx, n);
+  if (comboMultiplier(source, v) > 1) recordActivation(ctx, { name: COMBO_NAME, source: { kind: 'other' } });
   // 連携攻撃の記録（このターンにこの敵を攻撃した味方）
   if (isEnemy(v) && !isEnemy(source)) {
     const id = unitIdOf(source);
     if (!(v.hitBy ??= []).includes(id)) v.hitBy.push(id);
   }
-  if (mods.ignoreBlock && v.block > 0 && mods.ignoreBlockName && !ctx.fired.includes(mods.ignoreBlockName)) ctx.fired.push(mods.ignoreBlockName);
+  if (mods.ignoreBlock && v.block > 0 && mods.ignoreBlockNotice) recordActivation(ctx, mods.ignoreBlockNotice);
   if (!isEnemy(v) && dmg > 0 && isEnemy(source)) {
     if (v.airborne) return 0;
     const shield = v.summons?.findIndex(s => s.intercept) ?? -1;
     if (shield >= 0) {
       const [s] = v.summons!.splice(shield, 1);
-      abilityTriggered(state, v.id, s.name, events);
+      abilityTriggered(state, v.id, s.name, events, { kind: 'summon', id: s.id, label: s.name });
       events.push({ type: 'damage', unitId: v.id, amount: 0, blocked: dmg, sourceId: unitIdOf(source) });
       return 0;
     }

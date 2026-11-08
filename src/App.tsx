@@ -25,6 +25,7 @@ import { TitleScreen } from './components/screens/TitleScreen';
 import { Sheets } from './components/Sheets';
 import { JobPickOverlay } from './components/JobSheet';
 import { HeroTaskOverlay } from './components/HeroTasks';
+import { AbilityCutins } from './components/ui/AbilityCutins';
 import { SceneTabs } from './components/SceneTabs';
 import { VoteStatus } from './components/ui/Votes';
 import { TurnLock } from './components/ui/TurnLock';
@@ -61,6 +62,7 @@ function useKeyboard() {
 }
 
 function BattleScreen() {
+  const presenting = useBattle(s => s.presentationBusy);
   const selection = useBattle((s) => s.selection);
   const cancel = useBattle((s) => s.cancel);
   const tall = useTallScreen();
@@ -68,7 +70,7 @@ function BattleScreen() {
     <AnimatePresence>{selection && <FocusPanel key="focus" />}</AnimatePresence>
   );
   return (
-    <div className="game-bg safe-pad relative flex h-full w-full max-w-[480px] flex-col overflow-hidden" onClick={() => selection && cancel()}>
+    <div className="game-bg safe-pad relative flex h-full w-full max-w-[480px] flex-col overflow-hidden" onClick={() => selection && cancel()} data-battle-presenting={presenting || undefined}>
       <TopBar />
       <Battlefield />
       {/* フォーカス注入パネル: 高い画面では選んだカードが大きく浮き上がるので、その上（味方の枠の上）に出す。
@@ -86,7 +88,7 @@ function BattleScreen() {
       )}
       <Hand />
       <BottomBar />
-      <ResultScreen />
+      {!presenting && <ResultScreen />}
       <SlotPreviewDialog />
     </div>
   );
@@ -213,6 +215,7 @@ export default function App() {
             <OnlineOverlay />
             <VoteStatus />
             <TurnLock />
+            {screen === 'game' && <AbilityCutins />}
           </>}
           <Toast />
         </div>

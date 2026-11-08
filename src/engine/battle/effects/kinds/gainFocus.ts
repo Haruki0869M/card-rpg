@@ -21,6 +21,7 @@ export const effect: EffectHandler<'gainFocus'> = {
       const before = t.focus;
       t.focus = Math.min(t.focusMax, t.focus + e.amount);
       total += t.focus - before;
+      if (t.focus > before) ctx.events.push({ type: 'resource', unitId: t.id, resource: 'focus', amount: t.focus - before });
     }
     if (n) ctx.parts.push(n === 1 && ctx.target && ctx.target !== ctx.source ? `${nameOf(ctx.target)}のフォーカス+${total}` : `フォーカス+${total}`);
     return total > 0;

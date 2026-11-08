@@ -1,3 +1,4 @@
+import { SettingsControls } from './ui/SettingsControls';
 import { getDifficulty } from '../data/rules';
 import { QuestList } from './world/Places';
 // ===== メニュー・戦闘ログ・山札/捨札・パーティ（装備）・道具袋・冒険をやめる確認 =====
@@ -71,21 +72,8 @@ function BottomSheet({ title, onClose, children, tall }: { title: string; onClos
   );
 }
 
-function Toggle({ label, on, onChange }: { label: string; on: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button onClick={() => onChange(!on)} className="btn btn-dark flex h-12 w-full items-center justify-between rounded-lg px-3 text-[14px]">
-      <span>{label}</span>
-      <span className={`flex h-7 w-12 items-center rounded-full p-0.5 transition-colors ${on ? 'bg-amber-500' : 'bg-zinc-700'}`}>
-        <span className={`h-6 w-6 rounded-full bg-white transition-transform ${on ? 'translate-x-5' : ''}`} />
-      </span>
-    </button>
-  );
-}
-
 function MenuSheet() {
   const game = useBattle((s) => s.game);
-  const settings = useBattle((s) => s.settings);
-  const setSettings = useBattle((s) => s.setSettings);
   const openSheet = useBattle((s) => s.openSheet);
   const setConfirmAbandon = useBattle((s) => s.setConfirmAbandon);
   const online = useOnline((s) => !!s.room);
@@ -93,8 +81,7 @@ function MenuSheet() {
   return (
     <BottomSheet title="メニュー" onClose={() => openSheet(null)}>
       <div className="flex flex-col gap-2">
-        <Toggle label="高速モード（演出2倍速）" on={settings.fastMode} onChange={(v) => setSettings({ fastMode: v })} />
-        <Toggle label="振動" on={settings.vibration} onChange={(v) => setSettings({ vibration: v })} />
+        <SettingsControls />
         {online && <OnlinePanel />}
         {game?.world && game.mode === 'world' && (
           <>

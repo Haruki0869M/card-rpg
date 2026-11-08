@@ -1,5 +1,7 @@
 // ===== お供（ペット）の小さな表示。世界マップ・ダンジョン・戦闘・パーティで共通（設計 v2.1 §4-2） =====
 // 絵ができるまでは記号（絵文字）＋色の点で表示する。懐き度♡3でリボン、♡5でハートがふわっと出る
+import { useBattle, speedFactor } from '../../store/battleStore';
+import { TIMING } from '../../data/balance';
 import { Heart } from 'lucide-react';
 import { getPet } from '../../data/pets';
 import { describeAbility, isPetMaster, petAbilities, petExplore, petLoveLevel } from '../../engine';
@@ -20,14 +22,17 @@ export function petSpot(petId: string, size: number) {
   return { left: -size * 0.5, top: size * 0.45, size: size * 0.66 };
 }
 
-export function PetToken({ pet, size, hop, hopKey, hopDuration }: { pet: PetLook; size: number; /** 移動の時に1歩遅れて跳ねる */ hop?: boolean; hopDuration?: number; hopKey?: string | number }) {
+export function PetToken({ pet, size, hop, hopKey, hopDuration, ownerId }: { pet: PetLook; size: number; /** 移動の時に1歩遅れて跳ねる */ ownerId?: string; hop?: boolean; hopDuration?: number; hopKey?: string | number }) {
+  const pulse = useBattle(s => ownerId ? s.petPulses[ownerId]?.id : undefined);
+  const settings = useBattle(s => s.settings);
+  const active = !!pulse && settings.cutinMode === 'standard';
   const def = getPet(pet.petId);
   const col = def.colors.find((c) => c.id === pet.color) ?? def.colors[0];
   const lv = petLoveLevel(pet.love);
-  const anim = hop ? 'pet-hop' : def.perch === 'float' ? 'pet-float' : def.perch === 'shoulder' ? 'pet-perch' : 'pet-bob';
+  const anim = hop || active ? 'pet-hop' : def.perch === 'float' ? 'pet-float' : def.perch === 'shoulder' ? 'pet-perch' : 'pet-bob';
   return (
-    <span className="pointer-events-none relative block" style={{ width: size, height: size }} aria-label={`${pet.name}（${def.name}）`} data-pet={pet.petId}>
-      <span key={hopKey} className={`absolute inset-0 flex items-center justify-center ${anim}`} style={{ fontSize: Math.max(12, size * 0.82), lineHeight: 1, ...(hop && hopDuration ? { animationDuration: `${hopDuration * 0.8}s`, animationDelay: `${hopDuration * 0.15}s` } : {}), filter: 'drop-shadow(0 1px 1.5px rgba(0,0,0,.8))' }}>
+    <span className="pointer-events-none relative block" style={{ width: size, height: size }} aria-label={`${pet.name}（${def.name}）`} data-pet={pet.petId} data-pet-owner={ownerId} data-pet-pulse={pulse}>
+      <span key={`${hopKey ?? 'idle'}:${pulse ?? 'idle'}`} className={`absolute inset-0 flex items-center justify-center ${anim}`} style={{ fontSize: Math.max(12, size * 0.82), lineHeight: 1, ...(active ? { animationDuration: `${TIMING.petPulse / speedFactor(settings)}s`, animationDelay: '0s' } : {}), ...(pulse && !active ? { outline: '2px solid #ffe9a8', borderRadius: '50%' } : {}), ...(hop && hopDuration ? { animationDuration: `${hopDuration * 0.8}s`, animationDelay: `${hopDuration * 0.15}s` } : {}), filter: 'drop-shadow(0 1px 1.5px rgba(0,0,0,.8))' }}>
         {def.icon}
       </span>
       {/* 色違いの印 */}

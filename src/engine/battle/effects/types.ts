@@ -1,5 +1,5 @@
 // ===== 効果の部品の決まりごと =====
-import type { AbilityDef, BattleEvent, BattleState, CardDef, Effect, EffectKind, EffectTarget, EffectParams } from '../../../types';
+import type { AbilityDef, AbilityNotice, BattleEvent, BattleState, CardDef, Effect, EffectKind, EffectTarget, EffectParams } from '../../../types';
 import type { Rng } from '../../rng';
 import type { Unit } from '../units';
 
@@ -26,7 +26,7 @@ export interface EffectCtx {
   /** 効果を受けた相手のID（敵の行動の演出用） */
   hitIds: string[];
   /** 働いた常時型の能力の名前（重複なし。演出用） */
-  fired: string[];
+  fired: AbilityNotice[];
   /** 能力の連鎖の深さ（無限に続かないように） */
   depth: number;
 }
@@ -53,3 +53,8 @@ export const upgradeAmount = (n: number) => n + Math.max(1, Math.ceil(n * 0.25))
 
 /** 型の宣言用: 効果のファイルで `declare module '../../../../types' { interface EffectParams { 種類: {...} } }` と書く */
 export type { EffectParams };
+
+/** 同じ効果内の連撃では発動表示を重複させない。 */
+export function recordActivation(ctx: EffectCtx, notice: AbilityNotice) {
+  if (!ctx.fired.some(n => n.name === notice.name)) ctx.fired.push(notice);
+}

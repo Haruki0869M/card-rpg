@@ -3,6 +3,9 @@
 // ここでは画面の切り替え・UI 用の一時状態（選択中のカード・演出）・保存・敵フェーズのタイマーを扱う。
 
 import { create } from 'zustand';
+import { normalizeSettings, type Settings } from './settings';
+import { battleFrames, explorationNotices, type PopupDraft, type PopupTone, type NoticeDraft, type PresentationFrame } from './presentation';
+export type { Settings } from './settings';
 import { TIMING, VIBRATION } from '../data/balance';
 import { cardOf } from '../data/cards';
 import { CLASSES } from '../data/classes';
@@ -31,11 +34,6 @@ import type { Room } from '../net/room';
 import type { BattleEvent, BattleState, Command, Difficulty, GameCommand, GameResult, GameState, Gender, PlayerId, SlotResult } from '../types';
 import { actorOf, autoName, battleActorOf, isLocalPlayer, LOCAL_PLAYER } from './battleConfig';
 
-export interface Settings {
-  fastMode: boolean;
-  vibration: boolean;
-}
-
 export interface Selection {
   cardUid: string;
   targetId?: string;
@@ -53,7 +51,8 @@ export interface Popup {
   id: number;
   unitId: string;
   text: string;
-  tone: 'damage' | 'block' | 'status' | 'zero' | 'ability' | 'heal';
+  tone: PopupTone;
+  lane: number;
 }
 
 /** ユニットごとの動きの演出 */
@@ -79,6 +78,9 @@ export interface WorldMovePresentation {
 }
 
 interface StoreState {
+  presentationBusy: boolean;
+  cutins: (NoticeDraft & { id: number })[];
+  petPulses: Record<string, { id: number }>;
   worldMoves: WorldMovePresentation[];
   finishWorldMove: (id: number) => void;
   screen: Screen;
@@ -169,11 +171,11 @@ function loadSave(): SaveData | null {
 function loadSettings(): Settings {
   try {
     const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? 'null');
-    if (s && typeof s.fastMode === 'boolean') return s;
+    return normalizeSettings(s);
   } catch {
     /* noop */
   }
-  return { fastMode: false, vibration: true };
+  return normalizeSettings(null);
 }
 
 function writeSave(s: Pick<StoreState, 'full' | 'activeId'>) {
@@ -233,28 +235,6 @@ function nextActive(battle: BattleState, current: string): string {
   }
   if (cur && !cur.dead) return current;
   return mine.find((a) => !a.dead)?.id ?? mine[0]?.id ?? current;
-}
-
-function popupsFromEvents(events: BattleEvent[]): Popup[] {
-  const out: Popup[] = [];
-  for (const e of events) {
-    if (e.type === 'damage') {
-      if (e.amount > 0) out.push({ id: fxId++, unitId: e.unitId, text: `-${e.amount}`, tone: 'damage' });
-      else out.push({ id: fxId++, unitId: e.unitId, text: e.blocked > 0 ? `防御 ${e.blocked}` : '0', tone: 'zero' });
-    } else if (e.type === 'block') {
-      out.push({ id: fxId++, unitId: e.unitId, text: `+${e.amount}`, tone: 'block' });
-    } else if (e.type === 'heal') {
-      out.push({ id: fxId++, unitId: e.unitId, text: `+${e.amount}`, tone: 'heal' });
-    } else if (e.type === 'status') {
-      const n = { vulnerable: '脆弱', weak: '弱体', burn: '火傷', poison: '毒' }[e.status];
-      out.push({ id: fxId++, unitId: e.unitId, text: `${n} ${e.amount}`, tone: 'status' });
-    } else if (e.type === 'ability') {
-      out.push({ id: fxId++, unitId: e.unitId, text: e.name, tone: 'ability' });
-    } else if (e.type === 'enemyPhase') {
-      out.push({ id: fxId++, unitId: e.enemyUid, text: e.name, tone: 'ability' });
-    }
-  }
-  return out;
 }
 
 /** 戦闘が無い時の表示用の空の戦闘（画面部品の型を単純に保つため） */
@@ -334,50 +314,88 @@ export const useBattle = create<StoreState>((set, get) => {
     );
   };
 
-  const applyEvents = (events: BattleEvent[]) => {
-    if (!events.length) return;
-    const { settings, battle } = get();
-    const patch: Partial<StoreState> = {};
-    const unitFx: Record<string, UnitFx> = { ...get().unitFx };
-    let unitFxChanged = false;
-    const setFx = (unitId: string, kind: UnitFx['kind']) => {
-      unitFx[unitId] = { kind, id: fxId++ };
-      unitFxChanged = true;
-    };
-    for (const e of events) {
-      if (e.type === 'roll') {
-        patch.rollFx = { id: fxId++, results: e.results, summary: e.summary, perfect: e.perfect };
-        const ally = findAlly(battle, e.characterId);
-        const inst = ally && [...ally.discard].reverse().find((c) => c.cardId === e.cardId);
-        const target = inst ? cardOf(inst).target : 'enemy';
-        setFx(e.characterId, target === 'self' ? 'cast' : 'attack');
-        if (e.perfect) vibrate(settings, VIBRATION.perfect);
-      } else if (e.type === 'retarget') {
-        patch.retargets = { ...(patch.retargets ?? get().retargets), [e.enemyUid]: fxId++ };
-      } else if (e.type === 'enemyAct') {
-        setFx(e.enemyUid, 'attack');
-      } else if (e.type === 'enemyPhase') {
-        setFx(e.enemyUid, 'phase');
-        vibrate(settings, VIBRATION.victory);
-      } else if (e.type === 'damage') {
-        if (e.amount > 0 || e.blocked > 0) setFx(e.unitId, 'hit');
-        if (e.amount > 0 && findAlly(battle, e.unitId)) vibrate(settings, VIBRATION.hurt);
-      } else if (e.type === 'phase' && e.phase === 'victory') {
-        vibrate(settings, VIBRATION.victory);
+  let frames: PresentationFrame[] = [];
+  let presentationTimer: ReturnType<typeof setTimeout> | null = null;
+  const uiTimers = new Set<ReturnType<typeof setTimeout>>();
+  let pendingNotices: NoticeDraft[] = [];
+  const later = (fn: () => void, seconds: number) => {
+    const timer = setTimeout(() => { uiTimers.delete(timer); fn(); }, seconds * 1000 / speedFactor(get().settings));
+    uiTimers.add(timer);
+  };
+  const clearPresentation = () => {
+    if (presentationTimer) clearTimeout(presentationTimer);
+    presentationTimer = null; frames = []; pendingNotices = [];
+    for (const timer of uiTimers) clearTimeout(timer);
+    uiTimers.clear();
+    set({ presentationBusy: false, cutins: [], petPulses: {}, popups: [], unitFx: {}, rollFx: null });
+  };
+  const addPopup = (p: PopupDraft) => {
+    const current = [...get().popups], own = current.filter(x => x.unitId === p.unitId);
+    const replaced = own.length >= TIMING.popupRows ? own[0] : undefined;
+    const used = new Set(own.map(x => x.lane));
+    const lane = replaced?.lane ?? Array.from({ length: TIMING.popupRows }, (_, i) => i).find(i => !used.has(i)) ?? 0;
+    const id = fxId++;
+    set({ popups: [...current.filter(x => x.id !== replaced?.id), { ...p, lane, id }] });
+    later(() => set(s => ({ popups: s.popups.filter(x => x.id !== id) })), TIMING.resultPopup);
+  };
+  const pumpNotices = () => {
+    if (get().worldMoves.length) return;
+    while (pendingNotices.length && get().cutins.length < TIMING.cutinVisible) {
+      const n = pendingNotices.shift()!, id = fxId++;
+      set(s => ({ cutins: [...s.cutins, { ...n, id }], petPulses: { ...s.petPulses, [n.unitId]: { id } } }));
+      later(() => set(s => {
+        const pulses = { ...s.petPulses }; if (pulses[n.unitId]?.id === id) delete pulses[n.unitId];
+        return { petPulses: pulses };
+      }), TIMING.petPulse);
+      later(() => { set(s => ({ cutins: s.cutins.filter(x => x.id !== id) })); pumpNotices(); }, TIMING.abilityCutin);
+    }
+  };
+  const showNotices = (notices: NoticeDraft[]) => {
+    for (const n of notices) {
+      if (n.source?.kind === 'pet') {
+        const existing = pendingNotices.find(x => x.unitId === n.unitId && x.name === n.name);
+        if (existing) existing.count = (existing.count ?? 1) + (n.count ?? 1);
+        else pendingNotices.push(n);
+      } else {
+        addPopup({ unitId: n.unitId, tone: 'ability', text: `【${n.source?.kind === 'inherited' ? '継承：' : ''}${n.name}】${(n.count ?? 1) > 1 ? `×${n.count}` : ''}` });
       }
     }
-    if (unitFxChanged) patch.unitFx = unitFx;
-    const newPopups = popupsFromEvents(events);
-    if (newPopups.length) {
-      patch.popups = [...get().popups, ...newPopups].slice(-10);
-      const ids = new Set(newPopups.map((p) => p.id));
-      setTimeout(() => set((s) => ({ popups: s.popups.filter((p) => !ids.has(p.id)) })), (TIMING.resultPopup * 1000 + 250) / speedFactor(settings));
+    pumpNotices();
+  };
+  const applyFrame = (frame: PresentationFrame) => {
+    if (frame.roll) {
+      const e = frame.roll;
+      set({ rollFx: { id: fxId++, results: e.results, summary: e.summary, perfect: e.perfect } });
+      if (e.perfect) vibrate(get().settings, VIBRATION.perfect);
     }
-    set(patch);
+    if (frame.motions?.length) set(s => ({ unitFx: { ...s.unitFx, ...Object.fromEntries(frame.motions!.map(m => [m.unitId, { kind: m.kind, id: fxId++ }])) } }));
+    for (const p of frame.popups ?? []) addPopup(p);
+    showNotices(frame.notices ?? []);
+  };
+  const drainFrames = () => {
+    presentationTimer = null;
+    const frame = frames.shift();
+    if (!frame) { set({ presentationBusy: false }); return; }
+    const wait = frames.length > TIMING.presentationFramesMax ? 0 : frame.delay;
+    presentationTimer = setTimeout(() => {
+      presentationTimer = null; applyFrame(frame);
+      if (frames.length) drainFrames();
+      else presentationTimer = setTimeout(drainFrames, TIMING.actionLead * 1000 / speedFactor(get().settings));
+    }, wait * 1000 / speedFactor(get().settings));
+  };
+  const applyEvents = (events: BattleEvent[]) => {
+    if (!events.length) return;
+    for (const e of events) {
+      if (e.type === 'retarget') set(s => ({ retargets: { ...s.retargets, [e.enemyUid]: fxId++ } }));
+      if (e.type === 'phase' && e.phase === 'victory') vibrate(get().settings, VIBRATION.victory);
+      if (e.type === 'damage' && e.amount > 0 && findAlly(get().battle, e.unitId)) vibrate(get().settings, VIBRATION.hurt);
+    }
+    frames.push(...battleFrames(events));
+    if (frames.length) { set({ presentationBusy: true }); if (!presentationTimer) drainFrames(); }
   };
 
   /** 新しい戦闘に入った時の UI のリセット */
-  const resetBattleUi = (b: BattleState): Partial<StoreState> => ({
+  const resetBattleUi = (b: BattleState): Partial<StoreState> => { clearPresentation(); return ({
     selection: null,
     rollFx: null,
     popups: [],
@@ -386,10 +404,10 @@ export const useBattle = create<StoreState>((set, get) => {
     flash: null,
     hint: null,
     activeId: nextActive(b, b.allies.find((a) => isLocalPlayer(a.playerId))?.id ?? b.allies[0].id),
-  });
+  }); };
 
   /** 操作の結果を画面に反映する（この端末の操作・部屋から届いた操作で共通） */
-  const commit = (r: GameResult, cmdScene: string) => {
+  const commit = (r: GameResult, cmdScene: string, wire: GameCommand) => {
     const before = get().full;
     const full = r.state;
     const prevBattle = get().game?.battle;
@@ -402,11 +420,14 @@ export const useBattle = create<StoreState>((set, get) => {
     if (turn && turn !== before?.world?.turn && isLocalPlayer(full.heroes.find((h) => h.id === turn)?.playerId ?? 'P1')) scene = sceneOfHero(full, turn);
     scene = pickScene(full, scene);
     const next = viewOf(full, scene);
+    if (scene !== get().scene) clearPresentation();
     const patch: Partial<StoreState> = { full, scene, game: next };
+    let opening: BattleEvent[] = [];
     if (next.battle) {
       patch.battle = next.battle;
       if (next.battle !== prevBattle && (!prevBattle || prevBattle.seed !== next.battle.seed || prevBattle.encounterId !== next.battle.encounterId)) {
         Object.assign(patch, resetBattleUi(next.battle));
+        opening = next.battle.openingEvents ?? [];
       } else if (next.battle.phase === 'ally') {
         patch.activeId = nextActive(next.battle, get().activeId);
       }
@@ -425,7 +446,10 @@ export const useBattle = create<StoreState>((set, get) => {
     }
     set(patch);
     // 見ている場面の出来事だけ演出する
-    if (cmdScene === scene) applyEvents(r.battleEvents);
+    if (cmdScene === scene) {
+      applyEvents([...opening, ...r.battleEvents]);
+      if (before) showNotices(explorationNotices(before, full, wire));
+    }
     scheduleSave(get);
     scheduleEnemy();
   };
@@ -454,7 +478,7 @@ export const useBattle = create<StoreState>((set, get) => {
       if (!silent) get().showToast(r.error);
       return r.error;
     }
-    commit(r, unwrapCommand(wire).scene);
+    commit(r, unwrapCommand(wire).scene, wire);
     return undefined;
   };
 
@@ -467,9 +491,10 @@ export const useBattle = create<StoreState>((set, get) => {
     battle: viewIn(saved?.game ?? null, pickScene(saved?.game ?? null, WORLD_SCENE, true))?.battle ?? EMPTY_BATTLE,
     settings: loadSettings(),
     worldMoves: [],
+    presentationBusy: false, cutins: [], petPulses: {},
     finishWorldMove: id => {
       set(s => ({ worldMoves: s.worldMoves[0]?.id === id ? s.worldMoves.slice(1) : s.worldMoves }));
-      if (!get().worldMoves.length) scheduleEnemy();
+      if (!get().worldMoves.length) { pumpNotices(); scheduleEnemy(); }
     },
     activeId: saved?.activeId ?? '',
     selection: null,
@@ -483,8 +508,9 @@ export const useBattle = create<StoreState>((set, get) => {
     hint: null,
     toast: null,
 
-    setScreen: (screen) => set({ screen, sheet: null }),
+    setScreen: (screen) => { if (screen !== 'game') clearPresentation(); set({ screen, sheet: null }); },
     setScene: (s) => {
+      clearPresentation();
       const { full } = get();
       const scene = pickScene(full, s);
       const game = viewIn(full, scene);
@@ -501,6 +527,7 @@ export const useBattle = create<StoreState>((set, get) => {
     setDraft: (d) => set({ draft: { ...get().draft, ...d } }),
 
     startGame: () => {
+      clearPresentation();
       const d = get().draft;
       const game = createGame({
         seed: makeSeed(),
@@ -522,6 +549,7 @@ export const useBattle = create<StoreState>((set, get) => {
     },
 
     exitOnline: () => {
+      clearPresentation();
       if (enemyTimer) clearTimeout(enemyTimer);
       enemyTimer = null;
       enemyInFlight = false;
@@ -532,6 +560,7 @@ export const useBattle = create<StoreState>((set, get) => {
     },
 
     abandonGame: () => {
+      clearPresentation();
       if (enemyTimer) clearTimeout(enemyTimer);
       enemyTimer = null;
       set({ worldMoves: [], full: null, scene: WORLD_SCENE, game: null, screen: 'title', confirmAbandon: false, sheet: null, battle: EMPTY_BATTLE, selection: null });
@@ -575,10 +604,11 @@ export const useBattle = create<StoreState>((set, get) => {
 
     applyRemote: (r, cmd) => {
       enemyInFlight = false;
-      commit(r, unwrapCommand(cmd).scene);
+      commit(r, unwrapCommand(cmd).scene, cmd);
     },
 
     loadRemote: (full) => {
+      clearPresentation();
       enemyInFlight = false;
       if (enemyTimer) clearTimeout(enemyTimer);
       enemyTimer = null;
@@ -716,7 +746,7 @@ export const useBattle = create<StoreState>((set, get) => {
     },
 
     setSettings: (s) => {
-      const settings = { ...get().settings, ...s };
+      const settings = normalizeSettings({ ...get().settings, ...s });
       set({ settings });
       try {
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));

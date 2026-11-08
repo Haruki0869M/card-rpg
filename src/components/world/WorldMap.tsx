@@ -381,7 +381,7 @@ export function WorldMap({
                   const sp = petSpot(h.pet.petId, s);
                   return (
                     <span className="absolute" style={{ left: sp.left, top: sp.top }}>
-                      <PetToken pet={h.pet} size={sp.size} hop={!!anim?.heroes.includes(id) && anim.i > 0 && !anim.arrived} hopDuration={stepMs / 1000} hopKey={anim?.heroes.includes(id) ? `p${anim.i}` : 'still'} />
+                      <PetToken ownerId={h.id} pet={h.pet} size={sp.size} hop={!!anim?.heroes.includes(id) && anim.i > 0 && !anim.arrived} hopDuration={stepMs / 1000} hopKey={anim?.heroes.includes(id) ? `p${anim.i}` : 'still'} />
                     </span>
                   );
                 })()}

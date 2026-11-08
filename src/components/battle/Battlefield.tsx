@@ -1,7 +1,7 @@
 // ===== 戦場（画面上半分） =====
 // 背景の上に、敵（上段）と味方（下段）が向かい合う。動きの演出はラッパー要素の transform だけで行う。
 
-import { motion, useAnimate } from 'framer-motion';
+import { motion, useAnimate, useReducedMotion } from 'framer-motion';
 import { memo, useEffect, useMemo } from 'react';
 import { BattleBackground, CharacterArt, EnemyArt } from '../../art';
 import { getPet } from '../../data/pets';
@@ -28,22 +28,21 @@ function useUnitMotion(unitId: string, side: 'ally' | 'enemy') {
   const [scope, animate] = useAnimate<HTMLDivElement>();
   const fx: UnitFx | undefined = useBattle((s) => s.unitFx[unitId]);
   const fast = useBattle((s) => s.settings.fastMode);
+  const simple = useBattle(s => s.settings.cutinMode === 'simple');
+  const reduced = useReducedMotion();
   useEffect(() => {
     if (!fx || !scope.current) return;
     const k = 1 / speedFactor({ fastMode: fast });
     const dir = side === 'ally' ? 1 : -1;
-    if (fx.kind === 'attack') {
-      animate(scope.current, { x: [0, 26 * dir, 0], y: [0, -12 * dir, 0], scale: [1, 1.08, 1] }, { duration: 0.28 * k, ease: 'easeOut' });
-    } else if (fx.kind === 'cast') {
-      animate(scope.current, { y: [0, -10, 0], scale: [1, 1.06, 1] }, { duration: 0.3 * k, ease: 'easeOut' });
-    } else {
-      animate(
-        scope.current,
-        { x: [0, -7 * dir, 7 * dir, -4 * dir, 0], opacity: [1, 0.35, 1, 0.55, 1] },
-        { duration: 0.3 * k, ease: 'linear' },
-      );
-    }
-  }, [fx?.id]);
+    scope.current.dataset.unitMotion = fx.kind;
+    scope.current.dataset.motionUnit = unitId;
+    const frames = reduced || simple ? { opacity: [1, 0.6, 1] } : fx.kind === 'attack'
+      ? { x: [0, 12 * dir, 0], y: [0, -12 * dir, 0], scale: [1, 1.08, 1] }
+      : fx.kind === 'cast' ? { y: [0, -10, 0], scale: [1, 1.06, 1] }
+      : { x: [0, -7 * dir, 7 * dir, -4 * dir, 0], opacity: [1, 0.35, 1, 0.55, 1] };
+    const controls = animate(scope.current, frames, { duration: (reduced || simple ? 0.14 : 0.28) * k, ease: 'easeOut' });
+    return () => controls.stop();
+  }, [fx?.id, fast, simple, reduced]);
   return scope;
 }
 
@@ -299,19 +298,19 @@ const AllySprite = memo(function AllySprite({ ally, left, bottom, h, active }: {
         </div>
       </div>
       {/* お供: 鳥は肩、小竜は浮く、それ以外は足元 */}
-      {ally.pet && !ally.dead && <AllyPet pet={ally.pet} h={h} />}
+      {ally.pet && !ally.dead && <AllyPet ownerId={ally.id} pet={ally.pet} h={h} />}
       <UnitPopups unitId={ally.id} top="5%" />
     </div>
   );
 });
 
-function AllyPet({ pet, h }: { pet: NonNullable<AllyState['pet']>; h: number }) {
+function AllyPet({ pet, h, ownerId }: { ownerId: string; pet: NonNullable<AllyState['pet']>; h: number }) {
   const perch = getPet(pet.petId).perch;
   const size = Math.round(h * (perch === 'feet' ? 0.3 : 0.24));
   const pos = perch === 'shoulder' ? { right: '-2%', top: '20%' } : perch === 'float' ? { left: '-22%', top: '8%' } : { left: '-26%', bottom: '-2%' };
   return (
     <div className="pointer-events-none absolute" style={pos}>
-      <PetToken pet={pet} size={size} />
+      <PetToken ownerId={ownerId} pet={pet} size={size} />
     </div>
   );
 }

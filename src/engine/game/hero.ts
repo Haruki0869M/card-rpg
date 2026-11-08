@@ -38,10 +38,10 @@ export const heroExtraDraw = (hero: Hero) => equippedItems(hero).reduce((n, i) =
 /** 装備の特殊能力（エピック以上。spec §12.7） */
 export const heroAbilities = (hero: Hero) => [
   // 転職で持ち越した、前のジョブの戦闘の特殊能力（spec §6.4）
-  ...(hero.carried && hero.carried !== hero.classId ? [getClass(hero.carried).battleAbility] : []),
+  ...(hero.carried && hero.carried !== hero.classId ? [{ ...getClass(hero.carried).battleAbility, source: { kind: 'inherited' as const, id: hero.carried, label: getClass(hero.carried).name } }] : []),
   ...equippedItems(hero)
     .filter((i) => i.ability)
-    .map((i) => ({ name: i.ability!.name, effect: i.ability!.effect })),
+    .map((i) => ({ ...i.ability!, source: { kind: 'equipment' as const, id: i.id, label: i.name } })),
   // お供の能力（獣使い系統は2倍）
   ...petAbilities(hero),
 ];

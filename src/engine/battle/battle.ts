@@ -39,7 +39,7 @@ import { abilityTriggered, addLog, enemyName, findAlly, findEnemy, healUnit, los
 
 export { enemyName, findAlly, findEnemy, unitName } from './units';
 
-export const STATE_VERSION = 12;
+export const STATE_VERSION = 13;
 export { slotPreviewLimitOf } from './preview';
 
 // ---------- 生成 ----------
@@ -148,13 +148,15 @@ export function createBattle(setup: BattleSetup): BattleState {
     for (const e of state.enemies) e.intent = undefined;
     addLog(state, '奇襲成功！ 敵は最初のターンに動けない');
   }
-  startAllyPhase(state, rng, []);
+  const openingEvents: BattleEvent[] = [];
+  startAllyPhase(state, rng, openingEvents);
   // 装備による戦闘開始時のブロック（味方フェーズ開始のリセットの後に入れる）
   party.forEach((m, i) => {
     if (m.startBlock && !allies[i].dead) allies[i].block += m.startBlock;
   });
   // きっかけ: 戦闘開始時
-  for (const u of [...state.allies, ...state.enemies]) if (!u.dead) fireAbilities(state, rng, [], u, 'battleStart');
+  for (const u of [...state.allies, ...state.enemies]) if (!u.dead) fireAbilities(state, rng, openingEvents, u, 'battleStart');
+  state.openingEvents = openingEvents;
   checkEnd(state, []);
   state.rngState = rng.state;
   return state;
@@ -458,7 +460,7 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   const hasDamage = tier.effects.some((e) => e.kind === 'damage');
   if (hasDamage) parts.unshift(`${ctx.dealt} DMG`);
   // 働いた常時型の能力（闘志・貫通・止めなど）
-  for (const n of ctx.fired) abilityTriggered(state, ally.id, n, events);
+  for (const n of ctx.fired) abilityTriggered(state, ally.id, n.name, events, n.source);
 
   // きっかけ: カードの特殊能力 → 自分の能力（カードを使った後 → 完全成功時）
   const fireOpts = { card, target, dealt: ctx.dealt, focusUsed, tierEffects: tier.effects, perfect, successes, supportedOthers };
@@ -473,7 +475,7 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
     if (!summon.echoPct) continue;
     const echo = makeCtx(state, rng, events, ally, { card, target });
     for (const eff of tier.effects) if (eff.kind === 'damage') applyEffect(echo, { ...eff, amount: Math.floor(eff.amount * summon.echoPct / 100) });
-    if (echo.dealt > 0) abilityTriggered(state, ally.id, summon.name, events);
+    if (echo.dealt > 0) abilityTriggered(state, ally.id, summon.name, events, { kind: 'summon', id: summon.id, label: summon.name });
   }
 
   state.stats.maxDamage = Math.max(state.stats.maxDamage, ctx.dealt);
@@ -512,7 +514,7 @@ function summonsAttack(state: BattleState, ally: AllyState, rng: Rng, events: Ba
     const t = s.targetId ? foes.find(e => e.uid === s.targetId) ?? foes[0] : foes[rng.int(foes.length)];
     const ctx = makeCtx(state, rng, events, ally, { target: t });
     const loss = dealDamage(ctx, t, s.damage, s.element);
-    abilityTriggered(state, ally.id, s.name, events);
+    abilityTriggered(state, ally.id, s.name, events, { kind: 'summon', id: s.id, label: s.name });
     addLog(state, `${ally.name}の${s.name}が${enemyName(t)}を攻撃！ ${loss}ダメージ`);
     if (s.turns < 99) s.turns -= 1;
   }
@@ -633,7 +635,7 @@ function executeIntent(state: BattleState, enemy: EnemyState, rng: Rng, events: 
       owner.summons = owner.summons!.filter(s => s !== token);
       const trap = makeCtx(state, rng, events, owner, { target: enemy });
       for (const eff of token.effects ?? []) applyEffect(trap, eff);
-      abilityTriggered(state, owner.id, token.name, events);
+      abilityTriggered(state, owner.id, token.name, events, { kind: 'summon', id: token.id, label: token.name });
       addLog(state, `${owner.name}の${token.name}が発動した`);
     }
   }
@@ -643,7 +645,7 @@ function executeIntent(state: BattleState, enemy: EnemyState, rng: Rng, events: 
   const actionMultiplier = enemy.nextActionMultiplier ?? 1;
   delete enemy.nextActionMultiplier;
   for (const eff of action.effects) applyEffect(ctx, 'amount' in eff ? { ...eff, amount: Math.floor(eff.amount * actionMultiplier) } : eff);
-  for (const n of ctx.fired) abilityTriggered(state, enemy.uid, n, events);
+  for (const n of ctx.fired) abilityTriggered(state, enemy.uid, n.name, events, n.source);
   addLog(state, `${enemyName(enemy)}「${action.name}」${ctx.parts.join(' / ')}`);
   enemy.intent = undefined;
 }

@@ -1,7 +1,7 @@
 // ===== オンライン協力の部屋（テスト用の通信で、複数の端末をまねる） =====
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { botNextCommand } from '../../engine/bot';
-import { commandPlayer, createBattle, stateHash, toPartyMember } from '../../engine';
+import { commandPlayer, createBattle, heroAbilities, stateHash, toPartyMember } from '../../engine';
 import { MemoryHub } from '../memoryBackend';
 import { normalizeCode, Room, RoomError, seqKey, SNAPSHOT_EVERY } from '../room';
 
@@ -94,6 +94,20 @@ describe('毛色抽選の通信と再接続', () => {
 });
 
 describe('特殊職の通信と再接続', () => {
+  it('2端末へ現職・引き継ぎ・お供の同じ発動通知を配り、戦闘結果も一致する', async () => {
+    const { rooms } = await specialBattle(['swordSaint', 'warrior']);
+    const notifications: unknown[][] = [[], []];
+    rooms.forEach((r, i) => {
+      const h = r.game!.heroes[0]; h.carried = 'swordmaster'; h.pet = { petId: 'blackCat', color: 'black', name: 'ルナ', love: 0, acts: 0 };
+      const a = r.game!.battle!.allies[0]; a.abilities = heroAbilities(h); a.pet = h.pet; a.hand = [{ uid: 's', cardId: 'strike' }]; a.focus = 6;
+      r.on(e => { if (e.type === 'command') notifications[i].push(e.result.battleEvents); });
+    });
+    await rooms[0].send({ type: 'BATTLE', command: { type: 'PLAY_CARD', playerId: 'P1', characterId: 'h0', cardInstanceId: 's', targetId: 'e0', focusUsed: 1 } }); await settle();
+    expect(allSame(rooms)).toBe(true); expect(notifications[0]).toEqual(notifications[1]);
+    const text = JSON.stringify(notifications[0]); expect(text).toContain('"kind":"job"'); expect(text).toContain('"kind":"inherited"'); expect(text).toContain('"kind":"pet"');
+    for (const r of rooms) await r.leave();
+  });
+
   it('P1の歌がP2〜P4へ届き、P2のカード使用でP2の応援だけ消える', async () => {
     const { rooms } = await specialBattle(['bard', 'warrior', 'mage', 'hunter']);
     for (const r of rooms) {

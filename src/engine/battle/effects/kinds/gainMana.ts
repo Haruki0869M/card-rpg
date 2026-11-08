@@ -14,7 +14,7 @@ export const effect: EffectHandler<'gainMana'> = {
   defaultTo: 'self',
   apply(ctx, e) {
     const ts = resolveTargets(ctx, targetOf(e)).filter((t) => !isEnemy(t));
-    for (const t of ts) if (!isEnemy(t)) t.mana += e.amount;
+    for (const t of ts) if (!isEnemy(t)) { t.mana += e.amount; if (e.amount > 0) ctx.events.push({ type: 'resource', unitId: t.id, resource: 'mana', amount: e.amount }); }
     if (ts.length) ctx.parts.push(`マナ+${e.amount}`);
     return ts.length > 0;
   },
