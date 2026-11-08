@@ -1,7 +1,7 @@
 // ===== 宝箱の画面: 運のスロット → 確率が上へずれる → 揺れと光の段階アップ → リーチ → レジェンド演出（spec §10.3） =====
 // 格はエンジンが1回だけ抽選済み。ここは結果を「段階的に見せる」だけ（ガセ演出なし: 光・リーチ・予告は本当の格のときだけ出る）
 import { VoteChips } from '../ui/Votes';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Check, ChevronsRight, Lock, Sparkles, Star, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BattleBackground, ChestImage } from '../../art';
@@ -15,6 +15,7 @@ import type { ChestRoll, Hero, Rarity, SlotResult } from '../../types';
 import { CheckPanel, RollStrip } from '../ui/CheckPanel';
 import { CHEST_NAME, fmtPct, OddsBar } from '../ui/ChestOdds';
 import { RARITY_STYLE, Screen } from '../ui/game';
+import { CHEST_VIDEO_SECONDS, ChestVideo, chestVideoUrl } from './ChestVideo';
 import { LootList } from './RoomScreens';
 
 /** 光の色（白 → 青 → 紫 → 金）。本当の格の色で止まる */
@@ -28,12 +29,13 @@ type Step =
   | { kind: 'light'; level: number; dur: number }
   | { kind: 'reach'; dur: number }
   | { kind: 'premium'; dur: number }
+  | { kind: 'video'; dur: number }
   | { kind: 'result'; dur: 0 };
 
 const isTenpai = (results: SlotResult[]) => results.length >= 3 && results.slice(0, -1).every((r) => r !== 'miss');
 
-/** 演出の段取り（格が高いほど長く、段階が多い） */
-function buildTimeline(roll: ChestRoll): Step[] {
+/** 演出の段取り（格が高いほど長く、段階が多い）。video = 結果の前に、宝箱が開く動画を流す */
+export function buildTimeline(roll: ChestRoll, video = false): Step[] {
   const T = REVEAL_TIMING;
   const g = rarityIndex(roll.grade ?? 'common');
   const n = roll.results.length;
@@ -47,6 +49,8 @@ function buildTimeline(roll: ChestRoll): Step[] {
     steps.push({ kind: 'light', level: 3, dur: T.lightStep });
     steps.push({ kind: 'premium', dur: T.premium });
   }
+  // 動画は読み込みが遅れることがあるので、長さより少し長く待つ（終われば すぐ次へ）
+  if (video) steps.push({ kind: 'video', dur: CHEST_VIDEO_SECONDS + 0.6 });
   steps.push({ kind: 'result', dur: 0 });
   return steps;
 }
@@ -212,10 +216,16 @@ export function ChestScreen() {
   const roll = chest.lastRoll?.kind === 'luck' ? chest.lastRoll : undefined;
   const grade: Rarity = chest.grade ?? roll?.grade ?? look;
   const speed = speedFactor(settings);
+  // 宝箱が開く動画（宝箱の見た目の格ごと）。動作軽減・簡易のカットイン・読めなかった時は、今までの演出だけ
+  const reduced = useReducedMotion();
+  const [videoFailed, setVideoFailed] = useState(false);
+  const videoUrl = reduced || settings.cutinMode === 'simple' || videoFailed ? undefined : chestVideoUrl(look);
 
   // この端末で開けた時だけ演出する（再開した時は結果をそのまま見せる）
   const [stepIdx, setStepIdx] = useState<number | null>(null);
-  const timeline = useMemo(() => (roll && roll.grade ? buildTimeline(roll) : []), [roll]);
+  // 段取りは開けた時に決める（途中で動画が読めなくなっても、段取りは作り直さず、動画の段を飛ばす）
+  const useVideo = useRef(false);
+  const timeline = useMemo(() => (roll && roll.grade ? buildTimeline(roll, useVideo.current) : []), [roll]);
   const step = stepIdx === null ? undefined : timeline[stepIdx];
   const animating = !!step && step.kind !== 'result';
   const pendingOpen = useRef(false);
@@ -246,6 +256,8 @@ export function ChestScreen() {
   const skip = () => {
     if (animating) setStepIdx(timeline.length - 1);
   };
+  /** 動画の段を終える（再生が終わった・読めなかった） */
+  const endVideo = () => setStepIdx((i) => (i !== null && timeline[i]?.kind === 'video' ? i + 1 : i));
 
   // 今の光の段階（-1 = まだ光っていない）
   let light = -1;
@@ -273,6 +285,19 @@ export function ChestScreen() {
         <BattleBackground kind={sceneBackground(game)} className="absolute inset-0 h-full w-full opacity-35" />
         {premium && <PremiumLayer dim={showResult} />}
         <AnimatePresence>{reach && <ReachLayer key="reach" />}</AnimatePresence>
+        {/* 宝箱が開く動画: 演出の初めから置いて読み込み、動画の段で見せて再生する */}
+        {animating && useVideo.current && videoUrl && (
+          <ChestVideo
+            src={videoUrl}
+            playing={step?.kind === 'video'}
+            speed={speed}
+            onDone={endVideo}
+            onFail={() => {
+              setVideoFailed(true);
+              endVideo();
+            }}
+          />
+        )}
         {/* 光が上がった瞬間のフラッシュ */}
         <AnimatePresence>
           {step?.kind === 'light' && step.level > 0 && (
@@ -461,7 +486,10 @@ export function ChestScreen() {
               </button>
               <button
                 onClick={() => {
-                  if (!locked) pendingOpen.current = true;
+                  if (!locked) {
+                    pendingOpen.current = true;
+                    useVideo.current = !!videoUrl;
+                  }
                   dispatchGame({ type: 'OPEN_CHEST', playerId: LOCAL_PLAYER, heroId, recipientId: recipientId ?? heroId, focusUsed: focus });
                   setFocus(0);
                 }}

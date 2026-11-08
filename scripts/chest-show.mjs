@@ -6,6 +6,7 @@ import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from 'node:f
 import { chromium, URL } from './lib.mjs';
 
 const OUT = 'screenshots/chest';
+const problems = [];
 mkdirSync(OUT, { recursive: true });
 const VIEW = { width: 360, height: 640 };
 const KEY = 'card-rpg/adventure';
@@ -61,9 +62,11 @@ async function atChest(page, base, look, seed) {
   await page.getByText('運のスロットで開ける').waitFor();
 }
 
+// ffmpeg は環境変数 FFMPEG（無ければ PATH の ffmpeg）
+const FFMPEG = process.env.FFMPEG ?? 'ffmpeg';
 let hasFfmpeg = true;
 try {
-  execSync('ffmpeg -version', { stdio: 'ignore' });
+  execSync(`"${FFMPEG}" -version`, { stdio: 'ignore' });
 } catch {
   hasFfmpeg = false;
 }
@@ -112,13 +115,20 @@ for (const [grade, { seed, look }] of Object.entries(found)) {
   await p.getByText('運のスロットで開ける').click();
   // コマ割り（0.35秒ごと）
   const frames = [];
-  for (let i = 0; i < 22; i++) {
+  let videoPlayed = false;
+  for (let i = 0; i < 30; i++) {
     const f = `${OUT}/f-${grade}-${String(i).padStart(2, '0')}.png`;
     await p.screenshot({ path: f });
     frames.push(f);
+    // 宝箱が開く動画（ChestVideo）が見えていて、本当に進んでいるか
+    if (await p.locator('[data-chest-video="playing"]').count()) {
+      const t = await p.locator('[data-chest-video="playing"] video').evaluate((v) => v.currentTime).catch(() => 0);
+      if (t > 0) videoPlayed = true;
+    }
     if (await p.getByText('先へ進む').count()) break;
     await p.waitForTimeout(350);
   }
+  if (!videoPlayed) problems.push(`${grade}: 宝箱が開く動画が再生されなかった`);
   await p.waitForTimeout(1200);
   await c.close();
   const vid = readdirSync(dir).find((f) => f.endsWith('.webm'));
@@ -126,7 +136,7 @@ for (const [grade, { seed, look }] of Object.entries(found)) {
   rmSync(dir, { recursive: true, force: true });
   let video = `${OUT}/${grade}.webm`;
   if (hasFfmpeg) {
-    execSync(`ffmpeg -y -loglevel error -i ${OUT}/${grade}.webm -vf "fps=30,scale=360:-2" -pix_fmt yuv420p ${OUT}/${grade}.mp4`);
+    execSync(`"${FFMPEG}" -y -loglevel error -i ${OUT}/${grade}.webm -vf "fps=30,scale=360:-2" -pix_fmt yuv420p ${OUT}/${grade}.mp4`);
     rmSync(`${OUT}/${grade}.webm`);
     video = `${OUT}/${grade}.mp4`;
   }
@@ -140,3 +150,8 @@ for (const [grade, { seed, look }] of Object.entries(found)) {
   console.log(`${grade}: seed ${seed} (${look}) → ${video}`);
 }
 await browser.close();
+if (problems.length) {
+  console.error(problems.join('\n'));
+  process.exit(1);
+}
+console.log('chest-show: 4つの格で、宝箱が開く動画が再生された');
