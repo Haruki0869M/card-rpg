@@ -44,11 +44,11 @@ function Door({ bg, face, shade, opening }: { bg: string; face: ViewFace; shade:
   const img = artImage(`dungeon/${bg}-door`);
   const boss = face === 'boss';
   if (face === 'arch') return <div className="absolute inset-x-[22%] top-[22%] bottom-0 rounded-t-[40%] bg-black/85" style={{ boxShadow: 'inset 0 0 12px #000' }} />;
-  // 扉が開く（第3段階B2）: 左右の扉板が外へ開き、奥の暗がりが見える
+  // 扉が開く（第3段階B2）: 奥へ開いて暗がりが見える。ふつうの扉は片開き（左の蝶番・右に取っ手）、ボスの扉は両開きの門
   if (opening) {
-    const leaf = (side: 'left' | 'right') => (
+    const leaf = (side: 'left' | 'right', whole = false) => (
       <div
-        className="door-leaf absolute inset-y-0 w-1/2"
+        className={`door-leaf absolute inset-y-0 ${whole ? 'w-full' : 'w-1/2'}`}
         style={{
           [side]: 0,
           transformOrigin: side,
@@ -56,16 +56,24 @@ function Door({ bg, face, shade, opening }: { bg: string; face: ViewFace; shade:
           animationDuration: `${opening}s`,
           backgroundColor: t.door,
           backgroundImage: img ? `url(${img})` : 'repeating-linear-gradient(90deg, rgba(0,0,0,.35) 0 2px, transparent 2px 50%)',
-          backgroundSize: img ? '200% 100%' : undefined,
+          backgroundSize: img ? (whole ? 'cover' : '200% 100%') : undefined,
           backgroundPosition: side === 'left' ? 'left' : 'right',
-          borderRight: side === 'left' ? '2px solid #1a0e08' : undefined,
+          borderRight: side === 'left' && !whole ? '2px solid #1a0e08' : undefined,
         }}
-      />
+      >
+        {whole && <span className="absolute right-[14%] top-1/2 h-[7%] w-[7%] rounded-full bg-amber-300/80" />}
+      </div>
     );
     return (
       <div className="absolute bottom-0 overflow-hidden rounded-t-[30%] bg-black" style={{ left: boss ? '12%' : '22%', right: boss ? '12%' : '22%', top: boss ? '10%' : '22%', border: `3px solid ${boss ? '#d8a830' : '#2a1a10'}` }}>
-        {leaf('left')}
-        {leaf('right')}
+        {boss ? (
+          <>
+            {leaf('left')}
+            {leaf('right')}
+          </>
+        ) : (
+          leaf('left', true)
+        )}
       </div>
     );
   }
@@ -86,7 +94,9 @@ function Door({ bg, face, shade, opening }: { bg: string; face: ViewFace; shade:
         filter: face === 'locked' ? 'grayscale(.7) brightness(.6)' : undefined,
       }}
     >
-      {boss && <Crown className="text-amber-300" style={{ width: '34%', height: '34%' }} />}
+      {/* ボスの扉は両開きの門（真ん中に合わせ目） */}
+      {boss && <span className="absolute inset-y-0 left-1/2 w-[4px] -translate-x-1/2 bg-[#120804] shadow-[0_0_3px_#000]" />}
+      {boss && <Crown className="relative text-amber-300" style={{ width: '34%', height: '34%' }} />}
       {face === 'locked' && <Lock className="text-zinc-300/80" style={{ width: '24%', height: '24%' }} />}
       {face === 'door' && <span className="absolute right-[14%] top-1/2 h-[7%] w-[7%] rounded-full bg-amber-300/80" />}
     </div>
