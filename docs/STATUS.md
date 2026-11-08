@@ -5,6 +5,14 @@
 
 
 
+
+## 本番へ再公開（2回目・2026-11-09 05時台・まとめ役 Claude）
+
+夜の間の公開はオーナーが事前にOK（「確認が全部通った版だけ」）。確認済みの 98601c6 を `npm run deploy:firebase` で公開（index-DfB0DB9F.js）。
+- 公開前の確認（4199番・配信ビルドが自分の dist と一致を確認）: vitest 737件成功/5件スキップ・ビルド・lorebook・check-layout・world-move-stability・interaction-safety・pets・battle-feedback・dungeon-view・turn-cutin・playthrough・sanctuaries・jobchange・weapon-icons・piece-art・movement-pet-colors・chest-show・adventure（侵食の魔王・凍てつく王国・呪われた群島・機械仕掛けの帝国・種なし。各2人/4人）すべて成功。
+- 公開後の本番での確認: world-move-stability・dungeon-view・chest-show・adventure（呪われた群島2人）成功。
+- 1回目の確認で、呪われた群島2人が timeout → 負けた時の復活の町が船なしで行けない島になる不具合を見つけて直してから公開した（42b3403）。
+
 ## K3 C レアの敵10体・隠しボス4体（2026-11-09・Claude・ブランチ claude/sand-enemies-283edc）
 
 - **レアの敵10体**（`src/content/common/enemies/rare1.ts`。ID・名前は `docs/art/prompts-enemies-rare.md` のとおり）: 同じ地域の通常の敵の HP・攻撃が約1.5倍、経験値・ゴールドが約3倍、特殊能力が1つ。各地域の `rareEncounters` に「1体だけ」と「通常の敵1体と一緒」の2つの組を書いた（翠の森・嘆きの沼・白樺の雪林・氷の城の荒野・港の島・霧の海域・砂丘の海・星見の丘・煙突の街・蒸気の谷）。
