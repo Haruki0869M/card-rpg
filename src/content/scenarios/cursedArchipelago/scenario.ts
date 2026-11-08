@@ -7,6 +7,7 @@ export const cursedArchipelago: ScenarioDef = {
   id: 'cursedArchipelago',
   order: 3,
   name: '呪われた群島',
+  art: 'card-cursedArchipelago',
   synopsis: '百年前の呪いで、海は深い霧に閉ざされた。船で島々を渡って三つの灯台に灯をともし、幽霊船団の亡霊提督を止めよ。',
   recommended: '2〜4人',
   playTime: '60〜90分',

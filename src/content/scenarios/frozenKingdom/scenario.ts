@@ -7,6 +7,7 @@ export const frozenKingdom: ScenarioDef = {
   id: 'frozenKingdom',
   order: 2,
   name: '凍てつく王国',
+  art: 'card-frozenKingdom',
   synopsis: '百年続く冬に閉ざされた王国エルフロスト。三つの氷晶の鍵を集めて氷の城を開き、春を奪った白の女王を止めよ。',
   recommended: '2〜4人',
   playTime: '60〜90分',

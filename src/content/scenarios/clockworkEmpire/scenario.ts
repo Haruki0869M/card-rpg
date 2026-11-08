@@ -7,6 +7,7 @@ export const clockworkEmpire: ScenarioDef = {
   id: 'clockworkEmpire',
   order: 6,
   name: '機械仕掛けの帝国',
+  art: 'card-clockworkEmpire',
   synopsis: '暴走した大機械が、国じゅうの人を歯車の部品にしようとしている。三つの動力核を壊して、大機械を止めよ。',
   recommended: '2〜4人',
   playTime: '60〜90分',

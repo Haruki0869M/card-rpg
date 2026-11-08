@@ -7,6 +7,7 @@ export const starCastle: ScenarioDef = {
   id: 'starCastle',
   order: 5,
   name: '星降る天空城',
+  art: 'card-starCastle',
   synopsis: '夜空から落ちる星のかけらが、天空城の女王を狂わせている。三つの星環を集めて天空城へ入り、星の暴走を止めよ。',
   recommended: '2〜4人',
   playTime: '60〜90分',

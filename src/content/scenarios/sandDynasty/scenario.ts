@@ -7,6 +7,7 @@ export const sandDynasty: ScenarioDef = {
   id: 'sandDynasty',
   order: 4,
   name: '砂塵の王朝',
+  art: 'card-sandDynasty',
   synopsis: '砂に埋もれた古い王朝の王が、永遠の命を求めて民の魂を砂に変えている。三つの聖印を集め、砂塵の王を眠らせよ。',
   recommended: '2〜4人',
   playTime: '60〜90分',
