@@ -2,7 +2,11 @@
 import type { DungeonDef } from '../../../../types';
 
 export const CRYSTAL_POOLS: DungeonDef['pools'] = {
-  "battle": [['frostMoth', 'snowOwl'], 
+  "battle": [
+    [
+      "frostMoth",
+      "snowOwl"
+    ],
     [
       "iceBat",
       "frozenSoldier"
@@ -36,7 +40,11 @@ export const CRYSTAL_POOLS: DungeonDef['pools'] = {
 };
 
 export const CATHEDRAL_POOLS: DungeonDef['pools'] = {
-  "battle": [['iceFisher', 'iceArcher'], 
+  "battle": [
+    [
+      "iceFisher",
+      "iceArcher"
+    ],
     [
       "iceSlime",
       "frozenGhoul"
@@ -70,7 +78,11 @@ export const CATHEDRAL_POOLS: DungeonDef['pools'] = {
 };
 
 export const MINE_POOLS: DungeonDef['pools'] = {
-  "battle": [['stormSnowOwl', 'iceSwordsman'], 
+  "battle": [
+    [
+      "stormSnowOwl",
+      "iceSwordsman"
+    ],
     [
       "yeti",
       "iceSwordsman"
