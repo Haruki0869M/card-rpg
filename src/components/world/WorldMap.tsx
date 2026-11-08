@@ -102,7 +102,7 @@ const TerrainLayer = memo(function TerrainLayer({ tiles, geom }: { tiles: WorldS
         // 絵がある地形は模様で分かるので、小さな印は出さない
         const dec = !tex && ter.decor ? TERRAIN_DECOR[ter.decor] : undefined;
         return (
-          <g key={i}>
+          <g key={i} data-hex={i}>
             <polygon points={hexPoints(x, y, R - 0.5)} fill={tex ? `url(#ter-${ter.id})` : ter.color} stroke="rgba(0,0,0,.5)" strokeWidth={1.2} />
             {dec && <path d={dec.d} transform={`translate(${x},${y}) scale(${s})`} stroke={dec.stroke} fill={dec.fill ?? 'none'} strokeWidth={1.6} strokeLinecap="round" opacity={0.85} />}
           </g>
@@ -123,7 +123,7 @@ const TerrainLayer = memo(function TerrainLayer({ tiles, geom }: { tiles: WorldS
           if (t.seen) return null;
           const { x, y } = center(i);
           const shade = 0.82 + ((i * 2654435761) % 1000) / 1000 * 0.18;
-          return <polygon key={i} points={hexPoints(x, y, R * 1.22)} fill="url(#fog-fill)" opacity={shade} />;
+          return <polygon key={i} data-fog-tile={i} points={hexPoints(x, y, R * 1.22)} fill="url(#fog-fill)" opacity={shade} />;
         })}
       </g>
     </g>

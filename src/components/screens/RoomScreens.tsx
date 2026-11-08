@@ -150,7 +150,14 @@ export function EventScreen() {
           </motion.div>
         )}
         {/* イベントの窓: 絵・本文・選択肢（または結果）を中央の1枚にまとめる */}
-        <div className="panel panel-ornate relative rounded-2xl p-3 pt-4" data-event-window>
+        {/* 突発イベントは「！」のカットインが消えてから窓を出す（「！」と窓を重ねない） */}
+        <motion.div
+          initial={ev.random && !ev.result ? { opacity: 0 } : false}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.35, duration: 0.15 }}
+          className="panel panel-ornate relative rounded-2xl p-3 pt-4"
+          data-event-window
+        >
           <Crest />
           <div className="flex items-center gap-2">
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border-2 border-sky-300 bg-sky-950/60 shadow-[0_0_10px_rgba(120,200,255,.35)]">
@@ -175,7 +182,7 @@ export function EventScreen() {
           ) : (
             !opt?.check && options
           )}
-        </div>
+        </motion.div>
       </div>
       {(ev.result || opt?.check) && (
         <div className="panel shrink-0 rounded-t-2xl px-3 pt-2 pb-3">

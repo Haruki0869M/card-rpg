@@ -77,7 +77,10 @@ export interface NewGameDraft {
 
 export interface WorldMovePresentation {
   id: number;
+  /** 移動を確定した後の状態（到着してから見せる） */
   game: GameState;
+  /** 移動を押す前の状態。歩いている間はこちらの視界・敵の配置・手番を見せる（ゴールの敵が先に出ないように） */
+  before?: GameState;
 }
 
 interface StoreState {
@@ -444,7 +447,7 @@ export const useBattle = create<StoreState>((set, get) => {
     }
     const lm = full.world?.lastMove;
     if (before && scene === WORLD_SCENE && cmdScene === WORLD_SCENE && lm && lm.seq !== before.world?.lastMove?.seq && lm.path.length > 1) {
-      patch.worldMoves = [...get().worldMoves, { id: fxId++, game: full }];
+      patch.worldMoves = [...get().worldMoves, { id: fxId++, game: full, before }];
       patch.sheet = null;
     }
     set(patch);

@@ -14,7 +14,6 @@ import { ClearedScreen, GameOverScreen } from './components/screens/EndScreens';
 import { HubScreen } from './components/screens/HubScreen';
 import { RewardScreen } from './components/screens/RewardScreen';
 import { ChestScreen } from './components/screens/ChestScreen';
-import { WorldMoveScene } from './components/world/WorldMoveScene';
 import { WorldScreen } from './components/world/WorldScreen';
 import { EncounterScreen, EndingScreen, SanctuaryScreen, ShrineScreen, TownScreen } from './components/world/Places';
 import { EventScreen, RestScreen } from './components/screens/RoomScreens';
@@ -97,7 +96,9 @@ function CurrentScreen() {
     if (screen === 'lobby') return <LobbyScreen />;
     return <TitleScreen />;
   }
-  if (movement) return <WorldMoveScene key={movement.id} move={movement} />;
+  // 移動の演出は、いつもの世界マップの画面（同じ地図・同じ駒）のまま再生する。
+  // 下の case 'world' と同じ場所・同じ部品なので、画面も駒も作り直されない。
+  if (movement) return <WorldScreen movement={movement} />;
   switch (mode) {
     case 'hub':
       return <HubScreen />;

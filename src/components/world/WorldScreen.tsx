@@ -31,12 +31,13 @@ import {
   moveBonusOf,
 } from '../../engine';
 import { isLocalPlayer, isOnlinePlay } from '../../store/battleConfig';
-import { useBattle } from '../../store/battleStore';
+import { useBattle, type WorldMovePresentation } from '../../store/battleStore';
 import { useOnline } from '../../store/onlineStore';
 import type { GameState, PlayerId, TimeOfDay } from '../../types';
 import { RollStrip } from '../ui/CheckPanel';
 import { Bar, HeroFace, Screen } from '../ui/game';
 import { WorldMap } from './WorldMap';
+import { arrivalView, MoveStatus, useMovePlayback } from './WorldMoveScene';
 import { canChangeNow } from '../JobSheet';
 
 const TIME_ICON: Record<TimeOfDay, typeof Sun> = { morning: Sunrise, noon: Sun, evening: Sunset, night: Moon };
@@ -240,8 +241,13 @@ function interactLabel(game: GameState, tile: number): string | undefined {
   return { shrine: '祠で祈る', event: '調べる', landmark: '調べる', chest: '宝箱を開ける' }[f.kind];
 }
 
-export function WorldScreen() {
-  const game = useBattle((s) => s.game)!;
+export function WorldScreen({ movement }: { movement?: WorldMovePresentation } = {}) {
+  const storeGame = useBattle((s) => s.game)!;
+  // 移動の演出中は、移動を押す前の状態（視界・敵・手番・パネル）を見せ続ける。
+  // 画面を差し替えないので、地図と駒は同じまま・大きさもカメラも変わらない。
+  const playback = useMovePlayback(movement);
+  const game = movement ? (movement.before ?? movement.game) : storeGame;
+  const mapGame = movement && playback?.arrived ? arrivalView(movement) : game;
   const dispatchGame = useBattle((s) => s.dispatchGame);
   const w = game.world!;
   const hero = game.heroes.find((h) => h.id === w.turn);
@@ -268,6 +274,7 @@ export function WorldScreen() {
 
   useEffect(() => {
     setSelected(undefined);
+    setInfo(undefined);
     setFocus(0);
   }, [w.turn, w.move]);
 
@@ -303,9 +310,9 @@ export function WorldScreen() {
   const tapTile = (i: number) => {
     if (mine && reach?.has(i) && i !== here) {
       if (selected === i) {
+        // 選んだマスと説明は、移動の演出が終わるまで残す（パネルの高さが変わると地図の大きさが変わるため）。
+        // 手番か移動力が変わった時に上の useEffect で消える。
         dispatchGame({ type: 'WORLD_MOVE', playerId: pid, heroId: hero.id, to: i, companions: chosenCompanions });
-        setSelected(undefined);
-        setInfo(undefined);
       } else {
         setSelected(i);
         setInfo(tileInfo(game, i));
@@ -321,10 +328,20 @@ export function WorldScreen() {
     <Screen>
       <WorldTopBar game={game} />
       <PartyRow game={game} />
-      <WorldMap game={game} reach={reach} selected={w.moveProposal?.to ?? selected} path={path} onTapTile={tapTile} />
+      <WorldMap
+        game={mapGame}
+        reach={playback ? undefined : reach}
+        selected={playback ? undefined : w.moveProposal?.to ?? selected}
+        path={playback ? undefined : path}
+        movement={playback}
+        onTapTile={playback ? () => {} : tapTile}
+      />
       {w.moveProposal && <MoveProposal game={game} />}
       {info && <div className="shrink-0 bg-black/70 px-3 py-1 text-[12px] leading-4 text-zinc-200">{info}</div>}
 
+      {/* 手番の表示と操作パネル。移動の演出中は、同じ大きさのまま上に「移動中…」の帯を重ねて押せなくする */}
+      <div className="relative shrink-0">
+      {movement && playback && <MoveStatus move={movement} playback={playback} />}
       <div className="shrink-0 bg-sky-950 px-3 py-1 text-center text-[14px] font-bold" data-current-turn>現在は {hero.playerId}（{hero.name}）の手番です</div>
       {/* 手番のキャラの操作 */}
       <div className="panel relative z-10 shrink-0 rounded-t-2xl px-3 pt-2 pb-3">
@@ -499,7 +516,10 @@ export function WorldScreen() {
           </div>
         </div>
       </div>
+      </div>
 
+      {/* 移動の演出中は、上の情報欄・仲間の列・地図のタップも受け付けない（以前の移動画面と同じ） */}
+      {movement && <div className="absolute inset-0 z-30" aria-hidden data-move-blocker />}
       <AnimatePresence>
         {w.story && <StoryOverlay key="story" title={w.story.title} lines={w.story.lines} onNext={() => dispatchGame({ type: 'STORY_CONTINUE', playerId: pid })} />}
         {!w.story && needHandoff && (

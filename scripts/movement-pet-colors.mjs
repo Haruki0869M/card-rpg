@@ -49,7 +49,7 @@ try {
         const record = () => {
           const e = document.querySelector('[data-world-moving]'); if (!e) return;
           const i = Number(e.getAttribute('data-move-index')), phase = e.getAttribute('data-world-moving');
-          const tile = Number(e.querySelector('[data-hero="h0"]').getAttribute('data-tile'));
+          const tile = Number(document.querySelector('[data-hero="h0"]').getAttribute('data-tile'));
           const last = window.moveTrace.at(-1);
           if (!last || last.i !== i || last.phase !== phase) window.moveTrace.push({ i, tile, phase });
           if (document.querySelector('[data-event-window], [data-hero-task]') || [...document.querySelectorAll('button')].some(b => b.textContent.trim() === '戦う')) window.moveViolation.push('移動中に次の操作画面');
