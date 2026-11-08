@@ -328,10 +328,12 @@ export function WorldMap({
               key={wd.id}
               className="pointer-events-none absolute"
               data-wanderer={wd.id}
-              style={{ left: x - s / 2, top: y - s * 0.62, width: s, height: s, filter: wd.raidTown ? 'drop-shadow(0 0 6px #ff3a3a)' : 'drop-shadow(0 2px 2px #000)' }}
+              data-rare={wd.rare ? 'true' : undefined}
+              style={{ left: x - s / 2, top: y - s * 0.62, width: s, height: s, filter: wd.raidTown ? 'drop-shadow(0 0 6px #ff3a3a)' : wd.rare ? 'drop-shadow(0 0 7px #ffd24a)' : 'drop-shadow(0 2px 2px #000)' }}
             >
-              {/* 地形の模様の上でも見えるように、暗い円と赤い縁を敷く */}
-              <span className="absolute inset-[8%] rounded-full border-2 border-red-500/80 bg-[#140a10]/80" />
+              {/* 地形の模様の上でも見えるように、暗い円と赤い縁を敷く（レアは金の縁と★） */}
+              <span className={`absolute inset-[8%] rounded-full border-2 bg-[#140a10]/80 ${wd.rare ? 'border-amber-300' : 'border-red-500/80'}`} />
+              {wd.rare && <span className="absolute -left-1 top-0 z-10 text-[14px] leading-4 font-black text-amber-300">★</span>}
               <EnemyArt defId={wd.enemies[0].defId} className="relative h-full w-full" />
               <span className="absolute -right-1 bottom-0 rounded-full border border-red-300 bg-red-950/90 px-1 text-[12px] leading-4 font-black text-red-200">
                 {wd.enemies.length > 1 ? `×${wd.enemies.length}` : `Lv${wd.enemies[0].level ?? 1}`}

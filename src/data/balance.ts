@@ -159,6 +159,8 @@ export const BALANCE = {
   nightEnemyLevel: 1,
   nightSpawnChance: 40,
   wandererMoveEvery: 2,
+  /** 徘徊する敵を置く時、地域に rareEncounters があれば、この確率（%）でレアの組に置き換える（K3） */
+  rareWandererChance: 6,
   /** 町への襲撃: 陥落までのワールドターン / 守った時の報酬 */
   raidTurns: 8,
   raidRewardGold: 80,
