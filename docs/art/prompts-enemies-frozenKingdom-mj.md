@@ -101,7 +101,7 @@ full body creature illustration of one round translucent pale blue ice slime, a 
 元画像: `C:\dev\card-rpg-assets\enemy\frozenGhoul.png`
 
 ```
-full body creature illustration of one shivering frozen ghoul in ragged burial cloth, icy gray skin, hunched back and long empty clawed hands, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no weapon, shield, blood, gore, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one shivering frozen ghoul in ragged burial wrappings, icy gray skin, hunched back and long empty clawed hands, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no weapon, shield, blood, gore, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### iceArcher 極寒の弓兵（凍てつく王国・湖・通常・size 1）
@@ -149,7 +149,7 @@ full body creature illustration of one imposing frozen bishop in ornate white an
 元画像: `C:\dev\card-rpg-assets\enemy\yeti.png`
 
 ```
-full body creature illustration of one broad white yeti with long shaggy fur, blue face, heavy bare fists and stout legs, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no club, carried weapon, armor, rider, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one broad white yeti with long shaggy fur, blue face, heavy empty fists and stout legs, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no club, carried weapon, armor, rider, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### blizzardSnake 吹雪の蛇（凍てつく王国・山脈・通常・size 1）
