@@ -13,6 +13,7 @@ import { getScenario } from '../../data/scenarios';
 import { QUESTS, SANCTUARIES, SHRINES, TOWNS } from '../../data/world';
 import { canChangeNow } from '../JobSheet';
 import { PetAwards } from '../ui/PetToken';
+import { EndPetRecord, MyPetCall } from '../lorebook/MyPets';
 import {
   affinityFromStats,
   canReportQuest,
@@ -244,6 +245,7 @@ export function TownScreen() {
           </button>
         )}
       </div>
+      <MyPetCall game={game} hero={v} />
       <div className="mt-1 flex shrink-0 gap-1 overflow-x-auto px-2 pb-1">
         {TOWN_TABS.map((x) => (
           <button key={x.id} onClick={() => setTab(x.id)} className={`btn flex h-11 shrink-0 items-center gap-1 rounded-lg px-2.5 text-[13px] font-bold ${tab === x.id ? 'btn-gold' : 'btn-dark'}`}>
@@ -554,6 +556,7 @@ export function EndingScreen() {
           ))}
         </div>
         <PetAwards heroes={game.heroes} />
+        <EndPetRecord game={game} />
       </div>
       <div className="shrink-0 px-3 pt-1 pb-3">
         <button onClick={abandon} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px]">

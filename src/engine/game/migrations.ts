@@ -21,6 +21,11 @@ import { addSanctuaries, consolidateSanctuaries } from './world/sanctuaries';
 type Loose = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 const MIGRATIONS: Record<number, (g: Loose) => void> = {
+  // v15 → v16: 伝承の書（K5）でマイペットを呼ぶ操作（BRING_MY_PET）と、お供・キャラの任意の項目（myPetUid・dungeonClears・myPetCalled）を足した。
+  // 形は変わらないので直す所は無い（版を上げるのは、古い版の端末と同じ部屋に入らないため）。戦闘の版だけそろえる
+  15(g) {
+    for (const b of [g.battle, ...(g.expeditions ?? []).map((x: Loose) => x.battle)]) if (b) b.version = 16;
+  },
   // v13 → v14: 手動の味方対象が必要になった旧予約だけ、従来の最低HP割合の対象を固定する。
   // v14 → v15: ダンジョンを通路の地図で歩くようになった（第3段階）。地図は部屋のつながりから作り直せるので、
   // 今の部屋（無ければ入口）に立たせ、通った部屋と今の場所のまわりを「見たマス」にする。探索力（部屋の数）は歩数（×2）にする

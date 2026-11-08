@@ -1,7 +1,9 @@
 // ===== 伝承の書の記録（冒険をまたいで残る、この端末だけの記録。K5） =====
 // 図鑑（見た・手に入れた）とクリアの記録。冒険の状態を「見るだけ」で作る純粋な関数。
 // エンジン・乱数（Rng）・冒険の状態には一切触れない。強さが冒険をまたいで上がる物は持たない。
+import { BALANCE } from '../data/balance';
 import { jobOptions } from '../engine/game/jobs';
+import { petLoveLevel } from '../engine/game/pets';
 import type { GameState, Hero, PlayerId } from '../types';
 
 export const PROFILE_VERSION = 1;
@@ -10,6 +12,30 @@ export const PROFILE_VERSION = 1;
 export interface SeenGot {
   seen: string[];
   got: string[];
+}
+
+/** うちの子（自分のキャラが連れていたお供1匹ずつ）の、冒険1回分の思い出 */
+export interface UchinokoRun {
+  /** 戦闘で活躍した回数 */
+  acts: number;
+  /** 一緒にクリアしたダンジョンの数 */
+  dc: number;
+  /** 冒険の終わり（クリア / 全滅）。途中なら無し */
+  end?: 'ending' | 'gameover';
+}
+
+/** うちの子図鑑の1匹（名前・色はそのまま残る。強さは持たない） */
+export interface UchinokoEntry {
+  uid: string;
+  petId: string;
+  color: string;
+  name: string;
+  /** 懐き度の点数（見た目だけ。一番高かった時） */
+  love: number;
+  /** 出会ったシナリオ */
+  scenarioId: string;
+  /** 冒険ごとの思い出（冒険の鍵 → 記録） */
+  runs: Record<string, UchinokoRun>;
 }
 
 /** 冒険1回の記録（同じ冒険を二重に数えないための鍵と結果） */
@@ -38,10 +64,15 @@ export interface Profile {
   runs: RunRecord[];
   /** 最近数えた戦闘の勝利（二重に数えないため。最大 BATTLE_KEEP 件） */
   battles: string[];
+  /** うちの子図鑑（古い順） */
+  uchinoko: UchinokoEntry[];
+  /** マイペットに登録した子（uid） */
+  myPets: string[];
 }
 
 const RUN_KEEP = 30;
 const BATTLE_KEEP = 40;
+const UCHINOKO_KEEP = 200;
 
 export function emptyProfile(): Profile {
   return {
@@ -56,6 +87,8 @@ export function emptyProfile(): Profile {
     adventures: 0,
     runs: [],
     battles: [],
+    uchinoko: [],
+    myPets: [],
   };
 }
 
@@ -85,6 +118,7 @@ export function normalizeProfile(raw: unknown): Profile {
         .map((x) => ({ key: x.key, scenarioId: x.scenarioId, ...(x.result === 'ending' || x.result === 'gameover' ? { result: x.result } : {}) }))
         .slice(0, RUN_KEEP)
     : [];
+  const uchinoko = normalizeUchinoko(r.uchinoko);
   return {
     version: PROFILE_VERSION,
     jobs: seenGot(r.jobs),
@@ -97,8 +131,54 @@ export function normalizeProfile(raw: unknown): Profile {
     adventures: typeof r.adventures === 'number' && r.adventures > 0 ? Math.floor(r.adventures) : 0,
     runs,
     battles: strList(r.battles).slice(-BATTLE_KEEP),
+    uchinoko,
+    myPets: strList(r.myPets).filter((uid) => uchinoko.some((e) => e.uid === uid)),
   };
 }
+
+const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.floor(v) : 0);
+function normalizeUchinoko(v: unknown): UchinokoEntry[] {
+  if (!Array.isArray(v)) return [];
+  const out: UchinokoEntry[] = [];
+  for (const x of v as Record<string, unknown>[]) {
+    if (!x || typeof x !== 'object') continue;
+    if (typeof x.uid !== 'string' || typeof x.petId !== 'string' || typeof x.color !== 'string' || out.some((e) => e.uid === x.uid)) continue;
+    const runs: Record<string, UchinokoRun> = {};
+    if (x.runs && typeof x.runs === 'object') {
+      for (const [k, r] of Object.entries(x.runs as Record<string, Record<string, unknown>>)) {
+        if (!r || typeof r !== 'object') continue;
+        runs[k] = { acts: num(r.acts), dc: num(r.dc), ...(r.end === 'ending' || r.end === 'gameover' ? { end: r.end } : {}) };
+      }
+    }
+    out.push({ uid: x.uid, petId: x.petId, color: x.color, name: typeof x.name === 'string' ? x.name : '', love: num(x.love), scenarioId: typeof x.scenarioId === 'string' ? x.scenarioId : '', runs });
+  }
+  return out.slice(-UCHINOKO_KEEP);
+}
+
+/** うちの子の思い出の合計（冒険の数・クリアの数・一緒にクリアしたダンジョン・活躍） */
+export function uchinokoTotals(e: UchinokoEntry) {
+  const rs = Object.values(e.runs);
+  return {
+    adventures: rs.length,
+    clears: rs.filter((r) => r.end === 'ending').length,
+    dungeonClears: rs.reduce((n, r) => n + r.dc, 0),
+    acts: rs.reduce((n, r) => n + r.acts, 0),
+  };
+}
+
+/** マイペットに登録できるか（懐き度♡5か、ダンジョンを一緒に3回クリア。1回の冒険の中でもよい。オーナー決定） */
+export const canBeMyPet = (e: UchinokoEntry) => petLoveLevel(e.love) >= 5 || uchinokoTotals(e).dungeonClears >= BALANCE.myPetDungeonClears;
+
+/** マイペットに登録する / 外す（登録できない子は登録しない） */
+export function setMyPet(p: Profile, uid: string, on: boolean): Profile {
+  const e = p.uchinoko.find((x) => x.uid === uid);
+  if (on) return e && canBeMyPet(e) && !p.myPets.includes(uid) ? { ...p, myPets: [...p.myPets, uid] } : p;
+  return p.myPets.includes(uid) ? { ...p, myPets: p.myPets.filter((x) => x !== uid) } : p;
+}
+
+/** うちの子の ID（マイペットから呼んだ子はその ID。冒険の中で迎えた子は、冒険・キャラ・種類・色・名前から作る） */
+export const uchinokoUid = (game: Pick<GameState, 'seed'>, h: Hero) =>
+  h.pet!.myPetUid ?? `${game.seed}-${h.id}-${h.pet!.petId}-${h.pet!.color}-${h.pet!.name}`;
 
 /** クリアしたシナリオの ID（シナリオの解放に使う） */
 export const clearedScenarioIds = (p: Pick<Profile, 'clears'>): string[] => Object.keys(p.clears).filter((id) => p.clears[id] > 0);
@@ -113,6 +193,8 @@ export interface Sightings {
   victories: { key: string; kills: string[] }[];
   pets: SeenGot;
   run: { key: string; scenarioId: string; result?: 'ending' | 'gameover' };
+  /** この端末のキャラが今連れているお供（うちの子図鑑へ） */
+  myPets: { uid: string; petId: string; color: string; name: string; love: number; acts: number; dc: number }[];
 }
 
 /** 冒険を見分ける鍵（同じ種・同じシナリオ・同じ顔ぶれ） */
@@ -131,6 +213,7 @@ export function collectSightings(game: GameState, isMine: (p: PlayerId) => boole
     enemies: [],
     victories: [],
     pets: { seen: [], got: [] },
+    myPets: [],
     run: { key: runKey(game), scenarioId: game.scenarioId, ...(game.mode === 'ending' || game.mode === 'gameover' ? { result: game.mode } : {}) },
   };
   const mine = (h: Hero) => isMine(h.playerId);
@@ -156,7 +239,11 @@ export function collectSightings(game: GameState, isMine: (p: PlayerId) => boole
     if (h.pet) {
       const k = `${h.pet.petId}:${h.pet.color}`;
       s.pets.seen.push(k);
-      if (own) s.pets.got.push(k);
+      if (own) {
+        s.pets.got.push(k);
+        const p = h.pet;
+        s.myPets.push({ uid: uchinokoUid(game, h), petId: p.petId, color: p.color, name: p.name, love: p.love, acts: p.acts, dc: p.dungeonClears ?? 0 });
+      }
     }
     for (const id of h.petOffer ?? []) {
       const col = h.petOfferColors?.[id];
@@ -248,6 +335,29 @@ export function mergeSightings(p: Profile, s: Sightings): Profile {
     set('runs', runs);
     if (s.run.result === 'ending') set('clears', { ...p.clears, [s.run.scenarioId]: (p.clears[s.run.scenarioId] ?? 0) + 1 });
     else set('gameovers', { ...p.gameovers, [s.run.scenarioId]: (p.gameovers[s.run.scenarioId] ?? 0) + 1 });
+  }
+  // うちの子図鑑: 自分のキャラが連れているお供の、名前・懐き度・この冒険の思い出
+  if (s.myPets.length) {
+    let list = next.uchinoko;
+    for (const m of s.myPets) {
+      const i = list.findIndex((e) => e.uid === m.uid);
+      const old = i >= 0 ? list[i] : undefined;
+      const prevRun = old?.runs[s.run.key];
+      const run: UchinokoRun = { acts: Math.max(prevRun?.acts ?? 0, m.acts), dc: Math.max(prevRun?.dc ?? 0, m.dc), ...((s.run.result ?? prevRun?.end) ? { end: prevRun?.end ?? s.run.result } : {}) };
+      const love = Math.max(old?.love ?? 0, m.love);
+      const same = old && old.name === m.name && old.love === love && prevRun && prevRun.acts === run.acts && prevRun.dc === run.dc && prevRun.end === run.end;
+      if (same) continue;
+      const entry: UchinokoEntry = { uid: m.uid, petId: m.petId, color: m.color, name: m.name, love, scenarioId: old?.scenarioId ?? s.run.scenarioId, runs: { ...(old?.runs ?? {}), [s.run.key]: run } };
+      list = i >= 0 ? list.map((e, j) => (j === i ? entry : e)) : [...list, entry];
+    }
+    if (list !== next.uchinoko) {
+      // 多すぎたら、マイペットでない古い子から外す
+      while (list.length > UCHINOKO_KEEP) {
+        const k = list.findIndex((e) => !next.myPets.includes(e.uid));
+        list = list.filter((_, j) => j !== (k >= 0 ? k : 0));
+      }
+      set('uchinoko', list);
+    }
   }
   return next;
 }

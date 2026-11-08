@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createGame, stateHash } from '../engine';
 import { isScenarioUnlocked } from '../data/scenarios';
 import type { GameState, PlayerId } from '../types';
-import { clearedScenarioIds, collectSightings, emptyProfile, mergeSightings, normalizeProfile } from './profile';
+import { canBeMyPet, clearedScenarioIds, collectSightings, emptyProfile, mergeSightings, normalizeProfile, setMyPet, uchinokoTotals } from './profile';
 
 const game = (): GameState =>
   createGame({
@@ -99,5 +99,48 @@ describe('伝承の書の記録（K5）', () => {
     expect(isScenarioUnlocked(plain, clearedScenarioIds(p))).toBe(false); // 条件の無いシナリオは今までどおり
     expect(p.gameovers).toEqual({ corruptionKing: 1 });
     expect(p.adventures).toBe(2);
+  });
+
+  it('うちの子図鑑: 自分のキャラのお供を1匹ずつ、名前・懐き度・思い出と一緒に残す', () => {
+    const g = game();
+    g.heroes[0].pet = { petId: 'cockatiel', color: 'lutino', name: 'ぴー', love: 20, acts: 2 };
+    g.heroes[1].pet = { petId: 'owl', color: 'brown', name: 'ほー', love: 0, acts: 0 };
+    let p = mergeSightings(emptyProfile(), collectSightings(g, onlyP1));
+    expect(p.uchinoko).toHaveLength(1); // P2 のお供は載せない
+    const e = p.uchinoko[0];
+    expect(e).toMatchObject({ petId: 'cockatiel', color: 'lutino', name: 'ぴー', love: 20, scenarioId: 'corruptionKing' });
+    expect(canBeMyPet(e)).toBe(false);
+    expect(setMyPet(p, e.uid, true)).toBe(p); // 条件を満たさない子は登録しない
+    // ダンジョンを一緒に3回クリア（1回の冒険の中でもよい）
+    g.heroes[0].pet!.dungeonClears = 3;
+    g.heroes[0].pet!.acts = 5;
+    p = mergeSightings(p, collectSightings(g, onlyP1));
+    expect(p.uchinoko).toHaveLength(1);
+    expect(uchinokoTotals(p.uchinoko[0])).toEqual({ adventures: 1, clears: 0, dungeonClears: 3, acts: 5 });
+    expect(canBeMyPet(p.uchinoko[0])).toBe(true);
+    p = setMyPet(p, e.uid, true);
+    expect(p.myPets).toEqual([e.uid]);
+    // クリアで思い出に残る。同じ観察を繰り返しても変わらない
+    g.mode = 'ending';
+    p = mergeSightings(p, collectSightings(g, onlyP1));
+    expect(uchinokoTotals(p.uchinoko[0]).clears).toBe(1);
+    expect(mergeSightings(p, collectSightings(g, onlyP1))).toBe(p);
+    // 次の冒険でマイペットとして呼んだ子は、同じ子として思い出が増える
+    const g2 = createGame({ seed: 99, scenarioId: 'corruptionKing', difficulty: 'normal', party: [{ classId: 'mage', gender: 'male', name: 'c', playerId: 'P1' }] });
+    g2.heroes[0].pet = { petId: 'cockatiel', color: 'lutino', name: 'ぴー', love: 140, acts: 1, myPetUid: e.uid };
+    p = mergeSightings(p, collectSightings(g2, all));
+    expect(p.uchinoko).toHaveLength(1);
+    expect(p.uchinoko[0].love).toBe(140);
+    expect(uchinokoTotals(p.uchinoko[0])).toMatchObject({ adventures: 2, clears: 1, acts: 6 });
+    // 保存して読み直しても同じ
+    expect(normalizeProfile(JSON.parse(JSON.stringify(p)))).toEqual(p);
+    expect(setMyPet(p, e.uid, false).myPets).toEqual([]);
+  });
+
+  it('♡5の子はダンジョンをクリアしていなくても登録できる。壊れたうちの子の記録は捨てる', () => {
+    const p = normalizeProfile({ uchinoko: [{ uid: 'a', petId: 'owl', color: 'brown', name: 'ほー', love: 130, runs: {} }, { uid: 'a', petId: 'x', color: 'y' }, { petId: 'no-uid' }], myPets: ['a', 'ghost'] });
+    expect(p.uchinoko).toHaveLength(1);
+    expect(p.myPets).toEqual(['a']);
+    expect(canBeMyPet(p.uchinoko[0])).toBe(true);
   });
 });

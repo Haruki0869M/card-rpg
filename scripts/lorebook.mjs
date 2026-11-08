@@ -3,6 +3,7 @@
 //  2) 冒険を始めると、最初のジョブ・山札が記録される（冒険の状態は変えない）
 //  3) 記録を入れた状態で、各タブの一覧と詳細が 360/390/480px で崩れない
 //  4) 冒険の準備の画面（クリアの記録を渡しても、条件の無いシナリオは鍵のまま）
+//  5) うちの子図鑑・マイペット: 登録 → スタートの町で30Gで呼ぶ → 全滅の画面に記録
 // 使い方: npx vite preview を起こしてから node scripts/lorebook.mjs
 import { chromium, layoutIssues, URL } from './lib.mjs';
 
@@ -91,6 +92,75 @@ for (const width of [360, 390, 480]) {
   if (!(await page.locator('[data-scenario-lock]').count())) await ng('凍てつく王国の鍵が消えた');
   await shot('setup');
   await check('冒険の準備');
+  // 5) うちの子図鑑・マイペット: 登録できる子を入れて、登録 → スタートの町で呼ぶ → 全滅の画面に記録
+  await page.evaluate(() => {
+    const p = JSON.parse(localStorage.getItem('card-rpg/profile'));
+    p.uchinoko = [
+      { uid: 'k5-pii', petId: 'cockatiel', color: 'lutino', name: 'ぴーちゃん', love: 130, scenarioId: 'corruptionKing', runs: { r1: { acts: 4, dc: 1, end: 'ending' } } },
+      { uid: 'k5-hoo', petId: 'owl', color: 'brown', name: 'ほー', love: 20, scenarioId: 'corruptionKing', runs: { r1: { acts: 1, dc: 1 } } },
+    ];
+    p.myPets = [];
+    localStorage.setItem('card-rpg/profile', JSON.stringify(p));
+  });
+  await page.goto(URL);
+  await openBook();
+  if ((await page.locator('[data-uchinoko-row]').count()) !== 2) await ng('うちの子図鑑に2匹出ない');
+  await page.locator('[data-uchinoko-row="k5-pii"]').click();
+  await page.locator('[data-uchinoko-detail]').waitFor();
+  await shot('uchinoko-detail');
+  await check('うちの子の詳細');
+  await page.locator('[data-mypet-toggle="on"]').click();
+  await page.locator('[data-lore-detail]').getByText('閉じる', { exact: true }).click();
+  await page.locator('[data-uchinoko-row="k5-hoo"]').click();
+  if (await page.locator('[data-mypet-toggle="on"]').count()) await ng('条件を満たさない子に登録ボタンが出る');
+  await page.locator('[data-lore-detail]').getByText('閉じる', { exact: true }).click();
+  if (!(await page.locator('[data-mypet="k5-pii"]').count())) await ng('マイペットの列に出ない');
+  await shot('mypets');
+  await check('マイペット');
+  await page.getByLabel('閉じる').click();
+  await page.getByText('新しい冒険').click();
+  await page.getByText('1人', { exact: true }).click();
+  await page.getByText('キャラクター作成へ').click();
+  await page.getByText('冒険に出発').click();
+  await page.waitForTimeout(500);
+  // スタートの町（王都）に入った所から
+  const edit = async (fn) => {
+    await page.evaluate((src) => {
+      const k = 'card-rpg/adventure';
+      const d = JSON.parse(localStorage.getItem(k));
+      (0, eval)(src)(d.game);
+      localStorage.setItem(k, JSON.stringify(d));
+    }, fn.toString());
+    await page.reload();
+    await page.getByText('つづきから').click();
+    await page.waitForTimeout(300);
+  };
+  await edit((g) => {
+    g.world.story = undefined;
+    g.mode = 'town';
+    g.town = { townId: 'royalCapital', heroId: g.heroes[0].id };
+    g.heroes[0].gold = 100;
+  });
+  if (!(await page.locator('[data-mypet-call]').count())) await ng('スタートの町に「マイペットを呼ぶ」が出ない');
+  else {
+    await page.locator('[data-mypet-call] button').first().click();
+    await shot('town-call');
+    await check('町のマイペットを呼ぶ');
+    await page.locator('[data-mypet-pick="k5-pii"]').click();
+    await page.waitForTimeout(400);
+    const pet = await page.evaluate(() => JSON.parse(localStorage.getItem('card-rpg/adventure')).game.heroes[0]);
+    if (pet.pet?.myPetUid !== 'k5-pii' || pet.gold !== 70) await ng(`マイペットが来ない: ${JSON.stringify({ pet: pet.pet, gold: pet.gold })}`);
+    if (await page.locator('[data-mypet-call]').count()) await ng('呼んだ後も「マイペットを呼ぶ」が残る');
+    await shot('town-after');
+  }
+  // 全滅の画面: うちの子図鑑に記録しました
+  await edit((g) => {
+    g.mode = 'gameover';
+    g.town = undefined;
+  });
+  if (!(await page.locator('[data-end-pet-record]').count())) await ng('全滅の画面に、うちの子の記録が出ない');
+  await shot('gameover');
+  await check('全滅の画面');
   if (errors.length) await ng(`ページのエラー: ${errors.join(' / ')}`);
   await page.close();
 }

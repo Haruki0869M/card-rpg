@@ -22,6 +22,7 @@ import { CardFace } from '../ui/CardFace';
 import { CATEGORY_STYLE, ElementTag } from '../ui/icons';
 import { ItemIcon, itemSummary, RARITY_STYLE } from '../ui/game';
 import { PetToken } from '../ui/PetToken';
+import { UchinokoDetail, UchinokoSection } from './MyPets';
 
 type Tab = 'pets' | 'jobs' | 'cards' | 'items' | 'enemies' | 'record';
 const TABS: { id: Tab; label: string; Icon: typeof BookOpen }[] = [
@@ -41,7 +42,8 @@ type Detail =
   | { kind: 'item'; def: ItemDef; mark: Mark }
   | { kind: 'enemy'; def: EnemyDef; mark: Mark; kills: number }
   | { kind: 'job'; def: ClassDef; mark: Mark }
-  | { kind: 'pet'; def: PetDef; color: string; mark: Mark };
+  | { kind: 'pet'; def: PetDef; color: string; mark: Mark }
+  | { kind: 'uchinoko'; uid: string };
 
 /** 「見つけた 〇/〇・手に入れた 〇」と、埋まり具合の帯 */
 function Progress({ total, seen, got, gotLabel = '手に入れた' }: { total: number; seen: number; got: number; gotLabel?: string }) {
@@ -97,8 +99,9 @@ function PetsTab({ onDetail }: { onDetail: (d: Detail) => void }) {
   const total = PETS.all.reduce((n, p) => n + p.colors.length, 0);
   return (
     <>
-      <Progress total={total} seen={pets.seen.length} got={pets.got.length} gotLabel="仲間にした" />
+      <UchinokoSection onOpen={(uid) => onDetail({ kind: 'uchinoko', uid })} />
       <div className="mb-1 font-display text-[15px] text-pink-200">お供図鑑</div>
+      <Progress total={total} seen={pets.seen.length} got={pets.got.length} gotLabel="仲間にした" />
       <div className="flex flex-col gap-1.5">
         {PETS.all.map((def) => {
           const anySeen = def.colors.some((c) => pets.seen.includes(`${def.id}:${c.id}`));
@@ -137,7 +140,7 @@ function PetsTab({ onDetail }: { onDetail: (d: Detail) => void }) {
           );
         })}
       </div>
-      <p className="mt-2 text-[12px] leading-4 text-zinc-400">♥ = 仲間にした毛色。✨ = 珍しい毛色。うちの子図鑑とマイペットは、このあと追加します。</p>
+      <p className="mt-2 text-[12px] leading-4 text-zinc-400">♥ = 仲間にした毛色。✨ = 珍しい毛色。</p>
     </>
   );
 }
@@ -370,6 +373,8 @@ function DetailBody({ d }: { d: Detail }) {
           {d.def.requires && <div className="mt-1 text-zinc-400">転職の条件: {d.def.requires.text}</div>}
         </div>
       );
+    case 'uchinoko':
+      return <UchinokoDetail uid={d.uid} />;
     case 'pet': {
       const col = d.def.colors.find((c) => c.id === d.color) ?? d.def.colors[0];
       return (
