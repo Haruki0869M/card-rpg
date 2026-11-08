@@ -370,6 +370,8 @@ export interface EnemyDef {
   /** 弱点の属性（ダメージ×1.5）・耐性のある属性（ダメージ×0.5・状態異常が効かない） */
   weak?: string[];
   resist?: string[];
+  /** レアの敵（K3）: 名前に★が付く。倒した時の経験値・ゴールドはデータで多めに書く。徘徊の rareEncounters かイベントの戦闘で出す */
+  rare?: boolean;
   /** 亜種（K3）: 元の敵のID。絵は元の敵を使い回す。属性か開幕の特性を必ず1つ変える */
   variantOf?: string;
   /** 亜種の足元のオーラの色（data/enemyAuras.ts の ID） */

@@ -26,7 +26,7 @@ export const findUnit = (state: BattleState, id: string): Unit | undefined => fi
 export function enemyName(enemy: EnemyState): string {
   const def = getEnemy(enemy.defId);
   const phaseName = enemy.phase > 0 ? def.phases?.[enemy.phase - 1]?.name : undefined;
-  return (phaseName ?? def.name) + (enemy.nameSuffix ? ` ${enemy.nameSuffix}` : '');
+  return (def.rare ? '★' : '') + (phaseName ?? def.name) + (enemy.nameSuffix ? ` ${enemy.nameSuffix}` : '');
 }
 
 export const nameOf = (u: Unit) => (isEnemy(u) ? enemyName(u) : u.name);
