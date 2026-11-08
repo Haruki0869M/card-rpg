@@ -5,7 +5,7 @@ export const cloudSheep: EnemyDef = {
   id: 'cloudSheep',
   name: '雲羊',
   icon: '☁',
-  maxHp: 20,
+  maxHp: 23,
   baseLevel: 1,
   size: 0.85,
   exp: 4,
@@ -13,9 +13,9 @@ export const cloudSheep: EnemyDef = {
   weak: ['thunder'],
   pattern: 'sequence',
   actions: [
-    { id: 'charge', name: 'ふわふわ突進', effects: [{ kind: 'damage', amount: 6 }] },
+    { id: 'charge', name: 'ふわふわ突進', effects: [{ kind: 'damage', amount: 7 }] },
     { id: 'fluff', name: '綿雲にくるまる', effects: [{ kind: 'block', amount: 5 }] },
-    { id: 'headbutt', name: '頭突き', effects: [{ kind: 'damage', amount: 3, hits: 2 }] },
+    { id: 'headbutt', name: '頭突き', effects: [{ kind: 'damage', amount: 4, hits: 2 }] },
   ],
 };
 
@@ -23,7 +23,7 @@ export const skyGull: EnemyDef = {
   id: 'skyGull',
   name: '空カモメ',
   icon: '🕊',
-  maxHp: 20,
+  maxHp: 23,
   baseLevel: 2,
   size: 0.8,
   exp: 5,
@@ -31,8 +31,8 @@ export const skyGull: EnemyDef = {
   weak: ['thunder'],
   pattern: 'sequence',
   actions: [
-    { id: 'peck', name: '二連ついばみ', effects: [{ kind: 'damage', amount: 3, hits: 2 }] },
+    { id: 'peck', name: '二連ついばみ', effects: [{ kind: 'damage', amount: 4, hits: 2 }] },
     { id: 'soar', name: '風に乗る', effects: [{ kind: 'block', amount: 4 }] },
-    { id: 'dive', name: '急降下', effects: [{ kind: 'damage', amount: 7 }] },
+    { id: 'dive', name: '急降下', effects: [{ kind: 'damage', amount: 8 }] },
   ],
 };
