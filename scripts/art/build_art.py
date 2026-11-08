@@ -46,7 +46,7 @@ def has_src(n):
     except FileNotFoundError:
         return False
 
-def despeckle(im, keep=0.02, th=24):
+def despeckle(im, keep=0.02, th=24, m=0.18):
     """本体から離れた小さなかたまり（隅のサイン・文字・ごみ）を消す。
     一番大きいかたまりの keep 倍より小さく、かつ絵の外側 18% の帯の中だけにある物を透明にする。
     杖の先の宝玉のような、体の近くに浮いた小物は残る"""
@@ -57,7 +57,7 @@ def despeckle(im, keep=0.02, th=24):
         return im
     h, w = a.shape
     big = stats[1:, cv2.CC_STAT_AREA].max()
-    m = 0.18
+    # m = 外側の帯の幅（0.5 にすると、場所に関係なく小さなかたまりを全部消す）
     out = a.copy()
     for i in range(1, n):
         x, y, bw, bh, area = stats[i]
@@ -187,6 +187,20 @@ ENEMIES = {
     'valgrim': (16, 1.0), 'valgrim-1': (15, 1.0),
 }
 
+# 名前のファイル名の敵（元画像は enemy/<敵ID>.webp。SRC=C:/dev/card-rpg-assets で動かす）。
+# 凍てつく王国（docs/art/prompts-enemies-frozenKingdom.md）: 新規23体＋変身後5枚。亜種5体は元の絵を使い回す（art/index.tsx の artIdOf）。
+# 変身後は <敵ID>-<段階>（1 = HP50%以下など。戦闘で enemy/<ID>-<段階> を探し、無ければ元の絵）
+FROZEN_ENEMIES = ['snowHare', 'frostWolf', 'frostSprite', 'iceBat', 'frozenSoldier', 'snowOwl', 'icicleBug', 'snowWitch',
+                  'crystalLord', 'crystalLord-1', 'iceSlime', 'frozenGhoul', 'iceArcher', 'frostMage', 'frozenBishop', 'frozenBishop-1',
+                  'blizzardSnake', 'yeti', 'frostDrakeling', 'blizzardBeast', 'frostGiant', 'frostGiant-1',
+                  'iceKnight', 'iceSwordsman', 'frostGuardian', 'whiteQueen', 'whiteQueen-1', 'whiteQueen-2']
+# 共通の敵（docs/art/prompts-enemies-common.md）
+COMMON_ENEMIES = ['goldenThief', 'guardDog']
+# 隅に文字・サインがある絵（元画像のフォルダの _corner-text.txt）。サインが内側寄りにもあるので、離れた小さなかたまりを場所に関係なく消す
+CORNER_TEXT = {'iceBat', 'frozenSoldier', 'whiteQueen-2'}
+for _k in FROZEN_ENEMIES + COMMON_ENEMIES:
+    ENEMIES[_k] = (f'enemy/{_k}', 1.0)
+
 def flame_tint(im):
     """炎をまとった姿（第2形態）: 赤橙に染めて、ふちを光らせる"""
     a = im.getchannel('A')
@@ -206,8 +220,9 @@ def flame_tint(im):
 def build_enemies():
     for key, (n, size) in ENEMIES.items():
         name = f'enemy/{key}'
-        if not want(name): continue
-        fig = trim(cutout(n))
+        if not want(name) or not has_src(n): continue
+        # 名前の絵は、隅の文字・サイン（_corner-text.txt の iceBat・frozenSoldier・whiteQueen-2）も消す
+        fig = trim(despeckle(cutout(n), m=0.5 if key in CORNER_TEXT else 0.18) if isinstance(n, str) else cutout(n))
         if key == 'ignavarl-1':
             fig = flame_tint(fig)
         save(rim(place(fig, 520, 620, fill=0.97 * size, bottom=0.98), (8, 6, 12), 0.8, 3), f'{name}.webp')
@@ -431,17 +446,31 @@ def build_pieces():
 # 元画像は dungeon/<背景>-<wall|floor|ceiling|door>.webp（SRC の下。切り抜きは不要）。
 # 通路の面は1マス＝画面の短い辺くらい（スマホで最大 450px 前後）で、奥へ行くほど小さく暗くなるので、512px で足りる。
 # 扉は壁の面の中の 56%×78% に描くので、3:4 の 384×512。暗さはゲーム側（DungeonView の shade）で合わせる
+# ボスの門（<背景>-bossdoor）も 384×512。真っ黒な帯（翠の神殿の上下）を取り、ふちに写った壁を少し（4.5%）切る
 DUNGEON_FACE, DUNGEON_DOOR = 512, (384, 512)
+
+def cut_black_bands(im, th=3):
+    """上下左右の、真っ黒（平均の明るさ th 未満）な帯を取る"""
+    a = np.array(im.convert('L')).astype(float)
+    rows = np.where(a.mean(1) >= th)[0]
+    cols = np.where(a.mean(0) >= th)[0]
+    return im.crop((cols.min(), rows.min(), cols.max() + 1, rows.max() + 1))
+
+def inset(im, k=0.045):
+    dx, dy = round(im.width * k), round(im.height * k)
+    return im.crop((dx, dy, im.width - dx, im.height - dy))
 
 def build_dungeon():
     import glob, re
     for f in sorted(glob.glob(os.path.join(SRC, 'dungeon', '*'))):
-        m = re.match(r'(.+)-(wall|floor|ceiling|door)\.(webp|png|jpg)$', os.path.basename(f))
+        m = re.match(r'(.+)-(wall|floor|ceiling|door|bossdoor)\.(webp|png|jpg)$', os.path.basename(f))
         if not m: continue
         name = f'dungeon/{m.group(1)}-{m.group(2)}'
         if not want(name): continue
         im = Image.open(f).convert('RGB')
-        if m.group(2) == 'door':
+        if m.group(2) == 'bossdoor':
+            im = ImageOps.fit(inset(cut_black_bands(im)), DUNGEON_DOOR, Image.LANCZOS)
+        elif m.group(2) == 'door':
             im = ImageOps.fit(im, DUNGEON_DOOR, Image.LANCZOS)
         else:
             im = im.resize((DUNGEON_FACE, DUNGEON_FACE), Image.LANCZOS)
@@ -460,7 +489,7 @@ def write_dungeon_tone():
         v = round(ImageStat.Stat(Image.open(f).convert('L')).mean[0])
         tone.setdefault(m.group(1), {})[m.group(2)] = v
     lines = ['// 自動で作るファイル（scripts/art/build_art.py の write_dungeon_tone）。手で直さない。',
-             '// 通路の絵の明るさ（0〜255 の平均）。暗い絵のダンジョンで扉の縁を明るくするのに使う。',
+             '// 通路の絵の明るさ（0〜255 の平均）。暗い絵のダンジョンで、扉の縁を明るくし、通路の奥の暗さを弱めるのに使う。',
              'export const DUNGEON_TONE: Record<string, { wall?: number; floor?: number; ceiling?: number; door?: number }> = {']
     for bg, v in tone.items():
         lines.append(f'  {bg}: {{ ' + ', '.join(f'{k}: {v[k]}' for k in ('wall', 'floor', 'ceiling', 'door') if k in v) + ' },')
