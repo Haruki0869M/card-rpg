@@ -4,6 +4,7 @@ import { useBattle, speedFactor } from '../../store/battleStore';
 import { TIMING } from '../../data/balance';
 import { Heart } from 'lucide-react';
 import { getPet } from '../../data/pets';
+import { artImage } from '../../art/images';
 import { describeAbility, isPetMaster, petAbilities, petExplore, petLoveLevel } from '../../engine';
 import type { Hero } from '../../types';
 
@@ -29,14 +30,16 @@ export function PetToken({ pet, size, hop, hopKey, hopDuration, ownerId }: { pet
   const def = getPet(pet.petId);
   const col = def.colors.find((c) => c.id === pet.color) ?? def.colors[0];
   const lv = petLoveLevel(pet.love);
+  // 描いた絵（pet/<お供ID>-<色ID>.webp）があればそれを、無ければ記号（絵文字）＋色の点
+  const img = artImage(`pet/${pet.petId}-${col.id}`);
   const anim = hop || active ? 'pet-hop' : def.perch === 'float' ? 'pet-float' : def.perch === 'shoulder' ? 'pet-perch' : 'pet-bob';
   return (
     <span className="pointer-events-none relative block" style={{ width: size, height: size }} aria-label={`${pet.name}（${def.name}）`} data-pet={pet.petId} data-pet-owner={ownerId} data-pet-pulse={pulse}>
       <span key={`${hopKey ?? 'idle'}:${pulse ?? 'idle'}`} className={`absolute inset-0 flex items-center justify-center ${anim}`} style={{ fontSize: Math.max(12, size * 0.82), lineHeight: 1, ...(active ? { animationDuration: `${TIMING.petPulse / speedFactor(settings)}s`, animationDelay: '0s' } : {}), ...(pulse && !active ? { outline: '2px solid #ffe9a8', borderRadius: '50%' } : {}), ...(hop && hopDuration ? { animationDuration: `${hopDuration * 0.8}s`, animationDelay: `${hopDuration * 0.15}s` } : {}), filter: 'drop-shadow(0 1px 1.5px rgba(0,0,0,.8))' }}>
-        {def.icon}
+        {img ? <img src={img} alt="" draggable={false} className="h-full w-full object-contain" style={{ fontSize: 0 }} /> : def.icon}
       </span>
-      {/* 色違いの印 */}
-      <span className="absolute rounded-full border border-black/70" style={{ right: 0, bottom: 0, width: size * 0.3, height: size * 0.3, background: col.color }} />
+      {/* 色違いの印（絵がある時は絵そのものが色を表すので付けない） */}
+      {!img && <span className="absolute rounded-full border border-black/70" style={{ right: 0, bottom: 0, width: size * 0.3, height: size * 0.3, background: col.color }} />}
       {lv >= 3 && (
         <span className="absolute" style={{ left: -size * 0.08, top: -size * 0.12, fontSize: size * 0.38, lineHeight: 1 }} aria-hidden>
           🎀

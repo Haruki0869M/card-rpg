@@ -30,11 +30,14 @@ export function preloadImages(keys: string[]) {
   }
 }
 
-/** 起動時: 小さな絵（顔・道具・宝箱・地図の場所・地形・画面の枠）はすぐ、大きな絵（全身・敵・背景）は手が空いた時に少しずつ */
+/** 起動時: 小さな絵（顔・お供・道具・宝箱・地図の場所・地形・画面の枠）はすぐ、大きな絵（全身・敵・背景）は手が空いた時に少しずつ */
 export function preloadAllImages() {
-  const now = Object.keys(IMAGES).filter((k) => /^(item|chest|place|terrain|ui)\//.test(k) || k.endsWith('-face') || k === 'bg/title');
+  // 職業の絵は88枚ぶんあるので、最初から持っている4職（基本ジョブ）だけ先に読む。転職先の全身の絵は、表示する時に読む（通信量を抑える）
+  const BASE_JOBS = /^hero\/(hunter|guardian|mage|warrior)-/;
+  const isHero = (k: string) => k.startsWith('hero/');
+  const now = Object.keys(IMAGES).filter((k) => /^(item|chest|place|terrain|ui|pet)\//.test(k) || (k.endsWith('-face') && (!isHero(k) || BASE_JOBS.test(k))) || k === 'bg/title');
   preloadImages(now);
-  const later = Object.keys(IMAGES).filter((k) => !now.includes(k));
+  const later = Object.keys(IMAGES).filter((k) => !now.includes(k) && (!isHero(k) || BASE_JOBS.test(k)));
   const idle: (cb: () => void) => void =
     typeof window !== 'undefined' && 'requestIdleCallback' in window ? (cb) => window.requestIdleCallback(cb, { timeout: 2000 }) : (cb) => setTimeout(cb, 300);
   const step = () => {

@@ -132,6 +132,14 @@ FACES = {
     ('mage', 'female'): (0.5, 0.13, 0.17), ('mage', 'male'): (0.5, 0.135, 0.17),
     ('warrior', 'female'): (0.5, 0.085, 0.17), ('warrior', 'male'): (0.5, 0.085, 0.17),
 }
+# 帽子・冠・鎌などで自動の位置がずれる職は、目で確認して決めた値（J4）
+FACES.update({
+    ('hadesLord', 'female'): (0.543, 0.158, 0.157), ('hadesLord', 'male'): (0.443, 0.136, 0.156),
+    ('necromancer', 'female'): (0.421, 0.153, 0.156), ('necromancer', 'male'): (0.571, 0.139, 0.155),
+    ('overlord', 'female'): (0.598, 0.196, 0.156),
+    ('pope', 'female'): (0.50, 0.172, 0.156), ('pope', 'male'): (0.553, 0.178, 0.156),
+    ('lancer', 'female'): (0.559, 0.168, 0.156), ('hexer', 'female'): (0.535, 0.192, 0.156),
+})
 # 表に無い職は、この値（x=0.5 は頭の位置を自動で探す）
 FACE_DEFAULT = (0.5, 0.085, 0.17)
 
@@ -333,6 +341,20 @@ def build_items():
         fig = trim(soft_key(n) if key == 'town' else cutout(n), 24)
         save(rim(square(fig, 224, 0.04), strength=0.4), f'{name}.webp', 82)
 
+
+# ---------------- お供（ペット） ----------------
+# 元画像は pet-<お供ID>-<色ID>.(webp|png)。SRC に有る物を全部、pet/<お供ID>-<色ID>.webp にする（無い色は飛ばす）
+def build_pets():
+    import glob, re
+    for f in sorted(glob.glob(os.path.join(SRC, 'pet-*'))):
+        m = re.match(r'pet-(.+)\.(webp|png|jpg)$', os.path.basename(f))
+        if not m: continue
+        key = m.group(1)
+        name = f'pet/{key}'
+        if not want(name): continue
+        fig = trim(despeckle(cutout(f'pet-{key}')), 24)
+        save(rim(square(fig, 160, 0.04), (8, 6, 12), 0.6, 2), f'{name}.webp', 82)
+
 # ---------------- 画面の枠（UIの部品集 6 から切り出す） ----------------
 def key_out(im, bg=(60, 52, 55), tol=26):
     """部品集の無地の背景色を透明にする"""
@@ -380,4 +402,4 @@ def build_ui():
         save(seamless(im), 'ui/panel.webp', 70)
 
 if __name__ == '__main__':
-    build_heroes(); build_enemies(); build_bgs(); build_terrains(); build_items(); build_ui()
+    build_heroes(); build_enemies(); build_bgs(); build_terrains(); build_items(); build_ui(); build_pets()
