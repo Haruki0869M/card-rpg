@@ -1068,13 +1068,13 @@ adorable chibi red panda cub with a ringed fluffy tail and white face markings, 
 クリーム（`cream`）→ 元画像 `pet-redPanda-cream.png`
 
 ```
-adorable chibi red panda cub with a ringed fluffy tail and white face markings, pale cream fur with soft beige rings, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi red panda cub with a ringed fluffy tail and white face markings, entire body pale cream and light beige including the legs and belly, tail rings of beige and white, no orange or red fur, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 濃茶（`darkBrown`）→ 元画像 `pet-redPanda-darkBrown.png`
 
 ```
-adorable chibi red panda cub with a ringed fluffy tail and white face markings, dark chocolate brown fur, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi red panda cub with a ringed fluffy tail and white face markings, entire fur dark chocolate brown including the head and back, almost black legs, no orange or red fur, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 ## 組み込みの手順
