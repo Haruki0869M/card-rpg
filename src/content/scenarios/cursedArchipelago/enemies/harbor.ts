@@ -15,7 +15,7 @@ export const seaCrab: EnemyDef = {
   actions: [
     { id: 'pinch', name: 'はさみの二連撃', effects: [{ kind: 'damage', amount: 3, hits: 2 }] },
     { id: 'shell', name: '甲羅にこもる', effects: [{ kind: 'block', amount: 6 }] },
-    { id: 'crush', name: '挟みつぶし', effects: [{ kind: 'damage', amount: 6 }] },
+    { id: 'crush', name: '挟みつぶし', effects: [{ kind: 'damage', amount: 7 }] },
   ],
 };
 
@@ -34,7 +34,7 @@ export const jellyfish: EnemyDef = {
   actions: [
     { id: 'sting', name: '毒の触手', effects: [{ kind: 'damage', amount: 3 }, { kind: 'applyStatus', status: 'poison', amount: 2 }] },
     { id: 'drift', name: 'ただよう', effects: [{ kind: 'block', amount: 4 }] },
-    { id: 'lash', name: '触手の鞭', effects: [{ kind: 'damage', amount: 6 }] },
+    { id: 'lash', name: '触手の鞭', effects: [{ kind: 'damage', amount: 7 }] },
   ],
 };
 
@@ -49,7 +49,7 @@ export const pirateGrunt: EnemyDef = {
   gold: 5,
   pattern: 'sequence',
   actions: [
-    { id: 'saber', name: 'サーベルの斬りつけ', effects: [{ kind: 'damage', amount: 7 }] },
+    { id: 'saber', name: 'サーベルの斬りつけ', effects: [{ kind: 'damage', amount: 8 }] },
     { id: 'knives', name: '投げナイフ', effects: [{ kind: 'damage', amount: 3, hits: 2 }] },
     { id: 'duck', name: '樽の陰に隠れる', effects: [{ kind: 'block', amount: 5 }] },
   ],
