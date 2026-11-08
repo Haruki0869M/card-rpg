@@ -1,6 +1,6 @@
 // シナリオ2の世界マップ。下（雪解けの麓）から上（氷の城）へ進む。
 // 麓の外は寒い地域。地域ぜんぶの寒さ（climate）と雪原・氷原のマスで、1ターンごとにHPが減る。
-// 敵の組み合わせは仮（共通の敵）。手順2で凍てつく王国の敵に置き換える
+// 麓は指定3種を優先（全て氷耐性）。雪林以降は弱点の異なる敵・亜種を組み合わせる。
 import type { ScenarioMapDef } from '../../../types';
 
 export const frozenKingdomMap: ScenarioMapDef = {
@@ -15,9 +15,9 @@ export const frozenKingdomMap: ScenarioMapDef = {
       intro: '空が白く凍りついている。吹き荒れる雪の向こうに、氷の城が青白くそびえていた。',
       rows: [0, 2],
       terrain: { ice: 4, snow: 2, mountain: 1 },
-      climate: { kind: 'cold', ratio: 0.07 },
-      enemyLevel: 9,
-      encounters: [['goblinBrute'], ['goblinBrute', 'chaosShaman'], ['guardDog', 'goblinBrute']],
+      climate: { kind: 'cold', ratio: 0.08 },
+      enemyLevel: 10,
+      encounters: [["frostGuardian", "cursedFrozenSoldier"], ["iceKnight", "frozenGhoul"], ["frostDrakeling", "iceSwordsman"]],
       wanderers: 2,
     },
     {
@@ -26,9 +26,9 @@ export const frozenKingdomMap: ScenarioMapDef = {
       intro: '吹雪が視界をふさぐ。山の斜面に、巨人の足跡が凍りついていた。',
       rows: [3, 8],
       terrain: { snow: 4, mountain: 3, ice: 1 },
-      climate: { kind: 'cold', ratio: 0.06 },
-      enemyLevel: 7,
-      encounters: [['goblinBrute', 'goblinScout'], ['guardDog', 'guardDog'], ['chaosShaman', 'goblinBrute']],
+      climate: { kind: 'cold', ratio: 0.07 },
+      enemyLevel: 8,
+      encounters: [["yeti", "iceSwordsman"], ["blizzardSnake", "stormIceArcher"], ["venomIceSlime", "iceSwordsman"], ["yeti", "stormIceArcher"]],
       wanderers: 4,
       chests: 2,
       events: 2,
@@ -40,9 +40,9 @@ export const frozenKingdomMap: ScenarioMapDef = {
       intro: '見渡すかぎり、凍った湖が広がっている。氷の下に、沈んだ聖堂の尖塔がかすかに見えた。',
       rows: [9, 15],
       terrain: { ice: 5, snow: 2, water: 1 },
-      climate: { kind: 'cold', ratio: 0.05 },
-      enemyLevel: 5,
-      encounters: [['guardDog', 'goblinScout'], ['chaosShaman', 'guardDog'], ['goblinScout', 'goblinScout', 'chaosShaman']],
+      climate: { kind: 'cold', ratio: 0.06 },
+      enemyLevel: 6,
+      encounters: [["iceSlime", "frozenGhoul"], ["frostMage", "iceArcher"], ["cursedFrozenSoldier", "iceArcher"]],
       wanderers: 4,
       chests: 2,
       events: 2,
@@ -55,9 +55,9 @@ export const frozenKingdomMap: ScenarioMapDef = {
       intro: '雪をかぶった白樺の林が続く。木々の間で、何かが雪を踏む音がする。',
       rows: [16, 21],
       terrain: { forest: 3, snow: 4, hills: 1 },
-      climate: { kind: 'cold', ratio: 0.04 },
-      enemyLevel: 3,
-      encounters: [['guardDog', 'guardDog'], ['goblinScout', 'guardDog'], ['chaosShaman', 'goblinScout']],
+      climate: { kind: 'cold', ratio: 0.05 },
+      enemyLevel: 4,
+      encounters: [["iceBat", "frozenSoldier"], ["snowOwl", "icicleBug"], ["emberFrostWolf", "frozenSoldier"], ["frostWolf", "snowOwl"]],
       wanderers: 4,
       chests: 2,
       events: 2,
@@ -70,7 +70,7 @@ export const frozenKingdomMap: ScenarioMapDef = {
       rows: [22, 27],
       terrain: { plains: 5, hills: 2, forest: 1 },
       enemyLevel: 1,
-      encounters: [['goblinScout'], ['goblinScout', 'goblinScout'], ['guardDog', 'goblinScout']],
+      encounters: [["snowHare", "snowHare", "frostWolf"], ["frostWolf", "frostSprite"], ["snowHare", "frostSprite"]],
       wanderers: 3,
       chests: 2,
       events: 2,

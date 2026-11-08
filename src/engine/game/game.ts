@@ -61,7 +61,7 @@ import {
   agreeMove,
   heroesAt,
 } from './world/world';
-import { leaveSanctuary, leaveShrine, leaveTown, questAccept, questReport, shrineChoose, townBuy, townInn, townRemoveCard, townSell } from './world/town';
+import { leaveSanctuary, leaveShrine, leaveTown, questAccept, questReport, shrineChoose, bringMyPet, townBuy, townInn, townRemoveCard, townSell } from './world/town';
 import { getRoomType } from '../../data/rules';
 import { TERRAINS } from '../../data/world';
 import { buildDungeon, findRoom, RARITIES, rarityIndex, reachableRooms } from './dungeon';
@@ -548,6 +548,9 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
       case 'TOWN_INN':
         error = townInn(game, cmd);
         break;
+      case 'BRING_MY_PET':
+        error = bringMyPet(game, cmd);
+        break;
       case 'TOWN_REMOVE_CARD':
         error = townRemoveCard(game, cmd);
         break;
@@ -1004,11 +1007,24 @@ function leaveChest(game: GameState, playerId: string, rng: Rng): string | undef
   if (isBossRoom(room) && c.spec.big) {
     game.mode = 'cleared';
     game.stats.dungeonsCleared += 1;
+    // 一緒にダンジョンをクリアしたお供（伝承の書のマイペットの登録の条件。K5）
+    for (const h of sceneHeroes(game)) if (h.pet) h.pet.dungeonClears = (h.pet.dungeonClears ?? 0) + 1;
     if (!game.clearedDungeons.includes(run.dungeonId)) game.clearedDungeons.push(run.dungeonId);
     addLog(game, `${run.name}を制覇した！`);
     if (game.world) onDungeonCleared(game, run.dungeonId, rng);
   } else game.mode = 'dungeon';
   return undefined;
+}
+
+/** 制覇の物語の最後に足す一行: 鍵があと何個か / そろったら最終ダンジョンへ（シナリオのデータから作る。順番は決めつけない） */
+export function nextGoalLines(game: GameState): string[] {
+  const w = game.world!;
+  const total = Object.keys(getScenario(game.scenarioId).story?.keys ?? {}).length;
+  if (!total) return [];
+  const left = total - w.keys.length;
+  if (left > 0) return [`鍵はあと${left}つ。`];
+  const finale = DUNGEONS.forScenario(game.scenarioId).find((d) => d.finale);
+  return finale ? [`鍵がそろった。${finale.name}へ向かおう。`] : [];
 }
 
 /** 世界マップのダンジョンを制覇した時（封印の鍵・侵食度・依頼・最終ダンジョンならエンディング） */
@@ -1024,6 +1040,7 @@ function onDungeonCleared(game: GameState, dungeonId: string, rng: Rng) {
     addLog(game, `${corruptionName(game.scenarioId)}が${def.corruptionOnClear}%下がった`);
   }
   questSignal(game, { kind: 'clearDungeon', dungeonId });
+  if (def.clearStory?.length && !def.finale) w.story = { title: def.name, lines: [...def.clearStory, ...nextGoalLines(game)] };
   if (def.finale) {
     const story = getScenario(game.scenarioId).story;
     w.story = { title: 'エンディング', lines: story?.ending ?? ['魔王は封じられた。'] };
@@ -1041,8 +1058,8 @@ export function eventOptionState(game: GameState, eventId: string, index: number
   if (opt.requiresTag && !partyHasTag(game, opt.requiresTag)) return { visible: false };
   if (opt.requiresPet && !sceneHeroes(game).some((h) => h.hp > 0 && h.pet)) return { visible: false };
   if (opt.cost && !(payer ? [payer] : sceneHeroes(game)).some((h) => h.gold >= opt.cost!)) return { visible: true, reason: `ゴールドが足りません（${opt.cost}G）` };
-  if (opt.costFocus && !sceneHeroes(game).some((h) => h.focus >= opt.costFocus!)) return { visible: true, reason: `フォーカスが足りません（${opt.costFocus}）` };
-  if (opt.costItem && !sceneHeroes(game).some((h) => h.pouch.some((i) => i.itemId === opt.costItem))) return { visible: true, reason: `${getItem(opt.costItem).name}を持っていません` };
+  if (opt.costFocus && !(payer ? [payer] : sceneHeroes(game)).some((h) => h.focus >= opt.costFocus!)) return { visible: true, reason: `フォーカスが足りません（${opt.costFocus}）` };
+  if (opt.costItem && !(payer ? [payer] : sceneHeroes(game)).some((h) => h.pouch.some((i) => i.itemId === opt.costItem))) return { visible: true, reason: `${getItem(opt.costItem).name}を持っていません` };
   return { visible: true };
 }
 
@@ -1073,7 +1090,8 @@ function chooseEvent(
   const chosen = heroId ? findHero(game, heroId) : !game.activeScene && ev.tile !== undefined && game.world ? findHero(game, game.world.turn) : undefined;
   const payer = opt?.cost ? (chosen ?? sceneHeroes(game).find((h) => ownedBy(h, playerId) && h.gold >= opt.cost!)) : undefined;
   if (opt?.cost && (!payer || !ownedBy(payer, playerId))) return `ゴールドが足りません（${opt.cost}G）`;
-  const st = eventOptionState(game, ev.eventId, optionIndex, payer);
+  // フォーカス・道具も、選んだ本人がいれば本人で判定する（「選べる」と出たのに払えず断られるのを防ぐ）
+  const st = eventOptionState(game, ev.eventId, optionIndex, payer ?? chosen);
   if (!opt || !st.visible) return '選択肢がありません';
   if (st.reason) return st.reason;
   let actor: Hero | undefined = payer ?? chosen;

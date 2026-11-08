@@ -3,6 +3,11 @@ import { createRoot } from 'react-dom/client';
 import { lazy, Suspense } from 'react';
 import App from './App';
 import { prepareArt } from './art';
+import { installAudioUnlock } from './audio/player';
+import { installUiSounds } from './audio/uiSounds';
+import { installBgm } from './audio/bgm';
+import { useBattle } from './store/battleStore';
+import { useDetail } from './hooks/usePress';
 
 // 確認用: URL の末尾が #art ならアートの一覧、#data ならデータの一覧を表示する
 const ArtGallery = lazy(() => import('./art/ArtGallery'));
@@ -18,6 +23,11 @@ if (new URLSearchParams(location.search).has('emu') || new URLSearchParams(locat
 
 // 絵を先に画像化しておく（表示中の再計算・再描画を軽くするため）
 prepareArt();
+
+// 音: 最初のタップで使えるようにする（スマホの決まりで、それまでは鳴らせない。K6）
+installAudioUnlock();
+installUiSounds(useBattle, useDetail);
+installBgm(useBattle);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

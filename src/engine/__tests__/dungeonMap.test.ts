@@ -102,7 +102,7 @@ describe('通路の地図（部屋のつながりから決まった手順で作�
     const random = DUNGEONS.all.filter((d) => d.random);
     expect(random.length).toBeGreaterThan(0);
     for (const def of random) for (let seed = 1; seed <= 300; seed++) checkConnected(buildDungeon(def.id, createRng(seed), 0, eventIds));
-  });
+  }, 60_000); // ランダムダンジョンはシナリオごとに1つずつ増える（今6つ）ので、制限時間を長めにしておく
 
   it('同じ部屋の並びなら同じ地図。地図づくりで乱数を引かない', () => {
     const a = createRng(5);
@@ -274,13 +274,13 @@ describe('古い保存（v14）の移行', () => {
     if (old.expeditions![0].battle) old.expeditions![0].battle.version = 14;
     const m = migrateGame(JSON.parse(JSON.stringify(old)))!;
     expect(m).not.toBeNull();
-    expect(m.version).toBe(15);
+    expect(m.version).toBe(16);
     const md = m.expeditions![0].dungeon!;
     const c = dungeonGrid(md).roomCell.get('r0c0')!;
     expect(md.pos).toEqual({ x: c.x, y: c.y, facing: 0 });
     expect(md.seen).toContain(cellKey(c.x, c.y));
     expect(md.explore).toBe(3 * BALANCE.dungeonStepsPerExplore);
-    expect(m.expeditions![0].battle?.version).toBe(15);
+    expect(m.expeditions![0].battle?.version).toBe(16);
     // 移した後も、次の部屋の扉まで歩いて行ける
     const next = reachableRooms(md);
     expect(next.length).toBeGreaterThan(0);

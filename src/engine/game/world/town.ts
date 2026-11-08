@@ -5,6 +5,9 @@ import { CARDS } from '../../../data/cards';
 import { getClass } from '../../../data/classes';
 import { getItem, ITEMS } from '../../../data/items';
 import { QUESTS, SHRINES, TOWNS } from '../../../data/world';
+import { PETS } from '../../../data/pets';
+import { getScenario } from '../../../data/scenarios';
+import { idxOf } from './hex';
 import type { GameCommand, GameState, ShopStock } from '../../../types';
 import type { Rng } from '../../rng';
 import { addItem, addLog, addLoot, earnGold, ownedBy, shopPriceFor } from '../common';
@@ -40,7 +43,7 @@ export function ensureShop(game: GameState, rng: Rng): ShopStock {
   const price = (id: string) => BALANCE.itemPrice[getItem(id).rarity] ?? 30;
   for (const id of town.shop.fixed ?? []) items.push({ kind: 'item', item: newItem(game, getItem(id)), price: price(id) });
   const types = new Set(game.heroes.filter((h) => !h.retired).flatMap((h) => jobWeapons(h.classId)));
-  const equip = ITEMS.all.filter((i) => i.slot !== 'consumable' && (i.slot !== 'weapon' || types.has(i.weaponType!)));
+  const equip = ITEMS.all.filter((i) => i.slot !== 'consumable' && (!i.scenario || i.scenario === game.scenarioId) && (i.slot !== 'weapon' || types.has(i.weaponType!)));
   const cons = ITEMS.all.filter((i) => i.slot === 'consumable' && !(town.shop.fixed ?? []).includes(i.id));
   const pickByRarity = (pool: typeof ITEMS.all) => {
     for (let tries = 0; tries < 10; tries++) {
@@ -103,6 +106,42 @@ export function townBuy(game: GameState, cmd: Cmd<'TOWN_BUY'>, rng: Rng): string
     h.deck.push({ uid: `c${game.nextUid++}`, cardId: entry.cardId });
     addLog(game, `${h.name}の山札に「${CARDS.get(entry.cardId).name}」を加えた（${price}G）`);
   }
+  return undefined;
+}
+
+/** スタート地点の町にいるか（伝承の書のマイペットを呼べる町。K5） */
+export function inStartTown(game: GameState): boolean {
+  const map = getScenario(game.scenarioId).map;
+  const w = game.world;
+  if (!map || !w || game.mode !== 'town' || !game.town) return false;
+  const f = w.tiles[idxOf(w, map.start[0], map.start[1])]?.f;
+  return f?.kind === 'town' && f.id === game.town.townId;
+}
+
+/**
+ * マイペットを呼ぶ（K5）: スタートの町で、1人1回、自分のお金で。中身（種類・色・名前・懐き度）はその端末の記録から届く。
+ * 強さは変わらない（お供の効果は今までどおり、懐き度は見た目だけ）。乱数は使わない。
+ */
+export function bringMyPet(game: GameState, cmd: Cmd<'BRING_MY_PET'>): string | undefined {
+  const err = inTown(game, cmd.playerId, cmd.heroId);
+  if (err) return err;
+  if (!inStartTown(game)) return 'マイペットはスタートの町で呼べます';
+  const h = facilityHero(game, cmd.playerId, cmd.heroId)!;
+  if (h.myPetCalled) return 'この冒険では、もうマイペットを呼びました';
+  const p = cmd.pet;
+  const def = p && typeof p.petId === 'string' ? PETS.tryGet(p.petId) : undefined;
+  const col = def?.colors.find((c) => c.id === p.color);
+  if (!def || !col || typeof p.uid !== 'string' || !p.uid) return 'そのお供は呼べません';
+  if (game.heroes.some((x) => x.pet?.myPetUid === p.uid)) return 'その子はもう一緒にいます';
+  if (h.gold < BALANCE.myPetCost) return 'ゴールドが足りません';
+  const name = (typeof p.name === 'string' ? p.name : '').trim().slice(0, BALANCE.petNameMax) || def.names[0];
+  const maxLove = BALANCE.petLove[BALANCE.petLove.length - 1];
+  const love = Math.max(0, Math.min(maxLove, Math.floor(Number(p.love) || 0)));
+  h.gold -= BALANCE.myPetCost;
+  h.myPetCalled = true;
+  if (h.pet) addLog(game, `${h.pet.name}は${h.name}に見送られて、旅立っていった`);
+  h.pet = { petId: def.id, color: col.id, name, love, acts: 0, myPetUid: p.uid.slice(0, 80) };
+  addLog(game, `${h.name}が名前を呼ぶと、マイペットの「${name}」（${def.name}）が駆け寄ってきた！（${BALANCE.myPetCost}G）`);
   return undefined;
 }
 

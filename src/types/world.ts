@@ -27,6 +27,8 @@ export interface TerrainDef {
 export interface ClimateDef {
   kind: 'cold' | 'hot';
   ratio?: number;
+  /** 夜だけの設定（K4。砂漠は昼は暑く夜は寒い）。'none' なら夜は何も起きない。省略は昼夜とも同じ */
+  night?: Omit<ClimateDef, 'night'> | 'none';
 }
 
 /** 地域（マップの行の範囲。奥ほど敵が強い） */
@@ -105,6 +107,8 @@ export interface ScenarioMapDef {
   features: FixedFeature[];
   /** 町と町・ダンジョンを結ぶ道の地形（必ず通れる道を作る） */
   roadTerrain: string;
+  /** 施設（町・ダンジョンなど）のまわり何マスを、海でなく陸にするか（K4。小さすぎる島で詰まらないように。省略は0） */
+  landAround?: number;
   corruptionStages: CorruptionStage[];
 }
 

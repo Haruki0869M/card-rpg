@@ -9,6 +9,8 @@ import { BALANCE, REVEAL_TIMING, VIBRATION } from '../../data/balance';
 import { chestOdds, expectedChestOdds, rarityIndex, statChance, sceneBackground, sceneHeroes } from '../../engine';
 import { LOCAL_PLAYER, isLocalPlayer } from '../../store/battleConfig';
 import { speedFactor, useBattle, vibrate } from '../../store/battleStore';
+import { playSound } from '../../audio/player';
+import type { SfxId } from '../../audio/ids';
 import type { ChestRoll, Hero, Rarity, SlotResult } from '../../types';
 import { CheckPanel, RollStrip } from '../ui/CheckPanel';
 import { CHEST_NAME, fmtPct, OddsBar } from '../ui/ChestOdds';
@@ -82,7 +84,11 @@ function Reels({ results, speed }: { results: SlotResult[]; speed: number }) {
       if (r === 'focus') return undefined;
       const last = i === results.length - 1;
       const t = (REVEAL_TIMING.reelStop * (i + 1) + (last && tenpai ? REVEAL_TIMING.reelTenpai : 0)) / speed;
-      return setTimeout(() => setStopped((s) => s.map((v, j) => (j === i ? true : v))), t * 1000);
+      return setTimeout(() => {
+        setStopped((s) => s.map((v, j) => (j === i ? true : v)));
+        playSound('sfx_slot_stop');
+        if (tenpai && i === results.length - 2) playSound('sfx_slot_reach');
+      }, t * 1000);
     });
     return () => timers.forEach((t) => t && clearTimeout(t));
   }, [results, speed, tenpai]);
@@ -236,6 +242,12 @@ export function ChestScreen() {
     if (step.kind === 'light' && step.level > 0) vibrate(settings, VIBRATION.chestStep);
     if (step.kind === 'reach') vibrate(settings, VIBRATION.chestReach);
     if (step.kind === 'premium') vibrate(settings, VIBRATION.chestLegend);
+    // 音（K6）。簡易カットインでは、光は最後の段だけ鳴らす
+    const lastLight = Math.max(...timeline.map((s) => (s.kind === 'light' ? s.level : -1)));
+    if (step.kind === 'light' && (settings.cutinMode !== 'simple' || step.level === lastLight)) playSound(`sfx_chest_glow${step.level + 1}` as SfxId);
+    if (step.kind === 'shake') playSound('sfx_chest_shake');
+    if (step.kind === 'reach') playSound('sfx_chest_reach');
+    if (step.kind === 'premium') playSound('sfx_chest_legend');
     const t = setTimeout(() => setStepIdx((i) => (i === null ? i : i + 1)), (step.dur * 1000) / speed);
     return () => clearTimeout(t);
     // settings は振動の有無だけなので段取りの再実行はしない

@@ -14,7 +14,8 @@ export const corruptionName = (scenarioId?: string): string => (scenarioId ? SCE
  * clearedIds = クリア済みシナリオのID（クリア記録。まだ記録の仕組みが無い間は渡さない）。
  * 記録が無い間、または解放条件（unlockRequires）が無いシナリオは、従来の unlocked で決まる。
  */
-export function isScenarioUnlocked(sc: Pick<ScenarioDef, 'unlocked' | 'unlockRequires'>, clearedIds?: readonly string[]): boolean {
+export function isScenarioUnlocked(sc: Pick<ScenarioDef, 'unlocked' | 'unlockRequires' | 'wip'>, clearedIds?: readonly string[]): boolean {
+  if (sc.wip) return false; // 作成中は、クリアの記録があっても遊べない
   if (!clearedIds || !sc.unlockRequires) return sc.unlocked;
   return sc.unlockRequires.cleared.every((id) => clearedIds.includes(id));
 }

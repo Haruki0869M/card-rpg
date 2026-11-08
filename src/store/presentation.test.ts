@@ -93,7 +93,7 @@ describe('能力の出所と開始時の通知', () => {
     g.version = 12; g.mode = 'battle'; g.battle = createBattle({ seed: 7, party: [toPartyMember(h)], encounter: { id: 'test', name: '確認', enemies: [{ defId: 'forestWolf' }] } });
     g.battle.version = 12; delete g.battle.openingEvents; for (const a of g.battle.allies[0].abilities!) delete a.source;
     const original = structuredClone(g), next = migrateGame(structuredClone(g))!;
-    expect(next.version).toBe(15); expect(next.battle!.rngState).toBe(original.battle!.rngState); expect(next.rngState).toBe(original.rngState);
+    expect(next.version).toBe(16); expect(next.battle!.rngState).toBe(original.battle!.rngState); expect(next.rngState).toBe(original.rngState);
     expect(next.battle!.allies[0].abilities![0].effect).toEqual(original.battle!.allies[0].abilities![0].effect);
     expect(next.battle!.allies[0].abilities![0].source?.kind).toBe('equipment'); expect(next.battle!.openingEvents).toBeUndefined();
   });
@@ -126,8 +126,8 @@ describe('探索のお供通知と旧設定', () => {
     expect(explorationNotices(g, skipped.state, skip)).toEqual([]);
   });
   it('旧設定の高速/振動を維持し、カットインだけ標準で補う', () => {
-    expect(normalizeSettings({ fastMode: true, vibration: false })).toEqual({ fastMode: true, vibration: false, cutinMode: 'standard' });
-    expect(normalizeSettings(null)).toEqual({ fastMode: false, vibration: true, cutinMode: 'standard' });
+    expect(normalizeSettings({ fastMode: true, vibration: false })).toEqual({ fastMode: true, vibration: false, cutinMode: 'standard', sfxVolume: 5, bgmVolume: 4, petVolume: 3 });
+    expect(normalizeSettings(null)).toEqual({ fastMode: false, vibration: true, cutinMode: 'standard', sfxVolume: 5, bgmVolume: 4, petVolume: 3 });
     expect(normalizeSettings({ cutinMode: 'simple' }).cutinMode).toBe('simple');
     expect(normalizeSettings({ fastMode: 'invalid', vibration: 1, cutinMode: 'invalid' })).toEqual(normalizeSettings(null));
   });

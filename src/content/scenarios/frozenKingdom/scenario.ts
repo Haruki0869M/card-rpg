@@ -10,8 +10,9 @@ export const frozenKingdom: ScenarioDef = {
   synopsis: '百年続く冬に閉ざされた王国エルフロスト。三つの氷晶の鍵を集めて氷の城を開き、春を奪った白の女王を止めよ。',
   recommended: '2〜4人',
   playTime: '60〜90分',
-  unlocked: false,
-  unlockText: '伝承の書で解放（準備中）',
+  unlocked: true,
+  unlockText: '「侵食の魔王」をクリアすると遊べる',
+  unlockRequires: { cleared: ['corruptionKing'] },
   // 世界の悪化の名前（画面の「侵食度」の代わりに出る言葉）
   corruptionName: '冬の深さ',
   start: { gold: 40, pouch: [{ itemId: 'potion', count: 2 }] },

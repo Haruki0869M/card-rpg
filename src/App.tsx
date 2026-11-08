@@ -33,6 +33,7 @@ import { findAlly } from './engine';
 import { useBackButton } from './hooks/useBackButton';
 import { useDetail } from './hooks/usePress';
 import { useBattle } from './store/battleStore';
+import { useProfile } from './store/profileStore';
 
 /** PC向けの補助ショートカット（任意機能） */
 function useKeyboard() {
@@ -174,6 +175,13 @@ export default function App() {
   const closeTop = useBattle((s) => s.closeTop);
   const detail = useDetail(s => s.detail);
   useEffect(() => { if (screen !== 'game') useDetail.getState().hide(); }, [screen]);
+  // 伝承の書（K5）: 冒険の状態が変わるたびに、見た物・手に入れた物をこの端末の記録に足す（見るだけ。状態・同期は変えない）
+  useEffect(() => {
+    useProfile.getState().observe(useBattle.getState().full);
+    return useBattle.subscribe((s, prev) => {
+      if (s.full !== prev.full) useProfile.getState().observe(s.full);
+    });
+  }, []);
 
   useBackButton(!!detail || !!selection || !!sheet || confirmAbandon || screen === 'setup' || screen === 'create' || screen === 'join', () => {
     if (useDetail.getState().detail) { useDetail.getState().hide(); return true; }

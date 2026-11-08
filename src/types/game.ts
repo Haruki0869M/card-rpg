@@ -30,6 +30,10 @@ export interface HeroPet {
   acts: number;
   /** この冒険でもう撫でた（フォーカス+1は1回だけ） */
   patted?: boolean;
+  /** 伝承の書のマイペットから呼んだ子（その端末の記録の ID。K5） */
+  myPetUid?: string;
+  /** この冒険で一緒にダンジョンをクリアした回数（マイペットの登録の条件。K5） */
+  dungeonClears?: number;
 }
 
 export interface ItemDef {
@@ -102,6 +106,8 @@ export interface Hero {
   jobPick?: string[];
   /** 連れているお供（1匹まで） */
   pet?: HeroPet;
+  /** この冒険で、もうマイペットを呼んだ（1人1回。K5） */
+  myPetCalled?: boolean;
   /** 迎えられるお供の候補（イベントの後。ADOPT_PET で選ぶ） */
   petOffer?: string[];
   /** 候補を出した時点で抽選・保存する毛色。採用時には引き直さない。 */
@@ -194,6 +200,8 @@ export interface DungeonDef {
   bossChest: Rarity;
   /** 制覇すると手に入る封印の鍵（シナリオの story.keys のID） */
   rewardKey?: string;
+  /** 制覇した後に出る物語（2〜3行、1行30字まで。何が起きたかを伝える）。最後に鍵の残り数と次の目的地が自動で足される */
+  clearStory?: string[];
   /** 入るのに必要な鍵 */
   requiresKeys?: string[];
   /** 制覇すると侵食度がこれだけ下がる */
@@ -582,6 +590,8 @@ export type GameCommand =
   // ---------- 町・祠 ----------
   | { type: 'TOWN_BUY'; playerId: PlayerId; heroId?: string; kind: 'item' | 'card'; index: number }
   | { type: 'TOWN_INN'; playerId: PlayerId; heroId?: string }
+  /** 伝承の書のマイペットを呼ぶ（スタートの町で1人1回・お金。中身はその端末の記録から送る。乱数は使わない。K5） */
+  | { type: 'BRING_MY_PET'; playerId: PlayerId; heroId: string; pet: { uid: string; petId: string; color: string; name: string; love: number } }
   | { type: 'TOWN_REMOVE_CARD'; playerId: PlayerId; heroId: string; cardUid: string }
   | { type: 'TOWN_SELL'; playerId: PlayerId; heroId?: string; itemUid: string }
   | { type: 'QUEST_ACCEPT'; playerId: PlayerId; heroId?: string; questId: string }
@@ -636,6 +646,8 @@ export interface ScenarioDef {
   unlockText?: string;
   /** 解放の条件（クリア記録で決まる。無ければ従来の unlocked だけで決まる）。K4 */
   unlockRequires?: { cleared: string[] };
+  /** 作成中（敵・数値がそろうまで、クリアの記録があっても遊べない。仕上げて登録する時にこの印を外す）。K4 */
+  wip?: boolean;
   /** 世界の悪化の名前（画面の「侵食度」の代わりに出る言葉。無ければ TERMS.corruption）。K4 */
   corruptionName?: string;
   /** 冒険の開始条件 */

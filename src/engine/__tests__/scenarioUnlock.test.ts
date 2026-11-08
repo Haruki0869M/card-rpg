@@ -23,11 +23,14 @@ describe('シナリオの解放判定', () => {
     expect(isScenarioUnlocked({ unlocked: true }, [])).toBe(true);
     expect(isScenarioUnlocked({ ...base }, ['a'])).toBe(false);
   });
-  it('今の登録済みシナリオ: 1本目は遊べ、凍てつく王国は未解放のまま', () => {
+  it('今の登録済みシナリオ: 1本目は遊べ、凍てつく王国は1本目のクリアで解放される', () => {
     expect(isScenarioUnlocked(getScenario('corruptionKing'))).toBe(true);
     expect(isScenarioUnlocked(getScenario('corruptionKing'), [])).toBe(true);
     for (const s of SCENARIOS.all) expect(isScenarioUnlocked(s)).toBe(s.unlocked);
-    expect(isScenarioUnlocked(getScenario('frozenKingdom'))).toBe(false);
+    const frozen = getScenario('frozenKingdom');
+    expect(isScenarioUnlocked(frozen, [])).toBe(false);
+    expect(isScenarioUnlocked(frozen, ['frozenKingdom'])).toBe(false);
+    expect(isScenarioUnlocked(frozen, ['corruptionKing'])).toBe(true);
   });
 });
 

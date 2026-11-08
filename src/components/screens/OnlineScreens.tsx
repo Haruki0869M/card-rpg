@@ -6,7 +6,9 @@ import { useEffect, useState } from 'react';
 import { BALANCE } from '../../data/balance';
 import { CLASSES } from '../../data/classes';
 import { DIFFICULTIES, getDifficulty } from '../../data/rules';
-import { SCENARIOS } from '../../data/scenarios';
+import { SCENARIOS, isScenarioUnlocked } from '../../data/scenarios';
+import { clearedScenarioIds } from '../../store/profile';
+import { useProfile } from '../../store/profileStore';
 import { PLAYER_COLOR } from '../../data/theme';
 import { livingHeroes, waitingPlayers } from '../../engine';
 import { normalizeCode, SEATS } from '../../net/room';
@@ -112,10 +114,13 @@ export function LobbyScreen() {
   const setScreen = useBattle((s) => s.setScreen);
   const setDraft = useBattle((s) => s.setDraft);
   const toast = useBattle((s) => s.showToast);
+  const clears = useProfile((s) => s.profile.clears);
   if (!room?.meta) return null;
+  const cleared = clearedScenarioIds({ clears });
   const m = room.meta;
   const host = room.isHost;
-  const scenarios = SCENARIOS.all.filter((s) => s.unlocked);
+  // シナリオの解放は、部屋を作った人（ホスト）のこの端末の記録で決める（K5）。参加者はホストが選んだものを見るだけ
+  const scenarios = SCENARIOS.all.filter((s) => isScenarioUnlocked(s, cleared));
   const problem = room.startProblem();
   const editSlot = (i: number) => {
     const cur = room.slots[i];
@@ -180,7 +185,7 @@ export function LobbyScreen() {
         <div className="font-display mt-3 text-[15px] text-amber-200">冒険の設定{host ? '' : '（ホストが決めます）'}</div>
         <div className="mt-1 flex flex-col gap-2">
           <div className="flex flex-wrap gap-1.5">
-            {(host ? scenarios : scenarios.filter((s) => s.id === m.scenarioId)).map((s) => (
+            {(host ? scenarios : SCENARIOS.all.filter((s) => s.id === m.scenarioId)).map((s) => (
               <button key={s.id} disabled={!host} onClick={() => update({ scenarioId: s.id })} className={`btn h-11 rounded-lg px-3 text-[14px] font-bold ${m.scenarioId === s.id ? 'btn-gold' : 'btn-dark'}`}>
                 {s.name}
               </button>

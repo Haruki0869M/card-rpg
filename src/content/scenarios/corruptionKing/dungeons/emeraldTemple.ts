@@ -12,6 +12,7 @@ export const emeraldTemple: DungeonDef = {
   bossChest: 'epic',
   rewardKey: 'emerald',
   corruptionOnClear: 5,
+  clearStory: ['樹魔トレントキングが倒れた。', '森に、さわやかな風が戻ってくる。', '封印の鍵（翠）を手に入れた！'],
   // 行ごとの部屋。next は次の行の何番目の部屋につながるか
   layout: [
     [{ type: 'battle', next: [0, 1] }],
