@@ -23,7 +23,7 @@
 - 立ち絵の特徴: 赤茶の髪、赤いマント・赤い布、銀の鎧に赤の飾り
 
 ```
-chibi tabletop miniature figurine of a young male swordsman, short reddish-brown hair, silver plate armor with red trim, flowing red cape and red scarf, holding a single plain copper one-handed sword pointed down at his side, confident gentle expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, shield, second weapon, second sword, sheathed sword, scabbard, bow, arrows, quiver, spear, signature, text, watermark, scenery
+chibi tabletop miniature figurine of a young male swordsman, short reddish-brown hair, silver plate armor with red trim, flowing red cape and red scarf, holding only one plain copper one-handed sword in his right hand pointed down, his left hand empty and open, confident gentle expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, shield, dual wielding, two swords, second weapon, second sword, sheathed sword, scabbard, bow, arrows, quiver, spear, signature, text, watermark, scenery
 ```
 
 ### 2. 魔道士・女（ルーシア）`piece/mage-female`
@@ -44,3 +44,4 @@ chibi tabletop miniature figurine of a young female mage, short dark hair, wide-
 ## 試しの結果（2026-11-08）
 - 1回目: 剣士・男、魔道士・女とも、立ち絵と同じ服・武器のかわいいミニチュアになった（`C:\dev\card-rpg-assets\j4\piece-trial1\`）。ただし金の台座まで描かれ、ゲームの台座と2重になるため、**台座なし**に変えて作り直す。
 - 2回目: 魔道士・女は台座なしで**合格**（`C:\dev\card-rpg-assets\j4\piece\mage-female.webp`）。剣士・男は白い薄い円盤の台が残り、剣も2本（手と腰）になった → 「足が白い背景に直接つく」を足し、`--no` に円盤・2本目の剣・鞘を追加。
+- 3回目: 剣士・男は台が消えて合格に近いが、両手に1本ずつ剣を持った → 「右手に1本だけ・左手は空」にし、`--no` に二刀流・2本の剣（立ち絵の短剣・本と同じ直し方）。
