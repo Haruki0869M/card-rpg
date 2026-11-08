@@ -102,7 +102,7 @@ describe('通路の地図（部屋のつながりから決まった手順で作�
     const random = DUNGEONS.all.filter((d) => d.random);
     expect(random.length).toBeGreaterThan(0);
     for (const def of random) for (let seed = 1; seed <= 300; seed++) checkConnected(buildDungeon(def.id, createRng(seed), 0, eventIds));
-  });
+  }, 60_000); // ランダムダンジョンはシナリオごとに1つずつ増える（今6つ）ので、制限時間を長めにしておく
 
   it('同じ部屋の並びなら同じ地図。地図づくりで乱数を引かない', () => {
     const a = createRng(5);
