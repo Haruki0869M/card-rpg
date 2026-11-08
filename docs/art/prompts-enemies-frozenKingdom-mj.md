@@ -13,7 +13,7 @@
 元画像: `C:\dev\card-rpg-assets\enemy\snowHare.png`
 
 ```
-full body creature illustration of a small white snow hare, long frost tipped ears, stout hind legs raised for one kick, fluffy paws, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no weapons, shield, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of a small white snow hare, long frost tipped ears, stout hind legs raised for one kick, fluffy paws, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, weapons, shield, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### frostWolf 雪狼（凍てつく王国・麓・通常・size 0.95）
@@ -21,7 +21,7 @@ full body creature illustration of a small white snow hare, long frost tipped ea
 元画像: `C:\dev\card-rpg-assets\enemy\frostWolf.png`
 
 ```
-full body creature illustration of a lean white frost wolf, pale blue eyes, thick winter fur and small fangs, four visible paws, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no armor, weapons, rider, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of a lean white frost wolf, pale blue eyes, thick winter fur and clean white fangs, pale blue grey paws, four visible paws, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, armor, weapons, rider, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### frostSprite 霜の精（凍てつく王国・麓・通常・size 0.8）
@@ -29,7 +29,7 @@ full body creature illustration of a lean white frost wolf, pale blue eyes, thic
 元画像: `C:\dev\card-rpg-assets\enemy\frostSprite.png`
 
 ```
-full body creature illustration of one tiny hovering frost sprite, one round blue body with two small translucent ice wings and short arms, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no staff, weapon, shield, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one tiny hovering frost sprite, one round blue body with two small translucent ice wings and short arms, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, staff, weapon, shield, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### iceBat 氷の蝙蝠（凍てつく王国・雪林・通常・size 0.8）
@@ -37,7 +37,7 @@ full body creature illustration of one tiny hovering frost sprite, one round blu
 元画像: `C:\dev\card-rpg-assets\enemy\iceBat.png`
 
 ```
-full body creature illustration of one small icy bat with wide translucent blue wings and a furry white torso, pointed ears and tiny fangs, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no humanoid hands, weapon, armor, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one small icy bat with wide translucent blue wings and a furry white torso, pointed ears and tiny fangs, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, humanoid hands, weapon, armor, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### frozenSoldier 凍った兵士（凍てつく王国・雪林・通常・size 1）
@@ -45,7 +45,7 @@ full body creature illustration of one small icy bat with wide translucent blue 
 元画像: `C:\dev\card-rpg-assets\enemy\frozenSoldier.png`
 
 ```
-full body creature illustration of one frozen human soldier, weathered steel helmet, rigid icy blue coat of mail, exactly one short steel sword and one round wooden shield, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no bow, spear, extra weapons, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one frozen human soldier, weathered steel helmet, rigid icy blue coat of mail, exactly one short steel sword and one round wooden shield, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, bow, spear, extra weapons, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### snowOwl 白梟（凍てつく王国・雪林・通常・size 0.85）
@@ -53,7 +53,7 @@ full body creature illustration of one frozen human soldier, weathered steel hel
 元画像: `C:\dev\card-rpg-assets\enemy\snowOwl.png`
 
 ```
-full body creature illustration of one compact snowy owl with white feathered wings partly spread and black speckles, round amber eyes, large talons, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no weapon, perch, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one compact snowy owl with white feathered wings partly spread and black speckles, round amber eyes, large talons, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, weapon, perch, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### icicleBug 氷柱の虫（凍てつく王国・雪林・通常・size 0.85）
@@ -61,7 +61,7 @@ full body creature illustration of one compact snowy owl with white feathered wi
 元画像: `C:\dev\card-rpg-assets\enemy\icicleBug.png`
 
 ```
-full body creature illustration of one six legged ice beetle, broad faceted blue carapace and a single long icicle horn, insect mandibles, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no humanoid limbs, weapon, shield, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one six legged ice beetle, broad faceted blue carapace and a single long icicle horn, insect mandibles, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, humanoid limbs, weapon, shield, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### snowWitch 雪の魔女（凍てつく王国・雪林・エリート・size 1.2）
@@ -69,7 +69,7 @@ full body creature illustration of one six legged ice beetle, broad faceted blue
 元画像: `C:\dev\card-rpg-assets\enemy\snowWitch.png`
 
 ```
-full body creature illustration of one snow witch, pale face under a white fur hood, flowing blue winter robe, exactly one short crystal wand in her right hand, left hand open, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no sword, shield, broom, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one snow witch, pale face under a white fur hood, flowing blue winter robe, exactly one short crystal wand in her right hand, left hand open, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, sword, shield, broom, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### crystalLord 氷晶の主（凍てつく王国・雪林・ボス・size 1.4）
@@ -77,7 +77,7 @@ full body creature illustration of one snow witch, pale face under a white fur h
 元画像: `C:\dev\card-rpg-assets\enemy\crystalLord.png`
 
 ```
-full body creature illustration of one imposing crystalline ice golem, squat broad torso made of pale blue quartz plates, two thick arms ending in jagged crystal fists, large imposing boss silhouette, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no carried weapon, shield, crown, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one imposing crystalline ice golem, squat broad torso made of pale blue quartz plates, two thick arms ending in jagged crystal fists, large imposing boss silhouette, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, carried weapon, shield, crown, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 #### crystalLord-1 増殖する氷晶（HP50%以下）
@@ -85,7 +85,7 @@ full body creature illustration of one imposing crystalline ice golem, squat bro
 元画像: `C:\dev\card-rpg-assets\enemy\crystalLord-1.png`
 
 ```
-full body creature illustration of one imposing crystalline ice golem, squat broad torso made of pale blue quartz plates, two thick arms ending in jagged crystal fists, same creature transformed with additional tall ice crystals growing from both shoulders and back, wider armored silhouette, same two empty crystal fists, large imposing boss silhouette, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no carried weapon, shield, crown, separate crystal creatures, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one imposing crystalline ice golem, squat broad torso made of pale blue quartz plates, two thick arms ending in jagged crystal fists, same creature transformed with additional tall ice crystals growing from both shoulders and back, wider armored silhouette, same two empty crystal fists, large imposing boss silhouette, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, carried weapon, shield, crown, separate crystal creatures, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### iceSlime 氷結のスライム（凍てつく王国・湖・通常・size 0.9）
@@ -93,7 +93,7 @@ full body creature illustration of one imposing crystalline ice golem, squat bro
 元画像: `C:\dev\card-rpg-assets\enemy\iceSlime.png`
 
 ```
-full body creature illustration of one round translucent pale blue ice slime, a single visible frosty core and simple eyes, small frozen surface spikes, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no humanoid limbs, weapons, armor, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one round translucent pale blue ice slime, a single visible frosty core and simple eyes, small frozen surface spikes, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, humanoid limbs, weapons, armor, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### frozenGhoul 凍える亡者（凍てつく王国・湖・通常・size 1）
@@ -101,7 +101,7 @@ full body creature illustration of one round translucent pale blue ice slime, a 
 元画像: `C:\dev\card-rpg-assets\enemy\frozenGhoul.png`
 
 ```
-full body creature illustration of one shivering frozen ghoul in ragged burial wrappings, icy gray skin, hunched back and long empty clawed hands, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no weapon, shield, blood, gore, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one shivering frozen ghoul in ragged burial wrappings, icy gray skin, hunched back and long empty clawed hands, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, weapon, shield, blood, gore, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### iceArcher 極寒の弓兵（凍てつく王国・湖・通常・size 1）
@@ -109,7 +109,7 @@ full body creature illustration of one shivering frozen ghoul in ragged burial w
 元画像: `C:\dev\card-rpg-assets\enemy\iceArcher.png`
 
 ```
-full body creature illustration of one lean winter archer in a frost crusted leather coat and hood, exactly one longbow with one arrow drawn, a closed quiver on the back, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no sword, shield, crossbow, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one lean winter archer in a frost crusted leather coat and hood, exactly one longbow with one arrow drawn, a closed quiver on the back, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, sword, shield, crossbow, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### frostMage 霜の魔法使い（凍てつく王国・湖・通常・size 1）
@@ -117,7 +117,7 @@ full body creature illustration of one lean winter archer in a frost crusted lea
 元画像: `C:\dev\card-rpg-assets\enemy\frostMage.png`
 
 ```
-full body creature illustration of one frost mage in a long pale blue robe and angular hood, exactly one tall staff topped by a single six pointed ice crystal, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no sword, shield, book, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one frost mage in a long pale blue robe and angular hood, exactly one tall staff topped by a single six pointed ice crystal, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, sword, shield, book, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### iceKnight 氷の騎士（凍てつく王国・湖・エリート・size 1.2）
@@ -125,7 +125,7 @@ full body creature illustration of one frost mage in a long pale blue robe and a
 元画像: `C:\dev\card-rpg-assets\enemy\iceKnight.png`
 
 ```
-full body creature illustration of one stocky ice knight, full faceted blue plate armor with closed helmet, exactly one broad ice sword, empty left hand, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no shield, bow, extra blade, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one stocky ice knight, full faceted blue plate armor with closed helmet, exactly one broad ice sword, empty left hand, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, shield, bow, extra blade, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### frozenBishop 凍れる司教（凍てつく王国・湖・ボス・size 1.5）
@@ -133,7 +133,7 @@ full body creature illustration of one stocky ice knight, full faceted blue plat
 元画像: `C:\dev\card-rpg-assets\enemy\frozenBishop.png`
 
 ```
-full body creature illustration of one imposing frozen bishop in ornate white and blue vestments, tall split ceremonial mitre, exactly one silver crozier with an icy circular head, large imposing boss silhouette, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no sword, shield, book, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one imposing frozen bishop in ornate white and blue vestments, tall split ceremonial mitre, exactly one silver crozier with an icy circular head, large imposing boss silhouette, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, sword, shield, book, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 #### frozenBishop-1 冬への祈り（HP50%以下）
@@ -141,7 +141,7 @@ full body creature illustration of one imposing frozen bishop in ornate white an
 元画像: `C:\dev\card-rpg-assets\enemy\frozenBishop-1.png`
 
 ```
-full body creature illustration of one imposing frozen bishop in ornate white and blue vestments, tall split ceremonial mitre, exactly one silver crozier with an icy circular head, same bishop transformed with a halo of thin frozen prayer shards joined behind his mitre, robes fused into rigid ice plates, same single crozier, large imposing boss silhouette, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no sword, shield, book, extra figure, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one imposing frozen bishop in ornate white and blue vestments, tall split ceremonial mitre, exactly one silver crozier with an icy circular head, same bishop transformed with a halo of thin frozen prayer shards joined behind his mitre, robes fused into rigid ice plates, same single crozier, large imposing boss silhouette, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, sword, shield, book, extra figure, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### yeti 雪男（凍てつく王国・山脈・通常・size 1.1）
@@ -149,7 +149,7 @@ full body creature illustration of one imposing frozen bishop in ornate white an
 元画像: `C:\dev\card-rpg-assets\enemy\yeti.png`
 
 ```
-full body creature illustration of one broad white yeti with long shaggy fur, blue face, heavy empty fists and stout legs, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no club, carried weapon, armor, rider, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one broad white yeti with long shaggy fur, blue face, heavy empty fists and stout legs, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, club, carried weapon, armor, rider, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### blizzardSnake 吹雪の蛇（凍てつく王国・山脈・通常・size 1）
@@ -157,7 +157,7 @@ full body creature illustration of one broad white yeti with long shaggy fur, bl
 元画像: `C:\dev\card-rpg-assets\enemy\blizzardSnake.png`
 
 ```
-full body creature illustration of one large coiled white snow snake with icy blue scales along its spine, one head with two small fangs, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no legs, wings, weapon, armor, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one large coiled white snow snake with icy blue scales along its spine, one head with two small fangs, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, legs, wings, weapon, armor, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### iceSwordsman 氷の剣士（凍てつく王国・山脈・通常・size 1）
@@ -165,7 +165,7 @@ full body creature illustration of one large coiled white snow snake with icy bl
 元画像: `C:\dev\card-rpg-assets\enemy\iceSwordsman.png`
 
 ```
-full body creature illustration of one slender ice swordsman in blue padded armor and a white scarf, exactly one straight steel sword gripped with both hands, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no shield, bow, spare sword, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one slender ice swordsman in blue padded armor and a white scarf, exactly one straight steel sword gripped with both hands, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, shield, bow, spare sword, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### blizzardBeast 吹雪の獣（凍てつく王国・山脈・エリート・size 1.2）
@@ -173,7 +173,7 @@ full body creature illustration of one slender ice swordsman in blue padded armo
 元画像: `C:\dev\card-rpg-assets\enemy\blizzardBeast.png`
 
 ```
-full body creature illustration of one massive four legged snow beast, broad feline face with two saber fangs, shaggy white fur and pale blue shoulder crystals, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no wings, rider, weapon, armor, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one massive four legged snow beast, broad feline face with two saber fangs, shaggy white fur and pale blue shoulder crystals, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, wings, rider, weapon, armor, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### frostDrakeling 凍土の竜の幼体（凍てつく王国・山脈・エリート・size 1.2）
@@ -181,7 +181,7 @@ full body creature illustration of one massive four legged snow beast, broad fel
 元画像: `C:\dev\card-rpg-assets\enemy\frostDrakeling.png`
 
 ```
-full body creature illustration of one juvenile frost dragon, stout four legged body, short folded wings, pale blue scales and small swept horns, curled heavy tail, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no rider, armor, carried weapon, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one juvenile frost dragon, stout four legged body, short folded wings, pale blue scales and small swept horns, curled heavy tail, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, rider, armor, carried weapon, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### frostGiant 霜の巨人（凍てつく王国・山脈・ボス・size 1.6）
@@ -189,7 +189,7 @@ full body creature illustration of one juvenile frost dragon, stout four legged 
 元画像: `C:\dev\card-rpg-assets\enemy\frostGiant.png`
 
 ```
-full body creature illustration of one towering frost giant, huge blue gray muscular body, white beard and heavy fur belt, exactly one oversized stone mining hammer held in both hands, large imposing boss silhouette, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no shield, sword, helmet, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one towering frost giant, huge blue gray muscular body, white beard and heavy fur belt, exactly one oversized stone mining hammer held in both hands, large imposing boss silhouette, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, shield, sword, helmet, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 #### frostGiant-1 怒れる霜の巨人（HP50%以下）
@@ -197,7 +197,7 @@ full body creature illustration of one towering frost giant, huge blue gray musc
 元画像: `C:\dev\card-rpg-assets\enemy\frostGiant-1.png`
 
 ```
-full body creature illustration of one towering frost giant, huge blue gray muscular body, white beard and heavy fur belt, exactly one oversized stone mining hammer held in both hands, same giant enraged, frost cracks glowing blue across his skin, shoulders raised and the same single mining hammer lifted overhead, large imposing boss silhouette, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no shield, sword, helmet, second hammer, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one towering frost giant, huge blue gray muscular body, white beard and heavy fur belt, exactly one oversized stone mining hammer held in both hands, same giant enraged, frost cracks glowing blue across his skin, shoulders raised and the same single mining hammer lifted overhead, large imposing boss silhouette, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, shield, sword, helmet, second hammer, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### frostGuardian 霜の守護者（凍てつく王国・城・エリート・size 1.2）
@@ -205,7 +205,7 @@ full body creature illustration of one towering frost giant, huge blue gray musc
 元画像: `C:\dev\card-rpg-assets\enemy\frostGuardian.png`
 
 ```
-full body creature illustration of one broad faceless guardian golem, blue white stone blocks bound with ice, rectangular shoulders and massive empty fists, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no carried weapon, shield, bow, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one broad faceless guardian golem, blue white stone blocks bound with ice, rectangular shoulders and massive empty fists, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, carried weapon, shield, bow, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ### whiteQueen 白の女王（凍てつく王国・城・ボス・size 1.6）
@@ -213,7 +213,7 @@ full body creature illustration of one broad faceless guardian golem, blue white
 元画像: `C:\dev\card-rpg-assets\enemy\whiteQueen.png`
 
 ```
-full body creature illustration of one imposing tragic ice queen with a youthful sorrowful human face, a single delicate ice crown and a long blue white royal gown with crystalline hem, open empty hands, large imposing boss silhouette, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no sword, staff, shield, throne, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one imposing tragic ice queen with a youthful sorrowful human face, a single delicate ice crown and a long blue white royal gown with crystalline hem, open empty hands, large imposing boss silhouette, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, sword, staff, shield, throne, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 #### whiteQueen-1 帰らぬ春を待つ姫（HP60%以下）
@@ -221,7 +221,7 @@ full body creature illustration of one imposing tragic ice queen with a youthful
 元画像: `C:\dev\card-rpg-assets\enemy\whiteQueen-1.png`
 
 ```
-full body creature illustration of one imposing tragic ice queen with a youthful sorrowful human face, a single delicate ice crown and a long blue white royal gown with crystalline hem, open empty hands, same tragic young queen, icy tear tracks and a wider fractured crown, royal dress turning into rigid jagged ice, same empty open hands, large imposing boss silhouette, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no sword, staff, shield, throne, weapon, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one imposing tragic ice queen with a youthful sorrowful human face, a single delicate ice crown and a long blue white royal gown with crystalline hem, open empty hands, same tragic young queen, icy tear tracks and a wider fractured crown, royal dress turning into rigid jagged ice, same empty open hands, large imposing boss silhouette, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, sword, staff, shield, throne, weapon, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 #### whiteQueen-2 永遠の冬に呑まれた女王（HP30%以下）
@@ -229,7 +229,7 @@ full body creature illustration of one imposing tragic ice queen with a youthful
 元画像: `C:\dev\card-rpg-assets\enemy\whiteQueen-2.png`
 
 ```
-full body creature illustration of one imposing tragic ice queen with a youthful sorrowful human face, a single delicate ice crown and a long blue white royal gown with crystalline hem, open empty hands, same queen completely overtaken by winter, face still recognizable inside a broad ice crown, long gown transformed into a jagged crystalline royal silhouette, arms spread for a final blizzard, same empty hands, large imposing boss silhouette, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no sword, staff, shield, throne, wings, extra figure, ground shadow, scenery, pedestal, second creature, signature, text, watermark
+full body creature illustration of one imposing tragic ice queen with a youthful sorrowful human face, a single delicate ice crown and a long blue white royal gown with crystalline hem, open empty hands, same queen completely overtaken by winter, face still recognizable inside a broad ice crown, long gown transformed into a jagged crystalline royal silhouette, arms spread for a final blizzard, same empty hands, large imposing boss silhouette, detailed hand-painted fantasy RPG monster art, fine ornamental detail, muted earthy palette with cold pale blue tones, facing left three-quarter view, entire body visible from head to feet, filling the frame, plain off-white background, soft even lighting --ar 4:5 --sref https://card-rpg-1aa60.web.app/assets/forestWolf-Dm6xODDJ.webp https://card-rpg-1aa60.web.app/assets/treeWarden-D5KJkVfD.webp --no blood, red stains, dark background, black background, sword, staff, shield, throne, wings, extra figure, ground shadow, scenery, pedestal, second creature, signature, text, watermark
 ```
 
 ## build_art.py の ENEMIES 表へ追記する行
