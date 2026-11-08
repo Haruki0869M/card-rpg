@@ -1,6 +1,6 @@
 // シナリオ4の世界マップ。下（砂の入口）から上（砂塵の王宮）へ進む。
 // 砂漠（desert）のマスは昼は暑さ、夜は寒さでHPが減る（common/terrains/climate.ts）。入口の地域は暑さなし
-// 敵の組み合わせは仮（共通の敵）。敵ができたら置き換える
+// 敵の組み合わせは砂塵の王朝の専用の敵（enemies/）。弱点が同じ敵だけにならないように混ぜる
 import type { ScenarioMapDef } from '../../../types';
 
 export const sandDynastyMap: ScenarioMapDef = {
@@ -16,7 +16,7 @@ export const sandDynastyMap: ScenarioMapDef = {
       rows: [0, 2],
       terrain: { desert: 4, mountain: 2, hills: 1 },
       enemyLevel: 9,
-      encounters: [['goblinBrute'], ['goblinBrute', 'chaosShaman'], ['guardDog', 'goblinBrute']],
+      encounters: [['venomJackalWarrior', 'cursedPriest'], ['colossusStatue', 'cursedPriest'], ['venomJackalWarrior', 'mummyArcher'], ['cursedMummy', 'clayGolem']],
       wanderers: 2,
     },
     {
@@ -26,7 +26,7 @@ export const sandDynastyMap: ScenarioMapDef = {
       rows: [3, 8],
       terrain: { desert: 3, mountain: 3, hills: 1 },
       enemyLevel: 7,
-      encounters: [['goblinBrute', 'goblinScout'], ['guardDog', 'guardDog'], ['chaosShaman', 'goblinBrute']],
+      encounters: [['sandWorm', 'cursedPriest'], ['clayGolem', 'mummyArcher'], ['cursedMummy', 'stormVulture'], ['sandWorm', 'mummyArcher']],
       wanderers: 4,
       chests: 2,
       events: 2,
@@ -39,7 +39,7 @@ export const sandDynastyMap: ScenarioMapDef = {
       rows: [9, 15],
       terrain: { desert: 7, hills: 1 },
       enemyLevel: 5,
-      encounters: [['guardDog', 'goblinScout'], ['chaosShaman', 'guardDog'], ['goblinScout', 'goblinScout', 'chaosShaman']],
+      encounters: [['vulture', 'mummy'], ['sandSprite', 'mummy'], ['dustDevil', 'vulture'], ['emberSandScorpion', 'mummy'], ['sandSprite', 'dustDevil', 'vulture']],
       wanderers: 4,
       chests: 2,
       events: 2,
@@ -53,7 +53,7 @@ export const sandDynastyMap: ScenarioMapDef = {
       rows: [16, 21],
       terrain: { desert: 3, plains: 2, hills: 2 },
       enemyLevel: 3,
-      encounters: [['guardDog', 'guardDog'], ['goblinScout', 'guardDog'], ['chaosShaman', 'goblinScout']],
+      encounters: [['jackalWarrior', 'tombRobber'], ['sandScorpion', 'jackalWarrior'], ['tombRobber', 'sandScorpion'], ['desertViper', 'jackalWarrior']],
       wanderers: 4,
       chests: 2,
       events: 2,
@@ -66,7 +66,7 @@ export const sandDynastyMap: ScenarioMapDef = {
       rows: [22, 27],
       terrain: { plains: 5, hills: 2, desert: 1 },
       enemyLevel: 1,
-      encounters: [['goblinScout'], ['goblinScout', 'goblinScout'], ['guardDog', 'goblinScout']],
+      encounters: [['sandScarab', 'desertViper'], ['sandScarab', 'sandScarab'], ['desertViper', 'sandScarab']],
       wanderers: 3,
       chests: 2,
       events: 2,
