@@ -10,19 +10,19 @@ const WINDMILL_POOLS: DungeonDef['pools'] = {
 };
 
 const OBSERVATORY_POOLS: DungeonDef['pools'] = {
-  battle: [['shootingStarBird', 'moonRabbit'], ['starFragment', 'gearBeetle'], ['moonRabbit', 'starFragment'], ['shootingStarBird', 'gearBeetle', 'starFragment'], ['angelStatue', 'starFragment']],
+  battle: [['cometFox', 'moonRabbit'], ['shootingStarBird', 'moonRabbit'], ['starFragment', 'gearBeetle'], ['moonRabbit', 'starFragment'], ['shootingStarBird', 'gearBeetle', 'starFragment'], ['angelStatue', 'starFragment']],
   elite: [['starDustScribe'], ['shadowStarDustScribe', 'starFragment'], ['clockworkKnight']],
   boss: ['starLibrarian'],
 };
 
 const GARDEN_POOLS: DungeonDef['pools'] = {
-  battle: [['moonWolf', 'thornFairy'], ['shadowMoonRabbit', 'thornFairy'], ['moonWolf', 'starFragment'], ['thornFairy', 'thornFairy', 'moonWolf'], ['hourglassGolem', 'thornFairy']],
+  battle: [['harpGuardian', 'moonWolf'], ['moonWolf', 'thornFairy'], ['shadowMoonRabbit', 'thornFairy'], ['moonWolf', 'starFragment'], ['thornFairy', 'thornFairy', 'moonWolf'], ['hourglassGolem', 'thornFairy']],
   elite: [['moonGardener'], ['moonGardener', 'thornFairy']],
   boss: ['moonMaiden'],
 };
 
 const CASTLE_POOLS: DungeonDef['pools'] = {
-  battle: [['skyKnight', 'venomThornFairy'], ['skyKnight', 'moonWolf'], ['venomThornFairy', 'skyKnight', 'starFragment'], ['skyKnight', 'shadowMoonRabbit'], ['holyAngelStatue', 'venomThornFairy']],
+  battle: [['holyMoonWolf', 'venomThornFairy'], ['skyKnight', 'venomThornFairy'], ['skyKnight', 'moonWolf'], ['venomThornFairy', 'skyKnight', 'starFragment'], ['skyKnight', 'shadowMoonRabbit'], ['holyAngelStatue', 'venomThornFairy']],
   elite: [['skyPaladin']],
   boss: ['starSeerQueen'],
 };
