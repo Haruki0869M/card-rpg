@@ -66,7 +66,7 @@ a single small wooden traveling lute with a rounded body, a carved sound hole an
 
 ### 11. 銃（`gun`）→ 元画像 `icon-gun.png`
 ```
-a single antique long flintlock rifle with a dark wooden stock and engraved brass fittings, standing vertically upright with the barrel at the top, fantasy RPG item icon, detailed hand-painted illustration, isolated object, centered, soft even lighting, plain white background --ar 1:1 --sref https://card-rpg-1aa60.web.app/assets/sword-CPSjpUbp.webp https://card-rpg-1aa60.web.app/assets/staff-J1mfh1eS.webp --no hands, person, pistol, modern gun, scope, bayonet, signature, text, watermark, scenery
+a single antique flintlock musket shown in full side profile, laid diagonally, with a clearly visible curved dark wooden shoulder stock, an exposed trigger and trigger guard, a flintlock hammer and a long steel barrel with brass bands, fantasy RPG item icon, detailed hand-painted illustration, isolated object, centered, soft even lighting, plain white background --ar 1:1 --sref https://card-rpg-1aa60.web.app/assets/sword-CPSjpUbp.webp https://card-rpg-1aa60.web.app/assets/staff-J1mfh1eS.webp --no hands, person, pistol, modern gun, scope, bayonet, signature, text, watermark, scenery
 ```
 
 ## 組み込み（組み込み担当のセッションへ）
@@ -85,8 +85,8 @@ a single antique long flintlock rifle with a dark wooden stock and engraved bras
 | 槍 | `spear` | ☑ | ☐ |
 | 刀 | `katana` | ☑ | ☐ |
 | 魔導書 | `tome` | ☑ | ☐ |
-| 鎌 | `scythe` | ☐ | ☐ |
-| 錫杖 | `scepter` | ☐ | ☐ |
-| 鞭 | `whip` | ☐ | ☐ |
-| 楽器 | `instrument` | ☐ | ☐ |
+| 鎌 | `scythe` | ☑ | ☐ |
+| 錫杖 | `scepter` | ☑ | ☐ |
+| 鞭 | `whip` | ☑ | ☐ |
+| 楽器 | `instrument` | ☑ | ☐ |
 | 銃 | `gun` | ☐ | ☐ |
