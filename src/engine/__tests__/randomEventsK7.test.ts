@@ -108,6 +108,28 @@ describe('K7 突発イベントの出方', () => {
 });
 
 describe('K7 突発イベントの結果', () => {
+  it('フォーカスを払う選択肢は、選ぶ本人のフォーカスで判定する（道祖神で止まる不具合）', () => {
+    let g = newGame(['warrior', 'mage']);
+    const [a, b] = g.heroes;
+    g.mode = 'event';
+    g.party = [a.id, b.id];
+    g.activeScene = undefined;
+    g.world!.turn = a.id;
+    g.event = { tile: g.world!.pos[a.id], eventId: 'rRoadsideStatue', random: true };
+    const idx = EVENTS.get('rRoadsideStatue').options.findIndex((o) => o.costFocus);
+    a.focus = 0;
+    b.focus = 2;
+    // 場面のだれかが払えれば選択肢は出るが、本人を指定すると払えないと分かる
+    expect(eventOptionState(g, 'rRoadsideStatue', idx).reason).toBeUndefined();
+    expect(eventOptionState(g, 'rRoadsideStatue', idx, a).reason).toContain('フォーカス');
+    expect(eventOptionState(g, 'rRoadsideStatue', idx, b).reason).toBeUndefined();
+    // 本人が払えない時は、同じ理由で断られる（「選べる」と出て断られる食い違いが無い）
+    const r = applyGameCommand(g, { type: 'CHOOSE_EVENT', playerId: P, optionIndex: idx, heroId: a.id, focusUsed: 0 });
+    expect(r.error).toContain('フォーカス');
+    g = run(g, { type: 'CHOOSE_EVENT', playerId: P, optionIndex: idx, heroId: b.id, focusUsed: 0 });
+    expect(g.heroes[1].focus).toBe(0);
+  });
+
   it('お供連れの時だけの選択肢: 山賊の関所の「お供が気を引く」', () => {
     const g = newGame();
     const h = g.heroes[0];
