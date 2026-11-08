@@ -1,12 +1,14 @@
 // ===== ダンジョン制覇・全滅の画面 =====
 import { VoteChips } from '../ui/Votes';
 import { totalGold } from '../../engine';
+import { corruptionName } from '../../data/scenarios';
 import { motion } from 'framer-motion';
 import { Castle, Crown, Skull } from 'lucide-react';
 import { useBattle } from '../../store/battleStore';
 import { LOCAL_PLAYER } from '../../store/battleConfig';
 import { HeroFace, RARITY_STYLE, Screen } from '../ui/game';
 import { PetAwards } from '../ui/PetToken';
+import { EndPetRecord } from '../lorebook/MyPets';
 
 function Stats() {
   const game = useBattle((s) => s.game)!;
@@ -29,6 +31,7 @@ function Stats() {
         </div>
       ))}
       <PetAwards heroes={game.heroes} />
+      <EndPetRecord game={game} />
     </div>
   );
 }
@@ -81,7 +84,7 @@ export function GameOverScreen() {
           {game.world && game.world.corruption >= 100 ? '世界の終わり…' : '全滅…'}
         </div>
         <div className="text-[13px] text-zinc-400">
-          {game.world && game.world.corruption >= 100 ? '侵食度が100%に達し、世界は侵食に呑まれた。' : 'パーティは力尽きた。命の灯火も残っていなかった。'}
+          {game.world && game.world.corruption >= 100 ? `${corruptionName(game.scenarioId)}が100%に達し、世界は終わりを迎えた。` : 'パーティは力尽きた。命の灯火も残っていなかった。'}
         </div>
         <div className="mt-2 flex -space-x-2">
           {game.heroes.map((h) => (

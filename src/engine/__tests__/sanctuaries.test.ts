@@ -60,7 +60,7 @@ describe('神殿と祭壇の配置・旧保存の引き継ぎ', () => {
     old.event = { eventId: 'rStrayBird', tile: old.world!.pos.h1, random: true };
     const before = structuredClone(old);
     const m = migrateGame(structuredClone(old))!;
-    expect(m).not.toBeNull(); expect(m.version).toBe(15);
+    expect(m).not.toBeNull(); expect(m.version).toBe(16);
     expect(m.rngState).toBe(before.rngState); expect(m.event).toEqual(before.event); expect(m.party).toEqual(before.party); expect(m.mode).toBe('event');
     const withoutFeatures = (g: GameState) => ({ ...g.world!, tiles: g.world!.tiles.map(({ f: _f, ...t }) => t) });
     expect(withoutFeatures(m)).toEqual(withoutFeatures(before));
@@ -76,7 +76,7 @@ describe('神殿と祭壇の配置・旧保存の引き継ぎ', () => {
     old.expeditions = [{ id: 'x1', heroes: ['h0'], mode: 'battle', battle: b }];
     const before = structuredClone(old);
     const m = migrateGame(old)!;
-    expect(m.expeditions?.[0].battle?.version).toBe(15);
+    expect(m.expeditions?.[0].battle?.version).toBe(16);
     expect(m.expeditions?.[0].battle?.rngState).toBe(before.expeditions![0].battle!.rngState);
     expect(m.expeditions?.[0].battle?.allies[0].equippedWeaponType).toBe('sword');
     expect(m.expeditions?.[0].heroes).toEqual(['h0']);

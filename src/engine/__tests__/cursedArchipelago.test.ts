@@ -1,0 +1,77 @@
+// ===== シナリオ3「呪われた群島」（K4 手順1: 地図・地域・町・船）のテスト =====
+import { describe, expect, it } from 'vitest';
+import { corruptionName, getScenario } from '../../data/scenarios';
+import { DUNGEONS } from '../../data/dungeons';
+import { QUESTS, TERRAINS, TOWNS } from '../../data/world';
+import { applyGameCommand, canReportQuest, createGame, neighbors } from '../index';
+
+const newGame = (seed = 5) =>
+  createGame({ seed, scenarioId: 'cursedArchipelago', difficulty: 'normal', party: ['warrior', 'mage'].map((c, i) => ({ classId: c, gender: 'male' as const, name: `${c}${i}`, playerId: 'P1' })) });
+
+/** from から歩いて（船なしで）行けるマス、船ありで行けるマス */
+function flood(g: ReturnType<typeof newGame>, from: number, ship: boolean): Set<number> {
+  const w = g.world!;
+  const seen = new Set([from]);
+  const q = [from];
+  while (q.length) {
+    const cur = q.shift()!;
+    for (const n of neighbors(w, cur)) {
+      const t = TERRAINS.get(w.tiles[n].t);
+      const ok = t.moveCost > 0 || (ship && t.sea);
+      if (!ok || seen.has(n)) continue;
+      seen.add(n);
+      q.push(n);
+    }
+  }
+  return seen;
+}
+
+describe('呪われた群島', () => {
+  it('町・ダンジョン・依頼・鍵がそろっていて、鍵3つで最終ダンジョンが開く', () => {
+    const sc = getScenario('cursedArchipelago');
+    for (const f of sc.map!.features) {
+      if (f.kind === 'town') expect(TOWNS.has(f.id), f.id).toBe(true);
+      if (f.kind === 'dungeon') expect(DUNGEONS.has(f.id), f.id).toBe(true);
+    }
+    const keys = Object.keys(sc.story!.keys!);
+    const ds = DUNGEONS.forScenario('cursedArchipelago');
+    expect(ds.map((d) => d.rewardKey).filter(Boolean).sort()).toEqual([...keys].sort());
+    expect([...(ds.find((d) => d.finale)!.requiresKeys ?? [])].sort()).toEqual([...keys].sort());
+    for (const id of ['borrowShip', 'seaRaiders', 'tideStoneQuest', 'pirateCaptainQuest', 'sunkenTempleQuest']) expect(QUESTS.has(id), id).toBe(true);
+    expect(corruptionName('cursedArchipelago')).toBe('霧の濃さ');
+  });
+
+  it('どの種でも: 船が無ければ港の島だけ、船があれば町・ダンジョンの全部に行ける。海のマスが十分ある', () => {
+    for (let seed = 1; seed <= 25; seed++) {
+      const g = newGame(seed);
+      const w = g.world!;
+      const start = w.pos[g.heroes[0].id];
+      const land = flood(g, start, false);
+      const all = flood(g, start, true);
+      const targets = w.tiles.map((t, i) => (t.f?.kind === 'town' || t.f?.kind === 'dungeon' ? i : -1)).filter((i) => i >= 0);
+      for (const i of targets) expect(all.has(i), `seed ${seed} tile ${i}`).toBe(true);
+      expect(w.tiles.filter((t) => TERRAINS.get(t.t).sea).length, `seed ${seed}`).toBeGreaterThan(40);
+      // 港の島の中に、船をもらったあとの目的地（最初の依頼の町）があり、陸だけでも町を出られる広さがある
+      expect(land.size, `seed ${seed}`).toBeGreaterThanOrEqual(7);
+    }
+  });
+
+  it('最初の町で「船を借りる」を受けて報告すると船がもらえる（海を進めるようになる）', () => {
+    let g = newGame();
+    const w = g.world!;
+    w.story = undefined;
+    const run = (cmd: Parameters<typeof applyGameCommand>[1]) => {
+      const r = applyGameCommand(g, cmd);
+      if (r.error) throw new Error(`${cmd.type}: ${r.error}`);
+      g = r.state;
+    };
+    const hero = g.world!.turn;
+    run({ type: 'WORLD_INTERACT', playerId: 'P1', heroId: hero, party: [hero] });
+    expect(g.mode).toBe('town');
+    expect(g.world!.ship).toBeUndefined();
+    run({ type: 'QUEST_ACCEPT', playerId: 'P1', questId: 'borrowShip' });
+    expect(canReportQuest(g, 'borrowShip')).toBe(true);
+    run({ type: 'QUEST_REPORT', playerId: 'P1', questId: 'borrowShip' });
+    expect(g.world!.ship).toBe(true);
+  });
+});

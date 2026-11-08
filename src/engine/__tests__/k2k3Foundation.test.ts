@@ -4,7 +4,8 @@ import { ENEMIES } from '../../data/enemies';
 import { ITEMS } from '../../data/items';
 import { AURA_IDS } from '../../data/enemyAuras';
 import { makeVariant } from '../../data/enemyVariant';
-import { createRng, createBattle, createGame } from '../index';
+import { EVENTS } from '../../data/events';
+import { applyCommand, applyGameCommand, createRng, createBattle, createGame } from '../index';
 import { testConditions } from '../abilities';
 import { applyEffect, dealDamage, makeCtx } from '../battle/effects';
 import { getCard } from '../../data/cards';
@@ -190,5 +191,55 @@ describe('K3 敵の亜種', () => {
 
   it('オーラは亜種にだけ付く', () => {
     for (const e of ENEMIES.all) if (e.aura) expect(e.variantOf, e.id).toBeDefined();
+  });
+});
+
+describe('K2 お供のおやつ', () => {
+  const P = 'P1';
+  const gameWithSnack = () => {
+    const g = createGame({ seed: 7, scenarioId: 'corruptionKing', difficulty: 'normal', party: [{ classId: 'warrior', gender: 'female', name: 'a', playerId: P }] });
+    g.heroes[0].pouch.push({ uid: 'snack1', itemId: 'petSnack' });
+    return g;
+  };
+  const use = (g: ReturnType<typeof gameWithSnack>) => applyGameCommand(g, { type: 'USE_POUCH_ITEM', playerId: P, itemUid: 'snack1', userId: g.heroes[0].id, targetId: g.heroes[0].id });
+
+  it('お供がいれば、懐き度が増えて、おやつが1つ減る', () => {
+    const g = gameWithSnack();
+    g.heroes[0].pet = { petId: 'cockatiel', color: 'normal', name: 'ぴーちゃん', love: 0, acts: 0 } as never;
+    const r = use(g);
+    expect(r.error).toBeUndefined();
+    expect(r.state.heroes[0].pet?.love).toBe(10);
+    expect(r.state.heroes[0].pouch.some((i) => i.uid === 'snack1')).toBe(false);
+  });
+
+  it('お供がいなければ使えず、おやつは減らない', () => {
+    const g = gameWithSnack();
+    const r = use(g);
+    expect(r.error).toBe('お供がいません');
+    expect(g.heroes[0].pouch.some((i) => i.uid === 'snack1')).toBe(true);
+  });
+
+  it('戦闘の中では使えない', () => {
+    const s = fresh();
+    const r = applyCommand(s, { type: 'USE_ITEM', playerId: 'P1', characterId: s.allies[0].id, targetId: s.allies[0].id, itemName: 'お供のおやつ', effects: [{ kind: 'feedPet', amount: 10 }] });
+    expect(r.error).toBeTruthy();
+  });
+
+  it('お供の出会いのイベントに、おやつの選択肢がある（判定なしで必ず仲間になる）', () => {
+    for (const id of ['rStrayBird', 'rTrappedCritter']) {
+      const opt = EVENTS.get(id).options.find((o) => o.costItem === 'petSnack');
+      expect(opt, id).toBeDefined();
+      expect(opt!.check, id).toBeUndefined();
+      expect(opt!.success.some((o) => o.kind === 'pet'), id).toBe(true);
+    }
+  });
+
+  it('黄金のコソ泥を倒すと、装飾品が必ず出る', () => {
+    const opt = EVENTS.get('rGoldenThief').options[0];
+    const battle = opt.success.find((o) => o.kind === 'battle') as { onWin?: unknown[] };
+    expect(battle.onWin).toEqual([{ kind: 'item', rarity: 'rare', slot: 'accessory' }]);
+    const game = newGame();
+    const rng = createRng(5);
+    for (let i = 0; i < 50; i++) expect(rollEquipment('rare', game.heroes, rng, { scenario: 'corruptionKing', slot: 'accessory' }).slot).toBe('accessory');
   });
 });

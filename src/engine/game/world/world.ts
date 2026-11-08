@@ -5,7 +5,7 @@ import { moveBonusOf } from '../common';
 import { getClass } from '../../../data/classes';
 import { DUNGEONS } from '../../../data/dungeons';
 import { EVENTS } from '../../../data/events';
-import { getScenario } from '../../../data/scenarios';
+import { corruptionName, getScenario } from '../../../data/scenarios';
 import { getDifficulty } from '../../../data/rules';
 import { QUESTS, SANCTUARIES, TERRAINS, TOWNS } from '../../../data/world';
 import type { EncounterState, Expedition, GameCommand, GameState, Hero, QuestState, WorldState } from '../../../types';
@@ -140,7 +140,7 @@ function endWorldTurn(game: GameState, rng: Rng) {
     w.fallenTowns.push(raid.townId);
     const b2 = w.corruption;
     w.corruption = Math.min(100, w.corruption + BALANCE.corruptionOnTownFall);
-    addLog(game, `${TOWNS.get(raid.townId).name}が魔物に陥落した…（侵食度+${BALANCE.corruptionOnTownFall}%）`);
+    addLog(game, `${TOWNS.get(raid.townId).name}が魔物に陥落した…（${corruptionName(game.scenarioId)}+${BALANCE.corruptionOnTownFall}%）`);
     onCorruptionChange(game, rng, b2);
   }
   revealAround(game, w);
@@ -149,7 +149,7 @@ function endWorldTurn(game: GameState, rng: Rng) {
   else w.turn = '';
   if (w.corruption >= 100) {
     game.mode = 'gameover';
-    addLog(game, '侵食度が100%に達した。世界は侵食に呑まれた…');
+    addLog(game, `${corruptionName(game.scenarioId)}が100%に達した。世界は終わりを迎えた…`);
   }
 }
 
@@ -159,13 +159,13 @@ export function onCorruptionChange(game: GameState, rng: Rng, before: number) {
   const def = getScenario(game.scenarioId).map!;
   for (const st of def.corruptionStages) {
     if (before >= st.at || w.corruption < st.at) continue;
-    addLog(game, `侵食度${st.at}%: ${st.text}`);
+    addLog(game, `${corruptionName(game.scenarioId)}${st.at}%: ${st.text}`);
     for (let k = 0; k < (st.spawn ?? 0); k++) spawnWanderer(game, w, rng, rng.int(def.regions.length));
     if (st.raid) startRaid(game, rng);
   }
   if (w.corruption >= 100 && game.mode === 'world') {
     game.mode = 'gameover';
-    addLog(game, '侵食度が100%に達した。世界は侵食に呑まれた…');
+    addLog(game, `${corruptionName(game.scenarioId)}が100%に達した。世界は終わりを迎えた…`);
   }
 }
 
@@ -316,7 +316,7 @@ function maybeRandomEvent(game: GameState, w: WorldState, h: Hero, group: Hero[]
   if (w.tiles[tile].f || w.story) return;
   if (h.lastRandomEvent !== undefined && h.lastRandomEvent >= w.worldTurn - 1) return;
   if (rng.next() * 100 >= BALANCE.randomEventChance) return;
-  const ev = pickRandomEvent(game, rng);
+  const ev = pickRandomEvent(game, rng, tile, group);
   if (!ev) return;
   h.lastRandomEvent = w.worldTurn;
   game.party = group.map((g) => g.id);
@@ -324,10 +324,21 @@ function maybeRandomEvent(game: GameState, w: WorldState, h: Hero, group: Hero[]
   game.mode = 'event';
 }
 
-/** 突発イベントを1つ選ぶ（重み付き。夜・侵食度50%以上なら悪いイベントの重みが上がる） */
-export function pickRandomEvent(game: GameState, rng: Rng): string | undefined {
+/**
+ * 突発イベントを1つ選ぶ（重み付き。夜・侵食度50%以上なら悪いイベントの重みが上がる）。
+ * tile を渡すと地形の条件（terrain）、group を渡すとお供の条件（needsPet）で絞り込む。絞り込みでは乱数を引かない
+ */
+export function pickRandomEvent(game: GameState, rng: Rng, tile?: number, group?: Hero[]): string | undefined {
   const w = game.world!;
-  const list = EVENTS.forScenario(game.scenarioId).filter((e) => e.where === 'random' && (!e.night || timeOfDay(w.worldTurn) === 'night'));
+  const terrain = tile === undefined ? undefined : w.tiles[tile]?.t;
+  const hasPet = (group ?? []).some((g) => g.hp > 0 && g.pet);
+  const list = EVENTS.forScenario(game.scenarioId).filter(
+    (e) =>
+      e.where === 'random' &&
+      (!e.night || timeOfDay(w.worldTurn) === 'night') &&
+      (!e.terrain || (terrain !== undefined && e.terrain.includes(terrain))) &&
+      (!e.needsPet || hasPet),
+  );
   if (!list.length) return undefined;
   const harsh = timeOfDay(w.worldTurn) === 'night' || w.corruption >= 50;
   const weights = list.map((e) => (e.weight ?? 10) * (harsh && e.tone === 'bad' ? BALANCE.randomEventBadMul : 1));

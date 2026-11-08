@@ -131,6 +131,13 @@ describe('コンテンツの検査', () => {
     for (const ev of EVENTS.all) for (const o of ev.options) for (const x of [...o.success, ...(o.fail ?? [])]) checkOutcome(x, `event ${ev.id}`);
   });
 
+  it('イベント: お金がいる選択肢は、成功した時に実際にそのお金を払う', () => {
+    // cost は「払えるか」の条件だけ。実際に減らすのは結果の loseGold（迷い鳥の口笛・珍獣商人で抜けていた）
+    const paid = (outs: { kind: string; amount?: number }[]) => outs.filter((x) => x.kind === 'loseGold').reduce((n, x) => n + (x.amount ?? 0), 0);
+    for (const ev of EVENTS.all)
+      for (const o of ev.options) if (o.cost) expect(paid(o.success), `event ${ev.id}「${o.label}」`).toBeGreaterThanOrEqual(o.cost);
+  });
+
   it('シナリオ: 開始の持ち物が存在する', () => {
     for (const s of SCENARIOS.all) for (const p of [...(s.start.pouch ?? []), ...(s.start.stash ?? [])]) expect(ITEMS.has(p.itemId), `scenario ${s.id}`).toBe(true);
   });

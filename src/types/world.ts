@@ -18,6 +18,9 @@ export interface TerrainDef {
   background: string;
   /** 寒さ・暑さ（K4 段2）。この地形に立ったまま1ワールドターンが終わると、HPが減る（野営した人は除く） */
   climate?: ClimateDef;
+  /** 海（K4 段3）。moveCost は 0 のまま（陸の処理では今までどおり通れない）。船があるパーティだけが shipCost（既定1）で進める */
+  sea?: boolean;
+  shipCost?: number;
 }
 
 /** 寒さ・暑さ。ratio（最大HPの割合）を省略すると BALANCE.climateDamageRatio */
@@ -43,6 +46,9 @@ export interface RegionDef {
   climate?: ClimateDef;
   /** 最初に置く徘徊する敵の数 */
   wanderers: number;
+  /** 海のマスに置く徘徊する敵（幽霊船など）の数と組み合わせ（K4 段3） */
+  seaWanderers?: number;
+  seaEncounters?: string[][];
   /** ランダムに置くもの（数） */
   chests?: number;
   events?: number;
@@ -99,6 +105,8 @@ export interface ScenarioMapDef {
   features: FixedFeature[];
   /** 町と町・ダンジョンを結ぶ道の地形（必ず通れる道を作る） */
   roadTerrain: string;
+  /** 施設（町・ダンジョンなど）のまわり何マスを、海でなく陸にするか（K4。小さすぎる島で詰まらないように。省略は0） */
+  landAround?: number;
   corruptionStages: CorruptionStage[];
 }
 
@@ -228,6 +236,8 @@ export interface WorldState {
   visitedRegions: number[];
   /** このワールドターンに野営して、寒さ・暑さを受けないキャラ（ターンの終わりに消える。K4 段2。無ければ空） */
   sheltered?: string[];
+  /** 船を持っている（K4 段3。パーティ共有。あると海のマスを進める） */
+  ship?: boolean;
   /** 町の品揃え（町ID → 売り物）。訪れた時に作り、ワールドターンが一定進むと入れ替わる */
   shops: Record<string, ShopStock>;
   /** 画面に出す物語（冒頭・地域の紹介・エンディング） */

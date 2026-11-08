@@ -32,8 +32,10 @@ export const randomEvents: EventDef[] = [
         successText: '小鳥は木の実をついばみ、すっかり懐いた！',
         failText: '木の実は見つからなかった。小鳥はどこかへ行ってしまった。',
       },
-      { label: 'エサを買って分けてあげる', cost: 50, success: [{ kind: 'pet', species: BIRDS }], successText: '小鳥はお腹いっぱいになって、肩から離れなくなった！' },
+      { label: 'エサを買って分けてあげる', cost: 50, success: [{ kind: 'loseGold', amount: 50 }, { kind: 'pet', species: BIRDS }], successText: '小鳥はお腹いっぱいになって、肩から離れなくなった！' },
       { label: 'そっと見送る', success: [{ kind: 'nothing' }], successText: '小鳥は空へ帰っていった。' },
+      // 既存の選択肢の番号を変えないよう、最後に置く
+      { label: 'お供のおやつを差し出す', costItem: 'petSnack', success: [{ kind: 'pet', species: BIRDS }], successText: '小鳥はおやつに目を輝かせ、迷わず肩に乗ってきた！' },
     ],
   },
   {
@@ -62,6 +64,7 @@ export const randomEvents: EventDef[] = [
         failText: '手当ては済んだが、動物は森へ帰っていった。（経験値+10）',
       },
       { label: 'そっとして立ち去る', success: [{ kind: 'nothing' }], successText: '後ろ髪を引かれながら、先へ進んだ。' },
+      { label: 'お供のおやつを差し出す', costItem: 'petSnack', success: [{ kind: 'pet', species: CRITTERS }], successText: '小さな影はおやつを頬ばり、安心したようにすり寄ってきた！' },
     ],
   },
   {
@@ -73,7 +76,7 @@ export const randomEvents: EventDef[] = [
     icon: 'cart',
     text: '派手な荷馬車の商人が声をかけてきた。「珍しい生き物を保護したんだが、引き取らないかい？」',
     options: [
-      { label: '2匹の中から選んで引き取る', cost: 60, success: [{ kind: 'pet', count: 2 }], successText: '檻の中の2匹が、じっとこちらを見ている。' },
+      { label: '2匹の中から選んで引き取る', cost: 60, success: [{ kind: 'loseGold', amount: 60 }, { kind: 'pet', count: 2 }], successText: '檻の中の2匹が、じっとこちらを見ている。' },
       {
         label: 'サイコロ勝負（3枠すべて成功で、めったに出ない子をタダで）',
         check: { stat: 'luk', slots: 3, need: 3 },
@@ -171,7 +174,7 @@ export const randomEvents: EventDef[] = [
     icon: 'coins',
     text: '財宝袋を抱えた小さな魔物が、目の前を横切った！ 3ターン以内に倒さないと逃げられてしまう！',
     options: [
-      { label: '追い詰めて戦う（倒せば大金と装備）', success: [{ kind: 'battle', enemies: [{ defId: 'goldenThief' }], onWin: [{ kind: 'item', rarity: 'rare', slot: 'equipment' }] }], successText: '逃がすものか！' },
+      { label: '追い詰めて戦う（倒せば大金と装飾品）', success: [{ kind: 'battle', enemies: [{ defId: 'goldenThief' }], onWin: [{ kind: 'item', rarity: 'rare', slot: 'accessory' }] }], successText: '逃がすものか！' },
       { label: '見逃す', success: [{ kind: 'nothing' }], successText: 'コソ泥は、あっという間に見えなくなった。' },
     ],
   },

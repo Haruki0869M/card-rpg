@@ -129,9 +129,9 @@ describe('お供の効果', () => {
 });
 
 describe('突発イベント', () => {
-  it('11個あり、すべての選択肢に結果がある', () => {
-    const list = EVENTS.all.filter((e) => e.where === 'random');
-    expect(list).toHaveLength(11);
+  it('共通の突発イベントは20個あり（シナリオ限定は数えない）、すべての選択肢に結果がある', () => {
+    const list = EVENTS.all.filter((e) => e.where === 'random' && !EVENTS.scenarioOf(e.id));
+    expect(list).toHaveLength(20);
     for (const e of list) for (const o of e.options) expect(o.success.length, `${e.id}: ${o.label}`).toBeGreaterThan(0);
   });
 

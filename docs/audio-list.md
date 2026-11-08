@@ -1,7 +1,7 @@
 # 音の指示書（audio-list）— K6 効果音・BGM
 
 > **状態: 提案（オーナー未確認）。** 「提案」と書いた所は、まだ決まっていません。
-> 音は未実装です（Audio / AudioContext 未使用、`public/` にも音ファイルなし）。
+> **鳴らす仕組みは K6① で入った**（`src/audio/`）。`src/assets/audio/sfx/`・`bgm/`・`pet/` に、この一覧の ID をファイル名にして置く（例: `sfx/sfx_ui_tap.mp3`）だけで鳴る。無い音は何もしない。お供の鳴き声は `pet/pet_okame.mp3` など §5 の名前（お供IDとの対応は `src/audio/cues.ts` の `PET_CRY`: cockatiel→pet_okame、wolfPup→pet_wolf、blackCat→pet_cat、turtle→pet_turtle、babyDragon→pet_dragon、rabbit→pet_rabbit、owl→pet_owl、foxCub→pet_fox、javaSparrow→pet_bunting、budgie→pet_budgie、longTailedTit→pet_nagae、redPanda→pet_redpanda）。
 > 進め方: ① Claude がこの一覧と指示文を作る → ② オーナーが音のAIで作り `incoming/` に入れる → ③ Claude が変換・切り出し・組み込み。
 > 仕組み（`src/audio/` など）の設計は別の計画（k6-sound-plan）にあり、この文書は「作る音の一覧と指示文」だけを扱います。
 

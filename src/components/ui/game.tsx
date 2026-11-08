@@ -54,7 +54,8 @@ const ITEM_ICON: Record<string, LucideIcon> = {
 /** アイテムのアイコン（レア度の色の枠と光） */
 export function ItemIcon({ item, size = 44 }: { item: ItemDef; size?: number }) {
   const r = RARITY_STYLE[item.rarity];
-  const known = item.icon in ITEM_ICON;
+  // 描いた絵（src/assets/art/item/<icon>.webp）があればそれを、無ければ記号のアイコンを出す
+  const known = item.icon in ITEM_ICON || !!artImage(`item/${item.icon}`);
   const Icon = ITEM_ICON[item.icon] ?? Star;
   return (
     <span

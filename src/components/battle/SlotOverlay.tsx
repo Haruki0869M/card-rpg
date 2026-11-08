@@ -1,6 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, Star, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { rollResultSound } from '../../audio/cues';
+import { playSound } from '../../audio/player';
 import { TIMING } from '../../data/balance';
 import { speedFactor, useBattle } from '../../store/battleStore';
 
@@ -23,7 +25,18 @@ export function SlotOverlay() {
     if (!fx) return;
     setVisible(fx.id);
     const t = setTimeout(() => setVisible(null), (reveal + hold) * 1000);
-    return () => clearTimeout(t);
+    // 音（K6）: 回り始め → リールが1つずつ止まる → 結果。見た目の時刻に合わせる。速さは見た目と同じ（高速なら詰まる）
+    const opts = { quiet: fx.quiet }, n = fx.results.length, step = reveal / Math.max(1, n);
+    const sounds: ReturnType<typeof setTimeout>[] = [];
+    playSound('sfx_slot_spin', opts);
+    fx.results.forEach((_, i) => sounds.push(setTimeout(() => {
+      playSound('sfx_slot_stop', opts);
+      // リーチ: 3つ以上で、最後の1つの前まで全部当たり
+      if (n >= 3 && i === n - 2 && fx.results.slice(0, n - 1).every((r) => r !== 'miss')) playSound('sfx_slot_reach', opts);
+    }, step * i * 1000)));
+    const successes = fx.successes ?? fx.results.filter((r) => r !== 'miss').length;
+    sounds.push(setTimeout(() => playSound(rollResultSound(successes, n, fx.perfect), opts), reveal * 1000));
+    return () => { clearTimeout(t); sounds.forEach(clearTimeout); };
   }, [fx, reveal, hold]);
 
   return (
