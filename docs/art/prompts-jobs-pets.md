@@ -124,13 +124,13 @@ full body character illustration of a young adult female gentle priest healer, l
 男 → 元画像 `summoner-male.png`
 
 ```
-full body character illustration of a young adult male young summoner, masculine face, silver-lilac hair, violet hooded robe with faintly glowing summoning sigils on the hem, holding a single old leather-bound spellbook in one hand, faint glowing runes on its pages, violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, wand, sword, shield, creatures, animals, bow, arrows, quiver, spear, second book, text, watermark, scenery
+full body character illustration of a young adult male young summoner, masculine face, silver-lilac hair, violet hooded robe with faintly glowing summoning sigils on the hem, holding only one open leather-bound spellbook in one hand, faint glowing runes on its pages, the other hand empty, violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, wand, sword, shield, creatures, animals, bow, arrows, quiver, spear, second book, text, watermark, scenery
 ```
 
 女 → 元画像 `summoner-female.png`
 
 ```
-full body character illustration of a young adult female young summoner, long lavender hair, violet hooded robe with faintly glowing summoning sigils on the hem, holding a single old leather-bound spellbook in one hand, faint glowing runes on its pages, violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, wand, sword, shield, creatures, animals, bow, arrows, quiver, spear, second book, text, watermark, scenery
+full body character illustration of a young adult female young summoner, long lavender hair, violet hooded robe with faintly glowing summoning sigils on the hem, holding only one open leather-bound spellbook in one hand, faint glowing runes on its pages, the other hand empty, violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, wand, sword, shield, creatures, animals, bow, arrows, quiver, spear, second book, text, watermark, scenery
 ```
 
 ### 中位13職（26枚）
@@ -228,13 +228,13 @@ full body character illustration of a young adult female sinister hexer, long st
 男 → 元画像 `phantomTamer-male.png`
 
 ```
-full body character illustration of a young adult male phantom beast tamer, masculine face, teal-silver hair, violet and white robe with a feathered short cape and crystal ornaments, holding a single old leather-bound spellbook in one hand, faint glowing runes on its pages, violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, sword, shield, creatures, animals, bow, arrows, quiver, spear, second book, text, watermark, scenery
+full body character illustration of a young adult male phantom beast tamer, masculine face, teal-silver hair, violet and white robe with a feathered short cape and crystal ornaments, holding only one open leather-bound spellbook in one hand, faint glowing runes on its pages, the other hand empty, violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, sword, shield, creatures, animals, bow, arrows, quiver, spear, second book, text, watermark, scenery
 ```
 
 女 → 元画像 `phantomTamer-female.png`
 
 ```
-full body character illustration of a young adult female phantom beast tamer, long white hair with lavender tips, violet and white robe with a feathered short cape and crystal ornaments, holding a single old leather-bound spellbook in one hand, faint glowing runes on its pages, violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, sword, shield, creatures, animals, bow, arrows, quiver, spear, second book, text, watermark, scenery
+full body character illustration of a young adult female phantom beast tamer, long white hair with lavender tips, violet and white robe with a feathered short cape and crystal ornaments, holding only one open leather-bound spellbook in one hand, faint glowing runes on its pages, the other hand empty, violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, sword, shield, creatures, animals, bow, arrows, quiver, spear, second book, text, watermark, scenery
 ```
 
 #### 聖騎士（`paladin`）
@@ -451,13 +451,13 @@ full body character illustration of a young adult female lord of the underworld,
 男 → 元画像 `phantomKing-male.png`
 
 ```
-full body character illustration of a young adult male king of phantom beasts, masculine face, teal-silver hair, regal violet and white robe with a large feathered mantle and a gold circlet, holding a single old leather-bound spellbook in one hand, faint glowing runes on its pages, violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, sword, shield, creatures, animals, bow, arrows, quiver, spear, second book, text, watermark, scenery
+full body character illustration of a young adult male king of phantom beasts, masculine face, teal-silver hair, regal violet and white robe with a large feathered mantle and a gold circlet, holding only one open leather-bound spellbook in one hand, faint glowing runes on its pages, the other hand empty, violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, sword, shield, creatures, animals, bow, arrows, quiver, spear, second book, text, watermark, scenery
 ```
 
 女 → 元画像 `phantomKing-female.png`
 
 ```
-full body character illustration of a young adult female king of phantom beasts, long white hair with lavender tips, regal violet and white robe with a large feathered mantle and a gold circlet, holding a single old leather-bound spellbook in one hand, faint glowing runes on its pages, violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, sword, shield, creatures, animals, bow, arrows, quiver, spear, second book, text, watermark, scenery
+full body character illustration of a young adult female king of phantom beasts, long white hair with lavender tips, regal violet and white robe with a large feathered mantle and a gold circlet, holding only one open leather-bound spellbook in one hand, faint glowing runes on its pages, the other hand empty, violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, sword, shield, creatures, animals, bow, arrows, quiver, spear, second book, text, watermark, scenery
 ```
 
 #### 聖王（`holyKing`）
@@ -623,13 +623,13 @@ full body character illustration of a young adult female magic swordsman, crimso
 男 → 元画像 `timeMage-male.png`
 
 ```
-full body character illustration of a young adult male time mage, masculine face, neat silver hair, deep blue and gold robe with clock-face and hourglass motifs, small floating gears of light, holding a single old leather-bound spellbook in one hand, faint glowing runes on its pages, deep blue-violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, sword, shield, large clock, bow, arrows, quiver, spear, second book, text, watermark, scenery
+full body character illustration of a young adult male time mage, masculine face, neat silver hair, deep blue and gold robe with clock-face and hourglass motifs, small floating gears of light, holding only one open leather-bound spellbook in one hand, faint glowing runes on its pages, the other hand empty, deep blue-violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, sword, shield, large clock, bow, arrows, quiver, spear, second book, text, watermark, scenery
 ```
 
 女 → 元画像 `timeMage-female.png`
 
 ```
-full body character illustration of a young adult female time mage, long dark blue hair with a clock-shaped hair ornament, deep blue and gold robe with clock-face and hourglass motifs, small floating gears of light, holding a single old leather-bound spellbook in one hand, faint glowing runes on its pages, deep blue-violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, sword, shield, large clock, bow, arrows, quiver, spear, second book, text, watermark, scenery
+full body character illustration of a young adult female time mage, long dark blue hair with a clock-shaped hair ornament, deep blue and gold robe with clock-face and hourglass motifs, small floating gears of light, holding only one open leather-bound spellbook in one hand, faint glowing runes on its pages, the other hand empty, deep blue-violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, sword, shield, large clock, bow, arrows, quiver, spear, second book, text, watermark, scenery
 ```
 
 #### 死霊術師（`necromancer`）
@@ -691,13 +691,13 @@ full body character illustration of a young adult female Shinto shrine maiden, l
 男 → 元画像 `astrologer-male.png`
 
 ```
-full body character illustration of a young adult male astrologer star reader, masculine face, wavy silver hair, midnight blue robe with constellation patterns and a small star circlet, star chart pages on the book, holding a single old leather-bound spellbook in one hand, faint glowing runes on its pages, midnight blue as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, telescope, crystal ball, sword, shield, bow, arrows, quiver, spear, second book, text, watermark, scenery
+full body character illustration of a young adult male astrologer star reader, masculine face, wavy silver hair, midnight blue robe with constellation patterns and a small star circlet, star chart pages on the book, holding only one open leather-bound spellbook in one hand, faint glowing runes on its pages, the other hand empty, midnight blue as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, telescope, crystal ball, sword, shield, bow, arrows, quiver, spear, second book, text, watermark, scenery
 ```
 
 女 → 元画像 `astrologer-female.png`
 
 ```
-full body character illustration of a young adult female astrologer star reader, long wavy navy hair with star hairpins, midnight blue robe with constellation patterns and a small star circlet, star chart pages on the book, holding a single old leather-bound spellbook in one hand, faint glowing runes on its pages, midnight blue as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, telescope, crystal ball, sword, shield, bow, arrows, quiver, spear, second book, text, watermark, scenery
+full body character illustration of a young adult female astrologer star reader, long wavy navy hair with star hairpins, midnight blue robe with constellation patterns and a small star circlet, star chart pages on the book, holding only one open leather-bound spellbook in one hand, faint glowing runes on its pages, the other hand empty, midnight blue as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, telescope, crystal ball, sword, shield, bow, arrows, quiver, spear, second book, text, watermark, scenery
 ```
 
 #### 機工士（`machinist`）
@@ -975,25 +975,25 @@ adorable chibi fox kit with a big fluffy tail, black-brown fur with a white tail
 白（`white`）→ 元画像 `pet-javaSparrow-white.png`
 
 ```
-adorable chibi java sparrow, very round mochi-like body, thick pink-red beak, red eye rings, no head crest, pure white feathers, pink beak, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi java sparrow, very round mochi-like body, thick pink-red beak, red eye rings, pure white feathers, pink beak, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no head crest, crest feathers, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 桜（`sakura`）→ 元画像 `pet-javaSparrow-sakura.png`
 
 ```
-adorable chibi java sparrow, very round mochi-like body, thick pink-red beak, red eye rings, no head crest, gray body with soft white mottled patches, black head, white cheeks, pink beak, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi java sparrow, very round mochi-like body, thick pink-red beak, red eye rings, gray body with soft white mottled patches, black head, white cheeks, pink beak, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no head crest, crest feathers, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 シナモン（`cinnamon`）→ 元画像 `pet-javaSparrow-cinnamon.png`
 
 ```
-adorable chibi java sparrow, very round mochi-like body, thick pink-red beak, red eye rings, no head crest, soft beige-brown body, cocoa brown head, white cheeks, pink beak, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi java sparrow, very round mochi-like body, thick pink-red beak, red eye rings, soft beige-brown body, cocoa brown head, white cheeks, pink beak, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no head crest, crest feathers, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 シルバー（`silver`）→ 元画像 `pet-javaSparrow-silver.png`
 
 ```
-adorable chibi java sparrow, very round mochi-like body, thick pink-red beak, red eye rings, no head crest, pale silver-gray body, darker gray head, white cheeks, pink beak, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi java sparrow, very round mochi-like body, thick pink-red beak, red eye rings, pale silver-gray body, darker gray head, white cheeks, pink beak, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no head crest, crest feathers, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 ### セキセイインコ（`budgie`）
