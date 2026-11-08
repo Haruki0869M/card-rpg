@@ -2,5 +2,5 @@
 import type { TerrainDef } from '../../../types';
 
 export const skyTerrains: TerrainDef[] = [
-  { id: 'cloud', order: 15, name: '雲の道', moveCost: 1, color: '#d9e4f4', decor: 'snow', background: 'plains' },
+  { id: 'cloud', order: 15, name: '雲の道', moveCost: 1, color: '#d9e4f4', decor: 'snow', background: 'cloud' },
 ];

@@ -2,5 +2,5 @@
 import type { TerrainDef } from '../../../types';
 
 export const seaTerrains: TerrainDef[] = [
-  { id: 'sea', order: 14, name: '海', moveCost: 0, sea: true, shipCost: 1, color: '#245f8f', decor: 'waves', background: 'plains' },
+  { id: 'sea', order: 14, name: '海', moveCost: 0, sea: true, shipCost: 1, color: '#245f8f', decor: 'waves', background: 'sea' },
 ];

@@ -8,6 +8,8 @@ export const FOREST_POOLS: DungeonDef['pools'] = {
     ['goblinScout', 'toxicShroom', 'goblinScout'],
     ['chaosShaman', 'forestWolf'],
     ['toxicShroom', 'toxicShroom', 'forestWolf'],
+    ["thornBoar", "mossCarapace"],
+    ["emberForestWolf", "toxicShroom"],
   ],
   elite: [['treeWarden'], ['goblinBrute', 'chaosShaman']],
   boss: ['treantKing'],
@@ -20,8 +22,12 @@ export const SWAMP_POOLS: DungeonDef['pools'] = {
     ['mireSlime', 'bogGhoul'],
     ['mireSlime', 'mireSlime', 'bogGhoul'],
     ['bogGhoul', 'bogGhoul', 'mireSlime'],
+    ["reedStalker", "shadowBogGhoul"],
+    ["reedStalker", "mireSlime", "bogGhoul"],
   ],
-  elite: [['bogWraith', 'bogGhoul'], ['bogWraith']],
+  elite: [['bogWraith', 'bogGhoul'], ['bogWraith'],
+    ["fenGuardian", "bogGhoul"],
+  ],
   boss: ['mordea'],
 };
 
@@ -31,6 +37,8 @@ export const VOLCANO_POOLS: DungeonDef['pools'] = {
     ['fireSalamander', 'ashBat'],
     ['ashBat', 'ashBat', 'fireSalamander'],
     ['fireSalamander', 'fireSalamander'],
+    ["cinderHound", "ironAshBat"],
+    ["basaltCrawler", "ashBat"],
   ],
   elite: [['magmaGolem'], ['magmaGolem', 'ashBat']],
   boss: ['ignavarl'],
@@ -38,7 +46,16 @@ export const VOLCANO_POOLS: DungeonDef['pools'] = {
 
 // 魔王城（中ボスは強敵の部屋に置く）
 export const CASTLE_POOLS: DungeonDef['pools'] = {
-  battle: [['darkKnight', 'ashBat'], ['darkKnight', 'darkKnight'], ['bogWraith', 'darkKnight']],
+  battle: [['darkKnight', 'ashBat'], ['darkKnight', 'darkKnight'], ['bogWraith', 'darkKnight'],
+    ["cursedHound", "chainWraith"],
+    ["siegeImp", "darkKnight"],
+  ],
   elite: [['gatekeeper']],
   boss: ['valgrim'],
+};
+
+// ランダムの森向けの1体だけを追加する。固定の翠の森には混ぜない。
+export const RANDOM_FOREST_POOLS: DungeonDef['pools'] = {
+  ...FOREST_POOLS,
+  battle: [...FOREST_POOLS.battle, ['rootImp', 'toxicShroom']],
 };
