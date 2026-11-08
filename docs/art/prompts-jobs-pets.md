@@ -11,7 +11,7 @@
 
 | | 決めたこと |
 |---|---|
-| A | 立ち絵は、**今ゲームに入っている8枚**（細かく描き込んだ手描き風のファンタジー画）に合わせる。Web 版の「Style References」に今の立ち絵を入れて参照する。お供はちびキャラ風。 |
+| A | 立ち絵は、**今ゲームに入っている8枚**（細かく描き込んだ手描き風のファンタジー画）に合わせる。指示文の `--sref` で、公開中の今の立ち絵2枚を参照する。お供はちびキャラ風。 |
 | B | 顔の絵は立ち絵から切り出す（今の仕組み）。顔だけの指示文は作らない。 |
 | C | 最上位13職は、元の中位の職の「最初の武器」をデータの上で引き継いでいる（例: 剣聖＝銅の剣）。それを持たせる。得意な武器の種類とも一致する。 |
 | D | お供の絵を読み込むコードは今回作らない。置き場所の名前だけ決める（`src/assets/art/pet/<お供ID>-<色ID>.webp`）。 |
@@ -27,14 +27,15 @@
 - **持たせる武器は、ゲームの最初の武器と同じ**。各職の「最初の武器」に書いた物だけを持たせます。
 - **持たせない物は `--no` に書く。** Midjourney は文の中に「no shield」と書くと、かえって盾を描くことがあります。そのため、持たせない物は最後の `--no` の後ろにまとめました。
 
-### 作風の参照（Style References）の使い方（Web 版 `midjourney.com`）
-指示文には `--sref` を書いていません。お手本の画像は、画面のボタンで入れます。
-1. 「Create」の画面で、入力欄の左の画像のマークを押します。今の立ち絵を2枚上げます（おすすめは `src/assets/art/hero/hunter-male.webp` と `src/assets/art/hero/guardian-female.webp`）。
-2. 上に並ぶ3つのボタンのうち、**「Style References」**に2枚を入れます。ほかの欄（Image Prompts・Edit など）には入れません。絵の中身まで真似されたり、元の絵を書き換えるモードになったりするためです。
-3. 入れた画像は選ばれたまま残ります。立ち絵の指示文は、そのまま貼って送信すれば大丈夫です。
-4. **お供を作る時は、お手本の2枚を外します**（画像の右上の ✕）。お供はちびキャラ風なので、立ち絵の作風を参照しないようにします。
-5. 作風が強すぎる・弱すぎる時は、指示文の最後に `--sw 100`（ふつう）〜`--sw 300`（強め）を足して調整します。
-- Discord などで URL を使う場合だけ、`--ar 2:3` の後ろに `--sref <画像のURL>` を足します。
+### 作風の参照（`--sref`）について
+- **立ち絵の指示文には、お手本の URL が最初から入っています。** 公開中のゲーム（Firebase Hosting）にある今の立ち絵2枚（狩人・男、守護者・女）です。
+  - `https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp`
+  - `https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp`
+- そのため、**画面の「Style References」には何も入れません**（入れてあれば ✕ で外します）。画面に入れたままだと、お供にもリアルな作風が付いてしまいます。
+- お供の指示文には `--sref` がありません。そのまま貼れば、ちびキャラ風になります。
+- 作風が強すぎる・弱すぎる時は、指示文の最後に `--sw 100`（ふつう）〜`--sw 300`（強め）を足して調整します。
+- URL の末尾の英数字は、絵の中身から作られます。今の2枚の絵を描き直さない限り変わりません。描き直して公開し直した時は、この URL を新しいものに直します。
+- お手本の狩人が矢筒、守護者が槍と盾を持っているため、その職でない立ち絵には `--no` に「bow, arrows, quiver, spear, shield」を入れて、まねされないようにしています（1回目の試しで、召喚士に矢筒が付いたため）。
 
 ### お供
 - **小さくても分かるデフォルメ（ちびキャラ風）**。正方形 `--ar 1:1`・白い背景。
@@ -48,6 +49,8 @@
 1. **立ち絵を2枚**: 武闘家・女（素手の職）、召喚士・男（本を持つ職）。今の8枚と並べて、作風・大きさ・武器が合うかを見ます。
 2. **お供を2枚**: オカメインコ（ノーマル）と文鳥（白）。小さく表示しても見分けられるかを見ます。
 3. 見え方に合わせて、共通の部分（作風の言葉・`--sw` など）をこの文書で直してから、残りをまとめて作ります。
+
+**1回目の試しの結果（2026-11-08）**: 武闘家・女は合格（作風・素手ともに良い）。召喚士・男は本は良いが、お手本の狩人の矢筒が付いた → `--no` に弓・矢・矢筒・槍・盾を追加。お供2枚は、画面の Style References を入れたまま作ったためリアル寄りになった → お手本は指示文の `--sref` だけで指定する形に変更。オカメインコ（ノーマル）は白っぽくなった → 「濃い灰色の体」を強めた。オカメインコと文鳥は、はっきり見分けられた。
 
 ## 立ち絵の指示文（80本）
 
@@ -64,13 +67,13 @@
 男 → 元画像 `monk-male.png`
 
 ```
-full body character illustration of a young adult male martial artist, short spiky black hair, orange sleeveless martial arts gi with a dark sash, bandaged forearms, cloth shoes, both fists wrapped in worn cloth hand wraps, bare hands, orange as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no sword, staff, pole, claws, metal gauntlets, shield, text, watermark, scenery
+full body character illustration of a young adult male martial artist, short spiky black hair, orange sleeveless martial arts gi with a dark sash, bandaged forearms, cloth shoes, both fists wrapped in worn cloth hand wraps, bare hands, orange as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no sword, staff, pole, claws, metal gauntlets, shield, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `monk-female.png`
 
 ```
-full body character illustration of a young adult female martial artist, black hair in two round buns, orange sleeveless martial arts gi with a dark sash, bandaged forearms, cloth shoes, both fists wrapped in worn cloth hand wraps, bare hands, orange as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no sword, staff, pole, claws, metal gauntlets, shield, text, watermark, scenery
+full body character illustration of a young adult female martial artist, black hair in two round buns, orange sleeveless martial arts gi with a dark sash, bandaged forearms, cloth shoes, both fists wrapped in worn cloth hand wraps, bare hands, orange as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no sword, staff, pole, claws, metal gauntlets, shield, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 盗賊（`thief`）
@@ -81,13 +84,13 @@ full body character illustration of a young adult female martial artist, black h
 男 → 元画像 `thief-male.png`
 
 ```
-full body character illustration of a young adult male nimble thief, messy brown hair, mint green hooded short cloak, fitted leather vest, belts with small pouches, holding a single worn short dagger with a slightly chipped blade, mint green as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no second dagger, sword, bow, shield, text, watermark, scenery
+full body character illustration of a young adult male nimble thief, messy brown hair, mint green hooded short cloak, fitted leather vest, belts with small pouches, holding a single worn short dagger with a slightly chipped blade, mint green as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no second dagger, sword, bow, shield, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `thief-female.png`
 
 ```
-full body character illustration of a young adult female nimble thief, short ash-blonde bob hair, mint green hooded short cloak, fitted leather vest, belts with small pouches, holding a single worn short dagger with a slightly chipped blade, mint green as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no second dagger, sword, bow, shield, text, watermark, scenery
+full body character illustration of a young adult female nimble thief, short ash-blonde bob hair, mint green hooded short cloak, fitted leather vest, belts with small pouches, holding a single worn short dagger with a slightly chipped blade, mint green as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no second dagger, sword, bow, shield, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 僧侶（`priest`）
@@ -98,13 +101,13 @@ full body character illustration of a young adult female nimble thief, short ash
 男 → 元画像 `priest-male.png`
 
 ```
-full body character illustration of a young adult male gentle priest healer, neat light brown hair, white and pale gold clergy robe with a simple stole, small holy symbol pendant, holding a wooden ringed prayer staff (shakujo) with small brass bells and rings at the top, pale cream yellow as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no sword, hammer, mace, book, shield, text, watermark, scenery
+full body character illustration of a young adult male gentle priest healer, neat light brown hair, white and pale gold clergy robe with a simple stole, small holy symbol pendant, holding a wooden ringed prayer staff (shakujo) with small brass bells and rings at the top, pale cream yellow as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no sword, hammer, mace, book, shield, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `priest-female.png`
 
 ```
-full body character illustration of a young adult female gentle priest healer, long wavy blonde hair under a short white veil, white and pale gold clergy robe with a simple stole, small holy symbol pendant, holding a wooden ringed prayer staff (shakujo) with small brass bells and rings at the top, pale cream yellow as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no sword, hammer, mace, book, shield, text, watermark, scenery
+full body character illustration of a young adult female gentle priest healer, long wavy blonde hair under a short white veil, white and pale gold clergy robe with a simple stole, small holy symbol pendant, holding a wooden ringed prayer staff (shakujo) with small brass bells and rings at the top, pale cream yellow as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no sword, hammer, mace, book, shield, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 召喚士（`summoner`）
@@ -115,13 +118,13 @@ full body character illustration of a young adult female gentle priest healer, l
 男 → 元画像 `summoner-male.png`
 
 ```
-full body character illustration of a young adult male young summoner, silver-lilac hair, violet hooded robe with faintly glowing summoning sigils on the hem, holding an old leather-bound spellbook in one hand, faint glowing runes on its pages, violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no staff, wand, sword, shield, creatures, animals, text, watermark, scenery
+full body character illustration of a young adult male young summoner, silver-lilac hair, violet hooded robe with faintly glowing summoning sigils on the hem, holding an old leather-bound spellbook in one hand, faint glowing runes on its pages, violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, wand, sword, shield, creatures, animals, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `summoner-female.png`
 
 ```
-full body character illustration of a young adult female young summoner, long lavender hair, violet hooded robe with faintly glowing summoning sigils on the hem, holding an old leather-bound spellbook in one hand, faint glowing runes on its pages, violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no staff, wand, sword, shield, creatures, animals, text, watermark, scenery
+full body character illustration of a young adult female young summoner, long lavender hair, violet hooded robe with faintly glowing summoning sigils on the hem, holding an old leather-bound spellbook in one hand, faint glowing runes on its pages, violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, wand, sword, shield, creatures, animals, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 ### 中位13職（26枚）
@@ -134,13 +137,13 @@ full body character illustration of a young adult female young summoner, long la
 男 → 元画像 `swordmaster-male.png`
 
 ```
-full body character illustration of a young adult male seasoned swordmaster, long dark red hair tied back, long crimson coat over light leather armor, red hair tie, calm focused stance, holding a single plain copper one-handed sword with a simple crossguard, crimson red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no shield, katana, second sword, text, watermark, scenery
+full body character illustration of a young adult male seasoned swordmaster, long dark red hair tied back, long crimson coat over light leather armor, red hair tie, calm focused stance, holding a single plain copper one-handed sword with a simple crossguard, crimson red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no shield, katana, second sword, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `swordmaster-female.png`
 
 ```
-full body character illustration of a young adult female seasoned swordmaster, high ponytail of crimson hair, long crimson coat over light leather armor, red hair tie, calm focused stance, holding a single plain copper one-handed sword with a simple crossguard, crimson red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no shield, katana, second sword, text, watermark, scenery
+full body character illustration of a young adult female seasoned swordmaster, high ponytail of crimson hair, long crimson coat over light leather armor, red hair tie, calm focused stance, holding a single plain copper one-handed sword with a simple crossguard, crimson red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no shield, katana, second sword, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 狂戦士（`berserker`）
@@ -151,13 +154,13 @@ full body character illustration of a young adult female seasoned swordmaster, h
 男 → 元画像 `berserker-male.png`
 
 ```
-full body character illustration of a young adult male wild berserker warrior, wild crimson mane of hair, fur-trimmed leather armor with dark red cloth, muscular, battle scars, tribal war paint, holding a heavy thick-bladed woodcutter's axe with a wooden handle, dark blood red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no shield, sword, helmet covering the face, text, watermark, scenery
+full body character illustration of a young adult male wild berserker warrior, wild crimson mane of hair, fur-trimmed leather armor with dark red cloth, muscular, battle scars, tribal war paint, holding a heavy thick-bladed woodcutter's axe with a wooden handle, dark blood red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no shield, sword, helmet covering the face, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `berserker-female.png`
 
 ```
-full body character illustration of a young adult female wild berserker warrior, wild long red hair with small braids, fur-trimmed leather armor with dark red cloth, muscular, battle scars, tribal war paint, holding a heavy thick-bladed woodcutter's axe with a wooden handle, dark blood red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no shield, sword, helmet covering the face, text, watermark, scenery
+full body character illustration of a young adult female wild berserker warrior, wild long red hair with small braids, fur-trimmed leather armor with dark red cloth, muscular, battle scars, tribal war paint, holding a heavy thick-bladed woodcutter's axe with a wooden handle, dark blood red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no shield, sword, helmet covering the face, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 闘士（`brawler`）
@@ -168,13 +171,13 @@ full body character illustration of a young adult female wild berserker warrior,
 男 → 元画像 `brawler-male.png`
 
 ```
-full body character illustration of a young adult male street-fighting brawler, short black hair, open orange vest, wide dark trousers, red headband, fighting stance with raised fists, both fists wrapped in worn cloth hand wraps, bare hands, orange as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no sword, staff, claws, metal gauntlets, shield, text, watermark, scenery
+full body character illustration of a young adult male street-fighting brawler, short black hair, open orange vest, wide dark trousers, red headband, fighting stance with raised fists, both fists wrapped in worn cloth hand wraps, bare hands, orange as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no sword, staff, claws, metal gauntlets, shield, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `brawler-female.png`
 
 ```
-full body character illustration of a young adult female street-fighting brawler, short brown hair, open orange vest, wide dark trousers, red headband, fighting stance with raised fists, both fists wrapped in worn cloth hand wraps, bare hands, orange as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no sword, staff, claws, metal gauntlets, shield, text, watermark, scenery
+full body character illustration of a young adult female street-fighting brawler, short brown hair, open orange vest, wide dark trousers, red headband, fighting stance with raised fists, both fists wrapped in worn cloth hand wraps, bare hands, orange as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no sword, staff, claws, metal gauntlets, shield, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 大魔導士（`archmage`）
@@ -185,13 +188,13 @@ full body character illustration of a young adult female street-fighting brawler
 男 → 元画像 `archmage-male.png`
 
 ```
-full body character illustration of a young adult male powerful archmage, long silver hair, layered deep violet robes with gold star embroidery and a tall high collar, holding a tall gnarled oak wooden staff topped with a small violet crystal, deep blue-violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no sword, book, shield, wand, text, watermark, scenery
+full body character illustration of a young adult male powerful archmage, long silver hair, layered deep violet robes with gold star embroidery and a tall high collar, holding a tall gnarled oak wooden staff topped with a small violet crystal, deep blue-violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no sword, book, shield, wand, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `archmage-female.png`
 
 ```
-full body character illustration of a young adult female powerful archmage, long dark blue hair with an ornate circlet, layered deep violet robes with gold star embroidery and a tall high collar, holding a tall gnarled oak wooden staff topped with a small violet crystal, deep blue-violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no sword, book, shield, wand, text, watermark, scenery
+full body character illustration of a young adult female powerful archmage, long dark blue hair with an ornate circlet, layered deep violet robes with gold star embroidery and a tall high collar, holding a tall gnarled oak wooden staff topped with a small violet crystal, deep blue-violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no sword, book, shield, wand, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 呪術師（`hexer`）
@@ -202,13 +205,13 @@ full body character illustration of a young adult female powerful archmage, long
 男 → 元画像 `hexer-male.png`
 
 ```
-full body character illustration of a young adult male sinister hexer, black hair falling over one eye, tattered dark purple hooded robe with small bone and skull charms, pale skin, holding a large rusty scythe with dark stains on its curved blade, dark purple as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no book, staff, sword, shield, text, watermark, scenery
+full body character illustration of a young adult male sinister hexer, black hair falling over one eye, tattered dark purple hooded robe with small bone and skull charms, pale skin, holding a large rusty scythe with dark stains on its curved blade, dark purple as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no book, staff, sword, shield, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `hexer-female.png`
 
 ```
-full body character illustration of a young adult female sinister hexer, long straight black hair, tattered dark purple hooded robe with small bone and skull charms, pale skin, holding a large rusty scythe with dark stains on its curved blade, dark purple as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no book, staff, sword, shield, text, watermark, scenery
+full body character illustration of a young adult female sinister hexer, long straight black hair, tattered dark purple hooded robe with small bone and skull charms, pale skin, holding a large rusty scythe with dark stains on its curved blade, dark purple as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no book, staff, sword, shield, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 幻獣使い（`phantomTamer`）
@@ -219,13 +222,13 @@ full body character illustration of a young adult female sinister hexer, long st
 男 → 元画像 `phantomTamer-male.png`
 
 ```
-full body character illustration of a young adult male phantom beast tamer, teal-silver hair, violet and white robe with a feathered short cape and crystal ornaments, holding an old leather-bound spellbook in one hand, faint glowing runes on its pages, violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no staff, sword, shield, creatures, animals, text, watermark, scenery
+full body character illustration of a young adult male phantom beast tamer, teal-silver hair, violet and white robe with a feathered short cape and crystal ornaments, holding an old leather-bound spellbook in one hand, faint glowing runes on its pages, violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, sword, shield, creatures, animals, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `phantomTamer-female.png`
 
 ```
-full body character illustration of a young adult female phantom beast tamer, long white hair with lavender tips, violet and white robe with a feathered short cape and crystal ornaments, holding an old leather-bound spellbook in one hand, faint glowing runes on its pages, violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no staff, sword, shield, creatures, animals, text, watermark, scenery
+full body character illustration of a young adult female phantom beast tamer, long white hair with lavender tips, violet and white robe with a feathered short cape and crystal ornaments, holding an old leather-bound spellbook in one hand, faint glowing runes on its pages, violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, sword, shield, creatures, animals, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 聖騎士（`paladin`）
@@ -236,13 +239,13 @@ full body character illustration of a young adult female phantom beast tamer, lo
 男 → 元画像 `paladin-male.png`
 
 ```
-full body character illustration of a young adult male holy paladin knight, short blond hair, white and gold plate armor over leather, blue tabard with a sun emblem, a round knight shield on the other arm, holding a sturdy plain oak wooden war hammer in one hand, gold as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no sword, spear, second weapon, text, watermark, scenery
+full body character illustration of a young adult male holy paladin knight, short blond hair, white and gold plate armor over leather, blue tabard with a sun emblem, a round knight shield on the other arm, holding a sturdy plain oak wooden war hammer in one hand, gold as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no sword, spear, second weapon, bow, arrows, quiver, text, watermark, scenery
 ```
 
 女 → 元画像 `paladin-female.png`
 
 ```
-full body character illustration of a young adult female holy paladin knight, long golden braided hair, white and gold plate armor over leather, blue tabard with a sun emblem, a round knight shield on the other arm, holding a sturdy plain oak wooden war hammer in one hand, gold as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no sword, spear, second weapon, text, watermark, scenery
+full body character illustration of a young adult female holy paladin knight, long golden braided hair, white and gold plate armor over leather, blue tabard with a sun emblem, a round knight shield on the other arm, holding a sturdy plain oak wooden war hammer in one hand, gold as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no sword, spear, second weapon, bow, arrows, quiver, text, watermark, scenery
 ```
 
 #### 槍騎士（`lancer`）
@@ -253,13 +256,13 @@ full body character illustration of a young adult female holy paladin knight, lo
 男 → 元画像 `lancer-male.png`
 
 ```
-full body character illustration of a young adult male lance knight, short dark blue hair, blue and steel half-plate armor over leather, short blue cape, winged ornaments, holding a long plain straight iron spear, royal blue as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no shield, sword, text, watermark, scenery
+full body character illustration of a young adult male lance knight, short dark blue hair, blue and steel half-plate armor over leather, short blue cape, winged ornaments, holding a long plain straight iron spear, royal blue as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no shield, sword, bow, arrows, quiver, text, watermark, scenery
 ```
 
 女 → 元画像 `lancer-female.png`
 
 ```
-full body character illustration of a young adult female lance knight, long blue hair with a winged hair ornament, blue and steel half-plate armor over leather, short blue cape, winged ornaments, holding a long plain straight iron spear, royal blue as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no shield, sword, text, watermark, scenery
+full body character illustration of a young adult female lance knight, long blue hair with a winged hair ornament, blue and steel half-plate armor over leather, short blue cape, winged ornaments, holding a long plain straight iron spear, royal blue as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no shield, sword, bow, arrows, quiver, text, watermark, scenery
 ```
 
 #### 司祭（`bishop`）
@@ -270,13 +273,13 @@ full body character illustration of a young adult female lance knight, long blue
 男 → 元画像 `bishop-male.png`
 
 ```
-full body character illustration of a young adult male high priest bishop, short brown hair, layered white and gold vestments with an embroidered stole, holding a wooden ringed prayer staff (shakujo) with small brass bells and rings at the top, pale cream yellow as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no book, sword, hammer, shield, text, watermark, scenery
+full body character illustration of a young adult male high priest bishop, short brown hair, layered white and gold vestments with an embroidered stole, holding a wooden ringed prayer staff (shakujo) with small brass bells and rings at the top, pale cream yellow as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no book, sword, hammer, shield, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `bishop-female.png`
 
 ```
-full body character illustration of a young adult female high priest bishop, long silver-blonde hair under a white veil with gold trim, layered white and gold vestments with an embroidered stole, holding a wooden ringed prayer staff (shakujo) with small brass bells and rings at the top, pale cream yellow as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no book, sword, hammer, shield, text, watermark, scenery
+full body character illustration of a young adult female high priest bishop, long silver-blonde hair under a white veil with gold trim, layered white and gold vestments with an embroidered stole, holding a wooden ringed prayer staff (shakujo) with small brass bells and rings at the top, pale cream yellow as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no book, sword, hammer, shield, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 弓術士（`archer`）
@@ -287,13 +290,13 @@ full body character illustration of a young adult female high priest bishop, lon
 男 → 元画像 `archer-male.png`
 
 ```
-full body character illustration of a young adult male skilled archer, short blond hair, fitted forest green tunic, leather bracers, quiver of arrows on the back, holding a simple wooden hunting bow, forest green as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no sword, dagger in hand, shield, text, watermark, scenery
+full body character illustration of a young adult male skilled archer, short blond hair, fitted forest green tunic, leather bracers, quiver of arrows on the back, holding a simple wooden hunting bow, forest green as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no sword, dagger in hand, shield, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `archer-female.png`
 
 ```
-full body character illustration of a young adult female skilled archer, long light blonde hair in a side braid, fitted forest green tunic, leather bracers, quiver of arrows on the back, holding a simple wooden hunting bow, forest green as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no sword, dagger in hand, shield, text, watermark, scenery
+full body character illustration of a young adult female skilled archer, long light blonde hair in a side braid, fitted forest green tunic, leather bracers, quiver of arrows on the back, holding a simple wooden hunting bow, forest green as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no sword, dagger in hand, shield, spear, text, watermark, scenery
 ```
 
 #### 獣使い（`tamer`）
@@ -304,13 +307,13 @@ full body character illustration of a young adult female skilled archer, long li
 男 → 元画像 `tamer-male.png`
 
 ```
-full body character illustration of a young adult male beast tamer, messy brown hair, fur-collared leaf green vest, rugged trousers and boots, fang necklace, holding a coiled supple leather whip in one hand, leaf green as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no animals, creatures, sword, bow, shield, text, watermark, scenery
+full body character illustration of a young adult male beast tamer, messy brown hair, fur-collared leaf green vest, rugged trousers and boots, fang necklace, holding a coiled supple leather whip in one hand, leaf green as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no animals, creatures, sword, bow, shield, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `tamer-female.png`
 
 ```
-full body character illustration of a young adult female beast tamer, short orange-brown hair with a fur hood, fur-collared leaf green vest, rugged trousers and boots, fang necklace, holding a coiled supple leather whip in one hand, leaf green as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no animals, creatures, sword, bow, shield, text, watermark, scenery
+full body character illustration of a young adult female beast tamer, short orange-brown hair with a fur hood, fur-collared leaf green vest, rugged trousers and boots, fang necklace, holding a coiled supple leather whip in one hand, leaf green as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no animals, creatures, sword, bow, shield, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 隠密（`shadow`）
@@ -321,13 +324,13 @@ full body character illustration of a young adult female beast tamer, short oran
 男 → 元画像 `shadow-male.png`
 
 ```
-full body character illustration of a young adult male stealthy shadow agent, black hair, dark slate blue fitted hooded garb, face mask lowered around the neck so the face is visible, the dagger held in a reverse grip, holding a single worn short dagger with a slightly chipped blade, slate blue as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no katana, second dagger, shuriken, shield, face mask covering the face, text, watermark, scenery
+full body character illustration of a young adult male stealthy shadow agent, black hair, dark slate blue fitted hooded garb, face mask lowered around the neck so the face is visible, the dagger held in a reverse grip, holding a single worn short dagger with a slightly chipped blade, slate blue as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no katana, second dagger, shuriken, shield, face mask covering the face, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `shadow-female.png`
 
 ```
-full body character illustration of a young adult female stealthy shadow agent, black hair in a low ponytail, dark slate blue fitted hooded garb, face mask lowered around the neck so the face is visible, the dagger held in a reverse grip, holding a single worn short dagger with a slightly chipped blade, slate blue as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no katana, second dagger, shuriken, shield, face mask covering the face, text, watermark, scenery
+full body character illustration of a young adult female stealthy shadow agent, black hair in a low ponytail, dark slate blue fitted hooded garb, face mask lowered around the neck so the face is visible, the dagger held in a reverse grip, holding a single worn short dagger with a slightly chipped blade, slate blue as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no katana, second dagger, shuriken, shield, face mask covering the face, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 怪盗（`phantomThief`）
@@ -338,13 +341,13 @@ full body character illustration of a young adult female stealthy shadow agent, 
 男 → 元画像 `phantomThief-male.png`
 
 ```
-full body character illustration of a young adult male elegant phantom thief, neat dark hair, black tailcoat with gold trim, short cape, white gloves, small top hat, monocle, holding a single worn short dagger with a slightly chipped blade, gold as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no mask covering the face, gun, sword, shield, text, watermark, scenery
+full body character illustration of a young adult male elegant phantom thief, neat dark hair, black tailcoat with gold trim, short cape, white gloves, small top hat, monocle, holding a single worn short dagger with a slightly chipped blade, gold as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no mask covering the face, gun, sword, shield, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `phantomThief-female.png`
 
 ```
-full body character illustration of a young adult female elegant phantom thief, black bob hair, black tailcoat with gold trim, short cape, white gloves, small top hat, monocle, holding a single worn short dagger with a slightly chipped blade, gold as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no mask covering the face, gun, sword, shield, text, watermark, scenery
+full body character illustration of a young adult female elegant phantom thief, black bob hair, black tailcoat with gold trim, short cape, white gloves, small top hat, monocle, holding a single worn short dagger with a slightly chipped blade, gold as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no mask covering the face, gun, sword, shield, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 ### 最上位13職（26枚）
@@ -357,13 +360,13 @@ full body character illustration of a young adult female elegant phantom thief, 
 男 → 元画像 `swordSaint-male.png`
 
 ```
-full body character illustration of a young adult male legendary sword saint, long dark red hair tied back, flowing white and crimson ornate long coat over light armor with gold embroidery, serene master aura, holding a single plain copper one-handed sword with a simple crossguard, crimson red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no shield, katana, second sword, text, watermark, scenery
+full body character illustration of a young adult male legendary sword saint, long dark red hair tied back, flowing white and crimson ornate long coat over light armor with gold embroidery, serene master aura, holding a single plain copper one-handed sword with a simple crossguard, crimson red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no shield, katana, second sword, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `swordSaint-female.png`
 
 ```
-full body character illustration of a young adult female legendary sword saint, very long crimson hair in a high ponytail, flowing white and crimson ornate long coat over light armor with gold embroidery, serene master aura, holding a single plain copper one-handed sword with a simple crossguard, crimson red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no shield, katana, second sword, text, watermark, scenery
+full body character illustration of a young adult female legendary sword saint, very long crimson hair in a high ponytail, flowing white and crimson ornate long coat over light armor with gold embroidery, serene master aura, holding a single plain copper one-handed sword with a simple crossguard, crimson red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no shield, katana, second sword, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 覇王（`overlord`）
@@ -374,13 +377,13 @@ full body character illustration of a young adult female legendary sword saint, 
 男 → 元画像 `overlord-male.png`
 
 ```
-full body character illustration of a young adult male imposing warlord overlord, wild crimson mane of hair, black and dark red heavy armor with a thick fur mantle and a horned crown-like circlet, commanding presence, holding a heavy thick-bladed woodcutter's axe with a wooden handle, dark blood red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no shield, sword, helmet covering the face, text, watermark, scenery
+full body character illustration of a young adult male imposing warlord overlord, wild crimson mane of hair, black and dark red heavy armor with a thick fur mantle and a horned crown-like circlet, commanding presence, holding a heavy thick-bladed woodcutter's axe with a wooden handle, dark blood red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no shield, sword, helmet covering the face, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `overlord-female.png`
 
 ```
-full body character illustration of a young adult female imposing warlord overlord, long wild red hair, black and dark red heavy armor with a thick fur mantle and a horned crown-like circlet, commanding presence, holding a heavy thick-bladed woodcutter's axe with a wooden handle, dark blood red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no shield, sword, helmet covering the face, text, watermark, scenery
+full body character illustration of a young adult female imposing warlord overlord, long wild red hair, black and dark red heavy armor with a thick fur mantle and a horned crown-like circlet, commanding presence, holding a heavy thick-bladed woodcutter's axe with a wooden handle, dark blood red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no shield, sword, helmet covering the face, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 拳王（`fistKing`）
@@ -391,13 +394,13 @@ full body character illustration of a young adult female imposing warlord overlo
 男 → 元画像 `fistKing-male.png`
 
 ```
-full body character illustration of a young adult male martial arts master king of fists, short black hair with a red headband, white and orange gi with a gold-embroidered black belt, long flowing sash, powerful stance, both fists wrapped in worn cloth hand wraps, bare hands, orange as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no sword, staff, claws, metal gauntlets, shield, text, watermark, scenery
+full body character illustration of a young adult male martial arts master king of fists, short black hair with a red headband, white and orange gi with a gold-embroidered black belt, long flowing sash, powerful stance, both fists wrapped in worn cloth hand wraps, bare hands, orange as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no sword, staff, claws, metal gauntlets, shield, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `fistKing-female.png`
 
 ```
-full body character illustration of a young adult female martial arts master king of fists, long black hair in a high ponytail with a red headband, white and orange gi with a gold-embroidered black belt, long flowing sash, powerful stance, both fists wrapped in worn cloth hand wraps, bare hands, orange as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no sword, staff, claws, metal gauntlets, shield, text, watermark, scenery
+full body character illustration of a young adult female martial arts master king of fists, long black hair in a high ponytail with a red headband, white and orange gi with a gold-embroidered black belt, long flowing sash, powerful stance, both fists wrapped in worn cloth hand wraps, bare hands, orange as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no sword, staff, claws, metal gauntlets, shield, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 大賢者（`greatSage`）
@@ -408,13 +411,13 @@ full body character illustration of a young adult female martial arts master kin
 男 → 元画像 `greatSage-male.png`
 
 ```
-full body character illustration of a young adult male great sage, long silver hair, grand white and deep violet robes with gold celestial embroidery, small glowing runes floating around, holding a tall gnarled oak wooden staff topped with a small violet crystal, deep blue-violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no sword, book, shield, wand, text, watermark, scenery
+full body character illustration of a young adult male great sage, long silver hair, grand white and deep violet robes with gold celestial embroidery, small glowing runes floating around, holding a tall gnarled oak wooden staff topped with a small violet crystal, deep blue-violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no sword, book, shield, wand, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `greatSage-female.png`
 
 ```
-full body character illustration of a young adult female great sage, very long dark blue hair with a gold circlet, grand white and deep violet robes with gold celestial embroidery, small glowing runes floating around, holding a tall gnarled oak wooden staff topped with a small violet crystal, deep blue-violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no sword, book, shield, wand, text, watermark, scenery
+full body character illustration of a young adult female great sage, very long dark blue hair with a gold circlet, grand white and deep violet robes with gold celestial embroidery, small glowing runes floating around, holding a tall gnarled oak wooden staff topped with a small violet crystal, deep blue-violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no sword, book, shield, wand, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 冥王（`hadesLord`）
@@ -425,13 +428,13 @@ full body character illustration of a young adult female great sage, very long d
 男 → 元画像 `hadesLord-male.png`
 
 ```
-full body character illustration of a young adult male lord of the underworld, black hair falling over one eye, regal black and violet robe with a bone crown and a long dark cape, faint dark mist at the feet, holding a large rusty scythe with dark stains on its curved blade, dark purple as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no book, staff, sword, shield, skeleton minions, text, watermark, scenery
+full body character illustration of a young adult male lord of the underworld, black hair falling over one eye, regal black and violet robe with a bone crown and a long dark cape, faint dark mist at the feet, holding a large rusty scythe with dark stains on its curved blade, dark purple as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no book, staff, sword, shield, skeleton minions, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `hadesLord-female.png`
 
 ```
-full body character illustration of a young adult female lord of the underworld, long straight black hair, regal black and violet robe with a bone crown and a long dark cape, faint dark mist at the feet, holding a large rusty scythe with dark stains on its curved blade, dark purple as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no book, staff, sword, shield, skeleton minions, text, watermark, scenery
+full body character illustration of a young adult female lord of the underworld, long straight black hair, regal black and violet robe with a bone crown and a long dark cape, faint dark mist at the feet, holding a large rusty scythe with dark stains on its curved blade, dark purple as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no book, staff, sword, shield, skeleton minions, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 幻獣王（`phantomKing`）
@@ -442,13 +445,13 @@ full body character illustration of a young adult female lord of the underworld,
 男 → 元画像 `phantomKing-male.png`
 
 ```
-full body character illustration of a young adult male king of phantom beasts, teal-silver hair, regal violet and white robe with a large feathered mantle and a gold circlet, holding an old leather-bound spellbook in one hand, faint glowing runes on its pages, violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no staff, sword, shield, creatures, animals, text, watermark, scenery
+full body character illustration of a young adult male king of phantom beasts, teal-silver hair, regal violet and white robe with a large feathered mantle and a gold circlet, holding an old leather-bound spellbook in one hand, faint glowing runes on its pages, violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, sword, shield, creatures, animals, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `phantomKing-female.png`
 
 ```
-full body character illustration of a young adult female king of phantom beasts, long white hair with lavender tips, regal violet and white robe with a large feathered mantle and a gold circlet, holding an old leather-bound spellbook in one hand, faint glowing runes on its pages, violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no staff, sword, shield, creatures, animals, text, watermark, scenery
+full body character illustration of a young adult female king of phantom beasts, long white hair with lavender tips, regal violet and white robe with a large feathered mantle and a gold circlet, holding an old leather-bound spellbook in one hand, faint glowing runes on its pages, violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, sword, shield, creatures, animals, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 聖王（`holyKing`）
@@ -459,13 +462,13 @@ full body character illustration of a young adult female king of phantom beasts,
 男 → 元画像 `holyKing-male.png`
 
 ```
-full body character illustration of a young adult male radiant holy king, short blond hair, radiant white and gold ornate plate armor, royal blue cape, small crown, a round knight shield on the other arm, holding a sturdy plain oak wooden war hammer in one hand, gold as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no sword, spear, second weapon, text, watermark, scenery
+full body character illustration of a young adult male radiant holy king, short blond hair, radiant white and gold ornate plate armor, royal blue cape, small crown, a round knight shield on the other arm, holding a sturdy plain oak wooden war hammer in one hand, gold as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no sword, spear, second weapon, bow, arrows, quiver, text, watermark, scenery
 ```
 
 女 → 元画像 `holyKing-female.png`
 
 ```
-full body character illustration of a young adult female radiant holy king, long golden braided hair, radiant white and gold ornate plate armor, royal blue cape, small crown, a round knight shield on the other arm, holding a sturdy plain oak wooden war hammer in one hand, gold as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no sword, spear, second weapon, text, watermark, scenery
+full body character illustration of a young adult female radiant holy king, long golden braided hair, radiant white and gold ornate plate armor, royal blue cape, small crown, a round knight shield on the other arm, holding a sturdy plain oak wooden war hammer in one hand, gold as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no sword, spear, second weapon, bow, arrows, quiver, text, watermark, scenery
 ```
 
 #### 竜騎士（`dragoon`）
@@ -476,13 +479,13 @@ full body character illustration of a young adult female radiant holy king, long
 男 → 元画像 `dragoon-male.png`
 
 ```
-full body character illustration of a young adult male dragon knight dragoon, short dark blue hair, dark blue dragon-scale armor with spiky pauldrons, dragon-head helmet held under the arm so the face is visible, holding a long plain straight iron spear, royal blue as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no shield, sword, dragon creature, text, watermark, scenery
+full body character illustration of a young adult male dragon knight dragoon, short dark blue hair, dark blue dragon-scale armor with spiky pauldrons, dragon-head helmet held under the arm so the face is visible, holding a long plain straight iron spear, royal blue as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no shield, sword, dragon creature, bow, arrows, quiver, text, watermark, scenery
 ```
 
 女 → 元画像 `dragoon-female.png`
 
 ```
-full body character illustration of a young adult female dragon knight dragoon, long blue hair, dark blue dragon-scale armor with spiky pauldrons, dragon-head helmet held under the arm so the face is visible, holding a long plain straight iron spear, royal blue as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no shield, sword, dragon creature, text, watermark, scenery
+full body character illustration of a young adult female dragon knight dragoon, long blue hair, dark blue dragon-scale armor with spiky pauldrons, dragon-head helmet held under the arm so the face is visible, holding a long plain straight iron spear, royal blue as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no shield, sword, dragon creature, bow, arrows, quiver, text, watermark, scenery
 ```
 
 #### 教皇（`pope`）
@@ -493,13 +496,13 @@ full body character illustration of a young adult female dragon knight dragoon, 
 男 → 元画像 `pope-male.png`
 
 ```
-full body character illustration of a young adult male holy pope, short brown hair, grand white and gold vestments with a tall mitre and a long embroidered stole, gentle radiant halo light, holding a wooden ringed prayer staff (shakujo) with small brass bells and rings at the top, pale cream yellow as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no book, sword, hammer, shield, text, watermark, scenery
+full body character illustration of a young adult male holy pope, short brown hair, grand white and gold vestments with a tall mitre and a long embroidered stole, gentle radiant halo light, holding a wooden ringed prayer staff (shakujo) with small brass bells and rings at the top, pale cream yellow as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no book, sword, hammer, shield, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `pope-female.png`
 
 ```
-full body character illustration of a young adult female holy pope, long silver-blonde hair, grand white and gold vestments with a tall mitre and a long embroidered stole, gentle radiant halo light, holding a wooden ringed prayer staff (shakujo) with small brass bells and rings at the top, pale cream yellow as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no book, sword, hammer, shield, text, watermark, scenery
+full body character illustration of a young adult female holy pope, long silver-blonde hair, grand white and gold vestments with a tall mitre and a long embroidered stole, gentle radiant halo light, holding a wooden ringed prayer staff (shakujo) with small brass bells and rings at the top, pale cream yellow as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no book, sword, hammer, shield, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 弓聖（`bowSaint`）
@@ -510,13 +513,13 @@ full body character illustration of a young adult female holy pope, long silver-
 男 → 元画像 `bowSaint-male.png`
 
 ```
-full body character illustration of a young adult male legendary bow saint, short blond hair, elegant green and white hunter attire with gold leaf embroidery, feathered cape, quiver on the back, holding a simple wooden hunting bow, forest green as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no sword, dagger in hand, shield, text, watermark, scenery
+full body character illustration of a young adult male legendary bow saint, short blond hair, elegant green and white hunter attire with gold leaf embroidery, feathered cape, quiver on the back, holding a simple wooden hunting bow, forest green as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no sword, dagger in hand, shield, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `bowSaint-female.png`
 
 ```
-full body character illustration of a young adult female legendary bow saint, long light blonde hair in a side braid, elegant green and white hunter attire with gold leaf embroidery, feathered cape, quiver on the back, holding a simple wooden hunting bow, forest green as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no sword, dagger in hand, shield, text, watermark, scenery
+full body character illustration of a young adult female legendary bow saint, long light blonde hair in a side braid, elegant green and white hunter attire with gold leaf embroidery, feathered cape, quiver on the back, holding a simple wooden hunting bow, forest green as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no sword, dagger in hand, shield, spear, text, watermark, scenery
 ```
 
 #### ビーストマスター（`beastMaster`）
@@ -527,13 +530,13 @@ full body character illustration of a young adult female legendary bow saint, lo
 男 → 元画像 `beastMaster-male.png`
 
 ```
-full body character illustration of a young adult male wild beast master, messy brown hair, large wolf-pelt mantle over a leaf green leather outfit, bone and fang accessories, holding a coiled supple leather whip in one hand, leaf green as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no animals, creatures, sword, bow, shield, text, watermark, scenery
+full body character illustration of a young adult male wild beast master, messy brown hair, large wolf-pelt mantle over a leaf green leather outfit, bone and fang accessories, holding a coiled supple leather whip in one hand, leaf green as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no animals, creatures, sword, bow, shield, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `beastMaster-female.png`
 
 ```
-full body character illustration of a young adult female wild beast master, short orange-brown hair, large wolf-pelt mantle over a leaf green leather outfit, bone and fang accessories, holding a coiled supple leather whip in one hand, leaf green as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no animals, creatures, sword, bow, shield, text, watermark, scenery
+full body character illustration of a young adult female wild beast master, short orange-brown hair, large wolf-pelt mantle over a leaf green leather outfit, bone and fang accessories, holding a coiled supple leather whip in one hand, leaf green as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no animals, creatures, sword, bow, shield, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 忍者（`ninja`）
@@ -544,13 +547,13 @@ full body character illustration of a young adult female wild beast master, shor
 男 → 元画像 `ninja-male.png`
 
 ```
-full body character illustration of a young adult male master ninja, black hair, black and dark slate blue shinobi garb, long flowing red scarf, face visible, the dagger held in a reverse grip, holding a single worn short dagger with a slightly chipped blade, slate blue as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no katana, shuriken, second blade, shield, clones, text, watermark, scenery
+full body character illustration of a young adult male master ninja, black hair, black and dark slate blue shinobi garb, long flowing red scarf, face visible, the dagger held in a reverse grip, holding a single worn short dagger with a slightly chipped blade, slate blue as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no katana, shuriken, second blade, shield, clones, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `ninja-female.png`
 
 ```
-full body character illustration of a young adult female master ninja, black hair in a high ponytail, black and dark slate blue shinobi garb, long flowing red scarf, face visible, the dagger held in a reverse grip, holding a single worn short dagger with a slightly chipped blade, slate blue as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no katana, shuriken, second blade, shield, clones, text, watermark, scenery
+full body character illustration of a young adult female master ninja, black hair in a high ponytail, black and dark slate blue shinobi garb, long flowing red scarf, face visible, the dagger held in a reverse grip, holding a single worn short dagger with a slightly chipped blade, slate blue as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no katana, shuriken, second blade, shield, clones, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 大怪盗（`grandThief`）
@@ -561,13 +564,13 @@ full body character illustration of a young adult female master ninja, black hai
 男 → 元画像 `grandThief-male.png`
 
 ```
-full body character illustration of a young adult male legendary grand phantom thief, neat dark hair, black and gold tailcoat with a long cape lined in crimson, top hat, monocle, white gloves, holding a single worn short dagger with a slightly chipped blade, gold as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no mask covering the face, gun, sword, shield, text, watermark, scenery
+full body character illustration of a young adult male legendary grand phantom thief, neat dark hair, black and gold tailcoat with a long cape lined in crimson, top hat, monocle, white gloves, holding a single worn short dagger with a slightly chipped blade, gold as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no mask covering the face, gun, sword, shield, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `grandThief-female.png`
 
 ```
-full body character illustration of a young adult female legendary grand phantom thief, black bob hair, black and gold tailcoat with a long cape lined in crimson, top hat, monocle, white gloves, holding a single worn short dagger with a slightly chipped blade, gold as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no mask covering the face, gun, sword, shield, text, watermark, scenery
+full body character illustration of a young adult female legendary grand phantom thief, black bob hair, black and gold tailcoat with a long cape lined in crimson, top hat, monocle, white gloves, holding a single worn short dagger with a slightly chipped blade, gold as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no mask covering the face, gun, sword, shield, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 ### 特殊10職（20枚）
@@ -580,13 +583,13 @@ full body character illustration of a young adult female legendary grand phantom
 男 → 元画像 `samurai-male.png`
 
 ```
-full body character illustration of a young adult male calm samurai, black hair in a topknot, dark navy kimono and crimson hakama with simple lacquered shoulder plates, ready-to-draw iai stance, a plain unadorned katana in a black scabbard at the waist, one hand resting on the hilt, crimson red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no second sword, western sword, bow, shield, text, watermark, scenery
+full body character illustration of a young adult male calm samurai, black hair in a topknot, dark navy kimono and crimson hakama with simple lacquered shoulder plates, ready-to-draw iai stance, a plain unadorned katana in a black scabbard at the waist, one hand resting on the hilt, crimson red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no second sword, western sword, bow, shield, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `samurai-female.png`
 
 ```
-full body character illustration of a young adult female calm samurai, long black hair tied high with a red cord, dark navy kimono and crimson hakama with simple lacquered shoulder plates, ready-to-draw iai stance, a plain unadorned katana in a black scabbard at the waist, one hand resting on the hilt, crimson red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no second sword, western sword, bow, shield, text, watermark, scenery
+full body character illustration of a young adult female calm samurai, long black hair tied high with a red cord, dark navy kimono and crimson hakama with simple lacquered shoulder plates, ready-to-draw iai stance, a plain unadorned katana in a black scabbard at the waist, one hand resting on the hilt, crimson red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no second sword, western sword, bow, shield, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 魔剣士（`magicKnight`）
@@ -597,13 +600,13 @@ full body character illustration of a young adult female calm samurai, long blac
 男 → 元画像 `magicKnight-male.png`
 
 ```
-full body character illustration of a young adult male magic swordsman, dark red hair, red and blue armored coat with softly glowing elemental rune lines, faint elemental glow along the blade, holding a single plain copper one-handed sword with a simple crossguard, crimson red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no staff, shield, book, second sword, text, watermark, scenery
+full body character illustration of a young adult male magic swordsman, dark red hair, red and blue armored coat with softly glowing elemental rune lines, faint elemental glow along the blade, holding a single plain copper one-handed sword with a simple crossguard, crimson red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, shield, book, second sword, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `magicKnight-female.png`
 
 ```
-full body character illustration of a young adult female magic swordsman, crimson hair in a braid, red and blue armored coat with softly glowing elemental rune lines, faint elemental glow along the blade, holding a single plain copper one-handed sword with a simple crossguard, crimson red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no staff, shield, book, second sword, text, watermark, scenery
+full body character illustration of a young adult female magic swordsman, crimson hair in a braid, red and blue armored coat with softly glowing elemental rune lines, faint elemental glow along the blade, holding a single plain copper one-handed sword with a simple crossguard, crimson red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, shield, book, second sword, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 時魔道士（`timeMage`）
@@ -614,13 +617,13 @@ full body character illustration of a young adult female magic swordsman, crimso
 男 → 元画像 `timeMage-male.png`
 
 ```
-full body character illustration of a young adult male time mage, neat silver hair, deep blue and gold robe with clock-face and hourglass motifs, small floating gears of light, holding an old leather-bound spellbook in one hand, faint glowing runes on its pages, deep blue-violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no staff, sword, shield, large clock, text, watermark, scenery
+full body character illustration of a young adult male time mage, neat silver hair, deep blue and gold robe with clock-face and hourglass motifs, small floating gears of light, holding an old leather-bound spellbook in one hand, faint glowing runes on its pages, deep blue-violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, sword, shield, large clock, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `timeMage-female.png`
 
 ```
-full body character illustration of a young adult female time mage, long dark blue hair with a clock-shaped hair ornament, deep blue and gold robe with clock-face and hourglass motifs, small floating gears of light, holding an old leather-bound spellbook in one hand, faint glowing runes on its pages, deep blue-violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no staff, sword, shield, large clock, text, watermark, scenery
+full body character illustration of a young adult female time mage, long dark blue hair with a clock-shaped hair ornament, deep blue and gold robe with clock-face and hourglass motifs, small floating gears of light, holding an old leather-bound spellbook in one hand, faint glowing runes on its pages, deep blue-violet as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, sword, shield, large clock, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 死霊術師（`necromancer`）
@@ -631,13 +634,13 @@ full body character illustration of a young adult female time mage, long dark bl
 男 → 元画像 `necromancer-male.png`
 
 ```
-full body character illustration of a young adult male necromancer, pale skin and white hair, black and sickly green tattered robes with bone ornaments, pale ghostly wisps around, holding a large rusty scythe with dark stains on its curved blade, dark purple as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no book, staff, sword, shield, skeleton minions, text, watermark, scenery
+full body character illustration of a young adult male necromancer, pale skin and white hair, black and sickly green tattered robes with bone ornaments, pale ghostly wisps around, holding a large rusty scythe with dark stains on its curved blade, dark purple as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no book, staff, sword, shield, skeleton minions, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `necromancer-female.png`
 
 ```
-full body character illustration of a young adult female necromancer, pale skin and long black hair, black and sickly green tattered robes with bone ornaments, pale ghostly wisps around, holding a large rusty scythe with dark stains on its curved blade, dark purple as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no book, staff, sword, shield, skeleton minions, text, watermark, scenery
+full body character illustration of a young adult female necromancer, pale skin and long black hair, black and sickly green tattered robes with bone ornaments, pale ghostly wisps around, holding a large rusty scythe with dark stains on its curved blade, dark purple as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no book, staff, sword, shield, skeleton minions, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 暗黒騎士（`darkKnight`）
@@ -648,13 +651,13 @@ full body character illustration of a young adult female necromancer, pale skin 
 男 → 元画像 `darkKnight-male.png`
 
 ```
-full body character illustration of a young adult male dark knight, short silver hair, black spiked plate armor with dark red accents and a tattered black cape, face visible, faint dark aura around the blade, holding a single plain copper one-handed sword with a simple crossguard, black with dark red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no shield, hammer, helmet covering the face, text, watermark, scenery
+full body character illustration of a young adult male dark knight, short silver hair, black spiked plate armor with dark red accents and a tattered black cape, face visible, faint dark aura around the blade, holding a single plain copper one-handed sword with a simple crossguard, black with dark red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no shield, hammer, helmet covering the face, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `darkKnight-female.png`
 
 ```
-full body character illustration of a young adult female dark knight, long black hair, black spiked plate armor with dark red accents and a tattered black cape, face visible, faint dark aura around the blade, holding a single plain copper one-handed sword with a simple crossguard, black with dark red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no shield, hammer, helmet covering the face, text, watermark, scenery
+full body character illustration of a young adult female dark knight, long black hair, black spiked plate armor with dark red accents and a tattered black cape, face visible, faint dark aura around the blade, holding a single plain copper one-handed sword with a simple crossguard, black with dark red as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no shield, hammer, helmet covering the face, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 巫女（`shrineMaiden`）
@@ -665,13 +668,13 @@ full body character illustration of a young adult female dark knight, long black
 男 → 元画像 `shrineMaiden-male.png`
 
 ```
-full body character illustration of a young adult male Shinto shrine attendant, black hair tied back with white paper ribbon (male shrine priest attire), white kosode top and red hakama with white ribbons and paper charms, holding a wooden ringed prayer staff (shakujo) with small brass bells and rings at the top, red and white as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no sword, bow, shield, gohei wand, text, watermark, scenery
+full body character illustration of a young adult male Shinto shrine attendant, black hair tied back with white paper ribbon (male shrine priest attire), white kosode top and red hakama with white ribbons and paper charms, holding a wooden ringed prayer staff (shakujo) with small brass bells and rings at the top, red and white as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no sword, bow, shield, gohei wand, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `shrineMaiden-female.png`
 
 ```
-full body character illustration of a young adult female Shinto shrine maiden, long straight black hair tied low with a white paper ribbon, white kosode top and red hakama with white ribbons and paper charms, holding a wooden ringed prayer staff (shakujo) with small brass bells and rings at the top, red and white as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no sword, bow, shield, gohei wand, text, watermark, scenery
+full body character illustration of a young adult female Shinto shrine maiden, long straight black hair tied low with a white paper ribbon, white kosode top and red hakama with white ribbons and paper charms, holding a wooden ringed prayer staff (shakujo) with small brass bells and rings at the top, red and white as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no sword, bow, shield, gohei wand, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 占星術師（`astrologer`）
@@ -682,13 +685,13 @@ full body character illustration of a young adult female Shinto shrine maiden, l
 男 → 元画像 `astrologer-male.png`
 
 ```
-full body character illustration of a young adult male astrologer star reader, wavy silver hair, midnight blue robe with constellation patterns and a small star circlet, star chart pages on the book, holding an old leather-bound spellbook in one hand, faint glowing runes on its pages, midnight blue as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no staff, telescope, crystal ball, sword, shield, text, watermark, scenery
+full body character illustration of a young adult male astrologer star reader, wavy silver hair, midnight blue robe with constellation patterns and a small star circlet, star chart pages on the book, holding an old leather-bound spellbook in one hand, faint glowing runes on its pages, midnight blue as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, telescope, crystal ball, sword, shield, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `astrologer-female.png`
 
 ```
-full body character illustration of a young adult female astrologer star reader, long wavy navy hair with star hairpins, midnight blue robe with constellation patterns and a small star circlet, star chart pages on the book, holding an old leather-bound spellbook in one hand, faint glowing runes on its pages, midnight blue as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no staff, telescope, crystal ball, sword, shield, text, watermark, scenery
+full body character illustration of a young adult female astrologer star reader, long wavy navy hair with star hairpins, midnight blue robe with constellation patterns and a small star circlet, star chart pages on the book, holding an old leather-bound spellbook in one hand, faint glowing runes on its pages, midnight blue as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no staff, telescope, crystal ball, sword, shield, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 機工士（`machinist`）
@@ -699,13 +702,13 @@ full body character illustration of a young adult female astrologer star reader,
 男 → 元画像 `machinist-male.png`
 
 ```
-full body character illustration of a young adult male clever machinist engineer, messy ginger hair, goggles on the forehead, brown leather work coat with brass gears, utility belts with small tools, holding an antique long flintlock rifle with a dark wooden stock and brass fittings, brass and brown as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no bow, sword, shield, mechanical arm, dual pistols, text, watermark, scenery
+full body character illustration of a young adult male clever machinist engineer, messy ginger hair, goggles on the forehead, brown leather work coat with brass gears, utility belts with small tools, holding an antique long flintlock rifle with a dark wooden stock and brass fittings, brass and brown as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no bow, sword, shield, mechanical arm, dual pistols, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `machinist-female.png`
 
 ```
-full body character illustration of a young adult female clever machinist engineer, short ginger hair in a small ponytail, goggles on the forehead, brown leather work coat with brass gears, utility belts with small tools, holding an antique long flintlock rifle with a dark wooden stock and brass fittings, brass and brown as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no bow, sword, shield, mechanical arm, dual pistols, text, watermark, scenery
+full body character illustration of a young adult female clever machinist engineer, short ginger hair in a small ponytail, goggles on the forehead, brown leather work coat with brass gears, utility belts with small tools, holding an antique long flintlock rifle with a dark wooden stock and brass fittings, brass and brown as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no bow, sword, shield, mechanical arm, dual pistols, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 吟遊詩人（`bard`）
@@ -716,13 +719,13 @@ full body character illustration of a young adult female clever machinist engine
 男 → 元画像 `bard-male.png`
 
 ```
-full body character illustration of a young adult male cheerful traveling bard, wavy chestnut hair, feathered beret, colorful green and gold traveling outfit, short cape, holding a small wooden traveling lute, green and gold as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no dagger in hand, sword, shield, flute, text, watermark, scenery
+full body character illustration of a young adult male cheerful traveling bard, wavy chestnut hair, feathered beret, colorful green and gold traveling outfit, short cape, holding a small wooden traveling lute, green and gold as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no dagger in hand, sword, shield, flute, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `bard-female.png`
 
 ```
-full body character illustration of a young adult female cheerful traveling bard, long wavy chestnut hair, feathered beret, colorful green and gold traveling outfit, short cape, holding a small wooden traveling lute, green and gold as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no dagger in hand, sword, shield, flute, text, watermark, scenery
+full body character illustration of a young adult female cheerful traveling bard, long wavy chestnut hair, feathered beret, colorful green and gold traveling outfit, short cape, holding a small wooden traveling lute, green and gold as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no dagger in hand, sword, shield, flute, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 賭博師（`gambler`）
@@ -733,13 +736,13 @@ full body character illustration of a young adult female cheerful traveling bard
 男 → 元画像 `gambler-male.png`
 
 ```
-full body character illustration of a young adult male confident gambler, slicked-back dark hair, dark red waistcoat over a white shirt with loosened tie, playing cards tucked in the hat band, dice on the belt, holding a single worn short dagger with a slightly chipped blade, dark red and black as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no gun, sword, second dagger, shield, text, watermark, scenery
+full body character illustration of a young adult male confident gambler, slicked-back dark hair, dark red waistcoat over a white shirt with loosened tie, playing cards tucked in the hat band, dice on the belt, holding a single worn short dagger with a slightly chipped blade, dark red and black as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no gun, sword, second dagger, shield, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 女 → 元画像 `gambler-female.png`
 
 ```
-full body character illustration of a young adult female confident gambler, dark wavy hair, dark red waistcoat over a white shirt with loosened tie, playing cards tucked in the hat band, dice on the belt, holding a single worn short dagger with a slightly chipped blade, dark red and black as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --no gun, sword, second dagger, shield, text, watermark, scenery
+full body character illustration of a young adult female confident gambler, dark wavy hair, dark red waistcoat over a white shirt with loosened tie, playing cards tucked in the hat band, dice on the belt, holding a single worn short dagger with a slightly chipped blade, dark red and black as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no gun, sword, second dagger, shield, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 ## お供の指示文（12種×4色＝48本）
@@ -750,7 +753,7 @@ full body character illustration of a young adult female confident gambler, dark
 ノーマル（`normal`）→ 元画像 `pet-cockatiel-normal.png`
 
 ```
-adorable chibi cockatiel parrot with a tall upright head crest and round orange cheek patches, gray body, white wing patches, yellow face and crest, round orange cheek patches, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi cockatiel parrot with a tall upright head crest and round orange cheek patches, dark charcoal gray body, wings and tail, white wing patches, yellow face and crest, round orange cheek patches, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 ルチノー（`lutino`）→ 元画像 `pet-cockatiel-lutino.png`
