@@ -6,6 +6,7 @@ import { unitIdOf } from '../engine/battle/units';
 
 import { create } from 'zustand';
 import { normalizeSettings, type Settings } from './settings';
+import { playSound, setAudioVolumes } from '../audio/player';
 import { battleFrames, explorationNotices, type PopupDraft, type PopupTone, type NoticeDraft, type PresentationFrame } from './presentation';
 export type { Settings } from './settings';
 import { TIMING, VIBRATION } from '../data/balance';
@@ -48,6 +49,10 @@ export interface RollFx {
   results: SlotResult[];
   summary: string;
   perfect: boolean;
+  /** 成功の数（スロットの結果の音を選ぶ。K6） */
+  successes?: number;
+  /** 他の人の操作（音を少し小さく。K6） */
+  quiet?: boolean;
 }
 
 /** 扉が開く演出（入る前のダンジョンの様子と、その場面） */
@@ -237,6 +242,25 @@ export function vibrate(settings: Settings, pattern: number | readonly number[])
   }
 }
 
+const isSoundOnly = (f: PresentationFrame) => !!f.sounds?.length && !f.roll && !f.motions?.length && !f.popups?.length && !f.notices?.length;
+/** コマの音を鳴らす。勝敗のジングルは、他の人の操作でも普通の大きさ（K6） */
+function playFrameSounds(f: PresentationFrame) {
+  for (const id of new Set(f.sounds ?? [])) playSound(id, { quiet: !!f.quiet && !id.startsWith('jgl_') });
+}
+
+/** 他の人の操作か（音を少し小さくする）。敵の行動は誰が送っても普通の大きさ。K6 */
+function remoteActor(wire: GameCommand): boolean {
+  const cmd = unwrapCommand(wire).command;
+  const inner = cmd.type === 'VOTE' ? cmd.command : cmd;
+  if (!inner) return false;
+  if (inner.type === 'BATTLE') {
+    if (inner.command.type === 'ENEMY_STEP') return false;
+    return 'playerId' in inner.command && !isLocalPlayer(inner.command.playerId);
+  }
+  const actor = 'playerId' in inner ? inner.playerId : undefined;
+  return !!actor && !isLocalPlayer(actor);
+}
+
 export function speedFactor(settings: Pick<Settings, 'fastMode'>): number {
   return settings.fastMode ? TIMING.fastModeFactor : 1;
 }
@@ -396,9 +420,10 @@ export const useBattle = create<StoreState>((set, get) => {
   const applyFrame = (frame: PresentationFrame) => {
     if (frame.roll) {
       const e = frame.roll;
-      set({ rollFx: { id: fxId++, results: e.results, summary: e.summary, perfect: e.perfect } });
+      set({ rollFx: { id: fxId++, results: e.results, summary: e.summary, perfect: e.perfect, successes: e.successes, quiet: frame.quiet } });
       if (e.perfect) vibrate(get().settings, VIBRATION.perfect);
     }
+    playFrameSounds(frame);
     if (frame.motions?.length) set(s => ({ unitFx: { ...s.unitFx, ...Object.fromEntries(frame.motions!.map(m => [m.unitId, { kind: m.kind, id: fxId++ }])) } }));
     for (const p of frame.popups ?? []) addPopup(p);
     showNotices(frame.notices ?? []);
@@ -414,14 +439,19 @@ export const useBattle = create<StoreState>((set, get) => {
       else presentationTimer = setTimeout(drainFrames, TIMING.actionLead * 1000 / speedFactor(get().settings));
     }, wait * 1000 / speedFactor(get().settings));
   };
-  const applyEvents = (events: BattleEvent[]) => {
+  /** quiet = 他の人の操作（音を少し小さく） */
+  const applyEvents = (events: BattleEvent[], quiet = false) => {
     if (!events.length) return;
     for (const e of events) {
       if (e.type === 'retarget') set(s => ({ retargets: { ...s.retargets, [e.enemyUid]: fxId++ } }));
       if (e.type === 'phase' && e.phase === 'victory') vibrate(get().settings, VIBRATION.victory);
       if (e.type === 'damage' && e.amount > 0 && findAlly(get().battle, e.unitId)) vibrate(get().settings, VIBRATION.hurt);
     }
-    frames.push(...battleFrames(events));
+    const allyIds = new Set(get().battle.allies.map((a) => a.id));
+    const next = battleFrames(events, allyIds).map((f) => (quiet ? { ...f, quiet } : f));
+    // 音だけのコマ（手番が変わっただけ等）は、待たずにすぐ鳴らす（演出中の扱いにしない）
+    if (!frames.length && !presentationTimer && next.length === 1 && isSoundOnly(next[0])) { playFrameSounds(next[0]); return; }
+    frames.push(...next);
     if (frames.length) { set({ presentationBusy: true }); if (!presentationTimer) drainFrames(); }
   };
 
@@ -454,11 +484,13 @@ export const useBattle = create<StoreState>((set, get) => {
     if (scene !== get().scene) clearPresentation();
     const patch: Partial<StoreState> = { full, scene, game: next };
     let opening: BattleEvent[] = [];
+    let startedBattle = false;
     if (next.battle) {
       patch.battle = next.battle;
       if (next.battle !== prevBattle && (!prevBattle || prevBattle.seed !== next.battle.seed || prevBattle.encounterId !== next.battle.encounterId)) {
         Object.assign(patch, resetBattleUi(next.battle));
         opening = next.battle.openingEvents ?? [];
+        startedBattle = !!before;
       } else if (next.battle.phase === 'ally') {
         patch.activeId = nextActive(next.battle, get().activeId);
       }
@@ -489,7 +521,8 @@ export const useBattle = create<StoreState>((set, get) => {
     set(patch);
     // 見ている場面の出来事だけ演出する
     if (cmdScene === scene) {
-      applyEvents([...opening, ...r.battleEvents]);
+      if (startedBattle) playSound('sfx_battle_start');
+      applyEvents([...opening, ...r.battleEvents], remoteActor(wire));
       if (before) showNotices(explorationNotices(before, full, wire));
     }
     scheduleSave(get);
@@ -814,6 +847,7 @@ export const useBattle = create<StoreState>((set, get) => {
     setSettings: (s) => {
       const settings = normalizeSettings({ ...get().settings, ...s });
       set({ settings });
+      setAudioVolumes(settings);
       try {
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
       } catch {
@@ -851,3 +885,6 @@ if (typeof window !== 'undefined') {
     if (document.visibilityState === 'hidden') flush();
   });
 }
+
+// 保存してある音量を、音の部品に伝える（K6）
+setAudioVolumes(useBattle.getState().settings);
