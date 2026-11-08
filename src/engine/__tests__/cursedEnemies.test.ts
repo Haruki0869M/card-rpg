@@ -32,7 +32,9 @@ describe('呪われた群島の専用の敵', () => {
 
   it('28体とも配置し、仮の共通敵を残さない。組は2〜3体で、弱点が全員同じにならない', () => {
     const placed = new Set(waves().flat());
-    expect([...placed].sort()).toEqual([...ids].sort());
+    // K3 D で足した3体（extra.ts）も、このシナリオの敵として配置される
+    const extra = ['driftwoodSpirit', 'lanternAngler', 'cursedPirateGrunt'];
+    expect([...placed].sort()).toEqual([...ids, ...extra].sort());
     for (const r of map().regions) {
       for (const wave of [...(r.encounters ?? []), ...(r.seaEncounters ?? [])]) {
         expect(wave.length, wave.join(',')).toBeGreaterThanOrEqual(2);

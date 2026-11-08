@@ -15,7 +15,9 @@ const waves = () => [
 
 describe('K4 機械仕掛けの帝国の敵', () => {
   it('専用の敵は通常18・エリート6・ボス4（亜種5）', () => {
-    const own = ENEMIES.all.filter((e) => ENEMIES.scenarioOf(e.id) === 'clockworkEmpire');
+    // K3 D で足した3体（extra.ts）は別に数える
+    const extra = ['smokeStackCrow', 'pressGolem', 'ironClockworkDog'];
+    const own = ENEMIES.all.filter((e) => ENEMIES.scenarioOf(e.id) === 'clockworkEmpire' && !extra.includes(e.id));
     expect([...normal, ...elite, ...bosses].sort()).toEqual(own.map((e) => e.id).sort());
     expect(own.filter((e) => e.variantOf)).toHaveLength(5);
     for (const id of bosses) expect(ENEMIES.get(id).phases?.length, id).toBeGreaterThan(0);
