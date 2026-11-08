@@ -10,6 +10,8 @@ import { hexDistance } from '../engine/game/world/hex';
 import { heroMaxHp } from '../engine/game/hero';
 import { doorOmen } from '../engine/game/dungeonOmen';
 import { restMultiplierOf } from '../engine/game/common';
+import { cardSound, damageSound, statusSound } from '../audio/cues';
+import type { SoundId } from '../audio/ids';
 import type { AbilityNotice, BattleEvent, GameCommand, GameState } from '../types';
 
 export type PopupTone = 'damage' | 'block' | 'status' | 'zero' | 'ability' | 'heal' | 'resource';
@@ -21,24 +23,33 @@ export interface PresentationFrame {
   popups?: PopupDraft[];
   notices?: NoticeDraft[];
   roll?: Extract<BattleEvent, { type: 'roll' }>;
+  /** このコマで鳴らす音（K6。音は状態にも乱数にも触れない） */
+  sounds?: SoundId[];
+  /** 他の人の操作の演出（音を少し小さくする） */
+  quiet?: boolean;
 }
 
-/** 順序の整理だけを行う。エンジンの状態や乱数には触れない。 */
-export function battleFrames(events: BattleEvent[]): PresentationFrame[] {
+/** 順序の整理だけを行う。エンジンの状態や乱数には触れない。allyIds = 味方のID（被弾の音を分ける） */
+export function battleFrames(events: BattleEvent[], allyIds: ReadonlySet<string> = new Set()): PresentationFrame[] {
   const frames: PresentationFrame[] = [], actors = new Set<string>();
+  // カードの効果音（攻撃の種類・魔法の属性など）は、最初に効果が見えるコマで鳴らす
+  let pendingCast: SoundId | undefined;
+  const tailSounds: SoundId[] = [];
   const roll = events.find(e => e.type === 'roll');
   const act = events.find(e => e.type === 'enemyAct');
   if (roll?.type === 'roll') {
     actors.add(roll.characterId);
-    frames.push({ delay: 0, roll, motions: [{ unitId: roll.characterId, kind: getCard(roll.cardId).target === 'self' ? 'cast' : 'attack' }] });
+    const card = getCard(roll.cardId);
+    frames.push({ delay: 0, roll, motions: [{ unitId: roll.characterId, kind: card.target === 'self' ? 'cast' : 'attack' }], sounds: ['sfx_battle_card_play'] });
+    if (roll.successes > 0) pendingCast = cardSound(card);
   } else if (act?.type === 'enemyAct') {
-    actors.add(act.enemyUid); frames.push({ delay: 0, motions: [{ unitId: act.enemyUid, kind: 'attack' }] });
+    actors.add(act.enemyUid); frames.push({ delay: 0, motions: [{ unitId: act.enemyUid, kind: 'attack' }], sounds: ['sfx_enemy_attack_start'] });
   }
   const notices = new Map<string, NoticeDraft>();
   let firstEffect = true;
   const hitCounts = new Map<string, number>();
   for (const e of events) {
-    const popups: PopupDraft[] = [], motions: NonNullable<PresentationFrame['motions']> = [];
+    const popups: PopupDraft[] = [], motions: NonNullable<PresentationFrame['motions']> = [], sounds: SoundId[] = [];
     if (e.type === 'damage') {
       if (e.sourceId && !actors.has(e.sourceId)) {
         actors.add(e.sourceId); frames.push({ delay: 0, motions: [{ unitId: e.sourceId, kind: 'attack' }] }); firstEffect = true;
@@ -61,10 +72,22 @@ export function battleFrames(events: BattleEvent[]): PresentationFrame[] {
       if (e.amount > 0) popups.push({ unitId: e.unitId, tone: 'damage', text: `-${e.amount}` });
       if (e.blocked > 0 || e.amount === 0) popups.push({ unitId: e.unitId, tone: 'zero', text: e.blocked > 0 ? `防御${e.blocked}` : '0' });
       if (e.amount > 0 || e.blocked > 0) motions.push({ unitId: e.unitId, kind: 'hit' });
-    } else if (e.type === 'block' && e.amount > 0) popups.push({ unitId: e.unitId, tone: 'block', text: `ブロック+${e.amount}` });
-    else if (e.type === 'heal' && e.amount > 0) popups.push({ unitId: e.unitId, tone: 'heal', text: `HP+${e.amount}` });
-    else if (e.type === 'status' && e.amount) popups.push({ unitId: e.unitId, tone: 'status', text: `${getStatus(e.status).name}${e.amount > 0 ? '+' : ''}${e.amount}` });
-    else if (e.type === 'resource' && e.amount > 0) popups.push({ unitId: e.unitId, tone: 'resource', text: `${e.resource === 'focus' ? 'フォーカス' : 'マナ'}+${e.amount}` });
+      sounds.push(damageSound(e.amount, e.blocked, allyIds.has(e.unitId)));
+    } else if (e.type === 'block' && e.amount > 0) { popups.push({ unitId: e.unitId, tone: 'block', text: `ブロック+${e.amount}` }); sounds.push('sfx_status_block_gain'); }
+    else if (e.type === 'heal' && e.amount > 0) { popups.push({ unitId: e.unitId, tone: 'heal', text: `HP+${e.amount}` }); sounds.push('sfx_status_heal'); }
+    else if (e.type === 'status' && e.amount) {
+      const def = getStatus(e.status);
+      popups.push({ unitId: e.unitId, tone: 'status', text: `${def.name}${e.amount > 0 ? '+' : ''}${e.amount}` });
+      const snd = statusSound(def, e.amount); if (snd) sounds.push(snd);
+    }
+    else if (e.type === 'resource' && e.amount > 0) { popups.push({ unitId: e.unitId, tone: 'resource', text: `${e.resource === 'focus' ? 'フォーカス' : 'マナ'}+${e.amount}` }); sounds.push(e.resource === 'focus' ? 'sfx_status_focus' : 'sfx_status_mana'); }
+    else if (e.type === 'death') {
+      // 倒れた音は、とどめのコマに重ねる（コマを増やすと演出の間が変わるので）
+      if (!allyIds.has(e.unitId)) { const last = frames[frames.length - 1]; if (last) (last.sounds ??= []).push('sfx_enemy_down'); else tailSounds.push('sfx_enemy_down'); }
+    } else if (e.type === 'phase') {
+      const snd: SoundId | undefined = e.phase === 'victory' ? 'jgl_victory' : e.phase === 'defeat' ? 'jgl_defeat' : e.phase === 'ally' ? 'sfx_turn_start' : e.phase === 'enemy' ? 'sfx_turn_enemy' : undefined;
+      if (snd) tailSounds.push(snd);
+    }
     else if (e.type === 'ability') {
       const parent = [...notices.entries()].find(([, n]) => n.unitId === e.unitId && n.name === e.name && n.source?.kind !== 'summon');
       if (e.source?.kind === 'summon' && parent) continue;
@@ -74,12 +97,22 @@ export function battleFrames(events: BattleEvent[]): PresentationFrame[] {
       else notices.set(key, { unitId: e.unitId, name: e.name, source: e.source });
     } else if (e.type === 'enemyPhase') {
       motions.push({ unitId: e.enemyUid, kind: 'phase' }); popups.push({ unitId: e.enemyUid, tone: 'ability', text: e.name });
+      sounds.push('sfx_boss_phase');
     }
     if (popups.length || motions.length) {
-      frames.push({ delay: firstEffect && actors.size ? TIMING.actionLead : TIMING.effectStep, popups, motions }); firstEffect = false;
+      if (pendingCast) { sounds.unshift(pendingCast); pendingCast = undefined; }
+      const frame: PresentationFrame = { delay: firstEffect && actors.size ? TIMING.actionLead : TIMING.effectStep, popups, motions };
+      if (sounds.length) frame.sounds = [...new Set(sounds)];
+      frames.push(frame); firstEffect = false;
     }
   }
   if (notices.size) frames.push({ delay: 0, notices: [...notices.values()] });
+  // 手番・勝敗の音は最後のコマに重ねる。コマが無ければ音だけのコマを作る
+  if (tailSounds.length) {
+    const last = frames[frames.length - 1];
+    if (last) last.sounds = [...new Set([...(last.sounds ?? []), ...tailSounds])];
+    else frames.push({ delay: 0, sounds: [...new Set(tailSounds)] });
+  }
   return frames;
 }
 

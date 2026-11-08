@@ -126,8 +126,8 @@ describe('探索のお供通知と旧設定', () => {
     expect(explorationNotices(g, skipped.state, skip)).toEqual([]);
   });
   it('旧設定の高速/振動を維持し、カットインだけ標準で補う', () => {
-    expect(normalizeSettings({ fastMode: true, vibration: false })).toEqual({ fastMode: true, vibration: false, cutinMode: 'standard' });
-    expect(normalizeSettings(null)).toEqual({ fastMode: false, vibration: true, cutinMode: 'standard' });
+    expect(normalizeSettings({ fastMode: true, vibration: false })).toEqual({ fastMode: true, vibration: false, cutinMode: 'standard', sfxVolume: 7, bgmVolume: 5 });
+    expect(normalizeSettings(null)).toEqual({ fastMode: false, vibration: true, cutinMode: 'standard', sfxVolume: 7, bgmVolume: 5 });
     expect(normalizeSettings({ cutinMode: 'simple' }).cutinMode).toBe('simple');
     expect(normalizeSettings({ fastMode: 'invalid', vibration: 1, cutinMode: 'invalid' })).toEqual(normalizeSettings(null));
   });
