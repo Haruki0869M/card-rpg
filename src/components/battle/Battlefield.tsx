@@ -146,12 +146,16 @@ const EnemyUnit = memo(function EnemyUnit({
   top,
   slotW,
   spriteH,
+  boxH,
 }: {
   enemy: EnemyState;
   left: number;
   top: number;
   slotW: number;
+  /** 大きさ 1 の敵の絵の高さ（絵の高さ = spriteH × size） */
   spriteH: number;
+  /** 絵の箱の高さ（一番大きい敵が収まる高さ。絵は箱の下の端に立つ） */
+  boxH: number;
 }) {
   const def = getEnemy(enemy.defId);
   const tapEnemy = useBattle((s) => s.tapEnemy);
@@ -183,7 +187,7 @@ const EnemyUnit = memo(function EnemyUnit({
       data-dead={enemy.dead || undefined}
       data-hp={enemy.hp}
     >
-      <div className="relative flex w-full justify-center" style={{ height: spriteH }}>
+      <div className="relative flex w-full justify-center" style={{ height: boxH }}>
         {(isTarget || waiting) && (
           <div
             className={`absolute bottom-0 left-1/2 h-[18px] -translate-x-1/2 rounded-[50%] border-2 ${
@@ -213,7 +217,7 @@ const EnemyUnit = memo(function EnemyUnit({
       </div>
       {!enemy.dead && (
         // 予告は味方の立ち絵より手前に出す（画面が低くて重なっても、狙いと数字を読めるように）
-        <div className="relative z-[6] mt-0.5 flex flex-col items-center gap-0.5" style={{ width: barW }}>
+        <div className="relative z-[6] mt-0.5 flex flex-col items-center gap-0.5" style={{ width: barW }} data-enemy-info>
           <div className="text-outline w-full truncate text-center text-[12px] leading-[14px] font-bold text-zinc-100">
             <span className="text-amber-300">Lv{enemy.level}</span> {enemyName(enemy)}
           </div>
@@ -285,7 +289,7 @@ const AllySprite = memo(function AllySprite({ ally, left, bottom, h, active, fie
   });
   const press = usePress(() => setActive(ally.id), { type: 'ally', id: ally.id });
   return (
-    <div {...press} className="absolute" style={{ left: left - h * 0.4, bottom, width: h * 0.8, height: h }}>
+    <div {...press} className="absolute" style={{ left: left - h * 0.4, bottom, width: h * 0.8, height: h }} data-ally-sprite>
       {/* 足もとの影と陣形の円（敵と向き合う奥行き） */}
       <div className="pointer-events-none absolute -bottom-[6px] left-1/2 h-[22px] w-[105%] -translate-x-1/2 rounded-[50%]" style={{ background: 'radial-gradient(closest-side, rgba(0,0,0,.75), rgba(0,0,0,.35) 60%, transparent)' }} />
       <div className="pointer-events-none absolute -bottom-[4px] left-1/2 h-[16px] w-[88%] -translate-x-1/2 rounded-[50%] border border-sky-200/25" style={{ boxShadow: 'inset 0 0 8px rgba(140,190,255,.25)' }} />
@@ -362,6 +366,11 @@ export function Battlefield() {
   const enemyInfoH = 14 + 14 + 16 + 26 + 16 + (foresee ? 18 : 0) + 18 + 10 + (nE >= 3 ? 10 : 0);
   // 敵の列の下端と味方の頭の間に少し余白を残す（予告の枠が立ち絵の頭に重ならないように）
   const enemySpriteH = Math.max(40, Math.min(H * 0.56 - enemyInfoH, enemySlotW * 1.15));
+  // 大きな敵（size > 1）は、絵の箱より上へはみ出して描かれ、戦場の上の端（上の帯）で体が切れていた。
+  // 一番大きい敵がちょうど箱に収まるように、大きさ 1 の高さを size で割る（敵どうしの大きさの比は変わらない。
+  // 倒れた敵も数えて、途中で並びが動かないようにする）。箱の高さ（＝名前・予告の位置）は今までどおり
+  const maxSize = Math.max(1, ...enemies.map((e) => getEnemy(e.defId).size ?? 1));
+  const enemyUnitH = enemySpriteH / maxSize;
   const nA = allies.length;
   const allyAreaW = nA <= 2 ? W * 0.62 : W;
   // 味方の立ち絵は、敵の列（予告まで）の下に収まる高さにする。画面が低い時でも元の6割より小さくしない
@@ -384,7 +393,8 @@ export function Battlefield() {
               left={enemySlotW * (i + 0.5)}
               top={enemyTop + (nE >= 3 && i % 2 === 1 ? 10 : 0)}
               slotW={enemySlotW}
-              spriteH={enemySpriteH}
+              spriteH={enemyUnitH}
+              boxH={enemySpriteH}
             />
           ))}
           {allies.map((a, i) => (
