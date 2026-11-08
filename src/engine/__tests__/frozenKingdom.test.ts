@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { corruptionName, getScenario } from '../../data/scenarios';
 import { TERMS } from '../../data/terms';
 import { DUNGEONS } from '../../data/dungeons';
+import { EVENTS } from '../../data/events';
 import { ITEMS } from '../../data/items';
 import { createRng } from '../rng';
 import { QUESTS, TOWNS } from '../../data/world';
@@ -43,6 +44,13 @@ describe('凍てつく王国', () => {
     expect(climateAt(g, start)).toBeUndefined();
     const north = w.tiles.findIndex((t, i) => !t.f && Math.floor(i / w.width) <= 20 && Math.floor(i / w.width) >= 16);
     expect(climateAt(g, north)?.kind).toBe('cold');
+  });
+
+  it('凍てつく王国だけの突発イベント5つは、ほかのシナリオには出ない', () => {
+    const own = EVENTS.forScenario('frozenKingdom').filter((e) => e.where === 'random' && EVENTS.scenarioOf(e.id) === 'frozenKingdom');
+    expect(own.map((e) => e.id).sort()).toEqual(['frozenBlizzard', 'frozenIceTreasure', 'frozenPetShiver', 'frozenTraveler', 'frozenWolfPup']);
+    const other = EVENTS.forScenario('corruptionKing').map((e) => e.id);
+    for (const e of own) expect(other).not.toContain(e.id);
   });
 
   it('固有装備13個は、凍てつく王国の宝箱にだけ出る', () => {

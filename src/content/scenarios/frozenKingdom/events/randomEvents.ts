@@ -1,0 +1,118 @@
+// 凍てつく王国だけの突発イベント（世界マップの何もないマスに移動し終えた時に起きる。K7 の terrain / needsPet を使う）
+// 悪いイベントでも、判定で突破する / 道具やお金で解決する / やり過ごす のどれかを選べる（設計 v2.1 §5-1）
+// ID はシナリオをまたいで重ならないよう、頭に frozen を付ける
+import type { EventDef } from '../../../../types';
+
+export const frozenRandomEvents: EventDef[] = [
+  {
+    id: 'frozenBlizzard',
+    where: 'random',
+    tone: 'bad',
+    weight: 9,
+    terrain: ['snow', 'ice'],
+    title: '突然の吹雪',
+    icon: 'mountain',
+    text: '空が急に暗くなり、横殴りの雪が吹きつけてきた。一寸先も見えない。',
+    options: [
+      {
+        label: '身を寄せ合って吹雪をやり過ごす',
+        check: { stat: 'vit', slots: 3, need: 2 },
+        success: [{ kind: 'exp', amount: 15 }],
+        fail: [{ kind: 'damage', amount: 6, all: true }],
+        successText: '寒さに耐え抜いた。吹雪が去った頃には、少し強くなった気がする。（全員 経験値+15）',
+        failText: '吹雪に体力を奪われた…。（全員 6ダメージ）',
+      },
+      { label: '回復薬を飲んで先を急ぐ', costItem: 'potion', success: [{ kind: 'heal', amount: 15, all: true }], successText: '温かい薬が体に染みわたった。（全員 HP+15）' },
+      { label: '風の弱い所を探して休む', success: [{ kind: 'nothing' }], successText: '岩陰で吹雪が過ぎるのを待った。' },
+    ],
+  },
+  {
+    id: 'frozenTraveler',
+    where: 'random',
+    tone: 'good',
+    weight: 8,
+    title: '凍える旅人',
+    icon: 'mask',
+    text: '雪の中にうずくまる旅人がいる。唇は紫色で、息も絶え絶えだ。「…さ、寒い…」',
+    options: [
+      {
+        label: '毛布をかけて介抱する',
+        check: { stat: 'vit', slots: 2, need: 1 },
+        success: [{ kind: 'gold', amount: 50 }, { kind: 'gainFocus', amount: 1, all: true }],
+        fail: [{ kind: 'nothing' }],
+        successText: '旅人は息を吹き返し、お礼に金貨を渡してくれた。（50G・全員フォーカス+1）',
+        failText: '旅人は震えながら、礼を言って去っていった。',
+      },
+      { label: '回復薬を飲ませる', costItem: 'potion', success: [{ kind: 'gold', amount: 80 }, { kind: 'exp', amount: 20 }], successText: '旅人は涙を流して感謝した。（80G・全員 経験値+20）' },
+      { label: '先を急ぐ', success: [{ kind: 'nothing' }], successText: '旅人に背を向けて歩き出した。胸が少し痛んだ。' },
+    ],
+  },
+  {
+    id: 'frozenIceTreasure',
+    where: 'random',
+    tone: 'good',
+    weight: 8,
+    terrain: ['ice'],
+    title: '氷の下の輝き',
+    icon: 'sparkles',
+    text: '足元の透き通った氷の下で、何かがきらりと光った。',
+    options: [
+      {
+        label: '氷を割って取り出す',
+        check: { stat: 'str', slots: 3, need: 2, tag: 'obstacle' },
+        success: [{ kind: 'item', rarity: 'rare', slot: 'accessory' }],
+        fail: [{ kind: 'damage', amount: 5 }],
+        successText: '氷の下から、古い装飾品が現れた！',
+        failText: '氷が割れて、足を冷たい水に取られた…。',
+      },
+      {
+        label: '光の位置をよく見定めて、小さく割る',
+        check: { stat: 'per', slots: 3, need: 2 },
+        success: [{ kind: 'gold', amount: 60 }],
+        fail: [{ kind: 'nothing' }],
+        successText: '氷の下から、金貨の袋が出てきた！（60G）',
+        failText: '光はただの氷の反射だった。',
+      },
+      { label: '放っておく', success: [{ kind: 'nothing' }], successText: '氷には触れずに進んだ。' },
+    ],
+  },
+  {
+    id: 'frozenWolfPup',
+    where: 'random',
+    tone: 'pet',
+    weight: 8,
+    terrain: ['snow'],
+    title: '雪の中の子狼',
+    icon: 'paw',
+    text: '雪の吹きだまりから、白い子狼が顔を出した。親とはぐれたのか、小さく鳴いている。',
+    options: [
+      {
+        label: 'そっと近づいて抱き上げる',
+        check: { stat: 'dex', slots: 3, need: 2 },
+        success: [{ kind: 'pet', species: ['wolfPup'] }],
+        fail: [{ kind: 'nothing' }],
+        successText: '子狼は震えながら、胸に顔をうずめてきた。',
+        failText: '子狼は雪の中へ逃げてしまった。',
+      },
+      { label: '干し肉を分けてあげる', cost: 20, success: [{ kind: 'loseGold', amount: 20 }, { kind: 'pet', species: ['wolfPup'] }], successText: '子狼は夢中で食べて、足元に寄り添った。（20G）' },
+      { label: 'そっと見守る', success: [{ kind: 'nothing' }], successText: '子狼は、やがて遠くの遠吠えに向かって走っていった。' },
+      { label: 'お供のおやつを差し出す', costItem: 'petSnack', success: [{ kind: 'pet', species: ['wolfPup'] }], successText: '子狼はおやつをくわえて、うれしそうについてきた！' },
+    ],
+  },
+  {
+    id: 'frozenPetShiver',
+    where: 'random',
+    tone: 'pet',
+    weight: 8,
+    needsPet: true,
+    terrain: ['snow', 'ice'],
+    title: 'お供が震えている',
+    icon: 'paw',
+    text: 'お供が寒そうに身を縮めて、足を止めた。ふるふると小さく震えている。',
+    options: [
+      { label: '懐に入れてあたためる', success: [{ kind: 'petLove', amount: 12 }], successText: 'お供はぬくぬくと目を細めた。（懐き度+12）' },
+      { label: '毛布を巻いてあげる（20G）', cost: 20, success: [{ kind: 'loseGold', amount: 20 }, { kind: 'petLove', amount: 8, all: true }], successText: 'お供は毛布にくるまって、すっかり元気になった。（懐き度+8）' },
+      { label: '急いで先へ進む', success: [{ kind: 'nothing' }], successText: 'お供は小走りでついてきた。' },
+    ],
+  },
+];
