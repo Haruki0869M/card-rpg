@@ -446,6 +446,29 @@ def build_dungeon():
         else:
             im = im.resize((DUNGEON_FACE, DUNGEON_FACE), Image.LANCZOS)
         save(im, f'{name}.webp', 78)
+    write_dungeon_tone()
+
+def write_dungeon_tone():
+    """置いてある通路の絵の明るさ（0〜255 の平均）を src/art/dungeonTone.ts に書く。
+    暗い絵のダンジョンで、扉の縁を明るくして見つけやすくするのに使う（DungeonView）"""
+    import glob, re
+    from PIL import ImageStat
+    tone = {}
+    for f in sorted(glob.glob(os.path.join(OUT, 'dungeon', '*.webp'))):
+        m = re.match(r'(.+)-(wall|floor|ceiling|door)\.webp$', os.path.basename(f))
+        if not m: continue
+        v = round(ImageStat.Stat(Image.open(f).convert('L')).mean[0])
+        tone.setdefault(m.group(1), {})[m.group(2)] = v
+    lines = ['// 自動で作るファイル（scripts/art/build_art.py の write_dungeon_tone）。手で直さない。',
+             '// 通路の絵の明るさ（0〜255 の平均）。暗い絵のダンジョンで扉の縁を明るくするのに使う。',
+             'export const DUNGEON_TONE: Record<string, { wall?: number; floor?: number; ceiling?: number; door?: number }> = {']
+    for bg, v in tone.items():
+        lines.append(f'  {bg}: {{ ' + ', '.join(f'{k}: {v[k]}' for k in ('wall', 'floor', 'ceiling', 'door') if k in v) + ' },')
+    lines.append('};')
+    p = os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'art', 'dungeonTone.ts')
+    with open(p, 'w', encoding='utf-8', newline='\n') as fp:
+        fp.write('\n'.join(lines) + '\n')
+    print('src/art/dungeonTone.ts', tone)
 
 # ---------------- 画面の枠（UIの部品集 6 から切り出す） ----------------
 def key_out(im, bg=(60, 52, 55), tol=26):
