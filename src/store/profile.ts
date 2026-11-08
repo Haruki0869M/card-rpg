@@ -181,6 +181,8 @@ export const uchinokoUid = (game: Pick<GameState, 'seed'>, h: Hero) =>
   h.pet!.myPetUid ?? `${game.seed}-${h.id}-${h.pet!.petId}-${h.pet!.color}-${h.pet!.name}`;
 
 /** クリアしたシナリオの ID（シナリオの解放に使う） */
+/** お供を迎える画面の「NEW!」: この種類・毛色の子を、まだ一度も迎えたことがない（伝承の書の got に「種類:色」が無い） */
+export const isNewPetCoat = (p: Pick<Profile, 'pets'>, petId: string, color: string): boolean => !p.pets.got.includes(`${petId}:${color}`);
 export const clearedScenarioIds = (p: Pick<Profile, 'clears'>): string[] => Object.keys(p.clears).filter((id) => p.clears[id] > 0);
 
 /** 冒険の状態から見つけた物（1回分） */

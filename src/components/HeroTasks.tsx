@@ -2,7 +2,7 @@
 // イベントの窓・戦闘・報酬が閉じてから出す（どの場面にいても、この端末のキャラなら出す）
 import { motion } from 'framer-motion';
 import { Coins, Heart, X } from 'lucide-react';
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { cardOf, getCard } from '../data/cards';
 import { getItem } from '../data/items';
 import { getPet } from '../data/pets';
@@ -13,7 +13,9 @@ import { useBattle } from '../store/battleStore';
 import type { GameCommand, Hero } from '../types';
 import { CardBody } from './ui/CardBody';
 import { HeroFace, ItemIcon, itemSummary, RARITY_STYLE } from './ui/game';
-import { PetToken } from './ui/PetToken';
+import { PetReveal } from './ui/PetReveal';
+import { useProfile } from '../store/profileStore';
+import { isNewPetCoat } from '../store/profile';
 
 const CALM = new Set(['world', 'dungeon', 'rest', 'town', 'hub', 'shrine']);
 
@@ -21,7 +23,7 @@ const TASK_TEXT = { upgrade: '強化するカードを1枚選んでください'
 
 function Frame({ title, hero, children }: { title: string; hero: Hero; children: React.ReactNode }) {
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 z-[70] flex flex-col bg-[#0b0910]/[.97] px-3 pt-4 pb-3" data-hero-task>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 z-[70] flex flex-col bg-[#0b0910] px-3 pt-4 pb-3" data-hero-task>
       <div className="flex items-center justify-center gap-2">
         <HeroFace hero={hero} size={30} />
         <div className="font-display text-outline text-[22px] text-amber-100">{title}</div>
@@ -33,13 +35,33 @@ function Frame({ title, hero, children }: { title: string; hero: Hero; children:
 
 function AdoptPet({ hero, send }: { hero: Hero; send: (c: GameCommand) => void }) {
   const offer = hero.petOffer!;
+  const colorOf = (id: string) => hero.petOfferColors?.[id] ?? getPet(id).colors[0].id;
   const [petId, setPetId] = useState(offer[0]);
   const def = getPet(petId);
-  const color = hero.petOfferColors?.[petId] ?? def.colors[0].id;
+  const color = colorOf(petId);
   const coat = def.colors.find(c => c.id === color)!;
   const [name, setName] = useState('');
+  // NEW! は画面を開いた時の伝承の書の記録で決める（開いた後に「出会った」が記録されても消えない）
+  const [fresh] = useState(() => {
+    const prof = useProfile.getState().profile;
+    return Object.fromEntries(offer.map((id) => [id, isNewPetCoat(prof, id, colorOf(id))]));
+  });
+  // 演出が終わった子（選び直した時は短い版で出し直す）
+  const [shownOnce, setShownOnce] = useState<string[]>([]);
+  const [revealed, setRevealed] = useState(false);
+  const [more, setMore] = useState(false);
+  // 説明は2行まで。収まらない時だけ「くわしく」を出す
+  const descRef = useRef<HTMLSpanElement>(null);
+  const [clamped, setClamped] = useState(false);
+  useLayoutEffect(() => {
+    const e = descRef.current;
+    if (e && !more) setClamped(e.scrollHeight > e.clientHeight + 1);
+  }, [petId, more]);
   const pick = (id: string) => {
+    if (id === petId) return;
     setPetId(id);
+    setRevealed(false);
+    setMore(false);
   };
   const master = isPetMaster(hero);
   return (
@@ -48,37 +70,56 @@ function AdoptPet({ hero, send }: { hero: Hero; send: (c: GameCommand) => void }
       {offer.length > 1 && (
         <div className="mt-2 flex justify-center gap-2">
           {offer.map((id) => (
-            <button key={id} onClick={() => pick(id)} className={`btn flex h-16 w-24 flex-col items-center justify-center rounded-xl border-2 ${id === petId ? 'border-amber-300 bg-amber-500/15' : 'border-white/15 bg-black/40'}`}>
-              <span className="text-[28px] leading-8">{getPet(id).icon}</span>
+            <button key={id} data-pet-pick={id} onClick={() => pick(id)} className={`btn flex h-14 w-24 flex-col items-center justify-center rounded-xl border-2 ${id === petId ? 'border-amber-300 bg-amber-500/15' : 'border-white/15 bg-black/40'}`}>
+              <span className="text-[24px] leading-7">{getPet(id).icon}</span>
               <span className="text-[12px] font-bold">{getPet(id).name}</span>
             </button>
           ))}
         </div>
       )}
-      <div className="mt-3 flex flex-col items-center">
-        <div key={petId} className={coat.rarity === 'rare' ? 'pet-rare-reveal rounded-full p-2' : 'p-2'}><PetToken pet={{ petId, color, name, love: 0 }} size={84} /></div>
-        <div className="font-display mt-1 text-[20px] text-amber-100">
+      <div className="mt-1 flex min-h-0 flex-col items-center">
+        <PetReveal
+          key={petId}
+          petId={petId}
+          color={color}
+          name={name || def.name}
+          rare={coat.rarity === 'rare'}
+          isNew={fresh[petId]}
+          short={shownOnce.length > 0}
+          size={152}
+          onRevealed={() => { setRevealed(true); setShownOnce((l) => (l.includes(petId) ? l : [...l, petId])); }}
+        />
+        <div className="font-display text-[20px] leading-6 text-amber-100">
           {def.name}
           {def.rare && <span className="ml-1 rounded-full bg-violet-600/70 px-1.5 align-middle text-[12px]">めったに会えない</span>}
         </div>
-        <div className="mt-0.5 px-2 text-center text-[13px] leading-5 text-zinc-200">{def.description}</div>
+        <button type="button" disabled={!clamped && !more} onClick={() => setMore((v) => !v)} className="mt-0.5 px-2 text-center text-[13px] leading-5 text-zinc-200" aria-expanded={more}>
+          <span ref={descRef} className={more ? 'block' : 'line-clamp-2'}>{def.description}</span>
+          {(clamped || more) && <span className="text-[12px] text-amber-200/80">{more ? '▲ とじる' : '▼ くわしく'}</span>}
+        </button>
         <div className="mt-1 rounded-lg bg-black/40 px-2 py-1 text-[12px] leading-4 text-zinc-300">
           {(master ? def.masterAbilities : def.abilities).map((a) => a.name).join('・')}
           {master && <span className="ml-1 text-amber-300">（獣使い: 効果2倍）</span>}
         </div>
       </div>
-      <div className="mt-3 rounded-xl border border-amber-200/25 bg-black/30 p-2 text-center text-[15px]" data-pet-coat={color}>
-        <span className="mr-2 inline-block h-4 w-4 rounded-full align-middle" style={{ background: coat.color }} />{coat.name}
-        {coat.rarity === 'rare' && <div className="mt-1 font-bold text-amber-200" data-rare-coat>✨珍しい毛色！</div>}
-        <div className="mt-1 text-[12px] text-zinc-300">出会った時の毛色です</div>
+      <div className="mt-2 rounded-xl border border-amber-200/25 bg-black/30 p-1.5 text-center text-[15px]" data-pet-coat={color} data-pet-revealed={revealed ? '' : undefined}>
+        {revealed ? (
+          <>
+            毛色：<span className="mx-1 inline-block h-4 w-4 rounded-full align-middle" style={{ background: coat.color }} />{coat.name}
+            {coat.rarity === 'rare' ? <span className="ml-1 font-bold text-amber-200" data-rare-coat>（✨珍しい毛色！）</span> : <span className="ml-1 text-[13px] text-zinc-300">（通常の色）</span>}
+          </>
+        ) : (
+          <span className="text-zinc-400">毛色：？？？</span>
+        )}
       </div>
-      <div className="mt-3 text-[13px] font-bold text-zinc-300">名前</div>
+      <div className="mt-2 text-[13px] font-bold text-zinc-300">名前</div>
       <input
         value={name}
         maxLength={BALANCE.petNameMax}
+        disabled={!revealed}
         onChange={(e) => setName(e.target.value)}
         placeholder={`例: ${def.names[0]}`}
-        className="mt-1 h-11 w-full rounded-lg border border-white/20 bg-black/50 px-3 text-[16px] text-amber-50 outline-none focus:border-amber-300"
+        className="mt-1 h-11 w-full rounded-lg border border-white/20 bg-black/50 px-3 text-[16px] text-amber-50 outline-none focus:border-amber-300 disabled:opacity-50"
         aria-label="お供の名前"
       />
       {hero.pet && <div className="mt-2 rounded-lg bg-red-950/60 px-2 py-1.5 text-[13px] text-red-100">今の「{hero.pet.name}」とはお別れになります（お供は1匹まで）</div>}
@@ -86,7 +127,7 @@ function AdoptPet({ hero, send }: { hero: Hero; send: (c: GameCommand) => void }
         <button onClick={() => send({ type: 'ADOPT_PET', playerId: hero.playerId, heroId: hero.id })} className="btn btn-dark h-12 rounded-xl text-[15px] font-bold">
           見送る
         </button>
-        <button onClick={() => send({ type: 'ADOPT_PET', playerId: hero.playerId, heroId: hero.id, petId, color, name: name.trim() || def.names[0] })} className="btn btn-gold font-display flex h-12 items-center justify-center gap-1.5 rounded-xl text-[18px]">
+        <button disabled={!revealed} onClick={() => send({ type: 'ADOPT_PET', playerId: hero.playerId, heroId: hero.id, petId, color, name: name.trim() || def.names[0] })} className="btn btn-gold font-display flex h-12 items-center justify-center gap-1.5 rounded-xl text-[18px] disabled:opacity-50">
           <Heart size={18} className="fill-current" /> お供にする
         </button>
       </div>

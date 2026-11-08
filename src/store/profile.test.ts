@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createGame, stateHash } from '../engine';
 import { isScenarioUnlocked } from '../data/scenarios';
 import type { GameState, PlayerId } from '../types';
-import { canBeMyPet, clearedScenarioIds, collectSightings, emptyProfile, mergeSightings, normalizeProfile, setMyPet, uchinokoTotals } from './profile';
+import { canBeMyPet, clearedScenarioIds, collectSightings, emptyProfile, isNewPetCoat, mergeSightings, normalizeProfile, setMyPet, uchinokoTotals } from './profile';
 
 const game = (): GameState =>
   createGame({
@@ -142,5 +142,18 @@ describe('伝承の書の記録（K5）', () => {
     expect(p.uchinoko).toHaveLength(1);
     expect(p.myPets).toEqual(['a']);
     expect(canBeMyPet(p.uchinoko[0])).toBe(true);
+  });
+});
+
+describe('お供を迎える画面の NEW!（フェーズ3）', () => {
+  it('迎えたことのない種類・毛色だけ NEW。出会っただけ（seen）なら NEW のまま', () => {
+    const p = emptyProfile();
+    expect(isNewPetCoat(p, 'cockatiel', 'lutino')).toBe(true);
+    p.pets.seen.push('cockatiel:lutino');
+    expect(isNewPetCoat(p, 'cockatiel', 'lutino')).toBe(true);
+    p.pets.got.push('cockatiel:lutino');
+    expect(isNewPetCoat(p, 'cockatiel', 'lutino')).toBe(false);
+    expect(isNewPetCoat(p, 'cockatiel', 'pearl')).toBe(true);
+    expect(isNewPetCoat(p, 'rabbit', 'lutino')).toBe(true);
   });
 });
