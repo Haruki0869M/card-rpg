@@ -1,0 +1,14 @@
+import { open, loadSave } from './common.mjs';
+const { browser, page, shot, text, issues, errors } = await open();
+await loadSave(page, 'scripts/playtest/shots/save-pet.json', (g) => { const w = g.world; for (const id of Object.keys(w.pos)) w.pos[id] = 211; w.move = undefined; w.moveRoll = undefined; g.heroes[0].classId = 'swordmaster'; g.heroes[0].level = 3; g.heroes[0].exp = 0; g.heroes.forEach(h => h.gold = 300); });
+await page.getByText('王都クリスタリアに入る').click(); await page.waitForTimeout(1500);
+await page.mouse.move(195, 600); await page.mouse.wheel(0, 900); await page.waitForTimeout(400);
+await shot('06h-cards-scrolled');
+await page.mouse.wheel(0, -900);
+await page.getByText('聖堂（転職）').click(); await page.waitForTimeout(800);
+await shot('06i-temple-master');
+console.log(await text());
+await page.mouse.move(195, 600); await page.mouse.wheel(0, 700); await page.waitForTimeout(400);
+await shot('06j-temple-master2');
+await browser.close();
+console.log('errors', errors);

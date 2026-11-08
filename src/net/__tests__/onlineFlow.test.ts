@@ -3,7 +3,7 @@
 // 操作は「その操作の担当の端末」からだけ送る（ホストが代わりに送る逃げ道なし）。担当のない操作は端末を順番に替えて送る。
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { botNextCommand } from '../../engine/bot';
-import { commandPlayer, stateHash } from '../../engine';
+import { commandPlayer, reachable, stateHash } from '../../engine';
 import type { GameCommand } from '../../types';
 import { MemoryHub } from '../memoryBackend';
 import { Room } from '../room';
@@ -82,5 +82,53 @@ describe('オンライン協力の通し確認（担当の端末だけが送る�
       // P2 以降の端末も操作を送っている
       for (const r of rooms.slice(1)) expect(sentBy.get(r.seat!) ?? 0).toBeGreaterThan(0);
     }, 120_000);
+  }
+});
+
+// 同行の移動の提案への返事（レビュー資料 2026-11-09）: 画面は返事に同行キャラの heroId を付けて送る。
+// オンラインでも、その担当の端末から送った返事で全員が動き、全端末の状態がそろう。
+describe('オンライン: P2 の番に担当の違う仲間を連れて動く', () => {
+  for (const people of [2, 3, 4]) {
+    it(`${people}台: 誘う → 承知 → 移動の提案 → 各担当の端末の「一緒に行く」で全員が動く`, async () => {
+      const rooms = await playing(people, 20261109 + people);
+      const host = rooms[0];
+      const by = (p: string) => rooms.find((r) => r.myPlayers().includes(p as never))!;
+      // 物語を閉じて、全員を同じマスに・P2（h1）の番にする
+      const next = structuredClone(host.game!);
+      const w = next.world!;
+      w.story = undefined;
+      const start = w.pos.h0;
+      for (const h of next.heroes) w.pos[h.id] = start;
+      w.turn = 'h1';
+      w.acted = ['h0'];
+      for (const r of rooms) Object.assign(r.game!, structuredClone(next));
+      await host.backend.set(`rooms/${host.code}/snapshot`, { seq: host.seq, game: JSON.stringify(next), hash: stateHash(next) });
+      await settle();
+      const others = next.heroes.filter((h) => h.id !== 'h1');
+      const p2 = by('P2');
+      for (const c of others) {
+        await p2.send({ type: 'WORLD_INVITE', playerId: 'P2', heroId: 'h1', targetId: c.id });
+        await settle();
+        await by(c.playerId).send({ type: 'WORLD_INVITE_ANSWER', playerId: c.playerId, heroId: c.id, accept: true });
+        await settle();
+      }
+      await p2.send({ type: 'WORLD_ROLL_MOVE', playerId: 'P2', heroId: 'h1', focusUsed: 4 });
+      await settle();
+      const g = host.game!;
+      const to = [...reachable(g.world!, start, g.world!.move ?? 0).keys()].find((t) => t !== start)!;
+      await p2.send({ type: 'WORLD_MOVE', playerId: 'P2', heroId: 'h1', to, companions: others.map((h) => h.id) });
+      await settle();
+      expect(host.game!.world!.moveProposal?.owners.length).toBe(others.length);
+      for (const c of others) {
+        await by(c.playerId).send({ type: 'WORLD_MOVE_AGREE', playerId: c.playerId, heroId: c.id, accept: true });
+        await settle();
+      }
+      const end = host.game!.world!;
+      expect(end.moveProposal).toBeUndefined();
+      expect(end.pos.h1).toBe(to);
+      for (const h of host.game!.heroes) expect(end.pos[h.id]).toBe(to);
+      const hs = rooms.map((r) => `${r.seq}:${stateHash(r.game)}`);
+      expect(hs.every((h) => h === hs[0])).toBe(true);
+    }, 60_000);
   }
 });

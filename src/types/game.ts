@@ -577,7 +577,11 @@ export type GameCommand =
   /** 移動（同行するキャラも一緒に動く。同行したキャラはこのワールドターンの行動を終える） */
   | { type: 'WORLD_MOVE'; playerId: PlayerId; heroId: string; to: number; companions: string[] }
   /** 他の人のキャラと一緒に動く時: 移動先の提案に同意する / 断る（断ると同行をやめる。M3-D 指摘1） */
-  | { type: 'WORLD_MOVE_AGREE'; playerId: PlayerId; accept: boolean }
+  | {
+      type: 'WORLD_MOVE_AGREE'; playerId: PlayerId; accept: boolean;
+      /** 返事をする担当の、同行しているキャラ（画面から送る時の担当者を決めるだけ。エンジンは playerId で判定する） */
+      heroId?: string;
+    }
   | { type: 'WORLD_WAIT'; playerId: PlayerId; heroId: string }
   /** 倒れている仲間を助け起こす（同じマスで。手番を使う。M3-C5） */
   | { type: 'WORLD_REVIVE'; playerId: PlayerId; heroId: string; targetId: string }

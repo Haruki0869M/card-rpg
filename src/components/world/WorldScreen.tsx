@@ -123,16 +123,21 @@ function MoveProposal({ game }: { game: GameState }) {
           </span>
         ))}
       </div>
-      {mineToAnswer.map((p) => (
+      {mineToAnswer.map((p) => {
+        // 1台を回して遊ぶ時も、今の手番の人ではなく、その同行キャラの担当として返事を送る（store の actorOf が heroId から決める）
+        const heroId = pr.companions.find((id) => game.heroes.find((h) => h.id === id)?.playerId === p);
+        const answer = (accept: boolean) => dispatchGame({ type: 'WORLD_MOVE_AGREE', playerId: p as PlayerId, heroId, accept });
+        return (
         <div key={p} className="mt-1.5 grid grid-cols-2 gap-1.5">
-          <button onClick={() => dispatchGame({ type: 'WORLD_MOVE_AGREE', playerId: p as PlayerId, accept: false })} className="btn btn-dark h-11 rounded-lg text-[13px] font-bold">
+          <button onClick={() => answer(false)} className="btn btn-dark h-11 rounded-lg text-[13px] font-bold">
             {p}: 同行をやめる
           </button>
-          <button onClick={() => dispatchGame({ type: 'WORLD_MOVE_AGREE', playerId: p as PlayerId, accept: true })} className="btn btn-gold h-11 rounded-lg text-[14px] font-bold">
+          <button onClick={() => answer(true)} className="btn btn-gold h-11 rounded-lg text-[14px] font-bold">
             {p}: 一緒に行く
           </button>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
