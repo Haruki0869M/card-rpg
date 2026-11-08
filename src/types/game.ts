@@ -213,10 +213,17 @@ export interface DungeonRun {
   currentRoomId?: string;
   /** このダンジョンで手に入れたもの（撤退時に1つ失う候補） */
   gained: ItemInstance[];
-  /** 探索力（この手番で入れる部屋の残り。判定前は null。世界マップのあるシナリオだけ。M3-D） */
+  /** 残りの歩数（この手番で歩ける数。判定前は null。世界マップのあるシナリオだけ。M3-D → 第3段階で「部屋の数」から「歩数」に） */
   explore?: number | null;
   exploreRoll?: ('focus' | 'hit' | 'miss')[];
+  /** 通路の地図の上の位置と向き（地図は部屋のつながりから毎回作る。engine/game/dungeonMap.ts） */
+  pos?: { x: number; y: number; facing: Facing };
+  /** 見たマス（"x,y"。オートマッピング） */
+  seen?: string[];
 }
+
+/** 向き（0=北・奥 / 1=東 / 2=南 / 3=西） */
+export type Facing = 0 | 1 | 2 | 3;
 
 // ---------- 宝箱・イベント・報酬 ----------
 
@@ -572,6 +579,12 @@ export type GameCommand =
   /** ダンジョンのパーティの手番: 探索力の判定（素早さ）/ 手番を終える */
   | { type: 'EXPLORE_ROLL'; playerId: PlayerId; heroId: string; focusUsed: number }
   | { type: 'EXPLORE_END'; playerId: PlayerId }
+  /** ダンジョンの通路を1歩進む（左・右・後ろは、その向きを向いて1歩）。歩くのは手番のキャラの担当の人（第3段階） */
+  | { type: 'DUNGEON_STEP'; playerId: PlayerId; heroId: string; dir: 'forward' | 'left' | 'right' | 'back' }
+  /** その場で向きを変える（歩数は使わない） */
+  | { type: 'DUNGEON_TURN'; playerId: PlayerId; heroId: string; dir: 'left' | 'right' | 'back' }
+  /** 見えているマスまで歩く（歩いた数だけ歩数を使う）。face = 着いた後に向く向き */
+  | { type: 'DUNGEON_WALK'; playerId: PlayerId; heroId: string; x: number; y: number; face?: Facing }
   /** みんなで決める操作に1票入れる（command = 選んだ操作。null で取り消し） */
   | { type: 'VOTE'; playerId: PlayerId; command: GameCommand | null }
   /** 遭遇の戦闘に、自分のキャラを加える / 加えない（近くにいる、手番でない人のキャラ） */

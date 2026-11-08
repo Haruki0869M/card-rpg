@@ -93,7 +93,7 @@ describe('能力の出所と開始時の通知', () => {
     g.version = 12; g.mode = 'battle'; g.battle = createBattle({ seed: 7, party: [toPartyMember(h)], encounter: { id: 'test', name: '確認', enemies: [{ defId: 'forestWolf' }] } });
     g.battle.version = 12; delete g.battle.openingEvents; for (const a of g.battle.allies[0].abilities!) delete a.source;
     const original = structuredClone(g), next = migrateGame(structuredClone(g))!;
-    expect(next.version).toBe(14); expect(next.battle!.rngState).toBe(original.battle!.rngState); expect(next.rngState).toBe(original.rngState);
+    expect(next.version).toBe(15); expect(next.battle!.rngState).toBe(original.battle!.rngState); expect(next.rngState).toBe(original.rngState);
     expect(next.battle!.allies[0].abilities![0].effect).toEqual(original.battle!.allies[0].abilities![0].effect);
     expect(next.battle!.allies[0].abilities![0].source?.kind).toBe('equipment'); expect(next.battle!.openingEvents).toBeUndefined();
   });

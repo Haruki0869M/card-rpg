@@ -5,7 +5,6 @@ import { isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
 import { useOnline } from '../../store/onlineStore';
 import { EVENTS } from '../../data/events';
-import { getRoomType } from '../../data/rules';
 import type { GameCommand, GameState, PlayerId } from '../../types';
 
 const name = (p: PlayerId) => useOnline.getState().room?.seatName(p) ?? p;
@@ -13,10 +12,9 @@ const name = (p: PlayerId) => useOnline.getState().room?.seatName(p) ?? p;
 /** 選んだ操作の短い説明 */
 function voteLabel(game: GameState, cmd: GameCommand): string {
   switch (cmd.type) {
-    case 'ENTER_ROOM': {
-      const r = game.dungeon?.rooms.find((x) => x.id === cmd.roomId);
-      return r ? `${getRoomType(r.type).name}の部屋へ` : '部屋へ';
-    }
+    case 'ENTER_ROOM':
+      // 第3段階: 部屋の中身は開けるまで分からないので、種類は出さない
+      return '扉を開ける';
     case 'RETREAT':
       return '撤退';
     case 'CHOOSE_EVENT':

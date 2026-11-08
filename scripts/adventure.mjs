@@ -21,6 +21,18 @@ async function check(page, tag) {
   for (const i of await layoutIssues(page)) issues.add(`${tag}: ${i}`);
 }
 
+/** 名前がちょうど text の押せるボタンを押す（押せなければ false） */
+async function clickEnabled(page, text) {
+  const b = page.getByRole('button', { name: text, exact: true }).first();
+  if (!(await b.count()) || !(await b.isEnabled())) return false;
+  try {
+    await b.click({ timeout: 4000 });
+  } catch {
+    return false;
+  }
+  return true;
+}
+
 async function clickText(page, text, opts = {}) {
   const l = page.getByText(text, { exact: true, ...opts }).first();
   if (await l.count()) {
@@ -228,7 +240,7 @@ async function run(party, difficulty) {
       result = 'gameover';
       break;
     }
-    // ダンジョンの地図: 光っている部屋を選んで進む
+    // ダンジョンの通路（第3段階）: 歩いて扉を探し、扉を開けて進む
     if (await page.getByText('撤退', { exact: true }).count()) {
       if (!seen.has('dungeon')) {
         seen.add('dungeon');
@@ -239,12 +251,30 @@ async function run(party, difficulty) {
         await page.getByText('探索力の判定').click();
         continue;
       }
-      const rooms = page.locator('button[aria-label]').filter({ has: page.locator('.glow-pulse') });
-      if (await rooms.count()) {
-        await rooms.first().click();
-        if (await page.getByText('この部屋へ進む').count()) await page.getByText('この部屋へ進む').click();
-        else if (await page.getByText('手番を終える').count()) await page.getByText('手番を終える').click();
+      // 第3段階: 通路を歩いて扉を開ける。目の前に開けられる扉があれば開け、地図に見えている扉があればその前まで歩く
+      const enabled = async (loc) => (await loc.count()) > 0 && (await loc.first().isEnabled());
+      const open = page.getByRole('button', { name: /^扉を開ける/ });
+      if (await enabled(open)) {
+        await open.first().click();
+        continue;
       }
+      const door = page.locator('[data-door="open"]');
+      if (await door.count()) {
+        await door.first().click({ force: true });
+        const walk = page.getByRole('button', { name: '歩く', exact: true });
+        if (await enabled(walk)) {
+          await walk.click();
+          continue;
+        }
+        // 扉は見えているが、歩数が足りない（または今いる所が扉の前）: 扉を向くか、手番を終える
+        await page.locator('[data-walk-panel]').getByLabel('閉じる').click().catch(() => {});
+        if (await clickEnabled(page, '扉を向く')) continue;
+        await clickText(page, '手番を終える');
+        continue;
+      }
+      // まだ扉が見えていない: 前・右・左の順に歩いて探す。歩けなければ手番を終える
+      if ((await clickEnabled(page, '扉を向く')) || (await clickEnabled(page, '前進')) || (await clickEnabled(page, '右へ')) || (await clickEnabled(page, '左へ'))) continue;
+      await clickText(page, '手番を終える');
       continue;
     }
     if (await page.locator('button:has-text("ターン終了")').count()) {

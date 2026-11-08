@@ -329,16 +329,17 @@ describe('ダンジョンも世界マップの手番の順番で動く（M3-D）
     expect(applyGameCommand(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0', focusUsed: 0 }).error).toMatch(/ダンジョン/);
   });
 
-  it('探索力を判定（2〜4）→ 部屋に入るたびに1減る。使い切って通路に戻ると次の人の番', () => {
+  it('探索力を判定（2〜4）→ 歩数は×2。扉を開けると1歩使う。使い切って通路に戻ると次の人の番', () => {
     let { g, x } = h0InTemple();
     g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h1' });
     expect(applyGameCommand(g, inScene(x, { type: 'ENTER_ROOM', playerId: P, roomId: 'r0c0' })).error).toMatch(/探索力/);
     // フォーカスを2つ使えば、探索力は必ず4
     g.heroes[0].focus = 2;
     g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0', focusUsed: 2 }));
-    expect(viewOf(g, x).dungeon!.explore).toBe(BALANCE.exploreBase + BALANCE.exploreSlots);
+    const steps = (BALANCE.exploreBase + BALANCE.exploreSlots) * BALANCE.dungeonStepsPerExplore;
+    expect(viewOf(g, x).dungeon!.explore).toBe(steps);
     g = run(g, inScene(x, { type: 'ENTER_ROOM', playerId: P, roomId: 'r0c0' }));
-    expect(viewOf(g, x).dungeon!.explore).toBe(3);
+    expect(viewOf(g, x).dungeon!.explore).toBe(steps - 1);
     // 手番を終える → h1 の番（ワールドターンは同じ）
     g.expeditions![0].mode = 'dungeon';
     g.expeditions![0].battle = undefined;

@@ -75,8 +75,9 @@ try {
     }); g.heroes[0].carried = 'swordmaster';
     await resume(d); await page.getByText('翠の神殿に入る', { exact: true }).click();
     if (await page.getByText('探索力の判定').count()) await page.getByText('探索力の判定').click();
-    await page.getByLabel('戦闘', { exact: true }).first().click(); await observe();
-    await page.getByText('この部屋へ進む', { exact: true }).click();
+    // 第3段階: 入口は1行目の扉の前（北向き）。扉を開けて最初の部屋へ
+    await observe();
+    await page.getByRole('button', { name: /^扉を開ける/ }).click();
     await page.locator('[data-ability-cutin]').first().waitFor(); await shot(`opening-four-${width}`);
     await page.waitForTimeout(1600);
     const opening = await page.evaluate(() => window.feedback);

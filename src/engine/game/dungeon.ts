@@ -4,6 +4,7 @@ import { getRoomType, ROOM_TYPES } from '../../data/rules';
 import { getDungeon } from './registry';
 import type { ChestSpec, DungeonDef, DungeonRun, Rarity, Room, RoomType } from '../../types';
 import type { Rng } from '../rng';
+import { initDungeonPos } from './dungeonMap';
 
 export const RARITIES: Rarity[] = ['common', 'rare', 'epic', 'legend'];
 export const rarityIndex = (r: Rarity) => RARITIES.indexOf(r);
@@ -102,7 +103,10 @@ export function buildDungeon(dungeonId: string, rng: Rng, levelBonus: number, ev
       cleared: false,
     })),
   );
-  return { dungeonId, name: def.name, random, background: def.background, rooms, gained: [] };
+  const run: DungeonRun = { dungeonId, name: def.name, random, background: def.background, rooms, gained: [] };
+  // 通路の地図の入口に立ち、北（奥）を向く（地図は部屋のつながりから決まる。乱数は引かない）
+  initDungeonPos(run);
+  return run;
 }
 
 export function findRoom(run: DungeonRun, id: string): Room | undefined {

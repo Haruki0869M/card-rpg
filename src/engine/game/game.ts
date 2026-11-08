@@ -27,6 +27,7 @@ import type {
   Room,
   SlotResult,
   EncounterSpec,
+  Facing,
 } from '../../types';
 import { applyCommand, createBattle, STATE_VERSION } from '../battle/battle';
 import { createRng, type Rng } from '../rng';
@@ -64,6 +65,7 @@ import { leaveSanctuary, leaveShrine, leaveTown, questAccept, questReport, shrin
 import { getRoomType } from '../../data/rules';
 import { TERRAINS } from '../../data/world';
 import { buildDungeon, findRoom, RARITIES, rarityIndex, reachableRooms } from './dungeon';
+import { canMove, cellKey, DIRS, doorFront, doorNorthOf, findPath, moveIntoRoom, posOf, revealSeen, turnTo } from './dungeonMap';
 import {
   canEquip,
   clampHero,
@@ -238,8 +240,9 @@ function exploreRoll(game: GameState, cmd: Extract<GameCommand, { type: 'EXPLORE
   h.focus -= cmd.focusUsed;
   const results = rollWithFocus(slots, cmd.focusUsed, statChance(h, 'agi', 'move'), rng);
   run.exploreRoll = results;
-  run.explore = BALANCE.exploreBase + successes(results);
-  addLog(game, `探索力 ${run.explore}（この手番で入れる部屋の数）`);
+  const power = BALANCE.exploreBase + successes(results);
+  run.explore = power * BALANCE.dungeonStepsPerExplore;
+  addLog(game, `探索力 ${power}（この手番で歩ける数 ${run.explore}歩）`);
   return undefined;
 }
 
@@ -248,6 +251,58 @@ function exploreEnd(game: GameState): string | undefined {
   const run = game.dungeon;
   if (!game.world || !game.activeScene || game.mode !== 'dungeon' || !run) return 'ダンジョンの通路でのみ終えられます';
   run.explore = 0;
+  return undefined;
+}
+
+/** ダンジョンの通路を歩くキャラ（手番のキャラ。倒れていたら、パーティの最初の生きているキャラ） */
+export function dungeonNavigator(game: GameState): Hero | undefined {
+  const ids = game.party ?? game.heroes.map((h) => h.id);
+  const party = ids.map((id) => findHero(game, id)).filter((h): h is Hero => !!h && h.hp > 0 && !h.retired);
+  const turn = game.world ? party.find((h) => h.id === game.world!.turn) : undefined;
+  return turn ?? party[0];
+}
+
+/** 通路を歩く・向きを変える（第3段階。歩くのは手番のキャラの担当の人だけ。乱数は使わない） */
+function dungeonNav(game: GameState, cmd: Extract<GameCommand, { type: 'DUNGEON_STEP' | 'DUNGEON_TURN' | 'DUNGEON_WALK' }>): string | undefined {
+  const run = game.dungeon;
+  if (game.mode !== 'dungeon' || !run) return 'ダンジョンの通路でのみ歩けます';
+  const nav = dungeonNavigator(game);
+  if (!nav || nav.id !== cmd.heroId) return '歩くのは手番のキャラです';
+  if (!ownedBy(nav, cmd.playerId)) return '担当していないキャラです';
+  const p = posOf(run);
+  const limited = !!game.world && !!game.activeScene;
+  if (cmd.type === 'DUNGEON_TURN') {
+    run.pos = { ...p, facing: turnTo(p.facing, cmd.dir) };
+    revealSeen(run);
+    return undefined;
+  }
+  let path: Facing[];
+  let face: Facing | undefined;
+  if (cmd.type === 'DUNGEON_STEP') {
+    const d = turnTo(p.facing, cmd.dir);
+    if (!canMove(run, p, d)) return doorNorthOf(run, p) && d === 0 ? '扉です（「扉を開ける」で入ります）' : 'そちらには進めません';
+    path = [d];
+  } else {
+    if (!(run.seen ?? []).includes(cellKey(cmd.x, cmd.y))) return 'まだ見ていない場所です';
+    const found = findPath(run, { x: cmd.x, y: cmd.y });
+    if (!found) return 'そこへは歩いて行けません';
+    path = found;
+    face = cmd.face;
+  }
+  if (limited) {
+    if (run.explore == null) return '先に探索力を判定してください';
+    if (run.explore < path.length) return `歩数が足りません（あと${run.explore}歩）`;
+    run.explore -= path.length;
+  }
+  for (const d of path) {
+    const cur = posOf(run);
+    run.pos = { x: cur.x + DIRS[d][0], y: cur.y + DIRS[d][1], facing: d };
+    revealSeen(run);
+  }
+  if (face !== undefined) {
+    run.pos = { ...posOf(run), facing: face };
+    revealSeen(run);
+  }
   return undefined;
 }
 
@@ -406,6 +461,11 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
       case 'EXPLORE_END':
         error = exploreEnd(game);
         break;
+      case 'DUNGEON_STEP':
+      case 'DUNGEON_TURN':
+      case 'DUNGEON_WALK':
+        error = dungeonNav(game, cmd);
+        break;
       case 'WORLD_ROLL_MOVE':
         error = rollMove(game, cmd, rng);
         break;
@@ -518,6 +578,10 @@ function enterRoom(game: GameState, playerId: string, roomId: string, rng: Rng):
   if (game.mode !== 'dungeon' || !run) return 'ダンジョンにいません';
   const room = findRoom(run, roomId);
   if (!room || !reachableRooms(run).some((r) => r.id === roomId)) return 'その部屋には進めません';
+  // 第3段階: 扉の前（部屋の1つ南の通路）に立っている時だけ開けられる
+  const front = doorFront(run, room.id);
+  const p = posOf(run);
+  if (!front || front.x !== p.x || front.y !== p.y) return '扉の前まで歩いてください';
   // 世界マップのあるシナリオ: 部屋に入るたびに探索力を1使う
   if (game.world && game.activeScene) {
     if (run.explore == null) return '先に探索力を判定してください';
@@ -525,6 +589,7 @@ function enterRoom(game: GameState, playerId: string, roomId: string, rng: Rng):
     run.explore -= 1;
   }
   run.currentRoomId = room.id;
+  moveIntoRoom(run, room.id);
   roomBehavior(roomTypeOf(room).behavior).enter(game, room, rng);
   return undefined;
 }

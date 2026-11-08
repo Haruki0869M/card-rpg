@@ -23,6 +23,10 @@ import {
   heroStats,
   isDone,
   reachableRooms,
+  doorFront,
+  dungeonNavigator,
+  findPath,
+  posOf,
   retreatLoss,
   statChance,
   unusableReason,
@@ -331,7 +335,14 @@ function autoPlay(g: GameState, dungeonId: string, maxSteps = 4000): GameState {
     switch (g.mode) {
       case 'dungeon': {
         const rooms = reachableRooms(g.dungeon!);
-        g = run(g, { type: 'ENTER_ROOM', playerId: P, roomId: rooms[step % rooms.length].id });
+        const room = rooms[step % rooms.length];
+        // 第3段階: 扉の前まで歩いてから開ける
+        const front = doorFront(g.dungeon!, room.id)!;
+        for (const d of findPath(g.dungeon!, front)!) {
+          const rel = (['forward', 'right', 'back', 'left'] as const)[(d - posOf(g.dungeon!).facing + 4) % 4];
+          g = run(g, { type: 'DUNGEON_STEP', playerId: P, heroId: dungeonNavigator(g)!.id, dir: rel });
+        }
+        g = run(g, { type: 'ENTER_ROOM', playerId: P, roomId: room.id });
         break;
       }
       case 'battle': {

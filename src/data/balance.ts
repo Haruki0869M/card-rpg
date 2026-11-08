@@ -127,6 +127,8 @@ export const BALANCE = {
   /** ダンジョンの探索力（手番に入れる部屋の数）= exploreBase + 素早さの判定の成功数（exploreSlots 枠）。M3-D */
   exploreSlots: 2,
   exploreBase: 2,
+  /** 第3段階: 歩数 = 探索力 × これ（部屋から次の部屋へは、まっすぐなら「出口→扉」で2歩。今までの「探索力＝入れる部屋の数」と同じ速さ） */
+  dungeonStepsPerExplore: 2,
   /** 侵食度: 1ワールドターンごと / ダンジョンに入る時 / 町が陥落した時 */
   corruptionPerTurn: 1,
   corruptionOnDungeonEnter: 2,
