@@ -16,6 +16,14 @@ export interface TerrainDef {
   decor?: string;
   /** この地形で戦った時の戦闘の背景 */
   background: string;
+  /** 寒さ・暑さ（K4 段2）。この地形に立ったまま1ワールドターンが終わると、HPが減る（野営した人は除く） */
+  climate?: ClimateDef;
+}
+
+/** 寒さ・暑さ。ratio（最大HPの割合）を省略すると BALANCE.climateDamageRatio */
+export interface ClimateDef {
+  kind: 'cold' | 'hot';
+  ratio?: number;
 }
 
 /** 地域（マップの行の範囲。奥ほど敵が強い） */
@@ -31,6 +39,8 @@ export interface RegionDef {
   /** 徘徊する敵の基準レベルと組み合わせ（敵IDの並び） */
   enemyLevel: number;
   encounters: string[][];
+  /** 地域全体の寒さ・暑さ（地形の climate が優先） */
+  climate?: ClimateDef;
   /** 最初に置く徘徊する敵の数 */
   wanderers: number;
   /** ランダムに置くもの（数） */
@@ -216,6 +226,8 @@ export interface WorldState {
   keys: string[];
   quests: QuestState[];
   visitedRegions: number[];
+  /** このワールドターンに野営して、寒さ・暑さを受けないキャラ（ターンの終わりに消える。K4 段2。無ければ空） */
+  sheltered?: string[];
   /** 町の品揃え（町ID → 売り物）。訪れた時に作り、ワールドターンが一定進むと入れ替わる */
   shops: Record<string, ShopStock>;
   /** 画面に出す物語（冒頭・地域の紹介・エンディング） */

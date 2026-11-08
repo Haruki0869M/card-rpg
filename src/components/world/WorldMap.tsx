@@ -26,6 +26,8 @@ const TERRAIN_DECOR: Record<string, { d: string; stroke: string; fill?: string }
   peaks: { d: 'M-11 8 L-3 -8 L5 8 Z M-5 -4 L-3 -8 L-1 -4 Z M2 8 L8 -2 L13 8 Z', stroke: '#3a3438', fill: '#8a8088' },
   cracks: { d: 'M-10 -2 L-4 2 L0 -3 L5 2 L10 -1', stroke: '#2a1e1c' },
   lava: { d: 'M-8 2 Q-2 -6 4 2 Q8 6 10 0', stroke: '#ffd04a' },
+  snow: { d: 'M-8 -3 H8 M-6 4 H6 M0 -8 V8 M-6 -6 L6 6', stroke: '#ffffff' },
+  dunes: { d: 'M-11 4 Q-6 -3 -1 4 M0 6 Q5 -1 11 6', stroke: '#9a7a3a' },
   waves: { d: 'M-10 -2 Q-6 -6 -2 -2 T6 -2 M-6 5 Q-2 1 2 5 T10 5', stroke: '#8ac8ff' },
 };
 
@@ -104,6 +106,7 @@ const TerrainLayer = memo(function TerrainLayer({ tiles, geom }: { tiles: WorldS
         return (
           <g key={i} data-hex={i}>
             <polygon points={hexPoints(x, y, R - 0.5)} fill={tex ? `url(#ter-${ter.id})` : ter.color} stroke="rgba(0,0,0,.5)" strokeWidth={1.2} />
+            {ter.climate && <polygon points={hexPoints(x, y, R - 0.5)} fill={ter.climate.kind === 'cold' ? 'rgba(140,200,255,.18)' : 'rgba(255,120,40,.18)'} pointerEvents="none" data-climate={ter.climate.kind} />}
             {dec && <path d={dec.d} transform={`translate(${x},${y}) scale(${s})`} stroke={dec.stroke} fill={dec.fill ?? 'none'} strokeWidth={1.6} strokeLinecap="round" opacity={0.85} />}
           </g>
         );
