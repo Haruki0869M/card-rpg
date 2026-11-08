@@ -4,10 +4,12 @@ import { BattleBackground } from '../../art';
 import { BALANCE } from '../../data/balance';
 import { CLASSES } from '../../data/classes';
 import { SCENARIOS, isScenarioUnlocked } from '../../data/scenarios';
+import { clearedScenarioIds } from '../../store/profile';
+import { useProfile } from '../../store/profileStore';
 import { autoName } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
 import { useOnline } from '../../store/onlineStore';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { DIFFICULTIES, describeDifficulty } from '../../data/rules';
 import { Screen } from '../ui/game';
 import { ChoiceTile, Motes, SectionTitle, TopBar } from '../ui/fancy';
@@ -20,6 +22,9 @@ export function SetupScreen() {
   const setDraft = useBattle((s) => s.setDraft);
   const setScreen = useBattle((s) => s.setScreen);
   const toast = useBattle((s) => s.showToast);
+  // 伝承の書（K5）: この端末でクリアしたシナリオ。解放の条件（unlockRequires）に使う
+  const clears = useProfile((s) => s.profile.clears);
+  const cleared = useMemo(() => clearedScenarioIds({ clears }), [clears]);
   const onlineOk = useOnline((s) => s.available)();
   const createRoom = useOnline((s) => s.createRoom);
   const busy = useOnline((s) => s.busy);
@@ -59,7 +64,7 @@ export function SetupScreen() {
             return (
               <button
                 key={sc.id}
-                onClick={() => (isScenarioUnlocked(sc) ? setDraft({ scenarioId: sc.id }) : toast(sc.unlockText ?? 'まだ遊べません'))}
+                onClick={() => (isScenarioUnlocked(sc, cleared) ? setDraft({ scenarioId: sc.id }) : toast(sc.unlockText ?? 'まだ遊べません'))}
                 className="btn relative h-[214px] w-[82%] shrink-0 snap-center overflow-hidden rounded-2xl text-left"
                 style={{
                   border: '2px solid transparent',
@@ -67,9 +72,9 @@ export function SetupScreen() {
                   boxShadow: sel ? '0 0 22px rgba(255,200,90,.5), 0 6px 14px rgba(0,0,0,.6)' : '0 6px 14px rgba(0,0,0,.6)',
                 }}
               >
-                <BattleBackground kind={sc.art ?? 'title'} className={`absolute inset-0 h-full w-full ${isScenarioUnlocked(sc) ? '' : 'blur-[2px] grayscale brightness-[.35]'}`} />
+                <BattleBackground kind={sc.art ?? 'title'} className={`absolute inset-0 h-full w-full ${isScenarioUnlocked(sc, cleared) ? '' : 'blur-[2px] grayscale brightness-[.35]'}`} />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-transparent" />
-                {!isScenarioUnlocked(sc) && (
+                {!isScenarioUnlocked(sc, cleared) && (
                   // カードの上の方に横1列で置き、下の題名・あらすじと重ならないようにする
                   <div className="absolute inset-x-3 top-3 flex items-center gap-1.5 text-zinc-200" data-scenario-lock>
                     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-zinc-400/70 bg-black/60">

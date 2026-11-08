@@ -2,6 +2,7 @@
 //  1) 記録が空の時: タイトル →「伝承の書」→ 6つのタブが開き、見ていない物は「？？？」で押せない
 //  2) 冒険を始めると、最初のジョブ・山札が記録される（冒険の状態は変えない）
 //  3) 記録を入れた状態で、各タブの一覧と詳細が 360/390/480px で崩れない
+//  4) 冒険の準備の画面（クリアの記録を渡しても、条件の無いシナリオは鍵のまま）
 // 使い方: npx vite preview を起こしてから node scripts/lorebook.mjs
 import { chromium, layoutIssues, URL } from './lib.mjs';
 
@@ -82,6 +83,14 @@ for (const width of [360, 390, 480]) {
       await page.locator('[data-lore-detail]').getByText('閉じる', { exact: true }).click();
     }
   }
+  // 4) 冒険の準備: クリアの記録があっても、解放の条件の無いシナリオ（凍てつく王国）は鍵のまま（K4 が条件を入れるまで）
+  await page.getByLabel('閉じる').click();
+  page.once('dialog', (d) => d.accept());
+  await page.getByText('新しい冒険').click();
+  await page.locator('[data-scenarios]').waitFor();
+  if (!(await page.locator('[data-scenario-lock]').count())) await ng('凍てつく王国の鍵が消えた');
+  await shot('setup');
+  await check('冒険の準備');
   if (errors.length) await ng(`ページのエラー: ${errors.join(' / ')}`);
   await page.close();
 }

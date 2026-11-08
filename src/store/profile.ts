@@ -101,7 +101,7 @@ export function normalizeProfile(raw: unknown): Profile {
 }
 
 /** クリアしたシナリオの ID（シナリオの解放に使う） */
-export const clearedScenarioIds = (p: Profile): string[] => Object.keys(p.clears).filter((id) => p.clears[id] > 0);
+export const clearedScenarioIds = (p: Pick<Profile, 'clears'>): string[] => Object.keys(p.clears).filter((id) => p.clears[id] > 0);
 
 /** 冒険の状態から見つけた物（1回分） */
 export interface Sightings {

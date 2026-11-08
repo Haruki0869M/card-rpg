@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createGame, stateHash } from '../engine';
+import { isScenarioUnlocked } from '../data/scenarios';
 import type { GameState, PlayerId } from '../types';
 import { clearedScenarioIds, collectSightings, emptyProfile, mergeSightings, normalizeProfile } from './profile';
 
@@ -80,5 +81,23 @@ describe('伝承の書の記録（K5）', () => {
     const p = mergeSightings(emptyProfile(), collectSightings(g, onlyP1));
     expect(p.pets.got).toEqual(['cockatiel:normal']);
     expect(p.pets.seen).toEqual(expect.arrayContaining(['cockatiel:normal', 'owl:brown']));
+  });
+
+  it('クリアの記録で、解放の条件のあるシナリオが遊べるようになる（K4 の入口とつなぐ）', () => {
+    const locked = { unlocked: false, unlockRequires: { cleared: ['corruptionKing'] } };
+    const plain = { unlocked: false };
+    const g = game();
+    let p = mergeSightings(emptyProfile(), collectSightings(g, all));
+    expect(isScenarioUnlocked(locked, clearedScenarioIds(p))).toBe(false);
+    g.mode = 'gameover';
+    p = mergeSightings(p, collectSightings(g, all));
+    expect(isScenarioUnlocked(locked, clearedScenarioIds(p))).toBe(false); // 全滅では解放しない
+    const g2 = createGame({ seed: 8, scenarioId: 'corruptionKing', difficulty: 'normal', party: [{ classId: 'warrior', gender: 'male', name: 'a', playerId: 'P1' }] });
+    g2.mode = 'ending';
+    p = mergeSightings(p, collectSightings(g2, all));
+    expect(isScenarioUnlocked(locked, clearedScenarioIds(p))).toBe(true);
+    expect(isScenarioUnlocked(plain, clearedScenarioIds(p))).toBe(false); // 条件の無いシナリオは今までどおり
+    expect(p.gameovers).toEqual({ corruptionKing: 1 });
+    expect(p.adventures).toBe(2);
   });
 });
