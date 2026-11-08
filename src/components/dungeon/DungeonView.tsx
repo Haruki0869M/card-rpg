@@ -49,6 +49,18 @@ export function doorRimStrength(bg: string) {
   return Math.max(0, Math.min(1, (90 - wall) / 50));
 }
 
+/**
+ * 通路の暗さ（奥ほど暗くする量）の倍率（0.45〜1）。壁・床・天井の絵の平均の明るさ（DUNGEON_TONE）が 100 より暗いほど弱める。
+ * 絵がもともと暗いダンジョン（溶岩の洞窟・魔王城・森の洞窟）で、奥が真っ暗になって見づらくならないように。絵が無い時は 1（今までどおり）
+ */
+export function corridorShadeScale(bg: string) {
+  const t = artImage(`dungeon/${bg}-wall`) ? DUNGEON_TONE[bg] : undefined;
+  const v = [t?.wall, t?.floor, t?.ceiling].filter((x): x is number => x !== undefined);
+  if (!v.length) return 1;
+  const avg = v.reduce((a, b) => a + b, 0) / v.length;
+  return Math.max(0.45, Math.min(1, avg / 100));
+}
+
 /** 扉の縁（ふつうの扉）: 暗いダンジョンでは、松明に照らされたような明るい縁と淡い光にする */
 function doorRim(bg: string) {
   const k = doorRimStrength(bg);
@@ -62,8 +74,10 @@ function doorRim(bg: string) {
 /** 扉（壁の面の中に描く） */
 function Door({ bg, face, shade, opening, omen }: { bg: string; face: ViewFace; shade: number; opening?: number; omen?: DoorOmen }) {
   const t = themeOf(bg);
-  const img = artImage(`dungeon/${bg}-door`);
   const boss = face === 'boss';
+  // ボスの門は専用の絵（両開きの門）があれば使い、無ければふつうの扉の絵
+  const img = (boss && artImage(`dungeon/${bg}-bossdoor`)) || artImage(`dungeon/${bg}-door`);
+  const bossArt = boss && !!artImage(`dungeon/${bg}-bossdoor`);
   const rim = doorRim(bg);
   if (face === 'arch') return <div className="absolute inset-x-[22%] top-[22%] bottom-0 rounded-t-[40%] bg-black/85" style={{ boxShadow: 'inset 0 0 12px #000' }} />;
   // 扉が開く（第3段階B2）: 奥へ開いて暗がりが見える。ふつうの扉は片開き（左の蝶番・右に取っ手）、ボスの扉は両開きの門
@@ -117,7 +131,7 @@ function Door({ bg, face, shade, opening, omen }: { bg: string; face: ViewFace; 
       }}
     >
       {/* ボスの扉は両開きの門（真ん中に合わせ目） */}
-      {boss && <span className="absolute inset-y-0 left-1/2 w-[4px] -translate-x-1/2 bg-[#120804] shadow-[0_0_3px_#000]" />}
+      {boss && !bossArt && <span className="absolute inset-y-0 left-1/2 w-[4px] -translate-x-1/2 bg-[#120804] shadow-[0_0_3px_#000]" />}
       {boss && <Crown className="relative text-amber-300" style={{ width: '34%', height: '34%' }} />}
       {face === 'locked' && <Lock className="text-zinc-300/80" style={{ width: '24%', height: '24%' }} />}
       {face === 'door' && <span className="absolute right-[14%] top-1/2 h-[7%] w-[7%] rounded-full bg-amber-300/80" />}
@@ -157,7 +171,8 @@ export function DungeonView({ run, background, opening, omens }: { run: DungeonR
   const { slices, end } = viewSlices(run);
   // 1マスの大きさ（通路の幅・高さ・奥行き）。画面の小さい方の辺に合わせる
   const U = Math.max(120, Math.min(size.width * 0.92 || 300, size.height * 0.95 || 300));
-  const shade = (d: number) => Math.min(0.85, 0.12 + d * 0.2);
+  const dim = corridorShadeScale(background);
+  const shade = (d: number) => Math.min(0.85, 0.12 + d * 0.2) * dim;
   // 面は1枚ずつ同じカメラ（perspective）で遠近をかけ、奥から手前の順に描く。
   // ブラウザの3Dの並べ替え（preserve-3d）に任せると、壁の一部が消えることがあったため使わない
   const P = U * 0.75;
@@ -211,7 +226,7 @@ export function DungeonView({ run, background, opening, omens }: { run: DungeonR
         face(`${side}c${s.depth}`, `translate3d(${sign * U}px, ${-U / 2}px, ${z}px) rotateX(-90deg)`, surface(background, 'ceiling', sh2), undefined, s.depth + 0.8);
         // 隣のマスの正面（壁・扉・さらに続く暗がり）
         const ahead = side === 'left' ? s.leftAhead : s.rightAhead;
-        const shA = Math.min(0.9, shade(s.depth + 1) + 0.15);
+        const shA = Math.min(0.9, shade(s.depth + 1) + 0.15 * dim);
         if (ahead && ahead !== 'far' && ahead !== 'dark')
           face(`${side}a${s.depth}`, `translate3d(${sign * U}px, 0, ${-(s.depth + 1) * U}px)`, surface(background, 'wall', shA), ahead === 'wall' ? null : <Door bg={background} face={ahead} shade={shA} omen={omens?.[(side === 'left' ? s.leftAheadRoomId : s.rightAheadRoomId) ?? '']} />, s.depth + 1.2);
         else face(`${side}a${s.depth}`, `translate3d(${sign * U}px, 0, ${-(s.depth + 1) * U}px)`, { background: '#030303' }, undefined, s.depth + 1.2);
