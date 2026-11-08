@@ -28,7 +28,9 @@ describe('凍てつく王国の専用の敵', () => {
 
   it('専用の敵を28体とも配置し、仮の共通敵を残さない', () => {
     const placed = new Set(waves().flat());
-    expect([...placed].sort()).toEqual([...ids].sort());
+    // K3 D で足した3体（extra.ts）も、このシナリオの敵として配置される
+    const extra = ['iceFisher', 'frostMoth', 'stormSnowOwl'];
+    expect([...placed].sort()).toEqual([...ids, ...extra].sort());
     for (const wave of waves()) for (const id of wave) expect(ENEMIES.has(id), id).toBe(true);
     for (const r of getScenario('frozenKingdom').map!.regions) {
       for (const wave of r.encounters ?? []) expect(wave.length).toBeGreaterThanOrEqual(2);

@@ -12,7 +12,7 @@ export const smokeStackCrow: EnemyDef = {
   size: 0.8,
   exp: 5,
   gold: 3,
-  weak: ['thunder'],
+  weak: ['ice'], // 煙突の熱で動く鴉。冷やすと弱る（組の相手 conveyorBot が雷に弱いので、雷以外の弱点にする）
   resist: ['fire'],
   pattern: 'sequence',
   actions: [

@@ -25,8 +25,8 @@ const ROOM_ICONS: Record<string, typeof Swords> = { swords: Swords, skull: Skull
 
 type Part = 'wall' | 'floor' | 'ceiling' | 'door';
 
-function surface(bg: string, part: Part, shade: number): CSSProperties {
-  const t = themeOf(bg);
+function surface(bg: string, part: Part, shade: number, themeBg: string = bg): CSSProperties {
+  const t = themeOf(themeBg);
   const img = artImage(`dungeon/${bg}-${part}`);
   const dark = `linear-gradient(rgba(0,0,0,${shade}), rgba(0,0,0,${shade}))`;
   if (img) return { backgroundImage: `${dark}, url(${img})`, backgroundSize: 'cover' };
@@ -72,8 +72,8 @@ function doorRim(bg: string) {
 }
 
 /** 扉（壁の面の中に描く） */
-function Door({ bg, face, shade, opening, omen }: { bg: string; face: ViewFace; shade: number; opening?: number; omen?: DoorOmen }) {
-  const t = themeOf(bg);
+function Door({ bg, themeBg = bg, face, shade, opening, omen }: { bg: string; /** 絵が無い時の色を決める背景（通路の絵の名前と、部屋の背景が違う時） */ themeBg?: string; face: ViewFace; shade: number; opening?: number; omen?: DoorOmen }) {
+  const t = themeOf(themeBg);
   const boss = face === 'boss';
   // ボスの門は専用の絵（両開きの門）があれば使い、無ければふつうの扉の絵
   const img = (boss && artImage(`dungeon/${bg}-bossdoor`)) || artImage(`dungeon/${bg}-door`);
@@ -165,13 +165,22 @@ function Torch({ bg }: { bg: string }) {
   );
 }
 
+/**
+ * 通路の絵を読む名前。そのダンジョンのIDの通路の絵（dungeon/<ダンジョンID>-wall）があればそれ、無ければ部屋の背景（background）の名前。
+ * 部屋の背景（bg/<名前>）と通路の絵を別々に切り替えられる（K4: 通路の絵だけ先に届いたダンジョンのため）
+ */
+export function corridorArt(dungeonId: string | undefined, background: string): string {
+  return dungeonId && artImage(`dungeon/${dungeonId}-wall`) ? dungeonId : background;
+}
+
 /** 一人称の通路 */
 export function DungeonView({ run, background, opening, omens }: { run: DungeonRun; background: string; /** 正面の扉が開く演出の秒数（扉が開く演出の時だけ） */ opening?: number; /** 扉の気配（部屋のID → 種類） */ omens?: Record<string, DoorOmen> }) {
   const [ref, size] = useElementSize<HTMLDivElement>();
   const { slices, end } = viewSlices(run);
+  const art = corridorArt(run.dungeonId, background);
   // 1マスの大きさ（通路の幅・高さ・奥行き）。画面の小さい方の辺に合わせる
   const U = Math.max(120, Math.min(size.width * 0.92 || 300, size.height * 0.95 || 300));
-  const dim = corridorShadeScale(background);
+  const dim = corridorShadeScale(art);
   const shade = (d: number) => Math.min(0.85, 0.12 + d * 0.2) * dim;
   // 面は1枚ずつ同じカメラ（perspective）で遠近をかけ、奥から手前の順に描く。
   // ブラウザの3Dの並べ替え（preserve-3d）に任せると、壁の一部が消えることがあったため使わない
@@ -196,8 +205,8 @@ export function DungeonView({ run, background, opening, omens }: { run: DungeonR
   for (const s of slices) {
     const z = zMid(s.depth);
     const sh = shade(s.depth);
-    face(`f${s.depth}`, `translate3d(0, ${U / 2}px, ${z}px) rotateX(90deg)`, surface(background, 'floor', sh), undefined, s.depth + 0.5);
-    face(`c${s.depth}`, `translate3d(0, ${-U / 2}px, ${z}px) rotateX(-90deg)`, surface(background, 'ceiling', sh), undefined, s.depth + 0.5);
+    face(`f${s.depth}`, `translate3d(0, ${U / 2}px, ${z}px) rotateX(90deg)`, surface(art, 'floor', sh), undefined, s.depth + 0.5);
+    face(`c${s.depth}`, `translate3d(0, ${-U / 2}px, ${z}px) rotateX(-90deg)`, surface(art, 'ceiling', sh), undefined, s.depth + 0.5);
     // 部屋の中の床には、通った部屋の種類の印
     if (s.depth === 0 && s.inRoom && run.currentRoomId) {
       const room = run.rooms.find((r) => r.id === run.currentRoomId);
@@ -221,22 +230,22 @@ export function DungeonView({ run, background, opening, omens }: { run: DungeonR
       if (f === 'open' || f === 'dark') {
         // 横に開いた口: 隣のマスの床・天井・奥の壁（暗め）
         const sh2 = f === 'dark' ? 0.92 : Math.min(0.9, sh + 0.25);
-        face(`${side}w${s.depth}`, `translate3d(${sign * U * 1.5}px, 0, ${z}px) rotateY(${rot}deg)`, f === 'dark' ? { background: '#050505' } : surface(background, 'wall', sh2), undefined, s.depth + 0.9);
-        face(`${side}f${s.depth}`, `translate3d(${sign * U}px, ${U / 2}px, ${z}px) rotateX(90deg)`, surface(background, 'floor', sh2), undefined, s.depth + 0.8);
-        face(`${side}c${s.depth}`, `translate3d(${sign * U}px, ${-U / 2}px, ${z}px) rotateX(-90deg)`, surface(background, 'ceiling', sh2), undefined, s.depth + 0.8);
+        face(`${side}w${s.depth}`, `translate3d(${sign * U * 1.5}px, 0, ${z}px) rotateY(${rot}deg)`, f === 'dark' ? { background: '#050505' } : surface(art, 'wall', sh2), undefined, s.depth + 0.9);
+        face(`${side}f${s.depth}`, `translate3d(${sign * U}px, ${U / 2}px, ${z}px) rotateX(90deg)`, surface(art, 'floor', sh2), undefined, s.depth + 0.8);
+        face(`${side}c${s.depth}`, `translate3d(${sign * U}px, ${-U / 2}px, ${z}px) rotateX(-90deg)`, surface(art, 'ceiling', sh2), undefined, s.depth + 0.8);
         // 隣のマスの正面（壁・扉・さらに続く暗がり）
         const ahead = side === 'left' ? s.leftAhead : s.rightAhead;
         const shA = Math.min(0.9, shade(s.depth + 1) + 0.15 * dim);
         if (ahead && ahead !== 'far' && ahead !== 'dark')
-          face(`${side}a${s.depth}`, `translate3d(${sign * U}px, 0, ${-(s.depth + 1) * U}px)`, surface(background, 'wall', shA), ahead === 'wall' ? null : <Door bg={background} face={ahead} shade={shA} omen={omens?.[(side === 'left' ? s.leftAheadRoomId : s.rightAheadRoomId) ?? '']} />, s.depth + 1.2);
+          face(`${side}a${s.depth}`, `translate3d(${sign * U}px, 0, ${-(s.depth + 1) * U}px)`, surface(art, 'wall', shA), ahead === 'wall' ? null : <Door bg={art} themeBg={background} face={ahead} shade={shA} omen={omens?.[(side === 'left' ? s.leftAheadRoomId : s.rightAheadRoomId) ?? '']} />, s.depth + 1.2);
         else face(`${side}a${s.depth}`, `translate3d(${sign * U}px, 0, ${-(s.depth + 1) * U}px)`, { background: '#030303' }, undefined, s.depth + 1.2);
         continue;
       }
       face(
         `${side}${s.depth}`,
         `translate3d(${(sign * U) / 2}px, 0, ${z}px) rotateY(${rot}deg)`,
-        surface(background, 'wall', sh),
-        f === 'wall' ? (s.torch && s.depth <= 2 && side === (s.depth % 2 ? 'right' : 'left') ? <Torch bg={background} /> : null) : <Door bg={background} face={f} shade={sh} omen={omens?.[(side === 'left' ? s.leftRoomId : s.rightRoomId) ?? '']} />,
+        surface(art, 'wall', sh),
+        f === 'wall' ? (s.torch && s.depth <= 2 && side === (s.depth % 2 ? 'right' : 'left') ? <Torch bg={background} /> : null) : <Door bg={art} themeBg={background} face={f} shade={sh} omen={omens?.[(side === 'left' ? s.leftRoomId : s.rightRoomId) ?? '']} />,
         s.depth + 0.45,
       );
     }
@@ -245,7 +254,7 @@ export function DungeonView({ run, background, opening, omens }: { run: DungeonR
   const endZ = -end.depth * U;
   const endShade = shade(end.depth);
   if (end.face === 'far' || end.face === 'dark') face('end', `translate3d(0, 0, ${endZ}px)`, { background: '#030303' }, undefined, 99);
-  else face('end', `translate3d(0, 0, ${endZ}px)`, surface(background, 'wall', endShade), end.face === 'wall' ? null : <Door bg={background} face={end.face} shade={endShade} opening={opening} omen={omens?.[end.roomId ?? '']} />, 99);
+  else face('end', `translate3d(0, 0, ${endZ}px)`, surface(art, 'wall', endShade), end.face === 'wall' ? null : <Door bg={art} themeBg={background} face={end.face} shade={endShade} opening={opening} omen={omens?.[end.roomId ?? '']} />, 99);
   return (
     <div ref={ref} className="absolute inset-0 overflow-hidden bg-black" data-dungeon-view data-end={end.face}>
       {[...faces].sort((a, b) => b.dist - a.dist).map((f) => f.node)}

@@ -8,7 +8,7 @@ import type { Rng } from '../rng';
 import { RARITIES, rarityIndex } from './dungeon';
 import { pickCard } from './cardTags';
 import { jobWeapons } from './hero';
-import { heroCardPool } from './jobs';
+import { heroCardPool, heroJobCardPool } from './jobs';
 
 const pick = <T,>(list: readonly T[], rng: Rng) => list[rng.int(list.length)];
 
@@ -95,7 +95,10 @@ export function rollCardOffers(game: GameState, heroIds: string[], rng: Rng, odd
   if (!heroes.length) return offers;
   for (let tries = 0; offers.length < 3 && tries < 30; tries++) {
     const h = heroes[(offers.length + tries) % heroes.length];
-    const pool = heroCardPool(h);
+    // そのキャラの候補の先頭 cardRewardJobSlots 枚は、ジョブ専用・系統・装備している武器種のカードから（無ければ今までどおり。K7）
+    const jobSlot = offers.filter((o) => o.heroId === h.id).length < BALANCE.cardRewardJobSlots;
+    const jobPool = jobSlot ? heroJobCardPool(h) : [];
+    const pool = jobPool.length ? jobPool : heroCardPool(h);
     if (!pool.length) continue;
     // 抽選した格のカード。その格が無ければ1つ下の格へ
     let grade = pickWeighted(odds, rng);

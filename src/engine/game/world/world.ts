@@ -17,7 +17,7 @@ import { equippedItems, heroFocusMax, heroMaxHp } from '../hero';
 import { activeHeroes, expeditionOf, findHero, livingHeroes, mapHeroes, sceneHeroes } from '../heroes';
 import { applyClimate, climateAt } from './climate';
 import { revealAround } from './fog';
-import { hexDistance, pathTo, reachable } from './hex';
+import { hexDistance, moveCostOf, neighbors, pathTo, reachable } from './hex';
 import { objectiveHandler, type QuestSignal } from './objectives';
 import { timeOfDay } from './time';
 import { ensureShop } from './town';
@@ -575,13 +575,31 @@ export function handleDefeat(game: GameState, participants: string[], rng: Rng) 
   if (w) backToWorld(game, rng, true);
 }
 
+/**
+ * 倒れた場所に一番近い町。今の移動手段（船があれば海も）で歩いて行ける町を優先する
+ * （船が無い時に、海の向こうの島の町で目を覚まして、島から出られなくなるのを防ぐ）。行ける町が無ければ、直線の距離で一番近い町
+ */
 function nearestTown(w: WorldState, from: number): number | undefined {
-  let best: number | undefined;
-  w.tiles.forEach((t, i) => {
-    if (t.f?.kind !== 'town' || w.fallenTowns.includes(t.f.id)) return;
-    if (best === undefined || hexDistance(w, from, i) < hexDistance(w, from, best)) best = i;
-  });
-  return best;
+  const reach = new Set<number>([from]);
+  const queue = [from];
+  while (queue.length) {
+    const cur = queue.shift()!;
+    for (const n of neighbors(w, cur)) {
+      if (reach.has(n) || moveCostOf(w, n) <= 0) continue;
+      reach.add(n);
+      queue.push(n);
+    }
+  }
+  const pick = (onlyReachable: boolean) => {
+    let best: number | undefined;
+    w.tiles.forEach((t, i) => {
+      if (t.f?.kind !== 'town' || w.fallenTowns.includes(t.f.id)) return;
+      if (onlyReachable && !reach.has(i)) return;
+      if (best === undefined || hexDistance(w, from, i) < hexDistance(w, from, best)) best = i;
+    });
+    return best;
+  };
+  return pick(true) ?? pick(false);
 }
 
 // ---------- 今いるマスに入る（町・祠・イベント・宝箱・名所・ダンジョン） ----------

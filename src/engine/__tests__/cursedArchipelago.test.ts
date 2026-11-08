@@ -5,7 +5,8 @@ import { DUNGEONS } from '../../data/dungeons';
 import { EVENTS } from '../../data/events';
 import { ITEMS } from '../../data/items';
 import { QUESTS, TERRAINS, TOWNS } from '../../data/world';
-import { applyGameCommand, canReportQuest, createGame, neighbors } from '../index';
+import { createRng } from '../rng';
+import { applyGameCommand, canReportQuest, createGame, handleDefeat, neighbors } from '../index';
 
 const newGame = (seed = 5) =>
   createGame({ seed, scenarioId: 'cursedArchipelago', difficulty: 'normal', party: ['warrior', 'mage'].map((c, i) => ({ classId: c, gender: 'male' as const, name: `${c}${i}`, playerId: 'P1' })) });
@@ -75,6 +76,25 @@ describe('呪われた群島', () => {
     expect(canReportQuest(g, 'borrowShip')).toBe(true);
     run({ type: 'QUEST_REPORT', playerId: 'P1', questId: 'borrowShip' });
     expect(g.world!.ship).toBe(true);
+  });
+});
+
+describe('戦闘に負けた時の復活の町（船が無い時に、島から出られなくならない）', () => {
+  it('どの種でも: 海の向こうの町ではなく、船なしで行ける町で目を覚ます（種874651857は、近い町が霧の海域の島にあった）', () => {
+    for (const seed of [874651857, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
+      const g = newGame(seed);
+      const w = g.world!;
+      const h = g.heroes[0];
+      // 最初のダンジョン（難破船の洞窟）の上で負けた
+      const dungeon = w.tiles.findIndex((t) => t.f?.kind === 'dungeon' && t.f.id === 'wreckCave');
+      w.pos[h.id] = dungeon;
+      g.lives = 3;
+      handleDefeat(g, [h.id], createRng(1));
+      const at = w.pos[h.id];
+      expect(w.tiles[at].f?.kind, `seed ${seed}`).toBe('town');
+      // 負けた場所から、船なしで歩いて行ける
+      expect(flood(g, dungeon, false).has(at), `seed ${seed}: 町 ${at} は陸でつながっている`).toBe(true);
+    }
   });
 });
 
