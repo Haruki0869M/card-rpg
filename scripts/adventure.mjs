@@ -1,4 +1,4 @@
-// 実際の画面をタップして、キャラ作成 → 世界マップ（物語・移動・遭遇）→ 翠の神殿 → 宝箱 → レベルアップ → ボス撃破 → 大宝箱 → 地上 まで進める
+// 実際の画面をタップして、キャラ作成 → 世界マップ（物語・移動・遭遇）→ 最初のダンジョン（1本目は翠の神殿） → 宝箱 → レベルアップ → ボス撃破 → 大宝箱 → 地上 まで進める
 // 2人以上は担当プレイヤーを分けて、手番の受け渡しの画面も確かめる
 // npm run build && npx vite preview --port 4173 を起動した状態で: node scripts/adventure.mjs
 // 別のシナリオを通す時: ADVENTURE_SCENARIO=frozenKingdom node scripts/adventure.mjs（記録を入れて解放してから選ぶ）
@@ -18,6 +18,16 @@ const SCENARIO_NAMES = {
   starCastle: '星降る天空城',
   clockworkEmpire: '機械仕掛けの帝国',
   dreamLabyrinth: '夢幻の大迷宮',
+};
+// 世界マップで最初に向かうダンジョン（シナリオごとの、いちばん入りやすい鍵のダンジョン）
+const FIRST_DUNGEON = {
+  corruptionKing: { id: 'emeraldTemple', name: '翠の神殿' },
+  frozenKingdom: { id: 'crystalCave', name: '氷晶の洞' },
+  cursedArchipelago: { id: 'wreckCave', name: '難破船の洞窟' },
+  sandDynasty: { id: 'scorpionTomb', name: '蠍の墓所' },
+  starCastle: { id: 'windmillTower', name: '風車の塔' },
+  clockworkEmpire: { id: 'gearFactory', name: '歯車の工場' },
+  dreamLabyrinth: { id: 'echoIceVault', name: '氷の記憶の洞' },
 };
 const SCENARIO = process.env.ADVENTURE_SCENARIO ?? FIRST_SCENARIO;
 if (!SCENARIO_NAMES[SCENARIO]) throw new Error(`知らないシナリオ: ${SCENARIO}（${Object.keys(SCENARIO_NAMES).join(' / ')}）`);
@@ -234,7 +244,7 @@ async function run(party, difficulty) {
         await check(page, 'world');
         await page.screenshot({ path: `screenshots/adv-world.png` });
       }
-      if (await clickText(page, '翠の神殿に入る')) continue;
+      if (await clickText(page, `${FIRST_DUNGEON[SCENARIO].name}に入る`)) continue;
       if (await page.getByText('移動力の判定').count()) {
         await page.getByText('移動力の判定').click({ timeout: 3000 }).catch(() => {});
         continue;
@@ -242,7 +252,7 @@ async function run(party, difficulty) {
       const reach = page.locator('[data-reach]');
       const n = await reach.count();
       if (n) {
-        const goal = page.locator('[data-feature="dungeon:emeraldTemple"]');
+        const goal = page.locator(`[data-feature="dungeon:${FIRST_DUNGEON[SCENARIO].id}"]`);
         const gb = (await goal.count()) ? await goal.boundingBox() : null;
         const target = gb ? { x: gb.x + gb.width / 2, y: gb.y + gb.height / 2 } : { x: 180, y: -100000 };
         let best = null;
