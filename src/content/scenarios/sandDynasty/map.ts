@@ -40,6 +40,7 @@ export const sandDynastyMap: ScenarioMapDef = {
       terrain: { desert: 7, hills: 1 },
       enemyLevel: 6,
       encounters: [['vulture', 'mummy'], ['sandSprite', 'mummy'], ['dustDevil', 'vulture'], ['emberSandScorpion', 'mummy'], ['sandSprite', 'dustDevil', 'vulture']],
+      rareEncounters: [['goldenScarab'], ['goldenScarab', 'mummy']],
       wanderers: 4,
       chests: 2,
       events: 2,

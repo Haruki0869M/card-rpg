@@ -39,6 +39,7 @@ export const starCastleMap: ScenarioMapDef = {
       terrain: { hills: 4, cloud: 3, plains: 1 },
       enemyLevel: 5,
       encounters: [['cometFox', 'moonRabbit'], ['shootingStarBird', 'moonRabbit'], ['starFragment', 'gearBeetle'], ['moonRabbit', 'starFragment'], ['shootingStarBird', 'gearBeetle', 'starFragment'], ['angelStatue', 'moonRabbit']],
+      rareEncounters: [['starlitSwan'], ['starlitSwan', 'moonRabbit']],
       wanderers: 4,
       chests: 2,
       events: 2,

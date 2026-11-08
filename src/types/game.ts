@@ -336,6 +336,8 @@ export interface EventDef {
   terrain?: string[];
   /** 突発イベント: 移動した仲間のだれかがお供を連れている時だけ起きる（K7） */
   needsPet?: boolean;
+  /** 隠しボスの名所（K3 C。where: 'map' と使う）: この地域（地域の id）の空いたマスに必ず1つだけ置く。ふつうのマップのイベントの候補には入れない */
+  hiddenIn?: string;
   title: string;
   text: string;
   icon: string;
