@@ -14,6 +14,7 @@ export const crystalCave: DungeonDef = {
   bossChest: 'epic',
   rewardKey: 'crystalWhite',
   corruptionOnClear: 5,
+  clearStory: ['氷晶の主が、音を立てて砕け散った。', '最期に「…温かい」とつぶやいた。', '氷晶の鍵（白）を手に入れた！'],
   layout: [
     [{ type: 'battle', next: [0, 1] }],
     [
@@ -50,6 +51,7 @@ export const sunkenCathedral: DungeonDef = {
   bossChest: 'epic',
   rewardKey: 'crystalBlue',
   corruptionOnClear: 5,
+  clearStory: ['司教は微笑み、光になって消えた。', '「どうか、姫様を止めて」', '氷晶の鍵（蒼）を手に入れた！'],
   layout: [
     [{ type: 'battle', next: [0, 1] }],
     [
@@ -86,6 +88,7 @@ export const giantMine: DungeonDef = {
   bossChest: 'legend',
   rewardKey: 'crystalSilver',
   corruptionOnClear: 5,
+  clearStory: ['霜の巨人が、ゆっくり膝をついた。', '「女王様を…あたためてやってくれ」', '氷晶の鍵（銀）を手に入れた！'],
   layout: [
     [{ type: 'battle', next: [0, 1] }],
     [

@@ -200,6 +200,8 @@ export interface DungeonDef {
   bossChest: Rarity;
   /** 制覇すると手に入る封印の鍵（シナリオの story.keys のID） */
   rewardKey?: string;
+  /** 制覇した後に出る物語（2〜3行、1行30字まで。何が起きたかを伝える）。最後に鍵の残り数と次の目的地が自動で足される */
+  clearStory?: string[];
   /** 入るのに必要な鍵 */
   requiresKeys?: string[];
   /** 制覇すると侵食度がこれだけ下がる */

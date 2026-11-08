@@ -98,7 +98,7 @@ export const dungeonEvents: EventDef[] = [
     id: 'crystalGate',
     title: '氷晶の広間',
     icon: 'stele',
-    text: '洞窟の奥に、巨大な氷晶が並ぶ広間がある。中心で、氷晶の主が眠っている。「…春など、いらぬ。この冷たさだけが、私を守ってくれる」',
+    text: '氷晶の主が目を開いた。「春など、いらぬ。この冷たさだけが、私を守る」',
     options: [
       { label: '武器を構えて進む', success: [{ kind: 'nothing' }], successText: '氷晶の主が目を開いた。戦いが始まる！' },
       { label: '深呼吸して備える（全員のフォーカス+1）', success: [{ kind: 'gainFocus', amount: 1, all: true }], successText: '凍える空気を吸いこみ、心を落ち着けた。' },
@@ -108,7 +108,7 @@ export const dungeonEvents: EventDef[] = [
     id: 'bishopAltar',
     title: '凍れる祭壇',
     icon: 'stele',
-    text: '氷に沈んだ聖堂の祭壇で、司教が祈り続けている。「姫様は、民を守るために氷の力を求められた。…その祈りを、私は止められなかった」',
+    text: '凍れる司教が祈っている。「姫様は民を守るため、氷の力を求めた。私は止められなかった」',
     options: [
       { label: '司教に近づく', success: [{ kind: 'nothing' }], successText: '司教の祈りが、悲しい声に変わった。戦いが始まる！' },
       { label: '祭壇に祈りを捧げる（全員のHP+15）', success: [{ kind: 'heal', amount: 15, all: true }], successText: 'かすかな光が、体を温めた。' },
@@ -118,7 +118,7 @@ export const dungeonEvents: EventDef[] = [
     id: 'giantGate',
     title: '巨人の坑道',
     icon: 'mountain',
-    text: '坑道をふさぐ巨体が、ゆっくりと振り返る。「ここは…通さぬ。女王様は…ただ、寒がっておられるだけだ」',
+    text: '霜の巨人が振り返る。「通さぬ。女王様は、ただ寒がっておられるだけだ」',
     options: [
       { label: '武器を構えて進む', success: [{ kind: 'nothing' }], successText: '巨人が咆哮した。戦いが始まる！' },
       { label: '深呼吸して備える（全員のフォーカス+1）', success: [{ kind: 'gainFocus', amount: 1, all: true }], successText: '巨人の足音の中で、心を落ち着けた。' },
@@ -128,7 +128,7 @@ export const dungeonEvents: EventDef[] = [
     id: 'queenThrone',
     title: '氷の玉座',
     icon: 'stele',
-    text: '玉座の間に、白い影が座っている。「…また、温もりを求める者が来たのですね。百年経っても、民は春を忘れられない。なら、私が凍らせてあげましょう」',
+    text: '白の女王が玉座にいる。「温もりを求める者よ。私が、凍らせてあげましょう」',
     options: [
       { label: '女王に語りかける', success: [{ kind: 'nothing' }], successText: '女王の瞳に、一瞬だけ涙が光った。「…お願い、私を止めて」戦いが始まる！' },
       { label: '仲間と顔を見合わせる（全員のフォーカス+1）', success: [{ kind: 'gainFocus', amount: 1, all: true }], successText: '仲間と頷き合い、覚悟を決めた。' },
