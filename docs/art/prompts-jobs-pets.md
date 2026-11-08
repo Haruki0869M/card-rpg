@@ -786,25 +786,25 @@ adorable chibi cockatiel parrot with a tall upright head crest, light silver-gra
 灰（`gray`）→ 元画像 `pet-wolfPup-gray.png`
 
 ```
-adorable chibi fluffy wolf pup with big paws and pointy ears, gray fur with a lighter cream chest, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi fluffy wolf pup with big paws and pointy ears, gray fur with a lighter cream chest, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 茶（`brown`）→ 元画像 `pet-wolfPup-brown.png`
 
 ```
-adorable chibi fluffy wolf pup with big paws and pointy ears, warm brown fur with a cream chest, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi fluffy wolf pup with big paws and pointy ears, warm brown fur with a cream chest, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 黒（`black`）→ 元画像 `pet-wolfPup-black.png`
 
 ```
-adorable chibi fluffy wolf pup with big paws and pointy ears, jet black fur with golden eyes, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi fluffy wolf pup with big paws and pointy ears, jet black fur with golden eyes, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 白銀（`silver`）→ 元画像 `pet-wolfPup-silver.png`
 
 ```
-adorable chibi fluffy wolf pup with big paws and pointy ears, shining silver-white fur with pale blue eyes, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi fluffy wolf pup with big paws and pointy ears, shining silver-white fur with pale blue eyes, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 ### 黒猫（`blackCat`）
@@ -813,25 +813,25 @@ adorable chibi fluffy wolf pup with big paws and pointy ears, shining silver-whi
 黒（`black`）→ 元画像 `pet-blackCat-black.png`
 
 ```
-adorable chibi kitten with a curled tail, solid black fur with big yellow eyes, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi kitten with a curled tail, solid black fur with big yellow eyes, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 ハチワレ（`tuxedo`）→ 元画像 `pet-blackCat-tuxedo.png`
 
 ```
-adorable chibi kitten with a curled tail, black and white tuxedo pattern, white face blaze, white chest and paws, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi kitten with a curled tail, black and white tuxedo pattern, white face blaze, white chest and paws, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 三毛（`calico`）→ 元画像 `pet-blackCat-calico.png`
 
 ```
-adorable chibi kitten with a curled tail, calico pattern with white, orange and black patches, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi kitten with a curled tail, calico pattern with white, orange and black patches, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 ロシアンブルー（`russianBlue`）→ 元画像 `pet-blackCat-russianBlue.png`
 
 ```
-adorable chibi kitten with a curled tail, blue-gray velvety fur with green eyes, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi kitten with a curled tail, blue-gray velvety fur with green eyes, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 ### 子亀（`turtle`）
@@ -840,25 +840,25 @@ adorable chibi kitten with a curled tail, blue-gray velvety fur with green eyes,
 緑（`green`）→ 元画像 `pet-turtle-green.png`
 
 ```
-adorable chibi baby tortoise with a round domed shell and a happy face, green shell and green skin, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi baby tortoise with a round domed shell and a happy face, green shell and green skin, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 茶（`brown`）→ 元画像 `pet-turtle-brown.png`
 
 ```
-adorable chibi baby tortoise with a round domed shell and a happy face, brown shell with tan skin, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi baby tortoise with a round domed shell and a happy face, brown shell with tan skin, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 黄金（`gold`）→ 元画像 `pet-turtle-gold.png`
 
 ```
-adorable chibi baby tortoise with a round domed shell and a happy face, shiny golden shell with sparkles, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi baby tortoise with a round domed shell and a happy face, shiny golden shell with sparkles, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 玄武風（`genbu`）→ 元画像 `pet-turtle-genbu.png`
 
 ```
-adorable chibi baby tortoise with a round domed shell and a happy face, dark slate blue shell with faint hexagon patterns, a tiny cute snake-shaped tail, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi baby tortoise with a round domed shell and a happy face, dark slate blue shell with faint hexagon patterns, a tiny cute snake-shaped tail, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 ### 小竜（`babyDragon`）
@@ -867,25 +867,25 @@ adorable chibi baby tortoise with a round domed shell and a happy face, dark sla
 紅（`crimson`）→ 元画像 `pet-babyDragon-crimson.png`
 
 ```
-adorable chibi baby dragon with small wings, tiny horns and a chubby belly, flying in the air, crimson red scales with a cream belly, big round sparkling eyes, tiny simple body, hovering in the air, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi baby dragon with small wings, tiny horns and a chubby belly, flying in the air, crimson red scales with a cream belly, big round sparkling eyes, tiny simple body, hovering in the air, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 蒼（`azure`）→ 元画像 `pet-babyDragon-azure.png`
 
 ```
-adorable chibi baby dragon with small wings, tiny horns and a chubby belly, flying in the air, azure blue scales with a pale belly, big round sparkling eyes, tiny simple body, hovering in the air, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi baby dragon with small wings, tiny horns and a chubby belly, flying in the air, azure blue scales with a pale belly, big round sparkling eyes, tiny simple body, hovering in the air, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 翠（`jade`）→ 元画像 `pet-babyDragon-jade.png`
 
 ```
-adorable chibi baby dragon with small wings, tiny horns and a chubby belly, flying in the air, jade green scales with a pale belly, big round sparkling eyes, tiny simple body, hovering in the air, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi baby dragon with small wings, tiny horns and a chubby belly, flying in the air, jade green scales with a pale belly, big round sparkling eyes, tiny simple body, hovering in the air, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 金（`gold`）→ 元画像 `pet-babyDragon-gold.png`
 
 ```
-adorable chibi baby dragon with small wings, tiny horns and a chubby belly, flying in the air, golden scales with a cream belly, big round sparkling eyes, tiny simple body, hovering in the air, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi baby dragon with small wings, tiny horns and a chubby belly, flying in the air, golden scales with a cream belly, big round sparkling eyes, tiny simple body, hovering in the air, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 ### うさぎ（`rabbit`）
@@ -894,25 +894,25 @@ adorable chibi baby dragon with small wings, tiny horns and a chubby belly, flyi
 白（`white`）→ 元画像 `pet-rabbit-white.png`
 
 ```
-adorable chibi bunny rabbit with a fluffy round tail, pure white fur with pink inner ears, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi bunny rabbit with a fluffy round tail, pure white fur with pink inner ears, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 茶（`brown`）→ 元画像 `pet-rabbit-brown.png`
 
 ```
-adorable chibi bunny rabbit with a fluffy round tail, brown fur with a cream belly, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi bunny rabbit with a fluffy round tail, brown fur with a cream belly, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 グレー（`gray`）→ 元画像 `pet-rabbit-gray.png`
 
 ```
-adorable chibi bunny rabbit with a fluffy round tail, soft gray fur, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi bunny rabbit with a fluffy round tail, soft gray fur, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 垂れ耳（`lop`）→ 元画像 `pet-rabbit-lop.png`
 
 ```
-adorable chibi bunny rabbit with a fluffy round tail, cream-beige fur with long floppy drooping lop ears, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi bunny rabbit with a fluffy round tail, cream-beige fur with long floppy drooping lop ears, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 ### フクロウ（`owl`）
@@ -921,25 +921,25 @@ adorable chibi bunny rabbit with a fluffy round tail, cream-beige fur with long 
 茶（`brown`）→ 元画像 `pet-owl-brown.png`
 
 ```
-adorable chibi owlet with big round eyes, brown feathers with lighter speckles, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi owlet with big round eyes, brown feathers with lighter speckles, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 灰（`gray`）→ 元画像 `pet-owl-gray.png`
 
 ```
-adorable chibi owlet with big round eyes, gray feathers, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi owlet with big round eyes, gray feathers, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 シロフクロウ（`snowy`）→ 元画像 `pet-owl-snowy.png`
 
 ```
-adorable chibi owlet with big round eyes, snowy white feathers with a few small black spots, yellow eyes, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi owlet with big round eyes, snowy white feathers with a few small black spots, yellow eyes, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 ミミズク（`horned`）→ 元画像 `pet-owl-horned.png`
 
 ```
-adorable chibi owlet with big round eyes, tawny brown feathers with two pointy ear tufts, orange eyes, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi owlet with big round eyes, tawny brown feathers with two pointy ear tufts, orange eyes, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 ### 子狐（`foxCub`）
@@ -948,25 +948,25 @@ adorable chibi owlet with big round eyes, tawny brown feathers with two pointy e
 稲荷色（`inari`）→ 元画像 `pet-foxCub-inari.png`
 
 ```
-adorable chibi fox kit with a big fluffy tail, bright orange-gold fur with white tail tip and chest, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi fox kit with a big fluffy tail, bright orange-gold fur with white tail tip and chest, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 茶（`brown`）→ 元画像 `pet-foxCub-brown.png`
 
 ```
-adorable chibi fox kit with a big fluffy tail, warm brown fur with a cream chest, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi fox kit with a big fluffy tail, warm brown fur with a cream chest, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 白狐（`white`）→ 元画像 `pet-foxCub-white.png`
 
 ```
-adorable chibi fox kit with a big fluffy tail, pure white fur with faint red markings near the eyes, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi fox kit with a big fluffy tail, pure white fur with faint red markings near the eyes, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 黒狐（`black`）→ 元画像 `pet-foxCub-black.png`
 
 ```
-adorable chibi fox kit with a big fluffy tail, black-brown fur with a white tail tip, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi fox kit with a big fluffy tail, black-brown fur with a white tail tip, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 ### 文鳥（`javaSparrow`）
@@ -1002,25 +1002,25 @@ adorable chibi java sparrow, very round mochi-like body, thick pink-red beak, re
 水色（`blue`）→ 元画像 `pet-budgie-blue.png`
 
 ```
-adorable chibi budgerigar parakeet with wavy stripes on the head and wings, small round cheek dots, sky blue body, white face, black wavy stripes, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi budgerigar parakeet with wavy stripes on the head and wings, small round cheek dots, sky blue body, white face, black wavy stripes, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 黄緑（`green`）→ 元画像 `pet-budgie-green.png`
 
 ```
-adorable chibi budgerigar parakeet with wavy stripes on the head and wings, small round cheek dots, bright lime green body, yellow face, black wavy stripes, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi budgerigar parakeet with wavy stripes on the head and wings, small round cheek dots, bright lime green body, yellow face, black wavy stripes, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 ハルクイン（`harlequin`）→ 元画像 `pet-budgie-harlequin.png`
 
 ```
-adorable chibi budgerigar parakeet with wavy stripes on the head and wings, small round cheek dots, pied pattern with yellow and green patches, yellow face, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi budgerigar parakeet with wavy stripes on the head and wings, small round cheek dots, pied pattern with yellow and green patches, yellow face, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 レインボー（`rainbow`）→ 元画像 `pet-budgie-rainbow.png`
 
 ```
-adorable chibi budgerigar parakeet with wavy stripes on the head and wings, small round cheek dots, pastel gradient body of turquoise, blue and violet, yellow face, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi budgerigar parakeet with wavy stripes on the head and wings, small round cheek dots, pastel gradient body of turquoise, blue and violet, yellow face, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 ### シマエナガ（`longTailedTit`）
@@ -1029,25 +1029,25 @@ adorable chibi budgerigar parakeet with wavy stripes on the head and wings, smal
 雪白（`snow`）→ 元画像 `pet-longTailedTit-snow.png`
 
 ```
-adorable chibi long-tailed tit, tiny perfectly round fluffy snowball body, very small beak, black bead eyes, long thin tail, pure white fluffy face and body, black and white wings and tail, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi long-tailed tit, tiny perfectly round fluffy snowball body, very small beak, black bead eyes, long thin tail, pure white fluffy face and body, black and white wings and tail, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 銀灰（`silverGray`）→ 元画像 `pet-longTailedTit-silverGray.png`
 
 ```
-adorable chibi long-tailed tit, tiny perfectly round fluffy snowball body, very small beak, black bead eyes, long thin tail, white face, silvery gray body, gray wings and tail, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi long-tailed tit, tiny perfectly round fluffy snowball body, very small beak, black bead eyes, long thin tail, white face, silvery gray body, gray wings and tail, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 ほんのり桜色（`sakura`）→ 元画像 `pet-longTailedTit-sakura.png`
 
 ```
-adorable chibi long-tailed tit, tiny perfectly round fluffy snowball body, very small beak, black bead eyes, long thin tail, white face, soft pink tinted body, pink-gray wings, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi long-tailed tit, tiny perfectly round fluffy snowball body, very small beak, black bead eyes, long thin tail, white face, soft pink tinted body, pink-gray wings, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 淡金（`paleGold`）→ 元画像 `pet-longTailedTit-paleGold.png`
 
 ```
-adorable chibi long-tailed tit, tiny perfectly round fluffy snowball body, very small beak, black bead eyes, long thin tail, white face, pale golden cream body, light brown wings, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi long-tailed tit, tiny perfectly round fluffy snowball body, very small beak, black bead eyes, long thin tail, white face, pale golden cream body, light brown wings, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 ### レッサーパンダ（`redPanda`）
@@ -1056,25 +1056,25 @@ adorable chibi long-tailed tit, tiny perfectly round fluffy snowball body, very 
 茶（`brown`）→ 元画像 `pet-redPanda-brown.png`
 
 ```
-adorable chibi red panda cub with a ringed fluffy tail and white face markings, reddish brown fur, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi red panda cub with a ringed fluffy tail and white face markings, reddish brown fur, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 明橙（`orange`）→ 元画像 `pet-redPanda-orange.png`
 
 ```
-adorable chibi red panda cub with a ringed fluffy tail and white face markings, bright orange fur, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi red panda cub with a ringed fluffy tail and white face markings, bright orange fur, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 クリーム（`cream`）→ 元画像 `pet-redPanda-cream.png`
 
 ```
-adorable chibi red panda cub with a ringed fluffy tail and white face markings, pale cream fur with soft beige rings, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi red panda cub with a ringed fluffy tail and white face markings, pale cream fur with soft beige rings, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 濃茶（`darkBrown`）→ 元画像 `pet-redPanda-darkBrown.png`
 
 ```
-adorable chibi red panda cub with a ringed fluffy tail and white face markings, dark chocolate brown fur, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi red panda cub with a ringed fluffy tail and white face markings, dark chocolate brown fur, big round sparkling eyes, tiny simple body, sitting on the ground, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 ## 組み込みの手順
