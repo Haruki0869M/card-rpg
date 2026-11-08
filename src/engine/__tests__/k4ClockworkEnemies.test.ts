@@ -7,6 +7,8 @@ import { getScenario } from '../../data/scenarios';
 const normal = ['gearBug', 'steamRat', 'brokenAutomaton', 'conveyorBot', 'riveter', 'oilSlime', 'sparkTurret', 'steamSprite', 'boilerCrab', 'wrenchGolem', 'clockworkDog', 'pistonFist', 'furnaceImp', 'copperKnight', 'voltGearBug', 'emberOilSlime', 'venomBoilerCrab', 'ironCopperKnight'];
 const elite = ['foremanBot', 'steamTurretLord', 'ironButler', 'chainSaw', 'furnaceGolem', 'stormForemanBot'];
 const bosses = ['foremanGolem', 'runawayBoiler', 'clockworkSage', 'greatMachine'];
+// K3 D で足した追加の敵（extra.ts）。28体の内訳とは別に数え、配置は確かめる
+const extra = ['smokeStackCrow', 'pressGolem', 'ironClockworkDog'];
 const dungeons = () => DUNGEONS.forScenario('clockworkEmpire');
 const waves = () => [
   ...dungeons().flatMap((d) => [...d.pools.battle, ...d.pools.elite]),
@@ -15,8 +17,6 @@ const waves = () => [
 
 describe('K4 機械仕掛けの帝国の敵', () => {
   it('専用の敵は通常18・エリート6・ボス4（亜種5）', () => {
-    // K3 D で足した3体（extra.ts）は別に数える
-    const extra = ['smokeStackCrow', 'pressGolem', 'ironClockworkDog'];
     const own = ENEMIES.all.filter((e) => ENEMIES.scenarioOf(e.id) === 'clockworkEmpire' && !extra.includes(e.id));
     expect([...normal, ...elite, ...bosses].sort()).toEqual(own.map((e) => e.id).sort());
     expect(own.filter((e) => e.variantOf)).toHaveLength(5);

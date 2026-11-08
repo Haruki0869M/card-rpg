@@ -7,7 +7,7 @@ export const driftwoodSpirit: EnemyDef = {
   id: 'driftwoodSpirit',
   name: '流木の精霊',
   icon: '🪵',
-  maxHp: 26,
+  maxHp: 24,
   baseLevel: 3,
   size: 0.9,
   exp: 7,
@@ -16,7 +16,7 @@ export const driftwoodSpirit: EnemyDef = {
   resist: ['poison'],
   pattern: 'sequence',
   actions: [
-    { id: 'branch', name: '流木の枝', effects: [{ kind: 'damage', amount: 7 }] },
+    { id: 'branch', name: '流木の枝', effects: [{ kind: 'damage', amount: 6 }] },
     { id: 'soak', name: '水を吸う', effects: [{ kind: 'block', amount: 6 }] },
     { id: 'splinter', name: 'ささくれ', effects: [{ kind: 'damage', amount: 3, hits: 2 }] },
   ],
@@ -26,7 +26,7 @@ export const lanternAngler: EnemyDef = {
   id: 'lanternAngler',
   name: '提灯鮟鱇',
   icon: '🐟',
-  maxHp: 60,
+  maxHp: 48,
   baseLevel: 9,
   size: 1.1,
   exp: 16,
@@ -34,9 +34,9 @@ export const lanternAngler: EnemyDef = {
   weak: ['thunder'],
   pattern: 'sequence',
   actions: [
-    { id: 'lure', name: '妖しい灯り', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'foes' }, { kind: 'block', amount: 6 }] },
-    { id: 'gulp', name: '大口の丸呑み', effects: [{ kind: 'damage', amount: 16 }] },
-    { id: 'fangs', name: '並んだ牙', effects: [{ kind: 'damage', amount: 6, hits: 2 }] },
+    { id: 'lure', name: '妖しい灯り', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1 }] },
+    { id: 'gulp', name: '大口の丸呑み', effects: [{ kind: 'damage', amount: 12 }] },
+    { id: 'fangs', name: '並んだ牙', effects: [{ kind: 'damage', amount: 5, hits: 2 }] },
   ],
 };
 
