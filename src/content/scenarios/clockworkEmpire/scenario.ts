@@ -12,10 +12,8 @@ export const clockworkEmpire: ScenarioDef = {
   recommended: '2〜4人',
   playTime: '60〜90分',
   unlocked: true,
-  // いまは5本目の星降る天空城が作成中でクリアできないので、遊べる最後の本（呪われた群島）のクリアで解放する。
-  // 砂塵の王朝・星降る天空城を登録する時に、unlockText を「「星降る天空城」をクリアすると遊べる」に、解放の条件を starCastle に戻す
-  unlockText: '「呪われた群島」をクリアすると遊べる',
-  unlockRequires: { cleared: ['cursedArchipelago'] },
+  unlockText: '「星降る天空城」をクリアすると遊べる',
+  unlockRequires: { cleared: ['starCastle'] },
   // 世界の悪化の名前（画面の「侵食度」の代わりに出る言葉）
   corruptionName: '暴走率',
   start: { gold: 40, pouch: [{ itemId: 'potion', count: 2 }] },

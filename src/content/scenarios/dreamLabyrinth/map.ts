@@ -1,5 +1,5 @@
 // シナリオ7の世界マップ。下（目覚めの草原）から上（夢の最奥）へ進む。地域ごとに、過去の世界の景色が出てくる。
-// 雪・氷は寒さ、砂漠は昼の暑さと夜の寒さ、蒸気の地は暑さでHPが減る。敵の組み合わせは仮（共通の敵）
+// 雪・氷は寒さ、砂漠は昼の暑さと夜の寒さ、蒸気の地は暑さでHPが減る。敵の組み合わせは夢幻の大迷宮の敵（enemies/）
 import type { ScenarioMapDef } from '../../../types';
 
 export const dreamLabyrinthMap: ScenarioMapDef = {
@@ -15,7 +15,7 @@ export const dreamLabyrinthMap: ScenarioMapDef = {
       rows: [0, 2],
       terrain: { blight: 4, cloud: 2, metal: 1 },
       enemyLevel: 10,
-      encounters: [['goblinBrute'], ['goblinBrute', 'chaosShaman'], ['guardDog', 'goblinBrute']],
+      encounters: [['memoryEater', 'shadowChild'], ['mirrorKnight', 'dreamWeaver'], ['lostMemory', 'shadowChild', 'lostMemory'], ['echoColossusStatue', 'shadowChild'], ['memoryEater']],
       wanderers: 2,
     },
     {
@@ -25,7 +25,7 @@ export const dreamLabyrinthMap: ScenarioMapDef = {
       rows: [3, 7],
       terrain: { cloud: 4, water: 2, hills: 1 },
       enemyLevel: 8,
-      encounters: [['goblinBrute', 'goblinScout'], ['guardDog', 'guardDog'], ['chaosShaman', 'goblinBrute']],
+      encounters: [['echoAngelStatue', 'lostMemory'], ['echoShark', 'lullabyBird'], ['echoMoonRabbit', 'echoDrownedSailor'], ['dreamWeaver', 'shadowChild'], ['echoSeaWitch', 'lostMemory']],
       wanderers: 4,
       chests: 2,
       events: 2,
@@ -38,7 +38,7 @@ export const dreamLabyrinthMap: ScenarioMapDef = {
       rows: [8, 12],
       terrain: { desert: 3, steam: 2, metal: 2 },
       enemyLevel: 7,
-      encounters: [['guardDog', 'goblinScout'], ['chaosShaman', 'guardDog'], ['goblinScout', 'goblinScout', 'chaosShaman']],
+      encounters: [['echoMummy', 'shadowChild'], ['echoSandScorpion', 'echoConveyorBot'], ['echoWrenchGolem', 'lullabyBird'], ['pillowGolem', 'echoMummy'], ['echoConveyorBot', 'shadowChild', 'nightmareMote']],
       wanderers: 4,
       chests: 2,
       events: 2,
@@ -53,7 +53,7 @@ export const dreamLabyrinthMap: ScenarioMapDef = {
       terrain: { snow: 4, ice: 3, hills: 1 },
       climate: { kind: 'cold', ratio: 0.05 },
       enemyLevel: 5,
-      encounters: [['guardDog', 'guardDog'], ['goblinScout', 'guardDog'], ['chaosShaman', 'goblinScout']],
+      encounters: [['echoFrostWolf', 'pillowGolem'], ['echoIceSwordsman', 'lullabyBird'], ['echoFrostWolf', 'sleepwalker'], ['echoIceKnight'], ['nightmareMote', 'echoIceSwordsman']],
       wanderers: 4,
       chests: 2,
       events: 2,
@@ -66,7 +66,7 @@ export const dreamLabyrinthMap: ScenarioMapDef = {
       rows: [18, 22],
       terrain: { forest: 3, swamp: 3, plains: 1 },
       enemyLevel: 3,
-      encounters: [['guardDog', 'goblinScout'], ['goblinScout', 'goblinScout'], ['chaosShaman', 'goblinScout']],
+      encounters: [['echoForestWolf', 'sleepwalker'], ['echoBogGhoul', 'nightmareMote'], ['echoForestWolf', 'echoBogGhoul'], ['sleepwalker', 'nightmareMote', 'nightmareMote']],
       wanderers: 4,
       chests: 2,
       events: 2,
@@ -79,7 +79,7 @@ export const dreamLabyrinthMap: ScenarioMapDef = {
       rows: [23, 27],
       terrain: { plains: 5, hills: 2, forest: 1 },
       enemyLevel: 1,
-      encounters: [['goblinScout'], ['goblinScout', 'goblinScout'], ['guardDog', 'goblinScout']],
+      encounters: [['nightmareMote'], ['nightmareMote', 'nightmareMote'], ['sleepwalker', 'nightmareMote']],
       wanderers: 3,
       chests: 2,
       events: 2,

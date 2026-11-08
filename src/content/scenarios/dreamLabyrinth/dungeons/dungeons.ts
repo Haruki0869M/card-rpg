@@ -1,11 +1,33 @@
-// シナリオ7のダンジョン。敵の組み合わせ（POOLS）は仮（敵ができたら置き換える）。
+// シナリオ7のダンジョン。敵はこのシナリオの敵（enemies/。夢の再来と新しい夢の敵）。弱点が同じ敵だけの組にしない。
 // 制覇すると夢の欠片が手に入り、3つそろうと最終ダンジョンに入れる。ボスは過去のボスの再来。手前に「物語の部屋」（event）を置く
 import type { DungeonDef } from '../../../../types';
 
-const POOLS: DungeonDef['pools'] = {
-  battle: [['guardDog', 'guardDog'], ['goblinScout', 'guardDog'], ['chaosShaman', 'goblinScout'], ['goblinScout', 'goblinScout', 'chaosShaman']],
-  elite: [['goblinBrute'], ['goblinBrute', 'chaosShaman']],
-  boss: ['goblinBrute'],
+/** 氷の記憶の洞: 森と氷の記憶の敵。ボスは夢の白の女王 */
+const ICE_POOLS: DungeonDef['pools'] = {
+  battle: [['echoFrostWolf', 'pillowGolem'], ['echoIceSwordsman', 'sleepwalker'], ['echoForestWolf', 'lullabyBird'], ['echoBogGhoul', 'echoFrostWolf'], ['nightmareMote', 'echoIceSwordsman', 'sleepwalker']],
+  elite: [['echoIceKnight'], ['echoIceKnight', 'nightmareMote']],
+  boss: ['echoWhiteQueen'],
+};
+
+/** 砂の幻影の墓: 砂と機械の記憶の敵。ボスは夢の砂塵の王 */
+const SAND_POOLS: DungeonDef['pools'] = {
+  battle: [['echoMummy', 'shadowChild'], ['echoSandScorpion', 'echoWrenchGolem'], ['echoConveyorBot', 'pillowGolem'], ['echoMummy', 'echoConveyorBot'], ['shadowChild', 'echoSandScorpion', 'lullabyBird']],
+  elite: [['echoColossusStatue'], ['mirrorKnight']],
+  boss: ['echoSandPharaoh'],
+};
+
+/** 幽霊船の悪夢: 空と海の記憶の敵。ボスは夢の亡霊提督 */
+const GHOST_POOLS: DungeonDef['pools'] = {
+  battle: [['echoShark', 'echoAngelStatue'], ['echoDrownedSailor', 'lostMemory'], ['echoMoonRabbit', 'echoDrownedSailor'], ['lostMemory', 'echoShark']],
+  elite: [['echoSeaWitch'], ['dreamWeaver']],
+  boss: ['echoGhostAdmiral'],
+};
+
+/** 夢喰いの巣: 夢の敵の総力戦。ボスは夢喰い（3段階） */
+const LAIR_POOLS: DungeonDef['pools'] = {
+  battle: [['shadowChild', 'nightmareMote'], ['echoAngelStatue', 'echoMummy'], ['pillowGolem', 'lullabyBird'], ['echoWrenchGolem', 'lostMemory'], ['echoMoonRabbit', 'echoDrownedSailor']],
+  elite: [['memoryEater'], ['dreamWeaver']],
+  boss: ['dreamEater'],
 };
 
 type Layout = NonNullable<DungeonDef['layout']>;
@@ -95,7 +117,7 @@ export const echoIceVault: DungeonDef = {
   description: '氷の城の記憶が残る洞。蘇った白の女王の影が、夢の欠片（記憶）を抱えている。',
   background: 'catacomb',
   baseLevel: 4,
-  pools: POOLS,
+  pools: ICE_POOLS,
   bossChest: 'epic',
   rewardKey: 'shardMemory',
   corruptionOnClear: 5,
@@ -109,7 +131,7 @@ export const echoSandTomb: DungeonDef = {
   description: '砂漠の王朝の記憶が残る墓。蘇った砂塵の王の影が、夢の欠片（恐れ）を抱えている。',
   background: 'temple',
   baseLevel: 6,
-  pools: POOLS,
+  pools: SAND_POOLS,
   bossChest: 'epic',
   rewardKey: 'shardFear',
   corruptionOnClear: 5,
@@ -122,8 +144,8 @@ export const echoGhostShip: DungeonDef = {
   name: '幽霊船の悪夢',
   description: '霧の海の記憶が残る幽霊船。蘇った亡霊提督の影が、夢の欠片（希望）を抱えている。',
   background: 'forestCave',
-  baseLevel: 8,
-  pools: POOLS,
+  baseLevel: 7,
+  pools: GHOST_POOLS,
   bossChest: 'legend',
   rewardKey: 'shardHope',
   corruptionOnClear: 5,
@@ -136,8 +158,8 @@ export const dreamEaterLair: DungeonDef = {
   name: '夢喰いの巣',
   description: '夢喰いの住処。三つの夢の欠片がなければ、記憶の扉は開かない。',
   background: 'castle',
-  baseLevel: 10,
-  pools: POOLS,
+  baseLevel: 9,
+  pools: LAIR_POOLS,
   bossChest: 'legend',
   requiresKeys: ['shardMemory', 'shardFear', 'shardHope'],
   finale: true,
@@ -168,7 +190,7 @@ export const dreamCave: DungeonDef = {
   description: '訪れるたびに姿を変える夢の洞窟。危険だが、奥には豪華な財宝が眠る。',
   background: 'forestCave',
   baseLevel: 7,
-  pools: { ...POOLS, boss: ['goblinBrute', 'chaosShaman'] },
+  pools: { ...LAIR_POOLS, boss: ['mirrorKnight', 'memoryEater'] },
   bossChest: 'legend',
   random: true,
   rows: 6,

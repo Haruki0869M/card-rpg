@@ -11,10 +11,8 @@ export const dreamLabyrinth: ScenarioDef = {
   synopsis: '六つの世界の記憶が混ざった、夢の迷宮。蘇った過去の悪を越え、三つの夢の欠片を集めて、夢喰いを止めよ。',
   recommended: '2〜4人',
   playTime: '60〜90分',
-  unlocked: false,
-  // 作成中: 敵・数値がそろうまで遊べない。仕上げる時に wip を消し、unlockText を「他の6本をすべてクリアすると遊べる」にする
-  wip: true,
-  unlockText: '準備中（もうすぐ遊べます）',
+  unlocked: true,
+  unlockText: '他の6本をすべてクリアすると遊べる',
   unlockRequires: { cleared: ['corruptionKing', 'frozenKingdom', 'cursedArchipelago', 'sandDynasty', 'starCastle', 'clockworkEmpire'] },
   // 世界の悪化の名前（画面の「侵食度」の代わりに出る言葉）
   corruptionName: '夢の崩れ',

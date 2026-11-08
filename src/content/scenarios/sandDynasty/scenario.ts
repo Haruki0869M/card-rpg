@@ -11,10 +11,8 @@ export const sandDynasty: ScenarioDef = {
   synopsis: '砂に埋もれた古い王朝の王が、永遠の命を求めて民の魂を砂に変えている。三つの聖印を集め、砂塵の王を眠らせよ。',
   recommended: '2〜4人',
   playTime: '60〜90分',
-  unlocked: false,
-  // 作成中: 敵・数値がそろうまで遊べない。仕上げる時に wip を消し、unlockText を「「呪われた群島」をクリアすると遊べる」にする
-  wip: true,
-  unlockText: '準備中（もうすぐ遊べます）',
+  unlocked: true,
+  unlockText: '「呪われた群島」をクリアすると遊べる',
   unlockRequires: { cleared: ['cursedArchipelago'] },
   // 世界の悪化の名前（画面の「侵食度」の代わりに出る言葉）
   corruptionName: '砂の侵食',
