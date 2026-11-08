@@ -1011,6 +1011,17 @@ function leaveChest(game: GameState, playerId: string, rng: Rng): string | undef
   return undefined;
 }
 
+/** 制覇の物語の最後に足す一行: 鍵があと何個か / そろったら最終ダンジョンへ（シナリオのデータから作る。順番は決めつけない） */
+export function nextGoalLines(game: GameState): string[] {
+  const w = game.world!;
+  const total = Object.keys(getScenario(game.scenarioId).story?.keys ?? {}).length;
+  if (!total) return [];
+  const left = total - w.keys.length;
+  if (left > 0) return [`鍵はあと${left}つ。`];
+  const finale = DUNGEONS.forScenario(game.scenarioId).find((d) => d.finale);
+  return finale ? [`鍵がそろった。${finale.name}へ向かおう。`] : [];
+}
+
 /** 世界マップのダンジョンを制覇した時（封印の鍵・侵食度・依頼・最終ダンジョンならエンディング） */
 function onDungeonCleared(game: GameState, dungeonId: string, rng: Rng) {
   const w = game.world!;
@@ -1024,6 +1035,7 @@ function onDungeonCleared(game: GameState, dungeonId: string, rng: Rng) {
     addLog(game, `${corruptionName(game.scenarioId)}が${def.corruptionOnClear}%下がった`);
   }
   questSignal(game, { kind: 'clearDungeon', dungeonId });
+  if (def.clearStory?.length && !def.finale) w.story = { title: def.name, lines: [...def.clearStory, ...nextGoalLines(game)] };
   if (def.finale) {
     const story = getScenario(game.scenarioId).story;
     w.story = { title: 'エンディング', lines: story?.ending ?? ['魔王は封じられた。'] };
