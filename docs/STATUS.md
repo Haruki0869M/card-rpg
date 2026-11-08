@@ -56,7 +56,7 @@ Geminiの3段階案のうち、第1段階（新規開始の確認・対象選択
 - 結果: 12ケースすべて、作り直し0・止まっている駒のずれ最大0.00px・歩行中の霧と敵は移動前のまま（到着後に霧が晴れる）・「！」と窓の重なり0フレーム。同じスクリプトを公開中の旧版（1b132d0）に向けると「駒が作り直された h0,h1」で失敗し、問題を検出できることも確認。
 - 「移動中…」の帯は、下のパネルの文字が透けて読みにくかったので、ほぼ不透明（97%）＋少しぼかしにした。
 - 型チェック・500件成功/3件スキップ・ビルド成功。画面確認: world-move-stability（12ケース）・movement-pet-colors・check-layout・battle-feedback・interaction-safety・playthrough・final-special-jobs・pets・jobchange・sanctuaries すべて成功。adventure: 固定種874651857の2人・4人、種未指定の2人（2739806）・4人（231832735）すべてcleared（やさしい・翠の神殿の攻略と帰還まで）。帯の色の変更後に world-move-stability・movement-pet-colors・check-layout を再実行して成功。
-- まだHostingへ再公開していない（オーナーのOK待ち）。
+- オーナーのOKでHostingのみ再公開（587e8d3）。公開版に world-move-stability を向けて12ケースすべて成功（作り直し0・ずれ0.00px・歩行中の霧と敵は移動前のまま・「！」と窓の重なり0）。HTTP200・SPA転送も確認。実機2台での見え方はオーナーの確認待ち。
 
 ### Hosting再公開（第2段階・2026-11-08）
 
