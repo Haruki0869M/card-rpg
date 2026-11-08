@@ -333,6 +333,20 @@ def build_items():
         fig = trim(soft_key(n) if key == 'town' else cutout(n), 24)
         save(rim(square(fig, 224, 0.04), strength=0.4), f'{name}.webp', 82)
 
+
+# ---------------- お供（ペット） ----------------
+# 元画像は pet-<お供ID>-<色ID>.(webp|png)。SRC に有る物を全部、pet/<お供ID>-<色ID>.webp にする（無い色は飛ばす）
+def build_pets():
+    import glob, re
+    for f in sorted(glob.glob(os.path.join(SRC, 'pet-*'))):
+        m = re.match(r'pet-(.+)\.(webp|png|jpg)$', os.path.basename(f))
+        if not m: continue
+        key = m.group(1)
+        name = f'pet/{key}'
+        if not want(name): continue
+        fig = trim(despeckle(cutout(f'pet-{key}')), 24)
+        save(rim(square(fig, 160, 0.04), (8, 6, 12), 0.6, 2), f'{name}.webp', 82)
+
 # ---------------- 画面の枠（UIの部品集 6 から切り出す） ----------------
 def key_out(im, bg=(60, 52, 55), tol=26):
     """部品集の無地の背景色を透明にする"""
@@ -380,4 +394,4 @@ def build_ui():
         save(seamless(im), 'ui/panel.webp', 70)
 
 if __name__ == '__main__':
-    build_heroes(); build_enemies(); build_bgs(); build_terrains(); build_items(); build_ui()
+    build_heroes(); build_enemies(); build_bgs(); build_terrains(); build_items(); build_ui(); build_pets()

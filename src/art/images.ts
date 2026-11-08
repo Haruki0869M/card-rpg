@@ -30,9 +30,9 @@ export function preloadImages(keys: string[]) {
   }
 }
 
-/** 起動時: 小さな絵（顔・道具・宝箱・地図の場所・地形・画面の枠）はすぐ、大きな絵（全身・敵・背景）は手が空いた時に少しずつ */
+/** 起動時: 小さな絵（顔・お供・道具・宝箱・地図の場所・地形・画面の枠）はすぐ、大きな絵（全身・敵・背景）は手が空いた時に少しずつ */
 export function preloadAllImages() {
-  const now = Object.keys(IMAGES).filter((k) => /^(item|chest|place|terrain|ui)\//.test(k) || k.endsWith('-face') || k === 'bg/title');
+  const now = Object.keys(IMAGES).filter((k) => /^(item|chest|place|terrain|ui|pet)\//.test(k) || k.endsWith('-face') || k === 'bg/title');
   preloadImages(now);
   const later = Object.keys(IMAGES).filter((k) => !now.includes(k));
   const idle: (cb: () => void) => void =
