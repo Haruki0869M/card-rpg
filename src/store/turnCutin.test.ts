@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createGame, WORLD_SCENE } from '../engine';
 import type { GameState, PlayerId } from '../types';
 import { setLocalPlayers } from './battleConfig';
+import { cutinToShow } from '../components/ui/TurnCutin';
 import { useBattle } from './battleStore';
 
 vi.hoisted(() => {
@@ -58,6 +59,18 @@ describe('手番のカットイン', () => {
     expect(useBattle.getState().dispatchWire({ type: 'WORLD_WAIT', playerId: 'P2', heroId: 'h1' })).toBeUndefined();
     expect(useBattle.getState().turnCutin).toMatchObject({ heroId: 'h0', mine: true, scene: exp });
     expect(useBattle.getState().scene).toBe(exp);
+  });
+
+  it('物語を読んでいる間は、帯を出さずに後回しにする（物語を閉じると出る）。手番の状態は変わらない', () => {
+    useBattle.getState().loadRemote(twoPlayers());
+    useBattle.getState().dispatchWire({ type: 'WORLD_WAIT', playerId: 'P1', heroId: 'h0' });
+    const c = useBattle.getState().turnCutin!;
+    expect(c).not.toBeNull();
+    // 物語が出ている間: 帯は出さない（カットインの状態は消えずに残る）
+    expect(cutinToShow(c, true)).toBeNull();
+    expect(useBattle.getState().turnCutin).toBe(c);
+    // 物語を閉じたら、同じ帯が出る
+    expect(cutinToShow(c, false)).toBe(c);
   });
 
   it('冒険の画面を離れると消える', () => {

@@ -1,6 +1,6 @@
 // シナリオ3の世界マップ。下（港の島）から上（沈没船の海）へ進む。
 // 海のマス（sea）は船があるパーティだけが渡れる。施設のまわり1マスは必ず陸（landAround）
-// 敵の組み合わせは仮（共通の敵）。手順2で呪われた群島の敵に置き換える
+// 陸の敵（encounters）は海賊・半魚人・蟹など。海の敵（seaEncounters）は船に乗っている間に出会う鮫・クラゲ・幽霊など
 import type { ScenarioMapDef } from '../../../types';
 
 export const cursedArchipelagoMap: ScenarioMapDef = {
@@ -16,9 +16,9 @@ export const cursedArchipelagoMap: ScenarioMapDef = {
       intro: '霧の奥に、折れたマストの影が並ぶ。ここが、幽霊船団の巣だ。',
       rows: [0, 2],
       terrain: { sea: 6, swamp: 1, mountain: 1 },
-      enemyLevel: 9,
-      encounters: [['goblinBrute'], ['goblinBrute', 'chaosShaman'], ['guardDog', 'goblinBrute']],
-      seaEncounters: [['goblinBrute', 'chaosShaman'], ['goblinBrute', 'goblinBrute']],
+      enemyLevel: 10,
+      encounters: [['barnacleBeast', 'cursedDrownedSailor'], ['barnacleBeast', 'conchKnight']],
+      seaEncounters: [['venomShark', 'ghostDeckhand'], ['venomShark', 'stormPetrel', 'drownedSailor']],
       seaWanderers: 2,
       wanderers: 1,
     },
@@ -28,9 +28,9 @@ export const cursedArchipelagoMap: ScenarioMapDef = {
       intro: '黒い岩の島が点在している。島の奥で、何かが海を見つめている。',
       rows: [3, 8],
       terrain: { sea: 4, forest: 2, hills: 2, swamp: 1 },
-      enemyLevel: 7,
-      encounters: [['goblinBrute', 'goblinScout'], ['guardDog', 'guardDog'], ['chaosShaman', 'goblinBrute']],
-      seaEncounters: [['chaosShaman', 'guardDog'], ['goblinBrute']],
+      enemyLevel: 8,
+      encounters: [['conchKnight', 'cursedDrownedSailor'], ['octopusLarva', 'stormPetrel'], ['drownedKnight', 'octopusLarva']],
+      seaEncounters: [['shark', 'stormPetrel'], ['cursedDrownedSailor', 'siren']],
       seaWanderers: 2,
       wanderers: 3,
       chests: 2,
@@ -43,9 +43,9 @@ export const cursedArchipelagoMap: ScenarioMapDef = {
       intro: '濃い霧の中、波の音だけが聞こえる。時おり、遠くで鐘が鳴った。',
       rows: [9, 15],
       terrain: { sea: 7, hills: 1, forest: 1 },
-      enemyLevel: 5,
-      encounters: [['guardDog', 'goblinScout'], ['chaosShaman', 'guardDog'], ['goblinScout', 'goblinScout', 'chaosShaman']],
-      seaEncounters: [['guardDog', 'chaosShaman'], ['goblinScout', 'goblinScout', 'guardDog'], ['chaosShaman', 'chaosShaman']],
+      enemyLevel: 6,
+      encounters: [['pirateGrunt', 'pirateGunner'], ['drownedSailor', 'pirateGunner'], ['ghostDeckhand', 'pirateGrunt', 'pirateGunner']],
+      seaEncounters: [['ghostDeckhand', 'siren'], ['stormJellyfish', 'drownedSailor'], ['siren', 'jellyfish', 'stormJellyfish']],
       seaWanderers: 3,
       wanderers: 2,
       chests: 2,
@@ -59,9 +59,9 @@ export const cursedArchipelagoMap: ScenarioMapDef = {
       intro: '透き通った浅い海に、色とりどりの珊瑚が揺れている。小さな島が、あちこちに浮かんでいる。',
       rows: [16, 21],
       terrain: { sea: 4, plains: 3, hills: 1, forest: 1 },
-      enemyLevel: 3,
-      encounters: [['guardDog', 'guardDog'], ['goblinScout', 'guardDog'], ['chaosShaman', 'goblinScout']],
-      seaEncounters: [['goblinScout', 'goblinScout'], ['guardDog', 'goblinScout']],
+      enemyLevel: 4,
+      encounters: [['merfolkSpearman', 'pirateGrunt'], ['seaCrab', 'emberSeaCrab'], ['merfolkSpearman', 'merfolkSpearman', 'emberSeaCrab']],
+      seaEncounters: [['jellyfish', 'seaSerpentFry'], ['seaSerpentFry', 'emberSeaCrab']],
       seaWanderers: 2,
       wanderers: 3,
       chests: 2,
@@ -75,7 +75,7 @@ export const cursedArchipelagoMap: ScenarioMapDef = {
       rows: [22, 27],
       terrain: { plains: 5, forest: 1, hills: 1, sea: 2 },
       enemyLevel: 1,
-      encounters: [['goblinScout'], ['goblinScout', 'goblinScout'], ['guardDog', 'goblinScout']],
+      encounters: [['seaCrab', 'pirateGrunt'], ['pirateGrunt', 'seaCrab', 'pirateGrunt'], ['seaCrab', 'pirateGrunt', 'seaCrab']],
       wanderers: 3,
       chests: 2,
       events: 2,

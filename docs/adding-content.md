@@ -207,6 +207,9 @@ src/content/
 | `healPctOfDealt` | 与えたダメージの○%回復 | `pct` | self |
 | `blockFromStatus` | 状態異常の量だけブロック | `status`, `of`, `mult`, `max` | self |
 | `convertStatus` | 状態異常を別の状態異常に変える | `status`, `into` | target |
+| `retaliate` | 反撃（`when: 'hurt'` の能力で、攻撃してきた相手に返す。毒などでは返さない） | `amount`, `element`, `perTurn` | — |
+| `drainFocus` | 味方のフォーカスを奪う（敵用。0より下にならない） | `amount` | target |
+| `summonEnemy` | 敵が敵を呼ぶ（戦場4体まで・1戦闘 `uses` 回・呼ばれた敵は報酬なし・次のターンから動く） | `enemy`, `count`, `uses` | self |
 
 **対象（`to`）**: 省略すると表の「既定」になります。
 

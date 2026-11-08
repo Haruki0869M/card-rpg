@@ -18,6 +18,9 @@ import {
   Moon,
   Zap,
   Sparkles,
+  Hourglass,
+  StarOff,
+  Users,
   Star,
   Sword,
   Swords,
@@ -41,6 +44,7 @@ export const STATUS_ICONS: Record<string, LucideIcon> = {
   shield: Shield,
   sparkles: Sparkles,
   zap: Zap,
+  hourglass: Hourglass,
 };
 
 /** 属性のアイコン（属性のデータの icon のキー → アイコン） */
@@ -110,6 +114,9 @@ const EFFECT_ICON: Record<string, { Icon: LucideIcon; color: string }> = {
   fullRestore: { Icon: HeartPulse, color: '#7dffa8' },
   stealIntent: { Icon: Sparkles, color: '#ffd06a' },
   payHp: { Icon: HeartCrack, color: '#ff8aa0' },
+  drainFocus: { Icon: StarOff, color: '#ffd54a' },
+  summonEnemy: { Icon: Users, color: '#c8b0ff' },
+  retaliate: { Icon: Swords, color: '#ffb07a' },
 };
 const FALLBACK_EFFECT_ICON = { Icon: Sparkles, color: '#e0d8c0' };
 

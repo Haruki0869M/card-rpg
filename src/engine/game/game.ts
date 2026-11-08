@@ -754,7 +754,8 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
   const rewardMul = getDifficulty(game.difficulty).reward ?? 1;
   for (const e of b.enemies) {
     // 逃げた敵（黄金のコソ泥など）は倒していないので報酬なし
-    if (e.fled) continue;
+    // 戦闘中に呼ばれた増援も報酬なし（呼び続けさせて稼ぐことができないように）
+    if (e.fled || e.summoned) continue;
     const def = getEnemy(e.defId);
     const k = (1 + BALANCE.rewardPerLevel * (e.level - def.baseLevel)) * rewardMul;
     exp += Math.max(1, Math.round(def.exp * k));

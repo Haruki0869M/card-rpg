@@ -57,6 +57,10 @@
 | `stoneGuardianBeast` | 砂の守護獣 | 石像の神殿 | 9 | 270 | 一撃が重い。50%以下で石の咆哮（全体攻撃） |
 | `sandPharaoh` | 砂塵の王 | 砂塵の王宮 | 11 | 400 | 3段階（100〜60% / 60〜30% / 30%以下）。最後は砂嵐で全体攻撃。物語（民を救うために永遠の命を求めた王）を行動名に込める |
 
+### 部品の使い方（Claude が追加済み。見本は `src/content/scenarios/cursedArchipelago/enemies/`）
+- 反撃（`stoneCat`）: `abilities: [{ name: '…', effect: { when: 'hurt', do: [{ kind: 'retaliate', amount: 5, perTurn: 2 }] } }]`。攻撃してきた相手にだけ返す（毒などでは返さない）。見本は貝の騎士 `conchKnight`（4・1ターン2回）。
+- フォーカスを奪う（`sphinxCub`）: 行動に `{ kind: 'drainFocus', amount: 2 }`（狙った味方1人。全員なら `to: 'foes'`）。0より下にはならない。1回1〜2まで。
+
 ## 3. ダンジョンと地域に置く
 
 - `dungeons/dungeons.ts` の `POOLS` を、ダンジョンごとの本物に分ける。蠍の墓所は廃墟の敵とエリート `royalGuardMummy`、`boss: ['sandScorpionKing']`。影の書庫は砂丘の敵と `scribeShade`・`cursedScribeShade`、`boss: ['shadowVizier']`。石像の神殿は谷の敵と `sphinxCub`・`sandSerpentLord`、`boss: ['stoneGuardianBeast']`。砂塵の王宮は王宮前の敵と `colossusStatue`、`boss: ['sandPharaoh']`。`sandCave`（ランダム）の `boss` は `['sandSerpentLord', 'sphinxCub']`。

@@ -71,7 +71,7 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
       details.push(`${all ? '味方全員' : targetName}に「${STATUS_LABEL(eff.status)}」${eff.amount}`);
     } else {
       parts.push({ kind: 'other', effect: eff });
-      details.push(describeEffect(eff, 'enemy').replace('対象に', `${targetName}に`));
+      details.push(describeEffect(eff, 'enemy').replace('対象に', `${targetName}に`).replace('対象の', `${targetName}の`));
     }
   }
   // 凍結・痺れ（行動を休む・失敗する）

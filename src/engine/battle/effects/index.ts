@@ -41,7 +41,7 @@ export function makeCtx(
   rng: Rng,
   events: BattleEvent[],
   source: Unit,
-  opts: { target?: Unit; allyTarget?: Unit; card?: CardDef; cardAbilities?: AbilityDef[]; dealt?: number; depth?: number; perfect?: boolean; tierEffects?: Effect[] } = {},
+  opts: { target?: Unit; allyTarget?: Unit; attacker?: Unit; card?: CardDef; cardAbilities?: AbilityDef[]; dealt?: number; depth?: number; perfect?: boolean; tierEffects?: Effect[] } = {},
 ): EffectCtx {
   return {
     state,
@@ -50,6 +50,7 @@ export function makeCtx(
     source,
     target: opts.target,
     allyTarget: opts.allyTarget,
+    attacker: opts.attacker,
     card: opts.card,
     cardAbilities: opts.cardAbilities,
     perfect: opts.perfect,
@@ -263,7 +264,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   }
   // きっかけ: ダメージを受けた / 倒した
   if (ctx.depth < 3) {
-    if (r.hpLoss > 0 && !v.dead) fireAbilities(state, rng, events, v, 'hurt', { depth: ctx.depth + 1 });
+    if (r.hpLoss > 0 && !v.dead) fireAbilities(state, rng, events, v, 'hurt', { attacker: source, depth: ctx.depth + 1 });
     if (v.dead && isEnemy(source) !== isEnemy(v) && !source.dead) fireAbilities(state, rng, events, source, 'kill', { target: v, depth: ctx.depth + 1 });
     if (v.dead && isEnemy(v) && !isEnemy(source)) for (const a of state.allies) if (!a.dead) fireAbilities(state, rng, events, a, 'allyKill', { target: v, depth: ctx.depth + 1 });
   }
