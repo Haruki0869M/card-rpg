@@ -424,6 +424,8 @@ export interface StatusDef {
   /** 敵: 次の行動を1回休む / 味方: 次のフェーズのマナが減る（凍結など）。どちらも起きた時に1減る */
   skipAction?: boolean;
   manaPenalty?: number;
+  /** 味方: 次のターンの初めに引くカードが「数×この値」枚減る（遅延など）。引いた時に全部消える */
+  drawPenalty?: number;
   /** 重ねられる上限（省略は上限なし） */
   maxStacks?: number;
   /** 持ち主の element 属性の攻撃のダメージ +per×数。その攻撃で消える（聖光など） */
@@ -529,6 +531,8 @@ export interface EnemyState {
   queuedActionId?: string;
   /** 戦闘から逃げた（倒したことにならない。報酬なし） */
   fled?: boolean;
+  /** 戦闘中に別の敵に呼ばれた（増援）。経験値・お金は出ない */
+  summoned?: boolean;
   /** ボスの段階（0 = 最初） */
   phase: number;
   /** このターンにダメージを与えた味方（連携攻撃の判定。M3-C5） */

@@ -1,11 +1,32 @@
-// シナリオ3のダンジョン。敵の組み合わせ（POOLS）は仮（手順2で作り込む）。
+// シナリオ3のダンジョン。
 // 制覇すると鍵（灯）が手に入り、3つそろうと最終ダンジョンに入れる。ボスの手前に「物語の部屋」（event）を置く
 import type { DungeonDef } from '../../../../types';
 
-const POOLS: DungeonDef['pools'] = {
-  battle: [['guardDog', 'guardDog'], ['goblinScout', 'guardDog'], ['chaosShaman', 'goblinScout'], ['goblinScout', 'goblinScout', 'chaosShaman']],
-  elite: [['goblinBrute'], ['goblinBrute', 'chaosShaman']],
-  boss: ['goblinBrute'],
+// 敵の組（K4 手順2）。弱点が同じ敵だけの組にならないようにする（海の生き物は雷、幽霊は聖に弱い）
+const WRECK_CAVE_POOLS: DungeonDef['pools'] = {
+  battle: [['seaSerpentFry', 'pirateGrunt'], ['merfolkSpearman', 'merfolkSpearman', 'emberSeaCrab'], ['emberSeaCrab', 'jellyfish'], ['seaCrab', 'seaSerpentFry', 'pirateGrunt']],
+  elite: [['coralGolem'], ['coralGolem', 'pirateGrunt']],
+  boss: ['seaSerpentQueen'],
+};
+const PIRATE_ISLAND_POOLS: DungeonDef['pools'] = {
+  battle: [['pirateGrunt', 'pirateGunner'], ['drownedSailor', 'pirateGunner'], ['siren', 'pirateGrunt'], ['stormJellyfish', 'pirateGunner'], ['ghostDeckhand', 'siren', 'pirateGrunt']],
+  elite: [['pirateQuartermaster'], ['pirateQuartermaster', 'pirateGrunt']],
+  boss: ['pirateCaptainGuld'],
+};
+const SUNKEN_TEMPLE_POOLS: DungeonDef['pools'] = {
+  battle: [['shark', 'stormPetrel'], ['conchKnight', 'cursedDrownedSailor'], ['octopusLarva', 'stormPetrel'], ['cursedDrownedSailor', 'shark']],
+  elite: [['seaWitch'], ['seaWitch', 'cursedDrownedSailor']],
+  boss: ['tideHighPriest'],
+};
+const FLAGSHIP_POOLS: DungeonDef['pools'] = {
+  battle: [['barnacleBeast', 'venomShark'], ['venomShark', 'cursedDrownedSailor'], ['barnacleBeast', 'ghostDeckhand', 'stormPetrel'], ['barnacleBeast', 'cursedDrownedSailor']],
+  elite: [['krakenTentacle'], ['stormSeaWitch', 'barnacleBeast']],
+  boss: ['ghostAdmiral'],
+};
+const TIDE_CAVE_POOLS: DungeonDef['pools'] = {
+  battle: [['shark', 'drownedSailor'], ['conchKnight', 'stormPetrel'], ['venomShark', 'pirateGrunt'], ['octopusLarva', 'ghostDeckhand']],
+  elite: [['drownedKnight'], ['pirateQuartermaster', 'ghostDeckhand']],
+  boss: ['krakenTentacle', 'drownedKnight'],
 };
 
 type Layout = NonNullable<DungeonDef['layout']>;
@@ -95,7 +116,7 @@ export const wreckCave: DungeonDef = {
   description: '珊瑚の浅瀬の岩場に口を開ける洞窟。海蛇の女王が、星の灯の鍵を守るという。',
   background: 'catacomb',
   baseLevel: 3,
-  pools: POOLS,
+  pools: WRECK_CAVE_POOLS,
   bossChest: 'epic',
   rewardKey: 'lightStar',
   corruptionOnClear: 5,
@@ -109,7 +130,7 @@ export const pirateIsland: DungeonDef = {
   description: '霧の海に浮かぶ、海賊たちの隠れ家。死んでなお略奪を続ける船長が、月の灯の鍵を持っている。',
   background: 'forestCave',
   baseLevel: 5,
-  pools: POOLS,
+  pools: PIRATE_ISLAND_POOLS,
   bossChest: 'epic',
   rewardKey: 'lightMoon',
   corruptionOnClear: 5,
@@ -123,7 +144,7 @@ export const sunkenTemple: DungeonDef = {
   description: '潮の満ち引きで、半分だけ姿を現す古い神殿。潮の神官が、日の灯の鍵を抱いて祈っている。',
   background: 'temple',
   baseLevel: 7,
-  pools: POOLS,
+  pools: SUNKEN_TEMPLE_POOLS,
   bossChest: 'legend',
   rewardKey: 'lightSun',
   corruptionOnClear: 5,
@@ -137,7 +158,7 @@ export const ghostFlagship: DungeonDef = {
   description: '幽霊船団の旗艦。三つの灯がそろわなければ、霧に隠れて姿を現さない。',
   background: 'castle',
   baseLevel: 9,
-  pools: POOLS,
+  pools: FLAGSHIP_POOLS,
   bossChest: 'legend',
   requiresKeys: ['lightStar', 'lightMoon', 'lightSun'],
   finale: true,
@@ -168,7 +189,7 @@ export const tideCave: DungeonDef = {
   description: '訪れるたびに姿を変える海の洞窟。危険だが、奥には豪華な財宝が眠る。',
   background: 'forestCave',
   baseLevel: 6,
-  pools: { ...POOLS, boss: ['goblinBrute', 'chaosShaman'] },
+  pools: TIDE_CAVE_POOLS,
   bossChest: 'legend',
   random: true,
   rows: 6,

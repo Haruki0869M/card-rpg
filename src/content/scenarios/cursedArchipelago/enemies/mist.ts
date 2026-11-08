@@ -1,0 +1,150 @@
+// 呪われた群島：霧の海域・海賊の隠れ島（Lv5）。幽霊は聖に弱く、闇・毒に強い
+import type { EnemyDef } from '../../../../types';
+import { makeVariant } from '../../../../data/enemyVariant';
+import { jellyfish } from './harbor';
+
+export const drownedSailor: EnemyDef = {
+  id: 'drownedSailor',
+  name: '溺れた水夫',
+  icon: '👻',
+  maxHp: 30,
+  baseLevel: 5,
+  size: 1,
+  exp: 10,
+  gold: 6,
+  weak: ['holy'],
+  resist: ['dark', 'poison'],
+  pattern: 'sequence',
+  actions: [
+    { id: 'grab', name: '冷たい手', effects: [{ kind: 'damage', amount: 8 }] },
+    { id: 'curse', name: '海の底の呪い', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }] },
+    { id: 'drag', name: '引きずり込む', effects: [{ kind: 'damage', amount: 5 }, { kind: 'applyStatus', status: 'weak', amount: 1 }] },
+  ],
+};
+
+export const ghostDeckhand: EnemyDef = {
+  id: 'ghostDeckhand',
+  name: '幽霊水夫',
+  icon: '👻',
+  maxHp: 26,
+  baseLevel: 5,
+  size: 0.95,
+  exp: 10,
+  gold: 6,
+  weak: ['holy', 'fire'],
+  resist: ['dark'],
+  pattern: 'sequence',
+  actions: [
+    { id: 'hook', name: '錆びた鉤爪', effects: [{ kind: 'damage', amount: 9 }] },
+    { id: 'fade', name: '霧に溶ける', effects: [{ kind: 'block', amount: 7 }] },
+    { id: 'wail', name: '亡者の叫び', effects: [{ kind: 'damage', amount: 4 }, { kind: 'applyStatus', status: 'vulnerable', amount: 1 }] },
+  ],
+  abilities: [{ name: 'すり抜ける体', description: '戦闘開始時（呼ばれて現れた時も）、ブロック6', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 6 }] } }],
+};
+
+export const pirateGunner: EnemyDef = {
+  id: 'pirateGunner',
+  name: '海賊の砲手',
+  icon: '💣',
+  maxHp: 28,
+  baseLevel: 5,
+  size: 1,
+  exp: 10,
+  gold: 7,
+  weak: ['thunder'],
+  pattern: 'sequence',
+  actions: [
+    { id: 'barrage', name: '甲板の砲撃', effects: [{ kind: 'damage', amount: 4, to: 'foes' }] },
+    { id: 'reload', name: '弾込め', effects: [{ kind: 'block', amount: 6 }] },
+    { id: 'point', name: '至近の一発', effects: [{ kind: 'damage', amount: 10 }] },
+  ],
+};
+
+export const siren: EnemyDef = {
+  id: 'siren',
+  name: 'セイレーン',
+  icon: '🧜',
+  maxHp: 26,
+  baseLevel: 5,
+  size: 1,
+  exp: 10,
+  gold: 6,
+  weak: ['thunder'],
+  pattern: 'sequence',
+  actions: [
+    { id: 'song', name: '惑わしの歌', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'foes' }] },
+    { id: 'claw', name: '濡れた爪', effects: [{ kind: 'damage', amount: 8 }] },
+    { id: 'lament', name: '呪いの調べ', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }, { kind: 'damage', amount: 4 }] },
+  ],
+};
+
+/** クラゲの亜種。触手が雷属性 */
+export const stormJellyfish: EnemyDef = makeVariant(jellyfish, {
+  id: 'stormJellyfish',
+  name: '雷クラゲ',
+  aura: 'storm',
+  maxHp: 26,
+  baseLevel: 5,
+  exp: 10,
+  gold: 6,
+  weak: ['fire'],
+  resist: ['thunder', 'poison'],
+  actions: [
+    { id: 'sting', name: '雷の触手', effects: [{ kind: 'damage', amount: 8, element: 'thunder' }] },
+    { id: 'drift', name: '帯電してただよう', effects: [{ kind: 'block', amount: 6 }] },
+    { id: 'lash', name: '放電', effects: [{ kind: 'damage', amount: 4, element: 'thunder', to: 'foes' }] },
+  ],
+});
+
+export const pirateQuartermaster: EnemyDef = {
+  id: 'pirateQuartermaster',
+  name: '海賊の操舵手',
+  icon: '🏴',
+  maxHp: 50,
+  baseLevel: 5,
+  size: 1.2,
+  exp: 25,
+  gold: 22,
+  weak: ['thunder'],
+  pattern: 'sequence',
+  actions: [
+    { id: 'order', name: '野郎ども、かかれ！', effects: [{ kind: 'block', amount: 6, to: 'allies' }] },
+    { id: 'cutlass', name: '舵取りの剣', effects: [{ kind: 'damage', amount: 11 }] },
+    { id: 'pistol', name: '短銃の早撃ち', effects: [{ kind: 'damage', amount: 5, hits: 2 }] },
+    { id: 'helm', name: '舵を切る', effects: [{ kind: 'block', amount: 10 }, { kind: 'applyStatus', status: 'weak', amount: 1 }] },
+  ],
+  abilities: [{ name: '海賊の号令', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 4, to: 'allies' }] } }],
+};
+
+/** 50%以下で、幽霊水夫を呼ぶ（敵の増援 summonEnemy。1戦闘2回まで・戦場は4体まで・呼んだ敵は報酬なし） */
+export const pirateCaptainGuld: EnemyDef = {
+  id: 'pirateCaptainGuld',
+  name: '海賊船長ガルド',
+  icon: '♛',
+  maxHp: 210,
+  baseLevel: 7,
+  size: 1.5,
+  exp: 110,
+  gold: 130,
+  weak: ['holy', 'thunder'],
+  resist: ['dark'],
+  pattern: 'sequence',
+  actions: [
+    { id: 'broadside', name: '舷側の砲撃', effects: [{ kind: 'damage', amount: 7, to: 'foes' }] },
+    { id: 'cutlass', name: '略奪の剣', effects: [{ kind: 'damage', amount: 15 }] },
+    { id: 'plunder', name: 'まだ奪い足りねえ', effects: [{ kind: 'block', amount: 14 }, { kind: 'damage', amount: 6 }] },
+  ],
+  abilities: [{ name: '死んでも船長', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 6 }] } }],
+  phases: [
+    {
+      belowHpPct: 50,
+      name: '亡霊の船長ガルド',
+      pattern: 'sequence',
+      actions: [
+        { id: 'crew', name: '起きろ、野郎ども', effects: [{ kind: 'summonEnemy', enemy: 'ghostDeckhand', uses: 2 }, { kind: 'block', amount: 10 }] },
+        { id: 'loot', name: '亡者の略奪', effects: [{ kind: 'damage', amount: 19 }] },
+        { id: 'volley', name: '幽霊船の一斉砲撃', effects: [{ kind: 'damage', amount: 9, to: 'foes' }] },
+      ],
+    },
+  ],
+};

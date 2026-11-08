@@ -88,6 +88,7 @@ export function describeStatus(def: StatusDef): string {
   if (def.actionFailChance) parts.push(`敵は${def.actionFailChance}%の確率で行動に失敗する`);
   if (def.skipAction) parts.push('敵は次の行動を1回休む');
   if (def.manaPenalty) parts.push(`味方は次のターンのマナ-${def.manaPenalty}`);
+  if (def.drawPenalty) parts.push(`味方は次のターンに引くカード-${def.drawPenalty}枚（1つにつき）`);
   if (def.skipAction || def.manaPenalty) parts.push('効いたら消える');
   const decay = def.decay ?? 1;
   if (!(def.skipAction || def.manaPenalty)) parts.push(decay > 0 ? `フェーズ終了時に${decay}減る` : '戦闘中は減らない');
@@ -135,6 +136,19 @@ export function takeManaPenalty(s: Statuses): { amount: number; names: string[] 
     amount += def.manaPenalty;
     names.push(def.name);
     consumeStatus(s, def.id);
+  }
+  return { amount, names };
+}
+
+/** 次のターンの初めに減る引く枚数と、その状態異常（遅延など。使ったら全部消す） */
+export function takeDrawPenalty(s: Statuses): { amount: number; names: string[] } {
+  let amount = 0;
+  const names: string[] = [];
+  for (const { def, amount: n } of activeStatuses(s)) {
+    if (!def.drawPenalty) continue;
+    amount += def.drawPenalty * n;
+    names.push(def.name);
+    s[def.id] = 0;
   }
   return { amount, names };
 }
