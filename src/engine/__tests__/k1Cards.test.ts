@@ -46,13 +46,13 @@ describe('K1 武器種・系統・異端のカード', () => {
     }
   });
 
-  it('剣は7枚、武は15枚（コモン6・レア5・エピック4）', () => {
-    const sword = CARDS.all.filter((c) => c.weaponType === 'sword');
-    expect(sword).toHaveLength(7);
-    const bu = CARDS.all.filter((c) => c.lineage === 'bu');
-    expect(bu).toHaveLength(15);
-    const n = (r: string) => bu.filter((c) => (c.rarity ?? 'common') === r).length;
-    expect([n('common'), n('rare'), n('epic')]).toEqual([6, 5, 4]);
+  it('4系統とも15枚ずつ（コモン6・レア5・エピック4）', () => {
+    for (const lineage of ['bu', 'ma', 'sei', 'gi']) {
+      const cards = CARDS.all.filter((c) => c.lineage === lineage);
+      expect(cards, lineage).toHaveLength(15);
+      const n = (r: string) => cards.filter((c) => (c.rarity ?? 'common') === r).length;
+      expect([n('common'), n('rare'), n('epic')], lineage).toEqual([6, 5, 4]);
+    }
   });
 
   it('全15の武器種が7枚ずつ（コモン3・レア2・エピック2）', () => {
