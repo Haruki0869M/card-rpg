@@ -2,6 +2,8 @@
 #   SRC=元画像のフォルダ  python3 scripts/art/build_art.py [名前の一部…]
 # 必要なもの: pip install "rembg[cpu]" opencv-python-headless pillow numpy
 # 元画像は番号のファイル名（1.webp〜77.webp）。どの番号を何に使うかは下の表に書く。
+# J4 からは名前のファイル名（例 monk-male.webp）。立ち絵は <職ID>-<male|female> で置けば HEROES に自動で入る。
+# 元画像が SRC に無い物は飛ばす（番号の古い絵と、名前の新しい絵を別のフォルダで加工できる）。
 # 背景の切り抜き結果は CACHE に保存して使い回す（2回目からは速い）。
 import os, sys
 import numpy as np
@@ -36,6 +38,37 @@ def cutout(n):
     im = remove(Image.open(src(n)).convert('RGB'), session=_session)
     im.save(p)
     return im
+
+def has_src(n):
+    try:
+        src(n)
+        return True
+    except FileNotFoundError:
+        return False
+
+def despeckle(im, keep=0.02, th=24):
+    """本体から離れた小さなかたまり（隅のサイン・文字・ごみ）を消す。
+    一番大きいかたまりの keep 倍より小さく、かつ絵の外側 18% の帯の中だけにある物を透明にする。
+    杖の先の宝玉のような、体の近くに浮いた小物は残る"""
+    import cv2
+    a = np.array(im.getchannel('A'))
+    n, lab, stats, _ = cv2.connectedComponentsWithStats((a > th).astype(np.uint8), 8)
+    if n <= 2:
+        return im
+    h, w = a.shape
+    big = stats[1:, cv2.CC_STAT_AREA].max()
+    m = 0.18
+    out = a.copy()
+    for i in range(1, n):
+        x, y, bw, bh, area = stats[i]
+        if area >= big * keep:
+            continue
+        inner = x + bw > w * m and x < w * (1 - m) and y + bh > h * m and y < h * (1 - m)
+        if not inner:
+            out[lab == i] = 0
+    res = im.copy()
+    res.putalpha(Image.fromarray(out))
+    return res
 
 def trim(im, th=10):
     a = np.array(im.getchannel('A'))
@@ -81,6 +114,17 @@ HEROES = {
     ('mage', 'female'): 41, ('mage', 'male'): 42,
     ('warrior', 'female'): 43, ('warrior', 'male'): 45,
 }
+# J4（2026-11）: 残り40職×男女。元画像は名前（例 monk-male.webp）。指示文は docs/art/prompts-jobs-pets.md
+J4_JOBS = ['monk', 'thief', 'priest', 'summoner',
+           'swordmaster', 'berserker', 'brawler', 'archmage', 'hexer', 'phantomTamer', 'paladin', 'lancer',
+           'bishop', 'archer', 'tamer', 'shadow', 'phantomThief',
+           'swordSaint', 'overlord', 'fistKing', 'greatSage', 'hadesLord', 'phantomKing', 'holyKing', 'dragoon',
+           'pope', 'bowSaint', 'beastMaster', 'ninja', 'grandThief',
+           'samurai', 'magicKnight', 'timeMage', 'necromancer', 'darkKnight', 'shrineMaiden', 'astrologer',
+           'machinist', 'bard', 'gambler']
+for _cls in J4_JOBS:
+    for _g in ('male', 'female'):
+        HEROES[(_cls, _g)] = f'{_cls}-{_g}'
 # 顔の位置（切り抜いて余白を除いた絵の中の割合: 中心x, 中心y, 大きさ）。目で確認して決めた値
 FACES = {
     ('hunter', 'female'): (0.5, 0.085, 0.17), ('hunter', 'male'): (0.5, 0.085, 0.17),
@@ -88,6 +132,16 @@ FACES = {
     ('mage', 'female'): (0.5, 0.13, 0.17), ('mage', 'male'): (0.5, 0.135, 0.17),
     ('warrior', 'female'): (0.5, 0.085, 0.17), ('warrior', 'male'): (0.5, 0.085, 0.17),
 }
+# 帽子・冠・鎌などで自動の位置がずれる職は、目で確認して決めた値（J4）
+FACES.update({
+    ('hadesLord', 'female'): (0.543, 0.158, 0.157), ('hadesLord', 'male'): (0.443, 0.136, 0.156),
+    ('necromancer', 'female'): (0.421, 0.153, 0.156), ('necromancer', 'male'): (0.571, 0.139, 0.155),
+    ('overlord', 'female'): (0.598, 0.196, 0.156),
+    ('pope', 'female'): (0.50, 0.172, 0.156), ('pope', 'male'): (0.553, 0.178, 0.156),
+    ('lancer', 'female'): (0.559, 0.168, 0.156), ('hexer', 'female'): (0.535, 0.192, 0.156),
+})
+# 表に無い職は、この値（x=0.5 は頭の位置を自動で探す）
+FACE_DEFAULT = (0.5, 0.085, 0.17)
 
 def head_center(fig, top=0.03, bot=0.12):
     """頭のあたり（上から3〜12%の高さ）で、体の中心に近い不透明な部分の中心"""
@@ -107,9 +161,12 @@ def build_heroes():
     for (cls, g), n in HEROES.items():
         name = f'hero/{cls}-{g}'
         if not want(name): continue
-        fig = trim(cutout(n))
+        if not has_src(n):
+            print(f'{name:32s} (元画像 {n} が無いので飛ばす)')
+            continue
+        fig = trim(despeckle(cutout(n)))
         save(rim(place(fig, 480, 660), (8, 6, 12), 0.75, 2), f'{name}.webp')
-        fx, fy, fs = FACES[(cls, g)]
+        fx, fy, fs = FACES.get((cls, g), FACE_DEFAULT)
         if fx == 0.5: fx = head_center(fig)
         s = fs * fig.height
         cx, cy = fx * fig.width, fy * fig.height
@@ -284,6 +341,20 @@ def build_items():
         fig = trim(soft_key(n) if key == 'town' else cutout(n), 24)
         save(rim(square(fig, 224, 0.04), strength=0.4), f'{name}.webp', 82)
 
+
+# ---------------- お供（ペット） ----------------
+# 元画像は pet-<お供ID>-<色ID>.(webp|png)。SRC に有る物を全部、pet/<お供ID>-<色ID>.webp にする（無い色は飛ばす）
+def build_pets():
+    import glob, re
+    for f in sorted(glob.glob(os.path.join(SRC, 'pet-*'))):
+        m = re.match(r'pet-(.+)\.(webp|png|jpg)$', os.path.basename(f))
+        if not m: continue
+        key = m.group(1)
+        name = f'pet/{key}'
+        if not want(name): continue
+        fig = trim(despeckle(cutout(f'pet-{key}')), 24)
+        save(rim(square(fig, 160, 0.04), (8, 6, 12), 0.6, 2), f'{name}.webp', 82)
+
 # ---------------- 画面の枠（UIの部品集 6 から切り出す） ----------------
 def key_out(im, bg=(60, 52, 55), tol=26):
     """部品集の無地の背景色を透明にする"""
@@ -331,4 +402,4 @@ def build_ui():
         save(seamless(im), 'ui/panel.webp', 70)
 
 if __name__ == '__main__':
-    build_heroes(); build_enemies(); build_bgs(); build_terrains(); build_items(); build_ui()
+    build_heroes(); build_enemies(); build_bgs(); build_terrains(); build_items(); build_ui(); build_pets()
