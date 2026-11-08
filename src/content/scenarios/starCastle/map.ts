@@ -39,6 +39,7 @@ export const starCastleMap: ScenarioMapDef = {
       terrain: { hills: 4, cloud: 3, plains: 1 },
       enemyLevel: 5,
       encounters: [['guardDog', 'goblinScout'], ['chaosShaman', 'guardDog'], ['goblinScout', 'goblinScout', 'chaosShaman']],
+      rareEncounters: [['starlitSwan']],
       wanderers: 4,
       chests: 2,
       events: 2,

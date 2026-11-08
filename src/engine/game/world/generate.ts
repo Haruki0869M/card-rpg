@@ -111,7 +111,8 @@ export function createWorld(game: GameState, rng: Rng): WorldState {
   const ok = walkable(w, start);
   const free = (row0: number, row1: number) =>
     [...ok].filter((i) => !tiles[i].f && !TERRAINS.get(tiles[i].t).sea && rowOf(w, i) >= row0 && rowOf(w, i) <= row1 && hexDistance(w, i, start) >= 2);
-  const mapEvents = EVENTS.forScenario(game.scenarioId).filter((e) => e.where === 'map');
+  const scenarioEvents = EVENTS.forScenario(game.scenarioId);
+  const mapEvents = scenarioEvents.filter((e) => e.where === 'map' && !e.hiddenIn);
   const shrineIds = SHRINES.forScenario(game.scenarioId).map((s) => s.id);
   def.regions.forEach((reg, ri) => {
     const place = (n: number, make: () => MapFeature) => {
@@ -131,6 +132,13 @@ export function createWorld(game: GameState, rng: Rng): WorldState {
     if (shrineIds.length) place(reg.shrines ?? 0, () => ({ kind: 'shrine', id: pick(shrineIds, rng) }));
     for (const d of reg.randomDungeons ?? []) place(1, () => ({ kind: 'dungeon', id: d }));
   });
+  // 隠しボスの名所（K3 C）: 決めた地域の空いたマスに1つずつ。ほかの物を置き終えてから置くので、無いシナリオの地図は変わらない
+  for (const e of scenarioEvents) {
+    if (e.where !== 'map' || !e.hiddenIn) continue;
+    const reg = def.regions.find((r) => r.id === e.hiddenIn);
+    const cands = reg ? free(reg.rows[0], reg.rows[1]) : [];
+    if (cands.length) tiles[pick(cands, rng)].f = { kind: 'event', id: e.id };
+  }
 
   // キャラの位置（徘徊する敵はキャラの近くには置かない）
   const alive = game.heroes.filter((h) => !h.retired);

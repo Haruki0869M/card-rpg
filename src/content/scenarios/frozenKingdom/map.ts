@@ -18,6 +18,7 @@ export const frozenKingdomMap: ScenarioMapDef = {
       climate: { kind: 'cold', ratio: 0.08 },
       enemyLevel: 10,
       encounters: [["frostGuardian", "cursedFrozenSoldier"], ["iceKnight", "frozenGhoul"], ["frostDrakeling", "iceSwordsman"]],
+      rareEncounters: [["frostBellKnight"], ["frostBellKnight", "iceSwordsman"]],
       wanderers: 2,
     },
     {
@@ -58,6 +59,7 @@ export const frozenKingdomMap: ScenarioMapDef = {
       climate: { kind: 'cold', ratio: 0.05 },
       enemyLevel: 4,
       encounters: [["iceBat", "frozenSoldier"], ["snowOwl", "icicleBug"], ["emberFrostWolf", "frozenSoldier"], ["frostWolf", "snowOwl"]],
+      rareEncounters: [["whiteStag"], ["whiteStag", "snowOwl"]],
       wanderers: 4,
       chests: 2,
       events: 2,
