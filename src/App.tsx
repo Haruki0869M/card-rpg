@@ -14,6 +14,7 @@ import { ClearedScreen, GameOverScreen } from './components/screens/EndScreens';
 import { HubScreen } from './components/screens/HubScreen';
 import { RewardScreen } from './components/screens/RewardScreen';
 import { ChestScreen } from './components/screens/ChestScreen';
+import { DoorOpenScene } from './components/dungeon/DungeonAnim';
 import { WorldScreen } from './components/world/WorldScreen';
 import { EncounterScreen, EndingScreen, SanctuaryScreen, ShrineScreen, TownScreen } from './components/world/Places';
 import { EventScreen, RestScreen } from './components/screens/RoomScreens';
@@ -27,6 +28,7 @@ import { AbilityCutins } from './components/ui/AbilityCutins';
 import { SceneTabs } from './components/SceneTabs';
 import { VoteStatus } from './components/ui/Votes';
 import { TurnLock } from './components/ui/TurnLock';
+import { TurnCutin } from './components/ui/TurnCutin';
 import { findAlly } from './engine';
 import { useBackButton } from './hooks/useBackButton';
 import { useDetail } from './hooks/usePress';
@@ -89,6 +91,7 @@ function CurrentScreen() {
   const screen = useBattle((s) => s.screen);
   const mode = useBattle((s) => s.game?.mode);
   const movement = useBattle(s => s.worldMoves[0]);
+  const door = useBattle((s) => (s.doorOpen && s.doorOpen.scene === s.scene ? s.doorOpen : null));
   if (screen !== 'game' || !mode) {
     if (screen === 'setup') return <SetupScreen />;
     if (screen === 'create') return <CreateScreen />;
@@ -99,6 +102,8 @@ function CurrentScreen() {
   // 移動の演出は、いつもの世界マップの画面（同じ地図・同じ駒）のまま再生する。
   // 下の case 'world' と同じ場所・同じ部品なので、画面も駒も作り直されない。
   if (movement) return <WorldScreen movement={movement} />;
+  // 扉が開く演出の間は、部屋の画面（戦闘など）への切り替えを待つ（第3段階B2）
+  if (door) return <DoorOpenScene key={door.id} door={door} />;
   switch (mode) {
     case 'hub':
       return <HubScreen />;
@@ -213,6 +218,7 @@ export default function App() {
             {screen === 'game' && <VoteStatus />}
             {screen === 'game' && <TurnLock />}
             {screen === 'game' && <AbilityCutins />}
+            {screen === 'game' && <TurnCutin />}
           </>}
           <Toast />
         </div>

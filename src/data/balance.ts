@@ -129,6 +129,8 @@ export const BALANCE = {
   /** ダンジョンの探索力（手番に入れる部屋の数）= exploreBase + 素早さの判定の成功数（exploreSlots 枠）。M3-D */
   exploreSlots: 2,
   exploreBase: 2,
+  /** 第3段階: 歩数 = 探索力 × これ（部屋から次の部屋へは、まっすぐなら「出口→扉」で2歩。今までの「探索力＝入れる部屋の数」と同じ速さ） */
+  dungeonStepsPerExplore: 2,
   /** 侵食度: 1ワールドターンごと / ダンジョンに入る時 / 町が陥落した時 */
   corruptionPerTurn: 1,
   corruptionOnDungeonEnter: 2,
@@ -188,6 +190,16 @@ export const TIMING = {
   reasonFlash: 1.0,
   /** 高速モードの倍率 */
   fastModeFactor: 2,
+  /** 手番のカットイン（自分の番の大きな表示 / 簡易・高速・動作軽減の時 / ほかの人の番の小さなお知らせ）。秒 */
+  turnCutin: 1.2,
+  turnCutinShort: 0.6,
+  turnNotice: 1.0,
+  /** ダンジョンの演出（第3段階B2）: 1歩・ここまで歩くの1歩・向きを変える・扉が開く・簡易の時の切り替え。秒 */
+  dungeonStep: 0.25,
+  dungeonWalkStep: 0.15,
+  dungeonTurn: 0.25,
+  dungeonDoor: 0.45,
+  dungeonSimple: 0.1,
 } as const;
 
 /** 宝箱・カード報酬の演出時間（秒）。高速モードでは fastModeFactor で割る。spec §10.3 */
@@ -220,5 +232,7 @@ export const VIBRATION = {
   chestLegend: [120, 60, 120, 60, 300],
   perfect: [25, 30, 25],
   hurt: 20,
+  /** 自分のキャラの手番が来た（手番のカットイン） */
+  turn: 40,
   victory: [40, 40, 80],
 } as const;

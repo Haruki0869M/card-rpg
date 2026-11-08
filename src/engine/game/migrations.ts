@@ -9,7 +9,9 @@ import { ITEMS } from '../../data/items';
 import { SCENARIOS } from '../../data/scenarios';
 import { SANCTUARIES } from '../../data/world';
 import { getDifficulty, getRoomType } from '../../data/rules';
-import type { GameState } from '../../types';
+import type { DungeonRun, GameState } from '../../types';
+import { BALANCE } from '../../data/balance';
+import { cellKey, dungeonGrid, revealSeen } from './dungeonMap';
 import { STATE_VERSION } from '../battle/battle';
 import { createRng } from '../rng';
 import { rollPetOfferColors } from './pets';
@@ -20,6 +22,20 @@ type Loose = Record<string, any>; // eslint-disable-line @typescript-eslint/no-e
 
 const MIGRATIONS: Record<number, (g: Loose) => void> = {
   // v13 → v14: 手動の味方対象が必要になった旧予約だけ、従来の最低HP割合の対象を固定する。
+  // v14 → v15: ダンジョンを通路の地図で歩くようになった（第3段階）。地図は部屋のつながりから作り直せるので、
+  // 今の部屋（無ければ入口）に立たせ、通った部屋と今の場所のまわりを「見たマス」にする。探索力（部屋の数）は歩数（×2）にする
+  14(g) {
+    for (const b of [g.battle, ...(g.expeditions ?? []).map((x: Loose) => x.battle)]) if (b) b.version = 15;
+    for (const d of [g.dungeon, ...(g.expeditions ?? []).map((x: Loose) => x.dungeon)] as (DungeonRun | undefined)[]) {
+      if (!d || !Array.isArray(d.rooms)) continue;
+      const grid = dungeonGrid(d);
+      const cur = d.currentRoomId ? grid.roomCell.get(d.currentRoomId) : undefined;
+      d.pos = cur ? { x: cur.x, y: cur.y, facing: 0 } : { ...grid.start, facing: 0 };
+      d.seen = d.rooms.filter((r) => r.cleared).map((r) => grid.roomCell.get(r.id)).filter((c) => !!c).map((c) => cellKey(c!.x, c!.y));
+      revealSeen(d);
+      if (typeof d.explore === 'number') d.explore *= BALANCE.dungeonStepsPerExplore;
+    }
+  },
   13(g) {
     for (const b of [g.battle, ...(g.expeditions ?? []).map((x: Loose) => x.battle)]) {
       if (!b) continue;

@@ -1,14 +1,35 @@
-// ===== ダンジョンの地図（下から上へ進む。部屋の中身は入る前から見える） =====
+// ===== ダンジョンの通路（第3段階: 歩いて回り、見た所が地図に描き足される。部屋の中身は扉を開けるまで分からない） =====
+// 段階B: 一人称の通路の絵（DungeonView）・右上のミニマップ（タップで大きな地図と「ここまで歩く」）・絵に重ねた歩くボタン
 import { VoteChips } from '../ui/Votes';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Backpack, Check, Coins, Crown, Flame, Gift, Lock, LogOut, Menu, Sparkles, Swords, Skull, Users, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowUp, Backpack, Check, Coins, Compass, Crown, DoorClosed, DoorClosedLocked, Flame, Gift, LogOut, Menu, Sparkles, Swords, Skull, Undo2, Users, X } from 'lucide-react';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { BattleBackground, EnemyArt } from '../../art';
+import { AnimatedDungeonView } from '../dungeon/DungeonAnim';
 import { DUNGEONS } from '../../data/dungeons';
-import { getEnemy } from '../../data/enemies';
-import { EVENTS } from '../../data/events';
 import { getItem } from '../../data/items';
-import { chestOdds, currentVote, heroMaxHp, notVoted, partyGold, reachableRooms, retreatLoss, statChance, voters, votesFor } from '../../engine';
+import {
+  canMove,
+  cellKey,
+  currentVote,
+  doorAhead,
+  doorFront,
+  doorNorthOf,
+  dungeonGrid,
+  dungeonNavigator,
+  exploredPercent,
+  findPath,
+  heroMaxHp,
+  notVoted,
+  partyGold,
+  posOf,
+  reachableRooms,
+  retreatLoss,
+  statChance,
+  turnTo,
+  voters,
+  walkableKeys,
+  type MapCell,
+} from '../../engine';
 import { BALANCE } from '../../data/balance';
 import { PLAYER_COLOR } from '../../data/theme';
 import { isLocalPlayer } from '../../store/battleConfig';
@@ -17,14 +38,12 @@ import { RollStrip } from '../ui/CheckPanel';
 import { HeroFace } from '../ui/game';
 import { PetToken } from '../ui/PetToken';
 import { Footprints, Minus, Plus } from 'lucide-react';
-import type { GameState } from '../../types';
+import type { DungeonRun, Facing, GameState, Room } from '../../types';
 import { useElementSize } from '../../hooks/useElementSize';
 import { LOCAL_PLAYER } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
 import { getRoomType } from '../../data/rules';
-import type { Room } from '../../types';
-import { CHEST_NAME, OddsBar } from '../ui/ChestOdds';
-import { Bar, ItemIcon, RARITY_STYLE, Screen } from '../ui/game';
+import { Bar, ItemIcon, Screen } from '../ui/game';
 
 /** 部屋のアイコン（部屋の種類のデータの icon のキー → アイコン）。新しいアイコンが要る時はここに1行足す */
 const ROOM_ICONS: Record<string, typeof Swords> = { swords: Swords, skull: Skull, crown: Crown, gift: Gift, sparkles: Sparkles, flame: Flame };
@@ -35,68 +54,211 @@ function roomStyle(type: string) {
   return { name: t.name, Icon: ROOM_ICONS[t.icon] ?? Sparkles, color: t.color, bg: t.bg, behavior: t.behavior, boss: !!t.battle?.boss };
 }
 
-const ROW_H = 92;
-
-function RoomInfo({ room }: { room: Room }) {
+/** 目の前の扉（中身は入るまで分からない。ボスの扉だけは見て分かる） */
+function DoorPanel({ room, openable }: { room: Room; openable: boolean }) {
+  const game = useBattle((s) => s.game)!;
+  const dispatchGame = useBattle((s) => s.dispatchGame);
   const t = roomStyle(room.type);
-  if (room.enemies) {
-    return (
-      <div className="flex items-center gap-2">
-        <span className="flex -space-x-3">
-          {room.enemies.map((e, i) => (
-            <EnemyArt key={i} defId={e.defId} className="h-[54px] w-[46px]" />
-          ))}
-        </span>
-        <div className="min-w-0 text-[13px] leading-5">
-          <div className="font-display text-[16px]" style={{ color: t.color }}>
-            {t.name}
-          </div>
-          {room.enemies.map((e, i) => (
-            <div key={i} className="truncate">
-              <span className="text-amber-300">Lv{e.level}</span> {getEnemy(e.defId).name}
-              {t.boss && getEnemy(e.defId).phases ? '（HPが減ると姿を変える）' : ''}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-  if (t.behavior === 'chest' && room.chest) {
-    const r = RARITY_STYLE[room.chest.rarity];
-    return (
-      <div className="text-[13px] leading-5">
-        <div className="font-display text-[16px]" style={{ color: t.color }}>
-          宝箱
-        </div>
-        <div>
-          <span style={{ color: r.color }}>{CHEST_NAME[room.chest.rarity]}</span>
-          {room.chest.locked && (
-            <span className="ml-1 text-amber-200">
-              <Lock size={12} className="inline" /> 鍵付き（器用で判定・失敗すると罠）
-            </span>
-          )}
-        </div>
-        <div className="mt-0.5">
-          <OddsBar odds={chestOdds(room.chest.rarity, 0)} label="中身の格の確率（運のスロットで上げられる）" height={8} />
-        </div>
-      </div>
-    );
-  }
-  if (t.behavior === 'event')
-    return (
-      <div className="text-[13px] leading-5">
-        <div className="font-display text-[16px]" style={{ color: t.color }}>
-          イベント
-        </div>
-        <div>{room.eventId ? `「${EVENTS.get(room.eventId).title}」` : '何かが起きる…'}</div>
-      </div>
-    );
+  const known = room.cleared || room.id === game.dungeon?.currentRoomId;
+  const turnHere = dungeonTurnHere(game);
+  const noSteps = !!game.world && !game.dungeon?.explore;
   return (
-    <div className="text-[13px] leading-5">
-      <div className="font-display text-[16px]" style={{ color: t.color }}>
-        休憩所
+    <div className="flex items-center gap-2 rounded-xl border border-amber-300/40 bg-black/70 px-2 py-1.5 backdrop-blur-[2px]" data-door-ahead>
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ background: known ? t.bg : '#2a2018' }}>
+        {known ? <t.Icon size={22} style={{ color: t.color }} /> : t.boss ? <Crown size={22} className="text-amber-300" /> : <DoorClosed size={22} className="text-amber-200" />}
+      </span>
+      <div className="min-w-0 flex-1 text-[13px] leading-5">
+        <div className="font-bold text-amber-100">{known ? `${t.name}の部屋（通った）` : t.boss ? '重い扉（ボス）' : openable ? '扉' : '開かない扉'}</div>
+        <div className="truncate text-[12px] text-zinc-400">
+          {known ? 'もう何もない' : t.boss ? '奥から強い気配がする…' : openable ? '中身は開けるまで分からない' : '別の道を選んだので開かない'}
+        </div>
       </div>
-      <div>HPかフォーカスを回復できる</div>
+      {openable && !known && (
+        <button
+          onClick={() => dispatchGame({ type: 'ENTER_ROOM', playerId: LOCAL_PLAYER, roomId: room.id })}
+          disabled={!turnHere || noSteps}
+          className="btn btn-gold font-display h-11 shrink-0 rounded-lg px-3 text-[16px] disabled:opacity-40"
+        >
+          扉を開ける
+          <VoteChips cmd={{ type: 'ENTER_ROOM', playerId: LOCAL_PLAYER, roomId: room.id }} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** 地図のマス（見たマスだけ。北が上）。大きな地図とミニマップで使う。x0 = 左端のマス、yTop = 上端のマス */
+function MapCells({ run, cell, x0, yTop, left = 0, top = 0, only, target, onTap }: {
+  run: DungeonRun;
+  cell: number;
+  x0: number;
+  yTop: number;
+  left?: number;
+  top?: number;
+  /** この範囲のマスだけ描く（ミニマップ） */
+  only?: (c: MapCell) => boolean;
+  target?: { x: number; y: number } | null;
+  onTap?: (c: MapCell) => void;
+}) {
+  const grid = dungeonGrid(run);
+  const pos = posOf(run);
+  const seen = new Set(run.seen ?? []);
+  const walk = walkableKeys(run);
+  const reach = new Set(reachableRooms(run).map((r) => r.id));
+  const small = cell < 28;
+  return (
+    <>
+      {grid.cells.map((c) => {
+        const k = cellKey(c.x, c.y);
+        if (!seen.has(k) || (only && !only(c))) return null;
+        const here = c.x === pos.x && c.y === pos.y;
+        const isTarget = !!target && target.x === c.x && target.y === c.y;
+        const room = c.roomId ? run.rooms.find((r) => r.id === c.roomId) : undefined;
+        const known = !!room && (room.cleared || room.id === run.currentRoomId);
+        const t = room ? roomStyle(room.type) : undefined;
+        const openable = !!room && !known && reach.has(room.id);
+        // 中身は入るまで分からない（ボスの扉だけは見て分かる）
+        const Icon = !room || !t ? null : known ? t.Icon : t.boss ? Crown : openable ? DoorClosed : DoorClosedLocked;
+        const Tag = onTap ? 'button' : 'span';
+        return (
+          <Tag
+            key={k}
+            onClick={
+              onTap
+                ? (e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    onTap(c);
+                  }
+                : undefined
+            }
+            className="absolute flex items-center justify-center"
+            style={{
+              left: left + (c.x - x0) * cell + 1,
+              top: top + (yTop - c.y) * cell + 1,
+              width: cell - 2,
+              height: cell - 2,
+              borderRadius: room ? Math.max(3, cell / 6) : 2,
+              background: room && t ? (known ? t.bg : '#2a2018') : walk.has(k) ? '#3a3328' : '#211d18',
+              border: `${small ? 1 : 2}px solid ${isTarget ? '#fff' : openable ? '#ffd76a' : room ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.08)'}`,
+              boxShadow: openable && !small ? '0 0 10px rgba(255,215,106,.6)' : undefined,
+              opacity: room && t && !known && !openable && !t.boss ? 0.55 : 1,
+            }}
+            data-cell={onTap ? k : undefined}
+            data-door={onTap && room && !known ? (openable ? 'open' : 'closed') : undefined}
+            aria-label={onTap ? (room && t ? (known ? t.name : t.boss ? 'ボスの扉' : openable ? '扉' : '開かない扉') : '通路') : undefined}
+          >
+            {Icon && t && !here && <Icon size={Math.round(cell * 0.55)} strokeWidth={2.2} style={{ color: known ? t.color : t.boss ? '#ffcf4a' : openable ? '#ffd76a' : '#9a9080' }} />}
+            {room?.cleared && !small && (
+              <span className="absolute -right-1 -bottom-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-white">
+                <Check size={11} strokeWidth={3} />
+              </span>
+            )}
+            {here && (
+              <span className="absolute inset-0 flex items-center justify-center" data-party-here>
+                <span className="flex h-[78%] w-[78%] items-center justify-center rounded-full bg-amber-300 text-black shadow-[0_0_8px_#ffd36a]" style={{ transform: `rotate(${pos.facing * 90}deg)` }}>
+                  <ArrowUp size={Math.round(cell * 0.5)} strokeWidth={3} />
+                </span>
+              </span>
+            )}
+          </Tag>
+        );
+      })}
+    </>
+  );
+}
+
+/** 右上の小さな地図（今いる場所のまわり5×5マス）。タップで大きな地図 */
+function MiniMap({ run, onOpen }: { run: DungeonRun; onOpen: () => void }) {
+  const pos = posOf(run);
+  const R = 2;
+  const cell = 17;
+  const size = (R * 2 + 1) * cell;
+  return (
+    <button
+      onClick={onOpen}
+      aria-label="地図を開く"
+      className="panel panel-gold-edge absolute right-2 top-2 z-20 overflow-hidden rounded-lg p-0"
+      style={{ width: size + 8, height: size + 8 }}
+      data-minimap
+    >
+      <span className="absolute" style={{ left: 4, top: 4, width: size, height: size }}>
+        <MapCells run={run} cell={cell} x0={pos.x - R} yTop={pos.y + R} only={(c) => Math.abs(c.x - pos.x) <= R && Math.abs(c.y - pos.y) <= R} />
+      </span>
+    </button>
+  );
+}
+
+/** 大きな地図（ミニマップをタップで開く）。見えている場所をタップして「ここまで歩く」 */
+function MapOverlay({ run, onClose, canWalk, myTurn, stepsLeft, onWalk }: {
+  run: DungeonRun;
+  onClose: () => void;
+  canWalk: boolean;
+  myTurn: boolean;
+  stepsLeft: number;
+  onWalk: (t: { x: number; y: number; face?: Facing }) => void;
+}) {
+  const grid = dungeonGrid(run);
+  const pos = posOf(run);
+  const seen = new Set(run.seen ?? []);
+  const walk = walkableKeys(run);
+  const [target, setTarget] = useState<{ x: number; y: number; face?: Facing; label: string } | null>(null);
+  const [mapRef, size] = useElementSize<HTMLDivElement>();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const W = size.width || 340;
+  const cell = Math.max(34, Math.min(52, Math.floor((W - 24) / Math.max(3, grid.width))));
+  const mapH = grid.height * cell;
+  const left = (W - grid.width * cell) / 2;
+  // 今いるマスが見えるようにスクロール
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = Math.max(0, mapH - (pos.y + 1) * cell + 8 - el.clientHeight * 0.6);
+  }, [pos.y, mapH, cell]);
+  const targetPath = target ? findPath(run, target) : undefined;
+  const tapCell = (c: MapCell) => {
+    if (c.kind === 'room') {
+      const f = doorFront(run, c.roomId!);
+      if (f && walk.has(cellKey(f.x, f.y)) && seen.has(cellKey(f.x, f.y))) setTarget({ ...f, face: 0, label: '扉の前まで歩く' });
+      else setTarget(null);
+      return;
+    }
+    if (walk.has(cellKey(c.x, c.y))) setTarget({ x: c.x, y: c.y, label: 'ここまで歩く' });
+    else setTarget(null);
+  };
+  return (
+    <div className="absolute inset-0 z-30 flex flex-col bg-[#0c0a08]/95" data-map-overlay>
+      <div className="flex h-11 shrink-0 items-center gap-2 px-2">
+        <span className="font-display min-w-0 flex-1 text-[16px] text-amber-100">地図（探索度 {exploredPercent(run)}%）</span>
+        <button onClick={onClose} aria-label="地図を閉じる" className="btn btn-dark flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
+          <X size={20} />
+        </button>
+      </div>
+      <div className="relative min-h-0 flex-1">
+        <div ref={scrollRef} className="absolute inset-0 overflow-y-auto overscroll-contain" onClick={() => setTarget(null)}>
+          <div ref={mapRef} className="relative mx-auto w-full" style={{ height: mapH + 20 }} data-dungeon-map>
+            <MapCells run={run} cell={cell} x0={0} yTop={grid.height - 1} left={left} top={10} target={target} onTap={tapCell} />
+          </div>
+        </div>
+        {target && myTurn && (
+          <div className="panel panel-gold-edge absolute inset-x-2 top-2 z-10 flex items-center gap-2 rounded-xl p-2" onClick={(e) => e.stopPropagation()} data-walk-panel>
+            <div className="min-w-0 flex-1 text-[13px]">
+              {targetPath ? (targetPath.length === 0 ? 'ここにいます' : `${target.label}（${targetPath.length}歩）`) : 'そこへは歩いて行けません'}
+              {targetPath && targetPath.length > stepsLeft && <span className="block text-[12px] text-red-300">歩数が足りません（あと{stepsLeft}歩）</span>}
+            </div>
+            <button
+              disabled={!canWalk || !targetPath || targetPath.length === 0 || targetPath.length > stepsLeft}
+              onClick={() => onWalk(target)}
+              className="btn btn-gold h-11 shrink-0 rounded-lg px-4 font-bold disabled:opacity-40"
+            >
+              歩く
+            </button>
+            <button onClick={() => setTarget(null)} aria-label="閉じる" className="btn btn-dark flex h-11 w-11 shrink-0 items-center justify-center rounded-lg">
+              <X size={20} />
+            </button>
+          </div>
+        )}
+      </div>
+      <div className="shrink-0 px-3 pb-2 pt-1 text-center text-[12px] text-zinc-400">見えている通路や扉をタップすると、そこまで歩けます</div>
     </div>
   );
 }
@@ -105,203 +267,104 @@ export function DungeonScreen() {
   const game = useBattle((s) => s.game)!;
   const dispatchGame = useBattle((s) => s.dispatchGame);
   const openSheet = useBattle((s) => s.openSheet);
+  useOnline((s) => s.tick);
   const run = game.dungeon!;
+  const pos = posOf(run);
   const reach = useMemo(() => new Set(reachableRooms(run).map((r) => r.id)), [run]);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [showMap, setShowMap] = useState(false);
   const [showRetreat, setShowRetreat] = useState(false);
-  const [mapRef, size] = useElementSize<HTMLDivElement>();
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const rows = Math.max(...run.rooms.map((r) => r.row)) + 1;
-  const W = size.width || 340;
-  const H = rows * ROW_H + 40;
-  const pos = (r: Room) => {
-    const w = run.rooms.filter((x) => x.row === r.row).length;
-    return { x: ((r.col + 0.5) / w) * W, y: H - 40 - r.row * ROW_H };
-  };
-  const current = run.rooms.find((r) => r.id === run.currentRoomId);
   const hasTabs = useBattle((s) => (s.full?.expeditions?.length ?? 0) > 0);
   const partyHeroes = game.heroes.filter((h) => !game.party || game.party.includes(h.id));
-  const sel = selected ? run.rooms.find((r) => r.id === selected) : undefined;
   const loss = retreatLoss(game);
-
-  // 今いる行が見えるようにスクロール
-  useLayoutEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const row = current?.row ?? 0;
-    el.scrollTop = Math.max(0, H - 40 - row * ROW_H - el.clientHeight * 0.65);
-  }, [current?.row, H]);
-
+  const nav = dungeonNavigator(game);
+  // 歩けるか（手番・担当・歩数）。向きを変えるのは歩数0でもできる
+  const myTurn = dungeonTurnHere(game) && !!nav && isLocalPlayer(nav.playerId);
+  const stepsLeft = game.world ? (run.explore ?? 0) : Infinity;
+  const canWalk = myTurn && game.mode === 'dungeon' && (!game.world || (run.explore != null && run.explore > 0));
+  const ahead = doorAhead(run);
+  const step = (dir: 'forward' | 'left' | 'right' | 'back') => nav && dispatchGame({ type: 'DUNGEON_STEP', playerId: nav.playerId, heroId: nav.id, dir });
+  const turn = (dir: 'left' | 'right' | 'back') => nav && dispatchGame({ type: 'DUNGEON_TURN', playerId: nav.playerId, heroId: nav.id, dir });
+  const moveOk = (rel: 'forward' | 'left' | 'right' | 'back') => canWalk && canMove(run, pos, turnTo(pos.facing, rel));
+  // 左右に扉がある時は、歩く代わりにその扉の方を向く（0歩）
+  const doorSide = (rel: 'left' | 'right') => turnTo(pos.facing, rel) === 0 && !!doorNorthOf(run, pos);
+  const side = (rel: 'left' | 'right') => (moveOk(rel) ? step(rel) : doorSide(rel) ? turn(rel) : undefined);
+  const sideOk = (rel: 'left' | 'right') => moveOk(rel) || (myTurn && game.mode === 'dungeon' && doorSide(rel));
+  const background = DUNGEONS.tryGet(run.dungeonId)?.background ?? run.background;
   return (
     <Screen>
-      <div className="flex h-12 shrink-0 items-center gap-2 px-2">
+      <div className="flex h-12 shrink-0 items-center gap-1.5 px-2">
         {/* 名前は上の場面のタブに出ているので、タブがある時は出さない（2回出さない） */}
         <div className="font-display text-outline min-w-0 flex-1 truncate text-[18px] text-amber-100">{hasTabs ? '' : run.name}</div>
-        <div className="panel flex h-9 items-center gap-1 rounded-full px-3 text-[14px] font-bold text-amber-200 tabular-nums">
-          <Coins size={16} /> {partyGold(game)}G
+        <div className="panel flex h-9 shrink-0 items-center gap-1 rounded-full px-2.5 text-[13px] font-bold text-sky-200 tabular-nums" data-explored>
+          <Compass size={15} /> 探索度 {exploredPercent(run)}%
         </div>
-        <button onClick={() => openSheet('menu')} aria-label="メニュー" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-lg">
+        <div className="panel flex h-9 shrink-0 items-center gap-1 rounded-full px-2.5 text-[13px] font-bold text-amber-200 tabular-nums">
+          <Coins size={15} /> {partyGold(game)}G
+        </div>
+        <button onClick={() => openSheet('menu')} aria-label="メニュー" className="btn btn-dark flex h-11 w-11 shrink-0 items-center justify-center rounded-lg">
           <Menu size={22} />
         </button>
       </div>
-
-      <div className="relative min-h-0 flex-1 overflow-hidden border-y border-amber-500/30">
-        <BattleBackground kind={DUNGEONS.tryGet(run.dungeonId)?.mapBackground ?? run.background} className="absolute inset-0 h-full w-full opacity-40" />
-        <div ref={scrollRef} className="absolute inset-0 overflow-y-auto overscroll-contain" onClick={() => setSelected(null)}>
-          <div ref={mapRef} className="relative mx-auto w-full" style={{ height: H }}>
-            <svg className="absolute inset-0" width={W} height={H}>
-              {run.rooms.flatMap((r) =>
-                r.next.map((nid) => {
-                  const n = run.rooms.find((x) => x.id === nid)!;
-                  const a = pos(r);
-                  const b = pos(n);
-                  // 進める道: 太く明るい実線と光 / 通った道: 落ち着いた金 / それ以外: 暗い破線
-                  const next = r.cleared && reach.has(n.id);
-                  const walked = r.cleared && n.cleared;
-                  return (
-                    <line
-                      key={r.id + nid}
-                      x1={a.x}
-                      y1={a.y}
-                      x2={b.x}
-                      y2={b.y}
-                      stroke={next ? '#ffe08a' : walked ? '#a8853e' : 'rgba(220,200,170,.25)'}
-                      strokeWidth={next ? 5 : walked ? 3 : 2}
-                      strokeDasharray={next || walked ? undefined : '5 7'}
-                      style={next ? { filter: 'drop-shadow(0 0 4px #ffd36a)' } : undefined}
-                    />
-                  );
-                }),
-              )}
-            </svg>
-            {run.rooms.map((r) => {
-              const t = roomStyle(r.type);
-              const p = pos(r);
-              const canGo = reach.has(r.id);
-              const isCur = r.id === run.currentRoomId;
-              const big = t.boss;
-              const s = big ? 66 : 52;
-              return (
-                <button
-                  key={r.id}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelected(r.id);
-                  }}
-                  className="absolute flex items-center justify-center rounded-full border-[3px] transition-transform active:scale-95"
-                  style={{
-                    left: p.x - s / 2,
-                    top: p.y - s / 2,
-                    width: s,
-                    height: s,
-                    background: t.bg,
-                    borderColor: isCur ? '#fff3c4' : canGo ? t.color : 'rgba(255,255,255,.2)',
-                    opacity: r.cleared && !isCur ? 0.45 : canGo || isCur ? 1 : 0.6,
-                    filter: r.cleared && !isCur ? 'grayscale(.6)' : undefined,
-                    boxShadow: isCur ? '0 0 0 3px rgba(255,220,140,.5), 0 0 22px #ffd36a' : canGo ? `0 0 16px ${t.color}` : selected === r.id ? '0 0 0 3px #fff' : undefined,
-                  }}
-                  aria-label={t.name}
-                >
-                  {canGo && <span className="glow-pulse absolute -inset-1.5 rounded-full border-2" style={{ borderColor: t.color }} />}
-                  {/* みんなが選んでいる部屋（席の色の印）。全員が同じ部屋を選ぶと進む */}
-                  {canGo && (
-                    <span className="absolute -bottom-[14px] left-1/2 flex -translate-x-1/2 gap-0.5" data-room-votes={votesFor(game, { type: 'ENTER_ROOM', playerId: LOCAL_PLAYER, roomId: r.id }).join(',')}>
-                      {votesFor(game, { type: 'ENTER_ROOM', playerId: LOCAL_PLAYER, roomId: r.id }).map((p) => (
-                        <span key={p} className="h-[11px] w-[11px] rotate-45 border border-white/80" style={{ background: PLAYER_COLOR[p], boxShadow: `0 0 6px ${PLAYER_COLOR[p]}` }} />
-                      ))}
-                    </span>
-                  )}
-                  {/* 今いる部屋: パーティの顔 */}
-                  {isCur && (
-                    <span className="absolute -top-[22px] left-1/2 flex -translate-x-1/2 -space-x-2" data-party-here>
-                      {partyHeroes.map((h) => (
-                        <HeroFace key={h.id} hero={h} size={24} dim={h.hp <= 0} />
-                      ))}
-                      {/* お供は顔の横にちょこんと座る（2匹まで） */}
-                      {partyHeroes
-                        .filter((h) => h.pet)
-                        .slice(0, 2)
-                        .map((h) => (
-                          <span key={`pet${h.id}`} className="ml-2.5 self-end">
-                            <PetToken ownerId={h.id} pet={h.pet!} size={16} />
-                          </span>
-                        ))}
-                    </span>
-                  )}
-                  <t.Icon size={big ? 32 : 24} strokeWidth={2.4} style={{ color: t.color }} />
-                  {r.cleared && (
-                    <span className="absolute -right-1 -bottom-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white">
-                      <Check size={14} strokeWidth={3} />
-                    </span>
-                  )}
-                  {t.behavior === 'chest' && r.chest?.locked && !r.cleared && (
-                    <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-800 text-amber-200">
-                      <Lock size={12} />
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        {/* 2人以上で遊ぶ時: 部屋は全員一致で決まる */}
+      <div className="relative min-h-[200px] flex-1 overflow-hidden border-y border-amber-500/30">
+        {/* 一人称の通路 */}
+        <AnimatedDungeonView run={run} background={background} />
+        <MiniMap run={run} onOpen={() => setShowMap(true)} />
+        {/* 2人以上で遊ぶ時: 扉は全員一致で開く */}
         {voters(game).length > 1 && (
-          <div className="pointer-events-none absolute inset-x-0 top-1 z-10 flex justify-center">
-            <span className="rounded-full bg-black/70 px-3 py-0.5 text-[12px] text-zinc-200" data-vote-hint>
-              {currentVote(game) && notVoted(game).length === 0 ? '意見が分かれています。同じ部屋を選び直してください' : '全員が同じ部屋を選ぶと進みます'}
+          <div className="pointer-events-none absolute left-2 top-2 z-10 max-w-[calc(100%-130px)]">
+            <span className="inline-block rounded-lg bg-black/70 px-2 py-0.5 text-[12px] leading-4 text-zinc-200" data-vote-hint>
+              {currentVote(game) && notVoted(game).length === 0 ? '意見が分かれています。選び直してください' : '扉は全員が「開ける」を選ぶと開きます'}
             </span>
           </div>
         )}
-        {/* 選んだ部屋の情報と「進む」 */}
-        <AnimatePresence>
-          {sel && (
-            <motion.div
-              initial={{ y: 30, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 30, opacity: 0 }}
-              transition={{ duration: 0.12 }}
-              className="panel panel-gold-edge absolute inset-x-2 bottom-2 z-10 rounded-xl p-2"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  <RoomInfo room={sel} />
-                </div>
-                <button onClick={() => setSelected(null)} aria-label="閉じる" className="btn btn-dark flex h-11 w-11 shrink-0 items-center justify-center rounded-lg">
-                  <X size={20} />
-                </button>
-              </div>
-              {reach.has(sel.id) && game.world && (!dungeonTurnHere(game) || !run.explore) ? (
-                <div className="mt-2 text-center text-[13px] text-zinc-400">{!dungeonTurnHere(game) ? '今はほかの人の番です' : run.explore === 0 ? '探索力を使い切りました' : '先に探索力を判定してください'}</div>
-              ) : reach.has(sel.id) ? (
-                <button
-                  onClick={() => {
-                    setSelected(null);
-                    dispatchGame({ type: 'ENTER_ROOM', playerId: LOCAL_PLAYER, roomId: sel.id });
-                  }}
-                  className="btn btn-gold font-display mt-2 h-12 w-full rounded-xl text-[18px]"
-                >
-                  この部屋へ進む
-                  <VoteChips cmd={{ type: 'ENTER_ROOM', playerId: LOCAL_PLAYER, roomId: sel.id }} />
-                </button>
-              ) : (
-                <div className="mt-1 text-center text-[12px] text-zinc-400">{sel.cleared ? '通過済みの部屋' : 'まだ進めない部屋（光っている部屋から選ぶ）'}</div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* 下端: 目の前の扉と、歩くボタン（絵に重ねる）。歩くのは手番のキャラの担当の人 */}
+        <div className="absolute inset-x-2 bottom-2 z-10 flex flex-col gap-1.5">
+          {ahead && game.mode === 'dungeon' && <DoorPanel room={ahead} openable={reach.has(ahead.id)} />}
+          <div className="grid grid-cols-4 gap-1.5" data-dungeon-moves>
+            {(
+              [
+                [doorSide('left') && !moveOk('left') ? '扉を向く' : '左へ', ArrowLeft, () => side('left'), sideOk('left')],
+                ['前進', ArrowUp, () => step('forward'), moveOk('forward')],
+                [doorSide('right') && !moveOk('right') ? '扉を向く' : '右へ', ArrowRight, () => side('right'), sideOk('right')],
+                ['振り向く', Undo2, () => turn('back'), myTurn && game.mode === 'dungeon'],
+              ] as const
+            ).map(([label, Icon, on, ok], i) => (
+              <button key={i} onClick={on} disabled={!ok} className="btn flex h-12 flex-col items-center justify-center rounded-xl border border-amber-200/30 bg-black/55 text-[12px] leading-4 font-bold text-amber-50 backdrop-blur-[2px] disabled:opacity-40">
+                <Icon size={18} className="text-amber-200" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {showMap && (
+          <MapOverlay
+            run={run}
+            onClose={() => setShowMap(false)}
+            canWalk={canWalk}
+            myTurn={myTurn}
+            stepsLeft={stepsLeft}
+            onWalk={(t) => {
+              setShowMap(false);
+              if (nav) dispatchGame({ type: 'DUNGEON_WALK', playerId: nav.playerId, heroId: nav.id, x: t.x, y: t.y, face: t.face });
+            }}
+          />
+        )}
       </div>
-
       <ExplorePanel />
       {/* パーティ（顔と細いHP）と、装備・道具・撤退を1行に */}
       <div className="flex shrink-0 items-center gap-1 px-2 pt-1.5 pb-3" data-dungeon-bar>
         <div className="flex min-w-0 flex-1 gap-0.5 overflow-x-auto">
           {partyHeroes.map((h) => (
-            <button key={h.id} onClick={() => openSheet('party')} aria-label={`${h.name} HP${h.hp}/${heroMaxHp(h)}`} className="btn flex h-11 w-11 shrink-0 flex-col items-center justify-center">
+            <button key={h.id} onClick={() => openSheet('party')} aria-label={`${h.name} HP${h.hp}/${heroMaxHp(h)}`} className="btn relative flex h-11 w-11 shrink-0 flex-col items-center justify-center">
               <HeroFace hero={h} size={30} dim={h.hp <= 0} />
               <span className="mt-[2px] block w-[32px]">
                 <Bar value={h.hp} max={heroMaxHp(h)} color="linear-gradient(90deg,#22b45a,#7dffa8)" height={4} />
               </span>
+              {h.pet && (
+                <span className="absolute -top-1 -right-1">
+                  <PetToken ownerId={h.id} pet={h.pet} size={14} />
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -369,7 +432,7 @@ export const dungeonTurnHere = (game: GameState) => !game.world || (game.party ?
 
 /**
  * 探索力（M3-D）: ダンジョンのパーティも世界マップの手番の順番で動く。
- * 番が来たら素早さで探索力（2〜4）を決め、部屋に入るたびに1使う。使い切るか「手番を終える」で次の人の番
+ * 番が来たら素早さで探索力（2〜4）を決め、歩数はその2倍。1歩・扉を開けるたびに1使う。使い切るか「手番を終える」で次の人の番
  */
 function ExplorePanel() {
   const game = useBattle((s) => s.game)!;
@@ -424,7 +487,7 @@ function ExplorePanel() {
           >
             <Footprints size={19} /> 探索力の判定
             <span className="text-[13px] tabular-nums">
-              {BALANCE.exploreBase + f}〜{BALANCE.exploreBase + BALANCE.exploreSlots}
+              {(BALANCE.exploreBase + f) * BALANCE.dungeonStepsPerExplore}〜{(BALANCE.exploreBase + BALANCE.exploreSlots) * BALANCE.dungeonStepsPerExplore}歩
             </span>
           </button>
           <button onClick={() => setFocus(Math.min(max, f + 1))} disabled={f >= max} aria-label="フォーカスを増やす" className="btn btn-dark flex h-12 w-11 shrink-0 items-center justify-center rounded-xl">
@@ -432,7 +495,7 @@ function ExplorePanel() {
           </button>
         </div>
         <span className="text-center text-[12px] leading-4 text-zinc-400">
-          {roller.name}の素早さ{chance}%×{BALANCE.exploreSlots}枠・フォーカス<b className="text-amber-200">{f}</b>（探索力＝入れる部屋の数）
+          {roller.name}の素早さ{chance}%×{BALANCE.exploreSlots}枠・フォーカス<b className="text-amber-200">{f}</b>（歩数＝探索力×{BALANCE.dungeonStepsPerExplore}）
         </span>
       </div>
     );
@@ -440,12 +503,12 @@ function ExplorePanel() {
   return (
     <div className="mx-2 mt-2 flex shrink-0 items-center gap-2 rounded-xl border border-amber-300/40 bg-black/50 px-2 py-1.5">
       <div className="flex shrink-0 flex-col items-center rounded-lg bg-black/40 px-2 py-0.5">
-        <span className="text-[12px] text-zinc-400">探索力</span>
+        <span className="text-[12px] text-zinc-400">残り歩数</span>
         <b className="font-display text-[22px] leading-6 text-amber-200 tabular-nums">{run.explore}</b>
       </div>
       <div className="min-w-0 flex-1">
         {run.exploreRoll && <RollStrip results={run.exploreRoll} small />}
-        <div className="text-[12px] text-zinc-400">{run.explore > 0 ? '光っている部屋をタップして進む' : '探索力を使い切った'}</div>
+        <div className="text-[12px] text-zinc-400">{run.explore > 0 ? '歩くと1歩、扉を開けると1歩使う（向きを変えるのは0歩）' : '歩数を使い切った'}</div>
       </div>
       <button onClick={() => dispatchGame({ type: 'EXPLORE_END', playerId: LOCAL_PLAYER })} className="btn btn-dark h-11 shrink-0 rounded-lg px-3 text-[13px] font-bold">
         手番を終える

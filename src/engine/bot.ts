@@ -22,6 +22,10 @@ import {
   rarityIndex,
   reachable,
   reachableRooms,
+  doorFront,
+  dungeonNavigator,
+  findPath,
+  posOf,
   unusableReason,
   viewOf,
   waitingPlayers,
@@ -248,7 +252,16 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
       const rooms = reachableRooms(g.dungeon!);
       const hurt = livingHeroes(g).some((h) => h.hp < heroMaxHp(h) * 0.5);
       const pick = rooms.find((r) => (hurt ? r.type === 'rest' : r.type === 'chest')) ?? rooms[0];
-      return send(g, { type: 'ENTER_ROOM', playerId: pid(g), roomId: pick.id }, log);
+      // 第3段階: 扉の前まで1歩ずつ歩いてから開ける（bot はテスト用なので、部屋の中身を知っている）
+      const run = g.dungeon!;
+      const front = doorFront(run, pick.id)!;
+      const p = posOf(run);
+      if (p.x === front.x && p.y === front.y) return send(g, { type: 'ENTER_ROOM', playerId: pid(g), roomId: pick.id }, log);
+      const path = findPath(run, front);
+      const nav = dungeonNavigator(g);
+      if (!path?.length || !nav) return send(g, { type: 'EXPLORE_END', playerId: pid(g) }, log);
+      const rel = (['forward', 'right', 'back', 'left'] as const)[(path[0] - p.facing + 4) % 4];
+      return send(g, { type: 'DUNGEON_STEP', playerId: nav.playerId, heroId: nav.id, dir: rel }, log);
     }
     case 'chest': {
       const c = g.chest!;

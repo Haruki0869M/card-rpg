@@ -23,6 +23,10 @@ import {
   heroStats,
   isDone,
   reachableRooms,
+  doorFront,
+  dungeonNavigator,
+  findPath,
+  posOf,
   retreatLoss,
   statChance,
   unusableReason,
@@ -333,7 +337,14 @@ function autoPlay(g: GameState, dungeonId: string, maxSteps = 4000): GameState {
     switch (g.mode) {
       case 'dungeon': {
         const rooms = reachableRooms(g.dungeon!);
-        g = run(g, { type: 'ENTER_ROOM', playerId: P, roomId: rooms[step % rooms.length].id });
+        const room = rooms[step % rooms.length];
+        // 第3段階: 扉の前まで歩いてから開ける
+        const front = doorFront(g.dungeon!, room.id)!;
+        for (const d of findPath(g.dungeon!, front)!) {
+          const rel = (['forward', 'right', 'back', 'left'] as const)[(d - posOf(g.dungeon!).facing + 4) % 4];
+          g = run(g, { type: 'DUNGEON_STEP', playerId: P, heroId: dungeonNavigator(g)!.id, dir: rel });
+        }
+        g = run(g, { type: 'ENTER_ROOM', playerId: P, roomId: room.id });
         break;
       }
       case 'battle': {
@@ -430,7 +441,9 @@ describe('自動プレイ（ダンジョンを最後まで）', () => {
     }
     // 4人・やさしいなら、かなりの割合で制覇できる
     expect(results.filter((r) => r === 'cleared').length).toBeGreaterThan(results.length / 3);
-  });
+    // 第3段階: 扉の前まで1歩ずつ歩く分だけ操作が増え、単独で約3秒（以前は約2.8秒）。
+    // テスト全体を同時に流すと既定の5秒に近づき時々時間切れになるため、このテストだけ15秒にする（確認する中身は同じ）
+  }, 15000);
 
   it('同じシードなら同じ結果（オンライン協力で全員の結果が一致する前提）', () => {
     const a = autoPlay(newGame(9), 'emeraldTemple');

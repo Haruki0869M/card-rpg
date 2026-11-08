@@ -35,7 +35,7 @@ try {
   // 保存は操作後に更新されるため、メニューではなく世界マップの待機を実行する。
   await page.getByText('王都クリスタリアに入る', { exact: true }).click();
   const migrated = await save();
-  check(migrated.game.version === 14, '旧保存の版が更新されない');
+  check(migrated.game.version === 15, '旧保存の版が更新されない');
   check(migrated.game.world.tiles.filter(t => ['temple', 'altar'].includes(t.f?.kind)).length === 7, '旧地図に施設が追加されない');
   check(migrated.game.rngState !== undefined, '乱数状態がない');
   old.game.world.tiles.forEach((t, i) => {
