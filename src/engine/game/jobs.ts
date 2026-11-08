@@ -175,6 +175,26 @@ export function announceJobs(game: GameState, hero: Hero) {
  * = 今のジョブ＋これまでのジョブの専用カード ＋ 装備できる武器種のカード ＋ 今のジョブの系統のカード ＋ 共通カード。
  * 異端カードは入らない（イベントでだけ手に入る）。
  */
+/**
+ * ジョブ寄りの候補（報酬のカードの「必ず1枚」に使う。K7）: 今と前のジョブの専用カード・今のジョブの系統のカード・
+ * 装備している武器の種類のカード（武器が無ければ、そのジョブの得意な武器）。共通カード・異端カードは入れない
+ */
+export function heroJobCardPool(hero: Hero): string[] {
+  const pool = heroCardPool(hero);
+  const own = new Set<string>();
+  for (const cls of [hero.classId, ...(hero.jobs ?? [])]) for (const id of getClass(cls).cardPool) own.add(id);
+  const w = hero.equipment.weapon;
+  const weapon = (w ? getItem(w.itemId).weaponType : undefined) ?? getClass(hero.classId).weaponType;
+  const lineage = getClass(hero.classId).lineage;
+  return pool.filter((id) => {
+    const c = CARDS.get(id);
+    if (c.common || c.heresy) return false;
+    if (c.weaponType) return c.weaponType === weapon;
+    if (c.lineage) return c.lineage === lineage;
+    return own.has(id);
+  });
+}
+
 export function heroCardPool(hero: Hero): string[] {
   const ids = new Set<string>();
   for (const cls of [hero.classId, ...(hero.jobs ?? [])]) for (const id of getClass(cls).cardPool) if (CARDS.has(id)) ids.add(id);
