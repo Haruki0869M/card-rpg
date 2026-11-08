@@ -28,6 +28,7 @@ import { AbilityCutins } from './components/ui/AbilityCutins';
 import { SceneTabs } from './components/SceneTabs';
 import { VoteStatus } from './components/ui/Votes';
 import { TurnLock } from './components/ui/TurnLock';
+import { TurnCutin } from './components/ui/TurnCutin';
 import { findAlly } from './engine';
 import { useBackButton } from './hooks/useBackButton';
 import { useDetail } from './hooks/usePress';
@@ -212,6 +213,7 @@ export default function App() {
             {screen === 'game' && <VoteStatus />}
             {screen === 'game' && <TurnLock />}
             {screen === 'game' && <AbilityCutins />}
+            {screen === 'game' && <TurnCutin />}
           </>}
           <Toast />
         </div>

@@ -50,6 +50,16 @@ export interface RollFx {
   perfect: boolean;
 }
 
+/** 手番のカットイン（docs/tasks/turn-cutin.md） */
+export interface TurnCutin {
+  id: number;
+  heroId: string;
+  /** この端末で操作するキャラの番か（大きなカットイン）。違えば小さなお知らせ */
+  mine: boolean;
+  /** そのキャラのいる場面（世界マップかダンジョンの場面のID） */
+  scene: string;
+}
+
 export interface Popup {
   id: number;
   unitId: string;
@@ -86,6 +96,9 @@ interface StoreState {
   petPulses: Record<string, { id: number }>;
   worldMoves: WorldMovePresentation[];
   finishWorldMove: (id: number) => void;
+  /** 手番が移った時のカットイン（mine = この端末で操作するキャラの番。見た目だけ。状態・同期は変えない） */
+  turnCutin: TurnCutin | null;
+  dismissTurnCutin: (id: number) => void;
   screen: Screen;
   draft: NewGameDraft;
   /** 冒険の状態（全部の場面） */
@@ -442,6 +455,12 @@ export const useBattle = create<StoreState>((set, get) => {
       const sel = get().selection;
       if (sel && !findAlly(next.battle, get().activeId)?.hand.some((c) => c.uid === sel.cardUid)) patch.selection = null;
     }
+    // 手番が移った: カットイン（自分のキャラなら大きく、ほかの人のキャラなら小さなお知らせ）
+    if (before && turn && turn !== before.world?.turn) {
+      const mine = isLocalPlayer(full.heroes.find((h) => h.id === turn)?.playerId ?? 'P1');
+      patch.turnCutin = { id: fxId++, heroId: turn, mine, scene: sceneOfHero(full, turn) };
+      if (mine) vibrate(get().settings, VIBRATION.turn);
+    }
     const lm = full.world?.lastMove;
     if (before && scene === WORLD_SCENE && cmdScene === WORLD_SCENE && lm && lm.seq !== before.world?.lastMove?.seq && lm.path.length > 1) {
       patch.worldMoves = [...get().worldMoves, { id: fxId++, game: full }];
@@ -494,7 +513,7 @@ export const useBattle = create<StoreState>((set, get) => {
     battle: viewIn(saved?.game ?? null, pickScene(saved?.game ?? null, WORLD_SCENE, true))?.battle ?? EMPTY_BATTLE,
     settings: loadSettings(),
     worldMoves: [],
-    presentationBusy: false, cutins: [], petPulses: {},
+    presentationBusy: false, cutins: [], petPulses: {}, turnCutin: null,
     finishWorldMove: id => {
       set(s => ({ worldMoves: s.worldMoves[0]?.id === id ? s.worldMoves.slice(1) : s.worldMoves }));
       if (!get().worldMoves.length) { pumpNotices(); scheduleEnemy(); }
@@ -511,7 +530,8 @@ export const useBattle = create<StoreState>((set, get) => {
     hint: null,
     toast: null,
 
-    setScreen: (screen) => { if (screen !== 'game') clearPresentation(); set({ screen, sheet: null }); },
+    setScreen: (screen) => { if (screen !== 'game') clearPresentation(); set({ screen, sheet: null, ...(screen !== 'game' ? { turnCutin: null } : {}) }); },
+    dismissTurnCutin: (id) => { if (get().turnCutin?.id === id) set({ turnCutin: null }); },
     setScene: (s) => {
       clearPresentation();
       const { full } = get();
@@ -623,7 +643,7 @@ export const useBattle = create<StoreState>((set, get) => {
       const exp = full.expeditions?.find((x) => mine.length && mine.every((h) => x.heroes.includes(h.id)));
       const scene = pickScene(full, exp?.id ?? get().scene, true);
       const game = viewOf(full, scene);
-      set({ worldMoves: [], full, scene, game, screen: 'game', sheet: null, battle: game.battle ?? EMPTY_BATTLE, ...(game.battle ? resetBattleUi(game.battle) : { selection: null }) });
+      set({ worldMoves: [], turnCutin: null, full, scene, game, screen: 'game', sheet: null, battle: game.battle ?? EMPTY_BATTLE, ...(game.battle ? resetBattleUi(game.battle) : { selection: null }) });
       scheduleEnemy();
     },
 

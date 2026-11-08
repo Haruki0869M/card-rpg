@@ -188,6 +188,10 @@ export const TIMING = {
   reasonFlash: 1.0,
   /** 高速モードの倍率 */
   fastModeFactor: 2,
+  /** 手番のカットイン（自分の番の大きな表示 / 簡易・高速・動作軽減の時 / ほかの人の番の小さなお知らせ）。秒 */
+  turnCutin: 1.2,
+  turnCutinShort: 0.6,
+  turnNotice: 1.0,
 } as const;
 
 /** 宝箱・カード報酬の演出時間（秒）。高速モードでは fastModeFactor で割る。spec §10.3 */
@@ -220,5 +224,7 @@ export const VIBRATION = {
   chestLegend: [120, 60, 120, 60, 300],
   perfect: [25, 30, 25],
   hurt: 20,
+  /** 自分のキャラの手番が来た（手番のカットイン） */
+  turn: 40,
   victory: [40, 40, 80],
 } as const;
