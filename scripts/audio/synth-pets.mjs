@@ -52,10 +52,30 @@ function mix(total, parts) {
   }
   return buf;
 }
-/** ピークを −3dB にそろえて 16bit の WAV にする */
-function wav(buf) {
+/**
+ * 耳にやさしくする（オーナーの指示: 高い声はしんどいので小さめ・やわらかく）。
+ * ① 5kHz あたりから上をなだらかに削る（2回の1次ローパス） ② 頭と尻に短いフェード（プツッという音を消す）
+ * ③ 声が高いほど小さくする（人の耳は 2〜7kHz を大きく感じるので）。1.2kHz 以下はそのまま、6kHz で約 −9dB。
+ */
+function soften(buf) {
+  const k = 1 - Math.exp((-2 * Math.PI * 5000) / SR);
+  let a = 0, b = 0;
+  const out = new Float32Array(buf.length);
+  for (let i = 0; i < buf.length; i++) { a += k * (buf[i] - a); b += k * (a - b); out[i] = b; }
+  const fade = Math.round(0.008 * SR);
+  for (let i = 0; i < fade && i < out.length; i++) { out[i] *= i / fade; out[out.length - 1 - i] *= i / fade; }
+  // おおまかな声の高さ（ゼロ交差の数）
+  let z = 0; for (let i = 1; i < out.length; i++) if ((out[i - 1] < 0) !== (out[i] < 0)) z++;
+  const pitch = (z * SR) / (2 * out.length);
+  const level = Math.min(1, Math.max(0.35, Math.pow(1200 / Math.max(1, pitch), 0.6)));
+  return { buf: out, level };
+}
+
+/** 耳にやさしくしてから、ピーク（−3dB × 声の高さの補正）にそろえて 16bit の WAV にする */
+function wav(raw) {
+  const { buf, level } = soften(raw);
   let peak = 0; for (const v of buf) peak = Math.max(peak, Math.abs(v));
-  const g = peak ? 0.708 / peak : 1;
+  const g = peak ? (0.708 * level) / peak : 1;
   const b = Buffer.alloc(44 + buf.length * 2);
   b.write('RIFF', 0); b.writeUInt32LE(36 + buf.length * 2, 4); b.write('WAVE', 8); b.write('fmt ', 12);
   b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22); b.writeUInt32LE(SR, 24); b.writeUInt32LE(SR * 2, 28);

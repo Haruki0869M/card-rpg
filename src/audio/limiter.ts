@@ -16,7 +16,8 @@ interface Voice { id: string; start: number; end: number }
 
 export interface Limiter {
   /** 鳴らしてよければ true を返し、鳴っている音として数える */
-  tryStart(id: string, now: number, durationMs: number): boolean;
+  /** gapMs = この音だけ、続けて鳴らす時に空ける間を長くする（お供の鳴き声など） */
+  tryStart(id: string, now: number, durationMs: number, gapMs?: number): boolean;
   /** 今鳴っている数（テスト用） */
   active(now: number): number;
   clear(): void;
@@ -24,18 +25,21 @@ export interface Limiter {
 
 export function createLimiter(opts: LimiterOptions = DEFAULT_LIMITS): Limiter {
   let voices: Voice[] = [];
+  const lastStart = new Map<string, number>();
   const prune = (now: number) => { voices = voices.filter((v) => v.end > now); };
   return {
-    tryStart(id, now, durationMs) {
+    tryStart(id, now, durationMs, gapMs) {
       prune(now);
       if (voices.length >= opts.maxTotal) return false;
       const same = voices.filter((v) => v.id === id);
       if (same.length >= opts.maxSame) return false;
-      if (same.some((v) => now - v.start < opts.minGapMs)) return false;
+      const gap = Math.max(opts.minGapMs, gapMs ?? 0);
+      if (lastStart.has(id) && now - lastStart.get(id)! < gap) return false;
+      lastStart.set(id, now);
       voices.push({ id, start: now, end: now + Math.max(1, durationMs) });
       return true;
     },
     active(now) { prune(now); return voices.length; },
-    clear() { voices = []; },
+    clear() { voices = []; lastStart.clear(); },
   };
 }

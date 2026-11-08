@@ -5,6 +5,8 @@
 //   node scripts/audio/convert-ogg.mjs convert <素材フォルダ> <対応表.json> <出力フォルダ>
 //     → 対応表 { "sfx_ui_tap": "ui-audio/click1.ogg", ... } のとおりに、モノラル 22.05kHz 16bit の WAV にして書き出す
 //       （頭と尻の無音を切り、ピークを −3dB にそろえる。gain を付けた表 { id: { file, gain } } なら、その倍率も掛ける）
+//       耳障りにならないよう（オーナーの指示）、① 高い音を削る（lowpass Hz、既定 6000。2回の1次ローパス）
+//       ② 頭と尻に短いフェード ③ 詰まった大きな音は、平均の大きさを rmsCap dB（既定 −20）までに抑える
 // 環境変数: NODE_PATH・PLAYWRIGHT_BROWSERS_PATH（docs/STATUS.md の手順と同じ）
 import { createRequire } from 'node:module';
 import { execSync } from 'node:child_process';
@@ -55,9 +57,22 @@ async function decode(file) {
   }, { b64, SR });
 }
 
+function soften(samples, lowpass, rmsCap) {
+  const k = 1 - Math.exp((-2 * Math.PI * lowpass) / SR);
+  let a = 0, b = 0;
+  const out = samples.map((v) => { a += k * (v - a); b += k * (a - b); return b; });
+  const fade = Math.min(Math.round(0.004 * SR), Math.floor(out.length / 4));
+  for (let i = 0; i < fade; i++) { out[i] *= i / fade; out[out.length - 1 - i] *= i / fade; }
+  let peak = 0, sum = 0; for (const v of out) { peak = Math.max(peak, Math.abs(v)); sum += v * v; }
+  // ピークを −3dB にした時の平均の大きさが rmsCap を超えるなら、その分下げる
+  const norm = peak ? 0.708 / peak : 1;
+  const rmsDb = 20 * Math.log10(Math.sqrt(sum / Math.max(1, out.length)) * norm || 1e-9);
+  const cap = rmsDb > rmsCap ? Math.pow(10, (rmsCap - rmsDb) / 20) : 1;
+  return out.map((v) => v * norm * cap);
+}
+
 function wav(samples, gain = 1) {
-  let peak = 0; for (const v of samples) peak = Math.max(peak, Math.abs(v));
-  const g = (peak ? 0.708 / peak : 1) * gain;
+  const g = gain;
   const b = Buffer.alloc(44 + samples.length * 2);
   b.write('RIFF', 0); b.writeUInt32LE(36 + samples.length * 2, 4); b.write('WAVE', 8); b.write('fmt ', 12);
   b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22); b.writeUInt32LE(SR, 24); b.writeUInt32LE(SR * 2, 28);
@@ -78,8 +93,9 @@ if (mode === 'analyze') {
   const map = JSON.parse(readFileSync(arg3, 'utf8'));
   mkdirSync(arg4, { recursive: true });
   for (const [id, v] of Object.entries(map)) {
-    const { file, gain = 1 } = typeof v === 'string' ? { file: v } : v;
-    const { samples } = await decode(join(src, file));
+    const { file, gain = 1, lowpass = 6000, rmsCap = -20 } = typeof v === 'string' ? { file: v } : v;
+    const { samples: raw } = await decode(join(src, file));
+    const samples = soften(raw, lowpass, rmsCap);
     const dir = join(arg4, id.startsWith('pet_') ? 'pet' : id.startsWith('bgm_') ? 'bgm' : 'sfx');
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, `${id}.wav`), wav(samples, gain));

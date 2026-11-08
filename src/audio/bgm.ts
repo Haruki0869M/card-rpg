@@ -6,7 +6,17 @@ import { getRoomType } from '../data/rules';
 import { timeOfDay } from '../engine/game/world/time';
 import type { GameState } from '../types';
 import type { BgmId } from './ids';
-import { playBgm, playSound } from './player';
+import { playBgm, type BgmLoop } from './player';
+
+/**
+ * 曲ごとのつなぎ方（音の担当の sound-pick-bgm.md の「使う版」より）。ループ版の曲は継ぎ目なく、
+ * ループ用でない曲は終わりの2秒を重ねてつなぐ。エンディングは1回だけ。書いていない曲は crossfade。
+ */
+export const BGM_LOOP: Partial<Record<BgmId, BgmLoop>> = {
+  bgm_title: 'crossfade', bgm_town: 'crossfade', bgm_world_day: 'seamless', bgm_world_night: 'crossfade',
+  bgm_dungeon: 'crossfade', bgm_battle: 'crossfade', bgm_boss: 'seamless', bgm_camp: 'crossfade',
+  bgm_chest: 'seamless', bgm_ending: 'once',
+};
 
 /** その画面で流す曲。null = 止める（勝利・敗北のジングルの間など） */
 export function bgmFor(screen: string, game: GameState | null): BgmId | null {
@@ -24,7 +34,8 @@ export function bgmFor(screen: string, game: GameState | null): BgmId | null {
     case 'chest': return 'bgm_chest';
     case 'event': if (game.dungeon) return 'bgm_dungeon'; return night ? 'bgm_world_night' : 'bgm_world_day';
     case 'world': case 'encounter': case 'hub': return night ? 'bgm_world_night' : 'bgm_world_day';
-    // 報酬・敗北・クリア・エンディングはジングルを聞かせるので曲を止める
+    case 'ending': return 'bgm_ending';
+    // 報酬・敗北・クリアはジングルを聞かせるので曲を止める
     default: return null;
   }
 }
@@ -37,14 +48,11 @@ export function installBgm(store: Watchable): void {
   if (installed) return;
   installed = true;
   let last: BgmId | null | undefined;
-  let lastMode: string | undefined;
   const apply = (s: { screen: string; game: GameState | null }) => {
-    const mode = s.screen === 'game' ? s.game?.mode : undefined;
-    if (mode !== lastMode) { if (mode === 'ending' && lastMode !== undefined) playSound('jgl_ending'); lastMode = mode; }
     const id = bgmFor(s.screen, s.game);
     if (id === last) return;
     last = id;
-    playBgm(id);
+    playBgm(id, id ? BGM_LOOP[id] ?? 'crossfade' : undefined);
   };
   apply(store.getState());
   store.subscribe(apply);
