@@ -6,6 +6,8 @@ import { mkdirSync } from 'node:fs';
 import { chromium, layoutIssues, URL } from './lib.mjs';
 
 const OUT = process.env.DUNGEON_VIEW_OUTPUT ?? 'screenshots/dungeon-view';
+// 入るダンジョン（ID:名前）。ほかのダンジョンの通路の絵を見る時に変える（例 lavaCavern:溶岩の大空洞）
+const [DUNGEON_ID, DUNGEON_NAME] = (process.env.DUNGEON_VIEW_DUNGEON ?? 'emeraldTemple:翠の神殿').split(':');
 mkdirSync(OUT, { recursive: true });
 const SIZES = [
   [360, 640],
@@ -28,13 +30,13 @@ async function run(width, height, reduced = false) {
     const h = await page.locator('[data-dungeon-view]').evaluate((e) => e.getBoundingClientRect().height).catch(() => 0);
     if (h < 200) problems.push(`${tag} ${where}: 通路の絵の高さが ${Math.round(h)}px（200px未満）`);
   };
-  const edit = async (fn) => {
-    await page.evaluate((src) => {
+  const edit = async (fn, arg) => {
+    await page.evaluate(({ src, arg }) => {
       const k = 'card-rpg/adventure';
       const d = JSON.parse(localStorage.getItem(k));
-      (0, eval)(src)(d.game);
+      (0, eval)(src)(d.game, arg);
       localStorage.setItem(k, JSON.stringify(d));
-    }, fn.toString());
+    }, { src: fn.toString(), arg });
     await page.reload();
     await page.getByText('つづきから').click();
     await page.waitForTimeout(300);
@@ -54,13 +56,13 @@ async function run(width, height, reduced = false) {
   await page.getByText('キャラクター作成へ').click();
   await page.getByText('冒険に出発').click();
   await page.waitForTimeout(300);
-  await edit((g) => {
+  await edit((g, dungeonId) => {
     const w = g.world;
-    const t = w.tiles.findIndex((x) => x.f && x.f.kind === 'dungeon' && x.f.id === 'emeraldTemple');
+    const t = w.tiles.findIndex((x) => x.f && x.f.kind === 'dungeon' && x.f.id === dungeonId);
     for (const id of Object.keys(w.pos)) w.pos[id] = t;
     w.story = undefined;
-  });
-  await page.getByText('翠の神殿に入る').click();
+  }, DUNGEON_ID);
+  await page.getByText(`${DUNGEON_NAME}に入る`).click();
   await page.waitForTimeout(300);
   // 入口: 目の前に扉
   await expectEnd('door', '入口');
