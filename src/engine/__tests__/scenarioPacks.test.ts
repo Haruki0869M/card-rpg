@@ -9,14 +9,17 @@ import { QUESTS, SHRINES, TOWNS } from '../../data/world';
 import { createGame } from '../index';
 
 /** [シナリオID, 固有装備の数, 前の本（解放条件）, このシナリオだけの突発イベントのID] */
-const PACKS: [string, number, string, string[]][] = [
+const PACKS: [string, number, string | string[], string[]][] = [
   ['frozenKingdom', 13, 'corruptionKing', ['frozenBlizzard', 'frozenTraveler', 'frozenIceTreasure', 'frozenWolfPup', 'frozenPetShiver']],
   ['cursedArchipelago', 13, 'frozenKingdom', ['seaStorm', 'seaDriftingSailor', 'seaFloatingChest', 'seaDolphin', 'mistPetSeasick']],
   ['sandDynasty', 13, 'cursedArchipelago', ['sandStorm', 'sandLostCaravan', 'sandMirage', 'sandFennec', 'sandPetHeat']],
+  ['dreamLabyrinth', 13, ['corruptionKing', 'frozenKingdom', 'cursedArchipelago', 'sandDynasty', 'starCastle', 'clockworkEmpire'], ['dreamNightmareMist', 'dreamLostTraveler', 'dreamSnowSand', 'dreamSleepyCat', 'dreamPetMemory']],
+  ['clockworkEmpire', 13, 'starCastle', ['steamVentBurst', 'mechBrokenAutomaton', 'gearScrapPile', 'mechKitten', 'mechPetOily']],
   ['starCastle', 13, 'sandDynasty', ['skyGust', 'starShower', 'starLostAstronomer', 'starBirdOnCloud', 'skyPetStarGazer']],
 ];
 
-describe.each(PACKS)('追加シナリオ %s', (sid, gearCount, prev, randomIds) => {
+describe.each(PACKS)('追加シナリオ %s', (sid, gearCount, prevRaw, randomIds) => {
+  const prev = ([] as string[]).concat(prevRaw);
   const sc = getScenario(sid);
 
   it('町・ダンジョン・依頼・祠がそろい、鍵3つで最終ダンジョンが開く', () => {
@@ -61,16 +64,16 @@ describe.each(PACKS)('追加シナリオ %s', (sid, gearCount, prev, randomIds) 
   });
 
   it('前の本をクリアすると解放される。世界マップから始められる', () => {
-    expect(sc.unlockRequires).toEqual({ cleared: [prev] });
+    expect(sc.unlockRequires).toEqual({ cleared: prev });
     // 作成中（wip）は、前の本をクリアしていても遊べない。仕上げて wip を外すと、前の本のクリアで遊べる
     const everything = SCENARIOS.all.map((s) => s.id);
     if (sc.wip) {
-      expect(isScenarioUnlocked(sc, [prev])).toBe(false);
+      expect(isScenarioUnlocked(sc, prev)).toBe(false);
       expect(isScenarioUnlocked(sc, everything)).toBe(false);
       expect(sc.unlocked).toBe(false);
     } else {
       expect(isScenarioUnlocked(sc, [])).toBe(false);
-      expect(isScenarioUnlocked(sc, [prev])).toBe(true);
+      expect(isScenarioUnlocked(sc, prev)).toBe(true);
     }
     const g = createGame({ seed: 3, scenarioId: sid, difficulty: 'normal', party: [{ classId: 'warrior', gender: 'male', name: 'a', playerId: 'P1' }] });
     expect(g.world).toBeDefined();

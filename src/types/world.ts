@@ -44,6 +44,8 @@ export interface RegionDef {
   /** 徘徊する敵の基準レベルと組み合わせ（敵IDの並び） */
   enemyLevel: number;
   encounters: string[][];
+  /** レアの敵の組み合わせ（K3）。徘徊する敵を置く時、BALANCE.rareWandererChance% でこの中から置き換える。省略は出ない */
+  rareEncounters?: string[][];
   /** 地域全体の寒さ・暑さ（地形の climate が優先） */
   climate?: ClimateDef;
   /** 最初に置く徘徊する敵の数 */
@@ -190,6 +192,8 @@ export interface Wanderer {
   enemies: EncounterSpec['enemies'];
   /** 襲撃の敵（倒せば町を守れる） */
   raidTown?: string;
+  /** レアの敵の組（地図に星印で出る。K3） */
+  rare?: true;
 }
 
 export interface Raid {

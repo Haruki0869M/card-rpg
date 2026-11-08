@@ -44,7 +44,7 @@ export const PET_SOUND_IDS = [
 
 export const BGM_IDS = [
   'bgm_title', 'bgm_town', 'bgm_world_day', 'bgm_world_night', 'bgm_dungeon', 'bgm_battle', 'bgm_boss',
-  'bgm_camp', 'bgm_chest', 'bgm_sc1', 'bgm_sc2', 'bgm_sc3', 'bgm_sc4', 'bgm_sc5', 'bgm_sc6', 'bgm_sc7',
+  'bgm_camp', 'bgm_chest', 'bgm_ending', 'bgm_sc1', 'bgm_sc2', 'bgm_sc3', 'bgm_sc4', 'bgm_sc5', 'bgm_sc6', 'bgm_sc7',
 ] as const;
 
 export const JINGLE_IDS = ['jgl_victory', 'jgl_defeat', 'jgl_ending'] as const;

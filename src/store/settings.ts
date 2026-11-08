@@ -6,10 +6,13 @@ export interface Settings {
   sfxVolume: number;
   /** BGM の音量 0〜10。0 = オフ（K6） */
   bgmVolume: number;
+  /** お供の鳴き声の音量 0〜10。0 = オフ（K6。高い声なので効果音と分けて小さめ） */
+  petVolume: number;
 }
 
-export const DEFAULT_SFX_VOLUME = 7;
-export const DEFAULT_BGM_VOLUME = 5;
+export const DEFAULT_SFX_VOLUME = 5;
+export const DEFAULT_BGM_VOLUME = 4;
+export const DEFAULT_PET_VOLUME = 3;
 
 const volume = (v: unknown, fallback: number): number =>
   typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(10, Math.round(v))) : fallback;
@@ -23,5 +26,6 @@ export function normalizeSettings(raw: unknown): Settings {
     cutinMode: s.cutinMode === 'simple' ? 'simple' : 'standard',
     sfxVolume: volume(s.sfxVolume, DEFAULT_SFX_VOLUME),
     bgmVolume: volume(s.bgmVolume, DEFAULT_BGM_VOLUME),
+    petVolume: volume(s.petVolume, DEFAULT_PET_VOLUME),
   };
 }

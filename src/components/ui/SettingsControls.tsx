@@ -5,7 +5,7 @@ import { useBattle } from '../../store/battleStore';
 import type { Settings } from '../../store/settings';
 
 /** 音量（0〜10。0 = オフ）。押すたびに1つずつ変える（スマホで押しやすいように） */
-function VolumeRow({ label, field, sample }: { label: string; field: 'sfxVolume' | 'bgmVolume'; sample?: SoundId }) {
+function VolumeRow({ label, field, sample }: { label: string; field: 'sfxVolume' | 'bgmVolume' | 'petVolume'; sample?: SoundId }) {
   const value = useBattle(s => s.settings[field]), set = useBattle(s => s.setSettings);
   const change = (v: number) => {
     const next = Math.max(0, Math.min(10, v));
@@ -42,8 +42,9 @@ export function SettingsControls() {
       <p className="mt-1 text-[12px] text-zinc-300">簡易は動きを抑え、能力名と数値を短く表示します</p>
     </div>
     <VolumeRow label="効果音" field="sfxVolume" sample="sfx_ui_ok" />
+    <VolumeRow label="お供の鳴き声" field="petVolume" sample="pet_okame" />
     <VolumeRow label="BGM" field="bgmVolume" />
-    <p className="-mt-2 text-[12px] text-zinc-300">効果音にはお供の鳴き声も入ります。iPhone はマナーモードだと鳴りません</p>
+    <p className="-mt-2 text-[12px] text-zinc-300">iPhone はマナーモードだと鳴りません</p>
     <button aria-pressed={settings.vibration} onClick={() => set({ vibration: !settings.vibration })} className="btn btn-dark flex min-h-11 items-center justify-between rounded-lg px-3 text-[14px]"><span>振動</span><span>{settings.vibration ? 'ON' : 'OFF'}</span></button>
   </div>;
 }
