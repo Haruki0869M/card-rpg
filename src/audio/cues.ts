@@ -109,8 +109,31 @@ const TERRAIN_STEP: Record<string, SfxId> = {
 };
 export const footstepSound = (terrain: string | undefined): SfxId => (terrain && TERRAIN_STEP[terrain]) || 'sfx_step_stone';
 
-/** ダンジョン → 一人称の通路の足音（stage3 §11: 森の洞窟は土、溶岩の洞窟は岩、ほかは石） */
+/**
+ * ダンジョン → 一人称の通路の足音。ダンジョンIDごとの表で決める（通路の絵の題材に合わせる）。
+ * 土 = 森・島・船・洞窟・夢 / 草 = 庭 / 砂 = 墓所・砂の洞窟 / 雪 = 氷の洞窟 / 岩 = 溶岩・鉱山 / 石 = 神殿・城・図書館・機械・塔。
+ * 木の足音のファイルは無いので、船は土にしている。表に無いダンジョンは、背景の名前（forest → 土・volcano → 岩）、それも無ければ石
+ */
+const DUNGEON_STEP: Record<string, SfxId> = {
+  // 侵食の魔王
+  emeraldTemple: 'sfx_step_stone', demonCastle: 'sfx_step_stone', lavaCavern: 'sfx_step_rock', silentCatacomb: 'sfx_step_stone', randomForest: 'sfx_step_dirt',
+  // 凍てつく王国
+  crystalCave: 'sfx_step_snow', sunkenCathedral: 'sfx_step_stone', giantMine: 'sfx_step_rock', iceCastle: 'sfx_step_stone', frozenCave: 'sfx_step_snow',
+  // 呪われた群島
+  wreckCave: 'sfx_step_dirt', pirateIsland: 'sfx_step_dirt', sunkenTemple: 'sfx_step_stone', ghostFlagship: 'sfx_step_dirt', tideCave: 'sfx_step_dirt',
+  // 砂塵の王朝
+  scorpionTomb: 'sfx_step_sand', shadowLibrary: 'sfx_step_stone', statueTemple: 'sfx_step_stone', sandPalace: 'sfx_step_stone', sandCave: 'sfx_step_sand',
+  // 星降る天空城
+  windmillTower: 'sfx_step_stone', observatory: 'sfx_step_stone', moonlitGarden: 'sfx_step_grass', skyCastle: 'sfx_step_stone', starDustCave: 'sfx_step_stone',
+  // 機械仕掛けの帝国
+  gearFactory: 'sfx_step_stone', steamPlant: 'sfx_step_stone', clockTower: 'sfx_step_stone', machineHeart: 'sfx_step_stone', scrapCave: 'sfx_step_stone',
+  // 夢幻の大迷宮
+  echoIceVault: 'sfx_step_snow', echoSandTomb: 'sfx_step_sand', echoGhostShip: 'sfx_step_dirt', dreamEaterLair: 'sfx_step_stone', dreamCave: 'sfx_step_dirt',
+};
+export const dungeonStepSoundOf = (dungeonId: string | undefined): SfxId | undefined => (dungeonId ? DUNGEON_STEP[dungeonId] : undefined);
 export function dungeonStepSound(dungeonId: string | undefined, background?: string): SfxId {
+  const byId = dungeonStepSoundOf(dungeonId);
+  if (byId) return byId;
   const key = `${dungeonId ?? ''} ${background ?? ''}`.toLowerCase();
   if (key.includes('forest')) return 'sfx_step_dirt';
   if (key.includes('volcano') || key.includes('lava')) return 'sfx_step_rock';
