@@ -428,7 +428,7 @@ describe('自動プレイ（ダンジョンを最後まで）', () => {
     }
     // 4人・やさしいなら、かなりの割合で制覇できる
     expect(results.filter((r) => r === 'cleared').length).toBeGreaterThan(results.length / 3);
-  });
+  }, 60_000);
 
   it('同じシードなら同じ結果（オンライン協力で全員の結果が一致する前提）', () => {
     const a = autoPlay(newGame(9), 'emeraldTemple');

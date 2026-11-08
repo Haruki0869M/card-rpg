@@ -1,6 +1,6 @@
 // ===== 難易度の確認（自動プレイを何度も回してクリア率などを数える）=====
 // 時間がかかるので、普段のテストでは動かさない。SIM=1 npx vitest run balance で動かす。
-// 結果は screenshots/balance.md に書き出す
+// SIM_SCENARIO でシナリオを選ぶ（既定 corruptionKing）。結果は screenshots/balance.md に書き出す
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DIFFICULTIES } from '../../data/rules';
@@ -8,15 +8,16 @@ import type { PlayerId } from '../../types';
 import { createGame } from '../index';
 import { playToEnd } from '../bot';
 
+const SCENARIO = process.env.SIM_SCENARIO ?? 'corruptionKing';
 const SEEDS = Number(process.env.SIM_SEEDS ?? 40);
 const PARTIES: Record<string, string[]> = {
   '4人': ['warrior', 'mage', 'guardian', 'hunter'],
   '2人': ['warrior', 'mage'],
 };
 
-describe.skipIf(!process.env.SIM)('難易度のシミュレーション', () => {
+describe.skipIf(!process.env.SIM)(`難易度のシミュレーション（${SCENARIO}）`, () => {
   it('難易度ごとのクリア率', () => {
-    const rows: string[] = ['| 人数 | 難易度 | クリア率 | 最後の侵食度（平均） | 使った命の灯火（平均） | 平均レベル | かかった日数（平均） | 負け方 |', '|---|---|---|---|---|---|---|---|'];
+    const rows: string[] = ['| 人数 | 難易度 | クリア率 | 最後の侵食度（平均） | 使った命の灯火（平均） | 平均レベル | かかった日数（平均） | 戦闘数（平均） | 部屋数（平均） | 負け方 |', '|---|---|---|---|---|---|---|---|---|---|'];
     const only = process.env.SIM_DIFF;
     for (const [pname, classes] of Object.entries(PARTIES)) {
       if (process.env.SIM_PARTY && process.env.SIM_PARTY !== pname) continue;
@@ -27,9 +28,11 @@ describe.skipIf(!process.env.SIM)('難易度のシミュレーション', () => 
         let used = 0;
         let lv = 0;
         let days = 0;
+        let battles = 0;
+        let rooms = 0;
         const lose: Record<string, number> = {};
         for (let seed = 1; seed <= SEEDS; seed++) {
-          const g0 = createGame({ seed: 1000 + seed, scenarioId: 'corruptionKing', difficulty: d.id, party: classes.map((c, i) => ({ classId: c, gender: 'male', name: c + i, playerId: 'P1' as PlayerId })) });
+          const g0 = createGame({ seed: 1000 + seed, scenarioId: SCENARIO, difficulty: d.id, party: classes.map((c, i) => ({ classId: c, gender: 'male', name: c + i, playerId: 'P1' as PlayerId })) });
           const { game, log } = playToEnd(g0);
           expect(log.errors).toEqual([]);
           if (game.mode === 'ending') clear++;
@@ -41,10 +44,12 @@ describe.skipIf(!process.env.SIM)('難易度のシミュレーション', () => 
           used += d.lives - game.lives;
           lv += game.heroes.reduce((n, h) => n + h.level, 0) / game.heroes.length;
           days += (game.world?.worldTurn ?? 1) / 8;
+          battles += game.stats.battlesWon;
+          rooms += log.rooms ?? 0;
         }
         const n = SEEDS;
         rows.push(
-          `| ${pname} | ${d.name} | **${Math.round((clear / n) * 100)}%** | ${(corr / n).toFixed(0)}% | ${(used / n).toFixed(1)} | ${(lv / n).toFixed(1)} | ${(days / n).toFixed(1)} | ${Object.entries(lose).map(([k, v]) => `${k}${v}`).join('・') || '-'} |`,
+          `| ${pname} | ${d.name} | **${Math.round((clear / n) * 100)}%** | ${(corr / n).toFixed(0)}% | ${(used / n).toFixed(1)} | ${(lv / n).toFixed(1)} | ${(days / n).toFixed(1)} | ${(battles / n).toFixed(1)} | ${(rooms / n).toFixed(1)} | ${Object.entries(lose).map(([k, v]) => `${k}${v}`).join('・') || '-'} |`,
         );
       }
     }
