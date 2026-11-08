@@ -3,7 +3,7 @@
 // 報酬の3枚のうち2枚は、今の山札・装備の印と重なるほど出やすい。残り1枚は完全ランダム（新しい方向の発見）。
 import { BALANCE } from '../../data/balance';
 import { CARDS } from '../../data/cards';
-import { CLASSES } from '../../data/classes';
+import { CLASSES, getClass } from '../../data/classes';
 import { getItem } from '../../data/items';
 import type { CardDef, Effect, Hero } from '../../types';
 import type { Rng } from '../rng';
@@ -72,11 +72,19 @@ export function synergyWeight(card: CardDef, profile: Map<string, number>, stren
   return Math.min(S.maxWeight, 1 + S.perTag * strength * overlap);
 }
 
+/** 候補の基本の重み: ジョブ専用は1、武器種・系統のカードは balance.cardPoolWeight（候補が増えても専用カードが埋もれないように） */
+export function poolWeight(card: CardDef, hero: Hero): number {
+  const W = BALANCE.cardPoolWeight;
+  if (card.weaponType) return getClass(hero.classId).weaponType === card.weaponType ? W.mainWeapon : W.subWeapon;
+  if (card.lineage) return W.lineage;
+  return 1;
+}
+
 /** 候補から1枚選ぶ。smart = 好みで重み付けする */
 export function pickCard(cands: string[], hero: Hero, rng: Rng, smart: boolean, strength = 1): string {
-  if (!smart || cands.length < 2) return cands[rng.int(cands.length)];
-  const profile = heroTagProfile(hero);
-  const w = cands.map((id) => synergyWeight(CARDS.get(id), profile, strength));
+  if (cands.length < 2) return cands[rng.int(cands.length)];
+  const profile = smart ? heroTagProfile(hero) : undefined;
+  const w = cands.map((id) => poolWeight(CARDS.get(id), hero) * (profile ? synergyWeight(CARDS.get(id), profile, strength) : 1));
   const total = w.reduce((a, b) => a + b, 0);
   let x = rng.next() * total;
   for (let i = 0; i < cands.length; i++) {

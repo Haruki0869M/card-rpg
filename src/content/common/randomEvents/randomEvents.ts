@@ -127,6 +127,7 @@ export const randomEvents: EventDef[] = [
       { label: '血を払う（最大HPの25%分のHPを失う）', success: [{ kind: 'hpLossPct', pct: 25 }, { kind: 'item', rarity: 'epic', slot: 'equipment' }], successText: '仮面の奥で、商人が笑った。妖しく輝く装備を手に入れた。' },
       { label: 'カードを1枚捧げる（別の系統のカードに変異・能力値+1）', success: [{ kind: 'cardTask', action: 'mutate' }], successText: '「さあ、どのカードを捧げる？」' },
       { label: 'フォーカスを3払って金貨を受け取る', costFocus: 3, success: [{ kind: 'gold', amount: 100 }], successText: '魂が少し軽くなった気がする。（100G）' },
+      { label: '禁じられた契約を結ぶ（最大HPの25%分のHPを失う・異端のカード1枚）', success: [{ kind: 'hpLossPct', pct: 25 }, { kind: 'heresyCard' }], successText: '「ふふ…世界の理を外れた力だ。代償は、使うたびに払ってもらうよ」' },
       { label: '取引しない', success: [{ kind: 'nothing' }], successText: '煙と共に、商人は消えた。' },
     ],
   },

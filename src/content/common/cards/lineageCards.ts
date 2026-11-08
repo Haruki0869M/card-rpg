@@ -1,0 +1,40 @@
+// 系統カード（K1。1系統×15枚）: その系統のジョブなら誰でも報酬・ショップで出会う（bu=武 / ma=魔 / sei=聖 / gi=技）。
+// ID は ln + 系統 + 名前。コモン6・レア5・エピック4。
+import type { CardDef, CardTarget, Effect, Rarity, StatId, AbilityDef, CardCategory, Lineage } from '../../../types';
+
+const d = (amount: number): Effect => ({ kind: 'damage', amount });
+const dh = (amount: number, hits: number): Effect => ({ kind: 'damage', amount, hits });
+const b = (amount: number): Effect => ({ kind: 'block', amount });
+const ba = (amount: number): Effect => ({ kind: 'block', amount, to: 'allies' });
+const st = (status: string, amount: number): Effect => ({ kind: 'applyStatus', status, amount });
+const all = (status: string, amount: number): Effect => ({ kind: 'applyStatus', status, amount, to: 'foes' });
+const heal = (amount: number): Effect => ({ kind: 'heal', amount, to: 'self' });
+const focus = (amount: number): Effect => ({ kind: 'gainFocus', amount });
+const mana = (amount: number): Effect => ({ kind: 'gainMana', amount });
+
+type Opt = { rarity?: Rarity; stat?: StatId; trait?: AbilityDef; tags?: string[]; lineage?: Lineage };
+/** カードを1枚作る。tiers は成功数0から順に（成功数 i の効果） */
+function c(id: string, name: string, category: CardCategory, cost: number, baseChance: number, target: CardTarget, tiers: Effect[][], o: Opt = {}): CardDef {
+  return { id, name, category, cost, slots: tiers.length - 1, baseChance, target, tiers: tiers.map((effects, i) => ({ minSuccesses: i, effects })), ...o };
+}
+
+const L = (lineage: Lineage) => ({ lineage });
+
+export const LINEAGE_CARDS: CardDef[] = [
+  // ===== 武（力と体力。守りと押し切り） =====
+  c('lnBuBreath', '闘気の構え', 'skill', 0, 85, 'self', [[b(2)], [b(3), focus(1)]], L('bu')),
+  c('lnBuStack', '重ね打ち', 'physical', 1, 75, 'enemy', [[d(3)], [d(6)], [d(8)]], L('bu')),
+  c('lnBuIronBreath', '鉄壁の呼吸', 'skill', 1, 80, 'self', [[b(5)], [b(7)], [b(9)]], L('bu')),
+  c('lnBuSweepLeg', '足払い', 'physical', 1, 75, 'enemy', [[d(2)], [d(4), st('weak', 1)], [d(6), st('weak', 1)]], L('bu')),
+  c('lnBuSwipe', '払い斬り', 'physical', 1, 70, 'allEnemies', [[d(2)], [d(3)], [d(5)]], L('bu')),
+  c('lnBuPride', '戦士の矜持', 'skill', 0, 80, 'self', [[mana(1)], [mana(1), b(2)]], L('bu')),
+  c('lnBuAllIn', '渾身撃', 'physical', 2, 65, 'enemy', [[d(6)], [d(12)], [d(18)]], { ...L('bu'), rarity: 'rare', stat: 'str', tags: ['heavy'] }),
+  c('lnBuRally', '鼓舞の号令', 'skill', 1, 80, 'self', [[ba(3)], [ba(5)], [ba(7)]], { ...L('bu'), rarity: 'rare', tags: ['support'] }),
+  c('lnBuFlurry', '連続突き', 'physical', 1, 70, 'enemy', [[d(2)], [dh(3, 2)], [dh(3, 3)]], { ...L('bu'), rarity: 'rare', stat: 'dex', tags: ['combo'] }),
+  c('lnBuCounter', '見切り反撃', 'physical', 1, 75, 'enemy', [[b(3)], [d(5), b(4)], [d(8), b(6)]], { ...L('bu'), rarity: 'rare', stat: 'per' }),
+  c('lnBuRoar', '気迫の咆哮', 'skill', 1, 80, 'allEnemies', [[all('weak', 1)], [d(2), all('weak', 1)], [d(3), all('weak', 2)]], { ...L('bu'), rarity: 'rare', stat: 'vit' }),
+  c('lnBuUnyielding', '不屈', 'skill', 1, 85, 'self', [[b(6)], [b(9), heal(4)], [b(12), heal(6)]], { ...L('bu'), rarity: 'epic', stat: 'vit', trait: { name: '不屈', effect: { when: 'hurt', do: [b(2)] } } }),
+  c('lnBuThousand', '一騎当千', 'physical', 3, 55, 'allEnemies', [[d(4)], [d(7)], [d(10)], [d(14), all('vulnerable', 1)]], { ...L('bu'), rarity: 'epic', stat: 'str', trait: { name: '無双', effect: { when: 'kill', do: [mana(1)] } } }),
+  c('lnBuGodStrike', '武神の一撃', 'physical', 3, 55, 'enemy', [[d(9)], [d(16)], [d(24)], [d(34)]], { ...L('bu'), rarity: 'epic', stat: 'str', tags: ['heavy'], trait: { name: '神威', effect: { modifier: 'ignoreBlock' } } }),
+  c('lnBuConqueror', '戦場の覇者', 'physical', 2, 65, 'enemy', [[d(5), b(3)], [d(10), b(5)], [d(15), b(7)]], { ...L('bu'), rarity: 'epic', trait: { name: '覇気', effect: { modifier: 'damageDealt', multiplier: 1.25, if: [{ kind: 'selfHpAtMost', pct: 50 }] } } }),
+];

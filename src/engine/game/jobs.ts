@@ -170,9 +170,19 @@ export function announceJobs(game: GameState, hero: Hero) {
   }
 }
 
-/** キャラが報酬・ショップで出会うカードの候補（今のジョブ＋これまでのジョブ） */
+/**
+ * キャラが報酬・ショップで出会うカードの候補
+ * = 今のジョブ＋これまでのジョブの専用カード ＋ 装備できる武器種のカード ＋ 今のジョブの系統のカード。
+ * 異端カードは入らない（イベントでだけ手に入る）。
+ */
 export function heroCardPool(hero: Hero): string[] {
   const ids = new Set<string>();
   for (const cls of [hero.classId, ...(hero.jobs ?? [])]) for (const id of getClass(cls).cardPool) if (CARDS.has(id)) ids.add(id);
+  const weapons = new Set(jobWeapons(hero.classId));
+  const lineage = getClass(hero.classId).lineage;
+  for (const c of CARDS.all) {
+    if (c.heresy) continue;
+    if ((c.weaponType && weapons.has(c.weaponType)) || (c.lineage && c.lineage === lineage)) ids.add(c.id);
+  }
   return [...ids];
 }
