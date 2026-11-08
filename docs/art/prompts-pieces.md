@@ -371,7 +371,7 @@ chibi tabletop miniature figurine of a young female imposing warlord overlord, l
 - 持たせる物: 布の手甲（素手）　／　見た目: 白と橙の道着・金刺繍の黒帯・長い腰布
 
 ```
-chibi tabletop miniature figurine of a young male martial arts master king of fists, short black hair with a red headband, white and orange gi with a gold-embroidered black belt, long flowing sash, powerful stance, both fists wrapped in worn cloth hand wraps, bare hands, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, sword, staff, claws, metal gauntlets, shield, bow, arrows, quiver, weapon in hand, second weapon, signature, text, watermark, scenery
+chibi tabletop miniature figurine of a young male martial arts master king of fists, short black hair tied in a small topknot, no headband, sleeveless deep orange gi with gold trim and a gold-embroidered black belt, long flowing orange sash, powerful stance, both fists wrapped in worn cloth hand wraps, bare hands, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, headband, white gi, spiky hair, sword, staff, claws, metal gauntlets, shield, bow, arrows, quiver, weapon in hand, second weapon, signature, text, watermark, scenery
 ```
 
 #### 拳王・女（`piece/fistKing-female`）→ 元画像 `piece/fistKing-female.png`
