@@ -77,6 +77,7 @@ export function poolWeight(card: CardDef, hero: Hero): number {
   const W = BALANCE.cardPoolWeight;
   if (card.weaponType) return getClass(hero.classId).weaponType === card.weaponType ? W.mainWeapon : W.subWeapon;
   if (card.lineage) return W.lineage;
+  if (card.common) return W.common;
   return 1;
 }
 

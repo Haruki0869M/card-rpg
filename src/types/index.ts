@@ -91,6 +91,8 @@ export interface CardDef {
   weaponType?: string;
   /** 系統カード: この系統のジョブの報酬に出る（K1） */
   lineage?: Lineage;
+  /** 共通カード: どのジョブの報酬にも出る（K1） */
+  common?: boolean;
   /** 異端カード: 代償付きでルールを壊す。報酬・ショップには出ず、イベントでだけ手に入る（K1） */
   heresy?: boolean;
 }

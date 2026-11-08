@@ -37,8 +37,8 @@ describe('K1 武器種・系統・異端のカード', () => {
     for (const c of CARDS.all) {
       if (c.weaponType) expect(weapons.has(c.weaponType), `${c.id}: 武器種 ${c.weaponType}`).toBe(true);
       if (c.lineage) expect(['bu', 'ma', 'sei', 'gi']).toContain(c.lineage);
-      if (c.heresy) expect(c.weaponType ?? c.lineage, `${c.id}: 異端に武器種・系統は付けない`).toBeUndefined();
-      if (c.weaponType || c.lineage || c.heresy) {
+      if (c.heresy) expect(c.weaponType ?? c.lineage ?? c.common, `${c.id}: 異端に武器種・系統・共通は付けない`).toBeUndefined();
+      if (c.weaponType || c.lineage || c.heresy || c.common) {
         // エピック以上は特殊能力が必須
         if (['epic', 'legend'].includes(c.rarity ?? 'common')) expect(c.trait, c.id).toBeDefined();
         expect(c.tiers[0].minSuccesses, c.id).toBe(0);
@@ -62,6 +62,23 @@ describe('K1 武器種・系統・異端のカード', () => {
       const n = (r: string) => cards.filter((c) => (c.rarity ?? 'common') === r).length;
       expect([n('common'), n('rare'), n('epic')], type).toEqual([3, 2, 2]);
     }
+  });
+
+  it('共通カードは24枚（コモン10・レア8・エピック6）で、どのジョブの候補にも入る', () => {
+    const common = CARDS.all.filter((c) => c.common);
+    expect(common).toHaveLength(24);
+    const n = (r: string) => common.filter((c) => (c.rarity ?? 'common') === r).length;
+    expect([n('common'), n('rare'), n('epic')]).toEqual([10, 8, 6]);
+    for (const cls of CLASSES.all) {
+      const pool = heroCardPool(newGame([cls.id]).heroes[0]);
+      for (const c of common) expect(pool, `${cls.id}: ${c.id}`).toContain(c.id);
+    }
+  });
+
+  it('異端カードは17枚以上で、全部エピック（特殊能力つき）', () => {
+    const heresy = CARDS.all.filter((c) => c.heresy);
+    expect(heresy.length).toBeGreaterThanOrEqual(17);
+    for (const c of heresy) expect(c.rarity, c.id).toBe('epic');
   });
 
   it('基本の重み: 得意武器1・使える武器0.5・系統0.7・ジョブ専用1', () => {

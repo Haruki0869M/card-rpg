@@ -60,8 +60,8 @@ export const BALANCE = {
   randomEventBadMul: 1.5,
   /** 報酬のスマート抽選: 重なった印1つごとの重みの上乗せ・重みの上限・ショップの係数（設計 v2 §2） */
   smartDraw: { perTag: 0.5, maxWeight: 3, shopStrength: 0.5 },
-  /** 報酬の候補の基本の重み（ジョブ専用カードは1）: 得意武器・使える武器・系統のカード（K1） */
-  cardPoolWeight: { mainWeapon: 1, subWeapon: 0.5, lineage: 0.7 },
+  /** 報酬の候補の基本の重み（ジョブ専用カードは1）: 得意武器・使える武器・系統・共通のカード（K1） */
+  cardPoolWeight: { mainWeapon: 1, subWeapon: 0.5, lineage: 0.7, common: 0.8 },
   /** 転職した直後の Lv1→2 は軽く（成長ボーナスをすぐ選べるように） */
   firstLevelExpMul: 0.6,
   /** 敵のレベルが1上がるごとの経験値・ゴールドの増加率 */
