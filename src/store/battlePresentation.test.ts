@@ -39,7 +39,11 @@ describe('表示専用タイマーと能力カットイン', () => {
     vi.advanceTimersByTime(710); expect(useBattle.getState().cutins).toEqual([]); expect(useBattle.getState().petPulses).toEqual({});
   });
   it('4人のお供は2件ずつ全員分表示し、通知で戦闘を止めない', () => {
-    const g = setup(4); useBattle.getState().applyRemote({ state: g, battleEvents: g.heroes.map(h => petNotice(h.id)) }, wire);
+    const g = setup(4);
+    // 戦闘の始めの「ターン 1」の帯を先に出し終えておく（帯は数字の表示が終わってから出る）
+    useBattle.getState().applyRemote({ state: g, battleEvents: [] }, wire); vi.advanceTimersByTime(2000);
+    expect(useBattle.getState().presentationBusy).toBe(false);
+    useBattle.getState().applyRemote({ state: g, battleEvents: g.heroes.map(h => petNotice(h.id)) }, wire);
     vi.advanceTimersByTime(1); expect(useBattle.getState().cutins.map(n => n.unitId)).toEqual(['h0', 'h1']);
     vi.advanceTimersByTime(705); expect(useBattle.getState().cutins.map(n => n.unitId)).toEqual(['h2', 'h3']);
     expect(useBattle.getState().presentationBusy).toBe(false); expect(useBattle.getState().full!.battle!.phase).toBe('ally');

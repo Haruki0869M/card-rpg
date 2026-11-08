@@ -457,18 +457,21 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   const supportedOthers = recordSupport(ally, state.allies, supportBefore);
   const parts = ctx.parts;
   const hasDamage = tier.effects.some((e) => e.kind === 'damage');
-  if (hasDamage) parts.unshift(`${ctx.dealt} DMG`);
+  if (hasDamage) parts.unshift(`${ctx.dealt}ダメージ`);
   // 働いた常時型の能力（闘志・貫通・止めなど）
   for (const n of ctx.fired) abilityTriggered(state, ally.id, n.name, events, n.source);
 
   // きっかけ: カードの特殊能力 → 自分の能力（カードを使った後 → 完全成功時）
   const fireOpts = { card, target, allyTarget, dealt: ctx.dealt, focusUsed, tierEffects: tier.effects, perfect, successes, supportedOthers };
+  // 発動した能力（お供・ジョブ・カードの特殊能力）の名前は、結果の帯には入れず、記録にだけ残す（帯が長くなって切れるため。
+  // 能力はカットイン・キャラの上の【能力名】で見せる）
+  const abilityParts: string[] = [];
   if (cardAbilities) {
-    parts.push(...fireAbilities(state, rng, events, ally, 'afterCard', { ...fireOpts, list: cardAbilities }));
-    if (perfect) parts.push(...fireAbilities(state, rng, events, ally, 'perfect', { ...fireOpts, list: cardAbilities }));
+    abilityParts.push(...fireAbilities(state, rng, events, ally, 'afterCard', { ...fireOpts, list: cardAbilities }));
+    if (perfect) abilityParts.push(...fireAbilities(state, rng, events, ally, 'perfect', { ...fireOpts, list: cardAbilities }));
   }
-  parts.push(...fireAbilities(state, rng, events, ally, 'afterCard', fireOpts));
-  if (perfect) parts.push(...fireAbilities(state, rng, events, ally, 'perfect', fireOpts));
+  abilityParts.push(...fireAbilities(state, rng, events, ally, 'afterCard', fireOpts));
+  if (perfect) abilityParts.push(...fireAbilities(state, rng, events, ally, 'perfect', fireOpts));
   // 分身は攻撃効果を半分の威力で繰り返す。追撃から再帰しない。
   for (const summon of ally.summons ?? []) {
     if (!summon.echoPct) continue;
@@ -490,17 +493,23 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   (ally.playedBy ??= {})[card.category] = (ally.playedBy[card.category] ?? 0) + 1;
 
   const resultLabel = perfect ? '完全成功' : `${successes}成功`;
-  const summary = `${resultLabel}！ ${parts.join(' ')}`;
+  const summary = resultSummary(resultLabel, parts);
   const targetText = card.target === 'allEnemies' ? ' → 敵全体' : target ? ` → ${nameOf(target)}` : '';
   addLog(
     state,
     `${ally.name} ${card.name}${targetText} 成功率${chance}%${focusUsed ? `（🌟${focusUsed}）` : ''} → ${results
       .map((r) => SLOT_ICON[r])
-      .join('')} = ${resultLabel}：${parts.join(' ')}`,
+      .join('')} = ${resultLabel}：${[...parts, ...abilityParts].join(' ')}`,
   );
   events.unshift({ type: 'roll', characterId: ally.id, cardId: card.id, targetId: target ? unitIdOf(target) : undefined, chance, results, successes, perfect, summary });
   checkEnd(state, events);
   return undefined;
+}
+
+/** 結果の帯の文: 「完全成功！ 9ダメージ・7ブロック」。何も起きなければ「1成功！」だけ */
+export function resultSummary(resultLabel: string, parts: string[]): string {
+  const list = parts.filter((x) => x && x.trim());
+  return list.length ? `${resultLabel}！ ${list.join('・')}` : `${resultLabel}！`;
 }
 
 /** 実際のカード処理を複製上で試す。元の状態・乱数・予約は一切進めない。抽選を伴う値は目安として示す。 */

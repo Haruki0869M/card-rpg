@@ -124,6 +124,7 @@ function IntentBubble({ enemy, onTap }: { enemy: EnemyState; onTap: () => void }
           animate={{ scale: 1 }}
           transition={{ type: 'spring', stiffness: 500, damping: 18 }}
           className="relative flex max-w-full flex-wrap items-center justify-center gap-1 rounded-lg border border-red-300/50 bg-[#1c0a10]/90 px-1.5 py-0.5 text-[14px] leading-5 font-black shadow-[0_2px_0_rgba(0,0,0,.6)]"
+          data-intent={enemy.uid}
         >
           {view.parts.map((p, i) => (
             <IntentPartView key={i} p={p} />
@@ -201,6 +202,7 @@ const EnemyUnit = memo(function EnemyUnit({
           animate={enemy.dead ? { opacity: 0, scale: 0.85, y: 10 } : { opacity: 1, scale: 1, y: 0 }}
           transition={{ duration: 0.45 }}
           style={{ width: h * 0.85, height: h }}
+          data-enemy-sprite={enemy.uid}
         >
           <div ref={scope} className="h-full w-full will-change-transform">
             <div className="idle-bob h-full w-full" style={{ animationDelay: `${(enemy.uid.charCodeAt(1) % 4) * -0.7}s` }}>
@@ -213,7 +215,8 @@ const EnemyUnit = memo(function EnemyUnit({
             予測 {prediction}
           </div>
         )}
-        <UnitPopups unitId={enemy.uid} top="10%" />
+        {/* 数字は、その敵の絵の頭のすぐ上に出す（箱の上の空きではなく、絵の上の端に合わせる） */}
+        <UnitPopups unitId={enemy.uid} top={`${Math.max(0, boxH - h - 6)}px`} />
       </div>
       {!enemy.dead && (
         // 予告は味方の立ち絵より手前に出す（画面が低くて重なっても、狙いと数字を読めるように）
@@ -289,7 +292,7 @@ const AllySprite = memo(function AllySprite({ ally, left, bottom, h, active, fie
   });
   const press = usePress(() => setActive(ally.id), { type: 'ally', id: ally.id });
   return (
-    <div {...press} className="absolute" style={{ left: left - h * 0.4, bottom, width: h * 0.8, height: h }} data-ally-sprite>
+    <div {...press} className="absolute" style={{ left: left - h * 0.4, bottom, width: h * 0.8, height: h }} data-ally-sprite={ally.id}>
       {/* 足もとの影と陣形の円（敵と向き合う奥行き） */}
       <div className="pointer-events-none absolute -bottom-[6px] left-1/2 h-[22px] w-[105%] -translate-x-1/2 rounded-[50%]" style={{ background: 'radial-gradient(closest-side, rgba(0,0,0,.75), rgba(0,0,0,.35) 60%, transparent)' }} />
       <div className="pointer-events-none absolute -bottom-[4px] left-1/2 h-[16px] w-[88%] -translate-x-1/2 rounded-[50%] border border-sky-200/25" style={{ boxShadow: 'inset 0 0 8px rgba(140,190,255,.25)' }} />
@@ -303,7 +306,8 @@ const AllySprite = memo(function AllySprite({ ally, left, bottom, h, active, fie
       </div>
       {/* お供: 鳥は肩、小竜は浮く、それ以外は足元 */}
       {ally.pet && !ally.dead && <AllyPet ownerId={ally.id} pet={ally.pet} h={h} spriteLeft={left - h * 0.4} fieldW={fieldW} />}
-      <UnitPopups unitId={ally.id} top="5%" />
+      {/* 数字は、そのキャラの頭のすぐ上に出す */}
+      <UnitPopups unitId={ally.id} top="-6px" />
     </div>
   );
 });
@@ -311,8 +315,11 @@ const AllySprite = memo(function AllySprite({ ally, left, bottom, h, active, fie
 function AllyPet({ pet, h, ownerId, spriteLeft, fieldW }: { spriteLeft: number; fieldW: number; ownerId: string; pet: NonNullable<AllyState['pet']>; h: number }) {
   const perch = getPet(pet.petId).perch;
   const size = Math.round(h * (perch === 'feet' ? 0.3 : 0.24));
-  const preferred = perch === 'shoulder' ? h * 0.8 * 1.02 - 44 : -h * 0.8 * (perch === 'float' ? 0.22 : 0.26);
-  const left = Math.max(4 - spriteLeft, Math.min(preferred, fieldW - 48 - spriteLeft));
+  // 持ち主の立ち絵の幅の中に置く（外に出すと、隣の仲間の足元に立って見えるため）。押せる所は44px
+  const w = h * 0.8, box = Math.max(44, size);
+  const preferred = perch === 'shoulder' ? w * 0.68 - box / 2 : perch === 'float' ? w * 0.08 - (box - size) / 2 : w * 0.6 - box / 2;
+  const inside = Math.max(-(box - size) / 2, Math.min(preferred, w - box + (box - size) / 2));
+  const left = Math.max(4 - spriteLeft, Math.min(inside, fieldW - box - 4 - spriteLeft));
   const pos = perch === 'feet' ? { left, bottom: '-2%' } : { left, top: perch === 'shoulder' ? '20%' : '8%' };
   return (
     <div className="pointer-events-none absolute" style={pos}>
@@ -416,7 +423,7 @@ export function Battlefield() {
       <div className="pointer-events-none absolute inset-x-0 top-[46%] z-40 flex justify-center">
         <SlotOverlay />
       </div>
-      <PhaseBanner />
+      <PhaseBanner top={enemyTop + Math.max(0, enemySpriteH * 0.4 - 20)} />
       {/* 上下の画面との境目: 影でなじませ、金の飾り線を引く */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-[#0d0b16] to-transparent" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-[#0d0b16] via-[#0d0b16]/60 to-transparent" />
@@ -459,20 +466,25 @@ function TargetLines({ W, H, enemySlotW, enemyTop, enemySpriteH, allyAreaW, ally
   );
 }
 
-/** フェーズが変わった時に一瞬出る帯（操作をブロックしない） */
-function PhaseBanner() {
-  const phase = useBattle((s) => s.battle.phase);
-  const turn = useBattle((s) => s.battle.turn);
+/**
+ * フェーズが変わった時に一瞬出る帯（操作をブロックしない）。
+ * 前の数字の表示が全部終わってから store が出す（phaseBanner）。敵の予告の上ではなく、敵の絵の高さに出す
+ */
+function PhaseBanner({ top }: { top: number }) {
+  const banner = useBattle((s) => s.phaseBanner);
   const fast = useBattle((s) => s.settings.fastMode);
-  if (phase !== 'ally' && phase !== 'enemy') return null;
+  if (!banner) return null;
+  const { phase, turn } = banner;
   const k = 1 / speedFactor({ fastMode: fast });
   return (
     <motion.div
-      key={`${phase}-${turn}`}
+      key={banner.id}
       initial={{ opacity: 0, scaleX: 0.6 }}
       animate={{ opacity: [0, 1, 1, 0], scaleX: [0.6, 1, 1, 1.05] }}
-      transition={{ duration: (TIMING.resultPopup + 0.4) * k, times: [0, 0.2, 0.75, 1] }}
-      className="pointer-events-none absolute inset-x-0 top-[40%] z-30 flex justify-center"
+      transition={{ duration: TIMING.phaseBanner * k, times: [0, 0.2, 0.75, 1] }}
+      className="pointer-events-none absolute inset-x-0 z-30 flex justify-center"
+      style={{ top }}
+      data-phase-banner={phase}
     >
       <div
         className={`font-display text-outline w-full py-1 text-center text-[22px] tracking-[0.3em] ${

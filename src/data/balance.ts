@@ -198,8 +198,10 @@ export const TIMING = {
   presentationFramesMax: 48,
   /** 結果ポップアップの表示時間 */
   resultPopup: 0.6,
-  /** 敵1体の行動間隔 */
-  enemyStep: 0.35,
+  /** 敵1体の行動間隔（前の敵の数字の表示が終わってから、次の敵が動くまでの間） */
+  enemyStep: 0.4,
+  /** 「ターン N」「敵のターン」の帯の表示時間（数字の表示が全部終わってから出す） */
+  phaseBanner: 1.0,
   /** 長押し判定 */
   longPress: 0.4,
   /** 使えないカードの理由表示 */

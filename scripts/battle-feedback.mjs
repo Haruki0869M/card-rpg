@@ -79,6 +79,19 @@ try {
     await observe();
     await page.getByRole('button', { name: /^扉を開ける/ }).click();
     await page.locator('[data-ability-cutin]').first().waitFor(); await shot(`opening-four-${width}`);
+    // フェーズ1: お供は持ち主の立ち絵の幅の中（隣の仲間の足元に立たない）。カットインは上の帯に重ならず、お供の本物の絵を出す
+    const petPlace = await page.evaluate(() => [...document.querySelectorAll('[data-ally-sprite] [data-pet-owner]')].map((el) => {
+      const owner = el.getAttribute('data-pet-owner'), r = el.getBoundingClientRect(), o = document.querySelector(`[data-ally-sprite="${owner}"]`).getBoundingClientRect();
+      const cx = (r.left + r.right) / 2;
+      return cx >= o.left && cx <= o.right ? '' : `${owner}のお供 x=${Math.round(cx)} 持ち主=${Math.round(o.left)}〜${Math.round(o.right)}`;
+    }).filter(Boolean));
+    check(!petPlace.length, `お供が持ち主の外: ${petPlace.join(' / ')}`);
+    const cutinTop = await page.evaluate(() => {
+      const bar = document.querySelector('[data-cutin-anchor]').getBoundingClientRect().bottom;
+      return [...document.querySelectorAll('[data-ability-cutin]')].map((e) => e.getBoundingClientRect().top - bar);
+    });
+    check(cutinTop.every((d) => d >= 0), `お供のカットインが上の帯に重なる ${cutinTop}`);
+    check(await page.locator('[data-ability-cutin] [data-cutin-pet-art]').count() > 0, 'お供のカットインに絵が無い');
     await page.waitForTimeout(1600);
     const opening = await page.evaluate(() => window.feedback);
     check(opening.notices.length === 4 && opening.pulses.length === 4, `4人全員のお供が発動しない: ${JSON.stringify(opening)}`);

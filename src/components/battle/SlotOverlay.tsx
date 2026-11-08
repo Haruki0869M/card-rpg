@@ -48,7 +48,7 @@ export function SlotOverlay() {
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.08 }}
-          className={`flex flex-col items-center gap-1 rounded-xl border px-3 py-1.5 ${
+          className={`flex max-w-[calc(100%-24px)] flex-col items-center gap-1 rounded-xl border px-3 py-1.5 ${
             fx.perfect ? 'border-amber-300 bg-[#2a1a06]/90 shadow-[0_0_24px_rgba(255,200,80,.45)]' : 'border-white/25 bg-black/80'
           }`}
         >
@@ -73,7 +73,8 @@ export function SlotOverlay() {
             initial={{ opacity: 0, scale: 1.3 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.08, delay: reveal }}
-            className={`font-display text-outline text-[18px] whitespace-nowrap ${fx.perfect ? 'text-amber-300' : 'text-white'}`}
+            className={`font-display text-outline line-clamp-2 text-center text-[18px] leading-6 break-words ${fx.perfect ? 'text-amber-300' : 'text-white'}`}
+            data-roll-summary
           >
             {fx.summary}
           </motion.div>

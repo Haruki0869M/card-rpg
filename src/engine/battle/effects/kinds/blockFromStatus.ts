@@ -25,7 +25,7 @@ export const effect: EffectHandler<'blockFromStatus'> = {
       t.block += amount;
       ctx.events.push({ type: 'block', unitId: unitIdOf(t), amount });
     }
-    if (!isEnemy(ctx.source)) ctx.parts.push(`${amount} BLOCK`);
+    if (!isEnemy(ctx.source)) ctx.parts.push(`${amount}ブロック`);
     return ts.length > 0;
   },
   describe: (e, who) => `${e.of === 'self' ? '自分の' : '敵全員の'}「${getStatus(e.status).name}」${e.mult && e.mult !== 1 ? `×${e.mult}` : ''}と同じ量のブロックを${who === '自分に' ? '得る' : `${who}与える`}${e.max !== undefined ? `（最大${e.max}）` : ''}`,

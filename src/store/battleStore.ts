@@ -108,6 +108,8 @@ export interface WorldMovePresentation {
 
 interface StoreState {
   presentationBusy: boolean;
+  /** 「ターン N」「敵のターン」の帯（数字の表示が全部終わってから出す。見た目だけ） */
+  phaseBanner: { id: number; phase: 'ally' | 'enemy'; turn: number } | null;
   cutins: (NoticeDraft & { id: number })[];
   petPulses: Record<string, { id: number }>;
   worldMoves: WorldMovePresentation[];
@@ -355,11 +357,14 @@ export const useBattle = create<StoreState>((set, get) => {
     if (!enemyScene()) return;
     // オンライン協力: 敵の行動はホストが代表して進める
     if (room && (!room.isHost || enemyInFlight)) return;
+    // 前の行動の数字・帯の表示が終わるまで待つ（終わった時に drainFrames からもう一度呼ぶ）。見た目の間だけで、結果は変わらない
+    if (get().presentationBusy || presentationTimer) { enemyWaiting = true; return; }
     enemyTimer = setTimeout(
       () => {
         enemyTimer = null;
         const s = enemyScene();
         if (!s) return;
+        if (get().presentationBusy || presentationTimer) { enemyWaiting = true; return; }
         if (room) enemyInFlight = true;
         const step: GameCommand = {
           type: 'BATTLE',
@@ -373,6 +378,10 @@ export const useBattle = create<StoreState>((set, get) => {
 
   let frames: PresentationFrame[] = [];
   let presentationTimer: ReturnType<typeof setTimeout> | null = null;
+  /** 敵の行動が、演出の終わりを待っている */
+  let enemyWaiting = false;
+  /** 最後に帯を出した戦闘・手番（同じ手番で2回出さない） */
+  let bannerKey = '';
   const uiTimers = new Set<ReturnType<typeof setTimeout>>();
   let pendingNotices: NoticeDraft[] = [];
   const later = (fn: () => void, seconds: number) => {
@@ -384,7 +393,22 @@ export const useBattle = create<StoreState>((set, get) => {
     presentationTimer = null; frames = []; pendingNotices = [];
     for (const timer of uiTimers) clearTimeout(timer);
     uiTimers.clear();
-    set({ presentationBusy: false, cutins: [], petPulses: {}, popups: [], unitFx: {}, rollFx: null });
+    set({ presentationBusy: false, phaseBanner: null, cutins: [], petPulses: {}, popups: [], unitFx: {}, rollFx: null });
+    if (enemyWaiting) { enemyWaiting = false; setTimeout(scheduleEnemy, 0); }
+  };
+  /** 見ている戦闘の手番が変わっていたら、帯を出す手番を返す（出したことにする） */
+  const takeBanner = (): { phase: 'ally' | 'enemy'; turn: number } | null => {
+    const { game, battle } = get();
+    if (game?.mode !== 'battle' || (battle.phase !== 'ally' && battle.phase !== 'enemy')) return null;
+    const key = `${battle.seed}:${battle.encounterId}:${battle.phase}:${battle.turn}`;
+    if (key === bannerKey) return null;
+    bannerKey = key;
+    return { phase: battle.phase, turn: battle.turn };
+  };
+  /** 演出がすべて終わった（帯も出し終えた）。待っていた敵の行動を進める */
+  const finishPresentation = () => {
+    set({ presentationBusy: false });
+    if (enemyWaiting) { enemyWaiting = false; scheduleEnemy(); }
   };
   const addPopup = (p: PopupDraft) => {
     const current = [...get().popups], own = current.filter(x => x.unitId === p.unitId);
@@ -436,7 +460,19 @@ export const useBattle = create<StoreState>((set, get) => {
   const drainFrames = () => {
     presentationTimer = null;
     const frame = frames.shift();
-    if (!frame) { set({ presentationBusy: false }); return; }
+    if (!frame) {
+      // 手番が変わった: 前の数字が消えるのを待ってから帯を出し、帯が消えてから次へ（帯と数字・敵の行動を重ねない）
+      const banner = takeBanner();
+      if (!banner) { finishPresentation(); return; }
+      set({ presentationBusy: true });
+      const linger = get().popups.length ? Math.max(0, TIMING.resultPopup - TIMING.actionLead) : 0;
+      const k = 1000 / speedFactor(get().settings);
+      presentationTimer = setTimeout(() => {
+        set({ phaseBanner: { id: fxId++, ...banner } });
+        presentationTimer = setTimeout(() => { set({ phaseBanner: null }); drainFrames(); }, TIMING.phaseBanner * k);
+      }, linger * k);
+      return;
+    }
     const wait = frames.length > TIMING.presentationFramesMax ? 0 : frame.delay;
     presentationTimer = setTimeout(() => {
       presentationTimer = null; applyFrame(frame);
@@ -455,13 +491,16 @@ export const useBattle = create<StoreState>((set, get) => {
     const allyIds = new Set(get().battle.allies.map((a) => a.id));
     const next = battleFrames(events, allyIds).map((f) => (quiet ? { ...f, quiet } : f));
     // 音だけのコマ（手番が変わっただけ等）は、待たずにすぐ鳴らす（演出中の扱いにしない）
-    if (!frames.length && !presentationTimer && next.length === 1 && isSoundOnly(next[0])) { playFrameSounds(next[0]); return; }
+    if (!frames.length && !presentationTimer && next.length === 1 && isSoundOnly(next[0])) { playFrameSounds(next[0]); settle(); return; }
     frames.push(...next);
     if (frames.length) { set({ presentationBusy: true }); if (!presentationTimer) drainFrames(); }
+    else settle();
   };
+  /** 演出が止まっている時に手番が変わった（数字の出ない操作）: すぐ帯を出す */
+  const settle = () => { if (!frames.length && !presentationTimer) drainFrames(); };
 
   /** 新しい戦闘に入った時の UI のリセット */
-  const resetBattleUi = (b: BattleState): Partial<StoreState> => { clearPresentation(); return ({
+  const resetBattleUi = (b: BattleState): Partial<StoreState> => { clearPresentation(); bannerKey = ''; return ({
     selection: null,
     rollFx: null,
     popups: [],
@@ -530,6 +569,7 @@ export const useBattle = create<StoreState>((set, get) => {
       if (startedBattle) playSound('sfx_battle_start');
       const quiet = remoteActor(wire);
       applyEvents([...opening, ...r.battleEvents], quiet);
+      settle();
       if (before) {
         showNotices(explorationNotices(before, full, wire));
         for (const id of explorationSounds(before, full, wire)) playSound(id, { quiet });
@@ -576,7 +616,7 @@ export const useBattle = create<StoreState>((set, get) => {
     battle: viewIn(saved?.game ?? null, pickScene(saved?.game ?? null, WORLD_SCENE, true))?.battle ?? EMPTY_BATTLE,
     settings: loadSettings(),
     worldMoves: [],
-    presentationBusy: false, cutins: [], petPulses: {}, turnCutin: null, doorOpen: null,
+    presentationBusy: false, phaseBanner: null, cutins: [], petPulses: {}, turnCutin: null, doorOpen: null,
     finishWorldMove: id => {
       set(s => ({ worldMoves: s.worldMoves[0]?.id === id ? s.worldMoves.slice(1) : s.worldMoves }));
       if (!get().worldMoves.length) { pumpNotices(); scheduleEnemy(); }

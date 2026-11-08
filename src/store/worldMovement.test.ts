@@ -82,7 +82,8 @@ describe('移動結果と表示待ちの分離', () => {
     useBattle.getState().applyRemote({ state: next, battleEvents: [] }, { type: 'BATTLE', command: { type: 'ENEMY_STEP' } });
     vi.advanceTimersByTime(400); expect(useBattle.getState().full!.battle!.phase).toBe('enemy');
     const pending = useBattle.getState().worldMoves[0]; useBattle.getState().finishWorldMove(pending.id);
-    vi.advanceTimersByTime(1000); expect(useBattle.getState().full!.battle!.phase).toBe('ally');
+    // 「敵のターン」の帯（1秒）→ 敵の間（0.4秒）→ 敵の行動の演出 の後に進む
+    vi.advanceTimersByTime(3000); expect(useBattle.getState().full!.battle!.phase).toBe('ally');
   });
   it('再接続では過去の移動を再生せず、完了待ちを破棄して最新場面へ移る', () => {
     vi.useFakeTimers(); const g = fresh(); g.world!.wanderers = []; useBattle.getState().loadRemote(g);

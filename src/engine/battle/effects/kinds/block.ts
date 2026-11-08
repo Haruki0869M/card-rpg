@@ -19,7 +19,7 @@ export const effect: EffectHandler<'block'> = {
       ctx.events.push({ type: 'block', unitId: unitIdOf(t), amount: e.amount });
     }
     if (isEnemy(ctx.source)) ctx.parts.push(ts.length ? `ブロック${e.amount}` : '（効果なし）');
-    else ctx.parts.push(ts.length > 1 ? `全員 ${e.amount} BLOCK` : `${e.amount} BLOCK`);
+    else ctx.parts.push(ts.length > 1 ? `全員${e.amount}ブロック` : `${e.amount}ブロック`);
     return ts.length > 0;
   },
   describe: (e, who) => (who === '自分に' ? `ブロック${e.amount}獲得` : `${who}ブロック${e.amount}`),

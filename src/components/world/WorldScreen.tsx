@@ -54,7 +54,7 @@ export function WorldTopBar({ game }: { game: GameState }) {
   const next = nextCorruptionStage(game);
   const cName = corruptionName(game.scenarioId);
   return (
-    <div className="panel z-10 flex shrink-0 items-center gap-1.5 px-2 py-1">
+    <div className="panel z-10 flex shrink-0 items-center gap-1.5 px-2 py-1" data-cutin-anchor>
       <button
         onClick={() => toast(next ? `${cName}${next.at}%: ${next.text}` : cName)}
         className="btn flex min-h-11 min-w-0 flex-1 flex-col justify-center rounded-lg bg-black/30 px-1.5 py-0.5 text-left"
