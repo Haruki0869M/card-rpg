@@ -1,7 +1,7 @@
 // ===== 世界マップの地図（六角形のマス。spec §8.1）=====
 // 地形・霧・施設・移動できる範囲は SVG、キャラと敵は上に重ねた画像。タップしたマスを親に知らせる。
 import { Castle, CircleHelp, DoorOpen, Flag, Gift, House, Landmark, LocateFixed, Sparkles, TriangleAlert, type LucideIcon } from 'lucide-react';
-import { memo, useLayoutEffect, useMemo, useRef } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { artImage, EnemyArt } from '../../art';
 import { DUNGEONS } from '../../data/dungeons';
 import { getTerrain, QUESTS, TERRAINS, TOWNS } from '../../data/world';
@@ -153,6 +153,12 @@ export function WorldMap({
   const [box, size] = useElementSize<HTMLDivElement>();
   const geom = useMapGeom(w, size.width);
   const { R, W, H, center } = geom;
+  // 地図の大きさ（マスの半径）が、測る前の仮の値か、前の描画から変わった時は「落ち着き中」
+  const lastR = useRef<number | null>(null);
+  const geomSettling = size.width === 0 || lastR.current !== R;
+  useEffect(() => {
+    lastR.current = size.width === 0 ? null : R;
+  }, [R, size.width]);
   // 霧が晴れた時だけ地形の層を作り直す（それ以外は前の層を使い回す）
   const tilesRef = useRef(w.tiles);
   const key = seenKey(w) + ':' + w.tiles.length;
@@ -351,15 +357,19 @@ export function WorldMap({
             return <span key={`fp${k}`} className="footprint pointer-events-none absolute rounded-full" style={{ left: x - 5, top: y - 5, width: 10, height: 10 }} />;
           })}
         {/* キャラ */}
-        {[...heroSpots].map(([tile, raw]) => {
+        {/* マスごとに分けず1つの並びで描く。キャラの要素がマスをまたいでも作り直されず、
+            残った駒も新しい並びの位置へなめらかに動く */}
+        {[...heroSpots].flatMap(([tile, raw]) => {
           // 同じマスの駒は左奥から右手前へ斜めに並べ、手番のキャラを一番手前にする
           const ids = orderOnTile(raw, w.turn);
           const spots = pieceSpots(ids.length);
-          return ids.map((id, k) => {
+          return ids.map((id, k) => ({ id, tile, spot: spots[Math.min(k, spots.length - 1)] }));
+        })
+          .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+          .map(({ id, tile, spot }) => {
             const h = game.heroes.find((x) => x.id === id);
             if (!h) return null;
             const { x, y } = center(tile);
-            const spot = spots[Math.min(k, spots.length - 1)];
             const s = R * spot.size;
             const active = id === w.turn;
             const moving = !!anim?.heroes.includes(id);
@@ -378,7 +388,8 @@ export function WorldMap({
                   height: s,
                   zIndex: 2 + spot.z + (moving ? 10 : 0),
                   opacity: w.acted.includes(id) && !active ? 0.75 : 1,
-                  transition: moving ? `left ${stepMs * 0.8}ms ease-out, top ${stepMs * 0.8}ms ease-out` : 'left .35s ease-out, top .35s ease-out',
+                  // 地図の大きさが決まった直後・変わった直後は動かさずに置く（仮の大きさからすべって見えないように）
+                  transition: geomSettling ? 'none' : moving ? `left ${stepMs * 0.8}ms ease-out, top ${stepMs * 0.8}ms ease-out` : 'left .35s ease-out, top .35s ease-out',
                 }}
               >
                 <HeroPiece hero={h} size={s} ringColor={PLAYER_COLORS[h.playerId]} active={active} hopping={hopping} stepKey={moving ? anim!.i : 'still'} stepMs={stepMs} simple={simple} />
@@ -393,8 +404,7 @@ export function WorldMap({
                 })()}
               </div>
             );
-          });
-        })}
+          })}
       </div>
     </div>
       {/* 手番のキャラへ戻る（地図をスクロールして見失った時） */}
