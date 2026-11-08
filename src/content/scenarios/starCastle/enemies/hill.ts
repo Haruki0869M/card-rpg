@@ -125,3 +125,23 @@ export const shadowStarDustScribe: EnemyDef = makeVariant(starDustScribe, {
     { id: 'binding', name: '影の盾', effects: [{ kind: 'block', amount: 11 }] },
   ],
 });
+
+export const angelStatue: EnemyDef = {
+  id: 'angelStatue',
+  name: '天使の像',
+  icon: '🗿',
+  maxHp: 34,
+  baseLevel: 5,
+  size: 1,
+  exp: 10,
+  gold: 6,
+  weak: ['dark'],
+  resist: ['holy'],
+  pattern: 'sequence',
+  actions: [
+    { id: 'sword', name: '大理石の剣', effects: [{ kind: 'damage', amount: 10 }] },
+    { id: 'pray', name: '石の祈り', effects: [{ kind: 'block', amount: 8 }] },
+    { id: 'gaze', name: '見下ろす瞳', effects: [{ kind: 'damage', amount: 5 }, { kind: 'applyStatus', status: 'vulnerable', amount: 1 }] },
+  ],
+  abilities: [{ name: '裁きの反撃', effect: { when: 'hurt', do: [{ kind: 'retaliate', amount: 3, perTurn: 2 }] } }],
+};

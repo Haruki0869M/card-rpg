@@ -131,3 +131,22 @@ export const shadowMoonRabbit: EnemyDef = makeVariant(moonRabbit, {
     { id: 'hop', name: '影跳び', effects: [{ kind: 'damage', amount: 6, hits: 2, element: 'dark' }] },
   ],
 });
+
+export const hourglassGolem: EnemyDef = {
+  id: 'hourglassGolem',
+  name: '砂時計のゴーレム',
+  icon: '⏳',
+  maxHp: 62,
+  baseLevel: 7,
+  size: 1.1,
+  exp: 13,
+  gold: 9,
+  weak: ['thunder'],
+  resist: ['poison'],
+  pattern: 'sequence',
+  actions: [
+    { id: 'sand', name: '止まる砂', effects: [{ kind: 'damage', amount: 6 }, { kind: 'applyStatus', status: 'delay', amount: 1 }] },
+    { id: 'fist', name: '石の拳', effects: [{ kind: 'damage', amount: 12 }] },
+    { id: 'turn', name: '砂時計を返す', effects: [{ kind: 'block', amount: 12 }] },
+  ],
+};

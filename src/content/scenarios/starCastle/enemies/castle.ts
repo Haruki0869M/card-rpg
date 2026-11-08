@@ -2,6 +2,7 @@
 import type { EnemyDef } from '../../../../types';
 import { makeVariant } from '../../../../data/enemyVariant';
 import { thornFairy } from './garden';
+import { angelStatue } from './hill';
 
 export const skyKnight: EnemyDef = {
   id: 'skyKnight',
@@ -100,4 +101,19 @@ export const venomThornFairy: EnemyDef = makeVariant(thornFairy, {
     { id: 'prick', name: '毒の棘', effects: [{ kind: 'damage', amount: 5, hits: 2 }, { kind: 'applyStatus', status: 'poison', amount: 1 }] },
   ],
   abilities: [{ name: '毒の花粉', effect: { when: 'battleStart', do: [{ kind: 'applyStatus', status: 'poison', amount: 1, to: 'foes' }] } }],
+});
+
+export const holyAngelStatue: EnemyDef = makeVariant(angelStatue, {
+  id: 'holyAngelStatue',
+  name: '輝く天使の像',
+  aura: 'holy',
+  maxHp: 52,
+  baseLevel: 9,
+  exp: 16,
+  gold: 12,
+  actions: [
+    { id: 'sword', name: '光の剣', effects: [{ kind: 'damage', amount: 13, element: 'holy' }] },
+    { id: 'pray', name: '輝く祈り', effects: [{ kind: 'block', amount: 10 }] },
+    { id: 'gaze', name: '裁きの光', effects: [{ kind: 'damage', amount: 6, element: 'holy' }, { kind: 'applyStatus', status: 'vulnerable', amount: 1 }] },
+  ],
 });
