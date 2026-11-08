@@ -55,8 +55,8 @@ describe('K1 武器種・系統・異端のカード', () => {
     expect([n('common'), n('rare'), n('epic')]).toEqual([6, 5, 4]);
   });
 
-  it('作った武器種は7枚ずつ（コモン3・レア2・エピック2）', () => {
-    for (const type of ['sword', 'staff', 'tome', 'hammer', 'bow', 'dagger']) {
+  it('全15の武器種が7枚ずつ（コモン3・レア2・エピック2）', () => {
+    for (const type of ['sword', 'staff', 'tome', 'hammer', 'bow', 'dagger', 'spear', 'axe', 'fist', 'scepter', 'scythe', 'katana', 'whip', 'gun', 'instrument']) {
       const cards = CARDS.all.filter((c) => c.weaponType === type);
       expect(cards, type).toHaveLength(7);
       const n = (r: string) => cards.filter((c) => (c.rarity ?? 'common') === r).length;
