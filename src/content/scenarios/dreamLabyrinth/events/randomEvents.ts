@@ -1,0 +1,106 @@
+// 夢幻の大迷宮だけの突発イベント（世界マップを移動し終えた時に起きる。K7 の terrain / needsPet を使う）
+// 悪いイベントでも、判定で突破する / 道具やお金で解決する / やり過ごす のどれかを選べる。ID は頭に dream を付ける
+import type { EventDef } from '../../../../types';
+
+export const dreamRandomEvents: EventDef[] = [
+  {
+    id: 'dreamNightmareMist',
+    where: 'random',
+    tone: 'bad',
+    weight: 9,
+    title: '悪夢の霧',
+    icon: 'mountain',
+    text: '黒い霧が足元に広がり、嫌な記憶が頭をよぎる。',
+    options: [
+      {
+        label: '仲間の名前を呼んで正気を保つ',
+        check: { stat: 'int', slots: 3, need: 2 },
+        success: [{ kind: 'exp', amount: 15 }],
+        fail: [{ kind: 'damage', amount: 6, all: true }],
+        successText: '仲間の声で、霧を振り払った。少し強くなった気がする。（全員 経験値+15）',
+        failText: '悪夢に心を削られた…。（全員 6ダメージ）',
+      },
+      { label: '回復薬を飲んで耐える', costItem: 'potion', success: [{ kind: 'heal', amount: 15, all: true }], successText: '薬が体に染みわたった。（全員 HP+15）' },
+      { label: '霧が晴れるのを待つ', success: [{ kind: 'nothing' }], successText: '霧が晴れるのを待って、先へ進んだ。' },
+    ],
+  },
+  {
+    id: 'dreamLostTraveler',
+    where: 'random',
+    tone: 'good',
+    weight: 8,
+    title: '見覚えのある旅人',
+    icon: 'mask',
+    text: '道ばたで、旅人が困っている。顔に見覚えがある気がするが、どこで会ったのか思い出せない。',
+    options: [
+      {
+        label: '話しかけて手を貸す',
+        check: { stat: 'per', slots: 2, need: 1 },
+        success: [{ kind: 'gold', amount: 60 }, { kind: 'gainFocus', amount: 1, all: true }],
+        fail: [{ kind: 'nothing' }],
+        successText: '旅人は笑って、礼をくれた。「いつかの旅の、お返しです」（60G・全員フォーカス+1）',
+        failText: '旅人は礼を言って、霧の中に消えた。',
+      },
+      { label: '回復薬を分けてあげる', costItem: 'potion', success: [{ kind: 'gold', amount: 90 }, { kind: 'exp', amount: 20 }], successText: '旅人は涙を流して感謝した。（90G・全員 経験値+20）' },
+      { label: '先を急ぐ', success: [{ kind: 'nothing' }], successText: '旅人に手を振って、先へ進んだ。' },
+    ],
+  },
+  {
+    id: 'dreamSnowSand',
+    where: 'random',
+    tone: 'good',
+    weight: 8,
+    terrain: ['snow', 'desert', 'steam'],
+    title: '混ざり合う景色',
+    icon: 'sparkles',
+    text: '雪と砂と蒸気が、ひとつの景色に混ざっている。足元に、見たことのない光る石が落ちていた。',
+    options: [
+      {
+        label: '光る石を拾う',
+        check: { stat: 'luk', slots: 3, need: 2 },
+        success: [{ kind: 'item', rarity: 'rare', slot: 'accessory' }],
+        fail: [{ kind: 'nothing' }],
+        successText: '石は、装飾品に変わった！',
+        failText: '石は、手の中で溶けて消えた。',
+      },
+      { label: '景色を眺めて休む（全員のHP+15）', success: [{ kind: 'heal', amount: 15, all: true }], successText: '不思議と心が落ち着いた。' },
+    ],
+  },
+  {
+    id: 'dreamSleepyCat',
+    where: 'random',
+    tone: 'pet',
+    weight: 8,
+    title: '夢の中の子猫',
+    icon: 'paw',
+    text: '丸くなって眠っている黒い子猫を見つけた。夢の中なのに、ぬくもりを感じる。',
+    options: [
+      {
+        label: 'そっと撫でる',
+        check: { stat: 'dex', slots: 3, need: 2 },
+        success: [{ kind: 'pet', species: ['blackCat'] }],
+        fail: [{ kind: 'nothing' }],
+        successText: '子猫は目を細めて、肩に乗ってきた。',
+        failText: '子猫は目を覚まして、霧の中へ消えた。',
+      },
+      { label: '干し魚をそばに置く', cost: 20, success: [{ kind: 'loseGold', amount: 20 }, { kind: 'pet', species: ['blackCat'] }], successText: '子猫は干し魚をくわえて、ついてきた。（20G）' },
+      { label: 'そっと見守る', success: [{ kind: 'nothing' }], successText: '子猫は、すやすや眠り続けた。' },
+      { label: 'お供のおやつを差し出す', costItem: 'petSnack', success: [{ kind: 'pet', species: ['blackCat'] }], successText: '子猫はおやつの匂いに目を覚まし、ついてきた！' },
+    ],
+  },
+  {
+    id: 'dreamPetMemory',
+    where: 'random',
+    tone: 'pet',
+    weight: 8,
+    needsPet: true,
+    title: 'お供の夢',
+    icon: 'paw',
+    text: 'お供が足を止めて、じっとこちらを見ている。夢の中で、お供と過ごした日々が思い浮かぶ。',
+    options: [
+      { label: 'お供を抱きしめる', success: [{ kind: 'petLove', amount: 12 }], successText: 'お供は幸せそうに目を閉じた。（懐き度+12）' },
+      { label: 'お供のおやつをあげる（20G）', cost: 20, success: [{ kind: 'loseGold', amount: 20 }, { kind: 'petLove', amount: 8, all: true }], successText: 'お供はおやつを味わって、はしゃいだ。（懐き度+8）' },
+      { label: 'そっとしておく', success: [{ kind: 'nothing' }], successText: 'お供は、しばらくこちらを見つめていた。' },
+    ],
+  },
+];
