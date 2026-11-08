@@ -527,14 +527,14 @@ chibi tabletop miniature figurine of a young female legendary grand phantom thie
 - 持たせる物: 無銘の刀1本（腰の鞘）　／　見た目: 紺の着物と赤い袴・抜く前の居合の構え
 
 ```
-chibi tabletop miniature figurine of a young male calm samurai, black hair in a topknot, dark navy kimono and crimson hakama with simple lacquered shoulder plates, ready-to-draw iai stance, a single plain katana in a black scabbard at the waist, one hand resting on the hilt, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, second sword, western sword, bow, shield, arrows, quiver, two katanas, second weapon, signature, text, watermark, scenery
+chibi tabletop miniature figurine of a young male calm samurai, black hair in a topknot, dark navy kimono and crimson hakama with simple lacquered shoulder plates, holding one long plain katana in a long black scabbard in the left hand at the waist, the right hand gripping the hilt, the katana clearly visible and long, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, second sword, western sword, bow, shield, arrows, quiver, two katanas, empty hands without sword, second weapon, signature, text, watermark, scenery
 ```
 
 #### 侍・女（`piece/samurai-female`）→ 元画像 `piece/samurai-female.png`
 - 持たせる物: 無銘の刀1本（腰の鞘）　／　見た目: 紺の着物と赤い袴・抜く前の居合の構え
 
 ```
-chibi tabletop miniature figurine of a young female calm samurai, long black hair tied high with a red cord, dark navy kimono and crimson hakama with simple lacquered shoulder plates, ready-to-draw iai stance, a single plain katana in a black scabbard at the waist, one hand resting on the hilt, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, second sword, western sword, bow, shield, arrows, quiver, two katanas, second weapon, signature, text, watermark, scenery
+chibi tabletop miniature figurine of a young female calm samurai, long black hair tied high with a red cord, dark navy kimono and crimson hakama with simple lacquered shoulder plates, holding one long plain katana in a long black scabbard in the left hand at the waist, the right hand gripping the hilt, the katana clearly visible and long, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, second sword, western sword, bow, shield, arrows, quiver, two katanas, empty hands without sword, second weapon, signature, text, watermark, scenery
 ```
 
 #### 魔剣士・男（`piece/magicKnight-male`）→ 元画像 `piece/magicKnight-male.png`
