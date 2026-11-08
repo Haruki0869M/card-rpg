@@ -662,3 +662,9 @@ chibi tabletop miniature figurine of a young male confident gambler, slicked-bac
 ```
 chibi tabletop miniature figurine of a young female confident gambler, dark wavy hair, dark red waistcoat over a white shirt with loosened tie, playing cards tucked in the hat band, dice on the belt, holding only one short dagger in one hand, the other hand empty, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, gun, sword, second dagger, shield, bow, arrows, quiver, dual wielding, two daggers, second weapon, signature, text, watermark, scenery
 ```
+
+## 全部そろった（2026-11-08）
+- 駒の元画像88枚（44職×男女）が `C:\dev\card-rpg-assets\j4\piece\<職ID>-<male|female>.(webp|png)` にそろった。
+- 作り直した物: 剣士・男（台・2本目の剣）、守護者・女（槍が剣に見えた）、狩人・女（弓がパチンコに見えた）、剣聖・男（顔がのっぺり・影）、拳王・男（既存の格闘ゲームのキャラに似た）、侍の男女（刀が無い）、死霊術師・女（仮面のような顔）。
+- 武闘家・男は橙の道着にツンツンの黒髪だが、オーナーの判断でそのまま採用。
+- 組み込み: `src/assets/art/piece/<職ID>-<性別>.webp` に置くと、`components/world/HeroPiece.tsx` が台座の上に立たせる。背景を切り抜き、足の裏を絵の下端にそろえること。
