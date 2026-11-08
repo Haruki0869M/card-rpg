@@ -75,8 +75,12 @@ async function run(width, height, reduced = false) {
   await expectEnd('door', '入口');
   await check('入口');
   await shot('1-entrance');
+  // フェーズ2-B: 1台で2人の時、扉の「全員が開けるを選ぶと…」の案内は出さない。判定の前は「まずは探索力の判定」の案内
+  if (await page.locator('[data-vote-hint]').count()) problems.push(`${tag}: 1台で遊んでいるのに扉の全員一致の案内が出た`);
+  if (!(await page.locator('[data-move-guide]').filter({ hasText: '『探索力』の判定' }).isVisible())) problems.push(`${tag}: 判定の前に「まずは探索力の判定」の案内が出ない`);
   await page.getByText('探索力の判定').click();
   await page.waitForTimeout(200);
+  if (await page.locator('[data-move-guide]').count()) problems.push(`${tag}: 判定の後も「まずは探索力の判定」の案内が残る`);
   await page.getByRole('button', { name: /^扉を開ける/ }).click();
   // 段階B2: 扉が開く演出 → 戦闘の画面（動作軽減では演出なし）
   const doorScene = page.locator('[data-door-open]');
@@ -141,6 +145,7 @@ async function run(width, height, reduced = false) {
   // 地図を開いて、もう1つの扉の前まで歩く
   await page.getByLabel('地図を開く').click();
   await page.locator('[data-map-overlay]').waitFor();
+  if (await page.locator('[data-vote-hint]').count()) problems.push(`${tag}: 地図を開いているのに扉の案内が重なる`);
   await check('大きな地図');
   await shot('6-map');
   const doors = page.locator('[data-door="open"]');

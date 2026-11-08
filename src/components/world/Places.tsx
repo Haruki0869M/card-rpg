@@ -3,7 +3,7 @@ import { facilityMembers, facilityVisit } from '../../engine/game/world/faciliti
 // ===== 世界マップの場面: 遭遇（spec §8.5）・町（§17）・祠（§8.4）・エンディング =====
 import { motion } from 'framer-motion';
 import { ArrowUpCircle, BedDouble, Check, Coins, Eye, HandCoins, ScrollText, Sparkles, Store, Swords, Trash2, Wind } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { BattleBackground, EnemyArt } from '../../art';
 import { BALANCE } from '../../data/balance';
 import { cardOf, getCard } from '../../data/cards';
@@ -42,6 +42,10 @@ import { CardFace } from '../ui/CardFace';
 import { CheckPanel, RollStrip } from '../ui/CheckPanel';
 import { Heading, HeroFace, ItemIcon, itemSummary, RARITY_STYLE, Screen } from '../ui/game';
 import { WorldTopBar } from './WorldScreen';
+import { BuyNotice, boughtNotice, type Bought } from './BuyNotice';
+
+/** 買った時のお知らせの番号（同じ物を続けて買っても出し直す） */
+let buySeq = 0;
 
 /** 席の名前（オンラインなら参加者の名前、1台なら P1 など） */
 const seatLabel = (p: string) => useOnline.getState().room?.seatName(p as never) ?? p;
@@ -223,10 +227,27 @@ export function TownScreen() {
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const sellable = v.stash;
   const myCards = stock?.cards.map((c, i) => ({ c, i })).filter(({ c }) => getClass(game.heroes.find((x) => x.id === c.heroId)?.classId ?? '').id === v.classId) ?? [];
+  // 買った時の手応え（フェーズ2-A）: 装備品は「すぐ装備」の窓、道具・カードは短いお知らせ
+  const [bought, setBought] = useState<Bought | null>(null);
+  const closeBought = useCallback(() => setBought(null), []);
+  const buy = (kind: 'item' | 'card', index: number) => {
+    const entry = kind === 'item' ? stock?.items[index] : stock?.cards[index];
+    if (!entry) return;
+    const err = dispatchGame({ type: 'TOWN_BUY', heroId: v.id, playerId: p, kind, index });
+    if (err) return;
+    const id = ++buySeq;
+    if ('item' in entry) {
+      const after = useBattle.getState().game?.heroes.find((h) => h.id === v.id);
+      const def = getItem(entry.item.itemId);
+      // 道具袋が満杯だとゴールドに換わる（その時はエンジンの記録の文をそのまま出す）
+      if (def.slot === 'consumable' && !after?.pouch.some((x) => x.uid === entry.item.uid)) setBought({ id, kind: 'text', text: `${def.name}を買った！（袋が満杯のためゴールドに換えた）` });
+      else setBought(boughtNotice(id, v.name, v.id, { kind: 'item', itemUid: entry.item.uid, itemId: entry.item.itemId }));
+    } else setBought(boughtNotice(id, v.name, v.id, { kind: 'card', cardName: getCard(entry.cardId).name }));
+  };
 
   return (
     <Screen bg="town" bgOpacity={0.28}>
-      <WorldTopBar game={game} />
+      <WorldTopBar game={game} goldHeroId={v.id} />
       <FacilityRoster game={game} selected={v.id} onSelect={setVisitorId} />
       <Heading sub={def.description}>{def.name}</Heading>
       <div className="mx-3 mt-1 flex shrink-0 items-center gap-2 rounded-lg bg-black/40 px-2 py-1 text-[13px]">
@@ -246,15 +267,16 @@ export function TownScreen() {
         )}
       </div>
       <MyPetCall game={game} hero={v} />
-      <div className="mt-1 flex shrink-0 gap-1 overflow-x-auto px-2 pb-1">
+      {/* タブは画面の幅を5等分（横にスクロールさせない。「売却」が切れないように） */}
+      <div className="mt-1 grid shrink-0 grid-cols-5 gap-1 px-2 pb-1" data-town-tabs>
         {TOWN_TABS.map((x) => (
-          <button key={x.id} onClick={() => setTab(x.id)} className={`btn flex h-11 shrink-0 items-center gap-1 rounded-lg px-2.5 text-[13px] font-bold ${tab === x.id ? 'btn-gold' : 'btn-dark'}`}>
+          <button key={x.id} onClick={() => setTab(x.id)} className={`btn flex min-h-11 min-w-0 flex-col items-center justify-center rounded-lg px-0.5 py-0.5 text-[12px] leading-4 font-bold ${tab === x.id ? 'btn-gold' : 'btn-dark'}`}>
             <x.Icon size={16} />
-            {x.name}
+            <span className="whitespace-nowrap">{x.name}</span>
           </button>
         ))}
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-2">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-6" data-town-body>
         {tab === 'shop' && stock && (
           <div className="flex flex-col gap-1">
             {stock.items.map((s, i) => {
@@ -270,7 +292,7 @@ export function TownScreen() {
                   </span>
                   <button
                     disabled={!mine || s.sold || v.gold < shopPriceFor(v, s.price)}
-                    onClick={() => dispatchGame({ type: 'TOWN_BUY', heroId: v.id, playerId: p, kind: 'item', index: i })}
+                    onClick={() => buy('item', i)}
                     className="btn btn-gold flex h-11 w-[78px] shrink-0 items-center justify-center gap-0.5 rounded-lg text-[13px] font-bold"
                   >
                     {s.sold ? '売り切れ' : (
@@ -297,7 +319,7 @@ export function TownScreen() {
                     </span>
                     <button
                       disabled={!mine || c.sold || v.gold < shopPriceFor(v, c.price)}
-                      onClick={() => dispatchGame({ type: 'TOWN_BUY', heroId: v.id, playerId: v.playerId, kind: 'card', index: i })}
+                      onClick={() => buy('card', i)}
                       className="btn btn-gold flex h-11 w-[96px] items-center justify-center gap-0.5 rounded-lg text-[13px] font-bold"
                     >
                       {c.sold ? '売り切れ' : (
@@ -417,9 +439,10 @@ export function TownScreen() {
           </div>
         )}
       </div>
-      <div className="shrink-0 px-3 pt-1 pb-3">
+      <div className="relative shrink-0 px-3 pt-1 pb-3 shadow-[0_-10px_14px_-6px_rgba(0,0,0,.75)]" data-town-exit>
         <FacilityExit game={game} />
       </div>
+      <BuyNotice game={game} bought={bought} onClose={closeBought} />
       {confirmRemove && (
         <ConfirmDialog
           title="カードを取り除きますか？"
@@ -471,7 +494,7 @@ export function ShrineScreen() {
   const [heroId, setHeroId] = useState(heroes.find(h => isLocalPlayer(h.playerId))?.id ?? s.heroId);
   return (
     <Screen>
-      <WorldTopBar game={game} />
+      <WorldTopBar game={game} goldHeroId={heroId} />
       <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <BattleBackground kind="shrine" className="absolute inset-0 h-full w-full opacity-40" />
         <div className="relative px-3 pt-4">
