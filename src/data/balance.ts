@@ -145,6 +145,9 @@ export const BALANCE = {
   campHpRatio: 0.2,
   campFocus: 1,
   nightAmbushChance: 35,
+  /** 寒さ・暑さ（K4 段2・提案）: 1ワールドターンごとに減るHP（最大HPの割合。HPは1で止まる）/ そこで野営した時の回復の倍率 */
+  climateDamageRatio: 0.05,
+  climateCampHealMul: 0.5,
   /** 遭遇: 奇襲（感知）・逃走（素早さ）の枠数と必要成功数、戦闘に参加できる距離 */
   encounterSlots: 3,
   encounterNeed: 2,

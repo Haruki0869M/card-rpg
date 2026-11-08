@@ -14,6 +14,7 @@ import { PLAYER_COLOR } from '../../data/theme';
 import { getTerrain, SANCTUARIES, SHRINES, TOWNS } from '../../data/world';
 import {
   campAmbushChance,
+  climateAt,
   dayOf,
   heroesAt,
   heroFocusMax,
@@ -303,6 +304,7 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
   const moveBase = BALANCE.moveBase + moveBonusOf(hero);
   const avg = moveBase + dist.reduce((n, p, k) => n + p * k, 0);
   const ambush = campAmbushChance(game, hero.id);
+  const climate = climateAt(game, here);
   const onTown = w.tiles[here].f?.kind === 'town';
   const canCamp = !onTown && (w.move === null || w.move >= BALANCE.moveBase);
   const pid = hero.playerId;
@@ -502,6 +504,11 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
                 </button>
               ) : null;
             })}
+          {climate && (
+            <p className="text-[12px] leading-4 text-sky-200" data-climate-note>
+              {climate.kind === 'cold' ? '❄️ 寒さ' : '☀️ 暑さ'}で毎ターン体力が減る（野営すれば防げる。ただし回復は半分）
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-1.5">
             <button
               onClick={() => canCamp && dispatchGame({ type: 'WORLD_CAMP', playerId: pid, heroId: hero.id })}

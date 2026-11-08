@@ -15,6 +15,7 @@ import { addLog, campFocusOf, moveSlotsOf, ownedBy, restMultiplierOf, rollWithFo
 import { enterDungeonFromWorld, startBattleWith } from '../game';
 import { equippedItems, heroFocusMax, heroMaxHp } from '../hero';
 import { activeHeroes, expeditionOf, findHero, livingHeroes, mapHeroes, sceneHeroes } from '../heroes';
+import { applyClimate, climateAt } from './climate';
 import { revealAround } from './fog';
 import { hexDistance, pathTo, reachable } from './hex';
 import { objectiveHandler, type QuestSignal } from './objectives';
@@ -122,6 +123,7 @@ export function endExpeditionTurn(game: GameState, heroes: string[], rng: Rng) {
 function endWorldTurn(game: GameState, rng: Rng) {
   const w = game.world!;
   const before = w.corruption;
+  applyClimate(game);
   w.worldTurn += 1;
   w.acted = [];
   w.corruption = Math.min(100, w.corruption + (getDifficulty(game.difficulty).corruptionPerTurn ?? BALANCE.corruptionPerTurn));
@@ -380,9 +382,11 @@ export function camp(game: GameState, cmd: Cmd<'WORLD_CAMP'>, rng: Rng): string 
   if (w.tiles[tile].f?.kind === 'town') return '町の中では野営できません（宿屋を使えます）';
   if (w.move !== null && w.move < (BALANCE.moveBase as number)) return '移動した後は野営できません';
   const chance = campAmbushChance(game, h.id);
-  h.hp = Math.min(heroMaxHp(h), h.hp + Math.ceil(heroMaxHp(h) * BALANCE.campHpRatio * (restMultiplierOf(h) + (petExplore(h).campHeal ?? 0) + equippedItems(h).reduce((n, i) => n + (i.explore?.campHeal ?? 0), 0))));
+  const climateMul = climateAt(game, tile) ? BALANCE.climateCampHealMul : 1;
+  h.hp = Math.min(heroMaxHp(h), h.hp + Math.ceil(heroMaxHp(h) * BALANCE.campHpRatio * climateMul * (restMultiplierOf(h) + (petExplore(h).campHeal ?? 0) + equippedItems(h).reduce((n, i) => n + (i.explore?.campHeal ?? 0), 0))));
   h.focus = Math.min(heroFocusMax(h), h.focus + BALANCE.campFocus + campFocusOf(h));
-  addLog(game, `${h.name}は野営して体を休めた`);
+  (w.sheltered ??= []).push(h.id);
+  addLog(game, `${h.name}は野営して体を休めた${climateMul < 1 ? '（厳しい土地で、回復は半分）' : ''}`);
   if (chance > 0 && rng.next() * 100 < chance) {
     const wd = spawnWanderer(game, w, rng, w.tiles[tile].r, tile);
     if (wd) {

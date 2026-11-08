@@ -29,6 +29,7 @@ export * from './game/world/time';
 export * from './game/world/fog';
 export * from './game/world/wanderers';
 export * from './game/world/world';
+export * from './game/world/climate';
 export * from './game/world/town';
 export * from './game/world/objectives';
 export { createWorld, regionOfRow } from './game/world/generate';
