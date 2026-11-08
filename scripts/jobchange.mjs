@@ -69,7 +69,14 @@ for (const width of [360, 390, 480]) {
   await page.getByText('つづきから', { exact: true }).click();
   await page.locator('[data-party-row] button').first().click();
   await page.getByText('転職先を見る', { exact: true }).click();
-  if (!(await page.getByText('条件：完全成功15回（7/15）', { exact: true }).isVisible())) await fail(`${width}px: 条件の進捗が見えない`);
+  // フェーズ2-A: レベルと条件を1か所に、✓/✗と進み具合の棒つきで出す（同じ文を2回出さない）
+  const reqs = page.locator('[data-job-reqs]').filter({ hasText: '完全成功15回' });
+  if (!(await reqs.first().isVisible())) await fail(`${width}px: 条件の一覧が見えない`);
+  if (!(await reqs.first().getByText('7/15', { exact: true }).isVisible())) await fail(`${width}px: 条件の進捗（7/15）が見えない`);
+  if (!(await reqs.first().locator('[data-job-req="ng"]').filter({ hasText: 'Lv4以上（今 Lv3）' }).count())) await fail(`${width}px: レベルの不足（✗ Lv4以上）が見えない`);
+  if (!(await reqs.first().locator('[data-job-progress]').count())) await fail(`${width}px: 進み具合の棒が無い`);
+  const dup = await page.getByText('完全成功15回', { exact: false }).count();
+  if (dup !== await page.locator('[data-job-reqs]').filter({ hasText: '完全成功15回' }).count()) await fail(`${width}px: 条件の文が2回出ている（${dup}）`);
   await page.waitForTimeout(250);
   await shot(`top-progress-${width}`);
   seed.game.heroes[0].level = 4;

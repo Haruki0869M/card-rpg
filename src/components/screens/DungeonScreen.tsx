@@ -2,7 +2,8 @@
 // 段階B: 一人称の通路の絵（DungeonView）・右上のミニマップ（タップで大きな地図と「ここまで歩く」）・絵に重ねた歩くボタン
 import { VoteChips } from '../ui/Votes';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, ArrowRight, ArrowUp, Backpack, Check, Coins, Compass, Crown, DoorClosed, DoorClosedLocked, Flame, Gift, LogOut, Menu, Sparkles, Swords, Skull, Undo2, Users, X } from 'lucide-react';
+import { showVoteHint, moveGuide } from '../dungeon/hints';
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Backpack, Check, Coins, Compass, Crown, DoorClosed, DoorClosedLocked, Flame, Gift, LogOut, Menu, Sparkles, Swords, Skull, Undo2, Users, X } from 'lucide-react';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AnimatedDungeonView } from '../dungeon/DungeonAnim';
 import { OmenMark } from '../dungeon/DungeonView';
@@ -234,7 +235,7 @@ function MapOverlay({ run, onClose, canWalk, myTurn, stepsLeft, onWalk }: {
     else setTarget(null);
   };
   return (
-    <div className="absolute inset-0 z-30 flex flex-col bg-[#0c0a08]/95" data-map-overlay>
+    <div className="absolute inset-0 z-30 flex flex-col bg-[#0c0a08]" data-map-overlay>
       <div className="flex h-11 shrink-0 items-center gap-2 px-2">
         <span className="font-display min-w-0 flex-1 text-[16px] text-amber-100">地図（探索度 {exploredPercent(run)}%）</span>
         <button onClick={onClose} aria-label="地図を閉じる" className="btn btn-dark flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
@@ -290,6 +291,7 @@ export function DungeonScreen() {
   const stepsLeft = game.world ? (run.explore ?? 0) : Infinity;
   const canWalk = myTurn && game.mode === 'dungeon' && (!game.world || (run.explore != null && run.explore > 0));
   const ahead = doorAhead(run);
+  const guide = moveGuide({ myTurn, inDungeon: game.mode === 'dungeon', explore: run.explore, onWorld: !!game.world });
   const step = (dir: 'forward' | 'left' | 'right' | 'back') => nav && dispatchGame({ type: 'DUNGEON_STEP', playerId: nav.playerId, heroId: nav.id, dir });
   const turn = (dir: 'left' | 'right' | 'back') => nav && dispatchGame({ type: 'DUNGEON_TURN', playerId: nav.playerId, heroId: nav.id, dir });
   const moveOk = (rel: 'forward' | 'left' | 'right' | 'back') => canWalk && canMove(run, pos, turnTo(pos.facing, rel));
@@ -319,8 +321,8 @@ export function DungeonScreen() {
         {/* 一人称の通路 */}
         <AnimatedDungeonView run={run} background={background} omens={omens} />
         <MiniMap run={run} onOpen={() => setShowMap(true)} />
-        {/* 2人以上で遊ぶ時: 扉は全員一致で開く */}
-        {voters(game).length > 1 && (
+        {/* 別の端末の人と遊ぶ時: 扉は全員一致で開く（1台で遊ぶ時は1回で開くので出さない。地図を開いている間も出さない） */}
+        {(showVoteHint(voters(game), isLocalPlayer, showMap) || (!showMap && voters(game).length > 1 && !!currentVote(game) && notVoted(game).length === 0)) && (
           <div className="pointer-events-none absolute left-2 top-2 z-10 max-w-[calc(100%-130px)]">
             <span className="inline-block rounded-lg bg-black/70 px-2 py-0.5 text-[12px] leading-4 text-zinc-200" data-vote-hint>
               {currentVote(game) && notVoted(game).length === 0 ? '意見が分かれています。選び直してください' : '扉は全員が「開ける」を選ぶと開きます'}
@@ -330,6 +332,14 @@ export function DungeonScreen() {
         {/* 下端: 目の前の扉と、歩くボタン（絵に重ねる）。歩くのは手番のキャラの担当の人 */}
         <div className="absolute inset-x-2 bottom-2 z-10 flex flex-col gap-1.5">
           {ahead && game.mode === 'dungeon' && <DoorPanel room={ahead} openable={reach.has(ahead.id)} />}
+          {guide && (
+            <div className="pointer-events-none flex justify-center" data-move-guide>
+              <span className="move-guide flex items-center gap-1 rounded-lg border border-amber-300/60 bg-black/80 px-2.5 py-1 text-[13px] leading-5 font-bold text-amber-100">
+                {guide}
+                <ArrowDown size={15} className="shrink-0 text-amber-300" />
+              </span>
+            </div>
+          )}
           <div className="grid grid-cols-4 gap-1.5" data-dungeon-moves>
             {(
               [
@@ -585,7 +595,7 @@ function ExplorePanel() {
       </div>
       <div className="min-w-0 flex-1">
         {watchedHere && run.watchRoll ? <RollStrip results={run.watchRoll} small /> : run.exploreRoll && <RollStrip results={run.exploreRoll} small />}
-        <div className="text-[12px] leading-4 text-zinc-400">{run.explore > 0 ? '1歩・扉で1歩（向くのは0歩）' : '歩数を使い切った'}</div>
+        <div className="text-[12px] leading-4 text-zinc-400">{run.explore > 0 ? '1歩ごと・扉も1歩（向きを変えるのは0歩）' : '歩数を使い切った'}</div>
       </div>
       <button
         onClick={() => setWatching(true)}

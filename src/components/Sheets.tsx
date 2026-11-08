@@ -14,8 +14,9 @@ import { LOCAL_PLAYER, isLocalPlayer } from '../store/battleConfig';
 import { useBattle } from '../store/battleStore';
 import { useOnline } from '../store/onlineStore';
 import { OnlinePanel } from './screens/OnlineScreens';
-import type { CardInstance, EquipSlot, GameState, Hero, ItemDef } from '../types';
+import type { CardInstance, EquipSlot, GameState, Hero } from '../types';
 import { ConfirmDialog } from './ui/ConfirmDialog';
+import { diffText } from './equipDiff';
 import { canChangeNow, JobSheetBody } from './JobSheet';
 import { PetPanel } from './ui/PetToken';
 
@@ -189,27 +190,6 @@ function PileSheet({ kind }: { kind: 'draw' | 'discard' }) {
       <DeckRows cards={pile} />
     </BottomSheet>
   );
-}
-
-/** 装備を変えた時の能力値などの変化 */
-function diffText(hero: Hero, slot: EquipSlot, next: ItemDef | null): { label: string; delta: number }[] {
-  const cur = hero.equipment[slot] ? getItem(hero.equipment[slot]!.itemId) : null;
-  const out: { label: string; delta: number }[] = [];
-  for (const k of STAT_IDS) {
-    const d = (next?.stats?.[k] ?? 0) - (cur?.stats?.[k] ?? 0);
-    if (d) out.push({ label: STAT_LABEL[k], delta: d });
-  }
-  const pairs: [string, keyof ItemDef][] = [
-    ['最大HP', 'maxHp'],
-    ['フォーカス最大', 'focusMax'],
-    ['開始時ブロック', 'startBlock'],
-    ['ドロー', 'extraDraw'],
-  ];
-  for (const [label, key] of pairs) {
-    const d = ((next?.[key] as number | undefined) ?? 0) - ((cur?.[key] as number | undefined) ?? 0);
-    if (d) out.push({ label, delta: d });
-  }
-  return out;
 }
 
 const SLOT_NAME: Record<EquipSlot, string> = { weapon: '武器', armor: '防具', accessory: '装飾品' };

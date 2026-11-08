@@ -496,3 +496,8 @@ textarea {
   animation-timing-function: ease-in;
   animation-fill-mode: forwards;
 }
+
+/* ダンジョンの「まずは探索力の判定で歩数を決めよう」の案内（フェーズ2-B）。ゆっくり光る */
+@keyframes move-guide { 0%, 100% { box-shadow: 0 0 0 0 #ffd76a00; } 50% { box-shadow: 0 0 12px 2px #ffd76a66; } }
+.move-guide { animation: move-guide 1.8s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .move-guide { animation: none; } }

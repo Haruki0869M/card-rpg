@@ -99,6 +99,10 @@ export interface JobOption {
   qualified: boolean;
   /** できない理由（レベル・条件・場所） */
   reason?: string;
+  /** 転職に要るレベル（画面の進み具合の表示用） */
+  needLevel?: number;
+  /** 条件の目標の数（requires がある時） */
+  count?: number;
 }
 
 /** 今のジョブから転職できるジョブ（できるかどうかと、できない理由つき）。game を渡すと場所も確かめる */
@@ -112,7 +116,7 @@ export function jobOptions(hero: Hero, game?: GameState): JobOption[] {
       if (r && featOf(hero, r.feat) < r.count) return { job, ready: false, qualified: false, reason: `条件: ${r.text}（${featOf(hero, r.feat)}/${r.count}）` };
       if (game && !jobPlaceAllows(game, hero, job)) return { job, ready: false, qualified: true, reason: `${jobPlaceText(job)}で転職できる` };
       return { job, ready: true, qualified: true };
-    }).map(o => ({ ...o, progress: o.job.requires ? featOf(hero, o.job.requires.feat) : undefined }));
+    }).map(o => ({ ...o, progress: o.job.requires ? featOf(hero, o.job.requires.feat) : undefined, needLevel: jobChangeLevel(o.job), count: o.job.requires?.count }));
 }
 
 /** 転職した時に選べる専用カード（3枚。無ければ報酬の候補の先頭から） */

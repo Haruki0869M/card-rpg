@@ -44,7 +44,7 @@ import { canChangeNow } from '../JobSheet';
 const TIME_ICON: Record<TimeOfDay, typeof Sun> = { morning: Sunrise, noon: Sun, evening: Sunset, night: Moon };
 
 /** 上部のバー: 侵食度・命の灯火・ゴールド・時間帯・メニュー */
-export function WorldTopBar({ game }: { game: GameState }) {
+export function WorldTopBar({ game, goldHeroId }: { game: GameState; /** 所持金を出すキャラ（町・神殿・祠では切り替えたキャラ。無ければ世界マップの手番のキャラ） */ goldHeroId?: string }) {
   const openSheet = useBattle((s) => s.openSheet);
   const toast = useBattle((s) => s.showToast);
   const w = game.world!;
@@ -72,9 +72,9 @@ export function WorldTopBar({ game }: { game: GameState }) {
         <span className="flex items-center gap-0.5 text-orange-300" aria-label="命の灯火">
           <Flame size={14} className="fill-orange-500/60" />×{game.lives}
         </span>
-        <span className="flex items-center gap-0.5 text-amber-200" aria-label="手番のキャラの所持金">
+        <span className="flex items-center gap-0.5 text-amber-200" aria-label={goldHeroId ? '表示中のキャラの所持金' : '手番のキャラの所持金'} data-top-gold>
           <Coins size={14} />
-          {game.heroes.find((h) => h.id === game.world?.turn)?.gold ?? 0}G
+          {game.heroes.find((h) => h.id === (goldHeroId ?? game.world?.turn))?.gold ?? 0}G
         </span>
       </div>
       <div className="flex shrink-0 flex-col items-center text-[12px] leading-4">

@@ -1,6 +1,6 @@
 // ===== 転職（転職先の一覧と、転職した時の専用カードの3択。設計 v2 §3） =====
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowUpCircle, Check, Lock, MapPin } from 'lucide-react';
+import { ArrowUpCircle, Check, Lock, MapPin, X } from 'lucide-react';
 import { useState } from 'react';
 import { getCard } from '../data/cards';
 import { getClass } from '../data/classes';
@@ -28,7 +28,35 @@ export const canChangeNow = (game: GameState, hero: Hero) => isLocalPlayer(hero.
 const weaponText = (job: ClassDef) =>
   [`◎${WEAPON_TYPES.get(job.weaponType).name}`, ...(job.subWeapons ?? []).map((w) => `○${WEAPON_TYPES.get(w).name}`)].join(' ');
 
-function JobCard({ opt, onPick }: { opt: JobOption; onPick: () => void }) {
+/** 転職の条件の1行（✓/✗・文・進み具合の棒） */
+function ReqRow({ ok, text, now, need }: { ok: boolean; text: string; now?: number; need?: number }) {
+  return (
+    <div className="flex flex-col gap-0.5" data-job-req={ok ? 'ok' : 'ng'}>
+      <div className={`flex items-start gap-1 text-[12px] leading-4 ${ok ? 'text-emerald-200' : 'text-zinc-200'}`}>
+        {ok ? <Check size={14} className="mt-[1px] shrink-0 text-emerald-300" /> : <X size={14} className="mt-[1px] shrink-0 text-red-300" />}
+        <span className="min-w-0 flex-1">{text}</span>
+        {need !== undefined && <b className="shrink-0 tabular-nums">{Math.min(now ?? 0, need)}/{need}</b>}
+      </div>
+      {need !== undefined && (
+        <div className="ml-[18px] h-[6px] overflow-hidden rounded-full bg-black/60" data-job-progress>
+          <div className="h-full rounded-full" style={{ width: `${Math.min(100, ((now ?? 0) / Math.max(1, need)) * 100)}%`, background: ok ? 'linear-gradient(90deg,#22b45a,#7dffa8)' : 'linear-gradient(90deg,#b07a1a,#ffd76a)' }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** 転職の条件の一覧（レベル・条件）。今の進み具合と並べて1か所に出す */
+export function jobRequirements(opt: JobOption, level: number): { ok: boolean; text: string; now?: number; need?: number }[] {
+  const rows: { ok: boolean; text: string; now?: number; need?: number }[] = [];
+  const lv = opt.needLevel ?? 1;
+  rows.push({ ok: level >= lv, text: `Lv${lv}以上（今 Lv${level}）` });
+  const r = opt.job.requires;
+  if (r) rows.push({ ok: (opt.progress ?? 0) >= r.count, text: r.text, now: opt.progress ?? 0, need: r.count });
+  return rows;
+}
+
+function JobCard({ opt, level, onPick }: { opt: JobOption; level: number; onPick: () => void }) {
   const j = opt.job;
   return (
     <div className={`rounded-xl border p-2 ${opt.ready ? 'border-amber-300/70 bg-amber-500/10' : 'border-white/10 bg-black/30'}`}>
@@ -53,15 +81,25 @@ function JobCard({ opt, onPick }: { opt: JobOption; onPick: () => void }) {
         <span className="font-display text-sky-200">《{j.exploreAbility.name}》</span>
         {j.exploreAbility.description}
       </div>
-      {j.requires && <div className="mt-1 text-[12px] text-amber-100">条件：{j.requires.text}（{opt.progress ?? 0}/{j.requires.count}）</div>}
+      <div className="mt-1.5 flex flex-col gap-1 rounded-lg bg-black/30 px-2 py-1.5" data-job-reqs>
+        {jobRequirements(opt, level).map((r) => (
+          <ReqRow key={r.text} {...r} />
+        ))}
+      </div>
       {opt.ready ? (
         <button onClick={onPick} className="btn btn-gold mt-1.5 flex h-11 w-full items-center justify-center gap-1.5 rounded-lg text-[15px] font-bold">
           <ArrowUpCircle size={18} /> {j.name}に転職する
         </button>
-      ) : (
-        <div className="mt-1.5 flex items-center gap-1 rounded-lg bg-black/40 px-2 py-1.5 text-[13px] text-zinc-300">
-          {opt.qualified ? <MapPin size={15} className="text-sky-300" /> : <Lock size={15} className="text-zinc-400" />}
+      ) : opt.qualified ? (
+        // 条件はそろっていて、場所だけが足りない時（レベル・条件の文は上の一覧に出しているので、ここは場所の案内だけ）
+        <div className="mt-1.5 flex items-center gap-1 rounded-lg bg-black/40 px-2 py-1.5 text-[13px] text-sky-100">
+          <MapPin size={15} className="shrink-0 text-sky-300" />
           {opt.reason}
+        </div>
+      ) : (
+        <div className="mt-1.5 flex items-center gap-1 px-1 text-[12px] text-zinc-400">
+          <Lock size={14} className="shrink-0" />
+          上の ✗ をそろえると転職できます
         </div>
       )}
     </div>
@@ -98,7 +136,7 @@ export function JobSheetBody() {
         今：<b style={{ color: cur.color }}>{cur.name}</b> Lv{hero.level}。転職するとLv1に戻ります（成長の上乗せ・山札・装備はそのまま。今のジョブの戦闘の能力を持ち越します）。基本→中位は世界マップ・町・休憩部屋で、それより上は町の聖堂・祠で転職できます。
       </div>
       {opts.map((o) => (
-        <JobCard key={o.job.id} opt={o} onPick={() => setPick(o.job.id)} />
+        <JobCard key={o.job.id} opt={o} level={hero.level} onPick={() => setPick(o.job.id)} />
       ))}
       <AnimatePresence>
         {pick && (
