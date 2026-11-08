@@ -1,11 +1,26 @@
 // 実際の画面をタップして、キャラ作成 → 世界マップ（物語・移動・遭遇）→ 翠の神殿 → 宝箱 → レベルアップ → ボス撃破 → 大宝箱 → 地上 まで進める
 // 2人以上は担当プレイヤーを分けて、手番の受け渡しの画面も確かめる
 // npm run build && npx vite preview --port 4173 を起動した状態で: node scripts/adventure.mjs
+// 別のシナリオを通す時: ADVENTURE_SCENARIO=frozenKingdom node scripts/adventure.mjs（記録を入れて解放してから選ぶ）
+// 他のセッションと同じポートを使わないよう、自分専用のポートで preview を起こし URL=http://127.0.0.1:<番号>/card-rpg/ を付ける
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { chromium, layoutIssues, URL, waitForWorldMovement, waitForBattlePresentation } from './lib.mjs';
 
 mkdirSync('screenshots', { recursive: true });
 const output = process.env.ADVENTURE_OUTPUT ?? 'screenshots/adventure';
+// 遊ぶシナリオ（ADVENTURE_SCENARIO。省略は1本目の corruptionKing）。1本目以外は、記録を入れて解放してから選ぶ
+const FIRST_SCENARIO = 'corruptionKing';
+const SCENARIO_NAMES = {
+  corruptionKing: '侵食の魔王',
+  frozenKingdom: '凍てつく王国',
+  cursedArchipelago: '呪われた群島',
+  sandDynasty: '砂塵の王朝',
+  starCastle: '星降る天空城',
+  clockworkEmpire: '機械仕掛けの帝国',
+  dreamLabyrinth: '夢幻の大迷宮',
+};
+const SCENARIO = process.env.ADVENTURE_SCENARIO ?? FIRST_SCENARIO;
+if (!SCENARIO_NAMES[SCENARIO]) throw new Error(`知らないシナリオ: ${SCENARIO}（${Object.keys(SCENARIO_NAMES).join(' / ')}）`);
 mkdirSync(output, { recursive: true });
 async function record(page, party, result) {
   const data = await page.evaluate(() => ({ text: document.body.innerText, saved: JSON.parse(localStorage.getItem('card-rpg/adventure')) }));
@@ -103,8 +118,24 @@ async function run(party, difficulty) {
   page.on('pageerror', (e) => issues.add(`pageerror: ${e.message}`));
   await page.goto(URL);
   await page.evaluate(() => localStorage.clear());
+  // 1本目以外を遊ぶ時は、伝承の書の記録（card-rpg/profile）に「ほかのシナリオをクリア済み」と入れてから始める（解放されるため）
+  if (SCENARIO !== FIRST_SCENARIO) {
+    const clears = Object.fromEntries(Object.keys(SCENARIO_NAMES).filter((id) => id !== SCENARIO).map((id) => [id, 1]));
+    await page.evaluate((c) => localStorage.setItem('card-rpg/profile', JSON.stringify({ version: 1, clears: c })), clears);
+  }
   await page.reload();
   await page.getByText('新しい冒険').click();
+  if (SCENARIO !== FIRST_SCENARIO) {
+    // シナリオの一覧（横にスワイプ）から、名前のカードを選ぶ
+    const card = page.locator('[data-scenarios] button', { hasText: SCENARIO_NAMES[SCENARIO] }).first();
+    await card.scrollIntoViewIfNeeded();
+    await card.click();
+    if (await page.locator('[data-scenario-lock]').count()) {
+      const locked = await card.locator('[data-scenario-lock]').count();
+      if (locked) issues.add(`シナリオ ${SCENARIO} が解放されていない（記録を入れても鍵が付いたまま）`);
+    }
+    await page.waitForTimeout(150);
+  }
   if (!(await page.getByText('高速モード').count())) {
     /* 設定はメニューから */
   }
@@ -152,6 +183,17 @@ async function run(party, difficulty) {
       await check(page, 'cleared');
       await page.getByText('地上に戻る').click();
       await page.waitForTimeout(300);
+      // 鍵のダンジョンを制覇すると、制覇後の物語（鍵を手に入れた・鍵の残り数）が出る
+      if (await page.locator('[data-world-map]').count()) {
+        const storyText = await page.locator('body').innerText();
+        if (storyText.includes('手に入れた！')) {
+          await page.screenshot({ path: `${output}/${party}p-clearstory.png` });
+          console.log(`${party}人 制覇後の物語: ${storyText.replace(/\n/g, ' ').slice(0, 200)}`);
+          await check(page, 'clearstory');
+          await clickText(page, 'つづける');
+          await page.waitForTimeout(200);
+        } else issues.add('制覇後の物語が出ない');
+      }
       // 地上に戻ったあと: 世界マップか、手番が来た別の組のダンジョン（M3-D）
       if (!(await page.locator('[data-world-map]').count()) && !(await page.getByText('探索力の判定').count())) { issues.add('世界マップに戻れない'); await page.screenshot({ path: `screenshots/adv-${party}p-noworld.png` }); console.log((await page.locator('body').innerText()).slice(0, 300)); }
       break;
