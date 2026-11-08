@@ -45,7 +45,14 @@ page.on('pageerror', (e) => errors.push(String(e)));
 
 /** 戦闘の敵の絵の src（敵の順） */
 const enemyImgs = () =>
-  page.evaluate(() => [...document.querySelectorAll('[data-enemy-id] img, [data-enemy] img')].map((i) => ({ src: i.getAttribute('src') ?? '', ok: i.complete && i.naturalWidth > 0, h: i.getBoundingClientRect().height })));
+  page.evaluate(() =>
+    [...document.querySelectorAll('[data-enemy] img')].map((i) => {
+      // 戦場（敵の要素の親。overflow で切れる）の上の端より、絵の上の端が上に出ていないか
+      const field = i.closest('[data-enemy]')?.offsetParent?.getBoundingClientRect();
+      const r = i.getBoundingClientRect();
+      return { src: i.getAttribute('src') ?? '', ok: i.complete && i.naturalWidth > 0, h: r.height, over: field ? Math.round(field.top - r.top) : 0 };
+    }),
+  );
 
 async function check(tag, ids, phase = 0) {
   await page.waitForTimeout(500);
@@ -55,6 +62,8 @@ async function check(tag, ids, phase = 0) {
     const hit = imgs.find((i) => i.src.includes(`/${want}`));
     if (!hit) problems.push(`${tag}: ${id}${phase ? `（段階${phase}）` : ''} の描いた絵が出ていない`);
     else if (!hit.ok) problems.push(`${tag}: ${id} の絵が読み込めていない`);
+    // 大きな敵の体の上が、戦場の上の端（上の帯）で切れていないか（絵の上の余白の分、少しは許す）
+    else if (hit.over > hit.h * 0.04) problems.push(`${tag}: ${id} の絵の上が ${hit.over}px 切れている`);
   }
   const issues = await layoutIssues(page);
   if (issues.length) problems.push(`${tag}: ${issues.join(' / ')}`);
@@ -70,6 +79,29 @@ for (const [w, h] of [[360, 640], [480, 854], [390, 844]]) {
     await page.screenshot({ path: `${OUT}/${w}-${g.join('-')}.png` });
   }
 }
+// 大きなボス＋3体（4人の味方）: 敵の絵の上が切れない・敵の情報（名前〜予告）と味方の立ち絵の箱が重ならないか
+const MIXED = [['greatMachine', 'gearBug', 'steamRat', 'oilSlime'], ['starSeerQueen', 'cloudSheep', 'skyGull'], ['frostGiant', 'snowHare']];
+for (const [w, h] of [[360, 640], [390, 844], [480, 854]]) {
+  await page.setViewportSize({ width: w, height: h });
+  for (const g of MIXED) {
+    await startBattle(page, 4, g);
+    await check(`${w} 4人 ${g.join('・')}`, g);
+    const overlap = await page.evaluate(() => {
+      const infos = [...document.querySelectorAll('[data-enemy]:not([data-dead]) [data-enemy-info]')].map((e) => e.getBoundingClientRect());
+      const allies = [...document.querySelectorAll('[data-ally-sprite]')].map((e) => e.getBoundingClientRect());
+      let worst = 0;
+      for (const a of infos) for (const b of allies) {
+        const x = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+        const y = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+        if (x > 0 && y > 0) worst = Math.max(worst, Math.round(y));
+      }
+      return worst;
+    });
+    console.log(`${w}x${h} 4人 ${g.join('・')}: 敵の情報と味方の立ち絵の箱の重なり ${overlap}px`);
+    await page.screenshot({ path: `${OUT}/mixed-${w}-${g[0]}.png` });
+  }
+}
+await page.setViewportSize({ width: 390, height: 844 });
 // 変身後の絵
 for (const [id, list] of Object.entries(PHASES)) {
   await startBattle(page, 1, [id]);
