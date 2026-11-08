@@ -28,6 +28,7 @@ K3 単体で作るのは、共通の敵・隠しレアの敵・corruptionKing �
 - `weak` / `resist` に属性 ID。弱点はダメージ×1.5、耐性は×0.5で状態異常も効かない。
 - 行動の `{ kind: 'damage', amount, element }` で属性攻撃。
 - 特殊能力 `abilities`（味方と同じ書き方）。
+- （K4で追加した部品）反撃は `abilities: [{ name, effect: { when: 'hurt', do: [{ kind: 'retaliate', amount, perTurn? }] } }]`（攻撃してきた相手にだけ返す）。仲間を呼ぶのは行動に `{ kind: 'summonEnemy', enemy: '敵ID', uses?: 2 }`（戦場4体まで・呼ばれた敵は報酬なし）。フォーカスを奪うのは `{ kind: 'drainFocus', amount }`、行動を遅らせるのは `{ kind: 'applyStatus', status: 'delay', amount: 1 }`（次のターンに引くカードが減る）。見本は `scenarios/cursedArchipelago/enemies/`（貝の騎士・海賊船長ガルド）。
 - **シナリオ専用の敵を共通のイベントで使わない。** 共通の敵を足す。
 - 難易度は今のまま（難しめ）。同じ階層の敵と、HP・ダメージを見比べて揃える。
 

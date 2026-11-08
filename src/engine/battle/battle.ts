@@ -18,7 +18,6 @@ import type {
   CardInstance,
   Command,
   CommandResult,
-  EnemyDef,
   EnemyState,
   PlayerId,
   SlotResult,
@@ -35,7 +34,7 @@ import { finalChance, selectTier } from './probability';
 import { recordSupport, supportSnapshot } from './support';
 import { afterAttackCard, attackElement, cardHpCost, chargedMultiplier, tierHpCost } from './cardState';
 import { slotPreviewLimitOf } from './preview';
-import { activeStatuses, actionFailChanceOf, applyTick, chancePenaltyOf, consumeStatus, decayStatuses, emptyStatuses, skipActionStatus, takeManaPenalty, tickHealOf } from './statuses';
+import { activeStatuses, actionFailChanceOf, applyTick, chancePenaltyOf, consumeStatus, decayStatuses, emptyStatuses, skipActionStatus, takeDrawPenalty, takeManaPenalty, tickHealOf } from './statuses';
 import { abilityTriggered, addLog, enemyName, findAlly, healUnit, loseHp, nameOf, unitIdOf } from './units';
 
 export { enemyName, findAlly, findEnemy, unitName } from './units';
@@ -45,14 +44,8 @@ export { slotPreviewLimitOf } from './preview';
 
 // ---------- 生成 ----------
 
-/** 敵のレベル補正（HP・攻撃の倍率）。baseLevel で 1.0。伸び方は敵ごとに変えられる（省略は共通値） */
-export function enemyLevelFactors(def: Pick<EnemyDef, 'baseLevel' | 'hpPerLevel' | 'attackPerLevel'>, level: number) {
-  const d = level - def.baseLevel;
-  return {
-    hp: Math.max(0.3, 1 + (def.hpPerLevel ?? BALANCE.enemyHpPerLevel) * d),
-    attack: Math.max(0.3, 1 + (def.attackPerLevel ?? BALANCE.enemyAttackPerLevel) * d),
-  };
-}
+import { enemyLevelFactors } from './levels';
+export { enemyLevelFactors };
 
 export function createBattle(setup: BattleSetup): BattleState {
   const { seed, party, encounter } = setup;
@@ -260,7 +253,10 @@ function startAllyPhase(state: BattleState, rng: Rng, events: BattleEvent[]) {
       a.mana = Math.max(0, a.mana - pen.amount);
       addLog(state, `${a.name}は${pen.names.join('・')}でマナ-${pen.amount}`);
     }
-    const { reshuffled } = drawCards(a, BALANCE.drawPerTurn + a.extraDraw, rng);
+    // 遅延など: 引くカードが減る（効いたら消える）
+    const slow = takeDrawPenalty(a.statuses);
+    if (slow.amount) addLog(state, `${a.name}は${slow.names.join('・')}で引くカード-${slow.amount}`);
+    const { reshuffled } = drawCards(a, Math.max(0, BALANCE.drawPerTurn + a.extraDraw - slow.amount), rng);
     if (reshuffled) addLog(state, `${a.name}: 捨札をシャッフルして山札に戻した`);
   }
   for (const a of state.allies) if (!a.dead) applyTickHeal(state, a, events);

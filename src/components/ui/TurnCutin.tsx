@@ -11,6 +11,9 @@ import { useBattle } from '../../store/battleStore';
 import { useOnline } from '../../store/onlineStore';
 import { HeroFace } from './game';
 
+/** 物語を読んでいる間は、手番の帯は出さない（物語を閉じたら出す） */
+export const cutinToShow = <T,>(cutin: T | null, storyOpen: boolean): T | null => (storyOpen ? null : cutin);
+
 export function TurnCutin() {
   const cutin = useBattle((s) => s.turnCutin);
   const full = useBattle((s) => s.full);
@@ -18,12 +21,15 @@ export function TurnCutin() {
   const settings = useBattle((s) => s.settings);
   const reduced = useReducedMotion();
   const short = settings.fastMode || settings.cutinMode === 'simple' || !!reduced;
+  // 物語（冒頭・地域の紹介・制覇後の物語）を読んでいる間は、手番の帯を後回しにする。物語を閉じてから出す（物語が隠れないように）
+  const storyOpen = !!full?.world?.story;
+  const shown = cutinToShow(cutin, storyOpen);
   const seconds = cutin && !cutin.mine ? TIMING.turnNotice : short ? TIMING.turnCutinShort : TIMING.turnCutin;
   useEffect(() => {
-    if (!cutin) return;
+    if (!cutin || storyOpen) return;
     const t = setTimeout(() => dismiss(cutin.id), seconds * 1000);
     return () => clearTimeout(t);
-  }, [cutin, seconds, dismiss]);
+  }, [cutin, storyOpen, seconds, dismiss]);
   const hero = cutin && full?.heroes.find((h) => h.id === cutin.heroId);
   const exp = cutin && cutin.scene !== WORLD_SCENE ? full?.expeditions?.find((x) => x.id === cutin.scene) : undefined;
   const place = exp ? `${exp.dungeon?.name ?? 'ダンジョン'}（ダンジョン）` : '世界マップ';
@@ -36,7 +42,7 @@ export function TurnCutin() {
   const color = hero ? PLAYER_COLOR[hero.playerId] : '#ffd76a';
   return (
     <AnimatePresence>
-      {cutin && hero && cutin.mine && (
+      {shown && hero && shown.mine && (
         <motion.div
           key={cutin.id}
           className="absolute inset-0 z-[160] flex items-center"
@@ -81,7 +87,7 @@ export function TurnCutin() {
           <div className={`absolute inset-x-0 text-center text-[12px] text-zinc-300 ${hotseat ? 'top-[calc(50%+100px)]' : 'top-[calc(50%+72px)]'}`}>タップで閉じる</div>
         </motion.div>
       )}
-      {cutin && hero && !cutin.mine && (
+      {shown && hero && !shown.mine && (
         <motion.div
           key={cutin.id}
           className="pointer-events-none absolute inset-x-2 top-14 z-[155] flex justify-center"

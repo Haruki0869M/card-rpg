@@ -57,6 +57,10 @@
 | `moonMaiden` | 月の乙女 | 月光の庭 | 9 | 270 | 月光（聖属性）と茨。50%以下で満月の力（全体強化） |
 | `starSeerQueen` | 星読みの女王 | 天空城 | 11 | 400 | 3段階（100〜60% / 60〜30% / 30%以下）。未来を見る行動名（「予知」「星の涙」）。最後は流星群で全体攻撃 |
 
+### 部品の使い方（Claude が追加済み。見本は `src/content/scenarios/cursedArchipelago/enemies/`）
+- 反撃（`angelStatue`・亜種の `holyAngelStatue` も引き継ぐ）: `abilities: [{ name: '…', effect: { when: 'hurt', do: [{ kind: 'retaliate', amount: 3, perTurn: 2 }] } }]`。攻撃してきた相手にだけ返す。見本は貝の騎士 `conchKnight`。
+- 行動を遅らせる（`hourglassGolem`）: 行動に `{ kind: 'applyStatus', status: 'delay', amount: 1 }`（状態異常「遅延」。次のターンに引くカードが1枚につき1枚減る・最大2・引いた時に消える）。凍結・痺れとは別。重ねすぎないよう1回1まで・全体（`to: 'foes'`）にはしない。
+
 ## 3. ダンジョンと地域に置く
 
 - `dungeons/dungeons.ts` の `POOLS` を、ダンジョンごとの本物に分ける。風車の塔は回廊の敵と `windGuardianHawk`、`boss: ['windKeeper']`。星見の天文台は丘の敵と `starDustScribe`・`shadowStarDustScribe`・`clockworkKnight`、`boss: ['starLibrarian']`。月光の庭は庭園の敵と `moonGardener`、`boss: ['moonMaiden']`。天空城は前庭の敵と `skyPaladin`、`boss: ['starSeerQueen']`。`starDustCave`（ランダム）の `boss` は `['clockworkKnight', 'moonGardener']`。

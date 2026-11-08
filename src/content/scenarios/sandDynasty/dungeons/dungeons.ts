@@ -1,11 +1,40 @@
-// シナリオ4のダンジョン。敵の組み合わせ（POOLS）は仮（敵ができたら置き換える）。
+// シナリオ4のダンジョン。敵の組み合わせは砂塵の王朝の専用の敵（enemies/）。
 // 制覇すると聖印が手に入り、3つそろうと最終ダンジョンに入れる。ボスの手前に「物語の部屋」（event）を置く
 import type { DungeonDef } from '../../../../types';
 
-const POOLS: DungeonDef['pools'] = {
-  battle: [['guardDog', 'guardDog'], ['goblinScout', 'guardDog'], ['chaosShaman', 'goblinScout'], ['goblinScout', 'goblinScout', 'chaosShaman']],
-  elite: [['goblinBrute'], ['goblinBrute', 'chaosShaman']],
-  boss: ['goblinBrute'],
+/** 蠍の墓所: 廃墟の敵と王家の衛兵ミイラ */
+const TOMB_POOLS: DungeonDef['pools'] = {
+  battle: [['sandScorpion', 'tombRobber'], ['jackalWarrior', 'sandScorpion'], ['desertViper', 'tombRobber'], ['jackalWarrior', 'tombRobber']],
+  elite: [['royalGuardMummy'], ['royalGuardMummy', 'desertViper']],
+  boss: ['sandScorpionKing'],
+};
+
+/** 影の書庫: 砂丘の敵と書記官の影 */
+const LIBRARY_POOLS: DungeonDef['pools'] = {
+  battle: [['vulture', 'mummy'], ['sandSprite', 'mummy'], ['emberSandScorpion', 'mummy'], ['dustDevil', 'sandSprite', 'vulture']],
+  elite: [['scribeShade', 'dustDevil'], ['cursedScribeShade', 'vulture']],
+  boss: ['shadowVizier'],
+};
+
+/** 石像の神殿: 谷の敵と砂の大蛇（スフィンクスの子は、フォーカスを奪う部品が入ってから足す） */
+const TEMPLE_POOLS: DungeonDef['pools'] = {
+  battle: [['sandWorm', 'cursedPriest'], ['clayGolem', 'mummyArcher'], ['cursedMummy', 'stormVulture'], ['sandWorm', 'mummyArcher']],
+  elite: [['sandSerpentLord'], ['sandSerpentLord', 'cursedPriest']],
+  boss: ['stoneGuardianBeast'],
+};
+
+/** 砂塵の王宮: 王宮前の敵と石像の巨兵（石の猫像は、反撃の部品が入ってから足す） */
+const PALACE_POOLS: DungeonDef['pools'] = {
+  battle: [['venomJackalWarrior', 'cursedPriest'], ['venomJackalWarrior', 'mummyArcher'], ['cursedMummy', 'clayGolem']],
+  elite: [['colossusStatue'], ['colossusStatue', 'cursedPriest']],
+  boss: ['sandPharaoh'],
+};
+
+/** 砂の洞窟（ランダム）: 砂丘と谷の敵 */
+const CAVE_POOLS: DungeonDef['pools'] = {
+  battle: [['mummy', 'dustDevil'], ['sandWorm', 'vulture'], ['emberSandScorpion', 'mummyArcher'], ['clayGolem', 'sandSprite']],
+  elite: [['sandSerpentLord'], ['royalGuardMummy', 'sandSprite']],
+  boss: ['sandSerpentLord'],
 };
 
 type Layout = NonNullable<DungeonDef['layout']>;
@@ -95,7 +124,7 @@ export const scorpionTomb: DungeonDef = {
   description: '砂に埋もれた古い墓所。砂蠍王が、聖印（甲虫）を守っているという。',
   background: 'catacomb',
   baseLevel: 3,
-  pools: POOLS,
+  pools: TOMB_POOLS,
   bossChest: 'epic',
   rewardKey: 'sealScarab',
   corruptionOnClear: 5,
@@ -109,7 +138,7 @@ export const shadowLibrary: DungeonDef = {
   description: '王朝の記録が眠る地下の書庫。影の宰相が、聖印（眼）を守っている。',
   background: 'temple',
   baseLevel: 5,
-  pools: POOLS,
+  pools: LIBRARY_POOLS,
   bossChest: 'epic',
   rewardKey: 'sealEye',
   corruptionOnClear: 5,
@@ -123,7 +152,7 @@ export const statueTemple: DungeonDef = {
   description: '王家の谷の奥にある神殿。石の守護獣が、聖印（獣）を抱いて眠っている。',
   background: 'volcano',
   baseLevel: 7,
-  pools: POOLS,
+  pools: TEMPLE_POOLS,
   bossChest: 'legend',
   rewardKey: 'sealBeast',
   corruptionOnClear: 5,
@@ -137,7 +166,7 @@ export const sandPalace: DungeonDef = {
   description: '砂塵の王の居城。三つの聖印がなければ、黄金の扉は開かない。',
   background: 'castle',
   baseLevel: 9,
-  pools: POOLS,
+  pools: PALACE_POOLS,
   bossChest: 'legend',
   requiresKeys: ['sealScarab', 'sealEye', 'sealBeast'],
   finale: true,
@@ -168,7 +197,7 @@ export const sandCave: DungeonDef = {
   description: '訪れるたびに姿を変える砂の洞窟。危険だが、奥には豪華な財宝が眠る。',
   background: 'forestCave',
   baseLevel: 6,
-  pools: { ...POOLS, boss: ['goblinBrute', 'chaosShaman'] },
+  pools: CAVE_POOLS,
   bossChest: 'legend',
   random: true,
   rows: 6,

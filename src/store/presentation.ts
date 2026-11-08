@@ -83,6 +83,7 @@ export function battleFrames(events: BattleEvent[], allyIds: ReadonlySet<string>
       const snd = statusSound(def, e.amount); if (snd) sounds.push(snd);
     }
     else if (e.type === 'resource' && e.amount > 0) { popups.push({ unitId: e.unitId, tone: 'resource', text: `${e.resource === 'focus' ? 'フォーカス' : 'マナ'}+${e.amount}` }); sounds.push(e.resource === 'focus' ? 'sfx_status_focus' : 'sfx_status_mana'); }
+    else if (e.type === 'resource' && e.amount < 0) { popups.push({ unitId: e.unitId, tone: 'status', text: `${e.resource === 'focus' ? 'フォーカス' : 'マナ'}${e.amount}` }); sounds.push('sfx_status_debuff'); }
     else if (e.type === 'death') {
       // 倒れた音は、とどめのコマに重ねる（コマを増やすと演出の間が変わるので）
       if (!allyIds.has(e.unitId)) { const last = frames[frames.length - 1]; if (last) (last.sounds ??= []).push('sfx_enemy_down'); else tailSounds.push('sfx_enemy_down'); }

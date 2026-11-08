@@ -1,0 +1,127 @@
+// 星降る天空城：星見の丘（星見の天文台）。月の獣は聖に弱く、星のかけらは聖と闇の両方に強い
+import type { EnemyDef } from '../../../../types';
+import { makeVariant } from '../../../../data/enemyVariant';
+
+export const shootingStarBird: EnemyDef = {
+  id: 'shootingStarBird',
+  name: '流れ星の鳥',
+  icon: '☄',
+  maxHp: 30,
+  baseLevel: 5,
+  size: 0.9,
+  exp: 10,
+  gold: 6,
+  weak: ['dark'],
+  resist: ['holy'],
+  pattern: 'sequence',
+  actions: [
+    { id: 'streak', name: '流星の突進', effects: [{ kind: 'damage', amount: 12, element: 'holy' }] },
+    { id: 'flutter', name: '光の羽ばたき', effects: [{ kind: 'damage', amount: 4, hits: 2 }] },
+    { id: 'glide', name: '夜空を滑る', effects: [{ kind: 'block', amount: 6 }] },
+  ],
+  abilities: [{ name: '流れ星の速さ', effect: { when: 'battleStart', do: [{ kind: 'damage', amount: 4, to: 'randomFoe' }] } }],
+};
+
+export const moonRabbit: EnemyDef = {
+  id: 'moonRabbit',
+  name: '月のウサギ',
+  icon: '🐇',
+  maxHp: 32,
+  baseLevel: 5,
+  size: 0.85,
+  exp: 10,
+  gold: 6,
+  weak: ['holy'],
+  resist: ['dark'],
+  pattern: 'sequence',
+  actions: [
+    { id: 'mallet', name: '月の杵', effects: [{ kind: 'damage', amount: 10 }] },
+    { id: 'hex', name: '月影の呪い', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }, { kind: 'block', amount: 4 }] },
+    { id: 'hop', name: '跳ねる杵つき', effects: [{ kind: 'damage', amount: 5, hits: 2 }] },
+  ],
+};
+
+export const starFragment: EnemyDef = {
+  id: 'starFragment',
+  name: '星のかけら',
+  icon: '⭐',
+  maxHp: 25,
+  baseLevel: 5,
+  size: 0.75,
+  exp: 10,
+  gold: 6,
+  weak: ['thunder'],
+  resist: ['holy', 'dark'],
+  pattern: 'sequence',
+  actions: [
+    { id: 'shower', name: '星くずの雨', effects: [{ kind: 'damage', amount: 5, to: 'foes' }] },
+    { id: 'shine', name: 'またたき', effects: [{ kind: 'block', amount: 6 }] },
+    { id: 'shard', name: '尖った光', effects: [{ kind: 'damage', amount: 10 }] },
+  ],
+};
+
+export const starDustScribe: EnemyDef = {
+  id: 'starDustScribe',
+  name: '星屑の書記',
+  icon: '📜',
+  maxHp: 63,
+  baseLevel: 5,
+  size: 1.2,
+  exp: 25,
+  gold: 22,
+  weak: ['holy'],
+  resist: ['dark'],
+  pattern: 'sequence',
+  actions: [
+    { id: 'quill', name: '星屑の筆', effects: [{ kind: 'damage', amount: 11 }] },
+    { id: 'mark', name: '綴じられた運命', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'foes' }] },
+    { id: 'page', name: '呪いの頁', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }, { kind: 'damage', amount: 6 }] },
+    { id: 'binding', name: '頁の盾', effects: [{ kind: 'block', amount: 11 }] },
+  ],
+  abilities: [{ name: '書き換えの頁', effect: { when: 'battleStart', do: [{ kind: 'applyStatus', status: 'weak', amount: 1, to: 'randomFoe' }] } }],
+};
+
+export const starLibrarian: EnemyDef = {
+  id: 'starLibrarian',
+  name: '星の司書',
+  icon: '♛',
+  maxHp: 210,
+  baseLevel: 7,
+  size: 1.4,
+  exp: 110,
+  gold: 110,
+  weak: ['dark'],
+  resist: ['holy'],
+  pattern: 'sequence',
+  actions: [
+    { id: 'index', name: '星の索引', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'foes' }, { kind: 'block', amount: 8 }] },
+    { id: 'tome', name: '星図の一撃', effects: [{ kind: 'damage', amount: 19, element: 'holy' }] },
+    { id: 'curse', name: '禁書の呪い', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2, to: 'foes' }, { kind: 'damage', amount: 7 }] },
+  ],
+  abilities: [{ name: '閉じた書架', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 6 }] } }],
+  phases: [
+    {
+      belowHpPct: 50,
+      name: '星の雨を呼ぶ司書',
+      pattern: 'sequence',
+      actions: [
+        { id: 'rain', name: '星の雨', effects: [{ kind: 'damage', amount: 12, element: 'holy', to: 'foes' }] },
+        { id: 'shelf', name: '書架の壁', effects: [{ kind: 'block', amount: 16 }, { kind: 'damage', amount: 7 }] },
+        { id: 'meteor', name: '落ちる一番星', effects: [{ kind: 'damage', amount: 26 }] },
+        { id: 'fate', name: '書かれた結末', effects: [{ kind: 'applyStatus', status: 'weak', amount: 1, to: 'foes' }, { kind: 'damage', amount: 6, to: 'foes' }] },
+      ],
+    },
+  ],
+};
+
+export const shadowStarDustScribe: EnemyDef = makeVariant(starDustScribe, {
+  id: 'shadowStarDustScribe',
+  name: '影の星屑の書記',
+  aura: 'shadow',
+  actions: [
+    { id: 'quill', name: '影の筆', effects: [{ kind: 'damage', amount: 11, element: 'dark' }] },
+    { id: 'mark', name: '影に綴じる', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'foes' }] },
+    { id: 'page', name: '闇の頁', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }, { kind: 'damage', amount: 6, element: 'dark' }] },
+    { id: 'binding', name: '影の盾', effects: [{ kind: 'block', amount: 11 }] },
+  ],
+});

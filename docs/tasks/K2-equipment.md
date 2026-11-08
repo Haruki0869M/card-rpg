@@ -70,6 +70,9 @@
 |---|---|
 | `blockFromStatus` `{ status, of?: 'foes' \| 'self', mult?, max? }` | 状態異常の量だけブロック（例: 敵全員の毒の合計） |
 | `convertStatus` `{ status, into }` | 状態異常を別の状態異常に変える（量は同じ） |
+| `retaliate` `{ amount, element?, perTurn? }` | （K4で追加）`when: 'hurt'` の能力で、攻撃してきた相手に反撃する |
+| `drainFocus` `{ amount }` | （K4で追加）敵の行動で、味方のフォーカスを奪う（0より下にならない） |
+| `summonEnemy` `{ enemy, count?, uses? }` | （K4で追加）敵が敵を呼ぶ。戦場4体まで・1戦闘 uses 回（既定2）・呼ばれた敵は報酬なし |
 
 **常時型（`modifier`）**
 | modifier | 内容 |
@@ -82,7 +85,7 @@
 - `scenario: 'シナリオID'` … そのシナリオの冒険の宝箱・ショップにだけ出る。シナリオ固有の装備に使う。
 - `tags`・`ability`・`stats`・`maxHp`・`focusMax`・`startBlock`・`extraDraw`・`cards`。
 
-**まだ無い部品（使わない。必要なら報告に書く）**: 状態異常を付けた時・ブロックが割れた時のきっかけ、攻撃者への反撃、お供が2回動く、スロット+1、コスト-1。Claude が作る。
+**まだ無い部品（使わない。必要なら報告に書く）**: 状態異常を付けた時・ブロックが割れた時のきっかけ、お供が2回動く、スロット+1、コスト-1。Claude が作る。
 
 ## 6. 見本（ここを真似る）
 
