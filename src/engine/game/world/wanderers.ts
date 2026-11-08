@@ -66,9 +66,15 @@ export function spawnWanderer(game: GameState, w: WorldState, rng: Rng, region: 
     if (!cands.length) return undefined;
     tile = cands[rng.int(cands.length)];
   }
-  const group = reg.encounters[rng.int(reg.encounters.length)];
+  let group = reg.encounters[rng.int(reg.encounters.length)];
+  // レアの組（K3）: 地域に rareEncounters がある時だけ、確率で置き換える（ある時だけ乱数を引くので、無い地域の流れは変わらない）。襲撃など場所を決めた配置では出さない
+  let rare = false;
+  if (at === undefined && reg.rareEncounters?.length && rng.next() * 100 < BALANCE.rareWandererChance) {
+    group = reg.rareEncounters[rng.int(reg.rareEncounters.length)];
+    rare = true;
+  }
   const level = wandererLevel(game, w, region);
-  const wd: Wanderer = { id: `w${w.nextWandererId++}`, tile, enemies: group.map((defId) => ({ defId, level })) };
+  const wd: Wanderer = { id: `w${w.nextWandererId++}`, tile, enemies: group.map((defId) => ({ defId, level })), ...(rare ? { rare: true as const } : {}) };
   w.wanderers.push(wd);
   return wd;
 }
