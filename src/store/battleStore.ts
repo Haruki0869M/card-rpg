@@ -7,7 +7,8 @@ import { unitIdOf } from '../engine/battle/units';
 import { create } from 'zustand';
 import { normalizeSettings, type Settings } from './settings';
 import { playSound, setAudioVolumes } from '../audio/player';
-import { battleFrames, explorationNotices, type PopupDraft, type PopupTone, type NoticeDraft, type PresentationFrame } from './presentation';
+import { petCry } from '../audio/cues';
+import { battleFrames, explorationNotices, explorationSounds, type PopupDraft, type PopupTone, type NoticeDraft, type PresentationFrame } from './presentation';
 export type { Settings } from './settings';
 import { TIMING, VIBRATION } from '../data/balance';
 import { cardOf } from '../data/cards';
@@ -164,7 +165,8 @@ interface StoreState {
   setSettings: (s: Partial<Settings>) => void;
   openSheet: (s: Sheet) => void;
   setConfirmAbandon: (v: boolean) => void;
-  showToast: (text: string) => void;
+  /** tone: error = 操作が通らなかった（音を変える。K6）、offline = 通信できなかった */
+  showToast: (text: string, tone?: 'info' | 'error' | 'offline') => void;
   /** 確認用: 場面の指定まで済んだ操作をそのまま送る（自動プレイの確認スクリプト用） */
   dispatchWire: (cmd: GameCommand) => string | undefined;
   /** オンライン協力: 部屋から届いた操作の結果を反映する */
@@ -398,6 +400,9 @@ export const useBattle = create<StoreState>((set, get) => {
     while (pendingNotices.length && get().cutins.length < TIMING.cutinVisible) {
       const n = pendingNotices.shift()!, id = fxId++;
       set(s => ({ cutins: [...s.cutins, { ...n, id }], petPulses: { ...s.petPulses, [n.unitId]: { id } } }));
+      // お供の能力カットイン: きらりと鳴いて知らせる（K6）
+      playSound('sfx_pet_cutin');
+      if (n.source?.kind === 'pet' && n.source.id) playSound(petCry(n.source.id));
       later(() => set(s => {
         const pulses = { ...s.petPulses }; if (pulses[n.unitId]?.id === id) delete pulses[n.unitId];
         return { petPulses: pulses };
@@ -512,6 +517,7 @@ export const useBattle = create<StoreState>((set, get) => {
       const mine = isLocalPlayer(full.heroes.find((h) => h.id === turn)?.playerId ?? 'P1');
       patch.turnCutin = { id: fxId++, heroId: turn, mine, scene: sceneOfHero(full, turn) };
       if (mine) vibrate(get().settings, VIBRATION.turn);
+      playSound(mine ? 'sfx_turn_cutin' : 'sfx_turn_notice');
     }
     const lm = full.world?.lastMove;
     if (before && scene === WORLD_SCENE && cmdScene === WORLD_SCENE && lm && lm.seq !== before.world?.lastMove?.seq && lm.path.length > 1) {
@@ -522,8 +528,12 @@ export const useBattle = create<StoreState>((set, get) => {
     // 見ている場面の出来事だけ演出する
     if (cmdScene === scene) {
       if (startedBattle) playSound('sfx_battle_start');
-      applyEvents([...opening, ...r.battleEvents], remoteActor(wire));
-      if (before) showNotices(explorationNotices(before, full, wire));
+      const quiet = remoteActor(wire);
+      applyEvents([...opening, ...r.battleEvents], quiet);
+      if (before) {
+        showNotices(explorationNotices(before, full, wire));
+        for (const id of explorationSounds(before, full, wire)) playSound(id, { quiet });
+      }
     }
     scheduleSave(get);
     scheduleEnemy();
@@ -539,18 +549,18 @@ export const useBattle = create<StoreState>((set, get) => {
       const dry = applyGameCommand(full, wire);
       if (dry.error) {
         if (isEnemyStep(wire)) enemyInFlight = false;
-        else if (!silent) get().showToast(dry.error);
+        else if (!silent) get().showToast(dry.error, 'error');
         return dry.error;
       }
       room.send(wire).catch(() => {
         if (isEnemyStep(wire)) enemyInFlight = false;
-        get().showToast('送れませんでした。通信を確かめてください');
+        get().showToast('送れませんでした。通信を確かめてください', 'offline');
       });
       return undefined;
     }
     const r = applyGameCommand(full, wire);
     if (r.error) {
-      if (!silent) get().showToast(r.error);
+      if (!silent) get().showToast(r.error, 'error');
       return r.error;
     }
     commit(r, unwrapCommand(wire).scene, wire);
@@ -659,7 +669,7 @@ export const useBattle = create<StoreState>((set, get) => {
       if (needsVote(game, cmd)) {
         const mine = voters(game).filter((p) => isLocalPlayer(p));
         if (!mine.length) {
-          get().showToast('この場面のプレイヤーではありません');
+          get().showToast('この場面のプレイヤーではありません', 'error');
           return 'この場面のプレイヤーではありません';
         }
         for (const p of mine) {
@@ -673,7 +683,7 @@ export const useBattle = create<StoreState>((set, get) => {
         const actor = 'playerId' in cmd ? cmd.playerId : cmd.type === 'BATTLE' && 'playerId' in cmd.command ? cmd.command.playerId : undefined;
         if (actor && !isLocalPlayer(actor)) {
           const msg = `${actor}${room.seatName(actor) ? `（${room.seatName(actor)}）` : ''}の担当です`;
-          if (cmd.type !== 'BATTLE' || cmd.command.type !== 'ENEMY_STEP') get().showToast(msg);
+          if (cmd.type !== 'BATTLE' || cmd.command.type !== 'ENEMY_STEP') get().showToast(msg, 'error');
           return msg;
         }
       }
@@ -857,7 +867,10 @@ export const useBattle = create<StoreState>((set, get) => {
 
     openSheet: (sheet) => set({ sheet, selection: sheet ? null : get().selection }),
     setConfirmAbandon: (v) => set({ confirmAbandon: v }),
-    showToast: (text) => set({ toast: { text, id: fxId++ } }),
+    showToast: (text, tone = 'info') => {
+      playSound(tone === 'error' ? 'sfx_ui_deny' : tone === 'offline' ? 'sfx_ui_error' : 'sfx_ui_notice');
+      set({ toast: { text, id: fxId++ } });
+    },
 
     closeTop: () => {
       const s = get();

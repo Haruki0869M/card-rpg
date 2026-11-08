@@ -8,9 +8,11 @@ import { timeOfDay } from '../engine/game/world/time';
 import { visionOf } from '../engine/game/world/fog';
 import { hexDistance } from '../engine/game/world/hex';
 import { heroMaxHp } from '../engine/game/hero';
-import { doorOmen } from '../engine/game/dungeonOmen';
+import { doorOmen, type DoorOmen } from '../engine/game/dungeonOmen';
 import { restMultiplierOf } from '../engine/game/common';
-import { cardSound, damageSound, statusSound } from '../audio/cues';
+import { getRoomType } from '../data/rules';
+import { cardSound, damageSound, petCry, statusSound } from '../audio/cues';
+import { petLoveLevel } from '../engine/game/pets';
 import type { SoundId } from '../audio/ids';
 import type { AbilityNotice, BattleEvent, GameCommand, GameState } from '../types';
 
@@ -181,4 +183,65 @@ export function explorationNotices(before: GameState, after: GameState, wire: Ga
     for (const h of after.heroes) if (after.world.pos[h.id] !== undefined && petExplore(h).nightVision) add(h.id, '夜でもよく見える');
   }
   return result;
+}
+
+const OMEN_SOUND: Record<DoorOmen, SoundId> = { danger: 'sfx_dungeon_omen_danger', treasure: 'sfx_dungeon_omen_treasure', rest: 'sfx_dungeon_omen_other', mystery: 'sfx_dungeon_omen_other' };
+const PLACE_SOUND: Partial<Record<string, SoundId>> = { town: 'sfx_world_enter_town', shrine: 'sfx_world_shrine', sanctuary: 'sfx_world_shrine', rest: 'sfx_world_rest', event: 'sfx_world_event' };
+
+/**
+ * 探索・町・お供などの操作の音（K6）。確定した操作の前後を比べるだけの純粋な関数。描画からは呼ばない。
+ * 戦闘の音は battleFrames、歩く音・扉の音は見た目の部品（WorldMoveScene・DungeonAnim）が鳴らす。
+ */
+export function explorationSounds(before: GameState, after: GameState, wire: GameCommand): SoundId[] {
+  const unwrapped = unwrapCommand(wire), prev = viewOf(before, unwrapped.scene), next = viewOf(after, unwrapped.scene);
+  let cmd = unwrapped.command;
+  if (cmd.type === 'VOTE') { if (!cmd.command) return []; cmd = cmd.command; }
+  const out: SoundId[] = [];
+  const t = cmd.type;
+  if ((t === 'WORLD_ROLL_MOVE' && prev.world?.move === null && next.world?.move !== null) || (t === 'EXPLORE_ROLL' && !!next.dungeon?.exploreRoll && next.dungeon.exploreRoll !== prev.dungeon?.exploreRoll)) out.push('sfx_world_dice');
+  if (t === 'WORLD_CAMP') out.push('sfx_world_camp');
+  if (t === 'DUNGEON_WATCH' && next.dungeon?.watchRoll && next.dungeon.watchRoll !== prev.dungeon?.watchRoll) out.push('sfx_dungeon_watch');
+  if ((t === 'TOWN_BUY' || t === 'PEDDLER_BUY') && after !== before) out.push('sfx_ui_buy');
+  if (t === 'EQUIP') out.push('sfx_ui_equip');
+  // 場所に入った（町・祠・聖域・休憩・イベント）
+  if (prev.mode !== next.mode && PLACE_SOUND[next.mode]) out.push(PLACE_SOUND[next.mode]!);
+  // ダンジョンに入った（新しい場面ができた）
+  if ((after.expeditions ?? []).some((x) => !before.expeditions?.some((y) => y.id === x.id))) out.push('sfx_world_enter_dungeon');
+  // 夜になった
+  if (before.world && after.world && timeOfDay(before.world.worldTurn) !== 'night' && timeOfDay(after.world.worldTurn) === 'night') out.push('sfx_world_night');
+  // 扉を開けて部屋に入った（ボスの部屋は重い門の音）
+  if (prev.dungeon && next.dungeon && prev.dungeon.dungeonId === next.dungeon.dungeonId && prev.dungeon.currentRoomId !== next.dungeon.currentRoomId) {
+    const room = next.dungeon.rooms.find((r) => r.id === next.dungeon!.currentRoomId);
+    out.push(room && getRoomType(room.type).battle?.boss ? 'sfx_dungeon_gate' : 'sfx_dungeon_door');
+  }
+  // 歩数を使い切った
+  if (prev.dungeon && next.dungeon && prev.dungeon.dungeonId === next.dungeon.dungeonId && (prev.dungeon.explore ?? 0) > 0 && next.dungeon.explore === 0) out.push('sfx_dungeon_steps_out');
+  // 扉の気配が新しく見えた（一番気になる気配の音）
+  if (prev.dungeon && next.dungeon && prev.dungeon.dungeonId === next.dungeon.dungeonId) {
+    const seen = new Set(prev.dungeon.rooms.filter((r) => doorOmen(prev, r)).map((r) => r.id));
+    const fresh = next.dungeon.rooms.map((r) => !seen.has(r.id) && doorOmen(next, r)).filter((o): o is DoorOmen => !!o);
+    const omen = (['danger', 'treasure', 'mystery', 'rest'] as const).find((o) => fresh.includes(o));
+    if (omen) out.push(OMEN_SOUND[omen]);
+  }
+  // キャラごとの変化（転職・レベルアップ・お金・お供）
+  let classChange = false, levelUp = false, coin = false, cry: SoundId | undefined, heart = false, ribbon = false;
+  for (const h of after.heroes) {
+    const old = before.heroes.find((x) => x.id === h.id);
+    if (!old) continue;
+    if (h.classId !== old.classId) classChange = true;
+    else if (h.level > old.level) levelUp = true;
+    if (h.gold > old.gold && t !== 'GIVE') coin = true;
+    if (h.pet) {
+      if ((t === 'ADOPT_PET' && h.pet !== old.pet && h.pet.petId !== old.pet?.petId) || (t === 'PET_PAT' && 'heroId' in cmd && cmd.heroId === h.id)) cry ??= petCry(h.pet.petId);
+      const lv = petLoveLevel(h.pet.love), oldLv = old.pet && old.pet.petId === h.pet.petId ? petLoveLevel(old.pet.love) : lv;
+      if (lv > oldLv) { heart = true; if (oldLv < 3 && lv >= 3) ribbon = true; }
+    }
+  }
+  if (classChange) out.push('sfx_ui_classchange');
+  if (levelUp) out.push('sfx_ui_levelup');
+  if (coin && t !== 'TOWN_BUY' && t !== 'PEDDLER_BUY') out.push('sfx_ui_coin');
+  if (cry) out.push(cry);
+  if (ribbon) out.push('sfx_pet_ribbon');
+  else if (heart) out.push('sfx_pet_heart');
+  return [...new Set(out)];
 }

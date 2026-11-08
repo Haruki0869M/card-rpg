@@ -10,6 +10,7 @@ import { finalChance } from '../../engine';
 import { affinityFromStats } from '../../engine';
 import { isLocalPlayer, LOCAL_PLAYER } from '../../store/battleConfig';
 import { speedFactor, useBattle, vibrate } from '../../store/battleStore';
+import { playSound } from '../../audio/player';
 import type { GrowthOption, Hero, Rarity } from '../../types';
 import { CardFace } from '../ui/CardFace';
 import { Bar, Crest, HeroFace, ItemIcon, itemSummary, RARITY_STYLE, Screen } from '../ui/game';
@@ -78,6 +79,7 @@ function RewardCards({ heroId }: { heroId: string }) {
     const t = setTimeout(
       () => {
         setShown((x) => x + 1);
+        playSound(special ? 'sfx_card_flip_rare' : 'sfx_card_flip');
         if (rarity === 'epic' || rarity === 'legend') vibrate(settings, VIBRATION.chestReach);
         else if (special) vibrate(settings, VIBRATION.chestStep);
       },

@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react';
 import { TIMING } from '../../data/balance';
 import { speedFactor, useBattle, type WorldMovePresentation } from '../../store/battleStore';
 import type { GameState } from '../../types';
+import { footstepSound } from '../../audio/cues';
+import { playSound } from '../../audio/player';
 
 export interface MovePlayback {
   i: number;
@@ -23,6 +25,12 @@ export function useMovePlayback(move: WorldMovePresentation | undefined): MovePl
   const cur = move && st?.id === move.id ? st : move ? { id: move.id, i: 0, arrived: false } : undefined;
   const lm = move?.game.world?.lastMove;
   const speed = speedFactor({ fastMode });
+  // 音（K6）: 1マス進むごとに地形の足音、着いたら到着の音
+  useEffect(() => {
+    if (!move || !cur || !lm) return;
+    if (cur.arrived) playSound('sfx_world_arrive');
+    else if (cur.i > 0) playSound(footstepSound(move.game.world?.tiles[lm.path[cur.i]]?.t));
+  }, [move?.id, cur?.i, cur?.arrived]);
   useEffect(() => {
     if (!move || !cur || !lm) return;
     const delay = (cur.arrived ? TIMING.worldArrival : TIMING.worldMoveStep) * 1000 / speed;
