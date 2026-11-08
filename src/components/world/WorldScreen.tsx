@@ -1,7 +1,7 @@
 import { followingGroup } from '../../engine/game/world/group';
 // ===== 世界マップの画面（spec §8・§20.3）=====
 // 上: 侵食度・命の灯火・ゴールド・時間帯 / 中: 地図 / 下: 手番のキャラの操作（移動力の判定・移動・入る・野営・待機）
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Coins, Flame, Footprints, Hourglass, Menu, Minus, Moon, Plus, ScrollText, Star, Sun, Sunrise, Sunset, Tent, Users } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { BALANCE } from '../../data/balance';
@@ -34,7 +34,8 @@ import {
 import { isLocalPlayer, isOnlinePlay } from '../../store/battleConfig';
 import { useBattle, type WorldMovePresentation } from '../../store/battleStore';
 import { useOnline } from '../../store/onlineStore';
-import type { GameState, PlayerId, TimeOfDay } from '../../types';
+import type { GameState, Hero, PlayerId, TimeOfDay } from '../../types';
+import { autoAgreeCommands } from './companionMove';
 import { RollStrip } from '../ui/CheckPanel';
 import { Bar, HeroFace, Screen } from '../ui/game';
 import { WorldMap } from './WorldMap';
@@ -199,22 +200,48 @@ function StoryOverlay({ title, lines, onNext }: { title: string; lines: string[]
   );
 }
 
-/** 手番の受け渡し（1台を回して遊ぶ時。spec §7.3） */
-function HandoffOverlay({ player, name, onStart }: { player: PlayerId; name: string; onStart: () => void }) {
+/**
+ * 手番の受け渡し（1台を回して遊ぶ時。spec §7.3）。フェーズ2-C: 手番のカットインと同じ見た目（プレイヤーの色の帯が滑り込む）にして、
+ * この画面1枚だけを出す（カットインは store の側で出さない。src/store/handoff.ts）。盗み見を防ぐため、タップで始める
+ */
+function HandoffOverlay({ hero, onStart }: { hero: Hero; onStart: () => void }) {
+  const reduced = useReducedMotion();
+  const fast = useBattle((s) => s.settings.fastMode || s.settings.cutinMode === 'simple');
+  const short = fast || !!reduced;
+  const color = PLAYER_COLOR[hero.playerId];
   return (
     <motion.button
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
+      transition={{ duration: short ? 0.08 : 0.15 }}
       onClick={onStart}
-      className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-black/90"
+      className="absolute inset-0 z-50 flex flex-col items-stretch justify-center bg-black/90"
       aria-label="手番を始める"
+      data-handoff={hero.id}
     >
-      <span className="font-display rounded-full px-5 py-1 text-[28px] text-black" style={{ background: PLAYER_COLOR[player] }}>
-        {player}
-      </span>
-      <span className="font-display text-outline text-[24px] text-amber-50">{name}の番です</span>
-      <span className="text-[14px] text-zinc-300">スマホを渡して、タップで始める</span>
+      <motion.div
+        className="relative w-full py-3 text-left"
+        initial={short ? { opacity: 0 } : { x: '-110%' }}
+        animate={short ? { opacity: 1 } : { x: 0 }}
+        transition={short ? { duration: 0.08 } : { type: 'spring', stiffness: 420, damping: 34 }}
+        style={{ background: `linear-gradient(90deg, ${color}ee 0%, ${color}cc 55%, ${color}33 100%)`, boxShadow: `0 0 24px ${color}88` }}
+      >
+        <div className="absolute inset-x-0 top-0 h-[3px] bg-white/70" />
+        <div className="absolute inset-x-0 bottom-0 h-[3px] bg-white/70" />
+        <div className="flex items-center gap-3 px-4">
+          <span className="shrink-0 rounded-full border-2 border-white/90 shadow-lg">
+            <HeroFace hero={hero} size={64} />
+          </span>
+          <div className="min-w-0 flex-1 text-black">
+            <span className="rounded bg-black/80 px-1.5 text-[13px] font-bold text-white">{hero.playerId}</span>
+            <div className="font-display truncate text-[26px] leading-8 drop-shadow-[0_1px_0_rgba(255,255,255,.6)]">{hero.name}の番！</div>
+            <div className="truncate text-[14px] font-bold">世界マップ</div>
+          </div>
+        </div>
+      </motion.div>
+      <span className="mt-4 text-center text-[15px] font-bold text-white">スマホを {hero.playerId} さんに渡してください</span>
+      <span className="mt-1 text-center text-[14px] text-zinc-300">スマホを渡して、タップで始める</span>
     </motion.button>
   );
 }
@@ -286,6 +313,19 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
     setFocus(0);
   }, [w.turn, w.move]);
 
+  // 1台で遊ぶ時（フェーズ2-C）: 同行している仲間の担当も全員この端末にいるので、「一緒に行く」の確認を出さずに、
+  // その担当の同行キャラとして返事を送ってすぐ一緒に動く（オンラインで別の端末の人を連れて動く時だけ同意を取る）
+  const proposal = w.moveProposal;
+  const [autoAgreeFailed, setAutoAgreeFailed] = useState(false);
+  useEffect(() => {
+    if (!proposal || movement || isOnlinePlay()) return;
+    const cmds = autoAgreeCommands(useBattle.getState().game ?? game, isLocalPlayer);
+    let failed = false;
+    for (const c of cmds) if (dispatchGame(c)) failed = true;
+    setAutoAgreeFailed(failed);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proposal, movement]);
+
   const reach = useMemo(() => {
     if (here === undefined || w.move === null || w.move <= 0) return undefined;
     const r = reachable(w, here, w.move);
@@ -345,7 +385,7 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
         movement={playback}
         onTapTile={playback ? () => {} : tapTile}
       />
-      {w.moveProposal && <MoveProposal game={game} />}
+      {w.moveProposal && (isOnlinePlay() || autoAgreeFailed) && <MoveProposal game={game} />}
       {info && <div className="shrink-0 bg-black/70 px-3 py-1 text-[12px] leading-4 text-zinc-200">{info}</div>}
 
       {/* 手番の表示と操作パネル。移動の演出中は、同じ大きさのまま上に「移動中…」の帯を重ねて押せなくする */}
@@ -539,8 +579,7 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
         {!w.story && needHandoff && (
           <HandoffOverlay
             key="handoff"
-            player={hero.playerId}
-            name={hero.name}
+            hero={hero}
             onStart={() => {
               setShownFor(w.turn);
               setLastPlayer(hero.playerId);

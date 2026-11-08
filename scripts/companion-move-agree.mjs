@@ -1,5 +1,5 @@
 // 1台を回して遊ぶ時、P2 の番に担当の違う仲間を誘って連れて動けるか（移動先の提案への「一緒に行く」）。
-// 2人・3人・4人で、P2 が全員を誘う → 移動力の判定 → 行き先 → 移動する → 各担当の「一緒に行く」→ 全員が同じマスへ動く。
+// 2人・3人・4人で、P2 が全員を誘う → 移動力の判定 → 行き先 → 移動する → 確認なしで全員が同じマスへ動く（フェーズ2-C。オンラインの同意は単体テストと online.mjs で見る）。
 // 使い方: npx vite build && npx vite preview を起こしてから URL=... node scripts/companion-move-agree.mjs
 import { mkdir } from 'node:fs/promises';
 import { chromium, layoutIssues, URL, waitForWorldMovement } from './lib.mjs';
@@ -44,17 +44,15 @@ async function run(n) {
     const t = page.locator('[data-reach]').filter({ hasText: /^[1-9]$/ }).first();
     await t.scrollIntoViewIfNeeded(); const b = await t.boundingBox();
     await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2); await page.waitForTimeout(200);
-    await page.locator('button:has-text("移動する")').click(); await page.waitForTimeout(300);
-    check(await page.locator('[data-move-proposal]').count(), `${n}人: 移動先の提案が出ない`);
-    await page.screenshot({ path: `${dir}/${n}p-proposal.png` });
+    await page.locator('button:has-text("移動する")').click();
+    // フェーズ2-C: 1台で遊ぶ時は「一緒に行く」の確認を出さず、そのまま全員で動く（確認の窓が一瞬でも出ていないか、動き始めまで見張る）
+    let shownProposal = false;
+    for (let i = 0; i < 10; i++) { if (await page.locator('[data-move-proposal]').count()) shownProposal = true; await page.waitForTimeout(30); }
+    check(!shownProposal, `${n}人: 1台なのに「一緒に行く」の確認が出た`);
+    await page.screenshot({ path: `${dir}/${n}p-moving.png` });
     const issues = await layoutIssues(page);
-    for (let i = 0; i < n - 1; i++) {
-      const btn = page.getByRole('button', { name: /: 一緒に行く$/ }).first();
-      if (!(await btn.count())) break;
-      await btn.click(); await page.waitForTimeout(250);
-      const toast = await page.evaluate(() => document.body.innerText.match(/この提案に答える人ではありません/)?.[0]);
-      if (toast) toasts.push(toast);
-    }
+    const toast = await page.evaluate(() => document.body.innerText.match(/この提案に答える人ではありません/)?.[0]);
+    if (toast) toasts.push(toast);
     await waitForWorldMovement(page).catch(() => {});
     await page.waitForTimeout(500);
     const g2 = await read();
@@ -64,7 +62,7 @@ async function run(n) {
     check(g2.world.pos.h1 !== start, `${n}人: P2 が動いていない`);
     check(g2.heroes.every((h) => g2.world.pos[h.id] === g2.world.pos.h1), `${n}人: 全員が同じマスに着いていない ${JSON.stringify(g2.world.pos)}`);
     check(!errors.length, errors.join('\n'));
-    console.log(`OK: ${n}人 P2 が ${n - 1}人を連れて ${start} → ${g2.world.pos.h1}（提案の画面の表示の問題: ${issues.length ? issues.join(' / ') : 'なし'}）`);
+    console.log(`OK: ${n}人 P2 が ${n - 1}人を連れて ${start} → ${g2.world.pos.h1}（移動中の画面の表示の問題: ${issues.length ? issues.join(' / ') : 'なし'}）`);
   } catch (e) {
     await page.screenshot({ path: `${dir}/failure-${n}p.png` }).catch(() => {});
     throw e;
