@@ -19,7 +19,9 @@ import {
   migrateGame,
   posOf,
   reachableRooms,
+  revealSeen,
   viewOf,
+  viewSlices,
   walkableKeys,
 } from '../index';
 
@@ -298,5 +300,75 @@ describe('古い保存（v14）の移行', () => {
     expect(md.pos).toEqual({ ...dungeonGrid(md).start, facing: 0 });
     expect(md.explore).toBeNull();
     expect(md.seen!.length).toBeGreaterThan(0);
+  });
+});
+
+describe('一人称の通路の見え方（段階B）', () => {
+  const eventIds = EVENTS.all.filter((e) => e.where !== 'map').map((e) => e.id);
+  const temple = () => buildDungeon('emeraldTemple', createRng(1), 0, eventIds);
+
+  it('入口で北を向くと、目の前（1マス先）に開けられる扉。左右は壁', () => {
+    const v = viewSlices(temple());
+    expect(v.slices).toHaveLength(1);
+    expect(v.slices[0]).toMatchObject({ depth: 0, inRoom: false, left: 'wall', right: 'wall' });
+    expect(v.end).toEqual({ depth: 1, face: 'door', roomId: 'r0c0' });
+  });
+
+  it('部屋の中で北を向くと出口の先の通路が見え、南を向くと入ってきた扉は閉まっている', () => {
+    const d = standIn(temple(), 'r0c0');
+    d.seen = [];
+    revealSeen(d);
+    const north = viewSlices(d);
+    expect(north.slices[0].inRoom).toBe(true);
+    expect(north.slices.length).toBeGreaterThan(1);
+    expect(north.slices[1]).toMatchObject({ inRoom: false });
+    d.pos = { ...d.pos!, facing: 2 };
+    expect(viewSlices(d).end).toEqual({ depth: 1, face: 'locked' });
+    d.pos = { ...d.pos!, facing: 1 };
+    expect(viewSlices(d).end.face).toBe('wall');
+  });
+
+  it('通路で東を向くと、壁にある扉が横に見える。まだ見ていない所は暗い', () => {
+    const d = standIn(temple(), 'r0c0');
+    const c = dungeonGrid(d).roomCell.get('r0c0')!;
+    d.pos = { x: c.x, y: c.y + 1, facing: 1 };
+    d.seen = [];
+    revealSeen(d);
+    const v = viewSlices(d);
+    // 右（南）は出てきた部屋の入口、さらに東の通路のマスの左（北）は次の部屋の扉
+    expect(v.slices[0].right).toBe('arch');
+    expect(v.slices[1].left).toBe('door');
+    expect(v.slices[1].leftRoomId).toBe('r1c1');
+    // 北を向くと、左右は横に開いた口。その先（斜め前）に次の部屋の扉が見える
+    const north = structuredClone(d);
+    north.pos = { ...north.pos!, facing: 0 };
+    revealSeen(north);
+    const s0 = viewSlices(north).slices[0];
+    expect(s0.left).toBe('open');
+    expect(s0.right).toBe('open');
+    expect(s0.leftAhead).toBe('door');
+    expect(s0.leftAheadRoomId).toBe('r1c0');
+    expect(s0.rightAheadRoomId).toBe('r1c1');
+    const unseen = structuredClone(d);
+    unseen.seen = [cellKey(d.pos.x, d.pos.y)];
+    expect(viewSlices(unseen).end.face).toBe('dark');
+  });
+
+  it('ボスの扉は「ボス」、選ばなかった扉は「開かない扉」に見える', () => {
+    const d = temple();
+    const boss = d.rooms.find((r) => r.next.length === 0)!;
+    const before = d.rooms.find((r) => r.row === boss.row - 1)!;
+    const here = standIn(d, before.id);
+    const f = doorFront(here, boss.id)!;
+    here.pos = { ...f, facing: 0 };
+    revealSeen(here);
+    expect(viewSlices(here).end.face).toBe('boss');
+    const t2 = standIn(temple(), 'r1c1');
+    const front = doorFront(t2, 'r2c0')!;
+    // r1c1 の次は r2c1・r2c2。r2c0 は開かない
+    t2.pos = { ...front, facing: 0 };
+    t2.seen = [...(t2.seen ?? []), cellKey(front.x, front.y), cellKey(front.x, front.y + 1)];
+    expect(t2.rooms.find((r) => r.id === 'r1c1')!.next).not.toContain('r2c0');
+    expect(viewSlices(t2).end).toEqual({ depth: 1, face: 'locked', roomId: 'r2c0' });
   });
 });

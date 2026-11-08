@@ -258,7 +258,10 @@ async function run(party, difficulty) {
         await open.first().click();
         continue;
       }
+      // 段階B: 大きな地図はミニマップから開く
+      if (!(await page.locator('[data-map-overlay]').count())) await page.getByLabel('地図を開く').click();
       const door = page.locator('[data-door="open"]');
+      const closeMap = () => page.getByLabel('地図を閉じる').click().catch(() => {});
       if (await door.count()) {
         await door.first().click({ force: true });
         const walk = page.getByRole('button', { name: '歩く', exact: true });
@@ -267,11 +270,12 @@ async function run(party, difficulty) {
           continue;
         }
         // 扉は見えているが、歩数が足りない（または今いる所が扉の前）: 扉を向くか、手番を終える
-        await page.locator('[data-walk-panel]').getByLabel('閉じる').click().catch(() => {});
+        await closeMap();
         if (await clickEnabled(page, '扉を向く')) continue;
         await clickText(page, '手番を終える');
         continue;
       }
+      await closeMap();
       // まだ扉が見えていない: 前・右・左の順に歩いて探す。歩けなければ手番を終える
       if ((await clickEnabled(page, '扉を向く')) || (await clickEnabled(page, '前進')) || (await clickEnabled(page, '右へ')) || (await clickEnabled(page, '左へ'))) continue;
       await clickText(page, '手番を終える');

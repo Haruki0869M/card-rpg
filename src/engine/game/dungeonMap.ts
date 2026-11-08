@@ -55,12 +55,19 @@ function laneX(c: number, w: number, gridW: number) {
 }
 
 const CACHE = new Map<string, DungeonGrid>();
+/** 同じ部屋の配列なら、文字列の目印を作らずにすぐ返す（1回の操作の中で何度も呼ばれるため） */
+const BY_ROOMS = new WeakMap<object, DungeonGrid>();
 
 /** 部屋のつながりから通路の地図を作る（同じ並びなら同じ地図。軽いので覚えておく） */
 export function dungeonGrid(run: Pick<DungeonRun, 'dungeonId' | 'rooms'>): DungeonGrid {
+  const quick = BY_ROOMS.get(run.rooms);
+  if (quick) return quick;
   const sig = run.dungeonId + '|' + run.rooms.map((r) => `${r.id}:${r.row}:${r.col}`).join(',');
   const hit = CACHE.get(sig);
-  if (hit) return hit;
+  if (hit) {
+    BY_ROOMS.set(run.rooms, hit);
+    return hit;
+  }
   const rows = Math.max(0, ...run.rooms.map((r) => r.row)) + 1;
   const widths = Array.from({ length: rows }, (_, r) => run.rooms.filter((x) => x.row === r).length);
   const maxW = Math.max(1, ...widths);
@@ -89,6 +96,7 @@ export function dungeonGrid(run: Pick<DungeonRun, 'dungeonId' | 'rooms'>): Dunge
   const grid: DungeonGrid = { width: gridW, height: 2 * rows, cells, at, roomCell, start };
   if (CACHE.size > 64) CACHE.clear();
   CACHE.set(sig, grid);
+  BY_ROOMS.set(run.rooms, grid);
   return grid;
 }
 
@@ -109,10 +117,9 @@ export function walkableKeys(run: DungeonRun): Set<string> {
 }
 
 /** 1マス動けるか（部屋のマスは、北の出口とだけつながる。扉は「扉を開ける」で入る） */
-export function canMove(run: DungeonRun, from: { x: number; y: number }, dir: Facing): boolean {
+export function canMove(run: DungeonRun, from: { x: number; y: number }, dir: Facing, walk: Set<string> = walkableKeys(run)): boolean {
   const [dx, dy] = DIRS[dir];
   const to = { x: from.x + dx, y: from.y + dy };
-  const walk = walkableKeys(run);
   if (!walk.has(cellKey(from.x, from.y)) || !walk.has(cellKey(to.x, to.y))) return false;
   const grid = dungeonGrid(run);
   const a = grid.at.get(cellKey(from.x, from.y))!;
@@ -192,10 +199,11 @@ export function findPath(run: DungeonRun, to: { x: number; y: number }): Facing[
   const prev = new Map<string, { from: string; dir: Facing }>();
   const queue: { x: number; y: number }[] = [{ x: p.x, y: p.y }];
   const done = new Set([startK]);
+  const walk = walkableKeys(run);
   while (queue.length) {
     const c = queue.shift()!;
     for (let d = 0 as Facing; d < 4; d = (d + 1) as Facing) {
-      if (!canMove(run, c, d)) continue;
+      if (!canMove(run, c, d, walk)) continue;
       const n = { x: c.x + DIRS[d][0], y: c.y + DIRS[d][1] };
       const k = cellKey(n.x, n.y);
       if (done.has(k)) continue;
@@ -226,4 +234,120 @@ export function moveIntoRoom(run: DungeonRun, roomId: string) {
   if (!c) return;
   run.pos = { x: c.x, y: c.y, facing: 0 };
   revealSeen(run);
+}
+
+// ===== 一人称の通路の絵の材料（第3段階B）。見たマスだけから「何が見えるか」を決める（画面はこれを描くだけ） =====
+
+/** 壁の面の種類。open = 横に開いた口 / door = 開けられる扉 / locked = 開かない扉 / boss = ボスの扉 / arch = 出てきた部屋の入口 / dark = まだ見ていない */
+export type ViewFace = 'wall' | 'open' | 'door' | 'locked' | 'boss' | 'arch' | 'dark';
+
+export interface ViewSlice {
+  /** 手前から何マス目か（0 = 今いるマス） */
+  depth: number;
+  /** このマスは部屋の中か */
+  inRoom: boolean;
+  left: ViewFace;
+  right: ViewFace;
+  /** 左右の扉の部屋（left/right が扉の時） */
+  leftRoomId?: string;
+  rightRoomId?: string;
+  /** 横に開いた口の先（隣のマスの正面）に見えるもの。far = さらに続く */
+  leftAhead?: ViewFace | 'far';
+  rightAhead?: ViewFace | 'far';
+  leftAheadRoomId?: string;
+  rightAheadRoomId?: string;
+  /** 松明（通路の壁。マスの位置で決まる。乱数は使わない） */
+  torch: boolean;
+}
+
+export interface ViewEnd {
+  /** 正面の面がある奥行き（この数のマスの奥の境目）。far = 見える範囲より奥まで続く */
+  depth: number;
+  face: ViewFace | 'far';
+  roomId?: string;
+}
+
+/** 一人称の通路に描く奥行き（マス） */
+export const VIEW_DEPTH = 4;
+
+/** そのマスから見た部屋のマスの扉の種類 */
+function roomFace(run: DungeonRun, roomId: string, fromHall: boolean): ViewFace {
+  const room = run.rooms.find((r) => r.id === roomId);
+  if (!room) return 'wall';
+  if (room.id === run.currentRoomId) return fromHall ? 'arch' : 'wall';
+  if (room.cleared) return 'locked';
+  if (!reachableKeysOf(run).has(room.id)) return isBossRoomRow(run, room) ? 'boss' : 'locked';
+  return isBossRoomRow(run, room) ? 'boss' : 'door';
+}
+
+/** ボスの部屋（最後の行） */
+const isBossRoomRow = (run: DungeonRun, room: Room) => room.row === Math.max(...run.rooms.map((r) => r.row)) && room.next.length === 0;
+
+/** 今開けられる扉の部屋（reachableRooms と同じ。dungeon.ts を読み込むと循環するのでここで計算） */
+function reachableKeysOf(run: DungeonRun): Set<string> {
+  if (!run.currentRoomId) return new Set(run.rooms.filter((r) => r.row === 0).map((r) => r.id));
+  const cur = run.rooms.find((r) => r.id === run.currentRoomId);
+  return new Set(cur?.cleared ? cur.next : []);
+}
+
+/** 今の位置と向きから見える通路（手前から奥へ）と、正面の突き当たり */
+export function viewSlices(run: DungeonRun): { slices: ViewSlice[]; end: ViewEnd } {
+  const grid = dungeonGrid(run);
+  const seen = new Set(run.seen ?? []);
+  const p = posOf(run);
+  const [fx, fy] = DIRS[p.facing];
+  const [rx, ry] = DIRS[((p.facing + 1) % 4) as Facing];
+  const at = (x: number, y: number) => grid.at.get(cellKey(x, y));
+  const slices: ViewSlice[] = [];
+  let x = p.x;
+  let y = p.y;
+  for (let d = 0; d < VIEW_DEPTH; d++) {
+    const c = at(x, y)!;
+    const side = (sx: number, sy: number): { face: ViewFace; roomId?: string } => {
+      const n = at(x + sx, y + sy);
+      if (!n) return { face: 'wall' };
+      if (c.kind === 'hall' && n.kind === 'hall') return { face: seen.has(cellKey(n.x, n.y)) ? 'open' : 'dark' };
+      if (c.kind === 'hall' && n.kind === 'room') return seen.has(cellKey(n.x, n.y)) ? { face: roomFace(run, n.roomId!, true), roomId: n.roomId } : { face: 'dark' };
+      // 部屋の中: 北の出口だけ開いている。南は入ってきた扉（閉まっている）
+      if (c.kind === 'room' && n.kind === 'hall') return n.y > c.y ? { face: seen.has(cellKey(n.x, n.y)) ? 'open' : 'dark' } : { face: 'locked' };
+      return { face: 'wall' };
+    };
+    // 横に開いた口の先（隣のマスの、さらに正面のマス）
+    const beyond = (sx: number, sy: number): { face?: ViewFace | 'far'; roomId?: string } => {
+      const n = at(x + sx + fx, y + sy + fy);
+      if (!n) return { face: 'wall' };
+      if (!seen.has(cellKey(n.x, n.y))) return { face: 'dark' };
+      if (n.kind === 'room') return { face: roomFace(run, n.roomId!, true), roomId: n.roomId };
+      return { face: 'far' };
+    };
+    const l = side(-rx, -ry);
+    const r = side(rx, ry);
+    const la = l.face === 'open' ? beyond(-rx, -ry) : {};
+    const ra = r.face === 'open' ? beyond(rx, ry) : {};
+    slices.push({
+      depth: d,
+      inRoom: c.kind === 'room',
+      left: l.face,
+      right: r.face,
+      leftRoomId: l.roomId,
+      rightRoomId: r.roomId,
+      leftAhead: la.face,
+      rightAhead: ra.face,
+      leftAheadRoomId: la.roomId,
+      rightAheadRoomId: ra.roomId,
+      torch: c.kind === 'hall' && (x + y) % 2 === 0,
+    });
+    // 正面の次のマス
+    const n = at(x + fx, y + fy);
+    if (!n) return { slices, end: { depth: d + 1, face: 'wall' } };
+    if (!seen.has(cellKey(n.x, n.y))) return { slices, end: { depth: d + 1, face: 'dark' } };
+    if (c.kind === 'hall' && n.kind === 'room') return { slices, end: { depth: d + 1, face: roomFace(run, n.roomId!, true), roomId: n.roomId } };
+    if (c.kind === 'room') {
+      // 部屋から北の出口へは続く。それ以外の向きは壁か、入ってきた扉
+      if (!(n.kind === 'hall' && fy === 1)) return { slices, end: { depth: d + 1, face: n.kind === 'hall' ? 'locked' : 'wall' } };
+    } else if (n.kind === 'hall' && n.y !== c.y) return { slices, end: { depth: d + 1, face: 'wall' } };
+    x = n.x;
+    y = n.y;
+  }
+  return { slices, end: { depth: VIEW_DEPTH, face: 'far' } };
 }
