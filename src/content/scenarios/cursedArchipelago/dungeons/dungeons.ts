@@ -19,7 +19,7 @@ const SUNKEN_TEMPLE_POOLS: DungeonDef['pools'] = {
   boss: ['tideHighPriest'],
 };
 const FLAGSHIP_POOLS: DungeonDef['pools'] = {
-  battle: [['lanternAngler', 'barnacleBeast'], ['barnacleBeast', 'venomShark'], ['venomShark', 'cursedDrownedSailor'], ['barnacleBeast', 'ghostDeckhand', 'stormPetrel'], ['barnacleBeast', 'cursedDrownedSailor']],
+  battle: [['lanternAngler', 'ghostDeckhand'], ['barnacleBeast', 'venomShark'], ['venomShark', 'cursedDrownedSailor'], ['barnacleBeast', 'ghostDeckhand', 'stormPetrel'], ['barnacleBeast', 'cursedDrownedSailor']],
   elite: [['krakenTentacle'], ['stormSeaWitch', 'barnacleBeast']],
   boss: ['ghostAdmiral'],
 };
