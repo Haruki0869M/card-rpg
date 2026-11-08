@@ -24,7 +24,7 @@ export const mapEvents: EventDef[] = [
     id: 'bonfireTravelers',
     where: 'map',
     title: '旅人の焚き火',
-    icon: 'fire',
+    icon: 'sparkles',
     text: '誰かが残した焚き火が、まだ小さく燃えている。吹雪の中で、ここだけが温かい。',
     options: [
       { label: '火にあたって休む（全員のHP+20）', success: [{ kind: 'heal', amount: 20, all: true }], successText: '体が芯から温まった。' },

@@ -1,23 +1,9 @@
-// シナリオ2のダンジョン。部屋の並びは手順3で、第3段階の新しい形に合わせて作り込む（今は最小限の仮）
+// シナリオ2のダンジョン。部屋の並び（layout）から、通路の地図は自動で作られる（第3段階）。
+// ボスの手前に「物語の部屋」（event）を置き、ボスの正体や春を奪われた理由が分かるようにしている
 import type { DungeonDef } from '../../../../types';
 import { CASTLE_POOLS, CATHEDRAL_POOLS, CRYSTAL_POOLS, MINE_POOLS } from './pools';
 
-/** 仮の部屋の並び（戦闘→宝箱/戦闘→休憩→強敵→休憩→ボス）。イベントの部屋は手順3で足す */
-const baseLayout: NonNullable<DungeonDef['layout']> = [
-  [{ type: 'battle', next: [0, 1] }],
-  [
-    { type: 'battle', next: [0] },
-    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [0] },
-  ],
-  [{ type: 'rest', next: [0, 1] }],
-  [
-    { type: 'elite', next: [0] },
-    { type: 'chest', chest: { rarity: 'rare', locked: true }, next: [0] },
-  ],
-  [{ type: 'rest', next: [0] }],
-  [{ type: 'boss', next: [] }],
-];
-
+/** 氷晶の洞（8行。入門。道中のイベントと鍵の戦いまで） */
 export const crystalCave: DungeonDef = {
   id: 'crystalCave',
   name: '氷晶の洞',
@@ -28,9 +14,32 @@ export const crystalCave: DungeonDef = {
   bossChest: 'epic',
   rewardKey: 'crystalWhite',
   corruptionOnClear: 5,
-  layout: baseLayout,
+  layout: [
+    [{ type: 'battle', next: [0, 1] }],
+    [
+      { type: 'battle', next: [0, 1] },
+      { type: 'event', eventId: 'frostBridge', next: [1, 2] },
+    ],
+    [
+      { type: 'chest', chest: { rarity: 'common', locked: false }, next: [0] },
+      { type: 'battle', next: [0, 1] },
+      { type: 'rest', next: [1] },
+    ],
+    [
+      { type: 'event', eventId: 'buriedChest', next: [0] },
+      { type: 'elite', next: [0, 1] },
+    ],
+    [
+      { type: 'battle', next: [0] },
+      { type: 'chest', chest: { rarity: 'rare', locked: true }, next: [0] },
+    ],
+    [{ type: 'rest', next: [0] }],
+    [{ type: 'event', eventId: 'crystalGate', next: [0] }],
+    [{ type: 'boss', next: [] }],
+  ],
 };
 
+/** 沈んだ聖堂（8行。亡者と祈り。やや戦闘が多い） */
 export const sunkenCathedral: DungeonDef = {
   id: 'sunkenCathedral',
   name: '沈んだ聖堂',
@@ -41,9 +50,32 @@ export const sunkenCathedral: DungeonDef = {
   bossChest: 'epic',
   rewardKey: 'crystalBlue',
   corruptionOnClear: 5,
-  layout: baseLayout,
+  layout: [
+    [{ type: 'battle', next: [0, 1] }],
+    [
+      { type: 'event', eventId: 'iceSilhouette', next: [0, 1] },
+      { type: 'battle', next: [1] },
+    ],
+    [
+      { type: 'battle', next: [0, 1] },
+      { type: 'rest', next: [1, 2] },
+    ],
+    [
+      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
+      { type: 'elite', next: [0, 1] },
+      { type: 'event', eventId: 'frozenCamp', next: [1] },
+    ],
+    [
+      { type: 'battle', next: [0] },
+      { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
+    ],
+    [{ type: 'rest', next: [0] }],
+    [{ type: 'event', eventId: 'bishopAltar', next: [0] }],
+    [{ type: 'boss', next: [] }],
+  ],
 };
 
+/** 霜の巨人の鉱山（9行。分かれ道が多く、強敵が2回出る） */
 export const giantMine: DungeonDef = {
   id: 'giantMine',
   name: '霜の巨人の鉱山',
@@ -54,9 +86,36 @@ export const giantMine: DungeonDef = {
   bossChest: 'legend',
   rewardKey: 'crystalSilver',
   corruptionOnClear: 5,
-  layout: baseLayout,
+  layout: [
+    [{ type: 'battle', next: [0, 1] }],
+    [
+      { type: 'battle', next: [0, 1] },
+      { type: 'battle', next: [1, 2] },
+    ],
+    [
+      { type: 'event', eventId: 'buriedChest', next: [0] },
+      { type: 'battle', next: [0, 1] },
+      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [1] },
+    ],
+    [
+      { type: 'elite', next: [0, 1] },
+      { type: 'rest', next: [1] },
+    ],
+    [
+      { type: 'battle', next: [0] },
+      { type: 'event', eventId: 'furTrader', next: [0, 1] },
+    ],
+    [
+      { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
+      { type: 'elite', next: [0] },
+    ],
+    [{ type: 'rest', next: [0] }],
+    [{ type: 'event', eventId: 'giantGate', next: [0] }],
+    [{ type: 'boss', next: [] }],
+  ],
 };
 
+/** 氷の城（10行。三つの鍵で開く最終ダンジョン） */
 export const iceCastle: DungeonDef = {
   id: 'iceCastle',
   name: '氷の城',
@@ -70,13 +129,22 @@ export const iceCastle: DungeonDef = {
   layout: [
     [{ type: 'battle', next: [0, 1] }],
     [
-      { type: 'battle', next: [0] },
+      { type: 'battle', next: [0, 1] },
+      { type: 'battle', next: [1] },
+    ],
+    [
       { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
+      { type: 'battle', next: [0] },
     ],
     [{ type: 'rest', next: [0] }],
-    [{ type: 'elite', next: [0] }],
-    [{ type: 'battle', next: [0] }],
+    [{ type: 'elite', next: [0, 1] }],
+    [
+      { type: 'battle', next: [0] },
+      { type: 'event', eventId: 'iceSilhouette', next: [0] },
+    ],
     [{ type: 'rest', next: [0] }],
+    [{ type: 'battle', next: [0] }],
+    [{ type: 'event', eventId: 'queenThrone', next: [0] }],
     [{ type: 'boss', next: [] }],
   ],
 };
