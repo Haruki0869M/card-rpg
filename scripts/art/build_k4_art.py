@@ -86,7 +86,40 @@ def build_cards():
         B.save(im, f'{name}.webp', 76)
 
 
+# ---------------- ダンジョンの通路（壁・床・天井・扉・ボスの門） ----------------
+# 元画像は SRC/dungeon/<背景ID>-<wall|floor|ceiling|door|bossdoor>.webp。加工は build_art.py の build_dungeon と同じ
+# （面は 512×512、扉・ボスの門は 384×512）。すでに src/assets/art/dungeon にある物は触らない（上書きしない）。
+# 元画像のまわりに余計な縁が入っている扉は、割合で外側を切り落としてから 3:4 に合わせる
+# （_notes.txt: statueTemple-door は外側に細い黒い縁、skyCastle-door は外側にベージュの壁が少し見える）。
+DOOR_CROP = {'statueTemple-door': 0.032, 'skyCastle-door': 0.032}
+
+
+def build_dungeon():
+    import glob, re
+    for f in sorted(glob.glob(os.path.join(SRC, 'dungeon', '*'))):
+        m = re.match(r'(.+)-(wall|floor|ceiling|door|bossdoor)\.(webp|png|jpg)$', os.path.basename(f))
+        if not m:
+            continue
+        key = f'{m.group(1)}-{m.group(2)}'
+        name = f'dungeon/{key}'
+        out = os.path.join(B.OUT, f'{name}.webp')
+        if not B.want(name) or os.path.exists(out):
+            continue
+        im = Image.open(f).convert('RGB')
+        if m.group(2) in ('door', 'bossdoor'):
+            c = DOOR_CROP.get(key, 0)
+            if c:
+                dx, dy = round(im.width * c), round(im.height * c)
+                im = im.crop((dx, dy, im.width - dx, im.height - dy))
+            im = ImageOps.fit(im, B.DUNGEON_DOOR, Image.LANCZOS)
+        else:
+            im = im.resize((B.DUNGEON_FACE, B.DUNGEON_FACE), Image.LANCZOS)
+        B.save(im, f'{name}.webp', 78)
+    B.write_dungeon_tone()
+
+
 if __name__ == '__main__':
     build_terrains()
     build_bgs()
     build_cards()
+    build_dungeon()
