@@ -576,7 +576,7 @@ chibi tabletop miniature figurine of a young male necromancer, pale skin and whi
 - 持たせる物: 錆びた大鎌　／　見た目: 黒と淡い緑のぼろのローブ・骨の飾り・青白い霊の光
 
 ```
-chibi tabletop miniature figurine of a young female necromancer, pale skin and long black hair, black and sickly green tattered robes with bone ornaments, pale ghostly wisps around, holding a large rusty scythe, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, book, staff, sword, shield, skeleton minions, bow, arrows, quiver, second scythe, second weapon, signature, text, watermark, scenery
+chibi tabletop miniature figurine of a young female necromancer, cute human girl face with big expressive eyes and a small smile, pale skin and long black hair, black and sickly green tattered robes with bone ornaments, pale ghostly wisps around, holding a large rusty scythe, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, mask, skull face, hollow eyes, book, staff, sword, shield, skeleton minions, bow, arrows, quiver, second scythe, second weapon, signature, text, watermark, scenery
 ```
 
 #### 暗黒騎士・男（`piece/darkKnight-male`）→ 元画像 `piece/darkKnight-male.png`
