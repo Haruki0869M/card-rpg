@@ -3,6 +3,27 @@ import type { EnemyDef } from '../../../../types';
 import { makeVariant } from '../../../../data/enemyVariant';
 import { jackalWarrior } from './ruins';
 
+export const stoneCat: EnemyDef = {
+  id: 'stoneCat',
+  name: '石の猫像',
+  icon: '🐈',
+  maxHp: 40,
+  baseLevel: 9,
+  size: 0.95,
+  exp: 24,
+  gold: 18,
+  weak: ['thunder'],
+  resist: ['poison', 'fire'],
+  pattern: 'sequence',
+  actions: [
+    { id: 'claw', name: '砂岩の爪', effects: [{ kind: 'damage', amount: 6, hits: 2 }] },
+    { id: 'still', name: '像のふりをする', effects: [{ kind: 'block', amount: 12 }] },
+    { id: 'pounce', name: '飛びかかる', effects: [{ kind: 'damage', amount: 13 }] },
+  ],
+  // 叩いた相手に引っかき返す（1ターン2回まで）
+  abilities: [{ name: '守り猫の爪', effect: { when: 'hurt', do: [{ kind: 'retaliate', amount: 4, perTurn: 2 }] } }],
+};
+
 export const colossusStatue: EnemyDef = {
   id: 'colossusStatue',
   name: '石像の巨兵',

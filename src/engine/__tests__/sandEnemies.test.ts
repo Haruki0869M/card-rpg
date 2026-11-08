@@ -1,12 +1,11 @@
 // 砂塵の王朝：敵の内訳・配置・弱点の混ぜ方を確認する。
-// 石の猫像（反撃）・スフィンクスの子（フォーカスを奪う）は、部品が入ってから足す（いまは26体）
 import { describe, expect, it } from 'vitest';
 import { ENEMIES } from '../../data/enemies';
 import { DUNGEONS } from '../../data/dungeons';
 import { getScenario } from '../../data/scenarios';
 
-const normal = ['sandScarab', 'desertViper', 'jackalWarrior', 'tombRobber', 'sandScorpion', 'vulture', 'mummy', 'sandSprite', 'dustDevil', 'sandWorm', 'clayGolem', 'mummyArcher', 'cursedPriest', 'emberSandScorpion', 'cursedMummy', 'stormVulture', 'venomJackalWarrior'];
-const elite = ['royalGuardMummy', 'scribeShade', 'sandSerpentLord', 'colossusStatue', 'cursedScribeShade'];
+const normal = ['sandScarab', 'desertViper', 'jackalWarrior', 'tombRobber', 'sandScorpion', 'vulture', 'mummy', 'sandSprite', 'dustDevil', 'sandWorm', 'clayGolem', 'mummyArcher', 'cursedPriest', 'stoneCat', 'emberSandScorpion', 'cursedMummy', 'stormVulture', 'venomJackalWarrior'];
+const elite = ['royalGuardMummy', 'scribeShade', 'sphinxCub', 'sandSerpentLord', 'colossusStatue', 'cursedScribeShade'];
 const bosses = ['sandScorpionKing', 'shadowVizier', 'stoneGuardianBeast', 'sandPharaoh'];
 const ids = new Set([...normal, ...elite, ...bosses]);
 const dungeons = () => DUNGEONS.forScenario('sandDynasty');
@@ -17,7 +16,7 @@ const waves = () => [
 
 describe('砂塵の王朝の専用の敵', () => {
   it('亜種は5体で、元の敵は非亜種。エリートは特殊能力を持つ', () => {
-    expect(ids.size).toBe(26);
+    expect(ids.size).toBe(28);
     const enemies = [...ids].map(id => ENEMIES.get(id));
     const variants = enemies.filter(e => e.variantOf);
     expect(variants.map(v => v.id).sort()).toEqual(['cursedMummy', 'cursedScribeShade', 'emberSandScorpion', 'stormVulture', 'venomJackalWarrior']);
@@ -47,10 +46,12 @@ describe('砂塵の王朝の専用の敵', () => {
   it('各ダンジョンのボスと、砂塵の王の3段階を指定どおりにする', () => {
     const expected: Record<string, string[]> = {
       scorpionTomb: ['sandScorpionKing'], shadowLibrary: ['shadowVizier'],
-      statueTemple: ['stoneGuardianBeast'], sandPalace: ['sandPharaoh'], sandCave: ['sandSerpentLord'],
+      statueTemple: ['stoneGuardianBeast'], sandPalace: ['sandPharaoh'], sandCave: ['sandSerpentLord', 'sphinxCub'],
     };
     for (const d of dungeons()) expect(d.pools.boss, d.id).toEqual(expected[d.id]);
     for (const id of bosses) expect(ENEMIES.get(id).phases?.length, id).toBeGreaterThan(0);
+    expect(ENEMIES.get('stoneCat').abilities?.some(a => 'when' in a.effect && a.effect.when === 'hurt' && a.effect.do.some(e => e.kind === 'retaliate'))).toBe(true);
+    expect(ENEMIES.get('sphinxCub').actions.some(a => a.effects.some(e => e.kind === 'drainFocus'))).toBe(true);
     expect(ENEMIES.get('sandPharaoh').phases?.map(p => p.belowHpPct)).toEqual([60, 30]);
   });
 

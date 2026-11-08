@@ -81,6 +81,27 @@ export const cursedPriest: EnemyDef = {
   ],
 };
 
+export const sphinxCub: EnemyDef = {
+  id: 'sphinxCub',
+  name: 'スフィンクスの子',
+  icon: '🛡',
+  maxHp: 80,
+  baseLevel: 8,
+  size: 1.2,
+  exp: 30,
+  gold: 25,
+  weak: ['dark'],
+  resist: ['holy', 'fire'],
+  pattern: 'sequence',
+  actions: [
+    { id: 'riddle', name: '謎かけ', effects: [{ kind: 'drainFocus', amount: 2 }, { kind: 'damage', amount: 6 }] },
+    { id: 'claws', name: '獅子の爪', effects: [{ kind: 'damage', amount: 8, hits: 2 }] },
+    { id: 'wings', name: '翼でくるむ', effects: [{ kind: 'block', amount: 14 }] },
+    { id: 'puzzle', name: '答えのない問い', effects: [{ kind: 'drainFocus', amount: 1, to: 'foes' }, { kind: 'applyStatus', status: 'weak', amount: 1 }] },
+  ],
+  abilities: [{ name: '見透かす瞳', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 8 }] } }],
+};
+
 export const sandSerpentLord: EnemyDef = {
   id: 'sandSerpentLord',
   name: '砂の大蛇',

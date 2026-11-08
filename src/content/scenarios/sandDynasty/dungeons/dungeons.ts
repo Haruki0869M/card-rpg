@@ -16,16 +16,16 @@ const LIBRARY_POOLS: DungeonDef['pools'] = {
   boss: ['shadowVizier'],
 };
 
-/** 石像の神殿: 谷の敵と砂の大蛇（スフィンクスの子は、フォーカスを奪う部品が入ってから足す） */
+/** 石像の神殿: 谷の敵と、スフィンクスの子・砂の大蛇 */
 const TEMPLE_POOLS: DungeonDef['pools'] = {
   battle: [['sandWorm', 'cursedPriest'], ['clayGolem', 'mummyArcher'], ['cursedMummy', 'stormVulture'], ['sandWorm', 'mummyArcher']],
-  elite: [['sandSerpentLord'], ['sandSerpentLord', 'cursedPriest']],
+  elite: [['sphinxCub'], ['sandSerpentLord'], ['sphinxCub', 'clayGolem'], ['sandSerpentLord', 'cursedPriest']],
   boss: ['stoneGuardianBeast'],
 };
 
-/** 砂塵の王宮: 王宮前の敵と石像の巨兵（石の猫像は、反撃の部品が入ってから足す） */
+/** 砂塵の王宮: 王宮前の敵（石の猫像など）と石像の巨兵 */
 const PALACE_POOLS: DungeonDef['pools'] = {
-  battle: [['venomJackalWarrior', 'cursedPriest'], ['venomJackalWarrior', 'mummyArcher'], ['cursedMummy', 'clayGolem']],
+  battle: [['stoneCat', 'cursedPriest'], ['stoneCat', 'mummyArcher'], ['venomJackalWarrior', 'mummyArcher'], ['cursedMummy', 'clayGolem']],
   elite: [['colossusStatue'], ['colossusStatue', 'cursedPriest']],
   boss: ['sandPharaoh'],
 };
@@ -34,7 +34,7 @@ const PALACE_POOLS: DungeonDef['pools'] = {
 const CAVE_POOLS: DungeonDef['pools'] = {
   battle: [['mummy', 'dustDevil'], ['sandWorm', 'vulture'], ['emberSandScorpion', 'mummyArcher'], ['clayGolem', 'sandSprite']],
   elite: [['sandSerpentLord'], ['royalGuardMummy', 'sandSprite']],
-  boss: ['sandSerpentLord'],
+  boss: ['sandSerpentLord', 'sphinxCub'],
 };
 
 type Layout = NonNullable<DungeonDef['layout']>;
