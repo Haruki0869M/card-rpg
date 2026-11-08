@@ -224,7 +224,14 @@ STAR_ENEMIES = ['cloudSheep', 'skyGull', 'windSprite', 'clockworkSoldier', 'star
 # 各シナリオに足す敵（K3 D。docs/art/prompts-enemies-extra.md）。亜種は元の絵を使い回す
 EXTRA_ENEMIES = ['iceFisher', 'frostMoth', 'driftwoodSpirit', 'lanternAngler', 'desertFennec', 'obeliskSentinel', 'cometFox',
                  'harpGuardian', 'smokeStackCrow', 'pressGolem']
-for _k in CORRUPTION_ENEMIES + CLOCKWORK_ENEMIES + ARCHIPELAGO_ENEMIES + SAND_ENEMIES + STAR_ENEMIES + EXTRA_ENEMIES:
+# 夢幻の大迷宮の新しい敵（夢の再来は元の敵の絵を使い回す）
+DREAM_ENEMIES = ['nightmareMote', 'sleepwalker', 'pillowGolem', 'lullabyBird', 'shadowChild', 'lostMemory', 'mirrorKnight', 'dreamWeaver',
+                 'memoryEater', 'dreamEater', 'dreamEater-1', 'dreamEater-2']
+# レアの敵（K3 C）と隠しボス（変身後は -1）
+RARE_ENEMIES = ['goldenWolf', 'crystalGhoul', 'whiteStag', 'frostBellKnight', 'pearlCrab', 'lanternGhostCaptain', 'goldenScarab', 'starlitSwan',
+                'brassClockCat', 'crimsonSteamHound', 'hollowDemonLord', 'hollowDemonLord-1', 'drownedBride', 'drownedBride-1',
+                'fallenStarSerpent', 'fallenStarSerpent-1', 'ancientEngineHeart', 'ancientEngineHeart-1']
+for _k in CORRUPTION_ENEMIES + CLOCKWORK_ENEMIES + ARCHIPELAGO_ENEMIES + SAND_ENEMIES + STAR_ENEMIES + EXTRA_ENEMIES + DREAM_ENEMIES + RARE_ENEMIES:
     ENEMIES[_k] = (f'enemy/{_k}', 1.0)
 # 隅に文字・サインがある絵（元画像のフォルダの _corner-text.txt）。サインが内側寄りにもあるので、離れた小さなかたまりを場所に関係なく消す
 CORNER_TEXT = {'iceBat', 'frozenSoldier', 'whiteQueen-2', 'foremanGolem-1', 'pirateGunner', 'coralGolem', 'sandScorpion',

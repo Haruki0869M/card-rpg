@@ -9,7 +9,7 @@ import { FallbackEnemy, FallbackHero } from './fallback';
 import { HERO_FACE_VIEWBOX, Hero } from './hero/Hero';
 import { heroLookFor } from './hero/looks';
 import { ArtImage, generateArt, useArtUrl } from './rasterize';
-import { artImage, preloadAllImages } from './images';
+import { artImage, preloadAllImages, preloadImages } from './images';
 
 export { artImage, preloadImages } from './images';
 
@@ -33,6 +33,15 @@ const ENEMY_ART = collectArt<EnemyArtComponent>(import.meta.glob('./enemies/*.ts
 /** 絵がある敵か（データ検査用） */
 /** 絵を探すID（亜種は元の敵の絵を使い回す） */
 const artIdOf = (defId: string): string => (ENEMIES.tryGet(defId)?.variantOf ?? defId);
+/** 戦闘の始めに、出ている敵の変身後の絵（enemy/<ID>-<段階>）を先に読んでおく。変身した瞬間に絵が欠けないように（起動時には読まない） */
+export function preloadEnemyPhases(defIds: string[]) {
+  const keys: string[] = [];
+  for (const defId of defIds) {
+    const n = ENEMIES.tryGet(defId)?.phases?.length ?? 0;
+    for (let p = 1; p <= n; p++) keys.push(`enemy/${artIdOf(defId)}-${p}`);
+  }
+  preloadImages(keys);
+}
 export const hasEnemyArt = (defId: string) => !!ENEMY_ART[artIdOf(defId)] || !!artImage(`enemy/${artIdOf(defId)}`);
 
 const heroKey = (classId: string, gender: Gender, face?: boolean, weapon?: Rarity) =>
