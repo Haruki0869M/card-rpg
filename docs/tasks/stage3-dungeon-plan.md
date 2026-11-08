@@ -290,7 +290,7 @@
 
 ---
 
-## 10. 段階Cの詳しい計画（2026-11-08・オーナーが提案どおりOK。C1は実装済み）
+## 10. 段階Cの詳しい計画（2026-11-08・オーナーが提案どおりOK。C1は実装済み・C2は文書を作成）
 
 段階Bまでで「歩く・見る・演出」はできた。段階Cでは、中身が分からない扉に**少しだけ手がかり**を足し（気配・周囲の警戒）、**絵と音の準備**をして第3段階を仕上げる。「【提案】」は Claude が決めた所。
 
@@ -342,3 +342,55 @@
 2. 気配の種類: 4つ（危険・財宝・安らぎ・不思議）【提案】か、2つ（危険・財宝だけ）か
 3. 周囲の警戒: 歩数2・感知2枠・成功1で扉の場所と気配・完全成功で次の戦闘に「応援」1・通路ごとに1回【提案】でよいか
 4. C1 → C2 の順に進めてよいか
+
+---
+
+## 11. ダンジョン（第3段階）の音の一覧（C2・K6 へ渡す。提案）
+
+`docs/audio-list.md`（K6 の音の指示書）と同じ決まりで書いた（名前 `sfx_<分類>_<内容>`、優先 ◎/○/△、ツール J=jsfxr / E=ElevenLabs）。**今回はコードに音を入れない**。K6 の音の仕組みができた時に、この表を `docs/audio-list.md` の §2・§4 に足し、下の「鳴らす所」で鳴らす。今ある音で足りる所は使い回す（表の「使い回し」）。
+
+### 11.1 一覧
+| ID | 場面（鳴らす所） | 長さ | 雰囲気 | 優先 | ツール |
+|---|---|---|---|---|---|
+| sfx_step_stone（使い回し） | 1歩進む（神殿・地下墓地・魔王城）。`DUNGEON_STEP`/`WALK` の演出の1歩ごと | 0.25s | こつこつ | ◎ | E |
+| sfx_step_dirt | 1歩進む（森の洞窟） | 0.25s | 湿った土、ざっ | ○ | E |
+| sfx_step_rock | 1歩進む（溶岩の洞窟） | 0.25s | 乾いた岩、じゃりっ | ○ | E |
+| sfx_dungeon_turn | 向きを変える（左右・振り向く・扉を向く） | 0.2s | 衣ずれ、さっ | ○ | E |
+| sfx_dungeon_door | 扉が開く（ふつうの扉。扉の演出の始まり） | 0.5s | 木の扉がぎぃっと開く | ◎ | E |
+| sfx_dungeon_gate | ボスの門が開く | 1.2s | 重い石と鉄の門がごごご、低い反響 | ◎ | E |
+| sfx_dungeon_map | 見たマスが地図に描き足された | 0.2s | ペン先でさらっ | △ | J |
+| sfx_dungeon_steps_out | 歩数を使い切った | 0.5s | 小さく息をつく、低い2音 | ○ | J |
+| sfx_dungeon_omen_danger | 危険の気配が見えた | 0.6s | 低く不穏な響き、心臓の鼓動1回 | ○ | E |
+| sfx_dungeon_omen_treasure | 財宝の気配が見えた | 0.5s | きらりと小さな鈴 | ○ | J/E |
+| sfx_dungeon_omen_other | 安らぎ・不思議の気配が見えた | 0.5s | 柔らかい風、ふわっ | △ | E |
+| sfx_dungeon_watch | 周囲の警戒（判定の前） | 0.8s | 耳を澄ます、しんとした間 | ○ | E |
+| sfx_slot_*（使い回し） | 周囲の警戒の判定 | — | スロットの音をそのまま | ◎ | — |
+| sfx_turn_cutin | 手番のカットイン（自分の番） | 0.6s | 帯がしゅばっと滑り込む＋小さな鐘 | ◎ | J/E |
+| sfx_turn_notice | ほかの人の番の小さなお知らせ | 0.3s | ぽん | △ | J |
+| bgm_dungeon（使い回し） | ダンジョンの通路 | ループ | audio-list の bgm_dungeon | ◎ | S |
+
+ダンジョンごとの環境音（しずく・風・溶岩・すすり泣く風・低い響き）は、`bgm_dungeon` に混ぜるか、のちの追加にする（提案: まずは入れない）。
+
+### 11.2 指示文（ElevenLabs。英語）
+| ID | 指示文 |
+|---|---|
+| sfx_step_dirt | `A single soft footstep on damp earth in a cave, short, 0.25 seconds` |
+| sfx_step_rock | `A single footstep on dry gravelly volcanic rock, short crunch, 0.25 seconds` |
+| sfx_dungeon_turn | `A quick cloth rustle as a person turns around, very short, 0.2 seconds` |
+| sfx_dungeon_door | `An old wooden door creaking open slowly in a stone corridor, short echo, 0.5 seconds` |
+| sfx_dungeon_gate | `A huge heavy stone and iron double gate grinding open, deep rumble with echo, ominous, 1.2 seconds` |
+| sfx_dungeon_omen_danger | `A low ominous drone swell with a single muffled heartbeat, dark fantasy, 0.6 seconds` |
+| sfx_dungeon_omen_treasure | `A tiny bright magical chime sparkle, 0.5 seconds` |
+| sfx_dungeon_omen_other | `A soft gentle breeze whoosh with a faint airy shimmer, 0.5 seconds` |
+| sfx_dungeon_watch | `A quiet tense moment, faint distant drips in a silent stone corridor, held breath, 0.8 seconds` |
+| sfx_turn_cutin | `A fast stylish whoosh swipe followed by a small bright bell ding, game UI, 0.6 seconds` |
+
+jsfxr（sfx_dungeon_map・sfx_dungeon_steps_out・sfx_turn_notice・omen_treasure の代わり）は audio-list §4.7 と同じ作り方（「Blip」「Pickup」を短く）。
+
+### 11.3 鳴らす所（K6 の組み込みの時のメモ）
+- 1歩・向きを変える: `components/dungeon/DungeonAnim.tsx` の `AnimatedDungeonView`（1コマずつ。種類が forward なら足音、left/right/back なら sfx_dungeon_turn）。足音の種類はダンジョンの背景で選ぶ。
+- 扉: `DoorOpenScene` の始まり（ボスの扉なら sfx_dungeon_gate）。
+- 気配: `store/presentation.ts` の「何かの気配！」と同じ所（新しく見えた気配の種類で選ぶ）。
+- 周囲の警戒・歩数を使い切った: `DUNGEON_WATCH` の前後、`explore` が0になった時（store の commit で前後を比べる）。
+- 手番のカットイン: `components/ui/TurnCutin.tsx` が出る時。
+- オンラインで他人の操作の音は小さく（audio-list の決定に合わせる）。動作軽減・高速の時も音は鳴らす（音量は設定どおり）。
