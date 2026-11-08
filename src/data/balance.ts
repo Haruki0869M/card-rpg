@@ -131,6 +131,12 @@ export const BALANCE = {
   exploreBase: 2,
   /** 第3段階: 歩数 = 探索力 × これ（部屋から次の部屋へは、まっすぐなら「出口→扉」で2歩。今までの「探索力＝入れる部屋の数」と同じ速さ） */
   dungeonStepsPerExplore: 2,
+  /** 第3段階C1: 扉の気配が分かる感知の成功率（%）。フクロウのお供・霊感の探索能力でも分かる */
+  dungeonSensePer: 70,
+  /** 周囲の警戒: 使う歩数・感知の判定の枠・完全成功で次の戦闘に付く「応援」の数 */
+  dungeonWatchSteps: 2,
+  dungeonWatchSlots: 2,
+  dungeonWatchInspired: 1,
   /** 侵食度: 1ワールドターンごと / ダンジョンに入る時 / 町が陥落した時 */
   corruptionPerTurn: 1,
   corruptionOnDungeonEnter: 2,

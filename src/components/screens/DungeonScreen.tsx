@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, ArrowRight, ArrowUp, Backpack, Check, Coins, Compass, Crown, DoorClosed, DoorClosedLocked, Flame, Gift, LogOut, Menu, Sparkles, Swords, Skull, Undo2, Users, X } from 'lucide-react';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AnimatedDungeonView } from '../dungeon/DungeonAnim';
+import { OmenMark } from '../dungeon/DungeonView';
 import { DUNGEONS } from '../../data/dungeons';
 import { getItem } from '../../data/items';
 import {
@@ -14,8 +15,11 @@ import {
   doorAhead,
   doorFront,
   doorNorthOf,
+  doorOmen,
   dungeonGrid,
   dungeonNavigator,
+  OMEN_INFO,
+  type DoorOmen,
   exploredPercent,
   findPath,
   heroMaxHp,
@@ -37,7 +41,7 @@ import { useOnline } from '../../store/onlineStore';
 import { RollStrip } from '../ui/CheckPanel';
 import { HeroFace } from '../ui/game';
 import { PetToken } from '../ui/PetToken';
-import { Footprints, Minus, Plus } from 'lucide-react';
+import { Eye, Footprints, Minus, Plus } from 'lucide-react';
 import type { DungeonRun, Facing, GameState, Room } from '../../types';
 import { useElementSize } from '../../hooks/useElementSize';
 import { LOCAL_PLAYER } from '../../store/battleConfig';
@@ -62,15 +66,16 @@ function DoorPanel({ room, openable }: { room: Room; openable: boolean }) {
   const known = room.cleared || room.id === game.dungeon?.currentRoomId;
   const turnHere = dungeonTurnHere(game);
   const noSteps = !!game.world && !game.dungeon?.explore;
+  const omen = doorOmen(game, room);
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-amber-300/40 bg-black/70 px-2 py-1.5 backdrop-blur-[2px]" data-door-ahead>
+    <div className="flex items-center gap-2 rounded-xl border bg-black/70 px-2 py-1.5 backdrop-blur-[2px]" style={{ borderColor: omen ? OMEN_INFO[omen].color : 'rgba(252,211,77,.4)' }} data-door-ahead>
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ background: known ? t.bg : '#2a2018' }}>
         {known ? <t.Icon size={22} style={{ color: t.color }} /> : t.boss ? <Crown size={22} className="text-amber-300" /> : <DoorClosed size={22} className="text-amber-200" />}
       </span>
       <div className="min-w-0 flex-1 text-[13px] leading-5">
         <div className="font-bold text-amber-100">{known ? `${t.name}の部屋（通った）` : t.boss ? '重い扉（ボス）' : openable ? '扉' : '開かない扉'}</div>
         <div className="truncate text-[12px] text-zinc-400">
-          {known ? 'もう何もない' : t.boss ? '奥から強い気配がする…' : openable ? '中身は開けるまで分からない' : '別の道を選んだので開かない'}
+          {known ? 'もう何もない' : t.boss ? '奥から強い気配がする…' : omen ? OMEN_TEXT[omen] : openable ? '中身は開けるまで分からない' : '別の道を選んだので開かない'}
         </div>
       </div>
       {openable && !known && (
@@ -100,6 +105,7 @@ function MapCells({ run, cell, x0, yTop, left = 0, top = 0, only, target, onTap 
   target?: { x: number; y: number } | null;
   onTap?: (c: MapCell) => void;
 }) {
+  const game = useBattle((s) => s.game);
   const grid = dungeonGrid(run);
   const pos = posOf(run);
   const seen = new Set(run.seen ?? []);
@@ -117,6 +123,7 @@ function MapCells({ run, cell, x0, yTop, left = 0, top = 0, only, target, onTap 
         const known = !!room && (room.cleared || room.id === run.currentRoomId);
         const t = room ? roomStyle(room.type) : undefined;
         const openable = !!room && !known && reach.has(room.id);
+        const omen = room && game ? doorOmen(game, room) : undefined;
         // 中身は入るまで分からない（ボスの扉だけは見て分かる）
         const Icon = !room || !t ? null : known ? t.Icon : t.boss ? Crown : openable ? DoorClosed : DoorClosedLocked;
         const Tag = onTap ? 'button' : 'span';
@@ -139,8 +146,8 @@ function MapCells({ run, cell, x0, yTop, left = 0, top = 0, only, target, onTap 
               height: cell - 2,
               borderRadius: room ? Math.max(3, cell / 6) : 2,
               background: room && t ? (known ? t.bg : '#2a2018') : walk.has(k) ? '#3a3328' : '#211d18',
-              border: `${small ? 1 : 2}px solid ${isTarget ? '#fff' : openable ? '#ffd76a' : room ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.08)'}`,
-              boxShadow: openable && !small ? '0 0 10px rgba(255,215,106,.6)' : undefined,
+              border: `${small ? 1 : 2}px solid ${isTarget ? '#fff' : omen ? OMEN_INFO[omen].color : openable ? '#ffd76a' : room ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.08)'}`,
+              boxShadow: omen && !small ? `0 0 10px ${OMEN_INFO[omen].color}` : openable && !small ? '0 0 10px rgba(255,215,106,.6)' : undefined,
               opacity: room && t && !known && !openable && !t.boss ? 0.55 : 1,
             }}
             data-cell={onTap ? k : undefined}
@@ -148,6 +155,7 @@ function MapCells({ run, cell, x0, yTop, left = 0, top = 0, only, target, onTap 
             aria-label={onTap ? (room && t ? (known ? t.name : t.boss ? 'ボスの扉' : openable ? '扉' : '開かない扉') : '通路') : undefined}
           >
             {Icon && t && !here && <Icon size={Math.round(cell * 0.55)} strokeWidth={2.2} style={{ color: known ? t.color : t.boss ? '#ffcf4a' : openable ? '#ffd76a' : '#9a9080' }} />}
+            {omen && !here && <OmenMark omen={omen} className="absolute -right-1.5 -top-1.5 !w-[46%]" />}
             {room?.cleared && !small && (
               <span className="absolute -right-1 -bottom-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-white">
                 <Check size={11} strokeWidth={3} />
@@ -290,6 +298,8 @@ export function DungeonScreen() {
   const side = (rel: 'left' | 'right') => (moveOk(rel) ? step(rel) : doorSide(rel) ? turn(rel) : undefined);
   const sideOk = (rel: 'left' | 'right') => moveOk(rel) || (myTurn && game.mode === 'dungeon' && doorSide(rel));
   const background = DUNGEONS.tryGet(run.dungeonId)?.background ?? run.background;
+  // 扉の気配（第3段階C1）: 部屋のID → 種類
+  const omens = Object.fromEntries(run.rooms.map((r) => [r.id, doorOmen(game, r)]).filter(([, o]) => o)) as Record<string, DoorOmen>;
   return (
     <Screen>
       <div className="flex h-12 shrink-0 items-center gap-1.5 px-2">
@@ -307,7 +317,7 @@ export function DungeonScreen() {
       </div>
       <div className="relative min-h-[200px] flex-1 overflow-hidden border-y border-amber-500/30">
         {/* 一人称の通路 */}
-        <AnimatedDungeonView run={run} background={background} />
+        <AnimatedDungeonView run={run} background={background} omens={omens} />
         <MiniMap run={run} onOpen={() => setShowMap(true)} />
         {/* 2人以上で遊ぶ時: 扉は全員一致で開く */}
         {voters(game).length > 1 && (
@@ -427,6 +437,69 @@ export function DungeonScreen() {
   );
 }
 
+/** 気配の説明（目の前の扉） */
+const OMEN_TEXT: Record<DoorOmen, string> = {
+  danger: '奥から危険な気配がする…',
+  treasure: 'きらりと財宝の気配がする',
+  rest: '穏やかな安らぎの気配がする',
+  mystery: '不思議な気配がする…',
+};
+
+/** 周囲の警戒（第3段階C1）: 歩数2・感知の判定。成功1で開けられる扉の場所と気配、完全成功で次の戦闘に応援 */
+function WatchPanel({ onClose }: { onClose: () => void }) {
+  const game = useBattle((s) => s.game)!;
+  const dispatchGame = useBattle((s) => s.dispatchGame);
+  const [focus, setFocus] = useState(0);
+  const nav = dungeonNavigator(game);
+  // 判定するキャラ: 手番のキャラの担当の人のキャラのうち、感知が一番高いキャラ
+  const judge = game.heroes
+    .filter((h) => (game.party ?? []).includes(h.id) && h.hp > 0 && nav && h.playerId === nav.playerId)
+    .sort((a, b) => statChance(b, 'per') - statChance(a, 'per'))[0];
+  if (!judge) return null;
+  const slots = BALANCE.dungeonWatchSlots;
+  const max = Math.min(slots, judge.focus);
+  const f = Math.min(focus, max);
+  return (
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60" onClick={onClose} data-watch-panel>
+      <div className="panel panel-gold-edge m-2 w-full max-w-[464px] rounded-xl p-3" onClick={(e) => e.stopPropagation()}>
+        <div className="font-display flex items-center gap-1.5 text-[18px] text-sky-100">
+          <Eye size={18} /> 周囲の警戒（歩数{BALANCE.dungeonWatchSteps}）
+        </div>
+        <div className="mt-1 text-[13px] leading-5 text-zinc-300">
+          {judge.name}の感知{statChance(judge, 'per')}%×{slots}枠で判定する。この通路で1回だけ。
+          <span className="block">成功1つ: 開けられる扉の場所と気配が分かる</span>
+          <span className="block">成功2つ: さらに身構えて、次の戦闘で全員に「応援」</span>
+        </div>
+        <div className="mt-2 flex items-center justify-center gap-2 text-[13px]">
+          <button onClick={() => setFocus(Math.max(0, f - 1))} disabled={f <= 0} aria-label="フォーカスを減らす" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-lg">
+            <Minus size={18} />
+          </button>
+          <span>
+            フォーカス <b className="text-amber-200">{f}</b>（残り{judge.focus}）
+          </span>
+          <button onClick={() => setFocus(Math.min(max, f + 1))} disabled={f >= max} aria-label="フォーカスを増やす" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-lg">
+            <Plus size={18} />
+          </button>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button onClick={onClose} className="btn btn-dark h-12 rounded-lg font-bold">
+            やめる
+          </button>
+          <button
+            onClick={() => {
+              onClose();
+              dispatchGame({ type: 'DUNGEON_WATCH', playerId: judge.playerId, heroId: judge.id, focusUsed: f });
+            }}
+            className="btn btn-gold font-display h-12 rounded-lg text-[17px]"
+          >
+            警戒する
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** このダンジョンのパーティの番か（世界マップが無いシナリオは、いつでも） */
 export const dungeonTurnHere = (game: GameState) => !game.world || (game.party ?? []).includes(game.world.turn);
 
@@ -439,6 +512,7 @@ function ExplorePanel() {
   const dispatchGame = useBattle((s) => s.dispatchGame);
   useOnline((s) => s.tick);
   const [focus, setFocus] = useState(0);
+  const [watching, setWatching] = useState(false);
   const run = game.dungeon!;
   if (!game.world) return null;
   const w = game.world;
@@ -466,6 +540,9 @@ function ExplorePanel() {
     );
   }
   const party = game.heroes.filter((h) => (game.party ?? []).includes(h.id) && h.hp > 0);
+  const nav = dungeonNavigator(game);
+  const watchedHere = run.watchedAt === (run.currentRoomId ?? 'entrance');
+  const canWatch = !!nav && isLocalPlayer(nav.playerId) && game.mode === 'dungeon' && !watchedHere && (run.explore ?? 0) >= BALANCE.dungeonWatchSteps;
   const roller = party.filter((h) => isLocalPlayer(h.playerId)).sort((a, b) => statChance(b, 'agi', 'move') - statChance(a, 'agi', 'move'))[0];
   if (run.explore == null) {
     if (!roller) return null;
@@ -507,9 +584,19 @@ function ExplorePanel() {
         <b className="font-display text-[22px] leading-6 text-amber-200 tabular-nums">{run.explore}</b>
       </div>
       <div className="min-w-0 flex-1">
-        {run.exploreRoll && <RollStrip results={run.exploreRoll} small />}
-        <div className="text-[12px] text-zinc-400">{run.explore > 0 ? '歩くと1歩、扉を開けると1歩使う（向きを変えるのは0歩）' : '歩数を使い切った'}</div>
+        {watchedHere && run.watchRoll ? <RollStrip results={run.watchRoll} small /> : run.exploreRoll && <RollStrip results={run.exploreRoll} small />}
+        <div className="text-[12px] leading-4 text-zinc-400">{run.explore > 0 ? '1歩・扉で1歩（向くのは0歩）' : '歩数を使い切った'}</div>
       </div>
+      <button
+        onClick={() => setWatching(true)}
+        disabled={!canWatch}
+        className="btn btn-dark flex h-11 min-w-[48px] shrink-0 flex-col items-center justify-center rounded-lg px-2 text-[12px] leading-4 font-bold disabled:opacity-40"
+        data-watch-open
+      >
+        <Eye size={15} className="text-sky-200" />
+        警戒
+      </button>
+      {watching && <WatchPanel onClose={() => setWatching(false)} />}
       <button onClick={() => dispatchGame({ type: 'EXPLORE_END', playerId: LOCAL_PLAYER })} className="btn btn-dark h-11 shrink-0 rounded-lg px-3 text-[13px] font-bold">
         手番を終える
         <VoteChips cmd={{ type: 'EXPLORE_END', playerId: LOCAL_PLAYER }} />
