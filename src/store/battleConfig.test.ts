@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { applyGameCommand, createGame } from '../engine';
+import { applyGameCommand, createGame, reachable } from '../engine';
 import { needsVote, voters } from '../engine/game/votes';
 import type { GameCommand, GameState, PlayerId } from '../types';
 import { actorOf, isLocalPlayer, setLocalPlayers } from './battleConfig';
@@ -100,6 +100,70 @@ describe('画面から送る操作の担当者', () => {
       setLocalPlayers([seat]);
       expect(actorOf(g, choice)).toBe(seat);
       expect(voters(g).filter(isLocalPlayer)).toEqual([seat]);
+    }
+  });
+});
+
+// 1台を回して遊ぶ時、P2 の番に他の人のキャラを連れて動くと、移動先の提案への返事が「今の手番の人（P2）」として送られて
+// 「この提案に答える人ではありません」で止まっていた（レビュー資料 2026-11-09）。返事に同行キャラの heroId を付けて、その担当として送る。
+describe('同行の移動の提案への返事（担当の違う仲間を連れて動く）', () => {
+  const party = (n: number) => (['P1', 'P2', 'P3', 'P4'] as PlayerId[]).slice(0, n).map((playerId, i) => ({ playerId, classId: 'warrior', gender: 'male' as const, name: `仲間${i}` }));
+  /** P2（h1）の番で、全員が同じマスにいて、P2 がほかの全員を誘って承知してもらい、移動先を提案した所 */
+  function proposedByP2(n: number) {
+    let g = createGame({ seed: 3, scenarioId: 'corruptionKing', difficulty: 'normal', party: party(n) });
+    g.world!.story = undefined;
+    const w = g.world!;
+    const start = w.pos.h0;
+    for (const h of g.heroes) w.pos[h.id] = start;
+    w.turn = 'h1';
+    w.acted = ['h0'];
+    const others = g.heroes.filter((h) => h.id !== 'h1');
+    for (const c of others) {
+      g = send(g, { type: 'WORLD_INVITE', playerId: 'P2', heroId: 'h1', targetId: c.id }).state;
+      g = send(g, { type: 'WORLD_INVITE_ANSWER', playerId: c.playerId, heroId: c.id, accept: true }).state;
+    }
+    const rolled = send(g, { type: 'WORLD_ROLL_MOVE', playerId: 'P2', heroId: 'h1', focusUsed: 4 });
+    expect(rolled.error).toBeUndefined();
+    g = rolled.state;
+    const to = [...reachable(g.world!, start, g.world!.move ?? 0).keys()].find((t) => t !== start)!;
+    const moved = send(g, { type: 'WORLD_MOVE', playerId: 'P2', heroId: 'h1', to, companions: others.map((h) => h.id) });
+    expect(moved.error).toBeUndefined();
+    expect(moved.state.world!.moveProposal?.owners.sort()).toEqual(others.map((h) => h.playerId).sort());
+    return { g: moved.state, start, others };
+  }
+  /** 画面のボタンと同じ形の返事（返事をする担当の同行キャラを付ける） */
+  const agree = (g: GameState, p: PlayerId): GameCommand => {
+    const heroId = g.world!.moveProposal!.companions.find((id) => g.heroes.find((h) => h.id === id)?.playerId === p);
+    return { type: 'WORLD_MOVE_AGREE', playerId: p, heroId, accept: true };
+  };
+
+  for (const n of [2, 3, 4]) {
+    it(`1台で${n}人: P2 の番に全員を連れて、各担当の「一緒に行く」で全員が動く`, () => {
+      let { g, start, others } = proposedByP2(n);
+      // heroId が無い返事は、今の手番の P2 として送られて弾かれる（直す前の動き）
+      expect(actorOf(g, { type: 'WORLD_MOVE_AGREE', playerId: 'P1', accept: true })).toBe('P2');
+      for (const c of others) {
+        expect(actorOf(g, agree(g, c.playerId))).toBe(c.playerId);
+        const r = send(g, agree(g, c.playerId));
+        expect(r.error).toBeUndefined();
+        g = r.state;
+      }
+      const w = g.world!;
+      expect(w.moveProposal).toBeUndefined();
+      expect(w.pos.h1).not.toBe(start);
+      for (const h of g.heroes) expect(w.pos[h.id]).toBe(w.pos.h1);
+    });
+  }
+
+  it('オンラインでは、返事はその担当の席として送られ、ほかの席の名前では送れない', () => {
+    const { g, others } = proposedByP2(3);
+    for (const c of others) {
+      setLocalPlayers([c.playerId]);
+      expect(actorOf(g, agree(g, c.playerId))).toBe(c.playerId);
+      expect(isLocalPlayer(actorOf(g, agree(g, c.playerId)))).toBe(true);
+      // P2 の端末から P1 の返事を送ろうとしても、P1 の担当として扱われ、P2 の端末の操作にはならない
+      setLocalPlayers(['P2']);
+      expect(isLocalPlayer(actorOf(g, agree(g, c.playerId)))).toBe(false);
     }
   });
 });
