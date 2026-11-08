@@ -295,8 +295,14 @@ def build_terrains():
 # ---------------- 道具・宝箱・地図の場所 ----------------
 ITEMS = {'hammer': 53, 'bow': 54, 'staff': 55, 'sword': 56, 'armor': 57, 'robe': 58, 'boots': 59, 'ring': 60,
          'amulet': 61, 'charm': 62, 'crest': 63, 'potion': 64, 'ether': 65, 'antidote': 66, 'smoke': 67}
+# J4 の武器のアイコン（元画像は icon-<アイコンID>.png。指示文は docs/art/prompts-weapon-icons.md）
+WEAPON_ICONS = ['axe', 'fist', 'dagger', 'spear', 'katana', 'tome', 'scythe', 'scepter', 'whip', 'instrument', 'gun']
+ITEMS.update({k: f'icon-{k}' for k in WEAPON_ICONS})
 # 細長い物は斜めにして、枠いっぱいに見せる（角度は反時計回り）
-TILT = {'hammer': -40, 'bow': -45, 'staff': -45, 'sword': -45, 'charm': -40}
+TILT = {'hammer': -40, 'bow': -45, 'staff': -45, 'sword': -45, 'charm': -40,
+        # 武器のアイコン: 元画像の傾き（形の長い向き）を測って、剣と同じ「左下→右上」の斜め45度くらいにそろえる。
+        # 短剣は切っ先が下なので、半回転させて切っ先を右上に。刀（右下がり）・本・拳・鞭・楽器は元のまま
+        'axe': -25, 'spear': -20, 'scepter': -20, 'scythe': -50, 'gun': 13, 'dagger': 140}
 CHESTS = {'common': (68, False), 'rare': (69, False), 'epic': (70, True), 'legend': (71, True)}
 PLACES = {'shrine': 72, 'dungeon': 73, 'landmark': 74, 'capital': 75, 'town': 76}
 
@@ -321,11 +327,33 @@ def soft_key(n, tol=48, soft=50):
     out.putalpha(Image.fromarray(alpha.astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.8)))
     return out
 
+# 切り抜きで床の影（白い背景が少し暗くなった、薄い茶色がかった灰色）が残る絵
+SHADOW = {'dagger'}
+
+def deshadow(im, n):
+    """元画像の色で床の影を見つけて消す。影は残った本体と先の方でつながるので、
+    細いつながりを切ってから一番大きいかたまりだけを残す（刃の灰色・青みは影の色の範囲に入らない）"""
+    import cv2
+    s = np.array(Image.open(src(n)).convert('RGB')).astype(int)
+    r, g, b = s[..., 0], s[..., 1], s[..., 2]
+    sh = ((r - b >= 10) & (r - b <= 45) & (r >= 115) & (r <= 235) & (g <= r) & (g >= b)).astype(np.uint8)
+    sh = cv2.dilate(cv2.morphologyEx(sh, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8)), np.ones((5, 5), np.uint8))
+    a = np.array(im.getchannel('A'))
+    a[sh > 0] = 0
+    m = cv2.morphologyEx((a > 24).astype(np.uint8), cv2.MORPH_OPEN, np.ones((7, 7), np.uint8))
+    _, lab, st, _ = cv2.connectedComponentsWithStats(m, 8)
+    keep = cv2.dilate((lab == 1 + np.argmax(st[1:, 4])).astype(np.uint8), np.ones((7, 7), np.uint8))
+    a[keep == 0] = 0
+    res = im.copy()
+    res.putalpha(Image.fromarray(a))
+    return res
+
 def build_items():
     for key, n in ITEMS.items():
         name = f'item/{key}'
-        if not want(name): continue
-        fig = trim(cutout(n), 24)
+        if not want(name) or not has_src(n): continue
+        cut = cutout(n)
+        fig = trim(deshadow(cut, n) if key in SHADOW else cut, 24)
         if key in TILT:
             fig = trim(fig.rotate(TILT[key], resample=Image.BICUBIC, expand=True), 24)
         save(rim(square(fig, 192, 0.06)), f'{name}.webp', 82)
@@ -375,6 +403,7 @@ def gold_only(im):
     return out
 
 def build_ui():
+    if not has_src(6): return
     kit = Image.open(src(6)).convert('RGB')
     parts = {
         # 大きな枠の上の飾り（宝石つき）
