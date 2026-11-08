@@ -1,10 +1,14 @@
 // 宝箱の演出を格ごとに録画する（演出の確認用）。
 // 黄金箱で各格が出るシードを探し、そのシードで開ける様子を動画（mp4）とコマ割り画像に保存する。
+// 宝箱が開く動画（ChestVideo）が再生されたかも調べる。ffmpeg は環境変数 FFMPEG（無ければ PATH の ffmpeg）。
+// 使い方: URL=http://127.0.0.1:<番号>/card-rpg/ FFMPEG=<ffmpeg.exe> node scripts/chest-show.mjs
 import { execSync } from 'node:child_process';
 import { mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import { chromium, URL } from './lib.mjs';
 
 const OUT = 'screenshots/chest';
+const FFMPEG = process.env.FFMPEG ?? 'ffmpeg';
+const problems = [];
 mkdirSync(OUT, { recursive: true });
 const VIEW = { width: 360, height: 640 };
 const KEY = 'card-rpg/adventure';
@@ -20,7 +24,19 @@ async function newAdventure(page) {
   await page.getByText('1人', { exact: true }).click();
   await page.getByText('キャラクター作成へ').click();
   await page.getByText('冒険に出発').click();
-  await page.getByText('翠の神殿').first().click();
+  await page.waitForTimeout(300);
+  // 今の始め方: 物語を閉じて、全員を翠の神殿の入口へ移してから入る（scripts/lib.mjs の startBattle と同じ）
+  await page.evaluate((k) => {
+    const d = JSON.parse(localStorage.getItem(k));
+    const w = d.game.world;
+    const t = w.tiles.findIndex((x) => x.f && x.f.kind === 'dungeon' && x.f.id === 'emeraldTemple');
+    for (const id of Object.keys(w.pos)) w.pos[id] = t;
+    w.story = undefined;
+    localStorage.setItem(k, JSON.stringify(d));
+  }, KEY);
+  await page.reload();
+  await page.getByText('つづきから').click();
+  await page.getByText('翠の神殿に入る').click();
   await page.waitForTimeout(300);
   return page.evaluate((k) => localStorage.getItem(k), KEY);
 }
@@ -82,22 +98,36 @@ for (const [grade, { seed, look }] of Object.entries(found)) {
   await p.getByText('運のスロットで開ける').click();
   // コマ割り（0.35秒ごと）
   const frames = [];
-  for (let i = 0; i < 22; i++) {
+  let videoPlayed = false;
+  for (let i = 0; i < 30; i++) {
     const f = `${OUT}/f-${grade}-${String(i).padStart(2, '0')}.png`;
     await p.screenshot({ path: f });
     frames.push(f);
+    if (await p.locator('[data-chest-video="playing"]').count()) {
+      // 動画が本当に進んでいるか（止まっていないか）
+      const t = await p.locator('[data-chest-video="playing"] video').evaluate((v) => v.currentTime).catch(() => 0);
+      if (t > 0) videoPlayed = true;
+    }
     if (await p.getByText('先へ進む').count()) break;
     await p.waitForTimeout(350);
   }
+  if (!videoPlayed) problems.push(`${grade}: 宝箱が開く動画が再生されなかった`);
   await p.waitForTimeout(1200);
   await c.close();
   const vid = readdirSync(dir).find((f) => f.endsWith('.webm'));
   renameSync(`${dir}/${vid}`, `${OUT}/${grade}.webm`);
   rmSync(dir, { recursive: true, force: true });
-  execSync(`ffmpeg -y -loglevel error -i ${OUT}/${grade}.webm -vf "fps=30,scale=360:-2" -pix_fmt yuv420p ${OUT}/${grade}.mp4`);
+  execSync(`"${FFMPEG}" -y -loglevel error -i ${OUT}/${grade}.webm -vf "fps=30,scale=360:-2" -pix_fmt yuv420p ${OUT}/${grade}.mp4`);
   rmSync(`${OUT}/${grade}.webm`);
-  execSync(`convert ${frames.map((f) => `"${f}"`).join(' ')} -resize 50% miff:- | montage - -tile 6x -geometry +3+3 -background '#111' ${OUT}/${grade}-frames.png`);
+  // コマ割り（6列）。ImageMagick を使わず ffmpeg の tile で作る
+  const rows = Math.ceil(frames.length / 6);
+  execSync(`"${FFMPEG}" -y -loglevel error -framerate 1 -i ${OUT}/f-${grade}-%02d.png -vf "scale=iw/2:-1,tile=6x${rows}:padding=3:color=0x111111" -frames:v 1 ${OUT}/${grade}-frames.png`);
   frames.forEach((f) => rmSync(f));
   console.log(`${grade}: seed ${seed} (${look}) → ${OUT}/${grade}.mp4`);
 }
 await browser.close();
+if (problems.length) {
+  console.error(problems.join('\n'));
+  process.exit(1);
+}
+console.log('chest-show: 4つの格で、宝箱が開く動画が再生された');
