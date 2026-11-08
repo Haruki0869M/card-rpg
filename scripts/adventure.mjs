@@ -429,7 +429,8 @@ async function run(party, difficulty) {
       await page.getByText('挑戦する').click();
       continue;
     }
-    const evOpts = page.locator('.panel button.btn-dark, .panel button.bg-sky-950\\/60').filter({ hasNotText: '戻る' });
+    // 選択肢のボタン（押せないボタンと、フォーカスを増減するボタンは除く）
+    const evOpts = page.locator('.panel button.btn-dark:not([disabled]):not([aria-label^="フォーカス"]), .panel button.bg-sky-950\\/60:not([disabled])').filter({ hasNotText: '戻る' });
     if (await page.getByText('能力値で判定').count() || (await page.getByText('立ち去る').count())) {
       if (!seen.has('event')) {
         seen.add('event');
