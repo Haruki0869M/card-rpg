@@ -11,7 +11,8 @@ export const cursedArchipelago: ScenarioDef = {
   recommended: '2〜4人',
   playTime: '60〜90分',
   unlocked: false,
-  unlockText: '伝承の書で解放（準備中）',
+  unlockText: '「凍てつく王国」をクリアすると遊べる',
+  unlockRequires: { cleared: ['frozenKingdom'] },
   // 世界の悪化の名前（画面の「侵食度」の代わりに出る言葉）
   corruptionName: '霧の濃さ',
   start: { gold: 40, pouch: [{ itemId: 'potion', count: 2 }] },
