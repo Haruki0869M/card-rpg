@@ -70,11 +70,12 @@ export function SetupScreen() {
                 <BattleBackground kind={sc.art ?? 'title'} className={`absolute inset-0 h-full w-full ${sc.unlocked ? '' : 'blur-[2px] grayscale brightness-[.35]'}`} />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-transparent" />
                 {!sc.unlocked && (
-                  <div className="absolute inset-x-0 top-[22%] flex flex-col items-center gap-1 text-zinc-200">
-                    <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-zinc-400/70 bg-black/60">
-                      <Lock size={24} />
+                  // カードの上の方に横1列で置き、下の題名・あらすじと重ならないようにする
+                  <div className="absolute inset-x-3 top-3 flex items-center gap-1.5 text-zinc-200" data-scenario-lock>
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-zinc-400/70 bg-black/60">
+                      <Lock size={18} />
                     </span>
-                    <span className="rounded-full bg-black/70 px-2 text-[12px] text-amber-200">{sc.unlockText}</span>
+                    <span className="min-w-0 rounded-full bg-black/70 px-2 text-[12px] leading-5 text-amber-200">{sc.unlockText}</span>
                   </div>
                 )}
                 <div className="absolute inset-x-0 bottom-0 p-3">

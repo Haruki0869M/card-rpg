@@ -9,6 +9,6 @@ export const frozenKingdom: ScenarioDef = {
   recommended: '2〜4人',
   playTime: '60〜90分',
   unlocked: false,
-  unlockText: '伝承の書で解放（M4で追加予定）',
+  unlockText: '伝承の書で解放（準備中）',
   start: {},
 };

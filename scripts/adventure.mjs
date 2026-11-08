@@ -199,7 +199,7 @@ async function run(party, difficulty) {
           const d = (b.x + b.width / 2 - target.x) ** 2 + (b.y + b.height / 2 - target.y) ** 2;
           if (d < bestD) (bestD = d), (best = i);
         }
-        const hb = await page.locator('[data-hero].glow-pulse').boundingBox();
+        const hb = await page.locator('[data-hero][data-active]').boundingBox();
         const hd = hb ? (hb.x + hb.width / 2 - target.x) ** 2 + (hb.y + hb.height / 2 - target.y) ** 2 : Infinity;
         if (best !== null && bestD < hd) {
           await reach.nth(best).scrollIntoViewIfNeeded();

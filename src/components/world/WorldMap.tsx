@@ -12,6 +12,8 @@ import { TIMING } from '../../data/balance';
 import type { GameState, WorldState } from '../../types';
 import { HeroFace } from '../ui/game';
 import { petSpot, PetToken } from '../ui/PetToken';
+import { HeroPiece } from './HeroPiece';
+import { orderOnTile, pieceSpots, PLAYER_COLORS } from './pieceLayout';
 
 const SQRT3 = Math.sqrt(3);
 
@@ -162,6 +164,7 @@ export function WorldMap({
 
   // 移動中の地図は画面切替より上の共通部品で最後まで保持する。
   const fast = useBattle(st => st.settings.fastMode);
+  const simple = useBattle(st => st.settings.cutinMode === 'simple');
   const anim = movement;
   const stepMs = TIMING.worldMoveStep * 1000 / speedFactor({ fastMode: fast });
   const shownPos = useMemo(() => {
@@ -348,34 +351,37 @@ export function WorldMap({
             return <span key={`fp${k}`} className="footprint pointer-events-none absolute rounded-full" style={{ left: x - 5, top: y - 5, width: 10, height: 10 }} />;
           })}
         {/* キャラ */}
-        {[...heroSpots].map(([tile, ids]) =>
-          ids.map((id, k) => {
+        {[...heroSpots].map(([tile, raw]) => {
+          // 同じマスの駒は左奥から右手前へ斜めに並べ、手番のキャラを一番手前にする
+          const ids = orderOnTile(raw, w.turn);
+          const spots = pieceSpots(ids.length);
+          return ids.map((id, k) => {
             const h = game.heroes.find((x) => x.id === id);
             if (!h) return null;
             const { x, y } = center(tile);
-            const s = R * (ids.length > 1 ? 0.95 : 1.2);
-            const off = ids.length > 1 ? (k - (ids.length - 1) / 2) * s * 0.55 : 0;
+            const spot = spots[Math.min(k, spots.length - 1)];
+            const s = R * spot.size;
             const active = id === w.turn;
+            const moving = !!anim?.heroes.includes(id);
+            const hopping = moving && anim!.i > 0 && !anim!.arrived;
             return (
               <div
                 key={id}
                 data-hero={id}
                 data-tile={tile}
-                className={`pointer-events-none absolute rounded-full ${active ? 'glow-pulse' : ''}`}
+                data-active={active ? '' : undefined}
+                className="pointer-events-none absolute"
                 style={{
-                  left: x - s / 2 + off,
-                  top: y - s / 2 - (ids.length > 1 ? (k % 2) * s * 0.25 : 0),
+                  left: x - s / 2 + spot.dx * R,
+                  top: y - s * 0.62 + spot.dy * R,
                   width: s,
                   height: s,
-                  zIndex: active ? 3 : 2,
-                  boxShadow: active ? '0 0 0 3px #ffd76a, 0 0 12px #ffd76a' : '0 2px 4px #000',
-                  opacity: w.acted.includes(id) && !active ? 0.7 : 1,
-                  transition: anim?.heroes.includes(id) ? `left ${stepMs * 0.8}ms ease-out, top ${stepMs * 0.8}ms ease-out` : 'left .35s ease-out, top .35s ease-out',
+                  zIndex: 2 + spot.z + (moving ? 10 : 0),
+                  opacity: w.acted.includes(id) && !active ? 0.75 : 1,
+                  transition: moving ? `left ${stepMs * 0.8}ms ease-out, top ${stepMs * 0.8}ms ease-out` : 'left .35s ease-out, top .35s ease-out',
                 }}
               >
-                <span key={anim?.heroes.includes(id) ? `hop${anim.i}` : 'still'} className={`block ${anim?.heroes.includes(id) && anim.i > 0 && !anim.arrived ? 'token-hop' : ''}`} style={{ animationDuration: `${stepMs * 0.8}ms` }}>
-                  <HeroFace hero={h} size={s} />
-                </span>
+                <HeroPiece hero={h} size={s} ringColor={PLAYER_COLORS[h.playerId]} active={active} hopping={hopping} stepKey={moving ? anim!.i : 'still'} stepMs={stepMs} simple={simple} />
                 {/* お供: 肩に乗る・足元で1歩遅れてぴょこぴょこ付いてくる */}
                 {h.pet && (() => {
                   const sp = petSpot(h.pet.petId, s);
@@ -387,8 +393,8 @@ export function WorldMap({
                 })()}
               </div>
             );
-          }),
-        )}
+          });
+        })}
       </div>
     </div>
       {/* 手番のキャラへ戻る（地図をスクロールして見失った時） */}

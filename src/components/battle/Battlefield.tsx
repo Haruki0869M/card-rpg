@@ -58,7 +58,10 @@ function TargetFace({ allyId }: { allyId?: string }) {
 
 function IntentTargetName({ id }: { id?: string }) {
   const a = useBattle(s => s.battle.allies.find(a => a.id === id));
-  return a ? <span className="order-last w-full truncate text-center text-[12px]" data-intent-name>→{a.playerId}・{a.name}</span> : null;
+  // 予告の枠の中の一番上の行に出す（枠の下にはみ出して味方の頭と重ならないように）
+  // 敵が3体以上で枠が狭い時は「→P1」だけにして、隣の敵の予告と重ならないようにする（顔の印で誰かは分かる）
+  const narrow = useBattle(s => s.battle.enemies.length >= 3);
+  return a ? <span className="order-first w-full truncate text-center text-[12px] leading-4" data-intent-name>→{a.playerId}{narrow ? '' : `・${a.name}`}</span> : null;
 }
 function IntentPartView({ p }: { p: IntentPart }) {
   switch (p.kind) {
@@ -125,9 +128,9 @@ function IntentBubble({ enemy, onTap }: { enemy: EnemyState; onTap: () => void }
           {view.parts.map((p, i) => (
             <IntentPartView key={i} p={p} />
           ))}
-          {/* お供の先読み: 次のターンの行動の名前 */}
+          {/* お供の先読み: 次のターンの行動の名前（枠の中の最後の行。下の味方や狙いの名前に重ねない） */}
           {enemy.queuedActionId && (
-            <span className="absolute -bottom-[18px] left-1/2 -translate-x-1/2 rounded-full bg-sky-950/95 px-1.5 text-[12px] leading-4 font-bold text-sky-200 ring-1 ring-sky-300/60" data-foresee>
+            <span className="order-last max-w-full truncate rounded-full bg-sky-950/95 px-1.5 text-[12px] leading-4 font-bold text-sky-200 ring-1 ring-sky-300/60" data-foresee>
               次: {getEnemyAction(enemy.defId, enemy.queuedActionId).name}
             </span>
           )}
@@ -209,7 +212,8 @@ const EnemyUnit = memo(function EnemyUnit({
         <UnitPopups unitId={enemy.uid} top="10%" />
       </div>
       {!enemy.dead && (
-        <div className="mt-0.5 flex flex-col items-center gap-0.5" style={{ width: barW }}>
+        // 予告は味方の立ち絵より手前に出す（画面が低くて重なっても、狙いと数字を読めるように）
+        <div className="relative z-[6] mt-0.5 flex flex-col items-center gap-0.5" style={{ width: barW }}>
           <div className="text-outline w-full truncate text-center text-[12px] leading-[14px] font-bold text-zinc-100">
             <span className="text-amber-300">Lv{enemy.level}</span> {enemyName(enemy)}
           </div>
@@ -352,11 +356,18 @@ export function Battlefield() {
   const nE = enemies.length;
   const enemySlotW = W / nE;
   const enemyTop = 4;
-  const enemyInfoH = 14 + 14 + 26 + 18; // 名前 + HP + 行動の予告 + 状態異常
-  const enemySpriteH = Math.max(40, Math.min(H * 0.58 - enemyInfoH, enemySlotW * 1.15));
+  // 名前 + HP + 行動の予告（狙いの名前の行を含む）+ 先読みの行 + 状態異常
+  const foresee = enemies.some((e) => !e.dead && e.queuedActionId);
+  // 属性の印の行（16）・各行の間（0.5×5）・3体以上の時に互い違いにずらす分（10）も数える
+  const enemyInfoH = 14 + 14 + 16 + 26 + 16 + (foresee ? 18 : 0) + 18 + 10 + (nE >= 3 ? 10 : 0);
+  // 敵の列の下端と味方の頭の間に少し余白を残す（予告の枠が立ち絵の頭に重ならないように）
+  const enemySpriteH = Math.max(40, Math.min(H * 0.56 - enemyInfoH, enemySlotW * 1.15));
   const nA = allies.length;
   const allyAreaW = nA <= 2 ? W * 0.62 : W;
-  const allyH = Math.max(48, Math.min(H * 0.42, (allyAreaW / nA) * 1.25));
+  // 味方の立ち絵は、敵の列（予告まで）の下に収まる高さにする。画面が低い時でも元の6割より小さくしない
+  const allyFull = Math.min(H * 0.42, (allyAreaW / nA) * 1.25);
+  const enemyBottom = enemyTop + enemySpriteH + enemyInfoH;
+  const allyH = Math.max(48, allyFull * 0.6, Math.min(allyFull, H - 6 - enemyBottom));
 
   return (
     <div ref={ref} className="relative min-h-[190px] flex-1 overflow-hidden">
