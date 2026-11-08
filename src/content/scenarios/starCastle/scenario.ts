@@ -11,10 +11,8 @@ export const starCastle: ScenarioDef = {
   synopsis: '夜空から落ちる星のかけらが、天空城の女王を狂わせている。三つの星環を集めて天空城へ入り、星の暴走を止めよ。',
   recommended: '2〜4人',
   playTime: '60〜90分',
-  unlocked: false,
-  // 作成中: 敵・数値がそろうまで遊べない。仕上げる時に wip を消し、unlockText を「「砂塵の王朝」をクリアすると遊べる」にする
-  wip: true,
-  unlockText: '準備中（もうすぐ遊べます）',
+  unlocked: true,
+  unlockText: '「砂塵の王朝」をクリアすると遊べる',
   unlockRequires: { cleared: ['sandDynasty'] },
   // 世界の悪化の名前（画面の「侵食度」の代わりに出る言葉）
   corruptionName: '星の暴走',

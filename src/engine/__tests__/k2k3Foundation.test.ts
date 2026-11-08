@@ -179,7 +179,10 @@ describe('K3 敵の亜種', () => {
 
   it('亜種は全体の2割以下で、元の敵が実在し、属性か開幕の特性が違い、オーラが付く', () => {
     const variants = ENEMIES.all.filter((e) => e.variantOf);
-    expect(variants.length).toBeLessThanOrEqual(Math.floor(ENEMIES.all.length * 0.2));
+    // 夢幻の大迷宮（7本目・総集編）の「夢の再来」は、過去の敵の絵を使い回す例外（オーナー承認済み）なので、2割の数に入れない
+    const isDreamEcho = (e: EnemyDef) => ENEMIES.scenarioOf(e.id) === 'dreamLabyrinth' && !!e.variantOf;
+    const counted = ENEMIES.all.filter((e) => !isDreamEcho(e));
+    expect(counted.filter((e) => e.variantOf).length).toBeLessThanOrEqual(Math.floor(counted.length * 0.2));
     for (const v of variants) {
       const base = ENEMIES.tryGet(v.variantOf!);
       expect(base, `${v.id}: 元の敵 ${v.variantOf}`).toBeDefined();
