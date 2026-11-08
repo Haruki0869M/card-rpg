@@ -32,7 +32,7 @@ export const randomEvents: EventDef[] = [
         successText: '小鳥は木の実をついばみ、すっかり懐いた！',
         failText: '木の実は見つからなかった。小鳥はどこかへ行ってしまった。',
       },
-      { label: 'エサを買って分けてあげる', cost: 50, success: [{ kind: 'pet', species: BIRDS }], successText: '小鳥はお腹いっぱいになって、肩から離れなくなった！' },
+      { label: 'エサを買って分けてあげる', cost: 50, success: [{ kind: 'loseGold', amount: 50 }, { kind: 'pet', species: BIRDS }], successText: '小鳥はお腹いっぱいになって、肩から離れなくなった！' },
       { label: 'そっと見送る', success: [{ kind: 'nothing' }], successText: '小鳥は空へ帰っていった。' },
       // 既存の選択肢の番号を変えないよう、最後に置く
       { label: 'お供のおやつを差し出す', costItem: 'petSnack', success: [{ kind: 'pet', species: BIRDS }], successText: '小鳥はおやつに目を輝かせ、迷わず肩に乗ってきた！' },
@@ -76,7 +76,7 @@ export const randomEvents: EventDef[] = [
     icon: 'cart',
     text: '派手な荷馬車の商人が声をかけてきた。「珍しい生き物を保護したんだが、引き取らないかい？」',
     options: [
-      { label: '2匹の中から選んで引き取る', cost: 60, success: [{ kind: 'pet', count: 2 }], successText: '檻の中の2匹が、じっとこちらを見ている。' },
+      { label: '2匹の中から選んで引き取る', cost: 60, success: [{ kind: 'loseGold', amount: 60 }, { kind: 'pet', count: 2 }], successText: '檻の中の2匹が、じっとこちらを見ている。' },
       {
         label: 'サイコロ勝負（3枠すべて成功で、めったに出ない子をタダで）',
         check: { stat: 'luk', slots: 3, need: 3 },
