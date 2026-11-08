@@ -38,12 +38,8 @@ export const clockworkEmpireMap: ScenarioMapDef = {
       rows: [9, 15],
       terrain: { steam: 5, hills: 2, metal: 1 },
       enemyLevel: 5,
-<<<<<<< HEAD
-      encounters: [['steamSprite', 'wrenchGolem'], ['boilerCrab', 'clockworkDog'], ['emberOilSlime', 'clockworkDog'], ['steamSprite', 'sparkTurret']],
-      rareEncounters: [['crimsonSteamHound'], ['crimsonSteamHound', 'clockworkDog']],
-=======
       encounters: [['pressGolem', 'steamSprite'], ['steamSprite', 'wrenchGolem'], ['boilerCrab', 'clockworkDog'], ['emberOilSlime', 'clockworkDog'], ['steamSprite', 'sparkTurret']],
->>>>>>> ccr-d64a1cfc-debli5
+      rareEncounters: [['crimsonSteamHound'], ['crimsonSteamHound', 'clockworkDog']],
       wanderers: 4,
       chests: 2,
       events: 2,
@@ -70,12 +66,8 @@ export const clockworkEmpireMap: ScenarioMapDef = {
       rows: [22, 27],
       terrain: { plains: 5, metal: 1, hills: 2 },
       enemyLevel: 1,
-<<<<<<< HEAD
-      encounters: [['gearBug', 'steamRat'], ['steamRat', 'brokenAutomaton'], ['gearBug', 'brokenAutomaton'], ['brokenAutomaton', 'gearBug', 'gearBug']],
-      rareEncounters: [['brassClockCat'], ['brassClockCat', 'gearBug']],
-=======
       encounters: [['smokeStackCrow', 'steamRat'], ['gearBug', 'steamRat'], ['steamRat', 'brokenAutomaton'], ['gearBug', 'brokenAutomaton'], ['brokenAutomaton', 'gearBug', 'gearBug']],
->>>>>>> ccr-d64a1cfc-debli5
+      rareEncounters: [['brassClockCat'], ['brassClockCat', 'gearBug']],
       wanderers: 3,
       chests: 2,
       events: 2,

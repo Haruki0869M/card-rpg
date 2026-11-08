@@ -76,12 +76,8 @@ export const cursedArchipelagoMap: ScenarioMapDef = {
       rows: [22, 27],
       terrain: { plains: 5, forest: 1, hills: 1, sea: 2 },
       enemyLevel: 1,
-<<<<<<< HEAD
-      encounters: [['seaCrab', 'pirateGrunt'], ['pirateGrunt', 'seaCrab', 'pirateGrunt'], ['seaCrab', 'pirateGrunt', 'seaCrab']],
-      rareEncounters: [['pearlCrab'], ['pearlCrab', 'pirateGrunt']],
-=======
       encounters: [['driftwoodSpirit', 'seaCrab'], ['seaCrab', 'pirateGrunt'], ['pirateGrunt', 'seaCrab', 'pirateGrunt'], ['seaCrab', 'pirateGrunt', 'seaCrab']],
->>>>>>> ccr-d64a1cfc-debli5
+      rareEncounters: [['pearlCrab'], ['pearlCrab', 'pirateGrunt']],
       wanderers: 3,
       chests: 2,
       events: 2,

@@ -58,12 +58,8 @@ export const frozenKingdomMap: ScenarioMapDef = {
       terrain: { forest: 3, snow: 4, hills: 1 },
       climate: { kind: 'cold', ratio: 0.05 },
       enemyLevel: 4,
-<<<<<<< HEAD
-      encounters: [["iceBat", "frozenSoldier"], ["snowOwl", "icicleBug"], ["emberFrostWolf", "frozenSoldier"], ["frostWolf", "snowOwl"]],
-      rareEncounters: [["whiteStag"], ["whiteStag", "snowOwl"]],
-=======
       encounters: [['frostMoth', 'snowOwl'], ["iceBat", "frozenSoldier"], ["snowOwl", "icicleBug"], ["emberFrostWolf", "frozenSoldier"], ["frostWolf", "snowOwl"]],
->>>>>>> ccr-d64a1cfc-debli5
+      rareEncounters: [["whiteStag"], ["whiteStag", "snowOwl"]],
       wanderers: 4,
       chests: 2,
       events: 2,
