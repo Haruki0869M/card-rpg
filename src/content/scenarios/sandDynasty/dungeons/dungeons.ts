@@ -4,7 +4,7 @@ import type { DungeonDef } from '../../../../types';
 
 /** 蠍の墓所: 廃墟の敵と王家の衛兵ミイラ */
 const TOMB_POOLS: DungeonDef['pools'] = {
-  battle: [['sandScorpion', 'tombRobber'], ['jackalWarrior', 'sandScorpion'], ['desertViper', 'tombRobber'], ['jackalWarrior', 'tombRobber']],
+  battle: [['desertFennec', 'jackalWarrior'], ['sandScorpion', 'tombRobber'], ['jackalWarrior', 'sandScorpion'], ['desertViper', 'tombRobber'], ['jackalWarrior', 'tombRobber']],
   elite: [['royalGuardMummy'], ['royalGuardMummy', 'desertViper']],
   boss: ['sandScorpionKing'],
 };
@@ -18,14 +18,14 @@ const LIBRARY_POOLS: DungeonDef['pools'] = {
 
 /** 石像の神殿: 谷の敵と砂の大蛇（スフィンクスの子は、フォーカスを奪う部品が入ってから足す） */
 const TEMPLE_POOLS: DungeonDef['pools'] = {
-  battle: [['sandWorm', 'cursedPriest'], ['clayGolem', 'mummyArcher'], ['cursedMummy', 'stormVulture'], ['sandWorm', 'mummyArcher']],
+  battle: [['obeliskSentinel', 'cursedPriest'], ['sandWorm', 'cursedPriest'], ['clayGolem', 'mummyArcher'], ['cursedMummy', 'stormVulture'], ['sandWorm', 'mummyArcher']],
   elite: [['sandSerpentLord'], ['sandSerpentLord', 'cursedPriest']],
   boss: ['stoneGuardianBeast'],
 };
 
 /** 砂塵の王宮: 王宮前の敵と石像の巨兵（石の猫像は、反撃の部品が入ってから足す） */
 const PALACE_POOLS: DungeonDef['pools'] = {
-  battle: [['venomJackalWarrior', 'cursedPriest'], ['venomJackalWarrior', 'mummyArcher'], ['cursedMummy', 'clayGolem']],
+  battle: [['venomMummyArcher', 'cursedPriest'], ['venomJackalWarrior', 'cursedPriest'], ['venomJackalWarrior', 'mummyArcher'], ['cursedMummy', 'clayGolem']],
   elite: [['colossusStatue'], ['colossusStatue', 'cursedPriest']],
   boss: ['sandPharaoh'],
 };

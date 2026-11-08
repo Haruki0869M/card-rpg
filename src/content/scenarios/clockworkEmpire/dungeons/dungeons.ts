@@ -3,19 +3,19 @@
 import type { DungeonDef } from '../../../../types';
 
 const FACTORY_POOLS: DungeonDef['pools'] = {
-  battle: [['conveyorBot', 'oilSlime'], ['riveter', 'sparkTurret'], ['voltGearBug', 'brokenAutomaton'], ['gearBug', 'conveyorBot', 'oilSlime']],
+  battle: [['smokeStackCrow', 'conveyorBot'], ['conveyorBot', 'oilSlime'], ['riveter', 'sparkTurret'], ['voltGearBug', 'brokenAutomaton'], ['gearBug', 'conveyorBot', 'oilSlime']],
   elite: [['foremanBot', 'brokenAutomaton'], ['stormForemanBot', 'oilSlime']],
   boss: ['foremanGolem'],
 };
 
 const PLANT_POOLS: DungeonDef['pools'] = {
-  battle: [['steamSprite', 'wrenchGolem'], ['boilerCrab', 'clockworkDog'], ['emberOilSlime', 'wrenchGolem'], ['sparkTurret', 'clockworkDog']],
+  battle: [['pressGolem', 'steamSprite'], ['steamSprite', 'wrenchGolem'], ['boilerCrab', 'clockworkDog'], ['emberOilSlime', 'wrenchGolem'], ['sparkTurret', 'clockworkDog']],
   elite: [['steamTurretLord', 'clockworkDog'], ['steamTurretLord']],
   boss: ['runawayBoiler'],
 };
 
 const TOWER_POOLS: DungeonDef['pools'] = {
-  battle: [['pistonFist', 'furnaceImp'], ['venomBoilerCrab', 'pistonFist'], ['furnaceImp', 'wrenchGolem'], ['venomBoilerCrab', 'furnaceImp']],
+  battle: [['ironClockworkDog', 'furnaceImp'], ['pistonFist', 'furnaceImp'], ['venomBoilerCrab', 'pistonFist'], ['furnaceImp', 'wrenchGolem'], ['venomBoilerCrab', 'furnaceImp']],
   elite: [['ironButler', 'furnaceImp'], ['chainSaw']],
   boss: ['clockworkSage'],
 };
