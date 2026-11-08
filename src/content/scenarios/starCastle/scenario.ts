@@ -11,7 +11,9 @@ export const starCastle: ScenarioDef = {
   recommended: '2〜4人',
   playTime: '60〜90分',
   unlocked: false,
-  unlockText: '「砂塵の王朝」をクリアすると遊べる',
+  // 作成中: 敵・数値がそろうまで遊べない。仕上げる時に wip を消し、unlockText を「「砂塵の王朝」をクリアすると遊べる」にする
+  wip: true,
+  unlockText: '準備中（もうすぐ遊べます）',
   unlockRequires: { cleared: ['sandDynasty'] },
   // 世界の悪化の名前（画面の「侵食度」の代わりに出る言葉）
   corruptionName: '星の暴走',

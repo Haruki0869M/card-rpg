@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { DUNGEONS } from '../../data/dungeons';
 import { EVENTS } from '../../data/events';
 import { ITEMS } from '../../data/items';
-import { getScenario } from '../../data/scenarios';
+import { SCENARIOS, getScenario, isScenarioUnlocked } from '../../data/scenarios';
 import { QUESTS, SHRINES, TOWNS } from '../../data/world';
 import { createGame } from '../index';
 
@@ -62,6 +62,16 @@ describe.each(PACKS)('追加シナリオ %s', (sid, gearCount, prev, randomIds) 
 
   it('前の本をクリアすると解放される。世界マップから始められる', () => {
     expect(sc.unlockRequires).toEqual({ cleared: [prev] });
+    // 作成中（wip）は、前の本をクリアしていても遊べない。仕上げて wip を外すと、前の本のクリアで遊べる
+    const everything = SCENARIOS.all.map((s) => s.id);
+    if (sc.wip) {
+      expect(isScenarioUnlocked(sc, [prev])).toBe(false);
+      expect(isScenarioUnlocked(sc, everything)).toBe(false);
+      expect(sc.unlocked).toBe(false);
+    } else {
+      expect(isScenarioUnlocked(sc, [])).toBe(false);
+      expect(isScenarioUnlocked(sc, [prev])).toBe(true);
+    }
     const g = createGame({ seed: 3, scenarioId: sid, difficulty: 'normal', party: [{ classId: 'warrior', gender: 'male', name: 'a', playerId: 'P1' }] });
     expect(g.world).toBeDefined();
     expect(g.world!.width).toBe(8);
