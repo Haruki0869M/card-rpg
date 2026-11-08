@@ -54,30 +54,32 @@ async function run(width) {
     g.heroes[1].playerId = 'P2';
   });
   if (await cutin.count()) ng('始めた直後（手番が変わっていない）にカットインが出た');
-  // P1 が待機 → P2 の番の大きなカットイン
+  // フェーズ2-C: 1台で担当が P1→P2 に変わる時は、カットインを出さず、受け渡しの画面（カットインと同じ見た目）1枚だけ
+  const handoffScreen = page.getByLabel('手番を始める');
+  const watchNoCutin = async (label) => {
+    for (let i = 0; i < 12; i++) { if (await cutin.count()) { ng(`${label}: 受け渡しの画面と一緒にカットインも出た`); break; } await page.waitForTimeout(40); }
+  };
   await page.getByText('待機', { exact: true }).click();
-  await cutin.waitFor({ timeout: 3000 }).catch(() => ng('P2の番のカットインが出ない'));
+  await handoffScreen.waitFor({ timeout: 3000 }).catch(() => ng('P2の番の受け渡しの画面が出ない'));
+  await watchNoCutin('P1→P2');
   await page.waitForTimeout(350);
-  await shot('1-p2-turn');
-  const text = (await cutin.innerText().catch(() => '')).replace(/\s+/g, ' ');
-  if (!text.includes('の番！')) ng(`カットインの文言: ${text}`);
-  // 世界マップでは、受け渡しの一言は元からある受け渡しの画面が言う（カットインには出さない）
-  if (text.includes('スマホを')) ng('世界マップでカットインと受け渡しの画面の両方に一言が出ている');
-  if (!text.includes('世界マップ')) ng('場所（世界マップ）が無い');
+  await shot('1-p2-handoff');
+  const text = (await handoffScreen.innerText().catch(() => '')).replace(/\s+/g, ' ');
+  if (!text.includes('の番！')) ng(`受け渡しの画面の文言: ${text}`);
+  if (!text.includes('スマホを P2 さんに渡してください')) ng('受け渡しの画面に渡す相手の一言が無い');
+  if (!text.includes('スマホを渡して、タップで始める')) ng('受け渡しの画面に「タップで始める」が無い');
+  if ((await page.getByLabel('手番を始める').count()) !== 1) ng('受け渡しの画面が1枚ではない');
   const issues = await layoutIssues(page);
-  if (issues.length) ng(`カットインの表示: ${issues.join(' / ')}`);
-  // 約1.2秒で自動で消える
-  await cutin.waitFor({ state: 'detached', timeout: 3000 }).catch(() => ng('カットインが自動で消えない'));
-  if (!(await page.getByText('スマホを渡して、タップで始める').count())) ng('カットインの後に受け渡しの画面が出ない');
-  await shot('1b-handoff');
+  if (issues.length) ng(`受け渡しの画面の表示: ${issues.join(' / ')}`);
+  // 自動では消えない（盗み見を防ぐため、タップで始める）
+  await page.waitForTimeout(1600);
+  if (!(await handoffScreen.count())) ng('受け渡しの画面が自動で消えた');
   await startTurn();
-  // P2 が待機 → P1 の番。タップですぐ消える
+  if (await handoffScreen.count()) ng('タップしても受け渡しの画面が消えない');
+  // P2 が待機 → P1 の番も同じ（受け渡しの画面だけ）
   await page.getByText('待機', { exact: true }).click();
-  await cutin.waitFor({ timeout: 3000 }).catch(() => ng('P1の番のカットインが出ない'));
-  const t0 = Date.now();
-  await cutin.click();
-  await cutin.waitFor({ state: 'detached', timeout: 1000 }).catch(() => ng('タップで消えない'));
-  if (Date.now() - t0 > 800) ng('タップで消えるのが遅い');
+  await handoffScreen.waitFor({ timeout: 3000 }).catch(() => ng('P1の番の受け渡しの画面が出ない'));
+  await watchNoCutin('P2→P1');
   await startTurn();
   // ダンジョン: P1 が1人で翠の神殿に入る → P2 の番（世界マップ）→ P2 が待機 → P1 の番はダンジョンの中
   await edit((g) => {
@@ -91,7 +93,8 @@ async function run(width) {
   });
   await startTurn();
   await page.getByText('翠の神殿に入る').click();
-  await cutin.waitFor({ timeout: 3000 }).catch(() => ng('ダンジョンに入った後のP2の番のカットインが出ない'));
+  // 入った後は世界マップの P2 の番（1台で担当が変わる → 受け渡しの画面だけ）
+  await handoffScreen.waitFor({ timeout: 3000 }).catch(() => ng('ダンジョンに入った後のP2の番の受け渡しの画面が出ない'));
   await cutin.click().catch(() => {});
   await cutin.waitFor({ state: 'detached', timeout: 2000 }).catch(() => {});
   await startTurn();
@@ -118,4 +121,4 @@ if (problems.length) {
   console.log('NG:\n' + problems.join('\n'));
   process.exit(1);
 }
-console.log('OK: 手番のカットイン（P1→P2・1台の一言・自動で消える・タップで消える・ダンジョンの組の番）360/390/480px');
+console.log('OK: 手番の表示（1台で担当が変わる時は受け渡しの画面1枚・タップで始める・ダンジョンの組の番のカットイン）360/390/480px');

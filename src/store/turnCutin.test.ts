@@ -15,8 +15,8 @@ vi.hoisted(() => {
   });
 });
 
-function twoPlayers(): GameState {
-  const g = createGame({ seed: 3, scenarioId: 'corruptionKing', difficulty: 'normal', party: (['P1', 'P2'] as PlayerId[]).map((playerId, i) => ({ classId: 'warrior', gender: 'male' as const, name: `仲間${i}`, playerId })) });
+function twoPlayers(players: PlayerId[] = ['P1', 'P2']): GameState {
+  const g = createGame({ seed: 3, scenarioId: 'corruptionKing', difficulty: 'normal', party: players.map((playerId, i) => ({ classId: 'warrior', gender: 'male' as const, name: `仲間${i}`, playerId })) });
   g.world!.story = undefined;
   g.world!.turn = 'h0';
   return g;
@@ -28,8 +28,18 @@ afterEach(() => {
 });
 
 describe('手番のカットイン', () => {
-  it('1台で2人: 手番が P2 に移ると大きなカットイン。同じ手番のままの操作では出ない', () => {
+  it('1台で担当が P1→P2 に変わる（世界マップの画面のまま）: カットインは出さず、受け渡しの画面1枚だけ（フェーズ2-C）', () => {
     useBattle.getState().loadRemote(twoPlayers());
+    expect(useBattle.getState().dispatchWire({ type: 'WORLD_WAIT', playerId: 'P1', heroId: 'h0' })).toBeUndefined();
+    expect(useBattle.getState().full!.world!.turn).toBe('h1');
+    expect(useBattle.getState().turnCutin).toBeNull();
+    // P2 → P1 も同じ
+    expect(useBattle.getState().dispatchWire({ type: 'WORLD_WAIT', playerId: 'P2', heroId: 'h1' })).toBeUndefined();
+    expect(useBattle.getState().turnCutin).toBeNull();
+  });
+
+  it('1台で2人（担当が同じ P1）: 手番が2人目に移ると大きなカットイン。同じ手番のままの操作では出ない', () => {
+    useBattle.getState().loadRemote(twoPlayers(['P1', 'P1']));
     expect(useBattle.getState().turnCutin).toBeNull();
     expect(useBattle.getState().dispatchWire({ type: 'WORLD_ROLL_MOVE', playerId: 'P1', heroId: 'h0', focusUsed: 0 })).toBeUndefined();
     expect(useBattle.getState().turnCutin).toBeNull();
@@ -53,8 +63,8 @@ describe('手番のカットイン', () => {
     useBattle.getState().loadRemote(g);
     expect(useBattle.getState().dispatchWire({ type: 'WORLD_INTERACT', playerId: 'P1', heroId: 'h0', party: ['h0'] })).toBeUndefined();
     const exp = useBattle.getState().full!.expeditions![0].id;
-    // 入った番は終わり、世界マップの h1 の番
-    expect(useBattle.getState().turnCutin).toMatchObject({ heroId: 'h1', scene: WORLD_SCENE });
+    // 入った番は終わり、世界マップの h1（P2）の番。1台で世界マップの画面のまま担当が変わるので、受け渡しの画面だけ（カットインは出さない。フェーズ2-C）
+    expect(useBattle.getState().turnCutin).toBeNull();
     useBattle.getState().setScene(WORLD_SCENE);
     expect(useBattle.getState().dispatchWire({ type: 'WORLD_WAIT', playerId: 'P2', heroId: 'h1' })).toBeUndefined();
     expect(useBattle.getState().turnCutin).toMatchObject({ heroId: 'h0', mine: true, scene: exp });
@@ -62,7 +72,7 @@ describe('手番のカットイン', () => {
   });
 
   it('物語を読んでいる間は、帯を出さずに後回しにする（物語を閉じると出る）。手番の状態は変わらない', () => {
-    useBattle.getState().loadRemote(twoPlayers());
+    useBattle.getState().loadRemote(twoPlayers(['P1', 'P1']));
     useBattle.getState().dispatchWire({ type: 'WORLD_WAIT', playerId: 'P1', heroId: 'h0' });
     const c = useBattle.getState().turnCutin!;
     expect(c).not.toBeNull();
@@ -74,7 +84,7 @@ describe('手番のカットイン', () => {
   });
 
   it('冒険の画面を離れると消える', () => {
-    useBattle.getState().loadRemote(twoPlayers());
+    useBattle.getState().loadRemote(twoPlayers(['P1', 'P1']));
     useBattle.getState().dispatchWire({ type: 'WORLD_WAIT', playerId: 'P1', heroId: 'h0' });
     expect(useBattle.getState().turnCutin).not.toBeNull();
     useBattle.getState().setScreen('title');

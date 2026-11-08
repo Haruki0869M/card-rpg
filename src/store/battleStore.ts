@@ -36,7 +36,8 @@ import {
 import type { Room } from '../net/room';
 import type { BattleEvent, BattleState, Command, Difficulty, DungeonRun, GameCommand, GameResult, GameState, Gender, PlayerId, SlotResult } from '../types';
 import { pickAllyTarget } from './healTarget';
-import { actorOf, autoName, battleActorOf, isLocalPlayer, LOCAL_PLAYER } from './battleConfig';
+import { actorOf, autoName, battleActorOf, isLocalPlayer, isOnlinePlay, LOCAL_PLAYER } from './battleConfig';
+import { handoffReplacesCutin } from './handoff';
 
 export interface Selection {
   cardUid: string;
@@ -527,6 +528,8 @@ export const useBattle = create<StoreState>((set, get) => {
     const before = get().full;
     const full = r.state;
     const prevBattle = get().game?.battle;
+    // 前に見ていた場面が世界マップの画面だったか（手番の受け渡しの画面が出ていたか。フェーズ2-C）
+    const worldBefore = get().scene === WORLD_SCENE && get().game?.mode === 'world';
     let scene = get().scene;
     // ダンジョンに入った: この端末のキャラが入ったなら、その場面を見る
     const added = (full.expeditions ?? []).find((x) => !before?.expeditions?.some((y) => y.id === x.id));
@@ -565,7 +568,16 @@ export const useBattle = create<StoreState>((set, get) => {
     // 手番が移った: カットイン（自分のキャラなら大きく、ほかの人のキャラなら小さなお知らせ）
     if (before && turn && turn !== before.world?.turn) {
       const mine = isLocalPlayer(full.heroes.find((h) => h.id === turn)?.playerId ?? 'P1');
-      patch.turnCutin = { id: fxId++, heroId: turn, mine, scene: sceneOfHero(full, turn) };
+      // 1台で、世界マップの画面のまま担当の人が変わる時は、受け渡しの画面（カットインと同じ見た目）だけを出す
+      const handoff = handoffReplacesCutin({
+        online: isOnlinePlay(),
+        worldBefore,
+        worldAfter: scene === WORLD_SCENE && next.mode === 'world',
+        prevPlayer: before.heroes.find((h) => h.id === before.world?.turn)?.playerId,
+        nextPlayer: full.heroes.find((h) => h.id === turn)?.playerId,
+        players: new Set(full.heroes.filter((h) => !h.retired && h.hp > 0).map((h) => h.playerId)).size,
+      });
+      patch.turnCutin = handoff ? null : { id: fxId++, heroId: turn, mine, scene: sceneOfHero(full, turn) };
       if (mine) vibrate(get().settings, VIBRATION.turn);
       playSound(mine ? 'sfx_turn_cutin' : 'sfx_turn_notice');
     }
