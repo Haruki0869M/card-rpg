@@ -1,4 +1,5 @@
 // アートの登録表。職業・敵の絵はここから引く。無ければ汎用の仮の絵を使う。
+import { ENEMY_AURAS } from '../data/enemyAuras';
 import type { ComponentType, CSSProperties } from 'react';
 import { CLASSES } from '../data/classes';
 import { ENEMIES } from '../data/enemies';
@@ -30,7 +31,9 @@ function collectArt<T>(mods: Record<string, Record<string, unknown>>, key: strin
 const ENEMY_ART = collectArt<EnemyArtComponent>(import.meta.glob('./enemies/*.tsx', { eager: true }), 'enemyArt');
 
 /** 絵がある敵か（データ検査用） */
-export const hasEnemyArt = (defId: string) => !!ENEMY_ART[defId] || !!artImage(`enemy/${defId}`);
+/** 絵を探すID（亜種は元の敵の絵を使い回す） */
+const artIdOf = (defId: string): string => (ENEMIES.tryGet(defId)?.variantOf ?? defId);
+export const hasEnemyArt = (defId: string) => !!ENEMY_ART[artIdOf(defId)] || !!artImage(`enemy/${artIdOf(defId)}`);
 
 const heroKey = (classId: string, gender: Gender, face?: boolean, weapon?: Rarity) =>
   `hero:${classId}:${gender}:${face ? 'face' : 'full'}:${weapon ?? '-'}`;
@@ -47,7 +50,7 @@ function renderHero(classId: string, gender: Gender, face?: boolean, weapon?: Ra
   return <FallbackHero label={name.slice(0, 1)} viewBox={viewBox} />;
 }
 function renderEnemy(defId: string, phase = 0) {
-  const Comp = ENEMY_ART[defId];
+  const Comp = ENEMY_ART[artIdOf(defId)];
   if (Comp) return <Comp phase={phase} />;
   const name = ENEMIES.tryGet(defId)?.name ?? '?';
   return <FallbackEnemy label={name.slice(0, 1)} />;
@@ -68,7 +71,10 @@ export function prepareArt() {
 }
 
 const heroImage = (classId: string, gender: Gender, face?: boolean) => artImage(`hero/${classId}-${gender}${face ? '-face' : ''}`);
-const enemyImage = (defId: string, phase: number) => (phase ? artImage(`enemy/${defId}-${phase}`) : undefined) ?? artImage(`enemy/${defId}`);
+const enemyImage = (defId: string, phase: number) => {
+  const id = artIdOf(defId);
+  return (phase ? artImage(`enemy/${id}-${phase}`) : undefined) ?? artImage(`enemy/${id}`);
+};
 
 /** 武器のレア度の光（足もとの輪）。ふつうの武器では出さない */
 function WeaponAura({ rarity }: { rarity?: Rarity }) {
@@ -128,9 +134,21 @@ function CharacterSvgArt({
 const enemyKey = (defId: string, phase: number) => `enemy:${defId}:${phase}`;
 
 export function EnemyArt({ defId, phase = 0, className }: { defId: string; phase?: number; className?: string }) {
+  const aura = ENEMIES.tryGet(defId)?.aura;
   const img = enemyImage(defId, phase);
-  if (img) return <ArtImage src={img} className={className} />;
-  return <EnemySvgArt defId={defId} phase={phase} className={className} />;
+  const inner = img ? <ArtImage src={img} className={aura ? 'h-full w-full' : className} /> : <EnemySvgArt defId={defId} phase={phase} className={aura ? 'h-full w-full' : className} />;
+  if (!aura || !ENEMY_AURAS[aura]) return inner;
+  // 亜種: 足元に属性の色のオーラ（元の敵と見分ける）
+  const c = ENEMY_AURAS[aura].color;
+  return (
+    <span className={`relative block ${className ?? ''}`} data-aura={aura}>
+      <span
+        className="pointer-events-none absolute bottom-[1%] left-1/2 h-[10%] w-[86%] -translate-x-1/2 rounded-[50%]"
+        style={{ border: `2px solid ${c}`, background: `radial-gradient(closest-side, ${c}77, ${c}22 70%, transparent)`, boxShadow: `0 0 12px ${c}` }}
+      />
+      {inner}
+    </span>
+  );
 }
 
 function EnemySvgArt({ defId, phase = 0, className }: { defId: string; phase?: number; className?: string }) {

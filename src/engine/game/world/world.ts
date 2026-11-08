@@ -13,7 +13,7 @@ import type { Rng } from '../../rng';
 import { addPetLove, petExplore } from '../pets';
 import { addLog, campFocusOf, moveSlotsOf, ownedBy, restMultiplierOf, rollWithFocus, splitGold, statChance, successes } from '../common';
 import { enterDungeonFromWorld, startBattleWith } from '../game';
-import { heroFocusMax, heroMaxHp } from '../hero';
+import { equippedItems, heroFocusMax, heroMaxHp } from '../hero';
 import { activeHeroes, expeditionOf, findHero, livingHeroes, mapHeroes, sceneHeroes } from '../heroes';
 import { revealAround } from './fog';
 import { hexDistance, pathTo, reachable } from './hex';
@@ -380,7 +380,7 @@ export function camp(game: GameState, cmd: Cmd<'WORLD_CAMP'>, rng: Rng): string 
   if (w.tiles[tile].f?.kind === 'town') return '町の中では野営できません（宿屋を使えます）';
   if (w.move !== null && w.move < (BALANCE.moveBase as number)) return '移動した後は野営できません';
   const chance = campAmbushChance(game, h.id);
-  h.hp = Math.min(heroMaxHp(h), h.hp + Math.ceil(heroMaxHp(h) * BALANCE.campHpRatio * (restMultiplierOf(h) + (petExplore(h).campHeal ?? 0))));
+  h.hp = Math.min(heroMaxHp(h), h.hp + Math.ceil(heroMaxHp(h) * BALANCE.campHpRatio * (restMultiplierOf(h) + (petExplore(h).campHeal ?? 0) + equippedItems(h).reduce((n, i) => n + (i.explore?.campHeal ?? 0), 0))));
   h.focus = Math.min(heroFocusMax(h), h.focus + BALANCE.campFocus + campFocusOf(h));
   addLog(game, `${h.name}は野営して体を休めた`);
   if (chance > 0 && rng.next() * 100 < chance) {

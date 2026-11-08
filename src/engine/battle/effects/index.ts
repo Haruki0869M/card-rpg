@@ -2,7 +2,7 @@
 // 新しい効果: kinds/ にファイルを1つ置いて export const effect: EffectHandler<'種類'> = {...} と書くだけ。
 // カード・敵の行動・消費アイテム・特殊能力のデータから、その日から使える。
 import type { AbilityDef, BattleEvent, BattleState, CardDef, Effect, EffectKind, EffectTarget } from '../../../types';
-import { coverChance, damageModifiers, fireAbilities } from '../../abilities';
+import { convertedElement, coverChance, damageModifiers, elementGuardOf, fireAbilities } from '../../abilities';
 import type { Rng } from '../../rng';
 import { BALANCE } from '../../../data/balance';
 import { getElement } from '../../../data/elements';
@@ -11,7 +11,7 @@ import { getStatus } from '../../../data/statuses';
 import { absorb, calcDamage } from '../damage';
 import { addStatus } from '../statuses';
 import { attackElement } from '../cardState';
-import { abilityTriggered, addLog, afterHpLoss, findAlly, foesOf, isEnemy, nameOf, sideOf, type Unit, unitIdOf } from '../units';
+import { abilityTriggered, addLog, afterHpLoss, findAlly, foesOf, healUnit, isEnemy, nameOf, sideOf, type Unit, unitIdOf } from '../units';
 import { recordActivation, type EffectCtx, type EffectHandler } from './types';
 
 export type { EffectCtx, EffectHandler } from './types';
@@ -181,7 +181,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   const { state, rng, events, source } = ctx;
   if (victim.dead) return 0;
   // 武器に宿った属性: 属性の無い物理攻撃がその属性になる（妖精の泉）
-  element = attackElement(source, ctx.card, element);
+  element = convertedElement(source, ctx.card, attackElement(source, ctx.card, element));
   let v = victim;
   let mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities, ctx.perfect, element);
   // 属性を強める状態異常（聖光など）: この一撃で使い切る
@@ -221,6 +221,16 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
       events.push({ type: 'damage', unitId: v.id, amount: 0, blocked: dmg, sourceId: unitIdOf(source) });
       return 0;
     }
+  }
+  // 属性の守り（無効・吸収・半減）。敵の攻撃から味方を守る
+  const guard = isEnemy(source) !== isEnemy(v) ? elementGuardOf(v, element) : undefined;
+  if (guard) {
+    const guarded = guard === 'half' ? Math.floor(dmg / 2) : 0;
+    if (guard === 'absorb' && dmg > 0) {
+      const healed = healUnit(v, dmg, events);
+      if (healed > 0) ctx.parts.push(`${healed}吸収`);
+    }
+    dmg = guarded;
   }
   const r = absorb(dmg, mods.ignoreBlock ? 0 : v.block, v.hp);
   if (!mods.ignoreBlock) v.block = r.block;

@@ -128,6 +128,10 @@ export type AbilityEffect =
   | { modifier: 'slotPreview'; uses: number; if?: AbilityCondition[] }
   | { modifier: 'chestChance'; bonus: number; if?: AbilityCondition[] }
   | { modifier: 'weaknessDamage'; multiplier: number; if?: AbilityCondition[] }
+  /** 属性の攻撃を受ける時: immune = 無効 / absorb = 受けるダメージ分回復 / half = 半分（K2。敵の攻撃から守る） */
+  | { modifier: 'elementGuard'; element: string; mode: 'immune' | 'absorb' | 'half'; if?: AbilityCondition[] }
+  /** 属性の無い物理攻撃を属性 into に変える（K2。炎の指輪など） */
+  | { modifier: 'convertElement'; into: string; if?: AbilityCondition[] }
   /** 自分が付ける状態異常の量+amount（呪詛など） */
   | { modifier: 'statusBonus'; statuses: string[]; amount: number; if?: AbilityCondition[] };
 
@@ -366,6 +370,10 @@ export interface EnemyDef {
   /** 弱点の属性（ダメージ×1.5）・耐性のある属性（ダメージ×0.5・状態異常が効かない） */
   weak?: string[];
   resist?: string[];
+  /** 亜種（K3）: 元の敵のID。絵は元の敵を使い回す。属性か開幕の特性を必ず1つ変える */
+  variantOf?: string;
+  /** 亜種の足元のオーラの色（data/enemyAuras.ts の ID） */
+  aura?: string;
 }
 
 export interface EnemyPhaseDef {

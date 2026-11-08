@@ -56,6 +56,10 @@ export interface ItemDef {
   use?: ConsumableEffect;
   /** 装備の特殊能力（エピック以上は必ず持つ。spec §12.7） */
   ability?: AbilityDef;
+  /** 世界マップでの効果（K2）。vision = 視界+N / campHeal = 野営の回復量の割合を足す（0.25 = +25%） */
+  explore?: { vision?: number; campHeal?: number };
+  /** このシナリオの冒険でだけ宝箱・ショップに出る（K2/K4。省略は全シナリオ） */
+  scenario?: string;
 }
 
 export interface ItemInstance {

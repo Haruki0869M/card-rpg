@@ -41,12 +41,16 @@ export function chestOdds(look: Rarity, successes = 0): number[] {
 /** 確率の表から格を抽選する */
 export const rollGrade = (odds: readonly number[], rng: Rng): Rarity => RARITIES[pickWeighted(odds, rng)];
 
-/** レア度に合う装備（パーティの誰かが使える武器を優先） */
-export function rollEquipment(rarity: Rarity, heroes: Hero[], rng: Rng): ItemDef {
+/**
+ * レア度に合う装備（パーティの誰かが使える武器を優先）。
+ * scenario: そのシナリオ専用の装備（ItemDef.scenario）も候補に入れる。他のシナリオ専用の装備は出さない / slot: 装備の種類をしぼる
+ */
+export function rollEquipment(rarity: Rarity, heroes: Hero[], rng: Rng, opts: { scenario?: string; slot?: ItemDef['slot'] } = {}): ItemDef {
   const types = new Set(heroes.flatMap((h) => jobWeapons(h.classId)));
-  const pool = ITEMS.all.filter((i) => i.slot !== 'consumable' && i.rarity === rarity && (i.slot !== 'weapon' || types.has(i.weaponType!)));
-  const fallback = ITEMS.all.filter((i) => i.slot !== 'consumable' && rarityIndex(i.rarity) <= rarityIndex(rarity));
-  return pick(pool.length ? pool : fallback, rng);
+  const base = ITEMS.all.filter((i) => i.slot !== 'consumable' && (!opts.slot || i.slot === opts.slot) && (!i.scenario || i.scenario === opts.scenario));
+  const pool = base.filter((i) => i.rarity === rarity && (i.slot !== 'weapon' || types.has(i.weaponType!)));
+  const fallback = base.filter((i) => rarityIndex(i.rarity) <= rarityIndex(rarity) && (i.slot !== 'weapon' || types.has(i.weaponType!)));
+  return pick(pool.length ? pool : fallback.length ? fallback : base, rng);
 }
 
 /** その格の消費アイテム（無ければそれより下で一番高い格） */
@@ -70,7 +74,7 @@ export function newItem(game: GameState, def: ItemDef) {
 export function rollChestContents(game: GameState, grade: Rarity, big: boolean, rng: Rng): Loot[] {
   const out: Loot[] = [];
   const equip = big || rng.next() * 100 < (BALANCE.chestEquipChance[grade] ?? 100);
-  const main = equip ? rollEquipment(grade, game.heroes, rng) : rollConsumable(grade, rng);
+  const main = equip ? rollEquipment(grade, game.heroes, rng, { scenario: game.scenarioId }) : rollConsumable(grade, rng);
   out.push({ kind: 'item', item: newItem(game, main) });
   const g = BALANCE.chestGold[grade] ?? 10;
   out.push({ kind: 'gold', amount: Math.round(g * (0.8 + rng.next() * 0.4)) * (big ? 2 : 1) });

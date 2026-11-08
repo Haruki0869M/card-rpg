@@ -4,6 +4,7 @@
 //  - 新しい効果: src/engine/battle/effects/kinds/ にファイルを1つ置く
 //  - 職業IDや能力名による分岐は書かない
 import { getClass } from '../../data/classes';
+import { getElement } from '../../data/elements';
 import { getEnemy } from '../../data/enemies';
 import { getStatus } from '../../data/statuses';
 import type { AbilityCondition, AbilityDef, AbilityNotice, AbilitySource, AbilityEffect, AbilityTrigger, BattleEvent, BattleState, CardDef, DamageScale, Effect } from '../../types';
@@ -85,6 +86,27 @@ export function damageModifiers(state: BattleState | undefined, source: Unit, ca
     }
   }
   return out;
+}
+
+/** 属性 element の攻撃を受ける時の守り（無効・吸収・半減）。複数あれば無効 > 吸収 > 半減 */
+export function elementGuardOf(victim: Unit, element: string | undefined): 'immune' | 'absorb' | 'half' | undefined {
+  if (!element) return undefined;
+  const modes = new Set<string>();
+  for (const ab of abilitiesOf(victim)) {
+    const e = ab.effect;
+    if ('modifier' in e && e.modifier === 'elementGuard' && e.element === element && testConditions(e.if, { self: victim })) modes.add(e.mode);
+  }
+  return modes.has('immune') ? 'immune' : modes.has('absorb') ? 'absorb' : modes.has('half') ? 'half' : undefined;
+}
+
+/** 属性の無い物理攻撃を別の属性に変える能力（convertElement）。無ければそのまま */
+export function convertedElement(source: Unit, card: CardDef | undefined, element: string | undefined): string | undefined {
+  if (element || isEnemy(source) || card?.category !== 'physical') return element;
+  for (const ab of abilitiesOf(source)) {
+    const e = ab.effect;
+    if ('modifier' in e && e.modifier === 'convertElement' && testConditions(e.if, { self: source, card })) return e.into;
+  }
+  return element;
 }
 
 /** 倍率の上乗せ（状況で増える分。1 = 上乗せ無し） */
@@ -207,6 +229,8 @@ export function describeAbility(ab: AbilityDef, side: 'ally' | 'enemy' = 'ally')
     if (e.modifier === 'exhaust') return '1戦闘1回。使ったカードは戦闘が終わるまで山札から除く';
     if (e.modifier === 'slotPreview') return `1戦闘${e.uses}回、次のカードのスロットを先読みし、1回だけ振り直せる`;
     if (e.modifier === 'chestChance') return `宝箱の運の判定+${e.bonus}%`;
+    if (e.modifier === 'elementGuard') return `${head}${getElement(e.element).name}属性のダメージを${e.mode === 'immune' ? '無効にする' : e.mode === 'absorb' ? '受けず、その分回復する' : '半分にする'}`;
+    if (e.modifier === 'convertElement') return `${head}属性の無い物理攻撃が${getElement(e.into).name}属性になる`;
     if (e.modifier === 'weaknessDamage') return `${head}弱点属性のダメージ×${e.multiplier}`;
     if (e.modifier === 'statusBonus') return `${head}自分が付ける${e.statuses.map((x) => `「${getStatus(x).name}」`).join('')}+${e.amount}`;
     if (e.modifier === 'damageDealt') return `${head}${e.multiplier !== 1 ? `与えるダメージ×${e.multiplier}${e.scale ? '、さらに' : ''}` : ''}${e.scale ? scaleText(e.scale) : ''}`;

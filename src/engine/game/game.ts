@@ -679,7 +679,7 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
   // ドロップ（部屋の種類の設定どおり）。ボスの大宝箱は報酬の後に開ける
   const drop = rt.battle;
   if (drop?.equipmentDrop) {
-    const item = newItem(game, rollEquipment(rng.next() * 100 < drop.equipmentDrop.epicChance ? 'epic' : 'rare', game.heroes, rng));
+    const item = newItem(game, rollEquipment(rng.next() * 100 < drop.equipmentDrop.epicChance ? 'epic' : 'rare', game.heroes, rng, { scenario: game.scenarioId }));
     const to = leastLoaded(survivorHeroes);
     // 2人以上のプレイヤーが生き残ったら、みんなで取り合う（欲しい / 余れば / いらない → 運の判定）
     if (new Set(survivorHeroes.map((h) => h.playerId)).size > 1) reward.claim = { item, heroes: survivorHeroes.map((h) => h.id), choices: {} };

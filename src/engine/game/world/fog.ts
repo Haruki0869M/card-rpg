@@ -2,6 +2,7 @@
 import { BALANCE } from '../../../data/balance';
 import type { GameState, WorldState } from '../../../types';
 import { petExplore } from '../pets';
+import { equippedItems } from '../hero';
 import { hexDistance } from './hex';
 import { timeOfDay } from './time';
 import { exploreEffects } from '../exploreAbilities';
@@ -11,7 +12,7 @@ export function visionOf(game: GameState, w: WorldState, heroId: string): number
   const h = game.heroes.find((x) => x.id === heroId);
   const es = h ? exploreEffects(h) : [];
   const pe = petExplore(h);
-  const bonus = es.reduce((n, e) => n + (e.kind === 'tracking' ? e.vision : 0), 0) + (pe.vision ?? 0);
+  const bonus = es.reduce((n, e) => n + (e.kind === 'tracking' ? e.vision : 0), 0) + (pe.vision ?? 0) + (h ? equippedItems(h).reduce((n, i) => n + (i.explore?.vision ?? 0), 0) : 0);
   const night = timeOfDay(w.worldTurn) === 'night' && !pe.nightVision && !es.some(e => e.kind === 'travel' && e.nightVision);
   return Math.max(1, BALANCE.visionRange + bonus - (night ? BALANCE.nightVisionPenalty : 0));
 }
