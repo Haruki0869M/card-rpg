@@ -1,4 +1,5 @@
-// オンライン協力の確認: 3台（別々のブラウザ）で部屋を作って参加し、自動プレイで遊んで、全員の状態が一致するかを見る。
+// オンライン協力の確認: 2〜4台（別々のブラウザ。PEOPLE=2〜4、既定3）で部屋を作って参加し、自動プレイで遊んで、全員の状態が一致するかを見る。
+// 最後に、通った操作の種類（ダンジョンの歩き・扉・投票・戦闘・町など）と、端末ごとに送った数を表示する。
 // 途中で1台を切断 → ホストが代わりに操作 → 戻って追いつく。ホストが切断 → 次の人が引き継ぐ。
 // 事前に: npm run build && npx vite preview --port 4173 &   と   npm run emulators &
 import { chromium, URL } from './lib.mjs';
@@ -7,6 +8,8 @@ import { chromium, URL } from './lib.mjs';
 const REAL = !!process.env.REAL;
 const EMU = process.env.EMU_HOST ?? '127.0.0.1';
 const STEPS = Number(process.env.STEPS ?? 150);
+const PEOPLE = Number(process.env.PEOPLE ?? 3);
+if (!(PEOPLE >= 2 && PEOPLE <= 4)) throw new Error('PEOPLE は 2〜4');
 const base = (extra = '') => `${URL}?${REAL ? 'debug=1' : `emu=${EMU}`}${extra}`;
 const shot = (page, name) => page.screenshot({ path: `screenshots/online-${name}.png` });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -33,15 +36,16 @@ async function device(name) {
   return page;
 }
 
-const A = await device('A');
-const B = await device('B');
-const C = await device('C');
-const pages = [A, B, C];
+const NAMES = ['ハル', 'ナツ', 'アキ', 'フユ'];
+const pages = [];
+for (let i = 0; i < PEOPLE; i++) pages.push(await device('ABCD'[i]));
+const [A, B] = pages;
+const C = pages[PEOPLE - 1]; // 切断の確認に使う最後の端末
 
 // ---- ホストが部屋を作る ----
 await A.goto(base());
 await A.getByText('新しい冒険').click();
-await A.getByText('3人', { exact: true }).click();
+await A.getByText(`${PEOPLE}人`, { exact: true }).click();
 await A.getByRole('button', { name: 'オンライン協力' }).click();
 await A.getByPlaceholder('プレイヤー').fill('ハル');
 await A.getByRole('button', { name: '部屋を作る' }).click();
@@ -50,10 +54,7 @@ const code = (await A.getByTestId('room-code').textContent()).trim();
 console.log('room', code);
 
 // ---- 招待のリンクで参加 ----
-for (const [p, n] of [
-  [B, 'ナツ'],
-  [C, 'アキ'],
-]) {
+for (const [p, n] of pages.slice(1).map((p, i) => [p, NAMES[i + 1]])) {
   await p.goto(base(`&room=${code}`));
   await p.getByPlaceholder('プレイヤー').fill(n);
   await p.getByRole('button', { name: '参加する' }).click();
@@ -80,6 +81,9 @@ await wait(500);
 await shot(B, 'world-other');
 
 // ---- 自動プレイ ----
+const kinds = new Set();
+const sentBy = {};
+const kindOf = (c) => (c.type === 'SCENE' ? kindOf(c.command) : c.type === 'BATTLE' ? `BATTLE:${c.command.type}` : c.type);
 const seqs = () => Promise.all(pages.map((p) => p.evaluate(() => window.__online.seq())));
 async function drive(list, steps) {
   const host = async () => {
@@ -113,6 +117,9 @@ async function drive(list, steps) {
         continue;
       }
       retries = 0;
+      kinds.add(kindOf(cmd));
+      const seat = await sender.evaluate(() => window.__online.seat());
+      sentBy[seat] = (sentBy[seat] ?? 0) + 1;
       // みんなで決める操作の途中（1人が選んだところ）を、別の端末で撮る
       if (!shotVote && (cmd.type === 'VOTE' || (cmd.type === 'SCENE' && cmd.command.type === 'VOTE'))) {
         const other = list.find((p) => p !== sender);
@@ -144,7 +151,7 @@ const sameHash = async (list) => {
 
 await drive(pages, STEPS);
 let r = await sameHash(pages);
-console.log('3台で自動プレイ:', r.ok ? 'OK' : 'NG', r.hs.join(' '));
+console.log(`${PEOPLE}台で自動プレイ:`, r.ok ? 'OK' : 'NG', r.hs.join(' '));
 
 // スタンプ
 await B.evaluate(() => window.__online.stamp('ここ行こう'));
@@ -154,10 +161,10 @@ await shot(A, 'stamp');
 // ---- 1台が切断 → ホストが代わりに操作 → 戻って追いつく ----
 await C.evaluate(() => window.__online.goOffline());
 await wait(1500);
-await A.evaluate(() => window.__online.setProxy('P3', true));
+await A.evaluate((p) => window.__online.setProxy(p, true), `P${PEOPLE}`);
 await wait(500);
 await shot(A, 'offline');
-await drive([A, B], 40);
+await drive(pages.slice(0, -1), 40);
 await C.evaluate(() => window.__online.goOnline());
 await wait(3000);
 await drive(pages, 1);
@@ -169,8 +176,10 @@ await A.evaluate(() => window.__online.goOffline());
 await until(() => B.evaluate(() => window.__online.isHost()), 20000, 'host handover');
 await B.evaluate(() => window.__online.setProxy('P1', true));
 await wait(500);
-await drive([B, C], 30);
-r = await sameHash([B, C]);
+await drive(pages.slice(1), 30);
+r = await sameHash(pages.slice(1));
 console.log('ホストの引き継ぎ:', r.ok ? 'OK' : 'NG', r.hs.join(' '));
 console.log('seq', (await seqs()).join(' '));
+console.log('通った操作:', [...kinds].sort().join(' '));
+console.log('端末ごとに送った数:', JSON.stringify(sentBy));
 await browser.close();
