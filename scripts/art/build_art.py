@@ -205,12 +205,49 @@ CLOCKWORK_ENEMIES = ['gearBug', 'steamRat', 'brokenAutomaton', 'conveyorBot', 'r
                      'foremanGolem', 'foremanGolem-1', 'steamSprite', 'boilerCrab', 'wrenchGolem', 'clockworkDog', 'steamTurretLord',
                      'runawayBoiler', 'runawayBoiler-1', 'pistonFist', 'furnaceImp', 'ironButler', 'chainSaw', 'clockworkSage',
                      'clockworkSage-1', 'copperKnight', 'furnaceGolem', 'greatMachine', 'greatMachine-1', 'greatMachine-2']
-for _k in CORRUPTION_ENEMIES + CLOCKWORK_ENEMIES:
+# 呪われた群島（docs/art/prompts-enemies-cursedArchipelago.md）
+ARCHIPELAGO_ENEMIES = ['seaCrab', 'jellyfish', 'seaSerpentFry', 'merfolkSpearman', 'pirateGrunt', 'drownedSailor', 'ghostDeckhand',
+                       'pirateGunner', 'siren', 'shark', 'conchKnight', 'stormPetrel', 'octopusLarva', 'barnacleBeast',
+                       'pirateQuartermaster', 'coralGolem', 'drownedKnight', 'seaWitch', 'krakenTentacle', 'seaSerpentQueen',
+                       'seaSerpentQueen-1', 'pirateCaptainGuld', 'pirateCaptainGuld-1', 'tideHighPriest', 'tideHighPriest-1',
+                       'ghostAdmiral', 'ghostAdmiral-1', 'ghostAdmiral-2']
+# 砂塵の王朝（docs/art/prompts-enemies-sandDynasty.md）
+SAND_ENEMIES = ['sandScarab', 'desertViper', 'jackalWarrior', 'tombRobber', 'sandScorpion', 'vulture', 'mummy', 'sandSprite',
+                'dustDevil', 'sandWorm', 'clayGolem', 'mummyArcher', 'cursedPriest', 'stoneCat', 'royalGuardMummy', 'scribeShade',
+                'sphinxCub', 'sandSerpentLord', 'colossusStatue', 'sandScorpionKing', 'sandScorpionKing-1', 'shadowVizier',
+                'shadowVizier-1', 'stoneGuardianBeast', 'stoneGuardianBeast-1', 'sandPharaoh', 'sandPharaoh-1', 'sandPharaoh-2']
+for _k in CORRUPTION_ENEMIES + CLOCKWORK_ENEMIES + ARCHIPELAGO_ENEMIES + SAND_ENEMIES:
     ENEMIES[_k] = (f'enemy/{_k}', 1.0)
 # 隅に文字・サインがある絵（元画像のフォルダの _corner-text.txt）。サインが内側寄りにもあるので、離れた小さなかたまりを場所に関係なく消す
-CORNER_TEXT = {'iceBat', 'frozenSoldier', 'whiteQueen-2', 'foremanGolem-1'}
+CORNER_TEXT = {'iceBat', 'frozenSoldier', 'whiteQueen-2', 'foremanGolem-1', 'pirateGunner', 'coralGolem', 'sandScorpion'}
 # 足元に地面（白っぽい灰色）が描かれている絵
 GROUND = {'stoneTortoise', 'fenGuardian', 'riveter', 'pistonFist'}
+
+# 足元に砂（体と同じ色）が広がっている絵。色では分けられないので、形で取る（desand）
+SAND = {'sandScorpion', 'dustDevil', 'sandWorm', 'stoneCat', 'stoneGuardianBeast', 'stoneGuardianBeast-1'}
+
+def desand(im, band=0.12, haze=0.4):
+    """足元の砂・土ぼこりを消す。
+    1) 下から haze の高さの中の半透明（もや・煙）を消す
+    2) 一番下の band の帯では、その少し上の行の体の幅より外へ広がった所（砂の台）を消す"""
+    a = np.array(im).astype(int)
+    al = a[..., 3]
+    ys = np.where(al.max(1) > 24)[0]
+    top, bot = ys.min(), ys.max()
+    hgt = bot - top
+    y_haze = int(bot - hgt * haze)
+    low = al[y_haze:] < 170
+    al[y_haze:][low] = 0
+    y_band = int(bot - hgt * band)
+    ref = al[max(top, y_band - int(hgt * 0.12)):y_band] > 128
+    cols = np.where(ref.any(0))[0]
+    if len(cols):
+        pad = int(im.width * 0.03)
+        x0, x1 = max(0, cols.min() - pad), min(im.width, cols.max() + pad + 1)
+        al[y_band:, :x0] = 0
+        al[y_band:, x1:] = 0
+    a[..., 3] = al
+    return despeckle(Image.fromarray(a.astype(np.uint8)), m=0.5)
 
 def deground(im, band=0.22):
     """足元の地面を消す: 体の下から band の高さの中で、白っぽく色の薄い所と、半透明の所を透明にする"""
@@ -249,6 +286,8 @@ def build_enemies():
         # 名前の絵は、隅の文字・サイン（_corner-text.txt の iceBat・frozenSoldier・whiteQueen-2）も消す
         if key in GROUND:
             fig = trim(deground(cutout(n)))
+        elif key in SAND:
+            fig = trim(desand(cutout(n)))
         else:
             fig = trim(despeckle(cutout(n), m=0.5 if key in CORNER_TEXT else 0.18) if isinstance(n, str) else cutout(n))
         if key == 'ignavarl-1':
