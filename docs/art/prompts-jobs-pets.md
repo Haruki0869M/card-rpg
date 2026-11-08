@@ -777,7 +777,7 @@ adorable chibi cockatiel parrot with a tall upright head crest and round orange 
 ホワイトフェイス（`whiteface`）→ 元画像 `pet-cockatiel-whiteface.png`
 
 ```
-adorable chibi cockatiel parrot with a tall upright head crest and round orange cheek patches, light silver-gray body, pure white face and crest, plain white cheeks, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no black feathers, text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi cockatiel parrot with a tall upright head crest, light silver-gray body, pure white face and crest, plain white cheeks, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no black feathers, orange cheeks, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 ### 子狼（`wolfPup`）
