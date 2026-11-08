@@ -8,6 +8,8 @@ import { chromium, layoutIssues, URL } from './lib.mjs';
 const OUT = process.env.DUNGEON_VIEW_OUTPUT ?? 'screenshots/dungeon-view';
 // 入るダンジョン（ID:名前）。ほかのダンジョンの通路の絵を見る時に変える（例 lavaCavern:溶岩の大空洞）
 const [DUNGEON_ID, DUNGEON_NAME] = (process.env.DUNGEON_VIEW_DUNGEON ?? 'emeraldTemple:翠の神殿').split(':');
+// 通路の絵だけを別のダンジョンのものにする（ID）。鍵が要る・部屋の並びが毎回変わるダンジョンでも、同じ道順で見え方を確かめられる
+const LOOK = process.env.DUNGEON_VIEW_LOOK;
 mkdirSync(OUT, { recursive: true });
 const SIZES = [
   [360, 640],
@@ -64,6 +66,11 @@ async function run(width, height, reduced = false) {
   }, DUNGEON_ID);
   await page.getByText(`${DUNGEON_NAME}に入る`).click();
   await page.waitForTimeout(300);
+  if (LOOK) {
+    await edit((g, look) => {
+      (g.expeditions?.[0] ?? g).dungeon.dungeonId = look;
+    }, LOOK);
+  }
   // 入口: 目の前に扉
   await expectEnd('door', '入口');
   await check('入口');

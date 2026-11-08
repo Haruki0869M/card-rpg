@@ -1,11 +1,36 @@
-// シナリオ5のダンジョン。敵の組み合わせ（POOLS）は仮（敵ができたら置き換える）。
+// シナリオ5のダンジョン。
+// 敵の組み合わせはダンジョンごと（enemies/ の専用の敵）。
 // 制覇すると星環が手に入り、3つそろうと最終ダンジョンに入れる。ボスの手前に「物語の部屋」（event）を置く
 import type { DungeonDef } from '../../../../types';
 
-const POOLS: DungeonDef['pools'] = {
-  battle: [['guardDog', 'guardDog'], ['goblinScout', 'guardDog'], ['chaosShaman', 'goblinScout'], ['goblinScout', 'goblinScout', 'chaosShaman']],
-  elite: [['goblinBrute'], ['goblinBrute', 'chaosShaman']],
-  boss: ['goblinBrute'],
+const WINDMILL_POOLS: DungeonDef['pools'] = {
+  battle: [['windSprite', 'clockworkSoldier'], ['starJelly', 'gearBeetle'], ['stormWindSprite', 'clockworkSoldier'], ['windSprite', 'starJelly', 'gearBeetle']],
+  elite: [['windGuardianHawk'], ['windGuardianHawk', 'clockworkSoldier']],
+  boss: ['windKeeper'],
+};
+
+const OBSERVATORY_POOLS: DungeonDef['pools'] = {
+  battle: [['shootingStarBird', 'moonRabbit'], ['starFragment', 'gearBeetle'], ['moonRabbit', 'starFragment'], ['shootingStarBird', 'gearBeetle', 'starFragment'], ['angelStatue', 'starFragment']],
+  elite: [['starDustScribe'], ['shadowStarDustScribe', 'starFragment'], ['clockworkKnight']],
+  boss: ['starLibrarian'],
+};
+
+const GARDEN_POOLS: DungeonDef['pools'] = {
+  battle: [['moonWolf', 'thornFairy'], ['shadowMoonRabbit', 'thornFairy'], ['moonWolf', 'starFragment'], ['thornFairy', 'thornFairy', 'moonWolf'], ['hourglassGolem', 'thornFairy']],
+  elite: [['moonGardener'], ['moonGardener', 'thornFairy']],
+  boss: ['moonMaiden'],
+};
+
+const CASTLE_POOLS: DungeonDef['pools'] = {
+  battle: [['skyKnight', 'venomThornFairy'], ['skyKnight', 'moonWolf'], ['venomThornFairy', 'skyKnight', 'starFragment'], ['skyKnight', 'shadowMoonRabbit'], ['holyAngelStatue', 'venomThornFairy']],
+  elite: [['skyPaladin']],
+  boss: ['starSeerQueen'],
+};
+
+const CAVE_POOLS: DungeonDef['pools'] = {
+  battle: [['moonRabbit', 'gearBeetle'], ['moonWolf', 'starFragment'], ['shootingStarBird', 'thornFairy'], ['starJelly', 'moonRabbit', 'starFragment'], ['angelStatue', 'hourglassGolem']],
+  elite: [['starDustScribe'], ['moonGardener']],
+  boss: ['clockworkKnight', 'moonGardener'],
 };
 
 type Layout = NonNullable<DungeonDef['layout']>;
@@ -95,7 +120,7 @@ export const windmillTower: DungeonDef = {
   description: '風の回廊の先にそびえる、巨大な風車の塔。風の番人が、星環（風）を守っている。',
   background: 'temple',
   baseLevel: 3,
-  pools: POOLS,
+  pools: WINDMILL_POOLS,
   bossChest: 'epic',
   rewardKey: 'ringWind',
   corruptionOnClear: 5,
@@ -109,7 +134,7 @@ export const observatory: DungeonDef = {
   description: '星の記録が眠る古い天文台。星の司書が、星環（星）を守っている。',
   background: 'catacomb',
   baseLevel: 5,
-  pools: POOLS,
+  pools: OBSERVATORY_POOLS,
   bossChest: 'epic',
   rewardKey: 'ringStar',
   corruptionOnClear: 5,
@@ -123,7 +148,7 @@ export const moonlitGarden: DungeonDef = {
   description: '月の光が降りそそぐ、天空城の庭園。月の乙女が、星環（月）を抱いて眠っている。',
   background: 'forestCave',
   baseLevel: 7,
-  pools: POOLS,
+  pools: GARDEN_POOLS,
   bossChest: 'legend',
   rewardKey: 'ringMoon',
   corruptionOnClear: 5,
@@ -137,7 +162,7 @@ export const skyCastle: DungeonDef = {
   description: '星読みの女王の居城。三つの星環がなければ、白い門は開かない。',
   background: 'castle',
   baseLevel: 9,
-  pools: POOLS,
+  pools: CASTLE_POOLS,
   bossChest: 'legend',
   requiresKeys: ['ringWind', 'ringStar', 'ringMoon'],
   finale: true,
@@ -168,7 +193,7 @@ export const starDustCave: DungeonDef = {
   description: '訪れるたびに姿を変える星屑の洞窟。危険だが、奥には豪華な財宝が眠る。',
   background: 'forestCave',
   baseLevel: 6,
-  pools: { ...POOLS, boss: ['goblinBrute', 'chaosShaman'] },
+  pools: CAVE_POOLS,
   bossChest: 'legend',
   random: true,
   rows: 6,

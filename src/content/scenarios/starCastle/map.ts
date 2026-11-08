@@ -1,5 +1,5 @@
 // シナリオ5の世界マップ。下（雲の港）から上（天空城）へ進む。雲の道（cloud）と浮島が続く。
-// 敵の組み合わせは仮（共通の敵）。敵ができたら置き換える
+// 敵はこのシナリオ専用（enemies/）。弱点が同じ敵だけの組にしない（港の2種は雷が弱点の入門の例外）
 import type { ScenarioMapDef } from '../../../types';
 
 export const starCastleMap: ScenarioMapDef = {
@@ -15,7 +15,7 @@ export const starCastleMap: ScenarioMapDef = {
       rows: [0, 2],
       terrain: { cloud: 4, mountain: 2, hills: 1 },
       enemyLevel: 9,
-      encounters: [['goblinBrute'], ['goblinBrute', 'chaosShaman'], ['guardDog', 'goblinBrute']],
+      encounters: [['skyKnight', 'venomThornFairy'], ['skyKnight', 'moonWolf'], ['skyPaladin'], ['venomThornFairy', 'skyKnight', 'starFragment'], ['holyAngelStatue', 'venomThornFairy']],
       wanderers: 2,
     },
     {
@@ -25,7 +25,7 @@ export const starCastleMap: ScenarioMapDef = {
       rows: [3, 8],
       terrain: { cloud: 3, hills: 2, forest: 2 },
       enemyLevel: 7,
-      encounters: [['goblinBrute', 'goblinScout'], ['guardDog', 'guardDog'], ['chaosShaman', 'goblinBrute']],
+      encounters: [['moonWolf', 'thornFairy'], ['shadowMoonRabbit', 'thornFairy'], ['moonWolf', 'starFragment'], ['thornFairy', 'thornFairy', 'moonWolf'], ['hourglassGolem', 'moonWolf']],
       wanderers: 4,
       chests: 2,
       events: 2,
@@ -38,7 +38,7 @@ export const starCastleMap: ScenarioMapDef = {
       rows: [9, 15],
       terrain: { hills: 4, cloud: 3, plains: 1 },
       enemyLevel: 5,
-      encounters: [['guardDog', 'goblinScout'], ['chaosShaman', 'guardDog'], ['goblinScout', 'goblinScout', 'chaosShaman']],
+      encounters: [['shootingStarBird', 'moonRabbit'], ['starFragment', 'gearBeetle'], ['moonRabbit', 'starFragment'], ['shootingStarBird', 'gearBeetle', 'starFragment'], ['angelStatue', 'moonRabbit']],
       wanderers: 4,
       chests: 2,
       events: 2,
@@ -52,7 +52,7 @@ export const starCastleMap: ScenarioMapDef = {
       rows: [16, 21],
       terrain: { cloud: 4, plains: 2, hills: 1 },
       enemyLevel: 3,
-      encounters: [['guardDog', 'guardDog'], ['goblinScout', 'guardDog'], ['chaosShaman', 'goblinScout']],
+      encounters: [['windSprite', 'clockworkSoldier'], ['starJelly', 'gearBeetle'], ['clockworkSoldier', 'starJelly'], ['stormWindSprite', 'gearBeetle'], ['windSprite', 'starJelly', 'gearBeetle']],
       wanderers: 4,
       chests: 2,
       events: 2,
@@ -65,7 +65,7 @@ export const starCastleMap: ScenarioMapDef = {
       rows: [22, 27],
       terrain: { plains: 5, hills: 2, cloud: 1 },
       enemyLevel: 1,
-      encounters: [['goblinScout'], ['goblinScout', 'goblinScout'], ['guardDog', 'goblinScout']],
+      encounters: [['cloudSheep'], ['cloudSheep', 'skyGull'], ['skyGull'], ['cloudSheep', 'cloudSheep']],
       wanderers: 3,
       chests: 2,
       events: 2,

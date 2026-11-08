@@ -46,7 +46,7 @@ def has_src(n):
     except FileNotFoundError:
         return False
 
-def despeckle(im, keep=0.02, th=24):
+def despeckle(im, keep=0.02, th=24, m=0.18):
     """本体から離れた小さなかたまり（隅のサイン・文字・ごみ）を消す。
     一番大きいかたまりの keep 倍より小さく、かつ絵の外側 18% の帯の中だけにある物を透明にする。
     杖の先の宝玉のような、体の近くに浮いた小物は残る"""
@@ -57,7 +57,7 @@ def despeckle(im, keep=0.02, th=24):
         return im
     h, w = a.shape
     big = stats[1:, cv2.CC_STAT_AREA].max()
-    m = 0.18
+    # m = 外側の帯の幅（0.5 にすると、場所に関係なく小さなかたまりを全部消す）
     out = a.copy()
     for i in range(1, n):
         x, y, bw, bh, area = stats[i]
@@ -187,6 +187,82 @@ ENEMIES = {
     'valgrim': (16, 1.0), 'valgrim-1': (15, 1.0),
 }
 
+# 名前のファイル名の敵（元画像は enemy/<敵ID>.webp。SRC=C:/dev/card-rpg-assets で動かす）。
+# 凍てつく王国（docs/art/prompts-enemies-frozenKingdom.md）: 新規23体＋変身後5枚。亜種5体は元の絵を使い回す（art/index.tsx の artIdOf）。
+# 変身後は <敵ID>-<段階>（1 = HP50%以下など。戦闘で enemy/<ID>-<段階> を探し、無ければ元の絵）
+FROZEN_ENEMIES = ['snowHare', 'frostWolf', 'frostSprite', 'iceBat', 'frozenSoldier', 'snowOwl', 'icicleBug', 'snowWitch',
+                  'crystalLord', 'crystalLord-1', 'iceSlime', 'frozenGhoul', 'iceArcher', 'frostMage', 'frozenBishop', 'frozenBishop-1',
+                  'blizzardSnake', 'yeti', 'frostDrakeling', 'blizzardBeast', 'frostGiant', 'frostGiant-1',
+                  'iceKnight', 'iceSwordsman', 'frostGuardian', 'whiteQueen', 'whiteQueen-1', 'whiteQueen-2']
+# 共通の敵（docs/art/prompts-enemies-common.md）
+COMMON_ENEMIES = ['goldenThief', 'guardDog', 'banditThug', 'banditArcher', 'banditChief', 'wildBoar', 'giantSpider', 'caveBat',
+                  'stoneTortoise', 'greatBear', 'shambler', 'wanderingGhost', 'imp', 'hauntedKnight']
+# 侵食の魔王の新しい敵（Codex の T7）
+CORRUPTION_ENEMIES = ['thornBoar', 'mossCarapace', 'rootImp', 'reedStalker', 'fenGuardian', 'cinderHound', 'basaltCrawler',
+                      'chainWraith', 'siegeImp', 'cursedHound']
+# 機械仕掛けの帝国（docs/art/prompts-enemies-clockworkEmpire.md）: 新規23体＋変身後5枚
+CLOCKWORK_ENEMIES = ['gearBug', 'steamRat', 'brokenAutomaton', 'conveyorBot', 'riveter', 'oilSlime', 'sparkTurret', 'foremanBot',
+                     'foremanGolem', 'foremanGolem-1', 'steamSprite', 'boilerCrab', 'wrenchGolem', 'clockworkDog', 'steamTurretLord',
+                     'runawayBoiler', 'runawayBoiler-1', 'pistonFist', 'furnaceImp', 'ironButler', 'chainSaw', 'clockworkSage',
+                     'clockworkSage-1', 'copperKnight', 'furnaceGolem', 'greatMachine', 'greatMachine-1', 'greatMachine-2']
+# 呪われた群島（docs/art/prompts-enemies-cursedArchipelago.md）
+ARCHIPELAGO_ENEMIES = ['seaCrab', 'jellyfish', 'seaSerpentFry', 'merfolkSpearman', 'pirateGrunt', 'drownedSailor', 'ghostDeckhand',
+                       'pirateGunner', 'siren', 'shark', 'conchKnight', 'stormPetrel', 'octopusLarva', 'barnacleBeast',
+                       'pirateQuartermaster', 'coralGolem', 'drownedKnight', 'seaWitch', 'krakenTentacle', 'seaSerpentQueen',
+                       'seaSerpentQueen-1', 'pirateCaptainGuld', 'pirateCaptainGuld-1', 'tideHighPriest', 'tideHighPriest-1',
+                       'ghostAdmiral', 'ghostAdmiral-1', 'ghostAdmiral-2']
+# 砂塵の王朝（docs/art/prompts-enemies-sandDynasty.md）
+SAND_ENEMIES = ['sandScarab', 'desertViper', 'jackalWarrior', 'tombRobber', 'sandScorpion', 'vulture', 'mummy', 'sandSprite',
+                'dustDevil', 'sandWorm', 'clayGolem', 'mummyArcher', 'cursedPriest', 'stoneCat', 'royalGuardMummy', 'scribeShade',
+                'sphinxCub', 'sandSerpentLord', 'colossusStatue', 'sandScorpionKing', 'sandScorpionKing-1', 'shadowVizier',
+                'shadowVizier-1', 'stoneGuardianBeast', 'stoneGuardianBeast-1', 'sandPharaoh', 'sandPharaoh-1', 'sandPharaoh-2']
+for _k in CORRUPTION_ENEMIES + CLOCKWORK_ENEMIES + ARCHIPELAGO_ENEMIES + SAND_ENEMIES:
+    ENEMIES[_k] = (f'enemy/{_k}', 1.0)
+# 隅に文字・サインがある絵（元画像のフォルダの _corner-text.txt）。サインが内側寄りにもあるので、離れた小さなかたまりを場所に関係なく消す
+CORNER_TEXT = {'iceBat', 'frozenSoldier', 'whiteQueen-2', 'foremanGolem-1', 'pirateGunner', 'coralGolem', 'sandScorpion'}
+# 足元に地面（白っぽい灰色）が描かれている絵
+GROUND = {'stoneTortoise', 'fenGuardian', 'riveter', 'pistonFist'}
+
+# 足元に砂（体と同じ色）が広がっている絵。色では分けられないので、形で取る（desand）
+SAND = {'sandScorpion', 'dustDevil', 'sandWorm', 'stoneCat', 'stoneGuardianBeast', 'stoneGuardianBeast-1'}
+
+def desand(im, band=0.12, haze=0.4):
+    """足元の砂・土ぼこりを消す。
+    1) 下から haze の高さの中の半透明（もや・煙）を消す
+    2) 一番下の band の帯では、その少し上の行の体の幅より外へ広がった所（砂の台）を消す"""
+    a = np.array(im).astype(int)
+    al = a[..., 3]
+    ys = np.where(al.max(1) > 24)[0]
+    top, bot = ys.min(), ys.max()
+    hgt = bot - top
+    y_haze = int(bot - hgt * haze)
+    low = al[y_haze:] < 170
+    al[y_haze:][low] = 0
+    y_band = int(bot - hgt * band)
+    ref = al[max(top, y_band - int(hgt * 0.12)):y_band] > 128
+    cols = np.where(ref.any(0))[0]
+    if len(cols):
+        pad = int(im.width * 0.03)
+        x0, x1 = max(0, cols.min() - pad), min(im.width, cols.max() + pad + 1)
+        al[y_band:, :x0] = 0
+        al[y_band:, x1:] = 0
+    a[..., 3] = al
+    return despeckle(Image.fromarray(a.astype(np.uint8)), m=0.5)
+
+def deground(im, band=0.22):
+    """足元の地面を消す: 体の下から band の高さの中で、白っぽく色の薄い所と、半透明の所を透明にする"""
+    a = np.array(im).astype(int)
+    ys = np.where(a[..., 3].max(1) > 24)[0]
+    top, bot = ys.min(), ys.max()
+    rgb = a[..., :3]
+    mx, mn = rgb.max(2), rgb.min(2)
+    g = ((mn > 150) & ((mx - mn) < 28)) | (a[..., 3] < 170)
+    g[:int(bot - (bot - top) * band)] = False
+    a[..., 3][g] = 0
+    return despeckle(Image.fromarray(a.astype(np.uint8)), m=0.5)
+for _k in FROZEN_ENEMIES + COMMON_ENEMIES:
+    ENEMIES[_k] = (f'enemy/{_k}', 1.0)
+
 def flame_tint(im):
     """炎をまとった姿（第2形態）: 赤橙に染めて、ふちを光らせる"""
     a = im.getchannel('A')
@@ -206,8 +282,14 @@ def flame_tint(im):
 def build_enemies():
     for key, (n, size) in ENEMIES.items():
         name = f'enemy/{key}'
-        if not want(name): continue
-        fig = trim(cutout(n))
+        if not want(name) or not has_src(n): continue
+        # 名前の絵は、隅の文字・サイン（_corner-text.txt の iceBat・frozenSoldier・whiteQueen-2）も消す
+        if key in GROUND:
+            fig = trim(deground(cutout(n)))
+        elif key in SAND:
+            fig = trim(desand(cutout(n)))
+        else:
+            fig = trim(despeckle(cutout(n), m=0.5 if key in CORNER_TEXT else 0.18) if isinstance(n, str) else cutout(n))
         if key == 'ignavarl-1':
             fig = flame_tint(fig)
         save(rim(place(fig, 520, 620, fill=0.97 * size, bottom=0.98), (8, 6, 12), 0.8, 3), f'{name}.webp')
@@ -431,17 +513,31 @@ def build_pieces():
 # 元画像は dungeon/<背景>-<wall|floor|ceiling|door>.webp（SRC の下。切り抜きは不要）。
 # 通路の面は1マス＝画面の短い辺くらい（スマホで最大 450px 前後）で、奥へ行くほど小さく暗くなるので、512px で足りる。
 # 扉は壁の面の中の 56%×78% に描くので、3:4 の 384×512。暗さはゲーム側（DungeonView の shade）で合わせる
+# ボスの門（<背景>-bossdoor）も 384×512。真っ黒な帯（翠の神殿の上下）を取り、ふちに写った壁を少し（4.5%）切る
 DUNGEON_FACE, DUNGEON_DOOR = 512, (384, 512)
+
+def cut_black_bands(im, th=3):
+    """上下左右の、真っ黒（平均の明るさ th 未満）な帯を取る"""
+    a = np.array(im.convert('L')).astype(float)
+    rows = np.where(a.mean(1) >= th)[0]
+    cols = np.where(a.mean(0) >= th)[0]
+    return im.crop((cols.min(), rows.min(), cols.max() + 1, rows.max() + 1))
+
+def inset(im, k=0.045):
+    dx, dy = round(im.width * k), round(im.height * k)
+    return im.crop((dx, dy, im.width - dx, im.height - dy))
 
 def build_dungeon():
     import glob, re
     for f in sorted(glob.glob(os.path.join(SRC, 'dungeon', '*'))):
-        m = re.match(r'(.+)-(wall|floor|ceiling|door)\.(webp|png|jpg)$', os.path.basename(f))
+        m = re.match(r'(.+)-(wall|floor|ceiling|door|bossdoor)\.(webp|png|jpg)$', os.path.basename(f))
         if not m: continue
         name = f'dungeon/{m.group(1)}-{m.group(2)}'
         if not want(name): continue
         im = Image.open(f).convert('RGB')
-        if m.group(2) == 'door':
+        if m.group(2) == 'bossdoor':
+            im = ImageOps.fit(inset(cut_black_bands(im)), DUNGEON_DOOR, Image.LANCZOS)
+        elif m.group(2) == 'door':
             im = ImageOps.fit(im, DUNGEON_DOOR, Image.LANCZOS)
         else:
             im = im.resize((DUNGEON_FACE, DUNGEON_FACE), Image.LANCZOS)
@@ -460,7 +556,7 @@ def write_dungeon_tone():
         v = round(ImageStat.Stat(Image.open(f).convert('L')).mean[0])
         tone.setdefault(m.group(1), {})[m.group(2)] = v
     lines = ['// 自動で作るファイル（scripts/art/build_art.py の write_dungeon_tone）。手で直さない。',
-             '// 通路の絵の明るさ（0〜255 の平均）。暗い絵のダンジョンで扉の縁を明るくするのに使う。',
+             '// 通路の絵の明るさ（0〜255 の平均）。暗い絵のダンジョンで、扉の縁を明るくし、通路の奥の暗さを弱めるのに使う。',
              'export const DUNGEON_TONE: Record<string, { wall?: number; floor?: number; ceiling?: number; door?: number }> = {']
     for bg, v in tone.items():
         lines.append(f'  {bg}: {{ ' + ', '.join(f'{k}: {v[k]}' for k in ('wall', 'floor', 'ceiling', 'door') if k in v) + ' },')
