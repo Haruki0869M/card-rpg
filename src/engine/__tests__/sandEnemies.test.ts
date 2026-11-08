@@ -26,7 +26,9 @@ describe('砂塵の王朝の専用の敵', () => {
 
   it('専用の敵をすべて配置し、仮の共通敵を残さない', () => {
     const placed = new Set(waves().flat());
-    expect([...placed].sort()).toEqual([...ids].sort());
+    // K3 D で足した3体（extra.ts）も、このシナリオの敵として配置される
+    const extra = ['desertFennec', 'obeliskSentinel', 'venomMummyArcher'];
+    expect([...placed].sort()).toEqual([...ids, ...extra].sort());
     for (const r of getScenario('sandDynasty').map!.regions) {
       for (const wave of r.encounters ?? []) {
         expect(wave.length).toBeGreaterThanOrEqual(2);
