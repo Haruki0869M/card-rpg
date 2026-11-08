@@ -1,7 +1,7 @@
 // 実際のUIをタップ操作して、1〜4人それぞれで勝利・敗北まで到達できるか確認する
 // npm run build && npx vite preview --port 4173 を起動した状態で: node scripts/playthrough.mjs
 import { mkdirSync } from 'node:fs';
-import { chromium, layoutIssues, startBattle, waitForBattlePresentation } from './lib.mjs';
+import { chromium, confirmEndTurn, layoutIssues, startBattle, waitForBattlePresentation } from './lib.mjs';
 
 mkdirSync('screenshots', { recursive: true });
 const browser = await chromium.launch();
@@ -74,6 +74,7 @@ async function playToWin(page, tag) {
     await waitForBattlePresentation(page);
     if ((r = await resultText(page))) return r;
     await page.locator('button:has-text("ターン終了")').click();
+    await confirmEndTurn(page);
     await page.waitForTimeout(100);
   }
   return 'timeout';
@@ -87,6 +88,7 @@ async function playToLose(page) {
     await page.locator('button:has-text("ターン終了"):not([disabled])').or(page.getByText('全滅…', { exact: true })).first().waitFor({ timeout: 15000 });
     if (await resultText(page)) continue;
     await page.locator('button:has-text("ターン終了")').click();
+    await confirmEndTurn(page);
     await page.waitForTimeout(50);
   }
   return 'timeout';

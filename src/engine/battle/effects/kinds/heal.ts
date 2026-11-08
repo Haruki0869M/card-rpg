@@ -16,7 +16,7 @@ export const effect: EffectHandler<'heal'> = {
     const ts = resolveTargets(ctx, targetOf(e));
     let total = 0;
     for (const t of ts) total += healUnit(t, e.amount, ctx.events);
-    if (ts.length > 1) ctx.parts.push(`全員 回復${e.amount}`);
+    if (ts.length > 1) ctx.parts.push(`全員のHP+${e.amount}`);
     else if (ts.length === 1 && total > 0) ctx.parts.push(`${nameOf(ts[0])}のHP+${total}`);
     return total > 0;
   },

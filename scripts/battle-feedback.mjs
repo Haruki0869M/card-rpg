@@ -1,6 +1,6 @@
 // 後半③〜⑥: 設定・開幕のお供・追撃/継承・支援・4人のトークンと短い表示を確認する。
 import { mkdir, writeFile } from 'node:fs/promises';
-import { chromium, layoutIssues, startBattle, URL } from './lib.mjs';
+import { chromium, confirmEndTurn, layoutIssues, startBattle, URL } from './lib.mjs';
 const dir = 'screenshots/battle-feedback'; await mkdir(dir, { recursive: true });
 const browser = await chromium.launch(), page = await browser.newPage({ viewport: { width: 390, height: 780 } });
 page.setDefaultTimeout(10000);
@@ -79,6 +79,19 @@ try {
     await observe();
     await page.getByRole('button', { name: /^扉を開ける/ }).click();
     await page.locator('[data-ability-cutin]').first().waitFor(); await shot(`opening-four-${width}`);
+    // フェーズ1: お供は持ち主の立ち絵の幅の中（隣の仲間の足元に立たない）。カットインは上の帯に重ならず、お供の本物の絵を出す
+    const petPlace = await page.evaluate(() => [...document.querySelectorAll('[data-ally-sprite] [data-pet-owner]')].map((el) => {
+      const owner = el.getAttribute('data-pet-owner'), r = el.getBoundingClientRect(), o = document.querySelector(`[data-ally-sprite="${owner}"]`).getBoundingClientRect();
+      const cx = (r.left + r.right) / 2;
+      return cx >= o.left && cx <= o.right ? '' : `${owner}のお供 x=${Math.round(cx)} 持ち主=${Math.round(o.left)}〜${Math.round(o.right)}`;
+    }).filter(Boolean));
+    check(!petPlace.length, `お供が持ち主の外: ${petPlace.join(' / ')}`);
+    const cutinTop = await page.evaluate(() => {
+      const bar = document.querySelector('[data-cutin-anchor]').getBoundingClientRect().bottom;
+      return [...document.querySelectorAll('[data-ability-cutin]')].map((e) => e.getBoundingClientRect().top - bar);
+    });
+    check(cutinTop.every((d) => d >= 0), `お供のカットインが上の帯に重なる ${cutinTop}`);
+    check(await page.locator('[data-ability-cutin] [data-cutin-pet-art]').count() > 0, 'お供のカットインに絵が無い');
     await page.waitForTimeout(1600);
     const opening = await page.evaluate(() => window.feedback);
     check(opening.notices.length === 4 && opening.pulses.length === 4, `4人全員のお供が発動しない: ${JSON.stringify(opening)}`);
@@ -102,7 +115,7 @@ try {
     end.game.heroes[0].pet = a.pet = { petId: 'wolfPup', color: 'gray', name: 'ロウ', love: 0, acts: 0 };
     a.abilities = [{ name: 'ロウの噛みつき', pet: true, source: { kind: 'pet', id: 'wolfPup', label: 'ロウ', effectName: '噛みつき' }, effect: { when: 'turnEnd', do: [{ kind: 'damageByPlays', per: 2, category: 'physical' }] } }]; a.playedBy = { physical: 2 };
     end.game.expeditions[0].battle.allies.forEach(a => { a.mana = 0; a.hand = []; });
-    await resume(end, true, 'simple'); await observe(); await page.locator('button:has-text("ターン終了")').click();
+    await resume(end, true, 'simple'); await observe(); await page.locator('button:has-text("ターン終了")').click(); await confirmEndTurn(page);
     await page.waitForFunction(() => window.feedback.cutinTexts.some(t => t.includes('噛みつき') && t.includes('ロウ'))); await shot(`simple-pet-followup-${width}`);
     console.log(`OK: ${width}px 設定保存・4人の開幕/お供/屍兵/砲台/罠・攻撃/継承/歌・簡易高速の追撃`);
   }

@@ -4,7 +4,7 @@
 // 別のシナリオを通す時: ADVENTURE_SCENARIO=frozenKingdom node scripts/adventure.mjs（記録を入れて解放してから選ぶ）
 // 他のセッションと同じポートを使わないよう、自分専用のポートで preview を起こし URL=http://127.0.0.1:<番号>/card-rpg/ を付ける
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { chromium, layoutIssues, URL, waitForWorldMovement, waitForBattlePresentation } from './lib.mjs';
+import { chromium, confirmEndTurn, layoutIssues, URL, waitForWorldMovement, waitForBattlePresentation } from './lib.mjs';
 
 mkdirSync('screenshots', { recursive: true });
 const output = process.env.ADVENTURE_OUTPUT ?? 'screenshots/adventure';
@@ -84,6 +84,7 @@ async function playBattle(page) {
     const allies = page.locator('[data-ally]:not([data-done]):not([data-dead])');
     if ((await allies.count()) === 0) {
       await endBtn.click();
+      await confirmEndTurn(page);
       await page.waitForTimeout(200);
       continue;
     }
@@ -91,6 +92,7 @@ async function playBattle(page) {
     const cards = page.locator('[data-card-index][data-usable]');
     if (!(await cards.count())) {
       await endBtn.click();
+      await confirmEndTurn(page);
       continue;
     }
     const availableCards = await cards.count();

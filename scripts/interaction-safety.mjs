@@ -87,6 +87,24 @@ try {
     await page.getByText('世界マップへ', { exact: true }).click(); check((await read()).game.mode === 'world', '共同施設を退出できない');
     console.log(`${width}px: 味方対象・星読み保存再開・砲台/罠/お供詳細・P2施設利用 OK`);
   }
+  // フェーズ1: 全員満タンの時の回復カード。最初の相手は敵の予告のダメージが一番大きい味方、予測は「回復の力（今は満タン）」、使う人と対象の印
+  {
+    await page.setViewportSize({ width: 390, height: 780 });
+    const d = structuredClone(base), b = battleOf(d);
+    d.activeId = b.allies[0].id;
+    b.allies.forEach((a, i) => { a.hp = 100; a.maxHp = 100; a.name = `仲間${i + 1}`; a.mana = 20; a.playerId = 'P1'; });
+    b.allies[0].hand = [{ uid: 'uxheal', cardId: 'mend' }];
+    for (const e of b.enemies) if (e.intent) e.intent.targetId = b.allies[2].id;
+    await resume(d);
+    const cb = await page.locator('[data-card-index]').first().boundingBox(); await page.mouse.click(cb.x + 14, cb.y + 70);
+    check((await page.locator('[data-target-guide]').innerText()).includes('仲間3'), '全員満タンの時、狙われている味方が最初の相手にならない');
+    const pred = await page.locator('[data-card-predictions]').innerText();
+    check(/HP回復 \+\d+／\+\d+／\+\d+（今は満タン）/.test(pred) && !pred.includes('効果は上の表示を確認'), `満タンの回復の予測が違う: ${pred}`);
+    check(await page.locator(`[data-ally-sprite="${b.allies[2].id}"] [data-ally-role="target"]`).count() === 1, '立ち絵に「対象」の印が無い');
+    check(await page.locator(`[data-ally-sprite="${b.allies[0].id}"] [data-ally-role="user"]`).count() === 1, '立ち絵に「使う人」の印が無い');
+    await shot('390-heal-full');
+    console.log('満タンの回復・最初の相手・使う人と対象の印 OK');
+  }
   // 中断データを保った取消と、承認後の新規作成を両方確認する。
   await page.reload(); const before = await read();
   page.once('dialog', dialog => dialog.dismiss()); await page.getByText('新しい冒険', { exact: true }).click();

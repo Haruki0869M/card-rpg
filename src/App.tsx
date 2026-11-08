@@ -1,6 +1,7 @@
 import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { BottomBar, TopBar } from './components/battle/Bars';
+import { ConfirmDialog } from './components/ui/ConfirmDialog';
 import { Battlefield } from './components/battle/Battlefield';
 import { FocusPanel } from './components/battle/FocusPanel';
 import { SlotPreviewDialog } from './components/battle/SlotPreviewDialog';
@@ -83,7 +84,30 @@ function BattleScreen() {
       <BottomBar />
       {!presenting && <ResultScreen />}
       <SlotPreviewDialog />
+      <EndTurnConfirm />
     </div>
+  );
+}
+
+/** 「ターン終了」の確認（まだ行動できる仲間がいる時だけ。押し間違いの防止） */
+function EndTurnConfirm() {
+  const open = useBattle((s) => s.confirmEndTurn && s.battle.phase === 'ally');
+  const endTurn = useBattle((s) => s.endTurn);
+  const setOpen = useBattle((s) => s.setConfirmEndTurn);
+  return (
+    <AnimatePresence>
+      {open && (
+        <ConfirmDialog
+          key="end-turn"
+          title="ターン終了"
+          text="まだ行動できる仲間がいます。ターンを終了しますか？"
+          ok="ターンを終了する"
+          danger={false}
+          onOk={() => endTurn(true)}
+          onCancel={() => setOpen(false)}
+        />
+      )}
+    </AnimatePresence>
   );
 }
 

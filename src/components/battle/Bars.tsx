@@ -15,7 +15,7 @@ export function TopBar() {
   const lives = useBattle((s) => s.full?.lives);
   const corruptionLabel = useBattle((s) => corruptionName(s.full?.scenarioId));
   return (
-    <div className="flex h-11 shrink-0 items-center gap-2 px-2">
+    <div className="flex h-11 shrink-0 items-center gap-2 px-2" data-cutin-anchor>
       <div className="font-display flex items-baseline gap-1 whitespace-nowrap text-amber-200">
         <span className="text-[12px] text-amber-200/70">ターン</span>
         <span className="text-outline text-[22px] leading-none">{turn}</span>
@@ -102,7 +102,7 @@ export function BottomBar() {
         </AnimatePresence>
       </div>
       <button
-        onClick={endTurn}
+        onClick={() => endTurn()}
         disabled={battle.phase !== 'ally'}
         className={`btn ${allDone ? 'btn-gold' : 'btn-dark'} font-display relative h-12 w-[116px] shrink-0 rounded-xl text-[16px]`}
       >

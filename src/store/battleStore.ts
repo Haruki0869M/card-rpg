@@ -1,5 +1,4 @@
 import { cardTargets, isAllyCard, needsCardTarget, selectedCardTarget, targetGuide, secondaryCard, secondaryCardTarget } from '../engine/battle/targets';
-import { unitIdOf } from '../engine/battle/units';
 // ===== Zustand ストア =====
 // ロジックは src/engine（冒険: applyGameCommand / 戦闘: applyCommand）を呼ぶだけ。
 // ここでは画面の切り替え・UI 用の一時状態（選択中のカード・演出）・保存・敵フェーズのタイマーを扱う。
@@ -36,6 +35,7 @@ import {
 } from '../engine';
 import type { Room } from '../net/room';
 import type { BattleEvent, BattleState, Command, Difficulty, DungeonRun, GameCommand, GameResult, GameState, Gender, PlayerId, SlotResult } from '../types';
+import { pickAllyTarget } from './healTarget';
 import { actorOf, autoName, battleActorOf, isLocalPlayer, LOCAL_PLAYER } from './battleConfig';
 
 export interface Selection {
@@ -108,6 +108,8 @@ export interface WorldMovePresentation {
 
 interface StoreState {
   presentationBusy: boolean;
+  /** 「ターン N」「敵のターン」の帯（数字の表示が全部終わってから出す。見た目だけ） */
+  phaseBanner: { id: number; phase: 'ally' | 'enemy'; turn: number } | null;
   cutins: (NoticeDraft & { id: number })[];
   petPulses: Record<string, { id: number }>;
   worldMoves: WorldMovePresentation[];
@@ -134,6 +136,9 @@ interface StoreState {
   sheet: Sheet;
   /** 冒険の放棄・リセットの確認 */
   confirmAbandon: boolean;
+  /** 「ターン終了」の確認（この端末の担当で、まだ行動できる仲間がいる時だけ出す） */
+  confirmEndTurn: boolean;
+  setConfirmEndTurn: (v: boolean) => void;
   rollFx: RollFx | null;
   popups: Popup[];
   unitFx: Record<string, UnitFx>;
@@ -159,7 +164,8 @@ interface StoreState {
   preview: () => void;
   cancel: () => void;
   setActive: (id: string) => void;
-  endTurn: () => void;
+  /** force = 確認なしで終える（確認の窓の「ターンを終了する」） */
+  endTurn: (force?: boolean) => void;
   /** 道具を使う（userId = 袋の持ち主。戦闘中は操作中のキャラ） */
   usePouch: (itemUid: string, targetHeroId: string, userId?: string) => string | undefined;
   setSettings: (s: Partial<Settings>) => void;
@@ -278,6 +284,13 @@ export const setStoreRoom = (r: Room | null) => {
 /** ホストが送った「敵の行動」がまだ戻ってきていない */
 let enemyInFlight = false;
 
+/** この端末の担当で、まだ行動できる（使えるカードが残っている）仲間がいるか。オンラインで準備完了した席は数えない */
+export function canStillAct(battle: BattleState): boolean {
+  if (battle.phase !== 'ally') return false;
+  const waiting = battle.readyCheck ? new Set(waitingPlayers(battle)) : undefined;
+  return battle.allies.some((a) => isLocalPlayer(a.playerId) && (!waiting || waiting.has(a.playerId)) && !isDone(battle, a));
+}
+
 /** 次に操作するキャラ（この端末の担当キャラだけが対象） */
 function nextActive(battle: BattleState, current: string): string {
   const mine = battle.allies.filter((a) => isLocalPlayer(a.playerId));
@@ -355,11 +368,14 @@ export const useBattle = create<StoreState>((set, get) => {
     if (!enemyScene()) return;
     // オンライン協力: 敵の行動はホストが代表して進める
     if (room && (!room.isHost || enemyInFlight)) return;
+    // 前の行動の数字・帯の表示が終わるまで待つ（終わった時に drainFrames からもう一度呼ぶ）。見た目の間だけで、結果は変わらない
+    if (get().presentationBusy || presentationTimer) { enemyWaiting = true; return; }
     enemyTimer = setTimeout(
       () => {
         enemyTimer = null;
         const s = enemyScene();
         if (!s) return;
+        if (get().presentationBusy || presentationTimer) { enemyWaiting = true; return; }
         if (room) enemyInFlight = true;
         const step: GameCommand = {
           type: 'BATTLE',
@@ -373,6 +389,10 @@ export const useBattle = create<StoreState>((set, get) => {
 
   let frames: PresentationFrame[] = [];
   let presentationTimer: ReturnType<typeof setTimeout> | null = null;
+  /** 敵の行動が、演出の終わりを待っている */
+  let enemyWaiting = false;
+  /** 最後に帯を出した戦闘・手番（同じ手番で2回出さない） */
+  let bannerKey = '';
   const uiTimers = new Set<ReturnType<typeof setTimeout>>();
   let pendingNotices: NoticeDraft[] = [];
   const later = (fn: () => void, seconds: number) => {
@@ -384,7 +404,22 @@ export const useBattle = create<StoreState>((set, get) => {
     presentationTimer = null; frames = []; pendingNotices = [];
     for (const timer of uiTimers) clearTimeout(timer);
     uiTimers.clear();
-    set({ presentationBusy: false, cutins: [], petPulses: {}, popups: [], unitFx: {}, rollFx: null });
+    set({ presentationBusy: false, phaseBanner: null, cutins: [], petPulses: {}, popups: [], unitFx: {}, rollFx: null });
+    if (enemyWaiting) { enemyWaiting = false; setTimeout(scheduleEnemy, 0); }
+  };
+  /** 見ている戦闘の手番が変わっていたら、帯を出す手番を返す（出したことにする） */
+  const takeBanner = (): { phase: 'ally' | 'enemy'; turn: number } | null => {
+    const { game, battle } = get();
+    if (game?.mode !== 'battle' || (battle.phase !== 'ally' && battle.phase !== 'enemy')) return null;
+    const key = `${battle.seed}:${battle.encounterId}:${battle.phase}:${battle.turn}`;
+    if (key === bannerKey) return null;
+    bannerKey = key;
+    return { phase: battle.phase, turn: battle.turn };
+  };
+  /** 演出がすべて終わった（帯も出し終えた）。待っていた敵の行動を進める */
+  const finishPresentation = () => {
+    set({ presentationBusy: false });
+    if (enemyWaiting) { enemyWaiting = false; scheduleEnemy(); }
   };
   const addPopup = (p: PopupDraft) => {
     const current = [...get().popups], own = current.filter(x => x.unitId === p.unitId);
@@ -436,7 +471,19 @@ export const useBattle = create<StoreState>((set, get) => {
   const drainFrames = () => {
     presentationTimer = null;
     const frame = frames.shift();
-    if (!frame) { set({ presentationBusy: false }); return; }
+    if (!frame) {
+      // 手番が変わった: 前の数字が消えるのを待ってから帯を出し、帯が消えてから次へ（帯と数字・敵の行動を重ねない）
+      const banner = takeBanner();
+      if (!banner) { finishPresentation(); return; }
+      set({ presentationBusy: true });
+      const linger = get().popups.length ? Math.max(0, TIMING.resultPopup - TIMING.actionLead) : 0;
+      const k = 1000 / speedFactor(get().settings);
+      presentationTimer = setTimeout(() => {
+        set({ phaseBanner: { id: fxId++, ...banner } });
+        presentationTimer = setTimeout(() => { set({ phaseBanner: null }); drainFrames(); }, TIMING.phaseBanner * k);
+      }, linger * k);
+      return;
+    }
     const wait = frames.length > TIMING.presentationFramesMax ? 0 : frame.delay;
     presentationTimer = setTimeout(() => {
       presentationTimer = null; applyFrame(frame);
@@ -455,13 +502,16 @@ export const useBattle = create<StoreState>((set, get) => {
     const allyIds = new Set(get().battle.allies.map((a) => a.id));
     const next = battleFrames(events, allyIds).map((f) => (quiet ? { ...f, quiet } : f));
     // 音だけのコマ（手番が変わっただけ等）は、待たずにすぐ鳴らす（演出中の扱いにしない）
-    if (!frames.length && !presentationTimer && next.length === 1 && isSoundOnly(next[0])) { playFrameSounds(next[0]); return; }
+    if (!frames.length && !presentationTimer && next.length === 1 && isSoundOnly(next[0])) { playFrameSounds(next[0]); settle(); return; }
     frames.push(...next);
     if (frames.length) { set({ presentationBusy: true }); if (!presentationTimer) drainFrames(); }
+    else settle();
   };
+  /** 演出が止まっている時に手番が変わった（数字の出ない操作）: すぐ帯を出す */
+  const settle = () => { if (!frames.length && !presentationTimer) drainFrames(); };
 
   /** 新しい戦闘に入った時の UI のリセット */
-  const resetBattleUi = (b: BattleState): Partial<StoreState> => { clearPresentation(); return ({
+  const resetBattleUi = (b: BattleState): Partial<StoreState> => { clearPresentation(); bannerKey = ''; return ({
     selection: null,
     rollFx: null,
     popups: [],
@@ -530,6 +580,7 @@ export const useBattle = create<StoreState>((set, get) => {
       if (startedBattle) playSound('sfx_battle_start');
       const quiet = remoteActor(wire);
       applyEvents([...opening, ...r.battleEvents], quiet);
+      settle();
       if (before) {
         showNotices(explorationNotices(before, full, wire));
         for (const id of explorationSounds(before, full, wire)) playSound(id, { quiet });
@@ -576,7 +627,7 @@ export const useBattle = create<StoreState>((set, get) => {
     battle: viewIn(saved?.game ?? null, pickScene(saved?.game ?? null, WORLD_SCENE, true))?.battle ?? EMPTY_BATTLE,
     settings: loadSettings(),
     worldMoves: [],
-    presentationBusy: false, cutins: [], petPulses: {}, turnCutin: null, doorOpen: null,
+    presentationBusy: false, phaseBanner: null, cutins: [], petPulses: {}, turnCutin: null, doorOpen: null,
     finishWorldMove: id => {
       set(s => ({ worldMoves: s.worldMoves[0]?.id === id ? s.worldMoves.slice(1) : s.worldMoves }));
       if (!get().worldMoves.length) { pumpNotices(); scheduleEnemy(); }
@@ -585,6 +636,7 @@ export const useBattle = create<StoreState>((set, get) => {
     selection: null,
     sheet: null,
     confirmAbandon: false,
+    confirmEndTurn: false,
     rollFx: null,
     popups: [],
     unitFx: {},
@@ -743,12 +795,9 @@ export const useBattle = create<StoreState>((set, get) => {
         const alive = battle.enemies.filter((e) => !e.dead);
         if (alive.length === 1) targetId = alive[0].uid;
       }
-      if (isAllyCard(card)) {
-        const choices = cardTargets(battle, ally, card);
-        choices.sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp);
-        if (choices[0]) targetId = unitIdOf(choices[0]);
-      }
-      const allyTargetId = card.secondaryTarget ? cardTargets(battle, ally, secondaryCard(card)).sort((a,b) => a.hp/a.maxHp-b.hp/b.maxHp).map(unitIdOf)[0] : undefined;
+      // 回復・支援の最初の相手: HPが減っている味方（割合が一番低い）→ 全員満タンなら、敵の予告のダメージの合計が一番大きい味方
+      if (isAllyCard(card)) targetId = pickAllyTarget(battle, cardTargets(battle, ally, card)) ?? targetId;
+      const allyTargetId = card.secondaryTarget ? pickAllyTarget(battle, cardTargets(battle, ally, secondaryCard(card))) : undefined;
       set({ selection: { cardUid, targetId, allyTargetId, focus: 0 }, flash: null });
     },
 
@@ -832,11 +881,15 @@ export const useBattle = create<StoreState>((set, get) => {
       scheduleSave(get);
     },
 
-    endTurn: () => {
+    endTurn: (force = false) => {
       const { battle } = get();
+      set({ confirmEndTurn: false });
       if (battle.phase !== 'ally') return;
-      const canAct = battle.allies.some((a) => isLocalPlayer(a.playerId) && !isDone(battle, a));
-      set({ selection: null, hint: canAct ? { text: 'まだ行動できるキャラがいます', id: fxId++ } : null });
+      // この端末の担当のキャラだけで判断する（1台で全員を動かす時も、オンラインで自分の分だけの時も同じ）。
+      // 使えるカード（マナが足りる）が残っている仲間がいれば、押し間違いを防ぐために確認する
+      const canAct = canStillAct(battle);
+      if (canAct && !force) { set({ selection: null, confirmEndTurn: true }); return; }
+      set({ selection: null, hint: null });
       // オンライン協力: この端末の担当のうち、まだ準備完了していない席の分を押す
       if (room) {
         for (const p of waitingPlayers(battle).filter((x) => isLocalPlayer(x))) get().dispatch({ type: 'END_TURN', playerId: p });
@@ -867,6 +920,7 @@ export const useBattle = create<StoreState>((set, get) => {
 
     openSheet: (sheet) => set({ sheet, selection: sheet ? null : get().selection }),
     setConfirmAbandon: (v) => set({ confirmAbandon: v }),
+    setConfirmEndTurn: (v) => set({ confirmEndTurn: v }),
     showToast: (text, tone = 'info') => {
       playSound(tone === 'error' ? 'sfx_ui_deny' : tone === 'offline' ? 'sfx_ui_error' : 'sfx_ui_notice');
       set({ toast: { text, id: fxId++ } });
@@ -875,6 +929,7 @@ export const useBattle = create<StoreState>((set, get) => {
     closeTop: () => {
       const s = get();
       if (s.confirmAbandon) return set({ confirmAbandon: false }), true;
+      if (s.confirmEndTurn) return set({ confirmEndTurn: false }), true;
       if (s.sheet === 'log') return set({ sheet: 'menu' }), true;
       if (s.sheet) return set({ sheet: null }), true;
       if (s.selection) return set({ selection: null }), true;

@@ -457,18 +457,21 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   const supportedOthers = recordSupport(ally, state.allies, supportBefore);
   const parts = ctx.parts;
   const hasDamage = tier.effects.some((e) => e.kind === 'damage');
-  if (hasDamage) parts.unshift(`${ctx.dealt} DMG`);
+  if (hasDamage) parts.unshift(`${ctx.dealt}ダメージ`);
   // 働いた常時型の能力（闘志・貫通・止めなど）
   for (const n of ctx.fired) abilityTriggered(state, ally.id, n.name, events, n.source);
 
   // きっかけ: カードの特殊能力 → 自分の能力（カードを使った後 → 完全成功時）
   const fireOpts = { card, target, allyTarget, dealt: ctx.dealt, focusUsed, tierEffects: tier.effects, perfect, successes, supportedOthers };
+  // 発動した能力（お供・ジョブ・カードの特殊能力）の名前は、結果の帯には入れず、記録にだけ残す（帯が長くなって切れるため。
+  // 能力はカットイン・キャラの上の【能力名】で見せる）
+  const abilityParts: string[] = [];
   if (cardAbilities) {
-    parts.push(...fireAbilities(state, rng, events, ally, 'afterCard', { ...fireOpts, list: cardAbilities }));
-    if (perfect) parts.push(...fireAbilities(state, rng, events, ally, 'perfect', { ...fireOpts, list: cardAbilities }));
+    abilityParts.push(...fireAbilities(state, rng, events, ally, 'afterCard', { ...fireOpts, list: cardAbilities }));
+    if (perfect) abilityParts.push(...fireAbilities(state, rng, events, ally, 'perfect', { ...fireOpts, list: cardAbilities }));
   }
-  parts.push(...fireAbilities(state, rng, events, ally, 'afterCard', fireOpts));
-  if (perfect) parts.push(...fireAbilities(state, rng, events, ally, 'perfect', fireOpts));
+  abilityParts.push(...fireAbilities(state, rng, events, ally, 'afterCard', fireOpts));
+  if (perfect) abilityParts.push(...fireAbilities(state, rng, events, ally, 'perfect', fireOpts));
   // 分身は攻撃効果を半分の威力で繰り返す。追撃から再帰しない。
   for (const summon of ally.summons ?? []) {
     if (!summon.echoPct) continue;
@@ -490,21 +493,33 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   (ally.playedBy ??= {})[card.category] = (ally.playedBy[card.category] ?? 0) + 1;
 
   const resultLabel = perfect ? '完全成功' : `${successes}成功`;
-  const summary = `${resultLabel}！ ${parts.join(' ')}`;
+  const summary = resultSummary(resultLabel, parts);
   const targetText = card.target === 'allEnemies' ? ' → 敵全体' : target ? ` → ${nameOf(target)}` : '';
   addLog(
     state,
     `${ally.name} ${card.name}${targetText} 成功率${chance}%${focusUsed ? `（🌟${focusUsed}）` : ''} → ${results
       .map((r) => SLOT_ICON[r])
-      .join('')} = ${resultLabel}：${parts.join(' ')}`,
+      .join('')} = ${resultLabel}：${[...parts, ...abilityParts].join(' ')}`,
   );
   events.unshift({ type: 'roll', characterId: ally.id, cardId: card.id, targetId: target ? unitIdOf(target) : undefined, chance, results, successes, perfect, summary });
   checkEnd(state, events);
   return undefined;
 }
 
-/** 実際のカード処理を複製上で試す。元の状態・乱数・予約は一切進めない。抽選を伴う値は目安として示す。 */
-export function predictCard(state: BattleState, characterId: string, cardInstanceId: string, targetId: string | undefined, focusUsed: number, tier: number, allyTargetId?: string) {
+/** 結果の帯の文: 「完全成功！ 9ダメージ・7ブロック」。何も起きなければ「1成功！」だけ */
+export function resultSummary(resultLabel: string, parts: string[]): string {
+  const list = parts.filter((x) => x && x.trim());
+  return list.length ? `${resultLabel}！ ${list.join('・')}` : `${resultLabel}！`;
+}
+
+/** 予測の合計（1体ぶん）。値は [低い方, 高い方]（抽選のある攻撃は倍率の最小・最大） */
+export interface PredictTotals { id: string; damage: [number, number]; hpLoss: [number, number]; heal: [number, number]; block: [number, number]; hits: [number, number] }
+
+/**
+ * 実際のカード処理を複製上で試し、キャラごとの合計を返す。元の状態・乱数・予約は一切進めない。
+ * hurtTargets = 回復の相手のHPを1にして試す（満タンの相手にも「回復の力」を見せるため。表示だけ）
+ */
+export function predictCardTotals(state: BattleState, characterId: string, cardInstanceId: string, targetId: string | undefined, focusUsed: number, tier: number, allyTargetId?: string, hurtTargets = false): PredictTotals[] {
   const original = findAlly(state, characterId), inst = original?.hand.find(c => c.uid === cardInstanceId);
   if (!original || !inst) return [];
   const card = cardOf(inst);
@@ -514,6 +529,7 @@ export function predictCard(state: BattleState, characterId: string, cardInstanc
   for (const high of [false, true]) {
     const copy = structuredClone(state), a = findAlly(copy, characterId)!;
     delete copy.slotPreview;
+    if (hurtTargets) for (const u of copy.allies) if (!u.dead && (u.id === targetId || u.id === allyTargetId || card.target === 'self')) u.hp = 1;
     const modified = structuredClone(card);
     for (const t of modified.tiers) for (const e of t.effects) if (e.kind === 'damage' && e.outcomes?.length) {
       e.outcomes = [{ weight: 1, multiplier: (high ? Math.max : Math.min)(...e.outcomes.map(o => o.multiplier)) }];
@@ -527,7 +543,7 @@ export function predictCard(state: BattleState, characterId: string, cardInstanc
     samples.push(events);
   }
   const ids = [...new Set(samples.flat().flatMap(e => 'unitId' in e ? [e.unitId] : []))];
-  return ids.flatMap(id => {
+  return ids.map(id => {
     const totals = samples.map(events => {
       let damage = 0, hpLoss = 0, heal = 0, block = 0, hits = 0;
       for (const e of events) {
@@ -538,15 +554,27 @@ export function predictCard(state: BattleState, characterId: string, cardInstanc
       }
       return { damage, hpLoss, heal, block, hits };
     });
-    const range = (k: keyof typeof totals[0]) => {
-      const lo = Math.min(...totals.map(t => t[k])), hi = Math.max(...totals.map(t => t[k]));
-      return lo === hi ? `${lo}` : `${lo}〜${hi}`;
-    };
+    const range = (k: keyof typeof totals[0]): [number, number] => [Math.min(...totals.map(t => t[k])), Math.max(...totals.map(t => t[k]))];
+    return { id, damage: range('damage'), hpLoss: range('hpLoss'), heal: range('heal'), block: range('block'), hits: range('hits') };
+  });
+}
+
+/** 予測の値の書き方（同じなら1つ、違えば「7〜9」） */
+export const rangeText = ([lo, hi]: [number, number]) => (lo === hi ? `${lo}` : `${lo}〜${hi}`);
+
+/** 実際のカード処理を複製上で試す。元の状態・乱数・予約は一切進めない。抽選を伴う値は目安として示す。 */
+export function predictCard(state: BattleState, characterId: string, cardInstanceId: string, targetId: string | undefined, focusUsed: number, tier: number, allyTargetId?: string) {
+  return predictTexts(predictCardTotals(state, characterId, cardInstanceId, targetId, focusUsed, tier, allyTargetId));
+}
+
+/** 予測の合計を「ダメージ9（1回・HP減少9）・ブロック+7」の文にする */
+export function predictTexts(list: PredictTotals[]): { id: string; text: string }[] {
+  return list.flatMap(t => {
     const parts: string[] = [];
-    if (totals.some(t => t.damage || t.hits)) parts.push(`ダメージ${range('damage')}（${range('hits')}回・HP減少${range('hpLoss')}）`);
-    if (totals.some(t => t.heal)) parts.push(`HP回復${range('heal')}`);
-    if (totals.some(t => t.block)) parts.push(`ブロック+${range('block')}`);
-    return parts.length ? [{ id, text: parts.join('・') }] : [];
+    if (t.damage[1] || t.hits[1]) parts.push(`ダメージ${rangeText(t.damage)}（${rangeText(t.hits)}回・HP減少${rangeText(t.hpLoss)}）`);
+    if (t.heal[1]) parts.push(`HP回復${rangeText(t.heal)}`);
+    if (t.block[1]) parts.push(`ブロック+${rangeText(t.block)}`);
+    return parts.length ? [{ id: t.id, text: parts.join('・') }] : [];
   });
 }
 
