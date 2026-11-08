@@ -156,7 +156,7 @@ export const frozenCave: DungeonDef = {
   description: '訪れるたびに姿を変える氷の洞窟。危険だが、奥には豪華な財宝が眠る。',
   background: 'forestCave',
   baseLevel: 6,
-  pools: { ...CRYSTAL_POOLS, boss: ['goblinBrute', 'chaosShaman'] },
+  pools: { ...CRYSTAL_POOLS, boss: ['frostDrakeling', 'snowWitch'] },
   bossChest: 'legend',
   random: true,
   rows: 6,

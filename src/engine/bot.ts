@@ -91,7 +91,8 @@ function worldTarget(g: GameState, at: number): { tile: number; why: 'town' | 'g
     let best: number | undefined;
     w.tiles.forEach((t, i) => {
       if (t.f?.kind !== 'town' || w.fallenTowns.includes(t.f.id) || !t.seen) return;
-      if (heroes.every((h) => h.gold < TOWNS.get(t.f!.id).innCost)) return;
+      // 傷ついた本人が払える町だけを候補にする。健康な仲間のお金では泊まれない。
+      if (!heroes.some((h) => h.hp < heroMaxHp(h) * 0.5 && h.gold >= TOWNS.get(t.f!.id).innCost)) return;
       if (best === undefined || hexDistance(w, at, i) < hexDistance(w, at, best)) best = i;
     });
     if (best !== undefined) return { tile: best, why: 'town' };
@@ -300,12 +301,12 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
       return send(g, { type: 'RETURN_TO_HUB', playerId: pid(g) }, log);
     case 'town': {
       const t = g.town!;
-      const key = `${g.world!.worldTurn}:${t.townId}`;
-      if (memo.town !== key) {
-        memo.town = key;
-        const v = g.heroes.find((h) => h.id === t.heroId)!;
-        if (v.hp < heroMaxHp(v) && v.gold >= TOWNS.get(t.townId).innCost) return send(g, { type: 'TOWN_INN', playerId: v.playerId }, log);
-      }
+      // 施設はキャラごとに利用する。同じ担当の2人目も、本人を指定して宿泊する。
+      const v = facilityMembers(g)
+        .filter(id => !t.finished?.includes(id))
+        .map(id => findHero(g, id)!)
+        .find(h => h.hp > 0 && h.hp < heroMaxHp(h) && h.gold >= TOWNS.get(t.townId).innCost);
+      if (v) return send(g, { type: 'TOWN_INN', playerId: v.playerId, heroId: v.id }, log);
       return send(g, { type: 'LEAVE_TOWN', playerId: pid(g) }, log);
     }
     case 'sanctuary':

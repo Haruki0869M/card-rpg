@@ -1,27 +1,131 @@
-// 凍てつく王国の敵の組み合わせ（戦闘・強敵・ボス）。
-// 今は仮（共通の敵）。手順2で、このシナリオの敵28体に置き換える
+// 凍てつく王国の敵の組み合わせ。凍結役を同時に重ねず、亜種で弱点・耐性を分散する。
 import type { DungeonDef } from '../../../../types';
 
 export const CRYSTAL_POOLS: DungeonDef['pools'] = {
-  battle: [['guardDog', 'guardDog'], ['goblinScout', 'guardDog'], ['chaosShaman', 'goblinScout'], ['goblinScout', 'goblinScout', 'chaosShaman']],
-  elite: [['goblinBrute'], ['goblinBrute', 'chaosShaman']],
-  boss: ['goblinBrute'],
+  "battle": [
+    [
+      "iceBat",
+      "frozenSoldier"
+    ],
+    [
+      "snowOwl",
+      "icicleBug"
+    ],
+    [
+      "emberFrostWolf",
+      "frozenSoldier"
+    ],
+    [
+      "frostSprite",
+      "iceBat"
+    ]
+  ],
+  "elite": [
+    [
+      "snowWitch",
+      "frostWolf"
+    ],
+    [
+      "snowWitch",
+      "emberFrostWolf"
+    ]
+  ],
+  "boss": [
+    "crystalLord"
+  ]
 };
 
 export const CATHEDRAL_POOLS: DungeonDef['pools'] = {
-  battle: [['chaosShaman', 'guardDog'], ['chaosShaman', 'chaosShaman'], ['goblinScout', 'chaosShaman', 'guardDog']],
-  elite: [['goblinBrute', 'chaosShaman'], ['goblinBrute']],
-  boss: ['goblinBrute'],
+  "battle": [
+    [
+      "iceSlime",
+      "frozenGhoul"
+    ],
+    [
+      "frostMage",
+      "iceArcher"
+    ],
+    [
+      "cursedFrozenSoldier",
+      "iceArcher"
+    ],
+    [
+      "iceSlime",
+      "cursedFrozenSoldier"
+    ]
+  ],
+  "elite": [
+    [
+      "shadowSnowWitch",
+      "frozenGhoul"
+    ],
+    [
+      "iceKnight",
+      "cursedFrozenSoldier"
+    ]
+  ],
+  "boss": [
+    "frozenBishop"
+  ]
 };
 
 export const MINE_POOLS: DungeonDef['pools'] = {
-  battle: [['goblinBrute', 'goblinScout'], ['guardDog', 'guardDog', 'goblinScout'], ['goblinBrute', 'guardDog']],
-  elite: [['goblinBrute', 'goblinBrute'], ['goblinBrute', 'chaosShaman']],
-  boss: ['goblinBrute'],
+  "battle": [
+    [
+      "yeti",
+      "iceSwordsman"
+    ],
+    [
+      "blizzardSnake",
+      "stormIceArcher"
+    ],
+    [
+      "venomIceSlime",
+      "iceSwordsman"
+    ],
+    [
+      "yeti",
+      "stormIceArcher"
+    ]
+  ],
+  "elite": [
+    [
+      "blizzardBeast"
+    ],
+    [
+      "frostDrakeling"
+    ]
+  ],
+  "boss": [
+    "frostGiant"
+  ]
 };
 
 export const CASTLE_POOLS: DungeonDef['pools'] = {
-  battle: [['goblinBrute', 'chaosShaman'], ['goblinBrute', 'goblinBrute'], ['chaosShaman', 'chaosShaman', 'guardDog']],
-  elite: [['goblinBrute', 'goblinBrute']],
-  boss: ['goblinBrute'],
+  "battle": [
+    [
+      "iceSwordsman",
+      "cursedFrozenSoldier"
+    ],
+    [
+      "frozenGhoul",
+      "stormIceArcher"
+    ],
+    [
+      "yeti",
+      "cursedFrozenSoldier"
+    ]
+  ],
+  "elite": [
+    [
+      "iceKnight",
+      "frozenGhoul"
+    ],
+    [
+      "frostGuardian"
+    ]
+  ],
+  "boss": [
+    "whiteQueen"
+  ]
 };
