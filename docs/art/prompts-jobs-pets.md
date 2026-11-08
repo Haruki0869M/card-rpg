@@ -1014,7 +1014,7 @@ adorable chibi budgerigar parakeet with wavy stripes on the head and wings, smal
 ハルクイン（`harlequin`）→ 元画像 `pet-budgie-harlequin.png`
 
 ```
-adorable chibi budgerigar parakeet with wavy stripes on the head and wings, small round cheek dots, pied pattern with yellow and green patches, yellow face, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
+adorable chibi budgerigar parakeet with wavy stripes on the head and wings, small round cheek dots, harlequin pied coloring: mostly bright yellow body and wings with a few irregular bright green patches on the belly, very faint wing stripes, yellow face, big round sparkling eyes, tiny simple body, perched upright as if sitting on a shoulder, soft hand-painted shading, clean readable silhouette even at small size, full body, front three-quarter view, plain white background --ar 1:1 --no signature, text, human, ribbon, heart, collar, accessories, background scenery
 ```
 
 レインボー（`rainbow`）→ 元画像 `pet-budgie-rainbow.png`
