@@ -1,4 +1,4 @@
-// 敵の絵の確認（凍てつく王国・共通・侵食の魔王の新しい敵・機械仕掛けの帝国・呪われた群島・砂塵の王朝・星降る天空城・K3 D）: 戦闘に3体ずつ出して、描いた絵（webp）が出ているかを調べ、写真を撮る。
+// 敵の絵の確認（凍てつく王国・共通・侵食の魔王の新しい敵・機械仕掛けの帝国・呪われた群島・砂塵の王朝・星降る天空城・K3 D・夢幻の大迷宮・レアの敵と隠しボス）: 戦闘に3体ずつ出して、描いた絵（webp）が出ているかを調べ、写真を撮る。
 // 変身するボス（crystalLord・frozenBishop・frostGiant・whiteQueen）は、保存データで段階を進めて、変身後の絵（<ID>-<段階>）に変わるかも調べる。
 // 使い方: URL=http://127.0.0.1:<番号>/card-rpg/ node scripts/enemy-art.mjs
 import { mkdirSync } from 'node:fs';
@@ -31,11 +31,17 @@ const ENEMIES = ['snowHare', 'frostWolf', 'frostSprite', 'iceBat', 'frozenSoldie
   'clockworkKnight', 'moonGardener', 'moonMaiden', 'skyKnight', 'skyPaladin', 'starSeerQueen',
   // 各シナリオに足す敵（K3 D）
   'iceFisher', 'frostMoth', 'driftwoodSpirit', 'lanternAngler', 'desertFennec', 'obeliskSentinel', 'cometFox', 'harpGuardian',
-  'smokeStackCrow', 'pressGolem'];
+  'smokeStackCrow', 'pressGolem',
+  // 夢幻の大迷宮の新しい敵
+  'nightmareMote', 'sleepwalker', 'pillowGolem', 'lullabyBird', 'shadowChild', 'lostMemory', 'mirrorKnight', 'dreamWeaver', 'memoryEater', 'dreamEater',
+  // レアの敵と隠しボス
+  'goldenWolf', 'crystalGhoul', 'whiteStag', 'frostBellKnight', 'pearlCrab', 'lanternGhostCaptain', 'goldenScarab', 'starlitSwan',
+  'brassClockCat', 'crimsonSteamHound', 'hollowDemonLord', 'drownedBride', 'fallenStarSerpent', 'ancientEngineHeart'];
 const PHASES = { crystalLord: [1], frozenBishop: [1], frostGiant: [1], whiteQueen: [1, 2], foremanGolem: [1], runawayBoiler: [1], clockworkSage: [1], greatMachine: [1, 2],
   seaSerpentQueen: [1], pirateCaptainGuld: [1], tideHighPriest: [1], ghostAdmiral: [1, 2],
   sandScorpionKing: [1], shadowVizier: [1], stoneGuardianBeast: [1], sandPharaoh: [1, 2],
-  windKeeper: [1], starLibrarian: [1], moonMaiden: [1], starSeerQueen: [1, 2] };
+  windKeeper: [1], starLibrarian: [1], moonMaiden: [1], starSeerQueen: [1, 2], dreamEater: [1, 2],
+  hollowDemonLord: [1], drownedBride: [1], fallenStarSerpent: [1], ancientEngineHeart: [1] };
 const problems = [];
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
@@ -105,6 +111,10 @@ await page.setViewportSize({ width: 390, height: 844 });
 // 変身後の絵
 for (const [id, list] of Object.entries(PHASES)) {
   await startBattle(page, 1, [id]);
+  // 戦闘の始めに、変身後の絵を先に読み始めているか（変身した瞬間に絵が欠けないように）
+  await page.waitForTimeout(300);
+  const fetched = await page.evaluate(() => performance.getEntriesByType('resource').map((r) => r.name));
+  for (const phase of list) if (!fetched.some((u) => u.includes(`/${id}-${phase}-`))) problems.push(`390 ${id}: 戦闘の始めに段階${phase}の絵を先に読んでいない`);
   for (const phase of list) {
     await page.evaluate(
       ({ phase }) => {

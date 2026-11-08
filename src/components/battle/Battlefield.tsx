@@ -3,7 +3,7 @@
 
 import { motion, useAnimate, useReducedMotion } from 'framer-motion';
 import { memo, useEffect, useMemo } from 'react';
-import { BattleBackground, CharacterArt, EnemyArt } from '../../art';
+import { BattleBackground, CharacterArt, EnemyArt, preloadEnemyPhases } from '../../art';
 import { getPet } from '../../data/pets';
 import { PetToken } from '../ui/PetToken';
 import { BALANCE, TIMING } from '../../data/balance';
@@ -353,6 +353,9 @@ export function Battlefield() {
   const activeId = useBattle((s) => s.activeId);
   const phase = useBattle((s) => s.battle.phase);
   const bgKind = useBattle((s) => (s.game ? sceneBackground(s.game) : 'plains'));
+  // ボスの変身後の絵は、戦闘の始め（敵の顔ぶれが決まった時）に先に読む
+  const enemyIds = enemies.map((e) => e.defId).join(',');
+  useEffect(() => preloadEnemyPhases(enemyIds.split(',')), [enemyIds]);
   const W = size.width;
   const H = size.height;
 
