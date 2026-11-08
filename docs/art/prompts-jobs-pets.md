@@ -183,7 +183,7 @@ full body character illustration of a young adult male street-fighting brawler, 
 女 → 元画像 `brawler-female.png`
 
 ```
-full body character illustration of a young adult female street-fighting brawler, short brown hair, open orange vest, wide dark trousers, red headband, fighting stance with raised fists, both fists wrapped in worn cloth hand wraps, bare hands, orange as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no sword, staff, claws, metal gauntlets, shield, bow, arrows, quiver, spear, text, watermark, scenery
+full body character illustration of a young adult female street-fighting brawler, short brown hair, fitted orange sleeveless martial jacket closed at the front, wide dark trousers, red headband, fighting stance with raised fists, both fists wrapped in worn cloth hand wraps, bare hands, orange as the main color, detailed hand-painted fantasy RPG character art, fine ornamental embroidery, muted earthy palette, standing pose, front three-quarter view, entire body visible from head to feet, plain off-white background, soft even lighting --ar 2:3 --sref https://card-rpg-1aa60.web.app/assets/hunter-male-Didh6Op_.webp https://card-rpg-1aa60.web.app/assets/guardian-female-lfYd-E3U.webp --no sword, staff, claws, metal gauntlets, shield, bow, arrows, quiver, spear, text, watermark, scenery
 ```
 
 #### 大魔導士（`archmage`）
