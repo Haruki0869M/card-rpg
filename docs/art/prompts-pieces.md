@@ -597,14 +597,14 @@ chibi tabletop miniature figurine of a young female dark knight, long black hair
 - 持たせる物: 木の錫杖（鈴と輪）　／　見た目: 白い小袖と赤い袴（男は神主風の白と赤）
 
 ```
-chibi tabletop miniature figurine of a young male shrine maiden, black hair tied back with white paper ribbon (male shrine priest attire), white kosode top and red hakama with white ribbons and paper charms, holding a wooden ringed prayer staff (shakujo) with small brass rings and bells at the top in one hand, the other hand empty, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, sword, bow, shield, gohei wand, arrows, quiver, crystal staff, second staff, second weapon, signature, text, watermark, scenery
+chibi tabletop miniature figurine of a young male Shinto shrine attendant, black hair tied back with a white paper ribbon, white kosode top and red hakama with white ribbons and paper charms, holding a wooden ringed prayer staff (shakujo) with small brass rings and bells at the top in one hand, the other hand empty, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, sword, bow, shield, gohei wand, arrows, quiver, crystal staff, second staff, second weapon, signature, text, watermark, scenery
 ```
 
 #### 巫女・女（`piece/shrineMaiden-female`）→ 元画像 `piece/shrineMaiden-female.png`
 - 持たせる物: 木の錫杖（鈴と輪）　／　見た目: 白い小袖と赤い袴（男は神主風の白と赤）
 
 ```
-chibi tabletop miniature figurine of a young female shrine maiden, long straight black hair tied low with a white paper ribbon, white kosode top and red hakama with white ribbons and paper charms, holding a wooden ringed prayer staff (shakujo) with small brass rings and bells at the top in one hand, the other hand empty, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, sword, bow, shield, gohei wand, arrows, quiver, crystal staff, second staff, second weapon, signature, text, watermark, scenery
+chibi tabletop miniature figurine of a young female Shinto shrine maiden, long straight black hair tied low with a white paper ribbon, white kosode top and red hakama with white ribbons and paper charms, holding a wooden ringed prayer staff (shakujo) with small brass rings and bells at the top in one hand, the other hand empty, cute expression, standing on its own feet with no base, boots touching the plain white background directly, hand-painted resin board game figure, full body, front three-quarter view, soft studio lighting, plain white background --ar 3:4 --no pedestal, base, stand, round disc, sword, bow, shield, gohei wand, arrows, quiver, crystal staff, second staff, second weapon, signature, text, watermark, scenery
 ```
 
 #### 占星術師・男（`piece/astrologer-male`）→ 元画像 `piece/astrologer-male.png`
