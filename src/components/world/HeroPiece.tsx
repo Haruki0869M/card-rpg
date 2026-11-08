@@ -76,13 +76,15 @@ export function HeroPiece({ hero, size: s, ringColor, active, hopping, stepKey, 
           <ellipse cx="50" cy="13" rx="34" ry="7.5" fill="none" stroke="#fff6cf" strokeOpacity="0.7" strokeWidth="1.5" />
         </svg>
         {img ? (
-          // ミニチュアの絵（下を台座の上面にそろえる）
+          // ミニチュアの絵: 正方形（1.25s）。足の裏が絵の下端にあり、それを台座の上面の中ほど（0.78s）に置く。
+          // 横に長い武器は箱の左右へ少しはみ出す（体の大きさをそろえるため）。加工は scripts/art/build_art.py の build_pieces
           <img
             src={img}
             alt=""
             draggable={false}
-            className="absolute object-contain object-bottom"
-            style={{ left: s * 0.0, top: -s * 0.47, width: s, height: s * 1.25, filter: 'drop-shadow(0 1px 1px #000)' }}
+            decoding="async"
+            className="absolute"
+            style={{ left: -s * 0.125, top: -s * 0.47, width: s * 1.25, height: s * 1.25, filter: 'drop-shadow(0 1px 1px #000)' }}
           />
         ) : (
           <>

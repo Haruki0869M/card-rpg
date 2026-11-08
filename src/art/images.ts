@@ -32,9 +32,10 @@ export function preloadImages(keys: string[]) {
 
 /** 起動時: 小さな絵（顔・お供・道具・宝箱・地図の場所・地形・画面の枠）はすぐ、大きな絵（全身・敵・背景）は手が空いた時に少しずつ */
 export function preloadAllImages() {
-  // 職業の絵は88枚ぶんあるので、最初から持っている4職（基本ジョブ）だけ先に読む。転職先の全身の絵は、表示する時に読む（通信量を抑える）
-  const BASE_JOBS = /^hero\/(hunter|guardian|mage|warrior)-/;
-  const isHero = (k: string) => k.startsWith('hero/');
+  // 職業の絵（全身・顔・世界マップの駒）は職の数×男女ぶんあるので、最初から持っている4職（基本ジョブ）だけ先に読む。
+  // 転職先の絵は、表示する時に読む（通信量を抑える）
+  const BASE_JOBS = /^(hero|piece)\/(hunter|guardian|mage|warrior)-/;
+  const isHero = (k: string) => k.startsWith('hero/') || k.startsWith('piece/');
   const now = Object.keys(IMAGES).filter((k) => /^(item|chest|place|terrain|ui|pet)\//.test(k) || (k.endsWith('-face') && (!isHero(k) || BASE_JOBS.test(k))) || k === 'bg/title');
   preloadImages(now);
   const later = Object.keys(IMAGES).filter((k) => !now.includes(k) && (!isHero(k) || BASE_JOBS.test(k)));
