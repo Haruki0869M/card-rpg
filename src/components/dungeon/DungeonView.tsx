@@ -1,11 +1,11 @@
 // ===== ダンジョンの一人称の通路（第3段階B） =====
 // エンジンの viewSlices（見たマスだけから決めた「何が見えるか」）を、CSS の遠近法で四角形を並べて描く。
 // 絵（src/assets/art/dungeon/<背景>-<wall|floor|ceiling|door>.webp）があれば使い、無ければダンジョンごとの色の仮の見た目。
-import { Crown, Flame, Gift, Lock, Skull, Sparkles, Swords } from 'lucide-react';
+import { Crown, Flame, Gem, Gift, Leaf, Lock, Skull, Sparkles, Swords } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
 import { artImage } from '../../art/images';
 import { getRoomType } from '../../data/rules';
-import { viewSlices, type ViewFace } from '../../engine';
+import { OMEN_INFO, viewSlices, type DoorOmen, type ViewFace } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
 import type { DungeonRun } from '../../types';
 
@@ -39,7 +39,7 @@ function surface(bg: string, part: Part, shade: number): CSSProperties {
 }
 
 /** 扉（壁の面の中に描く） */
-function Door({ bg, face, shade, opening }: { bg: string; face: ViewFace; shade: number; opening?: number }) {
+function Door({ bg, face, shade, opening, omen }: { bg: string; face: ViewFace; shade: number; opening?: number; omen?: DoorOmen }) {
   const t = themeOf(bg);
   const img = artImage(`dungeon/${bg}-door`);
   const boss = face === 'boss';
@@ -84,13 +84,13 @@ function Door({ bg, face, shade, opening }: { bg: string; face: ViewFace; shade:
         left: boss ? '12%' : '22%',
         right: boss ? '12%' : '22%',
         top: boss ? '10%' : '22%',
-        border: `3px solid ${boss ? '#d8a830' : '#2a1a10'}`,
+        border: `3px solid ${boss ? '#d8a830' : omen ? OMEN_INFO[omen].color : '#2a1a10'}`,
         backgroundColor: t.door,
         backgroundImage: img
           ? `linear-gradient(rgba(0,0,0,${shade}), rgba(0,0,0,${shade})), url(${img})`
           : `linear-gradient(rgba(0,0,0,${shade}), rgba(0,0,0,${shade})), repeating-linear-gradient(90deg, rgba(0,0,0,.35) 0 2px, transparent 2px 25%)`,
         backgroundSize: 'cover',
-        boxShadow: boss ? '0 0 18px rgba(255,200,80,.45)' : undefined,
+        boxShadow: boss ? '0 0 18px rgba(255,200,80,.45)' : omen ? `0 0 16px ${OMEN_INFO[omen].color}, inset 0 0 10px ${OMEN_INFO[omen].color}` : undefined,
         filter: face === 'locked' ? 'grayscale(.7) brightness(.6)' : undefined,
       }}
     >
@@ -99,7 +99,21 @@ function Door({ bg, face, shade, opening }: { bg: string; face: ViewFace; shade:
       {boss && <Crown className="relative text-amber-300" style={{ width: '34%', height: '34%' }} />}
       {face === 'locked' && <Lock className="text-zinc-300/80" style={{ width: '24%', height: '24%' }} />}
       {face === 'door' && <span className="absolute right-[14%] top-1/2 h-[7%] w-[7%] rounded-full bg-amber-300/80" />}
+      {/* 気配（第3段階C1）: 扉の上に小さな印 */}
+      {omen && <OmenMark omen={omen} />}
     </div>
+  );
+}
+
+/** 気配の印（危険＝牙・財宝＝宝石・安らぎ＝葉・不思議＝星）。扉の上でゆっくり光る */
+const OMEN_ICONS: Record<DoorOmen, typeof Swords> = { danger: Skull, treasure: Gem, rest: Leaf, mystery: Sparkles };
+export function OmenMark({ omen, className = 'absolute left-1/2 top-[6%] -translate-x-1/2' }: { omen: DoorOmen; className?: string }) {
+  const Icon = OMEN_ICONS[omen];
+  const c = OMEN_INFO[omen].color;
+  return (
+    <span className={`glow-pulse flex items-center justify-center rounded-full ${className}`} style={{ width: '26%', aspectRatio: '1', background: 'rgba(0,0,0,.55)', boxShadow: `0 0 10px ${c}` }} data-omen={omen}>
+      <Icon style={{ width: '70%', height: '70%', color: c }} />
+    </span>
   );
 }
 
@@ -116,7 +130,7 @@ function Torch({ bg }: { bg: string }) {
 }
 
 /** 一人称の通路 */
-export function DungeonView({ run, background, opening }: { run: DungeonRun; background: string; /** 正面の扉が開く演出の秒数（扉が開く演出の時だけ） */ opening?: number }) {
+export function DungeonView({ run, background, opening, omens }: { run: DungeonRun; background: string; /** 正面の扉が開く演出の秒数（扉が開く演出の時だけ） */ opening?: number; /** 扉の気配（部屋のID → 種類） */ omens?: Record<string, DoorOmen> }) {
   const [ref, size] = useElementSize<HTMLDivElement>();
   const { slices, end } = viewSlices(run);
   // 1マスの大きさ（通路の幅・高さ・奥行き）。画面の小さい方の辺に合わせる
@@ -177,7 +191,7 @@ export function DungeonView({ run, background, opening }: { run: DungeonRun; bac
         const ahead = side === 'left' ? s.leftAhead : s.rightAhead;
         const shA = Math.min(0.9, shade(s.depth + 1) + 0.15);
         if (ahead && ahead !== 'far' && ahead !== 'dark')
-          face(`${side}a${s.depth}`, `translate3d(${sign * U}px, 0, ${-(s.depth + 1) * U}px)`, surface(background, 'wall', shA), ahead === 'wall' ? null : <Door bg={background} face={ahead} shade={shA} />, s.depth + 1.2);
+          face(`${side}a${s.depth}`, `translate3d(${sign * U}px, 0, ${-(s.depth + 1) * U}px)`, surface(background, 'wall', shA), ahead === 'wall' ? null : <Door bg={background} face={ahead} shade={shA} omen={omens?.[(side === 'left' ? s.leftAheadRoomId : s.rightAheadRoomId) ?? '']} />, s.depth + 1.2);
         else face(`${side}a${s.depth}`, `translate3d(${sign * U}px, 0, ${-(s.depth + 1) * U}px)`, { background: '#030303' }, undefined, s.depth + 1.2);
         continue;
       }
@@ -185,7 +199,7 @@ export function DungeonView({ run, background, opening }: { run: DungeonRun; bac
         `${side}${s.depth}`,
         `translate3d(${(sign * U) / 2}px, 0, ${z}px) rotateY(${rot}deg)`,
         surface(background, 'wall', sh),
-        f === 'wall' ? (s.torch && s.depth <= 2 && side === (s.depth % 2 ? 'right' : 'left') ? <Torch bg={background} /> : null) : <Door bg={background} face={f} shade={sh} />,
+        f === 'wall' ? (s.torch && s.depth <= 2 && side === (s.depth % 2 ? 'right' : 'left') ? <Torch bg={background} /> : null) : <Door bg={background} face={f} shade={sh} omen={omens?.[(side === 'left' ? s.leftRoomId : s.rightRoomId) ?? '']} />,
         s.depth + 0.45,
       );
     }
@@ -194,7 +208,7 @@ export function DungeonView({ run, background, opening }: { run: DungeonRun; bac
   const endZ = -end.depth * U;
   const endShade = shade(end.depth);
   if (end.face === 'far' || end.face === 'dark') face('end', `translate3d(0, 0, ${endZ}px)`, { background: '#030303' }, undefined, 99);
-  else face('end', `translate3d(0, 0, ${endZ}px)`, surface(background, 'wall', endShade), end.face === 'wall' ? null : <Door bg={background} face={end.face} shade={endShade} opening={opening} />, 99);
+  else face('end', `translate3d(0, 0, ${endZ}px)`, surface(background, 'wall', endShade), end.face === 'wall' ? null : <Door bg={background} face={end.face} shade={endShade} opening={opening} omen={omens?.[end.roomId ?? '']} />, 99);
   return (
     <div ref={ref} className="absolute inset-0 overflow-hidden bg-black" data-dungeon-view data-end={end.face}>
       {[...faces].sort((a, b) => b.dist - a.dist).map((f) => f.node)}

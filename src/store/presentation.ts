@@ -8,6 +8,7 @@ import { timeOfDay } from '../engine/game/world/time';
 import { visionOf } from '../engine/game/world/fog';
 import { hexDistance } from '../engine/game/world/hex';
 import { heroMaxHp } from '../engine/game/hero';
+import { doorOmen } from '../engine/game/dungeonOmen';
 import { restMultiplierOf } from '../engine/game/common';
 import type { AbilityNotice, BattleEvent, GameCommand, GameState } from '../types';
 
@@ -133,6 +134,14 @@ export function explorationNotices(before: GameState, after: GameState, wire: Ga
       const without = { ...after, heroes: after.heroes.map(x => x.id === id ? { ...x, pet: undefined } : x) };
       const base = visionOf(without, after.world, id), withPet = visionOf(after, after.world, id);
       if (after.world.tiles.some((t, i) => t.seen && !before.world!.tiles[i].seen && hexDistance(after.world!, at, i) > base && hexDistance(after.world!, at, i) <= withPet)) add(id, `視界+${pe.vision}`);
+    }
+  }
+  // フクロウ: 扉の気配が新しく見えた（第3段階C1）
+  if (prev.dungeon && next.dungeon && prev.dungeon.dungeonId === next.dungeon.dungeonId) {
+    const omens = (g: GameState) => g.dungeon!.rooms.filter((r) => doorOmen(g, r)).length;
+    if (omens(next) > omens(prev)) {
+      const owl = next.heroes.find((h) => (!next.party || next.party.includes(h.id)) && h.hp > 0 && h.pet?.petId === 'owl');
+      if (owl) add(owl.id, '何かの気配！');
     }
   }
   if (before.world && after.world && timeOfDay(before.world.worldTurn) !== 'night' && timeOfDay(after.world.worldTurn) === 'night') {

@@ -9,6 +9,7 @@ import { findPath, posOf } from '../../engine';
 import { useBattle } from '../../store/battleStore';
 import type { DoorOpen } from '../../store/battleStore';
 import type { DungeonRun, Facing } from '../../types';
+import type { DoorOmen } from '../../engine';
 import { Screen } from '../ui/game';
 import { DungeonView } from './DungeonView';
 
@@ -75,7 +76,7 @@ const IN: Record<Kind, TargetAndTransition> = {
 };
 
 /** 一人称の通路（歩いた・向きを変えた時に、前の景色からつなぐ） */
-export function AnimatedDungeonView({ run, background }: { run: DungeonRun; background: string }) {
+export function AnimatedDungeonView({ run, background, omens }: { run: DungeonRun; background: string; omens?: Record<string, DoorOmen> }) {
   const timing = useDungeonTiming();
   const prev = useRef(run);
   const [seq, setSeq] = useState<{ id: number; frames: Frame[]; i: number } | null>(null);
@@ -89,14 +90,14 @@ export function AnimatedDungeonView({ run, background }: { run: DungeonRun; back
     setSeq(frames.length ? { id: ++ids.current, frames, i: 0 } : null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run]);
-  if (!seq) return <DungeonView run={run} background={background} />;
+  if (!seq) return <DungeonView run={run} background={background} omens={omens} />;
   const f = seq.frames[seq.i];
   const base = seq.frames[seq.i + 1]?.run ?? run;
   const next = () => setSeq((s) => (s && s.id === seq.id ? (s.i + 1 < s.frames.length ? { ...s, i: s.i + 1 } : null) : s));
   return (
     <div className="absolute inset-0 overflow-hidden" data-dungeon-anim={f.kind}>
       <motion.div key={`b${seq.id}-${seq.i}`} className="absolute inset-0" initial={IN[f.kind]} animate={{ x: 0, scale: 1 }} transition={{ duration: f.seconds, ease: 'easeOut' }}>
-        <DungeonView run={base} background={background} />
+        <DungeonView run={base} background={background} omens={omens} />
       </motion.div>
       <motion.div
         key={`o${seq.id}-${seq.i}`}
@@ -106,7 +107,7 @@ export function AnimatedDungeonView({ run, background }: { run: DungeonRun; back
         transition={{ duration: f.seconds, ease: 'easeIn' }}
         onAnimationComplete={next}
       >
-        <DungeonView run={f.run} background={background} />
+        <DungeonView run={f.run} background={background} omens={omens} />
       </motion.div>
     </div>
   );

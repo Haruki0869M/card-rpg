@@ -9,6 +9,7 @@ export * from './stats';
 export * from './game/checks';
 export * from './game/dungeon';
 export * from './game/dungeonMap';
+export * from './game/dungeonOmen';
 export * from './game/game';
 export { campFocusOf, moveSlotsOf, moveBonusOf, partySenses, restMultiplierOf, shopPriceFor } from './game/common';
 export * from './game/jobs';

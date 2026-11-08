@@ -224,6 +224,12 @@ export interface DungeonRun {
   pos?: { x: number; y: number; facing: Facing };
   /** 見たマス（"x,y"。オートマッピング） */
   seen?: string[];
+  /** 「周囲の警戒」で気配の分かった部屋（第3段階C1） */
+  sensed?: string[];
+  /** 「周囲の警戒」を使った通路（今いる部屋のID か 'entrance'。1つの通路で1回だけ） */
+  watchedAt?: string;
+  /** 最後の「周囲の警戒」の判定（画面に出す） */
+  watchRoll?: ('focus' | 'hit' | 'miss')[];
 }
 
 /** 向き（0=北・奥 / 1=東 / 2=南 / 3=西） */
@@ -587,6 +593,8 @@ export type GameCommand =
   | { type: 'DUNGEON_STEP'; playerId: PlayerId; heroId: string; dir: 'forward' | 'left' | 'right' | 'back' }
   /** その場で向きを変える（歩数は使わない） */
   | { type: 'DUNGEON_TURN'; playerId: PlayerId; heroId: string; dir: 'left' | 'right' | 'back' }
+  /** 周囲の警戒（歩数2。感知の判定。成功1で開けられる扉の場所と気配、完全成功で次の戦闘に応援。第3段階C1） */
+  | { type: 'DUNGEON_WATCH'; playerId: PlayerId; heroId: string; focusUsed: number }
   /** 見えているマスまで歩く（歩いた数だけ歩数を使う）。face = 着いた後に向く向き */
   | { type: 'DUNGEON_WALK'; playerId: PlayerId; heroId: string; x: number; y: number; face?: Facing }
   /** みんなで決める操作に1票入れる（command = 選んだ操作。null で取り消し） */

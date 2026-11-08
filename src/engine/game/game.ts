@@ -65,7 +65,8 @@ import { leaveSanctuary, leaveShrine, leaveTown, questAccept, questReport, shrin
 import { getRoomType } from '../../data/rules';
 import { TERRAINS } from '../../data/world';
 import { buildDungeon, findRoom, RARITIES, rarityIndex, reachableRooms } from './dungeon';
-import { canMove, cellKey, DIRS, doorFront, doorNorthOf, findPath, moveIntoRoom, posOf, revealSeen, turnTo } from './dungeonMap';
+import { canMove, cellKey, DIRS, doorFront, doorNorthOf, dungeonGrid, findPath, moveIntoRoom, posOf, revealSeen, turnTo } from './dungeonMap';
+import { watchSpot } from './dungeonOmen';
 import {
   canEquip,
   clampHero,
@@ -306,6 +307,48 @@ function dungeonNav(game: GameState, cmd: Extract<GameCommand, { type: 'DUNGEON_
   return undefined;
 }
 
+/** 周囲の警戒（第3段階C1）: 歩数を使い、感知で判定。成功1で今の通路の開けられる扉の場所と気配、完全成功で次の戦闘に「応援」 */
+function dungeonWatch(game: GameState, cmd: Extract<GameCommand, { type: 'DUNGEON_WATCH' }>, rng: Rng): string | undefined {
+  const run = game.dungeon;
+  if (game.mode !== 'dungeon' || !run) return 'ダンジョンの通路でのみ使えます';
+  const nav = dungeonNavigator(game);
+  if (!nav || !ownedBy(nav, cmd.playerId)) return '手番のキャラの担当の人が使えます';
+  const h = findHero(game, cmd.heroId);
+  if (!h || h.hp <= 0 || !(game.party ?? game.heroes.map((x) => x.id)).includes(h.id)) return 'このキャラは判定できません';
+  if (!ownedBy(h, cmd.playerId)) return '担当していないキャラです';
+  if (run.watchedAt === watchSpot(game)) return 'この通路ではもう警戒しました';
+  const slots = BALANCE.dungeonWatchSlots;
+  if (!Number.isInteger(cmd.focusUsed) || cmd.focusUsed < 0 || cmd.focusUsed > Math.min(slots, h.focus)) return 'フォーカスの数が不正です';
+  const cost = BALANCE.dungeonWatchSteps;
+  if (game.world && game.activeScene) {
+    if (run.explore == null) return '先に探索力を判定してください';
+    if (run.explore < cost) return `歩数が足りません（${cost}歩いります）`;
+    run.explore -= cost;
+  }
+  h.focus -= cmd.focusUsed;
+  const results = rollWithFocus(slots, cmd.focusUsed, statChance(h, 'per'), rng);
+  run.watchRoll = results;
+  run.watchedAt = watchSpot(game);
+  const n = successes(results);
+  if (n >= 1) {
+    // 今の通路の開けられる扉: 場所（扉と扉の前のマス）が地図に出て、気配も分かる
+    const seen = new Set(run.seen ?? []);
+    const sensed = new Set(run.sensed ?? []);
+    for (const r of reachableRooms(run)) {
+      const c = dungeonGrid(run).roomCell.get(r.id);
+      if (!c) continue;
+      seen.add(cellKey(c.x, c.y));
+      seen.add(cellKey(c.x, c.y - 1));
+      sensed.add(r.id);
+    }
+    run.seen = [...seen];
+    run.sensed = [...sensed];
+  }
+  if (n >= slots) for (const p of sceneHeroes(game)) p.nextBattleStatuses.inspired = (p.nextBattleStatuses.inspired ?? 0) + BALANCE.dungeonWatchInspired;
+  addLog(game, n >= slots ? `${h.name}が周囲を警戒した: 扉の気配が分かり、身構えた（次の戦闘で応援）` : n >= 1 ? `${h.name}が周囲を警戒した: 扉の気配が分かった` : `${h.name}が周囲を警戒した: 何も分からなかった`);
+  return undefined;
+}
+
 /** みんなで決める操作に1票入れる。全員そろったら、決まった操作をそのまま動かす */
 function castVote(game: GameState, cmd: Extract<GameCommand, { type: 'VOTE' }>, rng: Rng): { error?: string; battleEvents: BattleEvent[] } {
   const none = { battleEvents: [] as BattleEvent[] };
@@ -465,6 +508,9 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
       case 'DUNGEON_TURN':
       case 'DUNGEON_WALK':
         error = dungeonNav(game, cmd);
+        break;
+      case 'DUNGEON_WATCH':
+        error = dungeonWatch(game, cmd, rng);
         break;
       case 'WORLD_ROLL_MOVE':
         error = rollMove(game, cmd, rng);

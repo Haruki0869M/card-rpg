@@ -89,6 +89,7 @@ async function run(width, height, reduced = false) {
     x.battleInfo = undefined;
     x.dungeon.rooms.find((r) => r.id === x.dungeon.currentRoomId).cleared = true;
     x.dungeon.explore = 8;
+    for (const h of g.heroes) h.focus = 4;
   });
   await check('部屋の中');
   await shot('2-room');
@@ -105,6 +106,19 @@ async function run(width, height, reduced = false) {
   await expectEnd('wall', '通路（前は壁）');
   await check('通路');
   await shot('3-hall');
+  // 第3段階C1: 周囲の警戒（フォーカス2で完全成功）→ 開けられる扉に気配の印
+  await page.locator('[data-watch-open]').click();
+  await page.locator('[data-watch-panel]').waitFor({ timeout: 2000 }).catch(() => problems.push(`${tag}: 周囲の警戒の窓が開かない`));
+  await check('周囲の警戒の窓');
+  await shot('3b-watch-panel');
+  const plus = page.locator('[data-watch-panel]').getByLabel('フォーカスを増やす');
+  for (let i = 0; i < 2; i++) if (await plus.isEnabled()) await plus.click();
+  await page.getByRole('button', { name: '警戒する', exact: true }).click();
+  await page.waitForTimeout(300);
+  if ((await page.locator('[data-dungeon-view] [data-omen]').count()) < 1) problems.push(`${tag}: 警戒の後、通路の扉に気配の印が出ない`);
+  if (await page.locator('[data-watch-open]').isEnabled()) problems.push(`${tag}: 同じ通路でもう一度警戒できてしまう`);
+  await check('警戒の後');
+  await shot('3c-watched');
   await page.getByRole('button', { name: '右へ', exact: true }).click();
   await page.locator('[data-dungeon-anim]').waitFor({ state: 'detached', timeout: 2000 }).catch(() => {});
   await page.waitForTimeout(100);
@@ -146,4 +160,4 @@ if (problems.length) {
   console.log('NG:\n' + problems.join('\n'));
   process.exit(1);
 }
-console.log('OK: 通路の絵・ミニマップ・大きな地図・歩くボタン・歩く/向く/扉の演出（360/390/480・360×560・動作軽減）');
+console.log('OK: 通路の絵・ミニマップ・大きな地図・歩くボタン・歩く/向く/扉の演出・周囲の警戒と気配（360/390/480・360×560・動作軽減）');
