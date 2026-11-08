@@ -80,13 +80,13 @@ try {
       console.log(`OK: ${width}px ${fast ? '高速' : '通常'} ${kind}の3マス・到着・画面切替順序`);
     }
     const d = fixture('normal'), h = d.game.heroes[0]; h.petOffer = ['cockatiel', 'rabbit']; h.petOfferColors = { cockatiel: 'pearl', rabbit: 'brown' };
-    await resume(d, false);
+    await resume(d, false); await page.locator('[data-pet-revealed]').waitFor();
     check(await page.locator('[data-pet-coat="pearl"]').count() === 1 && await page.locator('[data-rare-coat]').count() === 1, '珍しい毛色が出ない');
     await shot(`rare-coat-${width}`);
-    await page.locator('[data-hero-task] button').filter({ hasText: 'うさぎ' }).click();
+    await page.locator('[data-pet-pick="rabbit"]').click(); await page.locator('[data-pet-revealed]').waitFor();
     check(await page.locator('[data-pet-coat="brown"]').count() === 1, '候補の色が固定されない');
-    await page.locator('[data-hero-task] button').filter({ hasText: 'オカメインコ' }).click();
-    await resume(await read(), false); check(await page.locator('[data-pet-coat="pearl"]').count() === 1, '再開で色が変わった');
+    await page.locator('[data-pet-pick="cockatiel"]').click();
+    await resume(await read(), false); await page.locator('[data-pet-revealed]').waitFor(); check(await page.locator('[data-pet-coat="pearl"]').count() === 1, '再開で色が変わった');
     await page.getByLabel('お供の名前').fill('ぴーちゃん'); await page.getByText('お供にする', { exact: true }).click();
     const after = await read(); check(after.game.heroes[0].pet.color === 'pearl' && after.game.heroes[0].pet.name === 'ぴーちゃん', '採用で色/名前が変わった');
     check(after.game.log.some(l => l.text.includes('✨珍しい毛色！')), '珍しい色のログがない');

@@ -64,11 +64,59 @@ await issues('お供を迎える画面');
 const coat = await page.locator('[data-pet-coat]').getAttribute('data-pet-coat');
 if (!coat) await fail('抽選済みの毛色が表示されない');
 await page.getByLabel('お供の名前').fill('ぴーちゃん');
+await page.locator('[data-pet-revealed]').waitFor();
 await page.getByText('お供にする').click();
 await page.waitForTimeout(400);
 if (await page.locator('[data-hero-task]').count()) await fail('お供を迎える画面が閉じない');
 if (!(await page.locator('[data-hero] [data-pet]').count())) await fail('世界マップにお供が出ない');
 await shot('map');
+
+// 1b) シルエット → ポン！の演出（ふつうの速さ）・NEW!・不透明な背景・360px で「お供にする」が収まる
+const got = await page.evaluate(() => JSON.parse(localStorage.getItem('card-rpg/adventure')).game.heroes[0].pet);
+const other = got.petId === 'rabbit' ? 'cockatiel' : 'rabbit';
+const offerAgain = async (petId, color, width = 390, height = 780) => {
+  await page.setViewportSize({ width, height });
+  await page.evaluate(({ petId, color }) => {
+    localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: false, vibration: false }));
+    const k = 'card-rpg/adventure';
+    const d = JSON.parse(localStorage.getItem(k));
+    const h = d.game.heroes[0];
+    d.game.mode = 'world';
+    h.petOffer = [petId];
+    h.petOfferColors = { [petId]: color };
+    localStorage.setItem(k, JSON.stringify(d));
+  }, { petId, color });
+  await page.reload();
+  await page.getByText('つづきから').click();
+  await page.locator('[data-hero-task]').waitFor();
+};
+const otherColor = other === 'rabbit' ? 'white' : 'pearl';
+await offerAgain(other, otherColor);
+if (!(await page.locator('[data-pet-reveal="silhouette"]').count())) await fail('開いた直後にシルエットになっていない');
+if (await page.locator('[data-pet-revealed]').count()) await fail('開いた直後に毛色の名前が出ている');
+await page.waitForTimeout(250);
+await shot('reveal-silhouette');
+await page.waitForTimeout(900);
+if (!(await page.locator('[data-pet-revealed]').count())) await fail('0.9秒たっても毛色の名前が出ない');
+if (!(await page.locator('[data-pet-new]').count())) await fail('初めての子に NEW! が出ない');
+const bg = await page.locator('[data-hero-task]').evaluate((e) => getComputedStyle(e).backgroundColor);
+if (/^rgba\(.*,\s*0?\.\d+\)$/.test(bg)) await fail(`背景が透けている: ${bg}`);
+await shot('reveal-new');
+await issues('お供の演出');
+await page.getByText('見送る', { exact: true }).click();
+await page.waitForTimeout(300);
+await offerAgain(got.petId, got.color, 360, 640);
+await page.locator('[data-pet-reveal]').click(); // タップで飛ばす
+await page.waitForTimeout(400);
+if (!(await page.locator('[data-pet-revealed]').count())) await fail('タップしても演出が飛ばない');
+if (await page.locator('[data-pet-new]').count()) await fail('もう迎えた子に NEW! が出る');
+const btn = await page.getByText('お供にする', { exact: true }).boundingBox();
+if (!btn || btn.y + btn.height > 640) await fail('360×640 で「お供にする」が画面に収まらない');
+await shot('reveal-360');
+await page.getByText('見送る', { exact: true }).click();
+await page.waitForTimeout(300);
+await page.setViewportSize({ width: 390, height: 780 });
+await page.evaluate(() => localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true, vibration: false })));
 
 // 2) 撫でる
 await page.locator('[data-party-row] button').first().click();

@@ -467,6 +467,19 @@ textarea {
 .pet-rare-reveal { animation: pet-rare-reveal .7s ease-out both; }
 @media (prefers-reduced-motion: reduce) { .pet-rare-reveal { animation: none; outline: 2px solid #ffd76a; } }
 
+/* お供を迎える時の「シルエット → ポン！」（フェーズ3 項目1） */
+@keyframes pet-silhouette-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+.pet-silhouette-bob { animation: pet-silhouette-bob .6s ease-in-out infinite; }
+@keyframes pet-spark { 0% { transform: translate(var(--sx), var(--sy)) scale(1.2); opacity: 0; } 30% { opacity: 1; } 100% { transform: translate(0, 0) scale(.4); opacity: 0; } }
+.pet-spark { animation: pet-spark .6s ease-in both; box-shadow: 0 0 6px 2px #ffe9a8aa; }
+@keyframes pet-pop { 0% { transform: scale(.7); } 55% { transform: scale(1.15); } 100% { transform: scale(1); } }
+.pet-pop { animation: pet-pop .45s cubic-bezier(.3, 1.6, .5, 1) both; }
+@keyframes pet-pop-flash { 0% { transform: scale(.5); opacity: .9; } 100% { transform: scale(1.5); opacity: 0; } }
+.pet-pop-flash { animation: pet-pop-flash .45s ease-out both; filter: blur(6px); }
+@keyframes pet-new-badge { 0% { transform: scale(0) rotate(-12deg); } 70% { transform: scale(1.2) rotate(6deg); } 100% { transform: scale(1) rotate(6deg); } }
+.pet-new-badge { animation: pet-new-badge .4s .15s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .pet-silhouette-bob, .pet-spark, .pet-pop, .pet-pop-flash, .pet-new-badge { animation: none; } .pet-new-badge { transform: rotate(6deg); } }
+
 @media (prefers-reduced-motion: reduce) { [data-world-moving] [data-hero] { transition: none !important; } }
 
 /* ダンジョンの通路の松明（第3段階B）。小さく揺れる */
