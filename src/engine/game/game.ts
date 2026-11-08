@@ -1058,8 +1058,8 @@ export function eventOptionState(game: GameState, eventId: string, index: number
   if (opt.requiresTag && !partyHasTag(game, opt.requiresTag)) return { visible: false };
   if (opt.requiresPet && !sceneHeroes(game).some((h) => h.hp > 0 && h.pet)) return { visible: false };
   if (opt.cost && !(payer ? [payer] : sceneHeroes(game)).some((h) => h.gold >= opt.cost!)) return { visible: true, reason: `ゴールドが足りません（${opt.cost}G）` };
-  if (opt.costFocus && !sceneHeroes(game).some((h) => h.focus >= opt.costFocus!)) return { visible: true, reason: `フォーカスが足りません（${opt.costFocus}）` };
-  if (opt.costItem && !sceneHeroes(game).some((h) => h.pouch.some((i) => i.itemId === opt.costItem))) return { visible: true, reason: `${getItem(opt.costItem).name}を持っていません` };
+  if (opt.costFocus && !(payer ? [payer] : sceneHeroes(game)).some((h) => h.focus >= opt.costFocus!)) return { visible: true, reason: `フォーカスが足りません（${opt.costFocus}）` };
+  if (opt.costItem && !(payer ? [payer] : sceneHeroes(game)).some((h) => h.pouch.some((i) => i.itemId === opt.costItem))) return { visible: true, reason: `${getItem(opt.costItem).name}を持っていません` };
   return { visible: true };
 }
 
@@ -1090,7 +1090,8 @@ function chooseEvent(
   const chosen = heroId ? findHero(game, heroId) : !game.activeScene && ev.tile !== undefined && game.world ? findHero(game, game.world.turn) : undefined;
   const payer = opt?.cost ? (chosen ?? sceneHeroes(game).find((h) => ownedBy(h, playerId) && h.gold >= opt.cost!)) : undefined;
   if (opt?.cost && (!payer || !ownedBy(payer, playerId))) return `ゴールドが足りません（${opt.cost}G）`;
-  const st = eventOptionState(game, ev.eventId, optionIndex, payer);
+  // フォーカス・道具も、選んだ本人がいれば本人で判定する（「選べる」と出たのに払えず断られるのを防ぐ）
+  const st = eventOptionState(game, ev.eventId, optionIndex, payer ?? chosen);
   if (!opt || !st.visible) return '選択肢がありません';
   if (st.reason) return st.reason;
   let actor: Hero | undefined = payer ?? chosen;
