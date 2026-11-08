@@ -1,5 +1,5 @@
 // お供と突発イベントの画面の確認:
-//  1) 突発イベント「迷い鳥の口笛」→ エサ（50G）で迎える → 色と名前を選ぶ → 世界マップの肩に乗っている
+//  1) 突発イベント「迷い鳥の口笛」→ エサ（50G）で迎える → 抽選された色を確認して名前を付ける → 世界マップの肩に乗っている
 //  2) パーティ画面のお供の欄で撫でる（フォーカス+1）
 //  3) 戦闘で足元・肩にお供が出る（オカメインコの先読み「次:」）
 // 使い方: npx vite preview を起こしてから node scripts/pets.mjs
@@ -61,8 +61,8 @@ await page.waitForTimeout(300);
 if (!(await page.locator('[data-hero-task]').count())) await fail('お供を迎える画面が出ない');
 await shot('adopt');
 await issues('お供を迎える画面');
-const colorBtn = page.locator('[data-hero-task] button').filter({ hasText: /ルチノー|桜|黄緑|ほんのり/ }).first();
-if (await colorBtn.count()) await colorBtn.click();
+const coat = await page.locator('[data-pet-coat]').getAttribute('data-pet-coat');
+if (!coat) await fail('抽選済みの毛色が表示されない');
 await page.getByLabel('お供の名前').fill('ぴーちゃん');
 await page.getByText('お供にする').click();
 await page.waitForTimeout(400);
@@ -79,6 +79,7 @@ await page.waitForTimeout(200);
 await shot('panel');
 await issues('パーティ画面のお供');
 const after = await page.evaluate(() => JSON.parse(localStorage.getItem('card-rpg/adventure')).game.heroes[0].pet);
+if (after?.color !== coat) await fail('採用後に毛色が変わった');
 if (!after?.patted || after.love <= 0) await fail('撫でても懐かない');
 
 // 3) 戦闘（オカメインコにして先読みを見る）

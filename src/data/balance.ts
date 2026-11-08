@@ -52,6 +52,8 @@ export const BALANCE = {
   petLovePat: 2,
   petLoveBattle: 3,
   petRareChance: 15,
+  /** 通常色2種と珍しい色2種の出現率（%） */
+  petColorWeights: [35, 35, 15, 15],
   petNameMax: 8,
   /** 突発イベント: 何もないマスに移動し終えた時に起きる確率（%）。夜・侵食度50%以上では悪いイベントの重み×1.5 */
   randomEventChance: 20,
@@ -163,6 +165,9 @@ export const BALANCE = {
 export const TIMING = {
   /** スロット演出全体 */
   slotReveal: 0.15,
+  /** 世界マップの1マスと到着演出（秒） */
+  worldMoveStep: 0.17,
+  worldArrival: 0.3,
   /** 結果ポップアップの表示時間 */
   resultPopup: 0.6,
   /** 敵1体の行動間隔 */

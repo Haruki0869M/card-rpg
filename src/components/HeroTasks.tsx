@@ -35,11 +35,11 @@ function AdoptPet({ hero, send }: { hero: Hero; send: (c: GameCommand) => void }
   const offer = hero.petOffer!;
   const [petId, setPetId] = useState(offer[0]);
   const def = getPet(petId);
-  const [color, setColor] = useState(def.colors[0].id);
+  const color = hero.petOfferColors?.[petId] ?? def.colors[0].id;
+  const coat = def.colors.find(c => c.id === color)!;
   const [name, setName] = useState('');
   const pick = (id: string) => {
     setPetId(id);
-    setColor(getPet(id).colors[0].id);
   };
   const master = isPetMaster(hero);
   return (
@@ -56,7 +56,7 @@ function AdoptPet({ hero, send }: { hero: Hero; send: (c: GameCommand) => void }
         </div>
       )}
       <div className="mt-3 flex flex-col items-center">
-        <PetToken pet={{ petId, color, name, love: 0 }} size={84} />
+        <div key={petId} className={coat.rarity === 'rare' ? 'pet-rare-reveal rounded-full p-2' : 'p-2'}><PetToken pet={{ petId, color, name, love: 0 }} size={84} /></div>
         <div className="font-display mt-1 text-[20px] text-amber-100">
           {def.name}
           {def.rare && <span className="ml-1 rounded-full bg-violet-600/70 px-1.5 align-middle text-[12px]">めったに会えない</span>}
@@ -67,14 +67,10 @@ function AdoptPet({ hero, send }: { hero: Hero; send: (c: GameCommand) => void }
           {master && <span className="ml-1 text-amber-300">（獣使い: 効果2倍）</span>}
         </div>
       </div>
-      <div className="mt-3 text-[13px] font-bold text-zinc-300">色</div>
-      <div className="mt-1 flex flex-wrap gap-1.5">
-        {def.colors.map((c) => (
-          <button key={c.id} onClick={() => setColor(c.id)} className={`btn flex h-10 items-center gap-1.5 rounded-full border-2 px-2.5 text-[13px] ${c.id === color ? 'border-amber-300 bg-amber-500/15' : 'border-white/15 bg-black/40'}`}>
-            <span className="h-5 w-5 rounded-full border border-black/60" style={{ background: c.color }} />
-            {c.name}
-          </button>
-        ))}
+      <div className="mt-3 rounded-xl border border-amber-200/25 bg-black/30 p-2 text-center text-[15px]" data-pet-coat={color}>
+        <span className="mr-2 inline-block h-4 w-4 rounded-full align-middle" style={{ background: coat.color }} />{coat.name}
+        {coat.rarity === 'rare' && <div className="mt-1 font-bold text-amber-200" data-rare-coat>✨珍しい毛色！</div>}
+        <div className="mt-1 text-[12px] text-zinc-300">出会った時の毛色です</div>
       </div>
       <div className="mt-3 text-[13px] font-bold text-zinc-300">名前</div>
       <input
@@ -178,11 +174,12 @@ function Peddler({ hero, send }: { hero: Hero; send: (c: GameCommand) => void })
 
 /** この端末のキャラに、イベントの後の作業があれば出す */
 export function HeroTaskOverlay() {
+  const screen = useBattle(s => s.screen);
   const full = useBattle((s) => s.full);
   const mode = useBattle((s) => s.game?.mode);
   const dispatchWire = useBattle((s) => s.dispatchWire);
   const showToast = useBattle((s) => s.showToast);
-  if (!full || !mode || !CALM.has(mode)) return null;
+  if (screen !== 'game' || !full || !mode || !CALM.has(mode)) return null;
   const hero = full.heroes.find((h) => isLocalPlayer(h.playerId) && !h.jobPick?.length && (h.petOffer?.length || h.cardTask || h.peddler));
   if (!hero) return null;
   const send = (c: GameCommand) => {

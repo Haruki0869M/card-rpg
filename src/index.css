@@ -432,3 +432,10 @@ textarea {
 .pet-hop { animation: pet-hop .42s ease-out .12s 1 both; }
 .pet-heart { animation: pet-heart 3s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .pet-bob, .pet-perch, .pet-float, .pet-hop, .pet-heart { animation: none; } }
+
+/* 珍しい毛色は短い光で知らせる。再生しても抽選は行わない。 */
+@keyframes pet-rare-reveal { 0% { box-shadow: 0 0 0 0 #ffd76a00; } 45% { box-shadow: 0 0 24px 8px #ffd76aaa; } 100% { box-shadow: 0 0 10px 2px #ffd76a55; } }
+.pet-rare-reveal { animation: pet-rare-reveal .7s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .pet-rare-reveal { animation: none; outline: 2px solid #ffd76a; } }
+
+@media (prefers-reduced-motion: reduce) { [data-world-moving] [data-hero] { transition: none !important; } }

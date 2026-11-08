@@ -20,14 +20,14 @@ export function petSpot(petId: string, size: number) {
   return { left: -size * 0.5, top: size * 0.45, size: size * 0.66 };
 }
 
-export function PetToken({ pet, size, hop, hopKey }: { pet: PetLook; size: number; /** 移動の時に1歩遅れて跳ねる */ hop?: boolean; hopKey?: string | number }) {
+export function PetToken({ pet, size, hop, hopKey, hopDuration }: { pet: PetLook; size: number; /** 移動の時に1歩遅れて跳ねる */ hop?: boolean; hopDuration?: number; hopKey?: string | number }) {
   const def = getPet(pet.petId);
   const col = def.colors.find((c) => c.id === pet.color) ?? def.colors[0];
   const lv = petLoveLevel(pet.love);
   const anim = hop ? 'pet-hop' : def.perch === 'float' ? 'pet-float' : def.perch === 'shoulder' ? 'pet-perch' : 'pet-bob';
   return (
     <span className="pointer-events-none relative block" style={{ width: size, height: size }} aria-label={`${pet.name}（${def.name}）`} data-pet={pet.petId}>
-      <span key={hopKey} className={`absolute inset-0 flex items-center justify-center ${anim}`} style={{ fontSize: Math.max(12, size * 0.82), lineHeight: 1, filter: 'drop-shadow(0 1px 1.5px rgba(0,0,0,.8))' }}>
+      <span key={hopKey} className={`absolute inset-0 flex items-center justify-center ${anim}`} style={{ fontSize: Math.max(12, size * 0.82), lineHeight: 1, ...(hop && hopDuration ? { animationDuration: `${hopDuration * 0.8}s`, animationDelay: `${hopDuration * 0.15}s` } : {}), filter: 'drop-shadow(0 1px 1.5px rgba(0,0,0,.8))' }}>
         {def.icon}
       </span>
       {/* 色違いの印 */}

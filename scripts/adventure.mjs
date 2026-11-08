@@ -2,7 +2,7 @@
 // 2人以上は担当プレイヤーを分けて、手番の受け渡しの画面も確かめる
 // npm run build && npx vite preview --port 4173 を起動した状態で: node scripts/adventure.mjs
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { chromium, layoutIssues, URL } from './lib.mjs';
+import { chromium, layoutIssues, URL, waitForWorldMovement } from './lib.mjs';
 
 mkdirSync('screenshots', { recursive: true });
 const output = process.env.ADVENTURE_OUTPUT ?? 'screenshots/adventure';
@@ -120,6 +120,10 @@ async function run(party, difficulty) {
   let unchanged = 0;
   for (let step = 0; step < 900; step++) {
     await page.waitForTimeout(60);
+    if (await page.locator('[data-world-moving]').count()) {
+      await waitForWorldMovement(page);
+      unchanged = 0;
+    }
     const { signature, text } = await page.evaluate(() => ({ signature: localStorage.getItem('card-rpg/adventure'), text: document.body.innerText }));
     unchanged = signature === previous ? unchanged + 1 : 0;
     previous = signature;

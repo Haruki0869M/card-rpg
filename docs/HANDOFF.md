@@ -71,7 +71,7 @@ scripts/           画面の自動確認（Playwright）・絵の加工（art/bu
 
 ## 3. 今の進み具合と残っている作業（この順番で進める）
 
-**最新の進み具合・会話の決定・実装との差は [STATUS.md](./STATUS.md) を先に確認する。** 強奪の修正、J3d第1〜第3段階（特殊10職・専用60枚・神殿2/共用祭壇5・銃/楽器・星読み）は実装済み。跳躍と聖王の再臨は現状維持。次はJ4の計画を説明してOKを待つ。
+**最新の進み具合・会話の決定・実装との差は [STATUS.md](./STATUS.md) を先に確認する。** 強奪の修正、J3d第1〜第3段階（特殊10職・専用60枚・神殿2/共用祭壇5・銃/楽器・星読み）は実装済み。跳躍と聖王の再臨は現状維持。J4前の操作改善を優先中。前半（移動完了後の画面切替・毛色抽選）は実装済み。次は前半の報告を確認してもらい、後半（お供/能力/戦闘の演出・設定）の着手OKを待つ。
 
 各段階の終わりに: 確認を全部通す（§4）→ spec.md を更新 → コミット → bundle（§5）→ オーナーに日本語で報告。
 
@@ -109,7 +109,7 @@ scripts/           画面の自動確認（Playwright）・絵の加工（art/bu
 - 条件の数え方（feats）は `effects/index.ts`（倒した時）と `battle.ts`（カードを使った時）にある。足りない記録は同じ所に足す。
 
 ### J4 Midjourney の指示文（コードではなく文書）
-- 44ジョブ×男女の立ち絵と顔、お供12種類×色（約40枚）の指示文の一覧を `docs/art/prompts-jobs-pets.md` に作る。
+- 44ジョブ×男女の立ち絵と顔、お供12種類×色（48枚）の指示文の一覧を `docs/art/prompts-jobs-pets.md` に作る。
 - 既存の絵のスタイル（`docs/art/style-reference.png`）に合わせる。**各キャラが持つ武器を必ず明記**し、ゲームの最初の武器と一致させる。**持たせない物**（盾・別の武器など）も書く。
 - お供は「小さくても分かるデフォルメ（ちびキャラ風）」。色違いは色ごとに1枚。
 - できた絵の組み込み: 元画像を番号で置き、`scripts/art/build_art.py` の表に足して加工 → `src/assets/art/hero/<jobId>-<gender>.webp`（顔は `-face`）。お供は `pet/<petId>-<colorId>.webp` を読む仕組みを足し、無ければ今の記号のまま。
@@ -153,7 +153,7 @@ scripts/           画面の自動確認（Playwright）・絵の加工（art/bu
 
 ```
 npx tsc --noEmit          # 型チェック（エラー0）
-npx vitest run            # テスト（直近397件成功・任意3件スキップ）
+npx vitest run            # テスト（直近424件成功・任意3件スキップ）
 npx vite build            # ビルドが通る
 ```
 画面の確認（Playwright が入っていれば）:
@@ -163,6 +163,7 @@ node scripts/check-layout.mjs   # 8通りの画面サイズで、はみ出し・
 node scripts/playthrough.mjs    # 1〜4人の戦闘が最後まで進む
 node scripts/adventure.mjs      # 2人・4人で冒険をクリアまで進む
 node scripts/jobchange.mjs      # 転職の流れ
+node scripts/movement-pet-colors.mjs # 移動の全マス/到着/画面切替順序、通常/高速、毛色保存再開（360/390/480px）
 node scripts/final-special-jobs.mjs # 後半5職・星読み保存再開・4人の砲台/罠/お供（360/390/480px）
 node scripts/pets.mjs           # お供と突発イベントの流れ
 ```

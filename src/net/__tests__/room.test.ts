@@ -69,6 +69,30 @@ async function specialBattle(roles: string[]) {
   return session;
 }
 
+describe('毛色抽選の通信と再接続', () => {
+  it('P2の出会いで毛色を全員へ共有し、再接続後も同じ色で採用できる', async () => {
+    const { hub, host, rooms } = await playing(2);
+    const g = structuredClone(host.game!);
+    g.world!.story = undefined; g.world!.turn = 'h1'; g.mode = 'event'; g.party = ['h1']; g.heroes[1].gold = 200;
+    g.event = { eventId: 'rStrayBird', tile: g.world!.pos.h1, random: true };
+    for (const r of rooms) Object.assign(r.game!, structuredClone(g));
+    await host.backend.set(`rooms/${host.code}/snapshot`, { seq: host.seq, game: JSON.stringify(g), hash: stateHash(g) }); await settle();
+    await rooms[1].send({ type: 'CHOOSE_EVENT', playerId: 'P2', optionIndex: 2, focusUsed: 0 }); await settle();
+    expect(allSame(rooms)).toBe(true);
+    const offered = host.game!.heroes[1], petId = offered.petOffer![0], color = offered.petOfferColors![petId], rng = host.game!.rngState;
+    expect(color).toBeTruthy();
+    await rooms[1].send({ type: 'FINISH_EVENT', playerId: 'P2' }); await settle();
+    await host.backend.set(`rooms/${host.code}/snapshot`, { seq: host.seq, game: JSON.stringify(host.game), hash: stateHash(host.game) }); await settle();
+    const old = rooms[1]; old.backend.goOffline(); await settle();
+    rooms[1] = await Room.join(hub.client('u1'), host.code, 'P2'); await settle();
+    expect(rooms[1].game!.heroes[1].petOfferColors![petId]).toBe(color);
+    await rooms[1].send({ type: 'ADOPT_PET', playerId: 'P2', heroId: 'h1', petId, name: 'ピコ' }); await settle();
+    expect(allSame(rooms)).toBe(true); expect(host.game!.heroes[1].pet).toMatchObject({ petId, color, name: 'ピコ' });
+    expect(host.game!.rngState).toBe(rng);
+    for (const r of [...rooms, old]) await r.leave();
+  });
+});
+
 describe('特殊職の通信と再接続', () => {
   it('P1の歌がP2〜P4へ届き、P2のカード使用でP2の応援だけ消える', async () => {
     const { rooms } = await specialBattle(['bard', 'warrior', 'mage', 'hunter']);

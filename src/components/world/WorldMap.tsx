@@ -1,13 +1,14 @@
 // ===== 世界マップの地図（六角形のマス。spec §8.1）=====
 // 地形・霧・施設・移動できる範囲は SVG、キャラと敵は上に重ねた画像。タップしたマスを親に知らせる。
 import { Castle, CircleHelp, DoorOpen, Flag, Gift, House, Landmark, LocateFixed, Sparkles, TriangleAlert, type LucideIcon } from 'lucide-react';
-import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useLayoutEffect, useMemo, useRef } from 'react';
 import { artImage, EnemyArt } from '../../art';
 import { DUNGEONS } from '../../data/dungeons';
 import { getTerrain, QUESTS, TERRAINS, TOWNS } from '../../data/world';
 import { colOf, objectiveHandler, partySenses, rowOf, timeOfDay } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
-import { useBattle } from '../../store/battleStore';
+import { speedFactor, useBattle } from '../../store/battleStore';
+import { TIMING } from '../../data/balance';
 import type { GameState, WorldState } from '../../types';
 import { HeroFace } from '../ui/game';
 import { petSpot, PetToken } from '../ui/PetToken';
@@ -136,8 +137,10 @@ export function WorldMap({
   selected,
   path,
   onTapTile,
+  movement,
 }: {
   game: GameState;
+  movement?: { heroes: string[]; i: number; path: number[]; arrived: boolean };
   /** 移動できるマス（マス → 必要な移動力） */
   reach?: Map<number, number>;
   selected?: number;
@@ -157,34 +160,10 @@ export function WorldMap({
     tilesRef.current = w.tiles;
   }
 
-  // 移動の演出（指摘2）: 通ったマスを1マスずつ跳ねながら進む。足あとを残し、カメラもついていく。タップで飛ばせる
-  const fast = useBattle((st) => st.settings.fastMode);
-  const [anim, setAnim] = useState<{ heroes: string[]; i: number; path: number[] } | null>(null);
-  const lastSeq = useRef(w.lastMove?.seq);
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const stopAnim = () => {
-    if (timer.current) clearInterval(timer.current);
-    timer.current = null;
-    setAnim(null);
-  };
-  useEffect(() => {
-    const lm = w.lastMove;
-    if (!lm || lm.seq === lastSeq.current) return;
-    lastSeq.current = lm.seq;
-    if (lm.path.length < 2) return;
-    const stepMs = fast ? 90 : 170;
-    let i = 0;
-    setAnim({ heroes: lm.heroes, i, path: lm.path });
-    if (timer.current) clearInterval(timer.current);
-    timer.current = setInterval(() => {
-      i += 1;
-      if (i >= lm.path.length) return stopAnim();
-      setAnim({ heroes: lm.heroes, i, path: lm.path });
-    }, stepMs);
-    return () => {
-      if (timer.current) clearInterval(timer.current);
-    };
-  }, [w.lastMove?.seq]);
+  // 移動中の地図は画面切替より上の共通部品で最後まで保持する。
+  const fast = useBattle(st => st.settings.fastMode);
+  const anim = movement;
+  const stepMs = TIMING.worldMoveStep * 1000 / speedFactor({ fastMode: fast });
   const shownPos = useMemo(() => {
     if (!anim) return w.pos;
     const out = { ...w.pos };
@@ -198,7 +177,7 @@ export function WorldMap({
     const el = box.current;
     if (!el || here === undefined || !size.width) return;
     const { x, y } = center(here);
-    el.scrollTo({ top: y - el.clientHeight / 2, left: x - el.clientWidth / 2, behavior: 'smooth' });
+    el.scrollTo({ top: y - el.clientHeight / 2, left: x - el.clientWidth / 2, behavior: 'instant' });
   }, [here, w.turn, size.width, center]);
 
   // 依頼の目的地
@@ -242,7 +221,7 @@ export function WorldMap({
   return (
     <div className="relative min-h-0 flex-1">
     <div ref={box} className="absolute inset-0 overflow-auto overscroll-contain bg-[#0b0910]" data-world-map>
-      <div className="relative" style={{ width: W, height: H }} onClick={(e) => (anim ? stopAnim() : tap(e))}>
+      <div className="relative" style={{ width: W, height: H }} onClick={(e) => { if (!anim) tap(e); }}>
         <svg width={W} height={H} className="absolute inset-0 block">
           <defs>
             <filter id="place-shadow" x="-30%" y="-30%" width="160%" height="160%">
@@ -361,6 +340,7 @@ export function WorldMap({
             </div>
           );
         })}
+        {anim?.arrived && <span data-arrival-marker className="pointer-events-none absolute z-10 rounded-full border-2 border-amber-200 bg-amber-950 px-2 text-[22px] font-black text-amber-100" style={{ left: center(anim.path[anim.i]).x - 13, top: Math.max(4, center(anim.path[anim.i]).y - R * 2.3) }}>！</span>}
         {/* 足あと（移動の演出中） */}
         {anim &&
           anim.path.slice(0, anim.i).map((t, k) => {
@@ -380,6 +360,7 @@ export function WorldMap({
               <div
                 key={id}
                 data-hero={id}
+                data-tile={tile}
                 className={`pointer-events-none absolute rounded-full ${active ? 'glow-pulse' : ''}`}
                 style={{
                   left: x - s / 2 + off,
@@ -389,10 +370,10 @@ export function WorldMap({
                   zIndex: active ? 3 : 2,
                   boxShadow: active ? '0 0 0 3px #ffd76a, 0 0 12px #ffd76a' : '0 2px 4px #000',
                   opacity: w.acted.includes(id) && !active ? 0.7 : 1,
-                  transition: anim?.heroes.includes(id) ? `left ${fast ? 80 : 150}ms ease-out, top ${fast ? 80 : 150}ms ease-out` : 'left .35s ease-out, top .35s ease-out',
+                  transition: anim?.heroes.includes(id) ? `left ${stepMs * 0.8}ms ease-out, top ${stepMs * 0.8}ms ease-out` : 'left .35s ease-out, top .35s ease-out',
                 }}
               >
-                <span key={anim?.heroes.includes(id) ? `hop${anim.i}` : 'still'} className={`block ${anim?.heroes.includes(id) ? 'token-hop' : ''}`}>
+                <span key={anim?.heroes.includes(id) ? `hop${anim.i}` : 'still'} className={`block ${anim?.heroes.includes(id) && anim.i > 0 && !anim.arrived ? 'token-hop' : ''}`} style={{ animationDuration: `${stepMs * 0.8}ms` }}>
                   <HeroFace hero={h} size={s} />
                 </span>
                 {/* お供: 肩に乗る・足元で1歩遅れてぴょこぴょこ付いてくる */}
@@ -400,7 +381,7 @@ export function WorldMap({
                   const sp = petSpot(h.pet.petId, s);
                   return (
                     <span className="absolute" style={{ left: sp.left, top: sp.top }}>
-                      <PetToken pet={h.pet} size={sp.size} hop={!!anim?.heroes.includes(id)} hopKey={anim?.heroes.includes(id) ? `p${anim.i}` : 'still'} />
+                      <PetToken pet={h.pet} size={sp.size} hop={!!anim?.heroes.includes(id) && anim.i > 0 && !anim.arrived} hopDuration={stepMs / 1000} hopKey={anim?.heroes.includes(id) ? `p${anim.i}` : 'still'} />
                     </span>
                   );
                 })()}

@@ -4,6 +4,7 @@ import { EVENTS } from '../../data/events';
 import { PETS } from '../../data/pets';
 import type { GameCommand, GameState, PlayerId } from '../../types';
 import { applyCommand, applyGameCommand, createBattle, createGame, heroAbilities, petLoveLevel, statChance, toPartyMember } from '../index';
+import { getPet } from '../../data/pets';
 import { petExplore } from '../game/pets';
 import { visionOf } from '../game/world/fog';
 import { giveHand, nextTurn, play, setup } from './helpers';
@@ -19,6 +20,7 @@ const run = (g: GameState, cmd: GameCommand) => {
 /** お供を迎えさせる */
 function adopt(g: GameState, petId: string, color?: string, name?: string) {
   g.heroes[0].petOffer = [petId];
+  g.heroes[0].petOfferColors = { [petId]: color ?? getPet(petId).colors[0].id };
   return run(g, { type: 'ADOPT_PET', playerId: P, heroId: g.heroes[0].id, petId, color, name });
 }
 
@@ -35,7 +37,7 @@ describe('お供のデータ', () => {
 });
 
 describe('お供を迎える・撫でる・懐く', () => {
-  it('候補から色と名前を選んで迎える。名前が無ければ候補から付く', () => {
+  it('候補に保存された色で名前を付けて迎える。名前が無ければ候補から付く', () => {
     let g = newGame();
     g = adopt(g, 'cockatiel', 'lutino', 'ぴーちゃん');
     expect(g.heroes[0].pet).toMatchObject({ petId: 'cockatiel', color: 'lutino', name: 'ぴーちゃん', love: 0, acts: 0 });

@@ -108,3 +108,8 @@ export async function layoutIssues(page) {
     return out;
   });
 }
+
+/** 演出の固定秒数に依存しない。止まった場合は上限で失敗させる。 */
+export async function waitForWorldMovement(page) {
+  await page.locator('[data-world-moving]').waitFor({ state: 'detached', timeout: 15000 });
+}

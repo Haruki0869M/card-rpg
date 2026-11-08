@@ -100,6 +100,8 @@ export interface Hero {
   pet?: HeroPet;
   /** 迎えられるお供の候補（イベントの後。ADOPT_PET で選ぶ） */
   petOffer?: string[];
+  /** 候補を出した時点で抽選・保存する毛色。採用時には引き直さない。 */
+  petOfferColors?: Record<string, string>;
   /** イベントでカードを1枚選ぶ作業（強化 / 削除 / 変異。CARD_TASK で選ぶ） */
   cardTask?: 'upgrade' | 'remove' | 'mutate';
   /** さすらいの行商人の品物（PEDDLER_BUY で買う） */

@@ -73,7 +73,14 @@ export interface NewGameDraft {
   party: { classId: string; gender: Gender; name: string; playerId?: PlayerId }[];
 }
 
+export interface WorldMovePresentation {
+  id: number;
+  game: GameState;
+}
+
 interface StoreState {
+  worldMoves: WorldMovePresentation[];
+  finishWorldMove: (id: number) => void;
   screen: Screen;
   draft: NewGameDraft;
   /** 冒険の状態（全部の場面） */
@@ -411,6 +418,11 @@ export const useBattle = create<StoreState>((set, get) => {
       const sel = get().selection;
       if (sel && !findAlly(next.battle, get().activeId)?.hand.some((c) => c.uid === sel.cardUid)) patch.selection = null;
     }
+    const lm = full.world?.lastMove;
+    if (before && scene === WORLD_SCENE && cmdScene === WORLD_SCENE && lm && lm.seq !== before.world?.lastMove?.seq && lm.path.length > 1) {
+      patch.worldMoves = [...get().worldMoves, { id: fxId++, game: full }];
+      patch.sheet = null;
+    }
     set(patch);
     // 見ている場面の出来事だけ演出する
     if (cmdScene === scene) applyEvents(r.battleEvents);
@@ -422,6 +434,7 @@ export const useBattle = create<StoreState>((set, get) => {
   const send = (wire: GameCommand, silent: boolean): string | undefined => {
     const { full } = get();
     if (!full) return '冒険が始まっていません';
+    if (get().worldMoves.length && unwrapCommand(wire).scene === WORLD_SCENE) return '移動が終わるまでお待ちください';
     const isEnemyStep = (c: GameCommand): boolean => (c.type === 'SCENE' ? isEnemyStep(c.command) : c.type === 'BATTLE' && c.command.type === 'ENEMY_STEP');
     if (room) {
       const dry = applyGameCommand(full, wire);
@@ -453,6 +466,11 @@ export const useBattle = create<StoreState>((set, get) => {
     game: viewIn(saved?.game ?? null, pickScene(saved?.game ?? null, WORLD_SCENE, true)),
     battle: viewIn(saved?.game ?? null, pickScene(saved?.game ?? null, WORLD_SCENE, true))?.battle ?? EMPTY_BATTLE,
     settings: loadSettings(),
+    worldMoves: [],
+    finishWorldMove: id => {
+      set(s => ({ worldMoves: s.worldMoves[0]?.id === id ? s.worldMoves.slice(1) : s.worldMoves }));
+      if (!get().worldMoves.length) scheduleEnemy();
+    },
     activeId: saved?.activeId ?? '',
     selection: null,
     sheet: null,
@@ -471,6 +489,7 @@ export const useBattle = create<StoreState>((set, get) => {
       const scene = pickScene(full, s);
       const game = viewIn(full, scene);
       set({
+        worldMoves: [],
         scene,
         game,
         sheet: null,
@@ -489,7 +508,7 @@ export const useBattle = create<StoreState>((set, get) => {
         difficulty: d.difficulty,
         party: d.party.map((m) => ({ ...m, playerId: m.playerId ?? LOCAL_PLAYER })),
       });
-      set({ full: game, scene: WORLD_SCENE, game, screen: 'game', battle: EMPTY_BATTLE, sheet: null, selection: null });
+      set({ worldMoves: [], full: game, scene: WORLD_SCENE, game, screen: 'game', battle: EMPTY_BATTLE, sheet: null, selection: null });
       scheduleSave(get);
     },
 
@@ -509,13 +528,13 @@ export const useBattle = create<StoreState>((set, get) => {
       const local = loadSave();
       const scene = pickScene(local?.game ?? null, WORLD_SCENE, true);
       const game = viewIn(local?.game ?? null, scene);
-      set({ full: local?.game ?? null, scene, game, activeId: local?.activeId ?? '', screen: 'title', confirmAbandon: false, sheet: null, battle: game?.battle ?? EMPTY_BATTLE, selection: null });
+      set({ worldMoves: [], full: local?.game ?? null, scene, game, activeId: local?.activeId ?? '', screen: 'title', confirmAbandon: false, sheet: null, battle: game?.battle ?? EMPTY_BATTLE, selection: null });
     },
 
     abandonGame: () => {
       if (enemyTimer) clearTimeout(enemyTimer);
       enemyTimer = null;
-      set({ full: null, scene: WORLD_SCENE, game: null, screen: 'title', confirmAbandon: false, sheet: null, battle: EMPTY_BATTLE, selection: null });
+      set({ worldMoves: [], full: null, scene: WORLD_SCENE, game: null, screen: 'title', confirmAbandon: false, sheet: null, battle: EMPTY_BATTLE, selection: null });
       writeSave({ full: null, activeId: '' });
     },
 
@@ -568,7 +587,7 @@ export const useBattle = create<StoreState>((set, get) => {
       const exp = full.expeditions?.find((x) => mine.length && mine.every((h) => x.heroes.includes(h.id)));
       const scene = pickScene(full, exp?.id ?? get().scene, true);
       const game = viewOf(full, scene);
-      set({ full, scene, game, screen: 'game', sheet: null, battle: game.battle ?? EMPTY_BATTLE, ...(game.battle ? resetBattleUi(game.battle) : { selection: null }) });
+      set({ worldMoves: [], full, scene, game, screen: 'game', sheet: null, battle: game.battle ?? EMPTY_BATTLE, ...(game.battle ? resetBattleUi(game.battle) : { selection: null }) });
       scheduleEnemy();
     },
 

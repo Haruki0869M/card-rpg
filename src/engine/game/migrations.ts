@@ -11,12 +11,21 @@ import { SANCTUARIES } from '../../data/world';
 import { getDifficulty, getRoomType } from '../../data/rules';
 import type { GameState } from '../../types';
 import { STATE_VERSION } from '../battle/battle';
+import { createRng } from '../rng';
+import { rollPetOfferColors } from './pets';
 import { heroAbilities } from './hero';
 import { addSanctuaries, consolidateSanctuaries } from './world/sanctuaries';
 
 type Loose = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 const MIGRATIONS: Record<number, (g: Loose) => void> = {
+  // v11 → v12: 未選択のお供候補だけ毛色を抽選。既存のお供と地図は維持する。
+  11(g) {
+    const rng = createRng(g.rngState);
+    for (const h of g.heroes) if (h.petOffer?.length) h.petOfferColors = rollPetOfferColors(h.petOffer, rng);
+    g.rngState = rng.state;
+    for (const b of [g.battle, ...(g.expeditions ?? []).map((x: Loose) => x.battle)]) if (b) b.version = 12;
+  },
   // v10 → v11: 星読みの使用回数を補完。未予約と追加状態異常は未設定＝なしとして扱う。
   10(g) {
     for (const b of [g.battle, ...(g.expeditions ?? []).map((x: Loose) => x.battle)]) {

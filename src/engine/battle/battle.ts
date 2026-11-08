@@ -39,7 +39,7 @@ import { abilityTriggered, addLog, enemyName, findAlly, findEnemy, healUnit, los
 
 export { enemyName, findAlly, findEnemy, unitName } from './units';
 
-export const STATE_VERSION = 11;
+export const STATE_VERSION = 12;
 export { slotPreviewLimitOf } from './preview';
 
 // ---------- 生成 ----------

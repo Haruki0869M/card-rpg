@@ -68,24 +68,46 @@ export function rollPetOffer(species: string[] | undefined, count: number, rng: 
   return out;
 }
 
+/** 通常2色・珍しい2色。データの順序を明示した重みで抽選する。 */
+export function rollPetColor(petId: string, rng: Rng): string {
+  const colors = getPet(petId).colors;
+  const ordered = [...colors.filter(c => c.rarity === 'normal'), ...colors.filter(c => c.rarity === 'rare')];
+  let roll = rng.next() * BALANCE.petColorWeights.reduce((n, v) => n + v, 0);
+  for (let i = 0; i < ordered.length; i++) {
+    roll -= BALANCE.petColorWeights[i];
+    if (roll < 0) return ordered[i].id;
+  }
+  return ordered[ordered.length - 1].id;
+}
+
+/** 候補ごとに毛色を1度だけ抽選する。画面側からは呼ばない。 */
+export function rollPetOfferColors(offer: string[], rng: Rng): Record<string, string> {
+  return Object.fromEntries(offer.map(id => [id, rollPetColor(id, rng)]));
+}
+
 /** お供を迎える（petId が無ければ見送る） */
 export function adoptPet(game: GameState, hero: Hero, petId: string | undefined, color: string | undefined, name: string | undefined): string | undefined {
   const offer = hero.petOffer;
   if (!offer?.length) return '迎えられるお供はいません';
-  delete hero.petOffer;
   if (!petId) {
+    delete hero.petOffer;
+    delete hero.petOfferColors;
     addLog(game, `${hero.name}はお供を迎えなかった`);
     return undefined;
   }
   if (!offer.includes(petId)) {
-    hero.petOffer = offer;
     return 'そのお供は選べません';
   }
   const def = getPet(petId);
-  const col = def.colors.find((c) => c.id === color) ?? def.colors[0];
+  const col = def.colors.find((c) => c.id === hero.petOfferColors?.[petId]);
+  if (!col) return 'お供の毛色が保存されていません';
+  if (color !== undefined && color !== col.id) return '出会ったお供の毛色は変更できません';
+  delete hero.petOffer;
+  delete hero.petOfferColors;
   const nm = (name ?? '').trim().slice(0, BALANCE.petNameMax) || def.names[game.nextUid % def.names.length];
   if (hero.pet) addLog(game, `${hero.pet.name}は${hero.name}に見送られて、旅立っていった`);
   hero.pet = { petId, color: col.id, name: nm, love: 0, acts: 0 };
+  if (col.rarity === 'rare') addLog(game, `✨珍しい毛色！ ${def.name}の${col.name}`);
   addLog(game, `${def.name}（${col.name}）の「${nm}」が${hero.name}の旅のお供になった！`);
   return undefined;
 }

@@ -15,6 +15,7 @@ import { ClearedScreen, GameOverScreen } from './components/screens/EndScreens';
 import { HubScreen } from './components/screens/HubScreen';
 import { RewardScreen } from './components/screens/RewardScreen';
 import { ChestScreen } from './components/screens/ChestScreen';
+import { WorldMoveScene } from './components/world/WorldMoveScene';
 import { WorldScreen } from './components/world/WorldScreen';
 import { EncounterScreen, EndingScreen, SanctuaryScreen, ShrineScreen, TownScreen } from './components/world/Places';
 import { EventScreen, RestScreen } from './components/screens/RoomScreens';
@@ -37,6 +38,7 @@ function useKeyboard() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const s = useBattle.getState();
+      if (s.worldMoves.length) return;
       if (s.sheet || s.confirmAbandon) {
         if (e.key === 'Escape') s.closeTop();
         return;
@@ -94,6 +96,7 @@ function BattleScreen() {
 function CurrentScreen() {
   const screen = useBattle((s) => s.screen);
   const mode = useBattle((s) => s.game?.mode);
+  const movement = useBattle(s => s.worldMoves[0]);
   if (screen === 'title' || !mode) {
     if (screen === 'setup') return <SetupScreen />;
     if (screen === 'create') return <CreateScreen />;
@@ -101,6 +104,7 @@ function CurrentScreen() {
     if (screen === 'lobby') return <LobbyScreen />;
     return <TitleScreen />;
   }
+  if (movement) return <WorldMoveScene key={movement.id} move={movement} />;
   switch (mode) {
     case 'hub':
       return <HubScreen />;
@@ -166,6 +170,7 @@ export default function App() {
   const selection = useBattle((s) => s.selection);
   const sheet = useBattle((s) => s.sheet);
   const confirmAbandon = useBattle((s) => s.confirmAbandon);
+  const moving = useBattle(s => s.worldMoves.length > 0);
   const screen = useBattle((s) => s.screen);
   const closeTop = useBattle((s) => s.closeTop);
 
@@ -196,17 +201,19 @@ export default function App() {
     <MotionConfig reducedMotion="user">
       <div className="flex h-dvh w-full justify-center bg-[#050407]">
         <div className="relative flex h-full w-full max-w-[480px] flex-col overflow-hidden">
-          <SceneTabs />
+          {!moving && <SceneTabs />}
           <div className="relative flex min-h-0 w-full flex-1 justify-center">
             <CurrentScreen />
           </div>
-          <Sheets />
-          <JobPickOverlay />
-          <HeroTaskOverlay />
-          <DetailPopup />
-          <OnlineOverlay />
-          <VoteStatus />
-          <TurnLock />
+          {!moving && <>
+            <Sheets />
+            <JobPickOverlay />
+            <HeroTaskOverlay />
+            <DetailPopup />
+            <OnlineOverlay />
+            <VoteStatus />
+            <TurnLock />
+          </>}
           <Toast />
         </div>
       </div>

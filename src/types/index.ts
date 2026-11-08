@@ -244,7 +244,7 @@ export interface PetDef {
   perch: 'shoulder' | 'feet' | 'float';
   /** めったに出ない */
   rare?: boolean;
-  colors: { id: string; name: string; color: string }[];
+  colors: { id: string; name: string; color: string; rarity: 'normal' | 'rare' }[];
   /** 名前の候補（入れなかった時） */
   names: string[];
   description: string;
