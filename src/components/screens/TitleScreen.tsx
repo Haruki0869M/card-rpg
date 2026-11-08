@@ -9,6 +9,7 @@ import { useBattle } from '../../store/battleStore';
 import { useOnline } from '../../store/onlineStore';
 import { HeroFace, Screen } from '../ui/game';
 import { Motes } from '../ui/fancy';
+import { Lorebook } from '../lorebook/Lorebook';
 
 export const GAME_TITLE = TERMS.gameTitle;
 
@@ -18,6 +19,7 @@ export function TitleScreen() {
   const continueGame = useBattle((s) => s.continueGame);
   const toast = useBattle((s) => s.showToast);
   const [showSettings, setShowSettings] = useState(false);
+  const [showLore, setShowLore] = useState(false);
   const onlineOk = useOnline((s) => s.available)();
   const modeText: Record<string, string> = {
     hub: '冒険の拠点',
@@ -93,7 +95,7 @@ export function TitleScreen() {
           {(
             [
               { label: '部屋に参加', Icon: Users, color: '#7ac8ff', on: () => (onlineOk ? setScreen('join') : toast('オンライン協力は準備中です（Firebase の設定が入ると遊べます）')) },
-              { label: '伝承の書', Icon: BookOpen, color: '#ffd06a', on: () => toast('伝承の書は M4 で追加します') },
+              { label: '伝承の書', Icon: BookOpen, color: '#ffd06a', on: () => setShowLore(true) },
               { label: '設定', Icon: Settings2, color: '#c8c0e0', on: () => setShowSettings((v) => !v) },
             ] as const
           ).map((m) => (
@@ -118,6 +120,7 @@ export function TitleScreen() {
           </div>
         )}
       </div>
+      {showLore && <Lorebook onClose={() => setShowLore(false)} />}
     </Screen>
   );
 }
