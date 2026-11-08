@@ -72,18 +72,19 @@ a single antique long flintlock rifle with a dark wooden stock and engraved bras
 ## 組み込み（組み込み担当のセッションへ）
 - 元画像は `C:\dev\card-rpg-assets\j4\icon-<アイコンID>.(png|webp)` に置く。
 - `scripts/art/build_art.py` の `ITEMS` に `'axe': 'icon-axe'` のように名前で足す。
-- 縦に描いた細長い物は `TILT` に足す（今の剣・杖と同じ -45 くらい）: axe・dagger・spear・katana・scythe・scepter・gun。
+- 傾け（`TILT`）は、元画像の向きを見て決める。1回目（2026-11-08）は「縦に」と書いても、斧・槍・刀は最初から斜めに描かれたので傾けない。短剣だけ縦なので `TILT` に足す（-45 くらい）。鎌・錫杖・銃は、できた絵を見て決める。
+- 拳の絵は、下に水色の影が描かれている。切り抜きで残ったら消す。
 - 書き出し先は `src/assets/art/item/<アイコンID>.webp`。置けばゲームが読む（`src/art/index.tsx` の `artImage('item/…')`）。
 
 ## 確認表
 | アイコン | ID | 元画像 | 加工・画面で確認 |
 |---|---|---|---|
-| 斧 | `axe` | ☐ | ☐ |
-| 拳 | `fist` | ☐ | ☐ |
-| 短剣 | `dagger` | ☐ | ☐ |
-| 槍 | `spear` | ☐ | ☐ |
-| 刀 | `katana` | ☐ | ☐ |
-| 魔導書 | `tome` | ☐ | ☐ |
+| 斧 | `axe` | ☑ | ☐ |
+| 拳 | `fist` | ☑ | ☐ |
+| 短剣 | `dagger` | ☑ | ☐ |
+| 槍 | `spear` | ☑ | ☐ |
+| 刀 | `katana` | ☑ | ☐ |
+| 魔導書 | `tome` | ☑ | ☐ |
 | 鎌 | `scythe` | ☐ | ☐ |
 | 錫杖 | `scepter` | ☐ | ☐ |
 | 鞭 | `whip` | ☐ | ☐ |
