@@ -1,4 +1,4 @@
-// 敵の絵の確認（凍てつく王国・共通・侵食の魔王の新しい敵・機械仕掛けの帝国）: 戦闘に3体ずつ出して、描いた絵（webp）が出ているかを調べ、写真を撮る。
+// 敵の絵の確認（凍てつく王国・共通・侵食の魔王の新しい敵・機械仕掛けの帝国・呪われた群島・砂塵の王朝）: 戦闘に3体ずつ出して、描いた絵（webp）が出ているかを調べ、写真を撮る。
 // 変身するボス（crystalLord・frozenBishop・frostGiant・whiteQueen）は、保存データで段階を進めて、変身後の絵（<ID>-<段階>）に変わるかも調べる。
 // 使い方: URL=http://127.0.0.1:<番号>/card-rpg/ node scripts/enemy-art.mjs
 import { mkdirSync } from 'node:fs';
@@ -16,8 +16,18 @@ const ENEMIES = ['snowHare', 'frostWolf', 'frostSprite', 'iceBat', 'frozenSoldie
   // 機械仕掛けの帝国
   'gearBug', 'steamRat', 'brokenAutomaton', 'conveyorBot', 'riveter', 'oilSlime', 'sparkTurret', 'foremanBot', 'foremanGolem', 'steamSprite',
   'boilerCrab', 'wrenchGolem', 'clockworkDog', 'steamTurretLord', 'runawayBoiler', 'pistonFist', 'furnaceImp', 'ironButler', 'chainSaw',
-  'clockworkSage', 'copperKnight', 'furnaceGolem', 'greatMachine'];
-const PHASES = { crystalLord: [1], frozenBishop: [1], frostGiant: [1], whiteQueen: [1, 2], foremanGolem: [1], runawayBoiler: [1], clockworkSage: [1], greatMachine: [1, 2] };
+  'clockworkSage', 'copperKnight', 'furnaceGolem', 'greatMachine',
+  // 呪われた群島
+  'seaCrab', 'jellyfish', 'seaSerpentFry', 'merfolkSpearman', 'pirateGrunt', 'drownedSailor', 'ghostDeckhand', 'pirateGunner', 'siren',
+  'shark', 'conchKnight', 'stormPetrel', 'octopusLarva', 'barnacleBeast', 'pirateQuartermaster', 'coralGolem', 'drownedKnight', 'seaWitch',
+  'krakenTentacle', 'seaSerpentQueen', 'pirateCaptainGuld', 'tideHighPriest', 'ghostAdmiral',
+  // 砂塵の王朝（石の猫像・スフィンクスの子は、敵の定義が入ってから足す）
+  'sandScarab', 'desertViper', 'jackalWarrior', 'tombRobber', 'sandScorpion', 'vulture', 'mummy', 'sandSprite', 'dustDevil', 'sandWorm',
+  'clayGolem', 'mummyArcher', 'cursedPriest', 'royalGuardMummy', 'scribeShade', 'sandSerpentLord', 'colossusStatue', 'sandScorpionKing',
+  'shadowVizier', 'stoneGuardianBeast', 'sandPharaoh'];
+const PHASES = { crystalLord: [1], frozenBishop: [1], frostGiant: [1], whiteQueen: [1, 2], foremanGolem: [1], runawayBoiler: [1], clockworkSage: [1], greatMachine: [1, 2],
+  seaSerpentQueen: [1], pirateCaptainGuld: [1], tideHighPriest: [1], ghostAdmiral: [1, 2],
+  sandScorpionKing: [1], shadowVizier: [1], stoneGuardianBeast: [1], sandPharaoh: [1, 2] };
 const problems = [];
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
