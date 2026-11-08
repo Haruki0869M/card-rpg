@@ -28,6 +28,8 @@ import {
   unusableReason,
 } from '../index';
 import { party } from './helpers';
+import { cardTargets } from '../battle/targets';
+import { unitIdOf } from '../battle/units';
 
 const P: PlayerId = 'P1';
 /** ダンジョンの流れを確かめるため、世界マップを外して仮の拠点から始める（世界マップは world.test.ts で確かめる） */
@@ -345,7 +347,7 @@ function autoPlay(g: GameState, dungeonId: string, maxSteps = 4000): GameState {
             const card = cardOf(c);
             const target = b.enemies.find((e) => !e.dead)?.uid;
             const focus = card.slots >= 3 ? Math.min(card.slots, a.focus) : 0;
-            g = run(g, { type: 'BATTLE', command: { type: 'PLAY_CARD', playerId: P, characterId: a.id, cardInstanceId: c.uid, targetId: card.target === 'enemy' ? target : undefined, focusUsed: focus } });
+            g = run(g, { type: 'BATTLE', command: { type: 'PLAY_CARD', playerId: P, characterId: a.id, cardInstanceId: c.uid, targetId: card.target === 'enemy' ? target : card.target === 'ally' ? cardTargets(b, a, card).map(unitIdOf)[0] : undefined, focusUsed: focus } });
             played = true;
             break;
           }

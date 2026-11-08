@@ -55,6 +55,15 @@ describe('K1 武器種・系統・異端のカード', () => {
     expect([n('common'), n('rare'), n('epic')]).toEqual([6, 5, 4]);
   });
 
+  it('作った武器種は7枚ずつ（コモン3・レア2・エピック2）', () => {
+    for (const type of ['sword', 'staff', 'tome', 'hammer', 'bow', 'dagger']) {
+      const cards = CARDS.all.filter((c) => c.weaponType === type);
+      expect(cards, type).toHaveLength(7);
+      const n = (r: string) => cards.filter((c) => (c.rarity ?? 'common') === r).length;
+      expect([n('common'), n('rare'), n('epic')], type).toEqual([3, 2, 2]);
+    }
+  });
+
   it('基本の重み: 得意武器1・使える武器0.5・系統0.7・ジョブ専用1', () => {
     const [kn] = newGame(['darkKnight']).heroes; // 剣が得意、槌が副武器
     expect(getClass('darkKnight').weaponType).toBe('sword');
