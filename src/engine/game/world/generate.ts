@@ -93,6 +93,20 @@ export function createWorld(game: GameState, rng: Rng): WorldState {
   }
   tiles[start].t = def.roadTerrain;
 
+  // 施設とスタートのまわりは陸にする（海のある地図だけ。小さすぎる島や、海の上の町を防ぐ。乱数は引かない）
+  const landOf = (r: number) => {
+    const terr = def.regions[r].terrain;
+    const ids = Object.keys(terr).filter((id) => !TERRAINS.get(id).sea && TERRAINS.get(id).moveCost > 0);
+    return ids.sort((a, b) => terr[b] - terr[a])[0] ?? def.roadTerrain;
+  };
+  const radius = def.landAround ?? 0;
+  for (const c of [start, ...fixed.map((x) => x.i)]) {
+    for (let i = 0; i < tiles.length; i++) {
+      if (hexDistance(w, c, i) > radius || !TERRAINS.get(tiles[i].t).sea) continue;
+      tiles[i].t = landOf(tiles[i].r);
+    }
+  }
+
   // ランダムに置くもの（歩いて行けて、何も無いマス。スタートの近くは避ける）
   const ok = walkable(w, start);
   const free = (row0: number, row1: number) =>

@@ -219,7 +219,8 @@ function tileInfo(game: GameState, i: number): string {
   const w = game.world!;
   const t = w.tiles[i];
   if (!t.seen) return 'まだ霧に包まれている';
-  const parts = [`${getTerrain(t.t).name}（移動力${getTerrain(t.t).moveCost || '×'}）`];
+  const terr = getTerrain(t.t);
+  const parts = [terr.sea ? `${terr.name}（${w.ship ? `船で移動力${terr.shipCost ?? 1}` : '船が必要です'}）` : `${terr.name}（移動力${terr.moveCost || '×'}）`];
   const f = t.f;
   if (f?.kind === 'town') parts.push(TOWNS.get(f.id).name + (w.fallenTowns.includes(f.id) ? '（陥落）' : ''));
   if (f?.kind === 'dungeon') parts.push(DUNGEONS.get(f.id).name);

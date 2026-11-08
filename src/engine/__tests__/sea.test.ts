@@ -4,7 +4,8 @@ import { getScenario } from '../../data/scenarios';
 import { TERRAINS } from '../../data/world';
 import type { GameState } from '../../types';
 import { createRng } from '../rng';
-import { applyOutcome, createGame, makeOutcomeCtx, moveCostOf, moveWanderers, neighbors, reachable, spawnSeaWanderer } from '../index';
+import { applyOutcome, createGame, createWorld, hexDistance, makeOutcomeCtx, moveCostOf, moveWanderers, neighbors, reachable, spawnSeaWanderer } from '../index';
+import { objectiveHandler } from '../game/world/objectives';
 
 const newWorld = (seed = 3) =>
   createGame({ seed, scenarioId: 'corruptionKing', difficulty: 'normal', party: ['warrior', 'mage'].map((c, i) => ({ classId: c, gender: 'male' as const, name: `${c}${i}`, playerId: 'P1' })) });
@@ -58,6 +59,31 @@ describe('海と船', () => {
     const g = newWorld();
     expect(g.world!.tiles.some((t) => TERRAINS.get(t.t).sea)).toBe(false);
     expect(spawnSeaWanderer(g, g.world!, createRng(1), 0)).toBeUndefined();
+  });
+
+  it('施設とスタートのまわりは陸にする（landAround）。海がほとんどの地図でも小さな島ができない', () => {
+    const g = newWorld();
+    const def = getScenario('corruptionKing').map!;
+    const regs = def.regions.map((r) => ({ ...r.terrain }));
+    def.regions.forEach((r) => (r.terrain = { sea: 50, plains: 1 }));
+    def.landAround = 1;
+    try {
+      const w = createWorld(g, createRng(7));
+      const near = (c: number) => w.tiles.map((_, i) => i).filter((i) => hexDistance(w, c, i) <= 1);
+      const start = w.pos[g.heroes[0].id];
+      for (const c of [start, ...def.features.map((f) => f.at[1] * w.width + f.at[0])]) {
+        for (const i of near(c)) expect(!!TERRAINS.get(w.tiles[i].t).sea, `tile ${i}`).toBe(false);
+      }
+      expect(w.tiles.filter((t) => TERRAINS.get(t.t).sea).length).toBeGreaterThan(w.tiles.length / 2);
+    } finally {
+      def.regions.forEach((r, k) => (r.terrain = regs[k]));
+      delete def.landAround;
+    }
+  });
+
+  it('「話を聞くだけ」の依頼は、受けてすぐ報告できる', () => {
+    const g = newWorld();
+    expect(objectiveHandler({ kind: 'talk' }).canReport!(g, { kind: 'talk' } as never)).toBe(true);
   });
 
   it('海の敵は海のマスに出て、海のマスの中だけを動く', () => {

@@ -105,6 +105,8 @@ export interface ScenarioMapDef {
   features: FixedFeature[];
   /** 町と町・ダンジョンを結ぶ道の地形（必ず通れる道を作る） */
   roadTerrain: string;
+  /** 施設（町・ダンジョンなど）のまわり何マスを、海でなく陸にするか（K4。小さすぎる島で詰まらないように。省略は0） */
+  landAround?: number;
   corruptionStages: CorruptionStage[];
 }
 

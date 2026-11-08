@@ -8,7 +8,8 @@ import { cardOf } from '../data/cards';
 import { DUNGEONS } from '../data/dungeons';
 import { EVENTS } from '../data/events';
 import { getItem } from '../data/items';
-import { TOWNS } from '../data/world';
+import { QUESTS, TOWNS } from '../data/world';
+import { canReportQuest } from './game/world/town';
 import type { GameCommand, GameState, PlayerId } from '../types';
 import {
   applyGameCommand,
@@ -86,6 +87,11 @@ function worldTarget(g: GameState, at: number): { tile: number; why: 'town' | 'g
   const goal = goalDungeon(g);
   const need = DUNGEONS.get(goal).baseLevel + (DUNGEONS.get(goal).finale ? 1 : 0);
   const avgLv = heroes.reduce((n, h) => n + h.level, 0) / heroes.length;
+  // 船がもらえる依頼がまだなら、まずその町へ（海を渡るシナリオ）
+  if (!w.ship) {
+    const i = w.tiles.findIndex((t) => t.f?.kind === 'town' && (TOWNS.get(t.f.id).quests ?? []).some((qid) => QUESTS.get(qid).reward.some((o) => o.kind === 'ship') && !w.quests.some((q) => q.id === qid && q.reported)));
+    if (i >= 0) return { tile: i, why: 'town' };
+  }
   const hurt = heroes.some((h) => h.hp < heroMaxHp(h) * 0.5);
   if (hurt) {
     let best: number | undefined;
@@ -300,6 +306,13 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
       return send(g, { type: 'RETURN_TO_HUB', playerId: pid(g) }, log);
     case 'town': {
       const t = g.town!;
+      // 船がもらえる依頼（報酬に ship がある）は、受けてすぐ報告する（海を渡るシナリオの最初の町）
+      for (const qid of TOWNS.get(t.townId).quests ?? []) {
+        if (!QUESTS.get(qid).reward.some((o) => o.kind === 'ship')) continue;
+        const q = g.world!.quests.find((x) => x.id === qid);
+        if (!q) return send(g, { type: 'QUEST_ACCEPT', playerId: pid(g), questId: qid }, log);
+        if (!q.reported && canReportQuest(g, qid)) return send(g, { type: 'QUEST_REPORT', playerId: pid(g), questId: qid }, log);
+      }
       const key = `${g.world!.worldTurn}:${t.townId}`;
       if (memo.town !== key) {
         memo.town = key;
