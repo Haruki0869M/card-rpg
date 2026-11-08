@@ -427,6 +427,26 @@ def build_pieces():
         c.alpha_composite(f2, (round(PIECE_W / 2 - cx * k), PIECE_H - f2.height))
         save(c, f'{name}.webp', 80)
 
+# ---------------- ダンジョンの通路（第3段階。指示文は docs/art/prompts-dungeon.md） ----------------
+# 元画像は dungeon/<背景>-<wall|floor|ceiling|door>.webp（SRC の下。切り抜きは不要）。
+# 通路の面は1マス＝画面の短い辺くらい（スマホで最大 450px 前後）で、奥へ行くほど小さく暗くなるので、512px で足りる。
+# 扉は壁の面の中の 56%×78% に描くので、3:4 の 384×512。暗さはゲーム側（DungeonView の shade）で合わせる
+DUNGEON_FACE, DUNGEON_DOOR = 512, (384, 512)
+
+def build_dungeon():
+    import glob, re
+    for f in sorted(glob.glob(os.path.join(SRC, 'dungeon', '*'))):
+        m = re.match(r'(.+)-(wall|floor|ceiling|door)\.(webp|png|jpg)$', os.path.basename(f))
+        if not m: continue
+        name = f'dungeon/{m.group(1)}-{m.group(2)}'
+        if not want(name): continue
+        im = Image.open(f).convert('RGB')
+        if m.group(2) == 'door':
+            im = ImageOps.fit(im, DUNGEON_DOOR, Image.LANCZOS)
+        else:
+            im = im.resize((DUNGEON_FACE, DUNGEON_FACE), Image.LANCZOS)
+        save(im, f'{name}.webp', 78)
+
 # ---------------- 画面の枠（UIの部品集 6 から切り出す） ----------------
 def key_out(im, bg=(60, 52, 55), tol=26):
     """部品集の無地の背景色を透明にする"""
@@ -475,4 +495,4 @@ def build_ui():
         save(seamless(im), 'ui/panel.webp', 70)
 
 if __name__ == '__main__':
-    build_heroes(); build_enemies(); build_bgs(); build_terrains(); build_items(); build_ui(); build_pets(); build_pieces()
+    build_heroes(); build_enemies(); build_bgs(); build_terrains(); build_items(); build_ui(); build_pets(); build_pieces(); build_dungeon()
