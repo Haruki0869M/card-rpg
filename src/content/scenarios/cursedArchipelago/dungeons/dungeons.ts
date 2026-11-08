@@ -4,7 +4,7 @@ import type { DungeonDef } from '../../../../types';
 
 // 敵の組（K4 手順2）。弱点が同じ敵だけの組にならないようにする（海の生き物は雷、幽霊は聖に弱い）
 const WRECK_CAVE_POOLS: DungeonDef['pools'] = {
-  battle: [['seaSerpentFry', 'pirateGrunt'], ['merfolkSpearman', 'merfolkSpearman', 'emberSeaCrab'], ['emberSeaCrab', 'jellyfish'], ['seaCrab', 'seaSerpentFry', 'pirateGrunt']],
+  battle: [['driftwoodSpirit', 'seaSerpentFry'], ['seaSerpentFry', 'pirateGrunt'], ['merfolkSpearman', 'merfolkSpearman', 'emberSeaCrab'], ['emberSeaCrab', 'jellyfish'], ['seaCrab', 'seaSerpentFry', 'pirateGrunt']],
   elite: [['coralGolem'], ['coralGolem', 'pirateGrunt']],
   boss: ['seaSerpentQueen'],
 };
@@ -14,12 +14,12 @@ const PIRATE_ISLAND_POOLS: DungeonDef['pools'] = {
   boss: ['pirateCaptainGuld'],
 };
 const SUNKEN_TEMPLE_POOLS: DungeonDef['pools'] = {
-  battle: [['shark', 'stormPetrel'], ['conchKnight', 'cursedDrownedSailor'], ['octopusLarva', 'stormPetrel'], ['cursedDrownedSailor', 'shark']],
+  battle: [['cursedPirateGrunt', 'shark'], ['shark', 'stormPetrel'], ['conchKnight', 'cursedDrownedSailor'], ['octopusLarva', 'stormPetrel'], ['cursedDrownedSailor', 'shark']],
   elite: [['seaWitch'], ['seaWitch', 'cursedDrownedSailor']],
   boss: ['tideHighPriest'],
 };
 const FLAGSHIP_POOLS: DungeonDef['pools'] = {
-  battle: [['barnacleBeast', 'venomShark'], ['venomShark', 'cursedDrownedSailor'], ['barnacleBeast', 'ghostDeckhand', 'stormPetrel'], ['barnacleBeast', 'cursedDrownedSailor']],
+  battle: [['lanternAngler', 'barnacleBeast'], ['barnacleBeast', 'venomShark'], ['venomShark', 'cursedDrownedSailor'], ['barnacleBeast', 'ghostDeckhand', 'stormPetrel'], ['barnacleBeast', 'cursedDrownedSailor']],
   elite: [['krakenTentacle'], ['stormSeaWitch', 'barnacleBeast']],
   boss: ['ghostAdmiral'],
 };

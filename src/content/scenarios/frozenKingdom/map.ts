@@ -29,7 +29,7 @@ export const frozenKingdomMap: ScenarioMapDef = {
       terrain: { snow: 4, mountain: 3, ice: 1 },
       climate: { kind: 'cold', ratio: 0.07 },
       enemyLevel: 8,
-      encounters: [["yeti", "iceSwordsman"], ["blizzardSnake", "stormIceArcher"], ["venomIceSlime", "iceSwordsman"], ["yeti", "stormIceArcher"]],
+      encounters: [['stormSnowOwl', 'iceSwordsman'], ["yeti", "iceSwordsman"], ["blizzardSnake", "stormIceArcher"], ["venomIceSlime", "iceSwordsman"], ["yeti", "stormIceArcher"]],
       wanderers: 4,
       chests: 2,
       events: 2,
@@ -43,7 +43,7 @@ export const frozenKingdomMap: ScenarioMapDef = {
       terrain: { ice: 5, snow: 2, water: 1 },
       climate: { kind: 'cold', ratio: 0.06 },
       enemyLevel: 6,
-      encounters: [["iceSlime", "frozenGhoul"], ["frostMage", "iceArcher"], ["cursedFrozenSoldier", "iceArcher"]],
+      encounters: [['iceFisher', 'iceArcher'], ["iceSlime", "frozenGhoul"], ["frostMage", "iceArcher"], ["cursedFrozenSoldier", "iceArcher"]],
       wanderers: 4,
       chests: 2,
       events: 2,
@@ -58,8 +58,12 @@ export const frozenKingdomMap: ScenarioMapDef = {
       terrain: { forest: 3, snow: 4, hills: 1 },
       climate: { kind: 'cold', ratio: 0.05 },
       enemyLevel: 4,
+<<<<<<< HEAD
       encounters: [["iceBat", "frozenSoldier"], ["snowOwl", "icicleBug"], ["emberFrostWolf", "frozenSoldier"], ["frostWolf", "snowOwl"]],
       rareEncounters: [["whiteStag"], ["whiteStag", "snowOwl"]],
+=======
+      encounters: [['frostMoth', 'snowOwl'], ["iceBat", "frozenSoldier"], ["snowOwl", "icicleBug"], ["emberFrostWolf", "frozenSoldier"], ["frostWolf", "snowOwl"]],
+>>>>>>> ccr-d64a1cfc-debli5
       wanderers: 4,
       chests: 2,
       events: 2,

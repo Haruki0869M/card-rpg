@@ -7,14 +7,15 @@ export const clockworkEmpire: ScenarioDef = {
   id: 'clockworkEmpire',
   order: 6,
   name: '機械仕掛けの帝国',
+  art: 'card-clockworkEmpire',
   synopsis: '暴走した大機械が、国じゅうの人を歯車の部品にしようとしている。三つの動力核を壊して、大機械を止めよ。',
   recommended: '2〜4人',
   playTime: '60〜90分',
-  unlocked: false,
-  // 作成中: 敵・数値がそろうまで遊べない。仕上げる時に wip を消し、unlockText を「「星降る天空城」をクリアすると遊べる」にする
-  wip: true,
-  unlockText: '準備中（もうすぐ遊べます）',
-  unlockRequires: { cleared: ['starCastle'] },
+  unlocked: true,
+  // いまは5本目の星降る天空城が作成中でクリアできないので、遊べる最後の本（呪われた群島）のクリアで解放する。
+  // 砂塵の王朝・星降る天空城を登録する時に、unlockText を「「星降る天空城」をクリアすると遊べる」に、解放の条件を starCastle に戻す
+  unlockText: '「呪われた群島」をクリアすると遊べる',
+  unlockRequires: { cleared: ['cursedArchipelago'] },
   // 世界の悪化の名前（画面の「侵食度」の代わりに出る言葉）
   corruptionName: '暴走率',
   start: { gold: 40, pouch: [{ itemId: 'potion', count: 2 }] },
