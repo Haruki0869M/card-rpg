@@ -86,12 +86,50 @@ def build_cards():
         B.save(im, f'{name}.webp', 76)
 
 
+# ---------------- ダンジョンの部屋・戦闘の背景（bg/<ダンジョンID>.webp） ----------------
+# 元画像は SRC/bg/<ダンジョンID>.webp（縦長 9:16）。今の屋内の背景（temple・catacomb・castle）と同じ決まりで、
+# 暗く・少しぼかし・ふちを暗くして 600×1071 にする（上に文字やカードが乗るため）。
+DUNGEON_BG = (0.64, 1.2, 0.55)
+# 元画像の上に余計な帯がある背景は、上を切り落とす割合（_notes.txt: sandPalace は上の暗い帯の下に横一直線の境目がある）
+BG_CUT_TOP = {'sandPalace': 0.14}
+DUNGEON_IDS = ['clockTower', 'crystalCave', 'dreamEaterLair', 'echoGhostShip', 'echoIceVault', 'echoSandTomb', 'gearFactory',
+               'ghostFlagship', 'giantMine', 'iceCastle', 'machineHeart', 'moonlitGarden', 'observatory', 'pirateIsland',
+               'sandPalace', 'scorpionTomb', 'shadowLibrary', 'skyCastle', 'statueTemple', 'steamPlant', 'sunkenCathedral',
+               'sunkenTemple', 'windmillTower', 'wreckCave']
+
+
+def build_dungeon_bgs():
+    dark, blur, vig = DUNGEON_BG
+    for key in DUNGEON_IDS:
+        name = f'bg/{key}'
+        p = find(f'bg/{key}')
+        if not p or not B.want(name):
+            continue
+        im = cut_black_bands(Image.open(p).convert('RGB'))
+        cut = BG_CUT_TOP.get(key, 0)
+        if cut:
+            im = im.crop((0, round(im.height * cut), im.width, im.height))
+        im = ImageOps.fit(im, (600, 1071), Image.LANCZOS, centering=(0.5, 0.5))
+        im = im.filter(ImageFilter.GaussianBlur(blur))
+        im = ImageEnhance.Brightness(im).enhance(dark)
+        im = ImageEnhance.Color(im).enhance(0.85)
+        im = B.vignette(im, vig)
+        B.save(im, f'{name}.webp', 74)
+
+
 # ---------------- ダンジョンの通路（壁・床・天井・扉・ボスの門） ----------------
 # 元画像は SRC/dungeon/<背景ID>-<wall|floor|ceiling|door|bossdoor>.webp。加工は build_art.py の build_dungeon と同じ
 # （面は 512×512、扉・ボスの門は 384×512）。すでに src/assets/art/dungeon にある物は触らない（上書きしない）。
 # 元画像のまわりに余計な縁が入っている扉は、割合で外側を切り落としてから 3:4 に合わせる
 # （_notes.txt: statueTemple-door は外側に細い黒い縁、skyCastle-door は外側にベージュの壁が少し見える）。
 DOOR_CROP = {'statueTemple-door': 0.032, 'skyCastle-door': 0.032}
+# ボスの門: 元画像（928×1232）のまわりに枠や壁が見える物は、扉の部分だけ切り抜く（_notes.txt の位置。左・上・右・下）
+BOSSDOOR_BOX = {
+    'crystalCave-bossdoor': (110, 125, 830, 1140), 'statueTemple-bossdoor': (95, 95, 835, 1195),
+    'windmillTower-bossdoor': (145, 140, 775, 1205), 'observatory-bossdoor': (65, 60, 865, 1180),
+    'scorpionTomb-bossdoor': (80, 95, 845, 1175), 'clockTower-bossdoor': (80, 90, 850, 1175),
+    'machineHeart-bossdoor': (50, 50, 880, 1185), 'echoSandTomb-bossdoor': (130, 20, 800, 1200),
+}
 
 
 def build_dungeon():
@@ -107,6 +145,9 @@ def build_dungeon():
             continue
         im = Image.open(f).convert('RGB')
         if m.group(2) in ('door', 'bossdoor'):
+            box = BOSSDOOR_BOX.get(key)
+            if box:
+                im = im.crop(box)
             c = DOOR_CROP.get(key, 0)
             if c:
                 dx, dy = round(im.width * c), round(im.height * c)
@@ -122,4 +163,5 @@ if __name__ == '__main__':
     build_terrains()
     build_bgs()
     build_cards()
+    build_dungeon_bgs()
     build_dungeon()
