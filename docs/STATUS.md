@@ -25,7 +25,8 @@
 - 画面確認: dungeon-view（4サイズ）・adventure（固定種874651857と種なし × 2人・4人、すべてcleared。道を探す処理を軽くした後にも固定種で2人・4人を再確認）・check-layout・playthrough・pets・battle-feedback・interaction-safety・final-special-jobs・special-jobs・jobchange・sanctuaries・movement-pet-colors すべて成功。
 - **テストの時間切れの対処**: `game.test.ts` の自動プレイ（全ダンジョン×12の種）は、段階Aで扉の前まで歩く操作が増えたため、単独で約2.8〜3.4秒（変更前は約2.6〜2.9秒。同じ機械で交互に4回ずつ計測）。全体を同時に流すと既定の5秒に近づき、時々時間切れになった。地図の計算を使い回して道探しを軽くしたうえで、**このテストだけ上限を15秒にした**（理由をコメントに記載。確認する中身は同じ）。
 
-- 実スマホ・Firebaseでの確認はまだ。push・公開なし。
+- **お試しURLに公開（オーナーのOK）**: Firebase Hosting のプレビューチャンネル `stage3-dungeon`（`https://card-rpg-1aa60--stage3-dungeon-u5kor205.web.app`、2026-11-15に自動で消える）。`npm run build:firebase` のあと `firebase hosting:channel:deploy stage3-dungeon --expires 7d`。本番（card-rpg-1aa60.web.app）は変えていないことを確認（本番は index-BNX4Ehgi.js のまま）。お試しURLで dungeon-view（4サイズ）成功。オンライン協力のデータベースは本番と共通だが、保存の版（v15）が違う端末は同じ部屋に入れない。
+- 実スマホでの確認はオーナー待ち。push なし。
 
 ## 最新（Claude）：第3段階A ダンジョンを歩いて探索する土台（2026-11-08）
 
