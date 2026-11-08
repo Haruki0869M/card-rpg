@@ -152,14 +152,14 @@ export function fireAbilities(
   events: BattleEvent[],
   owner: Unit,
   when: AbilityTrigger,
-  opts: { card?: CardDef; target?: Unit; dealt?: number; list?: AbilityDef[]; depth?: number; focusUsed?: number; tierEffects?: Effect[]; perfect?: boolean } = {},
+  opts: { card?: CardDef; target?: Unit; dealt?: number; list?: AbilityDef[]; depth?: number; focusUsed?: number; tierEffects?: Effect[]; perfect?: boolean; successes?: number; supportedOthers?: boolean } = {},
 ): string[] {
   const out: string[] = [];
   if (owner.dead && when !== 'hurt' && !(when === 'allyDown' && opts.target === owner)) return out;
   for (const ab of opts.list ?? abilitiesOf(owner)) {
     const e = ab.effect;
     if (!isTriggered(e) || e.when !== when) continue;
-    if (!testConditions(e.if, { state, rng, self: owner, card: opts.card, target: opts.target, dealt: opts.dealt, focusUsed: opts.focusUsed })) continue;
+    if (!testConditions(e.if, { state, rng, self: owner, card: opts.card, target: opts.target, dealt: opts.dealt, focusUsed: opts.focusUsed, perfect: opts.perfect, successes: opts.successes, supportedOthers: opts.supportedOthers })) continue;
     const ctx = makeCtx(state, rng, events, owner, { target: opts.target, card: opts.card, dealt: opts.dealt, depth: opts.depth, tierEffects: opts.tierEffects, perfect: opts.perfect, cardAbilities: opts.card?.trait ? [opts.card.trait] : undefined });
     let any = false;
     for (const eff of e.do) any = applyEffect(ctx, eff) || any;
@@ -205,6 +205,7 @@ export function describeAbility(ab: AbilityDef, side: 'ally' | 'enemy' = 'ally')
     if (e.modifier === 'cardChance') return `${head}成功率+${e.bonus}%`;
     if (e.modifier === 'completeSlots') return `${head}残りの枠も全て成功する`;
     if (e.modifier === 'exhaust') return '1戦闘1回。使ったカードは戦闘が終わるまで山札から除く';
+    if (e.modifier === 'slotPreview') return `1戦闘${e.uses}回、次のカードのスロットを先読みし、1回だけ振り直せる`;
     if (e.modifier === 'chestChance') return `宝箱の運の判定+${e.bonus}%`;
     if (e.modifier === 'weaknessDamage') return `${head}弱点属性のダメージ×${e.multiplier}`;
     if (e.modifier === 'statusBonus') return `${head}自分が付ける${e.statuses.map((x) => `「${getStatus(x).name}」`).join('')}+${e.amount}`;

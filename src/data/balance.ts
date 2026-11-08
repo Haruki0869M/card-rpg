@@ -5,6 +5,10 @@ export const BALANCE = {
   sanctuaryRoadDistance: 2,
   /** 特殊職の能力とHP支払い。 */
   specialJobs: {
+    possessionHp: 6, possessionCost: 2, possessionTurns: 3, possessionDamage: 1.2, possessionChance: 10,
+    turretDamage: 3, deviceTurns: 3, trapDamage: 3, trapWeak: 1,
+    songChance: 10, supportBlock: 2, failureFocus: 1,
+    gambleOutcomes: [{ weight: 25, multiplier: 0.75 }, { weight: 50, multiplier: 1 }, { weight: 25, multiplier: 1.5 }],
     chargeFactor: 2, chargeMax: 4, firstTurnMana: 1,
     minionDamage: 3, minionLimit: 3, missingHpPer: 1, missingHpMax: 1,
     bloodCost: 3, offeringCost: 5, abyssCost: 8,

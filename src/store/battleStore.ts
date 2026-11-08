@@ -112,6 +112,7 @@ interface StoreState {
   tapEnemy: (uid: string) => void;
   setFocus: (n: number) => void;
   confirm: () => void;
+  preview: () => void;
   cancel: () => void;
   setActive: (id: string) => void;
   endTurn: () => void;
@@ -648,6 +649,16 @@ export const useBattle = create<StoreState>((set, get) => {
         targetId: card.target === 'enemy' ? selection.targetId : undefined,
         focusUsed: selection.focus,
       });
+      if (err) set({ flash: { cardUid: selection.cardUid, text: err, id: fxId++ } });
+      else set({ selection: null });
+    },
+
+    preview: () => {
+      const { selection, activeId, battle } = get();
+      if (!selection || battle.slotPreview) return;
+      const ally = findAlly(battle, activeId), inst = ally?.hand.find(c => c.uid === selection.cardUid);
+      if (!ally || !inst) return;
+      const err = get().dispatch({ type: 'PREVIEW_CARD', playerId: LOCAL_PLAYER, characterId: activeId, cardInstanceId: selection.cardUid, targetId: selection.targetId, focusUsed: selection.focus });
       if (err) set({ flash: { cardUid: selection.cardUid, text: err, id: fxId++ } });
       else set({ selection: null });
     },

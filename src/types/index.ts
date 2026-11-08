@@ -115,6 +115,7 @@ export type AbilityEffect =
   | { modifier: 'cardChance'; bonus: number; if?: AbilityCondition[] }
   | { modifier: 'completeSlots'; if?: AbilityCondition[] }
   | { modifier: 'exhaust'; if?: AbilityCondition[] }
+  | { modifier: 'slotPreview'; uses: number; if?: AbilityCondition[] }
   | { modifier: 'chestChance'; bonus: number; if?: AbilityCondition[] }
   | { modifier: 'weaknessDamage'; multiplier: number; if?: AbilityCondition[] }
   /** 自分が付ける状態異常の量+amount（呪詛など） */
@@ -401,6 +402,8 @@ export interface StatusDef {
   boostElement?: { element: string; per: number };
   /** 味方: 次に使うカードの成功率 +数×この値。カードを使うと消える（応援など） */
   chanceBonus?: number;
+  /** 残りターン数によらず一定の成功率を加える。カード使用では消費しない。 */
+  flatChanceBonus?: number;
   /** 説明文（省略すると数値から自動で作る） */
   description?: string;
 }
@@ -415,6 +418,7 @@ export interface CardInstance {
 }
 
 export interface AllyState {
+  slotPreviewUsed?: number;
   /** 次の攻撃カードへ蓄えた倍率。戦闘を越えて持ち越さない。 */
   attackCharge?: { multiplier: number; category: CardCategory };
   /** 次の物理攻撃へ宿す属性。 */
@@ -520,6 +524,8 @@ export interface LogEntry {
 }
 
 export interface BattleState {
+  /** 先読みで予約した結果。描画・読込では抽選しない。 */
+  slotPreview?: SlotPreview;
   version: number;
   seed: number;
   rngState: number;
@@ -545,6 +551,9 @@ export interface BattleState {
 
 /** 呼び出したお供（turns = 残りのターン数。0になったら帰る） */
 export interface SummonState {
+  targetId?: string;
+  trigger?: 'enemyBeforeAction';
+  effects?: Effect[];
   /** 同じ上限で数える召喚の印。 */
   group?: string;
   /** カード攻撃への追撃と、被弾の身代わりをする召喚 */
@@ -573,6 +582,9 @@ export interface BattleSetup {
 
 // ===== コマンド（シリアライズ可能・オンライン協力で同期する単位） =====
 export type Command =
+  | { type: 'PREVIEW_CARD'; playerId: PlayerId; characterId: string; cardInstanceId: string; targetId?: string; focusUsed: number }
+  | { type: 'REROLL_PREVIEW'; playerId: PlayerId; characterId: string }
+  | { type: 'CONFIRM_PREVIEW'; playerId: PlayerId; characterId: string }
   | {
       type: 'PLAY_CARD';
       playerId: PlayerId;
@@ -590,6 +602,17 @@ export type Command =
   | { type: 'ENEMY_STEP' };
 
 export type SlotResult = 'focus' | 'hit' | 'miss';
+
+export interface SlotPreview {
+  characterId: string;
+  cardInstanceId: string;
+  targetId?: string;
+  focusUsed: number;
+  chance: number;
+  results: SlotResult[];
+  rerollResults: SlotResult[];
+  rerolled: boolean;
+}
 
 /** UI演出用のイベント */
 export type BattleEvent =

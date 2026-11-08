@@ -33,12 +33,14 @@ import { decideAllIntents } from './intents';
 import { finalChance, selectTier } from './probability';
 import { recordSupport, supportSnapshot } from './support';
 import { afterAttackCard, attackElement, cardHpCost, chargedMultiplier, tierHpCost } from './cardState';
+import { slotPreviewLimitOf } from './preview';
 import { activeStatuses, actionFailChanceOf, applyTick, chancePenaltyOf, consumeStatus, decayStatuses, emptyStatuses, skipActionStatus, takeManaPenalty, tickHealOf } from './statuses';
 import { abilityTriggered, addLog, enemyName, findAlly, findEnemy, healUnit, loseHp, nameOf, unitIdOf } from './units';
 
 export { enemyName, findAlly, findEnemy, unitName } from './units';
 
-export const STATE_VERSION = 10;
+export const STATE_VERSION = 11;
+export { slotPreviewLimitOf } from './preview';
 
 // ---------- 生成 ----------
 
@@ -76,6 +78,7 @@ export function createBattle(setup: BattleSetup): BattleState {
       hp: Math.min(maxHp, m.hp ?? maxHp),
       maxHp,
       block: 0,
+      slotPreviewUsed: 0,
       mana: 0,
       focus: m.focus ?? BALANCE.focusStart,
       focusMax: m.focusMax ?? BALANCE.focusMax,
@@ -175,7 +178,7 @@ export function rollChanceFor(ally: AllyState, card: CardDef, focusUsed: number)
 /** 次のカードの成功率の上乗せ（状態異常の chanceBonus × 数） */
 export function statusChanceBonus(st: Statuses): number {
   let n = 0;
-  for (const [id, v] of Object.entries(st)) if (v) n += (getStatus(id).chanceBonus ?? 0) * v;
+  for (const [id, v] of Object.entries(st)) if (v) n += (getStatus(id).chanceBonus ?? 0) * v + (getStatus(id).flatChanceBonus ?? 0);
   return n;
 }
 
@@ -188,6 +191,7 @@ export const needsEnemyTarget = (card: CardDef) => card.target === 'enemy';
 
 /** カードが使えない理由（使えるなら null） */
 export function unusableReason(state: BattleState, ally: AllyState, card: CardDef): string | null {
+  if (state.slotPreview) return '星読みの結果を確定してください';
   if (state.phase !== 'ally') return '味方フェーズではありません';
   if (ally.dead) return '戦闘不能です';
   if (ally.exhaustedCards?.includes(card.id)) return 'この戦闘ではもう使いました';
@@ -223,7 +227,7 @@ export function tierDamageAgainst(ally: AllyState, card: CardDef, target: EnemyS
       if (e.kind !== 'damage' || (targetOf(e) !== 'target' && targetOf(e) !== 'foes')) return sum;
       const element = attackElement(source, card, e.element);
       const { multiplier } = damageModifiers(undefined, source, card, target, card.trait ? [card.trait] : undefined, t.minSuccesses === card.slots, element);
-      return sum + calcDamage(e.amount, source.statuses, target.statuses, chargedMultiplier(source, card) * multiplier * elementMultiplier(target, element) * comboMultiplier(source, target)) * (e.hits ?? 1);
+      return sum + calcDamage(e.amount, source.statuses, target.statuses, chargedMultiplier(source, card) * (e.outcomes?.length ? e.outcomes.reduce((n, o) => n + o.weight * o.multiplier, 0) / e.outcomes.reduce((n, o) => n + o.weight, 0) : 1) * multiplier * elementMultiplier(target, element) * comboMultiplier(source, target)) * (e.hits ?? 1);
     }, 0);
   });
 }
@@ -269,6 +273,7 @@ function startAllyPhase(state: BattleState, rng: Rng, events: BattleEvent[]) {
 }
 
 function checkEnd(state: BattleState, events: BattleEvent[]): boolean {
+  for (const a of state.allies) a.summons = a.summons?.filter(s => !s.trigger || (!a.dead && state.enemies.some(e => !e.dead && e.uid === s.targetId)));
   if (state.phase === 'victory' || state.phase === 'defeat' || state.phase === 'escaped') return true;
   if (!state.enemies.some((e) => !e.dead)) {
     state.phase = 'victory';
@@ -308,11 +313,30 @@ function tickDamageOverTime(state: BattleState, side: 'ally' | 'enemy', rng: Rng
 // ---------- コマンド処理 ----------
 
 export function applyCommand(input: BattleState, cmd: Command): CommandResult {
+  if (input.slotPreview && cmd.type !== 'REROLL_PREVIEW' && cmd.type !== 'CONFIRM_PREVIEW') return { state: input, events: [], error: '星読みの結果を確定するまで、この戦闘は待機します' };
   const state: BattleState = structuredClone(input);
   const rng = createRng(input.rngState);
   const events: BattleEvent[] = [];
   let error: string | undefined;
   switch (cmd.type) {
+    case 'PREVIEW_CARD':
+      error = reserveCard(state, cmd, rng);
+      break;
+    case 'REROLL_PREVIEW':
+    case 'CONFIRM_PREVIEW': {
+      const p = state.slotPreview, a = p && findAlly(state, p.characterId);
+      if (!p || !a || a.dead || state.phase !== 'ally') error = '先読みしたカードがありません';
+      else if (cmd.characterId !== a.id || cmd.playerId !== a.playerId) error = '先読みしたキャラの担当だけが操作できます';
+      else if (cmd.type === 'REROLL_PREVIEW') {
+        if (p.rerolled) error = '振り直しは1回だけです';
+        else p.rerolled = true;
+      } else {
+        delete state.slotPreview;
+        error = playCard(state, { type: 'PLAY_CARD', playerId: a.playerId, characterId: a.id, cardInstanceId: p.cardInstanceId, targetId: p.targetId, focusUsed: p.focusUsed }, rng, events,
+          { chance: p.chance, results: p.rerolled ? p.rerollResults : p.results });
+      }
+      break;
+    }
     case 'PLAY_CARD':
       error = playCard(state, cmd, rng, events);
       break;
@@ -356,7 +380,26 @@ export function rollSlots(slots: number, focusUsed: number, chance: number, rng:
   return out;
 }
 
-function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' }>, rng: Rng, events: BattleEvent[]): string | undefined {
+function reserveCard(state: BattleState, cmd: Extract<Command, { type: 'PREVIEW_CARD' }>, rng: Rng): string | undefined {
+  const ally = findAlly(state, cmd.characterId);
+  if (!ally || ally.playerId !== cmd.playerId) return '担当していないキャラです';
+  if ((ally.slotPreviewUsed ?? 0) >= slotPreviewLimitOf(ally)) return 'この戦闘では星読みを使えません';
+  const inst = ally.hand.find(c => c.uid === cmd.cardInstanceId);
+  if (!inst) return '手札にありません';
+  const card = cardOf(inst), reason = unusableReason(state, ally, card);
+  if (reason) return reason;
+  if (!Number.isInteger(cmd.focusUsed) || cmd.focusUsed < 0 || cmd.focusUsed > Math.min(card.slots, ally.focus)) return 'フォーカスの数が不正です';
+  if (card.target === 'enemy' && !state.enemies.some(e => !e.dead && e.uid === cmd.targetId)) return '対象を選んでください';
+  const chance = rollChanceFor(ally, card, cmd.focusUsed);
+  const results = rollSlots(card.slots, cmd.focusUsed, chance, rng);
+  const rerollResults = rollSlots(card.slots, cmd.focusUsed, chance, rng);
+  state.slotPreview = { characterId: ally.id, cardInstanceId: inst.uid, targetId: card.target === 'enemy' ? cmd.targetId : undefined, focusUsed: cmd.focusUsed, chance, results, rerollResults, rerolled: false };
+  ally.slotPreviewUsed = (ally.slotPreviewUsed ?? 0) + 1;
+  if (state.ready) state.ready = state.ready.filter(p => p !== ally.playerId);
+  return undefined;
+}
+
+function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' }>, rng: Rng, events: BattleEvent[], reserved?: { chance: number; results: SlotResult[] }): string | undefined {
   const ally = findAlly(state, cmd.characterId);
   if (!ally) return 'キャラが見つかりません';
   if (ally.playerId !== cmd.playerId) return '担当していないキャラです';
@@ -385,8 +428,8 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   state.stats.focusUsed += focusUsed;
 
   // 判定
-  const chance = rollChanceFor(ally, card, focusUsed);
-  const results = rollSlots(card.slots, focusUsed, chance, rng);
+  const chance = reserved?.chance ?? rollChanceFor(ally, card, focusUsed);
+  const results = reserved?.results ?? rollSlots(card.slots, focusUsed, chance, rng);
   // 次のカードの成功率が上がる状態異常（応援など）は、使ったら消える
   consumeChanceBonus(ally.statuses);
   const successes = results.filter((r) => r !== 'miss').length;
@@ -410,7 +453,7 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   const ctx = makeCtx(state, rng, events, ally, { target, card, cardAbilities, perfect, tierEffects: tier.effects });
   if (target && tier.effects.some(e => e.kind === 'damage')) ally.lastTargetId = target.uid;
   for (const eff of tier.effects) applyEffect(ctx, eff);
-  recordSupport(ally, state.allies, supportBefore);
+  const supportedOthers = recordSupport(ally, state.allies, supportBefore);
   const parts = ctx.parts;
   const hasDamage = tier.effects.some((e) => e.kind === 'damage');
   if (hasDamage) parts.unshift(`${ctx.dealt} DMG`);
@@ -418,7 +461,7 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   for (const n of ctx.fired) abilityTriggered(state, ally.id, n, events);
 
   // きっかけ: カードの特殊能力 → 自分の能力（カードを使った後 → 完全成功時）
-  const fireOpts = { card, target, dealt: ctx.dealt, focusUsed, tierEffects: tier.effects, perfect };
+  const fireOpts = { card, target, dealt: ctx.dealt, focusUsed, tierEffects: tier.effects, perfect, successes, supportedOthers };
   if (cardAbilities) {
     parts.push(...fireAbilities(state, rng, events, ally, 'afterCard', { ...fireOpts, list: cardAbilities }));
     if (perfect) parts.push(...fireAbilities(state, rng, events, ally, 'perfect', { ...fireOpts, list: cardAbilities }));
@@ -463,10 +506,10 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
 function summonsAttack(state: BattleState, ally: AllyState, rng: Rng, events: BattleEvent[]) {
   if (!ally.summons?.length) return;
   for (const s of [...ally.summons]) {
-    if (s.echoPct) continue;
+    if (s.echoPct || s.trigger) continue;
     const foes = state.enemies.filter((e) => !e.dead);
     if (!foes.length) break;
-    const t = foes[rng.int(foes.length)];
+    const t = s.targetId ? foes.find(e => e.uid === s.targetId) ?? foes[0] : foes[rng.int(foes.length)];
     const ctx = makeCtx(state, rng, events, ally, { target: t });
     const loss = dealDamage(ctx, t, s.damage, s.element);
     abilityTriggered(state, ally.id, s.name, events);
@@ -547,6 +590,11 @@ function enemyStep(state: BattleState, rng: Rng, events: BattleEvent[]): string 
     decayStatuses(e.statuses);
     e.tauntedBy = undefined;
   }
+  for (const a of state.allies) a.summons = a.summons?.filter(s => {
+    if (!s.trigger) return true;
+    s.turns -= 1;
+    return !a.dead && s.turns > 0 && state.enemies.some(e => !e.dead && e.uid === s.targetId);
+  });
   decideAllIntents(state, rng);
   addLog(state, `--- ターン${state.turn + 1} ---`);
   startAllyPhase(state, rng, events);
@@ -579,6 +627,17 @@ function executeIntent(state: BattleState, enemy: EnemyState, rng: Rng, events: 
     return;
   }
   const ctx = makeCtx(state, rng, events, enemy);
+  for (const owner of state.allies.filter(a => !a.dead)) {
+    for (const token of [...(owner.summons ?? [])]) {
+      if (token.trigger !== 'enemyBeforeAction' || token.targetId !== enemy.uid || enemy.dead) continue;
+      owner.summons = owner.summons!.filter(s => s !== token);
+      const trap = makeCtx(state, rng, events, owner, { target: enemy });
+      for (const eff of token.effects ?? []) applyEffect(trap, eff);
+      abilityTriggered(state, owner.id, token.name, events);
+      addLog(state, `${owner.name}の${token.name}が発動した`);
+    }
+  }
+  if (enemy.dead) { enemy.intent = undefined; return; }
   // 演出用のイベントは先に積み、対象の一覧は効果を使った後に埋まる
   events.push({ type: 'enemyAct', enemyUid: enemy.uid, actionName: action.name, targetIds: ctx.hitIds });
   const actionMultiplier = enemy.nextActionMultiplier ?? 1;

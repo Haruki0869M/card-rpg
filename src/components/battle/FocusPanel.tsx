@@ -2,7 +2,7 @@
 import { motion } from 'framer-motion';
 import { Minus, Plus, Star, X } from 'lucide-react';
 import { cardOf } from '../../data/cards';
-import { rollChanceFor, findAlly, tierDistribution, toPercents } from '../../engine';
+import { rollChanceFor, findAlly, tierDistribution, toPercents, slotPreviewLimitOf } from '../../engine';
 import { useBattle } from '../../store/battleStore';
 import { CATEGORY_STYLE, EffectChip } from '../ui/icons';
 
@@ -15,6 +15,7 @@ export function FocusPanel() {
   const setFocus = useBattle((s) => s.setFocus);
   const confirm = useBattle((s) => s.confirm);
   const cancel = useBattle((s) => s.cancel);
+  const preview = useBattle(s => s.preview);
 
   const ally = findAlly(battle, activeId);
   const inst = selection && ally?.hand.find((c) => c.uid === selection.cardUid);
@@ -65,6 +66,8 @@ export function FocusPanel() {
           <span className="text-[12px] leading-4 font-bold">{needsTarget ? '敵をタップ' : selection.focus ? `★${selection.focus} 確定` : '運に任せる'}</span>
         </button>
       </div>
+
+      {(ally.slotPreviewUsed ?? 0) < slotPreviewLimitOf(ally) && <button onClick={preview} disabled={needsTarget} className="btn btn-dark mt-1 min-h-11 w-full rounded-lg text-[14px] font-bold" data-preview-start>星読みで結果を見る（1戦闘1回）</button>}
 
       <div className="mt-1.5 flex items-center gap-2">
         <button

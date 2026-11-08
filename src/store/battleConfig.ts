@@ -50,7 +50,7 @@ export function actorOf(game: GameState, cmd: GameCommand): PlayerId {
 /** 戦闘のコマンドを送るプレイヤー */
 export function battleActorOf(game: GameState, cmd: Command): PlayerId {
   const b = game.battle;
-  const id = cmd.type === 'PLAY_CARD' || cmd.type === 'USE_ITEM' || cmd.type === 'AIM' ? cmd.characterId : undefined;
+  const id = 'characterId' in cmd ? cmd.characterId : undefined;
   if (localPlayers && !id) return 'playerId' in cmd ? cmd.playerId : myPlayer();
   return b?.allies.find((a) => a.id === id)?.playerId ?? b?.allies[0]?.playerId ?? LOCAL_PLAYER;
 }

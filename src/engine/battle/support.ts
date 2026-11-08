@@ -20,4 +20,5 @@ export function recordSupport(source: AllyState, allies: AllyState[], before: Re
     const f = (source.feats ??= {});
     f['support:others'] = (f['support:others'] ?? 0) + 1;
   }
+  return helped;
 }

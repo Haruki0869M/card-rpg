@@ -17,6 +17,14 @@ import { addSanctuaries, consolidateSanctuaries } from './world/sanctuaries';
 type Loose = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 const MIGRATIONS: Record<number, (g: Loose) => void> = {
+  // v10 → v11: 星読みの使用回数を補完。未予約と追加状態異常は未設定＝なしとして扱う。
+  10(g) {
+    for (const b of [g.battle, ...(g.expeditions ?? []).map((x: Loose) => x.battle)]) {
+      if (!b) continue;
+      b.version = 11;
+      for (const a of b.allies) a.slotPreviewUsed ??= 0;
+    }
+  },
   // v9 → v10: 祭壇を2職で共用し、10か所から5か所に統合する。
   9(g) {
     consolidateSanctuaries(g as GameState);

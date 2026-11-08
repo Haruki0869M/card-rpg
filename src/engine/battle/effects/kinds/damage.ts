@@ -9,7 +9,7 @@ import { type EffectHandler, upgradeAmount } from '../types';
 declare module '../../../../types' {
   interface EffectParams {
     /** element: 属性（src/content の elements の ID。省略は無属性） */
-    damage: { amount: number; hits?: number; element?: string };
+    damage: { amount: number; hits?: number; element?: string; outcomes?: { weight: number; multiplier: number }[] };
   }
 }
 
@@ -18,11 +18,17 @@ export const effect: EffectHandler<'damage'> = {
   defaultTo: 'target',
   apply(ctx, e) {
     let any = false;
+    let multiplier = 1;
+    if (e.outcomes?.length) {
+      let roll = ctx.rng.next() * e.outcomes.reduce((n, o) => n + o.weight, 0);
+      for (const o of e.outcomes) { multiplier = o.multiplier; roll -= o.weight; if (roll < 0) break; }
+      ctx.parts.push(`勝負×${multiplier}`);
+    }
     for (let h = 0; h < (e.hits ?? 1); h++) {
       for (const t of resolveTargets(ctx, targetOf(e))) {
         const charge = chargedMultiplier(ctx.source, ctx.card);
         if (charge > 1 && !ctx.fired.includes('蓄えた力')) ctx.fired.push('蓄えた力');
-        const loss = dealDamage(ctx, t, e.amount, e.element, charge);
+        const loss = dealDamage(ctx, t, e.amount, e.element, charge * multiplier);
         any = true;
         if (isEnemy(ctx.source)) ctx.parts.push(`${nameOf(t)}に${loss}`);
       }
@@ -32,8 +38,9 @@ export const effect: EffectHandler<'damage'> = {
   describe(e, who) {
     const el = e.element ? getElement(e.element) : undefined;
     const st = el?.status ? `（${el.chance}%で${getStatus(el.status).name}${el.amount ?? 1}・完全成功なら必ず）` : '';
-    return `${who}${e.amount}の${el ? `${el.name}属性` : ''}ダメージ${(e.hits ?? 1) > 1 ? `×${e.hits}回` : ''}${st}`;
+    const gamble = e.outcomes?.length ? `（${e.outcomes.map(o => `${o.weight}%で×${o.multiplier}`).join('／')}。1枚につき1回抽選）` : '';
+    return `${who}${e.amount}の${el ? `${el.name}属性` : ''}ダメージ${(e.hits ?? 1) > 1 ? `×${e.hits}回` : ''}${st}${gamble}`;
   },
-  short: (e) => `${e.amount}${(e.hits ?? 1) > 1 ? `×${e.hits}` : ''}`,
+  short: (e) => `${e.outcomes?.length ? `${Math.floor(e.amount * Math.min(...e.outcomes.map(o => o.multiplier)))}〜${Math.floor(e.amount * Math.max(...e.outcomes.map(o => o.multiplier)))}` : e.amount}${(e.hits ?? 1) > 1 ? `×${e.hits}` : ''}`,
   upgrade: (e) => ({ ...e, amount: upgradeAmount(e.amount) }),
 };

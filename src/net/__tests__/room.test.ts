@@ -1,7 +1,7 @@
 // ===== オンライン協力の部屋（テスト用の通信で、複数の端末をまねる） =====
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { botNextCommand } from '../../engine/bot';
-import { commandPlayer, stateHash } from '../../engine';
+import { commandPlayer, createBattle, stateHash, toPartyMember } from '../../engine';
 import { MemoryHub } from '../memoryBackend';
 import { normalizeCode, Room, RoomError, seqKey, SNAPSHOT_EVERY } from '../room';
 
@@ -53,6 +53,53 @@ const allSame = (rooms: Room[]) => {
   const hs = rooms.map((r) => `${r.seq}:${stateHash(r.game)}`);
   return hs.every((h) => h === hs[0]);
 };
+
+/** 同期確認用に同じ戦闘を全端末と保存点へ載せる。 */
+async function specialBattle(roles: string[]) {
+  const session = await playing(roles.length);
+  const game = structuredClone(session.host.game!);
+  game.heroes.forEach((h, i) => h.classId = roles[i]);
+  game.mode = 'battle'; game.party = game.heroes.map(h => h.id);
+  game.battle = createBattle({ seed: 93, readyCheck: true, party: game.heroes.map(toPartyMember), encounter: { id: 'netSpecial', name: '同期確認', enemies: [{ defId: 'forestWolf' }] } });
+  game.battle.enemies[0].hp = game.battle.enemies[0].maxHp = 10000;
+  for (const a of game.battle.allies) { a.mana = 20; a.focus = 0; }
+  for (const r of session.rooms) Object.assign(r.game!, structuredClone(game));
+  await session.host.backend.set(`rooms/${session.host.code}/snapshot`, { seq: session.host.seq, game: JSON.stringify(game), hash: stateHash(game) });
+  await settle();
+  return session;
+}
+
+describe('特殊職の通信と再接続', () => {
+  it('P1の歌がP2〜P4へ届き、P2のカード使用でP2の応援だけ消える', async () => {
+    const { rooms } = await specialBattle(['bard', 'warrior', 'mage', 'hunter']);
+    for (const r of rooms) {
+      r.game!.battle!.allies[0].hand = [{ uid: 'song', cardId: 'bardCourage' }];
+      r.game!.battle!.allies[1].hand = [{ uid: 'attack', cardId: 'starRay' }];
+    }
+    await rooms[0].send({ type: 'BATTLE', command: { type: 'PLAY_CARD', playerId: 'P1', characterId: 'h0', cardInstanceId: 'song', focusUsed: 0 } }); await settle();
+    expect(allSame(rooms)).toBe(true); expect(rooms[3].game!.battle!.allies.map(a => a.statuses.songInspired)).toEqual([1, 1, 1, 1]);
+    await rooms[1].send({ type: 'BATTLE', command: { type: 'PLAY_CARD', playerId: 'P2', characterId: 'h1', cardInstanceId: 'attack', targetId: rooms[1].game!.battle!.enemies[0].uid, focusUsed: 0 } }); await settle();
+    expect(allSame(rooms)).toBe(true); expect(rooms[0].game!.battle!.allies.map(a => a.statuses.songInspired)).toEqual([1, 0, 1, 1]);
+    for (const r of rooms) await r.leave();
+  });
+  it('P2の星読みを全端末が共有し、結果確認中の再接続でも予約・乱数が一致する', async () => {
+    const { hub, host, rooms } = await specialBattle(['warrior', 'astrologer']);
+    for (const r of rooms) r.game!.battle!.allies[1].hand = [{ uid: 'star', cardId: 'starRay' }];
+    await rooms[1].send({ type: 'BATTLE', command: { type: 'PREVIEW_CARD', playerId: 'P2', characterId: 'h1', cardInstanceId: 'star', targetId: host.game!.battle!.enemies[0].uid, focusUsed: 0 } }); await settle();
+    expect(allSame(rooms)).toBe(true); const preview = structuredClone(host.game!.battle!.slotPreview), rng = host.game!.battle!.rngState, seq = host.seq;
+    await rooms[0].send({ type: 'BATTLE', command: { type: 'CONFIRM_PREVIEW', playerId: 'P1', characterId: 'h1' } }); await settle();
+    expect(host.seq).toBe(seq); expect(host.game!.battle!.slotPreview).toEqual(preview);
+    await host.backend.set(`rooms/${host.code}/snapshot`, { seq: host.seq, game: JSON.stringify(host.game), hash: stateHash(host.game) }); await settle();
+    rooms[1].backend.goOffline(); await settle();
+    const again = await Room.join(hub.client('u1'), host.code, 'P2再接続'); await settle();
+    expect(again.game!.battle!.slotPreview).toEqual(preview); expect(again.game!.battle!.rngState).toBe(rng);
+    await again.send({ type: 'BATTLE', command: { type: 'REROLL_PREVIEW', playerId: 'P2', characterId: 'h1' } }); await settle();
+    expect(host.game!.battle!.slotPreview?.rerolled).toBe(true); expect(host.game!.battle!.rngState).toBe(rng);
+    await again.send({ type: 'BATTLE', command: { type: 'CONFIRM_PREVIEW', playerId: 'P2', characterId: 'h1' } }); await settle();
+    expect(host.game!.battle!.slotPreview).toBeUndefined(); expect(stateHash(host.game)).toBe(stateHash(again.game));
+    for (const r of [...rooms, again]) await r.leave();
+  });
+});
 
 describe('部屋を作る・入る', () => {
   it('合言葉は4文字。入るとP2・P3…の席。5人目は入れない', async () => {

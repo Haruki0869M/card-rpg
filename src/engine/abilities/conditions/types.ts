@@ -17,6 +17,8 @@ export interface CondCtx {
   perfect?: boolean;
   /** 今のカードで使ったフォーカス */
   focusUsed?: number;
+  successes?: number;
+  supportedOthers?: boolean;
 }
 
 /** 条件の種類1つ分。src/engine/abilities/conditions/ に1ファイル1種類で置く（export const condition = ...） */

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { BottomBar, TopBar } from './components/battle/Bars';
 import { Battlefield } from './components/battle/Battlefield';
 import { FocusPanel } from './components/battle/FocusPanel';
+import { SlotPreviewDialog } from './components/battle/SlotPreviewDialog';
 import { Hand } from './components/battle/Hand';
 import { useTallScreen } from './hooks/useTallScreen';
 import { PartyStrip } from './components/battle/PartyStrip';
@@ -84,6 +85,7 @@ function BattleScreen() {
       <Hand />
       <BottomBar />
       <ResultScreen />
+      <SlotPreviewDialog />
     </div>
   );
 }
