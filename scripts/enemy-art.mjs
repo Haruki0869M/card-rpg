@@ -46,6 +46,11 @@ const problems = [];
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 page.setDefaultTimeout(15000);
+// 本番は絵を1時間キャッシュするので、前の戦闘で読んだ絵は通信の記録（performance の resource）に残らない。
+// 「戦闘の始めに変身後の絵を読み始めているか」を正しく測るため、このページではキャッシュを使わない。
+await (await page.context().newCDPSession(page)).send('Network.setCacheDisabled', { cacheDisabled: true });
+// 通信の記録は標準で250件までしか残らない。本番は起動の後に絵を多く先読みするのですぐ埋まるので、広げておく
+await page.addInitScript(() => performance.setResourceTimingBufferSize(5000));
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
 
@@ -112,8 +117,13 @@ await page.setViewportSize({ width: 390, height: 844 });
 for (const [id, list] of Object.entries(PHASES)) {
   await startBattle(page, 1, [id]);
   // 戦闘の始めに、変身後の絵を先に読み始めているか（変身した瞬間に絵が欠けないように）
-  await page.waitForTimeout(300);
-  const fetched = await page.evaluate(() => performance.getEntriesByType('resource').map((r) => r.name));
+  // 通信の記録は読み終わった時に残るので、本番のように遠い時は少し待つ（最大3秒。変身はそれより後）
+  let fetched = [];
+  for (let t = 0; t < 30; t++) {
+    await page.waitForTimeout(100);
+    fetched = await page.evaluate(() => performance.getEntriesByType('resource').map((r) => r.name));
+    if (list.every((phase) => fetched.some((u) => u.includes(`/${id}-${phase}-`)))) break;
+  }
   for (const phase of list) if (!fetched.some((u) => u.includes(`/${id}-${phase}-`))) problems.push(`390 ${id}: 戦闘の始めに段階${phase}の絵を先に読んでいない`);
   for (const phase of list) {
     await page.evaluate(
