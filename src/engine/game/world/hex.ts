@@ -47,7 +47,11 @@ export function hexDistance(w: Pick<WorldState, 'width'>, a: number, b: number):
 }
 
 /** 入るのにかかる移動力（0 は通れない） */
-export const moveCostOf = (w: WorldState, i: number) => getTerrain(w.tiles[i].t).moveCost;
+export function moveCostOf(w: WorldState, i: number): number {
+  const t = getTerrain(w.tiles[i].t);
+  // 海は船があるパーティだけが進める（K4 段3）
+  return t.sea && w.ship ? (t.shipCost ?? 1) : t.moveCost;
+}
 
 /**
  * from から到達できるマスと、そこまでの最小の移動力・経路（ダイクストラ法）。

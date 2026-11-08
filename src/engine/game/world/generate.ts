@@ -10,7 +10,7 @@ import { RARITIES } from '../dungeon';
 import { pickWeighted } from '../loot';
 import { hexDistance, idxOf, neighbors, rowOf } from './hex';
 import { revealAround } from './fog';
-import { spawnWanderer } from './wanderers';
+import { spawnSeaWanderer, spawnWanderer } from './wanderers';
 import { addSanctuaries } from './sanctuaries';
 
 const pick = <T,>(list: readonly T[], rng: Rng) => list[rng.int(list.length)];
@@ -36,7 +36,8 @@ function walkable(w: WorldState, start: number): Set<number> {
   while (q.length) {
     const cur = q.shift()!;
     for (const n of neighbors(w, cur)) {
-      if (seen.has(n) || TERRAINS.get(w.tiles[n].t).moveCost <= 0) continue;
+      const tn = TERRAINS.get(w.tiles[n].t);
+      if (seen.has(n) || (tn.moveCost <= 0 && !tn.sea)) continue; // 海は船で渡れるので、島にもランダムな物を置ける
       seen.add(n);
       q.push(n);
     }
@@ -86,7 +87,7 @@ export function createWorld(game: GameState, rng: Rng): WorldState {
   const connected = [start];
   for (const { f, i } of [...fixed].sort((a, b) => hexDistance(w, start, a.i) - hexDistance(w, start, b.i))) {
     const from = connected.reduce((best, c) => (hexDistance(w, c, i) < hexDistance(w, best, i) ? c : best), connected[0]);
-    for (const p of straightPath(w, from, i)) tiles[p].t = def.roadTerrain;
+    for (const p of straightPath(w, from, i)) if (!TERRAINS.get(tiles[p].t).sea) tiles[p].t = def.roadTerrain; // 海には道を引かない（船で渡る）
     connected.push(i);
     tiles[i].f = { kind: f.kind, id: f.id };
   }
@@ -95,7 +96,7 @@ export function createWorld(game: GameState, rng: Rng): WorldState {
   // ランダムに置くもの（歩いて行けて、何も無いマス。スタートの近くは避ける）
   const ok = walkable(w, start);
   const free = (row0: number, row1: number) =>
-    [...ok].filter((i) => !tiles[i].f && rowOf(w, i) >= row0 && rowOf(w, i) <= row1 && hexDistance(w, i, start) >= 2);
+    [...ok].filter((i) => !tiles[i].f && !TERRAINS.get(tiles[i].t).sea && rowOf(w, i) >= row0 && rowOf(w, i) <= row1 && hexDistance(w, i, start) >= 2);
   const mapEvents = EVENTS.forScenario(game.scenarioId).filter((e) => e.where === 'map');
   const shrineIds = SHRINES.forScenario(game.scenarioId).map((s) => s.id);
   def.regions.forEach((reg, ri) => {
@@ -123,6 +124,8 @@ export function createWorld(game: GameState, rng: Rng): WorldState {
 
   // 徘徊する敵
   for (let ri = 0; ri < def.regions.length; ri++) for (let k = 0; k < def.regions[ri].wanderers; k++) spawnWanderer(game, w, rng, ri);
+  // 海の徘徊する敵（幽霊船など。K4 段3）。陸の敵のあとに置くので、海の無いシナリオの乱数の流れは変わらない
+  for (let ri = 0; ri < def.regions.length; ri++) for (let k = 0; k < (def.regions[ri].seaWanderers ?? 0); k++) spawnSeaWanderer(game, w, rng, ri);
 
   // 最初の手番
   w.turn = alive[0]?.id ?? '';

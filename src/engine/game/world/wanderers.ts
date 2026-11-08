@@ -21,8 +21,33 @@ export function wandererLevel(game: GameState, w: WorldState, region: number): n
   return Math.max(1, def.regions[region].enemyLevel + getDifficulty(game.difficulty).enemyLevel + corruptionLevelBonus(game, w) + night);
 }
 
-const blocked = (w: WorldState, i: number) =>
-  !!w.tiles[i].f || TERRAINS.get(w.tiles[i].t).moveCost <= 0 || w.wanderers.some((x) => x.tile === i) || Object.values(w.pos).includes(i);
+/** 敵やキャラ・施設のあるマス、または敵が入れない地形。海の敵（sea）は海のマスにだけ入る */
+const blocked = (w: WorldState, i: number, sea = false) => {
+  const t = TERRAINS.get(w.tiles[i].t);
+  const wrongTerrain = sea ? !t.sea : t.moveCost <= 0;
+  return !!w.tiles[i].f || wrongTerrain || w.wanderers.some((x) => x.tile === i) || Object.values(w.pos).includes(i);
+};
+
+/** 地域の海のマスに、海の敵（幽霊船など）を1組置く（K4 段3）。置けたら返す */
+export function spawnSeaWanderer(game: GameState, w: WorldState, rng: Rng, region: number): Wanderer | undefined {
+  const reg = getScenario(game.scenarioId).map!.regions[region];
+  if (!reg.seaEncounters?.length) return undefined;
+  const heroes = Object.values(w.pos);
+  const cands: number[] = [];
+  for (let i = 0; i < w.tiles.length; i++) {
+    const r = rowOf(w, i);
+    if (r < reg.rows[0] || r > reg.rows[1] || blocked(w, i, true)) continue;
+    if (heroes.some((h) => hexDistance(w, h, i) <= 2)) continue;
+    cands.push(i);
+  }
+  if (!cands.length) return undefined;
+  const tile = cands[rng.int(cands.length)];
+  const group = reg.seaEncounters[rng.int(reg.seaEncounters.length)];
+  const level = wandererLevel(game, w, region);
+  const wd: Wanderer = { id: `w${w.nextWandererId++}`, tile, enemies: group.map((defId) => ({ defId, level })) };
+  w.wanderers.push(wd);
+  return wd;
+}
 
 /** 地域に敵を1組置く（見えているマス・キャラや町の近くは避ける）。置けたら返す */
 export function spawnWanderer(game: GameState, w: WorldState, rng: Rng, region: number, at?: number): Wanderer | undefined {
@@ -53,7 +78,8 @@ export function moveWanderers(w: WorldState, rng: Rng) {
   if (w.worldTurn % BALANCE.wandererMoveEvery !== 0) return;
   for (const wd of w.wanderers) {
     if (wd.raidTown || rng.next() < 0.5) continue;
-    const opts = neighbors(w, wd.tile).filter((n) => !blocked(w, n) && w.tiles[n].r === w.tiles[wd.tile].r);
+    const atSea = !!TERRAINS.get(w.tiles[wd.tile].t).sea;
+    const opts = neighbors(w, wd.tile).filter((n) => !blocked(w, n, atSea) && w.tiles[n].r === w.tiles[wd.tile].r);
     if (opts.length) wd.tile = opts[rng.int(opts.length)];
   }
 }
