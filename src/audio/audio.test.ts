@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { CARDS } from '../data/cards';
 import { getStatus } from '../data/statuses';
 import { PETS } from '../data/pets';
-import { battleFrames } from '../store/presentation';
+import { battleFrames, explorationSounds } from '../store/presentation';
+import { applyGameCommand, createGame } from '../engine';
+import { tapSound } from './uiSounds';
+import { bgmFor } from './bgm';
 import type { BattleEvent, CardDef } from '../types';
-import { cardSound, damageSound, hitSize, PET_CRY, perfectSound, rollResultSound, statusSound } from './cues';
+import { cardSound, damageSound, dungeonStepSound, footstepSound, hitSize, PET_CRY, perfectSound, rollResultSound, statusSound } from './cues';
 import { BGM_IDS, JINGLE_IDS, PET_SOUND_IDS, PRELOAD_IDS, SFX_IDS } from './ids';
 import { createLimiter } from './limiter';
 import { audioReady, hasSound, playBgm, playSound, playSounds, setAudioVolumes } from './player';
@@ -82,11 +85,12 @@ describe('同時に鳴る数の制限', () => {
 
 describe('音のファイルが無い・音が使えない時', () => {
   it('何もせず、エラーも出さない', () => {
-    expect(hasSound('sfx_ui_tap')).toBe(false);
+    // 野営の音はまだファイルが無い（無い音でも何も起きないことを確かめる）
+    expect(hasSound('sfx_world_camp')).toBe(false);
     expect(audioReady()).toBe(false);
     expect(() => {
       setAudioVolumes({ sfxVolume: 7, bgmVolume: 5 });
-      playSound('sfx_ui_tap');
+      playSound('sfx_world_camp');
       playSounds(['sfx_hit_big', 'jgl_victory'], { quiet: true });
       playBgm('bgm_battle');
       playBgm(null);
@@ -126,5 +130,69 @@ describe('戦闘の演出の音', () => {
     const events: BattleEvent[] = [roll(1), { type: 'damage', unitId: 'e0', sourceId: 'a0', amount: 12, blocked: 0 }, { type: 'death', unitId: 'e0' }], before = structuredClone(events);
     battleFrames(events, allies);
     expect(events).toEqual(before);
+  });
+});
+
+describe('探索・画面の操作・BGM の音（K6②）', () => {
+  const fresh = () => createGame({ seed: 7, scenarioId: 'corruptionKing', difficulty: 'normal', party: [{ classId: 'warrior', name: '確認', gender: 'male', playerId: 'P1' }] });
+  it('サイコロを振ると音が鳴り、同じ状態どうし（描画のやり直し）では鳴らない', () => {
+    const g = fresh(); g.world!.story = undefined;
+    const cmd = { type: 'WORLD_ROLL_MOVE' as const, playerId: 'P1' as const, heroId: g.heroes[0].id, focusUsed: 0 };
+    const r = applyGameCommand(g, cmd); expect(r.error).toBeUndefined();
+    expect(explorationSounds(g, r.state, cmd)).toContain('sfx_world_dice');
+    expect(explorationSounds(r.state, r.state, cmd)).toEqual([]);
+  });
+  it('なでるとお供の鳴き声、懐き度の段が上がるとハート、♡3でリボン', () => {
+    const g = fresh(), h = g.heroes[0];
+    h.pet = { petId: 'cockatiel', color: 'normal', name: 'ぴー', love: 0, acts: 0 };
+    const after = structuredClone(g); after.heroes[0].pet!.love = 999;
+    const cmd = { type: 'PET_PAT' as const, playerId: 'P1' as const, heroId: h.id };
+    const s = explorationSounds(g, after, cmd);
+    expect(s).toContain('pet_okame'); expect(s).toContain('sfx_pet_ribbon');
+  });
+  it('お金が増えると硬貨の音、買い物は購入の音だけ', () => {
+    const g = fresh(), after = structuredClone(g); after.heroes[0].gold += 10;
+    expect(explorationSounds(g, after, { type: 'CLAIM_LOOT', playerId: 'P1' } as never)).toContain('sfx_ui_coin');
+    const buy = explorationSounds(g, after, { type: 'TOWN_BUY', playerId: 'P1' } as never);
+    expect(buy).toContain('sfx_ui_buy'); expect(buy).not.toContain('sfx_ui_coin');
+  });
+  it('ボタンの名前でタップの音を分け、data-sfx と切り替えボタンを優先する', () => {
+    expect(tapSound('閉じる')).toBe('sfx_ui_cancel');
+    expect(tapSound('発動')).toBe('sfx_ui_ok');
+    expect(tapSound('装備')).toBe('sfx_ui_tap');
+    expect(tapSound('閉じる', 'none')).toBeNull();
+    expect(tapSound('通常', null, true)).toBe('sfx_ui_toggle');
+  });
+  it('場面ごとの曲（タイトル・昼夜・ボス・勝敗の間は止める）', () => {
+    const g = fresh();
+    expect(bgmFor('title', null)).toBe('bgm_title');
+    expect(bgmFor('game', { ...g, mode: 'town' })).toBe('bgm_town');
+    expect(['bgm_world_day', 'bgm_world_night']).toContain(bgmFor('game', { ...g, mode: 'world' }));
+    expect(bgmFor('game', { ...g, mode: 'reward' })).toBeNull();
+    for (const s of [bgmFor('game', { ...g, mode: 'dungeon' }), bgmFor('game', { ...g, mode: 'chest' })]) expect(BGM_IDS).toContain(s);
+  });
+  it('地形とダンジョンで足音を選ぶ', () => {
+    expect(footstepSound('plains')).toBe('sfx_step_grass');
+    expect(footstepSound('desert')).toBe('sfx_step_sand');
+    expect(footstepSound('snow')).toBe('sfx_step_snow');
+    expect(footstepSound('road')).toBe('sfx_step_stone');
+    expect(footstepSound(undefined)).toBe('sfx_step_stone');
+    expect(dungeonStepSound('forestCave')).toBe('sfx_step_dirt');
+    expect(dungeonStepSound('volcano')).toBe('sfx_step_rock');
+    expect(dungeonStepSound('temple')).toBe('sfx_step_stone');
+  });
+});
+
+describe('置いた音のファイル', () => {
+  it('src/assets/audio の音は、すべて一覧にある名前で、種類のフォルダに入っている', async () => {
+    const { readdirSync } = await import('node:fs');
+    const ids = new Set<string>([...SFX_IDS, ...PET_SOUND_IDS, ...BGM_IDS, ...JINGLE_IDS]);
+    for (const dir of ['sfx', 'pet', 'bgm']) {
+      for (const f of readdirSync(`src/assets/audio/${dir}`).filter((f) => !f.startsWith('.'))) {
+        const id = f.replace(/\.(mp3|ogg|m4a|wav)$/, '');
+        expect(ids.has(id), f).toBe(true);
+        expect(dir === 'pet' ? id.startsWith('pet_') : dir === 'bgm' ? id.startsWith('bgm_') : id.startsWith('sfx_') || id.startsWith('jgl_'), f).toBe(true);
+      }
+    }
   });
 });

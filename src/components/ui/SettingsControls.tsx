@@ -16,12 +16,12 @@ function VolumeRow({ label, field, sample }: { label: string; field: 'sfxVolume'
   return <div role="group" aria-label={`${label}の音量`}>
     <div className="mb-1 text-[14px] font-bold">{label}</div>
     <div className="flex items-center gap-2">
-      <button aria-label={`${label}を小さく`} disabled={value <= 0} onClick={() => change(value - 1)} className={step}><Minus size={18} /></button>
+      <button data-sfx="none" aria-label={`${label}を小さく`} disabled={value <= 0} onClick={() => change(value - 1)} className={step}><Minus size={18} /></button>
       <div className="flex h-11 min-w-0 flex-1 items-center gap-[3px] rounded-lg border border-white/20 bg-black/30 px-2" aria-hidden>
         {Array.from({ length: 10 }, (_, i) => <span key={i} className={`h-4 flex-1 rounded-sm ${i < value ? 'bg-amber-400' : 'bg-white/15'}`} />)}
       </div>
       <span className="w-10 shrink-0 text-center text-[14px] font-bold" data-volume={field}>{value > 0 ? value : 'オフ'}</span>
-      <button aria-label={`${label}を大きく`} disabled={value >= 10} onClick={() => change(value + 1)} className={step}><Plus size={18} /></button>
+      <button data-sfx="none" aria-label={`${label}を大きく`} disabled={value >= 10} onClick={() => change(value + 1)} className={step}><Plus size={18} /></button>
     </div>
   </div>;
 }
