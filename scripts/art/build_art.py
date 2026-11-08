@@ -216,10 +216,19 @@ SAND_ENEMIES = ['sandScarab', 'desertViper', 'jackalWarrior', 'tombRobber', 'san
                 'dustDevil', 'sandWorm', 'clayGolem', 'mummyArcher', 'cursedPriest', 'stoneCat', 'royalGuardMummy', 'scribeShade',
                 'sphinxCub', 'sandSerpentLord', 'colossusStatue', 'sandScorpionKing', 'sandScorpionKing-1', 'shadowVizier',
                 'shadowVizier-1', 'stoneGuardianBeast', 'stoneGuardianBeast-1', 'sandPharaoh', 'sandPharaoh-1', 'sandPharaoh-2']
-for _k in CORRUPTION_ENEMIES + CLOCKWORK_ENEMIES + ARCHIPELAGO_ENEMIES + SAND_ENEMIES:
+# 星降る天空城（docs/art/prompts-enemies-starCastle.md）
+STAR_ENEMIES = ['cloudSheep', 'skyGull', 'windSprite', 'clockworkSoldier', 'starJelly', 'gearBeetle', 'shootingStarBird', 'moonRabbit',
+                'angelStatue', 'starFragment', 'windGuardianHawk', 'windKeeper', 'windKeeper-1', 'starDustScribe', 'starLibrarian',
+                'starLibrarian-1', 'moonWolf', 'thornFairy', 'hourglassGolem', 'clockworkKnight', 'moonGardener', 'moonMaiden',
+                'moonMaiden-1', 'skyKnight', 'skyPaladin', 'starSeerQueen', 'starSeerQueen-1', 'starSeerQueen-2']
+# 各シナリオに足す敵（K3 D。docs/art/prompts-enemies-extra.md）。亜種は元の絵を使い回す
+EXTRA_ENEMIES = ['iceFisher', 'frostMoth', 'driftwoodSpirit', 'lanternAngler', 'desertFennec', 'obeliskSentinel', 'cometFox',
+                 'harpGuardian', 'smokeStackCrow', 'pressGolem']
+for _k in CORRUPTION_ENEMIES + CLOCKWORK_ENEMIES + ARCHIPELAGO_ENEMIES + SAND_ENEMIES + STAR_ENEMIES + EXTRA_ENEMIES:
     ENEMIES[_k] = (f'enemy/{_k}', 1.0)
 # 隅に文字・サインがある絵（元画像のフォルダの _corner-text.txt）。サインが内側寄りにもあるので、離れた小さなかたまりを場所に関係なく消す
-CORNER_TEXT = {'iceBat', 'frozenSoldier', 'whiteQueen-2', 'foremanGolem-1', 'pirateGunner', 'coralGolem', 'sandScorpion'}
+CORNER_TEXT = {'iceBat', 'frozenSoldier', 'whiteQueen-2', 'foremanGolem-1', 'pirateGunner', 'coralGolem', 'sandScorpion',
+               'starLibrarian', 'moonGardener', 'skyKnight', 'iceFisher'}
 # 足元に地面（白っぽい灰色）が描かれている絵
 GROUND = {'stoneTortoise', 'fenGuardian', 'riveter', 'pistonFist'}
 
