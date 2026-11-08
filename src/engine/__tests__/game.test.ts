@@ -427,7 +427,7 @@ describe('自動プレイ（ダンジョンを最後まで）', () => {
   it('翠の神殿・ランダムダンジョンを、例外なく制覇または全滅まで進む', () => {
     const results: string[] = [];
     for (let seed = 1; seed <= 12; seed++) {
-      for (const d of Object.values(DUNGEONS.all).map((x) => x.id)) {
+      for (const d of DUNGEONS.forScenario('corruptionKing').map((x) => x.id)) {
         const g = autoPlay(newGame(seed, ['warrior', 'mage', 'guardian', 'hunter'], 'easy'), d);
         results.push(g.mode);
         expect(['cleared', 'gameover']).toContain(g.mode);

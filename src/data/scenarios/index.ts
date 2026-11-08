@@ -1,9 +1,13 @@
 // シナリオの登録表。src/content/scenarios/<シナリオID>/scenario.ts を置くだけで選べるようになる
 import type { ScenarioDef } from '../../types';
 import { contentRegistry, type ContentModules } from '../content';
+import { TERMS } from '../terms';
 
 export const SCENARIOS = contentRegistry<ScenarioDef>('scenario', import.meta.glob('/src/content/scenarios/*/scenario.ts', { eager: true }) as ContentModules);
 export const getScenario = (id: string) => SCENARIOS.get(id);
+
+/** 画面とログに出す「侵食度」の名前（シナリオごとに変えられる。例: 凍てつく王国は「冬の深さ」） */
+export const corruptionName = (scenarioId?: string): string => (scenarioId ? SCENARIOS.all.find((s) => s.id === scenarioId)?.corruptionName : undefined) ?? TERMS.corruption;
 
 /**
  * シナリオが遊べるか。

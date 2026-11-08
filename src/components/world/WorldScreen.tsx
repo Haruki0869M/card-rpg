@@ -9,7 +9,7 @@ import { DUNGEONS } from '../../data/dungeons';
 import { getEnemy } from '../../data/enemies';
 import { EVENTS } from '../../data/events';
 import { getScenario } from '../../data/scenarios';
-import { TERMS } from '../../data/terms';
+import { corruptionName } from '../../data/scenarios';
 import { PLAYER_COLOR } from '../../data/theme';
 import { getTerrain, SANCTUARIES, SHRINES, TOWNS } from '../../data/world';
 import {
@@ -52,15 +52,16 @@ export function WorldTopBar({ game }: { game: GameState }) {
   const TimeIcon = TIME_ICON[time];
   const until = turnsUntilNightChange(w.worldTurn);
   const next = nextCorruptionStage(game);
+  const cName = corruptionName(game.scenarioId);
   return (
     <div className="panel z-10 flex shrink-0 items-center gap-1.5 px-2 py-1">
       <button
-        onClick={() => toast(next ? `${TERMS.corruption}${next.at}%: ${next.text}` : '侵食度')}
+        onClick={() => toast(next ? `${cName}${next.at}%: ${next.text}` : cName)}
         className="btn flex min-h-11 min-w-0 flex-1 flex-col justify-center rounded-lg bg-black/30 px-1.5 py-0.5 text-left"
-        aria-label={TERMS.corruption}
+        aria-label={cName}
       >
         <span className="flex items-center justify-between text-[12px] leading-4">
-          <span className="font-display text-fuchsia-200">{TERMS.corruption}</span>
+          <span className="font-display text-fuchsia-200">{cName}</span>
           <b className="tabular-nums text-fuchsia-100">{w.corruption}%</b>
         </span>
         <Bar value={w.corruption} max={100} color="linear-gradient(90deg,#6a2a9a,#e04aff)" height={6} />
