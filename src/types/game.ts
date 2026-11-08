@@ -650,6 +650,8 @@ export interface ScenarioDef {
   unlocked: boolean;
   /** 解放条件の説明（未解放の時に表示） */
   unlockText?: string;
+  /** 4人で遊ぶ時の敵の攻撃倍率（省略すると BALANCE.enemyAttackByPartySize の4人。シナリオごとの難しさの合わせ用） */
+  fourPlayerAttack?: number;
   /** 解放の条件（クリア記録で決まる。無ければ従来の unlocked だけで決まる）。K4 */
   unlockRequires?: { cleared: string[] };
   /** 作成中（敵・数値がそろうまで、クリアの記録があっても遊べない。仕上げて登録する時にこの印を外す）。K4 */

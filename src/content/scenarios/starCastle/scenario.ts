@@ -14,6 +14,7 @@ export const starCastle: ScenarioDef = {
   unlocked: true,
   unlockText: '「砂塵の王朝」をクリアすると遊べる',
   unlockRequires: { cleared: ['sandDynasty'] },
+  fourPlayerAttack: 2.0,
   // 世界の悪化の名前（画面の「侵食度」の代わりに出る言葉）
   corruptionName: '星の暴走',
   start: { gold: 40, pouch: [{ itemId: 'potion', count: 2 }] },

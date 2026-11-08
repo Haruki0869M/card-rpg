@@ -14,6 +14,7 @@ export const clockworkEmpire: ScenarioDef = {
   unlocked: true,
   unlockText: '「星降る天空城」をクリアすると遊べる',
   unlockRequires: { cleared: ['starCastle'] },
+  fourPlayerAttack: 1.9,
   // 世界の悪化の名前（画面の「侵食度」の代わりに出る言葉）
   corruptionName: '暴走率',
   start: { gold: 40, pouch: [{ itemId: 'potion', count: 2 }] },
