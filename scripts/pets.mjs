@@ -33,7 +33,7 @@ const edit = async (fn) => {
 await page.goto(URL);
 await page.evaluate(() => {
   localStorage.clear();
-  localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true, vibration: false }));
+  localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true, vibration: false, firstGuide: false }));
 });
 await page.reload();
 await page.getByText('新しい冒険').click();
@@ -77,7 +77,7 @@ const other = got.petId === 'rabbit' ? 'cockatiel' : 'rabbit';
 const offerAgain = async (petId, color, width = 390, height = 780) => {
   await page.setViewportSize({ width, height });
   await page.evaluate(({ petId, color }) => {
-    localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: false, vibration: false }));
+    localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: false, vibration: false, firstGuide: false }));
     const k = 'card-rpg/adventure';
     const d = JSON.parse(localStorage.getItem(k));
     const h = d.game.heroes[0];
@@ -116,7 +116,7 @@ await shot('reveal-360');
 await page.getByText('見送る', { exact: true }).click();
 await page.waitForTimeout(300);
 await page.setViewportSize({ width: 390, height: 780 });
-await page.evaluate(() => localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true, vibration: false })));
+await page.evaluate(() => localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true, vibration: false, firstGuide: false })));
 
 // 2) 撫でる
 await page.locator('[data-party-row] button').first().click();

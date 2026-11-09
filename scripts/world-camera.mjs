@@ -20,7 +20,7 @@ for (const [width, height] of [[360, 640], [390, 844], [480, 854]]) {
       return { ratio: (h.top + h.height / 2 - box.top) / box.height, mapH: box.height };
     });
   await page.goto(URL);
-  await page.evaluate(() => { localStorage.clear(); localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: false, vibration: false })); });
+  await page.evaluate(() => { localStorage.clear(); localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: false, vibration: false, firstGuide: false })); });
   await page.reload();
   await page.getByText('新しい冒険').click();
   await page.getByText('2人', { exact: true }).click();

@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { findAlly, isDone, waitingPlayers } from '../../engine';
 import { isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
+import { useHelp } from '../../store/help';
 
 export function TopBar() {
   const turn = useBattle((s) => s.battle.turn);
@@ -20,7 +21,16 @@ export function TopBar() {
         <span className="text-[12px] text-amber-200/70">ターン</span>
         <span className="text-outline text-[22px] leading-none">{turn}</span>
       </div>
-      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+      {/* 押すと遊び方の「侵食度」を開く（読むだけ。戦闘の選択は変えない） */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          useHelp.getState().openHelp('corruption');
+        }}
+        aria-label={`${corruptionLabel}の説明`}
+        className="btn flex h-11 min-w-0 flex-1 items-center gap-1.5 text-left"
+        data-help-open="corruption"
+      >
         <Skull size={16} className="shrink-0 text-fuchsia-300" />
         <div className="min-w-0 flex-1">
           <div className="flex justify-between text-[12px] leading-[13px]">
@@ -34,11 +44,21 @@ export function TopBar() {
             />
           </div>
         </div>
-      </div>
+      </button>
       {lives !== undefined && (
-        <span className="flex shrink-0 items-center gap-0.5 rounded-full border border-orange-400/40 bg-black/50 px-1.5 text-[13px] font-bold text-orange-200 tabular-nums" aria-label="命の灯火" data-lives={lives}>
-          <Flame size={14} className="fill-orange-500/60 text-orange-300" />×{lives}
-        </span>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            useHelp.getState().openHelp('lives');
+          }}
+          className="btn flex h-11 min-w-11 shrink-0 items-center justify-center"
+          aria-label="命の灯火の説明"
+          data-help-open="lives"
+        >
+          <span className="flex items-center gap-0.5 rounded-full border border-orange-400/40 bg-black/50 px-1.5 text-[13px] font-bold text-orange-200 tabular-nums" data-lives={lives}>
+            <Flame size={14} className="fill-orange-500/60 text-orange-300" />×{lives}
+          </span>
+        </button>
       )}
       <button
         onClick={(e) => {

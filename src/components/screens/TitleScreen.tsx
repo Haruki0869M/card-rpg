@@ -2,7 +2,8 @@ import { SettingsControls } from '../ui/SettingsControls';
 import { TERMS } from '../../data/terms';
 // ===== タイトル画面 =====
 import { motion } from 'framer-motion';
-import { BookOpen, Play, Settings2, UserPlus, Users } from 'lucide-react';
+import { BookOpen, HelpCircle, Play, Settings2, UserPlus, Users } from 'lucide-react';
+import { useHelp } from '../../store/help';
 import { useState } from 'react';
 import { BattleBackground } from '../../art';
 import { useBattle } from '../../store/battleStore';
@@ -88,10 +89,11 @@ export function TitleScreen() {
             [
               { label: '部屋に参加', Icon: Users, color: '#7ac8ff', on: () => (onlineOk ? setScreen('join') : toast('オンライン協力は準備中です（Firebase の設定が入ると遊べます）')) },
               { label: '伝承の書', Icon: BookOpen, color: '#ffd06a', on: () => setShowLore(true) },
+              { label: '遊び方', Icon: HelpCircle, color: '#8af0c0', on: () => useHelp.getState().openHelp() },
               { label: '設定', Icon: Settings2, color: '#c8c0e0', on: () => setShowSettings((v) => !v) },
             ] as const
           ).map((m) => (
-            <button key={m.label} onClick={m.on} className="btn flex min-w-[76px] flex-col items-center gap-1">
+            <button key={m.label} onClick={m.on} className="btn flex min-w-[68px] flex-col items-center gap-1">
               <span
                 className="flex h-[50px] w-[50px] items-center justify-center rounded-full"
                 style={{

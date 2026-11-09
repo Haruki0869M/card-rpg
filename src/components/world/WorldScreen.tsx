@@ -34,6 +34,7 @@ import {
 import { isLocalPlayer, isOnlinePlay } from '../../store/battleConfig';
 import { useBattle, type WorldMovePresentation } from '../../store/battleStore';
 import { useOnline } from '../../store/onlineStore';
+import { useHelp } from '../../store/help';
 import type { GameState, Hero, PlayerId, TimeOfDay } from '../../types';
 import { autoAgreeCommands } from './companionMove';
 import { SpinRollStrip, useFreshRoll } from '../ui/CheckPanel';
@@ -47,7 +48,6 @@ const TIME_ICON: Record<TimeOfDay, typeof Sun> = { morning: Sunrise, noon: Sun, 
 /** 上部のバー: 侵食度・命の灯火・ゴールド・時間帯・メニュー */
 export function WorldTopBar({ game, goldHeroId }: { game: GameState; /** 所持金を出すキャラ（町・神殿・祠では切り替えたキャラ。無ければ世界マップの手番のキャラ） */ goldHeroId?: string }) {
   const openSheet = useBattle((s) => s.openSheet);
-  const toast = useBattle((s) => s.showToast);
   const w = game.world!;
   const time = timeOfDay(w.worldTurn);
   const TimeIcon = TIME_ICON[time];
@@ -57,9 +57,11 @@ export function WorldTopBar({ game, goldHeroId }: { game: GameState; /** 所持�
   return (
     <div className="panel z-10 flex shrink-0 items-center gap-1.5 px-2 py-1" data-cutin-anchor>
       <button
-        onClick={() => toast(next ? `${cName}${next.at}%: ${next.text}` : cName)}
+        // 押すと遊び方の「侵食度」（一番上に今の値と次の段階）を開く。以前のトーストの代わり
+        onClick={() => useHelp.getState().openHelp('corruption')}
         className="btn flex min-h-11 min-w-0 flex-1 flex-col justify-center rounded-lg bg-black/30 px-1.5 py-0.5 text-left"
-        aria-label={cName}
+        aria-label={`${cName}の説明`}
+        data-help-open="corruption"
       >
         <span className="flex items-center justify-between text-[12px] leading-4">
           <span className="font-display text-fuchsia-200">{cName}</span>
@@ -69,15 +71,21 @@ export function WorldTopBar({ game, goldHeroId }: { game: GameState; /** 所持�
         {/* 次の段階は省略せずに全文（2行まで） */}
         <span className="text-[12px] leading-[15px] text-zinc-400">{next ? `次: ${next.at}%で${next.text}` : ''}</span>
       </button>
-      <div className="flex shrink-0 flex-col items-end gap-0.5 text-[12px] leading-4 font-bold tabular-nums">
-        <span className="flex items-center gap-0.5 text-orange-300" aria-label="命の灯火">
+      {/* 命の灯火と所持金の列。押すと遊び方の「命の灯火」を開く（押しやすいように列ごと1つのボタン） */}
+      <button
+        onClick={() => useHelp.getState().openHelp('lives')}
+        className="btn flex min-h-11 min-w-11 shrink-0 flex-col items-end justify-center gap-0.5 text-[12px] leading-4 font-bold tabular-nums"
+        aria-label="命の灯火の説明"
+        data-help-open="lives"
+      >
+        <span className="flex items-center gap-0.5 text-orange-300">
           <Flame size={14} className="fill-orange-500/60" />×{game.lives}
         </span>
         <span className="flex items-center gap-0.5 text-amber-200" aria-label={goldHeroId ? '表示中のキャラの所持金' : '手番のキャラの所持金'} data-top-gold>
           <Coins size={14} />
           {game.heroes.find((h) => h.id === (goldHeroId ?? game.world?.turn))?.gold ?? 0}G
         </span>
-      </div>
+      </button>
       <div className="flex shrink-0 flex-col items-center text-[12px] leading-4">
         <span className="flex items-center gap-0.5 font-bold text-sky-100">
           <TimeIcon size={14} className={time === 'night' ? 'text-indigo-300' : 'text-amber-300'} />

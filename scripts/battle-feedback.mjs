@@ -12,7 +12,7 @@ async function resume(d, fast = false, mode = 'standard') {
   await page.reload();
   await page.evaluate(({ d, fast, mode }) => {
     localStorage.setItem('card-rpg/adventure', JSON.stringify(d));
-    localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: fast, vibration: false, cutinMode: mode }));
+    localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: fast, vibration: false, firstGuide: false, cutinMode: mode }));
   }, { d, fast, mode });
   await page.reload(); await page.getByText('つづきから', { exact: true }).click(); await page.waitForTimeout(150);
 }
@@ -56,7 +56,7 @@ try {
   const species = ['cockatiel', 'turtle', 'redPanda', 'rabbit'], colors = ['normal', 'green', 'brown', 'white'];
   for (const width of (process.env.FEEDBACK_WIDTHS ?? '360,390,480').split(',').map(Number)) {
     await page.setViewportSize({ width, height: 780 });
-    await page.goto(URL); await page.evaluate(() => { localStorage.clear(); localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true, vibration: false })); }); await page.reload();
+    await page.goto(URL); await page.evaluate(() => { localStorage.clear(); localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true, vibration: false, firstGuide: false })); }); await page.reload();
     await page.getByText('設定', { exact: true }).click();
     check(await page.getByRole('button', { name: '高速', exact: true }).getAttribute('aria-pressed') === 'true', '旧高速設定が失われた');
     check(await page.getByRole('button', { name: '標準', exact: true }).getAttribute('aria-pressed') === 'true', '旧設定に標準が補完されない');

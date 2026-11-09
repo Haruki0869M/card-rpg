@@ -19,6 +19,8 @@ import { ConfirmDialog } from './ui/ConfirmDialog';
 import { diffText } from './equipDiff';
 import { canChangeNow, JobSheetBody } from './JobSheet';
 import { PetPanel } from './ui/PetToken';
+import { HelpCircle } from 'lucide-react';
+import { useHelp } from '../store/help';
 
 /** 同じ場所にいる仲間（ダンジョンの中なら同じパーティ、世界マップなら同じマス） */
 function placeMates(game: GameState, hero: Hero): Hero[] {
@@ -82,6 +84,11 @@ function MenuSheet() {
   return (
     <BottomSheet title="メニュー" onClose={() => openSheet(null)}>
       <div className="flex flex-col gap-2">
+        {/* 遊び方・用語集（Step A ③）: メニューの上に重ねて開く。閉じるとこのメニューに戻る */}
+        <button onClick={() => useHelp.getState().openHelp()} className={row} data-menu-help>
+          <HelpCircle size={18} className="text-amber-300" /> 遊び方・用語集
+          <ChevronRight size={18} className="ml-auto" />
+        </button>
         <SettingsControls />
         {online && <OnlinePanel />}
         {game?.world && game.mode === 'world' && (

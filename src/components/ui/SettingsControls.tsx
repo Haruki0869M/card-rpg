@@ -3,6 +3,8 @@ import { playSound } from '../../audio/player';
 import type { SoundId } from '../../audio/ids';
 import { useBattle } from '../../store/battleStore';
 import type { Settings } from '../../store/settings';
+import { guideWanted } from '../../store/help';
+import { useProfile } from '../../store/profileStore';
 
 /** 音量（0〜10。0 = オフ）。押すたびに1つずつ変える（スマホで押しやすいように） */
 function VolumeRow({ label, field, sample }: { label: string; field: 'sfxVolume' | 'bgmVolume' | 'petVolume'; sample?: SoundId }) {
@@ -29,6 +31,8 @@ function VolumeRow({ label, field, sample }: { label: string; field: 'sfxVolume'
 /** タイトルと冒険中で同じ設定を使う。値はこの端末だけに保存する。 */
 export function SettingsControls() {
   const settings = useBattle(s => s.settings), set = useBattle(s => s.setSettings);
+  const won = useProfile(s => s.profile.battles.length);
+  const guide = guideWanted(settings, won);
   const choice = 'btn min-h-11 flex-1 rounded-lg border px-2 text-[14px] font-bold';
   return <div className="flex flex-col gap-3" data-settings-controls>
     <div role="group" aria-label="移動・戦闘アニメ速度">
@@ -46,5 +50,9 @@ export function SettingsControls() {
     <VolumeRow label="BGM" field="bgmVolume" />
     <p className="-mt-2 text-[12px] text-zinc-300">iPhone はマナーモードだと鳴りません</p>
     <button aria-pressed={settings.vibration} onClick={() => set({ vibration: !settings.vibration })} className="btn btn-dark flex min-h-11 items-center justify-between rounded-lg px-3 text-[14px]"><span>振動</span><span>{settings.vibration ? 'ON' : 'OFF'}</span></button>
+    <div>
+      <button aria-pressed={guide} onClick={() => set({ firstGuide: !guide })} className="btn btn-dark flex min-h-11 w-full items-center justify-between rounded-lg px-3 text-[14px]" data-setting-first-guide><span>はじめての案内</span><span>{guide ? 'ON' : 'OFF'}</span></button>
+      <p className="mt-1 text-[12px] text-zinc-300">ONにすると、次の戦闘で操作の案内（3つ）をもう一度出します</p>
+    </div>
   </div>;
 }

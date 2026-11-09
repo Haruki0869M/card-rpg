@@ -50,7 +50,7 @@ for (const [w, h] of [[360, 640], [390, 844], [480, 860]]) {
   page.on('dialog', (d) => { ng('ブラウザの確認の窓が出た'); void d.dismiss(); });
   const tag = `${w}x${h}-setup`;
   await page.goto(process.env.URL ?? 'http://localhost:4173/card-rpg/');
-  await page.evaluate(() => { localStorage.clear(); localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true, vibration: false })); });
+  await page.evaluate(() => { localStorage.clear(); localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true, vibration: false, firstGuide: false })); });
   await page.reload();
   await page.getByText('新しい冒険', { exact: true }).click();
   for (const d of ['やさしい', 'ふつう', 'むずかしい']) {

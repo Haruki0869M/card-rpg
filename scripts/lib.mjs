@@ -27,7 +27,7 @@ export async function startBattle(page, partySize, enemies, fast = true) {
   await page.goto(URL);
   await page.evaluate((fast) => {
     localStorage.clear();
-    localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: fast, vibration: false }));
+    localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: fast, vibration: false, firstGuide: false }));
   }, fast);
   await page.reload();
   await page.getByText('新しい冒険').click();
@@ -75,7 +75,8 @@ export async function layoutIssues(page) {
     const out = [];
     const de = document.documentElement;
     if (de.scrollHeight > innerHeight + 1 || de.scrollWidth > innerWidth + 1) out.push(`page overflow ${de.scrollWidth}x${de.scrollHeight}`);
-    const game = document.querySelector('.game-bg') ?? document.body;
+    // 遊び方・用語集（Step A ③）を開いている時は、その画面を確かめる（後ろの画面は隠れていて押せない）
+    const game = document.querySelector('[data-help]') ?? document.querySelector('.game-bg') ?? document.body;
     const visible = (el) => {
       const r = el.getBoundingClientRect();
       return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden';

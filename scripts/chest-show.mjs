@@ -15,7 +15,7 @@ async function newAdventure(page) {
   await page.goto(URL);
   await page.evaluate(() => {
     localStorage.clear();
-    localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: false, vibration: false }));
+    localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: false, vibration: false, firstGuide: false }));
   });
   await page.reload();
   await page.getByText('新しい冒険').click();
@@ -107,7 +107,7 @@ for (const [grade, { seed, look }] of Object.entries(found)) {
   const p = await c.newPage();
   await p.goto(URL);
   await p.evaluate((b) => {
-    localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: false, vibration: false }));
+    localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: false, vibration: false, firstGuide: false }));
     localStorage.setItem('card-rpg/adventure', b);
   }, base);
   await atChest(p, base, look, seed);

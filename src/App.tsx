@@ -32,6 +32,9 @@ import { TurnLock } from './components/ui/TurnLock';
 import { TurnCutin } from './components/ui/TurnCutin';
 import { findAlly } from './engine';
 import { useBackButton } from './hooks/useBackButton';
+import { HelpScreen } from './components/help/HelpScreen';
+import { useHelp } from './store/help';
+import { FirstBattleGuide } from './components/battle/FirstBattleGuide';
 import { useDetail } from './hooks/usePress';
 import { useBattle } from './store/battleStore';
 import { useProfile } from './store/profileStore';
@@ -40,6 +43,11 @@ import { useProfile } from './store/profileStore';
 function useKeyboard() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // 遊び方・用語集を開いている間は、Esc で閉じるだけ（下の画面は操作しない）
+      if (useHelp.getState().open) {
+        if (e.key === 'Escape') useHelp.getState().back();
+        return;
+      }
       const s = useBattle.getState();
       if (s.worldMoves.length) return;
       if (useDetail.getState().detail) {
@@ -77,6 +85,7 @@ function BattleScreen() {
   return (
     <div className="game-bg safe-pad relative flex h-full w-full max-w-[480px] flex-col overflow-hidden" onClick={() => selection && cancel()} data-battle-presenting={presenting || undefined}>
       <TopBar />
+      <FirstBattleGuide />
       <Battlefield />
       <PartyStrip />
       {/* 対象を押せるよう、操作パネルは手札と入れ替えて通常の配置に置く。 */}
@@ -198,6 +207,7 @@ export default function App() {
   const screen = useBattle((s) => s.screen);
   const closeTop = useBattle((s) => s.closeTop);
   const detail = useDetail(s => s.detail);
+  const helpOpen = useHelp((s) => s.open);
   useEffect(() => { if (screen !== 'game') useDetail.getState().hide(); }, [screen]);
   // 伝承の書（K5）: 冒険の状態が変わるたびに、見た物・手に入れた物をこの端末の記録に足す（見るだけ。状態・同期は変えない）
   useEffect(() => {
@@ -207,7 +217,9 @@ export default function App() {
     });
   }, []);
 
-  useBackButton(!!detail || !!selection || !!sheet || confirmAbandon || screen === 'setup' || screen === 'create' || screen === 'join', () => {
+  useBackButton(helpOpen || !!detail || !!selection || !!sheet || confirmAbandon || screen === 'setup' || screen === 'create' || screen === 'join', () => {
+    // 遊び方・用語集が一番上（項目 → 目次 → 閉じる）。閉じると開いた画面に戻る
+    if (useHelp.getState().open) { useHelp.getState().back(); return true; }
     if (useDetail.getState().detail) { useDetail.getState().hide(); return true; }
     return closeTop();
   });
@@ -252,6 +264,7 @@ export default function App() {
             {screen === 'game' && <AbilityCutins />}
             {screen === 'game' && <TurnCutin />}
           </>}
+          <HelpScreen />
           <Toast />
         </div>
       </div>

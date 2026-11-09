@@ -10,7 +10,7 @@ const read = async () => { await page.waitForTimeout(300); return page.evaluate(
 async function resume(d, fastMode) {
   await page.evaluate(({ d, fastMode }) => {
     localStorage.setItem('card-rpg/adventure', JSON.stringify(d));
-    localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode, vibration: false }));
+    localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode, vibration: false, firstGuide: false }));
   }, { d, fastMode });
   await page.reload(); await page.getByText('つづきから', { exact: true }).click(); await page.waitForTimeout(200);
 }

@@ -28,7 +28,7 @@ const browser = await chromium.launch(proxy ? { proxy } : {});
 async function device(name) {
   const ctx = await browser.newContext({ viewport: { width: 412, height: 860 }, deviceScaleFactor: 2, ignoreHTTPSErrors: REAL });
   await ctx.addInitScript(() => {
-    if (!localStorage.getItem('card-rpg/settings')) localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true, vibration: false }));
+    if (!localStorage.getItem('card-rpg/settings')) localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true, vibration: false, firstGuide: false }));
   });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.log(`[${name}] pageerror`, e.message));
