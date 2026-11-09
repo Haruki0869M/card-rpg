@@ -76,7 +76,7 @@ async function clickText(page, text, opts = {}) {
 async function playBattle(page) {
   for (let guard = 0; guard < 60; guard++) {
     await waitForBattlePresentation(page);
-    if (await page.locator('button:has-text("報酬を受け取る"), button:has-text("冒険の結果へ"), button:has-text("ダンジョンへ戻る")').count()) return;
+    if (await page.locator('button:has-text("報酬を受け取る"), button:has-text("冒険の結果へ"), [data-result-button], button:has-text("ダンジョンへ戻る")').count()) return;
     const endBtn = page.locator('button:has-text("ターン終了"):not([disabled])');
     if (!(await endBtn.count())) {
       await page.waitForTimeout(150);
@@ -296,11 +296,12 @@ async function run(party, difficulty) {
       await clickText(page, '手番を終える') || (await clickText(page, '待機'));
       continue;
     }
+    // 戦闘の全滅（ステップB: 灯火が残っていれば「敗北…」＋「町で態勢を立て直す」、灯火が無く仲間が残れば「力尽きた…」）
+    if (await page.locator('[data-result-button]').count() && (await page.getByText(/^(全滅…|敗北…|力尽きた…)$/).count())) {
+      await page.locator('[data-result-button]').click();
+      continue;
+    }
     if (await page.getByText('全滅…', { exact: true }).count()) {
-      if (await page.locator('button:has-text("冒険の結果へ")').count()) {
-        await page.locator('button:has-text("冒険の結果へ")').click();
-        continue;
-      }
       result = 'gameover';
       break;
     }
@@ -351,7 +352,7 @@ async function run(party, difficulty) {
         await check(page, 'battle');
       }
       await playBattle(page);
-      const fin = page.locator('button:has-text("報酬を受け取る"), button:has-text("冒険の結果へ"), button:has-text("ダンジョンへ戻る")');
+      const fin = page.locator('button:has-text("報酬を受け取る"), button:has-text("冒険の結果へ"), [data-result-button], button:has-text("ダンジョンへ戻る")');
       if (await fin.count()) await fin.first().click();
       continue;
     }

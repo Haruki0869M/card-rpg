@@ -16,7 +16,7 @@ async function tapCard(page, locator) {
 
 async function resultText(page) {
   if (await page.getByText('勝利！', { exact: true }).count()) return 'victory';
-  if (await page.getByText('全滅…', { exact: true }).count()) return 'defeat';
+  if (await page.getByText(/^(全滅…|敗北…|力尽きた…)$/).count()) return 'defeat';
   return null;
 }
 
@@ -85,7 +85,7 @@ async function playToLose(page) {
     await waitForBattlePresentation(page);
     const r = await resultText(page);
     if (r) return r;
-    await page.locator('button:has-text("ターン終了"):not([disabled])').or(page.getByText('全滅…', { exact: true })).first().waitFor({ timeout: 15000 });
+    await page.locator('button:has-text("ターン終了"):not([disabled])').or(page.getByText(/^(全滅…|敗北…|力尽きた…)$/)).first().waitFor({ timeout: 15000 });
     if (await resultText(page)) continue;
     await page.locator('button:has-text("ターン終了")').click();
     await confirmEndTurn(page);

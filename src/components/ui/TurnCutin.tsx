@@ -9,10 +9,24 @@ import { PLAYER_COLOR } from '../../data/theme';
 import { WORLD_SCENE } from '../../engine';
 import { useBattle } from '../../store/battleStore';
 import { useOnline } from '../../store/onlineStore';
+import { seatModeOf } from '../../store/seats';
+import type { PlayerId } from '../../types';
 import { HeroFace } from './game';
 
 /** 物語を読んでいる間は、手番の帯は出さない（物語を閉じたら出す） */
 export const cutinToShow = <T,>(cutin: T | null, storyOpen: boolean): T | null => (storyOpen ? null : cutin);
+
+/**
+ * 帯を出しておく秒数。ほかの人の番のお知らせ / 簡易・高速・動作軽減 / 通常。1人で全員を操作する時の世界マップは約0.5秒（ステップB）。
+ * 1台を回す時・オンラインは今までどおり
+ */
+export function turnCutinSeconds(o: { mine: boolean; short: boolean; online: boolean; world: boolean; players: readonly { playerId?: PlayerId }[] }): number {
+  if (!o.mine) return TIMING.turnNotice;
+  const base = o.short ? TIMING.turnCutinShort : TIMING.turnCutin;
+  // 簡易・高速の時も、通常より長くはしない（短い方を使う。見た目の出方は今までどおり）
+  if (!o.online && o.world && seatModeOf(o.players) === 'solo') return Math.min(base, TIMING.turnCutinSolo);
+  return base;
+}
 
 export function TurnCutin() {
   const cutin = useBattle((s) => s.turnCutin);
@@ -24,7 +38,9 @@ export function TurnCutin() {
   // 物語（冒頭・地域の紹介・制覇後の物語）を読んでいる間は、手番の帯を後回しにする。物語を閉じてから出す（物語が隠れないように）
   const storyOpen = !!full?.world?.story;
   const shown = cutinToShow(cutin, storyOpen);
-  const seconds = cutin && !cutin.mine ? TIMING.turnNotice : short ? TIMING.turnCutinShort : TIMING.turnCutin;
+  const room = useOnline.getState().room;
+  const living = full?.heroes.filter((h) => !h.retired) ?? [];
+  const seconds = turnCutinSeconds({ mine: !!cutin?.mine, short, online: !!room, world: cutin?.scene === WORLD_SCENE, players: living });
   useEffect(() => {
     if (!cutin || storyOpen) return;
     const t = setTimeout(() => dismiss(cutin.id), seconds * 1000);
@@ -34,7 +50,6 @@ export function TurnCutin() {
   const exp = cutin && cutin.scene !== WORLD_SCENE ? full?.expeditions?.find((x) => x.id === cutin.scene) : undefined;
   const place = exp ? `${exp.dungeon?.name ?? 'ダンジョン'}（ダンジョン）` : '世界マップ';
   const who = hero ? (exp && exp.heroes.length > 1 ? `${hero.name}たち` : hero.name) : '';
-  const room = useOnline.getState().room;
   const seat = hero ? room?.seatName(hero.playerId) : undefined;
   // 1台を回して遊ぶ時（この端末に2人以上のプレイヤー）は、渡す相手を一言。
   // 世界マップには元から受け渡しの画面（「スマホを渡して、タップで始める」）があるので、ダンジョンの番の時だけ

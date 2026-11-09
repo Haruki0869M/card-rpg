@@ -542,13 +542,46 @@ export function backToWorld(game: GameState, rng: Rng, endTurn: boolean) {
 
 // ---------- 命の灯火（spec §11.4） ----------
 
+/** 戦闘に負けたキャラが目を覚ます町のマス（handleDefeat と全滅の画面の両方で使う。同じ答えになるように） */
+function respawnTownOf(game: GameState, participants: string[]): number | undefined {
+  const w = game.world;
+  return w ? nearestTown(w, w.pos[participants.find((id) => findHero(game, id))!] ?? 0) : undefined;
+}
+
+/** 全滅した時にどうなるか（画面の表示用。ステップB）。状態は変えない */
+export type DefeatOutlook =
+  | { kind: 'retreat'; townName?: string; livesBefore: number; livesAfter: number; hpPercent: number }
+  | { kind: 'downed' }
+  | { kind: 'gameover' };
+
+/**
+ * 全滅の画面で見せる「この後どうなるか」。handleDefeat と同じ決まりで答える:
+ * 命の灯火が残っていれば灯火を1つ使って最寄りの町へ退却（HPは reviveHpRatio）、
+ * 無ければその場に倒れる。ほかに冒険を続けているキャラがいなければ本当のゲームオーバー
+ */
+export function defeatOutlook(game: GameState, participants: string[]): DefeatOutlook {
+  if (!game.world) return { kind: 'gameover' };
+  if (game.lives > 0) {
+    const tile = respawnTownOf(game, participants);
+    const f = tile === undefined ? undefined : game.world.tiles[tile]?.f;
+    return {
+      kind: 'retreat',
+      townName: f?.kind === 'town' ? TOWNS.get(f.id).name : undefined,
+      livesBefore: game.lives,
+      livesAfter: game.lives - 1,
+      hpPercent: Math.round(BALANCE.reviveHpRatio * 100),
+    };
+  }
+  return activeHeroes(game).some((h) => !participants.includes(h.id)) ? { kind: 'downed' } : { kind: 'gameover' };
+}
+
 /** 戦闘に負けた参加者: 命の灯火があれば最寄りの町でHP半分で復活、無ければ退場 */
 export function handleDefeat(game: GameState, participants: string[], rng: Rng) {
   const w = game.world;
   const heroes = participants.map((id) => findHero(game, id)!).filter(Boolean);
   if (game.lives > 0) {
     game.lives -= 1;
-    const town = w ? nearestTown(w, w.pos[heroes[0]?.id] ?? 0) : undefined;
+    const town = respawnTownOf(game, participants);
     for (const h of heroes) {
       h.hp = Math.max(1, Math.ceil(heroMaxHp(h) * BALANCE.reviveHpRatio));
       h.nextBattleStatuses = {};
