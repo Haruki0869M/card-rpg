@@ -9,6 +9,8 @@ import { GROUND_K, hash01, neighborAt } from '../diorama';
 export type ItemKind =
   | 'pine'
   | 'broadleaf'
+  | 'plainsTree'
+  | 'mushroom'
   | 'snowPine'
   | 'deadTree'
   | 'peak'
@@ -122,6 +124,12 @@ export function scatter({ w, geom, levels, links, rivers, blocked, stage }: Scat
         const k: ItemKind = t !== 'forest' ? 'snowPine' : dead(j) ? 'deadTree' : hash01(i * 16 + j, 8) < 0.62 ? 'pine' : 'broadleaf';
         out.push({ k, x, y, h: R * (0.78 + hash01(i * 16 + j, 9) * 0.32), v: hash01(i * 16 + j, 10), tile: i });
       }
+      // 森の足元のキノコ（4マスに1つくらい）
+      if (t === 'forest' && h(3) < 0.28) {
+        const x = c.x + (h(4) - 0.5) * R * 0.9;
+        const y = c.y + (h(5) - 0.3) * R * 0.7 * GROUND_K;
+        if (clearOf(i, x, y, c, 0.25)) out.push({ k: 'mushroom', x, y, h: R * 0.22, v: h(6), tile: i });
+      }
       continue;
     }
     if (isPeakTerrain(t)) {
@@ -172,6 +180,12 @@ export function scatter({ w, geom, levels, links, rivers, blocked, stage }: Scat
         const k: ItemKind = r < 0.55 ? 'grass' : r < 0.82 ? 'flower' : 'rock';
         out.push({ k, x, y, h: R * (k === 'rock' ? 0.18 : 0.2), v: hash01(i * 8 + j, 37), tile: i });
       }
+    }
+    // 平原のところどころに、1本だけ立つ木（1割くらいのマス）
+    if (h(60) < 0.12 && !links.has(i)) {
+      const x = c.x + (h(61) - 0.5) * R * 0.8;
+      const y = c.y + (h(62) - 0.4) * R * 0.7 * GROUND_K;
+      if (clearOf(i, x, y, c, 0.35)) out.push({ k: 'plainsTree', x, y, h: R * (0.85 + h(63) * 0.2), v: h(64), tile: i });
     }
     // 森の小道: 街道のマスで、周りに森が多い時は、道の両側に木を寄せる
     if (links.has(i)) {

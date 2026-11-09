@@ -31,7 +31,11 @@ const FEATURE_COLOR: Record<string, string> = { town: '#ffe9a8', dungeon: '#ff9a
 
 /** 地図の場所の絵（無ければ undefined → アイコンで描く） */
 function placeImage(f: NonNullable<WorldState['tiles'][number]['f']>): string | undefined {
-  if (f.kind === 'town') return artImage(TOWNS.tryGet(f.id)?.capital ? 'place/capital' : 'place/town');
+  // 箱庭の試作の絵（ChatGPT。墨線＋淡い水彩）があれば、それを使う
+  const capital = !!(f.kind === 'town' && TOWNS.tryGet(f.id)?.capital);
+  const box = f.kind === 'town' ? artImage(capital ? 'landscape/place-capital' : 'landscape/place-town') : f.kind === 'shrine' ? artImage('landscape/place-shrine') : undefined;
+  if (box) return box;
+  if (f.kind === 'town') return artImage(capital ? 'place/capital' : 'place/town');
   if (f.kind === 'chest') return artImage(`chest/${f.chest?.rarity ?? 'common'}`);
   if (f.kind === 'dungeon' || f.kind === 'shrine' || f.kind === 'landmark') return artImage(`place/${f.kind}`);
   return undefined;
@@ -537,7 +541,7 @@ export function WorldMap({
       <div style={{ paddingTop: padY, paddingBottom: padBottom, width: W, background: time === 'night' ? '#20233c' : '#53587a' }} data-map-pad>
       {/* 歩いている間は、雲と水の動きを止める（スマホで駒の動きをなめらかにするため） */}
       <div className="relative" style={{ width: W, height: H }} onClick={(e) => { if (!anim) tap(e); }} data-walking={anim ? '' : undefined}>
-        <LandscapeLayer w={w} tiles={tiles} geom={geom} levels={levels} links={links} rivers={rivers} under={under} roadTerrain={roadTerrain} noProp={finaleTiles} stage={stage} frozen={pinchZoom !== null} />
+        <LandscapeLayer w={w} tiles={tiles} geom={geom} levels={levels} links={links} rivers={rivers} under={under} roadTerrain={roadTerrain} noProp={finaleTiles} stage={stage} frozen={pinchZoom !== null} walking={!!anim} />
         <WaterLayer tiles={tiles} geom={geom} levels={levels} />
         <FogSea tiles={tiles} geom={geom} levels={levels} padTop={padY} padBottom={padBottom} miasma={miasma} fresh={freshRef.current} time={time} />
         {/* 霧の向こうの山のシルエットと、地平線の最後の城 */}

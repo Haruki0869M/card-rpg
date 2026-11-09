@@ -6,10 +6,10 @@
 import { artImage } from '../../art';
 import { GROUND_K, hash01 } from './diorama';
 
-/** 場所の種類 → 絵のキー（MAP_ART_KEYS の絵があればそれを使う） */
+/** 場所の種類 → 絵のキー（絵があればそれを使う。イベントは箱庭の試作のテントの絵） */
 export type MiniKind = 'event' | 'temple' | 'altar' | 'finale';
 export type PropKind = 'forest' | 'mountain' | 'volcano';
-export const MINI_ART_KEY: Record<MiniKind, string> = { event: 'place/event', temple: 'place/temple', altar: 'place/altar', finale: 'place/finale' };
+export const MINI_ART_KEY: Record<MiniKind, string> = { event: 'landscape/place-tent', temple: 'place/temple', altar: 'place/altar', finale: 'place/finale' };
 export const PROP_ART_KEY: Record<PropKind, string> = { forest: 'prop/forest', mountain: 'prop/mountain', volcano: 'prop/volcano' };
 
 /** 地形の飾り（枠から飛び出す木・山）の種類 */
@@ -27,7 +27,19 @@ export function propOf(terrainId: string): PropKind | undefined {
 export function PlaceMini({ kind, x, y, R, dim }: { kind: MiniKind; x: number; y: number; R: number; dim?: boolean }) {
   const img = artImage(MINI_ART_KEY[kind]);
   const big = R * (kind === 'finale' ? 1.9 : 1.5);
-  if (img) return <image href={img} x={x - big / 2} y={y - big * 0.62} width={big} height={big} filter="url(#place-shadow)" style={dim ? { filter: 'grayscale(1) brightness(.6)' } : undefined} />;
+  if (img)
+    return (
+      <>
+        <image href={img} x={x - big / 2} y={y - big * 0.62} width={big} height={big} filter="url(#place-shadow)" style={dim ? { filter: 'grayscale(1) brightness(.6)' } : undefined} />
+        {kind === 'event' && (
+          // イベントの印（テントの右上に小さな「？」）
+          <g transform={`translate(${(x + big * 0.3).toFixed(1)},${(y - big * 0.5).toFixed(1)}) scale(${(big / 100).toFixed(3)})`}>
+            <circle r="11" fill="#1a3a6a" stroke="#9ad8ff" strokeWidth="2.5" />
+            <text y="5.5" textAnchor="middle" fontSize="16" fontWeight="900" fill="#e8f6ff">?</text>
+          </g>
+        )}
+      </>
+    );
   // 図は 100×100 の枠で描き、足元（50, 80）をマスの中心より少し下に合わせる
   const s = big / 100;
   return (

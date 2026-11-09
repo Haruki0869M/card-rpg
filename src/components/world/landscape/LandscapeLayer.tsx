@@ -6,6 +6,7 @@
 import { Fragment, memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { WorldState } from '../../../types';
 import { GROUND_K, hexVerts, LEVEL_STEP, neighborAt, pts, TOP_SCALE } from '../diorama';
+import { artImage } from '../../../art';
 import { paintRange, type PaintGeom } from './paint';
 import { scatter } from './scatter';
 import { itemExtent, onImagesLoaded, silhouettePath } from './sprites';
@@ -39,9 +40,11 @@ interface Props {
   stage: number;
   /** ピンチの最中（描き直さず、前の絵を拡大して見せる） */
   frozen: boolean;
+  /** 駒が歩いている間（霧が晴れて描き直した区切りは、止まるまで Canvas のまま見せる。画像にするのが重いため） */
+  walking: boolean;
 }
 
-export const LandscapeLayer = memo(function LandscapeLayer({ w, tiles, geom, levels, links, rivers, under, roadTerrain, noProp, stage, frozen }: Props) {
+export const LandscapeLayer = memo(function LandscapeLayer({ w, tiles, geom, levels, links, rivers, under, roadTerrain, noProp, stage, frozen, walking }: Props) {
   // 描く時の地図の大きさ（ピンチの最中は、前の大きさのまま）
   const [drawGeom, setDrawGeom] = useState(geom);
   if (!frozen && drawGeom !== geom) setDrawGeom(geom);
@@ -90,8 +93,33 @@ export const LandscapeLayer = memo(function LandscapeLayer({ w, tiles, geom, lev
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     paintRange(ctx, inputRef.current, y0 + pa / dpr, y0 + pb / dpr, y0);
     ctx.restore();
-    toImage(k, cv);
+    if (walkingRef.current) {
+      // 歩いている間は、画像にする（重い）のを後回しにして、描き直した Canvas をそのまま見せる
+      cv.style.display = 'block';
+      deferred.current.add(k);
+    } else toImage(k, cv);
   };
+  const walkingRef = useRef(walking);
+  walkingRef.current = walking;
+  const deferred = useRef<Set<number>>(new Set());
+  // 止まったら、後回しにした区切りを画像にする
+  useEffect(() => {
+    if (walking || !deferred.current.size) return;
+    // 止まった直後は、カメラや演出が動いているので、手が空いた時に1枚ずつ（画像にするのは重い）
+    const idle: (cb: () => void) => number =
+      typeof window !== 'undefined' && 'requestIdleCallback' in window ? (cb) => window.requestIdleCallback(cb, { timeout: 3000 }) : (cb) => window.setTimeout(cb, 500);
+    const step = () => {
+      if (walkingRef.current) return;
+      const k = deferred.current.values().next().value;
+      if (k === undefined) return;
+      deferred.current.delete(k);
+      const cv = canvases.current[k];
+      if (cv) toImage(k, cv);
+      idle(step);
+    };
+    idle(step);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [walking]);
   /** Canvas の絵を画像にして、区切りの img に入れる（できたら Canvas を隠す。前の画像の URL は捨てる） */
   const imgs = useRef<(HTMLImageElement | null)[]>([]);
   const toImage = (k: number, cv: HTMLCanvasElement) => {
@@ -239,6 +267,7 @@ export const FogSilhouettes = memo(function FogSilhouettes({
   night: boolean;
 }) {
   const { R } = geom;
+  const skyline = artImage('landscape/skyline-demon-castle');
   const shapes = useMemo(() => {
     // 見えているマスからの距離（幅優先・4マスまで）
     const dist = new Map<number, number>();
@@ -269,10 +298,12 @@ export const FogSilhouettes = memo(function FogSilhouettes({
       out.push({ d: silhouettePath('peak', gr.x, y, R * (1.5 + (i % 3) * 0.12), (i * 0.37) % 1), a: [0, 0.55, 0.42, 0.3, 0.18][d] });
     });
     // 地平線の城（まだ見ていない時だけ）
-    if (finale !== undefined && !tiles[finale]?.seen) out.push({ d: silhouettePath('castle', geom.center(finale).x, -padTop * 0.18, R * 3.4, 0), a: 0.4 });
+    if (finale !== undefined && !tiles[finale]?.seen && !skyline) out.push({ d: silhouettePath('castle', geom.center(finale).x, -padTop * 0.18, R * 3.4, 0), a: 0.4 });
     return out;
-  }, [w, tiles, geom, levels, finale, padTop, R]);
-  if (!shapes.length) return null;
+  }, [w, tiles, geom, levels, finale, padTop, R, skyline]);
+  // 地平線の魔王城（描いた絵があれば絵。まだ見ていない間だけ）
+  const sky = finale !== undefined && !tiles[finale]?.seen && skyline ? { x: geom.center(finale).x, w: R * 7.5 } : undefined;
+  if (!shapes.length && !sky) return null;
   const color = night ? '#161a36' : '#5a5e84';
   return (
     <svg width={geom.W} height={geom.H + padTop} className="pointer-events-none absolute left-0 block" style={{ top: -padTop, overflow: 'visible' }} data-fog-silhouettes>
@@ -284,6 +315,7 @@ export const FogSilhouettes = memo(function FogSilhouettes({
         </linearGradient>
       </defs>
       <g transform={`translate(0 ${padTop})`}>
+        {sky && <image href={skyline} x={sky.x - sky.w / 2} y={-padTop * 0.18 - sky.w * 0.62} width={sky.w} height={sky.w * 0.75} opacity={night ? 0.45 : 0.75} data-skyline />}
         {shapes.map((s, k) => (
           <path key={k} d={s.d} fill="url(#sil-fade)" opacity={s.a} data-silhouette />
         ))}

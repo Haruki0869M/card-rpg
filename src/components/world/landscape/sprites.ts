@@ -32,11 +32,64 @@ export function loadedImage(url: string | undefined): HTMLImageElement | undefin
   return undefined;
 }
 
-/** その種類の描いた絵（複数あれば v で選ぶ） */
+/**
+ * 種類 → 描いた絵（ChatGPT で作った試作の絵。src/assets/art/landscape/）。複数あれば v で選ぶ。
+ * ここに無い種類も、scenery/<種類>[-n].webp を置けば使う
+ */
+const ART: Partial<Record<ItemKind, string[]>> = {
+  broadleaf: ['landscape/tree-forest-1', 'landscape/tree-forest-2', 'landscape/tree-forest-big'],
+  pine: ['landscape/tree-forest-3', 'landscape/tree-forest-4'],
+  plainsTree: ['landscape/tree-plains-1', 'landscape/tree-plains-2'],
+  hill: ['landscape/prop-hill'],
+  rock: ['landscape/prop-rock'],
+  grass: ['landscape/prop-grass'],
+  flower: ['landscape/prop-flower'],
+  mushroom: ['landscape/prop-mushroom'],
+};
+/** 絵の高さ ÷ 立つ物の高さ h（絵には周りの余白があるので、少し大きめに描く） */
+const ART_SCALE: Partial<Record<ItemKind, number>> = { broadleaf: 1.3, pine: 1.3, plainsTree: 1.3, hill: 2.1, rock: 2.2, grass: 2.3, flower: 2.3, mushroom: 1.9 };
 function sceneryImage(k: ItemKind, v: number): HTMLImageElement | undefined {
-  const ids = artImageIds('scenery').filter((id) => id === k || id.startsWith(`${k}-`));
-  if (!ids.length) return undefined;
-  return loadedImage(artImage(`scenery/${ids[Math.floor(v * ids.length) % ids.length]}`));
+  const keys = [...(ART[k] ?? []), ...artImageIds('scenery').filter((id) => id === k || id.startsWith(`${k}-`)).map((id) => `scenery/${id}`)].filter((key) => artImage(key));
+  if (!keys.length) return undefined;
+  return loadedImage(artImage(keys[Math.floor(v * keys.length) % keys.length]));
+}
+
+/**
+ * 前もって縮めた絵（大きさ 4px ごとに1枚、作り置き）。大きな絵を毎回小さく描くと、霧が晴れた時の描き直しが重かった
+ * （拡大2倍で歩く時、描き直しの JS が約2倍）
+ */
+const shrinkCache = new Map<string, HTMLCanvasElement | HTMLImageElement>();
+function shrunk(img: HTMLImageElement, ww: number, ctx: CanvasRenderingContext2D): HTMLCanvasElement | HTMLImageElement {
+  const scale = ctx.getTransform().a || 1;
+  const pw = Math.max(4, Math.ceil((ww * scale) / 4) * 4);
+  const ph = Math.max(4, Math.round((pw * img.naturalHeight) / img.naturalWidth));
+  if (pw >= img.naturalWidth || typeof document === 'undefined') return img;
+  const key = `${img.src}|${pw}`;
+  const got = shrinkCache.get(key);
+  if (got) return got;
+  const cv = document.createElement('canvas');
+  cv.width = pw;
+  cv.height = ph;
+  const c = cv.getContext('2d');
+  if (!c) return img;
+  c.imageSmoothingQuality = 'high';
+  c.drawImage(img, 0, 0, pw, ph);
+  if (shrinkCache.size > 400) shrinkCache.clear();
+  shrinkCache.set(key, cv);
+  return cv;
+}
+
+/** 絵がまだ無い時のキノコ（赤いかさ） */
+function mushroom(ctx: CanvasRenderingContext2D, x: number, y: number, h: number) {
+  footShadow(ctx, x, y, h * 0.5, h * 0.15);
+  ctx.fillStyle = '#efe6d0';
+  ctx.fillRect(x - h * 0.12, y - h * 0.55, h * 0.24, h * 0.55);
+  ctx.beginPath();
+  ctx.ellipse(x, y - h * 0.55, h * 0.48, h * 0.36, 0, Math.PI, 0);
+  ctx.closePath();
+  ctx.fillStyle = '#d0402a';
+  ctx.fill();
+  stroke(ctx, Math.max(0.7, h * 0.06));
 }
 
 /** 足元の影（地面に落ちる楕円） */
@@ -373,10 +426,10 @@ export function drawItem(ctx: CanvasRenderingContext2D, it: SceneItem) {
   const img = it.k === 'ridge' || it.k === 'crack' ? undefined : sceneryImage(it.k, it.v);
   if (img) {
     // 絵の高さを h に合わせる（峰・木は少し大きめに）。足元 = 絵の下の真ん中
-    const hh = it.h * 1.15;
+    const hh = it.h * (ART_SCALE[it.k] ?? 1.15);
     const ww = (hh * img.naturalWidth) / img.naturalHeight;
-    footShadow(ctx, it.x, it.y, ww * 0.36, ww * 0.1);
-    ctx.drawImage(img, it.x - ww / 2, it.y - hh, ww, hh);
+    footShadow(ctx, it.x, it.y, ww * 0.3, ww * 0.08);
+    ctx.drawImage(shrunk(img, ww, ctx), it.x - ww / 2, it.y - hh, ww, hh);
     return;
   }
   switch (it.k) {
@@ -385,7 +438,10 @@ export function drawItem(ctx: CanvasRenderingContext2D, it: SceneItem) {
     case 'snowPine':
       return pine(ctx, it.x, it.y, it.h, it.v, true);
     case 'broadleaf':
+    case 'plainsTree':
       return broadleaf(ctx, it.x, it.y, it.h, it.v);
+    case 'mushroom':
+      return mushroom(ctx, it.x, it.y, it.h);
     case 'deadTree':
       return deadTree(ctx, it.x, it.y, it.h, it.v);
     case 'peak':
@@ -415,7 +471,8 @@ export function drawItem(ctx: CanvasRenderingContext2D, it: SceneItem) {
 export function itemExtent(it: SceneItem): { up: number; down: number } {
   if (it.k === 'ridge') return { up: it.h * 1.2 + Math.abs((it.y2 ?? it.y) - it.y), down: Math.abs((it.y2 ?? it.y) - it.y) + it.h * 0.2 };
   if (it.k === 'crystal') return { up: it.h * 1.4, down: it.h * 0.6 };
-  return { up: it.h * 1.25, down: it.h * 0.3 };
+  // 描いた絵は h より大きく描く（ART_SCALE）。上に余裕を持たせないと、区切りの境目で木の上が切れる
+  return { up: it.h * Math.max(1.25, (ART_SCALE[it.k] ?? 1.15) + 0.1), down: it.h * 0.4 };
 }
 
 /** 霧の向こうのシルエット（山・火山・最後の城）の SVG の形。足元 x, y・高さ h */

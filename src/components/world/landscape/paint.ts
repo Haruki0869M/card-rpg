@@ -74,6 +74,9 @@ function flowPath(ctx: CanvasRenderingContext2D, v: V[], cx: number, cy: number,
   }
 }
 
+const patCache = new Map<string, CanvasPattern | null>();
+let patR = 0;
+
 /** 地形の模様（描いた絵を R*4 の大きさで敷く）。絵がまだ読み込まれていなければ色だけ */
 function terrainPattern(ctx: CanvasRenderingContext2D, id: string, R: number, cache: Map<string, CanvasPattern | null>): CanvasPattern | null {
   if (cache.has(id)) return cache.get(id)!;
@@ -83,7 +86,7 @@ function terrainPattern(ctx: CanvasRenderingContext2D, id: string, R: number, ca
     p = ctx.createPattern(img, 'repeat');
     if (p && typeof DOMMatrix !== 'undefined') p.setTransform(new DOMMatrix().scaleSelf((R * 4) / img.naturalWidth, (R * 4) / img.naturalHeight));
   }
-  cache.set(id, p);
+  if (p) cache.set(id, p);
   return p;
 }
 
@@ -96,7 +99,12 @@ export function paintRange(ctx: CanvasRenderingContext2D, inp: PaintInput, y0: n
   const { R } = geom;
   ctx.save();
   ctx.translate(0, -origin);
-  const pats = new Map<string, CanvasPattern | null>();
+  // 模様は、地図の大きさ（R）が同じ間は作り置きを使う（描き直しのたびに作ると重かった）
+  if (patR !== R) {
+    patCache.clear();
+    patR = R;
+  }
+  const pats = patCache;
   const topId = (i: number) => (!tiles[i].f && tiles[i].t === roadTerrain ? under[tiles[i].r] ?? 'plains' : tiles[i].t);
   const fillTerrain = (id: string, alpha = 1) => {
     ctx.fillStyle = getTerrain(id).color;
