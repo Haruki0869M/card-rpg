@@ -32,6 +32,7 @@ export * from './game/world/world';
 export * from './game/world/climate';
 export * from './game/world/town';
 export * from './game/world/objectives';
+export { spawnAt, spawnTurnsLeft, SPAWN_NAME, SPAWN_EVENT } from './game/world/explore';
 export { createWorld, regionOfRow } from './game/world/generate';
 export { sceneHeroes, activeHeroes } from './game/heroes';
 export * from './hash';

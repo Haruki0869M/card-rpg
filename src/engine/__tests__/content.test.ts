@@ -153,7 +153,7 @@ describe('コンテンツの検査', () => {
       }
       expect(TERRAINS.has(m.roadTerrain)).toBe(true);
       for (const f of m.features) {
-        const reg = { town: TOWNS, dungeon: DUNGEONS, shrine: SHRINES, temple: SANCTUARIES, altar: SANCTUARIES, event: EVENTS, landmark: EVENTS, chest: undefined }[f.kind];
+        const reg = { town: TOWNS, dungeon: DUNGEONS, shrine: SHRINES, temple: SANCTUARIES, altar: SANCTUARIES, event: EVENTS, landmark: EVENTS, chest: undefined, tower: undefined }[f.kind];
         if (reg) expect(reg.has(f.id), `${sc.id} feature ${f.kind}:${f.id}`).toBe(true);
         expect(f.at[0] < m.width && f.at[1] < m.height, `${f.id} は地図の中`).toBe(true);
       }

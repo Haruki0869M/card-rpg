@@ -330,8 +330,8 @@ export interface EventOption {
 
 export interface EventDef {
   id: string;
-  /** どこで起きるか（省略はダンジョンの部屋。random = 世界マップの何もないマスで突然起きる） */
-  where?: 'dungeon' | 'map' | 'random';
+  /** どこで起きるか（省略はダンジョンの部屋。random = 世界マップの何もないマスで突然起きる。spawn = 時間で消える出現スポット専用） */
+  where?: 'dungeon' | 'map' | 'random' | 'spawn';
   /** 突発イベントの出やすさ（省略は10） */
   weight?: number;
   /** 突発イベントの種類（bad = 夜・侵食度が高い時に出やすい） */

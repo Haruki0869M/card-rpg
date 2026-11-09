@@ -9,8 +9,8 @@ import type { OutcomeHandler } from '../types';
 
 declare module '../../../../types' {
   interface OutcomeParams {
-    /** discount: 値引き（%） */
-    peddler: { discount: number };
+    /** discount: 値引き（%）。rarity: 品物の格の範囲（0=コモン〜3=レジェンド。省略は1〜2。段階6の行商人は珍しい品） */
+    peddler: { discount: number; rarity?: [number, number] };
   }
 }
 
@@ -21,8 +21,9 @@ export const outcome: OutcomeHandler<'peddler'> = {
     if (!h) return;
     const { rng, game } = ctx;
     const k = (100 - o.discount) / 100;
+    const [lo, hi] = o.rarity ?? [1, 2];
     const goods = ITEMS.all.filter(
-      (i) => (!i.scenario || i.scenario === game.scenarioId) && (i.slot === 'weapon' ? jobWeapons(h.classId).includes(i.weaponType ?? '') : i.slot === 'accessory') && rarityIndex(i.rarity) >= 1 && rarityIndex(i.rarity) <= 2,
+      (i) => (!i.scenario || i.scenario === game.scenarioId) && (i.slot === 'weapon' ? jobWeapons(h.classId).includes(i.weaponType ?? '') : i.slot === 'accessory') && rarityIndex(i.rarity) >= lo && rarityIndex(i.rarity) <= hi,
     );
     const items = [];
     for (let n = 0; n < 2 && goods.length; n++) {
@@ -31,7 +32,7 @@ export const outcome: OutcomeHandler<'peddler'> = {
     }
     // 他の系統のジョブのカード（レア以上）
     const lin = getClass(h.classId).lineage;
-    const pool = [...new Set(CLASSES.all.filter((c) => c.lineage && c.lineage !== lin).flatMap((c) => c.cardPool))].filter((id) => CARDS.has(id) && rarityIndex(CARDS.get(id).rarity ?? 'common') >= 1);
+    const pool = [...new Set(CLASSES.all.filter((c) => c.lineage && c.lineage !== lin).flatMap((c) => c.cardPool))].filter((id) => CARDS.has(id) && rarityIndex(CARDS.get(id).rarity ?? 'common') >= Math.min(lo, 2));
     const cards = [];
     for (let n = 0; n < 2 && pool.length; n++) {
       const id = pool.splice(rng.int(pool.length), 1)[0];
