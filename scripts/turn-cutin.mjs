@@ -3,7 +3,7 @@
 // タップですぐ消せること、世界マップ→ダンジョンの組の番（カットインの後ろでダンジョンに切り替わっている）を、360/390/480px で確かめる。
 // 使い方: npx vite build && npx vite preview --port 4173 を起こしてから node scripts/turn-cutin.mjs（URL で変更可）
 import { mkdirSync } from 'node:fs';
-import { chromium, layoutIssues, URL } from './lib.mjs';
+import { chromium, layoutIssues, URL, depart } from './lib.mjs';
 
 const OUT = process.env.TURN_CUTIN_OUTPUT ?? 'screenshots/turn-cutin';
 mkdirSync(OUT, { recursive: true });
@@ -44,7 +44,7 @@ async function run(width) {
   await page.getByText('新しい冒険').click();
   await page.getByText('2人', { exact: true }).click();
   await page.getByText('キャラクター作成へ').click();
-  await page.getByText('冒険に出発').click();
+  await depart(page);
   await page.waitForTimeout(300);
   // 2人目の担当を P2 にする（作成画面の初期値は全員 P1 = 1人で全員を操作）
   await edit((g) => {

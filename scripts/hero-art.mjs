@@ -1,6 +1,6 @@
 // 職業の立ち絵・顔の見え方の確認（J4）: 4人パーティの職を差し替えて、世界マップ・パーティ・戦闘のスクリーンショットを撮る
 // 使い方: URL=http://localhost:5173/card-rpg/ node scripts/hero-art.mjs pope,hadesLord,necromancer,bard [出力名]
-import { chromium, URL } from './lib.mjs';
+import { chromium, URL, depart } from './lib.mjs';
 const jobs = (process.argv[2] ?? 'pope,hadesLord,necromancer,bard').split(',');
 const tag = process.argv[3] ?? 'a';
 // 4つ目の引数: お供（例 babyDragon:azure,wolfPup:gray,owl:snowy,cockatiel:pearl）。懐き度は5
@@ -16,7 +16,7 @@ await page.reload();
 await page.getByText('新しい冒険').click();
 await page.getByText('4人', { exact: true }).click();
 await page.getByText('キャラクター作成へ').click();
-await page.getByText('冒険に出発').click();
+await depart(page);
 await page.waitForTimeout(300);
 const edit = async (fn, arg) => {
   await page.evaluate(({ src, arg }) => { const k = 'card-rpg/adventure'; const d = JSON.parse(localStorage.getItem(k)); (0, eval)(src)(d.game, arg); localStorage.setItem(k, JSON.stringify(d)); }, { src: fn.toString(), arg });

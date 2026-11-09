@@ -1,7 +1,7 @@
 // お供12種類×毛色の全部を、迎える画面（ポン！の後）で1枚ずつ撮る（可愛さの確認用。390×780）
 // 使い方: vite preview を起こしてから node scripts/pet-gallery.mjs（保存先 screenshots/pet-gallery/）
 import { mkdir, readFile } from 'node:fs/promises';
-import { chromium, layoutIssues, URL } from './lib.mjs';
+import { chromium, layoutIssues, URL, depart } from './lib.mjs';
 
 const dir = 'screenshots/pet-gallery';
 await mkdir(dir, { recursive: true });
@@ -24,7 +24,7 @@ await page.reload();
 await page.getByText('新しい冒険').click();
 await page.getByText('1人', { exact: true }).click();
 await page.getByText('キャラクター作成へ').click();
-await page.getByText('冒険に出発').click();
+await depart(page);
 await page.waitForTimeout(300);
 let n = 0;
 const problems = [];

@@ -2,9 +2,10 @@
 // 2人以上は担当プレイヤーを分けて、手番の受け渡しの画面も確かめる
 // npm run build && npx vite preview --port 4173 を起動した状態で: node scripts/adventure.mjs
 // 別のシナリオを通す時: ADVENTURE_SCENARIO=frozenKingdom node scripts/adventure.mjs（記録を入れて解放してから選ぶ）
+// 担当を「スマホを回して操作」（P1・P2…）にする時: ADVENTURE_SEATS=pass（省略は「1人で全員」から2人目だけ P2）
 // 他のセッションと同じポートを使わないよう、自分専用のポートで preview を起こし URL=http://127.0.0.1:<番号>/card-rpg/ を付ける
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { chromium, layoutIssues, URL, waitForWorldMovement, waitForBattlePresentation } from './lib.mjs';
+import { chromium, layoutIssues, URL, waitForWorldMovement, waitForBattlePresentation, depart } from './lib.mjs';
 
 mkdirSync('screenshots', { recursive: true });
 const output = process.env.ADVENTURE_OUTPUT ?? 'screenshots/adventure';
@@ -154,13 +155,21 @@ async function run(party, difficulty) {
   await check(page, 'setup');
   await page.getByText('キャラクター作成へ').click();
   // 2人目以降は別のプレイヤーが担当（ローカル協力の手番の受け渡しを確かめる）
+  // ADVENTURE_SEATS=pass の時は「スマホを回して操作」（P1・P2…を自動で）を選ぶ。それ以外は2人目だけ P2（くわしく から）
   if (party > 1) {
-    await page.getByText('2人目').click();
-    await page.getByText('P2', { exact: true }).click();
-    await page.getByText('1人目').click();
+    if (process.env.ADVENTURE_SEATS === 'pass') await page.locator('[data-seat-choice="pass"]').click();
+    else {
+      await page.getByText('2人目', { exact: true }).click();
+      await page.locator('[data-seat-detail]').click();
+      await page.getByText('P2', { exact: true }).click();
+    }
+    // 全員のタブを確かめる（確かめると出発のボタンが光る）
+    for (let i = 2; i <= party; i++) await page.getByText(`${i}人目`, { exact: true }).click();
+    await page.getByText('1人目', { exact: true }).click();
+    if (!(await page.locator('[data-depart="ready"]').count())) issues.add('全員のタブを見ても出発のボタンが光らない');
   }
   await check(page, 'create');
-  await page.getByText('冒険に出発').click();
+  await depart(page);
   // 冒頭の物語
   await page.waitForTimeout(400);
   await page.screenshot({ path: `screenshots/adv-story.png` });

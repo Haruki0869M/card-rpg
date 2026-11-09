@@ -3,7 +3,7 @@
 // 立つ位置は engine/game/dungeonMap.ts の dungeonGrid・doorFront と同じ計算（部屋の行 r → y=2r+1、扉の前は y=2r）。
 // 使い方: URL=http://127.0.0.1:<番号>/card-rpg/ node scripts/boss-door.mjs
 import { mkdirSync } from 'node:fs';
-import { chromium, layoutIssues, URL } from './lib.mjs';
+import { chromium, layoutIssues, URL, depart } from './lib.mjs';
 
 const OUT = process.env.BOSS_DOOR_OUTPUT ?? 'screenshots/boss-door';
 mkdirSync(OUT, { recursive: true });
@@ -25,7 +25,7 @@ for (const [width, height] of SIZES) {
   await page.getByText('新しい冒険').click();
   await page.getByText('2人', { exact: true }).click();
   await page.getByText('キャラクター作成へ').click();
-  await page.getByText('冒険に出発').click();
+  await depart(page);
   await page.waitForTimeout(300);
   await page.evaluate(() => {
     const k = 'card-rpg/adventure';

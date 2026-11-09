@@ -12,6 +12,8 @@ import { autoName, PLAYER_IDS } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
 import { useOnline } from '../../store/onlineStore';
 import type { Gender, StatId } from '../../types';
+import { assignSeats, seatModeOf } from '../../store/seats';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { ItemIcon, itemSummary, Screen, STAT_LABEL } from '../ui/game';
 import { Motes, SectionTitle, TopBar } from '../ui/fancy';
 import { CATEGORY_STYLE } from '../ui/icons';
@@ -59,13 +61,53 @@ export function CreateScreen() {
   };
   const swipe = useSwipe((d) => step(d));
   const [showDeck, setShowDeck] = useState(false);
+  // 担当プレイヤー（この端末で2人以上）: 2択でまとめて決め、細かくはキャラごとに（くわしく）
+  const local = !online && draft.party.length > 1;
+  const seatMode = seatModeOf(draft.party);
+  const [showSeats, setShowSeats] = useState(false);
+  // 全員のタブを見たら出発のボタンが光る。見ていなくても押せる（1回だけ確かめる）
+  const unseen = local ? draft.party.map((_, i) => i).filter((i) => !seen.has(i)) : [];
+  const [askStart, setAskStart] = useState(false);
+  const depart = async () => {
+    if (draft.party.some((p) => !p.name.trim())) return toast('名前を入力してください');
+    if (online) {
+      const { classId, gender, name } = draft.party[0];
+      await claimSlot(editing, { classId, gender, name: name.trim() });
+      useOnline.setState({ editingSlot: null });
+      setScreen('lobby');
+      return;
+    }
+    startGame();
+  };
 
   return (
     <Screen>
       <TopBar title="キャラクター作成" onBack={() => setScreen(online ? 'lobby' : 'setup')} />
       {/* 何人目のキャラか */}
-      {!online && draft.party.length > 1 && (
-        <div className="flex shrink-0 gap-1.5 px-3 pt-1">
+      {local && (
+        <div className="grid shrink-0 grid-cols-2 gap-1.5 px-3 pt-1" role="radiogroup" aria-label="担当の決め方" data-seat-mode={seatMode}>
+          {(
+            [
+              ['solo', '1人で全員を操作', '全員 P1'],
+              ['pass', 'スマホを回して操作', 'P1・P2…を自動で'],
+            ] as const
+          ).map(([mode, label, sub]) => (
+            <button
+              key={mode}
+              role="radio"
+              aria-checked={seatMode === mode}
+              onClick={() => setDraft({ party: assignSeats(draft.party, mode) })}
+              className={`btn flex h-11 min-w-0 flex-col items-center justify-center rounded-xl px-1 leading-4 ${seatMode === mode ? 'btn-gold' : 'btn-dark text-zinc-300'}`}
+              data-seat-choice={mode}
+            >
+              <span className="truncate text-[13px] font-bold">{label}</span>
+              <span className="truncate text-[12px] opacity-80">{sub}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {local && (
+        <div className="flex shrink-0 gap-1.5 px-3 pt-1.5">
           {draft.party.map((p, i) => (
             <button
               key={i}
@@ -88,7 +130,7 @@ export function CreateScreen() {
           ))}
         </div>
       )}
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-2">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-8">
         {/* 舞台: 選んだ職業の全身を大きく。左右にスワイプで切り替え */}
         <div {...swipe} className="relative mt-2 h-[300px] touch-pan-y overflow-hidden rounded-2xl border border-amber-300/25" data-class-stage style={{ background: `radial-gradient(70% 60% at 50% 38%, ${cls.color}40, transparent 70%), linear-gradient(180deg,#1a1630,#0b0912)` }}>
           <Motes count={8} color={cls.color} />
@@ -150,27 +192,38 @@ export function CreateScreen() {
           })}
         </div>
 
-        {/* 担当プレイヤー（ローカル協力: 1台を回して遊ぶ。spec §7.3） */}
-        {draft.party.length > 1 && !online && (
+        {/* 担当プレイヤー（ローカル協力: 1台を回して遊ぶ。spec §7.3）。上の2択でまとめて決め、ここで1人ずつ変えられる */}
+        {local && (
           <>
-            <SectionTitle>担当プレイヤー</SectionTitle>
-            <div className="flex items-center gap-1.5">
-              {PLAYER_IDS.slice(0, draft.party.length).map((p) => {
-                const on = (m.playerId ?? 'P1') === p;
-                return (
-                  <button
-                    key={p}
-                    onClick={() => update({ playerId: p })}
-                    className={`btn flex h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full text-[14px] font-bold ${on ? 'btn-gold' : 'btn-dark text-zinc-300'}`}
-                  >
-                    {/* 席の色は小さな宝石で（世界観から浮かないように） */}
-                    <span className="h-[10px] w-[10px] rotate-45 border border-white/70" style={{ background: PLAYER_COLOR[p], boxShadow: `0 0 6px ${PLAYER_COLOR[p]}` }} />
-                    {p}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="mt-1 text-[12px] leading-4 text-zinc-500">1台を回して遊ぶ時に、誰がこのキャラを操作するか（1人で全員を操作するなら全員P1のまま）</div>
+            <button onClick={() => setShowSeats((v) => !v)} className="mt-3 flex h-11 w-full items-center gap-2 text-left" aria-expanded={showSeats} data-seat-detail>
+              <span className="h-[9px] w-[9px] rotate-45 border border-amber-200 bg-gradient-to-br from-amber-100 to-amber-600" />
+              <span className="font-display text-[16px] text-amber-100">担当プレイヤー</span>
+              <span className="rounded-full bg-black/50 px-2 text-[12px] text-zinc-300">このキャラ: {m.playerId ?? 'P1'}</span>
+              <span className="h-px flex-1 bg-gradient-to-r from-amber-400/70 to-transparent" />
+              <span className="text-[12px] text-amber-200/80">くわしく</span>
+              <ChevronDown size={18} className={`text-amber-200 transition-transform ${showSeats ? 'rotate-180' : ''}`} />
+            </button>
+            {showSeats && (
+              <>
+                <div className="flex items-center gap-1.5">
+                  {PLAYER_IDS.slice(0, draft.party.length).map((p) => {
+                    const on = (m.playerId ?? 'P1') === p;
+                    return (
+                      <button
+                        key={p}
+                        onClick={() => update({ playerId: p })}
+                        className={`btn flex h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full text-[14px] font-bold ${on ? 'btn-gold' : 'btn-dark text-zinc-300'}`}
+                      >
+                        {/* 席の色は小さな宝石で（世界観から浮かないように） */}
+                        <span className="h-[10px] w-[10px] rotate-45 border border-white/70" style={{ background: PLAYER_COLOR[p], boxShadow: `0 0 6px ${PLAYER_COLOR[p]}` }} />
+                        {p}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mt-1 text-[12px] leading-4 text-zinc-500">1台を回して遊ぶ時に、誰がこのキャラを操作するか（キャラごとに変えられます）</div>
+              </>
+            )}
           </>
         )}
 
@@ -248,23 +301,32 @@ export function CreateScreen() {
         </div>
       </div>
       <div className="shrink-0 px-3 pt-1 pb-3">
+        {unseen.length > 0 && (
+          <div className="mb-1 text-center text-[12px] leading-4 text-zinc-400" data-unseen-hint>
+            あと{unseen.length}人を確かめよう（{unseen.map((i) => `${i + 1}人目`).join('・')}）
+          </div>
+        )}
         <button
-          onClick={async () => {
-            if (draft.party.some((p) => !p.name.trim())) return toast('名前を入力してください');
-            if (online) {
-              const { classId, gender, name } = draft.party[0];
-              await claimSlot(editing, { classId, gender, name: name.trim() });
-              useOnline.setState({ editingSlot: null });
-              setScreen('lobby');
-              return;
-            }
-            startGame();
-          }}
-          className="btn btn-gold font-display flex h-14 w-full items-center justify-center gap-2 rounded-xl text-[19px]"
+          onClick={() => (unseen.length ? setAskStart(true) : void depart())}
+          className={`btn font-display flex h-14 w-full items-center justify-center gap-2 rounded-xl text-[19px] ${unseen.length ? 'btn-dark text-zinc-300' : 'btn-gold'} ${local && !unseen.length ? 'depart-ready' : ''}`}
+          data-depart={unseen.length ? 'waiting' : 'ready'}
         >
           <Swords size={22} /> {online ? 'このキャラに決める' : '冒険に出発'}
         </button>
       </div>
+      {askStart && (
+        <ConfirmDialog
+          title="このまま出発しますか？"
+          text={`${unseen.map((i) => `${i + 1}人目`).join('・')}の職業と名前を、まだ確かめていません。`}
+          ok="出発する"
+          danger={false}
+          onCancel={() => setAskStart(false)}
+          onOk={() => {
+            setAskStart(false);
+            void depart();
+          }}
+        />
+      )}
     </Screen>
   );
 }
@@ -295,7 +357,7 @@ function StatRadar({ values, labels, color }: { values: number[]; labels: string
   };
   const poly = (r: (i: number) => number) => values.map((_, i) => pt(i, r(i)).join(',')).join(' ');
   return (
-    <svg viewBox="-30 -6 210 164" className="h-[154px] w-[196px] shrink-0" data-radar>
+    <svg viewBox="-30 -6 210 172" className="h-[161px] w-[196px] shrink-0" data-radar>
       {[0.25, 0.5, 0.75, 1].map((k) => (
         <polygon key={k} points={poly(() => R * k)} fill="none" stroke="rgba(255,220,150,.18)" strokeWidth={1} />
       ))}

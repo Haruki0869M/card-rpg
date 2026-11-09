@@ -1,6 +1,6 @@
 // 転職の画面の確認: 世界マップで剣士をLv5にして、パーティ → 転職先を見る → 剣豪に転職 → 専用カードを1枚選ぶ
 // 使い方: npx vite preview を起こしてから node scripts/jobchange.mjs
-import { chromium, layoutIssues, URL } from './lib.mjs';
+import { chromium, layoutIssues, URL, depart } from './lib.mjs';
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 390, height: 780 }, deviceScaleFactor: 1 });
@@ -21,7 +21,7 @@ await page.reload();
 await page.getByText('新しい冒険').click();
 await page.getByText('1人', { exact: true }).click();
 await page.getByText('キャラクター作成へ').click();
-await page.getByText('冒険に出発').click();
+await depart(page);
 await page.waitForTimeout(300);
 // 剣士をLv5に（物語も閉じる）
 await page.evaluate(() => {

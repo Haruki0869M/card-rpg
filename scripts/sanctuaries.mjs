@@ -1,6 +1,6 @@
 // J3d第1段階: 旧保存の移行、神殿・祭壇の入退場と転職画面をスマホ幅で確認する。
 import { mkdir } from 'node:fs/promises';
-import { chromium, layoutIssues, URL } from './lib.mjs';
+import { chromium, layoutIssues, URL, depart } from './lib.mjs';
 
 await mkdir('screenshots/sanctuaries', { recursive: true });
 const browser = await chromium.launch();
@@ -24,7 +24,7 @@ try {
   await page.getByText('新しい冒険', { exact: true }).click();
   await page.getByText('2人', { exact: true }).click();
   await page.getByText('キャラクター作成へ', { exact: true }).click();
-  await page.getByText('冒険に出発', { exact: true }).click();
+  await depart(page, { exact: true });
   await page.waitForTimeout(300);
   const base = await save();
   // 神殿の無いv8の保存を模した状態。地図の番号・地形・霧・既存施設を比較する。

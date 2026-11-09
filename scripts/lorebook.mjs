@@ -5,7 +5,7 @@
 //  4) 冒険の準備の画面（クリアの記録を渡しても、条件の無いシナリオは鍵のまま）
 //  5) うちの子図鑑・マイペット: 登録 → スタートの町で30Gで呼ぶ → 全滅の画面に記録
 // 使い方: npx vite preview を起こしてから node scripts/lorebook.mjs
-import { chromium, layoutIssues, URL } from './lib.mjs';
+import { chromium, layoutIssues, URL, depart } from './lib.mjs';
 
 const OUT = process.env.LOREBOOK_OUTPUT ?? 'scripts/screenshots';
 const browser = await chromium.launch();
@@ -50,7 +50,7 @@ for (const width of [360, 390, 480]) {
   await page.getByText('新しい冒険').click();
   await page.getByText('1人', { exact: true }).click();
   await page.getByText('キャラクター作成へ').click();
-  await page.getByText('冒険に出発').click();
+  await depart(page);
   await page.waitForTimeout(800);
   const prof = await page.evaluate(() => JSON.parse(localStorage.getItem('card-rpg/profile') ?? 'null'));
   if (!prof || !prof.jobs.got.length || !prof.cards.got.length || prof.adventures !== 1) await ng(`冒険を始めても記録されない: ${JSON.stringify(prof && { jobs: prof.jobs, adventures: prof.adventures })}`);
@@ -86,8 +86,9 @@ for (const width of [360, 390, 480]) {
   }
   // 4) 冒険の準備: クリアの記録があっても、解放の条件の無いシナリオ（凍てつく王国）は鍵のまま（K4 が条件を入れるまで）
   await page.getByLabel('閉じる').click();
-  page.once('dialog', (d) => d.accept());
   await page.getByText('新しい冒険').click();
+  // 保存がある時はゲーム内の確認が出る（フェーズ3）
+  if (await page.getByRole('dialog').count()) await page.getByRole('dialog').getByText('上書きして始める', { exact: true }).click();
   await page.locator('[data-scenarios]').waitFor();
   if (!(await page.locator('[data-scenario-lock]').count())) await ng('凍てつく王国の鍵が消えた');
   await shot('setup');
@@ -121,7 +122,7 @@ for (const width of [360, 390, 480]) {
   await page.getByText('新しい冒険').click();
   await page.getByText('1人', { exact: true }).click();
   await page.getByText('キャラクター作成へ').click();
-  await page.getByText('冒険に出発').click();
+  await depart(page);
   await page.waitForTimeout(500);
   // スタートの町（王都）に入った所から
   const edit = async (fn) => {
