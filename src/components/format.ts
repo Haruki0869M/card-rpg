@@ -97,3 +97,50 @@ function elementStatusText(id?: string): string {
   const el = id ? getElement(id) : undefined;
   return el?.status ? `（${el.chance}%で${getStatus(el.status).name}${el.amount ?? 1}）` : '';
 }
+
+// ---------- カードのひとことの説明（報酬・店の説明の窓。フェーズ3 項目2） ----------
+const DAMAGE_KINDS = new Set(['damage', 'damageByPlays', 'echoHit', 'playedDamage', 'rallyDamage', 'chargeAttack', 'jump']);
+const HEAL_KINDS = new Set(['heal', 'fullRestore', 'healPctOfDealt']);
+const CARD_TARGET_WHO: Record<CardDef['target'], string> = { enemy: '敵1体', allEnemies: '敵全体', self: '自分', ally: '味方1人', otherAlly: 'ほかの味方1人', fallenAlly: '倒れた味方' };
+const EFFECT_TO_WHO: Partial<Record<NonNullable<CardEffect['to']>, string>> = {
+  self: '自分',
+  allies: '味方全員',
+  otherAllies: 'ほかの味方全員',
+  foes: '敵全体',
+  randomFoe: 'ランダムな敵',
+  lowestAlly: 'HPの低い味方',
+  randomAlly: 'ランダムな味方',
+};
+
+/** 効果の相手の名前（効果の to → 無ければカードの対象） */
+function effectWho(e: CardEffect, card: CardDef): string {
+  const to = targetOf(e); // 効果ごとの既定の相手（ブロックは自分など）
+  if (to === 'allyTarget') return card.secondaryTarget ? CARD_TARGET_WHO[card.secondaryTarget] : '味方1人';
+  return (to !== 'target' && EFFECT_TO_WHO[to]) || CARD_TARGET_WHO[card.target];
+}
+
+/**
+ * カードのひとことの説明（例: 「敵全体に物理ダメージ」「味方1人のHPを回復」「敵1体に物理ダメージ・自分にブロック」）。
+ * 一番よい成功（最後の段）の効果から、主な2つまで。ダメージ・回復・ブロックの量は出さない（段ごとの説明に出す）
+ */
+export function cardSummary(card: CardDef): string {
+  const tier = card.tiers[card.tiers.length - 1];
+  const parts: string[] = [];
+  for (const e of tier?.effects ?? []) {
+    const who = effectWho(e, card);
+    let text: string;
+    if (DAMAGE_KINDS.has(e.kind)) text = `${who}に${card.category === 'skill' ? '' : CATEGORY_LABEL[card.category]}ダメージ`;
+    else if (HEAL_KINDS.has(e.kind)) text = who === '自分' ? 'HPを回復' : `${who}のHPを回復`;
+    else if (e.kind === 'revive') text = `${who}を復活`;
+    else if (e.kind === 'block' || e.kind === 'blockFromStatus') text = `${who}にブロック`;
+    else if (e.kind === 'applyStatus' && 'status' in e) text = `${who}に「${STATUS_LABEL(e.status as StatusId)}」`;
+    else {
+      // そのほかの効果は、ふだんの説明の文の頭だけ（かっこの中の細かい所は段ごとの説明に出す）
+      const full = describeEffect(e, 'ally', card).replace(/（.*$/, '');
+      text = full.length > 24 ? `${full.slice(0, 23)}…` : full;
+    }
+    if (!parts.includes(text)) parts.push(text);
+    if (parts.length >= 2) break;
+  }
+  return parts.join('・') || '特殊な効果';
+}

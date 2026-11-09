@@ -39,6 +39,7 @@ import { OthersTurnNote } from '../screens/OnlineScreens';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import type { Hero } from '../../types';
 import { CardFace } from '../ui/CardFace';
+import { CardPickPanel } from '../ui/CardPickPanel';
 import { CheckPanel, RollStrip } from '../ui/CheckPanel';
 import { Heading, HeroFace, ItemIcon, itemSummary, RARITY_STYLE, Screen } from '../ui/game';
 import { WorldTopBar } from './WorldScreen';
@@ -229,6 +230,10 @@ export function TownScreen() {
   const myCards = stock?.cards.map((c, i) => ({ c, i })).filter(({ c }) => getClass(game.heroes.find((x) => x.id === c.heroId)?.classId ?? '').id === v.classId) ?? [];
   // 買った時の手応え（フェーズ2-A）: 装備品は「すぐ装備」の窓、道具・カードは短いお知らせ
   const [bought, setBought] = useState<Bought | null>(null);
+  // カード売り場: カードか値段のボタンを押すと説明の窓を開く。買うのは窓の「〇〇Gで買う」だけ（フェーズ3）
+  const [cardSel, setCardSel] = useState<number | null>(null);
+  const closeCardSel = useCallback(() => setCardSel(null), []);
+  const selCard = cardSel !== null ? stock?.cards[cardSel] : undefined;
   const closeBought = useCallback(() => setBought(null), []);
   const buy = (kind: 'item' | 'card', index: number) => {
     const entry = kind === 'item' ? stock?.items[index] : stock?.cards[index];
@@ -310,17 +315,28 @@ export function TownScreen() {
             <div className="flex flex-wrap justify-center gap-2">
               {myCards.map(({ c, i }) => {
                 const h = v;
+                const on = cardSel === i;
                 return (
                   <div key={i} className={`flex flex-col items-center gap-1 ${c.sold ? 'opacity-40' : ''}`}>
-                    <CardFace card={getCard(c.cardId)} chance={chanceOf(h, c.cardId)} width={96} height={146} />
+                    <button
+                      onClick={() => setCardSel((x) => (x === i ? null : i))}
+                      className="btn transition-transform duration-150"
+                      style={on ? { transform: 'scale(1.1) translateY(-3px)', zIndex: 2 } : undefined}
+                      aria-pressed={on}
+                      aria-label={getCard(c.cardId).name}
+                      data-pick-card={i}
+                    >
+                      <CardFace card={getCard(c.cardId)} chance={chanceOf(h, c.cardId)} width={96} height={146} />
+                    </button>
                     <span className="flex items-center gap-1 text-[12px]">
                       <HeroFace hero={h} size={18} />
                       {h.name}
                     </span>
                     <button
-                      disabled={!mine || c.sold || v.gold < shopPriceFor(v, c.price)}
-                      onClick={() => buy('card', i)}
+                      disabled={c.sold}
+                      onClick={() => setCardSel(i)}
                       className="btn btn-gold flex h-11 w-[96px] items-center justify-center gap-0.5 rounded-lg text-[13px] font-bold"
+                      data-pick-card={i}
                     >
                       {c.sold ? '売り切れ' : (
                         <>
@@ -333,6 +349,26 @@ export function TownScreen() {
                 );
               })}
             </div>
+            {selCard && cardSel !== null && myCards.some((x) => x.i === cardSel) && (
+              <CardPickPanel
+                card={getCard(selCard.cardId)}
+                chance={chanceOf(v, selCard.cardId)}
+                who={`${v.name}の成功率`}
+                action={
+                  <>
+                    <Coins size={18} />
+                    {shopPriceFor(v, selCard.price)}Gで買う
+                  </>
+                }
+                disabled={!mine || selCard.sold || v.gold < shopPriceFor(v, selCard.price)}
+                note={selCard.sold ? '売り切れです' : !mine ? `${v.name}の担当の人が買えます` : v.gold < shopPriceFor(v, selCard.price) ? 'お金が足りません' : undefined}
+                onAction={() => {
+                  buy('card', cardSel);
+                  setCardSel(null);
+                }}
+                onClose={closeCardSel}
+              />
+            )}
             <div className="mt-1 text-center text-[12px] text-zinc-500">品揃えは{BALANCE.shopRefreshTurns}ワールドターンごとに入れ替わります</div>
           </div>
         )}

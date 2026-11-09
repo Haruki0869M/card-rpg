@@ -370,6 +370,19 @@ async function run(party, difficulty) {
         await check(page, 'reward');
         await page.screenshot({ path: `screenshots/adv-reward.png` });
       }
+      // カードを押す → 説明の窓 →「このカードを選ぶ」（フェーズ3）。めくり終わる前の1回目はめくるだけ
+      const first = page.locator('[data-pick-card="0"]');
+      if (await first.count()) {
+        await first.click().catch(() => {});
+        await page.waitForTimeout(250);
+        if (!(await page.locator('[data-card-pick-action]').count())) await first.click().catch(() => {});
+        await page.waitForTimeout(250);
+        if (await page.locator('[data-card-pick-action]').count()) {
+          if (!seen.has('reward-panel')) { seen.add('reward-panel'); await check(page, 'reward-panel'); await page.screenshot({ path: `screenshots/adv-reward-panel.png` }); }
+          await page.locator('[data-card-pick-action]').click().catch(() => {});
+          continue;
+        }
+      }
       await page.getByText(/はカードを選ばない/).click();
       continue;
     }

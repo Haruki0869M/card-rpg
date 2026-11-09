@@ -2,7 +2,7 @@
 import { VoteChips } from '../ui/Votes';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowUpCircle, Coins, Gift, Heart, Sparkles, Star, TrendingUp } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { REVEAL_TIMING, VIBRATION } from '../../data/balance';
 import { cardOf, getCard } from '../../data/cards';
 import { cardOfferHeroes, expToNext, findHero, growthHandler, heroStats } from '../../engine';
@@ -13,6 +13,7 @@ import { speedFactor, useBattle, vibrate } from '../../store/battleStore';
 import { playSound } from '../../audio/player';
 import type { GrowthOption, Hero, Rarity } from '../../types';
 import { CardFace } from '../ui/CardFace';
+import { CardPickPanel } from '../ui/CardPickPanel';
 import { Bar, Crest, HeroFace, ItemIcon, itemSummary, RARITY_STYLE, Screen } from '../ui/game';
 import { getItem } from '../../data/items';
 import { LootList } from './RoomScreens';
@@ -67,6 +68,10 @@ function RewardCards({ heroId }: { heroId: string }) {
   const [shown, setShown] = useState(0);
   const [charging, setCharging] = useState(-1);
   const done = shown >= n;
+  // 押したカード（説明の窓を開く。決めるのは窓の「このカードを選ぶ」だけ。フェーズ3）
+  const [sel, setSel] = useState<number | null>(null);
+  const picked = sel !== null ? offers[sel] : undefined;
+  const closePanel = useCallback(() => setSel(null), []);
 
   useEffect(() => {
     if (shown >= n) return;
@@ -119,10 +124,14 @@ function RewardCards({ heroId }: { heroId: string }) {
               disabled={!done}
               onClick={(e) => {
                 e.stopPropagation();
-                if (done) dispatchGame({ type: 'PICK_CARD', playerId: LOCAL_PLAYER, offerIndex: o.index });
+                if (done) setSel((x) => (x === i ? null : i));
                 else setShown(n);
               }}
-              className="btn relative flex flex-col items-center gap-1 disabled:opacity-100 disabled:filter-none"
+              className="btn relative flex flex-col items-center gap-1 transition-transform duration-150 disabled:opacity-100 disabled:filter-none"
+              style={sel === i ? { transform: 'scale(1.15) translateY(-4px)', zIndex: 2 } : sel !== null ? { opacity: 0.7 } : undefined}
+              aria-pressed={sel === i}
+              aria-label={card.name}
+              data-pick-card={i}
             >
               {open && big && (
                 <motion.span
@@ -155,6 +164,17 @@ function RewardCards({ heroId }: { heroId: string }) {
         })}
       </div>
       {!done && <div className="mt-1 text-center text-[12px] text-zinc-400">タップですぐにめくる</div>}
+      {done && !picked && <div className="mt-2 text-center text-[12px] text-zinc-400">カードを押すと、くわしい説明が出ます</div>}
+      {picked && (
+        <CardPickPanel
+          card={getCard(picked.cardId)}
+          chance={chanceOf(hero, picked.cardId)}
+          who={`${hero.name}の成功率`}
+          action="このカードを選ぶ"
+          onAction={() => dispatchGame({ type: 'PICK_CARD', playerId: LOCAL_PLAYER, offerIndex: picked.index })}
+          onClose={closePanel}
+        />
+      )}
     </div>
   );
 }
