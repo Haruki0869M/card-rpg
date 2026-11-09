@@ -2,7 +2,7 @@
 // 世界マップで「パーティ・装備」→ 武器の欄を開き、持ち物に15種類の武器を1本ずつ入れて、
 // どれも描いた絵（item/<種類>.webp）で出ること・仮の記号（★）が出ないこと・画面が崩れないことを調べる。
 import { mkdirSync } from 'node:fs';
-import { chromium, layoutIssues, URL } from './lib.mjs';
+import { chromium, layoutIssues, URL, depart } from './lib.mjs';
 
 // 種類ごとに1本（ふつうの武器）
 const WEAPONS = {
@@ -28,7 +28,7 @@ for (const [w, h] of [[360, 640], [390, 844], [480, 854]]) {
   await page.getByText('新しい冒険').click();
   await page.getByText('1人', { exact: true }).click();
   await page.getByText('キャラクター作成へ').click();
-  await page.getByText('冒険に出発').click();
+  await depart(page);
   await page.waitForTimeout(300);
   // 保存データを書き換えて、全員の持ち物に15種類の武器を入れる（物語も閉じる）
   await page.evaluate((ids) => {

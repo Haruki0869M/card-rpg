@@ -6,6 +6,20 @@ export const { chromium } = require('playwright');
 export const URL = process.env.URL ?? 'http://localhost:4173/card-rpg/';
 
 /**
+ * キャラ作成の「冒険に出発」を押す。2人以上でまだ確かめていないキャラがいる時は、ゲーム内の確認（フェーズ3）で「出発する」を押す
+ */
+export async function depart(page, opts = {}) {
+  await page.getByText('冒険に出発', opts).click();
+  const ask = page.getByRole('dialog', { name: 'このまま出発しますか？' });
+  try {
+    await ask.waitFor({ timeout: 500 });
+    await ask.getByText('出発する', { exact: true }).click();
+  } catch {
+    /* 確認なし（1人・全員を確かめた） */
+  }
+}
+
+/**
  * 新しい冒険を始めて（人数を指定）、世界マップの翠の神殿の入口から入り、最初の部屋で戦闘を始める。
  * enemies を渡すと、最初の部屋の敵をその組み合わせに差し替える（敵1〜4体の確認用）。
  */
@@ -19,7 +33,7 @@ export async function startBattle(page, partySize, enemies, fast = true) {
   await page.getByText('新しい冒険').click();
   await page.getByText(`${partySize}人`, { exact: true }).click();
   await page.getByText('キャラクター作成へ').click();
-  await page.getByText('冒険に出発').click();
+  await depart(page);
   await page.waitForTimeout(300);
   // 保存データを書き換えて、全員を翠の神殿の入口へ（物語も閉じる）
   const edit = async (fn, arg) => {

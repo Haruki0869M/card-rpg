@@ -3,7 +3,7 @@
 //  2) パーティ画面のお供の欄で撫でる（フォーカス+1）
 //  3) 戦闘で足元・肩にお供が出る（オカメインコの先読み「次:」）
 // 使い方: npx vite preview を起こしてから node scripts/pets.mjs
-import { chromium, layoutIssues, URL } from './lib.mjs';
+import { chromium, layoutIssues, URL, depart } from './lib.mjs';
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 390, height: 780 }, deviceScaleFactor: 1 });
@@ -39,7 +39,7 @@ await page.reload();
 await page.getByText('新しい冒険').click();
 await page.getByText('1人', { exact: true }).click();
 await page.getByText('キャラクター作成へ').click();
-await page.getByText('冒険に出発').click();
+await depart(page);
 await page.waitForTimeout(300);
 
 // 1) 突発イベント

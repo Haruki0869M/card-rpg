@@ -10,6 +10,8 @@ import { useOnline } from '../../store/onlineStore';
 import { HeroFace, Screen } from '../ui/game';
 import { Motes } from '../ui/fancy';
 import { Lorebook } from '../lorebook/Lorebook';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { continueSummary, overwriteText } from './titleSummary';
 
 export const GAME_TITLE = TERMS.gameTitle;
 
@@ -21,16 +23,10 @@ export function TitleScreen() {
   const [showSettings, setShowSettings] = useState(false);
   const [showLore, setShowLore] = useState(false);
   const onlineOk = useOnline((s) => s.available)();
-  const modeText: Record<string, string> = {
-    hub: '冒険の拠点',
-    dungeon: 'ダンジョン探索中',
-    battle: '戦闘中',
-    reward: '戦闘の報酬',
-    chest: '宝箱',
-    event: 'イベント',
-    rest: '休憩所',
-    cleared: 'ダンジョン制覇',
-    gameover: '全滅',
+  const [askNew, setAskNew] = useState(false);
+  const startNew = () => {
+    if (useBattle.getState().game) useBattle.getState().abandonGame();
+    setScreen('setup');
   };
 
   return (
@@ -65,11 +61,7 @@ export function TitleScreen() {
         </div>
       </div>
       <div className="relative flex flex-col gap-2.5 px-4 pt-2 pb-4">
-        <button onClick={() => {
-          if (game && !window.confirm('中断データがあります。新しく始めると現在の冒険データは上書きされますがよろしいですか？')) return;
-          if (game) useBattle.getState().abandonGame();
-          setScreen('setup');
-        }} className="btn btn-gold font-display flex h-[60px] items-center justify-center gap-2 rounded-2xl text-[22px] tracking-wider">
+        <button onClick={() => (game ? setAskNew(true) : startNew())} className="btn btn-gold font-display flex h-[60px] items-center justify-center gap-2 rounded-2xl text-[22px] tracking-wider">
           <UserPlus size={24} /> 新しい冒険
         </button>
         {game && (
@@ -79,8 +71,8 @@ export function TitleScreen() {
             </span>
             <span className="min-w-0 flex-1">
               <span className="font-display block text-[18px] text-amber-50">つづきから</span>
-              <span className="block truncate text-[12px] text-zinc-400">
-                {modeText[game.mode] ?? ''}・{game.dungeon?.name ?? '拠点'}・{game.heroes.reduce((n, h) => n + (h.gold ?? 0), 0)}G
+              <span className="line-clamp-2 block text-[12px] leading-4 text-zinc-400" data-continue-summary>
+                {continueSummary(game)}
               </span>
             </span>
             <span className="flex -space-x-2">
@@ -121,6 +113,18 @@ export function TitleScreen() {
         )}
       </div>
       {showLore && <Lorebook onClose={() => setShowLore(false)} />}
+      {askNew && game && (
+        <ConfirmDialog
+          title="新しい冒険を始めますか？"
+          text={overwriteText(game)}
+          ok="上書きして始める"
+          onCancel={() => setAskNew(false)}
+          onOk={() => {
+            setAskNew(false);
+            startNew();
+          }}
+        />
+      )}
     </Screen>
   );
 }

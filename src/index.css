@@ -514,3 +514,8 @@ textarea {
 @keyframes move-guide { 0%, 100% { box-shadow: 0 0 0 0 #ffd76a00; } 50% { box-shadow: 0 0 12px 2px #ffd76a66; } }
 .move-guide { animation: move-guide 1.8s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .move-guide { animation: none; } }
+
+/* キャラ作成: 全員のタブを確かめたら「冒険に出発」がゆっくり光る（フェーズ3 項目3） */
+@keyframes depart-ready { 0%, 100% { box-shadow: 0 0 8px 1px rgba(255, 210, 110, .35); } 50% { box-shadow: 0 0 22px 6px rgba(255, 210, 110, .75); } }
+.depart-ready { animation: depart-ready 2.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .depart-ready { animation: none; box-shadow: 0 0 16px 4px rgba(255, 210, 110, .6); } }

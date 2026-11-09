@@ -3,7 +3,7 @@
 // を写真に撮り、はみ出し・12px未満の文字・小さすぎるボタン・通路の絵の高さ（200px以上）を調べる。
 // 使い方: npx vite build && npx vite preview --port 4173 を起こしてから node scripts/dungeon-view.mjs（URL で変更可）
 import { mkdirSync } from 'node:fs';
-import { chromium, layoutIssues, URL } from './lib.mjs';
+import { chromium, layoutIssues, URL, depart } from './lib.mjs';
 
 const OUT = process.env.DUNGEON_VIEW_OUTPUT ?? 'screenshots/dungeon-view';
 // 入るダンジョン（ID:名前）。ほかのダンジョンの通路の絵を見る時に変える（例 lavaCavern:溶岩の大空洞）
@@ -56,7 +56,7 @@ async function run(width, height, reduced = false) {
   await page.getByText('新しい冒険').click();
   await page.getByText('2人', { exact: true }).click();
   await page.getByText('キャラクター作成へ').click();
-  await page.getByText('冒険に出発').click();
+  await depart(page);
   await page.waitForTimeout(300);
   await edit((g, dungeonId) => {
     const w = g.world;

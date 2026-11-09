@@ -3,7 +3,7 @@
 // 使い方: npx vite build && npx vite preview --port 4173 を起こしてから node scripts/chest-show.mjs（URL で変更可）
 import { execSync } from 'node:child_process';
 import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from 'node:fs';
-import { chromium, URL } from './lib.mjs';
+import { chromium, URL, depart } from './lib.mjs';
 
 const OUT = 'screenshots/chest';
 const problems = [];
@@ -21,7 +21,7 @@ async function newAdventure(page) {
   await page.getByText('新しい冒険').click();
   await page.getByText('1人', { exact: true }).click();
   await page.getByText('キャラクター作成へ').click();
-  await page.getByText('冒険に出発').click();
+  await depart(page);
   await page.waitForTimeout(300);
   // 今は世界マップから始まるので、保存を書き換えて翠の神殿の入口へ移し（物語も閉じる）、入る
   await page.evaluate((k) => {

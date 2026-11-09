@@ -2,7 +2,7 @@
 // 2人・3人・4人で、P2 が全員を誘う → 移動力の判定 → 行き先 → 移動する → 確認なしで全員が同じマスへ動く（フェーズ2-C。オンラインの同意は単体テストと online.mjs で見る）。
 // 使い方: npx vite build && npx vite preview を起こしてから URL=... node scripts/companion-move-agree.mjs
 import { mkdir } from 'node:fs/promises';
-import { chromium, layoutIssues, URL, waitForWorldMovement } from './lib.mjs';
+import { chromium, layoutIssues, URL, waitForWorldMovement, depart } from './lib.mjs';
 const dir = 'screenshots/companion-move-agree'; await mkdir(dir, { recursive: true });
 const browser = await chromium.launch();
 const check = (ok, text) => { if (!ok) throw new Error(text); };
@@ -21,7 +21,7 @@ async function run(n) {
     await page.getByText('新しい冒険').click();
     await page.getByText(`${n}人`, { exact: true }).click();
     await page.getByText('キャラクター作成へ').click();
-    await page.getByText('冒険に出発').click();
+    await depart(page);
     await page.waitForTimeout(300);
     // 保存を書き換え: 担当を P1〜Pn に分け、全員を同じマスに、P2（h1）の番にする
     await page.evaluate(() => {

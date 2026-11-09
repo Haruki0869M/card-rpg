@@ -5,7 +5,7 @@
 //   - 390 の幅で、88枚すべてを4人ずつ並べて撮る（目で確かめる用）
 // 使い方: URL=http://localhost:<port>/card-rpg/ node scripts/piece-art.mjs
 import { mkdir } from 'node:fs/promises';
-import { chromium, URL, layoutIssues } from './lib.mjs';
+import { chromium, URL, layoutIssues, depart } from './lib.mjs';
 
 const JOBS = ['warrior', 'guardian', 'hunter', 'mage', 'monk', 'thief', 'priest', 'summoner',
   'swordmaster', 'berserker', 'brawler', 'archmage', 'hexer', 'phantomTamer', 'paladin', 'lancer',
@@ -37,7 +37,7 @@ await page.reload();
 await page.getByText('新しい冒険').click();
 await page.getByText('4人', { exact: true }).click();
 await page.getByText('キャラクター作成へ').click();
-await page.getByText('冒険に出発').click();
+await depart(page);
 await page.waitForTimeout(400);
 const base = await page.evaluate(() => JSON.parse(localStorage.getItem('card-rpg/adventure')));
 

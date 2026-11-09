@@ -107,9 +107,17 @@ try {
   }
   // 中断データを保った取消と、承認後の新規作成を両方確認する。
   await page.reload(); const before = await read();
-  page.once('dialog', dialog => dialog.dismiss()); await page.getByText('新しい冒険', { exact: true }).click();
+  // ブラウザの確認の窓（window.confirm）ではなく、ゲーム内の確認を出す（フェーズ3）
+  let nativeDialog = false; page.on('dialog', d => { nativeDialog = true; void d.dismiss(); });
+  await page.getByText('新しい冒険', { exact: true }).click();
+  const ask = page.getByRole('dialog', { name: '新しい冒険を始めますか？' }); await ask.waitFor();
+  check((await ask.textContent()).includes('上書きされて消えます'), '上書きの確認の文が無い'); await shot('new-adventure-confirm');
+  await ask.getByText('やめる', { exact: true }).click(); await page.waitForTimeout(200);
   check(JSON.stringify(await read()) === JSON.stringify(before), '新規開始の取消で保存が変わった');
-  page.once('dialog', dialog => dialog.accept()); await page.getByText('新しい冒険', { exact: true }).click();
+  check(!(await page.locator('[data-continue-summary]').textContent()).startsWith('・'), '「つづきから」の説明の先頭に「・」がある');
+  await page.getByText('新しい冒険', { exact: true }).click();
+  await page.getByRole('dialog').getByText('上書きして始める', { exact: true }).click();
+  check(!nativeDialog, 'ブラウザの確認の窓が出た');
   check(await page.getByText('キャラクター作成へ', { exact: true }).count(), '新しい冒険の作成画面に進まない');
   check(await read() === null, '承認後も古い冒険が残る'); await shot('new-adventure');
   check(!errors.length, `画面エラー: ${errors}`); console.log('新規開始の確認・取消・初期化 OK');
