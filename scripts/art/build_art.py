@@ -70,6 +70,53 @@ def despeckle(im, keep=0.02, th=24, m=0.18):
     res.putalpha(Image.fromarray(out))
     return res
 
+def fill_holes(im, n, always=False, th=18, grow=2, edge=3, solid=8, light=0.75):
+    """背景の切り抜き（rembg）で、体の中の白っぽい所まで透明になった「穴」を、元画像の色で戻す。
+    （2026-11 に、お供・主人公の絵に穴があいていたのを直した手順。Node 版は scripts/art/fill-holes.mjs。
+     PIL・opencv が無いパソコンでは、そちらで同じ結果を作れる）
+    - 穴 = 不透明度 128 未満で、絵のふちとつながっていない所。
+      always=True（お供）なら全部埋める。False（主人公）なら、元画像のその所の色が四隅の背景と
+      平均で th より違う時だけ埋める（背景と同じ色なら、腕と体の間などの本当の隙間なので残す）。
+    - 穴のまわり grow px も元画像の色で不透明にする（後で付けるふちの影が、穴のふちに出ないように）。
+    - 体の内側で半分すけている所は、外側から edge〜solid px の間で少しずつ不透明に戻す。
+      主人公は、元画像の色が背景の明るさの light 倍以上の所だけ（床の影まで濃くならないように）。
+    ふちの影（rim）は、この後に付けるので外側の輪郭にだけ付く"""
+    import cv2
+    cut = np.array(im.convert('RGBA'))
+    o = np.array(Image.open(src(n)).convert('RGB')).astype(np.int32)
+    if o.shape[:2] != cut.shape[:2]:
+        return im
+    h, w = cut.shape[:2]
+    bg = o[[4, 4, h - 5, h - 5], [4, w - 5, 4, w - 5]].mean(0)
+    low = (cut[..., 3] < 128).astype(np.uint8)
+    nl, lab = cv2.connectedComponents(low, connectivity=4)
+    border = set(np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]])))
+    dev = np.abs(o - bg).sum(2)
+    mask = np.zeros((h, w), bool)
+    for i in range(1, nl):
+        if i in border:
+            continue
+        part = lab == i
+        if always or dev[part].mean() > th:
+            mask |= part
+    outside = (low > 0) & ~mask
+    if grow:
+        mask = cv2.dilate(mask.astype(np.uint8), np.ones((3, 3), np.uint8), iterations=grow) > 0
+    dist = cv2.distanceTransform((~outside).astype(np.uint8), cv2.DIST_L2, 3)
+    a = cut[..., 3].astype(np.float32)
+    ramp = np.clip((dist - edge) / (solid - edge), 0, 1) * 255
+    ok = ~outside
+    if not always:
+        lum = o @ np.array([0.299, 0.587, 0.114])
+        ok &= lum >= light * (bg @ np.array([0.299, 0.587, 0.114]))
+    na = np.where(ok, np.maximum(a, ramp), a)
+    na[mask] = 255
+    up = na > a
+    out = cut.copy()
+    out[up, :3] = o[up]
+    out[..., 3] = np.round(na).astype(np.uint8)
+    return Image.fromarray(out, 'RGBA')
+
 def trim(im, th=10):
     a = np.array(im.getchannel('A'))
     ys, xs = np.where(a > th)
@@ -164,7 +211,7 @@ def build_heroes():
         if not has_src(n):
             print(f'{name:32s} (元画像 {n} が無いので飛ばす)')
             continue
-        fig = trim(despeckle(cutout(n)))
+        fig = trim(despeckle(fill_holes(cutout(n), n)))
         save(rim(place(fig, 480, 660), (8, 6, 12), 0.75, 2), f'{name}.webp')
         fx, fy, fs = FACES.get((cls, g), FACE_DEFAULT)
         if fx == 0.5: fx = head_center(fig)
@@ -478,7 +525,7 @@ def build_pets():
         key = m.group(1)
         name = f'pet/{key}'
         if not want(name): continue
-        fig = trim(despeckle(cutout(f'pet-{key}')), 24)
+        fig = trim(despeckle(fill_holes(cutout(f'pet-{key}'), f'pet-{key}', always=True)), 24)
         save(rim(square(fig, 160, 0.04), (8, 6, 12), 0.6, 2), f'{name}.webp', 82)
 
 # ---------------- ワールドマップの駒（ちびキャラのミニチュア） ----------------
