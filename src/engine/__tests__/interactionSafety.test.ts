@@ -221,6 +221,6 @@ describe('同行の交代運転と共同施設', () => {
       g = run(g, { type: 'CLAIM_LOOT', playerId: 'P1', heroId: 'h0', choice: 'need', index: i });
       g = run(g, { type: 'CLAIM_LOOT', playerId: 'P2', heroId: 'h1', choice: 'pass', index: i });
     });
-    for (const loot of g.chest!.contents ?? []) if (loot.kind === 'item') expect(loot.to).toBe('h0'); else if (loot.kind === 'gold') expect(loot.to).toEqual(['h1']);
+    for (const loot of g.chest!.contents ?? []) if (loot.kind === 'item') expect(loot.to).toBe('h0'); else if (loot.kind === 'gold') expect(loot.to).toEqual(['h0', 'h1']);
   });
 });

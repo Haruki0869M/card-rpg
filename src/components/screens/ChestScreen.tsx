@@ -471,7 +471,7 @@ export function ChestScreen() {
               {/* 手に入れた物: 格の色の縁と金の四隅 */}
               <div className="panel-ornate mt-1 w-full rounded-xl border-2 p-1.5" style={{ borderColor: r.color, background: 'rgba(0,0,0,.55)', boxShadow: `0 0 14px ${r.glow}` }} data-loot-frame>
                 <LootList loot={chest.contents!} />
-                <div className="mt-1 text-center text-[12px] text-zinc-400">{chest.claims?.length ? '品物はみんなで取り合って決めます（お金は今までどおり）' : '装備品は「パーティ・装備」から誰にでも装備できます'}</div>
+                <div className="mt-1 text-center text-[12px] text-zinc-400">{chest.claims?.length ? '品物はみんなで取り合って決めます（お金はその場の全員で山分け）' : '装備品は「パーティ・装備」から誰にでも装備できます'}</div>
               </div>
 
             </div>

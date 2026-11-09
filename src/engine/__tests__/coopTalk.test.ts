@@ -59,7 +59,7 @@ describe('宝箱: 2人以上は開け役をみんなで決める', () => {
     expect(g.chest!.lastRoll!.heroId).toBe('h1');
   });
 
-  it('開けた後: 品物（装備・消耗品）は取り合い。終わるまで先へ進めない。お金は今までどおり開け役へ', () => {
+  it('開けた後: 品物（装備・消耗品）は取り合い。終わるまで先へ進めない。お金はその場の全員で山分け', () => {
     let g = chestGame(['P1', 'P2']);
     g = vote(g, 'P1', { type: 'CHEST_OPENER', playerId: 'P1', heroId: 'h0' });
     g = vote(g, 'P2', { type: 'CHEST_OPENER', playerId: 'P2', heroId: 'h0' });
@@ -73,8 +73,9 @@ describe('宝箱: 2人以上は開け役をみんなで決める', () => {
     expect(items.every((l) => l.kind === 'item' && !l.to)).toBe(true);
     const gold = c.contents!.find((l) => l.kind === 'gold');
     if (gold && gold.kind === 'gold') {
-      expect(g.heroes[0].gold - gold0[0]).toBe(gold.amount);
-      expect(g.heroes[1].gold).toBe(gold0[1]);
+      expect(gold.to).toEqual(['h0', 'h1']);
+      expect(g.heroes[0].gold - gold0[0] + g.heroes[1].gold - gold0[1]).toBe(gold.amount);
+      expect(Math.abs(g.heroes[0].gold - gold0[0] - (g.heroes[1].gold - gold0[1]))).toBeLessThanOrEqual(1);
     }
     // 取り合いが終わるまで、先へ進む（投票）は通らない
     expect(applyGameCommand(g, { type: 'VOTE', playerId: 'P1', command: { type: 'LEAVE_CHEST', playerId: 'P1' } }).error).toBeTruthy();
@@ -137,6 +138,9 @@ describe('宝箱: 2人以上は開け役をみんなで決める', () => {
     g = ok(g, { type: 'OPEN_CHEST', playerId: 'P1', heroId: 'h0', recipientId: 'h1', focusUsed: 0 });
     expect(g.chest!.claims).toBeUndefined();
     for (const l of g.chest!.contents!) if (l.kind === 'item') expect(l.to).toBe('h1');
+    // お金は1人の時も、場にいるキャラで山分け（2026-11-10）
+    const gold = g.chest!.contents!.find((l) => l.kind === 'gold');
+    if (gold && gold.kind === 'gold') expect(gold.to).toEqual(['h0', 'h1']);
   });
 });
 
