@@ -1018,6 +1018,7 @@ node scripts/adventure.mjs
 | 同原因の操作 | キャラ指定のない世界マップ関連操作も調べて一緒に修正 | 上記11操作に対応 |
 | 不具合の修正手順 | ゲーム本体の不具合なら直し方を説明し、OKを待ってから修正 | 今回は説明・OK後に実施済み |
 | 難易度・作業手順 | 勝手に簡単にしない。日本語で計画を説明し、各段階のOKを待つ | 引き続き遵守。GitHubへpushしない。区切りごとにコミット・bundle |
+| 振動の長さ・試すボタン（2026-11-09） | 振動する部分は最低50ミリ秒。設定に「振動を試す」（0.2秒） | **済。** 20〜40ミリ秒はスマホによっては短すぎて感じられないため、`VIBRATION` の hurt・chestStep・turn と perfect・victory の振動する部分を50に伸ばした（止まる間隔は元のまま） |
 
 **強奪の食い違いは解消済:** [spec.mdの強奪の説明と旧判断理由](../spec.md)・[強奪カード](../src/content/common/cards/topJobCards.ts)・[stealIntent](../src/engine/battle/effects/kinds/stealIntent.ts)・関連テストを最新の決定へ揃えた。
 

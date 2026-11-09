@@ -255,12 +255,12 @@ export const REVEAL_TIMING = {
 /** 振動パターン（ms） */
 export const VIBRATION = {
   /** 宝箱: 光が1段上がる / リーチ / レジェンド確定 */
-  chestStep: 30,
+  chestStep: 50,
   chestReach: [60, 50, 60],
   chestLegend: [120, 60, 120, 60, 300],
-  perfect: [25, 30, 25],
-  hurt: 20,
+  perfect: [50, 30, 50],
+  hurt: 50,
   /** 自分のキャラの手番が来た（手番のカットイン） */
-  turn: 40,
-  victory: [40, 40, 80],
+  turn: 50,
+  victory: [50, 40, 80],
 } as const;
