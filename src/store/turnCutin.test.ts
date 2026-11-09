@@ -3,7 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createGame, WORLD_SCENE } from '../engine';
 import type { GameState, PlayerId } from '../types';
 import { setLocalPlayers } from './battleConfig';
-import { cutinToShow } from '../components/ui/TurnCutin';
+import { cutinToShow, turnCutinSeconds } from '../components/ui/TurnCutin';
+import { TIMING } from '../data/balance';
 import { useBattle } from './battleStore';
 
 vi.hoisted(() => {
@@ -89,5 +90,22 @@ describe('手番のカットイン', () => {
     expect(useBattle.getState().turnCutin).not.toBeNull();
     useBattle.getState().setScreen('title');
     expect(useBattle.getState().turnCutin).toBeNull();
+  });
+});
+
+describe('手番の帯の長さ（ステップB）', () => {
+  const solo = [{ playerId: 'P1' as const }, { playerId: 'P1' as const }];
+  const pass = [{ playerId: 'P1' as const }, { playerId: 'P2' as const }];
+  it('1人で全員を操作する時の世界マップは短く（約0.5秒）', () => {
+    expect(turnCutinSeconds({ mine: true, short: false, online: false, world: true, players: solo })).toBe(TIMING.turnCutinSolo);
+    expect(TIMING.turnCutinSolo).toBe(0.5);
+  });
+  it('1台を回す時・オンライン・ダンジョンの番は今までどおり。簡易・高速・動作軽減も今までどおり', () => {
+    expect(turnCutinSeconds({ mine: true, short: false, online: false, world: true, players: pass })).toBe(TIMING.turnCutin);
+    expect(turnCutinSeconds({ mine: true, short: false, online: true, world: true, players: solo })).toBe(TIMING.turnCutin);
+    expect(turnCutinSeconds({ mine: true, short: false, online: false, world: false, players: solo })).toBe(TIMING.turnCutin);
+    expect(turnCutinSeconds({ mine: true, short: true, online: false, world: true, players: pass })).toBe(TIMING.turnCutinShort);
+    expect(turnCutinSeconds({ mine: true, short: true, online: false, world: true, players: solo })).toBe(Math.min(TIMING.turnCutinShort, TIMING.turnCutinSolo));
+    expect(turnCutinSeconds({ mine: false, short: false, online: true, world: true, players: pass })).toBe(TIMING.turnNotice);
   });
 });

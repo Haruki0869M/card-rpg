@@ -77,7 +77,7 @@ describe('移動と手番', () => {
     g = run(g, { type: 'STORY_CONTINUE', playerId: P });
     return g;
   }
-  it('移動力を判定 → 経路の移動力だけ減る。同行したキャラは一緒に動き、自分の手番も持つ', () => {
+  it('移動力を判定 → 経路の移動力だけ減る。同行したキャラは一緒に動き、行動済みになる（ステップB）', () => {
     let g = started();
     g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0', focusUsed: 2 });
     const w = g.world!;
@@ -89,12 +89,12 @@ describe('移動と手番', () => {
     expect(g.world!.pos.h0).toBe(to);
     expect(g.world!.pos.h1).toBe(to);
     expect(g.world!.move).toBe(before - info.cost);
-    expect(g.world!.acted).not.toContain('h1');
-    // 運転者が待機すると同行者の手番。全員終わってからワールドターンが進む
+    expect(g.world!.acted).toContain('h1');
+    expect(g.world!.turn).toBe('h0');
+    // 運転者が手番を終えると、同行者は行動済みなので、そのままワールドターンが進む
     g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h0' });
-    expect(g.world!.turn).toBe('h1');
-    g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h1' });
     expect(g.world!.worldTurn).toBe(2);
+    expect(g.world!.acted).toEqual([]);
     expect(g.world!.corruption).toBe(getDifficulty(g.difficulty).corruptionPerTurn ?? BALANCE.corruptionPerTurn);
     expect(g.world!.turn).toBe('h0');
   });
