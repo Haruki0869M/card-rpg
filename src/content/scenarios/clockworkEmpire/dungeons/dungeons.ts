@@ -123,7 +123,6 @@ export const gearFactory: DungeonDef = {
   pools: FACTORY_POOLS,
   bossChest: 'epic',
   rewardKey: 'coreGear',
-  corruptionOnClear: 5,
   clearStory: ['工場長ゴーレムが、動かなくなった。', '工場のベルトが、静かに止まる。', '動力核（歯車）を壊した！'],
   layout: factoryLayout,
 };
@@ -137,7 +136,8 @@ export const steamPlant: DungeonDef = {
   pools: PLANT_POOLS,
   bossChest: 'epic',
   rewardKey: 'coreSteam',
-  corruptionOnClear: 5,
+  // 1つ目のダンジョンの鍵が要る（play-feedback-plan §4 C: 町や依頼を飛ばして、まっすぐ奥へ行けないように）
+  requiresKeys: ['coreGear'],
   clearStory: ['暴走ボイラーの炎が、消えた。', '発電所から、蒸気が引いていく。', '動力核（蒸気）を壊した！'],
   layout: plantLayout,
 };
@@ -151,7 +151,6 @@ export const clockTower: DungeonDef = {
   pools: TOWER_POOLS,
   bossChest: 'legend',
   rewardKey: 'coreTime',
-  corruptionOnClear: 5,
   clearStory: ['時計仕掛けの賢者の針が、止まった。', '「大機械を…止めてやってくれ」', '動力核（時間）を壊した！'],
   layout: towerLayout,
 };

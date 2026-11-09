@@ -12,7 +12,8 @@ export const silentCatacomb: DungeonDef = {
   pools: SWAMP_POOLS,
   bossChest: 'epic',
   rewardKey: 'azure',
-  corruptionOnClear: 5,
+  // 1つ目のダンジョンの鍵が要る（play-feedback-plan §4 C: 町や依頼を飛ばして、まっすぐ奥へ行けないように）
+  requiresKeys: ['emerald'],
   clearStory: ['屍術師モルデアは、静かに崩れ落ちた。', '亡者たちが、ようやく眠りについた。', '封印の鍵（蒼）を手に入れた！'],
   layout: [
     [{ type: 'battle', next: [0, 1] }],

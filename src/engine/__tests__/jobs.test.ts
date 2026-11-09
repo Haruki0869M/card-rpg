@@ -51,15 +51,15 @@ describe('転職の場所と手順', () => {
     expect(heroPlace(g, g.heroes[0])).toBe('map');
     const opt = jobOptions(g.heroes[0], g).find((o) => o.job.id === 'swordmaster')!;
     expect(opt.ready).toBe(false);
-    expect(opt.reason).toContain('Lv5');
-    g.heroes[0].level = 5;
+    expect(opt.reason).toContain(`Lv${BALANCE.jobChange.base}`);
+    g.heroes[0].level = BALANCE.jobChange.base;
     expect(jobOptions(g.heroes[0], g).find((o) => o.job.id === 'swordmaster')!.ready).toBe(true);
     expect(jobOptions(g.heroes[0], g).map((o) => o.job.id).sort()).toEqual(['berserker', 'swordmaster']);
   });
 
   it('戦闘中は転職できない', () => {
     const g = newGame();
-    g.heroes[0].level = 5;
+    g.heroes[0].level = BALANCE.jobChange.base;
     g.mode = 'battle';
     expect(heroPlace(g, g.heroes[0])).toBe('busy');
     expect(applyGameCommand(g, { type: 'CHANGE_JOB', playerId: P, heroId: g.heroes[0].id, jobId: 'swordmaster' }).error).toBeTruthy();
@@ -68,7 +68,7 @@ describe('転職の場所と手順', () => {
   it('転職するとLv1。経験値はLv2の手前まで持ち越し、専用カード3枚から1枚選ぶ', () => {
     let g = newGame();
     const h = g.heroes[0];
-    h.level = 6;
+    h.level = BALANCE.jobChange.base + 1;
     h.exp = 999;
     g = run(g, { type: 'CHANGE_JOB', playerId: P, heroId: h.id, jobId: 'swordmaster' });
     const n = g.heroes[0];
@@ -88,7 +88,7 @@ describe('転職の場所と手順', () => {
 
   it('経験値が少なければそのまま持ち越す', () => {
     let g = newGame();
-    g.heroes[0].level = 5;
+    g.heroes[0].level = BALANCE.jobChange.base;
     g.heroes[0].exp = 3;
     g = run(g, { type: 'CHANGE_JOB', playerId: P, heroId: g.heroes[0].id, jobId: 'berserker' });
     expect(g.heroes[0].exp).toBe(3);
@@ -96,7 +96,7 @@ describe('転職の場所と手順', () => {
 
   it('転職後のカードの候補は、今のジョブとこれまでのジョブのもの', () => {
     let g = newGame();
-    g.heroes[0].level = 5;
+    g.heroes[0].level = BALANCE.jobChange.base;
     g = run(g, { type: 'CHANGE_JOB', playerId: P, heroId: g.heroes[0].id, jobId: 'berserker' });
     const pool = heroCardPool(g.heroes[0]);
     expect(pool).toContain('bloodFeast');
@@ -105,7 +105,7 @@ describe('転職の場所と手順', () => {
 
   it('使えない武器は持ち物へ移り、そのジョブの最初の武器を持つ', () => {
     let g = newGame();
-    g.heroes[0].level = 5;
+    g.heroes[0].level = BALANCE.jobChange.base;
     g = run(g, { type: 'CHANGE_JOB', playerId: P, heroId: g.heroes[0].id, jobId: 'berserker' });
     // 狂戦士は斧（得意）と剣（使える）→ 銅の剣はそのまま
     expect(g.heroes[0].equipment.weapon?.itemId).toBe('copperSword');
@@ -250,9 +250,9 @@ describe('最上位13職の転職とカード', () => {
   });
   it.each(topJobs.map(j => [j.id, j] as const))('%s: レベル・実績・場所を満たした時だけ転職できる', (_, j) => {
     let g = newGame(['warrior']);
-    const h = g.heroes[0]; h.classId = j.from![0]; h.level = 3;
+    const h = g.heroes[0]; h.classId = j.from![0]; h.level = BALANCE.jobChange.mid - 1;
     expect(jobOptions(h, g).find(o => o.job.id === j.id)?.ready).toBe(false);
-    h.level = 4; h.feats = { [j.requires!.feat]: j.requires!.count - 1 };
+    h.level = BALANCE.jobChange.mid; h.feats = { [j.requires!.feat]: j.requires!.count - 1 };
     expect(jobOptions(h, g).find(o => o.job.id === j.id)?.progress).toBe(j.requires!.count - 1);
     expect(jobOptions(h, g).find(o => o.job.id === j.id)?.qualified).toBe(false);
     h.feats[j.requires!.feat]++;

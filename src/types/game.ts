@@ -204,7 +204,7 @@ export interface DungeonDef {
   clearStory?: string[];
   /** 入るのに必要な鍵 */
   requiresKeys?: string[];
-  /** 制覇すると侵食度がこれだけ下がる */
+  /** 制覇すると侵食度がこれだけ下がる（無ければ、鍵のダンジョンは BALANCE.corruptionOnKeyDungeonClear・それ以外は0） */
   corruptionOnClear?: number;
   /** 制覇するとシナリオのクリア（ラスボスのダンジョン） */
   finale?: boolean;

@@ -240,6 +240,12 @@ export interface WorldState {
   keys: string[];
   quests: QuestState[];
   visitedRegions: number[];
+  /**
+   * 交代運転の記録（§4 A）: このワールドターンに動いたキャラ → 動かした手番のキャラ / 交代運転で侵食度が上がった手番のキャラ。
+   * ワールドターンの終わりに消える（無ければ空。古い保存データは無いまま始まる）
+   */
+  movedBy?: Record<string, string>;
+  relayCharged?: string[];
   /** このワールドターンに野営して、寒さ・暑さを受けないキャラ（ターンの終わりに消える。K4 段2。無ければ空） */
   sheltered?: string[];
   /** 船を持っている（K4 段3。パーティ共有。あると海のマスを進める） */

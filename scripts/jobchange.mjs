@@ -1,4 +1,4 @@
-// 転職の画面の確認: 世界マップで剣士をLv5にして、パーティ → 転職先を見る → 剣豪に転職 → 専用カードを1枚選ぶ
+// 転職の画面の確認: 世界マップで剣士をLv6にして、パーティ → 転職先を見る → 剣豪に転職 → 専用カードを1枚選ぶ
 // 使い方: npx vite preview を起こしてから node scripts/jobchange.mjs
 import { chromium, layoutIssues, URL, depart } from './lib.mjs';
 
@@ -23,12 +23,12 @@ await page.getByText('1人', { exact: true }).click();
 await page.getByText('キャラクター作成へ').click();
 await depart(page);
 await page.waitForTimeout(300);
-// 剣士をLv5に（物語も閉じる）
+// 剣士をLv6に（物語も閉じる）
 await page.evaluate(() => {
   const k = 'card-rpg/adventure';
   const d = JSON.parse(localStorage.getItem(k));
   d.game.world.story = undefined;
-  d.game.heroes[0].level = 5;
+  d.game.heroes[0].level = 6;
   d.game.heroes[0].exp = 4;
   localStorage.setItem(k, JSON.stringify(d));
 });
@@ -57,12 +57,12 @@ const hero = await page.evaluate(() => JSON.parse(localStorage.getItem('card-rpg
 if (hero.classId !== 'swordmaster' || hero.level !== 1 || !hero.deck.some((c) => c.cardId === 'flashCut')) await fail(`転職の結果がおかしい: ${hero.classId} Lv${hero.level}`);
 console.log(`OK: ${hero.name} 剣豪 Lv${hero.level} EXP${hero.exp}・一閃を獲得・持ち越し=${hero.carried}`);
 
-// 最上位: レベル不足でも条件7/15が見え、聖堂で剣聖へ転職して専用カードを選べる。
+// 最上位: レベル不足でも条件7/60が見え、聖堂で剣聖へ転職して専用カードを選べる。
 const baseSave = await page.evaluate(() => JSON.parse(localStorage.getItem('card-rpg/adventure')));
 for (const width of [360, 390, 480]) {
   await page.setViewportSize({ width, height: 780 });
   const seed = structuredClone(baseSave);
-  seed.game.heroes[0].level = 3;
+  seed.game.heroes[0].level = 6;
   seed.game.heroes[0].feats = { perfects: 7 };
   await page.evaluate((d) => localStorage.setItem('card-rpg/adventure', JSON.stringify(d)), seed);
   await page.reload();
@@ -70,17 +70,17 @@ for (const width of [360, 390, 480]) {
   await page.locator('[data-party-row] button').first().click();
   await page.getByText('転職先を見る', { exact: true }).click();
   // フェーズ2-A: レベルと条件を1か所に、✓/✗と進み具合の棒つきで出す（同じ文を2回出さない）
-  const reqs = page.locator('[data-job-reqs]').filter({ hasText: '完全成功15回' });
+  const reqs = page.locator('[data-job-reqs]').filter({ hasText: '完全成功60回' });
   if (!(await reqs.first().isVisible())) await fail(`${width}px: 条件の一覧が見えない`);
-  if (!(await reqs.first().getByText('7/15', { exact: true }).isVisible())) await fail(`${width}px: 条件の進捗（7/15）が見えない`);
-  if (!(await reqs.first().locator('[data-job-req="ng"]').filter({ hasText: 'Lv4以上（今 Lv3）' }).count())) await fail(`${width}px: レベルの不足（✗ Lv4以上）が見えない`);
+  if (!(await reqs.first().getByText('7/60', { exact: true }).isVisible())) await fail(`${width}px: 条件の進捗（7/60）が見えない`);
+  if (!(await reqs.first().locator('[data-job-req="ng"]').filter({ hasText: 'Lv7以上（今 Lv6）' }).count())) await fail(`${width}px: レベルの不足（✗ Lv7以上）が見えない`);
   if (!(await reqs.first().locator('[data-job-progress]').count())) await fail(`${width}px: 進み具合の棒が無い`);
-  const dup = await page.getByText('完全成功15回', { exact: false }).count();
-  if (dup !== await page.locator('[data-job-reqs]').filter({ hasText: '完全成功15回' }).count()) await fail(`${width}px: 条件の文が2回出ている（${dup}）`);
+  const dup = await page.getByText('完全成功60回', { exact: false }).count();
+  if (dup !== await page.locator('[data-job-reqs]').filter({ hasText: '完全成功60回' }).count()) await fail(`${width}px: 条件の文が2回出ている（${dup}）`);
   await page.waitForTimeout(250);
   await shot(`top-progress-${width}`);
-  seed.game.heroes[0].level = 4;
-  seed.game.heroes[0].feats.perfects = 15;
+  seed.game.heroes[0].level = 7;
+  seed.game.heroes[0].feats.perfects = 60;
   await page.evaluate((d) => localStorage.setItem('card-rpg/adventure', JSON.stringify(d)), seed);
   await page.reload();
   await page.getByText('つづきから', { exact: true }).click();
@@ -105,6 +105,6 @@ for (const width of [360, 390, 480]) {
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('card-rpg/adventure')).game.heroes[0].deck.some(c => c.cardId === 'heavenBlade'));
   const top = await page.evaluate(() => JSON.parse(localStorage.getItem('card-rpg/adventure')).game.heroes[0]);
   if (top.classId !== 'swordSaint' || top.level !== 1 || !top.deck.some(c => c.cardId === 'heavenBlade') || top.carried !== 'swordmaster') await fail(`${width}px: 最上位への転職結果が不正`);
-  console.log(`OK: ${width}px 条件7/15・聖堂で剣聖へ転職・天剣を獲得`);
+  console.log(`OK: ${width}px 条件7/60・聖堂で剣聖へ転職・天剣を獲得`);
 }
 await browser.close();

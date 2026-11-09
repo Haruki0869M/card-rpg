@@ -119,7 +119,6 @@ export const wreckCave: DungeonDef = {
   pools: WRECK_CAVE_POOLS,
   bossChest: 'epic',
   rewardKey: 'lightStar',
-  corruptionOnClear: 5,
   clearStory: ['海蛇の女王が、静かに海へ沈んでいった。', '洞窟に、星の灯がともった。', '星の灯を手に入れた！'],
   layout: wreckCaveLayout,
 };
@@ -133,7 +132,8 @@ export const pirateIsland: DungeonDef = {
   pools: PIRATE_ISLAND_POOLS,
   bossChest: 'epic',
   rewardKey: 'lightMoon',
-  corruptionOnClear: 5,
+  // 1つ目のダンジョンの鍵が要る（play-feedback-plan §4 C: 町や依頼を飛ばして、まっすぐ奥へ行けないように）
+  requiresKeys: ['lightStar'],
   clearStory: ['海賊船長ガルドが、剣を落とした。', '「…灯台を、頼む」', '月の灯を手に入れた！'],
   layout: pirateIslandLayout,
 };
@@ -147,7 +147,6 @@ export const sunkenTemple: DungeonDef = {
   pools: SUNKEN_TEMPLE_POOLS,
   bossChest: 'legend',
   rewardKey: 'lightSun',
-  corruptionOnClear: 5,
   clearStory: ['潮の神官が、祈りを止めて微笑んだ。', '「提督は、悲しんでおられる」', '日の灯を手に入れた！'],
   layout: sunkenTempleLayout,
 };

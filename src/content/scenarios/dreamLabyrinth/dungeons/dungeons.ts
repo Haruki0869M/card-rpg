@@ -120,7 +120,6 @@ export const echoIceVault: DungeonDef = {
   pools: ICE_POOLS,
   bossChest: 'epic',
   rewardKey: 'shardMemory',
-  corruptionOnClear: 5,
   clearStory: ['白の女王の影が、雪のように溶けた。', '「…覚えていてくれて、ありがとう」', '夢の欠片（記憶）を手に入れた！'],
   layout: iceLayout,
 };
@@ -134,7 +133,8 @@ export const echoSandTomb: DungeonDef = {
   pools: SAND_POOLS,
   bossChest: 'epic',
   rewardKey: 'shardFear',
-  corruptionOnClear: 5,
+  // 1つ目のダンジョンの鍵が要る（play-feedback-plan §4 C: 町や依頼を飛ばして、まっすぐ奥へ行けないように）
+  requiresKeys: ['shardMemory'],
   clearStory: ['砂塵の王の影が、金色の砂に崩れた。', '「永遠でなくても、よかったのだな」', '夢の欠片（恐れ）を手に入れた！'],
   layout: sandLayout,
 };
@@ -148,7 +148,6 @@ export const echoGhostShip: DungeonDef = {
   pools: GHOST_POOLS,
   bossChest: 'legend',
   rewardKey: 'shardHope',
-  corruptionOnClear: 5,
   clearStory: ['亡霊提督の影が、静かに敬礼した。', '「今度こそ、朝日が見える」', '夢の欠片（希望）を手に入れた！'],
   layout: ghostLayout,
 };

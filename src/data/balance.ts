@@ -41,12 +41,15 @@ export const BALANCE = {
   maxPartySize: 4,
   /** 1回の戦闘の敵の最大数 */
   maxEnemies: 4,
-  /** 冒険: レベル上限・次のレベルまでの経験値（20 + 15×(レベル-1)） */
+  /** 冒険: レベル上限・次のレベルまでの経験値（20 + 25×(レベル-1)。段の倍率は tierExpMul） */
   maxLevel: 20,
   expBase: 20,
   expPerLevel: 25,
-  /** 転職（spec §6.4）: 転職できるレベル（基本→中位 / 中位→最上位 / 中位→特殊） */
-  jobChange: { base: 5, mid: 4, special: 3 },
+  /**
+   * 転職（spec §6.4）: 転職できるレベル（基本→中位 / 中位→最上位 / 中位→特殊）。
+   * play-feedback-plan §5（オーナー承認）で 5/4/3 → 6/7/5。中位のLv7までの経験値は合わせて584
+   */
+  jobChange: { base: 6, mid: 7, special: 5 },
   /** 段が上がるごとの、次のレベルに必要な経験値の倍率（基本1・中位×1.2・最上位と特殊×1.44） */
   tierExpMul: 1.2,
   /** お供: 懐き度の段階（♡1〜5）に必要な点数・撫でた時の点数・戦闘に勝った時の点数・めったに出ない子の出やすさ（%）・名前の長さ */
@@ -148,6 +151,13 @@ export const BALANCE = {
   corruptionPerTurn: 1,
   corruptionOnDungeonEnter: 2,
   corruptionOnTownFall: 5,
+  /**
+   * 侵食度: 交代運転（play-feedback-plan §4 A・オーナー承認）。
+   * 同じワールドターンのうちに、前の人の手番ですでに動いたキャラを、別の人の手番でまた動かした時に上がる（1手番に1回まで）
+   */
+  corruptionPerRelayMove: 1,
+  /** 侵食度: 鍵のダンジョンを制覇した時に下がる量（ダンジョンごとの corruptionOnClear が無い時。§4 B で 5→2） */
+  corruptionOnKeyDungeonClear: 2,
   /** 野営の回復（HPは最大HPの割合）と、夜に野営した時の夜襲の確率（%） */
   campHpRatio: 0.2,
   campFocus: 1,

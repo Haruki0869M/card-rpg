@@ -126,6 +126,8 @@ function endWorldTurn(game: GameState, rng: Rng) {
   applyClimate(game);
   w.worldTurn += 1;
   w.acted = [];
+  w.movedBy = undefined;
+  w.relayCharged = undefined;
   w.corruption = Math.min(100, w.corruption + (getDifficulty(game.difficulty).corruptionPerTurn ?? BALANCE.corruptionPerTurn));
   onCorruptionChange(game, rng, before);
   // 夜は魔物が増える
@@ -276,10 +278,29 @@ export function agreeMove(game: GameState, cmd: Cmd<'WORLD_MOVE_AGREE'>, rng: Rn
   return undefined;
 }
 
+/**
+ * 交代運転（play-feedback-plan §4 A）: 同じワールドターンのうちに、前の人（別のキャラ）の手番ですでに動いたキャラを、
+ * この手番でまた動かしたら、時間がかかったことにして侵食度が上がる。1つの手番で上がるのは1回まで。交代運転そのものはできる
+ */
+function chargeRelayMove(game: GameState, w: WorldState, h: Hero, group: Hero[], rng: Rng) {
+  const movedBy = (w.movedBy ??= {});
+  const charged = w.relayCharged ?? [];
+  const relay = group.some((g) => movedBy[g.id] !== undefined && movedBy[g.id] !== h.id) && !charged.includes(h.id);
+  for (const g of group) movedBy[g.id] = h.id;
+  if (!relay || BALANCE.corruptionPerRelayMove <= 0) return;
+  (w.relayCharged ??= []).push(h.id);
+  const before = w.corruption;
+  w.corruption = Math.min(100, w.corruption + BALANCE.corruptionPerRelayMove);
+  addLog(game, `交代で先へ進んだぶん、時が流れた（${corruptionName(game.scenarioId)}+${BALANCE.corruptionPerRelayMove}%）`);
+  onCorruptionChange(game, rng, before);
+}
+
 function doMove(game: GameState, w: WorldState, h: Hero, companions: Hero[], to: number, map: ReturnType<typeof reachable>, rng: Rng) {
   const from = w.pos[h.id];
   const path = pathTo(map, to);
   const group = [h, ...companions];
+  chargeRelayMove(game, w, h, group, rng);
+  if (game.mode === 'gameover') return;
   if (companions.length) {
     if (w.follow) delete w.follow[h.id];
     for (const c of companions) (w.follow ??= {})[c.id] = h.id;
@@ -685,7 +706,13 @@ export function interact(game: GameState, cmd: Cmd<'WORLD_INTERACT'>, rng: Rng):
       const missing = (def.requiresKeys ?? []).filter((k) => !w.keys.includes(k));
       if (missing.length) {
         const names = getScenario(game.scenarioId).story?.keys ?? {};
-        return `扉が開かない…（必要: ${missing.map((k) => names[k] ?? k).join('・')}）`;
+        const keyNames = missing.map((k) => names[k] ?? k).join('・');
+        // 最後のダンジョン以外は、どこで鍵が手に入るかも伝える（§4 C）
+        if (!def.finale) {
+          const from = missing.map((k) => DUNGEONS.forScenario(game.scenarioId).find((d) => d.rewardKey === k)?.name).filter(Boolean);
+          if (from.length) return `扉が開かない…。${keyNames}が要る。先に「${from.join('」「')}」を制覇しよう`;
+        }
+        return `扉が開かない…（必要: ${keyNames}）`;
       }
       // 一緒に入るのは、自分のキャラか、誘いを承知した他の人のキャラ
       const party = (cmd.party?.length ? cmd.party : here).filter((id) => here.includes(id) && (findHero(game, id)?.playerId === h.playerId || followingGroup(game, h.id).includes(id)));

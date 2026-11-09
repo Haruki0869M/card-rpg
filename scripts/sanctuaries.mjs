@@ -51,7 +51,7 @@ try {
       g.mode = 'world'; g.party = undefined; g.town = undefined; w.story = undefined;
       w.turn = 'h1'; const tile = w.tiles.findIndex(t => t.f?.id === id);
       w.pos.h1 = tile; w.tiles[tile].seen = true;
-      g.heroes[1].classId = 'swordmaster'; g.heroes[1].level = 4; g.heroes[1].feats = { perfects: 15 };
+      g.heroes[1].classId = 'swordmaster'; g.heroes[1].level = 7; g.heroes[1].feats = { perfects: 60 };
       await resume(d);
       const name = id === 'pilgrimTemple' ? '巡礼の神殿' : '剣の誓いの祭壇';
       await page.getByText(`${name}に入る`, { exact: true }).click();
