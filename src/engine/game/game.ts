@@ -1012,7 +1012,7 @@ function openChest(game: GameState, playerId: string, heroId: string, focusUsed:
   c.grade = grade;
   c.lastRoll = { kind: 'luck', heroId, results, success: n === slots, oddsBefore, odds, grade, gradeChance: odds[rarityIndex(grade)], omen };
   c.contents = rollChestContents(game, grade, !!c.spec.big, rng);
-  // 指定した受取人へ。判定と実績は開けたキャラのまま。大宝箱のお金は従来どおり山分け。
+  // 品物は指定した受取人へ。判定と実績は開けたキャラのまま。お金は、ふつうの宝箱も大宝箱も、場面のキャラで山分け（2026-11-10 オーナーの決定）。
   if (recipientId && !shared) for (const loot of c.contents) if (loot.kind === 'card') loot.heroId = recipient.id;
   if (shared) {
     // 2人以上: 品物（装備・消耗品）は1つずつ「欲しい／余れば／いらない」で取り合う。カードは今までどおり
@@ -1020,7 +1020,7 @@ function openChest(game: GameState, playerId: string, heroId: string, focusUsed:
     c.claims = c.contents.flatMap((l) => (l.kind === 'item' ? [{ item: l.item, heroes: ids, choices: {} }] : []));
     addLoot(game, c.contents.filter((l) => l.kind === 'card'), [recipient]);
   } else addLoot(game, c.contents.filter((l) => l.kind !== 'gold'), [recipient]);
-  addLoot(game, c.contents.filter((l) => l.kind === 'gold'), c.spec.big ? sceneHeroes(game) : [recipient]);
+  addLoot(game, c.contents.filter((l) => l.kind === 'gold'), sceneHeroes(game));
   game.stats.chestsOpened += 1;
   addLog(game, `宝箱の中身は${GRADE_NAME[grade]}だった（確率${odds[rarityIndex(grade)].toFixed(1)}%）`);
   return undefined;
