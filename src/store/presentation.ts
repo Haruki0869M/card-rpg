@@ -12,12 +12,13 @@ import { doorOmen, type DoorOmen } from '../engine/game/dungeonOmen';
 import { restMultiplierOf } from '../engine/game/common';
 import { getRoomType } from '../data/rules';
 import { cardSound, damageSound, petCry, statusSound } from '../audio/cues';
+import { COMBO_NAME } from '../engine/battle/effects';
 import { petLoveLevel } from '../engine/game/pets';
 import type { SoundId } from '../audio/ids';
 import type { AbilityNotice, BattleEvent, GameCommand, GameState } from '../types';
 
 export type PopupTone = 'damage' | 'block' | 'status' | 'zero' | 'ability' | 'heal' | 'resource';
-export interface PopupDraft { unitId: string; text: string; tone: PopupTone }
+export interface PopupDraft { unitId: string; text: string; tone: PopupTone; /** 連携の段階（2 = 金の光・大きな数字、3 = さらに広がる輪。見た目だけ） */ tier?: SynergyTier }
 export interface NoticeDraft extends AbilityNotice { unitId: string; count?: number }
 export interface PresentationFrame {
   delay: number;
@@ -29,6 +30,28 @@ export interface PresentationFrame {
   sounds?: SoundId[];
   /** 他の人の操作の演出（音を少し小さくする） */
   quiet?: boolean;
+  /** このコマで連携の演出（揺れ・輪）を始める段階（Step C。見た目だけ） */
+  synergy?: SynergyTier;
+}
+
+/** 重なりの段階（Step C）。1 = いつもの完全成功、2 = 完全成功＋連携かジョブの能力、3 = 3つ以上の重なり */
+export type SynergyTier = 1 | 2 | 3;
+export interface SynergyInfo { tier: SynergyTier | 0; layers: number; combo: boolean; jobAbilities: string[] }
+
+/**
+ * 1回の行動（カード1枚）の出来事から、演出の段階を決める（純粋。状態にも乱数にも触れない）。
+ * 重なり = 完全成功（1）＋ 連携（1）＋ その行動で発動したジョブの能力（今のジョブ・引き継いだ能力。名前ごとに1）。
+ * 完全成功でない・味方のカードでない・敵にダメージが無い行動は 0（演出なし）。
+ */
+export function synergyOf(events: readonly BattleEvent[], allyIds: ReadonlySet<string> = new Set()): SynergyInfo {
+  const none: SynergyInfo = { tier: 0, layers: 0, combo: false, jobAbilities: [] };
+  const roll = events.find((e): e is Extract<BattleEvent, { type: 'roll' }> => e.type === 'roll');
+  if (!roll?.perfect || (allyIds.size && !allyIds.has(roll.characterId))) return none;
+  if (!events.some((e) => e.type === 'damage' && e.amount > 0 && !allyIds.has(e.unitId))) return none;
+  const combo = events.some((e) => e.type === 'ability' && e.name === COMBO_NAME);
+  const jobAbilities = [...new Set(events.flatMap((e) => e.type === 'ability' && e.unitId === roll.characterId && (e.source?.kind === 'job' || e.source?.kind === 'inherited') ? [e.name] : []))];
+  const layers = 1 + (combo ? 1 : 0) + jobAbilities.length;
+  return { tier: layers >= 3 ? 3 : layers === 2 ? 2 : 1, layers, combo, jobAbilities };
 }
 
 /** 順序の整理だけを行う。エンジンの状態や乱数には触れない。allyIds = 味方のID（被弾の音を分ける） */
@@ -48,6 +71,9 @@ export function battleFrames(events: BattleEvent[], allyIds: ReadonlySet<string>
     actors.add(act.enemyUid); frames.push({ delay: 0, motions: [{ unitId: act.enemyUid, kind: 'attack' }], sounds: ['sfx_enemy_attack_start'] });
   }
   const notices = new Map<string, NoticeDraft>();
+  // 重なりの段階（Step C）: 2以上なら、この行動で敵に出すダメージの数字を大きく金色にし、最初のコマで揺れ・輪を始める
+  const synergy = synergyOf(events, allyIds), bigTier = synergy.tier >= 2 ? (synergy.tier as SynergyTier) : undefined;
+  let synergyStarted = false;
   let firstEffect = true;
   const hitCounts = new Map<string, number>();
   for (const e of events) {
@@ -71,7 +97,7 @@ export function battleFrames(events: BattleEvent[], allyIds: ReadonlySet<string>
           continue;
         }
       }
-      if (e.amount > 0) popups.push({ unitId: e.unitId, tone: 'damage', text: `-${e.amount}` });
+      if (e.amount > 0) popups.push({ unitId: e.unitId, tone: 'damage', text: `-${e.amount}`, ...(bigTier && !allyIds.has(e.unitId) ? { tier: bigTier } : {}) });
       if (e.blocked > 0 || e.amount === 0) popups.push({ unitId: e.unitId, tone: 'zero', text: e.blocked > 0 ? `防御${e.blocked}` : '0' });
       if (e.amount > 0 || e.blocked > 0) motions.push({ unitId: e.unitId, kind: 'hit' });
       sounds.push(damageSound(e.amount, e.blocked, allyIds.has(e.unitId)));
@@ -106,10 +132,17 @@ export function battleFrames(events: BattleEvent[], allyIds: ReadonlySet<string>
       if (pendingCast) { sounds.unshift(pendingCast); pendingCast = undefined; }
       const frame: PresentationFrame = { delay: firstEffect && actors.size ? TIMING.actionLead : TIMING.effectStep, popups, motions };
       if (sounds.length) frame.sounds = [...new Set(sounds)];
+      if (bigTier && !synergyStarted && popups.some((p) => p.tier)) { frame.synergy = bigTier; synergyStarted = true; }
       frames.push(frame); firstEffect = false;
     }
   }
-  if (notices.size) frames.push({ delay: 0, notices: [...notices.values()] });
+  if (notices.size) {
+    // 連携・ジョブの能力の小さな音（Step C。殴った音より静か）
+    const list = [...notices.values()], noticeSounds: SoundId[] = [];
+    if (list.some((n) => n.name === COMBO_NAME)) noticeSounds.push('sfx_battle_combo');
+    if (list.some((n) => n.source?.kind === 'job' || n.source?.kind === 'inherited')) noticeSounds.push('sfx_battle_ability');
+    frames.push({ delay: 0, notices: list, ...(noticeSounds.length ? { sounds: noticeSounds } : {}) });
+  }
   // 手番・勝敗の音は最後のコマに重ねる。コマが無ければ音だけのコマを作る
   if (tailSounds.length) {
     const last = frames[frames.length - 1];

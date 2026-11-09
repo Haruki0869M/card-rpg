@@ -20,8 +20,9 @@ import { CandidateLine, ItemInfoArea } from './ItemDetail';
 import { usePress } from '../hooks/usePress';
 import { canChangeNow, JobSheetBody } from './JobSheet';
 import { PetPanel } from './ui/PetToken';
-import { HelpCircle } from 'lucide-react';
+import { BookOpen, HelpCircle } from 'lucide-react';
 import { useHelp } from '../store/help';
+import { useLore } from '../store/lore';
 
 /** 同じ場所にいる仲間（ダンジョンの中なら同じパーティ、世界マップなら同じマス） */
 function placeMates(game: GameState, hero: Hero): Hero[] {
@@ -88,6 +89,11 @@ function MenuSheet() {
         {/* 遊び方・用語集（Step A ③）: メニューの上に重ねて開く。閉じるとこのメニューに戻る */}
         <button onClick={() => useHelp.getState().openHelp()} className={row} data-menu-help>
           <HelpCircle size={18} className="text-amber-300" /> 遊び方・用語集
+          <ChevronRight size={18} className="ml-auto" />
+        </button>
+        {/* 伝承の書（Step C ②）: メニューの上に重ねて開く。読むだけ。閉じるとこのメニューに戻る */}
+        <button onClick={() => useLore.getState().openLore()} className={row} data-menu-lore>
+          <BookOpen size={18} className="text-amber-300" /> 伝承の書（図鑑）
           <ChevronRight size={18} className="ml-auto" />
         </button>
         <SettingsControls />
