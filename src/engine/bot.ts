@@ -33,6 +33,7 @@ import {
   commandPlayer,
   needsVote,
   notVoted,
+  chestShared,
 } from './index';
 
 export interface BotLog {
@@ -277,11 +278,21 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
     }
     case 'chest': {
       const c = g.chest!;
+      // 2人以上で開けた宝箱の取り合い（戦闘の装備と同じ: 最初のキャラは「欲しい」、ほかは「余れば」）
+      const ci = c.claims?.findIndex((x) => !x.rolls) ?? -1;
+      if (ci >= 0) {
+        const cl = c.claims![ci];
+        const id = cl.heroes.find((x) => !cl.choices[x])!;
+        return send(g, { type: 'CLAIM_LOOT', playerId: pid(g, id), heroId: id, choice: id === cl.heroes[0] ? 'need' : 'greed', index: ci }, log);
+      }
       if (c.contents) return send(g, { type: 'LEAVE_CHEST', playerId: pid(g) }, log);
       // 世界マップの宝箱は、手番のキャラの担当の人のキャラで開ける
       const turnOwner = g.world && c.tile !== undefined && !g.activeScene ? findHero(g, g.world.turn)?.playerId : undefined;
       const inParty = livingHeroes(g).filter((x) => !g.party || g.party.includes(x.id));
-      const h = inParty.find((x) => !turnOwner || x.playerId === turnOwner) ?? inParty[0];
+      const first = inParty.find((x) => !turnOwner || x.playerId === turnOwner) ?? inParty[0];
+      // 2人以上: 開け役をみんなで決めてから、そのキャラで開ける
+      if (chestShared(g) && !c.opener) return send(g, { type: 'CHEST_OPENER', playerId: first.playerId, heroId: first.id }, log);
+      const h = (c.opener ? findHero(g, c.opener) : undefined) ?? first;
       const ng = send(g, { type: 'OPEN_CHEST', playerId: h.playerId, heroId: h.id, focusUsed: 0 }, log);
       if (ng.chest && !ng.chest.unlocked && ng.chest.lastRoll?.success === false) return send(ng, { type: 'LEAVE_CHEST', playerId: pid(g) }, log);
       return ng;

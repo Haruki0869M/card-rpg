@@ -519,3 +519,14 @@ textarea {
 @keyframes depart-ready { 0%, 100% { box-shadow: 0 0 8px 1px rgba(255, 210, 110, .35); } 50% { box-shadow: 0 0 22px 6px rgba(255, 210, 110, .75); } }
 .depart-ready { animation: depart-ready 2.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .depart-ready { animation: none; box-shadow: 0 0 16px 4px rgba(255, 210, 110, .6); } }
+
+/* ピン（「こっち！」の札。ステップ2）: ふわっと出る */
+@keyframes pin-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.pin-pop { animation: pin-pop 0.25s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .pin-pop { animation: none; }
+}

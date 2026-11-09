@@ -15,11 +15,13 @@
 //   snapshot  ある番号の時点の状態と要約
 //   errors    {端末ID: 最後に断られた理由}
 //   stamps    {端末ID: 最後に送ったスタンプ}
+//   pins      {端末ID: 今指しているピン（「こっち！」。約8秒で消える。src/net/pins.ts）}
 // roomIndex/{合言葉} = 最後に使った時刻（古い部屋の掃除用）
 import { contentVersion } from '../data/contentVersion';
 import { applyGameCommand, createGame, GAME_VERSION, stateHash } from '../engine';
 import type { Gender, GameCommand, GameResult, GameState, PlayerId } from '../types';
 import { type Backend, join, type Unsubscribe } from './backend';
+import type { Pin, PinTarget } from './pins';
 
 export const SEATS: PlayerId[] = ['P1', 'P2', 'P3', 'P4'];
 /** 何手ごとに状態を保存して比べるか */
@@ -82,6 +84,8 @@ export type RoomEvent =
   | { type: 'members' }
   | { type: 'slots' }
   | { type: 'stamp'; uid: string; stamp: Stamp }
+  /** だれかのピンが変わった（ゲームの状態は変わらない） */
+  | { type: 'pins' }
   /** 自分の操作が断られた */
   | { type: 'rejected'; text: string }
   | { type: 'connection'; connected: boolean }
@@ -111,6 +115,8 @@ export class Room {
   /** 部屋に保存されている枠（人数で切り出す前） */
   private rawSlots: Record<string, Slot> = {};
   stamps: Record<string, Stamp> = {};
+  /** 端末ID → 今指しているピン（古い物も入っている。出す時は activePins で選ぶ） */
+  pins: Record<string, Pin> = {};
   game: GameState | null = null;
   /** 最後に動かした操作の番号 */
   seq = 0;
@@ -277,6 +283,10 @@ export class Room {
           if (isNew) this.emit({ type: 'stamp', uid, stamp: st });
         }
       }),
+      b.onValue<Record<string, Pin>>(p('pins'), (s) => {
+        this.pins = s ?? {};
+        this.emit({ type: 'pins' });
+      }),
       b.onValue<{ text: string; at: number }>(p('errors', this.uid), (e) => {
         if (e && e.at > b.now() - 30_000) this.emit({ type: 'rejected', text: e.text });
       }),
@@ -374,6 +384,12 @@ export class Room {
   async sendStamp(kind: string) {
     if (!this.seat) return;
     await this.backend.set(roomPath(this.code, 'stamps', this.uid), { kind, at: this.backend.now(), seat: this.seat } satisfies Stamp);
+  }
+
+  /** ピンを指す（null で消す）。ゲームの状態・記録・乱数には さわらない。ctx = 今の場面の目印（pinContext） */
+  async sendPin(target: PinTarget | null, ctx = '') {
+    if (!this.seat) return;
+    await this.backend.set(roomPath(this.code, 'pins', this.uid), target ? ({ seat: this.seat, target, at: this.backend.now(), ctx } satisfies Pin) : null);
   }
 
   /** ホスト: 切断中の人の分を代わりに操作する / やめる */

@@ -205,11 +205,22 @@ describe('同行の交代運転と共同施設', () => {
     expect(g.heroes[1].feats?.prayers).toBe(1); expect(g.heroes[0].feats?.prayers ?? 0).toBe(0);
     expect(applyGameCommand(g, { type: 'SHRINE_CHOOSE', playerId: 'P1', heroId: 'h0', optionIndex: 0 }).error).toBeTruthy();
   });
-  it('P2の宝箱判定の記録と報酬の受取人を分ける', () => {
+  it('P2の宝箱判定の記録は開け役に、品物は取り合いで決める（ステップ2: 2人以上は開け役をみんなで決める）', () => {
     let g = world(2); g.world!.turn = 'h1'; g.world!.tiles[0].f = { kind: 'chest', id: 'test' };
     g = run(g, { type: 'WORLD_INTERACT', playerId: 'P2', heroId: 'h1' });
+    // 開け役を決める前は開けられない
+    expect(applyGameCommand(g, { type: 'OPEN_CHEST', playerId: 'P2', heroId: 'h1', focusUsed: 0 }).error).toBeTruthy();
+    g = run(g, { type: 'VOTE', playerId: 'P1', command: { type: 'CHEST_OPENER', playerId: 'P1', heroId: 'h1' } });
+    g = run(g, { type: 'VOTE', playerId: 'P2', command: { type: 'CHEST_OPENER', playerId: 'P2', heroId: 'h1' } });
+    expect(g.chest!.opener).toBe('h1');
     g = run(g, { type: 'OPEN_CHEST', playerId: 'P2', heroId: 'h1', recipientId: 'h0', focusUsed: 2 });
     expect(g.heroes[1].feats?.['checks:luk']).toBe(1); expect(g.heroes[0].feats?.['checks:luk'] ?? 0).toBe(0);
-    for (const loot of g.chest!.contents ?? []) if ('to' in loot) expect(loot.to).toEqual(loot.kind === 'gold' ? ['h0'] : 'h0'); else if ('heroId' in loot) expect(loot.heroId).toBe('h0');
+    const claims = g.chest!.claims!;
+    expect(claims.length).toBe(g.chest!.contents!.filter((l) => l.kind === 'item').length);
+    claims.forEach((_, i) => {
+      g = run(g, { type: 'CLAIM_LOOT', playerId: 'P1', heroId: 'h0', choice: 'need', index: i });
+      g = run(g, { type: 'CLAIM_LOOT', playerId: 'P2', heroId: 'h1', choice: 'pass', index: i });
+    });
+    for (const loot of g.chest!.contents ?? []) if (loot.kind === 'item') expect(loot.to).toBe('h0'); else if (loot.kind === 'gold') expect(loot.to).toEqual(['h1']);
   });
 });
