@@ -1,5 +1,7 @@
 # 世界マップの箱庭ジオラマの絵（Midjourney の指示文・33枚）
 
+> **このMidjourney用の指示文は使いません（2026-11-10）。** ChatGPT でまとめて作る新しい指示文は `diorama-prompts-chatgpt.md` です。
+
 計画: `docs/tasks/play-feedback-plan.md` の「絵の準備」（やり方A・オーナー承認済み）。
 私（Claude）が指示文を作り、オーナーが Midjourney で作り、私が切り抜いて組み込みます。**新しいお金はかかりません。**
 絵が届くまでは、箱庭のセッションが仮の絵（SVG）で動きを先に作ります。絵が届いたら差し替えるだけです。
