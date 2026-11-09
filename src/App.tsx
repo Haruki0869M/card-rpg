@@ -43,7 +43,7 @@ function useKeyboard() {
       const s = useBattle.getState();
       if (s.worldMoves.length) return;
       if (useDetail.getState().detail) {
-        if (e.key === 'Escape') useDetail.getState().hide();
+        if (e.key === 'Escape') useDetail.getState().back();
         return;
       }
       if (s.sheet || s.confirmAbandon) {
@@ -208,7 +208,7 @@ export default function App() {
   }, []);
 
   useBackButton(!!detail || !!selection || !!sheet || confirmAbandon || screen === 'setup' || screen === 'create' || screen === 'join', () => {
-    if (useDetail.getState().detail) { useDetail.getState().hide(); return true; }
+    if (useDetail.getState().detail) { useDetail.getState().back(); return true; }
     return closeTop();
   });
   useKeyboard();

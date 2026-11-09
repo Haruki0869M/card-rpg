@@ -16,7 +16,8 @@ import { useOnline } from '../store/onlineStore';
 import { OnlinePanel } from './screens/OnlineScreens';
 import type { CardInstance, EquipSlot, GameState, Hero } from '../types';
 import { ConfirmDialog } from './ui/ConfirmDialog';
-import { diffText } from './equipDiff';
+import { CandidateLine, ItemInfoArea } from './ItemDetail';
+import { usePress } from '../hooks/usePress';
 import { canChangeNow, JobSheetBody } from './JobSheet';
 import { PetPanel } from './ui/PetToken';
 
@@ -290,23 +291,35 @@ function PartySheet() {
         {EQUIP_SLOTS.map((s) => {
           const inst = hero.equipment[s];
           const it = inst ? getItem(inst.itemId) : null;
-          return (
-            <button
-              key={s}
-              disabled={inBattle || !mine}
-              onClick={() => setSlot(slot === s ? null : s)}
-              className={`btn flex min-h-14 items-center gap-2 rounded-lg border px-2 text-left ${slot === s ? 'border-amber-300 bg-amber-500/10' : 'border-white/10 bg-black/30'}`}
-            >
+          const inner = (
+            <>
               <span className="w-12 shrink-0 text-[12px] text-zinc-400">{SLOT_NAME[s]}</span>
-              {it ? <ItemIcon item={it} size={40} /> : <span className="h-10 w-10 rounded-lg border-2 border-dashed border-zinc-600" />}
+              {it ? <ItemIcon item={it} size={40} /> : <span className="h-10 w-10 shrink-0 rounded-lg border-2 border-dashed border-zinc-600" />}
               <span className="min-w-0 flex-1 leading-4">
                 <span className="block text-[14px] font-bold" style={{ color: it ? RARITY_STYLE[it.rarity].color : '#888' }}>
                   {it?.name ?? 'なし'}
                 </span>
                 {it && <span className="block truncate text-[12px] text-zinc-400">{itemSummary(it)}</span>}
               </span>
-              {!inBattle && mine && <ChevronRight size={18} className="text-zinc-400" />}
-            </button>
+            </>
+          );
+          return (
+            // 文字の所を押すと詳細、右の「付け替え」で持ち物の候補を出す
+            <div key={s} className={`flex min-h-14 items-center gap-1 rounded-lg border pr-1 ${slot === s ? 'border-amber-300 bg-amber-500/10' : 'border-white/10 bg-black/30'}`} data-equip-slot={s}>
+              {it && inst ? (
+                <ItemInfoArea itemId={it.id} heroId={hero.id} itemUid={inst.uid} className="flex min-h-14 flex-1 items-center gap-2 px-2">
+                  {inner}
+                </ItemInfoArea>
+              ) : (
+                <span className="flex min-h-14 min-w-0 flex-1 items-center gap-2 px-2">{inner}</span>
+              )}
+              {!inBattle && mine && (
+                <button onClick={() => setSlot(slot === s ? null : s)} aria-label={`${SLOT_NAME[s]}を付け替える`} aria-expanded={slot === s} className="btn btn-dark flex h-11 shrink-0 items-center rounded-lg pr-0.5 pl-2 text-[12px] font-bold">
+                  付け替え
+                  <ChevronRight size={16} className="text-zinc-300" />
+                </button>
+              )}
+            </div>
           );
         })}
       </div>
@@ -319,30 +332,18 @@ function PartySheet() {
             {candidates.map((inst) => {
               const it = getItem(inst.itemId);
               const why = canEquip(hero, it);
-              const diff = diffText(hero, slot, it);
               return (
                 <div key={inst.uid} className="flex items-center gap-2 rounded-lg bg-black/30 p-1.5">
-                  <ItemIcon item={it} size={40} />
-                  <span className="min-w-0 flex-1 leading-4">
-                    <span className="block text-[14px] font-bold" style={{ color: RARITY_STYLE[it.rarity].color }}>
-                      {it.name}
+                  <ItemInfoArea itemId={it.id} heroId={hero.id} className="flex flex-1 items-center gap-2">
+                    <ItemIcon item={it} size={40} />
+                    <span className="min-w-0 flex-1 leading-4">
+                      <span className="block text-[14px] font-bold" style={{ color: RARITY_STYLE[it.rarity].color }}>
+                        {it.name}
+                      </span>
+                      <CandidateLine hero={hero} slot={slot} item={it} />
+                      {why && <span className="block text-[12px] text-red-300">{why}</span>}
                     </span>
-                    <span className="flex flex-wrap gap-x-1.5 text-[12px]">
-                      {diff.map((d) => (
-                        <span key={d.label} className={d.delta > 0 ? 'text-emerald-300' : 'text-red-300'}>
-                          {d.label}
-                          {d.delta > 0 ? '+' : ''}
-                          {d.delta}
-                        </span>
-                      ))}
-                      {it.cards?.map((c) => (
-                        <span key={c.cardId} className="text-sky-300">
-                          「{cardOf({ cardId: c.cardId }).name}」×{c.count}
-                        </span>
-                      ))}
-                      {why && <span className="text-red-300">{why}</span>}
-                    </span>
-                  </span>
+                  </ItemInfoArea>
                   <button
                     disabled={!!why}
                     onClick={() => {
@@ -390,10 +391,12 @@ function PartySheet() {
           const it = getItem(inst.itemId);
           return (
             <div key={inst.uid} className="flex items-center gap-2 rounded-lg bg-black/30 p-1">
-              <ItemIcon item={it} size={34} />
-              <span className="min-w-0 flex-1 truncate text-[13px] font-bold" style={{ color: RARITY_STYLE[it.rarity].color }}>
-                {it.name}
-              </span>
+              <ItemInfoArea itemId={it.id} heroId={hero.id} className="flex min-h-11 flex-1 items-center gap-2">
+                <ItemIcon item={it} size={34} />
+                <span className="min-w-0 flex-1 truncate text-[13px] font-bold" style={{ color: RARITY_STYLE[it.rarity].color }}>
+                  {it.name}
+                </span>
+              </ItemInfoArea>
               {mine && mates.length > 0 && (
                 <button onClick={() => setGive({ itemUid: inst.uid })} className="btn btn-dark h-11 shrink-0 rounded-lg px-3 text-[13px] font-bold">
                   渡す
@@ -452,6 +455,16 @@ function PartySheet() {
   );
 }
 
+/** 道具袋の1行: 押すと選ぶ（使う相手を決める）、長押しで詳細（指を離しても残る） */
+function PouchRow({ itemId, heroId, onTap, className, children }: { itemId: string; heroId?: string; onTap: () => void; className: string; children: ReactNode }) {
+  const press = usePress(onTap, { type: 'item', itemId, heroId });
+  return (
+    <button {...press} className={className} data-pouch-item={itemId}>
+      {children}
+    </button>
+  );
+}
+
 function PouchSheet() {
   const game = useBattle((s) => s.game)!;
   const battle = useBattle((s) => s.battle);
@@ -497,11 +510,13 @@ function PouchSheet() {
       <div className="flex flex-col gap-1">
         {[...groups.entries()].map(([itemId, uids]) => {
           const it = getItem(itemId);
-          const active = chosen && uids.includes(chosen);
+          const active = !!chosen && uids.includes(chosen);
           return (
-            <button
+            <PouchRow
               key={itemId}
-              onClick={() => setChosen(active ? null : uids[0])}
+              itemId={itemId}
+              heroId={owner?.id}
+              onTap={() => setChosen(active ? null : uids[0])}
               className={`btn flex min-h-14 items-center gap-2 rounded-lg border px-2 text-left ${active ? 'border-amber-300 bg-amber-500/10' : 'border-white/10 bg-black/30'}`}
             >
               <ItemIcon item={it} size={42} />
@@ -511,7 +526,7 @@ function PouchSheet() {
                 </span>
                 <span className="block text-[12px] text-zinc-400">{itemSummary(it)}</span>
               </span>
-            </button>
+            </PouchRow>
           );
         })}
       </div>

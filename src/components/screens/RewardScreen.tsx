@@ -1,4 +1,5 @@
 // ===== 戦闘の報酬（ゴールド → 経験値 → レベルアップ → カード → ドロップ） =====
+import { ItemInfoArea } from '../ItemDetail';
 import { VoteChips } from '../ui/Votes';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowUpCircle, Coins, Gift, Heart, Sparkles, Star, TrendingUp } from 'lucide-react';
@@ -191,15 +192,16 @@ function ClaimPanel() {
   return (
     <div className="panel panel-gold-edge mt-3 rounded-xl p-2" data-claim>
       <div className="font-display text-center text-[16px] text-amber-100">戦利品を取り合う</div>
-      <div className="mt-1 flex items-center gap-2">
+      {/* 押すと詳細（この端末のキャラの今の装備と比べる）。「欲しい」等のボタンとは別 */}
+      <ItemInfoArea itemId={def.id} heroId={c.heroes.find((id) => isLocalPlayer(findHero(game, id)!.playerId))} className="mt-1 flex w-full items-center gap-2">
         <ItemIcon item={def} size={52} />
-        <div className="min-w-0">
-          <div className="font-bold" style={{ color: RARITY_STYLE[def.rarity].color }}>
+        <span className="block min-w-0">
+          <span className="block font-bold" style={{ color: RARITY_STYLE[def.rarity].color }}>
             {def.name}
-          </div>
-          <div className="text-[12px] leading-4 text-zinc-300">{itemSummary(def)}</div>
-        </div>
-      </div>
+          </span>
+          <span className="block text-[12px] leading-4 text-zinc-300">{itemSummary(def)}</span>
+        </span>
+      </ItemInfoArea>
       <div className="mt-1 text-[12px] text-zinc-400">「欲しい」人がいればその中で、いなければ「余れば」の人の中で、運の判定（1〜100＋運の半分）が一番高い人がもらう</div>
       <div className="mt-1.5 flex flex-col gap-1">
         {c.heroes.map((id) => {

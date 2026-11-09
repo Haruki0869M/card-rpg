@@ -79,14 +79,15 @@ for (width of [360, 390, 480]) {
   await page.locator('[data-town-body]').evaluate((el) => el.scrollTo(0, 0));
 
   // 装備品を買う: 2人目（P2）で、装備品の行を上から順に買い、「すぐ装備する」が出たら押す（ジョブで使えない武器なら次へ）
+  // 行の最後のボタンが「買う」（前のボタンは詳細を開く所。Step A）
   const rows = page.locator('[data-town-body] > div > div');
   const names = await rows.allInnerTexts();
   let equipped = false, notices = 0;
   for (let i = 0; i < names.length && !equipped; i++) {
-    if (/聖水|ポーション|薬|おやつ|売り切れ/.test(names[i]) || !(await rows.nth(i).locator('button').count())) continue;
-    if (await rows.nth(i).locator('button').isDisabled()) continue;
+    if (/聖水|ポーション|薬|おやつ|売り切れ/.test(names[i]) || !(await rows.nth(i).locator('button').last().count())) continue;
+    if (await rows.nth(i).locator('button').last().isDisabled()) continue;
     const before = JSON.stringify((await save()).game.heroes[1].equipment);
-    await rows.nth(i).locator('button').click();
+    await rows.nth(i).locator('button').last().click();
     await page.waitForTimeout(250);
     const notice = page.locator('[data-buy-notice]');
     if (!(await notice.count())) await fail(`買った時のお知らせが出ない（${names[i].slice(0, 20)}）`);

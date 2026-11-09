@@ -1,6 +1,7 @@
 // ===== 町で買った時の手応え（フェーズ2-A）。見た目だけで、買う・装備するのは今の操作（TOWN_BUY・EQUIP）のまま =====
 // 装備品: 「〇〇を買った！（持ち物へ）」＋今の装備との能力の差＋「すぐ装備する／あとで」。押し忘れないよう自動では閉じない。
 // 道具・カード: 短いお知らせ（少しして消える）。
+import { ItemInfoArea } from '../ItemDetail';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, Shirt } from 'lucide-react';
 import { useEffect } from 'react';
@@ -53,18 +54,18 @@ export function BuyNotice({ game, bought, onClose }: { game: GameState; bought: 
     const diff = hero ? diffText(hero, slot, it) : [];
     body = (
       <div className="panel panel-gold-edge pointer-events-auto mx-auto w-full max-w-sm rounded-2xl p-2.5" role="dialog" aria-label="買った装備" data-buy-notice="equip" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-2">
+        <ItemInfoArea itemId={it.id} heroId={hero?.id} className="flex w-full items-center gap-2">
           <ItemIcon item={it} size={42} />
-          <div className="min-w-0 flex-1 leading-5">
-            <div className="text-[15px] font-bold text-amber-50">
+          <span className="block min-w-0 flex-1 leading-5">
+            <span className="block text-[15px] font-bold text-amber-50">
               <span style={{ color: RARITY_STYLE[it.rarity].color }}>{it.name}</span>を買った！
               <span className="ml-1 text-[12px] font-normal text-zinc-300">（持ち物へ）</span>
-            </div>
-            <div className="truncate text-[12px] text-zinc-300">
-              今の{SLOT_NAME[slot]}：{cur?.name ?? 'なし'}
-            </div>
-          </div>
-        </div>
+            </span>
+            <span className="block truncate text-[12px] text-zinc-300">
+              今の{SLOT_NAME[slot]}：{cur?.name ?? 'なし'}（押すと詳細）
+            </span>
+          </span>
+        </ItemInfoArea>
         {!why && (
           <div className="mt-1 flex min-h-5 flex-wrap gap-x-2 text-[13px] font-bold" data-buy-diff>
             {diff.length ? (
@@ -76,7 +77,7 @@ export function BuyNotice({ game, bought, onClose }: { game: GameState; bought: 
                 </span>
               ))
             ) : (
-              <span className="font-normal text-zinc-400">能力の数値は変わらない（特殊な効果を確かめよう）</span>
+              <span className="font-normal text-zinc-400">能力の数値は変わらない（上を押して特殊な効果を確かめよう）</span>
             )}
           </div>
         )}
