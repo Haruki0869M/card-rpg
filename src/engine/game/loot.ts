@@ -6,7 +6,7 @@ import type { GameState, Hero, ItemDef, Loot, Rarity } from '../../types';
 import { successDistribution } from '../battle/probability';
 import type { Rng } from '../rng';
 import { RARITIES, rarityIndex } from './dungeon';
-import { pickCard } from './cardTags';
+import { pickCard, withoutStarterCards } from './cardTags';
 import { jobWeapons } from './hero';
 import { heroCardPool, heroJobCardPool } from './jobs';
 
@@ -97,8 +97,9 @@ export function rollCardOffers(game: GameState, heroIds: string[], rng: Rng, odd
     const h = heroes[(offers.length + tries) % heroes.length];
     // そのキャラの候補の先頭 cardRewardJobSlots 枚は、ジョブ専用・系統・装備している武器種のカードから（無ければ今までどおり。K7）
     const jobSlot = offers.filter((o) => o.heroId === h.id).length < BALANCE.cardRewardJobSlots;
-    const jobPool = jobSlot ? heroJobCardPool(h) : [];
-    const pool = jobPool.length ? jobPool : heroCardPool(h);
+    // 基本のカード（最初の山札の21種）は出さない（フェーズ3）
+    const jobPool = jobSlot ? withoutStarterCards(heroJobCardPool(h)) : [];
+    const pool = jobPool.length ? jobPool : withoutStarterCards(heroCardPool(h));
     if (!pool.length) continue;
     // 抽選した格のカード。その格が無ければ1つ下の格へ
     let grade = pickWeighted(odds, rng);
@@ -106,7 +107,9 @@ export function rollCardOffers(game: GameState, heroIds: string[], rng: Rng, odd
     for (; grade >= 0 && !cands.length; grade--) cands = pool.filter((id) => rarityIndex(CARDS.get(id).rarity ?? 'common') === grade);
     // 3枚のうち最後の1枚は完全ランダム、ほかは今の山札・装備と相性の良いカードが出やすい（スマート抽選）
     const cardId = pickCard(cands.length ? cands : pool, h, rng, offers.length < 2);
-    if (!offers.some((o) => o.cardId === cardId && o.heroId === h.id)) offers.push({ cardId, heroId: h.id });
+    // 同じキャラの中で、同じカード・同じ名前のカードを重ねない（フェーズ3）
+    const name = CARDS.get(cardId).name;
+    if (!offers.some((o) => o.heroId === h.id && (o.cardId === cardId || CARDS.get(o.cardId).name === name))) offers.push({ cardId, heroId: h.id });
   }
   return offers;
 }

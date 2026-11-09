@@ -51,6 +51,15 @@ export function cardTags(card: CardDef): string[] {
 /** 最初の山札のカード（どのジョブでも持つ基本のカードは、好みの判断に使わない） */
 let starters: Set<string> | undefined;
 const starterIds = () => (starters ??= new Set(CLASSES.all.flatMap((c) => c.deck.map((d) => d.cardId))));
+let baseStarters: Set<string> | undefined;
+/** 基本のカード: 基本ジョブ8つの最初の山札に入っているカード（ストライク・ガードなど21種）。報酬と店には出さない（フェーズ3・オーナーの決定 A） */
+export const baseStarterCardIds = (): ReadonlySet<string> =>
+  (baseStarters ??= new Set(CLASSES.all.filter((c) => (c.tier ?? 'base') === 'base').flatMap((c) => c.deck.map((d) => d.cardId))));
+/** 候補から基本のカードを外す。外すと空になる時（とても狭い候補）は、元のままにする（報酬が出ない、を防ぐ） */
+export function withoutStarterCards(pool: string[]): string[] {
+  const rest = pool.filter((id) => !baseStarterCardIds().has(id));
+  return rest.length ? rest : pool;
+}
 
 /** キャラの好み: 山札（最初のカード以外）と装備の印の数 */
 export function heroTagProfile(hero: Hero): Map<string, number> {

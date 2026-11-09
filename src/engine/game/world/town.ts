@@ -12,7 +12,7 @@ import type { GameCommand, GameState, ShopStock } from '../../../types';
 import type { Rng } from '../../rng';
 import { addItem, addLog, addLoot, earnGold, ownedBy, shopPriceFor } from '../common';
 import { rarityIndex } from '../dungeon';
-import { pickCard } from '../cardTags';
+import { pickCard, withoutStarterCards } from '../cardTags';
 import { clampHero, heroFocusMax, heroMaxHp, jobWeapons } from '../hero';
 import { findHero } from '../heroes';
 import { addFeat, heroCardPool } from '../jobs';
@@ -66,7 +66,8 @@ export function ensureShop(game: GameState, rng: Rng): ShopStock {
   const odds = cardRewardOdds('elite');
   for (let k = 0; k < town.shop.cards && heroes.length; k++) {
     const h = heroes[k % heroes.length];
-    const pool = heroCardPool(h);
+    // 基本のカード（最初の山札の21種）は並べない（フェーズ3）
+    const pool = withoutStarterCards(heroCardPool(h));
     let g = pickWeighted(odds, rng);
     let cand: string[] = [];
     for (; g >= 0 && !cand.length; g--) cand = pool.filter((id) => rarityIndex(CARDS.get(id).rarity ?? 'common') === g);

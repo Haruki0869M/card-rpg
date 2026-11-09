@@ -27,11 +27,12 @@ export function TopBar({ title, onBack, right }: { title: ReactNode; onBack?: ()
         <span className="w-11 shrink-0" />
       )}
       <div className="flex min-w-0 flex-1 items-center justify-center gap-2">
-        <span className="h-px w-6 bg-gradient-to-r from-transparent to-amber-300/80" />
+        {/* 飾りの線は狭い画面では出さない（360px で「キャラクター作成」が切れないように。フェーズ3） */}
+        <span className="hidden h-px w-6 bg-gradient-to-r from-transparent to-amber-300/80 min-[400px]:block" />
         <span className="h-[7px] w-[7px] rotate-45 bg-amber-300" />
         <span className="font-display text-outline truncate text-[20px] leading-7 tracking-wider text-amber-50">{title}</span>
         <span className="h-[7px] w-[7px] rotate-45 bg-amber-300" />
-        <span className="h-px w-6 bg-gradient-to-l from-transparent to-amber-300/80" />
+        <span className="hidden h-px w-6 bg-gradient-to-l from-transparent to-amber-300/80 min-[400px]:block" />
       </div>
       <span className="flex w-11 shrink-0 justify-end">{right}</span>
       <div className="pointer-events-none absolute inset-x-3 bottom-0 h-px bg-gradient-to-r from-transparent via-amber-400/50 to-transparent" />
