@@ -23,6 +23,8 @@ import { StatusChips } from '../ui/StatusChips';
 import { UnitPopups } from './Popups';
 import { SlotOverlay } from './SlotOverlay';
 import { isAllyCard } from '../../engine/battle/targets';
+import { isOnlinePlay } from '../../store/battleConfig';
+import { seatModeOf } from '../../store/seats';
 
 /** 動きの演出（攻撃・被弾・詠唱）。fx.id が変わった時だけ再生する */
 function useUnitMotion(unitId: string, side: 'ally' | 'enemy') {
@@ -452,6 +454,7 @@ export function Battlefield() {
       <div className="pointer-events-none absolute inset-x-0 top-[46%] z-40 flex justify-center">
         <SlotOverlay />
       </div>
+      <SeatLabel />
       <PhaseBanner top={enemyTop + Math.max(0, enemySpriteH * 0.4 - 20)} />
       {/* 上下の画面との境目: 影でなじませ、金の飾り線を引く */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-[#0d0b16] to-transparent" />
@@ -499,6 +502,30 @@ function TargetLines({ W, H, enemySlotW, enemyTop, enemySpriteH, allyAreaW, ally
  * フェーズが変わった時に一瞬出る帯（操作をブロックしない）。
  * 前の数字の表示が全部終わってから store が出す（phaseBanner）。敵の予告の上ではなく、敵の絵の高さに出す
  */
+/**
+ * 「スマホを回して」遊ぶ時（担当が P1・P2…と1人ずつの時）だけ、今だれが操作しているかを上に小さく出す（ステップB）。
+ * 1人で全員を操作する時・オンライン協力の時は出さない
+ */
+function SeatLabel() {
+  const pass = useBattle((s) => {
+    const heroes = s.full?.heroes ?? [];
+    return !isOnlinePlay() && heroes.length > 1 && seatModeOf(heroes) === 'pass';
+  });
+  const active = useBattle((s) => (s.battle.phase === 'ally' ? s.battle.allies.find((a) => a.id === s.activeId && !a.dead) : undefined));
+  if (!pass || !active) return null;
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-0.5 z-30 flex justify-center px-2">
+      <span
+        className="max-w-full truncate rounded-full border-2 bg-black/75 px-2 text-[12px] leading-4 font-bold text-white shadow-[0_2px_4px_rgba(0,0,0,.7)]"
+        style={{ borderColor: PLAYER_COLOR[active.playerId] }}
+        data-seat-label={active.playerId}
+      >
+        {active.playerId}（{active.name}）を操作中
+      </span>
+    </div>
+  );
+}
+
 function PhaseBanner({ top }: { top: number }) {
   const banner = useBattle((s) => s.phaseBanner);
   const fast = useBattle((s) => s.settings.fastMode);

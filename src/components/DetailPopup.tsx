@@ -155,6 +155,7 @@ function Content({ d, battle, game }: { d: Detail; battle: BattleState; game: Ga
             <Title>
               {a.name} <span className="text-[13px] text-zinc-400">{cls.name}・{cls.role}</span>
             </Title>
+            {a.dead && <div className="text-[13px] font-bold text-red-300" data-fallen-detail>戦闘不能（勝利でHP1復帰。この戦闘の経験値はもらえない）</div>}
             <div className="text-[13px]">
               HP {a.hp}/{a.maxHp} ・ ブロック{a.block} ・ マナ{a.mana} ・ フォーカス{a.focus}
             </div>

@@ -10,6 +10,7 @@ import { cardOf } from '../../data/cards';
 import { rollChanceFor, findAlly, tierDistribution, toPercents, slotPreviewLimitOf } from '../../engine';
 import { useBattle } from '../../store/battleStore';
 import { CATEGORY_STYLE, EffectChip } from '../ui/icons';
+import { TargetChips } from './TargetChips';
 
 const TIER_COLORS = ['#5a4a5e', '#7a6a8a', '#4a8cff', '#3ad08a', '#ffc94a'];
 
@@ -62,6 +63,9 @@ export function FocusPanel() {
     const hi = i + 1 < card.tiers.length ? card.tiers[i + 1].minSuccesses - 1 : card.slots;
     return t.minSuccesses === hi ? `${hi}成功` : `${t.minSuccesses}-${hi}`;
   };
+
+  // 一番出やすい成功数（同じ確率なら上の成功数）。狙う敵のチップの予測に使う
+  const likelyTier = probs.reduce((best, p, i) => (p >= probs[best] ? i : best), 0);
 
   // 確率の帯の下の数字: 下の詳しい予測と同じ「今の相手に対する計算後の値」。同じ種類の効果が2つ以上ある時は、最初の1つに合計を出す
   const chipsOf = (i: number) => {
@@ -120,6 +124,7 @@ export function FocusPanel() {
       </div>
 
       {needsCardTarget(card) && <div className="mt-1 text-center text-[12px] text-sky-100" data-target-guide>{targetGuide(card)}{selected && `（選択中：${nameOf(selected)}）`}</div>}
+      {card.target === 'enemy' && <TargetChips allyId={ally.id} cardUid={inst.uid} focus={selection.focus} tier={likelyTier} tierLabel={label(likelyTier)} targetId={selection.targetId} allyTargetId={selection.allyTargetId} />}
       {card.secondaryTarget && <div className="text-center text-[12px] text-sky-100" data-secondary-target-guide>回復・支援する味方をタップしてください{secondary && `（選択中：${nameOf(secondary)}）`}</div>}
       {(ally.slotPreviewUsed ?? 0) < slotPreviewLimitOf(ally) && <button onClick={preview} disabled={needsTarget} className="btn btn-dark mt-1 min-h-11 w-full rounded-lg text-[14px] font-bold" data-preview-start>星読みで結果を見る（1戦闘1回）</button>}
 

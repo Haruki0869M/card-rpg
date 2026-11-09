@@ -163,7 +163,7 @@ export function Hand() {
     <div ref={ref} className="relative mx-1" style={{ height: Math.max(height, CARD_H + 14) }}>
       {hand.length === 0 && (
         <div className="font-display flex h-full items-center justify-center text-[15px] text-zinc-500">
-          {battle.phase === 'enemy' ? '敵の行動中…' : ally?.dead ? '戦闘不能' : '手札なし'}
+          {battle.phase === 'enemy' ? '敵の行動中…' : ally?.dead ? '戦闘不能（勝利でHP1復帰）' : '手札なし'}
         </div>
       )}
       {ally &&
