@@ -17,7 +17,7 @@ mkdirSync('scripts/screenshots', { recursive: true });
 
 const sizes = SAMPLE ? [[390, 844]] : [[360, 640], [390, 844], [480, 854]];
 for (const [width, height] of sizes) {
-  const ctx = await browser.newContext({ viewport: { width, height }, hasTouch: true });
+  const ctx = await browser.newContext({ viewport: { width, height }, hasTouch: true, deviceScaleFactor: SAMPLE ? 3 : 1 });
   const page = await ctx.newPage();
   const ng = (m) => problems.push(`${width}px: ${m}`);
   const shot = (n) => page.screenshot({ path: `scripts/screenshots/world-zoom-${width}-${n}.png` });
@@ -60,7 +60,7 @@ for (const [width, height] of sizes) {
   if ((await zoom()) !== 1) ng(`始めが1倍でない（${await zoom()}）`);
   if (!(await page.locator('[data-zoom-out]').isDisabled())) ng('1倍で「−」が押せる');
   const base = await hexW();
-  if (SAMPLE) await page.screenshot({ path: 'screenshots/world-zoom/sample-min.png' });
+  if (SAMPLE) await page.screenshot({ path: 'screenshots/world-zoom/sample-min.png', scale: 'css' });
   else await shot('1-min');
   for (let k = 0; k < 10 && !(await page.locator('[data-zoom-in]').isDisabled()); k++) {
     await page.locator('[data-zoom-in]').click();
@@ -76,8 +76,19 @@ for (const [width, height] of sizes) {
   const hv = await heroView();
   if (!hv.inView) ng('最大の拡大で駒が見えない');
   if (SAMPLE) {
-    await page.screenshot({ path: 'screenshots/world-zoom/sample-max.png' });
+    await page.screenshot({ path: 'screenshots/world-zoom/sample-max.png', scale: 'css' });
     console.log(`見本: 1倍のマスの幅 ${base.toFixed(1)}px → 最大 ${big.toFixed(1)}px（${ratio.toFixed(2)}倍・横に約${(width / big).toFixed(1)}マス）`);
+    // ボタンの見本: 3つとも押せる大きさ（1.5倍）で、画面全体と、ボタンの周りを3倍の細かさで
+    await page.locator('[data-zoom-reset]').click();
+    await page.locator('[data-zoom-in]').click();
+    await page.locator('[data-zoom-in]').click();
+    await page.locator('[data-recenter]').click();
+    await page.waitForTimeout(700);
+    await page.screenshot({ path: 'screenshots/world-zoom/sample-buttons.png', scale: 'css' });
+    const cb = await page.locator('[data-zoom-controls]').boundingBox();
+    const rb = await page.locator('[data-recenter]').boundingBox();
+    const x = Math.max(0, cb.x - 90), y = Math.max(0, cb.y - 50);
+    await page.screenshot({ path: 'screenshots/world-zoom/sample-buttons-zoom.png', clip: { x, y, width: width - x, height: rb.y + rb.height + 30 - y } });
     await ctx.close();
     continue;
   }
