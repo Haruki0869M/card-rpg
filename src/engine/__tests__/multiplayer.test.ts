@@ -29,8 +29,10 @@ function inTemple() {
   g = run(g, { type: 'WORLD_INVITE_ANSWER', playerId: 'P2', heroId: 'h1', accept: true });
   g = run(g, { type: 'WORLD_INTERACT', playerId: 'P1', heroId: 'h0', party: ['h0', 'h1'] });
   expect(g.expeditions![0].heroes).toEqual(['h0', 'h1']);
-  // 2人とも入ったので、ワールドターンが進んでダンジョンの番。探索力を決める
+  // 2人とも入ったので、ワールドターンが進んでダンジョンの番。判定するキャラをみんなで決めてから、探索力を決める
   const x = g.expeditions![0].id;
+  g = run(g, inScene(x, { type: 'VOTE', playerId: 'P1', command: { type: 'EXPLORE_ROLLER', playerId: 'P1', heroId: 'h0' } }));
+  g = run(g, inScene(x, { type: 'VOTE', playerId: 'P2', command: { type: 'EXPLORE_ROLLER', playerId: 'P2', heroId: 'h0' } }));
   g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: 'P1', heroId: 'h0', focusUsed: 0 }));
   return { g, x };
 }

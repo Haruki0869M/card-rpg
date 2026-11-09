@@ -1,11 +1,10 @@
 // ===== ダンジョンの一人称の通路（第3段階B） =====
 // エンジンの viewSlices（見たマスだけから決めた「何が見えるか」）を、CSS の遠近法で四角形を並べて描く。
 // 絵（src/assets/art/dungeon/<背景>-<wall|floor|ceiling|door>.webp）があれば使い、無ければダンジョンごとの色の仮の見た目。
-import { Crown, Flame, Gem, Gift, Leaf, Lock, Skull, Sparkles, Swords } from 'lucide-react';
+import { Crown, Gem, Leaf, Lock, Skull, Sparkles, Swords } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
 import { DUNGEON_TONE } from '../../art/dungeonTone';
 import { artImage } from '../../art/images';
-import { getRoomType } from '../../data/rules';
 import { OMEN_INFO, viewSlices, type DoorOmen, type ViewFace } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
 import type { DungeonRun } from '../../types';
@@ -45,16 +44,14 @@ const THEMES: Record<string, { wall: string; wallLine: string; floor: string; ce
 };
 const themeOf = (bg: string) => THEMES[bg] ?? THEMES.temple;
 
-/** 部屋の種類のアイコン（通った部屋の床の印） */
-const ROOM_ICONS: Record<string, typeof Swords> = { swords: Swords, skull: Skull, crown: Crown, gift: Gift, sparkles: Sparkles, flame: Flame };
-
 type Part = 'wall' | 'floor' | 'ceiling' | 'door';
 
 function surface(bg: string, part: Part, shade: number, themeBg: string = bg): CSSProperties {
   const t = themeOf(themeBg);
   const img = artImage(`dungeon/${bg}-${part}`);
   const dark = `linear-gradient(rgba(0,0,0,${shade}), rgba(0,0,0,${shade}))`;
-  if (img) return { backgroundImage: `${dark}, url(${img})`, backgroundSize: 'cover' };
+  // 絵の下にも色を敷く（絵が描かれるまでの一瞬に、黒い下地が透けて見えないように）
+  if (img) return { backgroundColor: part === 'wall' ? t.wallLine : part === 'floor' ? t.floor : part === 'ceiling' ? t.ceil : t.door, backgroundImage: `${dark}, url(${img})`, backgroundSize: 'cover' };
   if (part === 'wall')
     return {
       backgroundColor: t.wall,
@@ -97,7 +94,7 @@ function doorRim(bg: string) {
 }
 
 /** 扉（壁の面の中に描く） */
-function Door({ bg, themeBg = bg, face, shade, opening, omen }: { bg: string; /** 絵が無い時の色を決める背景（通路の絵の名前と、部屋の背景が違う時） */ themeBg?: string; face: ViewFace; shade: number; opening?: number; omen?: DoorOmen }) {
+function Door({ bg, themeBg = bg, face, shade, opening, omen, onTap }: { bg: string; /** 絵が無い時の色を決める背景（通路の絵の名前と、部屋の背景が違う時） */ themeBg?: string; face: ViewFace; shade: number; opening?: number; omen?: DoorOmen; /** タップでその扉へ（開けられる扉・ボスの扉だけ） */ onTap?: () => void }) {
   const t = themeOf(themeBg);
   const boss = face === 'boss';
   // ボスの門は専用の絵（両開きの門）があれば使い、無ければふつうの扉の絵
@@ -138,9 +135,14 @@ function Door({ bg, themeBg = bg, face, shade, opening, omen }: { bg: string; /*
       </div>
     );
   }
+  const tap = onTap && (face === 'door' || face === 'boss') ? onTap : undefined;
   return (
     <div
-      className="absolute bottom-0 flex items-center justify-center rounded-t-[30%]"
+      className={`absolute bottom-0 flex items-center justify-center rounded-t-[30%] ${tap ? 'cursor-pointer' : ''}`}
+      onClick={tap}
+      role={tap ? 'button' : undefined}
+      aria-label={tap ? (face === 'boss' ? 'ボスの扉へ歩く' : 'この扉へ歩く') : undefined}
+      data-door-tap={tap ? '' : undefined}
       style={{
         left: boss ? '12%' : '22%',
         right: boss ? '12%' : '22%',
@@ -198,8 +200,23 @@ export function corridorArt(dungeonId: string | undefined, background: string): 
   return dungeonId && artImage(`dungeon/${dungeonId}-wall`) ? dungeonId : background;
 }
 
+/** 見える範囲より奥まで続く通路の暗がり（真っ黒ではなく、奥へ溶けていく暗さ） */
+const FAR: CSSProperties = { background: 'radial-gradient(ellipse at 50% 50%, #0d0b09 0%, #050404 70%)' };
+
 /** 一人称の通路 */
-export function DungeonView({ run, background, opening, omens }: { run: DungeonRun; background: string; /** 正面の扉が開く演出の秒数（扉が開く演出の時だけ） */ opening?: number; /** 扉の気配（部屋のID → 種類） */ omens?: Record<string, DoorOmen> }) {
+export function DungeonView({ run, background, opening, omens, main = true, onDoor }: {
+  run: DungeonRun;
+  background: string;
+  /** 正面の扉が開く演出の秒数（扉が開く演出の時だけ） */
+  opening?: number;
+  /** 扉の気配（部屋のID → 種類） */
+  omens?: Record<string, DoorOmen>;
+  /** 画面に出ている方の景色か（演出用の2枚目は false。確認スクリプトの目印を付けない） */
+  main?: boolean;
+  /** 扉をタップした（部屋のID） */
+  onDoor?: (roomId: string) => void;
+}) {
+  const tapOf = (roomId?: string) => (onDoor && roomId ? () => onDoor(roomId) : undefined);
   const [ref, size] = useElementSize<HTMLDivElement>();
   const { slices, end } = viewSlices(run);
   const art = corridorArt(run.dungeonId, background);
@@ -232,45 +249,31 @@ export function DungeonView({ run, background, opening, omens }: { run: DungeonR
     const sh = shade(s.depth);
     face(`f${s.depth}`, `translate3d(0, ${U / 2}px, ${z}px) rotateX(90deg)`, surface(art, 'floor', sh), undefined, s.depth + 0.5);
     face(`c${s.depth}`, `translate3d(0, ${-U / 2}px, ${z}px) rotateX(-90deg)`, surface(art, 'ceiling', sh), undefined, s.depth + 0.5);
-    // 部屋の中の床には、通った部屋の種類の印
-    if (s.depth === 0 && s.inRoom && run.currentRoomId) {
-      const room = run.rooms.find((r) => r.id === run.currentRoomId);
-      const t = room && getRoomType(room.type);
-      const Icon = t ? (ROOM_ICONS[t.icon] ?? Sparkles) : null;
-      if (Icon && t)
-        face(
-          'emblem',
-          `translate3d(0, ${U / 2 - 1}px, ${z}px) rotateX(90deg)`,
-          {},
-          <div className="flex h-full w-full items-center justify-center opacity-40">
-            <Icon style={{ width: '40%', height: '40%', color: t.color }} />
-          </div>,
-          0.4,
-        );
-    }
     for (const side of ['left', 'right'] as const) {
       const f = s[side];
       const sign = side === 'left' ? -1 : 1;
       const rot = side === 'left' ? 90 : -90;
       if (f === 'open' || f === 'dark') {
         // 横に開いた口: 隣のマスの床・天井・奥の壁（暗め）
-        const sh2 = f === 'dark' ? 0.92 : Math.min(0.9, sh + 0.25);
-        face(`${side}w${s.depth}`, `translate3d(${sign * U * 1.5}px, 0, ${z}px) rotateY(${rot}deg)`, f === 'dark' ? { background: '#050505' } : surface(art, 'wall', sh2), undefined, s.depth + 0.9);
+        // まだ見ていない口（dark）も真っ黒にせず、ほの暗い石の壁にする（見えた時にパッと明るくならないように）
+        const sh2 = f === 'dark' ? Math.min(0.9, sh + 0.45) : Math.min(0.9, sh + 0.25);
+        face(`${side}w${s.depth}`, `translate3d(${sign * U * 1.5}px, 0, ${z}px) rotateY(${rot}deg)`, surface(art, 'wall', sh2), undefined, s.depth + 0.9);
         face(`${side}f${s.depth}`, `translate3d(${sign * U}px, ${U / 2}px, ${z}px) rotateX(90deg)`, surface(art, 'floor', sh2), undefined, s.depth + 0.8);
         face(`${side}c${s.depth}`, `translate3d(${sign * U}px, ${-U / 2}px, ${z}px) rotateX(-90deg)`, surface(art, 'ceiling', sh2), undefined, s.depth + 0.8);
         // 隣のマスの正面（壁・扉・さらに続く暗がり）
         const ahead = side === 'left' ? s.leftAhead : s.rightAhead;
         const shA = Math.min(0.9, shade(s.depth + 1) + 0.15 * dim);
+        const aheadId = side === 'left' ? s.leftAheadRoomId : s.rightAheadRoomId;
         if (ahead && ahead !== 'far' && ahead !== 'dark')
-          face(`${side}a${s.depth}`, `translate3d(${sign * U}px, 0, ${-(s.depth + 1) * U}px)`, surface(art, 'wall', shA), ahead === 'wall' ? null : <Door bg={art} themeBg={background} face={ahead} shade={shA} omen={omens?.[(side === 'left' ? s.leftAheadRoomId : s.rightAheadRoomId) ?? '']} />, s.depth + 1.2);
-        else face(`${side}a${s.depth}`, `translate3d(${sign * U}px, 0, ${-(s.depth + 1) * U}px)`, { background: '#030303' }, undefined, s.depth + 1.2);
+          face(`${side}a${s.depth}`, `translate3d(${sign * U}px, 0, ${-(s.depth + 1) * U}px)`, surface(art, 'wall', shA), ahead === 'wall' ? null : <Door bg={art} themeBg={background} face={ahead} shade={shA} omen={omens?.[aheadId ?? '']} onTap={tapOf(aheadId)} />, s.depth + 1.2);
+        else face(`${side}a${s.depth}`, `translate3d(${sign * U}px, 0, ${-(s.depth + 1) * U}px)`, ahead === 'dark' || f === 'dark' ? surface(art, 'wall', Math.min(0.9, shA + 0.3)) : FAR, undefined, s.depth + 1.2);
         continue;
       }
       face(
         `${side}${s.depth}`,
         `translate3d(${(sign * U) / 2}px, 0, ${z}px) rotateY(${rot}deg)`,
         surface(art, 'wall', sh),
-        f === 'wall' ? (s.torch && s.depth <= 2 && side === (s.depth % 2 ? 'right' : 'left') ? <Torch bg={background} /> : null) : <Door bg={art} themeBg={background} face={f} shade={sh} omen={omens?.[(side === 'left' ? s.leftRoomId : s.rightRoomId) ?? '']} />,
+        f === 'wall' ? (s.torch && s.depth <= 2 && side === (s.depth % 2 ? 'right' : 'left') ? <Torch bg={background} /> : null) : <Door bg={art} themeBg={background} face={f} shade={sh} omen={omens?.[(side === 'left' ? s.leftRoomId : s.rightRoomId) ?? '']} onTap={tapOf(side === 'left' ? s.leftRoomId : s.rightRoomId)} />,
         s.depth + 0.45,
       );
     }
@@ -278,10 +281,13 @@ export function DungeonView({ run, background, opening, omens }: { run: DungeonR
   // 正面の突き当たり
   const endZ = -end.depth * U;
   const endShade = shade(end.depth);
-  if (end.face === 'far' || end.face === 'dark') face('end', `translate3d(0, 0, ${endZ}px)`, { background: '#030303' }, undefined, 99);
-  else face('end', `translate3d(0, 0, ${endZ}px)`, surface(art, 'wall', endShade), end.face === 'wall' ? null : <Door bg={art} themeBg={background} face={end.face} shade={endShade} opening={opening} omen={omens?.[end.roomId ?? '']} />, 99);
+  // 正面の扉: 目の前（1マス先）の扉はもう扉の前にいるのでタップしない（下の「扉を開ける」で開ける）
+  const endTap = end.depth > 1 ? tapOf(end.roomId) : undefined;
+  if (end.face === 'far') face('end', `translate3d(0, 0, ${endZ}px)`, FAR, undefined, 99);
+  else if (end.face === 'dark') face('end', `translate3d(0, 0, ${endZ}px)`, surface(art, 'wall', 0.88), undefined, 99);
+  else face('end', `translate3d(0, 0, ${endZ}px)`, surface(art, 'wall', endShade), end.face === 'wall' ? null : <Door bg={art} themeBg={background} face={end.face} shade={endShade} opening={opening} omen={omens?.[end.roomId ?? '']} onTap={endTap} />, 99);
   return (
-    <div ref={ref} className="absolute inset-0 overflow-hidden bg-black" data-dungeon-view data-end={end.face}>
+    <div ref={ref} className="absolute inset-0 overflow-hidden" style={{ background: themeOf(background).ceil }} data-dungeon-view={main ? '' : undefined} data-end={main ? end.face : undefined}>
       {[...faces].sort((a, b) => b.dist - a.dist).map((f) => f.node)}
       {/* 奥ほど暗く・まわりを少し暗く */}
       <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 50%, transparent 35%, rgba(0,0,0,.55) 100%)' }} />
