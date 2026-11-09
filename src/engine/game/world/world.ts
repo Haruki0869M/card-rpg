@@ -285,7 +285,7 @@ export function agreeMove(game: GameState, cmd: Cmd<'WORLD_MOVE_AGREE'>, rng: Rn
 function chargeRelayMove(game: GameState, w: WorldState, h: Hero, group: Hero[], rng: Rng) {
   const movedBy = (w.movedBy ??= {});
   const charged = w.relayCharged ?? [];
-  const relay = group.some((g) => movedBy[g.id] !== undefined && movedBy[g.id] !== h.id) && !charged.includes(h.id) && charged.length < BALANCE.corruptionRelayMaxPerWorldTurn;
+  const relay = group.some((g) => movedBy[g.id] !== undefined && movedBy[g.id] !== h.id) && !charged.includes(h.id);
   for (const g of group) movedBy[g.id] = h.id;
   if (!relay || BALANCE.corruptionPerRelayMove <= 0) return;
   (w.relayCharged ??= []).push(h.id);

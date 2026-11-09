@@ -127,7 +127,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     body: [
       '魔王の力が世界をむしばむ度合い。シナリオによって名前が変わります（例: 冬の深さ・霧の濃さ）。',
       `時間が進むと上がります（ワールドターンごと+${BALANCE.corruptionPerTurn}%・ダンジョンに入る時+${BALANCE.corruptionOnDungeonEnter}%・町が陥落した時+${BALANCE.corruptionOnTownFall}%）。鍵のダンジョンを制覇すると${BALANCE.corruptionOnKeyDungeonClear}%下がります。`,
-      `交代運転にも時間がかかります。同じワールドターンのうちに、仲間の番ですでに動いたキャラを、別の人の番でまた動かすと+${BALANCE.corruptionPerRelayMove}%（1回の番に1回まで・1ワールドターンに${BALANCE.corruptionRelayMaxPerWorldTurn}回まで）。`,
+      `交代運転にも時間がかかります。同じワールドターンのうちに、仲間の番ですでに動いたキャラを、別の人の番でまた動かすと+${BALANCE.corruptionPerRelayMove}%（1回の番に1回まで）。`,
       '一定の値をこえるごとに、敵が増える・強くなるなど世界が変わります。次の変化は上のバーに出ています。',
       '100%になるとゲームオーバーです。',
     ],
