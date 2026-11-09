@@ -204,3 +204,14 @@
 - 木は、横から見た形に近い（斜め45度の見下ろしより低い角度）。木は横から見ても不自然ではないので、このままでよい。
 - 元画像: `C:\dev\card-rpg-assets\diorama\chatgpt\try-tree.png`（1024×1536）・`try-town.png`（1254×1254）
 - 一度「色を塗った立体のミニチュア風」も考えたが、オーナーが「前の柄（墨の線＋淡い水彩）がいい」と決めた（2026-11-10）。**絵柄はこの2枚で決定。**
+
+## 試作16枚の結果（2026-11-10）
+- A〜D の4枚とも**背景は透明**。絵柄もそろっている。元画像は `C:\dev\card-rpg-assets\diorama\chatgpt\A-trees.png` など。
+- 1つずつに切り分けて、`src/assets/art/landscape/` に置いた（17個。試しの森の木も `tree-forest-big` として入れた）。`artImage('landscape/tree-forest-1')` で取れる。地図にはまだつないでいない（箱庭のセッションの作業）。
+  - 木 384×384: `tree-plains-1|2`・`tree-forest-1..4`・`tree-forest-big`
+  - 小物 256×256: `prop-hill|rock|grass|flower|mushroom`
+  - 施設 512×512: `place-town|capital|shrine|tent`（今の `place/town` などとは別の名前。差し替えるかは地図で見比べてから）
+  - 遠景 1024×768: `skyline-demon-castle`
+  - どれも、物の足元が絵の下の真ん中（設計書の決まり）。
+- 見本の写真: `docs/art/diorama-trial-preview.jpg`（地図のマスの上に、スマホの1倍くらいの大きさで並べた様子と、17個の一覧）。森は木を詰めて置くと、1つながりの森に見える。
+- 気になる所: 合わせて約0.77MB と重め（紙の質感の細かい模様のため）。組み込みの時に画質を少し下げて軽くする。魔王城の後ろに、三日月のような角の形が付いている（遠くでは気にならない程度）。
