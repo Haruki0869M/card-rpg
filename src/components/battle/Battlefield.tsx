@@ -2,7 +2,7 @@
 // 背景の上に、敵（上段）と味方（下段）が向かい合う。動きの演出はラッパー要素の transform だけで行う。
 
 import { motion, useAnimate, useReducedMotion } from 'framer-motion';
-import { memo, useEffect, useMemo } from 'react';
+import { memo, useEffect, useMemo, type ReactNode } from 'react';
 import { BattleBackground, CharacterArt, EnemyArt, preloadEnemyPhases } from '../../art';
 import { getPet } from '../../data/pets';
 import { PetToken } from '../ui/PetToken';
@@ -47,6 +47,26 @@ function useUnitMotion(unitId: string, side: 'ally' | 'enemy') {
     return () => controls.stop();
   }, [fx?.id, fast, simple, reduced]);
   return scope;
+}
+
+/**
+ * 重なりの段階2以上（Step C）: 戦場の人物を 0.12秒だけ小さく揺らす。高速の設定ではその分短く。
+ * OS の「動きを減らす」・カットインの「簡易」では揺らさない。見た目だけ（状態・乱数・同期は変えない）
+ */
+function SynergyShake({ children }: { children: ReactNode }) {
+  const [scope, animate] = useAnimate<HTMLDivElement>();
+  const fx = useBattle((s) => s.synergyFx);
+  const fast = useBattle((s) => s.settings.fastMode);
+  const simple = useBattle((s) => s.settings.cutinMode === 'simple');
+  const reduced = useReducedMotion();
+  useEffect(() => {
+    if (!fx || !scope.current) return;
+    scope.current.dataset.synergyShake = String(fx.tier);
+    if (reduced || simple) return;
+    const controls = animate(scope.current, { x: [0, -3, 3, -2, 0] }, { duration: TIMING.synergyShake / speedFactor({ fastMode: fast }), ease: 'linear' });
+    return () => controls.stop();
+  }, [fx?.id]);
+  return <div ref={scope} className="absolute inset-0" data-synergy-field>{children}</div>;
 }
 
 function TargetFace({ allyId }: { allyId?: string }) {
@@ -426,7 +446,7 @@ export function Battlefield() {
       <Embers />
       {W > 0 && phase === 'ally' && <TargetLines W={W} H={H} enemySlotW={enemySlotW} enemyTop={enemyTop} enemySpriteH={enemySpriteH} allyAreaW={allyAreaW} allyH={allyH} />}
       {W > 0 && (
-        <>
+        <SynergyShake>
           {enemies.map((e, i) => (
             <EnemyUnit
               key={e.uid}
@@ -449,7 +469,7 @@ export function Battlefield() {
               active={a.id === activeId && phase === 'ally'}
             />
           ))}
-        </>
+        </SynergyShake>
       )}
       <div className="pointer-events-none absolute inset-x-0 top-[46%] z-40 flex justify-center">
         <SlotOverlay />

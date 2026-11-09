@@ -2,7 +2,7 @@
 // 自分のキャラが連れていたお供を1匹ずつ残し、♡5か「ダンジョンを一緒に3回クリア」でマイペットに登録できる。
 // マイペットは、次の冒険のスタートの町で30G払うと、最初から連れて行ける（強さは変わらない）。
 import { Heart, PawPrint } from 'lucide-react';
-import { useState } from 'react';
+import { createContext, useContext, useState } from 'react';
 import { BALANCE } from '../../data/balance';
 import { getPet, PETS } from '../../data/pets';
 import { SCENARIOS } from '../../data/scenarios';
@@ -28,10 +28,15 @@ function conditionText(e: UchinokoEntry): string {
   return `♡5になるか、ダンジョンを一緒に${BALANCE.myPetDungeonClears}回クリアで登録できます（今 ${Math.min(dc, BALANCE.myPetDungeonClears)}/${BALANCE.myPetDungeonClears}回）`;
 }
 
+/** 冒険の途中にメニューから開いた伝承の書（読むだけ。Step C ②） */
+export const LoreReadOnly = createContext(false);
+
 /** マイペットの登録ボタン（登録済みなら外すボタン） */
 export function MyPetToggle({ e, compact }: { e: UchinokoEntry; compact?: boolean }) {
   const isMy = useProfile((s) => s.profile.myPets.includes(e.uid));
   const update = useProfile((s) => s.update);
+  const readOnly = useContext(LoreReadOnly);
+  if (readOnly) return compact ? null : <div className="text-[12px] leading-4 text-zinc-400" data-mypet-readonly>{isMy ? 'マイペットに登録ずみ。' : ''}登録・解除は、タイトル画面の伝承の書でできます。</div>;
   if (isMy)
     return (
       <button onClick={() => update((p) => setMyPet(p, e.uid, false))} className={`btn btn-dark flex min-h-11 items-center justify-center gap-1 rounded-lg px-3 text-[13px] ${compact ? '' : 'w-full'}`} data-mypet-toggle="off">

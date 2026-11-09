@@ -7,7 +7,7 @@ import { create } from 'zustand';
 import { normalizeSettings, type Settings } from './settings';
 import { playSound, setAudioVolumes } from '../audio/player';
 import { petCry } from '../audio/cues';
-import { battleFrames, explorationNotices, explorationSounds, type PopupDraft, type PopupTone, type NoticeDraft, type PresentationFrame } from './presentation';
+import { battleFrames, explorationNotices, explorationSounds, type PopupDraft, type PopupTone, type SynergyTier, type NoticeDraft, type PresentationFrame } from './presentation';
 export type { Settings } from './settings';
 import { TIMING, VIBRATION } from '../data/balance';
 import { cardOf } from '../data/cards';
@@ -80,6 +80,8 @@ export interface Popup {
   text: string;
   tone: PopupTone;
   lane: number;
+  /** 重なりの段階（Step C。2 = 大きな金の数字、3 = さらに広がる輪） */
+  tier?: SynergyTier;
 }
 
 /** ユニットごとの動きの演出 */
@@ -141,6 +143,8 @@ interface StoreState {
   confirmEndTurn: boolean;
   setConfirmEndTurn: (v: boolean) => void;
   rollFx: RollFx | null;
+  /** 重なりの演出（Step C）: 揺れ・広がる輪を始めた合図。見た目だけ（状態・乱数・同期は変えない） */
+  synergyFx: { id: number; tier: 2 | 3 } | null;
   popups: Popup[];
   unitFx: Record<string, UnitFx>;
   retargets: Record<string, number>;
@@ -405,7 +409,7 @@ export const useBattle = create<StoreState>((set, get) => {
     presentationTimer = null; frames = []; pendingNotices = [];
     for (const timer of uiTimers) clearTimeout(timer);
     uiTimers.clear();
-    set({ presentationBusy: false, phaseBanner: null, cutins: [], petPulses: {}, popups: [], unitFx: {}, rollFx: null });
+    set({ presentationBusy: false, phaseBanner: null, cutins: [], petPulses: {}, popups: [], unitFx: {}, rollFx: null, synergyFx: null });
     if (enemyWaiting) { enemyWaiting = false; setTimeout(scheduleEnemy, 0); }
   };
   /** 見ている戦闘の手番が変わっていたら、帯を出す手番を返す（出したことにする） */
@@ -465,6 +469,7 @@ export const useBattle = create<StoreState>((set, get) => {
       if (e.perfect) vibrate(get().settings, VIBRATION.perfect);
     }
     playFrameSounds(frame);
+    if (frame.synergy && frame.synergy >= 2) set({ synergyFx: { id: fxId++, tier: frame.synergy as 2 | 3 } });
     if (frame.motions?.length) set(s => ({ unitFx: { ...s.unitFx, ...Object.fromEntries(frame.motions!.map(m => [m.unitId, { kind: m.kind, id: fxId++ }])) } }));
     for (const p of frame.popups ?? []) addPopup(p);
     showNotices(frame.notices ?? []);
@@ -515,6 +520,7 @@ export const useBattle = create<StoreState>((set, get) => {
   const resetBattleUi = (b: BattleState): Partial<StoreState> => { clearPresentation(); bannerKey = ''; return ({
     selection: null,
     rollFx: null,
+    synergyFx: null,
     popups: [],
     unitFx: {},
     retargets: {},
@@ -650,6 +656,7 @@ export const useBattle = create<StoreState>((set, get) => {
     confirmAbandon: false,
     confirmEndTurn: false,
     rollFx: null,
+    synergyFx: null,
     popups: [],
     unitFx: {},
     retargets: {},
