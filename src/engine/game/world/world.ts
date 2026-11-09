@@ -284,9 +284,6 @@ function doMove(game: GameState, w: WorldState, h: Hero, companions: Hero[], to:
     if (w.follow) delete w.follow[h.id];
     for (const c of companions) (w.follow ??= {})[c.id] = h.id;
   }
-  // 一緒に歩いた同行者は、このワールドターンの行動を使ったことにする（ステップB: 同行者は後で自分の手番を持たない）。
-  // 先に印を付けるので、途中で敵に会った時・突発イベントが起きた時も同じ扱い
-  for (const c of companions) if (!w.acted.includes(c.id)) w.acted.push(c.id);
   // 画面の演出用: 通ったマス（敵に会ったら、そこまで）
   const trail = [from];
   w.lastMove = { seq: (w.lastMove?.seq ?? 0) + 1, heroes: group.map((g) => g.id), path: trail };
@@ -545,7 +542,6 @@ export function backToWorld(game: GameState, rng: Rng, endTurn: boolean) {
 
 // ---------- 命の灯火（spec §11.4） ----------
 
-/** 戦闘に負けた参加者: 命の灯火があれば最寄りの町でHP半分で復活、無ければ退場 */
 /** 戦闘に負けたキャラが目を覚ます町のマス（handleDefeat と全滅の画面の両方で使う。同じ答えになるように） */
 function respawnTownOf(game: GameState, participants: string[]): number | undefined {
   const w = game.world;
@@ -579,6 +575,7 @@ export function defeatOutlook(game: GameState, participants: string[]): DefeatOu
   return activeHeroes(game).some((h) => !participants.includes(h.id)) ? { kind: 'downed' } : { kind: 'gameover' };
 }
 
+/** 戦闘に負けた参加者: 命の灯火があれば最寄りの町でHP半分で復活、無ければ退場 */
 export function handleDefeat(game: GameState, participants: string[], rng: Rng) {
   const w = game.world;
   const heroes = participants.map((id) => findHero(game, id)!).filter(Boolean);

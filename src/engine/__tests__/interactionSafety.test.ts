@@ -159,25 +159,18 @@ describe('同行の交代運転と共同施設', () => {
     expect(a.world!.lastMove?.path).toEqual([0,1]);
     expect(new Set(Object.values(a.world!.pos))).toEqual(new Set([1]));
   });
-  it('4人で一緒に動くと乗客は行動済み（ステップB）。行動済みの仲間も乗客になれ、運転者の番が終わるとワールドターンが進む', () => {
+  it('4人でP1→P2→P3→P4へ回り、行動済みの仲間も乗客になれる', () => {
     let g = world();
-    // 1人目は待機（行動済み）→ 2人目が全員を連れて動く
-    g = run(g, { type: 'WORLD_WAIT', playerId: 'P1', heroId: 'h0' });
-    expect(g.world!.turn).toBe('h1'); g.world!.move = 2;
-    g = run(g, { type: 'WORLD_MOVE', playerId: 'P2', heroId: 'h1', to: 1, companions: ['h0', 'h2', 'h3'] });
-    for (const p of ['P1', 'P3', 'P4'] as PlayerId[]) g = run(g, { type: 'WORLD_MOVE_AGREE', playerId: p, accept: true });
-    expect(new Set(Object.values(g.world!.pos))).toEqual(new Set([1]));
-    expect(g.world!.lastMove!.path).toEqual([0, 1]); expect(followingGroup(g, 'h1')).toHaveLength(4);
-    expect([...g.world!.acted].sort()).toEqual(['h0', 'h2', 'h3']);
-    g = run(g, { type: 'WORLD_WAIT', playerId: 'P2', heroId: 'h1' });
+    for (let i=0; i<4; i++) {
+      expect(g.world!.turn).toBe(`h${i}`); g.world!.move = 2;
+      const to = i + 1;
+      g = run(g, { type: 'WORLD_MOVE', playerId: `P${i+1}` as PlayerId, heroId: `h${i}`, to, companions: g.heroes.filter(h => h.id !== `h${i}`).map(h => h.id) });
+      for (const p of g.heroes.filter(h => h.playerId !== `P${i+1}`)) g = run(g, { type: 'WORLD_MOVE_AGREE', playerId: p.playerId, accept: true });
+      expect(new Set(Object.values(g.world!.pos))).toEqual(new Set([to]));
+      expect(g.world!.lastMove!.path).toEqual([i, to]); expect(followingGroup(g, `h${i}`)).toHaveLength(4);
+      g = run(g, { type: 'WORLD_WAIT', playerId: `P${i+1}` as PlayerId, heroId: `h${i}` });
+    }
     expect(g.world!.worldTurn).toBe(2); expect(g.world!.turn).toBe('h0');
-    // 次のワールドターン: 同行は続き、先頭の h0 が全員を連れて動ける
-    g.world!.move = 2;
-    g = run(g, { type: 'WORLD_MOVE', playerId: 'P1', heroId: 'h0', to: 2, companions: ['h1', 'h2', 'h3'] });
-    for (const p of ['P2', 'P3', 'P4'] as PlayerId[]) g = run(g, { type: 'WORLD_MOVE_AGREE', playerId: p, accept: true });
-    expect(new Set(Object.values(g.world!.pos))).toEqual(new Set([2]));
-    g = run(g, { type: 'WORLD_WAIT', playerId: 'P1', heroId: 'h0' });
-    expect(g.world!.worldTurn).toBe(3);
   });
   it('P2が同行解除しても残る3人の同行を保つ', () => {
     let g = world(); g.world!.turn = 'h1';

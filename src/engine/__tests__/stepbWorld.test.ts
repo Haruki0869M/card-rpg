@@ -1,9 +1,9 @@
-// ===== ステップB: 同行して動いたキャラは、そのワールドターンは行動済みになる =====
+// ===== ステップB: 全滅の画面の「この後どうなるか」（灯火・退却の町・復帰のHP）=====
 import { describe, expect, it } from 'vitest';
 import type { GameCommand, GameState, PlayerId } from '../../types';
 import { BALANCE } from '../../data/balance';
 import { TOWNS } from '../../data/world';
-import { applyGameCommand, createGame, createRng, defeatOutlook, findHero, handleDefeat, heroMaxHp, reachable } from '../index';
+import { applyGameCommand, createGame, createRng, defeatOutlook, findHero, handleDefeat, heroMaxHp } from '../index';
 
 const party = (players: PlayerId[]) =>
   players.map((p, i) => ({ classId: ['warrior', 'mage', 'guardian', 'hunter'][i], gender: 'male' as const, name: `h${i}`, playerId: p }));
@@ -22,92 +22,6 @@ function ready(players: PlayerId[], seed = 3) {
   for (const id of Object.keys(w.pos)) w.pos[id] = w.pos.h0;
   return g;
 }
-/** 移動先: 何もない隣のマス（施設なし） */
-function emptyStep(g: GameState) {
-  const w = g.world!;
-  return [...reachable(w, w.pos.h0, w.move ?? 0)].find(([i, v]) => i !== w.pos.h0 && v.cost <= (w.move ?? 0) && !w.tiles[i].f)![0];
-}
-
-describe('同行者の行動済み（ステップB）', () => {
-  it('4人中2人を連れて動くと、その2人は行動済み。運転者の番が終わると残りの1人の番、その後ワールドターンが進む', () => {
-    let g = ready(['P1', 'P1', 'P1', 'P1']);
-    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: 'P1', heroId: 'h0', focusUsed: 2 });
-    g = run(g, { type: 'WORLD_MOVE', playerId: 'P1', heroId: 'h0', to: emptyStep(g), companions: ['h1', 'h2'] });
-    expect(g.mode).toBe('world'); // この種では突発イベントは起きない
-    expect(g.world!.acted.sort()).toEqual(['h1', 'h2']);
-    expect(g.world!.turn).toBe('h0');
-    const corruption = g.world!.corruption;
-    g = run(g, { type: 'WORLD_WAIT', playerId: 'P1', heroId: 'h0' });
-    expect(g.world!.turn).toBe('h3');
-    expect(g.world!.worldTurn).toBe(1);
-    g = run(g, { type: 'WORLD_WAIT', playerId: 'P1', heroId: 'h3' });
-    expect(g.world!.worldTurn).toBe(2);
-    expect(g.world!.corruption).toBeGreaterThan(corruption);
-    expect(g.world!.acted).toEqual([]);
-    expect(g.world!.turn).toBe('h0');
-    // 次のワールドターンでは、同行者も手番を持てる（同行は続いていても、自分で動ける）
-    expect(applyGameCommand(g, { type: 'WORLD_ROLL_MOVE', playerId: 'P1', heroId: 'h1', focusUsed: 0 }).error).toBeDefined(); // まだ h0 の番
-    g = run(g, { type: 'WORLD_WAIT', playerId: 'P1', heroId: 'h0' });
-    expect(g.world!.turn).toBe('h1');
-  });
-
-  it('残りが全員同行者なら、運転者の番が終わるとすぐワールドターンが進む（侵食度も今までどおり増える）', () => {
-    let g = ready(['P1', 'P1']);
-    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: 'P1', heroId: 'h0', focusUsed: 2 });
-    g = run(g, { type: 'WORLD_MOVE', playerId: 'P1', heroId: 'h0', to: emptyStep(g), companions: ['h1'] });
-    expect(g.mode).toBe('world');
-    const corruption = g.world!.corruption;
-    g = run(g, { type: 'WORLD_WAIT', playerId: 'P1', heroId: 'h0' });
-    expect(g.world!.worldTurn).toBe(2);
-    expect(g.world!.corruption).toBeGreaterThan(corruption);
-    expect(g.world!.turn).toBe('h0');
-  });
-
-  it('他の人のキャラ（オンライン・交代）: 提案に同意して動いた時も、同行者は行動済み', () => {
-    let g = ready(['P1', 'P2', 'P1']);
-    g = run(g, { type: 'WORLD_INVITE', playerId: 'P1', heroId: 'h0', targetId: 'h1' });
-    g = run(g, { type: 'WORLD_INVITE_ANSWER', playerId: 'P2', heroId: 'h1', accept: true });
-    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: 'P1', heroId: 'h0', focusUsed: 2 });
-    g = run(g, { type: 'WORLD_MOVE', playerId: 'P1', heroId: 'h0', to: emptyStep(g), companions: ['h1'] });
-    // 提案の間はまだ行動済みにしない（断られたら h1 は自分の番を持つ）
-    expect(g.world!.acted).not.toContain('h1');
-    const refused = run(g, { type: 'WORLD_MOVE_AGREE', playerId: 'P2', accept: false });
-    expect(refused.world!.acted).not.toContain('h1');
-    g = run(g, { type: 'WORLD_MOVE_AGREE', playerId: 'P2', accept: true });
-    expect(g.world!.acted).toContain('h1');
-    expect(g.mode).toBe('world');
-    g = run(g, { type: 'WORLD_WAIT', playerId: 'P1', heroId: 'h0' });
-    expect(g.world!.turn).toBe('h2');
-  });
-
-  it('途中で魔物に会っても、同行者は行動済み（戦闘のあと自分の番は来ない）', () => {
-    let g = ready(['P1', 'P1', 'P1']);
-    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: 'P1', heroId: 'h0', focusUsed: 2 });
-    const to = emptyStep(g);
-    g.world!.wanderers.push({ id: 'wx', tile: to, enemies: [{ defId: 'goblinScout', level: 1 }] });
-    g = run(g, { type: 'WORLD_MOVE', playerId: 'P1', heroId: 'h0', to, companions: ['h1'] });
-    expect(g.mode).toBe('encounter');
-    expect(g.world!.acted).toContain('h1');
-    expect(g.world!.acted).not.toContain('h2');
-  });
-
-  it('突発イベントが起きても、同行者は行動済み', () => {
-    let found = false;
-    for (let seed = 1; seed <= 200 && !found; seed++) {
-      let g = ready(['P1', 'P1', 'P1'], seed);
-      g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: 'P1', heroId: 'h0', focusUsed: 2 });
-      const to = emptyStep(g);
-      if (to === undefined) continue;
-      g = run(g, { type: 'WORLD_MOVE', playerId: 'P1', heroId: 'h0', to, companions: ['h1'] });
-      if (g.mode !== 'event') continue;
-      found = true;
-      expect(g.party).toEqual(['h0', 'h1']);
-      expect(g.world!.acted).toContain('h1');
-      expect(g.world!.acted).not.toContain('h2');
-    }
-    expect(found).toBe(true);
-  });
-});
 
 describe('全滅の画面の「この後どうなるか」（ステップB）', () => {
   it('灯火が残っていれば: 実際に目を覚ます町の名前・灯火の数（前→後）・復帰のHPが、handleDefeat の結果と同じ', () => {
