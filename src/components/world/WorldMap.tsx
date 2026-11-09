@@ -1,7 +1,7 @@
 // ===== 世界マップの地図（六角形のマス。spec §8.1）=====
 // 地形・霧・施設・移動できる範囲は SVG、キャラと敵は上に重ねた画像。タップしたマスを親に知らせる。
-import { Castle, CircleHelp, DoorOpen, Flag, Gift, House, Landmark, LocateFixed, Sparkles, TriangleAlert, type LucideIcon } from 'lucide-react';
-import { memo, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { Castle, CircleHelp, DoorOpen, Flag, Gift, House, Landmark, LocateFixed, Minus, Plus, Sparkles, TriangleAlert, type LucideIcon } from 'lucide-react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { artImage, EnemyArt } from '../../art';
 import { DUNGEONS } from '../../data/dungeons';
 import { getTerrain, QUESTS, TERRAINS, TOWNS } from '../../data/world';
@@ -14,7 +14,8 @@ import { HeroFace } from '../ui/game';
 import { petSpot, PetToken } from '../ui/PetToken';
 import { HeroPiece } from './HeroPiece';
 import { orderOnTile, pieceSpots, PLAYER_COLORS } from './pieceLayout';
-import { cameraTop, mapPadY, revealTop } from './mapCamera';
+import { cameraTop, mapPadY, revealLeft, revealTop } from './mapCamera';
+import { anchorScroll, clampZoom, stepZoom, ZOOM_MAX, ZOOM_MIN } from './mapZoom';
 
 const SQRT3 = Math.sqrt(3);
 
@@ -52,9 +53,10 @@ export interface MapGeom {
   center: (i: number) => { x: number; y: number };
 }
 
-export function useMapGeom(w: Pick<WorldState, 'width' | 'height'>, containerW: number): MapGeom {
+/** zoom: 世界マップの拡大（1 = 今までの大きさ）。枠の幅から決めた1倍のマスの半径に掛ける */
+export function useMapGeom(w: Pick<WorldState, 'width' | 'height'>, containerW: number, zoom = 1): MapGeom {
   return useMemo(() => {
-    const R = Math.max(18, Math.min(34, (containerW || 360) / (SQRT3 * (w.width + 0.5))));
+    const R = Math.max(18, Math.min(34, (containerW || 360) / (SQRT3 * (w.width + 0.5)))) * zoom;
     const hexW = SQRT3 * R;
     const rowH = 1.5 * R;
     return {
@@ -69,7 +71,7 @@ export function useMapGeom(w: Pick<WorldState, 'width' | 'height'>, containerW: 
         return { x: hexW * (c + 0.5 * (r & 1)) + hexW / 2, y: R + r * rowH };
       },
     };
-  }, [w, containerW]);
+  }, [w, containerW, zoom]);
 }
 
 const hexPoints = (x: number, y: number, R: number) =>
@@ -155,7 +157,12 @@ export function WorldMap({
 }) {
   const w = game.world!;
   const [box, size] = useElementSize<HTMLDivElement>();
-  const geom = useMapGeom(w, size.width);
+  // 拡大: この端末の設定に保存した値。ピンチの最中だけは指に合わせた仮の値（指を離した時に保存する）
+  const savedZoom = useBattle(st => st.settings.worldZoom);
+  const setSettings = useBattle(st => st.setSettings);
+  const [pinchZoom, setPinchZoom] = useState<number | null>(null);
+  const zoom = clampZoom(pinchZoom ?? savedZoom);
+  const geom = useMapGeom(w, size.width, zoom);
   const { R, W, H, center } = geom;
   // 地図の大きさ（マスの半径）が、測る前の仮の値か、前の描画から変わった時は「落ち着き中」
   const lastR = useRef<number | null>(null);
@@ -188,18 +195,101 @@ export function WorldMap({
   const here = anim ? anim.path[anim.i] : w.pos[w.turn];
   // 地図の上下の余白（端のマスでも駒を真ん中に置ける。フェーズ2-D）。枠の高さが変わった時（下のパネルの高さが変わった時）も合わせ直す
   const padY = mapPadY(size.height);
+  // 拡大を変える直前のスクロールと、残したい枠の中の点（ピンチの指の間・ボタンなら枠の真ん中）
+  const zoomAnchor = useRef<{ left: number; top: number; ax: number; ay: number; padY: number; R: number } | null>(null);
+  const lastCam = useRef<{ here?: number; turn: string; w: number; h: number } | null>(null);
   useLayoutEffect(() => {
     const el = box.current;
     if (!el || here === undefined || !size.width) return;
+    const prev = lastCam.current;
+    lastCam.current = { here, turn: w.turn, w: size.width, h: size.height };
+    const anchor = zoomAnchor.current;
+    zoomAnchor.current = null;
+    // 拡大だけが変わった時（歩いていない時）: 指の間の地面をそのまま残す。それ以外は手番・歩いている駒を真ん中へ
+    const zoomOnly = !!prev && prev.here === here && prev.turn === w.turn && prev.w === size.width && prev.h === size.height;
+    if (zoomOnly && !anim) {
+      if (anchor && anchor.R !== R) el.scrollTo({ ...anchorScroll(anchor, anchor.R, R), behavior: 'instant' });
+      return;
+    }
     const { x, y } = center(here);
     el.scrollTo({ top: cameraTop(y, el.clientHeight), left: x - el.clientWidth / 2, behavior: 'instant' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [here, w.turn, size.width, size.height, center]);
+
+  /** 拡大を変える（ax, ay = 残したい点。枠の中の座標。省略すると枠の真ん中）。save = この端末の設定に保存する */
+  const applyZoom = (next: number, save: boolean, ax?: number, ay?: number) => {
+    const el = box.current;
+    const z = clampZoom(next);
+    if (el && z !== zoom) {
+      zoomAnchor.current = { left: el.scrollLeft, top: el.scrollTop, ax: ax ?? el.clientWidth / 2, ay: ay ?? el.clientHeight / 2, padY, R };
+    }
+    if (save) {
+      setPinchZoom(null);
+      if (z !== savedZoom) setSettings({ worldZoom: z });
+    } else setPinchZoom(z);
+  };
+  const applyZoomRef = useRef(applyZoom);
+  applyZoomRef.current = applyZoom;
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+
+  // 2本指のピンチで拡大・縮小（1本指はいつものスクロールとタップ）。
+  // 指が拡大のボタンの上から始まっても効くように、ボタンも含む外側の枠で受ける
+  const wrapRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = box.current;
+    const wrap = wrapRef.current;
+    if (!el || !wrap) return;
+    let start: { dist: number; zoom: number } | null = null;
+    let last = 0;
+    const two = (e: TouchEvent) => {
+      const a = e.touches[0], b = e.touches[1];
+      const rect = el.getBoundingClientRect();
+      return {
+        dist: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
+        ax: (a.clientX + b.clientX) / 2 - rect.left,
+        ay: (a.clientY + b.clientY) / 2 - rect.top,
+      };
+    };
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length !== 2) return;
+      start = { dist: Math.max(1, two(e).dist), zoom: zoomRef.current };
+      last = zoomRef.current;
+      e.preventDefault();
+    };
+    const onMove = (e: TouchEvent) => {
+      if (!start || e.touches.length !== 2) return;
+      e.preventDefault();
+      const t = two(e);
+      const z = clampZoom(start.zoom * (t.dist / start.dist));
+      if (Math.abs(z - last) < 0.02) return;
+      last = z;
+      applyZoomRef.current(z, false, t.ax, t.ay);
+    };
+    const onEnd = (e: TouchEvent) => {
+      if (!start || e.touches.length >= 2) return;
+      start = null;
+      applyZoomRef.current(last, true);
+    };
+    wrap.addEventListener('touchstart', onStart, { passive: false });
+    wrap.addEventListener('touchmove', onMove, { passive: false });
+    wrap.addEventListener('touchend', onEnd);
+    wrap.addEventListener('touchcancel', onEnd);
+    return () => {
+      wrap.removeEventListener('touchstart', onStart);
+      wrap.removeEventListener('touchmove', onMove);
+      wrap.removeEventListener('touchend', onEnd);
+      wrap.removeEventListener('touchcancel', onEnd);
+    };
+  }, [box]);
   // 行き先を選んだ時: 選んだマスが見えていなければ、駒と選んだマスが両方見えるように動かす（見えていれば動かさない）
   useLayoutEffect(() => {
     const el = box.current;
     if (!el || anim || here === undefined || selected === undefined || !size.width) return;
     const top = revealTop(center(here).y, center(selected).y, el.scrollTop, el.clientHeight, R * 1.2);
-    if (top !== undefined) el.scrollTo({ top, behavior: 'smooth' });
+    // 拡大している時は横にもはみ出すので、横も同じ決まりで見せる
+    const left = revealLeft(center(here).x, center(selected).x, el.scrollLeft, el.clientWidth, R * 1.2);
+    if (top !== undefined || left !== undefined) el.scrollTo({ top: top ?? el.scrollTop, left: left ?? el.scrollLeft, behavior: 'smooth' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
 
@@ -242,8 +332,8 @@ export function WorldMap({
   }, [shownPos]);
 
   return (
-    <div className="relative min-h-0 flex-1">
-    <div ref={box} className="absolute inset-0 overflow-auto overscroll-contain bg-[#0b0910]" data-world-map>
+    <div ref={wrapRef} className="relative min-h-0 flex-1" style={{ touchAction: 'pan-x pan-y' }}>
+    <div ref={box} className="absolute inset-0 overflow-auto overscroll-contain bg-[#0b0910]" style={{ touchAction: 'pan-x pan-y' }} data-world-map>
       <div style={{ paddingTop: padY, paddingBottom: padY, width: W }} data-map-pad>
       <div className="relative" style={{ width: W, height: H }} onClick={(e) => { if (!anim) tap(e); }}>
         <svg width={W} height={H} className="absolute inset-0 block">
@@ -441,6 +531,18 @@ export function WorldMap({
           <LocateFixed size={20} className="text-amber-200" />
         </button>
       )}
+      {/* 拡大・縮小（右手の親指で届くように、「戻る」のボタンの上に縦に並べる）。標準 = 1倍 */}
+      <div className="absolute right-2 bottom-[60px] z-10 flex flex-col items-center gap-1.5" role="group" aria-label="地図の拡大" data-zoom-controls data-zoom={zoom}>
+        <button onClick={() => applyZoom(stepZoom(zoom, 1), true)} disabled={zoom >= ZOOM_MAX} aria-label="地図を拡大" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-full disabled:opacity-40" data-zoom-in>
+          <Plus size={20} className="text-amber-200" />
+        </button>
+        <button onClick={() => applyZoom(1, true)} disabled={zoom === ZOOM_MIN} aria-label="地図を標準の大きさに戻す" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-full text-[12px] font-bold text-amber-100 disabled:opacity-40" data-zoom-reset>
+          標準
+        </button>
+        <button onClick={() => applyZoom(stepZoom(zoom, -1), true)} disabled={zoom <= ZOOM_MIN} aria-label="地図を縮小" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-full disabled:opacity-40" data-zoom-out>
+          <Minus size={20} className="text-amber-200" />
+        </button>
+      </div>
       {/* 時間帯と侵食度の色（地図の上に重ねる。タップは通す） */}
       <div className="pointer-events-none absolute inset-0" style={{ background: tint }} />
       <div
