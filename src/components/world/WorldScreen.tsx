@@ -36,10 +36,10 @@ import { useBattle, type WorldMovePresentation } from '../../store/battleStore';
 import { useOnline } from '../../store/onlineStore';
 import type { GameState, Hero, PlayerId, TimeOfDay } from '../../types';
 import { autoAgreeCommands } from './companionMove';
-import { RollStrip } from '../ui/CheckPanel';
+import { SpinRollStrip, useFreshRoll } from '../ui/CheckPanel';
 import { Bar, HeroFace, Screen } from '../ui/game';
 import { WorldMap } from './WorldMap';
-import { arrivalView, MoveStatus, useMovePlayback } from './WorldMoveScene';
+import { arrivalView, moveButtonText, MoveStatus, useMovePlayback } from './WorldMoveScene';
 import { canChangeNow } from '../JobSheet';
 
 const TIME_ICON: Record<TimeOfDay, typeof Sun> = { morning: Sunrise, noon: Sun, evening: Sunset, night: Moon };
@@ -313,6 +313,10 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
     setFocus(0);
   }, [w.turn, w.move]);
 
+  // 移動力の判定のスロット（フェーズ2-D）: この画面を開いた後に新しく判定した時だけ回す
+  const moveRollKey = w.moveRoll ? `move:${game.seed}:${w.worldTurn}:${w.turn}` : undefined;
+  const freshRoll = useFreshRoll(moveRollKey);
+
   // 1台で遊ぶ時（フェーズ2-C）: 同行している仲間の担当も全員この端末にいるので、「一緒に行く」の確認を出さずに、
   // その担当の同行キャラとして返事を送ってすぐ一緒に動く（オンラインで別の端末の人を連れて動く時だけ同意を取る）
   const proposal = w.moveProposal;
@@ -377,20 +381,29 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
     <Screen>
       <WorldTopBar game={game} />
       <PartyRow game={game} />
-      <WorldMap
-        game={mapGame}
-        reach={playback ? undefined : reach}
-        selected={playback ? undefined : w.moveProposal?.to ?? selected}
-        path={playback ? undefined : path}
-        movement={playback}
-        onTapTile={playback ? () => {} : tapTile}
-      />
+      {/* 地図。タップしたマスの説明は地図の下の端に重ねる（行が増えて地図が狭くならないように。フェーズ2-D） */}
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <WorldMap
+          game={mapGame}
+          reach={playback ? undefined : reach}
+          selected={playback ? undefined : w.moveProposal?.to ?? selected}
+          path={playback ? undefined : path}
+          movement={playback}
+          onTapTile={playback ? () => {} : tapTile}
+        />
+        {info && !playback && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-black/75 py-1 pr-14 pl-3 text-[12px] leading-4 text-zinc-100" data-tile-info>
+            {info}
+          </div>
+        )}
+      </div>
       {w.moveProposal && (isOnlinePlay() || autoAgreeFailed) && <MoveProposal game={game} />}
-      {info && <div className="shrink-0 bg-black/70 px-3 py-1 text-[12px] leading-4 text-zinc-200">{info}</div>}
 
-      {/* 手番の表示と操作パネル。移動の演出中は、同じ大きさのまま上に「移動中…」の帯を重ねて押せなくする */}
+      {/* 手番の表示と操作パネル。移動の演出中は、パネルの代わりに小さな「移動中…」の帯だけを出して、地図を広く見せる（フェーズ2-D） */}
+      {movement && playback ? (
+        <MoveStatus move={movement} playback={playback} />
+      ) : (
       <div className="relative shrink-0">
-      {movement && playback && <MoveStatus move={movement} playback={playback} />}
       <div className="shrink-0 bg-sky-950 px-3 py-1 text-center text-[14px] font-bold" data-current-turn>現在は {hero.playerId}（{hero.name}）の手番です</div>
       {/* 手番のキャラの操作 */}
       <div className="panel relative z-10 shrink-0 rounded-t-2xl px-3 pt-2 pb-3">
@@ -449,8 +462,8 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
 
         {w.moveRoll && (
           <div className="mt-1 flex items-center gap-2">
-            <RollStrip results={w.moveRoll} small />
-            <span className="text-[12px] text-zinc-300">{w.move ? (selected !== undefined ? 'もう一度タップか「移動する」で決定' : '光るマスをタップして行き先を選ぶ') : '移動力を使い切った'}</span>
+            <SpinRollStrip results={w.moveRoll} small spinKey={moveRollKey ?? ''} fresh={freshRoll} />
+            <span className="text-[12px] leading-4 text-zinc-300">{w.move ? (selected !== undefined ? 'もう一度タップか下のボタンで決定' : 'マスの数字は、そこまでに使う移動力') : '移動力を使い切った'}</span>
           </div>
         )}
 
@@ -532,8 +545,13 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
               <Footprints size={20} /> 移動力の判定
             </button>
           ) : selected !== undefined ? (
-            <button onClick={() => tapTile(selected)} className="btn btn-gold font-display h-12 rounded-xl text-[18px]">
-              移動する（移動力 {reach?.get(selected)}）
+            <button onClick={() => tapTile(selected)} className="btn btn-gold font-display h-12 rounded-xl text-[17px] leading-5">
+              {moveButtonText(reach?.get(selected), path?.length)}
+            </button>
+          ) : (w.move ?? 0) > 0 && mine ? (
+            // 行き先を選ぶ前も同じ高さのボタンの場所を取っておく（選んだ時にパネルが高くならないように）
+            <button disabled className="btn btn-dark h-12 rounded-xl text-[15px] font-bold disabled:opacity-60" data-move-placeholder>
+              光るマスをタップして行き先を選ぶ
             </button>
           ) : null}
           {/* 同じマスに倒れている仲間（M3-C5）: 手番を使って助け起こす */}
@@ -571,6 +589,7 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
         </div>
       </div>
       </div>
+      )}
 
       {/* 移動の演出中は、上の情報欄・仲間の列・地図のタップも受け付けない（以前の移動画面と同じ） */}
       {movement && <div className="absolute inset-0 z-30" aria-hidden data-move-blocker />}
