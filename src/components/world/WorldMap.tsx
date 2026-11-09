@@ -1,6 +1,6 @@
 // ===== 世界マップの地図（六角形のマス。spec §8.1）=====
 // 地形・霧・施設・移動できる範囲は SVG、キャラと敵は上に重ねた画像。タップしたマスを親に知らせる。
-import { Castle, CircleHelp, DoorOpen, Flag, Gift, House, Landmark, LocateFixed, Minus, Plus, Sparkles, TriangleAlert, type LucideIcon } from 'lucide-react';
+import { CircleHelp, DoorOpen, Flag, Gift, House, Landmark, LocateFixed, Minus, Plus, Sparkles, TriangleAlert, type LucideIcon } from 'lucide-react';
 import { useReducedMotion } from 'framer-motion';
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { artImage, EnemyArt } from '../../art';
@@ -10,7 +10,10 @@ import { colOf, objectiveHandler, partySenses, rowOf, timeOfDay } from '../../en
 import { useElementSize } from '../../hooks/useElementSize';
 import { speedFactor, useBattle } from '../../store/battleStore';
 import { TIMING } from '../../data/balance';
-import type { GameState, WorldState } from '../../types';
+import { getScenario } from '../../data/scenarios';
+import type { GameState, TimeOfDay, WorldState } from '../../types';
+import { BASE_DEPTH, corruptionStage, hash01, hexVerts, LEVEL_STEP, MAX_LEVEL, neighborAt, pts, roadLinks, roadPath, terrainLevel, tileLevel, TOP_SCALE } from './diorama';
+import { PlaceMini, propOf, TerrainProp, type MiniKind } from './MapMiniatures';
 import { HeroFace } from '../ui/game';
 import { petSpot, PetToken } from '../ui/PetToken';
 import { HeroPiece } from './HeroPiece';
@@ -45,50 +48,128 @@ function placeImage(f: NonNullable<WorldState['tiles'][number]['f']>): string | 
   return undefined;
 }
 
+/** 夜・夕方の明かり（場所の種類 → 色と大きさ（R に対する半径）） */
+const GLOW: Record<string, { color: string; r: number }> = {
+  town: { color: 'rgba(255,196,110,.85)', r: 1.7 },
+  shrine: { color: 'rgba(150,255,210,.7)', r: 1.2 },
+  temple: { color: 'rgba(255,233,168,.75)', r: 1.3 },
+  altar: { color: 'rgba(200,160,255,.75)', r: 1.3 },
+  finale: { color: 'rgba(255,80,50,.7)', r: 1.6 },
+};
+
+/**
+ * 時間帯の光。wash = 地図の上に重ねる色（地図といっしょに動く）、glow = 明かりの強さ（0 = 出さない）。
+ * 朝は左上からの斜めの光の筋、夕方はオレンジ、夜は青い月明かり（前より、はっきり変える）
+ */
+function timeLight(time: TimeOfDay, R: number): { wash?: string; glow: number } {
+  const band = (c: string, a: number) =>
+    `repeating-linear-gradient(115deg, rgba(${c},0) 0px, rgba(${c},${a}) ${(R * 1.6).toFixed(0)}px, rgba(${c},0) ${(R * 3.2).toFixed(0)}px, rgba(${c},0) ${(R * 5.5).toFixed(0)}px)`;
+  if (time === 'morning') return { wash: `${band('255,226,160', 0.2)}, linear-gradient(rgba(255,214,160,.1), rgba(255,214,160,.1))`, glow: 0 };
+  if (time === 'evening') return { wash: 'linear-gradient(170deg, rgba(255,150,60,.3), rgba(220,80,60,.34))', glow: 0.55 };
+  if (time === 'night') return { wash: `${band('150,180,255', 0.09)}, linear-gradient(rgba(6,14,58,.58), rgba(6,14,58,.58))`, glow: 1 };
+  return { glow: 0 };
+}
+
+/** 魔物の駒の台座（赤。レアは金）。glow = 周りの光（襲撃・レア） */
+function EnemyBase({ color, s, glow }: { color: string; s: number; glow?: string }) {
+  return (
+    <svg className="absolute" style={{ left: s * 0.1, top: s * 0.66, width: s * 0.8, height: s * 0.32, overflow: 'visible', filter: glow ? `drop-shadow(0 0 5px ${glow})` : undefined }} viewBox="0 0 100 40" aria-hidden>
+      <ellipse cx="54" cy="31" rx="50" ry="11" fill="rgba(0,0,0,.5)" />
+      <ellipse cx="50" cy="27" rx="47" ry="12" fill={color} stroke="#1a0606" strokeWidth="2" />
+      <rect x="3" y="14" width="94" height="13" fill={color} />
+      <rect x="3" y="14" width="94" height="13" fill="rgba(0,0,0,.35)" />
+      <line x1="3" y1="14" x2="3" y2="27" stroke="#1a0606" strokeWidth="2" />
+      <line x1="97" y1="14" x2="97" y2="27" stroke="#1a0606" strokeWidth="2" />
+      <ellipse cx="50" cy="14" rx="47" ry="12" fill={color} stroke="#1a0606" strokeWidth="2" />
+      <ellipse cx="50" cy="13" rx="36" ry="8" fill="rgba(255,255,255,.18)" />
+    </svg>
+  );
+}
+
 export interface MapGeom {
   R: number;
   hexW: number;
   rowH: number;
   W: number;
   H: number;
+  /** マスの上の面の中心（高さの分だけ上へ持ち上げた位置。駒・光るマス・カメラもここを使う） */
   center: (i: number) => { x: number; y: number };
+  /** 高さ0の床の上の中心（高さで持ち上げない位置。雲の海はここに置く） */
+  ground: (i: number) => { x: number; y: number };
 }
 
-/** zoom: 世界マップの拡大（1 = 今までの大きさ）。枠の幅から決めた1倍のマスの半径に掛ける */
-export function useMapGeom(w: Pick<WorldState, 'width' | 'height'>, containerW: number, zoom = 1): MapGeom {
+/**
+ * zoom: 世界マップの拡大（1 = 今までの大きさ）。枠の幅から決めた1倍のマスの半径に掛ける。
+ * levels: マスごとの高さ（0〜3。箱庭の六角柱）。無ければ全部 0
+ */
+export function useMapGeom(w: Pick<WorldState, 'width' | 'height'>, containerW: number, zoom = 1, levels?: readonly number[]): MapGeom {
   return useMemo(() => {
     const R = Math.max(18, Math.min(34, (containerW || 360) / (SQRT3 * (w.width + 0.5)))) * zoom;
     const hexW = SQRT3 * R;
     const rowH = 1.5 * R;
+    // 一番上の行の高い山も切れないように、上に「一番高い段」の分の余白を足す。下は六角柱の土台の分
+    const top = MAX_LEVEL * LEVEL_STEP * R;
+    const ground = (i: number) => {
+      const c = colOf(w, i);
+      const r = rowOf(w, i);
+      return { x: hexW * (c + 0.5 * (r & 1)) + hexW / 2, y: top + R + r * rowH };
+    };
     return {
       R,
       hexW,
       rowH,
       W: hexW * (w.width + 0.5),
-      H: rowH * (w.height - 1) + 2 * R,
+      H: rowH * (w.height - 1) + 2 * R + top + BASE_DEPTH * R,
+      ground,
       center: (i: number) => {
-        const c = colOf(w, i);
-        const r = rowOf(w, i);
-        return { x: hexW * (c + 0.5 * (r & 1)) + hexW / 2, y: R + r * rowH };
+        const g = ground(i);
+        return { x: g.x, y: g.y - (levels?.[i] ?? 0) * LEVEL_STEP * R };
       },
     };
-  }, [w, containerW, zoom]);
+  }, [w, containerW, zoom, levels]);
 }
 
-const hexPoints = (x: number, y: number, R: number) =>
-  Array.from({ length: 6 }, (_, k) => {
-    const a = (Math.PI / 180) * (60 * k - 90);
-    return `${(x + R * Math.cos(a)).toFixed(1)},${(y + R * Math.sin(a)).toFixed(1)}`;
-  }).join(' ');
+const hexPoints = (x: number, y: number, R: number) => pts(hexVerts(x, y, R));
 
-/** 地形と霧（キャラの移動以外では変わりにくいので、タイルの見え方が変わった時だけ描き直す） */
-const TerrainLayer = memo(function TerrainLayer({ tiles, geom }: { tiles: WorldState['tiles']; geom: MapGeom }) {
-  const { R, center } = geom;
+/** 雲の海のふくらみ（マスごとに3つ。場所と大きさはマスの番号から決める） */
+const puffs = (i: number) =>
+  [0, 1, 2].map((k) => ({
+    dx: (hash01(i, 30 + k) - 0.5) * 1.0,
+    dy: (hash01(i, 40 + k) - 0.5) * 0.8,
+    r: 0.62 + hash01(i, 50 + k) * 0.36,
+  }));
+
+interface TerrainProps {
+  tiles: WorldState['tiles'];
+  geom: MapGeom;
+  w: Pick<WorldState, 'width' | 'height'>;
+  levels: readonly number[];
+  /** 道が出ていく辺（マス → 辺の番号） */
+  links: Map<number, number[]>;
+  /** 今、霧が晴れたばかりのマス（せり上がる演出） */
+  fresh: ReadonlySet<number>;
+  /** 地域ごとの、街道のマスの下に敷く地形（道の線を描くので、マスは草地などにする） */
+  under: readonly string[];
+  /** 瘴気の色の雲にするマスか */
+  miasma: (i: number) => boolean;
+  /** 最後の城のマス（地形の飾りを置かない） */
+  noProp: ReadonlySet<number>;
+  roadTerrain: string;
+}
+
+/**
+ * 地形の層（箱庭の六角柱）。キャラの移動以外では変わりにくいので、タイルの見え方が変わった時だけ描き直す。
+ * 上の行から順に描くので、手前（下の行）の高いマスが、奥のマスの下の方を隠す
+ */
+const TerrainLayer = memo(function TerrainLayer({ tiles, geom, w, levels, links, fresh, under, miasma, noProp, roadTerrain }: TerrainProps) {
+  const { R, center, ground } = geom;
   const s = R / 24;
   // 地形の模様（描いた絵）。並べてもつなぎ目が出ない絵を、マス2つ分くらいの大きさで敷く
   const size = R * 4;
+  const rt = R * TOP_SCALE;
+  const fill = (id: string) => (artImage(`terrain/${id}`) ? `url(#ter-${id})` : getTerrain(id).color);
   return (
-    <g>
+    <svg width={geom.W} height={geom.H} className="absolute inset-0 block" data-terrain-layer>
       <defs>
         {TERRAINS.all.map((t) => {
           const url = artImage(`terrain/${t.id}`);
@@ -100,40 +181,199 @@ const TerrainLayer = memo(function TerrainLayer({ tiles, geom }: { tiles: WorldS
           ) : null;
         })}
       </defs>
+      {/* 落ち影（マスの間の溝と、地図の端に落ちる） */}
+      <g data-shadows>
+        {tiles.map((t, i) => {
+          if (!t.seen) return null;
+          const { x, y } = ground(i);
+          return <polygon key={i} points={hexPoints(x + R * 0.1, y + R * (BASE_DEPTH + 0.1), R * 0.98)} fill="rgba(0,0,0,.45)" />;
+        })}
+      </g>
       {tiles.map((t, i) => {
-        const { x, y } = center(i);
         if (!t.seen) return null;
+        const { x, y } = center(i);
         const ter = getTerrain(t.t);
-        const tex = !!artImage(`terrain/${ter.id}`);
+        const lv = levels[i];
+        const d = (BASE_DEPTH + lv * LEVEL_STEP) * R;
+        const v = hexVerts(x, y, rt);
+        const dn = (p: [number, number]): [number, number] => [p[0], p[1] + d];
+        const road = !t.f && t.t === roadTerrain ? under[t.r] : undefined;
+        const topId = road ?? ter.id;
+        const tex = !!artImage(`terrain/${topId}`);
         // 絵がある地形は模様で分かるので、小さな印は出さない
         const dec = !tex && ter.decor ? TERRAIN_DECOR[ter.decor] : undefined;
+        const prop = !t.f && !noProp.has(i) ? propOf(ter.id) : undefined;
+        // 奥（左上・左・右上）の高いマスが落とす影を、上の面の辺にそって描く（高さの差が分かる）
+        const occl = [5, 4, 0].flatMap((k) => {
+          const j = neighborAt(w, i, k);
+          if (j === undefined || !tiles[j].seen || levels[j] <= lv) return [];
+          const f = Math.min(0.5, 0.2 * (levels[j] - lv));
+          const a = v[k], b = v[(k + 1) % 6];
+          const inA: [number, number] = [a[0] + (x - a[0]) * f, a[1] + (y - a[1]) * f];
+          const inB: [number, number] = [b[0] + (x - b[0]) * f, b[1] + (y - b[1]) * f];
+          return [<polygon key={`o${k}`} points={pts([a, b, inB, inA])} fill="rgba(0,0,0,.3)" />];
+        });
+        // 地域の境目（隣が別の地域の辺に、やわらかい光の線）
+        const border = [0, 1, 2, 3, 4, 5].flatMap((k) => {
+          const j = neighborAt(w, i, k);
+          if (j === undefined || tiles[j].r === t.r) return [];
+          const a = v[k], b = v[(k + 1) % 6];
+          return [`M${a[0].toFixed(1)} ${a[1].toFixed(1)} L${b[0].toFixed(1)} ${b[1].toFixed(1)}`];
+        });
+        const ks = links.get(i);
         return (
-          <g key={i} data-hex={i}>
-            <polygon points={hexPoints(x, y, R - 0.5)} fill={tex ? `url(#ter-${ter.id})` : ter.color} stroke="rgba(0,0,0,.5)" strokeWidth={1.2} />
-            {ter.climate && <polygon points={hexPoints(x, y, R - 0.5)} fill={ter.climate.kind === 'cold' ? 'rgba(140,200,255,.18)' : 'rgba(255,120,40,.18)'} pointerEvents="none" data-climate={ter.climate.kind} />}
+          <g key={i} data-hex={i} data-level={lv} className={fresh.has(i) ? 'hex-rise' : undefined} style={fresh.has(i) ? ({ '--rise': `${(R * 0.45).toFixed(1)}px` } as React.CSSProperties) : undefined}>
+            {/* 側面: 右下と左下の2面。地形の模様を暗くして、光の向き（左上から）で左右の明るさを変える */}
+            <path d={`M${pts([v[2], v[3], v[4], dn(v[4]), dn(v[3]), dn(v[2])]).replace(/ /g, ' L')} Z`} fill={fill(ter.id)} />
+            <path d={`M${pts([v[3], v[4], dn(v[4]), dn(v[3])]).replace(/ /g, ' L')} Z`} fill="rgba(10,6,4,.42)" />
+            <path d={`M${pts([v[2], v[3], dn(v[3]), dn(v[2])]).replace(/ /g, ' L')} Z`} fill="rgba(10,6,4,.62)" />
+            <path d={`M${pts([dn(v[2]), dn(v[3]), dn(v[4])]).replace(/ /g, ' L')}`} fill="none" stroke="rgba(0,0,0,.6)" strokeWidth={1.2} />
+            {/* 上の面（この g の最初の polygon。確認スクリプトがマスの大きさを測る） */}
+            <polygon points={pts(v)} fill={fill(topId)} stroke="rgba(0,0,0,.45)" strokeWidth={1} />
+            {ter.climate && <polygon points={pts(v)} fill={ter.climate.kind === 'cold' ? 'rgba(140,200,255,.18)' : 'rgba(255,120,40,.18)'} pointerEvents="none" data-climate={ter.climate.kind} />}
             {dec && <path d={dec.d} transform={`translate(${x},${y}) scale(${s})`} stroke={dec.stroke} fill={dec.fill ?? 'none'} strokeWidth={1.6} strokeLinecap="round" opacity={0.85} />}
+            {occl}
+            {ks && (
+              <g data-road={i} pointerEvents="none">
+                <path d={roadPath(x, y, rt, ks)} fill="none" stroke="#3a2a14" strokeWidth={R * 0.36} strokeLinecap="round" opacity={0.55} />
+                <path d={roadPath(x, y, rt, ks)} fill="none" stroke="#b8945c" strokeWidth={R * 0.26} strokeLinecap="round" />
+                <path d={roadPath(x, y, rt, ks)} fill="none" stroke="#d8bc84" strokeWidth={R * 0.07} strokeLinecap="round" strokeDasharray={`${(R * 0.12).toFixed(1)} ${(R * 0.16).toFixed(1)}`} opacity={0.8} />
+              </g>
+            )}
+            {border.length > 0 && <path d={border.join(' ')} stroke="rgba(255,236,190,.55)" strokeWidth={Math.max(1.5, R * 0.07)} strokeLinecap="round" strokeDasharray={`${(R * 0.14).toFixed(1)} ${(R * 0.12).toFixed(1)}`} fill="none" data-region-border />}
+            <path d={`M${pts([v[3], v[4], v[5], v[0], v[1]]).replace(/ /g, ' L')}`} fill="none" stroke="rgba(255,250,230,.28)" strokeWidth={Math.max(1, R * 0.04)} strokeLinejoin="round" />
+            <path d={`M${pts([v[1], v[2], v[3]]).replace(/ /g, ' L')}`} fill="none" stroke="rgba(0,0,0,.35)" strokeWidth={Math.max(1, R * 0.04)} strokeLinejoin="round" />
+            {prop && <TerrainProp kind={prop} x={x} y={y} R={R} i={i} />}
           </g>
         );
       })}
-      {/* 霧: まだ見ていないマスを、少しにじませて重ねる（見えている所との境目がぼける）。濃さはマスごとに少し変える */}
-      <defs>
-        <filter id="fog-blur" x="-10%" y="-10%" width="120%" height="120%">
-          <feGaussianBlur stdDeviation={R * 0.28} />
-        </filter>
-        <radialGradient id="fog-fill" cx="50%" cy="45%" r="60%">
-          <stop offset="0%" stopColor="#2a2540" />
-          <stop offset="100%" stopColor="#0e0b16" />
-        </radialGradient>
-      </defs>
-      <g filter="url(#fog-blur)" data-fog>
+      {/* 雲の海の土台（まだ見ていないマス。ふくらみは上の CloudLayer がゆっくり流す） */}
+      <g data-fog>
         {tiles.map((t, i) => {
           if (t.seen) return null;
-          const { x, y } = center(i);
-          const shade = 0.82 + ((i * 2654435761) % 1000) / 1000 * 0.18;
-          return <polygon key={i} data-fog-tile={i} points={hexPoints(x, y, R * 1.22)} fill="url(#fog-fill)" opacity={shade} />;
+          const g = ground(i);
+          return <polygon key={i} data-fog-tile={i} points={hexPoints(g.x, g.y - LEVEL_STEP * R, R * 1.06)} fill={miasma(i) ? '#4a2e64' : '#6e7392'} />;
         })}
       </g>
-    </g>
+    </svg>
+  );
+});
+
+/**
+ * 雲の海のふくらみ（ゆっくり流れる）。この層だけを CSS の transform で動かすので、地図の描き直しは起きない。
+ * 霧が晴れたばかりのマスの雲は、ふわっと上へ消える
+ */
+const CloudLayer = memo(function CloudLayer({ tiles, geom, fresh, miasma }: { tiles: WorldState['tiles']; geom: MapGeom; fresh: ReadonlySet<number>; miasma: (i: number) => boolean }) {
+  const { R, ground } = geom;
+  const puff = (i: number, cls?: string) => {
+    const g = ground(i);
+    const cy = g.y - LEVEL_STEP * R;
+    const m = miasma(i);
+    return (
+      <g key={i} className={cls} style={cls ? ({ '--lift': `${(-R * 0.5).toFixed(1)}px` } as React.CSSProperties) : undefined}>
+        {puffs(i).map((p, k) => (
+          <circle key={k} cx={g.x + p.dx * R} cy={cy + p.dy * R} r={p.r * R} fill={m ? 'url(#puff-miasma)' : 'url(#puff)'} />
+        ))}
+      </g>
+    );
+  };
+  return (
+    <div className="cloud-drift pointer-events-none absolute inset-0" style={{ '--drift': `${(R * 0.22).toFixed(1)}px` } as React.CSSProperties} data-cloud-layer>
+      <svg width={geom.W} height={geom.H} className="absolute inset-0 block overflow-visible">
+        <defs>
+          <radialGradient id="puff">
+            <stop offset="0%" stopColor="#d8dbea" stopOpacity=".85" />
+            <stop offset="55%" stopColor="#a8acc6" stopOpacity=".55" />
+            <stop offset="100%" stopColor="#6e7392" stopOpacity="0" />
+          </radialGradient>
+          <radialGradient id="puff-miasma">
+            <stop offset="0%" stopColor="#b48ad0" stopOpacity=".8" />
+            <stop offset="55%" stopColor="#74488e" stopOpacity=".55" />
+            <stop offset="100%" stopColor="#4a2e64" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+        {tiles.map((t, i) => (t.seen ? (fresh.has(i) ? puff(i, 'cloud-clear') : null) : puff(i)))}
+      </svg>
+    </div>
+  );
+});
+
+/** 水面のきらめき（水・海のマスの上の方に光の帯。この層の透明度だけを CSS で変える） */
+const WaterLayer = memo(function WaterLayer({ tiles, geom, levels }: { tiles: WorldState['tiles']; geom: MapGeom; levels: readonly number[] }) {
+  const { R, center } = geom;
+  const water = tiles.flatMap((t, i) => (t.seen && levels[i] === 0 && getTerrain(t.t).moveCost === 0 && (t.t === 'water' || getTerrain(t.t).sea) ? [i] : []));
+  if (!water.length) return null;
+  const band = (phase: number) => (
+    <svg width={geom.W} height={geom.H} className={`absolute inset-0 block water-shimmer ${phase ? 'water-shimmer-b' : ''}`}>
+      {water.map((i) => {
+        const { x, y } = center(i);
+        const o = (hash01(i, 60 + phase) - 0.5) * R * 0.3;
+        return (
+          <g key={i} stroke="#dff2ff" strokeLinecap="round" fill="none" strokeWidth={Math.max(1.2, R * 0.05)}>
+            <path d={`M${x - R * 0.45 + o} ${y - R * 0.18 + phase * R * 0.12} q${R * 0.12} ${-R * 0.08} ${R * 0.24} 0 t${R * 0.24} 0`} />
+            <path d={`M${x - R * 0.05 - o} ${y + R * 0.02 + phase * R * 0.08} q${R * 0.1} ${-R * 0.07} ${R * 0.2} 0 t${R * 0.2} 0`} />
+          </g>
+        );
+      })}
+    </svg>
+  );
+  return (
+    <div className="pointer-events-none absolute inset-0" data-water-layer>
+      {band(0)}
+      {band(1)}
+    </div>
+  );
+});
+
+/** 施設の層（立体のミニチュア・描いた絵）。歩いている間は変わらないので、施設の状態が変わった時だけ描き直す */
+const FeatureLayer = memo(function FeatureLayer({ tiles, geom, finaleTiles, fallenTowns }: { tiles: WorldState['tiles']; geom: MapGeom; finaleTiles: ReadonlySet<number>; fallenTowns: string[] }) {
+  const { R, center } = geom;
+  const w = { tiles, fallenTowns };
+  return (
+    <svg width={geom.W} height={geom.H} className="absolute inset-0 block" data-feature-layer>
+      <defs>
+        <filter id="place-shadow" x="-30%" y="-30%" width="160%" height="160%">
+          <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#000" floodOpacity=".85" />
+        </filter>
+      </defs>
+      {/* 上の行から順に描く（手前の場所の絵が奥の絵を隠す） */}
+      {w.tiles.map((t, i) => {
+        if (!t.f || !t.seen) return null;
+        const { x, y } = center(i);
+        const f = t.f;
+        const finale = finaleTiles.has(i);
+        const fallen = f.kind === 'town' && w.fallenTowns.includes(f.id);
+        const used = f.used && f.kind !== 'town' && f.kind !== 'dungeon';
+        const mini: MiniKind | undefined = finale ? 'finale' : f.kind === 'event' || f.kind === 'temple' || f.kind === 'altar' ? f.kind : undefined;
+        if (mini) {
+          return (
+            <g key={`f${i}`} opacity={used ? 0.45 : 1} data-feature={`${f.kind}:${f.id}`} data-used={used || undefined}>
+              <PlaceMini kind={mini} x={x} y={y} R={R} />
+            </g>
+          );
+        }
+        const img = placeImage(f);
+        if (img) {
+          // 描いた絵の場所: マスより少し大きく、影をつけて上の面から飛び出させる
+          const big = R * (f.kind === 'town' ? 1.75 : f.kind === 'chest' ? 1.25 : 1.55);
+          return (
+            <g key={`f${i}`} opacity={used ? 0.4 : 1} data-feature={`${f.kind}:${f.id}`} data-used={used || undefined}>
+              <ellipse cx={x} cy={y + big * 0.33} rx={big * 0.42} ry={big * 0.13} fill="rgba(0,0,0,.55)" />
+              <image href={img} x={x - big / 2} y={y - big * 0.62} width={big} height={big} filter="url(#place-shadow)" style={fallen ? { filter: 'grayscale(1) brightness(.6)' } : undefined} />
+            </g>
+          );
+        }
+        const Icon = FEATURE_ICON[f.kind] ?? CircleHelp;
+        const sz = R * 0.95;
+        const color = fallen ? '#7a6a7a' : FEATURE_COLOR[f.kind];
+        return (
+          <g key={`f${i}`} opacity={used ? 0.35 : 1} data-feature={`${f.kind}:${f.id}`} data-used={used || undefined}>
+            <circle cx={x} cy={y} r={sz * 0.62} fill="rgba(0,0,0,.55)" />
+            <Icon x={x - sz / 2} y={y - sz / 2} width={sz} height={sz} color={color ?? '#ffd76a'} strokeWidth={2.2} />
+          </g>
+        );
+      })}
+    </svg>
   );
 });
 
@@ -169,7 +409,45 @@ export function WorldMap({
   const setSettings = useBattle(st => st.setSettings);
   const [pinchZoom, setPinchZoom] = useState<number | null>(null);
   const zoom = clampZoom(pinchZoom ?? savedZoom);
-  const geom = useMapGeom(w, size.width, zoom);
+  // 霧が晴れた時だけ地形の層を作り直す（それ以外は前の層を使い回す）
+  const tilesRef = useRef(w.tiles);
+  const key = seenKey(w) + ':' + w.tiles.length;
+  const lastKey = useRef(key);
+  // 今、霧が晴れたばかりのマス（せり上がる演出。最初に地図を出した時は無し）
+  const freshRef = useRef<ReadonlySet<number>>(new Set());
+  if (lastKey.current !== key) {
+    const before = tilesRef.current;
+    const fresh = new Set<number>();
+    if (before.length === w.tiles.length) w.tiles.forEach((t, i) => t.seen && !before[i].seen && fresh.add(i));
+    freshRef.current = fresh;
+    lastKey.current = key;
+    tilesRef.current = w.tiles;
+  }
+  const tiles = tilesRef.current;
+  // 箱庭の高さ・道・最後の城（地形は冒険の間ほぼ変わらないので、地形の並びが変わった時だけ計算し直す）
+  const scenario = getScenario(game.scenarioId);
+  const terrainKey = tiles.map((t) => t.t).join(',');
+  const finaleTiles = useMemo(() => new Set(tiles.flatMap((t, i) => (t.f?.kind === 'dungeon' && DUNGEONS.tryGet(t.f.id)?.finale ? [i] : []))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [terrainKey]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const levels = useMemo(() => tiles.map((t, i) => tileLevel(t, finaleTiles.has(i))), [terrainKey, finaleTiles]);
+  const roadTerrain = scenario.map?.roadTerrain ?? 'road';
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const links = useMemo(() => roadLinks({ ...w, tiles }, roadTerrain), [terrainKey, roadTerrain, w.width, w.height]);
+  // 街道のマスの下に敷く地形（その地域で一番多い、高さ1の地形。無ければ平原）
+  const under = useMemo(
+    () => (scenario.map?.regions ?? []).map((r) => Object.entries(r.terrain).filter(([id]) => id !== roadTerrain && terrainLevel(id) === 1 && TERRAINS.tryGet(id)).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'plains'),
+    [scenario, roadTerrain],
+  );
+  // 侵食度が高いほど、奥の地域から雲が紫の瘴気になる
+  const stage = corruptionStage(w.corruption);
+  const lastRegion = (scenario.map?.regions.length ?? 1) - 1;
+  const miasma = useMemo(() => {
+    const from = stage >= 3 ? 0 : stage === 2 ? Math.max(1, lastRegion - 1) : stage === 1 ? lastRegion : lastRegion + 1;
+    return (i: number) => (tiles[i]?.r ?? 0) >= from || tiles[i]?.t === 'blight';
+  }, [stage, lastRegion, tiles]);
+  const geom = useMapGeom(w, size.width, zoom, levels);
   const { R, W, H, center } = geom;
   // 地図の大きさ（マスの半径）が、測る前の仮の値か、前の描画から変わった時は「落ち着き中」
   const lastR = useRef<number | null>(null);
@@ -177,15 +455,6 @@ export function WorldMap({
   useEffect(() => {
     lastR.current = size.width === 0 ? null : R;
   }, [R, size.width]);
-  // 霧が晴れた時だけ地形の層を作り直す（それ以外は前の層を使い回す）
-  const tilesRef = useRef(w.tiles);
-  const key = seenKey(w) + ':' + w.tiles.length;
-  const lastKey = useRef(key);
-  if (lastKey.current !== key) {
-    lastKey.current = key;
-    tilesRef.current = w.tiles;
-  }
-
   // 移動中の地図は画面切替より上の共通部品で最後まで保持する。
   const fast = useBattle(st => st.settings.fastMode);
   const simple = useBattle(st => st.settings.cutinMode === 'simple');
@@ -378,9 +647,41 @@ export function WorldMap({
   };
 
   const senses = partySenses(game);
-  const night = timeOfDay(w.worldTurn);
-  const tint =
-    night === 'night' ? 'rgba(12,18,60,.42)' : night === 'evening' ? 'rgba(255,110,40,.14)' : night === 'morning' ? 'rgba(255,230,180,.06)' : 'transparent';
+  const time = timeOfDay(w.worldTurn);
+  const light = timeLight(time, R);
+  // 明かり（町・祠・神殿・祭壇・最後の城・野営のたき火）
+  const glows = useMemo(() => {
+    if (!light.glow) return [];
+    const out: { key: string; kind: string; x: number; y: number; r: number; color: string }[] = [];
+    tiles.forEach((t, i) => {
+      if (!t.seen || !t.f) return;
+      const k = finaleTiles.has(i) ? 'finale' : t.f.kind;
+      const g = GLOW[k];
+      if (!g || (k === 'town' && w.fallenTowns.includes(t.f.id))) return;
+      const { x, y } = center(i);
+      out.push({ key: `g${i}`, kind: k, x, y: y - R * 0.2, r: R * g.r, color: g.color });
+    });
+    for (const id of w.sheltered ?? []) {
+      const tile = w.pos[id];
+      if (tile === undefined) continue;
+      const { x, y } = center(tile);
+      out.push({ key: `camp${id}`, kind: 'camp', x, y, r: R * 1.3, color: 'rgba(255,160,64,.8)' });
+    }
+    return out;
+  }, [light.glow, tiles, finaleTiles, center, R, w.fallenTowns, w.sheltered, w.pos]);
+  // 地域の名前（いつも左上に出す）と、地域に入るたびの短い帯
+  const regionIdx = here !== undefined ? w.tiles[here]?.r : undefined;
+  const regionName = regionIdx !== undefined ? scenario.map?.regions[regionIdx]?.name : undefined;
+  const [banner, setBanner] = useState<{ name: string; seq: number } | null>(null);
+  const prevRegion = useRef(regionIdx);
+  useEffect(() => {
+    const prev = prevRegion.current;
+    prevRegion.current = regionIdx;
+    if (prev === undefined || regionIdx === undefined || prev === regionIdx || !regionName) return;
+    setBanner((b) => ({ name: regionName, seq: (b?.seq ?? 0) + 1 }));
+    const t = setTimeout(() => setBanner(null), 2300);
+    return () => clearTimeout(t);
+  }, [regionIdx, regionName]);
 
   // 同じマスのキャラは少しずらして並べる
   const heroSpots = useMemo(() => {
@@ -393,29 +694,47 @@ export function WorldMap({
     <div ref={wrapRef} className="relative min-h-0 flex-1" style={{ touchAction: 'pan-x pan-y' }}>
     <div ref={box} className="absolute inset-0 overflow-auto overscroll-contain bg-[#0b0910]" style={{ touchAction: 'pan-x pan-y' }} data-world-map>
       <div style={{ paddingTop: padY, paddingBottom: padBottom, width: W }} data-map-pad>
-      <div className="relative" style={{ width: W, height: H }} onClick={(e) => { if (!anim) tap(e); }}>
-        <svg width={W} height={H} className="absolute inset-0 block">
-          <defs>
-            <filter id="place-shadow" x="-30%" y="-30%" width="160%" height="160%">
-              <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#000" floodOpacity=".85" />
-            </filter>
-          </defs>
-          <TerrainLayer tiles={tilesRef.current} geom={geom} />
-          {/* 移動できるマス */}
+      {/* 歩いている間は、雲と水の動きを止める（スマホで駒の動きをなめらかにするため） */}
+      <div className="relative" style={{ width: W, height: H }} onClick={(e) => { if (!anim) tap(e); }} data-walking={anim ? '' : undefined}>
+        <TerrainLayer tiles={tiles} geom={geom} w={w} levels={levels} links={links} fresh={freshRef.current} under={under} miasma={miasma} noProp={finaleTiles} roadTerrain={roadTerrain} />
+        <WaterLayer tiles={tiles} geom={geom} levels={levels} />
+        <CloudLayer tiles={tiles} geom={geom} fresh={freshRef.current} miasma={miasma} />
+        {/* 施設（立体のミニチュア・描いた絵）。時間帯の色の下に置く（夜は暗くなり、町などの明かりだけが光る） */}
+        <FeatureLayer tiles={w.tiles} geom={geom} finaleTiles={finaleTiles} fallenTowns={w.fallenTowns} />
+        {/* 時間帯の光（朝 = 斜めの光、夕方 = オレンジ、夜 = 青い月明かり）。地図といっしょに動く1枚の色なので、描き直しは起きない */}
+        {light.wash && <div className="pointer-events-none absolute inset-0" style={{ background: light.wash }} data-time-light={time} />}
+        {/* 夜と夕方の明かり（町・祠・神殿・祭壇・野営のたき火） */}
+        {light.glow > 0 &&
+          glows.map((g) => (
+            <span
+              key={g.key}
+              className="map-glow pointer-events-none absolute rounded-full"
+              data-glow={g.kind}
+              style={{
+                left: g.x - g.r,
+                top: g.y - g.r,
+                width: g.r * 2,
+                height: g.r * 2,
+                opacity: light.glow,
+                background: `radial-gradient(circle, ${g.color} 0%, ${g.color.replace(/[\d.]+\)$/, '0.25)')} 38%, transparent 70%)`,
+              }}
+            />
+          ))}
+        {/* 操作の印（移動できるマス・経路・選んだマス・霊感・依頼の旗・襲撃）。夜でも見えるように、時間帯の色より上に置く */}
+        <svg width={W} height={H} className="absolute inset-0 block" data-overlay-layer>
           {reach &&
             [...reach].map(([i, cost]) => {
               if (i === here) return null;
               const { x, y } = center(i);
               return (
                 <g key={`r${i}`} data-reach={i} data-cost={cost}>
-                  <polygon points={hexPoints(x, y, R - 3)} fill="rgba(255,240,180,.16)" stroke="rgba(255,214,110,.75)" strokeWidth={1.5} />
+                  <polygon points={hexPoints(x, y, R * TOP_SCALE - 2)} fill="rgba(255,240,180,.2)" stroke="rgba(255,214,110,.85)" strokeWidth={1.8} />
                   <text x={x} y={y + R * 0.62} textAnchor="middle" fontSize={Math.max(12, R * 0.42)} fontWeight={800} fill="#fff3c4" stroke="#000" strokeWidth={2.5} paintOrder="stroke">
                     {cost}
                   </text>
                 </g>
               );
             })}
-          {/* 経路 */}
           {path && path.length > 0 && here !== undefined && (
             <polyline
               points={[here, ...path].map((i) => `${center(i).x},${center(i).y}`).join(' ')}
@@ -426,44 +745,19 @@ export function WorldMap({
               strokeLinecap="round"
             />
           )}
-          {selected !== undefined && <polygon points={hexPoints(center(selected).x, center(selected).y, R - 2)} fill="none" stroke="#fff" strokeWidth={3} />}
-          {/* 施設（霊感のキャラがいれば、祠とイベントは霧の中でも光って見える） */}
+          {selected !== undefined && <polygon points={hexPoints(center(selected).x, center(selected).y, R * TOP_SCALE - 1)} fill="none" stroke="#fff" strokeWidth={3} />}
+          {/* 霊感のキャラがいれば、祠とイベントは雲の中でも光って見える */}
+          {senses &&
+            w.tiles.map((t, i) => {
+              if (t.seen || !t.f || (t.f.kind !== 'shrine' && t.f.kind !== 'event')) return null;
+              const { x, y } = geom.ground(i);
+              return <circle key={`sense${i}`} cx={x} cy={y - LEVEL_STEP * R} r={R * 0.32} fill={t.f.kind === 'shrine' ? '#9affd0' : '#9ad8ff'} opacity={0.8} stroke="#fff" strokeOpacity={0.6} data-sensed={t.f.kind} />;
+            })}
           {w.tiles.map((t, i) => {
-            if (!t.f) return null;
-            if (!t.seen) {
-              if (!senses || (t.f.kind !== 'shrine' && t.f.kind !== 'event')) return null;
-              const { x, y } = center(i);
-              return <circle key={`sense${i}`} cx={x} cy={y} r={R * 0.32} fill={t.f.kind === 'shrine' ? '#9affd0' : '#9ad8ff'} opacity={0.75} filter="url(#place-shadow)" data-sensed={t.f.kind} />;
-            }
+            if (!t.seen || !t.f || !questTargets.has(t.f.id)) return null;
             const { x, y } = center(i);
-            const f = t.f;
-            const finale = f.kind === 'dungeon' && DUNGEONS.tryGet(f.id)?.finale;
-            const Icon = finale ? Castle : FEATURE_ICON[f.kind] ?? CircleHelp;
-            const fallen = f.kind === 'town' && w.fallenTowns.includes(f.id);
-            const used = f.used && f.kind !== 'town' && f.kind !== 'dungeon';
-            const sz = R * (f.kind === 'town' || finale ? 1.15 : 0.95);
-            const color = fallen ? '#7a6a7a' : f.kind === 'chest' && f.chest?.rarity ? undefined : FEATURE_COLOR[f.kind];
-            const img = finale ? undefined : placeImage(f);
-            if (img) {
-              // 描いた絵の場所: マスより少し大きく、影をつけて地形から浮かせる
-              const big = R * (f.kind === 'town' ? 1.75 : f.kind === 'chest' ? 1.25 : 1.55);
-              return (
-                <g key={`f${i}`} opacity={used ? 0.4 : 1} data-feature={`${f.kind}:${f.id}`} data-used={used || undefined}>
-                  <ellipse cx={x} cy={y + big * 0.33} rx={big * 0.42} ry={big * 0.13} fill="rgba(0,0,0,.55)" />
-                  <image href={img} x={x - big / 2} y={y - big * 0.58} width={big} height={big} filter="url(#place-shadow)" style={fallen ? { filter: 'grayscale(1) brightness(.6)' } : undefined} />
-                  {questTargets.has(f.id) && <Flag x={x + big * 0.12} y={y - big * 0.75} width={R * 0.6} height={R * 0.6} color="#ff6a8a" fill="#ff6a8a" />}
-                </g>
-              );
-            }
-            return (
-              <g key={`f${i}`} opacity={used ? 0.35 : 1} data-feature={`${f.kind}:${f.id}`} data-used={used || undefined}>
-                <circle cx={x} cy={y} r={sz * 0.62} fill="rgba(0,0,0,.55)" />
-                <Icon x={x - sz / 2} y={y - sz / 2} width={sz} height={sz} color={color ?? '#ffd76a'} strokeWidth={2.2} />
-                {questTargets.has(f.id) && <Flag x={x + sz * 0.15} y={y - sz * 0.95} width={sz * 0.6} height={sz * 0.6} color="#ff6a8a" fill="#ff6a8a" />}
-              </g>
-            );
+            return <Flag key={`q${i}`} x={x + R * 0.2} y={y - R * 1.35} width={R * 0.6} height={R * 0.6} color="#ff6a8a" fill="#ff6a8a" />;
           })}
-          {/* 襲撃されている町 */}
           {w.raids.map((r) => {
             const i = w.tiles.findIndex((t) => t.f?.kind === 'town' && t.f.id === r.townId);
             if (i < 0 || !w.tiles[i].seen) return null;
@@ -478,24 +772,26 @@ export function WorldMap({
             );
           })}
         </svg>
-        {/* 徘徊する敵 */}
+        {/* 徘徊する敵: 赤い台座に乗った魔物の駒（レアは金の台座と★）。ゆっくり呼吸するように動く */}
         {w.wanderers.map((wd) => {
           if (!w.tiles[wd.tile].seen) return null;
           const { x, y } = center(wd.tile);
-          const s = R * 1.6;
+          const s = R * 1.5;
+          const base = wd.rare ? '#e0a82a' : '#c0282a';
           return (
             <div
               key={wd.id}
               className="pointer-events-none absolute"
               data-wanderer={wd.id}
               data-rare={wd.rare ? 'true' : undefined}
-              style={{ left: x - s / 2, top: y - s * 0.62, width: s, height: s, filter: wd.raidTown ? 'drop-shadow(0 0 6px #ff3a3a)' : wd.rare ? 'drop-shadow(0 0 7px #ffd24a)' : 'drop-shadow(0 2px 2px #000)' }}
+              style={{ left: x - s / 2, top: y - s * 0.72, width: s, height: s, zIndex: 1 }}
             >
-              {/* 地形の模様の上でも見えるように、暗い円と赤い縁を敷く（レアは金の縁と★） */}
-              <span className={`absolute inset-[8%] rounded-full border-2 bg-[#140a10]/80 ${wd.rare ? 'border-amber-300' : 'border-red-500/80'}`} />
+              <EnemyBase color={base} s={s} glow={wd.raidTown ? '#ff3a3a' : wd.rare ? '#ffd24a' : undefined} />
+              <span className="enemy-breathe absolute block" style={{ left: s * 0.08, top: -s * 0.02, width: s * 0.84, height: s * 0.84, animationDelay: `${-(hash01(Number(wd.id.replace(/\D/g, '')) || 0, 7) * 3).toFixed(2)}s` }}>
+                <EnemyArt defId={wd.enemies[0].defId} className="h-full w-full" />
+              </span>
               {wd.rare && <span className="absolute -left-1 top-0 z-10 text-[14px] leading-4 font-black text-amber-300">★</span>}
-              <EnemyArt defId={wd.enemies[0].defId} className="relative h-full w-full" />
-              <span className="absolute -right-1 bottom-0 rounded-full border border-red-300 bg-red-950/90 px-1 text-[12px] leading-4 font-black text-red-200">
+              <span className="absolute -right-1 bottom-[10%] rounded-full border border-red-300 bg-red-950/90 px-1 text-[12px] leading-4 font-black text-red-200">
                 {wd.enemies.length > 1 ? `×${wd.enemies.length}` : `Lv${wd.enemies[0].level ?? 1}`}
               </span>
             </div>
@@ -611,12 +907,29 @@ export function WorldMap({
           <Minus size={20} className="text-amber-200" />
         </button>
       </div>
-      {/* 時間帯と侵食度の色（地図の上に重ねる。タップは通す） */}
-      <div className="pointer-events-none absolute inset-0" style={{ background: tint }} />
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{ background: `radial-gradient(ellipse at center, transparent 45%, rgba(90,20,110,${(w.corruption / 100) * 0.55}) 100%)` }}
-      />
+      {/* 侵食度の色（25%・50%・75% で一段ずつ暗く紫に。地図の上に重ねる。タップは通す） */}
+      {stage > 0 && (
+        <div
+          className="pointer-events-none absolute inset-0"
+          data-corruption-stage={stage}
+          style={{ background: `radial-gradient(ellipse at center, transparent ${[0, 50, 38, 26][stage]}%, rgba(80,14,110,${[0, 0.38, 0.55, 0.72][stage]}) 100%), rgba(50,8,80,${[0, 0.07, 0.14, 0.22][stage]})` }}
+        />
+      )}
+      {/* 夜は、画面の端を少し暗くする（月明かり） */}
+      {time === 'night' && <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 40%, transparent 50%, rgba(2,6,30,.45) 100%)' }} />}
+      {/* 地域の名前（いつも出す）と、地域に入った時の帯 */}
+      {regionName && (
+        <div className="pointer-events-none absolute top-2 left-2 z-10 max-w-[60%] truncate rounded-full border border-amber-200/40 bg-black/65 px-3 py-0.5 text-[12px] leading-5 font-bold text-amber-100" data-region-name>
+          {regionName}
+        </div>
+      )}
+      {banner && !w.story && (
+        <div key={banner.seq} className="region-banner pointer-events-none absolute inset-x-0 z-10 flex justify-center" style={{ top: '18%' }} data-region-banner>
+          <div className="font-display border-y border-amber-200/60 px-10 py-1.5 text-[20px] text-amber-50" style={{ background: 'linear-gradient(90deg, transparent, rgba(20,12,30,.85) 20%, rgba(20,12,30,.85) 80%, transparent)', textShadow: '0 1px 3px #000' }}>
+            {banner.name}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

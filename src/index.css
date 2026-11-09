@@ -519,3 +519,55 @@ textarea {
 @keyframes depart-ready { 0%, 100% { box-shadow: 0 0 8px 1px rgba(255, 210, 110, .35); } 50% { box-shadow: 0 0 22px 6px rgba(255, 210, 110, .75); } }
 .depart-ready { animation: depart-ready 2.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .depart-ready { animation: none; box-shadow: 0 0 16px 4px rgba(255, 210, 110, .6); } }
+
+/* ===== 世界マップの箱庭（play-feedback-plan §8）。動くのは transform と opacity だけ（地図の描き直しを起こさない） ===== */
+/* 霧が晴れたマスが、下からふわっとせり上がる（0.4秒） */
+@keyframes hex-rise {
+  from { transform: translateY(var(--rise, 12px)); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.hex-rise { animation: hex-rise 0.42s cubic-bezier(.2,.8,.3,1.1) both; }
+/* 晴れたマスの雲が、上へ消える */
+@keyframes cloud-clear {
+  from { transform: none; opacity: 1; }
+  to { transform: translateY(var(--lift, -14px)); opacity: 0; }
+}
+.cloud-clear { animation: cloud-clear 0.45s ease-out both; }
+/* 雲の海がゆっくり流れる（層ごと動かす） */
+@keyframes cloud-drift {
+  from { transform: translate3d(calc(var(--drift, 6px) * -1), 0, 0); }
+  to { transform: translate3d(var(--drift, 6px), calc(var(--drift, 6px) * -0.3), 0); }
+}
+.cloud-drift { animation: cloud-drift 14s ease-in-out infinite alternate; will-change: transform; }
+/* 水面のきらめき（2枚を交互に） */
+@keyframes water-shimmer {
+  0%, 100% { opacity: 0.1; }
+  50% { opacity: 0.55; }
+}
+.water-shimmer { animation: water-shimmer 4.2s ease-in-out infinite; will-change: opacity; }
+.water-shimmer-b { animation-delay: -2.1s; }
+/* 夜の明かりが、ゆっくりゆらぐ */
+@keyframes map-glow {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+.map-glow { animation: map-glow 3.6s ease-in-out infinite; will-change: transform; }
+/* 魔物の駒が、ゆっくり呼吸する（足元を軸に） */
+@keyframes enemy-breathe {
+  0%, 100% { transform: scale(1, 1); }
+  50% { transform: scale(1.025, 1.045); }
+}
+.enemy-breathe { animation: enemy-breathe 3s ease-in-out infinite; transform-origin: 50% 92%; will-change: transform; }
+[data-walking] .cloud-drift, [data-walking] .water-shimmer, [data-walking] .map-glow { animation-play-state: paused; }
+/* 地域に入った時の帯 */
+@keyframes region-banner {
+  0% { opacity: 0; transform: translateY(-8px); }
+  14%, 82% { opacity: 1; transform: none; }
+  100% { opacity: 0; }
+}
+.region-banner { animation: region-banner 2.2s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .hex-rise, .cloud-drift, .water-shimmer, .map-glow, .enemy-breathe { animation: none; }
+  .cloud-clear { animation: none; opacity: 0; }
+  .region-banner { animation: none; }
+}
