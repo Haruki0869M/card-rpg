@@ -2,7 +2,7 @@
 // 1) キャラを切り替えると上の帯の所持金も切り替わる 2) タブ5つが切れない 3) 最後の段が「世界マップへ」の欄に重ならない
 // 4) 装備品を買うと「すぐ装備する」の窓が出て、押すと装備が変わる（担当は P2 にして、1台で P2 以降で止まらないことも見る）
 // 使い方: npx vite preview を起こしてから node scripts/town-ux.mjs（URL=... で場所を変えられる）
-import { chromium, layoutIssues, URL } from './lib.mjs';
+import { chromium, depart, layoutIssues, URL } from './lib.mjs';
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
@@ -25,7 +25,7 @@ await page.reload();
 await page.getByText('新しい冒険').click();
 await page.getByText('2人', { exact: true }).click();
 await page.getByText('キャラクター作成へ').click();
-await page.getByText('冒険に出発').click();
+await depart(page);
 await page.waitForTimeout(300);
 const base = await save();
 // 2人目は P2 の担当にして、最初から同行（誘って承知した形）にする。所持金を別々にする
