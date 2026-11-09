@@ -176,8 +176,8 @@
 | □ | B | 小物 5つ | `B-props.png` |
 | □ | C | 施設 4つ | `C-places.png` |
 | □ | D | 遠くの目印 1つ | `D-landmark.png` |
-| □ | 試し1 | 森の木 1本 | `try-tree.png` |
-| □ | 試し2 | 町 1つ | `try-town.png` |
+| ✅ | 試し1 | 森の木 1本 | `try-tree.png` |
+| ✅ | 試し2 | 町 1つ | `try-town.png` |
 
 ---
 
@@ -197,3 +197,9 @@
 - 名前（提案）: `tree/plains-1|2`・`tree/forest-1..4`・`prop/hill|rock|grass|flower|mushroom`・`place/town|capital|shrine`・`landmark/tent`・`skyline/demon-castle`。最終的な置き場と名前は、箱庭のセッションの `src/components/world/landscape/`（パーツの一覧）に合わせる。
 - 今の `place/town`・`place/capital`・`place/shrine` の絵は、試作の見え方を比べてから差し替えるか決める（オーナーに見比べの写真を見せる）。
 - ChatGPT の画像の使い方の決まり（商用・公開）は、組み込む前にもう一度確かめる（設計書の注意）。
+
+## 試しの結果（2026-11-10）
+- 試し1（森の木）・試し2（町）とも、**背景はきちんと透明**（透明と不透明の2つにはっきり分かれ、半端な所がほぼ無い）。切り抜きも穴埋めも要らない。
+- 絵柄は2枚とも「墨の線＋淡い水彩」でそろい、今の地図の絵になじむ。町は窓の明かり・煙突の煙まで形がはっきりしていて、小さくても町と分かる。
+- 木は、横から見た形に近い（斜め45度の見下ろしより低い角度）。木は横から見ても不自然ではないので、このままでよい。
+- 元画像: `C:\dev\card-rpg-assets\diorama\chatgpt\try-tree.png`（1024×1536）・`try-town.png`（1254×1254）
