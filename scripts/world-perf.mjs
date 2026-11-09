@@ -23,6 +23,7 @@ for (const zoom of [1, 2]) {
   }, SEED);
   // 原因を探す時だけ: PERF_CSS に CSS を入れると、ページに足す（例: 層を隠す・動きを止める）
   if (process.env.PERF_CSS) await page.addInitScript((css) => document.addEventListener('DOMContentLoaded', () => { const st = document.createElement('style'); st.textContent = css; document.head.append(st); }), process.env.PERF_CSS);
+  if (process.env.PERF_JS) await page.addInitScript(process.env.PERF_JS);
   await page.goto(URL);
   await page.evaluate((z) => { localStorage.clear(); localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: false, vibration: false, firstGuide: false, worldZoom: z })); }, zoom);
   await page.reload();

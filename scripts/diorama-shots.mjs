@@ -90,6 +90,29 @@ await shot('2-forest-night');
 // 3) 侵食度が高い時（75%）
 await edit('w.corruption = 78; w.worldTurn = 3;');
 await shot('3-corruption-75');
+// 4) 山の辺り（火山の地域）: 周り半径2マスだけ晴らす。霧の向こうの山のシルエットが見えるか
+await edit(`
+  const W = w.width, H = w.height;
+  const nb = (i) => { const c = i % W, r = Math.floor(i / W), o = r & 1;
+    const d = o ? [[1,0],[-1,0],[0,-1],[1,-1],[0,1],[1,1]] : [[1,0],[-1,0],[-1,-1],[0,-1],[-1,1],[0,1]];
+    return d.map(([dc,dr]) => [c+dc, r+dr]).filter(([c2,r2]) => c2>=0&&c2<W&&r2>=0&&r2<H).map(([c2,r2]) => r2*W+c2); };
+  w.corruption = 0;
+  w.tiles.forEach((t) => { t.seen = false; });
+  let best = -1, bs = -1;
+  w.tiles.forEach((t, i) => { if (Math.floor(i / W) > 9 || t.t === 'mountain' || t.t === 'lava' || t.f) return;
+    const s = nb(i).reduce((n, j) => n + (w.tiles[j].t === 'mountain' || w.tiles[j].t === 'lava' ? 1 : 0), 0);
+    if (s > bs) { bs = s; best = i; } });
+  w.pos[w.turn] = best;
+  let ring = new Set([best]);
+  for (let k = 0; k < 2; k++) { for (const i of [...ring]) for (const j of nb(i)) ring.add(j); }
+  for (const i of ring) w.tiles[i].seen = true;
+  w.worldTurn = 3;
+`);
+await shot('4-mountain-silhouette');
+// 5) 地平線（地図の一番上へスクロール）: まだ見ていない最後の城のシルエット
+await page.evaluate(() => document.querySelector('[data-world-map]').scrollTo({ top: 0, behavior: 'instant' }));
+await page.waitForTimeout(400);
+await shot('5-horizon');
 await browser.close();
 if (errors.length) console.log('ページのエラー:\n' + errors.join('\n'));
 console.log(`OK: ${OUT} に保存した`);

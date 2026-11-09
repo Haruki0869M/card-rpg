@@ -6,27 +6,26 @@ import type { WorldState } from '../../types';
 // 見本を作る時だけ、ビルドの時の値（VITE_DIORAMA_STEP・VITE_DIORAMA_TILT）で変えられる（ふだんは下の既定の値）
 const envNum = (v: unknown, d: number) => (typeof v === 'string' && v !== '' && Number.isFinite(Number(v)) ? Number(v) : d);
 /** 1段の高さ（マスの半径 R に対する割合） */
-export const LEVEL_STEP = envNum(import.meta.env.VITE_DIORAMA_STEP, 0.14);
+export const LEVEL_STEP = envNum(import.meta.env.VITE_DIORAMA_STEP, 0.18);
 /**
  * 地面を縦につぶす割合（斜めから見下ろす形。1 = 真上から）。高さ（側面）はつぶさない。
- * 駒・木・山・ミニチュアは立ったまま描く
+ * 駒・木・山・ミニチュアは立ったまま描く。オーナーが案B（斜めの見下ろし・0.68）に決めた
  */
-export const GROUND_K = envNum(import.meta.env.VITE_DIORAMA_TILT, 1);
-/** 一番高い段 */
-export const MAX_LEVEL = 3;
+export const GROUND_K = envNum(import.meta.env.VITE_DIORAMA_TILT, 0.68);
+/** 一番高い段（オーナーの決定: 地面は0〜2段に控えめにし、山や森の高さは立つ絵で見せる） */
+export const MAX_LEVEL = 2;
 /** 六角柱の土台の厚み（高さ0の水でも、これだけ側面が見える。R に対する割合） */
 export const BASE_DEPTH = 0.18;
 /** 上の面の大きさ（R に対する割合）。少し小さくして、マスどうしの間に溝と側面を見せる */
 export const TOP_SCALE = 0.93;
 
-/** 地形の高さ（0〜3）。水・海=0、平地=1、森・丘=2、山・火山=3 */
+/** 地形の高さ（0〜2）。水・海=0、平地・森=1、丘・山・火山=2 */
 const LEVEL: Record<string, number> = {
   water: 0,
   sea: 0,
-  forest: 2,
   hills: 2,
-  mountain: 3,
-  lava: 3,
+  mountain: 2,
+  lava: 2,
 };
 export function terrainLevel(terrainId: string): number {
   return LEVEL[terrainId] ?? 1;

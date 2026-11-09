@@ -7,7 +7,7 @@
 import { memo, useEffect, useMemo, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import type { TimeOfDay, WorldState } from '../../types';
-import { BASE_DEPTH, hash01, hexVerts, LEVEL_STEP, pts } from './diorama';
+import { BASE_DEPTH, GROUND_K, hash01, hexVerts, LEVEL_STEP, pts } from './diorama';
 
 /** 地図の座標（WorldMap の MapGeom の一部） */
 interface Geom {
@@ -190,7 +190,8 @@ export const FogSea = memo(function FogSea({ tiles, geom, levels, padTop, padBot
     tiles.forEach((t, i) => {
       if (t.seen || !miasma(i)) return;
       const { x, y } = geom.center(i);
-      out.push({ y: y + padTop, s: `<polygon points="${pts(hexVerts(x, y + padTop, R * 0.9))}"/>` });
+      // 丸い形を重ねて、マスの形（六角形のキルト模様）を出さない
+      out.push({ y: y + padTop, s: `<ellipse cx="${x.toFixed(1)}" cy="${(y + padTop).toFixed(1)}" rx="${(R * 1.2).toFixed(1)}" ry="${(R * 1.1 * GROUND_K).toFixed(1)}"/>` });
     });
     return out;
   }, [tiles, miasma, geom, padTop, R]);

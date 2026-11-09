@@ -12,8 +12,10 @@ import { speedFactor, useBattle } from '../../store/battleStore';
 import { TIMING } from '../../data/balance';
 import { getScenario } from '../../data/scenarios';
 import type { GameState, TimeOfDay, WorldState } from '../../types';
-import { BASE_DEPTH, corruptionStage, GROUND_K, hash01, hexVerts, LEVEL_STEP, MAX_LEVEL, neighborAt, pts, roadLinks, roadPath, terrainLevel, tileLevel, TOP_SCALE } from './diorama';
-import { PlaceMini, propOf, TerrainProp, type MiniKind } from './MapMiniatures';
+import { BASE_DEPTH, corruptionStage, GROUND_K, hash01, hexVerts, LEVEL_STEP, MAX_LEVEL, pts, roadLinks, terrainLevel, tileLevel, TOP_SCALE } from './diorama';
+import { PlaceMini, type MiniKind } from './MapMiniatures';
+import { FogSilhouettes, LandscapeLayer } from './landscape/LandscapeLayer';
+import { riverLinks } from './landscape/scatter';
 import { FogSea } from './FogSea';
 import { HeroFace } from '../ui/game';
 import { petSpot, PetToken } from '../ui/PetToken';
@@ -23,20 +25,6 @@ import { cameraTop, mapPadBottom, mapPadY, revealLeft, revealTop, visibleH } fro
 import { anchorScroll, clampZoom, stepZoom, ZOOM_MAX, ZOOM_MIN } from './mapZoom';
 
 const SQRT3 = Math.sqrt(3);
-
-/** 地形の模様（地形のデータの decor のキー → 小さな絵。中心が0,0・半径24の大きさで書く） */
-const TERRAIN_DECOR: Record<string, { d: string; stroke: string; fill?: string }> = {
-  grass: { d: 'M-9 4 l2 -5 M-1 6 l2 -6 M7 3 l2 -5', stroke: '#9cc86a' },
-  trees: { d: 'M-8 6 L-3 -6 L2 6 Z M2 8 L7 -3 L12 8 Z', stroke: '#173a20', fill: '#245a2e' },
-  reeds: { d: 'M-6 7 V-4 M-2 7 V-7 M2 7 V-3 M6 7 V-6', stroke: '#8a9a5a' },
-  hills: { d: 'M-11 6 Q-5 -4 1 6 M-1 6 Q5 -2 11 6', stroke: '#5a4a2a' },
-  peaks: { d: 'M-11 8 L-3 -8 L5 8 Z M-5 -4 L-3 -8 L-1 -4 Z M2 8 L8 -2 L13 8 Z', stroke: '#3a3438', fill: '#8a8088' },
-  cracks: { d: 'M-10 -2 L-4 2 L0 -3 L5 2 L10 -1', stroke: '#2a1e1c' },
-  lava: { d: 'M-8 2 Q-2 -6 4 2 Q8 6 10 0', stroke: '#ffd04a' },
-  snow: { d: 'M-8 -3 H8 M-6 4 H6 M0 -8 V8 M-6 -6 L6 6', stroke: '#ffffff' },
-  dunes: { d: 'M-11 4 Q-6 -3 -1 4 M0 6 Q5 -1 11 6', stroke: '#9a7a3a' },
-  waves: { d: 'M-10 -2 Q-6 -6 -2 -2 T6 -2 M-6 5 Q-2 1 2 5 T10 5', stroke: '#8ac8ff' },
-};
 
 const FEATURE_ICON: Record<string, LucideIcon> = { town: House, dungeon: DoorOpen, shrine: Sparkles, event: CircleHelp, chest: Gift, landmark: Landmark, temple: Landmark, altar: Sparkles };
 const FEATURE_COLOR: Record<string, string> = { town: '#ffe9a8', dungeon: '#ff9a7a', shrine: '#9affd0', event: '#9ad8ff', chest: '#ffd76a', landmark: '#d8c8ff', temple: '#ffe9a8', altar: '#c8a0ff' };
@@ -134,124 +122,6 @@ export function useMapGeom(w: Pick<WorldState, 'width' | 'height'>, containerW: 
 }
 
 const hexPoints = (x: number, y: number, R: number) => pts(hexVerts(x, y, R));
-
-interface TerrainProps {
-  tiles: WorldState['tiles'];
-  geom: MapGeom;
-  w: Pick<WorldState, 'width' | 'height'>;
-  levels: readonly number[];
-  /** 道が出ていく辺（マス → 辺の番号） */
-  links: Map<number, number[]>;
-  /** 今、霧が晴れたばかりのマス（せり上がる演出） */
-  fresh: ReadonlySet<number>;
-  /** 地域ごとの、街道のマスの下に敷く地形（道の線を描くので、マスは草地などにする） */
-  under: readonly string[];
-  /** 最後の城のマス（地形の飾りを置かない） */
-  noProp: ReadonlySet<number>;
-  roadTerrain: string;
-}
-
-/**
- * 地形の層（箱庭の六角柱）。キャラの移動以外では変わりにくいので、タイルの見え方が変わった時だけ描き直す。
- * 上の行から順に描くので、手前（下の行）の高いマスが、奥のマスの下の方を隠す
- */
-const TerrainLayer = memo(function TerrainLayer({ tiles, geom, w, levels, links, fresh, under, noProp, roadTerrain }: TerrainProps) {
-  const { R, center, ground } = geom;
-  const s = R / 24;
-  // 地形の模様（描いた絵）。並べてもつなぎ目が出ない絵を、マス2つ分くらいの大きさで敷く
-  const size = R * 4;
-  const rt = R * TOP_SCALE;
-  const fill = (id: string) => (artImage(`terrain/${id}`) ? `url(#ter-${id})` : getTerrain(id).color);
-  return (
-    <svg width={geom.W} height={geom.H} className="absolute inset-0 block" data-terrain-layer>
-      <defs>
-        {TERRAINS.all.map((t) => {
-          const url = artImage(`terrain/${t.id}`);
-          return url ? (
-            <pattern key={t.id} id={`ter-${t.id}`} patternUnits="userSpaceOnUse" width={size} height={size}>
-              <rect width={size} height={size} fill={t.color} />
-              <image href={url} width={size} height={size} preserveAspectRatio="none" opacity={0.68} />
-            </pattern>
-          ) : null;
-        })}
-      </defs>
-      {/* 落ち影（マスの間の溝と、地図の端に落ちる） */}
-      <g data-shadows>
-        {tiles.map((t, i) => {
-          if (!t.seen) return null;
-          const { x, y } = ground(i);
-          return <polygon key={i} points={hexPoints(x + R * 0.1, y + R * (BASE_DEPTH + 0.1), R * 0.98)} fill="rgba(0,0,0,.45)" />;
-        })}
-      </g>
-      {tiles.map((t, i) => {
-        if (!t.seen) return null;
-        const { x, y } = center(i);
-        const ter = getTerrain(t.t);
-        const lv = levels[i];
-        const d = (BASE_DEPTH + lv * LEVEL_STEP) * R;
-        const v = hexVerts(x, y, rt);
-        const dn = (p: [number, number]): [number, number] => [p[0], p[1] + d];
-        const road = !t.f && t.t === roadTerrain ? under[t.r] : undefined;
-        const topId = road ?? ter.id;
-        const tex = !!artImage(`terrain/${topId}`);
-        // 絵がある地形は模様で分かるので、小さな印は出さない
-        const dec = !tex && ter.decor ? TERRAIN_DECOR[ter.decor] : undefined;
-        const prop = !t.f && !noProp.has(i) ? propOf(ter.id) : undefined;
-        // 奥（左上・左・右上）の高いマスが落とす影を、上の面の辺にそって描く（高さの差が分かる）
-        const occl = [5, 4, 0].flatMap((k) => {
-          const j = neighborAt(w, i, k);
-          if (j === undefined || !tiles[j].seen || levels[j] <= lv) return [];
-          const f = Math.min(0.5, 0.2 * (levels[j] - lv));
-          const a = v[k], b = v[(k + 1) % 6];
-          const inA: [number, number] = [a[0] + (x - a[0]) * f, a[1] + (y - a[1]) * f];
-          const inB: [number, number] = [b[0] + (x - b[0]) * f, b[1] + (y - b[1]) * f];
-          return [<polygon key={`o${k}`} points={pts([a, b, inB, inA])} fill="rgba(0,0,0,.3)" />];
-        });
-        // 地域の境目（隣が別の地域の辺に、やわらかい光の線）
-        const border = [0, 1, 2, 3, 4, 5].flatMap((k) => {
-          const j = neighborAt(w, i, k);
-          if (j === undefined || tiles[j].r === t.r) return [];
-          const a = v[k], b = v[(k + 1) % 6];
-          return [`M${a[0].toFixed(1)} ${a[1].toFixed(1)} L${b[0].toFixed(1)} ${b[1].toFixed(1)}`];
-        });
-        const ks = links.get(i);
-        return (
-          <g key={i} data-hex={i} data-level={lv} className={fresh.has(i) ? 'hex-rise' : undefined} style={fresh.has(i) ? ({ '--rise': `${(R * 0.45).toFixed(1)}px` } as React.CSSProperties) : undefined}>
-            {/* 側面: 右下と左下の2面。地形の模様を暗くして、光の向き（左上から）で左右の明るさを変える */}
-            <path d={`M${pts([v[2], v[3], v[4], dn(v[4]), dn(v[3]), dn(v[2])]).replace(/ /g, ' L')} Z`} fill={fill(ter.id)} />
-            <path d={`M${pts([v[3], v[4], dn(v[4]), dn(v[3])]).replace(/ /g, ' L')} Z`} fill="rgba(10,6,4,.42)" />
-            <path d={`M${pts([v[2], v[3], dn(v[3]), dn(v[2])]).replace(/ /g, ' L')} Z`} fill="rgba(10,6,4,.62)" />
-            <path d={`M${pts([dn(v[2]), dn(v[3]), dn(v[4])]).replace(/ /g, ' L')}`} fill="none" stroke="rgba(0,0,0,.6)" strokeWidth={1.2} />
-            {/* 上の面（この g の最初の polygon。確認スクリプトがマスの大きさを測る） */}
-            <polygon points={pts(v)} fill={fill(topId)} stroke="rgba(0,0,0,.45)" strokeWidth={1} />
-            {ter.climate && <polygon points={pts(v)} fill={ter.climate.kind === 'cold' ? 'rgba(140,200,255,.18)' : 'rgba(255,120,40,.18)'} pointerEvents="none" data-climate={ter.climate.kind} />}
-            {dec && <path d={dec.d} transform={`translate(${x},${y}) scale(${s})`} stroke={dec.stroke} fill={dec.fill ?? 'none'} strokeWidth={1.6} strokeLinecap="round" opacity={0.85} />}
-            {occl}
-            {ks && (
-              <g data-road={i} pointerEvents="none">
-                <path d={roadPath(x, y, rt, ks)} fill="none" stroke="#3a2a14" strokeWidth={R * 0.36} strokeLinecap="round" opacity={0.55} />
-                <path d={roadPath(x, y, rt, ks)} fill="none" stroke="#b8945c" strokeWidth={R * 0.26} strokeLinecap="round" />
-                <path d={roadPath(x, y, rt, ks)} fill="none" stroke="#d8bc84" strokeWidth={R * 0.07} strokeLinecap="round" strokeDasharray={`${(R * 0.12).toFixed(1)} ${(R * 0.16).toFixed(1)}`} opacity={0.8} />
-              </g>
-            )}
-            {border.length > 0 && <path d={border.join(' ')} stroke="rgba(255,236,190,.55)" strokeWidth={Math.max(1.5, R * 0.07)} strokeLinecap="round" strokeDasharray={`${(R * 0.14).toFixed(1)} ${(R * 0.12).toFixed(1)}`} fill="none" data-region-border />}
-            <path d={`M${pts([v[3], v[4], v[5], v[0], v[1]]).replace(/ /g, ' L')}`} fill="none" stroke="rgba(255,250,230,.28)" strokeWidth={Math.max(1, R * 0.04)} strokeLinejoin="round" />
-            <path d={`M${pts([v[1], v[2], v[3]]).replace(/ /g, ' L')}`} fill="none" stroke="rgba(0,0,0,.35)" strokeWidth={Math.max(1, R * 0.04)} strokeLinejoin="round" />
-            {prop && <TerrainProp kind={prop} x={x} y={y} R={R} i={i} />}
-          </g>
-        );
-      })}
-      {/* まだ見ていないマス（雲は FogSea が描く。ここは確認スクリプトが数える印だけ） */}
-      <g data-fog>
-        {tiles.map((t, i) => {
-          if (t.seen) return null;
-          const g = ground(i);
-          return <polygon key={i} data-fog-tile={i} points={hexPoints(g.x, g.y - LEVEL_STEP * R, R)} fill="none" />;
-        })}
-      </g>
-    </svg>
-  );
-});
 
 /** 水面のきらめき（水・海のマスの上の方に光の帯。この層の透明度だけを CSS で変える） */
 const WaterLayer = memo(function WaterLayer({ tiles, geom, levels }: { tiles: WorldState['tiles']; geom: MapGeom; levels: readonly number[] }) {
@@ -390,6 +260,9 @@ export function WorldMap({
   const roadTerrain = scenario.map?.roadTerrain ?? 'road';
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const links = useMemo(() => roadLinks({ ...w, tiles }, roadTerrain), [terrainKey, roadTerrain, w.width, w.height]);
+  // 見た目だけの川（丘・山のふもとから湖・海・地図の端へ。移動には関係しない）
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const rivers = useMemo(() => riverLinks({ ...w, tiles }, levels), [terrainKey, levels, w.width, w.height]);
   // 街道のマスの下に敷く地形（その地域で一番多い、高さ1の地形。無ければ平原）
   const under = useMemo(
     () => (scenario.map?.regions ?? []).map((r) => Object.entries(r.terrain).filter(([id]) => id !== roadTerrain && terrainLevel(id) === 1 && TERRAINS.tryGet(id)).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'plains'),
@@ -587,10 +460,22 @@ export function WorldMap({
     return ids;
   }, [w.quests]);
 
+  // タップ: 押した所に見えている「上の面」を優先する（手前の行から調べる。高いマスが奥のマスに重なって見える所でも、見えている方を選ぶ）。
+  // どの上の面でもない所（崖の側面など）は、今までどおり一番近いマスの中心
   const tap = (e: React.MouseEvent) => {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const px = e.clientX - rect.left;
     const py = e.clientY - rect.top;
+    const half = (SQRT3 / 2) * R * TOP_SCALE;
+    for (let i = w.tiles.length - 1; i >= 0; i--) {
+      const c = center(i);
+      const dx = Math.abs(px - c.x);
+      const dy = Math.abs((py - c.y) / GROUND_K);
+      if (dx <= half && dy <= R * TOP_SCALE - dx / SQRT3) {
+        onTapTile(i);
+        return;
+      }
+    }
     let best = -1;
     let bd = Infinity;
     for (let i = 0; i < w.tiles.length; i++) {
@@ -652,9 +537,11 @@ export function WorldMap({
       <div style={{ paddingTop: padY, paddingBottom: padBottom, width: W, background: time === 'night' ? '#20233c' : '#53587a' }} data-map-pad>
       {/* 歩いている間は、雲と水の動きを止める（スマホで駒の動きをなめらかにするため） */}
       <div className="relative" style={{ width: W, height: H }} onClick={(e) => { if (!anim) tap(e); }} data-walking={anim ? '' : undefined}>
-        <TerrainLayer tiles={tiles} geom={geom} w={w} levels={levels} links={links} fresh={freshRef.current} under={under} noProp={finaleTiles} roadTerrain={roadTerrain} />
+        <LandscapeLayer w={w} tiles={tiles} geom={geom} levels={levels} links={links} rivers={rivers} under={under} roadTerrain={roadTerrain} noProp={finaleTiles} stage={stage} frozen={pinchZoom !== null} />
         <WaterLayer tiles={tiles} geom={geom} levels={levels} />
         <FogSea tiles={tiles} geom={geom} levels={levels} padTop={padY} padBottom={padBottom} miasma={miasma} fresh={freshRef.current} time={time} />
+        {/* 霧の向こうの山のシルエットと、地平線の最後の城 */}
+        <FogSilhouettes w={w} tiles={tiles} geom={geom} levels={levels} finale={finaleTiles.values().next().value} padTop={padY} night={time === 'night'} />
         {/* 施設（立体のミニチュア・描いた絵）。時間帯の色の下に置く（夜は暗くなり、町などの明かりだけが光る） */}
         <FeatureLayer tiles={w.tiles} geom={geom} finaleTiles={finaleTiles} fallenTowns={w.fallenTowns} />
         {/* 時間帯の光（朝 = 斜めの光、夕方 = オレンジ、夜 = 青い月明かり）。地図といっしょに動く1枚の色なので、描き直しは起きない */}
