@@ -123,7 +123,6 @@ export const windmillTower: DungeonDef = {
   pools: WINDMILL_POOLS,
   bossChest: 'epic',
   rewardKey: 'ringWind',
-  corruptionOnClear: 5,
   clearStory: ['風の番人が、風になって消えた。', '塔の風車が、静かに回りだす。', '星環（風）を手に入れた！'],
   layout: windmillLayout,
 };
@@ -137,7 +136,8 @@ export const observatory: DungeonDef = {
   pools: OBSERVATORY_POOLS,
   bossChest: 'epic',
   rewardKey: 'ringStar',
-  corruptionOnClear: 5,
+  // 1つ目のダンジョンの鍵が要る（play-feedback-plan §4 C: 町や依頼を飛ばして、まっすぐ奥へ行けないように）
+  requiresKeys: ['ringWind'],
   clearStory: ['星の司書は、本を閉じて微笑んだ。', '「女王様を…お願いします」', '星環（星）を手に入れた！'],
   layout: observatoryLayout,
 };
@@ -151,7 +151,6 @@ export const moonlitGarden: DungeonDef = {
   pools: GARDEN_POOLS,
   bossChest: 'legend',
   rewardKey: 'ringMoon',
-  corruptionOnClear: 5,
   clearStory: ['月の乙女が、花びらになって舞った。', '「ありがとう。女王様を、どうか」', '星環（月）を手に入れた！'],
   layout: moonGardenLayout,
 };

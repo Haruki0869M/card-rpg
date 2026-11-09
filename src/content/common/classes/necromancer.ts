@@ -2,7 +2,7 @@ import type { ClassDef } from '../../../types';
 import { BALANCE } from '../../../data/balance';
 import { hexer } from './hexer';
 
-// 特殊職: 中位Lv3と実績を満たし、神殿か対応する祭壇で転職する。
+// 特殊職: 中位の転職できるLv（BALANCE.jobChange.special）と実績を満たし、神殿か対応する祭壇で転職する。
 export const necromancer: ClassDef = {
   ...hexer, id: 'necromancer', order: 304, name: '死霊術師', role: '倒した敵を屍兵へ変える',
   tier: 'special', from: ['hexer'], altar: 'necromancer',

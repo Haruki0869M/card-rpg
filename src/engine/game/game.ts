@@ -1042,9 +1042,10 @@ function onDungeonCleared(game: GameState, dungeonId: string, rng: Rng) {
     w.keys.push(def.rewardKey);
     addLog(game, `${getScenario(game.scenarioId).story?.keys?.[def.rewardKey] ?? def.rewardKey}を手に入れた！`);
   }
-  if (def.corruptionOnClear) {
-    w.corruption = Math.max(0, w.corruption - def.corruptionOnClear);
-    addLog(game, `${corruptionName(game.scenarioId)}が${def.corruptionOnClear}%下がった`);
+  const drop = def.corruptionOnClear ?? (def.rewardKey ? BALANCE.corruptionOnKeyDungeonClear : 0);
+  if (drop > 0) {
+    w.corruption = Math.max(0, w.corruption - drop);
+    addLog(game, `${corruptionName(game.scenarioId)}が${drop}%下がった`);
   }
   questSignal(game, { kind: 'clearDungeon', dungeonId });
   if (def.clearStory?.length && !def.finale) w.story = { title: def.name, lines: [...def.clearStory, ...nextGoalLines(game)] };

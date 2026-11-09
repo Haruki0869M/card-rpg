@@ -1,5 +1,7 @@
 // フェーズ2-A: 町で買った装備を「すぐ装備」する（今の EQUIP の操作）・転職の条件の表示・買った時のお知らせ
 import { afterEach, describe, expect, it } from 'vitest';
+import { BALANCE } from '../../data/balance';
+import { CLASSES } from '../../data/classes';
 import { getItem } from '../../data/items';
 import { applyGameCommand, canEquip, createGame, jobOptions } from '../../engine';
 import { actorOf, setLocalPlayers } from '../../store/battleConfig';
@@ -83,21 +85,23 @@ describe('転職の条件の表示（同じ文を2回出さない）', () => {
     return g;
   }
   const saint = (g: GameState) => jobOptions(g.heroes[0], g).find((o) => o.job.id === 'swordSaint')!;
-  it('レベルも条件も足りない時: 2行とも ✗、条件の進み具合 7/15', () => {
-    const g = master(3, 7);
+  const LV = BALANCE.jobChange.mid;
+  const NEED = CLASSES.get('swordSaint').requires!.count;
+  it('レベルも条件も足りない時: 2行とも ✗、条件の進み具合 7/条件の数', () => {
+    const g = master(LV - 1, 7);
     const o = saint(g);
-    expect(o.needLevel).toBe(4);
-    expect(o.count).toBe(15);
+    expect(o.needLevel).toBe(LV);
+    expect(o.count).toBe(NEED);
     expect(o.progress).toBe(7);
-    expect(jobRequirements(o, 3)).toEqual([
-      { ok: false, text: 'Lv4以上（今 Lv3）' },
-      { ok: false, text: '完全成功15回', now: 7, need: 15 },
+    expect(jobRequirements(o, LV - 1)).toEqual([
+      { ok: false, text: `Lv${LV}以上（今 Lv${LV - 1}）` },
+      { ok: false, text: `完全成功${NEED}回`, now: 7, need: NEED },
     ]);
   });
   it('レベルだけ足りる時・両方そろった時', () => {
-    expect(jobRequirements(saint(master(5, 7)), 5).map((r) => r.ok)).toEqual([true, false]);
-    const o = saint(master(4, 15));
-    expect(jobRequirements(o, 4).map((r) => r.ok)).toEqual([true, true]);
+    expect(jobRequirements(saint(master(LV + 1, 7)), LV + 1).map((r) => r.ok)).toEqual([true, false]);
+    const o = saint(master(LV, NEED));
+    expect(jobRequirements(o, LV).map((r) => r.ok)).toEqual([true, true]);
     expect(o.qualified).toBe(true);
   });
 });

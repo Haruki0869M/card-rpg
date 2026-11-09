@@ -512,7 +512,7 @@ export function SanctuaryScreen() {
         <FacilityRoster game={game} />
         <h1 className="font-display text-[24px] text-amber-100">{def.name}</h1>
         <p className="panel mt-3 rounded-xl p-3 text-[15px] leading-6">{def.text}</p>
-        <p className="mt-3 text-[14px] leading-6">{def.kind === 'temple' ? '中位Lv3と条件を満たすと特殊職、中位Lv4と条件を満たすと最上位職へ進めます。' : '中位Lv3と条件を満たすと、この祭壇に対応する特殊職へ進めます。'}</p>
+        <p className="mt-3 text-[14px] leading-6">{def.kind === 'temple' ? `中位Lv${BALANCE.jobChange.special}と条件を満たすと特殊職、中位Lv${BALANCE.jobChange.mid}と条件を満たすと最上位職へ進めます。` : `中位Lv${BALANCE.jobChange.special}と条件を満たすと、この祭壇に対応する特殊職へ進めます。`}</p>
         <button onClick={() => openSheet('jobs')} className="btn btn-gold mt-4 min-h-12 w-full rounded-xl px-3 text-[15px] font-bold">転職先を見る</button>
       </div>
       <div className="shrink-0 px-3 pb-3">

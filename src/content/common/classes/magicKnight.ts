@@ -1,7 +1,7 @@
 import type { ClassDef } from '../../../types';
 import { swordmaster } from './swordmaster';
 
-// 特殊職: 中位Lv3と実績を満たし、神殿か対応する祭壇で転職する。
+// 特殊職: 中位の転職できるLv（BALANCE.jobChange.special）と実績を満たし、神殿か対応する祭壇で転職する。
 export const magicKnight: ClassDef = {
   ...swordmaster, id: 'magicKnight', order: 302, name: '魔剣士', role: '魔法の属性を剣へ宿す',
   tier: 'special', from: ['swordmaster'], altar: 'magicKnight',

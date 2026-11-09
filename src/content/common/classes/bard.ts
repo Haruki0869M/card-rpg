@@ -10,6 +10,6 @@ export const bard: ClassDef = {
   weaponType: 'instrument', subWeapons: ['dagger'], startingEquipment: { ...phantomThief.startingEquipment, weapon: 'travelerLute' },
   battleAbility: { name: '歌の余韻', effect: { when: 'afterCard', if: [{ kind: 'supportedOthers' }, { kind: 'oncePerTurn', key: 'songAfterglow' }], do: [{ kind: 'block', amount: BALANCE.specialJobs.supportBlock }] } },
   exploreAbility: { id: 'bardExplore', name: '旅の歌', description: 'イベントの判定+15%', effect: { kind: 'checkBonus', check: 'event', bonus: 15 } },
-  requires: { feat: 'support:others', count: 10, text: '仲間を助けるカードを10回' },
+  requires: { feat: 'support:others', count: 30, text: '仲間を助けるカードを30回' },
   cardPool: ['bardCourage', 'bardFocus', 'bardHeal', 'bardWard', 'bardStrike', 'bardFinale'], signature: ['bardCourage', 'bardFocus', 'bardHeal'],
 };
