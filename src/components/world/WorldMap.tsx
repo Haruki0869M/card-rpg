@@ -1,6 +1,7 @@
 // ===== 世界マップの地図（六角形のマス。spec §8.1）=====
 // 地形・霧・施設・移動できる範囲は SVG、キャラと敵は上に重ねた画像。タップしたマスを親に知らせる。
 import { Castle, CircleHelp, DoorOpen, Flag, Gift, House, Landmark, LocateFixed, Minus, Plus, Sparkles, TriangleAlert, type LucideIcon } from 'lucide-react';
+import { useReducedMotion } from 'framer-motion';
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { artImage, EnemyArt } from '../../art';
 import { DUNGEONS } from '../../data/dungeons';
@@ -14,7 +15,7 @@ import { HeroFace } from '../ui/game';
 import { petSpot, PetToken } from '../ui/PetToken';
 import { HeroPiece } from './HeroPiece';
 import { orderOnTile, pieceSpots, PLAYER_COLORS } from './pieceLayout';
-import { cameraTop, mapPadY, revealLeft, revealTop } from './mapCamera';
+import { cameraTop, mapPadBottom, mapPadY, revealLeft, revealTop, visibleH } from './mapCamera';
 import { anchorScroll, clampZoom, stepZoom, ZOOM_MAX, ZOOM_MIN } from './mapZoom';
 
 const SQRT3 = Math.sqrt(3);
@@ -146,6 +147,7 @@ export function WorldMap({
   path,
   onTapTile,
   movement,
+  bottomInset = 0,
 }: {
   game: GameState;
   movement?: { heroes: string[]; i: number; path: number[]; arrived: boolean };
@@ -154,6 +156,11 @@ export function WorldMap({
   selected?: number;
   path?: number[];
   onTapTile: (i: number) => void;
+  /**
+   * 地図の下の端に重なっている操作パネルの高さ（px）。地図の枠の大きさはパネルによらずいつも同じで、
+   * カメラは「枠の上の端〜パネルの上の端」の真ん中に駒を置く。移動中に帯へ縮んでいる間は、縮む前の高さを渡す（地図を動かさない）
+   */
+  bottomInset?: number;
 }) {
   const w = game.world!;
   const [box, size] = useElementSize<HTMLDivElement>();
@@ -193,35 +200,86 @@ export function WorldMap({
 
   // 手番のキャラが見えるようにスクロール（動いている間は、動いているキャラについていく）
   const here = anim ? anim.path[anim.i] : w.pos[w.turn];
-  // 地図の上下の余白（端のマスでも駒を真ん中に置ける。フェーズ2-D）。枠の高さが変わった時（下のパネルの高さが変わった時）も合わせ直す
+  // 地図の上下の余白（端のマスでも駒を真ん中に置ける。フェーズ2-D）。パネルは地図の上に重なるので、余白はパネルの高さによらない
   const padY = mapPadY(size.height);
+  const padBottom = mapPadBottom(size.height);
+  const inset = Math.round(bottomInset);
+  const reduced = useReducedMotion();
+  // 拡大のボタンを縦に並べる高さ（「戻る」のボタン＋3つ＋すき間 ≒ 210px）が、見えている地図に無い時は横に並べる
+  const compactZoom = size.height > 0 && visibleH(size.height, inset) < 225;
   // 拡大を変える直前のスクロールと、残したい枠の中の点（ピンチの指の間・ボタンなら枠の真ん中）
   const zoomAnchor = useRef<{ left: number; top: number; ax: number; ay: number; padY: number; R: number } | null>(null);
-  const lastCam = useRef<{ here?: number; turn: string; w: number; h: number } | null>(null);
+  const lastCam = useRef<{ here?: number; turn: string; w: number; h: number; inset: number } | null>(null);
+  // カメラを少しずつ動かす（ブラウザの smooth は端末によって効かず跳ぶことがあるので、自分で毎フレーム動かす）
+  const camAnim = useRef(0);
+  const stopCam = () => {
+    if (camAnim.current) cancelAnimationFrame(camAnim.current);
+    camAnim.current = 0;
+  };
+  const moveCam = (el: HTMLElement, left: number, top: number, ms: number) => {
+    stopCam();
+    if (ms <= 0) {
+      el.scrollTo({ left, top, behavior: 'instant' });
+      return;
+    }
+    // スクロールできる範囲に収めてから動かす（範囲の外を目指すと、最後に止まる所がずれる）
+    const maxL = Math.max(0, el.scrollWidth - el.clientWidth), maxT = Math.max(0, el.scrollHeight - el.clientHeight);
+    const toL = Math.max(0, Math.min(maxL, left)), toT = Math.max(0, Math.min(maxT, top));
+    const fromL = el.scrollLeft, fromT = el.scrollTop;
+    if (Math.abs(toL - fromL) < 1 && Math.abs(toT - fromT) < 1) return;
+    const t0 = performance.now();
+    const step = (now: number) => {
+      const k = Math.min(1, (now - t0) / ms);
+      const e = 1 - (1 - k) ** 3;
+      el.scrollTo({ left: fromL + (toL - fromL) * e, top: fromT + (toT - fromT) * e, behavior: 'instant' });
+      camAnim.current = k < 1 ? requestAnimationFrame(step) : 0;
+    };
+    camAnim.current = requestAnimationFrame(step);
+  };
+  // 指やホイールで地図を動かしたら、カメラの動きを止める（取り合わない）
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    el.addEventListener('touchstart', stopCam, { passive: true });
+    el.addEventListener('wheel', stopCam, { passive: true });
+    return () => {
+      stopCam();
+      el.removeEventListener('touchstart', stopCam);
+      el.removeEventListener('wheel', stopCam);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [box]);
   useLayoutEffect(() => {
     const el = box.current;
     if (!el || here === undefined || !size.width) return;
     const prev = lastCam.current;
-    lastCam.current = { here, turn: w.turn, w: size.width, h: size.height };
+    lastCam.current = { here, turn: w.turn, w: size.width, h: size.height, inset };
     const anchor = zoomAnchor.current;
     zoomAnchor.current = null;
     // 拡大だけが変わった時（歩いていない時）: 指の間の地面をそのまま残す。それ以外は手番・歩いている駒を真ん中へ
-    const zoomOnly = !!prev && prev.here === here && prev.turn === w.turn && prev.w === size.width && prev.h === size.height;
+    const sameView = !!prev && prev.w === size.width && prev.h === size.height && prev.inset === inset;
+    const zoomOnly = sameView && prev.here === here && prev.turn === w.turn;
     if (zoomOnly && !anim) {
-      if (anchor && anchor.R !== R) el.scrollTo({ ...anchorScroll(anchor, anchor.R, R), behavior: 'instant' });
+      if (anchor && anchor.R !== R) {
+        stopCam();
+        el.scrollTo({ ...anchorScroll(anchor, anchor.R, R), behavior: 'instant' });
+      }
       return;
     }
+    // 駒が歩いた・手番が変わった時は、跳ばずになめらかに追う（動きを減らす設定の時・枠の大きさや拡大が変わった時はすぐ合わせる）。
+    // 歩いている間は、駒が1マス動く時間（駒の動きと同じ）でカメラも動かす。駒が画面の上でほぼ止まって見える
+    const smooth = sameView && !anchor && !reduced && (prev.here !== here || prev.turn !== w.turn);
     const { x, y } = center(here);
-    el.scrollTo({ top: cameraTop(y, el.clientHeight), left: x - el.clientWidth / 2, behavior: 'instant' });
+    moveCam(el, x - el.clientWidth / 2, cameraTop(y, el.clientHeight, inset), smooth ? (anim ? stepMs * 0.8 : 350) : 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [here, w.turn, size.width, size.height, center]);
+  }, [here, w.turn, size.width, size.height, inset, center]);
 
   /** 拡大を変える（ax, ay = 残したい点。枠の中の座標。省略すると枠の真ん中）。save = この端末の設定に保存する */
   const applyZoom = (next: number, save: boolean, ax?: number, ay?: number) => {
     const el = box.current;
     const z = clampZoom(next);
     if (el && z !== zoom) {
-      zoomAnchor.current = { left: el.scrollLeft, top: el.scrollTop, ax: ax ?? el.clientWidth / 2, ay: ay ?? el.clientHeight / 2, padY, R };
+      zoomAnchor.current = { left: el.scrollLeft, top: el.scrollTop, ax: ax ?? el.clientWidth / 2, ay: ay ?? visibleH(el.clientHeight, inset) / 2, padY, R };
     }
     if (save) {
       setPinchZoom(null);
@@ -286,10 +344,10 @@ export function WorldMap({
   useLayoutEffect(() => {
     const el = box.current;
     if (!el || anim || here === undefined || selected === undefined || !size.width) return;
-    const top = revealTop(center(here).y, center(selected).y, el.scrollTop, el.clientHeight, R * 1.2);
+    const top = revealTop(center(here).y, center(selected).y, el.scrollTop, el.clientHeight, R * 1.2, inset);
     // 拡大している時は横にもはみ出すので、横も同じ決まりで見せる
     const left = revealLeft(center(here).x, center(selected).x, el.scrollLeft, el.clientWidth, R * 1.2);
-    if (top !== undefined || left !== undefined) el.scrollTo({ top: top ?? el.scrollTop, left: left ?? el.scrollLeft, behavior: 'smooth' });
+    if (top !== undefined || left !== undefined) moveCam(el, left ?? el.scrollLeft, top ?? el.scrollTop, reduced ? 0 : 300);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
 
@@ -334,7 +392,7 @@ export function WorldMap({
   return (
     <div ref={wrapRef} className="relative min-h-0 flex-1" style={{ touchAction: 'pan-x pan-y' }}>
     <div ref={box} className="absolute inset-0 overflow-auto overscroll-contain bg-[#0b0910]" style={{ touchAction: 'pan-x pan-y' }} data-world-map>
-      <div style={{ paddingTop: padY, paddingBottom: padY, width: W }} data-map-pad>
+      <div style={{ paddingTop: padY, paddingBottom: padBottom, width: W }} data-map-pad>
       <div className="relative" style={{ width: W, height: H }} onClick={(e) => { if (!anim) tap(e); }}>
         <svg width={W} height={H} className="absolute inset-0 block">
           <defs>
@@ -522,17 +580,27 @@ export function WorldMap({
             const el = box.current;
             if (!el) return;
             const { x, y } = center(here);
-            el.scrollTo({ top: cameraTop(y, el.clientHeight), left: x - el.clientWidth / 2, behavior: 'smooth' });
+            moveCam(el, x - el.clientWidth / 2, cameraTop(y, el.clientHeight, inset), reduced ? 0 : 350);
           }}
           aria-label="手番のキャラへ戻る"
-          className="btn btn-dark absolute right-2 bottom-2 z-10 flex h-11 w-11 items-center justify-center rounded-full"
+          className="btn btn-dark absolute right-2 z-10 flex h-11 w-11 items-center justify-center rounded-full"
+          style={{ bottom: inset + 8 }}
           data-recenter
         >
           <LocateFixed size={20} className="text-amber-200" />
         </button>
       )}
       {/* 拡大・縮小（右手の親指で届くように、「戻る」のボタンの上に縦に並べる）。標準 = 1倍 */}
-      <div className="absolute right-2 bottom-[60px] z-10 flex flex-col items-center gap-1.5" role="group" aria-label="地図の拡大" data-zoom-controls data-zoom={zoom}>
+      {/* 見えている地図が低い時（小さい画面）は、縦に並べると上にはみ出すので、地図の右上に横に並べる */}
+      <div
+        style={compactZoom ? { top: 8 } : { bottom: inset + 60 }}
+        className={`absolute right-2 z-10 flex items-center gap-1.5 ${compactZoom ? 'flex-row' : 'flex-col'}`}
+        role="group"
+        aria-label="地図の拡大"
+        data-zoom-controls
+        data-zoom={zoom}
+        data-zoom-layout={compactZoom ? 'row' : 'column'}
+      >
         <button onClick={() => applyZoom(stepZoom(zoom, 1), true)} disabled={zoom >= ZOOM_MAX} aria-label="地図を拡大" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-full disabled:opacity-40" data-zoom-in>
           <Plus size={20} className="text-amber-200" />
         </button>

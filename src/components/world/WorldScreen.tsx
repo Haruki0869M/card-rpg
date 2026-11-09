@@ -42,6 +42,7 @@ import { Bar, HeroFace, Screen } from '../ui/game';
 import { WorldMap } from './WorldMap';
 import { arrivalView, moveButtonText, MoveStatus, useMovePlayback } from './WorldMoveScene';
 import { canChangeNow } from '../JobSheet';
+import { useElementSize } from '../../hooks/useElementSize';
 
 const TIME_ICON: Record<TimeOfDay, typeof Sun> = { morning: Sunrise, noon: Sun, evening: Sunset, night: Moon };
 
@@ -291,6 +292,9 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
   const playback = useMovePlayback(movement);
   const game = movement ? (movement.before ?? movement.game) : storeGame;
   const mapGame = movement && playback?.arrived ? arrivalView(movement) : game;
+  // 下の操作パネルは地図の上に重ねる。地図の枠はパネルの高さによらず同じ大きさで、1pxも動かない。
+  // 移動中は、パネルを外さずに見えなくして、その上に小さな「移動中…」の帯を重ねる（パネルの高さが変わらないので、カメラも合わせ直さない）
+  const [panelBox, panelSize] = useElementSize<HTMLDivElement>();
   const dispatchGame = useBattle((s) => s.dispatchGame);
   const w = game.world!;
   const hero = game.heroes.find((h) => h.id === w.turn);
@@ -389,8 +393,8 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
     <Screen>
       <WorldTopBar game={game} />
       <PartyRow game={game} />
-      {/* 地図。タップしたマスの説明は地図の下の端に重ねる（行が増えて地図が狭くならないように。フェーズ2-D） */}
-      <div className="relative flex min-h-0 flex-1 flex-col">
+      {/* 地図。タップしたマスの説明は、地図の上に重ねたパネルのすぐ上に出す（行が増えて地図が狭くならないように。フェーズ2-D） */}
+      <div className="relative flex min-h-0 flex-1 flex-col" data-world-area>
         <WorldMap
           game={mapGame}
           reach={playback ? undefined : reach}
@@ -398,20 +402,24 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
           path={playback ? undefined : path}
           movement={playback}
           onTapTile={playback ? () => {} : tapTile}
+          bottomInset={panelSize.height}
         />
         {info && !playback && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-black/75 py-1 pr-14 pl-3 text-[12px] leading-4 text-zinc-100" data-tile-info>
+          <div className="pointer-events-none absolute inset-x-0 z-10 bg-black/75 py-1 pr-14 pl-3 text-[12px] leading-4 text-zinc-100" style={{ bottom: panelSize.height }} data-tile-info>
             {info}
           </div>
         )}
-      </div>
+      {/* 地図の下の端に重ねる操作パネル（高さが変わっても地図は動かない） */}
+      <div ref={panelBox} className="absolute inset-x-0 bottom-0 z-20" data-world-panel>
       {w.moveProposal && (isOnlinePlay() || autoAgreeFailed) && <MoveProposal game={game} />}
 
-      {/* 手番の表示と操作パネル。移動の演出中は、パネルの代わりに小さな「移動中…」の帯だけを出して、地図を広く見せる（フェーズ2-D） */}
-      {movement && playback ? (
-        <MoveStatus move={movement} playback={playback} />
-      ) : (
-      <div className="relative shrink-0">
+      {/* 手番の表示と操作パネル。移動の演出中は、パネルを見えなくして小さな「移動中…」の帯だけを見せ、地図を広く見せる（フェーズ2-D） */}
+      {movement && playback && (
+        <div className="absolute inset-x-0 bottom-0 z-40">
+          <MoveStatus move={movement} playback={playback} />
+        </div>
+      )}
+      <div className={`relative shrink-0 ${movement && playback ? 'invisible' : ''}`} aria-hidden={movement && playback ? true : undefined} data-world-controls>
       <div className="shrink-0 bg-sky-950 px-3 py-1 text-center text-[14px] font-bold" data-current-turn>現在は {hero.playerId}（{hero.name}）の手番です</div>
       {/* 手番のキャラの操作 */}
       <div className="panel relative z-10 shrink-0 rounded-t-2xl px-3 pt-2 pb-3">
@@ -597,7 +605,8 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
         </div>
       </div>
       </div>
-      )}
+      </div>
+      </div>
 
       {/* 移動の演出中は、上の情報欄・仲間の列・地図のタップも受け付けない（以前の移動画面と同じ） */}
       {movement && <div className="absolute inset-0 z-30" aria-hidden data-move-blocker />}
