@@ -3,8 +3,15 @@
 // 乱数は使わず、マスの番号から作るハッシュで「マスごとに少し違う」を出す（毎回同じ見た目になる）。
 import type { WorldState } from '../../types';
 
+// 見本を作る時だけ、ビルドの時の値（VITE_DIORAMA_STEP・VITE_DIORAMA_TILT）で変えられる（ふだんは下の既定の値）
+const envNum = (v: unknown, d: number) => (typeof v === 'string' && v !== '' && Number.isFinite(Number(v)) ? Number(v) : d);
 /** 1段の高さ（マスの半径 R に対する割合） */
-export const LEVEL_STEP = 0.14;
+export const LEVEL_STEP = envNum(import.meta.env.VITE_DIORAMA_STEP, 0.14);
+/**
+ * 地面を縦につぶす割合（斜めから見下ろす形。1 = 真上から）。高さ（側面）はつぶさない。
+ * 駒・木・山・ミニチュアは立ったまま描く
+ */
+export const GROUND_K = envNum(import.meta.env.VITE_DIORAMA_TILT, 1);
 /** 一番高い段 */
 export const MAX_LEVEL = 3;
 /** 六角柱の土台の厚み（高さ0の水でも、これだけ側面が見える。R に対する割合） */
@@ -40,10 +47,10 @@ export function hash01(i: number, salt = 0): number {
 }
 
 /** 六角形（とがった頭が上）の頂点。0=上、1=右上、2=右下、3=下、4=左下、5=左上 */
-export function hexVerts(x: number, y: number, r: number): [number, number][] {
+export function hexVerts(x: number, y: number, r: number, gk = GROUND_K): [number, number][] {
   return Array.from({ length: 6 }, (_, k) => {
     const a = (Math.PI / 180) * (60 * k - 90);
-    return [x + r * Math.cos(a), y + r * Math.sin(a)] as [number, number];
+    return [x + r * Math.cos(a), y + r * Math.sin(a) * gk] as [number, number];
   });
 }
 
@@ -135,7 +142,7 @@ export function roadLinks(w: Pick<WorldState, 'width' | 'height' | 'tiles'>, roa
 export function edgeMid(x: number, y: number, r: number, k: number): [number, number] {
   const a = (Math.PI / 180) * (60 * k - 60);
   const d = r * (Math.sqrt(3) / 2);
-  return [x + d * Math.cos(a), y + d * Math.sin(a)];
+  return [x + d * Math.cos(a), y + d * Math.sin(a) * GROUND_K];
 }
 
 /**

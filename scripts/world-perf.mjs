@@ -49,6 +49,10 @@ for (const zoom of [1, 2]) {
     requestAnimationFrame(loop);
   });
   const stop = () => page.evaluate(() => { window.__rec = false; return window.__frames; });
+  // 内訳（ms）: スクリプト・スタイル計算・レイアウト・全体の処理
+  await cdp.send('Performance.enable');
+  const metrics = async () => Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map((m) => [m.name, m.value]));
+  const diff = (a, b) => ({ js: Math.round((b.ScriptDuration - a.ScriptDuration) * 1000), style: Math.round((b.RecalcStyleDuration - a.RecalcStyleDuration) * 1000), layout: Math.round((b.LayoutDuration - a.LayoutDuration) * 1000), task: Math.round((b.TaskDuration - a.TaskDuration) * 1000) });
   // 止まっている時
   await record();
   await page.waitForTimeout(2000);
@@ -71,10 +75,28 @@ for (const zoom of [1, 2]) {
     await page.mouse.click(target.x, target.y);
     await page.waitForTimeout(500);
     await record();
+    const m0 = await metrics();
+    if (process.env.PERF_PROFILE) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.start'); }
+    if (process.env.PERF_RENDERS) await page.evaluate(() => { window.__r = {}; });
     await page.locator('button:has-text("移動する")').first().click();
     await page.waitForTimeout(400);
     await page.waitForFunction(() => !document.querySelector('[data-world-moving]'), null, { timeout: 15000 }).catch(() => {});
-    results.push({ zoom, scene: `歩いている（${target.cost}マス）`, ...stats(await stop()) });
+    const fr = await stop();
+    if (process.env.PERF_PROFILE) {
+      // 原因を探す時だけ: 関数ごとの時間（自分の分）の上位
+      const { profile } = await cdp.send('Profiler.stop');
+      const dt = profile.timeDeltas.reduce((a, b) => a + b, 0) / profile.samples.length / 1000;
+      const count = new Map();
+      for (const id of profile.samples) count.set(id, (count.get(id) ?? 0) + 1);
+      const by = new Map();
+      for (const n of profile.nodes) {
+        const k = `${n.callFrame.functionName || '(anon)'} ${n.callFrame.url.split('/').pop()}:${n.callFrame.lineNumber}`;
+        by.set(k, (by.get(k) ?? 0) + (count.get(n.id) ?? 0) * dt);
+      }
+      console.log([...by].sort((a, b) => b[1] - a[1]).slice(0, 18).map(([k, v]) => `${v.toFixed(0)}ms ${k}`).join(String.fromCharCode(10)));
+    }
+    if (process.env.PERF_RENDERS) console.log('renders', await page.evaluate(() => JSON.stringify(window.__r ?? {})));
+    results.push({ zoom, scene: `歩いている（${target.cost}マス）`, ...stats(fr), ...diff(m0, await metrics()) });
   } else results.push({ zoom, scene: '歩いている', frames: 0, note: '光るマスが無い' });
   await ctx.close();
 }

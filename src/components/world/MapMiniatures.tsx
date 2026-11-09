@@ -4,7 +4,7 @@
 //   飾り:   prop/forest.webp・prop/mountain.webp・prop/volcano.webp
 // 絵が無い間は、ここの SVG の図（仮のミニチュア）を描く。見た目だけで、ゲームの状態には関係しない。
 import { artImage } from '../../art';
-import { hash01 } from './diorama';
+import { GROUND_K, hash01 } from './diorama';
 
 /** 場所の種類 → 絵のキー（MAP_ART_KEYS の絵があればそれを使う） */
 export type MiniKind = 'event' | 'temple' | 'altar' | 'finale';
@@ -31,7 +31,7 @@ export function PlaceMini({ kind, x, y, R, dim }: { kind: MiniKind; x: number; y
   // 図は 100×100 の枠で描き、足元（50, 80）をマスの中心より少し下に合わせる
   const s = big / 100;
   return (
-    <g transform={`translate(${(x - 50 * s).toFixed(1)},${(y + R * 0.2 - 80 * s).toFixed(1)}) scale(${s.toFixed(3)})`} data-mini={kind}>
+    <g transform={`translate(${(x - 50 * s).toFixed(1)},${(y + R * 0.2 * GROUND_K - 80 * s).toFixed(1)}) scale(${s.toFixed(3)})`} data-mini={kind}>
       <ellipse cx="50" cy="82" rx="34" ry="9" fill="rgba(0,0,0,.45)" />
       {kind === 'event' && <EventShape />}
       {kind === 'temple' && <TempleShape />}
@@ -139,7 +139,7 @@ export function TerrainProp({ kind, x, y, R, i }: { kind: PropKind; x: number; y
       <g pointerEvents="none">
         {spots.slice(0, n).map(([dx, dy, k], j) => {
           const jx = (hash01(i, 10 + j) - 0.5) * 0.14;
-          return <Pine key={j} x={x + (dx + jx) * R} y={y + dy * R} h={R * 0.78 * k} dark={hash01(i, 20 + j) < 0.5} />;
+          return <Pine key={j} x={x + (dx + jx) * R} y={y + dy * R * GROUND_K} h={R * 0.78 * k} dark={hash01(i, 20 + j) < 0.5} />;
         })}
       </g>
     );
@@ -148,7 +148,7 @@ export function TerrainProp({ kind, x, y, R, i }: { kind: PropKind; x: number; y
     const h = R * (1.15 + hash01(i, 4) * 0.25);
     const wd = R * 0.78;
     const bx = x + (hash01(i, 5) - 0.5) * R * 0.16;
-    const by = y + R * 0.38;
+    const by = y + R * 0.38 * GROUND_K;
     const tx = bx + wd * 0.05;
     const ty = by - h;
     const snow = h * 0.3;
@@ -165,7 +165,7 @@ export function TerrainProp({ kind, x, y, R, i }: { kind: PropKind; x: number; y
   // 火山: 黒い山と、光る火口
   const h = R * 1.0;
   const wd = R * 0.8;
-  const by = y + R * 0.36;
+  const by = y + R * 0.36 * GROUND_K;
   return (
     <g pointerEvents="none">
       <path d={`M${x - wd} ${by} L${x - wd * 0.25} ${by - h} H${x + wd * 0.25} L${x + wd} ${by} Z`} fill="#3a2a28" stroke="#140c0a" strokeWidth={R * 0.05} strokeLinejoin="round" />

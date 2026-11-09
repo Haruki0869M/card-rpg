@@ -12,8 +12,9 @@ import { speedFactor, useBattle } from '../../store/battleStore';
 import { TIMING } from '../../data/balance';
 import { getScenario } from '../../data/scenarios';
 import type { GameState, TimeOfDay, WorldState } from '../../types';
-import { BASE_DEPTH, corruptionStage, hash01, hexVerts, LEVEL_STEP, MAX_LEVEL, neighborAt, pts, roadLinks, roadPath, terrainLevel, tileLevel, TOP_SCALE } from './diorama';
+import { BASE_DEPTH, corruptionStage, GROUND_K, hash01, hexVerts, LEVEL_STEP, MAX_LEVEL, neighborAt, pts, roadLinks, roadPath, terrainLevel, tileLevel, TOP_SCALE } from './diorama';
 import { PlaceMini, propOf, TerrainProp, type MiniKind } from './MapMiniatures';
+import { FogSea } from './FogSea';
 import { HeroFace } from '../ui/game';
 import { petSpot, PetToken } from '../ui/PetToken';
 import { HeroPiece } from './HeroPiece';
@@ -106,38 +107,33 @@ export function useMapGeom(w: Pick<WorldState, 'width' | 'height'>, containerW: 
   return useMemo(() => {
     const R = Math.max(18, Math.min(34, (containerW || 360) / (SQRT3 * (w.width + 0.5)))) * zoom;
     const hexW = SQRT3 * R;
-    const rowH = 1.5 * R;
+    const rowH = 1.5 * R; // 地面をつぶす前の行の間隔（つぶした後は rowH * GROUND_K）
     // 一番上の行の高い山も切れないように、上に「一番高い段」の分の余白を足す。下は六角柱の土台の分
     const top = MAX_LEVEL * LEVEL_STEP * R;
+    const dims = { width: w.width, height: w.height };
     const ground = (i: number) => {
-      const c = colOf(w, i);
-      const r = rowOf(w, i);
-      return { x: hexW * (c + 0.5 * (r & 1)) + hexW / 2, y: top + R + r * rowH };
+      const c = colOf(dims, i);
+      const r = rowOf(dims, i);
+      return { x: hexW * (c + 0.5 * (r & 1)) + hexW / 2, y: top + (R + r * rowH) * GROUND_K };
     };
     return {
       R,
       hexW,
       rowH,
       W: hexW * (w.width + 0.5),
-      H: rowH * (w.height - 1) + 2 * R + top + BASE_DEPTH * R,
+      H: (rowH * (w.height - 1) + 2 * R) * GROUND_K + top + BASE_DEPTH * R,
       ground,
       center: (i: number) => {
         const g = ground(i);
         return { x: g.x, y: g.y - (levels?.[i] ?? 0) * LEVEL_STEP * R };
       },
     };
-  }, [w, containerW, zoom, levels]);
+    // 地図の大きさ（幅・高さ）だけを見る。ゲームの状態が変わるたびに作り直すと、地形と雲の層まで描き直しになる
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [w.width, w.height, containerW, zoom, levels]);
 }
 
 const hexPoints = (x: number, y: number, R: number) => pts(hexVerts(x, y, R));
-
-/** 雲の海のふくらみ（マスごとに3つ。場所と大きさはマスの番号から決める） */
-const puffs = (i: number) =>
-  [0, 1, 2].map((k) => ({
-    dx: (hash01(i, 30 + k) - 0.5) * 1.0,
-    dy: (hash01(i, 40 + k) - 0.5) * 0.8,
-    r: 0.62 + hash01(i, 50 + k) * 0.36,
-  }));
 
 interface TerrainProps {
   tiles: WorldState['tiles'];
@@ -150,8 +146,6 @@ interface TerrainProps {
   fresh: ReadonlySet<number>;
   /** 地域ごとの、街道のマスの下に敷く地形（道の線を描くので、マスは草地などにする） */
   under: readonly string[];
-  /** 瘴気の色の雲にするマスか */
-  miasma: (i: number) => boolean;
   /** 最後の城のマス（地形の飾りを置かない） */
   noProp: ReadonlySet<number>;
   roadTerrain: string;
@@ -161,7 +155,7 @@ interface TerrainProps {
  * 地形の層（箱庭の六角柱）。キャラの移動以外では変わりにくいので、タイルの見え方が変わった時だけ描き直す。
  * 上の行から順に描くので、手前（下の行）の高いマスが、奥のマスの下の方を隠す
  */
-const TerrainLayer = memo(function TerrainLayer({ tiles, geom, w, levels, links, fresh, under, miasma, noProp, roadTerrain }: TerrainProps) {
+const TerrainLayer = memo(function TerrainLayer({ tiles, geom, w, levels, links, fresh, under, noProp, roadTerrain }: TerrainProps) {
   const { R, center, ground } = geom;
   const s = R / 24;
   // 地形の模様（描いた絵）。並べてもつなぎ目が出ない絵を、マス2つ分くらいの大きさで敷く
@@ -247,54 +241,15 @@ const TerrainLayer = memo(function TerrainLayer({ tiles, geom, w, levels, links,
           </g>
         );
       })}
-      {/* 雲の海の土台（まだ見ていないマス。ふくらみは上の CloudLayer がゆっくり流す） */}
+      {/* まだ見ていないマス（雲は FogSea が描く。ここは確認スクリプトが数える印だけ） */}
       <g data-fog>
         {tiles.map((t, i) => {
           if (t.seen) return null;
           const g = ground(i);
-          return <polygon key={i} data-fog-tile={i} points={hexPoints(g.x, g.y - LEVEL_STEP * R, R * 1.06)} fill={miasma(i) ? '#4a2e64' : '#6e7392'} />;
+          return <polygon key={i} data-fog-tile={i} points={hexPoints(g.x, g.y - LEVEL_STEP * R, R)} fill="none" />;
         })}
       </g>
     </svg>
-  );
-});
-
-/**
- * 雲の海のふくらみ（ゆっくり流れる）。この層だけを CSS の transform で動かすので、地図の描き直しは起きない。
- * 霧が晴れたばかりのマスの雲は、ふわっと上へ消える
- */
-const CloudLayer = memo(function CloudLayer({ tiles, geom, fresh, miasma }: { tiles: WorldState['tiles']; geom: MapGeom; fresh: ReadonlySet<number>; miasma: (i: number) => boolean }) {
-  const { R, ground } = geom;
-  const puff = (i: number, cls?: string) => {
-    const g = ground(i);
-    const cy = g.y - LEVEL_STEP * R;
-    const m = miasma(i);
-    return (
-      <g key={i} className={cls} style={cls ? ({ '--lift': `${(-R * 0.5).toFixed(1)}px` } as React.CSSProperties) : undefined}>
-        {puffs(i).map((p, k) => (
-          <circle key={k} cx={g.x + p.dx * R} cy={cy + p.dy * R} r={p.r * R} fill={m ? 'url(#puff-miasma)' : 'url(#puff)'} />
-        ))}
-      </g>
-    );
-  };
-  return (
-    <div className="cloud-drift pointer-events-none absolute inset-0" style={{ '--drift': `${(R * 0.22).toFixed(1)}px` } as React.CSSProperties} data-cloud-layer>
-      <svg width={geom.W} height={geom.H} className="absolute inset-0 block overflow-visible">
-        <defs>
-          <radialGradient id="puff">
-            <stop offset="0%" stopColor="#d8dbea" stopOpacity=".85" />
-            <stop offset="55%" stopColor="#a8acc6" stopOpacity=".55" />
-            <stop offset="100%" stopColor="#6e7392" stopOpacity="0" />
-          </radialGradient>
-          <radialGradient id="puff-miasma">
-            <stop offset="0%" stopColor="#b48ad0" stopOpacity=".8" />
-            <stop offset="55%" stopColor="#74488e" stopOpacity=".55" />
-            <stop offset="100%" stopColor="#4a2e64" stopOpacity="0" />
-          </radialGradient>
-        </defs>
-        {tiles.map((t, i) => (t.seen ? (fresh.has(i) ? puff(i, 'cloud-clear') : null) : puff(i)))}
-      </svg>
-    </div>
   );
 });
 
@@ -640,7 +595,7 @@ export function WorldMap({
     let bd = Infinity;
     for (let i = 0; i < w.tiles.length; i++) {
       const c = center(i);
-      const d = (c.x - px) ** 2 + (c.y - py) ** 2;
+      const d = (c.x - px) ** 2 + ((c.y - py) / GROUND_K) ** 2;
       if (d < bd) (bd = d), (best = i);
     }
     if (best >= 0 && bd <= R * R) onTapTile(best);
@@ -693,16 +648,17 @@ export function WorldMap({
   return (
     <div ref={wrapRef} className="relative min-h-0 flex-1" style={{ touchAction: 'pan-x pan-y' }}>
     <div ref={box} className="absolute inset-0 overflow-auto overscroll-contain bg-[#0b0910]" style={{ touchAction: 'pan-x pan-y' }} data-world-map>
-      <div style={{ paddingTop: padY, paddingBottom: padBottom, width: W }} data-map-pad>
+      {/* 地図の外（上下の余白）も雲の海（FogSea が余白まで広げる）。下地は雲の色 */}
+      <div style={{ paddingTop: padY, paddingBottom: padBottom, width: W, background: time === 'night' ? '#20233c' : '#53587a' }} data-map-pad>
       {/* 歩いている間は、雲と水の動きを止める（スマホで駒の動きをなめらかにするため） */}
       <div className="relative" style={{ width: W, height: H }} onClick={(e) => { if (!anim) tap(e); }} data-walking={anim ? '' : undefined}>
-        <TerrainLayer tiles={tiles} geom={geom} w={w} levels={levels} links={links} fresh={freshRef.current} under={under} miasma={miasma} noProp={finaleTiles} roadTerrain={roadTerrain} />
+        <TerrainLayer tiles={tiles} geom={geom} w={w} levels={levels} links={links} fresh={freshRef.current} under={under} noProp={finaleTiles} roadTerrain={roadTerrain} />
         <WaterLayer tiles={tiles} geom={geom} levels={levels} />
-        <CloudLayer tiles={tiles} geom={geom} fresh={freshRef.current} miasma={miasma} />
+        <FogSea tiles={tiles} geom={geom} levels={levels} padTop={padY} padBottom={padBottom} miasma={miasma} fresh={freshRef.current} time={time} />
         {/* 施設（立体のミニチュア・描いた絵）。時間帯の色の下に置く（夜は暗くなり、町などの明かりだけが光る） */}
         <FeatureLayer tiles={w.tiles} geom={geom} finaleTiles={finaleTiles} fallenTowns={w.fallenTowns} />
         {/* 時間帯の光（朝 = 斜めの光、夕方 = オレンジ、夜 = 青い月明かり）。地図といっしょに動く1枚の色なので、描き直しは起きない */}
-        {light.wash && <div className="pointer-events-none absolute inset-0" style={{ background: light.wash }} data-time-light={time} />}
+        {light.wash && <div className="pointer-events-none absolute" style={{ left: 0, top: -padY, width: W, height: padY + H + padBottom, background: light.wash }} data-time-light={time} />}
         {/* 夜と夕方の明かり（町・祠・神殿・祭壇・野営のたき火） */}
         {light.glow > 0 &&
           glows.map((g) => (
@@ -729,7 +685,7 @@ export function WorldMap({
               return (
                 <g key={`r${i}`} data-reach={i} data-cost={cost}>
                   <polygon points={hexPoints(x, y, R * TOP_SCALE - 2)} fill="rgba(255,240,180,.2)" stroke="rgba(255,214,110,.85)" strokeWidth={1.8} />
-                  <text x={x} y={y + R * 0.62} textAnchor="middle" fontSize={Math.max(12, R * 0.42)} fontWeight={800} fill="#fff3c4" stroke="#000" strokeWidth={2.5} paintOrder="stroke">
+                  <text x={x} y={y + R * 0.62 * GROUND_K} textAnchor="middle" fontSize={Math.max(12, R * 0.42)} fontWeight={800} fill="#fff3c4" stroke="#000" strokeWidth={2.5} paintOrder="stroke">
                     {cost}
                   </text>
                 </g>
@@ -844,7 +800,7 @@ export function WorldMap({
                 className="pointer-events-none absolute"
                 style={{
                   left: x - s / 2 + spot.dx * R,
-                  top: y - s * 0.62 + spot.dy * R,
+                  top: y - s * 0.62 + spot.dy * R * GROUND_K,
                   width: s,
                   height: s,
                   zIndex: 2 + spot.z + (moving ? 10 : 0),
@@ -915,6 +871,8 @@ export function WorldMap({
           style={{ background: `radial-gradient(ellipse at center, transparent ${[0, 50, 38, 26][stage]}%, rgba(80,14,110,${[0, 0.38, 0.55, 0.72][stage]}) 100%), rgba(50,8,80,${[0, 0.07, 0.14, 0.22][stage]})` }}
         />
       )}
+      {/* 斜めから見下ろす形の時: 画面の上の方（奥）を、少しかすませる（遠近感） */}
+      {GROUND_K < 1 && <div className="pointer-events-none absolute inset-x-0 top-0 h-[30%]" style={{ background: `linear-gradient(${time === 'night' ? 'rgba(10,14,40,.55)' : 'rgba(150,158,190,.42)'}, transparent)` }} data-depth-haze />}
       {/* 夜は、画面の端を少し暗くする（月明かり） */}
       {time === 'night' && <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 40%, transparent 50%, rgba(2,6,30,.45) 100%)' }} />}
       {/* 地域の名前（いつも出す）と、地域に入った時の帯 */}

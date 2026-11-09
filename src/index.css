@@ -527,18 +527,23 @@ textarea {
   to { transform: none; opacity: 1; }
 }
 .hex-rise { animation: hex-rise 0.42s cubic-bezier(.2,.8,.3,1.1) both; }
-/* 晴れたマスの雲が、上へ消える */
-@keyframes cloud-clear {
-  from { transform: none; opacity: 1; }
-  to { transform: translateY(var(--lift, -14px)); opacity: 0; }
+/* 雲の海: 遠い層はゆっくり、近い層は少し速く流れる（雲の模様1枚分ずつ動かすので、つなぎ目が出ない） */
+@keyframes fog-far {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(calc(var(--tile) * -1), 0, 0); }
 }
-.cloud-clear { animation: cloud-clear 0.45s ease-out both; }
-/* 雲の海がゆっくり流れる（層ごと動かす） */
-@keyframes cloud-drift {
-  from { transform: translate3d(calc(var(--drift, 6px) * -1), 0, 0); }
-  to { transform: translate3d(var(--drift, 6px), calc(var(--drift, 6px) * -0.3), 0); }
+@keyframes fog-near {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(calc(var(--tile) * -1), calc(var(--tile) * 0.5), 0); }
 }
-.cloud-drift { animation: cloud-drift 14s ease-in-out infinite alternate; will-change: transform; }
+.fog-far { animation: fog-far 90s linear infinite; will-change: transform; }
+.fog-near { animation: fog-near 46s linear infinite; will-change: transform; }
+/* 晴れたマスの雲が、薄く千切れて外へ流れながら消える */
+@keyframes cloud-tear {
+  from { opacity: 0.95; transform: none; }
+  to { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(1.45); }
+}
+.cloud-tear { animation: cloud-tear 0.7s ease-out both; }
 /* 水面のきらめき（2枚を交互に） */
 @keyframes water-shimmer {
   0%, 100% { opacity: 0.1; }
@@ -558,7 +563,7 @@ textarea {
   50% { transform: scale(1.025, 1.045); }
 }
 .enemy-breathe { animation: enemy-breathe 3s ease-in-out infinite; transform-origin: 50% 92%; will-change: transform; }
-[data-walking] .cloud-drift, [data-walking] .water-shimmer, [data-walking] .map-glow { animation-play-state: paused; }
+[data-walking] .fog-far, [data-walking] .fog-near, [data-walking] .water-shimmer, [data-walking] .map-glow { animation-play-state: paused; }
 /* 地域に入った時の帯 */
 @keyframes region-banner {
   0% { opacity: 0; transform: translateY(-8px); }
@@ -567,7 +572,7 @@ textarea {
 }
 .region-banner { animation: region-banner 2.2s ease-out both; }
 @media (prefers-reduced-motion: reduce) {
-  .hex-rise, .cloud-drift, .water-shimmer, .map-glow, .enemy-breathe { animation: none; }
-  .cloud-clear { animation: none; opacity: 0; }
+  .hex-rise, .fog-far, .fog-near, .water-shimmer, .map-glow, .enemy-breathe { animation: none; }
+  .cloud-tear { animation: none; opacity: 0; }
   .region-banner { animation: none; }
 }

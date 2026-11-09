@@ -1,6 +1,7 @@
 // 世界マップの箱庭（ジオラマ）の見比べの写真（390×844）。同じ種の冒険で、前と後の版を同じ場面で撮る
 //   1) 始まりの辺り（昼・夜）  2) 森と山のある辺り（昼・夜。周り半径4マスだけ霧を晴らす）  3) 夕方・朝
 // 使い方: npx vite preview を起こしてから OUT=screenshots/diorama/after node scripts/diorama-shots.mjs
+//   INJECT_CSS=... でページに CSS を足す（見本用）
 //   SEED=... で冒険の種（既定 12345）、PARTY=... で人数（既定 2）、ZOOM=... で拡大（既定 1）
 import { mkdirSync } from 'node:fs';
 import { chromium, depart, URL } from './lib.mjs';
@@ -17,6 +18,8 @@ await page.addInitScript((seed) => {
   const random = crypto.getRandomValues.bind(crypto);
   crypto.getRandomValues = (a) => (a instanceof Uint32Array && a.length === 1 ? ((a[0] = seed), a) : random(a));
 }, SEED);
+// 見本だけ: INJECT_CSS で CSS を足す（案A の CSS の3D傾きの見本など）
+if (process.env.INJECT_CSS) await page.addInitScript((css) => document.addEventListener('DOMContentLoaded', () => { const st = document.createElement('style'); st.textContent = css; document.head.append(st); }), process.env.INJECT_CSS);
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 await page.goto(URL);
