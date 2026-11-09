@@ -34,6 +34,8 @@ import {
   needsVote,
   notVoted,
   chestShared,
+  exploreRollerOf,
+  exploreShared,
 } from './index';
 
 export interface BotLog {
@@ -259,7 +261,10 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
     case 'dungeon': {
       // 手番の最初に探索力を決める（世界マップのあるシナリオ）
       if (g.world && g.dungeon!.explore == null) {
-        const h = livingHeroes(g).find((x) => !g.party || g.party.includes(x.id))!;
+        const chosen = exploreRollerOf(g);
+        const h = (chosen ? findHero(g, chosen) : undefined) ?? livingHeroes(g).find((x) => !g.party || g.party.includes(x.id))!;
+        // 2人以上: 判定するキャラをみんなで決めてから
+        if (exploreShared(g) && !chosen) return send(g, { type: 'EXPLORE_ROLLER', playerId: h.playerId, heroId: h.id }, log);
         return send(g, { type: 'EXPLORE_ROLL', playerId: h.playerId, heroId: h.id, focusUsed: 0 }, log);
       }
       const rooms = reachableRooms(g.dungeon!);

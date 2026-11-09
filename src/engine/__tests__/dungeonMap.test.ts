@@ -50,6 +50,11 @@ function inTemple(players: PlayerId[] = ['P1', 'P2']) {
   g = run(g, { type: 'WORLD_INTERACT', playerId: 'P1', heroId: 'h0', party: ['h0', 'h1'] });
   const x = g.expeditions![0].id;
   g.heroes[0].focus = 2;
+  // 2人のプレイヤー: 判定するキャラを先にみんなで決める
+  if (players[1] !== players[0]) {
+    g = run(g, inScene(x, { type: 'VOTE', playerId: 'P1', command: { type: 'EXPLORE_ROLLER', playerId: 'P1', heroId: 'h0' } }));
+    g = run(g, inScene(x, { type: 'VOTE', playerId: players[1], command: { type: 'EXPLORE_ROLLER', playerId: players[1], heroId: 'h0' } }));
+  }
   g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: 'P1', heroId: 'h0', focusUsed: 2 }));
   return { g, x };
 }
@@ -354,7 +359,7 @@ describe('一人称の通路の見え方（段階B）', () => {
     expect(viewSlices(unseen).end.face).toBe('dark');
   });
 
-  it('ボスの扉は「ボス」、選ばなかった扉は「開かない扉」に見える', () => {
+  it('ボスの扉は「ボス」、選ばなかった扉はただの壁に見える（オーナーの案）', () => {
     const d = temple();
     const boss = d.rooms.find((r) => r.next.length === 0)!;
     const before = d.rooms.find((r) => r.row === boss.row - 1)!;
@@ -365,10 +370,10 @@ describe('一人称の通路の見え方（段階B）', () => {
     expect(viewSlices(here).end.face).toBe('boss');
     const t2 = standIn(temple(), 'r1c1');
     const front = doorFront(t2, 'r2c0')!;
-    // r1c1 の次は r2c1・r2c2。r2c0 は開かない
+    // r1c1 の次は r2c1・r2c2。r2c0 は開かないので壁になる（古い保存データで、その前に立っていた時も落ちない）
     t2.pos = { ...front, facing: 0 };
     t2.seen = [...(t2.seen ?? []), cellKey(front.x, front.y), cellKey(front.x, front.y + 1)];
     expect(t2.rooms.find((r) => r.id === 'r1c1')!.next).not.toContain('r2c0');
-    expect(viewSlices(t2).end).toEqual({ depth: 1, face: 'locked', roomId: 'r2c0' });
+    expect(viewSlices(t2).end).toEqual({ depth: 1, face: 'wall' });
   });
 });

@@ -228,6 +228,8 @@ export interface DungeonRun {
   /** 残りの歩数（この手番で歩ける数。判定前は null。世界マップのあるシナリオだけ。M3-D → 第3段階で「部屋の数」から「歩数」に） */
   explore?: number | null;
   exploreRoll?: ('focus' | 'hit' | 'miss')[];
+  /** 探索力の判定をするキャラ（2人以上のプレイヤーの時にみんなで決める）。turn = 決めた手番の目印（ワールドターン:手番のキャラ）。違う手番のものは使わない */
+  exploreRoller?: { heroId: string; turn: string };
   /** 通路の地図の上の位置と向き（地図は部屋のつながりから毎回作る。engine/game/dungeonMap.ts） */
   pos?: { x: number; y: number; facing: Facing };
   /** 見たマス（"x,y"。オートマッピング） */
@@ -616,6 +618,8 @@ export type GameCommand =
   | { type: 'SCENE'; scene: string; command: GameCommand }
   /** ダンジョンのパーティの手番: 探索力の判定（素早さ）/ 手番を終える */
   | { type: 'EXPLORE_ROLL'; playerId: PlayerId; heroId: string; focusUsed: number }
+  /** 探索力の判定をするキャラを、みんなで決める（ダンジョンのパーティに2人以上のプレイヤーがいる時。全員一致） */
+  | { type: 'EXPLORE_ROLLER'; playerId: PlayerId; heroId: string }
   | { type: 'EXPLORE_END'; playerId: PlayerId }
   /** ダンジョンの通路を1歩進む（左・右・後ろは、その向きを向いて1歩）。歩くのは手番のキャラの担当の人（第3段階） */
   | { type: 'DUNGEON_STEP'; playerId: PlayerId; heroId: string; dir: 'forward' | 'left' | 'right' | 'back' }

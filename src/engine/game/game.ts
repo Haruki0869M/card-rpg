@@ -228,6 +228,31 @@ function runInScene(game: GameState, cmd: Extract<GameCommand, { type: 'SCENE' }
   return r;
 }
 
+/** 探索力の判定を2人以上のプレイヤーで決めるか（ダンジョンのパーティに別のプレイヤーのキャラがいる） */
+export const exploreShared = (game: GameState) => !!game.world && voters(game).length > 1;
+
+/** 今の手番の目印（探索力の判定をするキャラを決めた手番か確かめる） */
+const exploreTurnKey = (game: GameState) => (game.world ? `${game.world.worldTurn}:${game.world.turn}` : '');
+
+/** みんなで決めた、この手番の探索力の判定をするキャラ（決めていなければ undefined） */
+export function exploreRollerOf(game: GameState): string | undefined {
+  const r = game.dungeon?.exploreRoller;
+  return r && r.turn === exploreTurnKey(game) ? r.heroId : undefined;
+}
+
+/** 探索力の判定をするキャラをみんなで決めた（EXPLORE_ROLLER の投票が全員一致した時に動く。乱数は使わない） */
+function exploreRoller(game: GameState, heroId: string): string | undefined {
+  const run = game.dungeon;
+  if (!game.world || !game.activeScene || game.mode !== 'dungeon' || !run) return 'ダンジョンの通路でのみ決められます';
+  if (run.explore != null) return 'もう探索力を決めました';
+  if (!exploreShared(game)) return '1人の時は、そのまま判定できます';
+  const h = findHero(game, heroId);
+  if (!h || h.hp <= 0 || h.retired || !(game.party ?? []).includes(h.id)) return 'このキャラは判定できません';
+  run.exploreRoller = { heroId, turn: exploreTurnKey(game) };
+  addLog(game, `探索力の判定は${h.name}がすることになった`);
+  return undefined;
+}
+
 /** 探索力の判定（ダンジョンのパーティの手番の最初。素早さ。探索力 = exploreBase + 成功数） */
 function exploreRoll(game: GameState, cmd: Extract<GameCommand, { type: 'EXPLORE_ROLL' }>, rng: Rng): string | undefined {
   const run = game.dungeon;
@@ -236,6 +261,12 @@ function exploreRoll(game: GameState, cmd: Extract<GameCommand, { type: 'EXPLORE
   const h = findHero(game, cmd.heroId);
   if (!h || h.hp <= 0 || !(game.party ?? []).includes(h.id)) return 'このキャラは判定できません';
   if (!ownedBy(h, cmd.playerId)) return '担当していないキャラです';
+  // 2人以上: みんなで決めたキャラの担当の人が判定する（オーナーの案）
+  if (exploreShared(game)) {
+    const chosen = exploreRollerOf(game);
+    if (!chosen) return 'だれが判定するか、先にみんなで決めます';
+    if (chosen !== h.id) return `判定するのは${findHero(game, chosen)?.name ?? '決めたキャラ'}です`;
+  }
   const slots = BALANCE.exploreSlots;
   if (!Number.isInteger(cmd.focusUsed) || cmd.focusUsed < 0 || cmd.focusUsed > Math.min(slots, h.focus)) return 'フォーカスの数が不正です';
   h.focus -= cmd.focusUsed;
@@ -503,6 +534,9 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
         break;
       case 'EXPLORE_ROLL':
         error = exploreRoll(game, cmd, rng);
+        break;
+      case 'EXPLORE_ROLLER':
+        error = exploreRoller(game, cmd.heroId);
         break;
       case 'EXPLORE_END':
         error = exploreEnd(game);

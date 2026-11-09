@@ -311,6 +311,11 @@ async function run(party, difficulty) {
         seen.add('dungeon');
         await check(page, 'dungeon');
       }
+      // 2人以上のプレイヤー: 先に「だれが判定する？」をみんなで決める（おすすめの人＝一番上に任せる）
+      if (await page.locator('[data-explore-roller]').count()) {
+        await page.locator('[data-explore-roller] button').first().click();
+        continue;
+      }
       // 手番の最初は探索力を決める。使い切ったら「手番を終える」（M3-D）
       if (await page.getByText('探索力の判定').count()) {
         await page.getByText('探索力の判定').click();
