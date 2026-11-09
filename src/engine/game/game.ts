@@ -466,7 +466,10 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
         break;
       }
       case 'CLAIM_LOOT':
-        error = claimLoot(game, cmd.playerId, cmd.heroId, cmd.choice, rng);
+        error = claimLoot(game, cmd.playerId, cmd.heroId, cmd.choice, rng, cmd.index);
+        break;
+      case 'CHEST_OPENER':
+        error = chestOpener(game, cmd.heroId);
         break;
       case 'OPEN_CHEST':
         error = openChest(game, cmd.playerId, cmd.heroId, cmd.focusUsed, rng, cmd.recipientId);
@@ -847,9 +850,11 @@ function chooseGrowth(game: GameState, playerId: string, optionIndex: number, ca
 }
 
 /** 戦利品の取り合い: キャラごとに「欲しい / 余れば / いらない」。全員そろったら運の判定で決める */
-function claimLoot(game: GameState, playerId: string, heroId: string, choice: 'need' | 'greed' | 'pass', rng: Rng): string | undefined {
-  const c = game.reward?.claim;
-  if (game.mode !== 'reward' || !c || c.rolls) return '取り合う戦利品はありません';
+function claimLoot(game: GameState, playerId: string, heroId: string, choice: 'need' | 'greed' | 'pass', rng: Rng, index?: number): string | undefined {
+  // 宝箱の取り合い（ステップ2）は宝箱の画面で、戦闘の装備は報酬の画面で
+  const inChest = game.mode === 'chest';
+  const c = inChest ? game.chest?.claims?.[index ?? 0] : game.reward?.claim;
+  if ((game.mode !== 'reward' && !inChest) || !c || c.rolls) return '取り合う戦利品はありません';
   if (!c.heroes.includes(heroId)) return 'このキャラは選べません';
   const h = findHero(game, heroId)!;
   if (!ownedBy(h, playerId)) return '担当していないキャラです';
@@ -864,7 +869,10 @@ function claimLoot(game: GameState, playerId: string, heroId: string, choice: 'n
   if (to) {
     c.winner = to.id;
     addItem(game, to, c.item, true);
-    game.reward!.loot.push({ kind: 'item', item: c.item, to: to.id });
+    if (inChest) {
+      const l = game.chest!.contents?.find((x) => x.kind === 'item' && x.item.uid === c.item.uid);
+      if (l && l.kind === 'item') l.to = to.id;
+    } else game.reward!.loot.push({ kind: 'item', item: c.item, to: to.id });
     addLog(game, `${to.name}が戦利品を手に入れた${best ? `（運の判定 ${best.roll}）` : ''}`);
   }
   return undefined;
@@ -945,12 +953,33 @@ function worldTurnError(game: GameState, playerId: string, onTile: boolean): str
   return ownedBy(findHero(game, game.world.turn), playerId) ? undefined : '手番のキャラの担当の人が操作します';
 }
 
+/** 宝箱を2人以上のプレイヤーで開けるか（開け役をみんなで決め、中身を取り合う。ステップ2） */
+export const chestShared = (game: GameState) => voters(game).length > 1;
+
+/** 宝箱の開け役をみんなで決めた（CHEST_OPENER の投票が全員一致した時に動く） */
+function chestOpener(game: GameState, heroId: string): string | undefined {
+  const c = game.chest;
+  if (game.mode !== 'chest' || !c) return '宝箱がありません';
+  if (c.contents) return 'もう開けました';
+  if (!chestShared(game)) return '1人の時は、そのまま開けられます';
+  const h = sceneHeroes(game).find((x) => x.id === heroId && !x.retired);
+  if (!h) return 'そのキャラは開けられません';
+  if (c.opener === heroId) return undefined;
+  c.opener = heroId;
+  addLog(game, `宝箱は${h.name}が開けることになった`);
+  return undefined;
+}
+
 function openChest(game: GameState, playerId: string, heroId: string, focusUsed: number, rng: Rng, recipientId?: string): string | undefined {
   const c = game.chest;
   if (game.mode !== 'chest' || !c) return '宝箱がありません';
-  const te = worldTurnError(game, playerId, c.tile !== undefined);
+  const shared = chestShared(game);
+  // 2人以上: みんなで決めた開け役の担当の人が開ける。1人: 今までどおり（世界マップは手番の人）
+  const te = shared ? undefined : worldTurnError(game, playerId, c.tile !== undefined);
   if (te) return te;
   if (c.contents) return 'もう開けました';
+  if (shared && !c.opener) return 'だれが開けるか、先にみんなで決めます';
+  if (shared && c.opener !== heroId) return `開けるのは${findHero(game, c.opener!)?.name ?? '決めたキャラ'}です`;
   const h = findHero(game, heroId);
   if (!h || h.hp <= 0 || !sceneHeroes(game).some(x => x.id === h.id)) return 'そのキャラは動けません';
   if (!ownedBy(h, playerId)) return '担当していないキャラです';
@@ -970,7 +999,7 @@ function openChest(game: GameState, playerId: string, heroId: string, focusUsed:
     }
     return undefined;
   }
-  const recipient = recipientId ? sceneHeroes(game).find(x => x.id === recipientId && x.hp > 0 && !x.retired) : h;
+  const recipient = recipientId && !shared ? sceneHeroes(game).find(x => x.id === recipientId && x.hp > 0 && !x.retired) : h;
   if (!recipient) return '報酬を受け取る仲間がいません';
   // 運のスロット → 成功数で確率が上の格へずれる → 格を1回だけ抽選（spec §10.3）
   const results = rollWithFocus(slots, focusUsed, statChance(h, 'luk', 'luck'), rng);
@@ -984,8 +1013,13 @@ function openChest(game: GameState, playerId: string, heroId: string, focusUsed:
   c.lastRoll = { kind: 'luck', heroId, results, success: n === slots, oddsBefore, odds, grade, gradeChance: odds[rarityIndex(grade)], omen };
   c.contents = rollChestContents(game, grade, !!c.spec.big, rng);
   // 指定した受取人へ。判定と実績は開けたキャラのまま。大宝箱のお金は従来どおり山分け。
-  if (recipientId) for (const loot of c.contents) if (loot.kind === 'card') loot.heroId = recipient.id;
-  addLoot(game, c.contents.filter((l) => l.kind !== 'gold'), [recipient]);
+  if (recipientId && !shared) for (const loot of c.contents) if (loot.kind === 'card') loot.heroId = recipient.id;
+  if (shared) {
+    // 2人以上: 品物（装備・消耗品）は1つずつ「欲しい／余れば／いらない」で取り合う。カードは今までどおり
+    const ids = sceneHeroes(game).filter((x) => !x.retired).map((x) => x.id);
+    c.claims = c.contents.flatMap((l) => (l.kind === 'item' ? [{ item: l.item, heroes: ids, choices: {} }] : []));
+    addLoot(game, c.contents.filter((l) => l.kind === 'card'), [recipient]);
+  } else addLoot(game, c.contents.filter((l) => l.kind !== 'gold'), [recipient]);
   addLoot(game, c.contents.filter((l) => l.kind === 'gold'), c.spec.big ? sceneHeroes(game) : [recipient]);
   game.stats.chestsOpened += 1;
   addLog(game, `宝箱の中身は${GRADE_NAME[grade]}だった（確率${odds[rarityIndex(grade)].toFixed(1)}%）`);
@@ -997,6 +1031,7 @@ function leaveChest(game: GameState, playerId: string, rng: Rng): string | undef
   const c = game.chest;
   const run = game.dungeon;
   if (game.mode !== 'chest' || !c) return '宝箱がありません';
+  if (c.claims?.some((x) => !x.rolls)) return '宝箱の中身の取り合いが終わっていません';
   const te = worldTurnError(game, playerId, c.tile !== undefined);
   if (te) return te;
   // 世界マップの宝箱（マスの宝箱は使い終わり。隠し宝箱はそのまま）

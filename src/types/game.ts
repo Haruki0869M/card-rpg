@@ -266,6 +266,10 @@ export interface ChestState {
   lastRoll?: ChestRoll;
   /** 戦闘の後に見つけた隠し宝箱（マスには残らない） */
   hidden?: boolean;
+  /** 2人以上のプレイヤーで開ける時: みんなで決めた開け役（そのキャラの担当の人が判定する。ステップ2） */
+  opener?: string;
+  /** 2人以上のプレイヤーで開けた時: 中の品物（装備・消耗品）の取り合い（戦闘の装備と同じ「欲しい／余れば／いらない」） */
+  claims?: LootClaim[];
 }
 
 export interface ChestRoll {
@@ -559,7 +563,9 @@ export type GameCommand =
   | { type: 'CARD_TASK'; playerId: PlayerId; heroId: string; cardUid?: string }
   /** 行商人の品物を買う（index を省くと店を閉じる） */
   | { type: 'PEDDLER_BUY'; playerId: PlayerId; heroId: string; kind?: 'item' | 'card'; index?: number }
-  | { type: 'CLAIM_LOOT'; playerId: PlayerId; heroId: string; choice: 'need' | 'greed' | 'pass' }
+  | { type: 'CLAIM_LOOT'; playerId: PlayerId; heroId: string; choice: 'need' | 'greed' | 'pass'; /** 宝箱の取り合いの何番目か（戦闘の報酬では使わない） */ index?: number }
+  /** 宝箱を開けるキャラを、みんなで決める（2人以上のプレイヤーの時。全員一致） */
+  | { type: 'CHEST_OPENER'; playerId: PlayerId; heroId: string }
   | { type: 'OPEN_CHEST'; playerId: PlayerId; heroId: string; recipientId?: string; focusUsed: number }
   | { type: 'LEAVE_CHEST'; playerId: PlayerId }
   | { type: 'CHOOSE_EVENT'; playerId: PlayerId; optionIndex: number; heroId?: string; focusUsed: number }

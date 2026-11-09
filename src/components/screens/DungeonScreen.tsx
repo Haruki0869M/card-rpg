@@ -47,6 +47,9 @@ import type { DungeonRun, Facing, GameState, Room } from '../../types';
 import { useElementSize } from '../../hooks/useElementSize';
 import { LOCAL_PLAYER } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
+import { usePins, type PinsApi, type ShownPin } from '../../store/pins';
+import { PinBanner, PinChips } from '../ui/PinChips';
+import type { PinTarget } from '../../net/pins';
 import { getRoomType } from '../../data/rules';
 import { Bar, ItemIcon, Screen } from '../ui/game';
 
@@ -60,7 +63,7 @@ function roomStyle(type: string) {
 }
 
 /** 目の前の扉（中身は入るまで分からない。ボスの扉だけは見て分かる） */
-function DoorPanel({ room, openable }: { room: Room; openable: boolean }) {
+function DoorPanel({ room, openable, pins, canPin }: { room: Room; openable: boolean; pins: PinsApi; canPin: boolean }) {
   const game = useBattle((s) => s.game)!;
   const dispatchGame = useBattle((s) => s.dispatchGame);
   const t = roomStyle(room.type);
@@ -74,11 +77,19 @@ function DoorPanel({ room, openable }: { room: Room; openable: boolean }) {
         {known ? <t.Icon size={22} style={{ color: t.color }} /> : t.boss ? <Crown size={22} className="text-amber-300" /> : <DoorClosed size={22} className="text-amber-200" />}
       </span>
       <div className="min-w-0 flex-1 text-[13px] leading-5">
-        <div className="font-bold text-amber-100">{known ? `${t.name}の部屋（通った）` : t.boss ? '重い扉（ボス）' : openable ? '扉' : '開かない扉'}</div>
+        <div className="font-bold text-amber-100">
+          {known ? `${t.name}の部屋（通った）` : t.boss ? '重い扉（ボス）' : openable ? '扉' : '開かない扉'}
+          <PinChips pins={pins.at({ kind: 'door', id: room.id })} className="ml-1 align-middle" />
+        </div>
         <div className="truncate text-[12px] text-zinc-400">
           {known ? 'もう何もない' : t.boss ? '奥から強い気配がする…' : omen ? OMEN_TEXT[omen] : openable ? '中身は開けるまで分からない' : '別の道を選んだので開かない'}
         </div>
       </div>
+      {canPin && !known && (
+        <button onClick={() => pins.toggle({ kind: 'door', id: room.id })} aria-pressed={!!pins.mine && pins.mine.target.kind === 'door' && pins.mine.target.id === room.id} className="btn btn-dark h-11 shrink-0 rounded-lg px-2 text-[13px] font-bold" data-pin-door>
+          こっち！
+        </button>
+      )}
       {openable && !known && (
         <button
           onClick={() => dispatchGame({ type: 'ENTER_ROOM', playerId: LOCAL_PLAYER, roomId: room.id })}
@@ -94,7 +105,7 @@ function DoorPanel({ room, openable }: { room: Room; openable: boolean }) {
 }
 
 /** 地図のマス（見たマスだけ。北が上）。大きな地図とミニマップで使う。x0 = 左端のマス、yTop = 上端のマス */
-function MapCells({ run, cell, x0, yTop, left = 0, top = 0, only, target, onTap }: {
+function MapCells({ run, cell, x0, yTop, left = 0, top = 0, only, target, onTap, pinsOf }: {
   run: DungeonRun;
   cell: number;
   x0: number;
@@ -105,6 +116,8 @@ function MapCells({ run, cell, x0, yTop, left = 0, top = 0, only, target, onTap 
   only?: (c: MapCell) => boolean;
   target?: { x: number; y: number } | null;
   onTap?: (c: MapCell) => void;
+  /** そのマスを指しているピン（扉は部屋のID、通路は "x,y"） */
+  pinsOf?: (c: MapCell) => ShownPin[];
 }) {
   const game = useBattle((s) => s.game);
   const grid = dungeonGrid(run);
@@ -128,6 +141,7 @@ function MapCells({ run, cell, x0, yTop, left = 0, top = 0, only, target, onTap 
         // 中身は入るまで分からない（ボスの扉だけは見て分かる）
         const Icon = !room || !t ? null : known ? t.Icon : t.boss ? Crown : openable ? DoorClosed : DoorClosedLocked;
         const Tag = onTap ? 'button' : 'span';
+        const cellPins = pinsOf?.(c) ?? [];
         return (
           <Tag
             key={k}
@@ -147,7 +161,7 @@ function MapCells({ run, cell, x0, yTop, left = 0, top = 0, only, target, onTap 
               height: cell - 2,
               borderRadius: room ? Math.max(3, cell / 6) : 2,
               background: room && t ? (known ? t.bg : '#2a2018') : walk.has(k) ? '#3a3328' : '#211d18',
-              border: `${small ? 1 : 2}px solid ${isTarget ? '#fff' : omen ? OMEN_INFO[omen].color : openable ? '#ffd76a' : room ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.08)'}`,
+              border: `${small ? 1 : 2}px solid ${cellPins.length ? PLAYER_COLOR[cellPins[0].seat] : isTarget ? '#fff' : omen ? OMEN_INFO[omen].color : openable ? '#ffd76a' : room ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.08)'}`,
               boxShadow: omen && !small ? `0 0 10px ${OMEN_INFO[omen].color}` : openable && !small ? '0 0 10px rgba(255,215,106,.6)' : undefined,
               opacity: room && t && !known && !openable && !t.boss ? 0.55 : 1,
             }}
@@ -157,6 +171,11 @@ function MapCells({ run, cell, x0, yTop, left = 0, top = 0, only, target, onTap 
           >
             {Icon && t && !here && <Icon size={Math.round(cell * 0.55)} strokeWidth={2.2} style={{ color: known ? t.color : t.boss ? '#ffcf4a' : openable ? '#ffd76a' : '#9a9080' }} />}
             {omen && !here && <OmenMark omen={omen} className="absolute -right-1.5 -top-1.5 !w-[46%]" />}
+            {cellPins.length > 0 && (small ? (
+              <span className="pin-pop absolute -inset-[2px] rounded-[4px] border-2" style={{ borderColor: PLAYER_COLOR[cellPins[0].seat], boxShadow: `0 0 6px ${PLAYER_COLOR[cellPins[0].seat]}` }} data-cell-pin />
+            ) : (
+              <PinChips pins={cellPins} className="absolute -top-3 left-1/2 z-10 -translate-x-1/2" />
+            ))}
             {room?.cleared && !small && (
               <span className="absolute -right-1 -bottom-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-white">
                 <Check size={11} strokeWidth={3} />
@@ -177,7 +196,7 @@ function MapCells({ run, cell, x0, yTop, left = 0, top = 0, only, target, onTap 
 }
 
 /** 右上の小さな地図（今いる場所のまわり5×5マス）。タップで大きな地図 */
-function MiniMap({ run, onOpen }: { run: DungeonRun; onOpen: () => void }) {
+function MiniMap({ run, onOpen, pinsOf }: { run: DungeonRun; onOpen: () => void; pinsOf?: (c: MapCell) => ShownPin[] }) {
   const pos = posOf(run);
   const R = 2;
   const cell = 17;
@@ -191,15 +210,18 @@ function MiniMap({ run, onOpen }: { run: DungeonRun; onOpen: () => void }) {
       data-minimap
     >
       <span className="absolute" style={{ left: 4, top: 4, width: size, height: size }}>
-        <MapCells run={run} cell={cell} x0={pos.x - R} yTop={pos.y + R} only={(c) => Math.abs(c.x - pos.x) <= R && Math.abs(c.y - pos.y) <= R} />
+        <MapCells run={run} cell={cell} x0={pos.x - R} yTop={pos.y + R} only={(c) => Math.abs(c.x - pos.x) <= R && Math.abs(c.y - pos.y) <= R} pinsOf={pinsOf} />
       </span>
     </button>
   );
 }
 
 /** 大きな地図（ミニマップをタップで開く）。見えている場所をタップして「ここまで歩く」 */
-function MapOverlay({ run, onClose, canWalk, myTurn, stepsLeft, onWalk }: {
+function MapOverlay({ run, onClose, canWalk, myTurn, stepsLeft, onWalk, pins, canPin, pinsOf }: {
   run: DungeonRun;
+  pins: PinsApi;
+  canPin: boolean;
+  pinsOf: (c: MapCell) => ShownPin[];
   onClose: () => void;
   canWalk: boolean;
   myTurn: boolean;
@@ -210,7 +232,7 @@ function MapOverlay({ run, onClose, canWalk, myTurn, stepsLeft, onWalk }: {
   const pos = posOf(run);
   const seen = new Set(run.seen ?? []);
   const walk = walkableKeys(run);
-  const [target, setTarget] = useState<{ x: number; y: number; face?: Facing; label: string } | null>(null);
+  const [target, setTarget] = useState<{ x: number; y: number; face?: Facing; label: string; pin?: PinTarget } | null>(null);
   const [mapRef, size] = useElementSize<HTMLDivElement>();
   const scrollRef = useRef<HTMLDivElement>(null);
   const W = size.width || 340;
@@ -227,11 +249,11 @@ function MapOverlay({ run, onClose, canWalk, myTurn, stepsLeft, onWalk }: {
   const tapCell = (c: MapCell) => {
     if (c.kind === 'room') {
       const f = doorFront(run, c.roomId!);
-      if (f && walk.has(cellKey(f.x, f.y)) && seen.has(cellKey(f.x, f.y))) setTarget({ ...f, face: 0, label: '扉の前まで歩く' });
+      if (f && walk.has(cellKey(f.x, f.y)) && seen.has(cellKey(f.x, f.y))) setTarget({ ...f, face: 0, label: '扉の前まで歩く', pin: { kind: 'door', id: c.roomId! } });
       else setTarget(null);
       return;
     }
-    if (walk.has(cellKey(c.x, c.y))) setTarget({ x: c.x, y: c.y, label: 'ここまで歩く' });
+    if (walk.has(cellKey(c.x, c.y))) setTarget({ x: c.x, y: c.y, label: 'ここまで歩く', pin: { kind: 'dungeonCell', id: cellKey(c.x, c.y) } });
     else setTarget(null);
   };
   return (
@@ -245,9 +267,30 @@ function MapOverlay({ run, onClose, canWalk, myTurn, stepsLeft, onWalk }: {
       <div className="relative min-h-0 flex-1">
         <div ref={scrollRef} className="absolute inset-0 overflow-y-auto overscroll-contain" onClick={() => setTarget(null)}>
           <div ref={mapRef} className="relative mx-auto w-full" style={{ height: mapH + 20 }} data-dungeon-map>
-            <MapCells run={run} cell={cell} x0={0} yTop={grid.height - 1} left={left} top={10} target={target} onTap={tapCell} />
+            <MapCells run={run} cell={cell} x0={0} yTop={grid.height - 1} left={left} top={10} target={target} onTap={tapCell} pinsOf={pinsOf} />
           </div>
         </div>
+        {target && canPin && !myTurn && target.pin && (
+          <div className="panel panel-gold-edge absolute inset-x-2 top-2 z-10 flex items-center gap-2 rounded-xl p-2" onClick={(e) => e.stopPropagation()} data-pin-panel>
+            <div className="min-w-0 flex-1 text-[13px] leading-4">
+              {target.pin.kind === 'door' ? 'この扉' : 'この場所'}を手番の人に伝える
+              <span className="block text-[12px] text-zinc-400">歩くのは手番の人です。全員の画面に印が出ます</span>
+            </div>
+            <button
+              onClick={() => {
+                pins.toggle(target.pin!);
+                setTarget(null);
+              }}
+              className="btn btn-gold h-11 shrink-0 rounded-lg px-3 font-bold"
+              data-pin-send
+            >
+              こっち！
+            </button>
+            <button onClick={() => setTarget(null)} aria-label="閉じる" className="btn btn-dark flex h-11 w-11 shrink-0 items-center justify-center rounded-lg">
+              <X size={20} />
+            </button>
+          </div>
+        )}
         {target && myTurn && (
           <div className="panel panel-gold-edge absolute inset-x-2 top-2 z-10 flex items-center gap-2 rounded-xl p-2" onClick={(e) => e.stopPropagation()} data-walk-panel>
             <div className="min-w-0 flex-1 text-[13px]">
@@ -267,10 +310,13 @@ function MapOverlay({ run, onClose, canWalk, myTurn, stepsLeft, onWalk }: {
           </div>
         )}
       </div>
-      <div className="shrink-0 px-3 pb-2 pt-1 text-center text-[12px] text-zinc-400">見えている通路や扉をタップすると、そこまで歩けます</div>
+      <div className="shrink-0 px-3 pb-2 pt-1 text-center text-[12px] text-zinc-400">{canPin && !myTurn ? '見えている通路や扉をタップすると、手番の人に「こっち！」と伝えられます' : '見えている通路や扉をタップすると、そこまで歩けます'}</div>
     </div>
   );
 }
+
+/** 方向ボタンのピンの名前 */
+const DIR_NAME: Record<string, string> = { forward: '前進', left: '左', right: '右', back: '後ろ' };
 
 export function DungeonScreen() {
   const game = useBattle((s) => s.game)!;
@@ -291,6 +337,18 @@ export function DungeonScreen() {
   const stepsLeft = game.world ? (run.explore ?? 0) : Infinity;
   const canWalk = myTurn && game.mode === 'dungeon' && (!game.world || (run.explore != null && run.explore > 0));
   const ahead = doorAhead(run);
+  // ピン（ステップ2）: オンラインで、手番のキャラの担当でない人は「こっち！」を伝えられる（歩くのは手番の人だけ）
+  const pins = usePins();
+  const canPin = pins.enabled && game.mode === 'dungeon' && !!nav && !isLocalPlayer(nav.playerId);
+  const pinsOf = (c: MapCell): ShownPin[] => (c.roomId ? pins.at({ kind: 'door', id: c.roomId }) : pins.at({ kind: 'dungeonCell', id: cellKey(c.x, c.y) }));
+  const describePin = (p: ShownPin) => {
+    if (p.target.kind === 'dir') return DIR_NAME[p.target.id] ?? '方向';
+    if (p.target.kind === 'door') {
+      const r = run.rooms.find((x) => x.id === p.target.id);
+      return r && roomStyle(r.type).boss && !r.cleared ? 'ボスの扉' : r && ahead?.id === r.id ? '目の前の扉' : '地図の扉';
+    }
+    return '地図のマス';
+  };
   const guide = moveGuide({ myTurn, inDungeon: game.mode === 'dungeon', explore: run.explore, onWorld: !!game.world });
   const step = (dir: 'forward' | 'left' | 'right' | 'back') => nav && dispatchGame({ type: 'DUNGEON_STEP', playerId: nav.playerId, heroId: nav.id, dir });
   const turn = (dir: 'left' | 'right' | 'back') => nav && dispatchGame({ type: 'DUNGEON_TURN', playerId: nav.playerId, heroId: nav.id, dir });
@@ -320,7 +378,7 @@ export function DungeonScreen() {
       <div className="relative min-h-[200px] flex-1 overflow-hidden border-y border-amber-500/30">
         {/* 一人称の通路 */}
         <AnimatedDungeonView run={run} background={background} omens={omens} />
-        <MiniMap run={run} onOpen={() => setShowMap(true)} />
+        <MiniMap run={run} onOpen={() => setShowMap(true)} pinsOf={pinsOf} />
         {/* 別の端末の人と遊ぶ時: 扉は全員一致で開く（1台で遊ぶ時は1回で開くので出さない。地図を開いている間も出さない） */}
         {(showVoteHint(voters(game), isLocalPlayer, showMap) || (!showMap && voters(game).length > 1 && !!currentVote(game) && notVoted(game).length === 0)) && (
           <div className="pointer-events-none absolute left-2 top-2 z-10 max-w-[calc(100%-130px)]">
@@ -329,9 +387,20 @@ export function DungeonScreen() {
             </span>
           </div>
         )}
+        {/* ピン: だれが「こっち！」と言っているか（全員の画面に。約8秒か、手番の人が動くと消える） */}
+        {!showMap && pins.list.length > 0 && (
+          <div className="absolute left-2 top-9 z-10 max-w-[calc(100%-130px)]">
+            <PinBanner pins={pins.list} describe={describePin} />
+          </div>
+        )}
         {/* 下端: 目の前の扉と、歩くボタン（絵に重ねる）。歩くのは手番のキャラの担当の人 */}
         <div className="absolute inset-x-2 bottom-2 z-10 flex flex-col gap-1.5">
-          {ahead && game.mode === 'dungeon' && <DoorPanel room={ahead} openable={reach.has(ahead.id)} />}
+          {ahead && game.mode === 'dungeon' && <DoorPanel room={ahead} openable={reach.has(ahead.id)} pins={pins} canPin={canPin} />}
+          {canPin && !guide && (
+            <div className="pointer-events-none flex justify-center" data-pin-guide>
+              <span className="rounded-lg bg-black/75 px-2 py-0.5 text-[12px] leading-4 text-sky-100">ボタン・扉・地図のマスを押すと、手番の人に「こっち！」と伝えられます</span>
+            </div>
+          )}
           {guide && (
             <div className="pointer-events-none flex justify-center" data-move-guide>
               <span className="move-guide flex items-center gap-1 rounded-lg border border-amber-300/60 bg-black/80 px-2.5 py-1 text-[13px] leading-5 font-bold text-amber-100">
@@ -348,12 +417,26 @@ export function DungeonScreen() {
                 [doorSide('right') && !moveOk('right') ? '扉を向く' : '右へ', ArrowRight, () => side('right'), sideOk('right')],
                 ['振り向く', Undo2, () => turn('back'), myTurn && game.mode === 'dungeon'],
               ] as const
-            ).map(([label, Icon, on, ok], i) => (
-              <button key={i} onClick={on} disabled={!ok} className="btn flex h-12 flex-col items-center justify-center rounded-xl border border-amber-200/30 bg-black/55 text-[12px] leading-4 font-bold text-amber-50 backdrop-blur-[2px] disabled:opacity-40">
-                <Icon size={18} className="text-amber-200" />
-                {label}
-              </button>
-            ))}
+            ).map(([label, Icon, on, ok], i) => {
+              const dir = (['left', 'forward', 'right', 'back'] as const)[i];
+              const dirPins = pins.at({ kind: 'dir', id: dir });
+              return (
+                <div key={i} className="relative">
+                <button
+                  onClick={canPin ? () => pins.toggle({ kind: 'dir', id: dir }) : on}
+                  disabled={!canPin && !ok}
+                  className="btn flex h-12 w-full flex-col items-center justify-center rounded-xl border bg-black/55 text-[12px] leading-4 font-bold text-amber-50 backdrop-blur-[2px] disabled:opacity-40"
+                  style={{ borderColor: dirPins.length ? PLAYER_COLOR[dirPins[0].seat] : 'rgba(253,230,138,.3)' }}
+                  data-dir={dir}
+                >
+                  <Icon size={18} className="text-amber-200" />
+                  {label}
+                </button>
+                {/* 押せないボタン（薄くなる）の上でも札ははっきり見せる */}
+                <PinChips pins={dirPins} className="absolute -top-2.5 left-1/2 z-10 -translate-x-1/2" />
+                </div>
+              );
+            })}
           </div>
         </div>
         {showMap && (
@@ -363,6 +446,9 @@ export function DungeonScreen() {
             canWalk={canWalk}
             myTurn={myTurn}
             stepsLeft={stepsLeft}
+            pins={pins}
+            canPin={canPin}
+            pinsOf={pinsOf}
             onWalk={(t) => {
               setShowMap(false);
               if (nav) dispatchGame({ type: 'DUNGEON_WALK', playerId: nav.playerId, heroId: nav.id, x: t.x, y: t.y, face: t.face });
@@ -380,8 +466,9 @@ export function DungeonScreen() {
               <span className="mt-[2px] block w-[32px]">
                 <Bar value={h.hp} max={heroMaxHp(h)} color="linear-gradient(90deg,#22b45a,#7dffa8)" height={4} />
               </span>
+              {/* 並びの欄は横にスクロールするので、はみ出すと上が切れる（ステップ1）。ボタンの内側の右上に置く */}
               {h.pet && (
-                <span className="absolute -top-1 -right-1">
+                <span className="absolute top-0 right-0" data-party-pet>
                   <PetToken ownerId={h.id} pet={h.pet} size={14} />
                 </span>
               )}
