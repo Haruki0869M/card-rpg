@@ -130,7 +130,8 @@ async function run(party, difficulty) {
   }, Number(process.env.ADVENTURE_SEED));
   page.on('pageerror', (e) => issues.add(`pageerror: ${e.message}`));
   await page.goto(URL);
-  await page.evaluate(() => localStorage.clear());
+  // はじめての戦闘の案内（Step A ④）は自動の確認では出さない（「閉じる」などの文言を探す操作とぶつからないように）
+  await page.evaluate(() => { localStorage.clear(); localStorage.setItem('card-rpg/settings', JSON.stringify({ firstGuide: false })); });
   // 1本目以外を遊ぶ時は、伝承の書の記録（card-rpg/profile）に「ほかのシナリオをクリア済み」と入れてから始める（解放されるため）
   if (SCENARIO !== FIRST_SCENARIO) {
     const clears = Object.fromEntries(Object.keys(SCENARIO_NAMES).filter((id) => id !== SCENARIO).map((id) => [id, 1]));

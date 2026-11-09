@@ -19,7 +19,7 @@ async function resume(data) {
 }
 try {
   await page.goto(URL);
-  await page.evaluate(() => { localStorage.clear(); localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true, vibration: false })); });
+  await page.evaluate(() => { localStorage.clear(); localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true, vibration: false, firstGuide: false })); });
   await page.reload();
   await page.getByText('新しい冒険', { exact: true }).click();
   await page.getByText('2人', { exact: true }).click();

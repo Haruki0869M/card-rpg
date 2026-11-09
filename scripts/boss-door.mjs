@@ -19,7 +19,7 @@ for (const [width, height] of SIZES) {
   await page.goto(URL);
   await page.evaluate(() => {
     localStorage.clear();
-    localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true, vibration: false }));
+    localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true, vibration: false, firstGuide: false }));
   });
   await page.reload();
   await page.getByText('新しい冒険').click();

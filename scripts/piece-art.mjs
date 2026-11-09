@@ -31,7 +31,7 @@ const check = (ok, text) => { if (!ok) fail.push(text); };
 await page.goto(URL);
 await page.evaluate(() => {
   localStorage.clear();
-  localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true, vibration: false }));
+  localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true, vibration: false, firstGuide: false }));
 });
 await page.reload();
 await page.getByText('新しい冒険').click();

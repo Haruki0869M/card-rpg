@@ -34,7 +34,7 @@ for (const width of [360, 390, 480]) {
   await page.goto(URL);
   await page.evaluate(() => {
     localStorage.clear();
-    localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true, vibration: false }));
+    localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true, vibration: false, firstGuide: false }));
   });
   await page.reload();
 

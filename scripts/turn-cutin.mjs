@@ -38,7 +38,7 @@ async function run(width) {
   await page.goto(URL);
   await page.evaluate(() => {
     localStorage.clear();
-    localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: false, vibration: false }));
+    localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: false, vibration: false, firstGuide: false }));
   });
   await page.reload();
   await page.getByText('新しい冒険').click();

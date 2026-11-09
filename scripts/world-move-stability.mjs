@@ -18,7 +18,7 @@ async function run(width, party) {
   const resume = async (d) => {
     await page.evaluate((d) => {
       localStorage.setItem('card-rpg/adventure', JSON.stringify(d));
-      localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: false, vibration: false }));
+      localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: false, vibration: false, firstGuide: false }));
     }, d);
     await page.reload(); await page.getByText('つづきから', { exact: true }).click(); await page.waitForTimeout(400);
   };

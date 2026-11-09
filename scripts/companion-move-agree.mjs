@@ -16,7 +16,7 @@ async function run(n) {
   const handoff = async () => { if (await page.getByRole('button', { name: '手番を始める' }).count()) { await page.getByRole('button', { name: '手番を始める' }).click(); await page.waitForTimeout(300); } };
   try {
     await page.goto(URL);
-    await page.evaluate(() => { localStorage.clear(); localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true, vibration: false })); });
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true, vibration: false, firstGuide: false })); });
     await page.reload();
     await page.getByText('新しい冒険').click();
     await page.getByText(`${n}人`, { exact: true }).click();

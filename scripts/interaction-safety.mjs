@@ -11,7 +11,7 @@ const read = async () => { await page.waitForTimeout(250); return page.evaluate(
 const battleOf = d => d.game.expeditions?.find(x => x.battle)?.battle ?? d.game.battle;
 async function resume(d) {
   await page.reload();
-  await page.evaluate(d => { localStorage.setItem('card-rpg/adventure', JSON.stringify(d)); localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true })); }, d);
+  await page.evaluate(d => { localStorage.setItem('card-rpg/adventure', JSON.stringify(d)); localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true, firstGuide: false })); }, d);
   await page.reload(); await page.getByText('つづきから', { exact: true }).click(); await page.waitForTimeout(150);
 }
 async function shot(name) {
