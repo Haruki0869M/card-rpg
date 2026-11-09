@@ -79,7 +79,9 @@ async function run(width, party) {
           p.stripMax = Math.max(p.stripMax, moving.getBoundingClientRect().height);
           const map = document.querySelector('[data-world-map]')?.getBoundingClientRect();
           const h0 = document.querySelector('[data-hero="h0"]')?.getBoundingClientRect();
-          if (map && h0 && (h0.top + h0.height / 2 < map.top || h0.top + h0.height / 2 > map.bottom)) p.heroHidden++;
+          // 帯は地図の上に重なっているので、帯の上の端までを見えている範囲にする
+          const band = moving.getBoundingClientRect();
+          if (map && h0 && (h0.top + h0.height / 2 < map.top || h0.top + h0.height / 2 > Math.min(map.bottom, band.top))) p.heroHidden++;
         }
         if (phase === 'arrival') p.sawArrival = true;
         for (const [id, node] of Object.entries(p.nodes)) {

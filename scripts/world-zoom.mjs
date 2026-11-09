@@ -32,7 +32,8 @@ for (const [width, height] of sizes) {
       if (!el) return { inView: false, rx: -1, ry: -1 };
       const h = el.getBoundingClientRect();
       const cx = h.left + h.width / 2, cy = h.top + h.height / 2;
-      return { inView: cx >= box.left && cx <= box.right && cy >= box.top && cy <= box.bottom, rx: (cx - box.left) / box.width, ry: (cy - box.top) / box.height };
+      const bottom = Math.min(box.bottom, document.querySelector('[data-world-panel]').getBoundingClientRect().top);
+      return { inView: cx >= box.left && cx <= box.right && cy >= box.top && cy <= bottom, rx: (cx - box.left) / box.width, ry: (cy - box.top) / (bottom - box.top) };
     });
   const hexW = () => page.locator('[data-hex] polygon').first().evaluate((p) => p.getBoundingClientRect().width);
   const closeOverlays = async () => {
@@ -107,8 +108,10 @@ for (const [width, height] of sizes) {
 
   // 2) ピンチ（CDP のタッチ）。指の間の地面が残る
   const cdp = await ctx.newCDPSession(page);
+  // 下の操作パネルは地図の上に重なっているので、見えている地図（枠の上の端〜パネルの上の端）の真ん中でピンチする
   const mb = await page.locator('[data-world-map]').boundingBox();
-  const cx = mb.x + mb.width / 2, cy = mb.y + mb.height / 2;
+  const pb = await page.locator('[data-world-panel]').boundingBox();
+  const cx = mb.x + mb.width / 2, cy = (mb.y + Math.min(mb.y + mb.height, pb.y)) / 2;
   const pinch = async (from, to) => {
     const pts = (d) => [{ x: cx - d / 2, y: cy, id: 1 }, { x: cx + d / 2, y: cy, id: 2 }];
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pts(from) });
@@ -171,7 +174,8 @@ for (const [width, height] of sizes) {
       const box = document.querySelector('[data-world-map]').getBoundingClientRect();
       const list = [...document.querySelectorAll('[data-reach]')]
         .map((g) => ({ i: Number(g.getAttribute('data-reach')), cost: Number(g.getAttribute('data-cost')), r: g.getBoundingClientRect() }))
-        .filter(({ r }) => r.left + r.width / 2 > box.left + 20 && r.left + r.width / 2 < box.right - 70 && r.top + r.height / 2 > box.top + 20 && r.top + r.height / 2 < box.bottom - 20);
+        // 見えている地図の中（重なっているパネル・拡大のボタンの所は除く）
+        .filter(({ r }) => r.left + r.width / 2 > box.left + 20 && r.left + r.width / 2 < box.right - 70 && r.top + r.height / 2 > box.top + 60 && r.top + r.height / 2 < Math.min(box.bottom, document.querySelector('[data-world-panel]').getBoundingClientRect().top) - 20);
       list.sort((a, b) => b.cost - a.cost);
       const t = list[0];
       return t ? { i: t.i, x: t.r.left + t.r.width / 2, y: t.r.top + t.r.height / 2 } : null;
@@ -200,7 +204,9 @@ for (const [width, height] of sizes) {
               const z = Number(getComputedStyle(el).zIndex);
               const h = el.getBoundingClientRect();
               const cx = h.left + h.width / 2, cy = h.top + h.height / 2;
-              return { moving: z >= 10, inView: cx >= box.left && cx <= box.right && cy >= box.top && cy <= box.bottom };
+              // 移動中の帯は地図の上に重なっているので、帯の上の端までを見えている所にする
+              const band = document.querySelector('[data-world-moving]')?.getBoundingClientRect();
+              return { moving: z >= 10, inView: cx >= box.left && cx <= box.right && cy >= box.top && cy <= Math.min(box.bottom, band ? band.top : box.bottom) };
             }).filter((x) => x.moving);
           });
           if (v.length) {
