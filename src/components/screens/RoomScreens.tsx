@@ -1,4 +1,5 @@
 // ===== 宝箱・イベント・休憩の画面 =====
+import { ItemInfoArea } from '../ItemDetail';
 import { VoteChips } from '../ui/Votes';
 import { motion } from 'framer-motion';
 import { ArrowUpCircle, Coins, Flame, Sparkles, Star } from 'lucide-react';
@@ -25,6 +26,7 @@ function bestHero(heroes: Hero[], score: (h: Hero) => number): string {
 
 export function LootList({ loot }: { loot: Loot[] }) {
   const game = useBattle((s) => s.game)!;
+  const localHero = game.heroes.find((h) => isLocalPlayer(h.playerId) && !h.retired)?.id;
   return (
     <div className="flex flex-col gap-1">
       {loot.map((l, i) => {
@@ -49,15 +51,18 @@ export function LootList({ loot }: { loot: Loot[] }) {
         const def = getItem(l.item.itemId);
         const r = RARITY_STYLE[def.rarity];
         return (
-          <motion.div key={i} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 + i * 0.08 }} className="flex items-center gap-2 rounded-lg bg-black/30 p-1.5">
-            <ItemIcon item={def} size={44} />
-            <span className="min-w-0 flex-1 leading-4">
-              <span className="block text-[14px] font-bold" style={{ color: r.color }}>
-                {def.name} <span className="text-[12px] font-normal opacity-80">{r.name}</span>
+          <motion.div key={i} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 + i * 0.08 }} className="flex rounded-lg bg-black/30 p-1.5">
+            {/* 受け取ったキャラ（分からなければこの端末のキャラ）の今の装備と比べる */}
+            <ItemInfoArea itemId={def.id} heroId={l.to ?? localHero} className="flex flex-1 items-center gap-2">
+              <ItemIcon item={def} size={44} />
+              <span className="min-w-0 flex-1 leading-4">
+                <span className="block text-[14px] font-bold" style={{ color: r.color }}>
+                  {def.name} <span className="text-[12px] font-normal opacity-80">{r.name}</span>
+                </span>
+                {l.to && <span className="block text-[12px] text-sky-200">→ {game.heroes.find((x) => x.id === l.to)?.name}が受け取った</span>}
+                <span className="block truncate text-[12px] text-zinc-300">{itemSummary(def)}</span>
               </span>
-              {l.to && <span className="block text-[12px] text-sky-200">→ {game.heroes.find((x) => x.id === l.to)?.name}が受け取った</span>}
-              <span className="block truncate text-[12px] text-zinc-300">{itemSummary(def)}</span>
-            </span>
+            </ItemInfoArea>
           </motion.div>
         );
       })}

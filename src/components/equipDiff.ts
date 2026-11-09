@@ -24,3 +24,60 @@ export function diffText(hero: Hero, slot: EquipSlot, next: ItemDef | null): { l
   }
   return out;
 }
+
+/** 装備の「自分の能力」（差ではなく、その装備そのものの数値）。例: ["器用+10", "最大HP+5"] */
+export function itemOwnStats(it: ItemDef): string[] {
+  const out: string[] = [];
+  for (const k of STAT_IDS) {
+    const v = it.stats?.[k];
+    if (v) out.push(`${STAT_LABEL[k]}${v > 0 ? '+' : ''}${v}`);
+  }
+  if (it.maxHp) out.push(`最大HP${it.maxHp > 0 ? '+' : ''}${it.maxHp}`);
+  if (it.focusMax) out.push(`フォーカス最大${it.focusMax > 0 ? '+' : ''}${it.focusMax}`);
+  if (it.startBlock) out.push(`開始時ブロック${it.startBlock}`);
+  if (it.extraDraw) out.push(`毎ターンのドロー+${it.extraDraw}`);
+  if (it.explore?.vision) out.push(`世界マップの視界+${it.explore.vision}`);
+  if (it.explore?.campHeal) out.push(`野営の回復+${Math.round(it.explore.campHeal * 100)}%`);
+  return out;
+}
+
+/** 今の装備と比べた時の違い（数値・特殊能力の入れ替わり・山札のカードの増減） */
+export interface ItemCompare {
+  /** 比べる相手（今その部位に付けている物。無ければ null） */
+  current: ItemDef | null;
+  stats: { label: string; delta: number }[];
+  /** 特殊能力が変わる時だけ。from/to は能力の名前（無ければ null） */
+  ability: { from: string | null; to: string | null } | null;
+  /** 山札に加わるカード・抜けるカード（装備で入るカードの差） */
+  cardsGained: { cardId: string; count: number }[];
+  cardsLost: { cardId: string; count: number }[];
+  /** 何も変わらない */
+  same: boolean;
+}
+
+export function compareItems(hero: Hero, slot: EquipSlot, next: ItemDef | null): ItemCompare {
+  const cur = hero.equipment[slot] ? getItem(hero.equipment[slot]!.itemId) : null;
+  const stats = diffText(hero, slot, next);
+  const from = cur?.ability?.name ?? null;
+  const to = next?.ability?.name ?? null;
+  const ability = from === to ? null : { from, to };
+  const count = (it: ItemDef | null) => {
+    const m = new Map<string, number>();
+    for (const c of it?.cards ?? []) m.set(c.cardId, (m.get(c.cardId) ?? 0) + c.count);
+    return m;
+  };
+  const a = count(cur), b = count(next);
+  const cardsGained: ItemCompare['cardsGained'] = [];
+  const cardsLost: ItemCompare['cardsLost'] = [];
+  for (const id of new Set([...a.keys(), ...b.keys()])) {
+    const d = (b.get(id) ?? 0) - (a.get(id) ?? 0);
+    if (d > 0) cardsGained.push({ cardId: id, count: d });
+    else if (d < 0) cardsLost.push({ cardId: id, count: -d });
+  }
+  return { current: cur, stats, ability, cardsGained, cardsLost, same: !stats.length && !ability && !cardsGained.length && !cardsLost.length };
+}
+
+/** 差の短い文。例: "器用-10・最大HP+5" */
+export function diffLine(stats: { label: string; delta: number }[]): string {
+  return stats.map((d) => `${d.label}${d.delta > 0 ? '+' : ''}${d.delta}`).join('・');
+}

@@ -1,4 +1,5 @@
 import { FacilityRoster, FacilityExit } from './FacilityControls';
+import { ItemInfoArea } from '../ItemDetail';
 import { facilityMembers, facilityVisit } from '../../engine/game/world/facilities';
 // ===== 世界マップの場面: 遭遇（spec §8.5）・町（§17）・祠（§8.4）・エンディング =====
 import { motion } from 'framer-motion';
@@ -288,13 +289,15 @@ export function TownScreen() {
               const it = getItem(s.item.itemId);
               return (
                 <div key={s.item.uid} className={`flex items-center gap-2 rounded-lg bg-black/30 p-1.5 ${s.sold ? 'opacity-40' : ''}`}>
-                  <ItemIcon item={it} size={42} />
-                  <span className="min-w-0 flex-1 leading-4">
-                    <span className="block text-[14px] font-bold" style={{ color: RARITY_STYLE[it.rarity].color }}>
-                      {it.name}
+                  <ItemInfoArea itemId={it.id} heroId={v.id} className="flex flex-1 items-center gap-2">
+                    <ItemIcon item={it} size={42} />
+                    <span className="min-w-0 flex-1 leading-4">
+                      <span className="block text-[14px] font-bold" style={{ color: RARITY_STYLE[it.rarity].color }}>
+                        {it.name}
+                      </span>
+                      <span className="block truncate text-[12px] text-zinc-400">{itemSummary(it)}</span>
                     </span>
-                    <span className="block truncate text-[12px] text-zinc-400">{itemSummary(it)}</span>
-                  </span>
+                  </ItemInfoArea>
                   <button
                     disabled={!mine || s.sold || v.gold < shopPriceFor(v, s.price)}
                     onClick={() => buy('item', i)}

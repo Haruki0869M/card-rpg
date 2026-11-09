@@ -2,18 +2,20 @@ import { getPet } from '../data/pets';
 import { getStatus } from '../data/statuses';
 import { getElement } from '../data/elements';
 import { STAT_LABEL } from '../data/terms';
-// ===== 長押しで出る詳細（指を離すと閉じる。操作はブロックしない） =====
+// ===== 詳細の窓（長押し・タップで開く。指を離しても残る。閉じるボタン・外の暗い所・窓そのもの・戻るボタンで閉じる） =====
 import { CharacterArt, EnemyArt } from '../art';
 import { getCard } from '../data/cards';
-import { getItem } from '../data/items';
 import { getClass } from '../data/classes';
 import { getEnemy } from '../data/enemies';
-import { affinityOf, chanceFor, describeEffect, describeAbility, enemyName, findAlly, findEnemy, incomingDamage, statsOf, tierDistribution, toPercents } from '../engine';
+import { affinityFromStats, affinityOf, chanceFor, describeEffect, describeAbility, enemyHitDamage, enemyName, finalChance, findAlly, findEnemy, heroStats, incomingDamage, statsOf, targetOf, tierDistribution, toPercents } from '../engine';
+import { getEnemyAction } from '../data/enemies';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ItemDetailContent } from './ItemDetail';
 import { type Detail, useDetail } from '../hooks/usePress';
 import { useBattle } from '../store/battleStore';
-import type { BattleState, StatId } from '../types';
+import type { Affinity, BattleState, EnemyActionDef, EnemyState, GameState, StatId } from '../types';
 import { CATEGORY_LABEL, intentView, longEffect, tierTitle } from './format';
-import { itemSummary, RARITY_STYLE } from './ui/game';
+import { RARITY_STYLE } from './ui/game';
 import { CATEGORY_STYLE, ElementTag, statusStyle } from './ui/icons';
 import { BALANCE } from '../data/balance';
 
@@ -26,14 +28,17 @@ function Title({ children }: { children: React.ReactNode }) {
   return <div className="font-display text-[17px] leading-6 text-amber-100">{children}</div>;
 }
 
-function Content({ d, battle }: { d: Detail; battle: BattleState }) {
+function Content({ d, battle, game }: { d: Detail; battle: BattleState; game: GameState | null }) {
+  const inBattle = game?.mode === 'battle';
   switch (d.type) {
     case 'card': {
       const card = getCard(d.cardId, d.upgraded);
-      const ally = findAlly(battle, d.allyId);
-      if (!ally) return null;
-      const cls = getClass(ally.classId);
-      const chance = chanceFor(ally, card);
+      // 戦闘中は味方の成功率、戦闘の外ではキャラの能力値からの成功率（キャラが分からなければ基礎の成功率）
+      const ally = d.allyId && inBattle ? findAlly(battle, d.allyId) : undefined;
+      const hero = !ally && d.allyId ? game?.heroes.find((h) => h.id === d.allyId) : undefined;
+      const cls = ally ? getClass(ally.classId) : hero ? getClass(hero.classId) : null;
+      const aff: Affinity | null = ally ? affinityOf(ally) : hero ? affinityFromStats(heroStats(hero)) : null;
+      const chance = ally ? chanceFor(ally, card) : aff ? finalChance(card, aff) : card.baseChance;
       const focus = d.focus ?? 0;
       const pcts = toPercents(tierDistribution(card, focus, chance));
       const cat = CATEGORY_STYLE[card.category];
@@ -50,7 +55,7 @@ function Content({ d, battle }: { d: Detail; battle: BattleState }) {
           <div className="mt-1 text-[13px]">
             成功率 <b className="text-amber-200">{chance}%</b>
             <span className="text-zinc-400">
-              （基礎{card.baseChance}% ・{cls.name}の{CATEGORY_LABEL[card.category]}適性{signed(affinityOf(ally)[card.category])}）
+              （基礎{card.baseChance}%{cls && aff ? ` ・${(ally ?? hero)!.name}（${cls.name}）の${CATEGORY_LABEL[card.category]}適性${signed(aff[card.category])}` : ''}）
             </span>
           </div>
           {card.trait && (
@@ -78,7 +83,7 @@ function Content({ d, battle }: { d: Detail; battle: BattleState }) {
     }
     case 'enemy':
     case 'intent': {
-      const e = findEnemy(battle, d.uid);
+      const e = inBattle ? findEnemy(battle, d.uid) : undefined;
       if (!e) return null;
       const def = getEnemy(e.defId);
       const iv = intentView(battle, e);
@@ -127,6 +132,7 @@ function Content({ d, battle }: { d: Detail; battle: BattleState }) {
                 ) : null}
               </div>
             )}
+            <EnemyStats e={e} />
             <div className="mt-1 text-[12px] text-zinc-500">
               {def.pattern === 'sequence'
                 ? `行動順：${def.actions.map((a) => a.name).join(' → ')} → 最初に戻る`
@@ -137,7 +143,7 @@ function Content({ d, battle }: { d: Detail; battle: BattleState }) {
       );
     }
     case 'ally': {
-      const a = findAlly(battle, d.id);
+      const a = inBattle ? findAlly(battle, d.id) : undefined;
       if (!a) return null;
       const cls = getClass(a.classId);
       const aff = affinityOf(a);
@@ -172,31 +178,18 @@ function Content({ d, battle }: { d: Detail; battle: BattleState }) {
       );
     }
     case 'item': {
-      const it = getItem(d.itemId);
-      return (
-        <>
-          <Title>{it.name}</Title>
-          <div className="text-[13px]">{itemSummary(it)}</div>
-          <div className="text-[12px] text-zinc-400">{it.description}</div>
-          {it.ability && (
-            <div className="mt-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-[12px]">
-              <span className="font-display" style={{ color: RARITY_STYLE[it.rarity].color }}>
-                《{it.ability.name}》
-              </span>{' '}
-              {describeAbility(it.ability)}
-            </div>
-          )}
-        </>
-      );
+      const hero = d.heroId ? game?.heroes.find((h) => h.id === d.heroId) : undefined;
+      return <ItemDetailContent d={d} hero={hero} />;
     }
     case 'pet': {
-      const a = findAlly(battle, d.allyId), p = a?.pet;
+      const a = inBattle ? findAlly(battle, d.allyId) : undefined;
+      const p = a?.pet ?? game?.heroes.find((h) => h.id === d.allyId)?.pet;
       if (!p) return null;
       const def = getPet(p.petId);
       return <><Title>{p.name}（{def.name}）</Title><div className="text-[13px]">懐き度：{p.love}</div>{def.abilities.map(ab => <p key={ab.name} className="text-[13px]">{ab.name}：{describeAbility(ab)}</p>)}{a?.abilities?.filter(ab => ab.source?.kind === 'pet').map(ab => <p key={ab.name} className="text-[13px]">現在の能力：{describeAbility(ab)}</p>)}</>;
     }
     case 'tokens': {
-      const a = findAlly(battle, d.allyId);
+      const a = inBattle ? findAlly(battle, d.allyId) : undefined;
       if (!a) return null;
       return <><Title>{a.name}の特殊効果</Title>
         {a.attackCharge && <p className="text-[13px]">居合：次の{a.attackCharge.category === 'physical' ? '物理' : '攻撃'}カード×{a.attackCharge.multiplier}。使用まで持続。</p>}
@@ -207,7 +200,7 @@ function Content({ d, battle }: { d: Detail; battle: BattleState }) {
     }
     case 'status': {
       const st = statusStyle(d.status);
-      const by = d.by ? findAlly(battle, d.by) : undefined;
+      const by = d.by && inBattle ? findAlly(battle, d.by) : undefined;
       return (
         <>
           <Title>
@@ -229,14 +222,108 @@ function Content({ d, battle }: { d: Detail; battle: BattleState }) {
   }
 }
 
+/** 敵の行動1つの短い説明（今の攻撃力で計算したダメージ） */
+function actionText(e: EnemyState, a: EnemyActionDef): string {
+  const parts = a.effects.map((eff) => {
+    if (eff.kind === 'damage') {
+      const hits = eff.hits ?? 1;
+      return `${targetOf(eff) === 'target' ? '' : '全体に'}${enemyHitDamage(e, eff.amount, undefined)}ダメージ${hits > 1 ? `×${hits}` : ''}`;
+    }
+    return describeEffect(eff, 'enemy');
+  });
+  return `${a.name}（${parts.join('・')}）`;
+}
+
+/** 敵の強さ（レベルによる攻撃力・行動ごとのダメージ・特殊能力・段階） */
+function EnemyStats({ e }: { e: EnemyState }) {
+  const def = getEnemy(e.defId);
+  const ids = [...new Set(def.actions.map((a) => a.id))];
+  return (
+    <div className="mt-1 text-[12px] leading-4" data-enemy-stats>
+      <div>
+        <span className="text-zinc-400">攻撃力</span> <b className="tabular-nums">×{Math.round(e.attackMul * 100)}%</b>
+        <span className="text-zinc-500">（レベル・難易度による。下のダメージは今の値で、状態異常の前）</span>
+      </div>
+      <div className="text-zinc-300">
+        {ids.map((id) => (
+          <div key={id}>・{actionText(e, getEnemyAction(e.defId, id))}</div>
+        ))}
+      </div>
+      {def.abilities?.map((ab) => (
+        <div key={ab.name} className="mt-0.5 rounded bg-fuchsia-500/10 px-1.5 py-0.5">
+          <span className="font-display text-fuchsia-200">《{ab.name}》</span> {describeAbility(ab)}
+        </div>
+      ))}
+      {def.phases?.length ? (
+        <div className="mt-0.5 text-amber-200">{def.phases.map((ph) => `HP${ph.belowHpPct}%以下で「${ph.name}」に変わる`).join('／')}</div>
+      ) : null}
+    </div>
+  );
+}
+
 export function DetailPopup() {
   const detail = useDetail((s) => s.detail);
+  const canBack = useDetail((s) => s.stack.length > 0);
   const battle = useBattle((s) => s.battle);
-  if (!detail) return null;
+  const game = useBattle((s) => s.game);
+  const hide = () => useDetail.getState().hide();
   return (
-    <div className="panel panel-gold-edge absolute inset-x-2 top-12 z-[200] max-h-[75%] overflow-y-auto rounded-xl p-3 leading-5 shadow-[0_8px_24px_rgba(0,0,0,.6)]">
-      <button className="btn btn-dark mb-2 min-h-10 w-full rounded text-[13px]" onClick={() => useDetail.getState().hide()}>詳細を閉じる</button>
-      <Content d={detail} battle={battle} />
-    </div>
+    <AnimatePresence>
+      {detail && (
+        <motion.div
+          key="detail"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.12 }}
+          className="absolute inset-0 z-[200] bg-black/55"
+          data-detail-backdrop
+          role="presentation"
+          // 外の暗い所を押したら閉じる。下の画面へは届かせない
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            hide();
+          }}
+        >
+          <div
+            role="dialog"
+            aria-label="詳細"
+            data-detail-popup
+            className="panel panel-gold-edge absolute inset-x-2 top-12 max-h-[75%] overflow-y-auto overscroll-contain rounded-xl p-3 leading-5 shadow-[0_8px_24px_rgba(0,0,0,.6)]"
+            // 窓そのものを押しても閉じる（中のカードの名前・戻るのボタンは別の動き）
+            onClick={(e) => {
+              e.stopPropagation();
+              hide();
+            }}
+          >
+            <div className="mb-2 flex gap-1">
+              {canBack && (
+                <button
+                  className="btn btn-dark min-h-10 shrink-0 rounded px-3 text-[13px]"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    useDetail.getState().back();
+                  }}
+                >
+                  ← 戻る
+                </button>
+              )}
+              <button
+                className="btn btn-dark min-h-10 flex-1 rounded text-[13px]"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  hide();
+                }}
+              >
+                詳細を閉じる
+              </button>
+            </div>
+            <Content d={detail} battle={battle} game={game} />
+            <div className="mt-2 text-center text-[12px] text-zinc-500">窓か外の暗い所を押すと閉じます</div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

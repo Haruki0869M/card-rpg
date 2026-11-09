@@ -1,5 +1,6 @@
 // ===== イベントの後にキャラごとにすること: お供を迎える / カードを1枚選ぶ / 行商人で買い物（設計 v2.1 §4・§5） =====
 // イベントの窓・戦闘・報酬が閉じてから出す（どの場面にいても、この端末のキャラなら出す）
+import { ItemInfoArea } from './ItemDetail';
 import { motion } from 'framer-motion';
 import { Coins, Heart, X } from 'lucide-react';
 import { useLayoutEffect, useRef, useState } from 'react';
@@ -178,13 +179,15 @@ function Peddler({ hero, send }: { hero: Hero; send: (c: GameCommand) => void })
           const it = getItem(s.item.itemId);
           return (
             <div key={s.item.uid} className={`panel flex items-center gap-2 rounded-lg p-1.5 ${s.sold ? 'opacity-40' : ''}`}>
-              <ItemIcon item={it} size={44} />
-              <div className="min-w-0 flex-1 leading-4">
-                <div className="text-[14px] font-bold" style={{ color: RARITY_STYLE[it.rarity].color }}>
-                  {it.name}
-                </div>
-                <div className="truncate text-[12px] text-zinc-400">{itemSummary(it)}</div>
-              </div>
+              <ItemInfoArea itemId={it.id} heroId={hero.id} className="flex flex-1 items-center gap-2">
+                <ItemIcon item={it} size={44} />
+                <span className="block min-w-0 flex-1 leading-4">
+                  <span className="block text-[14px] font-bold" style={{ color: RARITY_STYLE[it.rarity].color }}>
+                    {it.name}
+                  </span>
+                  <span className="block truncate text-[12px] text-zinc-400">{itemSummary(it)}</span>
+                </span>
+              </ItemInfoArea>
               <button disabled={s.sold || hero.gold < s.price} onClick={() => send({ type: 'PEDDLER_BUY', playerId: hero.playerId, heroId: hero.id, kind: 'item', index: i })} className="btn btn-gold h-11 w-20 shrink-0 rounded-lg text-[14px] font-bold disabled:opacity-40">
                 {s.sold ? '済' : `${s.price}G`}
               </button>
