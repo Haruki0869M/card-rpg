@@ -4,7 +4,7 @@
 // 3) 判定の後も駒が枠の真ん中付近。行き先を選んでも、地図の枠の高さが変わらない（下のパネルが大きくならない）
 // 4) 選んだ時のボタンの文言「移動する（移動力N を使う・Mマス先）」・マスの説明は地図の上に重なる
 // 使い方: npx vite preview を起こしてから node scripts/world-camera.mjs（URL=... で場所を変えられる）
-import { chromium, layoutIssues, URL } from './lib.mjs';
+import { chromium, depart, layoutIssues, URL } from './lib.mjs';
 
 const browser = await chromium.launch();
 const problems = [];
@@ -25,7 +25,7 @@ for (const [width, height] of [[360, 640], [390, 844], [480, 854]]) {
   await page.getByText('新しい冒険').click();
   await page.getByText('2人', { exact: true }).click();
   await page.getByText('キャラクター作成へ').click();
-  await page.getByText('冒険に出発').click();
+  await depart(page);
   await page.waitForTimeout(500);
   const cont = page.getByText('つづける', { exact: true });
   if (await cont.count()) await cont.first().click();
