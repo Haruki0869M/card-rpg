@@ -204,6 +204,8 @@ export interface DungeonDef {
   clearStory?: string[];
   /** 入るのに必要な鍵 */
   requiresKeys?: string[];
+  /** 入るのに必要な、報告まで済ませた町の依頼の数（船を借りる依頼は数えない。冒険を長くする関門） */
+  requiresQuests?: number;
   /** 制覇すると侵食度がこれだけ下がる（無ければ、鍵のダンジョンは BALANCE.corruptionOnKeyDungeonClear・それ以外は0） */
   corruptionOnClear?: number;
   /** 制覇するとシナリオのクリア（ラスボスのダンジョン） */

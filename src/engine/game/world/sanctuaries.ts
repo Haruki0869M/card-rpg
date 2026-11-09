@@ -2,7 +2,8 @@ import { BALANCE } from '../../../data/balance';
 import { getScenario } from '../../../data/scenarios';
 import { SANCTUARIES, TERRAINS } from '../../../data/world';
 import type { GameState, WorldState } from '../../../types';
-import { idxOf, neighbors, rowOf } from './hex';
+import { neighbors, rowOf } from './hex';
+import { startTileOf } from './start';
 
 /** 旧10祭壇を5つの共用祭壇へ統合する。滞在中なら、そのマスを優先して残す。 */
 export function consolidateSanctuaries(game: GameState) {
@@ -28,7 +29,7 @@ export function consolidateSanctuaries(game: GameState) {
 export function addSanctuaries(game: GameState, w: WorldState): string[] {
   const map = getScenario(game.scenarioId).map;
   if (!map) return [];
-  const start = idxOf(w, map.start[0], map.start[1]);
+  const start = startTileOf(game, w);
   const reachable = new Set<number>([start]);
   const queue = [start];
   for (let k = 0; k < queue.length; k++) for (const n of neighbors(w, queue[k])) {

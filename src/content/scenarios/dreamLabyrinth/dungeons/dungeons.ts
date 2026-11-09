@@ -1,6 +1,7 @@
 // シナリオ7のダンジョン。敵はこのシナリオの敵（enemies/。夢の再来と新しい夢の敵）。弱点が同じ敵だけの組にしない。
 // 制覇すると夢の欠片が手に入り、3つそろうと最終ダンジョンに入れる。ボスは過去のボスの再来。手前に「物語の部屋」（event）を置く
 import type { DungeonDef } from '../../../../types';
+import { FINALE_EXTRA_FLOOR, KEY_EXTRA_FLOOR, withExtraFloor } from '../../extraFloor';
 
 /** 氷の記憶の洞: 森と氷の記憶の敵。ボスは夢の白の女王 */
 const ICE_POOLS: DungeonDef['pools'] = {
@@ -121,7 +122,7 @@ export const echoIceVault: DungeonDef = {
   bossChest: 'epic',
   rewardKey: 'shardMemory',
   clearStory: ['白の女王の影が、雪のように溶けた。', '「…覚えていてくれて、ありがとう」', '夢の欠片（記憶）を手に入れた！'],
-  layout: iceLayout,
+  layout: withExtraFloor(iceLayout, KEY_EXTRA_FLOOR),
 };
 
 export const echoSandTomb: DungeonDef = {
@@ -136,7 +137,7 @@ export const echoSandTomb: DungeonDef = {
   // 1つ目のダンジョンの鍵が要る（play-feedback-plan §4 C: 町や依頼を飛ばして、まっすぐ奥へ行けないように）
   requiresKeys: ['shardMemory'],
   clearStory: ['砂塵の王の影が、金色の砂に崩れた。', '「永遠でなくても、よかったのだな」', '夢の欠片（恐れ）を手に入れた！'],
-  layout: sandLayout,
+  layout: withExtraFloor(sandLayout, KEY_EXTRA_FLOOR),
 };
 
 export const echoGhostShip: DungeonDef = {
@@ -148,8 +149,11 @@ export const echoGhostShip: DungeonDef = {
   pools: GHOST_POOLS,
   bossChest: 'legend',
   rewardKey: 'shardHope',
+  // 2つ目の鍵と、町の依頼を1つ（報告まで）が要る（冒険を長くする。町に寄る理由を作る）
+  requiresKeys: ['shardFear'],
+  requiresQuests: 1,
   clearStory: ['亡霊提督の影が、静かに敬礼した。', '「今度こそ、朝日が見える」', '夢の欠片（希望）を手に入れた！'],
-  layout: ghostLayout,
+  layout: withExtraFloor(ghostLayout, KEY_EXTRA_FLOOR),
 };
 
 export const dreamEaterLair: DungeonDef = {
@@ -162,7 +166,7 @@ export const dreamEaterLair: DungeonDef = {
   bossChest: 'legend',
   requiresKeys: ['shardMemory', 'shardFear', 'shardHope'],
   finale: true,
-  layout: [
+  layout: withExtraFloor([
     [{ type: 'battle', next: [0, 1] }],
     [
       { type: 'battle', next: [0, 1] },
@@ -179,7 +183,7 @@ export const dreamEaterLair: DungeonDef = {
     [{ type: 'battle', next: [0] }],
     [{ type: 'event', eventId: 'dreamEaterNest', next: [0] }],
     [{ type: 'boss', next: [] }],
-  ],
+  ], FINALE_EXTRA_FLOOR),
 };
 
 // ランダムダンジョン: 夢の洞窟（部屋の並びを自動生成）

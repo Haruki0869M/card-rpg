@@ -4,6 +4,13 @@ import { BALANCE } from '../../data/balance';
 import { DUNGEONS } from '../../data/dungeons';
 import { SCENARIOS } from '../../data/scenarios';
 import { reachable } from '../game/world/hex';
+import { finishedQuestCount } from '../game/world/questGate';
+import { startTileOf } from '../game/world/start';
+import { spawnWanderer } from '../game/world/wanderers';
+import { nextGoalLines } from '../game/game';
+import { createRng } from '../rng';
+import { KEY_EXTRA_FLOOR, withExtraFloor } from '../../content/scenarios/extraFloor';
+import { QUESTS, TOWNS } from '../../data/world';
 import type { GameCommand, GameState, PlayerId } from '../../types';
 import { applyGameCommand, createGame } from '../index';
 
@@ -76,12 +83,22 @@ describe('交代運転には時間がかかる（§4 A）', () => {
 });
 
 describe('鍵のダンジョン（§4 B・C）', () => {
-  it.each(SCENARIOS.all.map((s) => [s.id] as const))('%s: 2つ目の鍵のダンジョンは1つ目の鍵が要る。3つ目は要らない。制覇の侵食度は共通の値', (sid) => {
+  it.each(SCENARIOS.all.map((s) => [s.id] as const))('%s: 2つ目の鍵のダンジョンは1つ目の鍵、3つ目は2つ目の鍵と町の依頼1つが要る。制覇の侵食度は共通の値', (sid) => {
     const keyed = DUNGEONS.forScenario(sid).filter((d) => d.rewardKey && !d.random).sort((a, b) => a.baseLevel - b.baseLevel);
     expect(keyed).toHaveLength(3);
     expect(keyed[0].requiresKeys ?? []).toEqual([]);
     expect(keyed[1].requiresKeys).toEqual([keyed[0].rewardKey]);
-    expect(keyed[2].requiresKeys ?? []).toEqual([]);
+    expect(keyed[1].requiresQuests ?? 0).toBe(0);
+    expect(keyed[2].requiresKeys).toEqual([keyed[1].rewardKey]);
+    expect(keyed[2].requiresQuests).toBe(1);
+    // 関門の依頼は、3つ目の鍵を取る前に果たせるものがある（3つ目・最後のダンジョンの制覇が目標の依頼だけではない）
+    const late = DUNGEONS.forScenario(sid).filter((d) => d === keyed[2] || d.finale).map((d) => d.id);
+    const quests = SCENARIOS.get(sid).map!.features.filter((f) => f.kind === 'town').flatMap((f) => TOWNS.get(f.id).quests ?? []);
+    const doable = quests.filter((q) => {
+      const def = QUESTS.get(q);
+      return !def.reward.some((o) => o.kind === 'ship') && !(def.objective.kind === 'clearDungeon' && late.includes(def.objective.dungeonId));
+    });
+    expect(doable.length, sid).toBeGreaterThanOrEqual(2);
     for (const d of keyed) expect(d.corruptionOnClear, d.id).toBeUndefined();
     expect(BALANCE.corruptionOnKeyDungeonClear).toBe(2);
   });
@@ -100,6 +117,94 @@ describe('鍵のダンジョン（§4 B・C）', () => {
     // 入った（1人なので、そのままワールドターンも進む）
     expect(g.world!.corruption).toBeGreaterThanOrEqual(before + BALANCE.corruptionOnDungeonEnter);
     expect([g.dungeon, ...(g.expeditions ?? []).map((e) => e.dungeon)].some((d) => d?.dungeonId === 'silentCatacomb')).toBe(true);
+  });
+});
+
+describe('3つ目の鍵のダンジョンの関門（町の依頼）', () => {
+  it('2つ目の鍵があっても、依頼を果たして報告するまでは開かない。何をすればよいかを伝える', () => {
+    let g = run(newWorld(['warrior']), { type: 'STORY_CONTINUE', playerId: P });
+    const w = g.world!;
+    w.pos.h0 = w.tiles.findIndex((t) => t.f?.kind === 'dungeon' && t.f.id === 'lavaCavern');
+    let r = applyGameCommand(g, { type: 'WORLD_INTERACT', playerId: P, heroId: 'h0' });
+    expect(r.error).toContain(DUNGEONS.get('silentCatacomb').name);
+    w.keys.push('emerald', 'azure');
+    r = applyGameCommand(g, { type: 'WORLD_INTERACT', playerId: P, heroId: 'h0' });
+    expect(r.error).toBe('扉が開かない…。町の依頼をあと1つ果たして、報告してから来よう');
+    // 受けただけ・達成しただけ（報告していない）では開かない
+    w.quests.push({ id: 'wolfHunt', town: 'royalCapital', progress: 3, done: true, reported: false });
+    expect(applyGameCommand(g, { type: 'WORLD_INTERACT', playerId: P, heroId: 'h0' }).error).toContain('町の依頼');
+    w.quests[0].reported = true;
+    g = run(g, { type: 'WORLD_INTERACT', playerId: P, heroId: 'h0' });
+    expect([g.dungeon, ...(g.expeditions ?? []).map((e) => e.dungeon)].some((d) => d?.dungeonId === 'lavaCavern')).toBe(true);
+  });
+
+  it('船を借りる依頼は数えない（群島）', () => {
+    const g = createGame({ seed: 3, scenarioId: 'cursedArchipelago', difficulty: 'normal', party: [{ classId: 'warrior', gender: 'male', name: 'a', playerId: P }] });
+    g.world!.quests.push({ id: 'borrowShip', town: 'harborTown', progress: 1, done: true, reported: true });
+    expect(finishedQuestCount(g)).toBe(0);
+  });
+
+  it('2つ目の鍵を取った時の物語で、依頼が要ることを伝える', () => {
+    const g = run(newWorld(['warrior']), { type: 'STORY_CONTINUE', playerId: P });
+    g.world!.keys.push('emerald', 'azure');
+    g.clearedDungeons.push('emeraldTemple', 'silentCatacomb');
+    expect(nextGoalLines(g)).toEqual(['鍵はあと1つ。', `「${DUNGEONS.get('lavaCavern').name}」は、町の依頼を果たしてから。`]);
+  });
+});
+
+describe('道を長くした地図（約20マス）と、1階増えたダンジョン', () => {
+  it.each(SCENARIOS.all.map((s) => [s.id] as const))('%s: 鍵のダンジョンまでの行の差が 16・13・14、高さ49', (sid) => {
+    const map = SCENARIOS.get(sid).map!;
+    expect(map.height).toBe(49);
+    const keyed = DUNGEONS.forScenario(sid).filter((d) => d.rewardKey && !d.random).sort((a, b) => a.baseLevel - b.baseLevel);
+    const row = (id: string) => map.features.find((f) => f.id === id)!.at[1];
+    expect(map.start[1] - row(keyed[0].id)).toBe(16);
+    expect(row(keyed[0].id) - row(keyed[1].id)).toBe(13);
+    expect(row(keyed[1].id) - row(keyed[2].id)).toBeGreaterThanOrEqual(13);
+    // 地域は隙間なく、上から下までつながっている
+    const regions = [...map.regions].sort((a, b) => a.rows[0] - b.rows[0]);
+    expect(regions[0].rows[0]).toBe(0);
+    for (let i = 1; i < regions.length; i++) expect(regions[i].rows[0]).toBe(regions[i - 1].rows[1] + 1);
+    expect(regions[regions.length - 1].rows[1]).toBe(48);
+  });
+
+  it('1階足しても、どの部屋も入口からボスまでつながっている', () => {
+    const layout = withExtraFloor(
+      [
+        [{ type: 'battle', next: [0, 1] }],
+        [{ type: 'battle', next: [0] }, { type: 'event', eventId: 'x', next: [0] }],
+        [{ type: 'rest', next: [0] }],
+        [{ type: 'boss', next: [] }],
+      ],
+      KEY_EXTRA_FLOOR,
+    );
+    expect(layout.map((r) => r.map((x) => x.type))).toEqual([['battle'], ['battle', 'event'], ['battle', 'chest'], ['rest'], ['boss']]);
+    expect(layout[1].map((x) => x.next)).toEqual([[0], [1]]);
+    expect(layout[2].map((x) => x.next)).toEqual([[0], [0]]);
+    for (const d of DUNGEONS.all.filter((x) => (x.rewardKey || x.finale) && x.layout)) {
+      const L = d.layout!;
+      for (let r = 0; r + 1 < L.length; r++) {
+        for (const room of L[r]) for (const n of room.next) expect(n, d.id).toBeLessThan(L[r + 1].length);
+        L[r + 1].forEach((_, c) => expect(L[r].some((p) => p.next.includes(c)), `${d.id} ${r + 1}:${c}`).toBe(true));
+      }
+    }
+  });
+});
+
+describe('古い保存データ（道を長くする前の地図）', () => {
+  it('地図を作り直さず、徘徊する敵は記録した地域のマスに出る。スタートの町はそのまま見つかる', () => {
+    const g = run(newWorld(['warrior']), { type: 'STORY_CONTINUE', playerId: P });
+    const w = g.world!;
+    // 高さ28の古い地図に見せかける（上の28行だけ残し、スタートの町を元の位置に置く）
+    const old = { ...w, height: 28, tiles: w.tiles.slice(0, 28 * w.width).map((t) => ({ ...t, f: t.f?.kind === 'town' && t.f.id === 'royalCapital' ? undefined : t.f })) };
+    old.tiles[26 * w.width + 3].f = { kind: 'town', id: 'royalCapital' };
+    expect(startTileOf(g, old)).toBe(26 * w.width + 3);
+    g.world = old;
+    old.wanderers = [];
+    for (let k = 0; k < 20; k++) {
+      const wd = spawnWanderer(g, old, createRng(k), 1);
+      if (wd) expect(old.tiles[wd.tile].r).toBe(1);
+    }
   });
 });
 

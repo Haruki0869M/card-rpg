@@ -2,6 +2,7 @@
 // ボスの手前に「物語の部屋」（event）を置き、ボスの正体や春を奪われた理由が分かるようにしている
 import type { DungeonDef } from '../../../../types';
 import { CASTLE_POOLS, CATHEDRAL_POOLS, CRYSTAL_POOLS, MINE_POOLS } from './pools';
+import { FINALE_EXTRA_FLOOR, KEY_EXTRA_FLOOR, withExtraFloor } from '../../extraFloor';
 
 /** 氷晶の洞（8行。入門。道中のイベントと鍵の戦いまで） */
 export const crystalCave: DungeonDef = {
@@ -14,7 +15,7 @@ export const crystalCave: DungeonDef = {
   bossChest: 'epic',
   rewardKey: 'crystalWhite',
   clearStory: ['氷晶の主が、音を立てて砕け散った。', '最期に「…温かい」とつぶやいた。', '氷晶の鍵（白）を手に入れた！'],
-  layout: [
+  layout: withExtraFloor([
     [{ type: 'battle', next: [0, 1] }],
     [
       { type: 'battle', next: [0, 1] },
@@ -36,7 +37,7 @@ export const crystalCave: DungeonDef = {
     [{ type: 'rest', next: [0] }],
     [{ type: 'event', eventId: 'crystalGate', next: [0] }],
     [{ type: 'boss', next: [] }],
-  ],
+  ], KEY_EXTRA_FLOOR),
 };
 
 /** 沈んだ聖堂（8行。亡者と祈り。やや戦闘が多い） */
@@ -52,7 +53,7 @@ export const sunkenCathedral: DungeonDef = {
   // 1つ目のダンジョンの鍵が要る（play-feedback-plan §4 C: 町や依頼を飛ばして、まっすぐ奥へ行けないように）
   requiresKeys: ['crystalWhite'],
   clearStory: ['司教は微笑み、光になって消えた。', '「どうか、姫様を止めて」', '氷晶の鍵（蒼）を手に入れた！'],
-  layout: [
+  layout: withExtraFloor([
     [{ type: 'battle', next: [0, 1] }],
     [
       { type: 'event', eventId: 'iceSilhouette', next: [0, 1] },
@@ -74,7 +75,7 @@ export const sunkenCathedral: DungeonDef = {
     [{ type: 'rest', next: [0] }],
     [{ type: 'event', eventId: 'bishopAltar', next: [0] }],
     [{ type: 'boss', next: [] }],
-  ],
+  ], KEY_EXTRA_FLOOR),
 };
 
 /** 霜の巨人の鉱山（9行。分かれ道が多く、強敵が2回出る） */
@@ -87,8 +88,11 @@ export const giantMine: DungeonDef = {
   pools: MINE_POOLS,
   bossChest: 'legend',
   rewardKey: 'crystalSilver',
+  // 2つ目の鍵と、町の依頼を1つ（報告まで）が要る（冒険を長くする。町に寄る理由を作る）
+  requiresKeys: ['crystalBlue'],
+  requiresQuests: 1,
   clearStory: ['霜の巨人が、ゆっくり膝をついた。', '「女王様を…あたためてやってくれ」', '氷晶の鍵（銀）を手に入れた！'],
-  layout: [
+  layout: withExtraFloor([
     [{ type: 'battle', next: [0, 1] }],
     [
       { type: 'battle', next: [0, 1] },
@@ -114,7 +118,7 @@ export const giantMine: DungeonDef = {
     [{ type: 'rest', next: [0] }],
     [{ type: 'event', eventId: 'giantGate', next: [0] }],
     [{ type: 'boss', next: [] }],
-  ],
+  ], KEY_EXTRA_FLOOR),
 };
 
 /** 氷の城（10行。三つの鍵で開く最終ダンジョン） */
@@ -128,7 +132,7 @@ export const iceCastle: DungeonDef = {
   bossChest: 'legend',
   requiresKeys: ['crystalWhite', 'crystalBlue', 'crystalSilver'],
   finale: true,
-  layout: [
+  layout: withExtraFloor([
     [{ type: 'battle', next: [0, 1] }],
     [
       { type: 'battle', next: [0, 1] },
@@ -148,7 +152,7 @@ export const iceCastle: DungeonDef = {
     [{ type: 'battle', next: [0] }],
     [{ type: 'event', eventId: 'queenThrone', next: [0] }],
     [{ type: 'boss', next: [] }],
-  ],
+  ], FINALE_EXTRA_FLOOR),
 };
 
 // ランダムダンジョン: 凍る洞窟（部屋の並びを自動生成）
