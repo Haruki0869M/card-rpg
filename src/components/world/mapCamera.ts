@@ -18,3 +18,12 @@ export function revealTop(hereY: number, selY: number, scrollTop: number, viewH:
   if (sy >= scrollTop + margin && sy <= scrollTop + viewH - margin) return undefined;
   return (hereY + selY) / 2 + pad - viewH / 2;
 }
+
+/**
+ * 横も同じ決まり（拡大して地図が枠より広い時）。選んだマスが枠の中に見えていれば動かさない。
+ * 見えていなければ、今の駒と選んだマスの中間を真ん中にする。横には余白が無い
+ */
+export function revealLeft(hereX: number, selX: number, scrollLeft: number, viewW: number, margin: number): number | undefined {
+  if (selX >= scrollLeft + margin && selX <= scrollLeft + viewW - margin) return undefined;
+  return (hereX + selX) / 2 - viewW / 2;
+}

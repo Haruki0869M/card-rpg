@@ -1,4 +1,5 @@
 import { Minus, Plus } from 'lucide-react';
+import { useState } from 'react';
 import { playSound } from '../../audio/player';
 import type { SoundId } from '../../audio/ids';
 import { useBattle } from '../../store/battleStore';
@@ -28,6 +29,28 @@ function VolumeRow({ label, field, sample }: { label: string; field: 'sfxVolume'
   </div>;
 }
 
+/** 振動の ON/OFF と「振動を試す」（0.2秒）。振動の設定が OFF でも試せる。押した操作の中で呼ぶ（ブラウザは押した時だけ振動を許す） */
+function VibrationRow() {
+  const vibration = useBattle(s => s.settings.vibration), set = useBattle(s => s.setSettings);
+  const [note, setNote] = useState<string | null>(null);
+  const test = () => {
+    let ok = false;
+    try {
+      ok = typeof navigator.vibrate === 'function' && navigator.vibrate(200) !== false;
+    } catch {
+      ok = false;
+    }
+    setNote(ok ? null : 'この端末では振動が使えません');
+  };
+  return <div>
+    <div className="flex gap-2">
+      <button aria-pressed={vibration} onClick={() => set({ vibration: !vibration })} className="btn btn-dark flex min-h-11 flex-1 items-center justify-between rounded-lg px-3 text-[14px]"><span>振動</span><span>{vibration ? 'ON' : 'OFF'}</span></button>
+      <button onClick={test} className="btn btn-dark min-h-11 shrink-0 rounded-lg px-3 text-[14px]" data-vibration-test>振動を試す</button>
+    </div>
+    {note && <p className="mt-1 text-[12px] text-zinc-300" role="status" data-vibration-note>{note}</p>}
+  </div>;
+}
+
 /** タイトルと冒険中で同じ設定を使う。値はこの端末だけに保存する。 */
 export function SettingsControls() {
   const settings = useBattle(s => s.settings), set = useBattle(s => s.setSettings);
@@ -49,7 +72,7 @@ export function SettingsControls() {
     <VolumeRow label="お供の鳴き声" field="petVolume" sample="pet_okame" />
     <VolumeRow label="BGM" field="bgmVolume" />
     <p className="-mt-2 text-[12px] text-zinc-300">iPhone はマナーモードだと鳴りません</p>
-    <button aria-pressed={settings.vibration} onClick={() => set({ vibration: !settings.vibration })} className="btn btn-dark flex min-h-11 items-center justify-between rounded-lg px-3 text-[14px]"><span>振動</span><span>{settings.vibration ? 'ON' : 'OFF'}</span></button>
+    <VibrationRow />
     <div>
       <button aria-pressed={guide} onClick={() => set({ firstGuide: !guide })} className="btn btn-dark flex min-h-11 w-full items-center justify-between rounded-lg px-3 text-[14px]" data-setting-first-guide><span>はじめての案内</span><span>{guide ? 'ON' : 'OFF'}</span></button>
       <p className="mt-1 text-[12px] text-zinc-300">ONにすると、次の戦闘で操作の案内（3つ）をもう一度出します</p>
