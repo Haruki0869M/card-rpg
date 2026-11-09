@@ -39,7 +39,7 @@ import { BALANCE } from '../../data/balance';
 import { PLAYER_COLOR } from '../../data/theme';
 import { isLocalPlayer } from '../../store/battleConfig';
 import { useOnline } from '../../store/onlineStore';
-import { RollStrip } from '../ui/CheckPanel';
+import { RollStrip, SpinRollStrip, useFreshRoll } from '../ui/CheckPanel';
 import { HeroFace } from '../ui/game';
 import { PetToken } from '../ui/PetToken';
 import { Eye, Footprints, Minus, Plus } from 'lucide-react';
@@ -524,6 +524,9 @@ function ExplorePanel() {
   const [focus, setFocus] = useState(0);
   const [watching, setWatching] = useState(false);
   const run = game.dungeon!;
+  // 探索力の判定のスロット（フェーズ2-D）: この画面を開いた後に新しく判定した時だけ回す
+  const exploreKey = run.exploreRoll && game.world ? `explore:${game.seed}:${run.dungeonId}:${game.world.worldTurn}:${game.world.turn}` : undefined;
+  const freshExplore = useFreshRoll(exploreKey);
   if (!game.world) return null;
   const w = game.world;
   if (!dungeonTurnHere(game)) {
@@ -594,7 +597,7 @@ function ExplorePanel() {
         <b className="font-display text-[22px] leading-6 text-amber-200 tabular-nums">{run.explore}</b>
       </div>
       <div className="min-w-0 flex-1">
-        {watchedHere && run.watchRoll ? <RollStrip results={run.watchRoll} small /> : run.exploreRoll && <RollStrip results={run.exploreRoll} small />}
+        {watchedHere && run.watchRoll ? <RollStrip results={run.watchRoll} small /> : run.exploreRoll && <SpinRollStrip results={run.exploreRoll} small spinKey={exploreKey ?? ''} fresh={freshExplore} />}
         <div className="text-[12px] leading-4 text-zinc-400">{run.explore > 0 ? '1歩ごと・扉も1歩（向きを変えるのは0歩）' : '歩数を使い切った'}</div>
       </div>
       <button

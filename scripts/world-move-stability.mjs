@@ -66,6 +66,7 @@ async function run(width, party) {
         start: Object.fromEntries(heroes.map(e => [e.dataset.hero, rel(e)])),
         fog0: fog(), enemies0: enemies(),
         frames: 0, sawMoving: false, sawArrival: false, remounted: new Set(), maxShift: {}, stepFog: [], stepEnemies: [], afterFog: null, afterEnemies: null,
+        stripMax: 0, heroHidden: 0,
       };
       const p = window.__probe;
       const tick = () => {
@@ -73,6 +74,13 @@ async function run(width, party) {
         const moving = document.querySelector('[data-world-moving]');
         const phase = moving?.getAttribute('data-world-moving');
         if (phase === 'steps') { p.sawMoving = true; p.stepFog.push(fog()); p.stepEnemies.push(enemies()); }
+        // フェーズ2-D: 移動中は下のパネルの代わりに小さな帯だけ。歩いている駒（h0）は地図の見える範囲に入っている
+        if (moving) {
+          p.stripMax = Math.max(p.stripMax, moving.getBoundingClientRect().height);
+          const map = document.querySelector('[data-world-map]')?.getBoundingClientRect();
+          const h0 = document.querySelector('[data-hero="h0"]')?.getBoundingClientRect();
+          if (map && h0 && (h0.top + h0.height / 2 < map.top || h0.top + h0.height / 2 > map.bottom)) p.heroHidden++;
+        }
         if (phase === 'arrival') p.sawArrival = true;
         for (const [id, node] of Object.entries(p.nodes)) {
           const now = document.querySelector(`[data-hero="${id}"]`);
@@ -103,6 +111,8 @@ async function run(width, party) {
     check(probe.stepFog.every(n => n === probe.fog0), `${width}px ${party}人: 歩いている間に霧が晴れた ${probe.fog0}→${[...new Set(probe.stepFog)]}`);
     check(probe.stepEnemies.every(n => n === probe.enemies0), `${width}px ${party}人: 歩いている間に敵が出た ${probe.enemies0}→${[...new Set(probe.stepEnemies)]}`);
     check(!issues.length, `${width}px ${party}人: ${issues}`);
+    check(probe.stripMax > 0 && probe.stripMax <= 90, `${width}px ${party}人: 移動中の下の帯が高すぎる（${probe.stripMax}px）`);
+    check(probe.heroHidden === 0, `${width}px ${party}人: 歩いている駒が地図の外に出た（${probe.heroHidden}フレーム）`);
     console.log(`OK: ${width}px ${party}人 ${probe.frames}フレーム・作り直し0・止まっている駒のずれ最大${Math.max(...shifts.map(s => s[1])).toFixed(2)}px・歩行中の霧${probe.fog0}/敵${probe.enemies0}のまま（到着後 霧${probe.afterFog}/敵${probe.afterEnemies}）`);
 
     // ---- 2. 突発イベント: 「！」のカットインと窓を重ねない ----

@@ -60,19 +60,35 @@ export function moveDiscovery(move: WorldMovePresentation) {
   return move.game.mode === 'encounter' || move.game.mode === 'event' || !!feature || !!w.story;
 }
 
-/** 下の操作パネルの上に重ねる帯。パネルの大きさは変えないので、地図の大きさやカメラは動かない */
+/** 移動中の帯の文言（フェーズ2-D）。1マス = 1歩で「残り○歩」と数える */
+export function moveStatusText(i: number, pathLength: number, arrived: boolean, discovery: boolean): { title: string; sub: string } {
+  if (arrived) return { title: discovery ? '！ 到着しました' : '到着しました', sub: '周囲を確かめています' };
+  const left = Math.max(0, pathLength - 1 - i);
+  return { title: `移動中…（残り${left}歩）`, sub: '' };
+}
+
+/** 「移動する」のボタンの文言。マスに出る数字（使う移動力）と、歩くマスの数の違いをここで言葉にする */
+export function moveButtonText(cost: number | undefined, steps: number | undefined): string {
+  return `移動する（移動力${cost ?? '?'}を使う・${steps ?? '?'}マス先）`;
+}
+
+/**
+ * 移動中は、下の操作パネルの代わりにこの小さな帯（約72px）だけを出す（フェーズ2-D）。
+ * 地図が広くなり、歩いている駒が地図の下の端で隠れない。マスの大きさは地図の幅だけで決まるので、駒やマスはずれない
+ */
 export function MoveStatus({ move, playback }: { move: WorldMovePresentation; playback: MovePlayback }) {
   const { i, arrived, path } = playback;
   const discovery = moveDiscovery(move);
+  const t = moveStatusText(i, path.length, arrived, discovery);
   return (
     <div
-      className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-1 rounded-t-2xl bg-[#0b0910]/[.97] px-3 text-center backdrop-blur-sm"
+      className="panel relative z-40 flex h-[72px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-t-2xl px-3 text-center"
       data-world-moving={arrived ? 'arrival' : 'steps'}
       data-move-index={i}
       data-move-length={path.length}
     >
-      <div className="text-[16px] font-bold text-amber-100" role="status">{arrived ? (discovery ? '！ 到着しました' : '到着しました') : '移動中…'}</div>
-      <div className="text-[13px] text-zinc-300">{arrived ? '周囲を確かめています' : `${i} / ${path.length - 1} マス`}</div>
+      <div className="text-[17px] font-bold text-amber-100" role="status">{t.title}</div>
+      {t.sub && <div className="text-[13px] text-zinc-300">{t.sub}</div>}
     </div>
   );
 }

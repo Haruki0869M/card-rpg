@@ -14,6 +14,7 @@ import { HeroFace } from '../ui/game';
 import { petSpot, PetToken } from '../ui/PetToken';
 import { HeroPiece } from './HeroPiece';
 import { orderOnTile, pieceSpots, PLAYER_COLORS } from './pieceLayout';
+import { cameraTop, mapPadY, revealTop } from './mapCamera';
 
 const SQRT3 = Math.sqrt(3);
 
@@ -185,12 +186,22 @@ export function WorldMap({
 
   // 手番のキャラが見えるようにスクロール（動いている間は、動いているキャラについていく）
   const here = anim ? anim.path[anim.i] : w.pos[w.turn];
+  // 地図の上下の余白（端のマスでも駒を真ん中に置ける。フェーズ2-D）。枠の高さが変わった時（下のパネルの高さが変わった時）も合わせ直す
+  const padY = mapPadY(size.height);
   useLayoutEffect(() => {
     const el = box.current;
     if (!el || here === undefined || !size.width) return;
     const { x, y } = center(here);
-    el.scrollTo({ top: y - el.clientHeight / 2, left: x - el.clientWidth / 2, behavior: 'instant' });
-  }, [here, w.turn, size.width, center]);
+    el.scrollTo({ top: cameraTop(y, el.clientHeight), left: x - el.clientWidth / 2, behavior: 'instant' });
+  }, [here, w.turn, size.width, size.height, center]);
+  // 行き先を選んだ時: 選んだマスが見えていなければ、駒と選んだマスが両方見えるように動かす（見えていれば動かさない）
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el || anim || here === undefined || selected === undefined || !size.width) return;
+    const top = revealTop(center(here).y, center(selected).y, el.scrollTop, el.clientHeight, R * 1.2);
+    if (top !== undefined) el.scrollTo({ top, behavior: 'smooth' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
 
   // 依頼の目的地
   const questTargets = useMemo(() => {
@@ -233,6 +244,7 @@ export function WorldMap({
   return (
     <div className="relative min-h-0 flex-1">
     <div ref={box} className="absolute inset-0 overflow-auto overscroll-contain bg-[#0b0910]" data-world-map>
+      <div style={{ paddingTop: padY, paddingBottom: padY, width: W }} data-map-pad>
       <div className="relative" style={{ width: W, height: H }} onClick={(e) => { if (!anim) tap(e); }}>
         <svg width={W} height={H} className="absolute inset-0 block">
           <defs>
@@ -411,6 +423,7 @@ export function WorldMap({
             );
           })}
       </div>
+      </div>
     </div>
       {/* 手番のキャラへ戻る（地図をスクロールして見失った時） */}
       {here !== undefined && (
@@ -419,7 +432,7 @@ export function WorldMap({
             const el = box.current;
             if (!el) return;
             const { x, y } = center(here);
-            el.scrollTo({ top: y - el.clientHeight / 2, left: x - el.clientWidth / 2, behavior: 'smooth' });
+            el.scrollTo({ top: cameraTop(y, el.clientHeight), left: x - el.clientWidth / 2, behavior: 'smooth' });
           }}
           aria-label="手番のキャラへ戻る"
           className="btn btn-dark absolute right-2 bottom-2 z-10 flex h-11 w-11 items-center justify-center rounded-full"

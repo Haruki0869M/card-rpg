@@ -1,5 +1,8 @@
 // ===== 能力値の判定（誰が挑むか・フォーカス・成功率）を選ぶ部品 =====
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
+import { useEffect, useRef, useState } from 'react';
+import { TIMING } from '../../data/balance';
+import { useBattle } from '../../store/battleStore';
 import { Check, Minus, Plus, Star, X } from 'lucide-react';
 import { successDistribution, statChance } from '../../engine';
 import { isLocalPlayer } from '../../store/battleConfig';
@@ -100,6 +103,56 @@ export function CheckPanel({
           （フォーカス {hero?.focus ?? 0} → {(hero?.focus ?? 0) - focus}）
         </span>
       </div>
+    </div>
+  );
+}
+
+/** もう回した判定（画面を作り直しても、同じ判定をもう一度回さない） */
+const spunRolls = new Set<string>();
+
+/** 画面を開いた時の判定の鍵を覚えておき、その後に新しい判定が出た時だけ「新しい」とする */
+export function useFreshRoll(key: string | undefined): boolean {
+  const atMount = useRef(key);
+  return key !== undefined && key !== atMount.current;
+}
+
+/**
+ * 判定の結果を「くるくる回してから止める」見た目（フェーズ2-D。世界マップの移動力・ダンジョンの探索力の判定）。
+ * 結果は押した時にもう決まっている。見た目だけで、状態・乱数・同期は待たせない。
+ * spin が真の間（押した直後だけ）回す。高速モード・動きを減らす設定・簡易の演出の時は回さない。
+ */
+export function SpinRollStrip({ results, spinKey, fresh, small }: { results: SlotResult[]; /** この判定を表す鍵（同じ判定は2回回さない） */ spinKey: string; /** 画面を開いた後に新しく判定した時だけ真 */ fresh: boolean; small?: boolean }) {
+  const reduced = useReducedMotion();
+  const quick = useBattle((s) => s.settings.fastMode || s.settings.cutinMode === 'simple');
+  const [doSpin] = useState(() => {
+    const ok = fresh && !reduced && !quick && !spunRolls.has(spinKey);
+    spunRolls.add(spinKey);
+    return ok;
+  });
+  const [spinning, setSpinning] = useState(doSpin);
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!doSpin) return;
+    const iv = setInterval(() => setTick((t) => t + 1), 70);
+    const done = setTimeout(() => setSpinning(false), TIMING.rollSpin * 1000);
+    return () => {
+      clearInterval(iv);
+      clearTimeout(done);
+    };
+  }, [doSpin]);
+  if (!spinning) return <RollStrip results={results} small={small} />;
+  const size = small ? 'h-7 w-7' : 'h-10 w-10';
+  const icon = small ? 15 : 20;
+  return (
+    <div className="flex justify-center gap-1" data-roll-spinning>
+      {results.map((_, i) => {
+        const hit = (tick + i) % 2 === 0;
+        return (
+          <span key={i} className={`flex ${size} items-center justify-center rounded-full border-2 border-white/40 bg-[#2a2630] text-zinc-200`} style={{ transform: `rotate(${(tick * 70 + i * 40) % 360}deg)` }}>
+            {hit ? <Check size={icon} strokeWidth={3} /> : <X size={icon} strokeWidth={3} />}
+          </span>
+        );
+      })}
     </div>
   );
 }

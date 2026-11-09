@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { ArrowUpCircle, Coins, Flame, Sparkles, Star } from 'lucide-react';
 import { useState } from 'react';
 import { BattleBackground } from '../../art';
-import { BALANCE } from '../../data/balance';
+import { BALANCE, TIMING } from '../../data/balance';
 import { EVENTS } from '../../data/events';
 import { getItem } from '../../data/items';
 import { eventOptionState, heroFocusMax, heroMaxHp, statChance, sceneBackground, sceneHeroes, successDistribution } from '../../engine';
@@ -137,12 +137,12 @@ export function EventScreen() {
     <Screen>
       <div className="relative flex min-h-0 flex-1 flex-col justify-center overflow-y-auto overscroll-contain px-3 py-4">
         <BattleBackground kind={sceneBackground(game)} className="absolute inset-0 h-full w-full opacity-30" />
-        {/* 突発イベント: 「！」の短いカットイン（0.3秒） */}
+        {/* 突発イベント: 「！」の短いカットイン（TIMING.eventBang） */}
         {ev.random && !ev.result && (
           <motion.div
             initial={{ opacity: 1, scale: 0.4 }}
             animate={{ opacity: 0, scale: 1.6 }}
-            transition={{ duration: 0.35, ease: 'easeOut' }}
+            transition={{ duration: TIMING.eventBang, ease: 'easeOut' }}
             className="font-display text-outline pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-[96px] text-amber-300"
             aria-hidden
           >
@@ -154,7 +154,7 @@ export function EventScreen() {
         <motion.div
           initial={ev.random && !ev.result ? { opacity: 0 } : false}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.35, duration: 0.15 }}
+          transition={{ delay: TIMING.eventBang, duration: TIMING.eventWindowIn }}
           className="panel panel-ornate relative rounded-2xl p-3 pt-4"
           data-event-window
         >
