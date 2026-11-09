@@ -300,3 +300,12 @@
 4. 黒いいばら：地面をはう、とげのある黒いつるのかたまり
 どくろ・骨・血・文字は描かないでください。
 ```
+
+## 2回目の結果（2026-11-10・E・F・G1・G2 の17個）
+- 4枚とも背景は透明。`src/assets/art/landscape/` に追加:
+  - 峰 512×512: `peak-lone`（ぽつんと1つ）・`peak-high`（山脈の高い所）・`peak-mid`（山脈の低め）・`peak-end`（山脈の端。右へ低くなる。左向きは左右反転して使う）
+  - 枯れ木 384×384: `tree-dead-1|2`、小物 256×256: `prop-stump|bush|pebbles`
+  - 施設 512×512: `place-dungeon|temple|altar|chest|campfire|bridge|watchtower|merchant`
+- 見本の写真: `docs/art/diorama-trial-preview-2.jpg`。山のマスに峰を大きめ（マスの約2倍）に置くと、山脈らしく見える。
+- 残り: H1（遠くの雪山）・H2（遠くの巨大な古木）・I（侵食の小物4つ）。
+- 合わせて34個・約1.6MB。地図につなぐ時に、表示の大きさに合わせて縮めて軽くする（施設は 256px でも足りる見込み）。
