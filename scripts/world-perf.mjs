@@ -59,7 +59,8 @@ for (const zoom of [1, 2]) {
   await page.waitForTimeout(2000);
   results.push({ zoom, scene: '止まっている', ...stats(await stop()) });
   // 歩いている時（一番遠い光るマスへ）
-  await page.getByText('移動力の判定', { exact: true }).click();
+  // 移動のサイコロを振る（サイコロに変わる前は「移動力の判定」の文字で押していた。world-steady-map.mjs と同じ押し方）
+  await page.locator('[data-roll-move]').click();
   await page.locator('[data-roll-spinning]').waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
   await page.waitForTimeout(600);
   const target = await page.evaluate(() => {
