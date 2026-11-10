@@ -49,8 +49,12 @@ export function VoteChips({ cmd }: { cmd: GameCommand }) {
   );
 }
 
-/** みんなの選択を待っている時の帯（画面の下に出す） */
-export function VoteStatus() {
+/**
+ * みんなの選択を待っている時の枠。
+ * 画面全体に重ねるのではなく、各画面の選択肢のボタンの上（パネルの中）に普通の要素として置く
+ * （重ねていた時、オンラインで宝箱の「任せる」などのボタンが隠れて見えなくなった。2026-11-10 の実機の不具合）
+ */
+export function VoteStatus({ className = '' }: { className?: string }) {
   const game = useBattle((s) => s.game);
   useOnline((s) => s.tick);
   if (!game) return null;
@@ -60,7 +64,7 @@ export function VoteStatus() {
   if (!waiting.length || voters(game).length < 2) return null;
   const meWaiting = waiting.filter((p) => isLocalPlayer(p));
   return (
-    <div className="pointer-events-none absolute inset-x-2 bottom-24 z-[65] flex flex-col gap-0.5 rounded-xl border border-sky-300/50 bg-black/90 px-3 py-2 text-[13px] text-sky-50">
+    <div className={`flex flex-col gap-0.5 rounded-xl border border-sky-300/50 bg-black/70 px-3 py-1.5 text-[13px] text-sky-50 ${className}`} data-vote-status>
       <div className="text-center font-bold">{meWaiting.length ? 'あなたの選択を待っています' : 'みんなの選択を待っています'}</div>
       {voters(game).map((p) => (
         <div key={p} className="flex items-center gap-1.5">
