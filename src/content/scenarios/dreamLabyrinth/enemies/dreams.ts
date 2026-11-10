@@ -126,7 +126,7 @@ export const mirrorKnight: EnemyDef = {
   gold: 18,
   pattern: 'sequence',
   actions: [
-    { id: 'slash', name: '鏡の一閃', effects: [{ kind: 'damage', amount: 13 }] },
+    { id: 'slash', name: '鏡の一閃', big: true, effects: [{ kind: 'damage', amount: 13 }] },
     { id: 'guard', name: '鏡の守り', effects: [{ kind: 'block', amount: 14 }] },
     { id: 'reflect', name: '映し返す闇', effects: [{ kind: 'damage', amount: 9, element: 'dark' }, { kind: 'block', amount: 6 }] },
   ],
@@ -146,8 +146,8 @@ export const dreamWeaver: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'weave', name: '眠気の糸', effects: [{ kind: 'applyStatus', status: 'weak', amount: 1, to: 'foes' }, { kind: 'block', amount: 6 }] },
-    { id: 'thread', name: '呪いの糸', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }, { kind: 'damage', amount: 8 }] },
-    { id: 'net', name: '夢の網', effects: [{ kind: 'damage', amount: 6, to: 'foes' }] },
+    { id: 'thread', name: '呪いの糸', big: true, effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }, { kind: 'damage', amount: 8 }] },
+    { id: 'net', name: '夢の網', big: true, effects: [{ kind: 'damage', amount: 6, to: 'foes' }] },
   ],
 };
 
@@ -163,7 +163,7 @@ export const memoryEater: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'devour', name: '記憶を食べる', effects: [{ kind: 'drainFocus', amount: 2 }, { kind: 'damage', amount: 10 }] },
-    { id: 'bite', name: '大きな口', effects: [{ kind: 'damage', amount: 16 }] },
+    { id: 'bite', name: '大きな口', big: true, effects: [{ kind: 'damage', amount: 16 }] },
     { id: 'forget', name: '忘れさせる', effects: [{ kind: 'drainFocus', amount: 1, to: 'foes' }, { kind: 'applyStatus', status: 'weak', amount: 1 }] },
   ],
 };
@@ -183,8 +183,8 @@ export const dreamEater: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'hug', name: '記憶を抱く', effects: [{ kind: 'block', amount: 20 }, { kind: 'damage', amount: 8 }] },
-    { id: 'swallow', name: '夢を呑む', effects: [{ kind: 'damage', amount: 22, element: 'dark' }] },
-    { id: 'lonely', name: 'さびしさ', effects: [{ kind: 'applyStatus', status: 'weak', amount: 1, to: 'foes' }, { kind: 'damage', amount: 6, to: 'foes' }] },
+    { id: 'swallow', name: '夢を呑む', big: true, effects: [{ kind: 'damage', amount: 22, element: 'dark' }] },
+    { id: 'lonely', name: 'さびしさ', big: true, effects: [{ kind: 'applyStatus', status: 'weak', amount: 1, to: 'foes' }, { kind: 'damage', amount: 6, to: 'foes' }] },
   ],
   abilities: [{ name: '抱えた記憶', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 10 }] } }],
   phases: [
@@ -193,9 +193,9 @@ export const dreamEater: EnemyDef = {
       name: '食べる夢喰い',
       pattern: 'sequence',
       actions: [
-        { id: 'devourAll', name: '全部食べる', effects: [{ kind: 'damage', amount: 14, to: 'foes' }] },
-        { id: 'forgetAll', name: '忘れさせる', effects: [{ kind: 'drainFocus', amount: 2, to: 'foes' }, { kind: 'damage', amount: 8, to: 'foes' }] },
-        { id: 'maw', name: '大きな口', effects: [{ kind: 'damage', amount: 26, element: 'dark' }] },
+        { id: 'devourAll', name: '全部食べる', big: true, effects: [{ kind: 'damage', amount: 14, to: 'foes' }] },
+        { id: 'forgetAll', name: '忘れさせる', big: true, effects: [{ kind: 'drainFocus', amount: 2, to: 'foes' }, { kind: 'damage', amount: 8, to: 'foes' }] },
+        { id: 'maw', name: '大きな口', big: true, effects: [{ kind: 'damage', amount: 26, element: 'dark' }] },
         { id: 'shadowWall', name: '影の壁', effects: [{ kind: 'block', amount: 26 }] },
       ],
     },
@@ -204,10 +204,10 @@ export const dreamEater: EnemyDef = {
       name: '思い出す夢喰い',
       pattern: 'sequence',
       actions: [
-        { id: 'remember', name: '思い出す', effects: [{ kind: 'damage', amount: 18, element: 'holy', to: 'foes' }] },
-        { id: 'tears', name: '涙', effects: [{ kind: 'damage', amount: 32, element: 'dark' }] },
-        { id: 'giveBack', name: '記憶を返す', effects: [{ kind: 'block', amount: 24 }, { kind: 'damage', amount: 10, to: 'foes' }] },
-        { id: 'oblivion', name: '忘却', effects: [{ kind: 'drainFocus', amount: 3, to: 'foes' }, { kind: 'damage', amount: 12, to: 'foes' }] },
+        { id: 'remember', name: '思い出す', big: true, effects: [{ kind: 'damage', amount: 18, element: 'holy', to: 'foes' }] },
+        { id: 'tears', name: '涙', big: true, effects: [{ kind: 'damage', amount: 32, element: 'dark' }] },
+        { id: 'giveBack', name: '記憶を返す', big: true, effects: [{ kind: 'block', amount: 24 }, { kind: 'damage', amount: 10, to: 'foes' }] },
+        { id: 'oblivion', name: '忘却', big: true, effects: [{ kind: 'drainFocus', amount: 3, to: 'foes' }, { kind: 'damage', amount: 12, to: 'foes' }] },
       ],
     },
   ],

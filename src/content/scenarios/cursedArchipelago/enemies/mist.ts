@@ -109,7 +109,7 @@ export const pirateQuartermaster: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'order', name: '野郎ども、かかれ！', effects: [{ kind: 'block', amount: 6, to: 'allies' }] },
-    { id: 'cutlass', name: '舵取りの剣', effects: [{ kind: 'damage', amount: 13 }] },
+    { id: 'cutlass', name: '舵取りの剣', big: true, effects: [{ kind: 'damage', amount: 13 }] },
     { id: 'pistol', name: '短銃の早撃ち', effects: [{ kind: 'damage', amount: 6, hits: 2 }] },
     { id: 'helm', name: '舵を切る', effects: [{ kind: 'block', amount: 10 }, { kind: 'applyStatus', status: 'weak', amount: 1 }] },
   ],
@@ -130,8 +130,8 @@ export const pirateCaptainGuld: EnemyDef = {
   resist: ['dark'],
   pattern: 'sequence',
   actions: [
-    { id: 'broadside', name: '舷側の砲撃', effects: [{ kind: 'damage', amount: 8, to: 'foes' }] },
-    { id: 'cutlass', name: '略奪の剣', effects: [{ kind: 'damage', amount: 17 }] },
+    { id: 'broadside', name: '舷側の砲撃', big: true, effects: [{ kind: 'damage', amount: 8, to: 'foes' }] },
+    { id: 'cutlass', name: '略奪の剣', big: true, effects: [{ kind: 'damage', amount: 17 }] },
     { id: 'plunder', name: 'まだ奪い足りねえ', effects: [{ kind: 'block', amount: 14 }, { kind: 'damage', amount: 7 }] },
   ],
   abilities: [{ name: '死んでも船長', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 6 }] } }],
@@ -142,8 +142,8 @@ export const pirateCaptainGuld: EnemyDef = {
       pattern: 'sequence',
       actions: [
         { id: 'crew', name: '起きろ、野郎ども', effects: [{ kind: 'summonEnemy', enemy: 'ghostDeckhand', uses: 2 }, { kind: 'block', amount: 10 }] },
-        { id: 'loot', name: '亡者の略奪', effects: [{ kind: 'damage', amount: 22 }] },
-        { id: 'volley', name: '幽霊船の一斉砲撃', effects: [{ kind: 'damage', amount: 10, to: 'foes' }] },
+        { id: 'loot', name: '亡者の略奪', big: true, effects: [{ kind: 'damage', amount: 22 }] },
+        { id: 'volley', name: '幽霊船の一斉砲撃', big: true, effects: [{ kind: 'damage', amount: 10, to: 'foes' }] },
       ],
     },
   ],

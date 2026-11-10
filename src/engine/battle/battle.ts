@@ -235,7 +235,12 @@ function startAllyPhase(state: BattleState, rng: Rng, events: BattleEvent[]) {
   state.phase = 'ally';
   // 連携攻撃の記録と、狙いの表示は、ターンごとに消す
   state.aims = {};
-  for (const e of state.enemies) e.hitBy = [];
+  for (const e of state.enemies) {
+    e.hitBy = [];
+    // BREAK の数えも、ターンごとに消す（予告は敵フェーズの終わりに決め直している）
+    delete e.turnDamage;
+    delete e.broken;
+  }
   for (const a of state.allies) {
     a.played = 0;
     a.playedBy = {};
@@ -510,7 +515,7 @@ export function resultSummary(resultLabel: string, parts: string[]): string {
 }
 
 /** 予測の合計（1体ぶん）。値は [低い方, 高い方]（抽選のある攻撃は倍率の最小・最大） */
-export interface PredictTotals { id: string; damage: [number, number]; hpLoss: [number, number]; heal: [number, number]; block: [number, number]; hits: [number, number] }
+export interface PredictTotals { id: string; damage: [number, number]; hpLoss: [number, number]; heal: [number, number]; block: [number, number]; hits: [number, number]; /** この成功数なら、この敵の大技の予告を崩せる（BREAK。低い方の見込みでも崩せる時だけ） */ breaks?: boolean }
 
 /**
  * 実際のカード処理を複製上で試し、キャラごとの合計を返す。元の状態・乱数・予約は一切進めない。
@@ -552,7 +557,8 @@ export function predictCardTotals(state: BattleState, characterId: string, cardI
       return { damage, hpLoss, heal, block, hits };
     });
     const range = (k: keyof typeof totals[0]): [number, number] => [Math.min(...totals.map(t => t[k])), Math.max(...totals.map(t => t[k]))];
-    return { id, damage: range('damage'), hpLoss: range('hpLoss'), heal: range('heal'), block: range('block'), hits: range('hits') };
+    const breaks = samples.every(events => events.some(e => e.type === 'break' && e.enemyUid === id));
+    return { id, damage: range('damage'), hpLoss: range('hpLoss'), heal: range('heal'), block: range('block'), hits: range('hits'), ...(breaks ? { breaks } : {}) };
   });
 }
 

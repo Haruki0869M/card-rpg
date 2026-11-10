@@ -41,6 +41,7 @@ import { playToEnd } from '../bot';
 import { DUNGEONS } from '../../data/dungeons';
 import { BALANCE } from '../../data/balance';
 import { SCENARIOS } from '../../data/scenarios';
+import { getDifficulty } from '../../data/rules';
 import { expToNext } from '../game/hero';
 import { heroPlace } from '../game/jobs';
 
@@ -64,6 +65,20 @@ const RATE_KEYS: Record<string, string> = { turn: 'corruptionPerTurn', dturn: 'c
 for (const kv of (process.env.VOL_RATES ?? '').split(',').filter(Boolean)) {
   const [k, v] = kv.split('=');
   (BALANCE as unknown as Record<string, number>)[RATE_KEYS[k] ?? k] = Number(v);
+}
+
+// VOL_SET=depthBonus.rowsPerStep=2,breakPower=0.5  BALANCE の値を差し替える（点でつないだ道。値は数か JSON。合わせ込みの試し用）
+for (const kv of (process.env.VOL_SET ?? '').split(';').filter(Boolean)) {
+  const at = kv.indexOf('=');
+  const path = kv.slice(0, at).split('.');
+  let o = BALANCE as unknown as Record<string, unknown>;
+  for (const k of path.slice(0, -1)) o = o[k] as Record<string, unknown>;
+  o[path[path.length - 1]] = JSON.parse(kv.slice(at + 1));
+}
+// VOL_DIFF_SET=enemyHp=1.7;enemyAttack=1.7  測る難易度のデータの値を差し替える（合わせ込みの試し用）
+for (const kv of (process.env.VOL_DIFF_SET ?? '').split(';').filter(Boolean)) {
+  const [k, v] = kv.split('=');
+  (getDifficulty(DIFF) as unknown as Record<string, number>)[k] = Number(v);
 }
 
 // 包んだ操作（VOTE・SCENE・BATTLE）は中身の種類で数える。
@@ -104,6 +119,12 @@ interface Run {
   /** 戦闘の量（抜本的な見直し §6）: 始まった戦闘の数・終わった戦闘のラウンドの合計・ダンジョンごとに入った回数 */
   fights: { started: number; finished: number; rounds: number };
   entered: Record<string, number>;
+  /** ダンジョンに初めて入った時の、生きているキャラの平均レベル（敵の強さの合わせ込み用） */
+  enterLv: Record<string, number>;
+  /** ダンジョンごとの戦闘の負け（全滅）の数 */
+  lostIn: Record<string, number>;
+  /** ダンジョンを制覇した時、それが何回目に入った時だったか（1 = 最初の挑戦で制覇） */
+  clearTry: Record<string, number>;
   /** どこで終わったか（鍵1の前／鍵1の中／…／最後の中／クリア） */
   where: string;
   /** キャラごとの「転職していたら」の時期（中位・特殊の Lv・最上位の Lv・最上位に転職できる場所に着いた時） */
@@ -125,6 +146,9 @@ function runOne(scen: string, classes: string[], seed: number): Run {
   const counts = { turnsMap: 0, turnsDungeon: 0, relays: 0, enters: 0, clears: 0 };
   const fights = { started: 0, finished: 0, rounds: 0 };
   const entered: Record<string, number> = {};
+  const enterLv: Record<string, number> = {};
+  const lostIn: Record<string, number> = {};
+  const clearTry: Record<string, number> = {};
   // 今の戦闘（世界マップの場面と、ダンジョンの場面ごと）
   const battlesOf = (g: GameState) => [g.battle, ...(g.expeditions ?? []).map((x) => x.battle)].filter((b): b is NonNullable<GameState['battle']> => !!b);
   const dungeonsOf = (g: GameState) => [g.dungeon, ...(g.expeditions ?? []).map((x) => x.dungeon)].filter((d): d is NonNullable<GameState['dungeon']> => !!d);
@@ -145,7 +169,16 @@ function runOne(scen: string, classes: string[], seed: number): Run {
     }
     const d0 = dungeonsOf(pre).length;
     const ds = dungeonsOf(post);
-    if (ds.length > d0) for (const d of ds.slice(d0)) entered[d.dungeonId] = (entered[d.dungeonId] ?? 0) + 1;
+    if (ds.length > d0) for (const d of ds.slice(d0)) {
+      entered[d.dungeonId] = (entered[d.dungeonId] ?? 0) + 1;
+      const living = post.heroes.filter((h) => !h.retired && h.hp > 0);
+      enterLv[d.dungeonId] ??= living.reduce((n, h) => n + h.level, 0) / Math.max(1, living.length);
+    }
+    // 負けた戦闘（どのダンジョンの中か）
+    if (u.type === 'FINISH_BATTLE') for (const b of b0) if (b.phase === 'defeat') {
+      const d = dungeonsOf(pre)[0]?.dungeonId ?? 'world';
+      lostIn[d] = (lostIn[d] ?? 0) + 1;
+    }
     if (pre.world && post.world) {
       if (post.world.worldTurn > pre.world.worldTurn) {
         const living = post.heroes.filter((h) => !h.retired && h.hp > 0);
@@ -158,6 +191,7 @@ function runOne(scen: string, classes: string[], seed: number): Run {
     }
     for (const d of post.clearedDungeons) {
       const def = DUNGEONS.get(d);
+      if (!pre.clearedDungeons.includes(d)) clearTry[d] = entered[d] ?? 1;
       if (!pre.clearedDungeons.includes(d) && !def.random && !def.finale) { keyClear.push(mark(post)); counts.clears++; }
     }
     if (inFinale(post) && !inFinale(pre)) {
@@ -196,7 +230,7 @@ function runOne(scen: string, classes: string[], seed: number): Run {
   const nextAt = keyed.findIndex((d) => !game.clearedDungeons.includes(d.id));
   const target = nextAt < 0 ? finale : keyed[nextAt];
   const where = end === 'clear' ? 'クリア' : `${nextAt < 0 ? '最後' : `鍵${nextAt + 1}`}の${entered[target.id] ? '中' : '前'}`;
-  return { seed, end, stuck, keyClear, finaleEnter, finaleTries, finaleLast, final, counts, byType, fights, entered, where, jobs: Object.values(V).map((v) => v.ev) };
+  return { seed, end, stuck, keyClear, finaleEnter, finaleTries, finaleLast, final, counts, byType, fights, entered, enterLv, lostIn, clearTry, where, jobs: Object.values(V).map((v) => v.ev) };
 }
 
 // ----- 表にする -----

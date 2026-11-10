@@ -91,8 +91,8 @@ export const windGuardianHawk: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'talons', name: '三連の鉤爪', effects: [{ kind: 'damage', amount: 5, hits: 3 }] },
-    { id: 'gale', name: '翼の突風', effects: [{ kind: 'damage', amount: 6, to: 'foes' }] },
-    { id: 'dive', name: '天からの急降下', effects: [{ kind: 'damage', amount: 16 }] },
+    { id: 'gale', name: '翼の突風', big: true, effects: [{ kind: 'damage', amount: 6, to: 'foes' }] },
+    { id: 'dive', name: '天からの急降下', big: true, effects: [{ kind: 'damage', amount: 16 }] },
     { id: 'rise', name: '上昇気流', effects: [{ kind: 'block', amount: 10 }] },
   ],
   abilities: [{ name: '先制の羽ばたき', effect: { when: 'battleStart', do: [{ kind: 'damage', amount: 4, to: 'randomFoe' }] } }],
@@ -111,8 +111,8 @@ export const windKeeper: EnemyDef = {
   resist: ['thunder'],
   pattern: 'sequence',
   actions: [
-    { id: 'gale', name: '大風', effects: [{ kind: 'damage', amount: 8, to: 'foes' }] },
-    { id: 'halberd', name: '風車の矛', effects: [{ kind: 'damage', amount: 17 }] },
+    { id: 'gale', name: '大風', big: true, effects: [{ kind: 'damage', amount: 8, to: 'foes' }] },
+    { id: 'halberd', name: '風車の矛', big: true, effects: [{ kind: 'damage', amount: 17 }] },
     { id: 'wall', name: '風の壁', effects: [{ kind: 'block', amount: 14 }, { kind: 'damage', amount: 5 }] },
   ],
   abilities: [{ name: '塔の風', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 6 }] } }],
@@ -123,8 +123,8 @@ export const windKeeper: EnemyDef = {
       pattern: 'sequence',
       actions: [
         { id: 'tornado', name: '竜巻', effects: [{ kind: 'block', amount: 16 }, { kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'foes' }] },
-        { id: 'storm', name: '暴風の矛', effects: [{ kind: 'damage', amount: 22 }] },
-        { id: 'gale', name: '吹き荒れる風', effects: [{ kind: 'damage', amount: 11, to: 'foes' }] },
+        { id: 'storm', name: '暴風の矛', big: true, effects: [{ kind: 'damage', amount: 22 }] },
+        { id: 'gale', name: '吹き荒れる風', big: true, effects: [{ kind: 'damage', amount: 11, to: 'foes' }] },
       ],
     },
   ],

@@ -95,8 +95,8 @@ export const steamTurretLord: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'aim', name: '照準を合わせる', effects: [{ kind: 'block', amount: 10 }] },
-    { id: 'barrage', name: '蒸気の一斉砲撃', effects: [{ kind: 'damage', amount: 7, to: 'foes' }] },
-    { id: 'cannon', name: '大砲の直撃', effects: [{ kind: 'damage', amount: 13 }] },
+    { id: 'barrage', name: '蒸気の一斉砲撃', big: true, effects: [{ kind: 'damage', amount: 7, to: 'foes' }] },
+    { id: 'cannon', name: '大砲の直撃', big: true, effects: [{ kind: 'damage', amount: 13 }] },
     { id: 'scald', name: '熱い蒸気幕', effects: [{ kind: 'applyStatus', status: 'burn', amount: 1, to: 'foes' }, { kind: 'block', amount: 5 }] },
   ],
   abilities: [{ name: '砲台の装甲', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 6 }] } }],
@@ -115,15 +115,15 @@ export const runawayBoiler: EnemyDef = {
   resist: ['fire', 'poison'],
   pattern: 'sequence',
   actions: [
-    { id: 'steam', name: '噴き出す蒸気', effects: [{ kind: 'damage', amount: 6, to: 'foes' }, { kind: 'applyStatus', status: 'burn', amount: 1, to: 'foes' }] },
-    { id: 'valve', name: '安全弁が飛ぶ', effects: [{ kind: 'damage', amount: 15, element: 'fire' }] },
+    { id: 'steam', name: '噴き出す蒸気', big: true, effects: [{ kind: 'damage', amount: 6, to: 'foes' }, { kind: 'applyStatus', status: 'burn', amount: 1, to: 'foes' }] },
+    { id: 'valve', name: '安全弁が飛ぶ', big: true, effects: [{ kind: 'damage', amount: 15, element: 'fire' }] },
     { id: 'pressure', name: '圧力をためる', effects: [{ kind: 'block', amount: 18 }, { kind: 'damage', amount: 6 }] },
   ],
   abilities: [{ name: '鋼の釜', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 6 }] } }],
   phases: [
     { belowHpPct: 50, name: '爆発寸前のボイラー', pattern: 'sequence', actions: [
-      { id: 'burst', name: '爆発寸前の熱波', effects: [{ kind: 'damage', amount: 11, element: 'fire', to: 'foes' }] },
-      { id: 'rivets', name: '飛び散る鋲', effects: [{ kind: 'damage', amount: 5, hits: 3 }] },
+      { id: 'burst', name: '爆発寸前の熱波', big: true, effects: [{ kind: 'damage', amount: 11, element: 'fire', to: 'foes' }] },
+      { id: 'rivets', name: '飛び散る鋲', big: true, effects: [{ kind: 'damage', amount: 5, hits: 3 }] },
       { id: 'hiss', name: '悲鳴のような汽笛', effects: [{ kind: 'block', amount: 20 }, { kind: 'applyStatus', status: 'burn', amount: 2, to: 'foes' }] },
     ] },
   ],

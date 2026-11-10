@@ -34,8 +34,8 @@ export const furnaceGolem: EnemyDef = {
   resist: ['fire', 'poison'],
   pattern: 'sequence',
   actions: [
-    { id: 'blast', name: '炉の熱風', effects: [{ kind: 'damage', amount: 8, element: 'fire', to: 'foes' }] },
-    { id: 'fist', name: '灼けた拳', effects: [{ kind: 'damage', amount: 17, element: 'fire' }] },
+    { id: 'blast', name: '炉の熱風', big: true, effects: [{ kind: 'damage', amount: 8, element: 'fire', to: 'foes' }] },
+    { id: 'fist', name: '灼けた拳', big: true, effects: [{ kind: 'damage', amount: 17, element: 'fire' }] },
     { id: 'stoke', name: '火をくべる', effects: [{ kind: 'block', amount: 16 }, { kind: 'applyStatus', status: 'burn', amount: 1, to: 'foes' }] },
     { id: 'slag', name: '溶けた鉄', effects: [{ kind: 'damage', amount: 7, hits: 2 }] },
   ],
@@ -55,22 +55,22 @@ export const greatMachine: EnemyDef = {
   resist: ['poison', 'fire'],
   pattern: 'sequence',
   actions: [
-    { id: 'gears', name: '歯車の嵐', effects: [{ kind: 'damage', amount: 9, to: 'foes' }] },
-    { id: 'parts', name: '部品にする', effects: [{ kind: 'damage', amount: 22 }, { kind: 'applyStatus', status: 'vulnerable', amount: 1 }] },
+    { id: 'gears', name: '歯車の嵐', big: true, effects: [{ kind: 'damage', amount: 9, to: 'foes' }] },
+    { id: 'parts', name: '部品にする', big: true, effects: [{ kind: 'damage', amount: 22 }, { kind: 'applyStatus', status: 'vulnerable', amount: 1 }] },
     { id: 'plate', name: '装甲板を閉じる', effects: [{ kind: 'block', amount: 22 }, { kind: 'damage', amount: 6 }] },
   ],
   abilities: [{ name: '帝国の鋼鉄', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 8 }] } }],
   phases: [
     { belowHpPct: 60, name: '人を繋ぐ大機械', pattern: 'sequence', actions: [
-      { id: 'link', name: '繋ぐ', effects: [{ kind: 'applyStatus', status: 'paralysis', amount: 1, to: 'foes' }, { kind: 'damage', amount: 8, element: 'thunder', to: 'foes' }] },
-      { id: 'press', name: '帝国の圧延', effects: [{ kind: 'damage', amount: 26 }] },
+      { id: 'link', name: '繋ぐ', big: true, effects: [{ kind: 'applyStatus', status: 'paralysis', amount: 1, to: 'foes' }, { kind: 'damage', amount: 8, element: 'thunder', to: 'foes' }] },
+      { id: 'press', name: '帝国の圧延', big: true, effects: [{ kind: 'damage', amount: 26 }] },
       { id: 'reroute', name: '動力を回す', effects: [{ kind: 'block', amount: 24 }, { kind: 'heal', amount: 10, to: 'self' }] },
-      { id: 'steam', name: '白い蒸気の奔流', effects: [{ kind: 'damage', amount: 7, to: 'foes' }, { kind: 'applyStatus', status: 'burn', amount: 1, to: 'foes' }] },
+      { id: 'steam', name: '白い蒸気の奔流', big: true, effects: [{ kind: 'damage', amount: 7, to: 'foes' }, { kind: 'applyStatus', status: 'burn', amount: 1, to: 'foes' }] },
     ] },
     { belowHpPct: 30, name: '全力稼働の大機械', pattern: 'sequence', actions: [
-      { id: 'fullPower', name: '全力稼働', effects: [{ kind: 'damage', amount: 16, element: 'thunder', to: 'foes' }] },
-      { id: 'crush', name: '鋼の歯車で砕く', effects: [{ kind: 'damage', amount: 32 }] },
-      { id: 'overheat', name: '炉の暴走', effects: [{ kind: 'block', amount: 26 }, { kind: 'damage', amount: 8, element: 'fire', to: 'foes' }] },
+      { id: 'fullPower', name: '全力稼働', big: true, effects: [{ kind: 'damage', amount: 16, element: 'thunder', to: 'foes' }] },
+      { id: 'crush', name: '鋼の歯車で砕く', big: true, effects: [{ kind: 'damage', amount: 32 }] },
+      { id: 'overheat', name: '炉の暴走', big: true, effects: [{ kind: 'block', amount: 26 }, { kind: 'damage', amount: 8, element: 'fire', to: 'foes' }] },
     ] },
   ],
 };

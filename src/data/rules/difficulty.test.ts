@@ -9,9 +9,9 @@ describe('難易度の説明（フェーズ3）', () => {
       expect(text).toContain(`命の灯火×${d.lives}`);
     }
   });
-  it('「ふつう」の内部の倍率は 1.55 のまま', () => {
+  it('「ふつう」の内部の倍率は 1.65（見直しの段階3で 1.55 → 1.65。BREAK で楽になった分を戻すため。提案）', () => {
     const n = DIFFICULTIES.get('normal');
-    expect(n.enemyHp).toBe(1.55);
-    expect(n.enemyAttack).toBe(1.55);
+    expect(n.enemyHp).toBe(1.65);
+    expect(n.enemyAttack).toBe(1.65);
   });
 });

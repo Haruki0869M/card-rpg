@@ -3,6 +3,7 @@ import { BALANCE } from '../../data/balance';
 // ===== ダンジョンの生成と移動 =====
 import { getRoomType, ROOM_TYPES } from '../../data/rules';
 import { getDungeon } from './registry';
+import { DUNGEONS } from '../../data/dungeons';
 import type { ChestSpec, DungeonDef, DungeonRun, Rarity, Room, RoomType } from '../../types';
 import type { Rng } from '../rng';
 import { initDungeonPos } from './dungeonMap';
@@ -13,7 +14,7 @@ export { RARITY_NAME };
 
 const pick = <T,>(list: readonly T[], rng: Rng) => list[rng.int(list.length)];
 
-/** 深さの段: 3行ごとに +1（入口の行が 0。抜本的な見直し §2-2） */
+/** 深さの段: rowsPerStep 行ごとに +1（入口の行が 0。抜本的な見直し §2-2。段階3で 3行ごと → 2行ごと） */
 export const depthStep = (row: number) => Math.floor(row / BALANCE.depthBonus.rowsPerStep);
 /** 深層ボーナスの段（0=入口 / 1=浅層 / 2=中層 / 3=深層。それより深くても 3） */
 export const depthTier = (row: number) => Math.min(BALANCE.depthBonus.reward.length - 1, depthStep(row));
@@ -33,15 +34,31 @@ export function isLegacyLayout(run: Pick<DungeonRun, 'dungeonId' | 'rooms' | 'ra
   return !!layout && layout.length !== dungeonRows(run);
 }
 
+/**
+ * ダンジョンの順番（0 = 1つ目の鍵のダンジョン / 1 = 2つ目 / 2 = 3つ目 / 3 = 最後のダンジョン。ランダムダンジョンは undefined）。
+ * 鍵のダンジョンは、そのシナリオの中で、敵の基準レベルが低い順に数える（データに順番は書かない）
+ */
+export function dungeonStage(def: DungeonDef): number | undefined {
+  if (def.random || (!def.rewardKey && !def.finale)) return undefined;
+  const keyed = DUNGEONS.forScenario(DUNGEONS.scenarioOf(def.id) ?? '').filter((d) => !d.random && d.rewardKey && !d.finale).sort((a, b) => a.baseLevel - b.baseLevel);
+  return def.finale ? Math.max(BALANCE.dungeonStageLevel.length - 1, keyed.length) : Math.max(0, keyed.findIndex((d) => d.id === def.id));
+}
+
+/** そのダンジョンの敵の基準レベル（データの基準レベル ＋ ダンジョンの順番ごとの上乗せ） */
+export function dungeonEnemyLevel(def: DungeonDef): number {
+  const stage = dungeonStage(def);
+  return def.baseLevel + (stage === undefined ? 0 : (BALANCE.dungeonStageLevel[Math.min(stage, BALANCE.dungeonStageLevel.length - 1)] ?? 0));
+}
+
 /** 部屋の敵を決める（組み合わせと加算レベルは部屋の種類のデータ。レベルはダンジョンの基準 + 深さ + 難易度） */
 function rollEnemies(def: DungeonDef, type: RoomType, row: number, levelBonus: number, rng: Rng) {
   const b = getRoomType(type).battle!;
   let ids = b.pool === 'boss' ? def.pools.boss : b.pool === 'midboss' ? (def.pools.midboss ?? def.pools.elite[0]) : pick(def.pools[b.pool], rng);
   const step = depthStep(row);
-  // 奥（7行目以降）の戦闘・強敵の部屋は、そのダンジョンの戦闘の敵が1体増える（最大4体。ボス・中ボスは決まった組のまま）
+  // 奥（深さの段が extraEnemyFromStep 以上。今は5行目以降）の戦闘・強敵の部屋は、そのダンジョンの戦闘の敵が1体増える（最大4体。ボス・中ボスは決まった組のまま）
   if ((b.pool === 'battle' || b.pool === 'elite') && step >= BALANCE.depthBonus.extraEnemyFromStep && ids.length < BALANCE.maxEnemies) ids = [...ids, pick(pick(def.pools.battle, rng), rng)];
-  // 深さ: 3行ごとに+1（鍵10行のボスで+3、最後13行のボスで+4）
-  const lv = def.baseLevel + step + levelBonus + b.levelBonus;
+  // 深さ: 段ごとに+1（今は2行ごと。鍵10行のボスの行で+4、最後13行のボスの行で+6）
+  const lv = dungeonEnemyLevel(def) + step + levelBonus + b.levelBonus;
   return ids.map((defId) => ({ defId, level: Math.max(1, lv) }));
 }
 
@@ -116,23 +133,41 @@ function generateLayout(def: DungeonDef, rng: Rng, eventIds: string[]): NonNulla
   return layout;
 }
 
+/** 封魔の宝箱の部屋の種類（データに1つ。無ければ封魔の宝箱は出ない） */
+const sealedChestType = () => ROOM_TYPES.all.find((t) => t.sealedChest);
+
+/**
+ * 宝箱の部屋を、一定の確率で「封魔の宝箱」に変える（奥の行だけ）。乱数はダンジョンを作る時に引き、結果は部屋に書く
+ * （保存して再開しても・オンラインでも同じ）。部屋の並びの決まり（偏り防止）は、どちらも「宝箱の行」として数える
+ */
+function sealChest(spec: { type: RoomType; chest?: ChestSpec }, row: number, rng: Rng): { type: RoomType; chest?: ChestSpec } {
+  const sealed = sealedChestType();
+  const s = BALANCE.sealedChest;
+  if (!sealed || getRoomType(spec.type).behavior !== 'chest' || getRoomType(spec.type).sealedChest || !spec.chest || row < s.fromRow) return spec;
+  if (rng.next() * 100 >= s.chance) return spec;
+  return { type: sealed.id, chest: { rarity: row >= s.legendFromRow ? 'legend' : 'epic', locked: false, sealed: true } };
+}
+
 export function buildDungeon(dungeonId: string, rng: Rng, levelBonus: number, eventIds: string[]): DungeonRun {
   const def = getDungeon(dungeonId);
   const random = !!def.random || !def.layout;
   const layout = def.layout ?? generateLayout(def, rng, eventIds);
   const id = (r: number, c: number) => `r${r}c${c}`;
   const rooms: Room[] = layout.flatMap((row, r) =>
-    row.map((spec, c) => ({
-      id: id(r, c),
-      row: r,
-      col: c,
-      type: spec.type,
-      next: spec.next.map((n) => id(r + 1, n)),
-      enemies: getRoomType(spec.type).battle ? rollEnemies(def, spec.type, r, levelBonus, rng) : undefined,
-      chest: spec.chest ? { ...spec.chest } : undefined,
-      eventId: spec.eventId,
-      cleared: false,
-    })),
+    row.map((spec, c) => {
+      const { type, chest } = sealChest(spec, r, rng);
+      return {
+        id: id(r, c),
+        row: r,
+        col: c,
+        type,
+        next: spec.next.map((n) => id(r + 1, n)),
+        enemies: getRoomType(type).battle ? rollEnemies(def, type, r, levelBonus, rng) : undefined,
+        chest: chest ? { ...chest } : undefined,
+        eventId: spec.eventId,
+        cleared: false,
+      };
+    }),
   );
   const run: DungeonRun = { dungeonId, name: def.name, random, background: def.background, rooms, gained: [] };
   // 通路の地図の入口に立ち、北（奥）を向く（地図は部屋のつながりから決まる。乱数は引かない）

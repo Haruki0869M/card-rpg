@@ -36,9 +36,9 @@ export const skyPaladin: EnemyDef = {
   resist: ['holy'],
   pattern: 'sequence',
   actions: [
-    { id: 'smite', name: '聖なる剣', effects: [{ kind: 'damage', amount: 19, element: 'holy' }] },
+    { id: 'smite', name: '聖なる剣', big: true, effects: [{ kind: 'damage', amount: 19, element: 'holy' }] },
     { id: 'aegis', name: '星の盾', effects: [{ kind: 'block', amount: 18 }] },
-    { id: 'judgment', name: '天の裁き', effects: [{ kind: 'damage', amount: 10, element: 'holy', to: 'foes' }] },
+    { id: 'judgment', name: '天の裁き', big: true, effects: [{ kind: 'damage', amount: 10, element: 'holy', to: 'foes' }] },
     { id: 'oath', name: '聖騎士の誓い', effects: [{ kind: 'block', amount: 8, to: 'allies' }, { kind: 'damage', amount: 8 }] },
   ],
   abilities: [{ name: '光輪の加護', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 10 }] } }],
@@ -58,7 +58,7 @@ export const starSeerQueen: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'foresight', name: '予知', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'foes' }, { kind: 'block', amount: 10 }] },
-    { id: 'orb', name: '星の宝珠', effects: [{ kind: 'damage', amount: 26, element: 'holy' }] },
+    { id: 'orb', name: '星の宝珠', big: true, effects: [{ kind: 'damage', amount: 26, element: 'holy' }] },
     { id: 'chart', name: '星図の結界', effects: [{ kind: 'block', amount: 22 }, { kind: 'damage', amount: 8 }] },
   ],
   abilities: [{ name: '見えている未来', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 8 }] } }],
@@ -68,10 +68,10 @@ export const starSeerQueen: EnemyDef = {
       name: '予知の涙を流す女王',
       pattern: 'sequence',
       actions: [
-        { id: 'tears', name: '星の涙', effects: [{ kind: 'damage', amount: 13, element: 'holy', to: 'foes' }] },
+        { id: 'tears', name: '星の涙', big: true, effects: [{ kind: 'damage', amount: 13, element: 'holy', to: 'foes' }] },
         { id: 'fate', name: '定められた結末', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2, to: 'foes' }, { kind: 'damage', amount: 10 }] },
         { id: 'wall', name: '見通す壁', effects: [{ kind: 'block', amount: 24 }] },
-        { id: 'pierce', name: '先回りの一閃', effects: [{ kind: 'damage', amount: 24 }] },
+        { id: 'pierce', name: '先回りの一閃', big: true, effects: [{ kind: 'damage', amount: 24 }] },
       ],
     },
     {
@@ -79,9 +79,9 @@ export const starSeerQueen: EnemyDef = {
       name: '流星群を呼ぶ女王',
       pattern: 'sequence',
       actions: [
-        { id: 'meteors', name: '流星群', effects: [{ kind: 'damage', amount: 19, element: 'holy', to: 'foes' }] },
-        { id: 'last', name: '最後の予言', effects: [{ kind: 'damage', amount: 36 }] },
-        { id: 'sky', name: '星の天蓋', effects: [{ kind: 'block', amount: 26 }, { kind: 'damage', amount: 10, to: 'foes' }] },
+        { id: 'meteors', name: '流星群', big: true, effects: [{ kind: 'damage', amount: 19, element: 'holy', to: 'foes' }] },
+        { id: 'last', name: '最後の予言', big: true, effects: [{ kind: 'damage', amount: 36 }] },
+        { id: 'sky', name: '星の天蓋', big: true, effects: [{ kind: 'block', amount: 26 }, { kind: 'damage', amount: 10, to: 'foes' }] },
       ],
     },
   ],

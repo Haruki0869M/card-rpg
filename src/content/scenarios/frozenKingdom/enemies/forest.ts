@@ -93,7 +93,7 @@ export const snowWitch: EnemyDef = {
   resist: ["ice"],
   pattern: "sequence",
   actions: [
-    {"id": "shard", "name": "霜の刃", "effects": [{"kind": "damage", "amount": 8}]},
+    {"id": "shard", "name": "霜の刃", big: true, "effects": [{"kind": "damage", "amount": 8}]},
     {"id": "hex", "name": "眠りの霜", "effects": [{"kind": "applyStatus", "status": "freeze", "amount": 1}]},
     {"id": "curse", "name": "冬の呪い", "effects": [{"kind": "applyStatus", "status": "curse", "amount": 2}]},
     {"id": "veil", "name": "雪の帳", "effects": [{"kind": "block", "amount": 8}]},
@@ -114,16 +114,16 @@ export const crystalLord: EnemyDef = {
   resist: ["ice"],
   pattern: "sequence",
   actions: [
-    {"id": "pillars", "name": "氷柱の雨", "effects": [{"kind": "damage", "amount": 7, "element": "ice", "to": "foes"}]},
+    {"id": "pillars", "name": "氷柱の雨", big: true, "effects": [{"kind": "damage", "amount": 7, "element": "ice", "to": "foes"}]},
     {"id": "guard", "name": "氷晶の殻", "effects": [{"kind": "block", "amount": 16}]},
-    {"id": "pierce", "name": "結晶の槍", "effects": [{"kind": "damage", "amount": 14}]},
+    {"id": "pierce", "name": "結晶の槍", big: true, "effects": [{"kind": "damage", "amount": 14}]},
   ],
   abilities: [{"name": "氷晶の外殻", "effect": {"when": "battleStart", "do": [{"kind": "block", "amount": 6}]}}],
   phases: [
     { belowHpPct: 50, name: "増殖する氷晶", pattern: 'sequence', actions: [
       {"id": "bloom", "name": "増え続ける氷晶", "effects": [{"kind": "block", "amount": 22}]},
-      {"id": "storm", "name": "氷柱の嵐", "effects": [{"kind": "damage", "amount": 10, "element": "ice", "to": "foes"}]},
-      {"id": "lance", "name": "裂ける氷晶", "effects": [{"kind": "damage", "amount": 20}]},
+      {"id": "storm", "name": "氷柱の嵐", big: true, "effects": [{"kind": "damage", "amount": 10, "element": "ice", "to": "foes"}]},
+      {"id": "lance", "name": "裂ける氷晶", big: true, "effects": [{"kind": "damage", "amount": 20}]},
     ] },
   ],
 };

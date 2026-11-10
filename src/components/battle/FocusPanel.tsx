@@ -9,10 +9,17 @@ import { motion } from 'framer-motion';
 import { useMemo } from 'react';
 import { Minus, Plus, Star, X } from 'lucide-react';
 import { cardOf } from '../../data/cards';
+import { getElement } from '../../data/elements';
+import { getStatus } from '../../data/statuses';
+import { attackElement } from '../../engine/battle/cardState';
+import { convertedElement } from '../../engine/abilities';
+import { resistsElement } from '../../engine/battle/effects';
+import type { AllyState, BattleState, CardDef } from '../../types';
+import { breakPreview } from '../format';
 import { rollChanceFor, findAlly, tierDistribution, toPercents, slotPreviewLimitOf } from '../../engine';
 import { useBattle } from '../../store/battleStore';
-import { CATEGORY_STYLE, EffectChip } from '../ui/icons';
-import { TargetChips } from './TargetChips';
+import { CATEGORY_STYLE, EffectChip, ELEMENT_ICONS } from '../ui/icons';
+import { TargetChips, weakGuide } from './TargetChips';
 
 const TIER_COLORS = ['#5a4a5e', '#7a6a8a', '#4a8cff', '#3ad08a', '#ffc94a'];
 
@@ -23,6 +30,48 @@ function pickValue(totals: PredictTotals[], kind: 'damage' | 'block' | 'heal', t
   const own = targetId ? totals.find((t) => t.id === targetId) : undefined;
   if (own && own[kind][1] > 0) return own[kind];
   return maxRange(totals.map((t) => t[kind]).filter((r) => r[1] > 0));
+}
+
+/** 完全成功で必ず付く状態異常の、ひとことの効き目（依頼の文: 氷=行動を止める・雷=30%で行動失敗・火=火傷） */
+const STATUS_HINT: Record<string, string> = { freeze: '敵の行動を止める！', paralysis: '30%で敵の行動が失敗！', burn: '毎ターン火傷のダメージ！', poison: '毎ターン毒のダメージ！', curse: '敵の回復が半分！' };
+
+interface CounterHint { kind: 'break' | 'status'; text: string; color: string; icon?: string }
+/**
+ * 敵の予告を潰す手がかり。乱数の結果は使わない（完全成功の時に必ず起きる事と、成功数だけで決まる事だけを出す）。
+ * - BREAK: 狙う敵（全体カードなら大技を出している敵）が、どの成功数から体勢を崩せるか（大技 48→18 の数字つき）
+ * - 状態異常: 完全成功なら必ず付く、属性の状態異常（耐性のある敵には付かないので出さない）
+ */
+function counterHints(battle: BattleState, ally: AllyState, card: CardDef, targetId: string | undefined, preds: PredictTotals[][], label: (i: number) => string): CounterHint[] {
+  const out: CounterHint[] = [];
+  const foes = battle.enemies.filter((e) => !e.dead && (card.target === 'allEnemies' || e.uid === targetId));
+  if (card.target !== 'enemy' && card.target !== 'allEnemies') return out;
+  for (const e of foes) {
+    const bp = breakPreview(battle, e);
+    if (!bp) continue;
+    const from = preds.findIndex((p) => p.some((t) => t.id === e.uid && t.breaks));
+    if (from < 0) continue;
+    const who = foes.length > 1 ? `${unitName(battle, e.uid)}：` : '';
+    const power = bp.from !== undefined && bp.to !== undefined ? `（${bp.name} ${bp.from}→${bp.to}）` : `（${bp.name}の威力が半分）`;
+    out.push({ kind: 'break', color: '#fcd34d', text: `⚡${who}${from === 0 ? 'この攻撃' : `${label(from)}${from < preds.length - 1 ? '以上' : ''}`}で BREAK！${power}` });
+  }
+  // 完全成功の段の、最初の属性つきの攻撃
+  const top = card.tiers[card.tiers.length - 1];
+  if (top && top.minSuccesses === card.slots) {
+    const seen = new Set<string>();
+    for (const eff of top.effects) {
+      if (eff.kind !== 'damage') continue;
+      const id = convertedElement(ally, card, attackElement(ally, card, eff.element));
+      const el = id ? getElement(id) : undefined;
+      if (!el?.status || seen.has(el.status)) continue;
+      if (!foes.some((e) => !resistsElement(e, el.id))) continue;
+      // 狙う敵がみんな弱点なら、的の札に「弱点×1.5！（完全成功で…）」が出るので、ここには重ねて出さない
+      if (card.target === 'enemy' && foes.every((e) => weakGuide(ally, card, e)?.note)) continue;
+      seen.add(el.status);
+      const st = getStatus(el.status);
+      out.push({ kind: 'status', color: el.color, icon: el.icon, text: `完全成功で${st.name}${STATUS_HINT[el.status] ? `（${STATUS_HINT[el.status]}）` : ''}` });
+    }
+  }
+  return out;
 }
 
 export function FocusPanel() {
@@ -65,6 +114,9 @@ export function FocusPanel() {
     const hi = i + 1 < card.tiers.length ? card.tiers[i + 1].minSuccesses - 1 : card.slots;
     return t.minSuccesses === hi ? `${hi}成功` : `${t.minSuccesses}-${hi}`;
   };
+
+  // 予告を潰す手がかり（抜本的な見直し §3-2）: 大技の予告を崩せる成功数と、完全成功で必ず付く属性の状態異常
+  const hints = !preds || needsTarget ? [] : counterHints(battle, ally, card, selection.targetId, preds.map((p) => p.now), label);
 
   // 一番出やすい成功数（同じ確率なら上の成功数）。狙う敵のチップの予測に使う
   const likelyTier = probs.reduce((best, p, i) => (p >= probs[best] ? i : best), 0);
@@ -131,6 +183,13 @@ export function FocusPanel() {
 
       {needsCardTarget(card) && <div className="mt-1 text-center text-[12px] text-sky-100" data-target-guide>{targetGuide(card)}{selected && `（選択中：${nameOf(selected)}）`}</div>}
       {card.target === 'enemy' && <TargetChips allyId={ally.id} cardUid={inst.uid} focus={selection.focus} tier={likelyTier} tierLabel={label(likelyTier)} targetId={selection.targetId} allyTargetId={selection.allyTargetId} />}
+      {hints.length > 0 && (
+        <div className="mt-1 flex flex-col items-center gap-0.5" data-counter-hints>
+          {hints.map((h, i) => (
+            <div key={i} className="rounded-md bg-black/55 px-2 text-center text-[14px] leading-5 font-black" style={{ color: h.color, boxShadow: `0 0 0 1px ${h.color}` }} data-counter-hint={h.kind}>{h.icon && ELEMENT_ICONS[h.icon] ? (() => { const I = ELEMENT_ICONS[h.icon!]; return <I size={14} strokeWidth={2.8} className="mr-0.5 inline align-[-2px]" />; })() : null}{h.text}</div>
+          ))}
+        </div>
+      )}
       {isAllyCard(card) && !card.secondaryTarget && <AllyTargetChips allyId={ally.id} candidates={cardTargets(battle, ally, card).map(unitIdOf)} chosen={selection.targetId} />}
       {card.secondaryTarget && <div className="text-center text-[12px] text-sky-100" data-secondary-target-guide>回復・支援する味方をタップしてください{secondary && `（選択中：${nameOf(secondary)}）`}</div>}
       {card.secondaryTarget && <AllyTargetChips allyId={ally.id} candidates={cardTargets(battle, ally, secondaryCard(card)).map(unitIdOf)} chosen={selection.allyTargetId} />}

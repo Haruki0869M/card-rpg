@@ -71,8 +71,8 @@ export const coralGolem: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'wall', name: '珊瑚の壁', effects: [{ kind: 'block', amount: 16 }] },
-    { id: 'slam', name: '珊瑚の拳', effects: [{ kind: 'damage', amount: 14 }] },
-    { id: 'shards', name: '砕けた珊瑚', effects: [{ kind: 'damage', amount: 6, to: 'foes' }] },
+    { id: 'slam', name: '珊瑚の拳', big: true, effects: [{ kind: 'damage', amount: 14 }] },
+    { id: 'shards', name: '砕けた珊瑚', big: true, effects: [{ kind: 'damage', amount: 6, to: 'foes' }] },
   ],
   abilities: [{ name: '育つ珊瑚', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 8 }] } }],
 };
@@ -91,7 +91,7 @@ export const seaSerpentQueen: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'fang', name: '女王の毒牙', effects: [{ kind: 'damage', amount: 9 }, { kind: 'applyStatus', status: 'poison', amount: 3 }] },
-    { id: 'coil', name: '締め付け', effects: [{ kind: 'damage', amount: 14 }, { kind: 'applyStatus', status: 'weak', amount: 1 }] },
+    { id: 'coil', name: '締め付け', big: true, effects: [{ kind: 'damage', amount: 14 }, { kind: 'applyStatus', status: 'weak', amount: 1 }] },
     { id: 'scales', name: '鱗の守り', effects: [{ kind: 'block', amount: 14 }] },
   ],
   abilities: [{ name: '女王の鱗', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 6 }] } }],
@@ -101,8 +101,8 @@ export const seaSerpentQueen: EnemyDef = {
       name: '怒れる海蛇の女王',
       pattern: 'sequence',
       actions: [
-        { id: 'miasma', name: '毒の潮', effects: [{ kind: 'applyStatus', status: 'poison', amount: 3, to: 'foes' }, { kind: 'damage', amount: 5, to: 'foes' }] },
-        { id: 'crush', name: '大締め付け', effects: [{ kind: 'damage', amount: 20 }] },
+        { id: 'miasma', name: '毒の潮', big: true, effects: [{ kind: 'applyStatus', status: 'poison', amount: 3, to: 'foes' }, { kind: 'damage', amount: 5, to: 'foes' }] },
+        { id: 'crush', name: '大締め付け', big: true, effects: [{ kind: 'damage', amount: 20 }] },
         { id: 'shed', name: '脱皮', effects: [{ kind: 'block', amount: 18 }] },
       ],
     },

@@ -60,8 +60,8 @@ export const bogWraith: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'wail', name: '嘆きの声', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'foes' }] },
-    { id: 'touch', name: '凍える手', effects: [{ kind: 'damage', element: 'ice', amount: 12 }] },
-    { id: 'haunt', name: '取り憑く', effects: [{ kind: 'damage', element: 'dark', amount: 6, to: 'foes' }] },
+    { id: 'touch', name: '凍える手', big: true, effects: [{ kind: 'damage', element: 'ice', amount: 12 }] },
+    { id: 'haunt', name: '取り憑く', big: true, effects: [{ kind: 'damage', element: 'dark', amount: 6, to: 'foes' }] },
   ],
   abilities: [{ name: '怨念', effect: { when: 'turnStart', do: [{ kind: 'heal', amount: 3, to: 'self' }] } }],
 };
@@ -79,7 +79,7 @@ export const mordea: EnemyDef = {
   gold: 120,
   pattern: 'sequence',
   actions: [
-    { id: 'deathBolt', name: '死の魔弾', effects: [{ kind: 'damage', element: 'dark', amount: 14 }] },
+    { id: 'deathBolt', name: '死の魔弾', big: true, effects: [{ kind: 'damage', element: 'dark', amount: 14 }] },
     {
       id: 'curse',
       name: '屍の呪い',
@@ -96,9 +96,9 @@ export const mordea: EnemyDef = {
       name: '冥府の屍術師',
       pattern: 'sequence',
       actions: [
-        { id: 'necromance', name: '死霊の宴', effects: [{ kind: 'heal', amount: 20, to: 'self' }, { kind: 'damage', element: 'dark', amount: 10, to: 'foes' }] },
-        { id: 'soulRip', name: '魂裂き', effects: [{ kind: 'damage', element: 'dark', amount: 22 }] },
-        { id: 'plague', name: '疫病の霧', effects: [{ kind: 'applyStatus', status: 'poison', amount: 4, to: 'foes' }, { kind: 'damage', amount: 5, to: 'foes' }] },
+        { id: 'necromance', name: '死霊の宴', big: true, effects: [{ kind: 'heal', amount: 20, to: 'self' }, { kind: 'damage', element: 'dark', amount: 10, to: 'foes' }] },
+        { id: 'soulRip', name: '魂裂き', big: true, effects: [{ kind: 'damage', element: 'dark', amount: 22 }] },
+        { id: 'plague', name: '疫病の霧', big: true, effects: [{ kind: 'applyStatus', status: 'poison', amount: 4, to: 'foes' }, { kind: 'damage', amount: 5, to: 'foes' }] },
       ],
     },
   ],

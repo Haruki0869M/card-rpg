@@ -3,6 +3,7 @@
 // マス目の視界（viewSlices）は扉には使わない（絵とボタンが食い違わないように）。乱数は使わない。
 import { doorFront, doorKind, dungeonGrid, findPath, omenOfType, reachableRooms, type DoorKind, type DoorOmen, type ViewEnd, type ViewSlice } from '../../engine';
 import type { DungeonRun, Room } from '../../types';
+import { getRoomType } from '../../data/rules';
 
 /** 前にある扉の選択肢（左から右へ）。押すと扉を開ける（扉1つ＝手番1回） */
 export interface DoorChoice {
@@ -34,9 +35,11 @@ export interface WallDoor {
   roomId: string;
   kind: DoorKind;
   omen?: DoorOmen;
+  /** 封魔の宝箱の扉（金の扉に、紫の封印の印を重ねて見せる） */
+  sealed?: boolean;
 }
 
-export const wallDoors = (choices: DoorChoice[]): WallDoor[] => choices.map(({ room }) => ({ roomId: room.id, kind: doorKind(room), omen: omenOfType(room.type) }));
+export const wallDoors = (choices: DoorChoice[]): WallDoor[] => choices.map(({ room }) => ({ roomId: room.id, kind: doorKind(room), omen: omenOfType(room.type), ...(getRoomType(room.type).sealedChest ? { sealed: true } : {}) }));
 
 /** 絵の中の扉の位置（center = 正面 / left・right = 左右の口の奥） */
 export type WallSlot = 'left' | 'center' | 'right';

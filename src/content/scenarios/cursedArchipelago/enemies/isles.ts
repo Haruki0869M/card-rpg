@@ -108,8 +108,8 @@ export const drownedKnight: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'oath', name: '沈んだ誓い', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }, { kind: 'block', amount: 10 }] },
-    { id: 'blade', name: '錆びた大剣', effects: [{ kind: 'damage', amount: 18 }] },
-    { id: 'sweep', name: '潮の薙ぎ払い', effects: [{ kind: 'damage', amount: 8, to: 'foes' }] },
+    { id: 'blade', name: '錆びた大剣', big: true, effects: [{ kind: 'damage', amount: 18 }] },
+    { id: 'sweep', name: '潮の薙ぎ払い', big: true, effects: [{ kind: 'damage', amount: 8, to: 'foes' }] },
     { id: 'guard', name: '水底の構え', effects: [{ kind: 'block', amount: 14 }, { kind: 'damage', amount: 7 }] },
   ],
   abilities: [{ name: '錆びた鎧', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 8 }] } }],
@@ -130,7 +130,7 @@ export const seaWitch: EnemyDef = {
   actions: [
     { id: 'brew', name: '毒の煮汁', effects: [{ kind: 'applyStatus', status: 'poison', amount: 3, to: 'foes' }] },
     { id: 'hex', name: '海霧の呪い', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }, { kind: 'damage', amount: 7 }] },
-    { id: 'wave', name: '黒い波', effects: [{ kind: 'damage', amount: 15 }] },
+    { id: 'wave', name: '黒い波', big: true, effects: [{ kind: 'damage', amount: 15 }] },
     { id: 'veil', name: '霧の帳', effects: [{ kind: 'block', amount: 12 }] },
   ],
   abilities: [{ name: '魔女の霧', effect: { when: 'battleStart', do: [{ kind: 'applyStatus', status: 'weak', amount: 1, to: 'foes' }] } }],
@@ -149,9 +149,9 @@ export const tideHighPriest: EnemyDef = {
   resist: ['holy'],
   pattern: 'sequence',
   actions: [
-    { id: 'wave', name: '潮の波', effects: [{ kind: 'damage', amount: 10, to: 'foes' }] },
+    { id: 'wave', name: '潮の波', big: true, effects: [{ kind: 'damage', amount: 10, to: 'foes' }] },
     { id: 'prayer', name: '満ち潮の祈り', effects: [{ kind: 'block', amount: 20 }] },
-    { id: 'trident', name: '神官の三叉槍', effects: [{ kind: 'damage', amount: 23 }] },
+    { id: 'trident', name: '神官の三叉槍', big: true, effects: [{ kind: 'damage', amount: 23 }] },
   ],
   abilities: [{ name: '潮の加護', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 8 }] } }],
   phases: [
@@ -160,9 +160,9 @@ export const tideHighPriest: EnemyDef = {
       name: '大潮を呼ぶ神官',
       pattern: 'sequence',
       actions: [
-        { id: 'springTide', name: '大潮', effects: [{ kind: 'damage', amount: 15, to: 'foes' }] },
+        { id: 'springTide', name: '大潮', big: true, effects: [{ kind: 'damage', amount: 15, to: 'foes' }] },
         { id: 'undertow', name: '引き潮の呪い', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2, to: 'foes' }, { kind: 'block', amount: 16 }] },
-        { id: 'drown', name: '溺れる祈り', effects: [{ kind: 'damage', amount: 30 }] },
+        { id: 'drown', name: '溺れる祈り', big: true, effects: [{ kind: 'damage', amount: 30 }] },
       ],
     },
   ],
