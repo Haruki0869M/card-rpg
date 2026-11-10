@@ -1,6 +1,6 @@
 // ===== 宝箱・イベント・休憩の画面 =====
 import { ItemInfoArea } from '../ItemDetail';
-import { VoteChips } from '../ui/Votes';
+import { VoteChips, VoteStatus } from '../ui/Votes';
 import { motion } from 'framer-motion';
 import { ArrowUpCircle, Coins, Flame, Sparkles, Star } from 'lucide-react';
 import { useState } from 'react';
@@ -102,6 +102,7 @@ export function EventScreen() {
   };
   const options = (
     <div className="mt-3 flex flex-col gap-2">
+      <VoteStatus />
       {def.options.map((o, i) => {
         const st = eventOptionState(game, ev.eventId, i);
         if (!st.visible) return null;
@@ -191,6 +192,7 @@ export function EventScreen() {
       </div>
       {(ev.result || opt?.check) && (
         <div className="panel shrink-0 rounded-t-2xl px-3 pt-2 pb-3">
+          {ev.result && <VoteStatus className="mb-2" />}
           {ev.result ? (
             <button onClick={() => dispatchGame({ type: 'FINISH_EVENT', playerId: LOCAL_PLAYER })} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px]">
               {ev.battle ? '戦闘を始める' : '先へ進む'}
@@ -283,6 +285,7 @@ export function RestScreen() {
         </div>
       </div>
       <div className="grid shrink-0 grid-cols-2 gap-2 px-3 pt-2 pb-3">
+        <VoteStatus className="col-span-2" />
         <button onClick={() => dispatchGame({ type: 'REST', playerId: LOCAL_PLAYER, kind: 'hp' })} className="btn btn-gold flex h-16 flex-col items-center justify-center rounded-xl">
           <span className="font-display text-[18px]">
             休む

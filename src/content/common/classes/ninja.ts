@@ -9,6 +9,6 @@ export const ninja: ClassDef = {
   stats: { ...shadow.stats, agi: shadow.stats.agi + 8, dex: shadow.stats.dex + 8 },
   battleAbility: { name: '影分身', description: '分身2つ。攻撃のたびに各分身が半分の威力で追撃。被弾時は分身1つを消してダメージを0にする', effect: { when: 'battleStart', do: [1, 2].map(n => ({ kind: 'summon' as const, id: `shadowClone${n}`, name: `影分身${n}`, icon: '👤', damage: 0, turns: 99, echoPct: 50, intercept: true })) } },
   exploreAbility: { id: 'ninjaExplore', name: '忍び足', description: '逃げる判定+35%', effect: { kind: 'checkBonus', check: 'flee', bonus: 35 } },
-  requires: { feat: 'kills:status', count: 10, text: '状態異常の敵を10体倒す' },
+  requires: { feat: 'kills:status', count: 6, text: '状態異常の敵を6体倒す' },
   cardPool: ["shadowShuriken","ninjaVenom","shadowStep","ninjaBreath","nightExecution"], signature: ["shadowShuriken","ninjaVenom","shadowStep"],
 };

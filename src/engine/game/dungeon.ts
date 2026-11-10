@@ -1,4 +1,5 @@
 import { RARITY_NAME } from '../../data/terms';
+import { BALANCE } from '../../data/balance';
 // ===== ダンジョンの生成と移動 =====
 import { getRoomType, ROOM_TYPES } from '../../data/rules';
 import { getDungeon } from './registry';
@@ -12,17 +13,35 @@ export { RARITY_NAME };
 
 const pick = <T,>(list: readonly T[], rng: Rng) => list[rng.int(list.length)];
 
-/** 深さの数え方の元になる行の数（大きくする前の鍵のダンジョンの行の数） */
-const DEPTH_ROWS = 9;
+/** 深さの段: 3行ごとに +1（入口の行が 0。抜本的な見直し §2-2） */
+export const depthStep = (row: number) => Math.floor(row / BALANCE.depthBonus.rowsPerStep);
+/** 深層ボーナスの段（0=入口 / 1=浅層 / 2=中層 / 3=深層。それより深くても 3） */
+export const depthTier = (row: number) => Math.min(BALANCE.depthBonus.reward.length - 1, depthStep(row));
+/** 深層ボーナスの名前（画面用。入口は空） */
+export const DEPTH_TIER_NAME = ['', '浅層', '中層', '深層'] as const;
+
+/** 入口からボスまでの行の数 */
+export const dungeonRows = (run: Pick<DungeonRun, 'rooms'>) => Math.max(0, ...run.rooms.map((r) => r.row)) + 1;
+
+/**
+ * 古い形のダンジョンか（40行・52行に大きくしていた頃に入った、固定のダンジョン）。
+ * 保存に目印は足さない: 「今のデータの行の数」と「入った時に保存した部屋の行の数」が違えば古い形。ランダムダンジョンは形が変わっていないので当てはまらない
+ */
+export function isLegacyLayout(run: Pick<DungeonRun, 'dungeonId' | 'rooms' | 'random'>): boolean {
+  if (run.random) return false;
+  const layout = getDungeon(run.dungeonId).layout;
+  return !!layout && layout.length !== dungeonRows(run);
+}
 
 /** 部屋の敵を決める（組み合わせと加算レベルは部屋の種類のデータ。レベルはダンジョンの基準 + 深さ + 難易度） */
-function rollEnemies(def: DungeonDef, type: RoomType, row: number, levelBonus: number, rng: Rng, rows = 0) {
+function rollEnemies(def: DungeonDef, type: RoomType, row: number, levelBonus: number, rng: Rng) {
   const b = getRoomType(type).battle!;
-  const ids = b.pool === 'boss' ? def.pools.boss : pick(def.pools[b.pool], rng);
-  // 深さ: 3行ごとに+1。大きくしたダンジョン（9行より長い）は、元の9行の深さに直して数える（40行で+13にならないように。奥のボスで+2まで）
-  const depthRow = rows > DEPTH_ROWS ? (row * (DEPTH_ROWS - 1)) / (rows - 1) : row;
-  const depthBonus = Math.floor(depthRow / 3);
-  const lv = def.baseLevel + depthBonus + levelBonus + b.levelBonus;
+  let ids = b.pool === 'boss' ? def.pools.boss : b.pool === 'midboss' ? (def.pools.midboss ?? def.pools.elite[0]) : pick(def.pools[b.pool], rng);
+  const step = depthStep(row);
+  // 奥（7行目以降）の戦闘・強敵の部屋は、そのダンジョンの戦闘の敵が1体増える（最大4体。ボス・中ボスは決まった組のまま）
+  if ((b.pool === 'battle' || b.pool === 'elite') && step >= BALANCE.depthBonus.extraEnemyFromStep && ids.length < BALANCE.maxEnemies) ids = [...ids, pick(pick(def.pools.battle, rng), rng)];
+  // 深さ: 3行ごとに+1（鍵10行のボスで+3、最後13行のボスで+4）
+  const lv = def.baseLevel + step + levelBonus + b.levelBonus;
   return ids.map((defId) => ({ defId, level: Math.max(1, lv) }));
 }
 
@@ -37,8 +56,8 @@ function rollChest(row: number, rng: Rng): ChestSpec {
 }
 
 /** 途中の行の部屋の種類（部屋の種類のデータの layoutWeight の割合。x は 0〜1 の乱数） */
-function pickRoomType(x: number): RoomType {
-  const list = ROOM_TYPES.all.filter((t) => (t.layoutWeight ?? 0) > 0);
+function pickRoomType(x: number, banned: ReadonlySet<RoomType>): RoomType {
+  const list = ROOM_TYPES.all.filter((t) => (t.layoutWeight ?? 0) > 0 && !banned.has(t.id));
   const total = list.reduce((n, t) => n + t.layoutWeight!, 0);
   let acc = 0;
   for (const t of list) {
@@ -56,13 +75,21 @@ function generateLayout(def: DungeonDef, rng: Rng, eventIds: string[]): NonNulla
   for (let r = 0; r < rows; r++) {
     const w = widths[r];
     const nextW = r + 1 < rows ? widths[r + 1] : 1;
+    // 偏り防止（どの道でも: 休憩→休憩なし・イベント→イベントなし・通常の戦闘は最大2連続）。
+    // つながりに関係なく「前の行にその種類が1つでもあれば、この行には出さない」と決める（厳しめだが、どの道でも必ず守れる）
+    const prev = layout[r - 1]?.map((p) => p.type) ?? [];
+    const prev2 = layout[r - 2]?.map((p) => p.type) ?? [];
+    const banned = new Set<RoomType>();
+    if (prev.includes('rest')) banned.add('rest');
+    if (prev.includes('event')) banned.add('event');
+    if (prev.includes('battle') && prev2.includes('battle')) banned.add('battle');
     const row = Array.from({ length: w }, (_, c) => {
       // 部屋の種類: 1行目は戦闘。最後の行の手前は休憩が出やすい
       let type: RoomType;
       const x = rng.next();
       if (r === 0) type = 'battle';
-      else if (r === rows - 1) type = x < 0.6 ? 'rest' : 'chest';
-      else type = pickRoomType(x);
+      else if (r === rows - 1) type = x < 0.6 && !banned.has('rest') ? 'rest' : 'chest';
+      else type = pickRoomType(x, banned);
       // 次の行への接続（位置が近い部屋へ。必ず1つ以上）
       const center = nextW === 1 ? 0 : Math.round((c / Math.max(1, w - 1)) * (nextW - 1));
       const next = new Set<number>([center]);
@@ -101,7 +128,7 @@ export function buildDungeon(dungeonId: string, rng: Rng, levelBonus: number, ev
       col: c,
       type: spec.type,
       next: spec.next.map((n) => id(r + 1, n)),
-      enemies: getRoomType(spec.type).battle ? rollEnemies(def, spec.type, r, levelBonus, rng, layout.length) : undefined,
+      enemies: getRoomType(spec.type).battle ? rollEnemies(def, spec.type, r, levelBonus, rng) : undefined,
       chest: spec.chest ? { ...spec.chest } : undefined,
       eventId: spec.eventId,
       cleared: false,

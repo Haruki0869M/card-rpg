@@ -67,7 +67,7 @@ import { questGatedNext } from './world/questGate';
 import { leaveSanctuary, leaveShrine, leaveTown, questAccept, questReport, shrineChoose, bringMyPet, townBuy, townInn, townRemoveCard, townSell } from './world/town';
 import { getRoomType } from '../../data/rules';
 import { TERRAINS } from '../../data/world';
-import { buildDungeon, findRoom, RARITIES, rarityIndex, reachableRooms } from './dungeon';
+import { buildDungeon, depthTier, findRoom, isLegacyLayout, RARITIES, rarityIndex, reachableRooms } from './dungeon';
 import { newDice, rerollDice } from './dice';
 import { canMove, cellKey, DIRS, doorFront, doorNorthOf, dungeonGrid, findPath, moveIntoRoom, posOf, revealSeen, turnTo } from './dungeonMap';
 import { watchSpot } from './dungeonOmen';
@@ -826,7 +826,9 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
   let gold = 0;
   const rt = getRoomType(room?.type ?? game.battleInfo?.roomType ?? 'battle');
   if (!room) onWandererDefeated(game, rng);
-  const rewardMul = getDifficulty(game.difficulty).reward ?? 1;
+  // 深層ボーナス: ダンジョンの奥の部屋ほど、お金・経験値が増え、カードのコモンが減る（古い形のダンジョンには付けない）
+  const tier = room && run && !isLegacyLayout(run) ? depthTier(room.row) : 0;
+  const rewardMul = (getDifficulty(game.difficulty).reward ?? 1) * (1 + BALANCE.depthBonus.reward[tier]);
   for (const e of b.enemies) {
     // 逃げた敵（黄金のコソ泥など）は倒していないので報酬なし
     // 戦闘中に呼ばれた増援も報酬なし（呼び続けさせて稼ぐことができないように）
@@ -847,7 +849,7 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
   const onWin = game.battleInfo?.onWin;
   if (onWin?.length) applyOutcomes(game, onWin, survivorHeroes[0], rng);
 
-  const cardOdds = cardRewardOdds(rt.battle?.cardOdds ?? 'battle');
+  const cardOdds = cardRewardOdds(rt.battle?.cardOdds ?? 'battle', tier);
   const reward: RewardState = { gold, exp: [], levelUps: [], cardOffers: survivors.flatMap((id) => rollCardOffers(game, [id], rng, cardOdds)), cardOdds, cardDone: [], cardPicked: false, loot: [] };
   for (const id of survivors) {
     const h = findHero(game, id)!;
@@ -1016,7 +1018,10 @@ const GRADE_NAME = RARITY_NAME;
  */
 function worldTurnError(game: GameState, playerId: string, onTile: boolean): string | undefined {
   if (!onTile || game.activeScene || !game.world) return undefined;
-  return ownedBy(findHero(game, game.world.turn), playerId) ? undefined : '手番のキャラの担当の人が操作します';
+  const turnHero = findHero(game, game.world.turn);
+  if (ownedBy(turnHero, playerId)) return undefined;
+  // だれの番かが分かる文に（2026-11-10 の実機で「だれが押すのか分からない」と言われたため）
+  return turnHero ? `${turnHero.playerId} ${turnHero.name}の手番です（担当の人が操作します）` : '手番のキャラの担当の人が操作します';
 }
 
 /** 宝箱を2人以上のプレイヤーで開けるか（開け役をみんなで決め、中身を取り合う。ステップ2） */
@@ -1278,6 +1283,8 @@ function rest(game: GameState, playerId: string, kind: 'hp' | 'focus'): string |
 
 /** 撤退すると失うもの（このダンジョンで最後に手に入れた装備） */
 export function retreatLoss(game: GameState): ItemInstance | undefined {
+  // 古い形（40行・52行）のダンジョンは、損をせずに撤退できる（入り直すと新しい形になる。オーナーの決定 6-B）
+  if (game.dungeon && isLegacyLayout(game.dungeon)) return undefined;
   const g = game.dungeon?.gained ?? [];
   for (let i = g.length - 1; i >= 0; i--) if (game.heroes.some((h) => h.stash.some((s) => s.uid === g[i].uid)) || isEquipped(game, g[i].uid)) return g[i];
   return undefined;
@@ -1296,6 +1303,7 @@ function retreat(game: GameState, playerId: string, rng: Rng): string | undefine
     addLog(game, `撤退の途中で「${getItem(lost.itemId).name}」を落としてしまった…`);
   }
   addLog(game, `${game.dungeon.name}から撤退した`);
+  if (isLegacyLayout(game.dungeon)) addLog(game, '古い形のダンジョンだったので、何も失わずに引き返せた。入り直すと新しい短い形になる');
   leaveDungeon(game, rng);
   return undefined;
 }
@@ -1395,6 +1403,7 @@ function usePouchItem(
   if (game.mode === 'battle' && game.battle) {
     const room = game.dungeon ? findRoom(game.dungeon, game.dungeon.currentRoomId ?? '') : undefined;
     if (def.use.some((e) => e.kind === 'escape') && isBossRoom(room)) return { error: 'ボスからは逃げられない！', events: [] };
+    if (def.use.some((e) => e.kind === 'escape') && room && roomTypeOf(room).battle?.noEscape) return { error: '中ボスからは逃げられない！', events: [] };
     const r = applyCommand(game.battle, {
       type: 'USE_ITEM',
       playerId: cmd.playerId,

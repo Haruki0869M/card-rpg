@@ -74,6 +74,22 @@ for (width of [360, 390, 480]) {
   });
   if (overlap > 0) await fail(`最後の段が「世界マップへ」の欄に ${overlap.toFixed(1)}px 重なる`);
   await shot('shop-bottom');
+  // 下までスクロールした後に「カード削除」へ替えても、説明文の1行目から見える（2026-11-10: 「くはできません）」だけ見えていた）
+  await page.locator('[data-town-tabs] button', { hasText: 'カード削除' }).click();
+  await page.waitForTimeout(150);
+  const removeNote = await page.evaluate(() => {
+    const body = document.querySelector('[data-town-body]');
+    const el = [...body.querySelectorAll('div')].find((d) => d.childElementCount === 0 && /山札からいらないカードを1枚取り除きます/.test(d.textContent));
+    if (!el) return { found: false };
+    const r = el.getBoundingClientRect();
+    const b = body.getBoundingClientRect();
+    return { found: true, top: r.top, bodyTop: b.top, scrollTop: body.scrollTop };
+  });
+  if (!removeNote.found) await fail('「カード削除」の説明文が見つからない');
+  else if (removeNote.top < removeNote.bodyTop - 0.5 || removeNote.scrollTop > 0) await fail(`「カード削除」の説明文の1行目が隠れている（top ${removeNote.top.toFixed(0)} / 枠 ${removeNote.bodyTop.toFixed(0)} / scroll ${removeNote.scrollTop}）`);
+  await shot('remove-tab');
+  await page.locator('[data-town-tabs] button', { hasText: 'ショップ' }).click();
+  await page.waitForTimeout(150);
   const issues = await layoutIssues(page);
   if (issues.length) await fail(`町の表示の問題: ${issues.join(' / ')}`);
   await page.locator('[data-town-body]').evaluate((el) => el.scrollTo(0, 0));

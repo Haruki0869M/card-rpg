@@ -1,6 +1,6 @@
 // ===== ダンジョンの通路（第3段階: 歩いて回り、見た所が地図に描き足される。部屋の中身は扉を開けるまで分からない） =====
 // 段階B: 一人称の通路の絵（DungeonView）・右上のミニマップ（タップで大きな地図と「ここまで歩く」）・絵に重ねた歩くボタン
-import { VoteChips } from '../ui/Votes';
+import { VoteChips, VoteStatus } from '../ui/Votes';
 import { AnimatePresence, motion } from 'framer-motion';
 import { showVoteHint, moveGuide } from '../dungeon/hints';
 import { ArrowDown, ArrowUp, Backpack, Check, Coins, Compass, Crown, DoorClosed, DoorClosedLocked, Flame, Gift, Hand, LogOut, Menu, Sparkles, Swords, Skull, Users, X, Dices, Star } from 'lucide-react';
@@ -23,6 +23,10 @@ import {
   OMEN_INFO,
   type DoorOmen,
   exploredPercent,
+  depthTier,
+  DEPTH_TIER_NAME,
+  dungeonRows,
+  isLegacyLayout,
   findPath,
   heroMaxHp,
   notVoted,
@@ -372,6 +376,9 @@ export function DungeonScreen() {
   const hasTabs = useBattle((s) => (s.full?.expeditions?.length ?? 0) > 0);
   const partyHeroes = game.heroes.filter((h) => !game.party || game.party.includes(h.id));
   const loss = retreatLoss(game);
+  // 古い形（40行・52行）のダンジョンか / 今いる行（入口の通路は0）
+  const oldShape = isLegacyLayout(run);
+  const depthRow = (vr.rooms.find((r) => r.id === vr.currentRoomId)?.row ?? -1) + 1;
   const nav = dungeonNavigator(game);
   // 扉を選べるか（手番・担当・サイコロの後・残りがある）
   const myTurn = dungeonTurnHere(game) && !!nav && isLocalPlayer(nav.playerId);
@@ -445,6 +452,22 @@ export function DungeonScreen() {
               <Coins size={14} /> {partyGold(game)}G
             </div>
           </div>
+          {/* 深さ（今いる行 / 入口からボスまでの行）と、深層ボーナス。古い形のダンジョンは撤退して入り直せることを知らせる */}
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="panel flex h-7 shrink-0 items-center gap-1 rounded-full px-2 text-[12px] font-bold text-violet-200 tabular-nums" data-depth>
+              <ArrowDown size={13} /> 深さ {depthRow}/{dungeonRows(vr)}
+              {!oldShape && depthTier(Math.max(0, depthRow - 1)) > 0 && (
+                <span className="text-amber-200">
+                  {DEPTH_TIER_NAME[depthTier(depthRow - 1)]} 報酬+{Math.round(BALANCE.depthBonus.reward[depthTier(depthRow - 1)] * 100)}%
+                </span>
+              )}
+            </span>
+            {oldShape && (
+              <span className="rounded-lg bg-black/75 px-2 py-0.5 text-[12px] leading-4 font-bold text-amber-200" data-old-shape>
+                このダンジョンは古い形です。撤退しても何も失いません。入り直すと新しい短い形になります
+              </span>
+            )}
+          </div>
           {inRoom && inRoomStyle && (
             <span className="flex items-center gap-1 rounded-lg bg-black/70 px-2 py-0.5 text-[12px] leading-4 font-bold" style={{ color: inRoomStyle.color }} data-room-here>
               <inRoomStyle.Icon size={13} /> {inRoomStyle.name}の部屋{inRoom.cleared ? '（済）' : ''}
@@ -464,6 +487,8 @@ export function DungeonScreen() {
         </div>
         {/* 下端: 前にある扉のボタン（左から右へ）。押すと扉の前まで歩いて開ける。開けるのは手番のキャラの担当の人 */}
         <div className="absolute inset-x-2 bottom-2 z-10 flex flex-col gap-1" style={{ pointerEvents: busy ? 'none' : undefined }} data-dungeon-controls={busy ? 'busy' : 'ready'}>
+          {/* みんなの選択を待っている時の枠（扉・手番を終える など）。ボタンの上に置き、重ねない */}
+          {!showRetreat && <VoteStatus />}
           {canPin && !guide && (
             <div className="pointer-events-none flex justify-center" data-pin-guide>
               <span className="rounded-lg bg-black/75 px-2 py-0.5 text-[12px] leading-4 text-sky-100">扉のボタン・地図のマスを押すと、手番の人に「こっち！」と伝えられます</span>
@@ -530,7 +555,12 @@ export function DungeonScreen() {
           >
             <div className="panel panel-gold-edge m-2 w-full rounded-xl p-3" onClick={(e) => e.stopPropagation()}>
               <div className="font-display text-[18px] text-red-200">ダンジョンから撤退する</div>
-              <div className="mt-1 text-[13px] text-zinc-300">拠点に戻ると全員が全回復します。ただし、このダンジョンで手に入れた宝を1つ失います。</div>
+              <VoteStatus className="mt-1" />
+              <div className="mt-1 text-[13px] text-zinc-300">
+                {oldShape
+                  ? 'このダンジョンは古い形です。撤退しても何も失いません。入り直すと新しい短い形になります（進んだ部屋は最初からになります。入り直す時の侵食度と手番は、いつもどおりかかります）。'
+                  : '拠点に戻ると全員が全回復します。ただし、このダンジョンで手に入れた宝を1つ失います。'}
+              </div>
               {loss ? (
                 <div className="mt-2 flex items-center gap-2 rounded-lg bg-red-950/50 p-2 text-[13px]">
                   <ItemIcon item={getItem(loss.itemId)} size={36} />

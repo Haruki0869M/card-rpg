@@ -84,8 +84,16 @@ export function rollChestContents(game: GameState, grade: Rarity, big: boolean, 
 }
 
 /** カード報酬の格の確率（%・コモン/レア/エピック） */
-export function cardRewardOdds(roomType: string): number[] {
-  return [...(BALANCE.cardRewardOdds[roomType] ?? BALANCE.cardRewardOdds.battle)];
+export function cardRewardOdds(roomType: string, depthTier = 0): number[] {
+  const base = BALANCE.cardRewardOdds[roomType] ?? BALANCE.cardRewardOdds.battle;
+  // 深層ボーナス: 奥の部屋ほどコモンの枠が減る（コモンは0より下げない。減らせなかった分はレアから引く）
+  const shift = BALANCE.depthBonus.cardShift[depthTier] ?? [];
+  const out = base.map((v, i) => v + (shift[i] ?? 0));
+  if (out[0] < 0) {
+    out[1] += out[0];
+    out[0] = 0;
+  }
+  return out;
 }
 
 /** 報酬カード3枚（生きているキャラの職業の候補から。重複なし）。1枚ずつ格を抽選する（spec §13） */

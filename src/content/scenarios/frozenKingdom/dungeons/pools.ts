@@ -137,6 +137,10 @@ export const CASTLE_POOLS: DungeonDef['pools'] = {
       "frostGuardian"
     ]
   ],
+  "midboss": [
+    "frostGuardian",
+    "iceSwordsman"
+  ],
   "boss": [
     "whiteQueen"
   ]

@@ -12,7 +12,7 @@ export const timeMage: ClassDef = {
   startingEquipment: { ...archmage.startingEquipment, weapon: 'apprenticeTome' },
   battleAbility: { name: '時間の余白', effect: { when: 'turnStart', if: [{ kind: 'turnAtMost', turn: 1 }], do: [{ kind: 'gainMana', amount: BALANCE.specialJobs.firstTurnMana }] } },
   exploreAbility: { id: 'timeMageExplore', name: '時の直感', description: 'イベントの判定+15%', effect: { kind: 'checkBonus', check: 'event', bonus: 15 } },
-  requires: { feat: 'mana', count: 200, text: 'マナを合わせて200使う' },
+  requires: { feat: 'mana', count: 70, text: 'マナを合わせて70使う' },
   cardPool: ['timeArrow', 'timeShield', 'timeHaste', 'timeStop', 'timeMend', 'timeCollapse'], signature: ['timeArrow', 'timeShield', 'timeHaste'],
   jobCards: ['timeStop'],
 };

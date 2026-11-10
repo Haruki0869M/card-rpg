@@ -1,5 +1,5 @@
 // ===== 戦闘の報酬（ゴールド → 経験値 → レベルアップ → カード → ドロップ） =====
-import { VoteChips } from '../ui/Votes';
+import { VoteChips, VoteStatus } from '../ui/Votes';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowUpCircle, Coins, Gift, Heart, Sparkles, Star, TrendingUp } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
@@ -278,10 +278,13 @@ export function RewardScreen() {
         ) : pending.length ? (
           <div className="flex h-12 items-center justify-center rounded-xl bg-black/40 text-[14px] text-zinc-300">ほかの人がカードを選び終えるのを待っています</div>
         ) : (
-          <button onClick={() => dispatchGame({ type: 'FINISH_REWARD', playerId: LOCAL_PLAYER })} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px]">
-            {r.hiddenChest ? '隠し宝箱へ' : '先へ進む'}
-            <VoteChips cmd={{ type: 'FINISH_REWARD', playerId: LOCAL_PLAYER }} />
-          </button>
+          <>
+            <VoteStatus className="mb-2" />
+            <button onClick={() => dispatchGame({ type: 'FINISH_REWARD', playerId: LOCAL_PLAYER })} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px]">
+              {r.hiddenChest ? '隠し宝箱へ' : '先へ進む'}
+              <VoteChips cmd={{ type: 'FINISH_REWARD', playerId: LOCAL_PLAYER }} />
+            </button>
+          </>
         )}
       </div>
 

@@ -51,6 +51,8 @@ export const CASTLE_POOLS: DungeonDef['pools'] = {
     ["siegeImp", "darkKnight"],
   ],
   elite: [['gatekeeper']],
+  // 7行目の中ボス: 門番と黒騎士（提案）
+  midboss: ['gatekeeper', 'darkKnight'],
   boss: ['valgrim'],
 };
 

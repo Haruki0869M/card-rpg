@@ -7,6 +7,7 @@ import { useBattle } from '../store/battleStore';
 import { useOnline } from '../store/onlineStore';
 import type { GameState } from '../types';
 import { HeroFace } from './ui/game';
+import { sceneTabLabels } from './sceneTabLabels';
 
 /** その場面が、この端末の操作を待っているか */
 export function sceneNeedsMe(full: GameState, scene: string): boolean {
@@ -40,9 +41,9 @@ export function SceneTabs() {
       label: '世界マップ',
       heroes: full.heroes.filter((h) => h.hp > 0 && !h.retired && !exps.some((x) => x.heroes.includes(h.id))),
     },
-    ...exps.map((x) => ({
+    ...exps.map((x, i) => ({
       id: x.id,
-      label: x.dungeon?.name ?? 'ダンジョン',
+      label: sceneTabLabels(exps, full.heroes)[i],
       heroes: full.heroes.filter((h) => x.heroes.includes(h.id)),
     })),
   ].filter((t) => t.id !== WORLD_SCENE || t.heroes.length > 0);

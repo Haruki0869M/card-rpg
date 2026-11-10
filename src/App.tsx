@@ -28,7 +28,6 @@ import { JobPickOverlay } from './components/JobSheet';
 import { HeroTaskOverlay } from './components/HeroTasks';
 import { AbilityCutins } from './components/ui/AbilityCutins';
 import { SceneTabs } from './components/SceneTabs';
-import { VoteStatus } from './components/ui/Votes';
 import { TurnLock } from './components/ui/TurnLock';
 import { TurnCutin } from './components/ui/TurnCutin';
 import { findAlly } from './engine';
@@ -273,7 +272,6 @@ export default function App() {
             <HeroTaskOverlay />
             <DetailPopup />
             <OnlineOverlay />
-            {screen === 'game' && <VoteStatus />}
             {screen === 'game' && <TurnLock />}
             {screen === 'game' && <AbilityCutins />}
             {screen === 'game' && <TurnCutin />}

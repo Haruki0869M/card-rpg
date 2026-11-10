@@ -145,13 +145,15 @@ export interface RoomTypeDef {
   /** 戦闘の部屋の設定 */
   battle?: {
     /** ダンジョンの敵の組み合わせのどれを使うか */
-    pool: 'battle' | 'elite' | 'boss';
+    pool: 'battle' | 'elite' | 'boss' | 'midboss';
     /** 敵のレベルの加算 */
     levelBonus: number;
     /** カード報酬の確率（balance.ts の cardRewardOdds のキー） */
     cardOdds: string;
     /** ボス（倒すと大宝箱 → ダンジョン制覇。逃げられない。隠し宝箱は出ない） */
     boss?: boolean;
+    /** 逃げられない戦闘（中ボス。逃げて素通りできないように） */
+    noEscape?: boolean;
     /** 勝った時に装備を落とす（epicChance% でエピック、それ以外はレア） */
     equipmentDrop?: { epicChance: number };
     /** 勝った時に chance% でコモンの消費アイテムを落とす */
@@ -192,8 +194,8 @@ export interface DungeonDef {
   mapBackground?: string;
   /** 敵の基準レベル */
   baseLevel: number;
-  /** 出現する敵（戦闘・強敵・ボス） */
-  pools: { battle: string[][]; elite: string[][]; boss: string[] };
+  /** 出現する敵（戦闘・強敵・ボス。midboss = 中ボスの部屋の敵。無ければ強敵の1組目） */
+  pools: { battle: string[][]; elite: string[][]; boss: string[]; midboss?: string[] };
   /** 固定の部屋の並び（行ごと）。無ければ自動生成 */
   layout?: { type: RoomType; next: number[]; chest?: ChestSpec; eventId?: string }[][];
   /** 大宝箱の見た目（中身の格の確率を決める） */
