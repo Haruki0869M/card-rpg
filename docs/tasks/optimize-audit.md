@@ -125,3 +125,41 @@
 6. `perf.mjs`・`world-perf.mjs` の fps
 - 重い確認は `node C:/dev/card-rpg-tools/heavy.mjs` を通して1つずつ（同時1本）。
 - 「撮影・一回きり」のスクリプト（`hero-art`・`diorama-shots` など約25個）は、確認の役目が無いので回さない（提案）。
+
+---
+
+## J. 結果（2026-11-10。オーナーの OK の後に実施）
+
+### 変えた物
+- A: 使っていない関数・部品 約30個を消した（`edgeMid` は連鎖で使われなくなったので一緒に消した）。B: CSS 3つと動き3つを消した。
+- C1: **残した**（CSS の枠の飾りで使っていた）。C2: `tsconfig.tsbuildinfo` を Git から外した。
+- D1: `scripts/playtest` → `scripts/archive/playtest`。D2: **残した**（運用テストで録画に使う）。D3: `scripts/README.md` を作った。
+- E1: Firebase を後から読む（`src/net/onlineEnv.ts` を新しく作り、`vite.config.ts` に分け方を1行足した。`base` は変えていない）。
+- F1〜F8: 直した。F3 の `TIMING.rollSpin` は、使っていた部品（A4）が無くなったので説明を直すのではなく消した。F5 は残して説明を書いた。
+- G: 19個を `docs/archive/tasks/` に移した。
+- ほか: `scripts/world-perf.mjs` がサイコロに変わる前のボタンを押していて動かなかったので、今の押し方に直した（測るため）。
+
+### 前と後の確認（前 = 63ca024 + この文書、後 = cf3d311）
+
+| 確認 | 前 | 後 | 見立て |
+|---|---|---|---|
+| 型チェック | OK | OK | 同じ |
+| vitest | 924件成功・6件スキップ | 924件成功・6件スキップ | 同じ |
+| ビルド | OK | OK | |
+| 最初に読む JS+CSS | 2,494KB（gzip 694KB） | **2,259KB（gzip 626KB）** | −235KB（約1割減）。Firebase 237KB は別の塊になり、オンラインの時だけ読む |
+| dist 全体 | 57MB・1,202ファイル | 57MB・1,204ファイル | 塊が2つ増えただけ |
+| volume.sim 第1シナリオ（2人・4人・種4個） | 2人 314分・4人 702分 ほか | **数字が1つ残らず同じ** | エンジンと乱数の流れは変わっていない |
+| check-layout・playthrough・battle-feedback・movement-pet-colors・pets・stepb-battle・enemy-turn-timing・status-button・dice-shots・dungeon-view・dungeon-frames・chest-show | 全部 OK | 全部 OK | 同じ |
+| jobchange | NG「世界マップに転職の印が出ない」 | 同じ NG | 前からの問題（スクリプトが転職 Lv6 のまま） |
+| interaction-safety | NG（味方の枠が戦闘のパネルに隠れて押せない） | 同じ NG | 前からの問題（戦闘の見た目の改修の後、スクリプトが古い） |
+| final-special-jobs | NG「巫女に転職する」が出ない | 同じ NG | 前からの問題（転職レベルの変更の後、スクリプトが古い） |
+| world-steady-map | 3回中2回 OK（NG は 360px で 61〜62px 跳ぶ） | 3回中2回 OK（NG は 360px の 61px・「移動する」が無い・480px で 61px） | 前からの時々落ちる問題と同じ形 |
+| explore | 4回中3回 OK | 4回中2回 OK | NG はどちらも「置き場所が足りない」（毎回ちがう地図で、近くに同じ地形の空きマスが3つ無い時）。前からのスクリプトの問題 |
+| adventure（種 874651857・2人と4人） | 2回とも 2人・4人ともクリア（ボス→地上） | 2人・4人ともクリア | 途中のお金などは回ごとにずれる（前どうしでも 370G と 94G）。押すタイミングで変わるスクリプトのため |
+| online.mjs（3台・エミュレーター） | 3台一致・切断して戻る・ホストの引き継ぎ OK | 同じく OK | Firebase を後から読んでも同じ |
+| dungeon-coop・coop-talk（エミュレーター） | OK | OK | 同じ |
+| perf（戦闘・CPU 4倍遅く） | 2人 50.2fps・4人 48.1fps | 2人 49.2fps・4人 48.1fps | 揺れの範囲 |
+| world-perf（世界マップ） | 止まっている 60fps・歩く 51.1/49.4fps | 止まっている 60fps・歩く 50.5/50.1fps | 揺れの範囲 |
+
+- 重い確認は heavy.mjs を通して1つずつ（同時1本）。エミュレーターは別のセッションが起こしていた物（127.0.0.1:9099/9000）を使った。本番の Firebase には書いていない。
+- `load-size.mjs` は、読み込みの記録が再読み込みで消える作りで、JS が 0MB と出るなど当てにならなかったので、表には dist から数えた大きさを書いた。
