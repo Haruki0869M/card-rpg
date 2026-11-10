@@ -23,6 +23,9 @@ function voteLabel(game: GameState, cmd: GameCommand): string {
       return cmd.kind === 'hp' ? '休む' : '瞑想';
     case 'LEAVE_CHEST':
       return '先へ進む';
+    case 'CHEST_OPENER':
+    case 'EXPLORE_ROLLER':
+      return `${game.heroes.find((h) => h.id === cmd.heroId)?.name ?? ''}に任せる`;
     default:
       return '続ける';
   }

@@ -8,7 +8,7 @@ export const beastMaster: ClassDef = {
   baseMaxHp: tamer.baseMaxHp + 10,
   stats: { ...tamer.stats, per: tamer.stats.per + 8, dex: tamer.stats.dex + 8 },
   battleAbility: { name: '群れ', effect: { when: 'battleStart', do: [1, 2, 3].map(n => ({ kind: 'summon' as const, id: `royalBeast${n}`, name: `群れの獣${n}`, icon: '🐾', damage: 4, turns: 99 })) } },
-  exploreAbility: { id: 'beastMasterExplore', name: '群れの導き', description: '移動力の判定の成功数+1・夜でも視界が減らない', effect: { kind: 'travel', moveBonus: 1, nightVision: true } },
+  exploreAbility: { id: 'beastMasterExplore', name: '群れの導き', description: '移動のサイコロ+1・夜でも視界が減らない', effect: { kind: 'travel', moveBonus: 1, nightVision: true } },
   requires: { feat: 'kills', count: 15, text: '敵を15体倒す' },
   cardPool: ["packAssault","packGuard","alphaCall","packCare","wildKingdom"], signature: ["packAssault","packGuard","alphaCall"], petMaster: true,
 };

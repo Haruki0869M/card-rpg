@@ -2,7 +2,7 @@ import type { ClassDef } from '../../../types';
 import { BALANCE } from '../../../data/balance';
 import { swordmaster } from './swordmaster';
 
-// 特殊職: 中位Lv3と実績を満たし、神殿か対応する祭壇で転職する。
+// 特殊職: 中位の転職できるLv（BALANCE.jobChange.special）と実績を満たし、神殿か対応する祭壇で転職する。
 export const samurai: ClassDef = {
   ...swordmaster, id: 'samurai', order: 301, name: '侍', role: '静かに力を蓄えて斬る',
   tier: 'special', from: ['swordmaster'], altar: 'samurai',

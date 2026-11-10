@@ -127,7 +127,6 @@ export const scorpionTomb: DungeonDef = {
   pools: TOMB_POOLS,
   bossChest: 'epic',
   rewardKey: 'sealScarab',
-  corruptionOnClear: 5,
   clearStory: ['砂蠍王が、砂になって崩れた。', '墓所に、風が通り抜ける。', '聖印（甲虫）を手に入れた！'],
   layout: scorpionTombLayout,
 };
@@ -141,7 +140,8 @@ export const shadowLibrary: DungeonDef = {
   pools: LIBRARY_POOLS,
   bossChest: 'epic',
   rewardKey: 'sealEye',
-  corruptionOnClear: 5,
+  // 1つ目のダンジョンの鍵が要る（play-feedback-plan §4 C: 町や依頼を飛ばして、まっすぐ奥へ行けないように）
+  requiresKeys: ['sealScarab'],
   clearStory: ['影の宰相は、書を閉じて消えた。', '「王を、救ってくれ」', '聖印（眼）を手に入れた！'],
   layout: shadowLibraryLayout,
 };
@@ -155,7 +155,6 @@ export const statueTemple: DungeonDef = {
   pools: TEMPLE_POOLS,
   bossChest: 'legend',
   rewardKey: 'sealBeast',
-  corruptionOnClear: 5,
   clearStory: ['守護獣の石の体に、ひびが走った。', '「王を…頼む」', '聖印（獣）を手に入れた！'],
   layout: statueTempleLayout,
 };

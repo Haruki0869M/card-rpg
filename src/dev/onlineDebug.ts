@@ -30,6 +30,21 @@ const api = {
   goOffline: () => useOnline.getState().room?.backend.goOffline(),
   goOnline: () => useOnline.getState().room?.backend.goOnline(),
   stamp: (k: string) => useOnline.getState().sendStamp(k),
+  /** 部屋の今の状態（写し） */
+  game: () => structuredClone(useOnline.getState().room?.game ?? null),
+  /** 確認用: ホストが状態を差し込む（部屋の snapshot を書き換えて、自分も取り直す）。ほかの端末は resync() で取り直す */
+  inject: async (game: unknown) => {
+    const r = useOnline.getState().room;
+    if (!r?.isHost) return 'ホストではありません';
+    const g = game as Parameters<typeof stateHash>[0];
+    const s = { seq: r.seq, game: JSON.stringify(g), hash: stateHash(g) };
+    await r.backend.set(`rooms/${r.code}/snapshot`, s);
+    (r as unknown as { adopt: (s: unknown, why: string) => void }).adopt(s, 'error');
+    return null;
+  },
+  resync: () => useOnline.getState().room?.resync('error'),
+  /** 部屋のピン（確認用） */
+  pins: () => structuredClone(useOnline.getState().room?.pins ?? {}),
 };
 
 declare global {

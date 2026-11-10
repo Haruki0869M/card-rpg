@@ -13,7 +13,7 @@ await page.getByRole('button', { name: /セシル/ }).filter({ hasText: '' }).la
 await page.waitForTimeout(500);
 await shot('03f-companion-on');
 // 移動力の判定
-await page.getByText('移動力の判定').click();
+await page.locator('[data-roll-move]').click();
 for (let i = 0; i < 12; i++) { await page.waitForTimeout(300); await shot(`03g-roll-${String(i).padStart(2,'0')}`); }
 console.log(await text());
 const buttons = await page.evaluate(() => [...document.querySelectorAll('button')].map(b => b.textContent.trim().slice(0,24) + '|' + (b.getAttribute('aria-label')||'')).join(' ; '));

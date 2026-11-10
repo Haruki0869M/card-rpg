@@ -4,6 +4,7 @@ import { BottomBar, TopBar } from './components/battle/Bars';
 import { ConfirmDialog } from './components/ui/ConfirmDialog';
 import { Battlefield } from './components/battle/Battlefield';
 import { FocusPanel } from './components/battle/FocusPanel';
+import { useElementSize } from './hooks/useElementSize';
 import { SlotPreviewDialog } from './components/battle/SlotPreviewDialog';
 import { Hand } from './components/battle/Hand';
 import { PartyStrip } from './components/battle/PartyStrip';
@@ -86,17 +87,20 @@ function BattleScreen() {
   const presenting = useBattle(s => s.presentationBusy);
   const selection = useBattle((s) => s.selection);
   const cancel = useBattle((s) => s.cancel);
-  const focus = (
-    <AnimatePresence>{selection && <FocusPanel key="focus" />}</AnimatePresence>
-  );
+  const calm = useBattle((s) => s.settings.cutinMode === 'simple');
+  const [dockRef, dock] = useElementSize<HTMLDivElement>();
   return (
-    <div className="game-bg safe-pad relative flex h-full w-full max-w-[480px] flex-col overflow-hidden" onClick={() => selection && cancel()} data-battle-presenting={presenting || undefined}>
+    <div className="game-bg safe-pad relative flex h-full w-full max-w-[480px] flex-col overflow-hidden" onClick={() => selection && cancel()} data-battle-presenting={presenting || undefined} data-calm={calm || undefined}>
       <TopBar />
       <FirstBattleGuide />
       <Battlefield />
-      <PartyStrip />
-      {/* 対象を押せるよう、操作パネルは手札と入れ替えて通常の配置に置く。 */}
-      {selection ? focus : <Hand />}
+      {/* 段階A: 味方の枠と手札はいつも同じ高さで置く（カードを選んでも戦場は縮まない）。
+          操作パネルはその上に重ねる（味方の下半身〜手札の上。戦場の敵・味方の上半身は押せるまま） */}
+      <div ref={dockRef} className="relative flex min-h-0 flex-col" data-battle-dock style={{ ['--dock-h' as string]: `${dock.height}px` }}>
+        <PartyStrip />
+        <Hand />
+        <AnimatePresence>{selection && <FocusPanel key="focus" />}</AnimatePresence>
+      </div>
       <BottomBar />
       {!presenting && <ResultScreen />}
       <SlotPreviewDialog />

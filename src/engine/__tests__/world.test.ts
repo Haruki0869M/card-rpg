@@ -79,11 +79,13 @@ describe('移動と手番', () => {
   }
   it('移動力を判定 → 経路の移動力だけ減る。同行したキャラは一緒に動き、自分の手番も持つ', () => {
     let g = started();
-    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0', focusUsed: 2 });
+    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0' });
     const w = g.world!;
-    expect(w.move).toBeGreaterThanOrEqual(BALANCE.moveBase + 2);
+    expect(w.move).toBeGreaterThanOrEqual(1);
     const reach = reachable(w, w.pos.h0, w.move!);
-    const [to, info] = [...reach].find(([i, v]) => i !== w.pos.h0 && v.cost <= w.move! && !w.wanderers.some((x) => x.tile === i))!;
+    // 施設・敵のいないマスへ。移動中のランダムイベントは、この確認では起こさない（直前に起きたことにする。乱数の順番で変わるため）
+    g.heroes[0].lastRandomEvent = w.worldTurn;
+    const [to, info] = [...reach].find(([i, v]) => i !== w.pos.h0 && v.cost <= w.move! && !w.tiles[i].f && !w.wanderers.some((x) => x.tile === i))!;
     const before = w.move!;
     g = run(g, { type: 'WORLD_MOVE', playerId: P, heroId: 'h0', to, companions: ['h1'] });
     expect(g.world!.pos.h0).toBe(to);
@@ -329,17 +331,16 @@ describe('ダンジョンも世界マップの手番の順番で動く（M3-D）
     expect(applyGameCommand(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0', focusUsed: 0 }).error).toMatch(/ダンジョン/);
   });
 
-  it('探索力を判定（2〜4）→ 歩数は×2。扉を開けると1歩使う。使い切って通路に戻ると次の人の番', () => {
+  it('探索のサイコロ（1〜3）→ 選べる扉の数。扉を開けると1使う。手番を終えると次の人の番', () => {
     let { g, x } = h0InTemple();
     g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h1' });
-    expect(applyGameCommand(g, inScene(x, { type: 'ENTER_ROOM', playerId: P, roomId: 'r0c0' })).error).toMatch(/探索力/);
-    // フォーカスを2つ使えば、探索力は必ず4
-    g.heroes[0].focus = 2;
-    g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0', focusUsed: 2 }));
-    const steps = (BALANCE.exploreBase + BALANCE.exploreSlots) * BALANCE.dungeonStepsPerExplore;
-    expect(viewOf(g, x).dungeon!.explore).toBe(steps);
+    expect(applyGameCommand(g, inScene(x, { type: 'ENTER_ROOM', playerId: P, roomId: 'r0c0' })).error).toMatch(/サイコロ/);
+    g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0' }));
+    const n = viewOf(g, x).dungeon!.explore!;
+    expect(n).toBeGreaterThanOrEqual(1);
+    expect(n).toBeLessThanOrEqual(BALANCE.exploreDiceSides);
     g = run(g, inScene(x, { type: 'ENTER_ROOM', playerId: P, roomId: 'r0c0' }));
-    expect(viewOf(g, x).dungeon!.explore).toBe(steps - 1);
+    expect(viewOf(g, x).dungeon!.explore).toBe(n - 1);
     // 手番を終える → h1 の番（ワールドターンは同じ）
     g.expeditions![0].mode = 'dungeon';
     g.expeditions![0].battle = undefined;

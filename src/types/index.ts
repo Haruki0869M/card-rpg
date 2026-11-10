@@ -169,7 +169,7 @@ export type ExploreAbility =
   | { kind: 'tracking'; vision: number; hiddenFindBonus: number }
   | { kind: 'nightAmbushReduction'; multiplier: number }
   | { kind: 'extraEventOption'; tag: string }
-  /** 移動力の判定のスロット+N（武闘家など） */
+  /** 移動のサイコロ+1（前の「移動力の判定のスロット+N」。武闘家など） */
   | { kind: 'moveSlots'; slots: number }
   /** 野営・休憩の回復の倍率（僧侶など） */
   | { kind: 'restBonus'; multiplier: number }
@@ -248,7 +248,7 @@ export interface PetExplore {
   vision?: number;
   /** 夜でも視界が狭くならない */
   nightVision?: boolean;
-  /** 移動力の判定の成功数+N */
+  /** 移動のサイコロ+N */
   moveBonus?: number;
   /** 宝箱の運の判定の成功率+N% */
   luckBonus?: number;

@@ -12,8 +12,8 @@ await btns();
 await page.getByText('翠の神殿に入る').click();
 for (let i = 0; i < 4; i++) { await page.waitForTimeout(400); await shot(`07b-enter-${i}`); }
 console.log(await text()); await btns();
-if (await page.getByText('探索力の判定').count()) {
-  await page.getByText('探索力の判定').click();
+if (await page.locator('[data-explore-roll-button]').count()) {
+  await page.locator('[data-explore-roll-button]').click();
   for (let i = 0; i < 5; i++) { await page.waitForTimeout(300); await shot(`07c-explore-${i}`); }
 }
 console.log(await text()); await issues('dungeon'); await btns();

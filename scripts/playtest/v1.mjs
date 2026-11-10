@@ -39,7 +39,7 @@ console.log(await text()); await btns();
 // C. P1 が単独で移動
 const solo = async (who, other) => {
   if (await page.getByRole('button', { name: `${other}を残す` }).count()) { await page.getByRole('button', { name: `${other}を残す` }).click(); await beat(700); }
-  await page.getByText('移動力の判定').click(); await beat(1200);
+  await page.locator('[data-roll-move]').click(); await beat(1200);
   const far = await page.evaluate(() => { const occ = new Set([...document.querySelectorAll('[data-hero]')].map((e) => e.getAttribute('data-tile'))); let best = null, n = -1; for (const e of document.querySelectorAll('[data-reach]')) { if (occ.has(e.getAttribute('data-reach'))) continue; const v = parseInt(e.textContent.trim()); if (v > n) { n = v; best = e.getAttribute('data-reach'); } } return best; });
   const t = page.locator(`[data-reach="${far}"]`); await t.scrollIntoViewIfNeeded(); const b = await t.boundingBox();
   await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2); await beat(800);

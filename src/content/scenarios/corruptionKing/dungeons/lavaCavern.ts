@@ -11,7 +11,6 @@ export const lavaCavern: DungeonDef = {
   pools: VOLCANO_POOLS,
   bossChest: 'legend',
   rewardKey: 'crimson',
-  corruptionOnClear: 5,
   clearStory: ['炎竜イグナヴァルが地に伏した。', '溶岩の流れが、少しずつ静まっていく。', '封印の鍵（紅）を手に入れた！'],
   layout: [
     [{ type: 'battle', next: [0, 1] }],

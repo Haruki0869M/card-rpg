@@ -20,6 +20,7 @@ import { FogSea } from './FogSea';
 import { HeroFace } from '../ui/game';
 import { petSpot, PetToken } from '../ui/PetToken';
 import { HeroPiece } from './HeroPiece';
+import { SpawnMarks, TowerMini } from './ExploreMarks';
 import { orderOnTile, pieceSpots, PLAYER_COLORS } from './pieceLayout';
 import { cameraTop, mapPadBottom, mapPadY, revealLeft, revealTop, visibleH } from './mapCamera';
 import { anchorScroll, clampZoom, stepZoom, ZOOM_MAX, ZOOM_MIN } from './mapZoom';
@@ -180,6 +181,8 @@ const FeatureLayer = memo(function FeatureLayer({ tiles, geom, finaleTiles, fall
         const finale = finaleTiles.has(i);
         const fallen = f.kind === 'town' && w.fallenTowns.includes(f.id);
         const used = f.used && f.kind !== 'town' && f.kind !== 'dungeon';
+        // 見晴らしの塔（段階6）: 仮のミニチュア。上の面から少し浮かせる
+        if (f.kind === 'tower') return <TowerMini key={`f${i}`} x={x} y={y - R * FACILITY_LIFT} R={R} used={f.used} />;
         const mini: MiniKind | undefined = finale ? 'finale' : f.kind === 'event' || f.kind === 'temple' || f.kind === 'altar' ? f.kind : undefined;
         if (mini) {
           return (
@@ -614,6 +617,9 @@ export function WorldMap({
             const { x, y } = center(i);
             return <Flag key={`q${i}`} x={x + R * 0.2} y={y - R * 1.35} width={R * 0.6} height={R * 0.6} color="#ff6a8a" fill="#ff6a8a" />;
           })}
+          {/* 時間で消える出現スポット（段階6） */}
+          <SpawnMarks w={w} R={R} center={center} />
+          {/* 襲撃されている町 */}
           {w.raids.map((r) => {
             const i = w.tiles.findIndex((t) => t.f?.kind === 'town' && t.f.id === r.townId);
             if (i < 0 || !w.tiles[i].seen) return null;

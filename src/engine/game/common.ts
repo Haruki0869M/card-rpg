@@ -130,15 +130,6 @@ export function statChance(hero: Hero, stat: StatId, tag?: string, event?: boole
   return finalChanceOf(heroStats(hero)[stat] + checkBonus(hero, tag) + (event ? checkBonus(hero, 'event') + (petExplore(hero).eventBonus ?? 0) : 0));
 }
 
-/** 探索の特殊能力: 移動力の判定のスロット（武闘家など） */
-export function moveSlotsOf(hero: Hero): number {
-  return BALANCE.moveSlots + exploreEffects(hero).reduce((n, e) => n + (e.kind === 'moveSlots' ? e.slots : 0), 0);
-}
-
-/** 移動判定に足す成功数。画面の予測と実際の移動力で共有する。 */
-export function moveBonusOf(hero: Hero): number {
-  return (petExplore(hero).moveBonus ?? 0) + exploreEffects(hero).reduce((n, e) => n + (e.kind === 'travel' ? e.moveBonus : 0), 0);
-}
 
 /** 探索の特殊能力: 野営・休憩の回復の倍率（僧侶など） */
 export function restMultiplierOf(hero: Hero): number {

@@ -30,6 +30,24 @@ export function preloadImages(keys: string[]) {
   }
 }
 
+const held = new Map<string, HTMLImageElement>();
+/**
+ * 絵を読み込んで描ける形（decode）にし、手放さずに持っておく（通路の絵: 1歩ごとに描き直しても、絵が欠けて下地が見えないように）。
+ * 何度呼んでもよい。戻り値は useEffect の後片付け用（何もしない。持ったままにする）
+ */
+export function holdImages(keys: string[]): () => void {
+  for (const k of keys) {
+    const url = IMAGES[k];
+    if (!url || held.has(url)) continue;
+    const img = new Image();
+    img.src = url;
+    img.decode?.().catch(() => {});
+    held.set(url, img);
+    loaded.add(url);
+  }
+  return () => {};
+}
+
 /** 起動時: 小さな絵（顔・お供・道具・宝箱・地図の場所・地形・画面の枠）はすぐ、大きな絵（全身・背景・通路）は手が空いた時に少しずつ。敵の絵は表示する時に読む */
 export function preloadAllImages() {
   // 職業の絵（全身・顔・世界マップの駒）は職の数×男女ぶんあるので、最初から持っている4職（基本ジョブ）だけ先に読む。

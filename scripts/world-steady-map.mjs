@@ -29,7 +29,7 @@ for (const [width, height] of [[360, 640], [390, 844], [480, 854]]) {
     await page.waitForTimeout(1600);
     // 1人で歩く（同行を外す）と、到着の後に手番が隣の仲間へ移る（手番の切り替えのカメラも見られる）
     const solo = page.getByText('同行を解除して単独行動する', { exact: true });
-    await page.getByText('移動力の判定', { exact: true }).click();
+    await page.locator('[data-roll-move]').click();
     await page.locator('[data-roll-spinning]').waitFor({ state: 'detached', timeout: 3000 }).catch(() => {});
     await page.waitForTimeout(400);
     if (await solo.count()) { await solo.click(); await page.waitForTimeout(300); }

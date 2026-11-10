@@ -92,7 +92,7 @@ export function PetPanel({ hero, canPat, onPat }: { hero: Hero; canPat: boolean;
   const exText = [
     ex.vision && `視界+${ex.vision}`,
     ex.nightVision && '夜でも視界が狭くならない',
-    ex.moveBonus && `移動力の判定の成功数+${ex.moveBonus}`,
+    ex.moveBonus && `移動のサイコロ+${ex.moveBonus}`,
     ex.luckBonus && `宝箱の運の判定+${ex.luckBonus}%`,
     ex.eventBonus && `イベントの判定+${ex.eventBonus}%`,
     ex.campHeal && `野営の回復+${Math.round(ex.campHeal * 100)}%`,

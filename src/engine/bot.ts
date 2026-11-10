@@ -23,16 +23,15 @@ import {
   rarityIndex,
   reachable,
   reachableRooms,
-  doorFront,
-  dungeonNavigator,
-  findPath,
-  posOf,
   unusableReason,
   viewOf,
   waitingPlayers,
   commandPlayer,
   needsVote,
   notVoted,
+  chestShared,
+  exploreRollerOf,
+  exploreShared,
 } from './index';
 
 export interface BotLog {
@@ -67,11 +66,29 @@ const pid = (g: GameState, heroId?: string): PlayerId => {
   return owner(heroId) ?? (!g.activeScene && g.world?.turn ? owner(g.world.turn) : undefined) ?? owner(g.party?.[0]) ?? g.heroes[0].playerId;
 };
 
+/** bot の作戦の切り替え（memo に入れて渡す） */
+export interface BotMemo {
+  interacted: Set<string>;
+  town?: string;
+  /**
+   * 人のようにまっすぐ進む（遊びの長さを測る用）。
+   * レベル上げをせず、次に入れる鍵のダンジョン → 最終ダンジョンへ向かう。町は回復・船の依頼の時だけ寄る。
+   */
+  straight?: boolean;
+}
+
 /** 目的のダンジョン（鍵の順。最後は魔王城） */
-function goalDungeon(g: GameState): string {
+function goalDungeon(g: GameState, straight = false): string {
   // シナリオのダンジョンを、鍵のダンジョン（敵のレベルが低い順）→最終ダンジョンの順に回る
   const list = DUNGEONS.forScenario(g.scenarioId).filter((d) => !d.random && (d.rewardKey || d.finale));
   const order = [...list.filter((d) => !d.finale).sort((a, b) => a.baseLevel - b.baseLevel), ...list.filter((d) => d.finale)].map((d) => d.id);
+  // まっすぐ進む時は、今の鍵で扉が開くダンジョンを先に選ぶ（開かない所へ向かって無駄足を踏まない）
+  const keys = g.world?.keys ?? [];
+  const open = (d: string) => (DUNGEONS.get(d).requiresKeys ?? []).every((k) => keys.includes(k));
+  if (straight) {
+    const next = order.find((d) => !g.clearedDungeons.includes(d) && open(d));
+    if (next) return next;
+  }
   return order.find((d) => !g.clearedDungeons.includes(d)) ?? order[order.length - 1];
 }
 
@@ -81,10 +98,10 @@ function tileOf(g: GameState, kind: string, id: string): number | undefined {
 }
 
 /** 世界マップでの行き先（HPが減ったら町、レベルが足りなければ近くの敵、それ以外は次のダンジョン） */
-function worldTarget(g: GameState, at: number): { tile: number; why: 'town' | 'grind' | 'dungeon' } {
+function worldTarget(g: GameState, at: number, straight = false): { tile: number; why: 'town' | 'grind' | 'dungeon' } {
   const w = g.world!;
   const heroes = livingHeroes(g);
-  const goal = goalDungeon(g);
+  const goal = goalDungeon(g, straight);
   const need = DUNGEONS.get(goal).baseLevel + (DUNGEONS.get(goal).finale ? 1 : 0);
   const avgLv = heroes.reduce((n, h) => n + h.level, 0) / heroes.length;
   // 船がもらえる依頼がまだなら、まずその町へ（海を渡るシナリオ）
@@ -103,20 +120,20 @@ function worldTarget(g: GameState, at: number): { tile: number; why: 'town' | 'g
     });
     if (best !== undefined) return { tile: best, why: 'town' };
   }
-  if (avgLv < need) {
+  if (!straight && avgLv < need) {
     const near = w.wanderers.filter((x) => w.tiles[x.tile].seen).sort((a, b) => hexDistance(w, at, a.tile) - hexDistance(w, at, b.tile))[0];
     if (near && hexDistance(w, at, near.tile) <= 6) return { tile: near.tile, why: 'grind' };
   }
   return { tile: tileOf(g, 'dungeon', goal)!, why: 'dungeon' };
 }
 
-function worldStep(g: GameState, log: BotLog, memo: { interacted: Set<string> }): GameState {
+function worldStep(g: GameState, log: BotLog, memo: BotMemo): GameState {
   const w = g.world!;
   if (w.story) return send(g, { type: 'STORY_CONTINUE', playerId: pid(g) }, log);
   const h = findHero(g, w.turn)!;
   const p = pid(g, h.id);
   const at = w.pos[h.id];
-  const target = worldTarget(g, at);
+  const target = worldTarget(g, at, memo.straight);
   const key = `${w.worldTurn}:${h.id}:${at}`;
   // 目的地に着いたら入る（1手番に1回だけ）
   if (at === target.tile && !memo.interacted.has(key)) {
@@ -126,7 +143,10 @@ function worldStep(g: GameState, log: BotLog, memo: { interacted: Set<string> })
       if (ng !== g) return ng;
     }
   }
-  if (w.move === null) return send(g, { type: 'WORLD_ROLL_MOVE', playerId: p, heroId: h.id, focusUsed: 0 }, log);
+  if (w.move === null) return send(g, { type: 'WORLD_ROLL_MOVE', playerId: p, heroId: h.id }, log);
+  // 移動のサイコロの目が小さく、フォーカスに余裕があれば1回だけ振り直す（まだ動く前）
+  const md = w.moveDice;
+  if (md && !md.rerolled && md.face <= 2 && h.focus >= 2 && w.move === md.total && w.pos[h.id] === w.prevTile) return send(g, { type: 'WORLD_REROLL_MOVE', playerId: p, heroId: h.id }, log);
   // 同じマスの他の人のキャラは、誘って承知してもらってから一緒に動く（自動プレイは全員の代わりに答える）
   {
     for (const c of livingHeroes(g)) {
@@ -192,7 +212,7 @@ function equipBest(g: GameState, log: BotLog): GameState {
   return g;
 }
 
-export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<string>; town?: string }, inScene = false): GameState {
+export function botStep(g: GameState, log: BotLog, memo: BotMemo, inScene = false): GameState {
   // ダンジョンの場面があれば、先にそちらを進める（その場面を載せた冒険で次の操作を決めて、SCENE で送る）
   // 手番がダンジョンの中のキャラなら、そのダンジョンの場面を進める（世界マップがなければ、最初の場面）
   const exp = inScene ? undefined : g.world ? g.expeditions?.find((x) => x.heroes.includes(g.world!.turn)) : g.expeditions?.[0];
@@ -256,32 +276,45 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
       return send(g, { type: 'FINISH_REWARD', playerId: pid(g) }, log);
     }
     case 'dungeon': {
-      // 手番の最初に探索力を決める（世界マップのあるシナリオ）
-      if (g.world && g.dungeon!.explore == null) {
-        const h = livingHeroes(g).find((x) => !g.party || g.party.includes(x.id))!;
-        return send(g, { type: 'EXPLORE_ROLL', playerId: h.playerId, heroId: h.id, focusUsed: 0 }, log);
+      // 手番の最初に探索のサイコロを振る（世界マップのあるシナリオ。1〜3 = 選べる扉の数）
+      const run = g.dungeon!;
+      if (g.world && run.explore == null) {
+        const chosen = exploreRollerOf(g);
+        const h = (chosen ? findHero(g, chosen) : undefined) ?? livingHeroes(g).find((x) => !g.party || g.party.includes(x.id))!;
+        // 2人以上: 振るキャラをみんなで決めてから
+        if (exploreShared(g) && !chosen) return send(g, { type: 'EXPLORE_ROLLER', playerId: h.playerId, heroId: h.id }, log);
+        return send(g, { type: 'EXPLORE_ROLL', playerId: h.playerId, heroId: h.id }, log);
       }
-      const rooms = reachableRooms(g.dungeon!);
+      // 1が出て、振ったキャラのフォーカスに余裕があれば1回だけ振り直す（まだ扉を選ぶ前）
+      const d = run.exploreDice;
+      const dh = d?.heroId ? findHero(g, d.heroId) : undefined;
+      if (g.world && d && dh && !d.rerolled && d.face === 1 && dh.focus >= 2 && run.explore === d.total) return send(g, { type: 'EXPLORE_REROLL', playerId: dh.playerId, heroId: dh.id }, log);
+      // 扉を選び終えた（警戒ができる時は手番が続く）: 手番を終える
+      if (g.world && run.explore === 0) return send(g, { type: 'EXPLORE_END', playerId: pid(g) }, log);
+      const rooms = reachableRooms(run);
       const hurt = livingHeroes(g).some((h) => h.hp < heroMaxHp(h) * 0.5);
       const pick = rooms.find((r) => (hurt ? r.type === 'rest' : r.type === 'chest')) ?? rooms[0];
-      // 第3段階: 扉の前まで1歩ずつ歩いてから開ける（bot はテスト用なので、部屋の中身を知っている）
-      const run = g.dungeon!;
-      const front = doorFront(run, pick.id)!;
-      const p = posOf(run);
-      if (p.x === front.x && p.y === front.y) return send(g, { type: 'ENTER_ROOM', playerId: pid(g), roomId: pick.id }, log);
-      const path = findPath(run, front);
-      const nav = dungeonNavigator(g);
-      if (!path?.length || !nav) return send(g, { type: 'EXPLORE_END', playerId: pid(g) }, log);
-      const rel = (['forward', 'right', 'back', 'left'] as const)[(path[0] - p.facing + 4) % 4];
-      return send(g, { type: 'DUNGEON_STEP', playerId: nav.playerId, heroId: nav.id, dir: rel }, log);
+      // 扉を選ぶだけ: 扉の前まではエンジンが自動で歩く（bot はテスト用なので、部屋の中身を知っている）
+      if (!pick) return send(g, { type: 'EXPLORE_END', playerId: pid(g) }, log);
+      return send(g, { type: 'ENTER_ROOM', playerId: pid(g), roomId: pick.id }, log);
     }
     case 'chest': {
       const c = g.chest!;
+      // 2人以上で開けた宝箱の取り合い（戦闘の装備と同じ: 最初のキャラは「欲しい」、ほかは「余れば」）
+      const ci = c.claims?.findIndex((x) => !x.rolls) ?? -1;
+      if (ci >= 0) {
+        const cl = c.claims![ci];
+        const id = cl.heroes.find((x) => !cl.choices[x])!;
+        return send(g, { type: 'CLAIM_LOOT', playerId: pid(g, id), heroId: id, choice: id === cl.heroes[0] ? 'need' : 'greed', index: ci }, log);
+      }
       if (c.contents) return send(g, { type: 'LEAVE_CHEST', playerId: pid(g) }, log);
       // 世界マップの宝箱は、手番のキャラの担当の人のキャラで開ける
       const turnOwner = g.world && c.tile !== undefined && !g.activeScene ? findHero(g, g.world.turn)?.playerId : undefined;
       const inParty = livingHeroes(g).filter((x) => !g.party || g.party.includes(x.id));
-      const h = inParty.find((x) => !turnOwner || x.playerId === turnOwner) ?? inParty[0];
+      const first = inParty.find((x) => !turnOwner || x.playerId === turnOwner) ?? inParty[0];
+      // 2人以上: 開け役をみんなで決めてから、そのキャラで開ける
+      if (chestShared(g) && !c.opener) return send(g, { type: 'CHEST_OPENER', playerId: first.playerId, heroId: first.id }, log);
+      const h = (c.opener ? findHero(g, c.opener) : undefined) ?? first;
       const ng = send(g, { type: 'OPEN_CHEST', playerId: h.playerId, heroId: h.id, focusUsed: 0 }, log);
       if (ng.chest && !ng.chest.unlocked && ng.chest.lastRoll?.success === false) return send(ng, { type: 'LEAVE_CHEST', playerId: pid(g) }, log);
       return ng;
@@ -330,14 +363,14 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
       return send(g, { type: 'SHRINE_CHOOSE', playerId: pid(g, s.heroId), optionIndex: 0, heroId: s.heroId }, log);
     }
     case 'hub':
-      return send(g, { type: 'ENTER_DUNGEON', playerId: pid(g), dungeonId: goalDungeon(g) }, log);
+      return send(g, { type: 'ENTER_DUNGEON', playerId: pid(g), dungeonId: goalDungeon(g, memo.straight) }, log);
     default:
       return g;
   }
 }
 
 /** 次に送る操作を決める（状態は変えない）。何もすることがなければ null */
-export function botNextCommand(g: GameState, memo: { interacted: Set<string>; town?: string }): GameCommand | null {
+export function botNextCommand(g: GameState, memo: BotMemo): GameCommand | null {
   capture = [];
   try {
     botStep(g, { steps: 0, errors: [], modes: {} }, memo);
@@ -347,10 +380,10 @@ export function botNextCommand(g: GameState, memo: { interacted: Set<string>; to
   }
 }
 
-/** エンディングかゲームオーバーまで自動で遊ぶ */
-export function playToEnd(g: GameState, maxSteps = 60000): { game: GameState; log: BotLog } {
+/** エンディングかゲームオーバーまで自動で遊ぶ（opts.straight = 人のようにまっすぐ進む。BotMemo を参照） */
+export function playToEnd(g: GameState, maxSteps = 60000, opts: { straight?: boolean } = {}): { game: GameState; log: BotLog } {
   const log: BotLog = { steps: 0, errors: [], modes: {} };
-  const memo = { interacted: new Set<string>() };
+  const memo: BotMemo = { interacted: new Set<string>(), straight: opts.straight };
   let stuck = 0;
   for (; log.steps < maxSteps; log.steps++) {
     if (g.mode === 'ending' || g.mode === 'gameover') break;

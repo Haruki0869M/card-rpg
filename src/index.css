@@ -576,3 +576,13 @@ textarea {
   .cloud-tear { animation: none; opacity: 0; }
   .region-banner { animation: none; }
 }
+/* ピン（「こっち！」の札。ステップ2）: ふわっと出る */
+@keyframes pin-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.pin-pop { animation: pin-pop 0.25s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .pin-pop { animation: none; }
+}

@@ -1,6 +1,7 @@
 // ===== 世界マップの生成（spec §8.1） =====
 // シナリオで決めた骨格（地域・町・ダンジョン・名所）＋ シードによるランダム要素（地形・宝箱・イベント・祠・徘徊する敵）。
 // 町・ダンジョンは道でつなぎ、ランダムに置くものはスタート地点から歩いて行ける場所にだけ置く
+import { BALANCE } from '../../../data/balance';
 import { getScenario } from '../../../data/scenarios';
 import { EVENTS } from '../../../data/events';
 import { SHRINES, TERRAINS } from '../../../data/world';
@@ -12,6 +13,7 @@ import { hexDistance, idxOf, neighbors, rowOf } from './hex';
 import { revealAround } from './fog';
 import { spawnSeaWanderer, spawnWanderer } from './wanderers';
 import { addSanctuaries } from './sanctuaries';
+import { addWatchtowers } from './explore';
 
 const pick = <T,>(list: readonly T[], rng: Rng) => list[rng.int(list.length)];
 
@@ -156,6 +158,11 @@ export function createWorld(game: GameState, rng: Rng): WorldState {
   w.visitedRegions.push(tiles[start].r);
   revealAround(game, w);
   addSanctuaries(game, w);
+  // 見晴らしの塔（段階6）。乱数は引かないので、ほかの物の置き方は変わらない
+  addWatchtowers(game, w);
+  w.spawns = [];
+  w.nextSpawnAt = BALANCE.spawnFirstAt;
+  w.nextSpawnId = 1;
   return w;
 }
 

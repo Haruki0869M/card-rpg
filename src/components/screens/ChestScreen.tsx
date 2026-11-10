@@ -6,7 +6,11 @@ import { Check, ChevronsRight, Lock, Sparkles, Star, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BattleBackground, ChestImage } from '../../art';
 import { BALANCE, REVEAL_TIMING, VIBRATION } from '../../data/balance';
-import { chestOdds, expectedChestOdds, rarityIndex, statChance, sceneBackground, sceneHeroes } from '../../engine';
+import { chestOdds, chestShared, expectedChestOdds, findHero, rarityIndex, statChance, sceneBackground, sceneHeroes } from '../../engine';
+import { PLAYER_COLOR } from '../../data/theme';
+import { useOnline } from '../../store/onlineStore';
+import { ClaimPanel } from '../ui/ClaimPanel';
+import { OpenerPicker } from './ChestTalk';
 import { LOCAL_PLAYER, isLocalPlayer } from '../../store/battleConfig';
 import { speedFactor, useBattle, vibrate } from '../../store/battleStore';
 import { playSound } from '../../audio/player';
@@ -14,7 +18,7 @@ import type { SfxId } from '../../audio/ids';
 import type { ChestRoll, Hero, Rarity, SlotResult } from '../../types';
 import { CheckPanel, RollStrip } from '../ui/CheckPanel';
 import { CHEST_NAME, fmtPct, OddsBar } from '../ui/ChestOdds';
-import { RARITY_STYLE, Screen } from '../ui/game';
+import { HeroFace, RARITY_STYLE, Screen } from '../ui/game';
 import { CHEST_VIDEO_SECONDS, ChestVideo, chestVideoUrl } from './ChestVideo';
 import { LootList } from './RoomScreens';
 
@@ -212,6 +216,21 @@ export function ChestScreen() {
   const [heroId, setHeroId] = useState(() => (!game.activeScene && game.world?.turn) || bestHero(sceneHeroes(game), (h) => statChance(h, locked ? 'dex' : 'luk')));
   const [focus, setFocus] = useState(0);
   const [recipientId, setRecipientId] = useState<string>();
+  useOnline((s) => s.tick);
+  // 2人以上のプレイヤー: 開け役をみんなで決め、中身は取り合う（ステップ2）。1人なら今までどおり
+  const shared = chestShared(game);
+  const opener = shared && chest.opener ? findHero(game, chest.opener) : undefined;
+  const myOpener = !!opener && isLocalPlayer(opener.playerId);
+  const [pickAgain, setPickAgain] = useState(false);
+  // 開け役が決まった・変わったら、選び直しの一覧を閉じる
+  useEffect(() => setPickAgain(false), [chest.opener]);
+  const claimsLeft = chest.claims?.filter((x) => !x.rolls).length ?? 0;
+  // 下のパネルに出す取り合い: この端末のキャラがまだ選んでいない物から。全部選んだら、待っている物
+  const claimIdx = (() => {
+    const cs = chest.claims ?? [];
+    const open = cs.map((c, i) => ({ c, i })).filter(({ c }) => !c.rolls);
+    return (open.find(({ c }) => c.heroes.some((id) => !c.choices[id] && isLocalPlayer(findHero(game, id)?.playerId ?? 'P1'))) ?? open[0])?.i ?? -1;
+  })();
   const opened = !!chest.contents;
   const roll = chest.lastRoll?.kind === 'luck' ? chest.lastRoll : undefined;
   const grade: Rarity = chest.grade ?? roll?.grade ?? look;
@@ -266,7 +285,7 @@ export function ChestScreen() {
   const showResult = opened && !animating;
 
   // 帯グラフ: 開ける前 = 今の設定での確率 / 演出中 = スロット後にずれる / 結果 = 当たった格を強調
-  const hero = sceneHeroes(game).find((h) => h.id === heroId) ?? sceneHeroes(game)[0];
+  const hero = opener ?? sceneHeroes(game).find((h) => h.id === heroId) ?? sceneHeroes(game)[0];
   const chance = statChance(hero, 'luk', 'luck');
   const slots = BALANCE.chestLuckSlots;
   const expected = useMemo(() => expectedChestOdds(look, slots, Math.min(focus, slots, hero.focus), chance), [look, slots, focus, hero.focus, chance]);
@@ -325,7 +344,7 @@ export function ChestScreen() {
             </div>
           )}
 
-          {!opened && <label className="flex items-center gap-2 text-[13px]">報酬を受け取る人<select aria-label="報酬を受け取る人" value={recipientId ?? heroId} onChange={e => setRecipientId(e.target.value)} className="min-h-11 max-w-[180px] rounded bg-zinc-900 px-2 text-[13px]">{sceneHeroes(game).map(h => <option key={h.id} value={h.id}>{h.playerId}・{h.name}</option>)}</select></label>}
+          {!opened && !shared && <label className="flex items-center gap-2 text-[13px]">報酬を受け取る人<select aria-label="報酬を受け取る人" value={recipientId ?? heroId} onChange={e => setRecipientId(e.target.value)} className="min-h-11 max-w-[180px] rounded bg-zinc-900 px-2 text-[13px]">{sceneHeroes(game).map(h => <option key={h.id} value={h.id}>{h.playerId}・{h.name}</option>)}</select></label>}
           {/* 宝箱 */}
           <motion.div
             animate={reach || step?.kind === 'premium' ? { y: -14, scale: 1.12 } : showResult ? { y: 0, scale: [0.85, 1.15, 1] } : { y: 0, scale: 1 }}
@@ -452,8 +471,9 @@ export function ChestScreen() {
               {/* 手に入れた物: 格の色の縁と金の四隅 */}
               <div className="panel-ornate mt-1 w-full rounded-xl border-2 p-1.5" style={{ borderColor: r.color, background: 'rgba(0,0,0,.55)', boxShadow: `0 0 14px ${r.glow}` }} data-loot-frame>
                 <LootList loot={chest.contents!} />
-                <div className="mt-1 text-center text-[12px] text-zinc-400">装備品は「パーティ・装備」から誰にでも装備できます</div>
+                <div className="mt-1 text-center text-[12px] text-zinc-400">{chest.claims?.length ? '品物はみんなで取り合って決めます（お金はその場の全員で山分け）' : '装備品は「パーティ・装備」から誰にでも装備できます'}</div>
               </div>
+
             </div>
           )}
         </div>
@@ -464,11 +484,50 @@ export function ChestScreen() {
           <button onClick={skip} className="btn btn-dark flex h-12 w-full items-center justify-center gap-1 rounded-xl text-[15px] font-bold">
             <ChevronsRight size={20} /> タップで結果まで飛ばす
           </button>
+        ) : !opened && shared && (!opener || pickAgain) ? (
+          <>
+            <OpenerPicker chest={chest} heroes={sceneHeroes(game).filter((h) => !h.retired)} />
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} className="btn btn-dark h-12 rounded-xl text-[14px] font-bold">
+                {chest.spec.big ? '開けずに去る' : '立ち去る'}
+                <VoteChips cmd={{ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER }} />
+              </button>
+              {opener && (
+                <button onClick={() => setPickAgain(false)} className="btn btn-dark h-12 rounded-xl text-[14px] font-bold">
+                  もどる
+                </button>
+              )}
+            </div>
+          </>
+        ) : !opened && shared && opener && !myOpener ? (
+          <div className="flex flex-col gap-2" data-opener-wait>
+            <div className="flex items-center gap-2 rounded-lg bg-black/35 p-1.5 text-[13px]">
+              <HeroFace hero={opener} size={32} />
+              <span className="min-w-0 flex-1 leading-5">
+                <span className="rounded px-1 text-[12px] font-bold text-black" style={{ background: PLAYER_COLOR[opener.playerId] }}>
+                  {opener.playerId}
+                </span>{' '}
+                <b>{opener.name}</b>が開けます
+                <span className="block text-[12px] text-zinc-400">{useOnline.getState().room?.seatName(opener.playerId) ?? opener.playerId}さんが{locked ? '鍵を開ける' : '運のスロットを回す'}のを待っています</span>
+              </span>
+            </div>
+            <button onClick={() => setPickAgain(true)} className="btn btn-dark h-11 rounded-xl text-[13px] font-bold">
+              開ける人を選び直す
+            </button>
+          </div>
         ) : !opened ? (
           <>
+            {opener && (
+              <div className="mb-1 flex items-center gap-1.5 text-[12px] text-amber-100" data-opener-chosen>
+                <span className="min-w-0 flex-1">みんなで決めた開け役：<b>{opener.name}</b></span>
+                <button onClick={() => setPickAgain(true)} className="btn btn-dark h-11 shrink-0 rounded-lg px-2 text-[12px] font-bold">
+                  選び直す
+                </button>
+              </div>
+            )}
             <CheckPanel
-              heroes={sceneHeroes(game).filter(h => !game.world || game.activeScene || chest.tile === undefined || h.id === game.world.turn)}
-              heroId={heroId}
+              heroes={opener ? [opener] : sceneHeroes(game).filter(h => !game.world || game.activeScene || chest.tile === undefined || h.id === game.world.turn)}
+              heroId={opener?.id ?? heroId}
               setHeroId={setHeroId}
               focus={focus}
               setFocus={setFocus}
@@ -490,7 +549,7 @@ export function ChestScreen() {
                     pendingOpen.current = true;
                     useVideo.current = !!videoUrl;
                   }
-                  dispatchGame({ type: 'OPEN_CHEST', playerId: LOCAL_PLAYER, heroId, recipientId: recipientId ?? heroId, focusUsed: focus });
+                  dispatchGame(opener ? { type: 'OPEN_CHEST', playerId: LOCAL_PLAYER, heroId: opener.id, focusUsed: focus } : { type: 'OPEN_CHEST', playerId: LOCAL_PLAYER, heroId, recipientId: recipientId ?? heroId, focusUsed: focus });
                   setFocus(0);
                 }}
                 className="btn btn-gold font-display h-12 rounded-xl text-[18px]"
@@ -499,9 +558,15 @@ export function ChestScreen() {
               </button>
             </div>
           </>
+        ) : claimIdx >= 0 ? (
+          // 中身の取り合い（ステップ2）: 1つずつ。決まった物は上の一覧に「→ 名前」で出る
+          <div className="-mt-3 max-h-[46vh] overflow-y-auto overscroll-contain" data-claim-area>
+            <ClaimPanel claim={chest.claims![claimIdx]} index={claimIdx} title={`中身を取り合う（${claimIdx + 1}/${chest.claims!.length}）`} />
+            <div className="mt-1 text-center text-[12px] text-zinc-400">残り{claimsLeft}つ。全部決まると先へ進めます</div>
+          </div>
         ) : (
-          <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px]">
-            {chest.spec.big ? 'ダンジョン制覇！' : '先へ進む'}
+          <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} disabled={claimsLeft > 0} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px] disabled:opacity-40">
+            {claimsLeft > 0 ? `取り合いを待っています（残り${claimsLeft}）` : chest.spec.big ? 'ダンジョン制覇！' : '先へ進む'}
             <VoteChips cmd={{ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER }} />
           </button>
         )}

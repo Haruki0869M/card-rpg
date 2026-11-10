@@ -89,6 +89,12 @@ for (width of [360, 390, 480]) {
     const before = JSON.stringify((await save()).game.heroes[1].equipment);
     await rows.nth(i).locator('button').last().click();
     await page.waitForTimeout(250);
+    // 2人以上で最後の1つを買う時は「残り1つです」の確認が出る（ステップ2）→ 買う
+    const lastOne = page.getByRole('dialog', { name: '残り1つです' });
+    if (await lastOne.count()) {
+      await lastOne.getByRole('button', { name: '買う' }).click();
+      await page.waitForTimeout(250);
+    }
     const notice = page.locator('[data-buy-notice]');
     if (!(await notice.count())) await fail(`買った時のお知らせが出ない（${names[i].slice(0, 20)}）`);
     notices++;

@@ -48,9 +48,9 @@ describe('後半5職のデータ・転職', () => {
     expect(j.weaponType).toBe(main); expect(j.subWeapons).toEqual([sub]); expect(ITEMS.get(j.startingEquipment.weapon!).weaponType).toBe(main);
     expect(j.baseMaxHp).toBe(base.baseMaxHp + 8); expect(j.stats[primary]).toBe(base.stats[primary] + 6); expect(j.stats[secondary]).toBe(base.stats[secondary] + 4);
   });
-  it.each(jobs)('%sはLv3・実績・神殿で転職し、代表カードを1枚選べる', id => {
+  it.each(jobs)('%sは特殊職のLv・実績・神殿で転職し、代表カードを1枚選べる', id => {
     let g = fresh(); const j = CLASSES.get(id), h = g.heroes[0];
-    h.classId = j.from![0]; h.level = 3; h.feats = { [j.requires!.feat]: j.requires!.count };
+    h.classId = j.from![0]; h.level = BALANCE.jobChange.special; h.feats = { [j.requires!.feat]: j.requires!.count };
     const tile = g.world!.tiles.findIndex(t => t.f?.id === 'pilgrimTemple'); g.world!.pos[h.id] = tile;
     g.mode = 'sanctuary'; g.party = [h.id]; g.sanctuary = { sanctuaryId: 'pilgrimTemple', heroId: h.id, tile };
     expect(jobOptions(h, g).find(o => o.job.id === id)?.ready).toBe(true);
@@ -278,8 +278,8 @@ describe('v10保存の互換性', () => {
   it('進行中の戦闘に先読み回数0を補い、カード・トークン・乱数を維持する', () => {
     const g = fresh(), b = battle(['machinist']); g.version = 10; b.version = 10; delete b.allies[0].slotPreviewUsed;
     g.expeditions = [{ id: 'x1', mode: 'battle', heroes: ['h0'], battle: b }]; const before = structuredClone(g);
-    const next = migrateGame(JSON.parse(JSON.stringify(g)))!; expect(next.version).toBe(16);
-    const after = next.expeditions![0].battle!; expect(after.version).toBe(16); expect(after.allies[0].slotPreviewUsed).toBe(0); expect(after.slotPreview).toBeUndefined();
+    const next = migrateGame(JSON.parse(JSON.stringify(g)))!; expect(next.version).toBe(17);
+    const after = next.expeditions![0].battle!; expect(after.version).toBe(17); expect(after.allies[0].slotPreviewUsed).toBe(0); expect(after.slotPreview).toBeUndefined();
     expect(after.rngState).toBe(before.expeditions![0].battle!.rngState); expect(after.allies[0].summons).toEqual(before.expeditions![0].battle!.allies[0].summons);
   });
   it('罠の対象・効果・残り期間と強化状態は保存再開でも保持される', () => {
