@@ -122,7 +122,7 @@ describe('同行の移動の提案への返事（担当の違う仲間を連れ�
       g = send(g, { type: 'WORLD_INVITE', playerId: 'P2', heroId: 'h1', targetId: c.id }).state;
       g = send(g, { type: 'WORLD_INVITE_ANSWER', playerId: c.playerId, heroId: c.id, accept: true }).state;
     }
-    const rolled = send(g, { type: 'WORLD_ROLL_MOVE', playerId: 'P2', heroId: 'h1', focusUsed: 4 });
+    const rolled = send(g, { type: 'WORLD_ROLL_MOVE', playerId: 'P2', heroId: 'h1' });
     expect(rolled.error).toBeUndefined();
     g = rolled.state;
     const to = [...reachable(g.world!, start, g.world!.move ?? 0).keys()].find((t) => t !== start)!;

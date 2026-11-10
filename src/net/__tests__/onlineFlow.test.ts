@@ -112,7 +112,7 @@ describe('オンライン: P2 の番に担当の違う仲間を連れて動く',
         await by(c.playerId).send({ type: 'WORLD_INVITE_ANSWER', playerId: c.playerId, heroId: c.id, accept: true });
         await settle();
       }
-      await p2.send({ type: 'WORLD_ROLL_MOVE', playerId: 'P2', heroId: 'h1', focusUsed: 4 });
+      await p2.send({ type: 'WORLD_ROLL_MOVE', playerId: 'P2', heroId: 'h1' });
       await settle();
       const g = host.game!;
       const to = [...reachable(g.world!, start, g.world!.move ?? 0).keys()].find((t) => t !== start)!;

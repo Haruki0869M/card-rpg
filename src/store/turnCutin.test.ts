@@ -42,7 +42,7 @@ describe('手番のカットイン', () => {
   it('1台で2人（担当が同じ P1）: 手番が2人目に移ると大きなカットイン。同じ手番のままの操作では出ない', () => {
     useBattle.getState().loadRemote(twoPlayers(['P1', 'P1']));
     expect(useBattle.getState().turnCutin).toBeNull();
-    expect(useBattle.getState().dispatchWire({ type: 'WORLD_ROLL_MOVE', playerId: 'P1', heroId: 'h0', focusUsed: 0 })).toBeUndefined();
+    expect(useBattle.getState().dispatchWire({ type: 'WORLD_ROLL_MOVE', playerId: 'P1', heroId: 'h0' })).toBeUndefined();
     expect(useBattle.getState().turnCutin).toBeNull();
     expect(useBattle.getState().dispatchWire({ type: 'WORLD_WAIT', playerId: 'P1', heroId: 'h0' })).toBeUndefined();
     const c = useBattle.getState().turnCutin!;

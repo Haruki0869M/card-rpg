@@ -211,7 +211,7 @@ describe('操作の同期', () => {
     const got: string[] = [];
     b.on((e) => e.type === 'rejected' && got.push(e.text));
     const h0 = host.game!.heroes[0];
-    await b.send({ type: 'WORLD_ROLL_MOVE', playerId: 'P2', heroId: h0.id, focusUsed: 0 });
+    await b.send({ type: 'WORLD_ROLL_MOVE', playerId: 'P2', heroId: h0.id });
     await settle();
     expect(host.seq).toBe(0);
     expect(got.length).toBe(1);

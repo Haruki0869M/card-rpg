@@ -4,7 +4,7 @@ import type { DungeonDef } from '../../../../types';
 import { CASTLE_POOLS, CATHEDRAL_POOLS, CRYSTAL_POOLS, MINE_POOLS } from './pools';
 import { FINALE_EXTRA_FLOOR, KEY_EXTRA_FLOOR, grownLayout } from '../../extraFloor';
 
-/** 氷晶の洞（8行。入門。道中のイベントと鍵の戦いまで） */
+/** 氷晶の洞（元の並びは8行。extraFloor.ts で40行に広げる。入門。道中のイベントと鍵の戦いまで） */
 export const crystalCave: DungeonDef = {
   id: 'crystalCave',
   name: '氷晶の洞',
@@ -40,7 +40,7 @@ export const crystalCave: DungeonDef = {
   ], KEY_EXTRA_FLOOR),
 };
 
-/** 沈んだ聖堂（8行。亡者と祈り。やや戦闘が多い） */
+/** 沈んだ聖堂（元の並びは8行。extraFloor.ts で40行に広げる。亡者と祈り。やや戦闘が多い） */
 export const sunkenCathedral: DungeonDef = {
   id: 'sunkenCathedral',
   name: '沈んだ聖堂',
@@ -78,7 +78,7 @@ export const sunkenCathedral: DungeonDef = {
   ], KEY_EXTRA_FLOOR),
 };
 
-/** 霜の巨人の鉱山（9行。分かれ道が多く、強敵が2回出る） */
+/** 霜の巨人の鉱山（元の並びは9行。extraFloor.ts で40行に広げる。分かれ道が多く、強敵が2回出る） */
 export const giantMine: DungeonDef = {
   id: 'giantMine',
   name: '霜の巨人の鉱山',
@@ -121,7 +121,7 @@ export const giantMine: DungeonDef = {
   ], KEY_EXTRA_FLOOR),
 };
 
-/** 氷の城（10行。三つの鍵で開く最終ダンジョン） */
+/** 氷の城（元の並びは10行。extraFloor.ts で52行に広げる。三つの鍵で開く最終ダンジョン） */
 export const iceCastle: DungeonDef = {
   id: 'iceCastle',
   name: '氷の城',

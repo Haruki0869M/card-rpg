@@ -36,7 +36,7 @@ const SCRAP_POOLS: DungeonDef['pools'] = {
 
 type Layout = NonNullable<DungeonDef['layout']>;
 
-/** 歯車の工場（8行。入門。ベルトコンベアとプレス機） */
+/** 歯車の工場（元の並びは8行。extraFloor.ts で40行に広げる。入門。ベルトコンベアとプレス機） */
 const factoryLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
@@ -61,7 +61,7 @@ const factoryLayout: Layout = [
   [{ type: 'boss', next: [] }],
 ];
 
-/** 蒸気の発電所（8行。蒸気のバルブと冷却水。強敵が2回） */
+/** 蒸気の発電所（元の並びは8行。extraFloor.ts で40行に広げる。蒸気のバルブと冷却水。強敵が2回） */
 const plantLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
@@ -86,7 +86,7 @@ const plantLayout: Layout = [
   [{ type: 'boss', next: [] }],
 ];
 
-/** 時計塔（9行。スクラップと行商ロボット。分かれ道が多い） */
+/** 時計塔（元の並びは9行。extraFloor.ts で40行に広げる。スクラップと行商ロボット。分かれ道が多い） */
 const towerLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [

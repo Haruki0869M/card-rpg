@@ -32,7 +32,7 @@ const TIDE_CAVE_POOLS: DungeonDef['pools'] = {
 
 type Layout = NonNullable<DungeonDef['layout']>;
 
-/** 難破船の洞窟（8行。入門。潮と沈んだ宝箱） */
+/** 難破船の洞窟（元の並びは8行。extraFloor.ts で40行に広げる。入門。潮と沈んだ宝箱） */
 const wreckCaveLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
@@ -57,7 +57,7 @@ const wreckCaveLayout: Layout = [
   [{ type: 'boss', next: [] }],
 ];
 
-/** 海賊の隠れ島（8行。海賊の財宝と罠。強敵が2回） */
+/** 海賊の隠れ島（元の並びは8行。extraFloor.ts で40行に広げる。海賊の財宝と罠。強敵が2回） */
 const pirateIslandLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
@@ -82,7 +82,7 @@ const pirateIslandLayout: Layout = [
   [{ type: 'boss', next: [] }],
 ];
 
-/** 沈んだ神殿（9行。霧の歌と潮の祭壇。分かれ道が多い） */
+/** 沈んだ神殿（元の並びは9行。extraFloor.ts で40行に広げる。霧の歌と潮の祭壇。分かれ道が多い） */
 const sunkenTempleLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [

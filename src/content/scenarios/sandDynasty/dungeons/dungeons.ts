@@ -40,7 +40,7 @@ const CAVE_POOLS: DungeonDef['pools'] = {
 
 type Layout = NonNullable<DungeonDef['layout']>;
 
-/** 蠍の墓所（8行。入門。砂の崩落と墓の罠） */
+/** 蠍の墓所（元の並びは8行。extraFloor.ts で40行に広げる。入門。砂の崩落と墓の罠） */
 const scorpionTombLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
@@ -65,7 +65,7 @@ const scorpionTombLayout: Layout = [
   [{ type: 'boss', next: [] }],
 ];
 
-/** 影の書庫（8行。壁画と泉。強敵が2回） */
+/** 影の書庫（元の並びは8行。extraFloor.ts で40行に広げる。壁画と泉。強敵が2回） */
 const shadowLibraryLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
@@ -90,7 +90,7 @@ const shadowLibraryLayout: Layout = [
   [{ type: 'boss', next: [] }],
 ];
 
-/** 石像の神殿（9行。分かれ道が多く、幽霊の隊商がいる） */
+/** 石像の神殿（元の並びは9行。extraFloor.ts で40行に広げる。分かれ道が多く、幽霊の隊商がいる） */
 const statueTempleLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
