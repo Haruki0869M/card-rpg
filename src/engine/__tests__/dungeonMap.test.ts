@@ -385,12 +385,12 @@ describe('一人称の通路の見え方（段階B）', () => {
     here.pos = { ...f, facing: 0 };
     revealSeen(here);
     expect(viewSlices(here).end.face).toBe('boss');
-    const t2 = standIn(temple(), 'r1c1');
-    const front = doorFront(t2, 'r2c0')!;
-    // r1c1 の次は r2c1・r2c2。r2c0 は開かないので壁になる（古い保存データで、その前に立っていた時も落ちない）
+    const t2 = standIn(temple(), 'r4c1');
+    const front = doorFront(t2, 'r5c0')!;
+    // r4c1 の次は r5c1 だけ。r5c0 は開かないので壁になる（古い保存データで、その前に立っていた時も落ちない）
     t2.pos = { ...front, facing: 0 };
     t2.seen = [...(t2.seen ?? []), cellKey(front.x, front.y), cellKey(front.x, front.y + 1)];
-    expect(t2.rooms.find((r) => r.id === 'r1c1')!.next).not.toContain('r2c0');
+    expect(t2.rooms.find((r) => r.id === 'r4c1')!.next).not.toContain('r5c0');
     expect(viewSlices(t2).end).toEqual({ depth: 1, face: 'wall' });
   });
 });

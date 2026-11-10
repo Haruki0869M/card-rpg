@@ -1,7 +1,6 @@
 // シナリオ6のダンジョン。敵の組み合わせはダンジョンごと（雷だけが弱点の敵ばかりにならないよう、火・氷が弱点の敵を混ぜる）。
 // 制覇すると動力核が壊れて鍵になり、3つそろうと最終ダンジョンに入れる。ボスの手前に「物語の部屋」（event）を置く
 import type { DungeonDef } from '../../../../types';
-import { FINALE_EXTRA_FLOOR, KEY_EXTRA_FLOOR, grownLayout } from '../../extraFloor';
 
 const FACTORY_POOLS: DungeonDef['pools'] = {
   battle: [['smokeStackCrow', 'brokenAutomaton'], ['conveyorBot', 'oilSlime'], ['riveter', 'sparkTurret'], ['voltGearBug', 'brokenAutomaton'], ['gearBug', 'conveyorBot', 'oilSlime']],
@@ -24,6 +23,8 @@ const TOWER_POOLS: DungeonDef['pools'] = {
 const HEART_POOLS: DungeonDef['pools'] = {
   battle: [['copperKnight', 'furnaceImp'], ['ironCopperKnight', 'furnaceImp'], ['copperKnight', 'venomBoilerCrab']],
   elite: [['furnaceGolem'], ['furnaceGolem', 'copperKnight']],
+  // 7行目の中ボス（提案）
+  midboss: ['furnaceGolem', 'ironCopperKnight'],
   boss: ['greatMachine'],
 };
 
@@ -36,7 +37,7 @@ const SCRAP_POOLS: DungeonDef['pools'] = {
 
 type Layout = NonNullable<DungeonDef['layout']>;
 
-/** 歯車の工場（元の並びは8行。extraFloor.ts で40行に広げる。入門。ベルトコンベアとプレス機） */
+/** 歯車の工場（入門。ベルトコンベアとプレス機） */
 const factoryLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
@@ -44,13 +45,13 @@ const factoryLayout: Layout = [
     { type: 'event', eventId: 'gearConveyor', next: [1, 2] },
   ],
   [
-    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [0] },
-    { type: 'battle', next: [0, 1] },
-    { type: 'rest', next: [1] },
+    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [0, 1] },
+    { type: 'elite', next: [0, 1] },
+    { type: 'rest', next: [0] },
   ],
   [
+    { type: 'battle', next: [0, 1] },
     { type: 'event', eventId: 'pressTrap', next: [0] },
-    { type: 'elite', next: [0, 1] },
   ],
   [
     { type: 'battle', next: [0] },
@@ -61,7 +62,7 @@ const factoryLayout: Layout = [
   [{ type: 'boss', next: [] }],
 ];
 
-/** 蒸気の発電所（元の並びは8行。extraFloor.ts で40行に広げる。蒸気のバルブと冷却水。強敵が2回） */
+/** 蒸気の発電所（蒸気のバルブと冷却水。強敵が2回） */
 const plantLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
@@ -78,37 +79,45 @@ const plantLayout: Layout = [
     { type: 'event', eventId: 'coolantTank', next: [1] },
   ],
   [
+    { type: 'battle', next: [0, 1] },
+    { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
+  ],
+  [
     { type: 'battle', next: [0] },
-    { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
+    { type: 'elite', next: [0] },
   ],
   [{ type: 'rest', next: [0] }],
   [{ type: 'event', eventId: 'boilerRoom', next: [0] }],
   [{ type: 'boss', next: [] }],
 ];
 
-/** 時計塔（元の並びは9行。extraFloor.ts で40行に広げる。スクラップと行商ロボット。分かれ道が多い） */
+/** 時計塔（スクラップと行商ロボット。分かれ道が多い） */
 const towerLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
     { type: 'battle', next: [0, 1] },
-    { type: 'battle', next: [1, 2] },
+    { type: 'event', eventId: 'scrapChest', next: [1, 2] },
   ],
   [
-    { type: 'event', eventId: 'scrapChest', next: [0] },
-    { type: 'battle', next: [0, 1] },
-    { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [1] },
-  ],
-  [
+    { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
     { type: 'elite', next: [0, 1] },
-    { type: 'rest', next: [1] },
+    { type: 'battle', next: [1] },
   ],
   [
-    { type: 'battle', next: [0] },
-    { type: 'event', eventId: 'peddlerBot', next: [0, 1] },
+    { type: 'rest', next: [0, 1] },
+    { type: 'event', eventId: 'peddlerBot', next: [1] },
+  ],
+  [
+    { type: 'battle', next: [0, 1] },
+    { type: 'battle', next: [1] },
   ],
   [
     { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
-    { type: 'elite', next: [0] },
+    { type: 'elite', next: [0, 1] },
+  ],
+  [
+    { type: 'battle', next: [0] },
+    { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
   ],
   [{ type: 'rest', next: [0] }],
   [{ type: 'event', eventId: 'sageStudy', next: [0] }],
@@ -125,7 +134,7 @@ export const gearFactory: DungeonDef = {
   bossChest: 'epic',
   rewardKey: 'coreGear',
   clearStory: ['工場長ゴーレムが、動かなくなった。', '工場のベルトが、静かに止まる。', '動力核（歯車）を壊した！'],
-  layout: grownLayout(factoryLayout, KEY_EXTRA_FLOOR),
+  layout: factoryLayout,
 };
 
 export const steamPlant: DungeonDef = {
@@ -140,7 +149,7 @@ export const steamPlant: DungeonDef = {
   // 1つ目のダンジョンの鍵が要る（play-feedback-plan §4 C: 町や依頼を飛ばして、まっすぐ奥へ行けないように）
   requiresKeys: ['coreGear'],
   clearStory: ['暴走ボイラーの炎が、消えた。', '発電所から、蒸気が引いていく。', '動力核（蒸気）を壊した！'],
-  layout: grownLayout(plantLayout, KEY_EXTRA_FLOOR),
+  layout: plantLayout,
 };
 
 export const clockTower: DungeonDef = {
@@ -156,7 +165,7 @@ export const clockTower: DungeonDef = {
   requiresKeys: ['coreSteam'],
   requiresQuests: 1,
   clearStory: ['時計仕掛けの賢者の針が、止まった。', '「大機械を…止めてやってくれ」', '動力核（時間）を壊した！'],
-  layout: grownLayout(towerLayout, KEY_EXTRA_FLOOR),
+  layout: towerLayout,
 };
 
 export const machineHeart: DungeonDef = {
@@ -169,24 +178,42 @@ export const machineHeart: DungeonDef = {
   bossChest: 'legend',
   requiresKeys: ['coreGear', 'coreSteam', 'coreTime'],
   finale: true,
-  layout: grownLayout([
+  layout: [
     [{ type: 'battle', next: [0, 1] }],
     [
-      { type: 'battle', next: [0, 1] },
+      { type: 'battle', next: [0] },
+      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0, 1] },
+    ],
+    [
+      { type: 'elite', next: [0, 1] },
       { type: 'battle', next: [1] },
     ],
     [
-      { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
+      { type: 'rest', next: [0, 1] },
+      { type: 'event', eventId: 'peddlerBot', next: [1] },
+    ],
+    [
+      { type: 'battle', next: [0, 1] },
+      { type: 'elite', next: [1] },
+    ],
+    [
+      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
+      { type: 'battle', next: [0] },
+    ],
+    [{ type: 'midboss', next: [0] }],
+    [{ type: 'rest', next: [0, 1] }],
+    [
+      { type: 'battle', next: [0, 1] },
+      { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
+    ],
+    [
+      { type: 'elite', next: [0] },
       { type: 'battle', next: [0] },
     ],
     [{ type: 'rest', next: [0] }],
-    [{ type: 'elite', next: [0] }],
-    [{ type: 'battle', next: [0] }],
-    [{ type: 'rest', next: [0] }],
-    [{ type: 'battle', next: [0] }],
     [{ type: 'event', eventId: 'machineHeartRoom', next: [0] }],
     [{ type: 'boss', next: [] }],
-  ], FINALE_EXTRA_FLOOR),
+  ],
 };
 
 // ランダムダンジョン: 廃品の洞窟（部屋の並びを自動生成）

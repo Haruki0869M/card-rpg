@@ -17,7 +17,7 @@ describe('凍てつく王国', () => {
     const g = newWorld();
     const w = g.world!;
     expect(w.width).toBe(8);
-    expect(w.height).toBe(49);
+    expect(w.height).toBe(35);
     const sc = getScenario('frozenKingdom');
     for (const f of sc.map!.features) {
       const t = w.tiles.find((x) => x.f?.kind === f.kind && x.f.id === f.id);

@@ -255,6 +255,8 @@ export interface WorldState {
    * ワールドターンの終わりに消える（無ければ空。古い保存データは無いまま始まる）
    */
   movedBy?: Record<string, string>;
+  /** 古い形（40行・52行）のダンジョンから損をせずに撤退した時の目印（ダンジョンのID）。次にそこへ入る時は侵食度が上がらない（入り直しの分。使ったら消える。無ければ空） */
+  freeReentry?: string[];
   relayCharged?: string[];
   /** このワールドターンに野営して、寒さ・暑さを受けないキャラ（ターンの終わりに消える。K4 段2。無ければ空） */
   sheltered?: string[];

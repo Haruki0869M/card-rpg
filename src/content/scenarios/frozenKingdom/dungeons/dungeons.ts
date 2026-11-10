@@ -2,9 +2,8 @@
 // ボスの手前に「物語の部屋」（event）を置き、ボスの正体や春を奪われた理由が分かるようにしている
 import type { DungeonDef } from '../../../../types';
 import { CASTLE_POOLS, CATHEDRAL_POOLS, CRYSTAL_POOLS, MINE_POOLS } from './pools';
-import { FINALE_EXTRA_FLOOR, KEY_EXTRA_FLOOR, grownLayout } from '../../extraFloor';
 
-/** 氷晶の洞（元の並びは8行。extraFloor.ts で40行に広げる。入門。道中のイベントと鍵の戦いまで） */
+/** 氷晶の洞（入門。道中のイベントと鍵の戦いまで） */
 export const crystalCave: DungeonDef = {
   id: 'crystalCave',
   name: '氷晶の洞',
@@ -15,20 +14,20 @@ export const crystalCave: DungeonDef = {
   bossChest: 'epic',
   rewardKey: 'crystalWhite',
   clearStory: ['氷晶の主が、音を立てて砕け散った。', '最期に「…温かい」とつぶやいた。', '氷晶の鍵（白）を手に入れた！'],
-  layout: grownLayout([
+  layout: [
     [{ type: 'battle', next: [0, 1] }],
     [
       { type: 'battle', next: [0, 1] },
       { type: 'event', eventId: 'frostBridge', next: [1, 2] },
     ],
     [
-      { type: 'chest', chest: { rarity: 'common', locked: false }, next: [0] },
-      { type: 'battle', next: [0, 1] },
-      { type: 'rest', next: [1] },
+      { type: 'chest', chest: { rarity: 'common', locked: false }, next: [0, 1] },
+      { type: 'elite', next: [0, 1] },
+      { type: 'rest', next: [0] },
     ],
     [
+      { type: 'battle', next: [0, 1] },
       { type: 'event', eventId: 'buriedChest', next: [0] },
-      { type: 'elite', next: [0, 1] },
     ],
     [
       { type: 'battle', next: [0] },
@@ -37,10 +36,10 @@ export const crystalCave: DungeonDef = {
     [{ type: 'rest', next: [0] }],
     [{ type: 'event', eventId: 'crystalGate', next: [0] }],
     [{ type: 'boss', next: [] }],
-  ], KEY_EXTRA_FLOOR),
+  ],
 };
 
-/** 沈んだ聖堂（元の並びは8行。extraFloor.ts で40行に広げる。亡者と祈り。やや戦闘が多い） */
+/** 沈んだ聖堂（亡者と祈り。やや戦闘が多い） */
 export const sunkenCathedral: DungeonDef = {
   id: 'sunkenCathedral',
   name: '沈んだ聖堂',
@@ -53,7 +52,7 @@ export const sunkenCathedral: DungeonDef = {
   // 1つ目のダンジョンの鍵が要る（play-feedback-plan §4 C: 町や依頼を飛ばして、まっすぐ奥へ行けないように）
   requiresKeys: ['crystalWhite'],
   clearStory: ['司教は微笑み、光になって消えた。', '「どうか、姫様を止めて」', '氷晶の鍵（蒼）を手に入れた！'],
-  layout: grownLayout([
+  layout: [
     [{ type: 'battle', next: [0, 1] }],
     [
       { type: 'event', eventId: 'iceSilhouette', next: [0, 1] },
@@ -69,16 +68,20 @@ export const sunkenCathedral: DungeonDef = {
       { type: 'event', eventId: 'frozenCamp', next: [1] },
     ],
     [
+      { type: 'battle', next: [0, 1] },
+      { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
+    ],
+    [
       { type: 'battle', next: [0] },
-      { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
+      { type: 'elite', next: [0] },
     ],
     [{ type: 'rest', next: [0] }],
     [{ type: 'event', eventId: 'bishopAltar', next: [0] }],
     [{ type: 'boss', next: [] }],
-  ], KEY_EXTRA_FLOOR),
+  ],
 };
 
-/** 霜の巨人の鉱山（元の並びは9行。extraFloor.ts で40行に広げる。分かれ道が多く、強敵が2回出る） */
+/** 霜の巨人の鉱山（分かれ道が多く、強敵が2回出る） */
 export const giantMine: DungeonDef = {
   id: 'giantMine',
   name: '霜の巨人の鉱山',
@@ -92,36 +95,40 @@ export const giantMine: DungeonDef = {
   requiresKeys: ['crystalBlue'],
   requiresQuests: 1,
   clearStory: ['霜の巨人が、ゆっくり膝をついた。', '「女王様を…あたためてやってくれ」', '氷晶の鍵（銀）を手に入れた！'],
-  layout: grownLayout([
+  layout: [
     [{ type: 'battle', next: [0, 1] }],
     [
       { type: 'battle', next: [0, 1] },
-      { type: 'battle', next: [1, 2] },
+      { type: 'event', eventId: 'buriedChest', next: [1, 2] },
     ],
     [
-      { type: 'event', eventId: 'buriedChest', next: [0] },
-      { type: 'battle', next: [0, 1] },
-      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [1] },
-    ],
-    [
+      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
       { type: 'elite', next: [0, 1] },
-      { type: 'rest', next: [1] },
+      { type: 'battle', next: [1] },
     ],
     [
-      { type: 'battle', next: [0] },
-      { type: 'event', eventId: 'furTrader', next: [0, 1] },
+      { type: 'rest', next: [0, 1] },
+      { type: 'event', eventId: 'furTrader', next: [1] },
+    ],
+    [
+      { type: 'battle', next: [0, 1] },
+      { type: 'battle', next: [1] },
     ],
     [
       { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
-      { type: 'elite', next: [0] },
+      { type: 'elite', next: [0, 1] },
+    ],
+    [
+      { type: 'battle', next: [0] },
+      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
     ],
     [{ type: 'rest', next: [0] }],
     [{ type: 'event', eventId: 'giantGate', next: [0] }],
     [{ type: 'boss', next: [] }],
-  ], KEY_EXTRA_FLOOR),
+  ],
 };
 
-/** 氷の城（元の並びは10行。extraFloor.ts で52行に広げる。三つの鍵で開く最終ダンジョン） */
+/** 氷の城（三つの鍵で開く最終ダンジョン） */
 export const iceCastle: DungeonDef = {
   id: 'iceCastle',
   name: '氷の城',
@@ -132,27 +139,42 @@ export const iceCastle: DungeonDef = {
   bossChest: 'legend',
   requiresKeys: ['crystalWhite', 'crystalBlue', 'crystalSilver'],
   finale: true,
-  layout: grownLayout([
+  layout: [
     [{ type: 'battle', next: [0, 1] }],
     [
-      { type: 'battle', next: [0, 1] },
+      { type: 'battle', next: [0] },
+      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0, 1] },
+    ],
+    [
+      { type: 'elite', next: [0, 1] },
       { type: 'battle', next: [1] },
     ],
     [
-      { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
-      { type: 'battle', next: [0] },
+      { type: 'rest', next: [0, 1] },
+      { type: 'event', eventId: 'iceSilhouette', next: [1] },
     ],
-    [{ type: 'rest', next: [0] }],
-    [{ type: 'elite', next: [0, 1] }],
     [
+      { type: 'battle', next: [0, 1] },
+      { type: 'elite', next: [1] },
+    ],
+    [
+      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
       { type: 'battle', next: [0] },
-      { type: 'event', eventId: 'iceSilhouette', next: [0] },
+    ],
+    [{ type: 'midboss', next: [0] }],
+    [{ type: 'rest', next: [0, 1] }],
+    [
+      { type: 'battle', next: [0, 1] },
+      { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
+    ],
+    [
+      { type: 'elite', next: [0] },
+      { type: 'battle', next: [0] },
     ],
     [{ type: 'rest', next: [0] }],
-    [{ type: 'battle', next: [0] }],
     [{ type: 'event', eventId: 'queenThrone', next: [0] }],
     [{ type: 'boss', next: [] }],
-  ], FINALE_EXTRA_FLOOR),
+  ],
 };
 
 // ランダムダンジョン: 凍る洞窟（部屋の並びを自動生成）

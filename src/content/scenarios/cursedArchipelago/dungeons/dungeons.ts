@@ -1,7 +1,6 @@
 // シナリオ3のダンジョン。
 // 制覇すると鍵（灯）が手に入り、3つそろうと最終ダンジョンに入れる。ボスの手前に「物語の部屋」（event）を置く
 import type { DungeonDef } from '../../../../types';
-import { FINALE_EXTRA_FLOOR, KEY_EXTRA_FLOOR, grownLayout } from '../../extraFloor';
 
 // 敵の組（K4 手順2）。弱点が同じ敵だけの組にならないようにする（海の生き物は雷、幽霊は聖に弱い）
 const WRECK_CAVE_POOLS: DungeonDef['pools'] = {
@@ -22,6 +21,8 @@ const SUNKEN_TEMPLE_POOLS: DungeonDef['pools'] = {
 const FLAGSHIP_POOLS: DungeonDef['pools'] = {
   battle: [['lanternAngler', 'ghostDeckhand'], ['barnacleBeast', 'venomShark'], ['venomShark', 'cursedDrownedSailor'], ['barnacleBeast', 'ghostDeckhand', 'stormPetrel'], ['barnacleBeast', 'cursedDrownedSailor']],
   elite: [['krakenTentacle'], ['stormSeaWitch', 'barnacleBeast']],
+  // 7行目の中ボス（提案）
+  midboss: ['krakenTentacle', 'ghostDeckhand'],
   boss: ['ghostAdmiral'],
 };
 const TIDE_CAVE_POOLS: DungeonDef['pools'] = {
@@ -32,7 +33,7 @@ const TIDE_CAVE_POOLS: DungeonDef['pools'] = {
 
 type Layout = NonNullable<DungeonDef['layout']>;
 
-/** 難破船の洞窟（元の並びは8行。extraFloor.ts で40行に広げる。入門。潮と沈んだ宝箱） */
+/** 難破船の洞窟（入門。潮と沈んだ宝箱） */
 const wreckCaveLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
@@ -40,13 +41,13 @@ const wreckCaveLayout: Layout = [
     { type: 'event', eventId: 'seaCaveTide', next: [1, 2] },
   ],
   [
-    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [0] },
-    { type: 'battle', next: [0, 1] },
-    { type: 'rest', next: [1] },
+    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [0, 1] },
+    { type: 'elite', next: [0, 1] },
+    { type: 'rest', next: [0] },
   ],
   [
+    { type: 'battle', next: [0, 1] },
     { type: 'event', eventId: 'sunkenChest', next: [0] },
-    { type: 'elite', next: [0, 1] },
   ],
   [
     { type: 'battle', next: [0] },
@@ -57,7 +58,7 @@ const wreckCaveLayout: Layout = [
   [{ type: 'boss', next: [] }],
 ];
 
-/** 海賊の隠れ島（元の並びは8行。extraFloor.ts で40行に広げる。海賊の財宝と罠。強敵が2回） */
+/** 海賊の隠れ島（海賊の財宝と罠。強敵が2回） */
 const pirateIslandLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
@@ -74,37 +75,45 @@ const pirateIslandLayout: Layout = [
     { type: 'event', eventId: 'castawayCamp', next: [1] },
   ],
   [
+    { type: 'battle', next: [0, 1] },
+    { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
+  ],
+  [
     { type: 'battle', next: [0] },
-    { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
+    { type: 'elite', next: [0] },
   ],
   [{ type: 'rest', next: [0] }],
   [{ type: 'event', eventId: 'captainCabin', next: [0] }],
   [{ type: 'boss', next: [] }],
 ];
 
-/** 沈んだ神殿（元の並びは9行。extraFloor.ts で40行に広げる。霧の歌と潮の祭壇。分かれ道が多い） */
+/** 沈んだ神殿（霧の歌と潮の祭壇。分かれ道が多い） */
 const sunkenTempleLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
     { type: 'battle', next: [0, 1] },
-    { type: 'battle', next: [1, 2] },
+    { type: 'event', eventId: 'ghostSong', next: [1, 2] },
   ],
   [
-    { type: 'event', eventId: 'ghostSong', next: [0] },
-    { type: 'battle', next: [0, 1] },
-    { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [1] },
-  ],
-  [
+    { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
     { type: 'elite', next: [0, 1] },
-    { type: 'rest', next: [1] },
+    { type: 'battle', next: [1] },
   ],
   [
-    { type: 'battle', next: [0] },
-    { type: 'event', eventId: 'seaTrader', next: [0, 1] },
+    { type: 'rest', next: [0, 1] },
+    { type: 'event', eventId: 'seaTrader', next: [1] },
+  ],
+  [
+    { type: 'battle', next: [0, 1] },
+    { type: 'battle', next: [1] },
   ],
   [
     { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
-    { type: 'elite', next: [0] },
+    { type: 'elite', next: [0, 1] },
+  ],
+  [
+    { type: 'battle', next: [0] },
+    { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
   ],
   [{ type: 'rest', next: [0] }],
   [{ type: 'event', eventId: 'tideAltar', next: [0] }],
@@ -121,7 +130,7 @@ export const wreckCave: DungeonDef = {
   bossChest: 'epic',
   rewardKey: 'lightStar',
   clearStory: ['海蛇の女王が、静かに海へ沈んでいった。', '洞窟に、星の灯がともった。', '星の灯を手に入れた！'],
-  layout: grownLayout(wreckCaveLayout, KEY_EXTRA_FLOOR),
+  layout: wreckCaveLayout,
 };
 
 export const pirateIsland: DungeonDef = {
@@ -136,7 +145,7 @@ export const pirateIsland: DungeonDef = {
   // 1つ目のダンジョンの鍵が要る（play-feedback-plan §4 C: 町や依頼を飛ばして、まっすぐ奥へ行けないように）
   requiresKeys: ['lightStar'],
   clearStory: ['海賊船長ガルドが、剣を落とした。', '「…灯台を、頼む」', '月の灯を手に入れた！'],
-  layout: grownLayout(pirateIslandLayout, KEY_EXTRA_FLOOR),
+  layout: pirateIslandLayout,
 };
 
 export const sunkenTemple: DungeonDef = {
@@ -152,7 +161,7 @@ export const sunkenTemple: DungeonDef = {
   requiresKeys: ['lightMoon'],
   requiresQuests: 1,
   clearStory: ['潮の神官が、祈りを止めて微笑んだ。', '「提督は、悲しんでおられる」', '日の灯を手に入れた！'],
-  layout: grownLayout(sunkenTempleLayout, KEY_EXTRA_FLOOR),
+  layout: sunkenTempleLayout,
 };
 
 export const ghostFlagship: DungeonDef = {
@@ -165,24 +174,42 @@ export const ghostFlagship: DungeonDef = {
   bossChest: 'legend',
   requiresKeys: ['lightStar', 'lightMoon', 'lightSun'],
   finale: true,
-  layout: grownLayout([
+  layout: [
     [{ type: 'battle', next: [0, 1] }],
     [
-      { type: 'battle', next: [0, 1] },
+      { type: 'battle', next: [0] },
+      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0, 1] },
+    ],
+    [
+      { type: 'elite', next: [0, 1] },
       { type: 'battle', next: [1] },
     ],
     [
-      { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
+      { type: 'rest', next: [0, 1] },
+      { type: 'event', eventId: 'seaTrader', next: [1] },
+    ],
+    [
+      { type: 'battle', next: [0, 1] },
+      { type: 'elite', next: [1] },
+    ],
+    [
+      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
+      { type: 'battle', next: [0] },
+    ],
+    [{ type: 'midboss', next: [0] }],
+    [{ type: 'rest', next: [0, 1] }],
+    [
+      { type: 'battle', next: [0, 1] },
+      { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
+    ],
+    [
+      { type: 'elite', next: [0] },
       { type: 'battle', next: [0] },
     ],
     [{ type: 'rest', next: [0] }],
-    [{ type: 'elite', next: [0] }],
-    [{ type: 'battle', next: [0] }],
-    [{ type: 'rest', next: [0] }],
-    [{ type: 'battle', next: [0] }],
     [{ type: 'event', eventId: 'admiralBridge', next: [0] }],
     [{ type: 'boss', next: [] }],
-  ], FINALE_EXTRA_FLOOR),
+  ],
 };
 
 // ランダムダンジョン: 潮騒の洞窟（部屋の並びを自動生成）

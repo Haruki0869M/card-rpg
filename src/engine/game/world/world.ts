@@ -745,7 +745,10 @@ export function interact(game: GameState, cmd: Cmd<'WORLD_INTERACT'>, rng: Rng):
       // 同行しているキャラ（他の人のキャラも）は、必ず一緒に入る（指摘1）
       for (const id of here) if (followingGroup(game, h.id).includes(id) && !party.includes(id)) party.push(id);
       const before = w.corruption;
-      w.corruption = Math.min(100, w.corruption + BALANCE.corruptionOnDungeonEnter);
+      // 古い形のダンジョンから損をせずに撤退した後の入り直しは、侵食度が上がらない（1回だけ）
+      const free = w.freeReentry?.includes(f.id);
+      if (free) w.freeReentry = w.freeReentry!.filter((id) => id !== f.id);
+      else w.corruption = Math.min(100, w.corruption + BALANCE.corruptionOnDungeonEnter);
       onCorruptionChange(game, rng, before);
       if (game.mode === 'gameover') return undefined;
       for (const id of party) if (!w.acted.includes(id) && id !== h.id) w.acted.push(id);
