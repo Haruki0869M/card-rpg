@@ -123,7 +123,13 @@ export const LandscapeLayer = memo(function LandscapeLayer({ w, tiles, geom, lev
       if (img.dataset.url !== url) return;
       img.style.visibility = 'visible';
       const cv = canvases.current[r.k];
-      if (cv) cv.style.display = 'none';
+      if (cv) {
+        // 隠した Canvas の絵のメモリを手放す（別のスレッドが描く間は、画面のスレッドの Canvas は要らない。
+        // 次に画面のスレッドで描く時は、paint() で大きさを戻して、区切り全体を描き直す）
+        cv.style.display = 'none';
+        cv.width = 0;
+        cv.height = 0;
+      }
     };
     // 開き終わってから入れ替える（入れ替えの瞬間に、画面のスレッドで画像を開く重さが出ないように）
     img.decode().then(done, done);
@@ -201,6 +207,13 @@ export const LandscapeLayer = memo(function LandscapeLayer({ w, tiles, geom, lev
     const cv = canvases.current[k];
     const ctx = cv?.getContext('2d');
     if (!cv || !ctx) return;
+    // メモリを手放した Canvas（大きさ0）は、大きさを戻して区切り全体を描く（帯だけだと、ほかの所が空になる）
+    const cw = Math.ceil(W * dpr), ch = Math.ceil(CHUNK * dpr);
+    if (cv.width !== cw || cv.height !== ch) {
+      cv.width = cw;
+      cv.height = ch;
+      band = undefined;
+    }
     const y0 = top + k * CHUNK;
     const a = Math.max(y0, band?.[0] ?? y0);
     const b = Math.min(y0 + CHUNK, band?.[1] ?? y0 + CHUNK);
@@ -295,6 +308,8 @@ export const LandscapeLayer = memo(function LandscapeLayer({ w, tiles, geom, lev
       pending.current.clear();
       if (useWorker) {
         gen.current++;
+        // 新しい番号の地図になったので、見せた画像の番号も忘れる（seq は増え続けるので今は無くても動くが、念のため）
+        shownSeq.current = [];
         sendStatic();
         sendSeen();
         post({ type: 'images', urls: loadedImageUrls() });

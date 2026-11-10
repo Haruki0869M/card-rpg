@@ -69,13 +69,16 @@ function sceneryImage(k: ItemKind, v: number): SceneImage | undefined {
  * 前もって縮めた絵（大きさ 4px ごとに1枚、作り置き）。大きな絵を毎回小さく描くと、霧が晴れた時の描き直しが重かった
  * （拡大2倍で歩く時、描き直しの JS が約2倍）
  */
+/** 絵の元の大きさ（画面の img は naturalWidth、別スレッドの ImageBitmap は width） */
+const natW = (img: SceneImage) => ('naturalWidth' in img && img.naturalWidth) || img.width;
+const natH = (img: SceneImage) => ('naturalHeight' in img && img.naturalHeight) || img.height;
 let shrinkCache = new WeakMap<SceneImage, Map<number, CanvasImageSource>>();
 let shrinkCount = 0;
 function shrunk(img: SceneImage, ww: number, ctx: CanvasRenderingContext2D): CanvasImageSource {
   const scale = ctx.getTransform().a || 1;
   const pw = Math.max(4, Math.ceil((ww * scale) / 4) * 4);
-  const ph = Math.max(4, Math.round((pw * img.height) / img.width));
-  if (pw >= img.width) return img;
+  const ph = Math.max(4, Math.round((pw * natH(img)) / natW(img)));
+  if (pw >= natW(img)) return img;
   let byW = shrinkCache.get(img);
   const got = byW?.get(pw);
   if (got) return got;
@@ -445,7 +448,7 @@ export function drawItem(ctx: CanvasRenderingContext2D, it: SceneItem) {
   if (img) {
     // 絵の高さを h に合わせる（峰・木は少し大きめに）。足元 = 絵の下の真ん中
     const hh = it.h * (ART_SCALE[it.k] ?? 1.15);
-    const ww = (hh * img.width) / img.height;
+    const ww = (hh * natW(img)) / natH(img);
     footShadow(ctx, it.x, it.y, ww * 0.3, ww * 0.08);
     ctx.drawImage(shrunk(img, ww, ctx), it.x - ww / 2, it.y - hh, ww, hh);
     return;

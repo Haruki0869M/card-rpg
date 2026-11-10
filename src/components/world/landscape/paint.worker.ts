@@ -62,6 +62,8 @@ export interface FromWorker {
 
 const host = self as unknown as { postMessage(m: FromWorker): void; onmessage: ((e: MessageEvent<ToWorker>) => void) | null; location: Location };
 
+/** 絵の読み込みを諦めるまでの時間 */
+const IMAGE_TIMEOUT_MS = 5000;
 const norm = (url: string) => new URL(url, host.location.href).href;
 const bitmaps = new Map<string, SceneImage>();
 setImageSource((url) => bitmaps.get(norm(url)));
@@ -114,10 +116,17 @@ async function handle(m: ToWorker) {
       m.urls.map(async (url) => {
         const key = norm(url);
         if (bitmaps.has(key)) return;
+        // 通信が止まっても、描く仕事が全部止まらないように、5秒で諦める
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), IMAGE_TIMEOUT_MS);
         try {
-          const blob = await (await fetch(key)).blob();
+          const res = await fetch(key, { signal: ctrl.signal });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const blob = await res.blob();
+          clearTimeout(timer);
           bitmaps.set(key, await createImageBitmap(blob));
         } catch {
+          clearTimeout(timer);
           // 読めない絵は、画面のスレッドの「絵が無い時」と同じく、仮の図で描く
         }
       }),
