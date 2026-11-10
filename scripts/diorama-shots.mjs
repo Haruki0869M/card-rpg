@@ -20,6 +20,8 @@ await page.addInitScript((seed) => {
 }, SEED);
 // 見本だけ: INJECT_CSS で CSS を足す（案A の CSS の3D傾きの見本など）
 if (process.env.INJECT_CSS) await page.addInitScript((css) => document.addEventListener('DOMContentLoaded', () => { const st = document.createElement('style'); st.textContent = css; document.head.append(st); }), process.env.INJECT_CSS);
+// 調べる時だけ: INJECT_JS でページに JS を足す（例: 別スレッドを使わない端末のまねをする）
+if (process.env.INJECT_JS) await page.addInitScript(process.env.INJECT_JS);
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 await page.goto(URL);

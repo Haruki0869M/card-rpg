@@ -1,9 +1,8 @@
 // ===== 景色の層を Canvas に描く（docs/tasks/diorama-design.md ④「景色の層の作り」） =====
 // 行ごとに奥から手前へ: その行の地面（崖・上の面・にじみ・岸辺・川・道・地域の境目）→ その行の立つ物（足元の y の順）。
 // 手前の行の地面が、奥の行の木や峰の足元を少し隠すので、地面から生えて見える。
-import { artImage } from '../../../art';
-import { getTerrain } from '../../../data/world';
-import type { WorldState } from '../../../types';
+import { artImage } from '../../../art/images';
+import type { TerrainDef, WorldState } from '../../../types';
 import { BASE_DEPTH, GROUND_K, hash01, hexVerts, LEVEL_STEP, neighborAt } from '../diorama';
 import type { SceneItem } from './scatter';
 import { drawItem, itemExtent, loadedImage } from './sprites';
@@ -28,7 +27,11 @@ export interface PaintInput {
   under: readonly string[];
   roadTerrain: string;
   items: SceneItem[];
+  /** 地形の色と寒さ・暑さ（別スレッドでも描けるように、データの表を引かずに渡す） */
+  terrains: TerrainLook;
 }
+
+export type TerrainLook = Record<string, Pick<TerrainDef, 'color' | 'climate'>>;
 
 type V = [number, number];
 
@@ -84,7 +87,7 @@ function terrainPattern(ctx: CanvasRenderingContext2D, id: string, R: number, ca
   let p: CanvasPattern | null = null;
   if (img) {
     p = ctx.createPattern(img, 'repeat');
-    if (p && typeof DOMMatrix !== 'undefined') p.setTransform(new DOMMatrix().scaleSelf((R * 4) / img.naturalWidth, (R * 4) / img.naturalHeight));
+    if (p && typeof DOMMatrix !== 'undefined') p.setTransform(new DOMMatrix().scaleSelf((R * 4) / img.width, (R * 4) / img.height));
   }
   if (p) cache.set(id, p);
   return p;
@@ -95,7 +98,8 @@ function terrainPattern(ctx: CanvasRenderingContext2D, id: string, R: number, ca
  * 帯の外にはみ出す物は、呼ぶ側が帯で切り抜く
  */
 export function paintRange(ctx: CanvasRenderingContext2D, inp: PaintInput, y0: number, y1: number, origin = y0) {
-  const { w, tiles, geom, levels, links, rivers, under, roadTerrain, items } = inp;
+  const { w, tiles, geom, levels, links, rivers, under, roadTerrain, items, terrains } = inp;
+  const getTerrain = (id: string): TerrainLook[string] => terrains[id] ?? { color: '#888' };
   const { R } = geom;
   ctx.save();
   ctx.translate(0, -origin);

@@ -3,13 +3,18 @@
 // スクロールは絵を動かすだけ。描き直すのは「霧が晴れた区切り」と「拡大を変えた時（指を離してから）」だけ。
 // ピンチの最中は、前の絵を CSS で拡大して見せる（docs/tasks/diorama-design.md ④）。
 // 確認スクリプトのために、マスの形（data-hex・data-fog-tile）は透明な SVG に残す。
+// 霧が晴れた時などの描き直しは、使える端末では別のスレッド（Worker・OffscreenCanvas。paint.worker.ts）で描いて、
+// できた画像を受け取るだけにする（駒が歩く動きが引っかからないように）。使えない端末と、別のスレッドで失敗した時は、
+// 今までどおり画面のスレッドで描く。
 import { Fragment, memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { WorldState } from '../../../types';
 import { GROUND_K, hexVerts, LEVEL_STEP, neighborAt, pts, TOP_SCALE } from '../diorama';
 import { artImage } from '../../../art';
-import { paintRange, type PaintGeom } from './paint';
-import { scatter } from './scatter';
-import { itemExtent, onImagesLoaded, silhouettePath } from './sprites';
+import { TERRAINS } from '../../../data/world';
+import { paintRange, type PaintGeom, type PaintInput, type TerrainLook } from './paint';
+import type { FromWorker, ToWorker } from './paint.worker';
+import { scatter, type SceneItem } from './scatter';
+import { itemExtent, loadedImageUrls, onImagesLoaded, silhouettePath } from './sprites';
 
 /**
  * 区切り1枚の高さ（CSS の px）。
@@ -24,6 +29,12 @@ const CHUNK = 512;
  * 1倍の拡大では画素2倍のまま、拡大するほど少しずつ粗くする（水彩ふうの絵なので目立ちにくい）
  */
 const MAX_PIXELS = 3_500_000;
+
+/** 別のスレッドで描けるか（Worker・OffscreenCanvas・画像にする機能がそろっているか） */
+const CAN_WORKER =
+  typeof window !== 'undefined' && typeof Worker !== 'undefined' && typeof OffscreenCanvas !== 'undefined' && typeof OffscreenCanvas.prototype.convertToBlob === 'function';
+/** 別のスレッドで一度失敗したら、その後は画面のスレッドで描く */
+let workerBroken = false;
 
 interface Props {
   w: Pick<WorldState, 'width' | 'height'>;
@@ -40,7 +51,7 @@ interface Props {
   stage: number;
   /** ピンチの最中（描き直さず、前の絵を拡大して見せる） */
   frozen: boolean;
-  /** 駒が歩いている間（霧が晴れて描き直した区切りは、止まるまで Canvas のまま見せる。画像にするのが重いため） */
+  /** 駒が歩いている間（画面のスレッドで描く時だけ使う。霧が晴れて描き直した区切りは、止まるまで Canvas のまま見せる。画像にするのが重いため） */
   walking: boolean;
 }
 
@@ -50,30 +61,142 @@ export const LandscapeLayer = memo(function LandscapeLayer({ w, tiles, geom, lev
   if (!frozen && drawGeom !== geom) setDrawGeom(geom);
   const g = frozen ? drawGeom : geom;
   const { R, W, H } = g;
-  const items = useMemo(
-    () => scatter({ w: { ...w, tiles }, geom: g, levels, links, rivers, stage, blocked: (i) => !!tiles[i].f || noProp.has(i) }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [w.width, w.height, tiles, g, levels, links, rivers, stage, noProp],
-  );
+  const terrains = useMemo<TerrainLook>(() => Object.fromEntries(TERRAINS.all.map((t) => [t.id, { color: t.color, climate: t.climate }])), []);
+  // 立つ物の置き場所（画面のスレッドで描く時だけ作る。同じ材料なら作り置きを使う）
+  const itemsMemo = useRef<{ deps: unknown[]; items: SceneItem[] } | null>(null);
+  const getItems = () => {
+    const deps = [w.width, w.height, tiles, g, levels, links, rivers, stage, noProp];
+    const m = itemsMemo.current;
+    if (m && m.deps.every((d, i) => d === deps[i])) return m.items;
+    const items = scatter({ w: { ...w, tiles }, geom: g, levels, links, rivers, stage, blocked: (i) => !!tiles[i].f || noProp.has(i) });
+    itemsMemo.current = { deps, items };
+    return items;
+  };
   // 上は一番上の行の峰・木がはみ出す分、下は崖と影の分
   const top = -R * 2.8;
   const bottom = H + R * 0.6;
   const n = Math.max(1, Math.ceil((bottom - top) / CHUNK));
   const dpr = Math.min(2, typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, Math.sqrt(MAX_PIXELS / Math.max(1, W * (bottom - top))));
   const canvases = useRef<(HTMLCanvasElement | null)[]>([]);
+  const imgs = useRef<(HTMLImageElement | null)[]>([]);
   const [imgVer, setImgVer] = useState(0);
   useEffect(() => onImagesLoaded(() => setImgVer((v) => v + 1)), []);
 
   // 前に描いた時の状態（何が変わったかで、描き直す区切りを決める）
-  const last = useRef<{ g: PaintGeom; tiles: WorldState['tiles']; stage: number; ver: number; dpr: number } | null>(null);
+  const last = useRef<{ g: PaintGeom; tiles: WorldState['tiles']; stage: number; ver: number; dpr: number; worker: boolean } | null>(null);
   /** 描き直しを待つ区切り → その中の描き直す帯（地図の y） */
   const pending = useRef<Map<number, [number, number]>>(new Map());
   const raf = useRef(0);
-  const input = { w, tiles, geom: g, levels, links, rivers, under, roadTerrain, items };
-  const inputRef = useRef(input);
-  inputRef.current = input;
+  const inputRef = useRef({ w, tiles, geom: g, levels, links, rivers, under, roadTerrain, terrains });
+  inputRef.current = { w, tiles, geom: g, levels, links, rivers, under, roadTerrain, terrains };
+  const input = (): PaintInput => ({ ...inputRef.current, items: getItems() });
 
-  /** 区切り k を描く。band = その中の帯だけ（霧が晴れた時。描く量を減らして、歩いている間の引っかかりを抑える） */
+  // ---- 別のスレッド（Worker） ----
+  const [workerOff, setWorkerOff] = useState(!CAN_WORKER || workerBroken);
+  const worker = useRef<Worker | null>(null);
+  /** 地図の作り直しの番号（古い番号の画像は捨てる） */
+  const gen = useRef(0);
+  const seq = useRef(0);
+  const shownSeq = useRef<number[]>([]);
+  const sentStatic = useRef<unknown[] | null>(null);
+  const post = (m: ToWorker) => worker.current?.postMessage(m);
+  /** 別のスレッドで描けなかった: 止めて、画面のスレッドで全部描き直す */
+  const giveUp = () => {
+    workerBroken = true;
+    worker.current?.terminate();
+    worker.current = null;
+    setWorkerOff(true);
+  };
+  /** 別のスレッドから届いた画像を、区切りの img に入れる（開き終わってから Canvas を隠す） */
+  const showImage = (r: FromWorker) => {
+    if (r.error) return giveUp();
+    if (r.gen !== gen.current || !r.blob || r.seq < (shownSeq.current[r.k] ?? -1)) return;
+    shownSeq.current[r.k] = r.seq;
+    const img = imgs.current[r.k];
+    if (!img) return;
+    const url = URL.createObjectURL(r.blob);
+    const old = img.dataset.url;
+    img.dataset.url = url;
+    img.src = url;
+    if (old) URL.revokeObjectURL(old);
+    const done = () => {
+      if (img.dataset.url !== url) return;
+      img.style.visibility = 'visible';
+      const cv = canvases.current[r.k];
+      if (cv) cv.style.display = 'none';
+    };
+    // 開き終わってから入れ替える（入れ替えの瞬間に、画面のスレッドで画像を開く重さが出ないように）
+    img.decode().then(done, done);
+  };
+  const showRef = useRef(showImage);
+  showRef.current = showImage;
+  /** Worker を用意する（新しく作ったら true。前の状態を知らないので、全部を送り直す） */
+  const ensureWorker = (): boolean => {
+    if (workerOff || worker.current) return false;
+    try {
+      const wk = new Worker(new URL('./paint.worker.ts', import.meta.url), { type: 'module' });
+      wk.onmessage = (e: MessageEvent<FromWorker>) => showRef.current(e.data);
+      wk.onerror = () => giveUp();
+      worker.current = wk;
+      sentStatic.current = null;
+      return true;
+    } catch {
+      giveUp();
+      return false;
+    }
+  };
+  useEffect(
+    () => () => {
+      worker.current?.terminate();
+      worker.current = null;
+    },
+    [],
+  );
+  /** 地図の、描き直しの間は変わらない部分を送る（変わった時だけ） */
+  const sendStatic = () => {
+    const deps = [gen.current, w.width, w.height, g, levels, links, rivers, under, roadTerrain, noProp, stage, terrains, dpr, top];
+    if (sentStatic.current && sentStatic.current.length === deps.length && sentStatic.current.every((d, i) => d === deps[i])) return;
+    sentStatic.current = deps;
+    const centers = new Float64Array(tiles.length * 2);
+    const grounds = new Float64Array(tiles.length * 2);
+    for (let i = 0; i < tiles.length; i++) {
+      const c = g.center(i), gr = g.ground(i);
+      centers[i * 2] = c.x;
+      centers[i * 2 + 1] = c.y;
+      grounds[i * 2] = gr.x;
+      grounds[i * 2 + 1] = gr.y;
+    }
+    post({
+      type: 'static',
+      gen: gen.current,
+      width: w.width,
+      height: w.height,
+      t: tiles.map((t) => t.t),
+      r: tiles.map((t) => t.r),
+      f: tiles.map((t) => !!t.f),
+      R: g.R,
+      hexW: g.hexW,
+      W: g.W,
+      H: g.H,
+      centers,
+      grounds,
+      levels: [...levels],
+      links,
+      rivers,
+      under: [...under],
+      roadTerrain,
+      noProp: [...noProp],
+      stage,
+      terrains,
+      dpr,
+      top,
+      chunk: CHUNK,
+    });
+  };
+  const sendSeen = () => post({ type: 'seen', seen: Uint8Array.from(tiles, (t) => (t.seen ? 1 : 0)) });
+  const workerPaint = (k: number, band?: [number, number]) => post({ type: 'paint', gen: gen.current, k, seq: ++seq.current, band });
+
+  /** 区切り k を、画面のスレッドで描く。band = その中の帯だけ（霧が晴れた時。描く量を減らして、歩いている間の引っかかりを抑える） */
   const paint = (k: number, band?: [number, number]) => {
     const cv = canvases.current[k];
     const ctx = cv?.getContext('2d');
@@ -91,9 +214,14 @@ export const LandscapeLayer = memo(function LandscapeLayer({ w, tiles, geom, lev
     ctx.rect(0, pa, cv.width, pb - pa);
     ctx.clip();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    paintRange(ctx, inputRef.current, y0 + pa / dpr, y0 + pb / dpr, y0);
+    paintRange(ctx, input(), y0 + pa / dpr, y0 + pb / dpr, y0);
     ctx.restore();
-    if (walkingRef.current) {
+    if (worker.current) {
+      // 別のスレッドの画像が届くまで、描いた Canvas を見せる
+      cv.style.display = 'block';
+      const img = imgs.current[k];
+      if (img) img.style.visibility = 'hidden';
+    } else if (walkingRef.current) {
       // 歩いている間は、画像にする（重い）のを後回しにして、描き直した Canvas をそのまま見せる
       cv.style.display = 'block';
       deferred.current.add(k);
@@ -121,16 +249,17 @@ export const LandscapeLayer = memo(function LandscapeLayer({ w, tiles, geom, lev
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walking]);
   /** Canvas の絵を画像にして、区切りの img に入れる（できたら Canvas を隠す。前の画像の URL は捨てる） */
-  const imgs = useRef<(HTMLImageElement | null)[]>([]);
   const toImage = (k: number, cv: HTMLCanvasElement) => {
     if (!cv.toBlob || typeof URL === 'undefined' || !URL.createObjectURL) return;
-    const seq = (cv.dataset.seq = String(Number(cv.dataset.seq ?? 0) + 1));
+    const sq = (cv.dataset.seq = String(Number(cv.dataset.seq ?? 0) + 1));
     cv.toBlob((blob) => {
       const img = imgs.current[k];
-      if (!blob || !img || cv.dataset.seq !== seq) return;
+      // 区切りを作り直した後に、前の Canvas の画像が届いたら捨てる（古い大きさの絵が、新しい img に入って、地形がずれて見えた）
+      if (!blob || !img || cv.dataset.seq !== sq || canvases.current[k] !== cv) return;
       const url = URL.createObjectURL(blob);
       const old = img.dataset.url;
       img.onload = () => {
+        if (img.dataset.url !== url) return;
         img.style.visibility = 'visible';
         cv.style.display = 'none';
         if (old) URL.revokeObjectURL(old);
@@ -154,14 +283,25 @@ export const LandscapeLayer = memo(function LandscapeLayer({ w, tiles, geom, lev
 
   useLayoutEffect(() => {
     if (frozen) return;
+    const fresh = ensureWorker();
+    const useWorker = !!worker.current;
     const prev = last.current;
-    last.current = { g, tiles, stage, ver: imgVer, dpr };
-    const all = !prev || prev.g !== g || prev.stage !== stage || prev.ver !== imgVer || prev.dpr !== dpr || prev.tiles.length !== tiles.length;
+    last.current = { g, tiles, stage, ver: imgVer, dpr, worker: useWorker };
+    // 区切りの Canvas・img を作り直した時（最初・拡大を変えた時・別のスレッドをやめた時）は、画面のスレッドですぐ描く（白い絵が一瞬出ないように）
+    const remade = !prev || prev.g !== g || prev.dpr !== dpr || prev.tiles.length !== tiles.length || prev.worker !== useWorker;
+    const all = fresh || remade || prev.stage !== stage || prev.ver !== imgVer;
     if (all) {
-      // 最初・拡大を変えた時・絵が読み込めた時: 全部をすぐ描く（白い絵が一瞬出ないように）
       cancelAnimationFrame(raf.current);
       pending.current.clear();
-      for (let k = 0; k < n; k++) paint(k);
+      if (useWorker) {
+        gen.current++;
+        sendStatic();
+        sendSeen();
+        post({ type: 'images', urls: loadedImageUrls() });
+        if (remade) for (let k = 0; k < n; k++) paint(k);
+        // 絵・侵食度が変わっただけなら、今の画像を見せたまま、別のスレッドの新しい画像を待つ
+        for (let k = 0; k < n; k++) workerPaint(k);
+      } else for (let k = 0; k < n; k++) paint(k);
       return;
     }
     if (prev.tiles === tiles) return;
@@ -174,13 +314,21 @@ export const LandscapeLayer = memo(function LandscapeLayer({ w, tiles, geom, lev
       hi = Math.max(hi, Math.max(...ys) + R * 1.2);
     }
     if (!(hi > lo)) return;
-    for (let k = Math.max(0, Math.floor((lo - top) / CHUNK)); k <= Math.min(n - 1, Math.floor((hi - top) / CHUNK)); k++) {
+    const k0 = Math.max(0, Math.floor((lo - top) / CHUNK)), k1 = Math.min(n - 1, Math.floor((hi - top) / CHUNK));
+    if (useWorker) {
+      // 別のスレッドへ: 見えたマスを知らせて、帯を描いてもらう（画面のスレッドは描かない）
+      sendStatic();
+      sendSeen();
+      for (let k = k0; k <= k1; k++) workerPaint(k, [lo, hi]);
+      return;
+    }
+    for (let k = k0; k <= k1; k++) {
       const was = pending.current.get(k);
       pending.current.set(k, was ? [Math.min(was[0], lo), Math.max(was[1], hi)] : [lo, hi]);
     }
     runPending();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [g, tiles, stage, imgVer, frozen, dpr, n]);
+  }, [g, tiles, stage, imgVer, frozen, dpr, n, workerOff]);
   useEffect(() => () => cancelAnimationFrame(raf.current), []);
   void itemExtent;
 

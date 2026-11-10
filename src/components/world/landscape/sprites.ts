@@ -2,23 +2,34 @@
 // 絵（ChatGPT で作る透明背景の1つの物の絵）を src/assets/art/scenery/<種類>.webp（またはその後ろに -1, -2 … を付けた複数枚）に置くと、
 // その絵を足元（下の真ん中）に合わせて描く。無い間は、墨線＋淡い水彩ふうの図をここで描く。
 // 光は左上から。影は足元の楕円だけ（プログラムで描く）。
-import { artImage } from '../../../art';
-import { artImageIds } from '../../../art/images';
+import { artImage, artImageIds } from '../../../art/images';
 import { hash01 } from '../diorama';
 import type { ItemKind, SceneItem } from './scatter';
 
 const INK = 'rgba(34,24,16,.85)';
 
 // ---- 描いた絵（画像）の読み込み。読み込めたら、知らせを受けた景色の層が描き直す ----
+/** 描ける絵（画面では HTMLImageElement、別スレッド（Worker）では ImageBitmap） */
+export type SceneImage = CanvasImageSource & { width: number; height: number };
 const images = new Map<string, HTMLImageElement | null>();
+/** 別スレッドで描く時の絵の取り出し口（画面側で読み込めた絵と同じ物だけを渡す） */
+let external: ((url: string) => SceneImage | undefined) | undefined;
+export function setImageSource(fn: (url: string) => SceneImage | undefined) {
+  external = fn;
+}
+/** 読み込みが終わった絵の URL（別スレッドへ、同じ絵を使うように知らせる） */
+export function loadedImageUrls(): string[] {
+  return [...images].filter(([, img]) => img && img.complete && img.naturalWidth).map(([url]) => url);
+}
 const listeners = new Set<() => void>();
 export function onImagesLoaded(fn: () => void) {
   listeners.add(fn);
   return () => void listeners.delete(fn);
 }
 /** 絵（読み込み済みなら画像、まだなら読み込みを始めて undefined） */
-export function loadedImage(url: string | undefined): HTMLImageElement | undefined {
+export function loadedImage(url: string | undefined): SceneImage | undefined {
   if (!url) return undefined;
+  if (external) return external(url);
   const got = images.get(url);
   if (got) return got.complete && got.naturalWidth ? got : undefined;
   if (got === null) return undefined;
@@ -48,7 +59,7 @@ const ART: Partial<Record<ItemKind, string[]>> = {
 };
 /** 絵の高さ ÷ 立つ物の高さ h（絵には周りの余白があるので、少し大きめに描く） */
 const ART_SCALE: Partial<Record<ItemKind, number>> = { broadleaf: 1.3, pine: 1.3, plainsTree: 1.3, hill: 2.1, rock: 2.2, grass: 2.3, flower: 2.3, mushroom: 1.9 };
-function sceneryImage(k: ItemKind, v: number): HTMLImageElement | undefined {
+function sceneryImage(k: ItemKind, v: number): SceneImage | undefined {
   const keys = [...(ART[k] ?? []), ...artImageIds('scenery').filter((id) => id === k || id.startsWith(`${k}-`)).map((id) => `scenery/${id}`)].filter((key) => artImage(key));
   if (!keys.length) return undefined;
   return loadedImage(artImage(keys[Math.floor(v * keys.length) % keys.length]));
@@ -58,24 +69,31 @@ function sceneryImage(k: ItemKind, v: number): HTMLImageElement | undefined {
  * 前もって縮めた絵（大きさ 4px ごとに1枚、作り置き）。大きな絵を毎回小さく描くと、霧が晴れた時の描き直しが重かった
  * （拡大2倍で歩く時、描き直しの JS が約2倍）
  */
-const shrinkCache = new Map<string, HTMLCanvasElement | HTMLImageElement>();
-function shrunk(img: HTMLImageElement, ww: number, ctx: CanvasRenderingContext2D): HTMLCanvasElement | HTMLImageElement {
+let shrinkCache = new WeakMap<SceneImage, Map<number, CanvasImageSource>>();
+let shrinkCount = 0;
+function shrunk(img: SceneImage, ww: number, ctx: CanvasRenderingContext2D): CanvasImageSource {
   const scale = ctx.getTransform().a || 1;
   const pw = Math.max(4, Math.ceil((ww * scale) / 4) * 4);
-  const ph = Math.max(4, Math.round((pw * img.naturalHeight) / img.naturalWidth));
-  if (pw >= img.naturalWidth || typeof document === 'undefined') return img;
-  const key = `${img.src}|${pw}`;
-  const got = shrinkCache.get(key);
+  const ph = Math.max(4, Math.round((pw * img.height) / img.width));
+  if (pw >= img.width) return img;
+  let byW = shrinkCache.get(img);
+  const got = byW?.get(pw);
   if (got) return got;
-  const cv = document.createElement('canvas');
+  // 画面では Canvas、別スレッドでは OffscreenCanvas
+  const cv = typeof document !== 'undefined' ? document.createElement('canvas') : typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(pw, ph) : undefined;
+  if (!cv) return img;
   cv.width = pw;
   cv.height = ph;
-  const c = cv.getContext('2d');
+  const c = cv.getContext('2d') as CanvasRenderingContext2D | null;
   if (!c) return img;
   c.imageSmoothingQuality = 'high';
   c.drawImage(img, 0, 0, pw, ph);
-  if (shrinkCache.size > 400) shrinkCache.clear();
-  shrinkCache.set(key, cv);
+  if (++shrinkCount > 400) {
+    shrinkCache = new WeakMap();
+    shrinkCount = 0;
+  }
+  if (!byW) shrinkCache.set(img, (byW = new Map()));
+  byW.set(pw, cv);
   return cv;
 }
 
@@ -427,7 +445,7 @@ export function drawItem(ctx: CanvasRenderingContext2D, it: SceneItem) {
   if (img) {
     // 絵の高さを h に合わせる（峰・木は少し大きめに）。足元 = 絵の下の真ん中
     const hh = it.h * (ART_SCALE[it.k] ?? 1.15);
-    const ww = (hh * img.naturalWidth) / img.naturalHeight;
+    const ww = (hh * img.width) / img.height;
     footShadow(ctx, it.x, it.y, ww * 0.3, ww * 0.08);
     ctx.drawImage(shrunk(img, ww, ctx), it.x - ww / 2, it.y - hh, ww, hh);
     return;
