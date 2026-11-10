@@ -66,7 +66,7 @@
 | # | 何 | どこ | どうする | 理由 |
 |---|---|---|---|---|
 | D1 | Gemini のテストプレイの記録用（36個） | `scripts/playtest/` | `scripts/archive/playtest/` に移す（提案。`../lib.mjs` の読み込みを `../../lib.mjs` に直す） | 一回きりの撮影と記録。今の確認には使わない |
-| D2 | Gemini の検証の撮影用（10個） | `scripts/gemini-verify/` | `scripts/archive/gemini-verify/` に移す（提案。同上） | 同上 |
+| D2 | Gemini の検証の撮影用（10個） | `scripts/gemini-verify/` | **残す**（作業中に判断を変えた） | 運用テストの計画（ops-test-plan.md）が録画の道具として使う |
 | D3 | ほかの `scripts/*.mjs`（約50個） | `scripts/` | 残す。`scripts/README.md` を作り「いつも使う確認」「撮影・一回きり」に分けて書く（提案） | まとめ役の運用確認で使う物があるので、場所を変えない |
 
 ## E. 重い処理・最初に読み込む大きさ
