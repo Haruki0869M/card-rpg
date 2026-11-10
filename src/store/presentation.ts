@@ -15,6 +15,7 @@ import { cardSound, damageSound, petCry, statusSound } from '../audio/cues';
 import { COMBO_NAME } from '../engine/battle/effects';
 import { petLoveLevel } from '../engine/game/pets';
 import { BIG_HIT, cardImpact, type ImpactStyle } from './hitStyle';
+import { slotTiming } from './slotTiming';
 import type { SoundId } from '../audio/ids';
 import type { AbilityNotice, BattleEvent, GameCommand, GameState } from '../types';
 
@@ -161,7 +162,9 @@ export function battleFrames(events: BattleEvent[], allyIds: ReadonlySet<string>
     }
     if (popups.length || motions.length) {
       if (pendingCast) { sounds.unshift(pendingCast); pendingCast = undefined; }
-      const frame: PresentationFrame = { delay: firstEffect && actors.size ? TIMING.actionLead : TIMING.effectStep, popups, motions };
+      // 段階C: カードの効果は、スロットが全部止まって結果が出てから（攻撃のエフェクトへつなぐ）。敵の行動は今までどおり
+      const lead = firstEffect && roll?.type === 'roll' && frames.length === 1 ? Math.max(TIMING.actionLead, slotTiming(roll.results).total) : TIMING.actionLead;
+      const frame: PresentationFrame = { delay: firstEffect && actors.size ? lead : TIMING.effectStep, popups, motions };
       if (sounds.length) frame.sounds = [...new Set(sounds)];
       if (impacts.length) frame.impacts = impacts;
       if (guards.length) frame.guards = guards;

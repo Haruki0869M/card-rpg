@@ -7,6 +7,7 @@ import { useMemo } from 'react';
 import { predictCardTotals, rangeText } from '../../engine/battle/battle';
 import { unitName } from '../../engine/battle/units';
 import { getElement } from '../../data/elements';
+import { cardOf } from '../../data/cards';
 import { useBattle } from '../../store/battleStore';
 import type { BattleState, EnemyState } from '../../types';
 import { intentView, type IntentPart } from '../format';
@@ -43,28 +44,48 @@ export function predictionText(enemy: EnemyState, loss: [number, number] | undef
   return `HP ${hp} → ${rangeText([after(loss[1]), after(loss[0])])}`;
 }
 
+/**
+ * チップの予測（一番出やすい段）と撃破バッジ（段階C）を、同じ計算の使い回しで出す（予測は重いので、同じ敵・段は1回だけ）。
+ * 撃破バッジ: 今のフォーカスの数で確実に倒せる（全部外れても倒せる）= sure、完全成功なら倒せる = perfect。
+ * 「確実」は、フォーカスの枠だけ成功した時に必ず届く一番上の段、「完全」は一番上の段の、少ない方の見込み（ブロック差し引き後のHP減少）で比べる
+ */
+export type KillBadge = 'sure' | 'perfect' | undefined;
 function useChipPredictions(battle: BattleState, allyId: string, cardUid: string, focus: number, tier: number, allyTargetId?: string) {
   return useMemo(() => {
-    const out: Record<string, [number, number] | undefined> = {};
+    const preds: Record<string, [number, number] | undefined> = {};
+    const badges: Record<string, KillBadge> = {};
+    const ally = battle.allies.find((a) => a.id === allyId);
+    const inst = ally?.hand.find((c) => c.uid === cardUid);
+    const tiers = inst ? cardOf(inst).tiers.map((t) => t.minSuccesses) : [];
+    let sure = -1;
+    tiers.forEach((m, i) => { if (m <= focus) sure = i; });
+    const top = tiers.length - 1;
     for (const e of battle.enemies) {
       if (e.dead) continue;
-      const totals = predictCardTotals(battle, allyId, cardUid, e.uid, focus, tier, allyTargetId);
-      out[e.uid] = totals.find((t) => t.id === e.uid)?.hpLoss;
+      const cache = new Map<number, [number, number] | undefined>();
+      const loss = (t: number) => {
+        if (!cache.has(t)) cache.set(t, predictCardTotals(battle, allyId, cardUid, e.uid, focus, t, allyTargetId).find((x) => x.id === e.uid)?.hpLoss);
+        return cache.get(t);
+      };
+      preds[e.uid] = loss(tier);
+      const s = sure >= 0 ? loss(sure) : undefined;
+      if (s && s[0] >= e.hp) badges[e.uid] = 'sure';
+      else if (top >= 0 && (loss(top)?.[0] ?? 0) >= e.hp) badges[e.uid] = 'perfect';
     }
-    return out;
+    return { preds, badges };
   }, [battle, allyId, cardUid, focus, tier, allyTargetId]);
 }
 
 export function TargetChips({ allyId, cardUid, focus, tier, tierLabel, targetId, allyTargetId }: { allyId: string; cardUid: string; focus: number; tier: number; tierLabel: string; targetId?: string; allyTargetId?: string }) {
   const battle = useBattle((s) => s.battle);
   const tapEnemy = useBattle((s) => s.tapEnemy);
-  const preds = useChipPredictions(battle, allyId, cardUid, focus, tier, allyTargetId);
+  const { preds, badges } = useChipPredictions(battle, allyId, cardUid, focus, tier, allyTargetId);
   const alive = battle.enemies.filter((e) => !e.dead);
   if (!alive.length) return null;
   return (
     <div className="mt-1" data-target-chips>
       <div className="text-center text-[12px] leading-4 text-zinc-400">狙う敵（予測は一番出やすい「{tierLabel}」の時）</div>
-      <div className="mt-0.5 grid gap-1" style={{ gridTemplateColumns: `repeat(${alive.length}, minmax(0,1fr))` }}>
+      <div className="mt-2 grid gap-1" style={{ gridTemplateColumns: `repeat(${alive.length}, minmax(0,1fr))` }}>
         {alive.map((e) => {
           const on = e.uid === targetId;
           const text = predictionText(e, preds[e.uid]);
@@ -81,8 +102,17 @@ export function TargetChips({ allyId, cardUid, focus, tier, tierLabel, targetId,
               data-target-chip={e.uid}
               data-chip-selected={on || undefined}
               data-chip-prediction={text}
-              className={`flex min-h-11 min-w-0 flex-col justify-center rounded-lg border px-1 py-0.5 text-left leading-4 ${on ? 'border-sky-300 bg-sky-900/60 ring-2 ring-sky-300' : 'border-zinc-600 bg-black/40'}`}
+              data-kill-badge={badges[e.uid]}
+              className={`relative flex min-h-11 min-w-0 flex-col justify-center rounded-lg border px-1 py-0.5 text-left leading-4 ${on ? 'border-sky-300 bg-sky-900/60 ring-2 ring-sky-300' : 'border-zinc-600 bg-black/40'}`}
             >
+              {badges[e.uid] && (
+                <span
+                  className={`absolute -top-2.5 right-0.5 rounded-full px-1 text-[12px] leading-4 font-black whitespace-nowrap shadow-[0_1px_3px_rgba(0,0,0,.8)] ${badges[e.uid] === 'sure' ? 'bg-gradient-to-b from-amber-200 to-amber-500 text-amber-950 ring-1 ring-amber-100' : 'bg-gradient-to-b from-sky-200 to-sky-400 text-sky-950 ring-1 ring-sky-100'}`}
+                  title={badges[e.uid] === 'sure' ? '今のフォーカスで確実に倒せる' : '完全成功なら倒せる'}
+                >
+                  {badges[e.uid] === 'sure' ? '確実に撃破' : '完全で撃破'}
+                </span>
+              )}
               <span className="flex min-w-0 items-center gap-1 text-[12px]">
                 <span className={`min-w-0 flex-1 truncate font-bold ${on ? 'text-sky-50' : 'text-zinc-200'}`}>{unitName(battle, e.uid)}</span>
                 <MiniIntent p={intentView(battle, e)?.parts[0]} />

@@ -10,6 +10,7 @@ import { usePress } from '../../hooks/usePress';
 import { useTallScreen } from '../../hooks/useTallScreen';
 import { useBattle } from '../../store/battleStore';
 import { CardBody } from '../ui/CardBody';
+import { EnemyOrderBar } from './EnemyOrderBar';
 
 export const CARD_H = 128;
 /** 選んだカード（大きく浮き上がって、段階ごとの効果まで見せる） */
@@ -156,15 +157,17 @@ export function Hand() {
   const W = size.width || 340;
   const tall = useTallScreen();
 
-  const hand = ally && !ally.dead && battle.phase !== 'victory' && battle.phase !== 'defeat' ? ally.hand : [];
+  // 敵の番の間は、手札の場所に敵の行動順を出す（段階C。敵の番には手札を使えない）
+  const hand = ally && !ally.dead && battle.phase === 'ally' ? ally.hand : [];
   const { cardW, positions, height } = useMemo(() => layout(hand.length, W), [hand.length, W]);
 
   return (
     // カードを選んでいる間は、上に操作パネルが重なる（手札は押せない。高さはそのまま＝戦場が縮まない）
     <div ref={ref} className={`relative isolate z-0 mx-1 ${selection ? 'pointer-events-none' : ''}`} style={{ height: Math.max(height, CARD_H + 14) }} data-hand-covered={selection ? true : undefined}>
-      {hand.length === 0 && (
+      {battle.phase === 'enemy' && <EnemyOrderBar />}
+      {hand.length === 0 && battle.phase === 'ally' && (
         <div className="font-display flex h-full items-center justify-center text-[15px] text-zinc-500">
-          {battle.phase === 'enemy' ? '敵の行動中…' : ally?.dead ? '戦闘不能（勝利でHP1復帰）' : '手札なし'}
+          {ally?.dead ? '戦闘不能（勝利でHP1復帰）' : '手札なし'}
         </div>
       )}
       {ally &&

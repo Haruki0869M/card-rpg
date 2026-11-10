@@ -4,6 +4,7 @@ import { CARDS, getCard } from '../data/cards';
 import type { BattleEvent } from '../types';
 import { cardImpact } from './hitStyle';
 import { battleFrames } from './presentation';
+import { isReach, slotTiming } from './slotTiming';
 
 const ally = new Set(['a0', 'a1']);
 const roll = (cardId: string, perfect = false): BattleEvent => ({ type: 'roll', characterId: 'a0', cardId, targetId: 'e0', chance: 80, results: ['hit'], successes: 1, perfect, summary: '確認' });
@@ -54,5 +55,36 @@ describe('段階B: 命中の見た目', () => {
     expect(f.map((x) => x.delay)).toEqual([0, expect.any(Number), expect.any(Number)]);
     expect(f[1].impacts).toEqual([{ unitId: 'a0', style: 'barrier' }]);
     expect(f[2].impacts).toEqual([{ unitId: 'a1', style: 'heal' }]);
+  });
+});
+
+describe('段階C: スロットを左から1つずつ止める時間', () => {
+  it('1〜4枠は全体0.3〜0.4秒、1枠0.06〜0.1秒。左から順に止まる', () => {
+    for (let n = 1; n <= 4; n++) {
+      const t = slotTiming(Array.from({ length: n }, () => 'hit' as const));
+      expect(t.total).toBeGreaterThanOrEqual(0.3 - 1e-9);
+      expect(t.total).toBeLessThanOrEqual(0.4 + 1e-9);
+      for (let i = 1; i < n; i++) {
+        const step = t.stops[i] - t.stops[i - 1];
+        expect(step).toBeGreaterThanOrEqual(0.06 - 1e-9);
+        expect(step).toBeLessThanOrEqual(0.1 + 1e-9);
+      }
+      expect(t.stops[n - 1]).toBeCloseTo(t.total);
+    }
+  });
+  it('フォーカスの枠は最初から止まっている。全部フォーカスなら短い', () => {
+    const t = slotTiming(['focus', 'focus', 'hit']);
+    expect(t.stops.slice(0, 2)).toEqual([0, 0]);
+    expect(t.last).toBe(2);
+    expect(slotTiming(['focus', 'focus']).total).toBeLessThan(0.3);
+  });
+  it('リーチ: 最後の1枠の前まで全部成功している時だけ', () => {
+    expect(isReach(['focus', 'hit', 'miss'], 2)).toBe(true);
+    expect(isReach(['miss', 'hit', 'hit'], 2)).toBe(false);
+    expect(isReach(['hit'], 0)).toBe(false);
+  });
+  it('カードの効果のコマは、スロットが止まってから（敵の行動は今までどおり）', () => {
+    const f = battleFrames([roll('strike'), { type: 'damage', unitId: 'e0', sourceId: 'a0', amount: 7, blocked: 0 }], ally);
+    expect(f[1].delay).toBeCloseTo(slotTiming(['hit']).total);
   });
 });
