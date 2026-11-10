@@ -260,8 +260,8 @@ describe('古い保存データ（道を長くする前の地図）', () => {
 });
 
 describe('転職の速さ（§5）', () => {
-  it('転職できるレベルは 中位6・最上位7・特殊5', () => {
-    expect(BALANCE.jobChange).toEqual({ base: 6, mid: 7, special: 5 });
+  it('転職できるレベルは 中位9・最上位9・特殊7（道を長くした分）', () => {
+    expect(BALANCE.jobChange).toEqual({ base: 9, mid: 9, special: 7 });
   });
   it('中位に転職すると記録を数え直す（最上位・特殊職の条件は、中位になってからの数）', () => {
     let g = run(newWorld(['warrior']), { type: 'STORY_CONTINUE', playerId: P });
