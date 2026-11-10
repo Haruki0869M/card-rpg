@@ -100,16 +100,11 @@ export function advanceTurn(game: GameState, rng: Rng) {
   endWorldTurn(game, rng);
 }
 
-/** 手番をそのキャラにする（ダンジョンの中なら、そのパーティの探索力の判定から） */
+/** 手番をそのキャラにする */
 function setTurn(game: GameState, heroId: string) {
   const w = game.world!;
   w.turn = heroId;
   w.prevTile = w.pos[heroId];
-  const exp = expeditionOf(game, heroId);
-  if (exp?.dungeon) {
-    exp.dungeon.explore = null;
-    exp.dungeon.exploreDice = undefined;
-  }
 }
 
 /** そのダンジョンのパーティの番か */

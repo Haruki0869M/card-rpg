@@ -1,7 +1,7 @@
-// ダンジョンの手直しの確認（オンライン2人・エミュレーター）:
-// - 「だれがサイコロを振る？」が2台に出る → 2人が同じキャラを選ぶと決まる → その人だけが振れる。仲間の画面でも同じ目が転がる
-// - 扉のボタン（手番の人は開ける・ほかの人は「こっち！」）。2人が同じ扉を選ぶと扉の前まで自動で歩いて開く（1つで1）。選べる扉0の形
-// - 選ばなかった扉は壁になり、探索度が100%まで届く形になっているか（地図に出ない）
+// ダンジョンの確認（オンライン2人・エミュレーター。抜本的な見直し 段階2）:
+// - 探索のサイコロ・「だれが振る？」・「手番を終える」は無い。入ったらすぐ、2人が同じ扉を選ぶと開く（扉1つ＝手番1回）
+// - 絵の扉とボタンが同じ数・同じ並び。扉の予兆。P2 が自分のキャラのフォーカス1で「周囲の警戒」→ 2台とも先読みが見える
+// - 手番でない人が扉を押すと「こっち！」。選ばなかった扉は地図に残らない
 // 事前に: npx vite build && npx vite preview --port 4245 --host 127.0.0.1 &   と   npm run emulators &
 // 使い方: URL=http://127.0.0.1:4245/card-rpg/ WIDTH=390 node scripts/dungeon-coop.mjs（WIDTH は 360・390・480）
 import { mkdirSync } from 'node:fs';
@@ -116,46 +116,33 @@ await send(A, { type: 'WORLD_INTERACT', playerId: 'P1', heroId: h1 });
 await until(async () => !!(await dun()), 10000, 'enter dungeon');
 for (const p of [A, B]) await closeStory(p);
 
-// ===== 1. だれがサイコロを振る？ =====
-await A.locator('[data-explore-picker]').waitFor({ timeout: 8000 }).catch(() => {});
-check((await A.locator('[data-explore-picker]').count()) === 1, 'P1 に「だれが探索のサイコロを振る？」が出る');
-await B.locator('[data-explore-picker]').waitFor({ timeout: 8000 }).catch(() => {});
-check((await B.locator('[data-explore-picker]').count()) === 1, 'P2 にも同じ一覧が出る');
-check(!(await A.locator('[data-explore-roll-button]').count()), '決まるまでサイコロのボタンは出ない');
-check((await A.locator('[data-dir]').count()) === 0, '方向のボタン（左へ・前進など）は無い');
-await shot(A, '1-picker-P1');
-await layout(A, '振る人の一覧（P1）');
-await layout(B, '振る人の一覧（P2）');
-// P1 は P2 のキャラ、P2 は自分のキャラ → 一致して P2 のキャラに決まる
-await A.locator(`[data-explore-roller="${h2}"] button`).click();
-await wait(700);
-check(!(await dun()).exploreRoller, '1人だけ選んだ時はまだ決まらない');
-await B.locator(`[data-explore-roller="${h2}"] button`).click();
-await until(async () => !!(await dun())?.exploreRoller, 6000, 'roller decided').catch(() => {});
-check((await dun())?.exploreRoller?.heroId === h2, '2人が同じキャラを選ぶと決まる');
-await wait(500);
-check((await A.locator('[data-explore-wait]').count()) === 1, 'P1 には「〇〇がサイコロを振ります（ナツさんを待っています）」');
-check((await B.locator('[data-explore-roll-button]').count()) === 1, 'P2 にサイコロのボタンが出る');
-await shot(A, '2-wait-P1');
-await B.locator('[data-explore-roll-button]').click();
-// 仲間（P1）の画面でも、同じサイコロが転がる
-const rollingA = await A.locator('[data-dice-overlay]').waitFor({ timeout: 4000 }).then(() => true, () => false);
-check(rollingA, 'P1 の画面でも、P2 のサイコロが真ん中で転がる');
-await wait(300);
-await shot(A, '3-dice-rolling-P1');
-await A.locator('[data-dice-overlay="done"]').waitFor({ timeout: 4000 }).catch(() => {});
-await B.locator('[data-dice-overlay="done"]').waitFor({ timeout: 4000 }).catch(() => {});
-const faceA = await A.locator('[data-dice-overlay] [data-die-face]').getAttribute('data-die-face').catch(() => null);
-const faceB = await B.locator('[data-dice-overlay] [data-die-face]').getAttribute('data-die-face').catch(() => null);
-check(!!faceA && faceA === faceB, `2台で同じ目が出る（P1 ${faceA}・P2 ${faceB}）`);
-await shot(A, '3b-dice-result-P1');
-await until(async () => (await dun())?.explore != null, 6000, 'rolled');
-const n0 = (await dun())?.explore ?? 0;
-check(n0 >= 1 && n0 <= 3 && String(n0) === faceA, `選べる扉の数 = 出た目（${n0}）`);
-await A.locator('[data-dice-overlay]').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+// 絵の扉（左から右）とボタン（左から右）が同じ数・同じ並びか
+const sameDoors = async (page, name, want) => {
+  const r = await page.evaluate(() => {
+    const view = document.querySelector('[data-dungeon-view]');
+    const drawn = [...view.querySelectorAll('[data-wall-door]')].map((e) => ({ id: e.getAttribute('data-wall-door'), x: e.getBoundingClientRect().left })).sort((a, b) => a.x - b.x).map((d) => d.id);
+    const buttons = [...document.querySelectorAll('[data-door-choice]')].map((e) => e.getAttribute('data-door-choice'));
+    return { drawn, buttons };
+  });
+  check(r.buttons.length === want && r.drawn.join() === r.buttons.join(), `${name}: 絵の扉 ${r.drawn.length}つ ＝ ボタン ${r.buttons.length}つ（同じ並び。${want}つのはず）`);
+};
 
-// ===== 2. 扉のボタン（手番の人 = P1 のキャラの番） =====
-const clearRoom = async (left) => {
+// ===== 1. サイコロは無い。入ったらすぐ、2人で扉を選ぶ（扉1つ＝手番1回） =====
+for (const [p, n] of [[A, 'P1'], [B, 'P2']]) {
+  await p.locator('[data-door-choice]').first().waitFor({ timeout: 8000 }).catch(() => {});
+  const gone = (await p.locator('[data-explore-picker], [data-explore-roll-button], [data-explore-end], [data-dice-overlay]').count()) + (await p.getByText('サイコロを振る').count()) + (await p.getByText('手番を終える').count());
+  check(gone === 0, `${n}: 探索のサイコロ・「だれが振る？」・「手番を終える」は出ない`);
+  check((await p.locator('[data-dir]').count()) === 0, `${n}: 方向のボタン（左へ・前進など）は無い`);
+  await sameDoors(p, `${n} 入口`, 1);
+  check((await p.locator('[data-door-choice]').first().getAttribute('data-door-omen')) === 'danger', `${n}: 入口の扉に予兆（赤＝魔物の群れ）が出る`);
+}
+await shot(A, '1-entrance-P1');
+await shot(B, '1-entrance-P2');
+await layout(A, '入口（P1）');
+await layout(B, '入口（P2）');
+
+// ===== 2. 扉のボタン（全員一致で開く） =====
+const clearRoom = async () => {
   const g = await A.evaluate(() => window.__online.game());
   const x = g.expeditions[0];
   x.mode = 'dungeon';
@@ -164,60 +151,87 @@ const clearRoom = async (left) => {
   x.event = undefined;
   x.chest = undefined;
   x.reward = undefined;
+  x.vote = undefined;
   x.dungeon.rooms.find((r) => r.id === x.dungeon.currentRoomId).cleared = true;
-  x.dungeon.explore = left;
-  x.dungeon.watchedAt = undefined;
-  g.world.turn = h1;
+  x.dungeon.opened = undefined;
+  for (const h of g.heroes) {
+    h.focus = 3;
+    h.hp = Math.max(1, h.hp);
+  }
+  g.world.turn = x.heroes[0];
+  g.world.acted = g.heroes.filter((h) => !x.heroes.includes(h.id)).map((h) => h.id);
   await inject(g);
   for (const p of [A, B]) await closeStory(p);
 };
-// 入口の扉を2人で開ける（P2 が押すと、票と「こっち！」の印）
+// 入口の扉を2人で開ける（1人だけではまだ開かない）
 const firstRoom = (await dun()).currentRoomId;
 await A.locator('[data-door-choice]').first().click().catch(() => {});
+await wait(900);
+check((await dun()).currentRoomId === firstRoom, 'P1 だけが扉を選んだ時は、まだ開かない');
+check((await B.locator('[data-vote-status]').count()) > 0 || (await B.getByText(/待って|選んで/).count()) > 0, 'P2 の画面に、票の様子が出る');
+await shot(B, '2-vote-waiting-P2');
 await B.locator('[data-door-choice]').first().click().catch(() => {});
+const sceneA = await A.locator('[data-door-open]').waitFor({ timeout: 4000 }).then(() => true, () => false);
+check(sceneA, '2人が同じ扉を選ぶと、扉が開く演出が出る（P1）');
 await until(async () => (await dun())?.currentRoomId !== firstRoom, 8000, 'entered room').catch(() => problems.push('入口の扉が開かない'));
-check((await dun()).explore === n0 - 1, `入口の扉を開けると、選べる扉が1つ減る（${n0} → ${(await dun()).explore}）`);
+check((await dun()).opened === true, '扉を開けると「この手番に扉を開けた」になる（部屋を済ませると手番が終わる）');
 await wait(2500);
-await clearRoom(3);
+await clearRoom();
 await A.locator('[data-dungeon-controls="ready"]').waitFor({ timeout: 4000 }).catch(() => {});
 await wait(400);
 const doorsA = A.locator('[data-door-choice]');
 const doorsB = B.locator('[data-door-choice]');
-check((await doorsA.count()) >= 1, `P1 に扉のボタンが出る（${(await doorsA.allInnerTexts()).map((t) => t.split('\n')[0]).join(' / ')}）`);
-check((await doorsB.count()) >= 1, 'P2 にも扉のボタンが出る（押すと「こっち！」）');
+check((await doorsA.count()) >= 1, `P1 に扉のボタンが出る（${(await doorsA.allInnerTexts()).map((t) => t.split('\n').slice(0, 2).join('・')).join(' / ')}）`);
+check((await doorsB.count()) >= 1, 'P2 にも扉のボタンが出る');
+await sameDoors(A, 'P1 扉2つ', 2);
+await sameDoors(B, 'P2 扉2つ', 2);
 await shot(A, '4-doors-P1');
 await shot(B, '4-doors-P2');
 await layout(A, '扉のボタン（P1）');
 await layout(B, '扉のボタン（P2）');
-// P2 が扉を押す → P1 の画面にピン
+
+// ===== 3. 周囲の警戒: P2 が自分のキャラのフォーカス1で（手番のキャラは P1）。2台とも先読みが見える =====
+check((await A.locator('[data-door-detail]').count()) === 0, '警戒の前は、扉の中身は出ない');
+await B.locator('[data-scout-open]').click();
+await B.locator('[data-scout-panel]').waitFor({ timeout: 3000 }).catch(() => {});
+check((await B.locator('[data-scout-hero]').count()) === 1 && (await B.locator(`[data-scout-hero="${h2}"]`).count()) === 1, 'P2 の警戒の窓には、P2 のキャラだけが出る');
+await shot(B, '4b-scout-panel-P2');
+await layout(B, '警戒の窓（P2）');
+const f0 = (await A.evaluate(() => window.__online.game())).heroes.find((h) => h.id === h2).focus;
+await B.locator(`[data-scout-hero="${h2}"]`).click();
+await until(async () => (await dun())?.watchedAt !== undefined, 6000, 'scouted').catch(() => {});
+const f1 = (await A.evaluate(() => window.__online.game())).heroes.find((h) => h.id === h2).focus;
+check(f1 === f0 - 1, `P2 のキャラのフォーカスが1減る（${f0} → ${f1}）`);
+await wait(600);
+check((await A.locator('[data-door-detail]').count()) >= 1 && (await B.locator('[data-door-detail]').count()) >= 1, '警戒の後、2台とも扉の中身（敵の名前など）が見える');
+check((await A.locator('[data-door-beyond]').count()) === 2, '「その先」の扉の色も見える（P1）');
+check((await A.locator('[data-scout-open]').count()) === 0, '同じ通路では、もう警戒できない');
+await shot(A, '4c-scouted-P1');
+await layout(A, '警戒の後（P1）');
+
+// ===== 4. P2 が扉を押す → P1 の画面にピン。2人が同じ（右の）扉を選ぶと開く =====
 if (await doorsB.count()) {
   await doorsB.last().click();
   await until(async () => (await A.locator('[data-pin-banner]').count()) > 0, 5000, 'pin on A').catch(() => {});
   check((await A.locator('[data-pin-banner]').count()) > 0, 'P2 が扉のボタンを押すと、P1 に「P2: こっち！」');
   await shot(A, '5-pin-from-P2');
 }
-// 2人が同じ（右の）扉を選ぶ → 扉の前まで自動で歩いて開く。使うのは1だけ（P2 は上でもう右の扉を押した＝票も入っている）
 const before = await dun();
 const target = (await doorsA.last().getAttribute('data-door-choice')) ?? '';
 check((await dun()).currentRoomId === before.currentRoomId, 'P2 だけが選んだ時はまだ開かない');
 await doorsA.last().click();
-const walkSeen = await A.locator('[data-door-open="walk"]').waitFor({ timeout: 4000 }).then(() => true, () => false);
-check(walkSeen, '扉の前まで自動で歩く演出が出る（P1）');
-if (walkSeen) await shot(A, '6-walking-P1');
+const openSeen = await A.locator('[data-door-open][data-door-open-slot="right"]').waitFor({ timeout: 4000 }).then(() => true, () => false);
+check(openSeen, '右の扉へ寄って開く演出が出る（P1）');
+if (openSeen) await shot(A, '6-door-opening-P1');
 await until(async () => (await dun())?.currentRoomId === target, 8000, 'entered target').catch(() => {});
-const after = await dun();
-check(after.currentRoomId === target, '2人が同じ扉を選ぶと、その扉が開く');
-check(before.explore - after.explore === 1, `どれだけ歩いても、扉1つで1だけ使う（${before.explore} → ${after.explore}）`);
+check((await dun()).currentRoomId === target, '2人が同じ扉を選ぶと、その扉が開く');
 await wait(2500);
-// 選べる扉0: 扉のボタンは押せない。警戒と「手番を終える」は残る
-await clearRoom(0);
+await clearRoom();
 await wait(400);
-const enabledDoors = await A.locator('[data-door-choice]:not([disabled])').count();
-check((await A.locator('[data-door-choice]').count()) >= 1 && enabledDoors === 0, '選べる扉0: 扉のボタンは灰色で押せない');
-check(await A.locator('[data-watch-open]').isEnabled(), '選べる扉0: 警戒はできる');
-check(await A.locator('[data-explore-end]').isVisible(), '選べる扉0: 「手番を終える」がある');
-await shot(A, '7-zero-left-P1');
-await layout(A, '選べる扉0（P1）');
+check((await A.locator('[data-door-choice]:not([disabled])').count()) >= 1, '部屋を済ませたら、すぐ次の扉を選べる（全員がダンジョンの中）');
+check((await A.locator('[data-scout-bar]').getAttribute('data-scout-bar').catch(() => null)) === 'none', '次の通路では、警戒は消えている（また警戒できる）');
+await shot(A, '7-next-corridor-P1');
+await layout(A, '次の通路（P1）');
 // 一人称の絵の扉をタップ
 const tapDoor = A.locator('[data-dungeon-view] [data-door-tap]');
 console.log(`  絵の中の押せる扉: ${await tapDoor.count()}`);

@@ -12,7 +12,6 @@ import { getEnemy } from '../../data/enemies';
 import { EVENTS } from '../../data/events';
 import { getItem, POUCH_LIMIT } from '../../data/items';
 import type {
-  DungeonRun,
   EventBattle,
   BattleEvent,
   EventOutcome,
@@ -68,9 +67,8 @@ import { leaveSanctuary, leaveShrine, leaveTown, questAccept, questReport, shrin
 import { getRoomType } from '../../data/rules';
 import { TERRAINS } from '../../data/world';
 import { buildDungeon, depthTier, findRoom, isLegacyLayout, RARITIES, rarityIndex, reachableRooms } from './dungeon';
-import { newDice, rerollDice } from './dice';
-import { canMove, cellKey, DIRS, doorFront, doorNorthOf, dungeonGrid, findPath, moveIntoRoom, posOf, revealSeen, turnTo } from './dungeonMap';
-import { watchSpot } from './dungeonOmen';
+import { canMove, cellKey, DIRS, doorFront, doorNorthOf, findPath, moveIntoRoom, posOf, revealSeen, turnTo } from './dungeonMap';
+import { canWatchHere, watchSpot } from './dungeonOmen';
 import {
   canEquip,
   clampHero,
@@ -223,94 +221,13 @@ function runInScene(game: GameState, cmd: Extract<GameCommand, { type: 'SCENE' }
     if (game.world && exp.heroes.includes(game.world.turn)) endExpeditionTurn(game, exp.heroes, rng);
     return r;
   }
-  // 扉を選べる数を使い切って、部屋の出来事も終わった（通路に戻った）: 次のキャラの番へ。
-  // ただし、この通路でまだ「警戒」ができる時は待つ（警戒してから「手番を終える」。警戒すると自動で次へ）
-  if (game.world && exp.mode === 'dungeon' && exp.dungeon?.explore === 0 && (exp.dungeon.ended || !canWatchHere(exp.dungeon))) {
-    exp.dungeon.explore = null;
-    exp.dungeon.exploreDice = undefined;
-    exp.dungeon.ended = undefined;
+  // 扉1つ＝手番1回: 扉を開けて、部屋の出来事が終わった（通路に戻った）ら、次のキャラの番へ。
+  // 全員がダンジョンの中なら、ワールドターンが進んで、すぐ同じ組の番に戻る（プレイヤーから見れば「部屋を済ませたらすぐ次の扉」）
+  if (game.world && exp.mode === 'dungeon' && exp.dungeon?.opened) {
+    exp.dungeon.opened = undefined;
     endExpeditionTurn(game, exp.heroes, rng);
   }
   return r;
-}
-
-/** 探索力の判定を2人以上のプレイヤーで決めるか（ダンジョンのパーティに別のプレイヤーのキャラがいる） */
-export const exploreShared = (game: GameState) => !!game.world && voters(game).length > 1;
-
-/** 今の手番の目印（探索力の判定をするキャラを決めた手番か確かめる） */
-const exploreTurnKey = (game: GameState) => (game.world ? `${game.world.worldTurn}:${game.world.turn}` : '');
-
-/** みんなで決めた、この手番の探索力の判定をするキャラ（決めていなければ undefined） */
-export function exploreRollerOf(game: GameState): string | undefined {
-  const r = game.dungeon?.exploreRoller;
-  return r && r.turn === exploreTurnKey(game) ? r.heroId : undefined;
-}
-
-/** 探索力の判定をするキャラをみんなで決めた（EXPLORE_ROLLER の投票が全員一致した時に動く。乱数は使わない） */
-function exploreRoller(game: GameState, heroId: string): string | undefined {
-  const run = game.dungeon;
-  if (!game.world || !game.activeScene || game.mode !== 'dungeon' || !run) return 'ダンジョンの通路でのみ決められます';
-  if (run.explore != null) return 'もう探索力を決めました';
-  if (!exploreShared(game)) return '1人の時は、そのまま判定できます';
-  const h = findHero(game, heroId);
-  if (!h || h.hp <= 0 || h.retired || !(game.party ?? []).includes(h.id)) return 'このキャラは判定できません';
-  run.exploreRoller = { heroId, turn: exploreTurnKey(game) };
-  addLog(game, `探索力の判定は${h.name}がすることになった`);
-  return undefined;
-}
-
-/** 探索のサイコロ（ダンジョンのパーティの手番の最初。1〜3。出た目 = この手番に選べる扉の数） */
-function exploreRoll(game: GameState, cmd: Extract<GameCommand, { type: 'EXPLORE_ROLL' }>, rng: Rng): string | undefined {
-  const run = game.dungeon;
-  if (!game.world || !game.activeScene || game.mode !== 'dungeon' || !run) return 'ダンジョンの通路でのみ判定できます';
-  if (run.explore != null) return 'もう探索力を決めました';
-  const h = findHero(game, cmd.heroId);
-  if (!h || h.hp <= 0 || !(game.party ?? []).includes(h.id)) return 'このキャラは判定できません';
-  if (!ownedBy(h, cmd.playerId)) return '担当していないキャラです';
-  // 2人以上: みんなで決めたキャラの担当の人が判定する（オーナーの案）
-  if (exploreShared(game)) {
-    const chosen = exploreRollerOf(game);
-    if (!chosen) return 'だれが判定するか、先にみんなで決めます';
-    if (chosen !== h.id) return `判定するのは${findHero(game, chosen)?.name ?? '決めたキャラ'}です`;
-  }
-  const d = { ...newDice(game, BALANCE.exploreDiceSides, [], rng), heroId: h.id };
-  run.exploreDice = d;
-  run.explore = d.total;
-  addLog(game, `${h.name}の探索のサイコロ: ${d.face}（この手番に選べる扉 ${d.total}つ）`);
-  return undefined;
-}
-
-/** フォーカス1で探索のサイコロを振り直す（振ったキャラ。まだ扉を選ぶ前に1回だけ。2回目の目で決まる） */
-function exploreReroll(game: GameState, cmd: Extract<GameCommand, { type: 'EXPLORE_REROLL' }>, rng: Rng): string | undefined {
-  const run = game.dungeon;
-  if (!game.world || !game.activeScene || game.mode !== 'dungeon' || !run) return 'ダンジョンの通路でのみ振り直せます';
-  const d = run.exploreDice;
-  if (run.explore == null || !d) return '先に探索のサイコロを振ってください';
-  if (d.rerolled) return '振り直しは1回だけです';
-  if (d.heroId && d.heroId !== cmd.heroId) return '振り直すのはサイコロを振ったキャラです';
-  if (run.explore !== d.total) return '扉を選んだ後は振り直せません';
-  const h = findHero(game, cmd.heroId);
-  if (!h || h.hp <= 0) return 'このキャラは振り直せません';
-  if (!ownedBy(h, cmd.playerId)) return '担当していないキャラです';
-  if (h.focus < 1) return 'フォーカスがありません';
-  h.focus -= 1;
-  const n = rerollDice(game, d, rng);
-  run.exploreDice = n;
-  run.explore = n.total;
-  addLog(game, `${h.name}がフォーカスで振り直した: ${n.face}（この手番に選べる扉 ${n.total}つ）`);
-  return undefined;
-}
-
-/** この通路で、まだ「警戒」ができるか */
-export const canWatchHere = (run: DungeonRun) => run.watchedAt !== (run.currentRoomId ?? 'entrance');
-
-/** ダンジョンのパーティの手番を終える（探索力が残っていても） */
-function exploreEnd(game: GameState): string | undefined {
-  const run = game.dungeon;
-  if (!game.world || !game.activeScene || game.mode !== 'dungeon' || !run) return 'ダンジョンの通路でのみ終えられます';
-  run.explore = 0;
-  run.ended = true;
-  return undefined;
 }
 
 /** ダンジョンの通路を歩くキャラ（手番のキャラ。倒れていたら、パーティの最初の生きているキャラ） */
@@ -329,7 +246,6 @@ function dungeonNav(game: GameState, cmd: Extract<GameCommand, { type: 'DUNGEON_
   if (!nav || nav.id !== cmd.heroId) return '歩くのは手番のキャラです';
   if (!ownedBy(nav, cmd.playerId)) return '担当していないキャラです';
   const p = posOf(run);
-  const limited = !!game.world && !!game.activeScene;
   if (cmd.type === 'DUNGEON_TURN') {
     run.pos = { ...p, facing: turnTo(p.facing, cmd.dir) };
     revealSeen(run);
@@ -348,8 +264,6 @@ function dungeonNav(game: GameState, cmd: Extract<GameCommand, { type: 'DUNGEON_
     path = found;
     face = cmd.face;
   }
-  // 歩くのは数えない（扉を選んだ回数だけ数える。オーナーの案）。サイコロの前は歩けない
-  if (limited && run.explore == null) return '先に探索のサイコロを振ってください';
   for (const d of path) {
     const cur = posOf(run);
     run.pos = { x: cur.x + DIRS[d][0], y: cur.y + DIRS[d][1], facing: d };
@@ -362,41 +276,23 @@ function dungeonNav(game: GameState, cmd: Extract<GameCommand, { type: 'DUNGEON_
   return undefined;
 }
 
-/** 周囲の警戒（第3段階C1）: 歩数を使い、感知で判定。成功1で今の通路の開けられる扉の場所と気配、完全成功で次の戦闘に「応援」 */
-function dungeonWatch(game: GameState, cmd: Extract<GameCommand, { type: 'DUNGEON_WATCH' }>, rng: Rng): string | undefined {
+/**
+ * 周囲の警戒（抜本的な見直し §2-4・オーナーの決定 2-A）: そのキャラのフォーカス1を払うと、今の通路にいる間、先読みが見える
+ * （扉の先の敵の名前・宝箱の格・イベントの題と、次の次の行の扉の色）。判定なし・乱数なし・1つの通路で1回だけ。
+ * 払うのは、場面にいる生きているキャラ（その担当の人が押す）
+ */
+function dungeonScout(game: GameState, cmd: Extract<GameCommand, { type: 'DUNGEON_SCOUT' }>): string | undefined {
   const run = game.dungeon;
   if (game.mode !== 'dungeon' || !run) return 'ダンジョンの通路でのみ使えます';
-  const nav = dungeonNavigator(game);
-  if (!nav || !ownedBy(nav, cmd.playerId)) return '手番のキャラの担当の人が使えます';
   const h = findHero(game, cmd.heroId);
-  if (!h || h.hp <= 0 || !(game.party ?? game.heroes.map((x) => x.id)).includes(h.id)) return 'このキャラは判定できません';
+  if (!h || h.hp <= 0 || h.retired || !sceneHeroes(game).some((x) => x.id === h.id)) return 'このキャラは警戒できません';
   if (!ownedBy(h, cmd.playerId)) return '担当していないキャラです';
-  if (run.watchedAt === watchSpot(game)) return 'この通路ではもう警戒しました';
-  const slots = BALANCE.dungeonWatchSlots;
-  if (!Number.isInteger(cmd.focusUsed) || cmd.focusUsed < 0 || cmd.focusUsed > Math.min(slots, h.focus)) return 'フォーカスの数が不正です';
-  // 扉の数は使わない（残りが0でもできる）。サイコロの前はできない
-  if (game.world && game.activeScene && run.explore == null) return '先に探索のサイコロを振ってください';
-  h.focus -= cmd.focusUsed;
-  const results = rollWithFocus(slots, cmd.focusUsed, statChance(h, 'per'), rng);
-  run.watchRoll = results;
+  if (!canWatchHere(run)) return 'この通路ではもう警戒しました';
+  if (!reachableRooms(run).some((r) => !r.cleared)) return 'この先に扉はありません';
+  if (h.focus < BALANCE.dungeonScoutFocus) return 'フォーカスがありません';
+  h.focus -= BALANCE.dungeonScoutFocus;
   run.watchedAt = watchSpot(game);
-  const n = successes(results);
-  if (n >= 1) {
-    // 今の通路の開けられる扉: 場所（扉と扉の前のマス）が地図に出て、気配も分かる
-    const seen = new Set(run.seen ?? []);
-    const sensed = new Set(run.sensed ?? []);
-    for (const r of reachableRooms(run)) {
-      const c = dungeonGrid(run).roomCell.get(r.id);
-      if (!c) continue;
-      seen.add(cellKey(c.x, c.y));
-      seen.add(cellKey(c.x, c.y - 1));
-      sensed.add(r.id);
-    }
-    run.seen = [...seen];
-    run.sensed = [...sensed];
-  }
-  if (n >= slots) for (const p of sceneHeroes(game)) p.nextBattleStatuses.inspired = (p.nextBattleStatuses.inspired ?? 0) + BALANCE.dungeonWatchInspired;
-  addLog(game, n >= slots ? `${h.name}が周囲を警戒した: 扉の気配が分かり、身構えた（次の戦闘で応援）` : n >= 1 ? `${h.name}が周囲を警戒した: 扉の気配が分かった` : `${h.name}が周囲を警戒した: 何も分からなかった`);
+  addLog(game, `${h.name}が周囲を警戒した: 扉の先の様子が分かった`);
   return undefined;
 }
 
@@ -552,25 +448,13 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
       case 'GIVE':
         error = give(game, cmd);
         break;
-      case 'EXPLORE_ROLL':
-        error = exploreRoll(game, cmd, rng);
-        break;
-      case 'EXPLORE_REROLL':
-        error = exploreReroll(game, cmd, rng);
-        break;
-      case 'EXPLORE_ROLLER':
-        error = exploreRoller(game, cmd.heroId);
-        break;
-      case 'EXPLORE_END':
-        error = exploreEnd(game);
-        break;
       case 'DUNGEON_STEP':
       case 'DUNGEON_TURN':
       case 'DUNGEON_WALK':
         error = dungeonNav(game, cmd);
         break;
-      case 'DUNGEON_WATCH':
-        error = dungeonWatch(game, cmd, rng);
+      case 'DUNGEON_SCOUT':
+        error = dungeonScout(game, cmd);
         break;
       case 'WORLD_ROLL_MOVE':
         error = rollMove(game, cmd, rng);
@@ -694,11 +578,8 @@ function enterRoom(game: GameState, playerId: string, roomId: string, rng: Rng):
   const front = doorFront(run, room.id);
   const path = front ? findPath(run, front) : undefined;
   if (!front || !path) return 'その扉までは歩いて行けません';
-  if (game.world && game.activeScene) {
-    if (run.explore == null) return '先に探索のサイコロを振ってください';
-    if (run.explore <= 0) return 'この手番に選べる扉は、もうありません';
-    run.explore -= 1;
-  }
+  // 扉1つ＝手番1回（部屋を済ませて通路に戻ったら、この組の手番は終わる）
+  if (game.world && game.activeScene) run.opened = true;
   for (const d of path) {
     const cur = posOf(run);
     run.pos = { x: cur.x + DIRS[d][0], y: cur.y + DIRS[d][1], facing: d };
@@ -1266,16 +1147,24 @@ function finishEvent(game: GameState, playerId: string, rng: Rng): string | unde
   return undefined;
 }
 
-function rest(game: GameState, playerId: string, kind: 'hp' | 'focus'): string | undefined {
+/** 休憩で「技を磨く」を選べるキャラ（まだ＋にしていないカードを持つ、場面の生きているキャラ） */
+export const canHoneCards = (h: Hero) => h.deck.some((c) => !c.upgraded);
+
+function rest(game: GameState, playerId: string, kind: 'hp' | 'focus' | 'upgrade'): string | undefined {
   if (!isPartyPlayer(game, playerId)) return 'このパーティのプレイヤーではありません';
   if (game.mode !== 'rest' || !game.dungeon) return '休憩できる場所ではありません';
-  for (const h of sceneHeroes(game)) {
+  if (kind !== 'hp' && kind !== 'focus' && kind !== 'upgrade') return '選べない休憩です';
+  const heroes = sceneHeroes(game);
+  if (kind === 'upgrade' && !heroes.some(canHoneCards)) return '磨けるカードがありません';
+  for (const h of heroes) {
     if (kind === 'hp') h.hp = Math.min(heroMaxHp(h), h.hp + Math.ceil(heroMaxHp(h) * BALANCE.restHpRatio * restMultiplierOf(h)));
-    else h.focus = Math.min(heroFocusMax(h), h.focus + BALANCE.restFocus);
+    else if (kind === 'focus') h.focus = Math.min(heroFocusMax(h), h.focus + BALANCE.restFocus);
+    // 技を磨く: その場のキャラがそれぞれ、自分のカードを1枚選んで＋にする（選ぶのは CARD_TASK。その冒険の中だけの強化）
+    else if (canHoneCards(h)) h.cardTask = 'upgrade';
   }
   findRoom(game.dungeon, game.dungeon.currentRoomId ?? '')!.cleared = true;
   game.mode = 'dungeon';
-  addLog(game, kind === 'hp' ? '休憩してHPを回復した' : '瞑想してフォーカスを回復した');
+  addLog(game, kind === 'hp' ? '休憩してHPを回復した' : kind === 'focus' ? '瞑想してフォーカスを回復した' : '焚き火のそばで技を磨いた（カードを1枚ずつ強化できる）');
   return undefined;
 }
 

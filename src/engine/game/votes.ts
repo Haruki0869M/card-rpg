@@ -7,9 +7,9 @@ import { findHero, sceneHeroes } from './heroes';
 
 /** みんなで決める操作の種類 */
 /** 全員一致で決める操作（多数決にしない） */
-export const UNANIMOUS = new Set<GameCommand['type']>(['ENTER_ROOM', 'CHEST_OPENER', 'EXPLORE_ROLLER']);
+export const UNANIMOUS = new Set<GameCommand['type']>(['ENTER_ROOM', 'CHEST_OPENER']);
 
-export const VOTED_COMMANDS = new Set<GameCommand['type']>(['ENTER_ROOM', 'RETREAT', 'CHOOSE_EVENT', 'FINISH_EVENT', 'REST', 'LEAVE_CHEST', 'RETURN_TO_HUB', 'FINISH_REWARD', 'EXPLORE_END', 'CHEST_OPENER', 'EXPLORE_ROLLER']);
+export const VOTED_COMMANDS = new Set<GameCommand['type']>(['ENTER_ROOM', 'RETREAT', 'CHOOSE_EVENT', 'FINISH_EVENT', 'REST', 'LEAVE_CHEST', 'RETURN_TO_HUB', 'FINISH_REWARD', 'CHEST_OPENER']);
 
 /** 選べるプレイヤー（場面にいる、生きているキャラの担当） */
 export const voters = (game: GameState): PlayerId[] => [...new Set(sceneHeroes(game).map((h) => h.playerId))];
@@ -32,7 +32,7 @@ export function needsVote(game: GameState, cmd: GameCommand): boolean {
 export function voteKey(cmd: GameCommand): string {
   const c = cmd as Record<string, unknown>;
   // 宝箱の開け役は「だれに任せるか」が選択肢そのもの
-  return JSON.stringify([cmd.type, c.roomId ?? null, c.optionIndex ?? null, c.kind ?? null, cmd.type === 'CHEST_OPENER' || cmd.type === 'EXPLORE_ROLLER' ? cmd.heroId : null]);
+  return JSON.stringify([cmd.type, c.roomId ?? null, c.optionIndex ?? null, c.kind ?? null, cmd.type === 'CHEST_OPENER' ? cmd.heroId : null]);
 }
 
 /** 今の票（場面が変わっていたら空） */

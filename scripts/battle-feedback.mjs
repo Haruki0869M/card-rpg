@@ -74,7 +74,6 @@ try {
       h.pet = { petId: species[i], color: colors[i], name: ['ぴーちゃん', 'カメキチ', 'ふうた', 'ぴょん'][i], love: 0, acts: 0 };
     }); g.heroes[0].carried = 'swordmaster';
     await resume(d); await page.getByText('翠の神殿に入る', { exact: true }).click();
-    if (await page.locator('[data-explore-roll-button]').count()) await page.locator('[data-explore-roll-button]').click();
     // 第3段階: 入口は1行目の扉の前（北向き）。扉を開けて最初の部屋へ
     await observe();
     await page.getByRole('button', { name: /扉を開ける/ }).click();

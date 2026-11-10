@@ -1,5 +1,5 @@
 // ===== 冒険（ゲーム全体）の型 =====
-import type { DiceRoll, EncounterState, ScenarioMapDef, ScenarioStory, ShrineVisit, SanctuaryVisit, TownVisit, WorldState } from './world';
+import type { EncounterState, ScenarioMapDef, ScenarioStory, ShrineVisit, SanctuaryVisit, TownVisit, WorldState } from './world';
 import type {
   AbilityDef,
   BattleState,
@@ -159,6 +159,10 @@ export interface RoomTypeDef {
     /** 勝った時に chance% でコモンの消費アイテムを落とす */
     consumableDrop?: { chance: number };
   };
+  /** 扉の予兆の種類（無ければ behavior から決まる。強敵だけ別の色にする時などに書く） */
+  omen?: 'danger' | 'elite' | 'treasure' | 'rest' | 'mystery';
+  /** 重い扉で見せる部屋（中ボス。予兆の色は出さず、扉の見た目で分かる） */
+  heavyDoor?: boolean;
   /** ランダムダンジョンの途中の行での出やすさ（0なら自動生成では出ない） */
   layoutWeight?: number;
 }
@@ -229,24 +233,14 @@ export interface DungeonRun {
   currentRoomId?: string;
   /** このダンジョンで手に入れたもの（撤退時に1つ失う候補） */
   gained: ItemInstance[];
-  /** この手番で、あと何回扉を選べるか（判定前は null。世界マップのあるシナリオだけ。サイコロ1〜3。扉を1つ選ぶたびに1減る） */
-  explore?: number | null;
-  /** 探索のサイコロの結果 */
-  exploreDice?: DiceRoll;
-  /** 「手番を終える」を選んだ（警戒ができても次の人へ） */
-  ended?: boolean;
-  /** 探索力の判定をするキャラ（2人以上のプレイヤーの時にみんなで決める）。turn = 決めた手番の目印（ワールドターン:手番のキャラ）。違う手番のものは使わない */
-  exploreRoller?: { heroId: string; turn: string };
+  /** この手番に扉を開けた（扉1つ＝手番1回。部屋を済ませて通路に戻ったら、その組の手番は終わる。抜本的な見直し §2-3） */
+  opened?: boolean;
   /** 通路の地図の上の位置と向き（地図は部屋のつながりから毎回作る。engine/game/dungeonMap.ts） */
   pos?: { x: number; y: number; facing: Facing };
   /** 見たマス（"x,y"。オートマッピング） */
   seen?: string[];
-  /** 「周囲の警戒」で気配の分かった部屋（第3段階C1） */
-  sensed?: string[];
-  /** 「周囲の警戒」を使った通路（今いる部屋のID か 'entrance'。1つの通路で1回だけ） */
+  /** 「周囲の警戒」（フォーカス1）を使った通路（今いる部屋のID か 'entrance'。1つの通路で1回だけ。その通路にいる間、先読みが見える） */
   watchedAt?: string;
-  /** 最後の「周囲の警戒」の判定（画面に出す） */
-  watchRoll?: ('focus' | 'hit' | 'miss')[];
 }
 
 /** 向き（0=北・奥 / 1=東 / 2=南 / 3=西） */
@@ -443,6 +437,8 @@ export interface GameLog {
 export interface Expedition {
   id: string;
   heroes: string[];
+  /** 入った入口のマスの番号（同じダンジョンに後から来た仲間が合流する時の見分け。古い保存には無い） */
+  entranceTile?: number;
   mode: GameMode;
   dungeon?: DungeonRun;
   battle?: BattleState;
@@ -579,7 +575,7 @@ export type GameCommand =
   | { type: 'LEAVE_CHEST'; playerId: PlayerId }
   | { type: 'CHOOSE_EVENT'; playerId: PlayerId; optionIndex: number; heroId?: string; focusUsed: number }
   | { type: 'FINISH_EVENT'; playerId: PlayerId }
-  | { type: 'REST'; playerId: PlayerId; kind: 'hp' | 'focus' }
+  | { type: 'REST'; playerId: PlayerId; kind: 'hp' | 'focus' | 'upgrade' }
   | { type: 'RETREAT'; playerId: PlayerId }
   | { type: 'RETURN_TO_HUB'; playerId: PlayerId }
   | { type: 'EQUIP'; playerId: PlayerId; heroId: string; itemUid: string }
@@ -625,13 +621,6 @@ export type GameCommand =
   | { type: 'LEAVE_SANCTUARY'; playerId: PlayerId; heroId?: string }
   /** 世界マップと別に進んでいる場面（ダンジョン）の中の操作 */
   | { type: 'SCENE'; scene: string; command: GameCommand }
-  /** ダンジョンのパーティの手番: 探索力の判定（素早さ）/ 手番を終える */
-  | { type: 'EXPLORE_ROLL'; playerId: PlayerId; heroId: string }
-  /** フォーカス1で探索のサイコロを振り直す（振ったキャラ。まだ扉を選ぶ前。2回目の目で決まる） */
-  | { type: 'EXPLORE_REROLL'; playerId: PlayerId; heroId: string }
-  /** 探索力の判定をするキャラを、みんなで決める（ダンジョンのパーティに2人以上のプレイヤーがいる時。全員一致） */
-  | { type: 'EXPLORE_ROLLER'; playerId: PlayerId; heroId: string }
-  | { type: 'EXPLORE_END'; playerId: PlayerId }
   /**
    * ダンジョンの通路を1歩進む（左・右・後ろは、その向きを向いて1歩）。歩くのは手番のキャラの担当の人（第3段階）。
    * DUNGEON_STEP・DUNGEON_TURN・DUNGEON_WALK は、扉を選ぶだけの形になってから画面では使わない。テストでキャラの位置を動かす道具として残している
@@ -639,8 +628,8 @@ export type GameCommand =
   | { type: 'DUNGEON_STEP'; playerId: PlayerId; heroId: string; dir: 'forward' | 'left' | 'right' | 'back' }
   /** その場で向きを変える（歩数は使わない） */
   | { type: 'DUNGEON_TURN'; playerId: PlayerId; heroId: string; dir: 'left' | 'right' | 'back' }
-  /** 周囲の警戒（歩数2。感知の判定。成功1で開けられる扉の場所と気配、完全成功で次の戦闘に応援。第3段階C1） */
-  | { type: 'DUNGEON_WATCH'; playerId: PlayerId; heroId: string; focusUsed: number }
+  /** 周囲の警戒（そのキャラのフォーカス1。判定なし。その通路にいる間、扉の先の中身と次の次の行の色が分かる。1つの通路で1回だけ） */
+  | { type: 'DUNGEON_SCOUT'; playerId: PlayerId; heroId: string }
   /** 見えているマスまで歩く（歩いた数だけ歩数を使う）。face = 着いた後に向く向き */
   | { type: 'DUNGEON_WALK'; playerId: PlayerId; heroId: string; x: number; y: number; face?: Facing }
   /** みんなで決める操作に1票入れる（command = 選んだ操作。null で取り消し） */

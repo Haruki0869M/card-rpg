@@ -21,6 +21,7 @@ export const roomTypes: RoomTypeDef[] = [
     color: '#ff5a6a',
     bg: '#4a0c18',
     behavior: 'battle',
+    omen: 'elite',
     battle: { pool: 'elite', levelBonus: 1, cardOdds: 'elite', equipmentDrop: { epicChance: 10 } },
     layoutWeight: 14,
   },

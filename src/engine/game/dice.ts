@@ -1,6 +1,6 @@
 // ===== 移動のサイコロ（オーナーの案: すごろくのように、自分の番に応援できるサイコロ） =====
 // 世界マップ: 1d6 ＋ 素早さのボーナス（+0〜+2）＋ 探索の能力・お供のボーナス
-// ダンジョン: 1〜3 の小さなサイコロ。出た目 = この手番に選べる扉の数
+// （ダンジョンの探索のサイコロは無くなった。扉1つ＝手番1回。抜本的な見直し §2-3）
 // フォーカス1 = 目を見た後に1回だけ振り直せる（2回目の目で決まる）。乱数は GameState の rng だけを使う（オンライン・保存して再開でも同じ目）
 import { BALANCE } from '../../data/balance';
 import { getClass } from '../../data/classes';
@@ -56,6 +56,3 @@ export function rerollDice(game: GameState, d: DiceRoll, rng: Rng): DiceRoll {
   const face = rollDie(d.sides, rng);
   return { ...d, first: d.face, face, rerolled: true, total: face + d.bonus.reduce((n, b) => n + b.value, 0), seq: nextSeq(game) };
 }
-
-/** ダンジョンの探索のサイコロ（1〜3。ボーナスなし） */
-export const exploreDiceSides = () => BALANCE.exploreDiceSides;

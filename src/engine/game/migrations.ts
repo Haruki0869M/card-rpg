@@ -50,7 +50,6 @@ const MIGRATIONS: Record<number, (g: Loose) => void> = {
       d.pos = cur ? { x: cur.x, y: cur.y, facing: 0 } : { ...grid.start, facing: 0 };
       d.seen = d.rooms.filter((r) => r.cleared).map((r) => grid.roomCell.get(r.id)).filter((c) => !!c).map((c) => cellKey(c!.x, c!.y));
       revealSeen(d);
-      if (typeof d.explore === 'number') d.explore *= BALANCE.dungeonStepsPerExplore;
     }
   },
   13(g) {
@@ -195,15 +194,22 @@ const MIGRATIONS: Record<number, (g: Loose) => void> = {
 };
 
 /**
- * 移動のサイコロ（版を上げずに直す）: 前の「スロットの判定」の結果は捨てる。
- * 世界マップの移動力はそのまま。ダンジョンの途中の「残り歩数」は「選べる扉の数」に直す（歩数÷2 を切り上げ、3まで）
+ * 版を上げずに直す物:
+ * - 世界マップの前の「スロットの判定」の結果は捨てる
+ * - ダンジョンの探索のサイコロ（選べる扉の数）は無くなった（扉1つ＝手番1回）。途中の保存に残っている項目は捨てる。
+ *   部屋の中（戦闘・宝箱など）で保存していたら「この手番に扉を開けた」ことにする（部屋を済ませたら手番が終わる）
+ * - 前の「周囲の警戒」（感知の判定）の結果は捨てる（今はフォーカス1で先読み）
  */
 function normalizeDice(g: Loose) {
   if (g.world && Array.isArray(g.world.moveRoll)) delete g.world.moveRoll;
-  for (const d of [g.dungeon, ...(g.expeditions ?? []).map((x: Loose) => x.dungeon)] as Loose[]) {
-    if (!d || !Array.isArray(d.exploreRoll)) continue;
-    delete d.exploreRoll;
-    if (typeof d.explore === 'number') d.explore = Math.min(BALANCE.exploreDiceSides, Math.ceil(d.explore / BALANCE.dungeonStepsPerExplore));
+  const scenes: { d: Loose; mode: string; scene: boolean }[] = [{ d: g.dungeon, mode: g.mode, scene: false }, ...(g.expeditions ?? []).map((x: Loose) => ({ d: x.dungeon, mode: x.mode, scene: true }))];
+  for (const { d, mode, scene } of scenes) {
+    if (!d) continue;
+    const old = 'explore' in d || 'exploreDice' in d || 'exploreRoll' in d || 'watchRoll' in d || 'sensed' in d;
+    if (!old) continue;
+    if (scene && mode !== 'dungeon' && d.opened === undefined) d.opened = true;
+    if ('watchRoll' in d || 'sensed' in d) delete d.watchedAt;
+    for (const k of ['explore', 'exploreDice', 'exploreRoll', 'ended', 'exploreRoller', 'watchRoll', 'sensed']) delete d[k];
   }
 }
 

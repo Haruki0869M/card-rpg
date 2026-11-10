@@ -218,7 +218,7 @@ async function run(party, difficulty) {
         } else issues.add('制覇後の物語が出ない');
       }
       // 地上に戻ったあと: 世界マップか、手番が来た別の組のダンジョン（M3-D）
-      if (!(await page.locator('[data-world-map]').count()) && !(await page.locator('[data-explore-roll-button]').count())) { issues.add('世界マップに戻れない'); await page.screenshot({ path: `screenshots/adv-${party}p-noworld.png` }); console.log((await page.locator('body').innerText()).slice(0, 300)); }
+      if (!(await page.locator('[data-world-map]').count()) && !(await page.locator('[data-door-choice]').count())) { issues.add('世界マップに戻れない'); await page.screenshot({ path: `screenshots/adv-${party}p-noworld.png` }); console.log((await page.locator('body').innerText()).slice(0, 300)); }
       break;
     }
     if (await page.getByText('世界の終わり…', { exact: true }).count()) {
@@ -318,17 +318,7 @@ async function run(party, difficulty) {
         seen.add('dungeon');
         await check(page, 'dungeon');
       }
-      // 2人以上のプレイヤー: 先に「だれが判定する？」をみんなで決める（おすすめの人＝一番上に任せる）
-      if (await page.locator('[data-explore-roller]').count()) {
-        await page.locator('[data-explore-roller] button').first().click();
-        continue;
-      }
-      // 手番の最初は探索のサイコロを振る（1〜3 = 選べる扉の数）。選び終えたら「手番を終える」
-      if (await page.locator('[data-explore-roll-button]').count()) {
-        await page.locator('[data-explore-roll-button]').click();
-        continue;
-      }
-      // 扉を選ぶだけ: 前にある扉のボタン（左の扉を先に）。押すと扉の前まで自動で歩いて開ける
+      // 扉1つ＝手番1回（サイコロは無い）: 前にある扉のボタン（左の扉を先に）を押すと、扉が開く
       const doorBtn = page.locator('[data-door-choice]:not([disabled])');
       if ((await doorBtn.count()) && (await page.locator('[data-dungeon-controls="ready"]').count())) {
         await doorBtn.first().click();
@@ -338,7 +328,8 @@ async function run(party, difficulty) {
         await page.waitForTimeout(100);
         continue;
       }
-      await clickText(page, '手番を終える');
+      // ほかの人の番（世界マップにいる仲間）を待っている: 場面のタブで世界マップへ
+      await page.waitForTimeout(150);
       continue;
     }
     if (await page.locator('button:has-text("ターン終了")').count()) {

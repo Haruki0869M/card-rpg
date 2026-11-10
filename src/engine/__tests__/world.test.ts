@@ -326,7 +326,7 @@ describe('ダンジョンも世界マップの手番の順番で動く（M3-D）
   it('入ると手番は次の人へ。ダンジョンの番が来るまで、ダンジョンの中は動かせない', () => {
     let { g, x } = h0InTemple();
     expect(g.world!.turn).toBe('h1');
-    expect(applyGameCommand(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0' })).error).toMatch(/ほかのキャラの番/);
+    expect(applyGameCommand(g, inScene(x, { type: 'ENTER_ROOM', playerId: P, roomId: 'r0c0' })).error).toMatch(/ほかのキャラの番/);
     // h1 が手番を終えると、ワールドターンが進み、h0（ダンジョン）の番
     g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h1' });
     expect(g.world!.worldTurn).toBe(2);
@@ -335,26 +335,24 @@ describe('ダンジョンも世界マップの手番の順番で動く（M3-D）
     expect(applyGameCommand(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0' }).error).toMatch(/ダンジョン/);
   });
 
-  it('探索のサイコロ（1〜3）→ 選べる扉の数。扉を開けると1使う。手番を終えると次の人の番', () => {
+  it('扉1つ＝手番1回: 扉を開けて部屋を済ませると、次の人の番。次に番が来たら、また扉を1つ', () => {
     let { g, x } = h0InTemple();
     g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h1' });
-    expect(applyGameCommand(g, inScene(x, { type: 'ENTER_ROOM', playerId: P, roomId: 'r0c0' })).error).toMatch(/サイコロ/);
-    g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0' }));
-    const n = viewOf(g, x).dungeon!.explore!;
-    expect(n).toBeGreaterThanOrEqual(1);
-    expect(n).toBeLessThanOrEqual(BALANCE.exploreDiceSides);
     g = run(g, inScene(x, { type: 'ENTER_ROOM', playerId: P, roomId: 'r0c0' }));
-    expect(viewOf(g, x).dungeon!.explore).toBe(n - 1);
-    // 手番を終える → h1 の番（ワールドターンは同じ）
+    expect(viewOf(g, x).dungeon!.opened).toBe(true);
+    // 部屋の途中は h0 の番のまま
+    expect(g.world!.turn).toBe('h0');
+    // 部屋を済ませて通路に戻る → h1 の番（ワールドターンは同じ）
     g.expeditions![0].mode = 'dungeon';
     g.expeditions![0].battle = undefined;
-    g = run(g, inScene(x, { type: 'EXPLORE_END', playerId: P }));
+    g.expeditions![0].dungeon!.rooms.find((r) => r.id === 'r0c0')!.cleared = true;
+    g = run(g, inScene(x, { type: 'DUNGEON_TURN', playerId: P, heroId: 'h0', dir: 'left' }));
     expect(g.world!.turn).toBe('h1');
     expect(g.world!.worldTurn).toBe(2);
-    // 次にダンジョンの番が来たら、また判定から
+    // 次にダンジョンの番が来たら、また扉を選べる
     g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h1' });
     expect(g.world!.turn).toBe('h0');
-    expect(viewOf(g, x).dungeon!.explore).toBeNull();
+    expect(viewOf(g, x).dungeon!.opened).toBeUndefined();
   });
 
   it('撤退すると世界マップに戻り、次のワールドターンから地図で動く', () => {
@@ -373,9 +371,13 @@ describe('ダンジョンも世界マップの手番の順番で動く（M3-D）
     const turn = g.world!.worldTurn;
     expect(g.world!.turn).toBe('h0');
     expect(turn).toBe(2);
-    g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0' }));
     const c = g.world!.corruption;
-    g = run(g, inScene(x, { type: 'EXPLORE_END', playerId: P }));
+    // 扉を開けて部屋を済ませると、ワールドターンが1つ進んで、すぐ同じ組の番
+    g = run(g, inScene(x, { type: 'ENTER_ROOM', playerId: P, roomId: 'r0c0' }));
+    g.expeditions![0].mode = 'dungeon';
+    g.expeditions![0].battle = undefined;
+    g.expeditions![0].dungeon!.rooms.find((r) => r.id === 'r0c0')!.cleared = true;
+    g = run(g, inScene(x, { type: 'DUNGEON_TURN', playerId: P, heroId: 'h0', dir: 'left' }));
     expect(g.world!.worldTurn).toBe(turn + 1);
     expect(g.world!.corruption).toBeGreaterThan(c);
     expect(g.world!.turn).toBe('h0');

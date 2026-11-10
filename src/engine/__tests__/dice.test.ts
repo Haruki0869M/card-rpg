@@ -118,74 +118,68 @@ describe('ダンジョンの探索のサイコロと扉', () => {
   }
   const dun = (g: GameState, x: string) => viewOf(g, x).dungeon!;
 
-  it('目は1〜3で、出た目 = 選べる扉の数', () => {
-    const faces = new Set<number>();
-    for (let seed = 1; seed <= 30; seed++) {
-      const { g, x } = inTemple(seed);
-      const r = applyGameCommand(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0' }));
-      if (r.error) continue;
-      const d = dun(r.state, x);
-      expect(d.exploreDice!.sides).toBe(3);
-      expect(d.explore).toBe(d.exploreDice!.face);
-      expect(d.exploreDice!.bonus).toEqual([]);
-      faces.add(d.exploreDice!.face);
-    }
-    expect([...faces].sort()).toEqual([1, 2, 3]);
+  it('探索のサイコロは無くなった: 入ったらすぐ扉を選べて、乱数は引かない（戦闘が始まるまで）', () => {
+    const { g, x } = inTemple();
+    expect(err(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0' } as unknown as GameCommand))).toBeTruthy();
+    const d = dun(g, x) as unknown as Record<string, unknown>;
+    expect(d.explore).toBeUndefined();
+    expect(d.exploreDice).toBeUndefined();
+    const g2 = run(g, inScene(x, { type: 'ENTER_ROOM', playerId: P, roomId: 'r0c0' }));
+    expect(dun(g2, x).currentRoomId).toBe('r0c0');
   });
 
-  it('フォーカス1で振り直す: 振ったキャラだけ。扉を選んだ後はできない。1回だけ', () => {
+  it('扉1つで、どれだけ歩いても手番1回（遠い扉でも）', () => {
     let { g, x } = inTemple();
-    g.heroes[0].focus = 2;
-    g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0' }));
-    const first = dun(g, x).exploreDice!;
-    g = run(g, inScene(x, { type: 'EXPLORE_REROLL', playerId: P, heroId: 'h0' }));
-    const d = dun(g, x).exploreDice!;
-    expect(d.rerolled).toBe(true);
-    expect(d.first).toBe(first.face);
-    expect(dun(g, x).explore).toBe(d.total);
-    expect(g.heroes[0].focus).toBe(1);
-    expect(err(g, inScene(x, { type: 'EXPLORE_REROLL', playerId: P, heroId: 'h0' }))).toMatch(/1回だけ/);
-    // 扉を選んだ後
-    let b = inTemple();
-    b.g.heroes[0].focus = 2;
-    b.g = run(b.g, inScene(b.x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0' }));
-    b.g = run(b.g, inScene(b.x, { type: 'ENTER_ROOM', playerId: P, roomId: 'r0c0' }));
-    b.g.expeditions![0].mode = 'dungeon';
-    b.g.expeditions![0].battle = undefined;
-    if (dun(b.g, b.x).explore != null) expect(err(b.g, inScene(b.x, { type: 'EXPLORE_REROLL', playerId: P, heroId: 'h0' }))).toBeDefined();
-  });
-
-  it('扉1つで、どれだけ歩いても1だけ使う（遠い扉でも）', () => {
-    let { g, x } = inTemple();
-    g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0' }));
-    g.expeditions![0].dungeon!.explore = 3;
     g = run(g, inScene(x, { type: 'ENTER_ROOM', playerId: P, roomId: 'r0c0' }));
-    expect(dun(g, x).explore).toBe(2);
     g.expeditions![0].mode = 'dungeon';
     g.expeditions![0].battle = undefined;
     g.expeditions![0].dungeon!.rooms.find((r) => r.id === 'r0c0')!.cleared = true;
+    // 通路に戻ったので h1 の番 → h1 が待つと、また h0 の番
+    g = run(g, inScene(x, { type: 'DUNGEON_TURN', playerId: P, heroId: 'h0', dir: 'left' }));
+    expect(g.world!.turn).toBe('h1');
+    g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h1' });
     const d = dun(g, x);
     const lens = reachableRooms(d).map((r) => ({ id: r.id, len: findPath(d, doorFront(d, r.id)!)!.length }));
     const far = lens.sort((a, b) => b.len - a.len)[0];
     g = run(g, inScene(x, { type: 'ENTER_ROOM', playerId: P, roomId: far.id }));
-    expect(dun(g, x).explore).toBe(1);
     expect(dun(g, x).currentRoomId).toBe(far.id);
+    expect(dun(g, x).opened).toBe(true);
   });
 
-  it('古い保存データ: スロットの結果は捨て、残り歩数は選べる扉の数（÷2 切り上げ、3まで）に直す', () => {
+  it('古い保存データ: 前のスロットの結果・探索のサイコロの途中の項目は捨てる（読めて、そのまま扉を選べる）', () => {
     const { g, x } = inTemple();
     const old = JSON.parse(JSON.stringify(g));
     old.version = GAME_VERSION;
     const exp = old.expeditions.find((e: { id: string }) => e.id === x);
     exp.dungeon.exploreRoll = ['hit', 'miss'];
     exp.dungeon.explore = 5;
+    exp.dungeon.exploreDice = { sides: 3, face: 2, bonus: [], total: 2, seq: 1, heroId: 'h0' };
+    exp.dungeon.exploreRoller = { heroId: 'h0', turn: '2:h0' };
+    exp.dungeon.ended = true;
+    exp.dungeon.watchRoll = ['hit', 'miss'];
+    exp.dungeon.watchedAt = 'entrance';
+    exp.dungeon.sensed = ['r0c0'];
     old.world.moveRoll = ['hit', 'hit', 'miss', 'miss'];
     const m = migrateGame(old)!;
     expect(m).not.toBeNull();
-    const d = m.expeditions!.find((e) => e.id === x)!.dungeon!;
-    expect(d.explore).toBe(3);
-    expect((d as unknown as Record<string, unknown>).exploreRoll).toBeUndefined();
+    const d = m.expeditions!.find((e) => e.id === x)!.dungeon! as unknown as Record<string, unknown>;
+    for (const k of ['explore', 'exploreRoll', 'exploreDice', 'exploreRoller', 'ended', 'watchRoll', 'watchedAt', 'sensed']) expect(d[k], k).toBeUndefined();
     expect((m.world as unknown as Record<string, unknown>).moveRoll).toBeUndefined();
+    // そのまま扉を選べる
+    const g2 = run(m, inScene(x, { type: 'ENTER_ROOM', playerId: P, roomId: 'r0c0' }));
+    expect(dun(g2, x).currentRoomId).toBe('r0c0');
+  });
+
+  it('古い保存データ: 部屋の中（戦闘など）で保存していたら、部屋を済ませた時にその手番が終わる', () => {
+    let { g, x } = inTemple();
+    g = run(g, inScene(x, { type: 'ENTER_ROOM', playerId: P, roomId: 'r0c0' }));
+    const old = JSON.parse(JSON.stringify(g));
+    const exp = old.expeditions.find((e: { id: string }) => e.id === x);
+    // 前の版: 残り1つ選べる状態で戦闘中（opened は無い）
+    delete exp.dungeon.opened;
+    exp.dungeon.explore = 1;
+    const m = migrateGame(old)!;
+    expect(m.expeditions![0].dungeon!.opened).toBe(true);
   });
 
   it('自動プレイ（bot）は新しいルールで最後まで遊べる', () => {

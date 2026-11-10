@@ -1,13 +1,15 @@
 // ===== ダンジョンの一人称の通路（第3段階B） =====
 // エンジンの viewSlices（見たマスだけから決めた「何が見えるか」）を、CSS の遠近法で四角形を並べて描く。
+// 通路で扉を選ぶ時は、マス目ではなく「扉の壁の構図」（doors.ts の doorWallView）で、選択肢と同じ数・同じ並びの扉を描く。
 // 絵（src/assets/art/dungeon/<背景>-<wall|floor|ceiling|door>.webp）があれば使い、無ければダンジョンごとの色の仮の見た目。
-import { Crown, Gem, Leaf, Lock, Skull, Sparkles, Swords } from 'lucide-react';
+import { Crown, Flame, Gem, Lock, Skull, Sparkles, Swords } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
 import { DUNGEON_TONE } from '../../art/dungeonTone';
 import { artImage } from '../../art/images';
 import { OMEN_INFO, viewSlices, type DoorOmen, type ViewFace } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
 import type { DungeonRun } from '../../types';
+import { doorWallView, type WallDoor } from './doors';
 
 /** ダンジョンの背景ごとの仮の色（壁・床・天井・扉・松明の光） */
 const THEMES: Record<string, { wall: string; wallLine: string; floor: string; ceil: string; door: string; glow: string }> = {
@@ -94,7 +96,7 @@ function doorRim(bg: string) {
 }
 
 /** 扉（壁の面の中に描く） */
-function Door({ bg, themeBg = bg, face, shade, opening, omen, onTap }: { bg: string; /** 絵が無い時の色を決める背景（通路の絵の名前と、部屋の背景が違う時） */ themeBg?: string; face: ViewFace; shade: number; opening?: number; omen?: DoorOmen; /** タップでその扉へ（開けられる扉・ボスの扉だけ） */ onTap?: () => void }) {
+function Door({ bg, themeBg = bg, face, shade, opening, omen, heavy, roomId, onTap }: { /** 中ボスの重い扉（ボスの門の絵を、鉄の色と紫の縁で見せる） */ heavy?: boolean; /** 確認用の目印（扉の壁の構図の時） */ roomId?: string; bg: string; /** 絵が無い時の色を決める背景（通路の絵の名前と、部屋の背景が違う時） */ themeBg?: string; face: ViewFace; shade: number; opening?: number; omen?: DoorOmen; /** タップでその扉へ（開けられる扉・ボスの扉だけ） */ onTap?: () => void }) {
   const t = themeOf(themeBg);
   const boss = face === 'boss';
   // ボスの門は専用の絵（両開きの門）があれば使い、無ければふつうの扉の絵
@@ -123,7 +125,7 @@ function Door({ bg, themeBg = bg, face, shade, opening, omen, onTap }: { bg: str
       </div>
     );
     return (
-      <div className="absolute bottom-0 overflow-hidden rounded-t-[30%] bg-black" style={{ left: boss ? '12%' : '22%', right: boss ? '12%' : '22%', top: boss ? '10%' : '22%', border: `3px solid ${boss ? '#d8a830' : rim.border}`, boxShadow: boss ? undefined : rim.glow }}>
+      <div className="absolute bottom-0 overflow-hidden rounded-t-[30%] bg-black" style={{ left: boss ? '12%' : '22%', right: boss ? '12%' : '22%', top: boss ? '10%' : '22%', border: `3px solid ${heavy ? HEAVY.border : boss ? '#d8a830' : omen ? OMEN_INFO[omen].color : rim.border}`, boxShadow: boss ? undefined : rim.glow, filter: heavy ? HEAVY.filter : undefined }} data-wall-door={roomId} data-door-opening="">
         {boss ? (
           <>
             {leaf('left')}
@@ -143,23 +145,26 @@ function Door({ bg, themeBg = bg, face, shade, opening, omen, onTap }: { bg: str
       role={tap ? 'button' : undefined}
       aria-label={tap ? (face === 'boss' ? 'ボスの扉へ歩く' : 'この扉へ歩く') : undefined}
       data-door-tap={tap ? '' : undefined}
+      data-wall-door={roomId}
+      data-wall-door-kind={roomId ? (heavy ? 'midboss' : boss ? 'boss' : (omen ?? 'door')) : undefined}
       style={{
         left: boss ? '12%' : '22%',
         right: boss ? '12%' : '22%',
         top: boss ? '10%' : '22%',
-        border: `3px solid ${boss ? '#d8a830' : omen ? OMEN_INFO[omen].color : rim.border}`,
+        border: `3px solid ${heavy ? HEAVY.border : boss ? '#d8a830' : omen ? OMEN_INFO[omen].color : rim.border}`,
         backgroundColor: t.door,
         backgroundImage: img
           ? `linear-gradient(rgba(0,0,0,${shade}), rgba(0,0,0,${shade})), url(${img})`
           : `linear-gradient(rgba(0,0,0,${shade}), rgba(0,0,0,${shade})), repeating-linear-gradient(90deg, rgba(0,0,0,.35) 0 2px, transparent 2px 25%)`,
         backgroundSize: 'cover',
-        boxShadow: boss ? '0 0 18px rgba(255,200,80,.45)' : omen ? `0 0 16px ${OMEN_INFO[omen].color}, inset 0 0 10px ${OMEN_INFO[omen].color}` : rim.glow,
-        filter: face === 'locked' ? 'grayscale(.7) brightness(.6)' : undefined,
+        boxShadow: heavy ? HEAVY.glow : boss ? '0 0 18px rgba(255,200,80,.45)' : omen ? `0 0 16px ${OMEN_INFO[omen].color}, inset 0 0 10px ${OMEN_INFO[omen].color}` : rim.glow,
+        filter: face === 'locked' ? 'grayscale(.7) brightness(.6)' : heavy ? HEAVY.filter : undefined,
       }}
     >
       {/* ボスの扉は両開きの門（真ん中に合わせ目） */}
       {boss && !bossArt && <span className="absolute inset-y-0 left-1/2 w-[4px] -translate-x-1/2 bg-[#120804] shadow-[0_0_3px_#000]" />}
-      {boss && <Crown className="relative text-amber-300" style={{ width: '34%', height: '34%' }} />}
+      {boss && !heavy && <Crown className="relative text-amber-300" style={{ width: '34%', height: '34%' }} />}
+      {heavy && <Skull className="relative" style={{ width: '34%', height: '34%', color: HEAVY.border, filter: 'drop-shadow(0 0 4px #000)' }} />}
       {face === 'locked' && <Lock className="text-zinc-300/80" style={{ width: '24%', height: '24%' }} />}
       {face === 'door' && <span className="absolute right-[14%] top-1/2 h-[7%] w-[7%] rounded-full bg-amber-300/80" />}
       {/* 気配（第3段階C1）: 扉の上に小さな印 */}
@@ -168,8 +173,11 @@ function Door({ bg, themeBg = bg, face, shade, opening, omen, onTap }: { bg: str
   );
 }
 
-/** 気配の印（危険＝牙・財宝＝宝石・安らぎ＝葉・不思議＝星）。扉の上でゆっくり光る */
-const OMEN_ICONS: Record<DoorOmen, typeof Swords> = { danger: Skull, treasure: Gem, rest: Leaf, mystery: Sparkles };
+/** 中ボスの重い扉の見た目（新しい絵は足さず、ボスの門の絵を鉄の色にして、紫の縁と光を付ける） */
+const HEAVY = { border: '#d9a2ff', glow: '0 0 18px rgba(200,130,255,.55), inset 0 0 12px rgba(120,60,180,.6)', filter: 'saturate(.45) brightness(.82)' };
+
+/** 予兆の印（魔物の群れ＝剣・強敵＝どくろ・宝＝宝石・休憩＝焚き火・イベント＝星）。扉の上でゆっくり光る */
+export const OMEN_ICONS: Record<DoorOmen, typeof Swords> = { danger: Swords, elite: Skull, treasure: Gem, rest: Flame, mystery: Sparkles };
 export function OmenMark({ omen, className = 'absolute left-1/2 top-[6%] -translate-x-1/2' }: { omen: DoorOmen; className?: string }) {
   const Icon = OMEN_ICONS[omen];
   const c = OMEN_INFO[omen].color;
@@ -203,14 +211,19 @@ export function corridorArt(dungeonId: string | undefined, background: string): 
 /** 見える範囲より奥まで続く通路の暗がり（真っ黒ではなく、奥へ溶けていく暗さ） */
 const FAR: CSSProperties = { background: 'radial-gradient(ellipse at 50% 50%, #0d0b09 0%, #050404 70%)' };
 
+/** 通路の1マスの大きさ（通路の幅・高さ・奥行き）。画面の小さい方の辺に合わせる */
+export const viewUnit = (width: number, height: number) => Math.max(120, Math.min(width * 0.92 || 300, height * 0.95 || 300));
+
 /** 一人称の通路 */
-export function DungeonView({ run, background, opening, omens, main = true, onDoor }: {
+export function DungeonView({ run, background, opening, openingRoomId, doors, main = true, onDoor }: {
   run: DungeonRun;
   background: string;
-  /** 正面の扉が開く演出の秒数（扉が開く演出の時だけ） */
+  /** 扉が開く演出の秒数（扉が開く演出の時だけ） */
   opening?: number;
-  /** 扉の気配（部屋のID → 種類） */
-  omens?: Record<string, DoorOmen>;
+  /** 開く扉の部屋（扉の壁の構図の時。無ければ正面の扉） */
+  openingRoomId?: string;
+  /** 扉の壁の構図で描く扉（選択肢と同じ順番。通路で扉を選ぶ時。無ければマス目の視界で描く） */
+  doors?: WallDoor[];
   /** 画面に出ている方の景色か（演出用の2枚目は false。確認スクリプトの目印を付けない） */
   main?: boolean;
   /** 扉をタップした（部屋のID） */
@@ -218,10 +231,16 @@ export function DungeonView({ run, background, opening, omens, main = true, onDo
 }) {
   const tapOf = (roomId?: string) => (onDoor && roomId ? () => onDoor(roomId) : undefined);
   const [ref, size] = useElementSize<HTMLDivElement>();
-  const { slices, end } = viewSlices(run);
+  // 扉を選ぶ時は、選択肢と同じ数・同じ並びの扉を必ず描く（マス目の視界からは描かない）
+  const wall = doors?.length ? doorWallView(doors) : undefined;
+  const { slices, end } = wall ?? viewSlices(run);
+  /** 扉に渡すもの（予兆の色・重い扉・開く演出・確認用の目印） */
+  const doorProps = (roomId?: string) => {
+    const d = wall && roomId ? doors!.find((x) => x.roomId === roomId) : undefined;
+    return { omen: d?.omen, heavy: d?.kind === 'midboss', roomId: d?.roomId, opening: opening && d && (openingRoomId ?? end.roomId) === d.roomId ? opening : undefined };
+  };
   const art = corridorArt(run.dungeonId, background);
-  // 1マスの大きさ（通路の幅・高さ・奥行き）。画面の小さい方の辺に合わせる
-  const U = Math.max(120, Math.min(size.width * 0.92 || 300, size.height * 0.95 || 300));
+  const U = viewUnit(size.width, size.height);
   const dim = corridorShadeScale(art);
   const shade = (d: number) => Math.min(0.85, 0.12 + d * 0.2) * dim;
   // 面は1枚ずつ同じカメラ（perspective）で遠近をかけ、奥から手前の順に描く。
@@ -264,8 +283,10 @@ export function DungeonView({ run, background, opening, omens, main = true, onDo
         const ahead = side === 'left' ? s.leftAhead : s.rightAhead;
         const shA = Math.min(0.9, shade(s.depth + 1) + 0.15 * dim);
         const aheadId = side === 'left' ? s.leftAheadRoomId : s.rightAheadRoomId;
+        // 扉の壁の構図: 手前のマスの口の先は描かない（奥のマスへ続く広間）
+        if (wall && !ahead) continue;
         if (ahead && ahead !== 'far' && ahead !== 'dark')
-          face(`${side}a${s.depth}`, `translate3d(${sign * U}px, 0, ${-(s.depth + 1) * U}px)`, surface(art, 'wall', shA), ahead === 'wall' ? null : <Door bg={art} themeBg={background} face={ahead} shade={shA} omen={omens?.[aheadId ?? '']} onTap={tapOf(aheadId)} />, s.depth + 1.2);
+          face(`${side}a${s.depth}`, `translate3d(${sign * U}px, 0, ${-(s.depth + 1) * U}px)`, surface(art, 'wall', shA), ahead === 'wall' ? null : <Door bg={art} themeBg={background} face={ahead} shade={shA} {...doorProps(aheadId)} onTap={tapOf(aheadId)} />, s.depth + 1.2);
         else face(`${side}a${s.depth}`, `translate3d(${sign * U}px, 0, ${-(s.depth + 1) * U}px)`, ahead === 'dark' || f === 'dark' ? surface(art, 'wall', Math.min(0.9, shA + 0.3)) : FAR, undefined, s.depth + 1.2);
         continue;
       }
@@ -273,7 +294,7 @@ export function DungeonView({ run, background, opening, omens, main = true, onDo
         `${side}${s.depth}`,
         `translate3d(${(sign * U) / 2}px, 0, ${z}px) rotateY(${rot}deg)`,
         surface(art, 'wall', sh),
-        f === 'wall' ? (s.torch && s.depth <= 2 && side === (s.depth % 2 ? 'right' : 'left') ? <Torch bg={background} /> : null) : <Door bg={art} themeBg={background} face={f} shade={sh} omen={omens?.[(side === 'left' ? s.leftRoomId : s.rightRoomId) ?? '']} onTap={tapOf(side === 'left' ? s.leftRoomId : s.rightRoomId)} />,
+        f === 'wall' ? (s.torch && s.depth <= 2 && side === (s.depth % 2 ? 'right' : 'left') ? <Torch bg={background} /> : null) : <Door bg={art} themeBg={background} face={f} shade={sh} {...doorProps(side === 'left' ? s.leftRoomId : s.rightRoomId)} onTap={tapOf(side === 'left' ? s.leftRoomId : s.rightRoomId)} />,
         s.depth + 0.45,
       );
     }
@@ -282,12 +303,12 @@ export function DungeonView({ run, background, opening, omens, main = true, onDo
   const endZ = -end.depth * U;
   const endShade = shade(end.depth);
   // 正面の扉: 目の前（1マス先）の扉はもう扉の前にいるのでタップしない（下の「扉を開ける」で開ける）
-  const endTap = end.depth > 1 ? tapOf(end.roomId) : undefined;
+  const endTap = end.depth > 1 || wall ? tapOf(end.roomId) : undefined;
   if (end.face === 'far') face('end', `translate3d(0, 0, ${endZ}px)`, FAR, undefined, 99);
   else if (end.face === 'dark') face('end', `translate3d(0, 0, ${endZ}px)`, surface(art, 'wall', 0.88), undefined, 99);
-  else face('end', `translate3d(0, 0, ${endZ}px)`, surface(art, 'wall', endShade), end.face === 'wall' ? null : <Door bg={art} themeBg={background} face={end.face} shade={endShade} opening={opening} omen={omens?.[end.roomId ?? '']} onTap={endTap} />, 99);
+  else face('end', `translate3d(0, 0, ${endZ}px)`, surface(art, 'wall', endShade), end.face === 'wall' ? null : <Door bg={art} themeBg={background} face={end.face} shade={endShade} {...(wall ? doorProps(end.roomId) : { opening })} onTap={endTap} />, 99);
   return (
-    <div ref={ref} className="absolute inset-0 overflow-hidden" style={{ background: themeOf(background).ceil }} data-dungeon-view={main ? '' : undefined} data-end={main ? end.face : undefined}>
+    <div ref={ref} className="absolute inset-0 overflow-hidden" style={{ background: themeOf(background).ceil }} data-dungeon-view={main ? '' : undefined} data-end={main ? end.face : undefined} data-door-wall={main && wall ? doors!.length : undefined}>
       {[...faces].sort((a, b) => b.dist - a.dist).map((f) => f.node)}
       {/* 奥ほど暗く・まわりを少し暗く */}
       <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 50%, transparent 35%, rgba(0,0,0,.55) 100%)' }} />

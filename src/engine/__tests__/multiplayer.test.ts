@@ -29,11 +29,8 @@ function inTemple() {
   g = run(g, { type: 'WORLD_INVITE_ANSWER', playerId: 'P2', heroId: 'h1', accept: true });
   g = run(g, { type: 'WORLD_INTERACT', playerId: 'P1', heroId: 'h0', party: ['h0', 'h1'] });
   expect(g.expeditions![0].heroes).toEqual(['h0', 'h1']);
-  // 2人とも入ったので、ワールドターンが進んでダンジョンの番。判定するキャラをみんなで決めてから、探索力を決める
+  // 2人とも入ったので、ワールドターンが進んでダンジョンの番（すぐ扉を選べる）
   const x = g.expeditions![0].id;
-  g = run(g, inScene(x, { type: 'VOTE', playerId: 'P1', command: { type: 'EXPLORE_ROLLER', playerId: 'P1', heroId: 'h0' } }));
-  g = run(g, inScene(x, { type: 'VOTE', playerId: 'P2', command: { type: 'EXPLORE_ROLLER', playerId: 'P2', heroId: 'h0' } }));
-  g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: 'P1', heroId: 'h0' }));
   return { g, x };
 }
 
@@ -77,7 +74,6 @@ describe('みんなで決める（ダンジョンの中）', () => {
     const t = tileOf(g, 'dungeon', 'emeraldTemple');
     g.world!.pos.h0 = g.world!.pos.h1 = t;
     g = run(g, { type: 'WORLD_INTERACT', playerId: 'P1', heroId: 'h0', party: ['h0', 'h1'] });
-    g = run(g, inScene(g.expeditions![0].id, { type: 'EXPLORE_ROLL', playerId: 'P1', heroId: 'h0' }));
     g = run(g, inScene(g.expeditions![0].id, { type: 'ENTER_ROOM', playerId: 'P1', roomId: 'r0c0' }));
     expect(viewOf(g, g.expeditions![0].id).dungeon!.currentRoomId).toBe('r0c0');
   });

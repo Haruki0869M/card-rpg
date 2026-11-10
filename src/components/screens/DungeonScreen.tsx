@@ -1,12 +1,13 @@
-// ===== ダンジョンの通路（第3段階: 歩いて回り、見た所が地図に描き足される。部屋の中身は扉を開けるまで分からない） =====
-// 段階B: 一人称の通路の絵（DungeonView）・右上のミニマップ（タップで大きな地図と「ここまで歩く」）・絵に重ねた歩くボタン
+// ===== ダンジョンの通路（抜本的な見直し 段階2: 扉1つ＝手番1回。扉の予兆（5色）を見て、次の扉を選ぶ） =====
+// 一人称の絵は「扉の壁」（選択肢と同じ数・同じ並びの扉。dungeon/doors.ts）・右上のミニマップ（タップで大きな地図）・下に扉のボタン
 import { VoteChips, VoteStatus } from '../ui/Votes';
 import { AnimatePresence, motion } from 'framer-motion';
-import { showVoteHint, moveGuide } from '../dungeon/hints';
-import { ArrowDown, ArrowUp, Backpack, Check, Coins, Compass, Crown, DoorClosed, DoorClosedLocked, Flame, Gift, Hand, LogOut, Menu, Sparkles, Swords, Skull, Users, X, Dices, Star } from 'lucide-react';
+import { showVoteHint } from '../dungeon/hints';
+import { ArrowDown, ArrowUp, Backpack, Check, Coins, Compass, Crown, DoorClosed, DoorClosedLocked, Eye, Flame, Gift, LogOut, Menu, Skull, Sparkles, Star, Swords, Users, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AnimatedDungeonView } from '../dungeon/DungeonAnim';
-import { corridorArt, OmenMark } from '../dungeon/DungeonView';
+import { corridorArt, OMEN_ICONS, OmenMark } from '../dungeon/DungeonView';
+import { doorChoices, wallDoors, type DoorChoice } from '../dungeon/doors';
 import { holdImages } from '../../art/images';
 import { DUNGEONS } from '../../data/dungeons';
 import { getItem } from '../../data/items';
@@ -15,26 +16,27 @@ import {
   currentVote,
   doorFront,
   doorOmen,
-  exploreRollerOf,
+  doorBeyond,
+  doorDepthBonus,
+  doorDetail,
+  doorKind,
+  omenOfType,
   canWatchHere,
-  exploreShared,
+  partySensesDoors,
   dungeonGrid,
   dungeonNavigator,
   OMEN_INFO,
-  type DoorOmen,
   exploredPercent,
   depthTier,
   DEPTH_TIER_NAME,
   dungeonRows,
   isLegacyLayout,
-  findPath,
   heroMaxHp,
   notVoted,
   partyGold,
   posOf,
   reachableRooms,
   retreatLoss,
-  statChance,
   voters,
   walkableKeys,
   activeCells,
@@ -44,12 +46,9 @@ import { BALANCE } from '../../data/balance';
 import { PLAYER_COLOR } from '../../data/theme';
 import { isLocalPlayer } from '../../store/battleConfig';
 import { useOnline } from '../../store/onlineStore';
-import { RollStrip } from '../ui/CheckPanel';
-import { DiceOverlay, DiceResult } from '../ui/DiceRoll';
 import { HeroFace } from '../ui/game';
 import { PetToken } from '../ui/PetToken';
-import { Eye, Minus, Plus } from 'lucide-react';
-import type { DungeonRun, Facing, GameState, Hero, Room } from '../../types';
+import type { DungeonRun, Facing, GameState, Room } from '../../types';
 import { useElementSize } from '../../hooks/useElementSize';
 import { LOCAL_PLAYER } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
@@ -58,6 +57,8 @@ import { PinBanner, PinChips } from '../ui/PinChips';
 import type { PinTarget } from '../../net/pins';
 import { getRoomType } from '../../data/rules';
 import { Bar, ItemIcon, Screen } from '../ui/game';
+
+export { doorChoices, type DoorChoice };
 
 /** 部屋のアイコン（部屋の種類のデータの icon のキー → アイコン）。新しいアイコンが要る時はここに1行足す */
 const ROOM_ICONS: Record<string, typeof Swords> = { swords: Swords, skull: Skull, crown: Crown, gift: Gift, sparkles: Sparkles, flame: Flame };
@@ -68,66 +69,87 @@ function roomStyle(type: string) {
   return { name: t.name, Icon: ROOM_ICONS[t.icon] ?? Sparkles, color: t.color, bg: t.bg, behavior: t.behavior, boss: !!t.battle?.boss };
 }
 
-/** 前にある扉の選択肢（左から右へ）。押すと、扉の前まで自動で歩いて、扉を開ける（扉1つで1回分。オーナーの案） */
-export interface DoorChoice {
-  room: Room;
-  /** ボタンの文字（例: 「左の扉を開ける」） */
-  label: string;
-}
+/** 重い扉（ボスの門・中ボスの扉）の色と文 */
+const GATE = {
+  boss: { color: '#ffcf4a', name: 'ボスの間', text: '奥から強い気配がする…', Icon: Crown },
+  midboss: { color: '#d9a2ff', name: '中ボスの間', text: '逃げられない強敵が待つ', Icon: Skull },
+} as const;
 
-/** 選べる扉（今の通路の、開けられる扉だけ。後ろの扉・通った扉・選ばなかった扉・入口は出さない）。左から右の順 */
-export function doorChoices(run: DungeonRun): DoorChoice[] {
-  const grid = dungeonGrid(run);
-  const rooms = reachableRooms(run)
-    .filter((r) => !r.cleared && r.id !== run.currentRoomId)
-    .map((r) => ({ r, c: grid.roomCell.get(r.id), f: doorFront(run, r.id) }))
-    .filter((x) => x.c && x.f && findPath(run, x.f))
-    .sort((a, b) => a.c!.x - b.c!.x)
-    .map((x) => x.r);
-  const n = rooms.length;
-  const pos = (i: number) => (n === 1 ? '正面' : n === 2 ? (i === 0 ? '左' : '右') : n === 3 ? ['左', '真ん中', '右'][i] : `左から${i + 1}番目`);
-  return rooms.map((room, i) => ({ room, label: `${pos(i)}の扉を開ける` }));
+/** 扉の予兆の見た目（色・名前・説明・印）。ボス・中ボスは重い扉 */
+export function doorLook(room: Room) {
+  const kind = doorKind(room);
+  if (kind !== 'door') return GATE[kind];
+  const omen = omenOfType(room.type) ?? 'mystery';
+  return { color: OMEN_INFO[omen].color, name: OMEN_INFO[omen].name, text: OMEN_INFO[omen].text, Icon: OMEN_ICONS[omen] };
 }
 
 /**
- * 扉のボタン（大きく。気配の色の縁・ボスの冠・「こっち！」の札・みんなの票）。
+ * 扉のボタン（予兆の色の縁・印・名前・ご褒美の説明・深層ボーナス・「こっち！」の札・みんなの票）。
+ * 先読みができる時は、説明の代わりに中身（敵の名前・宝箱の格・イベントの題）と、その先の扉の色が出る。
  * 押すと、その扉に票を入れる（1台なら、すぐ開く）。オンラインで手番でない人が押すと、票と一緒に「こっち！」の印も出る
  */
-function DoorButtons({ choices, ok, canPin, pins, omens, onOpen }: {
+function DoorButtons({ game, choices, ok, canPin, pins, onOpen }: {
+  game: GameState;
   choices: DoorChoice[];
-  /** 票を入れられるか（このパーティの番・サイコロの後・残りがある・演出中でない） */
+  /** 票を入れられるか（このパーティの番・演出中でない） */
   ok: boolean;
   canPin: boolean;
   pins: PinsApi;
-  omens: Record<string, DoorOmen>;
   onOpen: (roomId: string) => void;
 }) {
   if (!choices.length) return null;
   const many = choices.length >= 3;
+  const run = game.dungeon!;
   return (
-    <div className={`grid gap-1.5 ${choices.length === 1 ? 'grid-cols-1' : many ? 'grid-cols-3' : 'grid-cols-2'}`} data-door-choices={choices.length}>
-      {choices.map(({ room, label }) => {
-        const omen = omens[room.id];
-        const boss = roomStyle(room.type).boss;
+    <div className={`grid items-stretch gap-1.5 ${choices.length === 1 ? 'grid-cols-1' : many ? 'grid-cols-3' : 'grid-cols-2'}`} data-door-choices={choices.length}>
+      {choices.map(({ room, place, label }) => {
+        const look = doorLook(room);
+        const detail = doorDetail(game, room);
+        const beyond = doorBeyond(game, room);
+        const bonus = doorDepthBonus(run, room);
         const roomPins = pins.at({ kind: 'door', id: room.id });
         const cmd = { type: 'ENTER_ROOM', playerId: LOCAL_PLAYER, roomId: room.id } as const;
         return (
-          <div key={room.id} className="relative">
+          <div key={room.id} className="relative flex">
             <button
               onClick={() => onOpen(room.id)}
               disabled={!ok && !canPin}
-              className={`btn flex w-full flex-col items-center justify-center rounded-xl border-2 bg-black/70 px-1 text-amber-50 backdrop-blur-[2px] disabled:opacity-45 ${many ? 'h-14 text-[13px] leading-4' : 'h-14 text-[16px] leading-5'} font-bold`}
-              style={{ borderColor: roomPins.length ? PLAYER_COLOR[roomPins[0].seat] : omen ? OMEN_INFO[omen].color : 'rgba(255,215,106,.7)', boxShadow: omen ? `0 0 10px ${OMEN_INFO[omen].color}` : undefined }}
+              aria-label={`${label}（${look.name}）`}
+              className="btn flex min-h-14 w-full min-w-0 flex-col items-center justify-center rounded-xl border-2 bg-black/75 px-1 py-1 text-amber-50 backdrop-blur-[2px] disabled:opacity-45"
+              style={{ borderColor: roomPins.length ? PLAYER_COLOR[roomPins[0].seat] : look.color, boxShadow: `0 0 10px ${look.color}` }}
               data-door-choice={room.id}
+              data-door-omen={doorKind(room) === 'door' ? (omenOfType(room.type) ?? '') : doorKind(room)}
             >
-              <span className="flex items-center gap-1">
-                {boss ? <Crown size={many ? 15 : 18} className="shrink-0 text-amber-300" /> : <DoorClosed size={many ? 15 : 18} className="shrink-0 text-amber-200" />}
-                <span className="font-display">{label}</span>
+              <span className={`flex max-w-full items-center gap-1 font-bold ${many ? 'text-[13px] leading-4' : 'text-[15px] leading-5'}`}>
+                <look.Icon size={many ? 14 : 16} className="shrink-0" style={{ color: look.color }} />
+                <span className="font-display truncate">{place}</span>
                 <VoteChips cmd={cmd} />
               </span>
-              <span className="max-w-full truncate text-[12px] font-normal" style={{ color: omen ? OMEN_INFO[omen].color : '#a1a1aa' }}>
-                {boss ? '奥から強い気配がする…' : omen ? OMEN_TEXT[omen] : '中身は開けるまで分からない'}
+              <span className="max-w-full truncate text-[12px] leading-4 font-bold" style={{ color: look.color }} data-door-omen-name>
+                {look.name}
               </span>
+              {detail ? (
+                <span className="line-clamp-2 max-w-full text-center text-[12px] leading-4 text-zinc-100" data-door-detail>
+                  {detail}
+                </span>
+              ) : (
+                <span className="line-clamp-2 max-w-full text-center text-[12px] leading-4 text-zinc-300">{look.text}</span>
+              )}
+              {bonus && (
+                <span className="max-w-full truncate text-[12px] leading-4 font-bold text-amber-200" data-door-bonus>
+                  {bonus}
+                </span>
+              )}
+              {beyond.length > 0 && (
+                <span className="flex max-w-full items-center gap-1 text-[12px] leading-4 text-zinc-300" data-door-beyond={beyond.join(',')} aria-label={`その先: ${beyond.map((b) => (b === 'boss' || b === 'midboss' ? GATE[b].name : OMEN_INFO[b].name)).join('・')}`}>
+                  その先
+                  {beyond.map((b, i) => {
+                    const c = b === 'boss' || b === 'midboss' ? GATE[b].color : OMEN_INFO[b].color;
+                    const I = b === 'boss' || b === 'midboss' ? GATE[b].Icon : OMEN_ICONS[b];
+                    return <I key={i} size={13} className="shrink-0" style={{ color: c }} />;
+                  })}
+                </span>
+              )}
             </button>
             <PinChips pins={roomPins} className="absolute -top-2.5 left-1/2 z-10 -translate-x-1/2" />
           </div>
@@ -173,7 +195,7 @@ function MapCells({ run, cell, x0, yTop, left = 0, top = 0, only, target, onTap,
         const t = room ? roomStyle(room.type) : undefined;
         const openable = !!room && !known && reach.has(room.id);
         const omen = room && game ? doorOmen(game, room) : undefined;
-        // 中身は入るまで分からない（ボスの扉だけは見て分かる）
+        // 次の行の扉は予兆の色が付く。それより先の扉は、入るまで分からない（ボスの扉だけは見て分かる）
         const Icon = !room || !t ? null : known ? t.Icon : t.boss ? Crown : openable ? DoorClosed : DoorClosedLocked;
         const Tag = onTap ? 'button' : 'span';
         const cellPins = pinsOf?.(c) ?? [];
@@ -380,11 +402,10 @@ export function DungeonScreen() {
   const oldShape = isLegacyLayout(run);
   const depthRow = (vr.rooms.find((r) => r.id === vr.currentRoomId)?.row ?? -1) + 1;
   const nav = dungeonNavigator(game);
-  // 扉を選べるか（手番・担当・サイコロの後・残りがある）
+  // 手番のキャラの担当が、この端末の人か
   const myTurn = dungeonTurnHere(game) && !!nav && isLocalPlayer(nav.playerId);
-  const left = game.world ? (run.explore ?? 0) : Infinity;
-  // 扉の票はパーティのだれでも入れられる（全員一致で開く。今までの「扉を開ける」と同じ）
-  const canVote = dungeonTurnHere(game) && game.mode === 'dungeon' && !busy && (!game.world || (run.explore != null && left > 0));
+  // 扉の票はパーティのだれでも入れられる（全員一致で開く。扉1つ＝手番1回）
+  const canVote = dungeonTurnHere(game) && game.mode === 'dungeon' && !busy;
   // ピン（ステップ2）: オンラインで、手番のキャラの担当でない人は「こっち！」を伝えられる（開けるのは手番の人だけ）
   const pins = usePins();
   const canPin = pins.enabled && game.mode === 'dungeon' && !!nav && !isLocalPlayer(nav.playerId);
@@ -397,24 +418,12 @@ export function DungeonScreen() {
     }
     return '地図のマス';
   };
-  // 2人以上: サイコロの前に「だれが振る？」。決まった人がほかの端末の人なら、その人を待つ
-  const rollerId = exploreRollerOf(game);
-  const roller = rollerId ? game.heroes.find((h) => h.id === rollerId) : undefined;
-  const sharedRoll = exploreShared(game) && run.explore == null;
-  const guide =
-    myTurn && sharedRoll && game.mode === 'dungeon'
-      ? !roller
-        ? 'まずは下で、だれがサイコロを振るか決めよう'
-        : !isLocalPlayer(roller.playerId)
-          ? `${roller.name}がサイコロを振るのを待っています`
-          : moveGuide({ myTurn, inDungeon: true, explore: run.explore, onWorld: !!game.world })
-      : moveGuide({ myTurn, inDungeon: game.mode === 'dungeon', explore: run.explore, onWorld: !!game.world });
   const background = DUNGEONS.tryGet(run.dungeonId)?.background ?? run.background;
   // 通路の絵は入った時に読み込んで描ける形にし、手放さない（1歩ごとに描き直しても欠けない）
   const art = corridorArt(run.dungeonId, background);
   useEffect(() => holdImages(['wall', 'floor', 'ceiling', 'door', 'bossdoor'].map((p) => `dungeon/${art}-${p}`)), [art]);
-  // 扉の気配（第3段階C1）: 部屋のID → 種類
-  const omens = Object.fromEntries(run.rooms.map((r) => [r.id, doorOmen(game, r)]).filter(([, o]) => o)) as Record<string, DoorOmen>;
+  // 絵に描く扉（扉のボタンと同じ並び。絵とボタンが食い違わない）
+  const doors = useMemo(() => wallDoors(choices), [choices.map((c) => c.room.id).join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
   // 扉を選ぶ（票を入れる。全員一致で、扉の前まで自動で歩いて開ける。歩く様子は扉が開く演出の中で見せる）。
   // オンラインで手番でない人は、票と一緒に「こっち！」の印も出す（もう同じ扉を指していれば、印はそのまま）
   const openDoor = (roomId: string) => {
@@ -430,15 +439,13 @@ export function DungeonScreen() {
   const roomHere = vr.currentRoomId && dungeonGrid(vr).roomCell.get(vr.currentRoomId);
   const inRoom = roomHere && roomHere.x === pos.x && roomHere.y === pos.y ? vr.rooms.find((r) => r.id === vr.currentRoomId) : undefined;
   const inRoomStyle = inRoom ? roomStyle(inRoom.type) : undefined;
-  const diceKey = run.exploreDice ? `explore:${game.seed}:${run.dungeonId}:${run.exploreDice.seq}` : undefined;
-  const diceHero = run.exploreDice?.heroId ? game.heroes.find((h) => h.id === run.exploreDice!.heroId) : undefined;
   return (
     <Screen>
       {/* 名前は上の場面のタブに出ているので、タブが無い時だけ出す（帯は1本にまとめた） */}
       {!hasTabs && <div className="font-display text-outline shrink-0 truncate px-2 pt-1 text-[17px] leading-6 text-amber-100">{run.name}</div>}
       <div className="relative min-h-[200px] flex-1 overflow-hidden border-y border-amber-500/30">
         {/* 一人称の通路（いつも前を向く） */}
-        <AnimatedDungeonView run={runN} background={background} omens={omens} onShown={setShown} onDoor={tapDoor} />
+        <AnimatedDungeonView run={runN} background={background} doors={doors} onShown={setShown} onDoor={tapDoor} />
         {/* 左上: メニュー・探索度・お金（帯を1本にまとめた）と、部屋の中なら部屋の種類 */}
         <div className="absolute left-2 top-2 z-20 flex max-w-[calc(100%-118px)] flex-col items-start gap-1">
           <div className="flex items-center gap-1">
@@ -487,19 +494,11 @@ export function DungeonScreen() {
         </div>
         {/* 下端: 前にある扉のボタン（左から右へ）。押すと扉の前まで歩いて開ける。開けるのは手番のキャラの担当の人 */}
         <div className="absolute inset-x-2 bottom-2 z-10 flex flex-col gap-1" style={{ pointerEvents: busy ? 'none' : undefined }} data-dungeon-controls={busy ? 'busy' : 'ready'}>
-          {/* みんなの選択を待っている時の枠（扉・手番を終える など）。ボタンの上に置き、重ねない */}
+          {/* みんなの選択を待っている時の枠（扉・撤退）。ボタンの上に置き、重ねない */}
           {!showRetreat && <VoteStatus />}
-          {canPin && !guide && (
+          {canPin && (
             <div className="pointer-events-none flex justify-center" data-pin-guide>
               <span className="rounded-lg bg-black/75 px-2 py-0.5 text-[12px] leading-4 text-sky-100">扉のボタン・地図のマスを押すと、手番の人に「こっち！」と伝えられます</span>
-            </div>
-          )}
-          {guide && (
-            <div className="pointer-events-none flex justify-center" data-move-guide>
-              <span className="move-guide flex items-center gap-1 rounded-lg border border-amber-300/60 bg-black/80 px-2 py-0.5 text-[12px] leading-4 font-bold text-amber-100">
-                {guide}
-                <ArrowDown size={14} className="shrink-0 text-amber-300" />
-              </span>
             </div>
           )}
           {choices.length >= 2 && canVote && (
@@ -507,12 +506,11 @@ export function DungeonScreen() {
               <span className="rounded-lg bg-black/70 px-2 py-0.5 text-[12px] leading-4 text-amber-300/90">1つ開けると、ほかの扉は閉ざされます</span>
             </div>
           )}
-          <DoorButtons choices={choices} ok={canVote} canPin={canPin} pins={pins} omens={omens} onOpen={openDoor} />
+          <DoorButtons game={game} choices={choices} ok={canVote} canPin={canPin} pins={pins} onOpen={openDoor} />
         </div>
         {showMap && <MapOverlay run={run} onClose={() => setShowMap(false)} myTurn={myTurn} pins={pins} canPin={canPin} pinsOf={pinsOf} />}
       </div>
-      <DiceOverlay dice={run.exploreDice} diceKey={diceKey} title={`${diceHero?.name ?? ''}の探索のサイコロ（選べる扉の数）`} />
-      <ExplorePanel busy={busy} />
+      <ScoutBar busy={busy} />
       {/* パーティ（顔と細いHP）と、装備・道具・撤退を1行に */}
       <div className="flex shrink-0 items-center gap-1 px-2 pt-1.5 pb-3" data-dungeon-bar>
         <div className="flex min-w-0 flex-1 gap-0.5 overflow-x-auto">
@@ -595,134 +593,79 @@ export function DungeonScreen() {
   );
 }
 
-/** 気配の説明（目の前の扉） */
-const OMEN_TEXT: Record<DoorOmen, string> = {
-  danger: '奥から危険な気配がする…',
-  treasure: 'きらりと財宝の気配がする',
-  rest: '穏やかな安らぎの気配がする',
-  mystery: '不思議な気配がする…',
-};
+/** このダンジョンのパーティの番か（世界マップが無いシナリオは、いつでも） */
+export const dungeonTurnHere = (game: GameState) => !game.world || (game.party ?? []).includes(game.world.turn);
 
-/** 周囲の警戒（第3段階C1）: 歩数2・感知の判定。成功1で開けられる扉の場所と気配、完全成功で次の戦闘に応援 */
-function WatchPanel({ onClose }: { onClose: () => void }) {
+/**
+ * 周囲の警戒（オーナーの決定 2-A）: キャラを1人選び、そのキャラのフォーカス1を払う。判定は無い。
+ * この通路にいる間、扉の先の中身（敵の名前・宝箱の格・イベントの題）と、その先の扉の色が分かる
+ */
+function ScoutPicker({ onClose }: { onClose: () => void }) {
   const game = useBattle((s) => s.game)!;
   const dispatchGame = useBattle((s) => s.dispatchGame);
-  const [focus, setFocus] = useState(0);
-  const nav = dungeonNavigator(game);
-  // 判定するキャラ: 手番のキャラの担当の人のキャラのうち、感知が一番高いキャラ
-  const judge = game.heroes
-    .filter((h) => (game.party ?? []).includes(h.id) && h.hp > 0 && nav && h.playerId === nav.playerId)
-    .sort((a, b) => statChance(b, 'per') - statChance(a, 'per'))[0];
-  if (!judge) return null;
-  const slots = BALANCE.dungeonWatchSlots;
-  const max = Math.min(slots, judge.focus);
-  const f = Math.min(focus, max);
+  // 払えるキャラ: この端末の人のキャラ（パーティの中で、生きている）
+  const mine = game.heroes.filter((h) => (game.party ?? game.heroes.map((x) => x.id)).includes(h.id) && h.hp > 0 && !h.retired && isLocalPlayer(h.playerId));
+  const cost = BALANCE.dungeonScoutFocus;
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60" onClick={onClose} data-watch-panel>
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60" onClick={onClose} data-scout-panel>
       <div className="panel panel-gold-edge m-2 w-full max-w-[464px] rounded-xl p-3" onClick={(e) => e.stopPropagation()}>
         <div className="font-display flex items-center gap-1.5 text-[18px] text-sky-100">
-          <Eye size={18} /> 周囲の警戒（扉の数は使わない）
+          <Eye size={18} /> 周囲の警戒（フォーカス{cost}）
         </div>
         <div className="mt-1 text-[13px] leading-5 text-zinc-300">
-          {judge.name}の感知{statChance(judge, 'per')}%×{slots}枠で判定する。この通路で1回だけ。
-          <span className="block">成功1つ: 開けられる扉の場所と気配が分かる</span>
-          <span className="block">成功2つ: さらに身構えて、次の戦闘で全員に「応援」</span>
+          だれかのフォーカスを{cost}払うと、この通路にいる間、扉の先が読めます（判定なし・この通路で1回だけ）。
+          <span className="block">・扉の先の中身（敵の名前・宝箱の種類・イベントの名前）</span>
+          <span className="block">・その先の扉の色</span>
         </div>
-        <div className="mt-2 flex items-center justify-center gap-2 text-[13px]">
-          <button onClick={() => setFocus(Math.max(0, f - 1))} disabled={f <= 0} aria-label="フォーカスを減らす" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-lg">
-            <Minus size={18} />
-          </button>
-          <span>
-            フォーカス <b className="text-amber-200">{f}</b>（残り{judge.focus}）
-          </span>
-          <button onClick={() => setFocus(Math.min(max, f + 1))} disabled={f >= max} aria-label="フォーカスを増やす" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-lg">
-            <Plus size={18} />
-          </button>
+        <div className="mt-2 flex flex-col gap-1">
+          {mine.map((h) => (
+            <button
+              key={h.id}
+              disabled={h.focus < cost}
+              onClick={() => {
+                onClose();
+                dispatchGame({ type: 'DUNGEON_SCOUT', playerId: h.playerId, heroId: h.id });
+              }}
+              className="btn btn-dark flex h-12 items-center gap-2 rounded-lg px-2 text-left disabled:opacity-40"
+              data-scout-hero={h.id}
+            >
+              <HeroFace hero={h} size={32} />
+              <span className="min-w-0 flex-1 truncate text-[14px] font-bold">
+                <span className="mr-1 rounded px-1 text-[12px] text-black" style={{ background: PLAYER_COLOR[h.playerId] }}>
+                  {h.playerId}
+                </span>
+                {h.name}
+              </span>
+              <span className="flex shrink-0 items-center gap-0.5 text-[13px] text-amber-200 tabular-nums">
+                <Star size={13} className="fill-amber-400/70 text-amber-300" />
+                {h.focus < cost ? 'フォーカスなし' : `${h.focus} → ${h.focus - cost}`}
+              </span>
+            </button>
+          ))}
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <button onClick={onClose} className="btn btn-dark h-12 rounded-lg font-bold">
-            やめる
-          </button>
-          <button
-            onClick={() => {
-              onClose();
-              dispatchGame({ type: 'DUNGEON_WATCH', playerId: judge.playerId, heroId: judge.id, focusUsed: f });
-            }}
-            className="btn btn-gold font-display h-12 rounded-lg text-[17px]"
-          >
-            警戒する
-          </button>
-        </div>
+        <button onClick={onClose} className="btn btn-dark mt-2 h-12 w-full rounded-lg font-bold">
+          やめる
+        </button>
       </div>
     </div>
   );
 }
 
-/** このダンジョンのパーティの番か（世界マップが無いシナリオは、いつでも） */
-export const dungeonTurnHere = (game: GameState) => !game.world || (game.party ?? []).includes(game.world.turn);
-
-/** 「だれが振る？」（ダンジョンのパーティに2人以上のプレイヤーがいる時。全員が同じキャラを選ぶと決まる。宝箱の開け役と同じ形）。
- * サイコロの目はだれが振っても同じ確率。違うのは、振り直しに使うフォーカスが残っているか */
-function ExploreRollerPicker({ heroes, chosen }: { heroes: Hero[]; chosen?: string }) {
-  const dispatchGame = useBattle((s) => s.dispatchGame);
-  useOnline((s) => s.tick);
-  const best = [...heroes].sort((a, b) => b.focus - a.focus)[0]?.id;
-  const seatName = (h: Hero) => useOnline.getState().room?.seatName(h.playerId);
-  return (
-    <div className="mx-2 mt-1.5 flex shrink-0 flex-col gap-1" data-explore-picker>
-      <div className="text-[12px] leading-4 text-zinc-300">だれが探索のサイコロ（1〜{BALANCE.exploreDiceSides}）を振る？ 全員が同じ人を選ぶと決まります（振った人のフォーカス1で1回振り直せる）</div>
-      {heroes.map((h) => {
-        const cmd = { type: 'EXPLORE_ROLLER', playerId: LOCAL_PLAYER, heroId: h.id } as const;
-        return (
-          <div key={h.id} className={`flex items-center gap-1.5 rounded-lg p-1 ${chosen === h.id ? 'bg-amber-500/25 ring-1 ring-amber-300' : 'bg-black/35'}`} data-explore-roller={h.id}>
-            <HeroFace hero={h} size={30} />
-            <span className="min-w-0 flex-1 leading-4">
-              <span className="flex items-center gap-1 text-[13px] font-bold">
-                <span className="rounded px-1 text-[12px] text-black" style={{ background: PLAYER_COLOR[h.playerId] }}>
-                  {h.playerId}
-                </span>
-                <span className="truncate">{h.name}</span>
-                {h.id === best && h.focus > 0 && <span className="shrink-0 text-[12px] text-amber-300">おすすめ</span>}
-              </span>
-              <span className="block truncate text-[12px] text-zinc-300 tabular-nums">
-                {h.focus > 0 ? `フォーカス${h.focus}（振り直しできる）` : 'フォーカスなし（振り直しできない）'}
-                {seatName(h) ? `・${seatName(h)}` : ''}
-              </span>
-            </span>
-            <button onClick={() => dispatchGame(cmd)} className={`btn flex h-11 shrink-0 items-center gap-0.5 rounded-lg px-2 text-[13px] font-bold ${chosen === h.id ? 'btn-gold' : 'btn-dark'}`}>
-              <Hand size={14} />
-              任せる
-              <VoteChips cmd={cmd} />
-            </button>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 /**
- * 探索のサイコロ（オーナーの案）: ダンジョンのパーティも世界マップの手番の順番で動く。
- * 番が来たらサイコロ（1〜3）を振り、出た目の数だけ扉を選べる。扉1つで1（歩く距離は数えない）。使い切るか「手番を終える」で次の人の番。
- * 2人以上のプレイヤー: 先に「だれが振る？」をみんなで決め、決まったキャラの担当の人が振る（オーナーの案）。
- * 残りが0でも、この通路でまだ「警戒」していなければ、警戒と「手番を終える」が残る
+ * 扉のボタンの下の帯: だれの番か（ほかの人の番の時）／先読みの状態と「周囲の警戒」。
+ * 扉1つ＝手番1回: 扉を開けて部屋を済ませたら、この組の番は終わる（全員がダンジョンの中なら、すぐ次の扉を選べる）
  */
-function ExplorePanel({ busy }: { busy: boolean }) {
+function ScoutBar({ busy }: { busy: boolean }) {
   const game = useBattle((s) => s.game)!;
-  const dispatchGame = useBattle((s) => s.dispatchGame);
   useOnline((s) => s.tick);
-  const [watching, setWatching] = useState(false);
-  const [pickAgain, setPickAgain] = useState(false);
+  const [picking, setPicking] = useState(false);
   const run = game.dungeon!;
-  const chosenId = exploreRollerOf(game);
-  useEffect(() => setPickAgain(false), [chosenId]);
-  if (!game.world) return null;
   const w = game.world;
-  if (!dungeonTurnHere(game)) {
+  if (w && !dungeonTurnHere(game)) {
     const t = game.heroes.find((h) => h.id === w.turn);
     const seat = t ? useOnline.getState().room?.seatName(t.playerId) : undefined;
     return (
-      <div className="mx-2 mt-2 flex shrink-0 items-center gap-2 rounded-xl border border-sky-300/40 bg-black/50 px-3 py-2 text-[13px]">
+      <div className="mx-2 mt-2 flex shrink-0 items-center gap-2 rounded-xl border border-sky-300/40 bg-black/50 px-3 py-2 text-[13px]" data-dungeon-wait>
         {t && <HeroFace hero={t} size={30} />}
         <span className="min-w-0 flex-1">
           {t ? (
@@ -736,98 +679,50 @@ function ExplorePanel({ busy }: { busy: boolean }) {
           ) : (
             'ほかの人の番です'
           )}
-          <span className="block text-[12px] text-zinc-400">順番が来たら、このダンジョンを探索できます</span>
+          <span className="block text-[12px] text-zinc-400">順番が来たら、次の扉を選べます</span>
         </span>
       </div>
     );
   }
-  const party = game.heroes.filter((h) => (game.party ?? []).includes(h.id) && h.hp > 0);
-  const nav = dungeonNavigator(game);
-  const watchedHere = !canWatchHere(run);
-  const canWatch = !!nav && isLocalPlayer(nav.playerId) && game.mode === 'dungeon' && !watchedHere && run.explore != null;
-  const shared = exploreShared(game);
-  const chosen = chosenId ? party.find((h) => h.id === chosenId) : undefined;
-  // 1人の時に振るキャラ: この端末のキャラのうち、フォーカスが一番多いキャラ（振り直しに使える）
-  const roller = shared ? chosen : party.filter((h) => isLocalPlayer(h.playerId)).sort((a, b) => b.focus - a.focus)[0];
-  if (run.explore == null) {
-    if (game.mode !== 'dungeon') return null;
-    // 2人以上: まず「だれが振る？」
-    if (shared && (!chosen || pickAgain)) return <ExploreRollerPicker heroes={party} chosen={chosen?.id} />;
-    // 決まったキャラが、ほかの人の担当: 待つ
-    if (shared && chosen && !isLocalPlayer(chosen.playerId)) {
-      return (
-        <div className="mx-2 mt-1.5 flex shrink-0 items-center gap-2 rounded-xl border border-sky-300/40 bg-black/50 px-2 py-1.5 text-[13px]" data-explore-wait>
-          <HeroFace hero={chosen} size={30} />
-          <span className="min-w-0 flex-1 leading-4">
-            <b>{chosen.name}</b>がサイコロを振ります
-            <span className="block text-[12px] text-zinc-400">{useOnline.getState().room?.seatName(chosen.playerId) ?? chosen.playerId}さんが振るのを待っています</span>
-          </span>
-          <button onClick={() => setPickAgain(true)} className="btn btn-dark h-11 shrink-0 rounded-lg px-2 text-[12px] font-bold">
-            選び直す
-          </button>
-        </div>
-      );
-    }
-    if (!roller) return null;
-    return (
-      <div className="mx-2 mt-1.5 flex shrink-0 flex-col gap-0.5" data-explore-roll>
-        {shared && (
-          <div className="flex items-center gap-1.5 text-[12px] text-amber-100" data-explore-chosen>
-            <span className="min-w-0 flex-1">みんなで決めた振る人：<b>{roller.name}</b></span>
-            <button onClick={() => setPickAgain(true)} className="btn btn-dark h-11 shrink-0 rounded-lg px-2 text-[12px] font-bold">
-              選び直す
-            </button>
-          </div>
-        )}
-        <button
-          onClick={() => dispatchGame({ type: 'EXPLORE_ROLL', playerId: roller.playerId, heroId: roller.id })}
-          className="btn btn-gold font-display flex h-12 min-w-0 items-center justify-center gap-1.5 rounded-xl text-[17px]"
-          data-explore-roll-button
-        >
-          <Dices size={19} /> サイコロを振る
-          <span className="text-[13px] tabular-nums">扉 1〜{BALANCE.exploreDiceSides}つ</span>
-        </button>
-        <span className="text-center text-[12px] leading-4 text-zinc-400">
-          出た目の数だけ扉を選べる・{roller.name}のフォーカス1で1回振り直せる（残り{roller.focus}）
-        </span>
-      </div>
-    );
-  }
-  const d = run.exploreDice;
-  const diceHero = d?.heroId ? party.find((h) => h.id === d.heroId) : undefined;
-  const canReroll = !!d && !d.rerolled && run.explore === d.total && game.mode === 'dungeon' && !!diceHero && isLocalPlayer(diceHero.playerId) && diceHero.focus >= 1;
+  if (game.mode !== 'dungeon' || !reachableRooms(run).some((r) => !r.cleared)) return null;
+  const senses = partySensesDoors(game);
+  const watched = !canWatchHere(run);
+  const mine = game.heroes.filter((h) => (game.party ?? game.heroes.map((x) => x.id)).includes(h.id) && h.hp > 0 && !h.retired && isLocalPlayer(h.playerId));
+  const canScout = !senses && !watched && mine.some((h) => h.focus >= BALANCE.dungeonScoutFocus);
   return (
-    <div className="mx-2 mt-2 flex shrink-0 items-center gap-2 rounded-xl border border-amber-300/40 bg-black/50 px-2 py-1.5" style={{ pointerEvents: busy ? 'none' : undefined }} data-explore-left={run.explore}>
-      <div className="flex shrink-0 flex-col items-center rounded-lg bg-black/40 px-2 py-0.5">
-        <span className="text-[12px] text-zinc-400">選べる扉</span>
-        <b className="font-display text-[22px] leading-6 text-amber-200 tabular-nums">{run.explore}</b>
-      </div>
-      <div className="min-w-0 flex-1">
-        {watchedHere && run.watchRoll ? <RollStrip results={run.watchRoll} small /> : d && <DiceResult dice={d} unit="" />}
-        <div className="truncate text-[12px] leading-4 text-zinc-400">{run.explore > 0 ? '扉1つで1回分' : canWatch ? '選び終えた（警戒できる）' : '選び終えた'}</div>
-      </div>
-      {canReroll && (
-        <button onClick={() => diceHero && dispatchGame({ type: 'EXPLORE_REROLL', playerId: diceHero.playerId, heroId: diceHero.id })} className="btn btn-dark flex h-11 shrink-0 flex-col items-center justify-center rounded-lg px-2 text-[12px] leading-4 font-bold" data-reroll>
+    <div className="mx-2 mt-1.5 flex shrink-0 items-center gap-2 rounded-xl border border-amber-300/40 bg-black/50 px-2 py-1" style={{ pointerEvents: busy ? 'none' : undefined }} data-scout-bar={senses ? 'sense' : watched ? 'watched' : 'none'}>
+      <Eye size={18} className={`shrink-0 ${senses || watched ? 'text-sky-200' : 'text-zinc-500'}`} />
+      <span className="min-w-0 flex-1 text-[12px] leading-4 text-zinc-200">
+        {senses ? (
+          <>
+            <b className="text-sky-100">先読み中</b>（感知の高い仲間・フクロウ・霊感）
+            <span className="block text-zinc-400">扉の先の中身と、その先の扉の色が見えています</span>
+          </>
+        ) : watched ? (
+          <>
+            <b className="text-sky-100">警戒中</b>
+            <span className="block text-zinc-400">扉の先の中身と、その先の扉の色が見えています</span>
+          </>
+        ) : (
+          <>
+            扉を1つ選ぶと、部屋へ進みます
+            <span className="block text-zinc-400">警戒すると、扉の先の中身まで読めます</span>
+          </>
+        )}
+      </span>
+      {!senses && !watched && (
+        <button onClick={() => setPicking(true)} disabled={!canScout} className="btn btn-dark flex h-11 min-w-[72px] shrink-0 flex-col items-center justify-center rounded-lg px-2 text-[12px] leading-4 font-bold disabled:opacity-40" data-scout-open>
           <span className="flex items-center gap-0.5">
-            <Star size={11} className="fill-amber-400/70 text-amber-300" />1で
+            <Eye size={14} className="text-sky-200" />
+            警戒
           </span>
-          振り直す
+          <span className="flex items-center gap-0.5 text-amber-200">
+            <Star size={11} className="fill-amber-400/70 text-amber-300" />
+            {BALANCE.dungeonScoutFocus}
+          </span>
         </button>
       )}
-      <button
-        onClick={() => setWatching(true)}
-        disabled={!canWatch}
-        className="btn btn-dark flex h-11 min-w-[48px] shrink-0 flex-col items-center justify-center rounded-lg px-2 text-[12px] leading-4 font-bold disabled:opacity-40"
-        data-watch-open
-      >
-        <Eye size={15} className="text-sky-200" />
-        警戒
-      </button>
-      {watching && <WatchPanel onClose={() => setWatching(false)} />}
-      <button onClick={() => dispatchGame({ type: 'EXPLORE_END', playerId: LOCAL_PLAYER })} className="btn btn-dark h-11 shrink-0 rounded-lg px-3 text-[13px] font-bold" data-explore-end>
-        手番を終える
-        <VoteChips cmd={{ type: 'EXPLORE_END', playerId: LOCAL_PLAYER }} />
-      </button>
+      {picking && <ScoutPicker onClose={() => setPicking(false)} />}
     </div>
   );
 }

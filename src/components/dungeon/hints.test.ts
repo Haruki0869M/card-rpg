@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { moveGuide, showVoteHint } from './hints';
+import { showVoteHint } from './hints';
 import type { PlayerId } from '../../types';
 
 describe('ダンジョンの案内（フェーズ2-B）', () => {
@@ -14,14 +14,5 @@ describe('ダンジョンの案内（フェーズ2-B）', () => {
   });
   it('扉の案内: 1人だけの時は出さない', () => {
     expect(showVoteHint(['P1'], onlyP1, false)).toBe(false);
-  });
-  it('移動の案内: 判定の前・使い切った時だけ出す', () => {
-    const base = { myTurn: true, inDungeon: true, onWorld: true };
-    expect(moveGuide({ ...base, explore: null })).toContain('『サイコロを振る』');
-    expect(moveGuide({ ...base, explore: undefined })).toContain('『サイコロを振る』');
-    expect(moveGuide({ ...base, explore: 0 })).toContain('手番を終える');
-    expect(moveGuide({ ...base, explore: 3 })).toBeUndefined();
-    expect(moveGuide({ ...base, myTurn: false, explore: null })).toBeUndefined();
-    expect(moveGuide({ ...base, inDungeon: false, explore: null })).toBeUndefined();
   });
 });

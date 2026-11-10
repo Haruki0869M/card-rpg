@@ -68,7 +68,7 @@ describe('古い保存（40行のダンジョンの途中）', () => {
     const { g, x } = inTemple();
     makeOldShape(g.expeditions![0].dungeon!);
     // 前の版が保存していた項目（サイコロの残り）もそのまま
-    g.expeditions![0].dungeon!.explore = 2;
+    (g.expeditions![0].dungeon! as unknown as Record<string, unknown>).explore = 2;
     const saved = JSON.parse(JSON.stringify(g));
     expect(saved.version).toBe(GAME_VERSION);
     expect(GAME_VERSION).toBe(17);
