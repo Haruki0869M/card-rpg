@@ -37,6 +37,7 @@ import { useOnline } from '../../store/onlineStore';
 import { useHelp } from '../../store/help';
 import type { GameState, Hero, PlayerId, TimeOfDay } from '../../types';
 import { autoAgreeCommands } from './companionMove';
+import { PlayerTag, showOwners } from '../Sheets';
 import { DiceOverlay, DiceResult, bonusText } from '../ui/DiceRoll';
 import { Bar, HeroFace, Screen } from '../ui/game';
 import { WorldMap } from './WorldMap';
@@ -157,6 +158,9 @@ function PartyRow({ game }: { game: GameState }) {
   const openSheet = useBattle((s) => s.openSheet);
   const setScene = useBattle((s) => s.setScene);
   const w = game.world!;
+  const owners = showOwners(game);
+  // 「ステータス」で開くキャラ: 手番のキャラが自分のならそれ、ちがえば自分の最初のキャラ
+  const self = game.heroes.find((h) => h.id === w.turn && isLocalPlayer(h.playerId)) ?? game.heroes.find((h) => isLocalPlayer(h.playerId)) ?? game.heroes[0];
   return (
     <div className="flex shrink-0 items-center gap-1.5 bg-black/50 px-2 py-0.5" data-party-row>
       {game.heroes.map((h) => {
@@ -168,7 +172,7 @@ function PartyRow({ game }: { game: GameState }) {
         return (
           <button
             key={h.id}
-            onClick={() => (exp ? setScene(exp.id) : openSheet('party'))}
+            onClick={() => (exp ? setScene(exp.id) : openSheet('party', h.id))}
             aria-label={`${h.name}${status ? `（${status}）` : ''} HP${h.hp}/${max}`}
             className={`btn relative flex h-11 w-11 shrink-0 flex-col items-center justify-center ${w.acted.includes(h.id) && !active ? 'opacity-55' : ''}`}
           >
@@ -179,6 +183,11 @@ function PartyRow({ game }: { game: GameState }) {
               <Bar value={h.hp} max={max} color="linear-gradient(90deg,#22b45a,#7dffa8)" height={4} />
             </span>
             {exp && <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full border border-black bg-sky-400" />}
+            {owners && (
+              <span className="absolute right-[-3px] bottom-[5px]">
+                <PlayerTag hero={h} />
+              </span>
+            )}
             {!exp && canChangeNow(game, h) && (
               <span className="absolute -top-1 -left-1 flex h-[18px] w-[18px] items-center justify-center rounded-full border border-black bg-amber-300 text-[12px] font-bold text-black" aria-label="転職できます">
                 ↑
@@ -187,7 +196,21 @@ function PartyRow({ game }: { game: GameState }) {
           </button>
         );
       })}
-      <span className="ml-auto truncate text-[12px] text-zinc-400">タップで詳しく</span>
+      <button
+        onClick={() => openSheet('party', self.id)}
+        aria-label={`${self.name}のステータスを見る`}
+        className="btn ml-auto flex h-11 min-w-0 shrink items-center gap-1 rounded-lg border border-amber-200/40 bg-[#2a2040]/90 px-2 text-amber-100 shadow"
+        data-status-button
+      >
+        <HeroFace hero={self} size={22} />
+        <span className="flex min-w-0 flex-col items-start leading-[15px]">
+          <span className="text-[13px] font-bold whitespace-nowrap">ステータス</span>
+          <span className="max-w-[88px] truncate text-[12px] text-zinc-300">
+            {owners ? `${isOnlinePlay() && isLocalPlayer(self.playerId) ? '自分' : self.playerId}・` : ''}
+            {self.name}
+          </span>
+        </span>
+      </button>
     </div>
   );
 }

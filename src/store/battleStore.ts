@@ -139,6 +139,8 @@ interface StoreState {
   activeId: string;
   selection: Selection | null;
   sheet: Sheet;
+  /** パーティの窓で最初に見せるキャラ */
+  sheetHeroId: string | null;
   /** 冒険の放棄・リセットの確認 */
   confirmAbandon: boolean;
   /** 「ターン終了」の確認（この端末の担当で、まだ行動できる仲間がいる時だけ出す） */
@@ -176,7 +178,8 @@ interface StoreState {
   /** 道具を使う（userId = 袋の持ち主。戦闘中は操作中のキャラ） */
   usePouch: (itemUid: string, targetHeroId: string, userId?: string) => string | undefined;
   setSettings: (s: Partial<Settings>) => void;
-  openSheet: (s: Sheet) => void;
+  /** heroId: パーティの窓で最初に見せるキャラ（世界マップの顔を押した時など） */
+  openSheet: (s: Sheet, heroId?: string) => void;
   setConfirmAbandon: (v: boolean) => void;
   /** tone: error = 操作が通らなかった（音を変える。K6）、offline = 通信できなかった */
   showToast: (text: string, tone?: 'info' | 'error' | 'offline') => void;
@@ -655,6 +658,7 @@ export const useBattle = create<StoreState>((set, get) => {
     activeId: saved?.activeId ?? '',
     selection: null,
     sheet: null,
+    sheetHeroId: null,
     confirmAbandon: false,
     confirmEndTurn: false,
     rollFx: null,
@@ -939,7 +943,7 @@ export const useBattle = create<StoreState>((set, get) => {
       }
     },
 
-    openSheet: (sheet) => set({ sheet, selection: sheet ? null : get().selection }),
+    openSheet: (sheet, heroId) => set({ sheet, sheetHeroId: heroId ?? null, selection: sheet ? null : get().selection }),
     setConfirmAbandon: (v) => set({ confirmAbandon: v }),
     setConfirmEndTurn: (v) => set({ confirmEndTurn: v }),
     showToast: (text, tone = 'info') => {
