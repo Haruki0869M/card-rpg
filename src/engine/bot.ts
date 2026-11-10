@@ -66,11 +66,29 @@ const pid = (g: GameState, heroId?: string): PlayerId => {
   return owner(heroId) ?? (!g.activeScene && g.world?.turn ? owner(g.world.turn) : undefined) ?? owner(g.party?.[0]) ?? g.heroes[0].playerId;
 };
 
+/** bot の作戦の切り替え（memo に入れて渡す） */
+export interface BotMemo {
+  interacted: Set<string>;
+  town?: string;
+  /**
+   * 人のようにまっすぐ進む（遊びの長さを測る用）。
+   * レベル上げをせず、次に入れる鍵のダンジョン → 最終ダンジョンへ向かう。町は回復・船の依頼の時だけ寄る。
+   */
+  straight?: boolean;
+}
+
 /** 目的のダンジョン（鍵の順。最後は魔王城） */
-function goalDungeon(g: GameState): string {
+function goalDungeon(g: GameState, straight = false): string {
   // シナリオのダンジョンを、鍵のダンジョン（敵のレベルが低い順）→最終ダンジョンの順に回る
   const list = DUNGEONS.forScenario(g.scenarioId).filter((d) => !d.random && (d.rewardKey || d.finale));
   const order = [...list.filter((d) => !d.finale).sort((a, b) => a.baseLevel - b.baseLevel), ...list.filter((d) => d.finale)].map((d) => d.id);
+  // まっすぐ進む時は、今の鍵で扉が開くダンジョンを先に選ぶ（開かない所へ向かって無駄足を踏まない）
+  const keys = g.world?.keys ?? [];
+  const open = (d: string) => (DUNGEONS.get(d).requiresKeys ?? []).every((k) => keys.includes(k));
+  if (straight) {
+    const next = order.find((d) => !g.clearedDungeons.includes(d) && open(d));
+    if (next) return next;
+  }
   return order.find((d) => !g.clearedDungeons.includes(d)) ?? order[order.length - 1];
 }
 
@@ -80,10 +98,10 @@ function tileOf(g: GameState, kind: string, id: string): number | undefined {
 }
 
 /** 世界マップでの行き先（HPが減ったら町、レベルが足りなければ近くの敵、それ以外は次のダンジョン） */
-function worldTarget(g: GameState, at: number): { tile: number; why: 'town' | 'grind' | 'dungeon' } {
+function worldTarget(g: GameState, at: number, straight = false): { tile: number; why: 'town' | 'grind' | 'dungeon' } {
   const w = g.world!;
   const heroes = livingHeroes(g);
-  const goal = goalDungeon(g);
+  const goal = goalDungeon(g, straight);
   const need = DUNGEONS.get(goal).baseLevel + (DUNGEONS.get(goal).finale ? 1 : 0);
   const avgLv = heroes.reduce((n, h) => n + h.level, 0) / heroes.length;
   // 船がもらえる依頼がまだなら、まずその町へ（海を渡るシナリオ）
@@ -102,20 +120,20 @@ function worldTarget(g: GameState, at: number): { tile: number; why: 'town' | 'g
     });
     if (best !== undefined) return { tile: best, why: 'town' };
   }
-  if (avgLv < need) {
+  if (!straight && avgLv < need) {
     const near = w.wanderers.filter((x) => w.tiles[x.tile].seen).sort((a, b) => hexDistance(w, at, a.tile) - hexDistance(w, at, b.tile))[0];
     if (near && hexDistance(w, at, near.tile) <= 6) return { tile: near.tile, why: 'grind' };
   }
   return { tile: tileOf(g, 'dungeon', goal)!, why: 'dungeon' };
 }
 
-function worldStep(g: GameState, log: BotLog, memo: { interacted: Set<string> }): GameState {
+function worldStep(g: GameState, log: BotLog, memo: BotMemo): GameState {
   const w = g.world!;
   if (w.story) return send(g, { type: 'STORY_CONTINUE', playerId: pid(g) }, log);
   const h = findHero(g, w.turn)!;
   const p = pid(g, h.id);
   const at = w.pos[h.id];
-  const target = worldTarget(g, at);
+  const target = worldTarget(g, at, memo.straight);
   const key = `${w.worldTurn}:${h.id}:${at}`;
   // 目的地に着いたら入る（1手番に1回だけ）
   if (at === target.tile && !memo.interacted.has(key)) {
@@ -194,7 +212,7 @@ function equipBest(g: GameState, log: BotLog): GameState {
   return g;
 }
 
-export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<string>; town?: string }, inScene = false): GameState {
+export function botStep(g: GameState, log: BotLog, memo: BotMemo, inScene = false): GameState {
   // ダンジョンの場面があれば、先にそちらを進める（その場面を載せた冒険で次の操作を決めて、SCENE で送る）
   // 手番がダンジョンの中のキャラなら、そのダンジョンの場面を進める（世界マップがなければ、最初の場面）
   const exp = inScene ? undefined : g.world ? g.expeditions?.find((x) => x.heroes.includes(g.world!.turn)) : g.expeditions?.[0];
@@ -345,14 +363,14 @@ export function botStep(g: GameState, log: BotLog, memo: { interacted: Set<strin
       return send(g, { type: 'SHRINE_CHOOSE', playerId: pid(g, s.heroId), optionIndex: 0, heroId: s.heroId }, log);
     }
     case 'hub':
-      return send(g, { type: 'ENTER_DUNGEON', playerId: pid(g), dungeonId: goalDungeon(g) }, log);
+      return send(g, { type: 'ENTER_DUNGEON', playerId: pid(g), dungeonId: goalDungeon(g, memo.straight) }, log);
     default:
       return g;
   }
 }
 
 /** 次に送る操作を決める（状態は変えない）。何もすることがなければ null */
-export function botNextCommand(g: GameState, memo: { interacted: Set<string>; town?: string }): GameCommand | null {
+export function botNextCommand(g: GameState, memo: BotMemo): GameCommand | null {
   capture = [];
   try {
     botStep(g, { steps: 0, errors: [], modes: {} }, memo);
@@ -362,10 +380,10 @@ export function botNextCommand(g: GameState, memo: { interacted: Set<string>; to
   }
 }
 
-/** エンディングかゲームオーバーまで自動で遊ぶ */
-export function playToEnd(g: GameState, maxSteps = 60000): { game: GameState; log: BotLog } {
+/** エンディングかゲームオーバーまで自動で遊ぶ（opts.straight = 人のようにまっすぐ進む。BotMemo を参照） */
+export function playToEnd(g: GameState, maxSteps = 60000, opts: { straight?: boolean } = {}): { game: GameState; log: BotLog } {
   const log: BotLog = { steps: 0, errors: [], modes: {} };
-  const memo = { interacted: new Set<string>() };
+  const memo: BotMemo = { interacted: new Set<string>(), straight: opts.straight };
   let stuck = 0;
   for (; log.steps < maxSteps; log.steps++) {
     if (g.mode === 'ending' || g.mode === 'gameover') break;
