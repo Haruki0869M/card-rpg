@@ -16,7 +16,7 @@
 //                                           侵食度で終わらない時の「番の数・交代運転・入った回数」を数えられる（侵食度の設計用）
 //
 // 時間の見積もり: 操作1回あたりの秒数（下の SEC。カード6秒・移動5秒など）を全員分足した値。
-// docs/tasks/play-feedback-plan.md（測り方）・冒険の長さの測定（pacing）と同じ式（ただし戦闘の操作の数え方を直した。unwrap を参照）。
+// docs/archive/tasks/play-feedback-plan.md（測り方）・冒険の長さの測定（pacing）と同じ式（ただし戦闘の操作の数え方を直した。unwrap を参照）。
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { describe, it, vi } from 'vitest';

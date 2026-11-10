@@ -1,4 +1,4 @@
-// ===== 冒険の長さ・転職の速さの見直し（docs/tasks/play-feedback-plan.md §4・§5） =====
+// ===== 冒険の長さ・転職の速さの見直し（docs/archive/tasks/play-feedback-plan.md §4・§5） =====
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../data/balance';
 import { DUNGEONS } from '../../data/dungeons';

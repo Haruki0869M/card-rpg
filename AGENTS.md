@@ -8,7 +8,8 @@
 2. `spec.md` … 仕様書（とくに §2 デザイン指針、§6 ジョブ・転職・お供、§8 世界マップ）
 3. `docs/design-v2.md` … 量の目標・転職・お供・突発イベントの決定事項
 4. `docs/adding-content.md` … どこに何を書けば追加できるか
-5. `docs/tasks/` … 今やる作業の指示書（例: `docs/tasks/J3c-top-jobs.md`）
+5. `docs/STATUS.md` … 今の進み具合と決定事項（先頭の節が最新）
+6. `docs/tasks/` … 今やる作業の指示書・計画（済んだ物は `docs/archive/tasks/` に移してある）
 
 ## 作業の進め方（オーナーとの約束）
 - 作業の前に、何をするかを**日本語でわかりやすく**説明して、オーナーの「OK」を待つ。
@@ -30,12 +31,13 @@
 ```
 npm install            # 最初の1回
 npx tsc --noEmit       # 型チェック
-npx vitest run         # テスト（全部通ること）
+npx vitest run         # テスト（全部通ること。2026-11-10 時点で 924件成功・6件スキップ）
 npx vite build         # ビルド
 npm run dev            # 開発サーバー（ブラウザで http://localhost:5173/card-rpg/ ）
 ```
-画面の自動確認（任意。Playwright が必要）: `npx vite build && npx vite preview --port 4173` を起こしてから
-`node scripts/check-layout.mjs` / `node scripts/playthrough.mjs` / `node scripts/adventure.mjs` / `node scripts/jobchange.mjs` / `node scripts/pets.mjs`
+- このパソコンでは、重い確認（vitest の全体・ビルド・Playwright の画面の確認）は `node C:/dev/card-rpg-tools/heavy.mjs <コマンド>` を通して順番に動かす（同時に動かす数はオーナーの指示に従う）。
+- 画面の自動確認（Playwright）: `npx vite build && npx vite preview --port <自分の番号>` を起こしてから `URL=http://127.0.0.1:<番号>/card-rpg/ node scripts/<名前>.mjs`。どのスクリプトが何を見るかは `scripts/README.md` と `docs/HANDOFF.md` §4。
+- オンラインの確認（`online.mjs` など）は Firebase のエミュレーター（`npm run emulators`。Java 21 以上が要る）で。本番の Firebase には書かない。
 
 ## Git
 - 作業ブランチ: `ccr-d64a1cfc-debli5`
@@ -44,6 +46,7 @@ npm run dev            # 開発サーバー（ブラウザで http://localhost:5
 - 作業が終わったら、Claude に戻すためにバックアップを作る:
   `git bundle create ../card-rpg-from-codex.bundle --all`
 
-## 今の進み具合
-- 済: 戦闘・ダンジョン・世界マップ・シナリオ1・オンライン協力・UI刷新・転職の土台・基本8職・中位13職・スマート抽選・お供12種類・突発イベント11個
-- 次: J3c 最上位13職（`docs/tasks/J3c-top-jobs.md`）→ J3d 特殊10職 → J4 Midjourney の指示文 → K1〜K7（カード・装備・敵・シナリオの量産、伝承の書、効果音、調整）
+## 今の進み具合（2026-11-10）
+- 済: ジョブ44（基本8・中位13・最上位13・特殊10）・カード・装備・敵の量産・シナリオ7本・伝承の書・効果音とBGM・突発イベント20個・オンライン協力・扉を選ぶダンジョンと移動のサイコロ・見晴らしの塔と出現スポット（保存 v17）・箱庭の世界マップ（シナリオ1）・戦闘の見た目の改修。公開は Firebase Hosting で10回。
+- 次・残り: 運用テスト（いまはシナリオ1まで）・シナリオ2〜7の箱庭の絵・侵食度・経験値・転職の提案の値の最終決定（オーナーが遊んでから）。
+- 細かい最新の状態は `docs/STATUS.md` の先頭の節と `docs/HANDOFF.md` §3 を見る。

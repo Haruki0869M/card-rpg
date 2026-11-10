@@ -1,6 +1,6 @@
 # K4 作業書：夢幻の大迷宮（総集編）敵28体と絵の指示文（Codex 向け）
 
-シナリオ7「夢幻の大迷宮」の敵を作る。**この作業は、1〜6本目の敵がすべて入ってから始める**（過去の敵を再登場させるため）。先に `docs/tasks/K3-enemies.md`・`K4-frozen-enemies.md`・`K4-cursed-enemies.md` を読む（書き方・亜種の決まり・確認の方法・絵の指示文の形は同じ）。
+シナリオ7「夢幻の大迷宮」の敵を作る。**この作業は、1〜6本目の敵がすべて入ってから始める**（過去の敵を再登場させるため）。先に `docs/archive/tasks/K3-enemies.md`・`K4-frozen-enemies.md`・`K4-cursed-enemies.md` を読む（書き方・亜種の決まり・確認の方法・絵の指示文の形は同じ）。
 
 前提: `src/content/scenarios/dreamLabyrinth/` に `scenario.ts`・`map.ts`・`dungeons/`・`towns/`・`quests/`・`shrines/`・`events/`・`items/` がある（Claude が作成済み）。敵の組み合わせは**仮**（共通の敵）。この作業で本物に置き換える。
 

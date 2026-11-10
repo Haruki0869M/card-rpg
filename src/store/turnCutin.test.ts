@@ -1,4 +1,4 @@
-// 手番のカットイン（docs/tasks/turn-cutin.md）: 手番が移った時だけ出る。自分のキャラなら大きく、ほかの人のキャラなら小さなお知らせ
+// 手番のカットイン（docs/archive/tasks/turn-cutin.md）: 手番が移った時だけ出る。自分のキャラなら大きく、ほかの人のキャラなら小さなお知らせ
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createGame, WORLD_SCENE } from '../engine';
 import type { GameState, PlayerId } from '../types';

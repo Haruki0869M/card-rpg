@@ -1,6 +1,6 @@
 # K4 作業書：砂塵の王朝 敵28体と絵の指示文（Codex 向け）
 
-シナリオ4「砂塵の王朝」の敵を作る。**先に `docs/tasks/K3-enemies.md`・`docs/tasks/K4-frozen-enemies.md`・`docs/tasks/K4-cursed-enemies.md` を読む**（書き方・亜種の決まり・確認の方法・絵の指示文の形は同じ。この文書は、このシナリオだけの決め事）。
+シナリオ4「砂塵の王朝」の敵を作る。**先に `docs/archive/tasks/K3-enemies.md`・`docs/archive/tasks/K4-frozen-enemies.md`・`docs/archive/tasks/K4-cursed-enemies.md` を読む**（書き方・亜種の決まり・確認の方法・絵の指示文の形は同じ。この文書は、このシナリオだけの決め事）。
 
 前提: `src/content/scenarios/sandDynasty/` に `scenario.ts`・`map.ts`・`dungeons/`・`towns/`・`quests/`・`shrines/`・`events/`・`items/` がある（Claude が作成済み）。敵の組み合わせは**仮**（共通の敵）。この作業で本物に置き換える。
 
@@ -69,7 +69,7 @@
 
 ## 4. 絵の指示文
 
-`docs/art/prompts-enemies-sandDynasty.md` に書く（亜種は絵を使い回すので不要。**23体分**）。形は `docs/tasks/K4-cursed-enemies.md` の §4 と同じ（`--sref` 付き。持たせない物は `--no`）。このシナリオの雰囲気: 金色の砂、褪せた赤土、古い青銅と包帯の白。ミイラは包帯と錆びた金の装飾。石像は砂岩の質感。
+`docs/art/prompts-enemies-sandDynasty.md` に書く（亜種は絵を使い回すので不要。**23体分**）。形は `docs/archive/tasks/K4-cursed-enemies.md` の §4 と同じ（`--sref` 付き。持たせない物は `--no`）。このシナリオの雰囲気: 金色の砂、褪せた赤土、古い青銅と包帯の白。ミイラは包帯と錆びた金の装飾。石像は砂岩の質感。
 
 ## 5. 確認と報告
 

@@ -1,5 +1,5 @@
 // ===== 音の名前の一覧（K6） =====
-// docs/audio-list.md と docs/tasks/stage3-dungeon-plan.md §11 の ID をそのまま並べる。
+// docs/audio-list.md と docs/archive/tasks/stage3-dungeon-plan.md §11 の ID をそのまま並べる。
 // ファイルは src/assets/audio/<sfx|bgm|pet>/<ID>.mp3 に置くだけで鳴る（無ければ何もしない）。
 
 export const SFX_IDS = [

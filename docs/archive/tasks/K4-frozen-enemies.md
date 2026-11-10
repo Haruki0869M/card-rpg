@@ -1,6 +1,6 @@
 # K4 作業書：凍てつく王国 手順2「敵28体と絵の指示文」（Codex 向け）
 
-シナリオ2「凍てつく王国」の敵を作る。**先に `docs/tasks/K3-enemies.md` を全部読む**（書き方・亜種の決まり・絵の指示文の書き方は、そちらが正本）。この文書は、凍てつく王国だけの決め事。
+シナリオ2「凍てつく王国」の敵を作る。**先に `docs/archive/tasks/K3-enemies.md` を全部読む**（書き方・亜種の決まり・絵の指示文の書き方は、そちらが正本）。この文書は、凍てつく王国だけの決め事。
 
 前提（Claude が手順1で作成済み）: `src/content/scenarios/frozenKingdom/` に `scenario.ts`・`map.ts`・`dungeons/`・`towns/`・`quests/`・`shrines/`・`events/` がある。いまの敵の組み合わせは**仮**（共通の敵 goblinBrute など）。この作業で本物に置き換える。
 
