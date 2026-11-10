@@ -2,7 +2,7 @@
 // 部屋（src/net/room.ts）の知らせを受けて、冒険の状態（battleStore）に反映する。
 import { create } from 'zustand';
 import type { Backend } from '../net/backend';
-import { connectFirebase, emulatorFromUrl, onlineAvailable } from '../net/firebaseBackend';
+import { emulatorFromUrl, onlineAvailable } from '../net/onlineEnv';
 import { normalizeCode, Room, RoomError, type Slot, type Stamp } from '../net/room';
 import type { PlayerId } from '../types';
 import { setLocalPlayers } from './battleConfig';
@@ -64,11 +64,14 @@ function saveLast(code: string | null, name: string) {
 }
 
 let backendPromise: Promise<Backend> | null = null;
-/** Firebase につなぐ（URL の ?emu=1 でエミュレーター。?as=名前 で同じブラウザの別の端末としてつなぐ: テスト用） */
+/**
+ * Firebase につなぐ（URL の ?emu=1 でエミュレーター。?as=名前 で同じブラウザの別の端末としてつなぐ: テスト用）。
+ * Firebase の部品は大きいので、ここで初めて読み込む（1人で遊ぶ時は読まない。つなぐのはもともと待つ作りなので、流れは同じ）
+ */
 function backend(): Promise<Backend> {
   if (!backendPromise) {
     const as = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('as') : null;
-    backendPromise = connectFirebase({ emulatorHost: emulatorFromUrl(), appName: as ?? undefined });
+    backendPromise = import('../net/firebaseBackend').then((m) => m.connectFirebase({ emulatorHost: emulatorFromUrl(), appName: as ?? undefined }));
     backendPromise.catch(() => (backendPromise = null));
   }
   return backendPromise;
