@@ -41,15 +41,8 @@ function sameAbilityGroups(items: readonly ItemDef[]): string[][] {
  * 2026-11-11 の時点のデータを実際に読んで作った。
  */
 const KNOWN_SAME_ABILITY_GROUPS: string[][] = [
-  ['admiralCloak', 'dawnMantle', 'stardustArmor'],
   ['angelRobe', 'barnacleArmor', 'echoArmor', 'steelPlate'],
-  ['constellationStaff', 'pharaohStaff', 'teslaStaff'],
   ['everIceBracer', 'goldenAnchor', 'kingSignet', 'masterCore', 'sixWorldsBadge'],
-  ['gearGuardian', 'mummyWrappings'],
-  ['lighthouseScepter', 'springbringerScepter', 'starScepter'],
-  ['memoryStaff', 'tideStaff'],
-  ['sageScepter', 'sunScepter'],
-  ['sparkRing', 'stormRing'],
 ];
 
 describe('ラインナップの見張り（フェーズ1 1-E）', () => {

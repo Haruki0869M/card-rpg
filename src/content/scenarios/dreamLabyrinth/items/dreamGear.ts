@@ -12,19 +12,19 @@ export const dreamGear: ItemDef[] = [
   },
   {
     id: 'memoryStaff', name: '記憶の杖', slot: 'weapon', weaponType: 'staff', rarity: 'epic', icon: 'staff', scenario: 'dreamLabyrinth',
-    description: '魔法の完全成功で、味方全員がブロック3を得る。1ターンに1回。', stats: { int: 8, vit: 2 }, tags: ['magic', 'block'],
+    description: 'コスト2以上の魔法が完全成功すると、その効果がもう一度起きる。1回の戦闘で1回だけ。', stats: { int: 8, vit: 2 }, tags: ['magic', 'highCost'],
     cards: [{ cardId: 'wLightning', count: 2 }],
-    ability: { name: '記憶の守り', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'magic' }, { kind: 'oncePerTurn', key: 'memoryStaff' }], do: [{ kind: 'block', amount: 3, to: 'allies' }] } },
+    ability: { name: '追憶', description: 'コスト2以上の魔法カードが完全成功した時（1回の戦闘で1回まで）：使ったカードの効果をもう一度発動', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'magic' }, { kind: 'cardCost', min: 2 }, { kind: 'perBattle', key: 'memoryStaff', max: 1 }], do: [{ kind: 'repeatCard' }] } },
   },
   {
     id: 'lullabySpear', name: '子守歌の槍', slot: 'weapon', weaponType: 'spear', rarity: 'rare', icon: 'spear', scenario: 'dreamLabyrinth',
-    description: '眠りを誘う穂先を持つ槍。力のある者に馴染む。', stats: { str: 5, dex: 3 }, tags: ['physical'],
-    cards: [{ cardId: 'wtSpearHook', count: 2 }],
+    description: '眠りを誘う穂先を持つ槍。敵をまとめて薙ぎ払う技が付く。', stats: { str: 5, dex: 3 }, tags: ['physical'],
+    cards: [{ cardId: 'wtSpearSweep', count: 2 }],
   },
   {
     id: 'pillowDagger', name: '枕元の短剣', slot: 'weapon', weaponType: 'dagger', rarity: 'rare', icon: 'dagger', scenario: 'dreamLabyrinth',
-    description: '枕元に置かれていた小さな短剣。素早い者に馴染む。', stats: { dex: 4, agi: 3 }, tags: ['physical'],
-    cards: [{ cardId: 'wtDaggerVenom', count: 2 }],
+    description: '枕元に置かれていた小さな短剣。影から刺して、敵を弱らせる技が付く。', stats: { dex: 4, agi: 3 }, tags: ['physical'],
+    cards: [{ cardId: 'wtDaggerShadow', count: 2 }],
   },
   {
     id: 'awakeningScepter', name: '目覚めの錫杖', slot: 'weapon', weaponType: 'scepter', rarity: 'legend', icon: 'scepter', scenario: 'dreamLabyrinth',
@@ -35,9 +35,9 @@ export const dreamGear: ItemDef[] = [
   // ----- 鎧 -----
   { id: 'nightgown', name: '夢見のローブ', slot: 'armor', rarity: 'rare', icon: 'robe', scenario: 'dreamLabyrinth', description: '闇属性のダメージを半分に和らげる。戦闘の始めにブロックを得る。', maxHp: 8, startBlock: 3, tags: ['dark'], ability: { name: '悪夢除け', effect: { modifier: 'elementGuard', element: 'dark', mode: 'half' } } },
   { id: 'echoArmor', name: '残響の鎧', slot: 'armor', rarity: 'epic', icon: 'armor', scenario: 'dreamLabyrinth', description: 'ダメージを受けるたびに、ブロック3を得る。', maxHp: 12, tags: ['block'], ability: { name: '記憶の殻', effect: { when: 'hurt', do: [{ kind: 'block', amount: 3 }] } } },
-  { id: 'dawnMantle', name: '夜明けの外套', slot: 'armor', rarity: 'legend', icon: 'robe', scenario: 'dreamLabyrinth', description: '毎ターンの始めに、味方全員がブロック3を得る。野営でよく休める。', maxHp: 20, explore: { campHeal: 0.5 }, tags: ['block'], ability: { name: '夜明けの加護', effect: { when: 'turnStart', do: [{ kind: 'block', amount: 3, to: 'allies' }] } } },
+  { id: 'dawnMantle', name: '夜明けの外套', slot: 'armor', rarity: 'legend', icon: 'robe', scenario: 'dreamLabyrinth', description: 'フォーカスを使ってカードを使うと、ブロック5を得て、カードを1枚引く。1ターンに1回。野営でよく休める。', maxHp: 20, explore: { campHeal: 0.5 }, tags: ['focus', 'block', 'draw'], ability: { name: '夜明けの加護', description: 'フォーカスを使ってカードを使った後（1ターンに1回）：ブロック5、カードを1枚引く', effect: { when: 'afterCard', if: [{ kind: 'usedFocus' }, { kind: 'oncePerTurn', key: 'dawnMantle' }], do: [{ kind: 'block', amount: 5 }, { kind: 'draw', amount: 1 }] } } },
   // ----- 装飾品 -----
-  { id: 'dreamCatcher', name: '夢の捕まえ網', slot: 'accessory', rarity: 'rare', icon: 'charm', scenario: 'dreamLabyrinth', description: '悪夢を捕まえる網。世界マップで遠くまで見渡せる。', stats: { per: 4 }, explore: { vision: 1 } },
+  { id: 'dreamCatcher', name: '夢の捕まえ網', slot: 'accessory', rarity: 'rare', icon: 'charm', scenario: 'dreamLabyrinth', description: '悪夢を捕まえる網。運が上がり、世界マップで遠くまで見渡せる。', stats: { luk: 4 }, explore: { vision: 1 } },
   { id: 'memoryLocket', name: '思い出のロケット', slot: 'accessory', rarity: 'rare', icon: 'amulet', scenario: 'dreamLabyrinth', description: '運と体力が上がる。', stats: { luk: 5, vit: 4 } },
   { id: 'nightmareRing', name: '悪夢の指輪', slot: 'accessory', rarity: 'epic', icon: 'ring', scenario: 'dreamLabyrinth', description: '属性の無い物理攻撃に、闇の力が宿る。', tags: ['dark'], stats: { str: 4 }, ability: { name: '闇の付与', effect: { modifier: 'convertElement', into: 'dark' } } },
   { id: 'clearMindCharm', name: '澄んだ心のお守り', slot: 'accessory', rarity: 'epic', icon: 'charm', scenario: 'dreamLabyrinth', description: '完全成功すると、自分の悪い状態異常がすべて治る。1ターンに1回。', tags: ['focus'], stats: { vit: 4 }, ability: { name: '澄みわたる心', effect: { when: 'perfect', if: [{ kind: 'oncePerTurn', key: 'clearMindCharm' }], do: [{ kind: 'cleanse', to: 'self' }] } } },
