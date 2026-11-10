@@ -27,6 +27,7 @@ import { isAllyCard } from '../../engine/battle/targets';
 import { isOnlinePlay } from '../../store/battleConfig';
 import { seatModeOf } from '../../store/seats';
 import './battleFx.css';
+import { CalloutBand, GuardLayer, ImpactLayer } from './BattleFx';
 
 /** 個体ごとの呼吸の周期と始まりをずらす（IDの文字から決める。乱数は使わない） */
 export function breathStyle(id: string, base: number, spread: number, sway: number): React.CSSProperties {
@@ -49,12 +50,19 @@ function useUnitMotion(unitId: string, side: 'ally' | 'enemy') {
     const dir = side === 'ally' ? 1 : -1;
     scope.current.dataset.unitMotion = fx.kind;
     scope.current.dataset.motionUnit = unitId;
-    const frames = reduced || simple ? { opacity: [1, 0.6, 1] } : fx.kind === 'attack'
+    const calm = reduced || simple;
+    const frames = calm ? { opacity: [1, 0.6, 1] } : fx.kind === 'attack'
       ? { x: [0, 12 * dir, 0], y: [0, -12 * dir, 0], scale: [1, 1.08, 1] }
       : fx.kind === 'cast' ? { y: [0, -10, 0], scale: [1, 1.06, 1] }
-      : { x: [0, -7 * dir, 7 * dir, -4 * dir, 0], opacity: [1, 0.35, 1, 0.55, 1] };
-    const controls = animate(scope.current, frames, { duration: (reduced || simple ? 0.14 : 0.28) * k, ease: 'easeOut' });
-    return () => controls.stop();
+      // 被弾（段階B）: 小刻みな揺れ（白いフラッシュは中の絵に重ねる）
+      : { x: [0, -6 * dir, 6 * dir, -5 * dir, 4 * dir, -2 * dir, 0] };
+    const controls = animate(scope.current, frames, { duration: (calm ? 0.14 : fx.kind === 'hit' ? 0.24 : 0.28) * k, ease: 'easeOut' });
+    // 被弾の白いフラッシュ（0.06秒・明るさ2.8倍）。動きを減らす設定では出さない
+    const inner = scope.current.firstElementChild as HTMLElement | null;
+    const flash = fx.kind === 'hit' && !calm && inner
+      ? animate(inner, { filter: ['brightness(2.8)', 'brightness(2.8)', 'brightness(1)'] }, { duration: TIMING.hitFlash * 2 * k, times: [0, 0.5, 1], ease: 'linear' })
+      : undefined;
+    return () => { controls.stop(); flash?.stop(); };
   }, [fx?.id, fast, simple, reduced]);
   return scope;
 }
@@ -66,6 +74,7 @@ function useUnitMotion(unitId: string, side: 'ally' | 'enemy') {
 function SynergyShake({ children }: { children: ReactNode }) {
   const [scope, animate] = useAnimate<HTMLDivElement>();
   const fx = useBattle((s) => s.synergyFx);
+  const big = useBattle((s) => s.fieldShake);
   const fast = useBattle((s) => s.settings.fastMode);
   const simple = useBattle((s) => s.settings.cutinMode === 'simple');
   const reduced = useReducedMotion();
@@ -76,6 +85,14 @@ function SynergyShake({ children }: { children: ReactNode }) {
     const controls = animate(scope.current, { x: [0, -3, 3, -2, 0] }, { duration: TIMING.synergyShake / speedFactor({ fastMode: fast }), ease: 'linear' });
     return () => controls.stop();
   }, [fx?.id]);
+  // 段階B: 大ダメージ・完全成功で戦場全体（背景ごと）を0.12秒揺らす
+  useEffect(() => {
+    if (!big || !scope.current) return;
+    scope.current.dataset.fieldShake = String(big.id);
+    if (reduced || simple) return;
+    const controls = animate(scope.current, { x: [0, -5, 5, -4, 3, 0], y: [0, 2, -2, 1, 0, 0] }, { duration: TIMING.fieldShake / speedFactor({ fastMode: fast }), ease: 'linear' });
+    return () => controls.stop();
+  }, [big?.id]);
   return <div ref={scope} className="absolute inset-0" data-synergy-field>{children}</div>;
 }
 
@@ -273,6 +290,7 @@ const EnemyUnit = memo(function EnemyUnit({
               <EnemyArt defId={enemy.defId} phase={enemy.phase} className="h-full w-full" />
             </div>
           </div>
+          <ImpactLayer unitId={enemy.uid} />
         </motion.div>
         {/* 狙う敵: 足元の光る輪・絵の発光・頭の上の矢印（予測の数字は下の操作パネルに出す。絵は隠さない） */}
         {isTarget && (
@@ -413,6 +431,8 @@ const AllySprite = memo(function AllySprite({ ally, left, bottom, h, active, fie
           </span>
         </div>
       )}
+      <ImpactLayer unitId={ally.id} />
+      <GuardLayer unitId={ally.id} />
       {/* 数字は、そのキャラの頭のすぐ上に出す */}
       <UnitPopups unitId={ally.id} top="-6px" />
     </div>
@@ -502,12 +522,14 @@ export function Battlefield() {
 
   return (
     <div ref={ref} className="relative min-h-[190px] flex-1 overflow-hidden">
-      <BattleBackground kind={bgKind} className="absolute inset-0 h-full w-full" />
+      <SynergyShake>
+      {/* 背景も一緒に揺れる（揺れても端が見えないよう少し大きく） */}
+      <BattleBackground kind={bgKind} className="absolute -inset-2 h-[calc(100%+16px)] w-[calc(100%+16px)]" />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/45" />
       <Embers />
       {W > 0 && phase === 'ally' && <TargetLines W={W} H={H} enemySlotW={enemySlotW} enemyTop={enemyTop} enemySpriteH={enemySpriteH} allyAreaW={allyAreaW} allyH={allyH} />}
       {W > 0 && (
-        <SynergyShake>
+        <>
           {enemies.map((e, i) => (
             <EnemyUnit
               key={e.uid}
@@ -530,8 +552,10 @@ export function Battlefield() {
               active={a.id === activeId && phase === 'ally'}
             />
           ))}
-        </SynergyShake>
+        </>
       )}
+      </SynergyShake>
+      <CalloutBand top={22} />
       <div className="pointer-events-none absolute inset-x-0 top-[46%] z-40 flex justify-center">
         <SlotOverlay />
       </div>

@@ -245,6 +245,14 @@ export const TIMING = {
   resultPopup: 0.6,
   /** 重なりの演出（Step C）の戦場の揺れ（秒。見た目だけ。高速の設定では短くなる） */
   synergyShake: 0.12,
+  /** 戦闘の見た目の改修（段階B。秒・提案）: 技名の帯 / 被弾の白いフラッシュ / 戦場の揺れ / HPの残像が残る時間・追いかける時間 / 命中のエフェクト / 盾 */
+  callout: 0.5,
+  hitFlash: 0.06,
+  fieldShake: 0.12,
+  hpGhostHold: 0.35,
+  hpGhostChase: 0.28,
+  impactFx: 0.42,
+  guardFx: 0.5,
   /** 敵1体の行動間隔（前の敵の数字の表示が終わってから、次の敵が動くまでの間） */
   enemyStep: 0.4,
   /** 「ターン N」「敵のターン」の帯の表示時間（数字の表示が全部終わってから出す） */

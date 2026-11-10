@@ -79,8 +79,88 @@
   pointer-events: none;
 }
 
+
+/* ----- 段階B: 技名の帯（シャープな平行四辺形・金の線・光が走る） ----- */
+.callout-band {
+  clip-path: polygon(16px 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  overflow: hidden;
+}
+.callout-ally {
+  background:
+    linear-gradient(180deg, #fbe7a4, #b88a36) top / 100% 2px no-repeat,
+    linear-gradient(180deg, #b88a36, #fbe7a4) bottom / 100% 2px no-repeat,
+    linear-gradient(90deg, rgba(20, 34, 80, 0.2), rgba(30, 56, 130, 0.94) 18%, rgba(22, 40, 100, 0.94) 82%, rgba(20, 34, 80, 0.2));
+}
+.callout-enemy {
+  background:
+    linear-gradient(180deg, #ffb0a0, #a8302a) top / 100% 2px no-repeat,
+    linear-gradient(180deg, #a8302a, #ffb0a0) bottom / 100% 2px no-repeat,
+    linear-gradient(90deg, rgba(80, 10, 16, 0.2), rgba(130, 20, 30, 0.94) 18%, rgba(100, 14, 22, 0.94) 82%, rgba(80, 10, 16, 0.2));
+}
+.callout-gem {
+  transform: rotate(45deg);
+  border: 1.5px solid #fbe7a4;
+  background: radial-gradient(circle, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.85));
+  box-shadow: 0 0 6px rgba(255, 210, 120, 0.7);
+}
+.callout-gem > * { transform: rotate(-45deg); }
+@keyframes callout-sheen { from { transform: translateX(-120%) skewX(-20deg); } to { transform: translateX(260%) skewX(-20deg); } }
+.callout-sheen {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  animation: callout-sheen 0.5s ease-out both;
+  pointer-events: none;
+}
+
+/* ----- 段階B: 命中のエフェクト（粒は決まった角度に飛ぶ。乱数は使わない） ----- */
+@keyframes fx-spark-fly {
+  from { transform: translate(-50%, -50%) rotate(var(--a)) translateY(-6px) scaleY(1); opacity: 1; }
+  to { transform: translate(-50%, -50%) rotate(var(--a)) translateY(calc(var(--reach, 34px) * -1)) scaleY(0.3); opacity: 0; }
+}
+.fx-spark {
+  position: absolute; left: 50%; top: 50%; width: 3px; height: 14px; border-radius: 2px;
+  box-shadow: 0 0 5px rgba(255, 230, 150, 0.95);
+  animation: fx-spark-fly var(--d, 0.4s) ease-out both;
+}
+@keyframes fx-mote-fly {
+  0% { transform: translate(-50%, -50%) rotate(var(--a)) translateY(-4px) scale(1); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translate(-50%, -50%) rotate(var(--a)) translateY(calc(var(--reach, 32px) * -1)) scale(0.4); opacity: 0; }
+}
+.fx-mote {
+  position: absolute; left: 50%; top: 50%; width: 5px; height: 5px; border-radius: 50%;
+  animation: fx-mote-fly var(--d, 0.4s) ease-out both;
+}
+@keyframes fx-ring-grow { from { transform: translate(-50%, -50%) scale(0.2); opacity: 1; } to { transform: translate(-50%, -50%) scale(1.6); opacity: 0; } }
+.fx-ring {
+  position: absolute; left: 50%; top: 52%; width: 70%; aspect-ratio: 1; border-radius: 50%;
+  border: 4px solid #fff3c4; box-shadow: 0 0 10px rgba(255, 230, 160, 0.8), inset 0 0 8px rgba(255, 230, 160, 0.6);
+  animation: fx-ring-grow var(--d, 0.4s) ease-out both;
+}
+.fx-ring-small { width: 38%; }
+@keyframes fx-shot-fly { from { transform: translate(-50%, 70%) scaleY(0.4); opacity: 0; } 30% { opacity: 1; } to { transform: translate(-50%, -40%) scaleY(1); opacity: 0; } }
+.fx-shot {
+  position: absolute; left: 50%; top: 30%; width: 4px; height: 60%; border-radius: 2px;
+  box-shadow: 0 0 8px rgba(255, 240, 200, 0.9);
+  animation: fx-shot-fly var(--d, 0.2s) ease-in both;
+}
+@keyframes fx-pillar-rise { 0% { transform: scaleY(0); opacity: 0; } 30% { transform: scaleY(1); opacity: 1; } 100% { transform: scaleY(1); opacity: 0; } }
+.fx-pillar {
+  position: absolute; left: 18%; right: 18%; bottom: 0; top: -10%; border-radius: 40% 40% 0 0;
+  transform-origin: 50% 100%; mix-blend-mode: screen;
+  animation: fx-pillar-rise var(--d, 0.4s) ease-out both;
+}
+@keyframes fx-rise-up { from { transform: translateY(0); opacity: 0; } 25% { opacity: 1; } to { transform: translateY(-70px); opacity: 0; } }
+.fx-rise {
+  position: absolute; bottom: 8%; width: 4px; height: 4px; border-radius: 50%;
+  animation: fx-rise-up var(--d, 0.4s) ease-out both;
+}
+
 /* 動きを減らす（OS の設定・ゲームの設定「簡易」） */
 @media (prefers-reduced-motion: reduce) {
-  .idle-live, .foot-shadow, .element-aura, .target-ring-spin, .spotlight-beam { animation: none; }
+  .idle-live, .foot-shadow, .element-aura, .target-ring-spin, .spotlight-beam, .callout-sheen, .fx-spark, .fx-mote, .fx-rise { animation: none; }
+  .fx-spark, .fx-mote, .fx-rise { display: none; }
 }
 [data-calm] .idle-live, [data-calm] .foot-shadow, [data-calm] .element-aura, [data-calm] .target-ring-spin { animation: none; }

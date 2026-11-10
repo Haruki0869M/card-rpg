@@ -7,7 +7,7 @@ import { create } from 'zustand';
 import { normalizeSettings, type Settings } from './settings';
 import { playSound, setAudioVolumes } from '../audio/player';
 import { petCry } from '../audio/cues';
-import { battleFrames, explorationNotices, explorationSounds, type PopupDraft, type PopupTone, type SynergyTier, type NoticeDraft, type PresentationFrame } from './presentation';
+import { battleFrames, explorationNotices, explorationSounds, type CalloutDraft, type ImpactDraft, type PopupDraft, type PopupTone, type SynergyTier, type NoticeDraft, type PresentationFrame } from './presentation';
 export type { Settings } from './settings';
 import { TIMING, VIBRATION } from '../data/balance';
 import { cardOf } from '../data/cards';
@@ -86,6 +86,10 @@ export interface Popup {
   tier?: SynergyTier;
 }
 
+/** 段階B: 技名の帯・命中のエフェクト・戦場の揺れ・盾（見た目だけ。状態・乱数・同期には触れない） */
+export type Callout = CalloutDraft & { id: number };
+export type ImpactFx = Omit<ImpactDraft, 'unitId'> & { id: number };
+
 /** ユニットごとの動きの演出 */
 export interface UnitFx {
   kind: 'attack' | 'hit' | 'cast' | 'phase';
@@ -149,6 +153,10 @@ interface StoreState {
   synergyFx: { id: number; tier: 2 | 3 } | null;
   popups: Popup[];
   unitFx: Record<string, UnitFx>;
+  callout: Callout | null;
+  impactFx: Record<string, ImpactFx>;
+  fieldShake: { id: number } | null;
+  guardFx: Record<string, { id: number }>;
   retargets: Record<string, number>;
   flash: { cardUid: string; text: string; id: number } | null;
   hint: { text: string; id: number } | null;
@@ -411,7 +419,7 @@ export const useBattle = create<StoreState>((set, get) => {
     presentationTimer = null; frames = []; pendingNotices = [];
     for (const timer of uiTimers) clearTimeout(timer);
     uiTimers.clear();
-    set({ presentationBusy: false, phaseBanner: null, cutins: [], petPulses: {}, popups: [], unitFx: {}, rollFx: null, synergyFx: null });
+    set({ presentationBusy: false, phaseBanner: null, cutins: [], petPulses: {}, popups: [], unitFx: {}, rollFx: null, synergyFx: null, callout: null, impactFx: {}, fieldShake: null, guardFx: {} });
     if (enemyWaiting) { enemyWaiting = false; setTimeout(scheduleEnemy, 0); }
   };
   /** 見ている戦闘の手番が変わっていたら、帯を出す手番を返す（出したことにする） */
@@ -473,6 +481,10 @@ export const useBattle = create<StoreState>((set, get) => {
     playFrameSounds(frame);
     if (frame.synergy && frame.synergy >= 2) set({ synergyFx: { id: fxId++, tier: frame.synergy as 2 | 3 } });
     if (frame.motions?.length) set(s => ({ unitFx: { ...s.unitFx, ...Object.fromEntries(frame.motions!.map(m => [m.unitId, { kind: m.kind, id: fxId++ }])) } }));
+    if (frame.callout) set({ callout: { ...frame.callout, id: fxId++ } });
+    if (frame.impacts?.length) set(s => ({ impactFx: { ...s.impactFx, ...Object.fromEntries(frame.impacts!.map(({ unitId, ...rest }) => [unitId, { ...rest, id: fxId++ }])) } }));
+    if (frame.guards?.length) set(s => ({ guardFx: { ...s.guardFx, ...Object.fromEntries(frame.guards!.map(id => [id, { id: fxId++ }])) } }));
+    if (frame.shake) set({ fieldShake: { id: fxId++ } });
     for (const p of frame.popups ?? []) addPopup(p);
     showNotices(frame.notices ?? []);
   };
@@ -525,6 +537,10 @@ export const useBattle = create<StoreState>((set, get) => {
     synergyFx: null,
     popups: [],
     unitFx: {},
+    callout: null,
+    impactFx: {},
+    fieldShake: null,
+    guardFx: {},
     retargets: {},
     flash: null,
     hint: null,
@@ -661,6 +677,10 @@ export const useBattle = create<StoreState>((set, get) => {
     synergyFx: null,
     popups: [],
     unitFx: {},
+    callout: null,
+    impactFx: {},
+    fieldShake: null,
+    guardFx: {},
     retargets: {},
     flash: null,
     hint: null,
