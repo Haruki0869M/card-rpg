@@ -92,7 +92,7 @@ export const royalGuardMummy: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'shield', name: '王家の大盾', effects: [{ kind: 'block', amount: 14 }] },
-    { id: 'khopesh', name: '鎌剣の一閃', effects: [{ kind: 'damage', amount: 12 }] },
+    { id: 'khopesh', name: '鎌剣の一閃', big: true, effects: [{ kind: 'damage', amount: 12 }] },
     { id: 'bash', name: '盾で打つ', effects: [{ kind: 'damage', amount: 6 }, { kind: 'block', amount: 6 }] },
     { id: 'oath', name: '王への誓い', effects: [{ kind: 'block', amount: 8, to: 'allies' }] },
   ],
@@ -113,7 +113,7 @@ export const scribeShade: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'record', name: '罪を書き記す', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1 }, { kind: 'damage', amount: 5 }] },
-    { id: 'ink', name: '墨の刃', effects: [{ kind: 'damage', amount: 11 }] },
+    { id: 'ink', name: '墨の刃', big: true, effects: [{ kind: 'damage', amount: 11 }] },
     { id: 'curse', name: '呪いの文字', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }] },
     { id: 'scroll', name: '巻物の帳', effects: [{ kind: 'block', amount: 9 }] },
   ],
@@ -134,7 +134,7 @@ export const shadowVizier: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'decree', name: '偽りの勅令', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2, to: 'foes' }] },
-    { id: 'staff', name: '蛇杖の一撃', effects: [{ kind: 'damage', amount: 18, element: 'dark' }] },
+    { id: 'staff', name: '蛇杖の一撃', big: true, effects: [{ kind: 'damage', amount: 18, element: 'dark' }] },
     { id: 'expose', name: '弱みを暴く', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 2 }, { kind: 'damage', amount: 8 }] },
     { id: 'ward', name: '書庫の結界', effects: [{ kind: 'block', amount: 16 }] },
   ],
@@ -142,8 +142,8 @@ export const shadowVizier: EnemyDef = {
   phases: [
     { belowHpPct: 50, name: '影を分ける宰相', pattern: 'sequence', actions: [
       { id: 'split', name: '影の分身', effects: [{ kind: 'block', amount: 26 }] },
-      { id: 'shadows', name: '分身たちの刃', effects: [{ kind: 'damage', amount: 10, element: 'dark', to: 'foes' }] },
-      { id: 'judgment', name: '宰相の裁き', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1 }, { kind: 'damage', amount: 22, element: 'dark' }] },
+      { id: 'shadows', name: '分身たちの刃', big: true, effects: [{ kind: 'damage', amount: 10, element: 'dark', to: 'foes' }] },
+      { id: 'judgment', name: '宰相の裁き', big: true, effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1 }, { kind: 'damage', amount: 22, element: 'dark' }] },
     ] },
   ],
 };
@@ -162,7 +162,7 @@ export const cursedScribeShade: EnemyDef = makeVariant(scribeShade, {
   id: 'cursedScribeShade', name: '呪詛の書記官の影', aura: 'shadow',
   actions: [
     { id: 'record', name: '呪詛を書き記す', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1 }, { kind: 'damage', amount: 5, element: 'dark' }] },
-    { id: 'ink', name: '闇の墨の刃', effects: [{ kind: 'damage', amount: 11, element: 'dark' }] },
+    { id: 'ink', name: '闇の墨の刃', big: true, effects: [{ kind: 'damage', amount: 11, element: 'dark' }] },
     { id: 'curse', name: '呪いの文字', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }] },
     { id: 'scroll', name: '巻物の帳', effects: [{ kind: 'block', amount: 9 }] },
   ],

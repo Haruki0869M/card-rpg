@@ -104,16 +104,17 @@ describe('扉の予兆（5色）は、だれでも・いつでも見える', () 
     expect(doorOmen(v2, v2.dungeon!.rooms.find((r) => r.id === 'r0c0')!)).toBeUndefined();
   });
 
-  it('扉の先の深層ボーナスの文: 4行目から「浅層：報酬+15%」、戦闘の部屋だけ', () => {
+  it('扉の先の深層ボーナスの文: 3行目から「浅層：報酬+15%」、5行目から中層、7行目から深層。戦闘のある部屋だけ', () => {
     const eventIds = EVENTS.all.filter((e) => e.where !== 'map' && e.where !== 'spawn').map((e) => e.id);
     const final = DUNGEONS.all.find((d) => d.layout?.some((row) => row.some((r) => r.type === 'midboss')))!;
     const d = buildDungeon(final.id, createRng(1), 0, eventIds);
     for (const r of d.rooms) {
       const text = doorDepthBonus(d, r);
-      const battle = ['battle', 'elite', 'midboss', 'boss'].includes(r.type);
-      if (!battle || r.row < 3) expect(text, r.id).toBeUndefined();
-      else if (r.row < 6) expect(text).toBe(`浅層：報酬+${Math.round(BALANCE.depthBonus.reward[1] * 100)}%`);
-      else if (r.row < 9) expect(text).toBe(`中層：報酬+${Math.round(BALANCE.depthBonus.reward[2] * 100)}%`);
+      // 戦闘のある部屋（戦闘・強敵・中ボス・ボス・封魔の宝箱の番人）
+      const battle = ['battle', 'elite', 'midboss', 'boss', 'sealedChest'].includes(r.type);
+      if (!battle || r.row < 2) expect(text, r.id).toBeUndefined();
+      else if (r.row < 4) expect(text).toBe(`浅層：報酬+${Math.round(BALANCE.depthBonus.reward[1] * 100)}%`);
+      else if (r.row < 6) expect(text).toBe(`中層：報酬+${Math.round(BALANCE.depthBonus.reward[2] * 100)}%`);
       else expect(text).toBe(`深層：報酬+${Math.round(BALANCE.depthBonus.reward[3] * 100)}%`);
     }
   });

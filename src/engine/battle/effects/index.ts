@@ -1,12 +1,12 @@
 // ===== 効果の部品の登録表と、共通の処理（対象の決め方・ダメージの与え方） =====
 // 新しい効果: kinds/ にファイルを1つ置いて export const effect: EffectHandler<'種類'> = {...} と書くだけ。
 // カード・敵の行動・消費アイテム・特殊能力のデータから、その日から使える。
-import type { AbilityDef, BattleEvent, BattleState, CardDef, Effect, EffectTarget } from '../../../types';
+import type { AbilityDef, BattleEvent, BattleState, CardDef, Effect, EffectTarget, EnemyState } from '../../../types';
 import { convertedElement, coverChance, damageModifiers, elementGuardOf, fireAbilities } from '../../abilities';
 import type { Rng } from '../../rng';
 import { BALANCE } from '../../../data/balance';
 import { getElement } from '../../../data/elements';
-import { getEnemy } from '../../../data/enemies';
+import { getEnemy, getEnemyAction } from '../../../data/enemies';
 import { getStatus } from '../../../data/statuses';
 import { absorb, calcDamage } from '../damage';
 import { addStatus } from '../statuses';
@@ -149,10 +149,38 @@ export function elementMultiplier(victim: Unit | undefined, element: string | un
 
 /** 連携攻撃（M3-C5）: このターンに別の味方が攻撃した敵には、ダメージが上乗せされる */
 export const COMBO_NAME = '連携';
-export function comboMultiplier(source: Unit | undefined, victim: Unit | undefined): number {
-  if (!source || !victim || isEnemy(source) || !isEnemy(victim)) return 1;
+/** 連携の段階の名前（1 = 連携 / 2 = 大連携 / 3 = 極連携） */
+export const COMBO_NAMES = ['', '連携', '大連携', '極連携'] as const;
+/** 連携の段階: このターンに、その敵を先に攻撃した「別の味方」の人数（上限は表の長さ。0 = 連携なし） */
+export function comboStage(source: Unit | undefined, victim: Unit | undefined): number {
+  if (!source || !victim || isEnemy(source) || !isEnemy(victim)) return 0;
   const id = unitIdOf(source);
-  return victim.hitBy?.some((x) => x !== id) ? 1 + BALANCE.comboBonus : 1;
+  return Math.min(BALANCE.comboBonus.length - 1, victim.hitBy?.filter((x) => x !== id).length ?? 0);
+}
+/** 連携の段階の上乗せ（0.2 / 0.35 / 0.5） */
+export const comboBonusOf = (stage: number) => BALANCE.comboBonus[Math.max(0, Math.min(BALANCE.comboBonus.length - 1, stage))] ?? 0;
+export function comboMultiplier(source: Unit | undefined, victim: Unit | undefined): number {
+  return 1 + comboBonusOf(comboStage(source, victim));
+}
+
+// ---------- BREAK（大技の予告を崩す。抜本的な見直し §3-2） ----------
+
+/** その敵が今、大技の予告を出しているか（崩せる状態か。もう崩した・倒れた・予告が無い時は false） */
+export function canBreak(enemy: Unit | undefined): boolean {
+  if (!enemy || !isEnemy(enemy) || enemy.dead || enemy.broken || !enemy.intent) return false;
+  return !!getEnemyAction(enemy.defId, enemy.intent.actionId).big;
+}
+
+/** 大技の予告を崩す: 威力が半分・弱体1・ブロック0（オーナーの決定 3-A）。乱数は使わない */
+function breakEnemy(ctx: EffectCtx, enemy: EnemyState, why: 'weak' | 'perfect' | 'damage') {
+  enemy.broken = true;
+  enemy.nextActionMultiplier = (enemy.nextActionMultiplier ?? 1) * BALANCE.breakPower;
+  enemy.block = 0;
+  ctx.events.push({ type: 'break', enemyUid: enemy.uid, why });
+  addStatus(enemy.statuses, 'weak', BALANCE.breakWeak);
+  ctx.events.push({ type: 'status', unitId: enemy.uid, status: 'weak', amount: BALANCE.breakWeak });
+  ctx.parts.push('BREAK！');
+  addLog(ctx.state, `⚡BREAK！ ${nameOf(enemy)}の体勢が崩れた（次の行動の威力が半分・弱体${BALANCE.breakWeak}・ブロック0）`);
 }
 
 /** 属性を強める状態異常（聖光など）の倍率。使った分は消す */
@@ -205,7 +233,10 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
     }
   }
   for (const n of mods.active) recordActivation(ctx, n);
-  if (comboMultiplier(source, v) > 1) recordActivation(ctx, { name: COMBO_NAME, source: { kind: 'other' } });
+  const stage = comboStage(source, v);
+  if (stage > 0) recordActivation(ctx, { name: COMBO_NAMES[stage] ?? COMBO_NAME, source: { kind: 'other' } });
+  // 弱点の属性で攻撃したか（BREAK のきっかけ。かばう・属性の変換の後の、実際の相手と属性で見る）
+  const weakHit = !!element && isEnemy(v) && !!getEnemy(v.defId).weak?.includes(element);
   // 連携攻撃の記録（このターンにこの敵を攻撃した味方）
   if (isEnemy(v) && !isEnemy(source)) {
     const id = unitIdOf(source);
@@ -240,6 +271,14 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   ctx.dealt += r.hpLoss;
   if (isEnemy(source) !== isEnemy(v) && !ctx.hitIds.includes(unitIdOf(v))) ctx.hitIds.push(unitIdOf(v));
   afterHpLoss(state, v, rng, events);
+  // BREAK: 大技の予告を出している敵に、弱点の属性で攻撃／完全成功で攻撃／このターンの合計ダメージが最大HPの2割以上
+  if (isEnemy(v) && !isEnemy(source)) {
+    v.turnDamage = (v.turnDamage ?? 0) + r.hpLoss;
+    if (dmg > 0 && canBreak(v)) {
+      const why = weakHit ? 'weak' : ctx.perfect && ctx.card ? 'perfect' : v.turnDamage * 100 >= v.maxHp * BALANCE.breakDamagePct ? 'damage' : undefined;
+      if (why) breakEnemy(ctx, v, why);
+    }
+  }
   // 属性の状態異常（HPに当たった時。完全成功なら必ず。耐性があれば効かない）
   if (element && r.hpLoss > 0 && !v.dead) {
     const el = getElement(element);

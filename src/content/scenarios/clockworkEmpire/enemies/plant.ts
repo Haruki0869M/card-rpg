@@ -55,8 +55,8 @@ export const ironButler: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'bow', name: 'うやうやしい一礼', effects: [{ kind: 'block', amount: 18 }] },
-    { id: 'tray', name: '銀盆の打撃', effects: [{ kind: 'damage', amount: 15 }] },
-    { id: 'serve', name: 'お茶を浴びせる', effects: [{ kind: 'damage', amount: 6, to: 'foes' }, { kind: 'applyStatus', status: 'burn', amount: 1 }] },
+    { id: 'tray', name: '銀盆の打撃', big: true, effects: [{ kind: 'damage', amount: 15 }] },
+    { id: 'serve', name: 'お茶を浴びせる', big: true, effects: [{ kind: 'damage', amount: 6, to: 'foes' }, { kind: 'applyStatus', status: 'burn', amount: 1 }] },
     { id: 'guard', name: '主人を守る構え', effects: [{ kind: 'block', amount: 10, to: 'allies' }, { kind: 'damage', amount: 6 }] },
   ],
   abilities: [{ name: '磨き上げた鋼の体', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 10 }] } }],
@@ -76,8 +76,8 @@ export const chainSaw: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'rev', name: '刃を回す', effects: [{ kind: 'block', amount: 8 }, { kind: 'applyStatus', status: 'vulnerable', amount: 1 }] },
-    { id: 'saw', name: '連続の切りつけ', effects: [{ kind: 'damage', amount: 5, hits: 3 }] },
-    { id: 'sweep', name: '回転の薙ぎ払い', effects: [{ kind: 'damage', amount: 7, to: 'foes' }] },
+    { id: 'saw', name: '連続の切りつけ', big: true, effects: [{ kind: 'damage', amount: 5, hits: 3 }] },
+    { id: 'sweep', name: '回転の薙ぎ払い', big: true, effects: [{ kind: 'damage', amount: 7, to: 'foes' }] },
     { id: 'grind', name: '削り取る', effects: [{ kind: 'damage', amount: 14 }] },
   ],
   abilities: [{ name: '止まらない刃', effect: { when: 'battleStart', do: [{ kind: 'damage', amount: 4, to: 'randomFoe' }] } }],
@@ -97,14 +97,14 @@ export const clockworkSage: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'rewind', name: '逆回し', effects: [{ kind: 'heal', amount: 12, to: 'self' }, { kind: 'block', amount: 12 }] },
-    { id: 'hands', name: '長針の一閃', effects: [{ kind: 'damage', amount: 20 }] },
-    { id: 'stop', name: '止まる秒針', effects: [{ kind: 'applyStatus', status: 'paralysis', amount: 1, to: 'foes' }, { kind: 'damage', amount: 6, to: 'foes' }] },
+    { id: 'hands', name: '長針の一閃', big: true, effects: [{ kind: 'damage', amount: 20 }] },
+    { id: 'stop', name: '止まる秒針', big: true, effects: [{ kind: 'applyStatus', status: 'paralysis', amount: 1, to: 'foes' }, { kind: 'damage', amount: 6, to: 'foes' }] },
   ],
   abilities: [{ name: '真鍮の外装', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 8 }] } }],
   phases: [
     { belowHpPct: 50, name: '針の早まった賢者', pattern: 'sequence', actions: [
-      { id: 'accel', name: '加速', effects: [{ kind: 'damage', amount: 7, hits: 3 }] },
-      { id: 'toll', name: '終わりの鐘', effects: [{ kind: 'damage', amount: 12, element: 'thunder', to: 'foes' }] },
+      { id: 'accel', name: '加速', big: true, effects: [{ kind: 'damage', amount: 7, hits: 3 }] },
+      { id: 'toll', name: '終わりの鐘', big: true, effects: [{ kind: 'damage', amount: 12, element: 'thunder', to: 'foes' }] },
       { id: 'rewind2', name: '最後の逆回し', effects: [{ kind: 'heal', amount: 10, to: 'self' }, { kind: 'block', amount: 20 }] },
     ] },
   ],

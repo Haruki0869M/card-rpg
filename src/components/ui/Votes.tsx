@@ -1,6 +1,6 @@
 // ===== みんなで決める操作の表示（M3-C）: だれがどれを選んだか・だれを待っているか =====
 import { PLAYER_COLOR } from '../../data/theme';
-import { currentVote, doorKind, needsVote, notVoted, OMEN_INFO, omenOfType, voters, votesFor } from '../../engine';
+import { currentVote, doorKind, needsVote, notVoted, omenInfoOf, voters, votesFor } from '../../engine';
 import { isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
 import { useOnline } from '../../store/onlineStore';
@@ -15,8 +15,8 @@ function doorVoteLabel(game: GameState, roomId: string): string {
   if (!room) return '扉を開ける';
   const kind = doorKind(room);
   if (kind !== 'door') return kind === 'boss' ? 'ボスの扉' : '中ボスの扉';
-  const omen = omenOfType(room.type);
-  return omen ? `${OMEN_INFO[omen].name}の扉` : '扉を開ける';
+  const info = omenInfoOf(room.type);
+  return info ? `${info.name}の扉` : '扉を開ける';
 }
 
 /** 選んだ操作の短い説明 */

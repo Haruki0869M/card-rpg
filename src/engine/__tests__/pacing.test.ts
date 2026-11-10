@@ -213,9 +213,9 @@ describe('転職の速さ（§5）', () => {
   it('転職できるレベルは 中位5・最上位6・特殊5（抜本的な見直し。戦闘25〜32回の冒険に合わせた）', () => {
     expect(BALANCE.jobChange).toEqual({ base: 5, mid: 6, special: 5 });
   });
-  it('最上位・特殊職の条件の数（計画書 §2-6 の表）', () => {
+  it('最上位・特殊職の条件の数（計画書 §2-6 の表。聖王 20・幻獣王 80 は 2026-11-11 の依頼文の例に合わせた）', () => {
     const want: Record<string, number> = {
-      swordSaint: 22, bowSaint: 20, holyKing: 25, bard: 12, phantomKing: 90, timeMage: 70, fistKing: 35, pope: 22, grandThief: 250, overlord: 10, beastMaster: 8,
+      swordSaint: 22, bowSaint: 20, holyKing: 20, bard: 12, phantomKing: 80, timeMage: 70, fistKing: 35, pope: 22, grandThief: 250, overlord: 10, beastMaster: 8,
       greatSage: 6, magicKnight: 6, hadesLord: 4, necromancer: 3, ninja: 6, dragoon: 2, darkKnight: 3, samurai: 6, gambler: 6, astrologer: 3, machinist: 3, shrineMaiden: 2,
     };
     const withReq = CLASSES.all.filter((c) => c.requires);

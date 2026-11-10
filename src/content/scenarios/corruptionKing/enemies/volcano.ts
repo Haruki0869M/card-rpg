@@ -52,9 +52,9 @@ export const magmaGolem: EnemyDef = {
   gold: 25,
   pattern: 'sequence',
   actions: [
-    { id: 'slam', name: '溶岩の拳', effects: [{ kind: 'damage', element: 'fire', amount: 16 }] },
+    { id: 'slam', name: '溶岩の拳', big: true, effects: [{ kind: 'damage', element: 'fire', amount: 16 }] },
     { id: 'harden', name: '冷え固まる', effects: [{ kind: 'block', amount: 20 }] },
-    { id: 'eruption', name: '小噴火', effects: [{ kind: 'damage', element: 'fire', amount: 8, to: 'foes' }, { kind: 'applyStatus', status: 'burn', amount: 1, to: 'foes' }] },
+    { id: 'eruption', name: '小噴火', big: true, effects: [{ kind: 'damage', element: 'fire', amount: 8, to: 'foes' }, { kind: 'applyStatus', status: 'burn', amount: 1, to: 'foes' }] },
   ],
   abilities: [{ name: '溶岩の体', effect: { when: 'turnStart', do: [{ kind: 'block', amount: 4 }] } }],
 };
@@ -72,8 +72,8 @@ export const ignavarl: EnemyDef = {
   gold: 160,
   pattern: 'sequence',
   actions: [
-    { id: 'claw', name: '竜の爪', effects: [{ kind: 'damage', element: 'fire', amount: 18 }] },
-    { id: 'wingbeat', name: '羽ばたき', effects: [{ kind: 'damage', amount: 7, hits: 2, to: 'foes' }] },
+    { id: 'claw', name: '竜の爪', big: true, effects: [{ kind: 'damage', element: 'fire', amount: 18 }] },
+    { id: 'wingbeat', name: '羽ばたき', big: true, effects: [{ kind: 'damage', amount: 7, hits: 2, to: 'foes' }] },
     { id: 'scales', name: '竜鱗', effects: [{ kind: 'block', amount: 22 }, { kind: 'damage', amount: 9 }] },
   ],
   phases: [
@@ -82,8 +82,8 @@ export const ignavarl: EnemyDef = {
       name: '怒れる炎竜',
       pattern: 'sequence',
       actions: [
-        { id: 'inferno', name: '獄炎', effects: [{ kind: 'damage', element: 'fire', amount: 12, to: 'foes' }, { kind: 'applyStatus', status: 'burn', amount: 2, to: 'foes' }] },
-        { id: 'fangs', name: '灼熱の牙', effects: [{ kind: 'damage', element: 'fire', amount: 26 }] },
+        { id: 'inferno', name: '獄炎', big: true, effects: [{ kind: 'damage', element: 'fire', amount: 12, to: 'foes' }, { kind: 'applyStatus', status: 'burn', amount: 2, to: 'foes' }] },
+        { id: 'fangs', name: '灼熱の牙', big: true, effects: [{ kind: 'damage', element: 'fire', amount: 26 }] },
         { id: 'roar', name: '竜の咆哮', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 2, to: 'foes' }, { kind: 'block', amount: 15 }] },
       ],
     },

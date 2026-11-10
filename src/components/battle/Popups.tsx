@@ -7,6 +7,7 @@ const TONE: Record<string, string> = {
   status: 'text-[14px] text-fuchsia-200', zero: 'text-[14px] text-zinc-100',
   ability: 'text-[12px] font-display text-amber-100', heal: 'text-[17px] text-emerald-200',
   resource: 'text-[14px] text-yellow-100',
+  break: 'text-[20px] font-display text-amber-200',
 };
 /** 段の高さ（px）。数字は1行、能力の名前は2行まで */
 const LANE = 28;

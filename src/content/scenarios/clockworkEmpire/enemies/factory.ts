@@ -94,8 +94,8 @@ export const foremanBot: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'order', name: '作業の号令', effects: [{ kind: 'block', amount: 6, to: 'allies' }] },
-    { id: 'hammer', name: '監督の鉄槌', effects: [{ kind: 'damage', amount: 10 }] },
-    { id: 'hurry', name: '急がせる', effects: [{ kind: 'damage', amount: 4, to: 'foes' }] },
+    { id: 'hammer', name: '監督の鉄槌', big: true, effects: [{ kind: 'damage', amount: 10 }] },
+    { id: 'hurry', name: '急がせる', big: true, effects: [{ kind: 'damage', amount: 4, to: 'foes' }] },
     { id: 'inspect', name: '厳しい点検', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1 }, { kind: 'damage', amount: 5 }] },
   ],
   abilities: [{ name: '始業の笛', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 4, to: 'allies' }] } }],
@@ -115,14 +115,14 @@ export const foremanGolem: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'command', name: '工場長の命令', effects: [{ kind: 'block', amount: 10, to: 'allies' }, { kind: 'damage', amount: 4 }] },
-    { id: 'smash', name: '鉄拳の殴打', effects: [{ kind: 'damage', amount: 14 }] },
-    { id: 'press', name: 'プレス機の圧', effects: [{ kind: 'damage', amount: 6, to: 'foes' }] },
+    { id: 'smash', name: '鉄拳の殴打', big: true, effects: [{ kind: 'damage', amount: 14 }] },
+    { id: 'press', name: 'プレス機の圧', big: true, effects: [{ kind: 'damage', amount: 6, to: 'foes' }] },
   ],
   abilities: [{ name: '分厚い装甲', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 6 }] } }],
   phases: [
     { belowHpPct: 50, name: '暴走する工場長', pattern: 'sequence', actions: [
-      { id: 'overdrive', name: '暴走の連打', effects: [{ kind: 'damage', amount: 5, hits: 3 }] },
-      { id: 'quota', name: 'ノルマの嵐', effects: [{ kind: 'damage', amount: 8, to: 'foes' }] },
+      { id: 'overdrive', name: '暴走の連打', big: true, effects: [{ kind: 'damage', amount: 5, hits: 3 }] },
+      { id: 'quota', name: 'ノルマの嵐', big: true, effects: [{ kind: 'damage', amount: 8, to: 'foes' }] },
       { id: 'vent', name: '過熱の排気', effects: [{ kind: 'block', amount: 14 }, { kind: 'applyStatus', status: 'burn', amount: 1, to: 'foes' }] },
     ] },
   ],
@@ -153,8 +153,8 @@ export const stormForemanBot: EnemyDef = makeVariant(foremanBot, {
   resist: ['thunder', 'poison'],
   actions: [
     { id: 'order', name: '雷の号令', effects: [{ kind: 'block', amount: 6, to: 'allies' }] },
-    { id: 'hammer', name: '帯電した鉄槌', effects: [{ kind: 'damage', amount: 10, element: 'thunder' }] },
-    { id: 'hurry', name: '放電で急がせる', effects: [{ kind: 'damage', amount: 4, to: 'foes', element: 'thunder' }] },
+    { id: 'hammer', name: '帯電した鉄槌', big: true, effects: [{ kind: 'damage', amount: 10, element: 'thunder' }] },
+    { id: 'hurry', name: '放電で急がせる', big: true, effects: [{ kind: 'damage', amount: 4, to: 'foes', element: 'thunder' }] },
     { id: 'inspect', name: '厳しい点検', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1 }, { kind: 'damage', amount: 5 }] },
   ],
 });

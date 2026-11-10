@@ -95,7 +95,7 @@ export const sphinxCub: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'riddle', name: '謎かけ', effects: [{ kind: 'drainFocus', amount: 2 }, { kind: 'damage', amount: 6 }] },
-    { id: 'claws', name: '獅子の爪', effects: [{ kind: 'damage', amount: 8, hits: 2 }] },
+    { id: 'claws', name: '獅子の爪', big: true, effects: [{ kind: 'damage', amount: 8, hits: 2 }] },
     { id: 'wings', name: '翼でくるむ', effects: [{ kind: 'block', amount: 14 }] },
     { id: 'puzzle', name: '答えのない問い', effects: [{ kind: 'drainFocus', amount: 1, to: 'foes' }, { kind: 'applyStatus', status: 'weak', amount: 1 }] },
   ],
@@ -116,7 +116,7 @@ export const sandSerpentLord: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'fang', name: '大蛇の毒牙', effects: [{ kind: 'damage', amount: 9 }, { kind: 'applyStatus', status: 'poison', amount: 3 }] },
-    { id: 'constrict', name: '締め付け', effects: [{ kind: 'damage', amount: 7, hits: 2 }, { kind: 'applyStatus', status: 'weak', amount: 1 }] },
+    { id: 'constrict', name: '締め付け', big: true, effects: [{ kind: 'damage', amount: 7, hits: 2 }, { kind: 'applyStatus', status: 'weak', amount: 1 }] },
     { id: 'hood', name: '頭巾を広げる', effects: [{ kind: 'block', amount: 14 }] },
     { id: 'spray', name: '毒の霧', effects: [{ kind: 'applyStatus', status: 'poison', amount: 2, to: 'foes' }] },
   ],
@@ -136,15 +136,15 @@ export const stoneGuardianBeast: EnemyDef = {
   resist: ['poison', 'fire'],
   pattern: 'sequence',
   actions: [
-    { id: 'paw', name: '石の前脚', effects: [{ kind: 'damage', amount: 22 }] },
+    { id: 'paw', name: '石の前脚', big: true, effects: [{ kind: 'damage', amount: 22 }] },
     { id: 'guard', name: '神殿の守り', effects: [{ kind: 'block', amount: 20 }] },
-    { id: 'tail', name: '砂岩の尾', effects: [{ kind: 'damage', amount: 8, to: 'foes' }] },
+    { id: 'tail', name: '砂岩の尾', big: true, effects: [{ kind: 'damage', amount: 8, to: 'foes' }] },
   ],
   abilities: [{ name: '砂岩の体', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 8 }] } }],
   phases: [
     { belowHpPct: 50, name: '咆哮する守護獣', pattern: 'sequence', actions: [
-      { id: 'roar', name: '石の咆哮', effects: [{ kind: 'damage', amount: 12, to: 'foes' }] },
-      { id: 'pounce', name: '砕ける跳びかかり', effects: [{ kind: 'damage', amount: 28 }] },
+      { id: 'roar', name: '石の咆哮', big: true, effects: [{ kind: 'damage', amount: 12, to: 'foes' }] },
+      { id: 'pounce', name: '砕ける跳びかかり', big: true, effects: [{ kind: 'damage', amount: 28 }] },
       { id: 'guard', name: 'ひび割れた守り', effects: [{ kind: 'block', amount: 24 }] },
     ] },
   ],

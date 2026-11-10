@@ -21,6 +21,7 @@ import {
   doorDetail,
   doorKind,
   omenOfType,
+  omenInfoOf,
   canWatchHere,
   partySensesDoors,
   dungeonGrid,
@@ -79,8 +80,8 @@ const GATE = {
 export function doorLook(room: Room) {
   const kind = doorKind(room);
   if (kind !== 'door') return GATE[kind];
-  const omen = omenOfType(room.type) ?? 'mystery';
-  return { color: OMEN_INFO[omen].color, name: OMEN_INFO[omen].name, text: OMEN_INFO[omen].text, Icon: OMEN_ICONS[omen] };
+  const info = omenInfoOf(room.type) ?? { omen: 'mystery' as const, ...OMEN_INFO.mystery };
+  return { color: info.color, name: info.name, text: info.text, Icon: OMEN_ICONS[info.omen] };
 }
 
 /**
@@ -119,6 +120,7 @@ function DoorButtons({ game, choices, ok, canPin, pins, onOpen }: {
               style={{ borderColor: roomPins.length ? PLAYER_COLOR[roomPins[0].seat] : look.color, boxShadow: `0 0 10px ${look.color}` }}
               data-door-choice={room.id}
               data-door-omen={doorKind(room) === 'door' ? (omenOfType(room.type) ?? '') : doorKind(room)}
+              data-door-sealed={getRoomType(room.type).sealedChest || undefined}
             >
               <span className={`flex max-w-full items-center gap-1 font-bold ${many ? 'text-[13px] leading-4' : 'text-[15px] leading-5'}`}>
                 <look.Icon size={many ? 14 : 16} className="shrink-0" style={{ color: look.color }} />
@@ -464,7 +466,8 @@ export function DungeonScreen() {
             <span className="panel flex h-7 shrink-0 items-center gap-1 rounded-full px-2 text-[12px] font-bold text-violet-200 tabular-nums" data-depth>
               <ArrowDown size={13} /> 深さ {depthRow}/{dungeonRows(vr)}
               {!oldShape && depthTier(Math.max(0, depthRow - 1)) > 0 && (
-                <span className="text-amber-200">
+                <span className="flex items-center gap-0.5 text-amber-200" data-depth-bonus>
+                  <Flame size={12} className="text-orange-300" />
                   {DEPTH_TIER_NAME[depthTier(depthRow - 1)]} 報酬+{Math.round(BALANCE.depthBonus.reward[depthTier(depthRow - 1)] * 100)}%
                 </span>
               )}

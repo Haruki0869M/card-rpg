@@ -6,6 +6,6 @@ import type { DifficultyDef } from '../../../types';
 
 export const difficulties: DifficultyDef[] = [
   { id: 'easy', order: 1, name: 'やさしい', description: '初めての人向け。敵が少し弱く、命の灯火×5', enemyLevel: -1, lives: 5, enemyHp: 1.2, enemyAttack: 1.2, corruptionPerTurn: 1 },
-  { id: 'normal', order: 2, name: 'ふつう', description: '標準の歯ごたえ。連携とフォーカスの使い方が鍵（命の灯火×3）', enemyLevel: 0, lives: 3, enemyHp: 1.55, enemyAttack: 1.55, corruptionPerTurn: 1 },
+  { id: 'normal', order: 2, name: 'ふつう', description: '標準の歯ごたえ。連携とフォーカスの使い方が鍵（命の灯火×3）', enemyLevel: 0, lives: 3, enemyHp: 1.65, enemyAttack: 1.65, corruptionPerTurn: 1 },
   { id: 'hard', order: 3, name: 'むずかしい', description: '敵が強く、報酬も少ない。腕に自信のある人へ（命の灯火×2）', enemyLevel: 1, lives: 2, enemyHp: 1.7, enemyAttack: 1.7, reward: 0.8, corruptionPerTurn: 1 },
 ];

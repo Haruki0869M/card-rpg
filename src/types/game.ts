@@ -163,6 +163,11 @@ export interface RoomTypeDef {
   omen?: 'danger' | 'elite' | 'treasure' | 'rest' | 'mystery';
   /** 重い扉で見せる部屋（中ボス。予兆の色は出さず、扉の見た目で分かる） */
   heavyDoor?: boolean;
+  /** 扉の予兆の名前と説明（同じ色の中で、別の名前で見せる時。例: 金の扉の「封魔の宝箱」） */
+  omenName?: string;
+  omenText?: string;
+  /** 封魔の宝箱の部屋（宝箱の部屋が、ダンジョンを作る時に一定の確率でこの種類に変わる。敵は battle の設定で決める） */
+  sealedChest?: boolean;
   /** ランダムダンジョンの途中の行での出やすさ（0なら自動生成では出ない） */
   layoutWeight?: number;
 }
@@ -173,6 +178,8 @@ export interface ChestSpec {
   locked: boolean;
   /** 大宝箱（ボス撃破後） */
   big?: boolean;
+  /** 封魔の宝箱（封印を解くと罠の判定があり、番人との戦闘に勝つと開けられる。部屋の種類 sealedChest） */
+  sealed?: boolean;
 }
 
 export interface Room {
@@ -271,12 +278,14 @@ export interface ChestState {
   hidden?: boolean;
   /** 2人以上のプレイヤーで開ける時: みんなで決めた開け役（そのキャラの担当の人が判定する。ステップ2） */
   opener?: string;
+  /** 封魔の宝箱の進み具合（無し = 封印されている / broken = 封印を解いた。番人との戦闘の前 / cleared = 番人を倒した。開けられる） */
+  seal?: 'broken' | 'cleared';
   /** 2人以上のプレイヤーで開けた時: 中の品物（装備・消耗品）の取り合い（戦闘の装備と同じ「欲しい／余れば／いらない」） */
   claims?: LootClaim[];
 }
 
 export interface ChestRoll {
-  kind: 'lock' | 'luck';
+  kind: 'lock' | 'luck' | 'seal';
   heroId: string;
   results: ('focus' | 'hit' | 'miss')[];
   success: boolean;

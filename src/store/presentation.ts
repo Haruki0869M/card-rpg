@@ -12,14 +12,17 @@ import { doorBeyond, doorDetail, doorOmen, type DoorOmen } from '../engine/game/
 import { restMultiplierOf } from '../engine/game/common';
 import { getRoomType } from '../data/rules';
 import { cardSound, damageSound, petCry, statusSound } from '../audio/cues';
-import { COMBO_NAME } from '../engine/battle/effects';
+import { COMBO_NAMES } from '../engine/battle/effects';
+
+/** 連携の印か（連携・大連携・極連携） */
+const isCombo = (name: string) => !!name && (COMBO_NAMES as readonly string[]).includes(name);
 import { petLoveLevel } from '../engine/game/pets';
 import { BIG_HIT, cardImpact, type ImpactStyle } from './hitStyle';
 import { slotTiming } from './slotTiming';
 import type { SoundId } from '../audio/ids';
 import type { AbilityNotice, BattleEvent, GameCommand, GameState } from '../types';
 
-export type PopupTone = 'damage' | 'block' | 'status' | 'zero' | 'ability' | 'heal' | 'resource';
+export type PopupTone = 'damage' | 'block' | 'status' | 'zero' | 'ability' | 'heal' | 'resource' | 'break';
 export interface PopupDraft { unitId: string; text: string; tone: PopupTone; /** 連携の段階（2 = 金の光・大きな数字、3 = さらに広がる輪。見た目だけ） */ tier?: SynergyTier }
 export interface NoticeDraft extends AbilityNotice { unitId: string; count?: number }
 export interface PresentationFrame {
@@ -61,7 +64,7 @@ export function synergyOf(events: readonly BattleEvent[], allyIds: ReadonlySet<s
   const roll = events.find((e): e is Extract<BattleEvent, { type: 'roll' }> => e.type === 'roll');
   if (!roll?.perfect || (allyIds.size && !allyIds.has(roll.characterId))) return none;
   if (!events.some((e) => e.type === 'damage' && e.amount > 0 && !allyIds.has(e.unitId))) return none;
-  const combo = events.some((e) => e.type === 'ability' && e.name === COMBO_NAME);
+  const combo = events.some((e) => e.type === 'ability' && isCombo(e.name));
   const jobAbilities = [...new Set(events.flatMap((e) => e.type === 'ability' && e.unitId === roll.characterId && (e.source?.kind === 'job' || e.source?.kind === 'inherited') ? [e.name] : []))];
   const layers = 1 + (combo ? 1 : 0) + jobAbilities.length;
   return { tier: layers >= 3 ? 3 : layers === 2 ? 2 : 1, layers, combo, jobAbilities };
@@ -156,6 +159,10 @@ export function battleFrames(events: BattleEvent[], allyIds: ReadonlySet<string>
       const key = `${e.unitId}:${e.source?.kind}:${e.source?.id}:${e.name}`, old = notices.get(key);
       if (old) old.count = (old.count ?? 1) + 1;
       else notices.set(key, { unitId: e.unitId, name: e.name, source: e.source });
+    } else if (e.type === 'break') {
+      // 大技の予告を崩した: 敵の上に大きく「BREAK!」。敵がのけぞる（音は連携と同じ小さな音。静かな音が好み、の決まり）
+      motions.push({ unitId: e.enemyUid, kind: 'hit' }); popups.push({ unitId: e.enemyUid, tone: 'break', text: '⚡BREAK!' });
+      sounds.push('sfx_battle_combo');
     } else if (e.type === 'enemyPhase') {
       motions.push({ unitId: e.enemyUid, kind: 'phase' }); popups.push({ unitId: e.enemyUid, tone: 'ability', text: e.name });
       sounds.push('sfx_boss_phase');
@@ -176,7 +183,7 @@ export function battleFrames(events: BattleEvent[], allyIds: ReadonlySet<string>
   if (notices.size) {
     // 連携・ジョブの能力の小さな音（Step C。殴った音より静か）
     const list = [...notices.values()], noticeSounds: SoundId[] = [];
-    if (list.some((n) => n.name === COMBO_NAME)) noticeSounds.push('sfx_battle_combo');
+    if (list.some((n) => isCombo(n.name))) noticeSounds.push('sfx_battle_combo');
     if (list.some((n) => n.source?.kind === 'job' || n.source?.kind === 'inherited')) noticeSounds.push('sfx_battle_ability');
     frames.push({ delay: 0, notices: list, ...(noticeSounds.length ? { sounds: noticeSounds } : {}) });
   }

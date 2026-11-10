@@ -15,8 +15,8 @@ export const frostGuardian: EnemyDef = {
   pattern: "sequence",
   actions: [
     {"id": "guard", "name": "城門の氷壁", "effects": [{"kind": "block", "amount": 22}]},
-    {"id": "slam", "name": "守護の拳", "effects": [{"kind": "damage", "amount": 16}]},
-    {"id": "sweep", "name": "城門の薙ぎ払い", "effects": [{"kind": "damage", "amount": 8, "to": "foes"}]},
+    {"id": "slam", "name": "守護の拳", big: true, "effects": [{"kind": "damage", "amount": 16}]},
+    {"id": "sweep", "name": "城門の薙ぎ払い", big: true, "effects": [{"kind": "damage", "amount": 8, "to": "foes"}]},
     {"id": "brace", "name": "氷壁の再生", "effects": [{"kind": "block", "amount": 14}, {"kind": "damage", "amount": 6}]},
   ],
   abilities: [{"name": "城門の守り", "effect": {"when": "battleStart", "do": [{"kind": "block", "amount": 10}]}}],
@@ -36,21 +36,21 @@ export const whiteQueen: EnemyDef = {
   pattern: "sequence",
   actions: [
     {"id": "lullaby", "name": "姫の子守歌", "effects": [{"kind": "applyStatus", "status": "weak", "amount": 1}, {"kind": "block", "amount": 8}]},
-    {"id": "promise", "name": "凍った約束", "effects": [{"kind": "damage", "amount": 22, "element": "ice"}]},
+    {"id": "promise", "name": "凍った約束", big: true, "effects": [{"kind": "damage", "amount": 22, "element": "ice"}]},
     {"id": "throne", "name": "氷の玉座", "effects": [{"kind": "block", "amount": 22}, {"kind": "damage", "amount": 6}]},
   ],
   abilities: [{"name": "百年の氷衣", "effect": {"when": "battleStart", "do": [{"kind": "block", "amount": 8}]}}],
   phases: [
     { belowHpPct: 60, name: "帰らぬ春を待つ姫", pattern: 'sequence', actions: [
-      {"id": "spring", "name": "帰らぬ春", "effects": [{"kind": "damage", "amount": 11, "element": "ice", "to": "foes"}]},
-      {"id": "tears", "name": "王女の涙", "effects": [{"kind": "damage", "amount": 20, "element": "holy"}]},
+      {"id": "spring", "name": "帰らぬ春", big: true, "effects": [{"kind": "damage", "amount": 11, "element": "ice", "to": "foes"}]},
+      {"id": "tears", "name": "王女の涙", big: true, "effects": [{"kind": "damage", "amount": 20, "element": "holy"}]},
       {"id": "wall", "name": "拒絶の氷壁", "effects": [{"kind": "block", "amount": 24}]},
       {"id": "memory", "name": "思い出の霜", "effects": [{"kind": "applyStatus", "status": "freeze", "amount": 1}, {"kind": "damage", "amount": 6}]},
     ] },
     { belowHpPct: 30, name: "永遠の冬に呑まれた女王", pattern: 'sequence', actions: [
-      {"id": "winter", "name": "永遠の冬", "effects": [{"kind": "damage", "amount": 16, "element": "ice", "to": "foes"}]},
-      {"id": "prayer", "name": "砕けた祈り", "effects": [{"kind": "damage", "amount": 30, "element": "holy"}]},
-      {"id": "solitude", "name": "百年の孤独", "effects": [{"kind": "block", "amount": 26}, {"kind": "damage", "amount": 8, "to": "foes"}]},
+      {"id": "winter", "name": "永遠の冬", big: true, "effects": [{"kind": "damage", "amount": 16, "element": "ice", "to": "foes"}]},
+      {"id": "prayer", "name": "砕けた祈り", big: true, "effects": [{"kind": "damage", "amount": 30, "element": "holy"}]},
+      {"id": "solitude", "name": "百年の孤独", big: true, "effects": [{"kind": "block", "amount": 26}, {"kind": "damage", "amount": 8, "to": "foes"}]},
     ] },
   ],
 };

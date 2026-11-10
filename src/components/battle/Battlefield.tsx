@@ -7,11 +7,11 @@ import type React from 'react';
 import { BattleBackground, CharacterArt, EnemyArt, preloadEnemyPhases } from '../../art';
 import { getPet } from '../../data/pets';
 import { PetToken } from '../ui/PetToken';
-import { BALANCE, TIMING } from '../../data/balance';
+import { TIMING } from '../../data/balance';
 import { PLAYER_COLOR } from '../../data/theme';
 import { cardOf } from '../../data/cards';
 import { getEnemy, getEnemyAction } from '../../data/enemies';
-import { enemyName, findAlly, weaponRarity, sceneBackground } from '../../engine';
+import { COMBO_NAMES, comboBonusOf, enemyName, findAlly, weaponRarity, sceneBackground } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
 import { useDetail, usePress } from '../../hooks/usePress';
 import { speedFactor, useBattle, type UnitFx } from '../../store/battleStore';
@@ -19,6 +19,7 @@ import type { AllyState, BattleState, EnemyState } from '../../types';
 import { intentView, type IntentPart } from '../format';
 import { HpBar } from '../ui/HpBar';
 import { EffectChip, ELEMENT_ICONS, Shield, Skull, statusStyle, Swords } from '../ui/icons';
+import { Flame } from 'lucide-react';
 import { getElement } from '../../data/elements';
 import { StatusChips } from '../ui/StatusChips';
 import { UnitPopups } from './Popups';
@@ -177,7 +178,16 @@ function IntentBubble({ enemy, onTap }: { enemy: EnemyState; onTap: () => void }
           transition={{ type: 'spring', stiffness: 500, damping: 18 }}
           className="relative flex max-w-full flex-wrap items-center justify-center gap-1 rounded-lg border border-red-300/50 bg-[#1c0a10]/90 px-1.5 py-0.5 text-[14px] leading-5 font-black shadow-[0_2px_0_rgba(0,0,0,.6)]"
           data-intent={enemy.uid}
+          data-intent-big={view.big || undefined}
+          data-intent-broken={view.broken || undefined}
+          style={view.broken ? { borderColor: 'rgba(251,191,36,.9)' } : view.big ? { borderColor: 'rgba(255,90,90,.95)', boxShadow: '0 0 8px rgba(255,80,80,.7), 0 2px 0 rgba(0,0,0,.6)' } : undefined}
         >
+          {/* 大技の予告（体勢を崩せる）。崩した後は「BREAK」の札に変わる */}
+          {view.broken ? (
+            <span className="order-first rounded bg-amber-400 px-1 text-[12px] leading-4 font-black whitespace-nowrap text-amber-950" data-break-mark>⚡BREAK</span>
+          ) : view.big ? (
+            <span className="order-first flex items-center rounded bg-red-600 px-1 text-[12px] leading-4 font-black whitespace-nowrap text-white" data-big-mark><Flame size={12} strokeWidth={2.8} />大技</span>
+          ) : null}
           {view.parts.map((p, i) => (
             <IntentPartView key={i} p={p} />
           ))}
@@ -374,11 +384,15 @@ function ElementMarks({ defId }: { defId: string }) {
 function AimMarks({ battle, enemyUid }: { battle: BattleState; enemyUid: string }) {
   const aimers = battle.allies.filter((a) => !a.dead && battle.aims?.[a.id] === enemyUid);
   const enemy = battle.enemies.find((e) => e.uid === enemyUid);
-  const combo = !!enemy?.hitBy?.length;
+  const activeId = useBattle((s) => s.activeId);
+  // 連携の段階: 今選んでいるキャラが次に攻撃した時の段階（自分しか攻撃していない時は、ほかの仲間が攻撃した時の段階）
+  const hitBy = enemy?.hitBy ?? [];
+  const stage = Math.min(COMBO_NAMES.length - 1, hitBy.filter((x) => x !== activeId).length || hitBy.length);
+  const combo = stage > 0;
   if (!aimers.length && !combo) return null;
   return (
     <div className="flex items-center gap-0.5" data-aims={aimers.map((a) => a.id).join(',')}>
-      {combo && <span className="rounded bg-amber-500/90 px-1 text-[12px] leading-4 font-black text-amber-950">連携+{Math.round(BALANCE.comboBonus * 100)}%</span>}
+      {combo && <span className={`rounded px-1 text-[12px] leading-4 font-black whitespace-nowrap ${stage >= 3 ? 'bg-gradient-to-b from-amber-100 to-amber-400 text-amber-950 ring-1 ring-amber-100' : stage === 2 ? 'bg-amber-400 text-amber-950' : 'bg-amber-500/90 text-amber-950'}`} data-combo-stage={stage}>{COMBO_NAMES[stage]}+{Math.round(comboBonusOf(stage) * 100)}%</span>}
       {aimers.map((a) => (
         <span key={a.id} className="overflow-hidden rounded-full border-2" style={{ width: 20, height: 20, borderColor: PLAYER_COLOR[a.playerId] ?? '#ffd76a' }}>
           <CharacterArt classId={a.classId} gender={a.gender} face className="h-full w-full" />

@@ -56,9 +56,9 @@ export const clockworkKnight: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'guard', name: '真鍮の大盾', effects: [{ kind: 'block', amount: 18 }] },
-    { id: 'slash', name: '秒針の斬撃', effects: [{ kind: 'damage', amount: 18 }] },
+    { id: 'slash', name: '秒針の斬撃', big: true, effects: [{ kind: 'damage', amount: 18 }] },
     { id: 'bash', name: '盾の打撃', effects: [{ kind: 'block', amount: 10 }, { kind: 'damage', amount: 10 }] },
-    { id: 'chime', name: '十二時の鐘', effects: [{ kind: 'damage', amount: 8, to: 'foes' }] },
+    { id: 'chime', name: '十二時の鐘', big: true, effects: [{ kind: 'damage', amount: 8, to: 'foes' }] },
   ],
   abilities: [{ name: '巻き上げた装甲', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 10 }] } }],
 };
@@ -76,9 +76,9 @@ export const moonGardener: EnemyDef = {
   resist: ['dark'],
   pattern: 'sequence',
   actions: [
-    { id: 'thorns', name: '茨の垣根', effects: [{ kind: 'damage', amount: 8, to: 'foes' }] },
-    { id: 'shears', name: '大ばさみ', effects: [{ kind: 'damage', amount: 18 }] },
-    { id: 'prune', name: '枝払い', effects: [{ kind: 'damage', amount: 5, to: 'foes' }, { kind: 'applyStatus', status: 'poison', amount: 2, to: 'foes' }] },
+    { id: 'thorns', name: '茨の垣根', big: true, effects: [{ kind: 'damage', amount: 8, to: 'foes' }] },
+    { id: 'shears', name: '大ばさみ', big: true, effects: [{ kind: 'damage', amount: 18 }] },
+    { id: 'prune', name: '枝払い', big: true, effects: [{ kind: 'damage', amount: 5, to: 'foes' }, { kind: 'applyStatus', status: 'poison', amount: 2, to: 'foes' }] },
     { id: 'hedge', name: '生け垣の守り', effects: [{ kind: 'block', amount: 14 }] },
   ],
   abilities: [{ name: '月夜の庭', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 6, to: 'allies' }] } }],
@@ -97,8 +97,8 @@ export const moonMaiden: EnemyDef = {
   resist: ['holy'],
   pattern: 'sequence',
   actions: [
-    { id: 'moonlight', name: '月光', effects: [{ kind: 'damage', amount: 22, element: 'holy' }] },
-    { id: 'rose', name: '茨の抱擁', effects: [{ kind: 'damage', amount: 7, to: 'foes' }, { kind: 'applyStatus', status: 'poison', amount: 2, to: 'foes' }] },
+    { id: 'moonlight', name: '月光', big: true, effects: [{ kind: 'damage', amount: 22, element: 'holy' }] },
+    { id: 'rose', name: '茨の抱擁', big: true, effects: [{ kind: 'damage', amount: 7, to: 'foes' }, { kind: 'applyStatus', status: 'poison', amount: 2, to: 'foes' }] },
     { id: 'veil', name: '月の帳', effects: [{ kind: 'block', amount: 18 }, { kind: 'damage', amount: 7 }] },
   ],
   abilities: [{ name: '眠りの花びら', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 8 }] } }],
@@ -109,9 +109,9 @@ export const moonMaiden: EnemyDef = {
       pattern: 'sequence',
       actions: [
         { id: 'fullMoon', name: '満月の力', effects: [{ kind: 'block', amount: 12, to: 'allies' }, { kind: 'applyStatus', status: 'regen', amount: 4, to: 'self' }] },
-        { id: 'lunar', name: '満月の光', effects: [{ kind: 'damage', amount: 14, element: 'holy', to: 'foes' }] },
-        { id: 'briar', name: '茨の檻', effects: [{ kind: 'damage', amount: 29 }] },
-        { id: 'petals', name: '散る花びら', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'foes' }, { kind: 'damage', amount: 7, to: 'foes' }] },
+        { id: 'lunar', name: '満月の光', big: true, effects: [{ kind: 'damage', amount: 14, element: 'holy', to: 'foes' }] },
+        { id: 'briar', name: '茨の檻', big: true, effects: [{ kind: 'damage', amount: 29 }] },
+        { id: 'petals', name: '散る花びら', big: true, effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'foes' }, { kind: 'damage', amount: 7, to: 'foes' }] },
       ],
     },
   ],

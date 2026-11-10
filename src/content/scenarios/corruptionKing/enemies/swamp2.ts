@@ -35,9 +35,9 @@ export const fenGuardian: EnemyDef = {
   resist: ["poison"],
   pattern: "sequence",
   actions: [
-    {"id": "slam", "name": "苔石の拳", "effects": [{"kind": "damage", "amount": 12}]},
+    {"id": "slam", "name": "苔石の拳", big: true, "effects": [{"kind": "damage", "amount": 12}]},
     {"id": "guard", "name": "沈んだ石壁", "effects": [{"kind": "block", "amount": 12}]},
-    {"id": "sweep", "name": "沼水の薙ぎ払い", "effects": [{"kind": "damage", "amount": 7, "to": "foes"}]},
+    {"id": "sweep", "name": "沼水の薙ぎ払い", big: true, "effects": [{"kind": "damage", "amount": 7, "to": "foes"}]},
   ],
   abilities: [{"name": "苔石の守り", "effect": {"when": "battleStart", "do": [{"kind": "block", "amount": 4}]}}],
 };

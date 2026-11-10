@@ -4,12 +4,18 @@
 // 予測の数字は、パネルの「予測」と同じ predictCardTotals の「HP減少」（ブロック差し引き後）を使う。
 // 成功数ごとに値が違うので、チップには「一番出やすい成功数」の時の値を出す（同じ確率なら上の成功数）。
 import { useMemo } from 'react';
-import { predictCardTotals, rangeText } from '../../engine/battle/battle';
+import { predictCardTotals, rangeText, type PredictTotals } from '../../engine/battle/battle';
+import { canBreak } from '../../engine/battle/effects';
 import { unitName } from '../../engine/battle/units';
 import { getElement } from '../../data/elements';
 import { cardOf } from '../../data/cards';
 import { useBattle } from '../../store/battleStore';
-import type { BattleState, EnemyState } from '../../types';
+import type { AllyState, BattleState, CardDef, EnemyState } from '../../types';
+import { BALANCE } from '../../data/balance';
+import { getEnemy } from '../../data/enemies';
+import { getStatus } from '../../data/statuses';
+import { attackElement } from '../../engine/battle/cardState';
+import { convertedElement } from '../../engine/abilities';
 import { intentView, type IntentPart } from '../format';
 import { EffectChip, ELEMENT_ICONS, Shield, Skull, statusStyle, Swords } from '../ui/icons';
 
@@ -34,6 +40,34 @@ function MiniIntent({ p }: { p?: IntentPart }) {
   return <span className="shrink-0"><EffectChip e={p.effect} size={12} /></span>;
 }
 
+/** 完全成功で必ず付く状態異常の、的の札での言い方（依頼の文: 火傷確定・凍結＝敵の行動阻止！） */
+const WEAK_STATUS: Record<string, string> = { burn: '火傷確定', freeze: '凍結＝敵の行動阻止！', paralysis: '痺れ＝30%で行動失敗', poison: '毒確定', curse: '呪い確定' };
+
+/**
+ * そのカードの攻撃の属性（武器に宿った属性・属性の変換を入れた後。一番上の段から探す）と、完全成功の段にその属性の攻撃があるか。
+ * 乱数の結果は使わない
+ */
+export function cardAttackElement(ally: AllyState, card: CardDef): { element: string; perfect: boolean } | undefined {
+  for (let i = card.tiers.length - 1; i >= 0; i--) {
+    for (const eff of card.tiers[i].effects) {
+      if (eff.kind !== 'damage') continue;
+      const element = convertedElement(ally, card, attackElement(ally, card, eff.element));
+      if (element) return { element, perfect: i === card.tiers.length - 1 && card.tiers[i].minSuccesses === card.slots };
+    }
+  }
+  return undefined;
+}
+
+/** 弱点を突いている時の案内（例「弱点×1.5！（完全成功で火傷確定）」）。弱点でなければ undefined */
+export function weakGuide(ally: AllyState | undefined, card: CardDef | undefined, enemy: EnemyState): { text: string; note?: string; element: string } | undefined {
+  if (!ally || !card) return undefined;
+  const hit = cardAttackElement(ally, card);
+  if (!hit || !getEnemy(enemy.defId).weak?.includes(hit.element)) return undefined;
+  const el = getElement(hit.element);
+  const st = hit.perfect && el.status ? (WEAK_STATUS[el.status] ?? `${getStatus(el.status).name}確定`) : undefined;
+  return { element: hit.element, text: `弱点×${BALANCE.elementWeakMul}！`, note: st ? `（完全成功で${st}）` : undefined };
+}
+
 /** 予測の文字（HP 45 → 12 / HP 45 → 撃破！ / 幅がある時は → 撃破〜12） */
 export function predictionText(enemy: EnemyState, loss: [number, number] | undefined): string {
   const hp = enemy.hp;
@@ -54,6 +88,8 @@ function useChipPredictions(battle: BattleState, allyId: string, cardUid: string
   return useMemo(() => {
     const preds: Record<string, [number, number] | undefined> = {};
     const badges: Record<string, KillBadge> = {};
+    // 大技の予告を崩せるか（BREAK）: now = 一番出やすい段で崩せる / perfect = 完全成功なら崩せる
+    const breaks: Record<string, 'now' | 'perfect' | undefined> = {};
     const ally = battle.allies.find((a) => a.id === allyId);
     const inst = ally?.hand.find((c) => c.uid === cardUid);
     const tiers = inst ? cardOf(inst).tiers.map((t) => t.minSuccesses) : [];
@@ -62,24 +98,29 @@ function useChipPredictions(battle: BattleState, allyId: string, cardUid: string
     const top = tiers.length - 1;
     for (const e of battle.enemies) {
       if (e.dead) continue;
-      const cache = new Map<number, [number, number] | undefined>();
-      const loss = (t: number) => {
-        if (!cache.has(t)) cache.set(t, predictCardTotals(battle, allyId, cardUid, e.uid, focus, t, allyTargetId).find((x) => x.id === e.uid)?.hpLoss);
+      const cache = new Map<number, PredictTotals | undefined>();
+      const total = (t: number) => {
+        if (!cache.has(t)) cache.set(t, predictCardTotals(battle, allyId, cardUid, e.uid, focus, t, allyTargetId).find((x) => x.id === e.uid));
         return cache.get(t);
       };
+      const loss = (t: number) => total(t)?.hpLoss;
+      if (canBreak(e)) breaks[e.uid] = total(tier)?.breaks ? 'now' : top >= 0 && total(top)?.breaks ? 'perfect' : undefined;
       preds[e.uid] = loss(tier);
       const s = sure >= 0 ? loss(sure) : undefined;
       if (s && s[0] >= e.hp) badges[e.uid] = 'sure';
       else if (top >= 0 && (loss(top)?.[0] ?? 0) >= e.hp) badges[e.uid] = 'perfect';
     }
-    return { preds, badges };
+    return { preds, badges, breaks };
   }, [battle, allyId, cardUid, focus, tier, allyTargetId]);
 }
 
 export function TargetChips({ allyId, cardUid, focus, tier, tierLabel, targetId, allyTargetId }: { allyId: string; cardUid: string; focus: number; tier: number; tierLabel: string; targetId?: string; allyTargetId?: string }) {
   const battle = useBattle((s) => s.battle);
   const tapEnemy = useBattle((s) => s.tapEnemy);
-  const { preds, badges } = useChipPredictions(battle, allyId, cardUid, focus, tier, allyTargetId);
+  const { preds, badges, breaks } = useChipPredictions(battle, allyId, cardUid, focus, tier, allyTargetId);
+  const ally = battle.allies.find((a) => a.id === allyId);
+  const inst = ally?.hand.find((c) => c.uid === cardUid);
+  const card = inst ? cardOf(inst) : undefined;
   const alive = battle.enemies.filter((e) => !e.dead);
   if (!alive.length) return null;
   return (
@@ -90,6 +131,9 @@ export function TargetChips({ allyId, cardUid, focus, tier, tierLabel, targetId,
           const on = e.uid === targetId;
           const text = predictionText(e, preds[e.uid]);
           const kill = text.includes('撃破！');
+          // 弱点を突いている時の案内（新しい依頼文 パート5-1）
+          const weak = weakGuide(ally, card, e);
+          const WeakIcon = weak ? ELEMENT_ICONS[getElement(weak.element).icon] : undefined;
           return (
             <button
               key={e.uid}
@@ -103,6 +147,8 @@ export function TargetChips({ allyId, cardUid, focus, tier, tierLabel, targetId,
               data-chip-selected={on || undefined}
               data-chip-prediction={text}
               data-kill-badge={badges[e.uid]}
+              data-break-chip={breaks[e.uid]}
+              data-weak-chip={weak ? weak.element : undefined}
               className={`relative flex min-h-11 min-w-0 flex-col justify-center rounded-lg border px-1 py-0.5 text-left leading-4 ${on ? 'border-sky-300 bg-sky-900/60 ring-2 ring-sky-300' : 'border-zinc-600 bg-black/40'}`}
             >
               {badges[e.uid] && (
@@ -121,6 +167,15 @@ export function TargetChips({ allyId, cardUid, focus, tier, tierLabel, targetId,
               <span className={`flex flex-wrap gap-x-1 text-[12px] font-bold tabular-nums ${kill ? 'text-amber-300' : 'text-zinc-100'}`}>
                 {text.split(' → ').map((t, i) => <span key={i} className="whitespace-nowrap">{i ? `→ ${t}` : t}</span>)}
               </span>
+              {weak && (
+                <span className="text-[12px] leading-4 font-black" style={{ color: getElement(weak.element).color }} data-weak-guide>
+                  {WeakIcon && <WeakIcon size={12} strokeWidth={2.8} className="mr-0.5 inline align-[-2px]" />}
+                  <span className="whitespace-nowrap">{weak.text}</span>
+                  {weak.note && <span className="font-bold">{weak.note}</span>}
+                </span>
+              )}
+              {/* 大技の予告を出している敵: この攻撃で体勢を崩せるか */}
+              {breaks[e.uid] && !kill && <span className="text-[12px] font-black whitespace-nowrap text-amber-300">{breaks[e.uid] === 'now' ? '⚡BREAK!' : '⚡完全でBREAK'}</span>}
             </button>
           );
         })}

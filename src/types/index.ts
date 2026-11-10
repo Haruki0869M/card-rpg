@@ -340,6 +340,8 @@ export interface EnemyActionDef {
   effects: EnemyEffect[];
   /** 自分以外の敵がいない時はこの行動に変える */
   fallbackIfAloneId?: string;
+  /** 大技（強敵・ボスの強い一撃や全体攻撃）。この予告が出ているターンは、味方が体勢を崩せる（BREAK。抜本的な見直し §3-2） */
+  big?: boolean;
 }
 
 export interface EnemyDef {
@@ -539,6 +541,10 @@ export interface EnemyState {
   phase: number;
   /** このターンにダメージを与えた味方（連携攻撃の判定。M3-C5） */
   hitBy?: string[];
+  /** このターンに味方から受けたHPのダメージの合計（BREAK の「最大HPの2割」の判定。ターンの初めに消す） */
+  turnDamage?: number;
+  /** このターンの予告は、もう体勢を崩された（BREAK は1つの予告に1回。ターンの初めに消す） */
+  broken?: boolean;
 }
 
 export type Phase = 'ally' | 'enemy' | 'victory' | 'defeat' | 'escaped';
@@ -671,6 +677,8 @@ export type BattleEvent =
   | { type: 'status'; unitId: string; status: StatusId; amount: number }
   | { type: 'ability'; unitId: string; name: string; source?: AbilitySource }
   | { type: 'retarget'; enemyUid: string }
+  /** 大技の予告を崩した（BREAK）。why = きっかけ（弱点・完全成功・大ダメージ） */
+  | { type: 'break'; enemyUid: string; why: 'weak' | 'perfect' | 'damage' }
   | { type: 'enemyAct'; enemyUid: string; actionName: string; targetIds: string[] }
   | { type: 'death'; unitId: string }
   | { type: 'enemyPhase'; enemyUid: string; name: string }

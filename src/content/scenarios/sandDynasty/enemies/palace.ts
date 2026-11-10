@@ -38,8 +38,8 @@ export const colossusStatue: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'wall', name: '石の大盾', effects: [{ kind: 'block', amount: 24 }] },
-    { id: 'fist', name: '巨兵の拳', effects: [{ kind: 'damage', amount: 17 }] },
-    { id: 'stomp', name: '地響き', effects: [{ kind: 'damage', amount: 8, to: 'foes' }] },
+    { id: 'fist', name: '巨兵の拳', big: true, effects: [{ kind: 'damage', amount: 17 }] },
+    { id: 'stomp', name: '地響き', big: true, effects: [{ kind: 'damage', amount: 8, to: 'foes' }] },
     { id: 'shove', name: '盾で押し潰す', effects: [{ kind: 'block', amount: 12 }, { kind: 'damage', amount: 8 }] },
   ],
   abilities: [{ name: '砂岩の守り', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 12 }] } }],
@@ -59,21 +59,21 @@ export const sandPharaoh: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'decree', name: '王の勅命', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1 }, { kind: 'block', amount: 10 }] },
-    { id: 'crook', name: '牧者の王杖', effects: [{ kind: 'damage', amount: 22 }] },
+    { id: 'crook', name: '牧者の王杖', big: true, effects: [{ kind: 'damage', amount: 22 }] },
     { id: 'eternity', name: '永遠の守り', effects: [{ kind: 'block', amount: 22 }, { kind: 'damage', amount: 6 }] },
   ],
   abilities: [{ name: '千年の包帯', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 8 }] } }],
   phases: [
     { belowHpPct: 60, name: '民のために永遠を求めた王', pattern: 'sequence', actions: [
-      { id: 'famine', name: '飢えた民の記憶', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2, to: 'foes' }, { kind: 'damage', amount: 6, to: 'foes' }] },
-      { id: 'vow', name: '果たせなかった誓い', effects: [{ kind: 'damage', amount: 24, element: 'dark' }] },
+      { id: 'famine', name: '飢えた民の記憶', big: true, effects: [{ kind: 'applyStatus', status: 'curse', amount: 2, to: 'foes' }, { kind: 'damage', amount: 6, to: 'foes' }] },
+      { id: 'vow', name: '果たせなかった誓い', big: true, effects: [{ kind: 'damage', amount: 24, element: 'dark' }] },
       { id: 'tomb', name: '王墓の壁', effects: [{ kind: 'block', amount: 24 }] },
       { id: 'sand', name: 'こぼれ落ちる砂', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'foes' }, { kind: 'damage', amount: 6 }] },
     ] },
     { belowHpPct: 30, name: '砂嵐に呑まれた王', pattern: 'sequence', actions: [
-      { id: 'storm', name: '王国を呑む砂嵐', effects: [{ kind: 'damage', amount: 16, to: 'foes' }] },
-      { id: 'last', name: '最後の王命', effects: [{ kind: 'damage', amount: 30, element: 'dark' }] },
-      { id: 'dune', name: '民なき王国', effects: [{ kind: 'block', amount: 26 }, { kind: 'damage', amount: 8, to: 'foes' }] },
+      { id: 'storm', name: '王国を呑む砂嵐', big: true, effects: [{ kind: 'damage', amount: 16, to: 'foes' }] },
+      { id: 'last', name: '最後の王命', big: true, effects: [{ kind: 'damage', amount: 30, element: 'dark' }] },
+      { id: 'dune', name: '民なき王国', big: true, effects: [{ kind: 'block', amount: 26 }, { kind: 'damage', amount: 8, to: 'foes' }] },
     ] },
   ],
 };

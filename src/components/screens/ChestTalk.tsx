@@ -4,7 +4,7 @@
 import { Hand } from 'lucide-react';
 import { BALANCE } from '../../data/balance';
 import { PLAYER_COLOR } from '../../data/theme';
-import { heroStats, statChance } from '../../engine';
+import { heroStats, sealStep, statChance } from '../../engine';
 import { LOCAL_PLAYER } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
 import { useOnline } from '../../store/onlineStore';
@@ -25,14 +25,16 @@ export function openerChance(h: Hero, locked: boolean, focus: number): number {
 export function OpenerPicker({ chest, heroes }: { chest: ChestState; heroes: Hero[] }) {
   const dispatchGame = useBattle((s) => s.dispatchGame);
   useOnline((s) => s.tick);
-  const locked = !chest.unlocked;
+  // 封魔の宝箱の封印を解く判定は、鍵開けと同じ（器用）
+  const sealed = sealStep(chest) === 'sealed';
+  const locked = !chest.unlocked || sealed;
   const slots = locked ? BALANCE.lockSlots : BALANCE.chestLuckSlots;
   const best = [...heroes].sort((a, b) => openerChance(b, locked, b.focus) - openerChance(a, locked, a.focus))[0]?.id;
   const seatName = (h: Hero) => useOnline.getState().room?.seatName(h.playerId);
   return (
     <div className="flex flex-col gap-1" data-opener-picker>
       <div className="text-[12px] leading-4 text-zinc-300">
-        だれが開ける？ 全員が同じ人を選ぶと決まります（{locked ? `器用の判定・${slots}枠のうち${BALANCE.lockNeed}つで鍵が開く` : `運の判定・${slots}枠。成功が多いほど中身の格が上がる`}）
+        だれが開ける？ 全員が同じ人を選ぶと決まります（{sealed ? `封印を解く人。器用の判定・${slots}枠のうち${BALANCE.lockNeed}つで罠を避ける。その後、番人との戦闘` : locked ? `器用の判定・${slots}枠のうち${BALANCE.lockNeed}つで鍵が開く` : `運の判定・${slots}枠。成功が多いほど中身の格が上がる`}）
       </div>
       {heroes.map((h) => {
         const st = heroStats(h);
@@ -52,7 +54,7 @@ export function OpenerPicker({ chest, heroes }: { chest: ChestState; heroes: Her
                 {h.id === best && <span className="shrink-0 text-[12px] text-amber-300">おすすめ</span>}
               </span>
               <span className="block text-[12px] text-zinc-300 tabular-nums">
-                {locked ? '鍵が開く' : '完全成功'} <b className="text-amber-200">{p0}%</b>
+                {sealed ? '罠を避ける' : locked ? '鍵が開く' : '完全成功'} <b className="text-amber-200">{p0}%</b>
                 {pMax !== p0 && <>（フォーカス{Math.min(slots, h.focus)}で{pMax}%）</>}
               </span>
               <span className="block truncate text-[12px] text-zinc-400 tabular-nums">

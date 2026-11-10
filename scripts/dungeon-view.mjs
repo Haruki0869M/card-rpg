@@ -164,6 +164,8 @@ async function run(width, height, reduced = false, three = false) {
     g.world.turn = x.heroes[0];
     g.world.acted = [];
     if (mut?.nextType) for (const id of x.dungeon.rooms.find((r) => r.id === x.dungeon.currentRoomId).next) x.dungeon.rooms.find((r) => r.id === id).type = mut.nextType;
+    // 封魔の宝箱（見直しの段階3）: 次の行の部屋を、保存の上で封魔の宝箱に差し替える（番人 = 翠の神殿の強敵）
+    if (mut?.sealed) for (const id of x.dungeon.rooms.find((r) => r.id === x.dungeon.currentRoomId).next) Object.assign(x.dungeon.rooms.find((r) => r.id === id), { type: 'sealedChest', chest: { rarity: 'epic', locked: false, sealed: true }, enemies: [{ defId: 'treeWarden', level: 4 }], eventId: undefined });
   }, mut ?? null);
   await afterBattle();
   if (three) {
@@ -238,10 +240,50 @@ async function run(width, height, reduced = false, three = false) {
   await check('大きな地図');
   await shot('5-map');
   await page.getByLabel('地図を閉じる').click();
+  // 封魔の宝箱（見直しの段階3）: 金の扉のまま「封魔の宝箱」と出て、絵の扉に紫の封印の印。先読みで箱の種類と番人の名前。
+  // 入る → 封印の説明 → 封印を解く（器用の判定）→ 結果と「番人が現れた！」（立ち去れない）→ 番人と戦う → 戦闘の画面
+  await afterBattle({ owl: true, sealed: true });
+  const sealedDoors = await sameDoors('封魔の宝箱の扉');
+  if (sealedDoors.buttons.some((b) => b.kind !== 'treasure')) problems.push(`${tag}: 封魔の宝箱の扉が金（treasure）でない（${sealedDoors.buttons.map((b) => b.kind).join()}）`);
+  const sealedText = await doors.first().innerText();
+  if (!sealedText.includes('封魔の宝箱')) problems.push(`${tag}: 扉のボタンに「封魔の宝箱」が出ない（${sealedText}）`);
+  if (!sealedText.includes('番人')) problems.push(`${tag}: 先読みで番人の名前が出ない（${sealedText}）`);
+  if (!(await doors.first().getAttribute('data-door-sealed'))) problems.push(`${tag}: 扉のボタンに封魔の宝箱の目印が無い`);
+  if ((await page.locator('[data-dungeon-view] [data-wall-door-sealed]').count()) !== (await doors.count())) problems.push(`${tag}: 絵の扉に封印の印が無い`);
+  await check('封魔の宝箱の扉');
+  await shot('5a-sealed-door');
+  await doors.first().click();
+  await page.locator('[data-seal-note]').waitFor({ timeout: 6000 }).catch(() => problems.push(`${tag}: 封魔の宝箱の画面（封印の説明）が出ない`));
+  if (!(await page.getByText('封魔の宝箱（装飾箱）').count())) problems.push(`${tag}: 宝箱の題が「封魔の宝箱（装飾箱）」でない`);
+  if (!(await page.getByRole('button', { name: /立ち去る/ }).count())) problems.push(`${tag}: 封印を解く前なのに「立ち去る」が無い`);
+  await check('封魔の宝箱（封印の前）', false);
+  await shot('5b-sealed-chest');
+  // 2人（P1・P2）なので、先に開け役をみんなで決める（1台なら1回押すと決まる）
+  if (await page.locator('[data-opener-picker]').count()) {
+    if (!(await page.locator('[data-opener-picker]').innerText()).includes('封印を解く人')) problems.push(`${tag}: 開け役の一覧に、封印を解く人の説明が無い`);
+    await shot('5b2-sealed-opener');
+    await page.locator('[data-opener] button').first().click();
+    await page.waitForTimeout(300);
+  }
+  await page.locator('[data-chest-open="sealed"]').click();
+  await page.locator('[data-seal-result]').waitFor({ timeout: 4000 }).catch(() => problems.push(`${tag}: 封印を解いた結果が出ない`));
+  if (!(await page.getByText('番人が現れた！').count())) problems.push(`${tag}: 「番人が現れた！」が出ない`);
+  if (await page.getByRole('button', { name: /立ち去る/ }).count()) problems.push(`${tag}: 封印を解いた後なのに「立ち去る」が出ている`);
+  await page.waitForTimeout(500); // 判定の結果の印（2枠）が出そろうのを待つ
+  if ((await page.locator('[data-seal-result] > div').first().locator('span').count()) < 2) problems.push(`${tag}: 封印の判定の結果が2枠ぶん出ていない`);
+  await check('封魔の宝箱（番人の前）', false);
+  await shot('5c-sealed-guard');
+  await page.locator('[data-chest-open="guard"]').click();
+  await page.getByText('ターン終了').waitFor({ timeout: 6000 }).catch(() => problems.push(`${tag}: 「番人と戦う」の後に戦闘の画面にならない`));
+  await page.waitForTimeout(400);
+  await shot('5d-sealed-battle');
   // 休憩所の3択（休む・瞑想・技を磨く）。HP・フォーカスが満タンの選択肢は薄く「満タン」。技を磨く → 1人ずつカードを1枚選んで＋に
   await edit((g) => {
     const x = g.expeditions[0];
     x.mode = 'rest';
+    x.battle = undefined;
+    x.battleInfo = undefined;
+    x.chest = undefined;
     x.dungeon.opened = true;
     for (const h of g.heroes) {
       h.hp = 9999;
