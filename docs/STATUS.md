@@ -9,6 +9,16 @@
 
 
 
+## 最新（Claude）：ダンジョンの移動演出の画面酔いの手直し（2026-11-10・ブランチ claude/dungeon-calm-11da59・まだ main に入れていない）
+
+オーナーの「動くスピードが早すぎて画面酔いする」への手直し。**見た目だけ**（エンジン・乱数・保存・ゲームの数値は変えていない）。場所は `components/dungeon/DungeonAnim.tsx` と `balance.ts` の `TIMING.dungeon*`。
+- 時間: 扉まで歩く1マス `dungeonWalkStep` 0.15→0.32秒、1歩 `dungeonStep` 0.25→0.4、向きを変える `dungeonTurn` 0.25→0.4（歩く途中で曲がる時もこの時間）、扉 `dungeonDoor` 0.45→0.6。高速モードは半分のまま。
+- 前進のズームを小さく（前の景色 1.45倍→1.16倍、次の景色 0.86→0.94倍から）、振り向き 1.08→1.06倍。ease は簡易の切り替え以外すべて easeInOut。扉が開く時の寄り 2.6→2.0倍。
+- 遠くまで歩く時（コマが6以上）は最初と最後の2コマずつだけ見せ、間は `dim`（少し暗くなって入れ替わり明るく戻る。暗さ0.55＝真っ暗にしない）1回 `dungeonWalkFade` 0.45秒でつなぐ（`shortenWalk`）。最長で約1.9秒。ただし今のダンジョンでは扉までの道は最長5コマなので、実際には暗転は出ない（念のための仕組み）。今の一番長い歩きは約1.8秒（前は約0.8秒）。
+- 簡易（cutinMode simple）・動作軽減は今のまま。演出の途中に次の操作が届いた時のつなぎ直しの仕組みはそのまま。
+- テスト `components/dungeon/dungeonAnim.test.ts`（全ダンジョンの全部屋→全扉で2秒程度まで・高速は半分・最後は今の景色・暗転のまとめ方）。`scripts/dungeon-frames.mjs` に `DUNGEON_FRAMES_STRIP=1`（歩く間のコマを0.1秒おきに保存）と歩く時間の記録を足した。
+- 確認: 型チェック・vitest（924件成功・6件スキップ）・ビルド・dungeon-view・dungeon-frames（チカチカなし）・dice-shots。dungeon-coop（エミュレーターが要る）は回していない。
+
 ## 最新（Claude）：戦闘の見た目と手ごたえ（のっぺり感の改修 A・B・C）（2026-11-10・ブランチ claude/battle-feel-52d7f8・まだ main に入れていない）
 
 Gemini と写真・動画で相談して決め、オーナーが承認した計画（`docs/review/2026-11-10-battle-feel.md`）。**見た目だけ**の変更。ゲームの数値・乱数・エンジン（`src/engine`）・保存の版は変えていない（オンラインでずれない）。見た目の部品は `components/battle/battleFx.css`。

@@ -2,6 +2,7 @@
 // 見た目だけ。ゲームの結果はもう決まっていて、ここは「前の景色」から「今の景色」へのつなぎを端末の中で見せるだけ。
 // 時間は balance.ts の TIMING。高速は半分、カットイン「簡易」は短い切り替えだけ、OS の動作軽減では演出なし。
 // 手直し（チカチカ）: 景色は2枚をずっと置いたまま交互に使う（1歩ごとに作り直さない）。途中の景色は、その位置までに見えたマスだけで描く
+// 手直し（画面酔い）: ゆっくり・寄る幅を小さく・なめらかな easeInOut。遠くまで歩く時は最初と最後の2コマずつだけ見せ、間はふわっと暗転（dim）でつなぐ
 import { motion, useAnimationControls, useReducedMotion } from 'framer-motion';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { dungeonStepSound } from '../../audio/cues';
@@ -16,8 +17,8 @@ import type { DoorOmen } from '../../engine';
 import { Screen } from '../ui/game';
 import { DungeonView } from './DungeonView';
 
-type Kind = 'forward' | 'left' | 'right' | 'back' | 'fade';
-interface Frame {
+type Kind = 'forward' | 'left' | 'right' | 'back' | 'fade' | 'dim';
+export interface Frame {
   /** このコマで現れる景色（歩いた先・向いた先。見えたマスは、このコマの位置までに見えた分だけ） */
   target: DungeonRun;
   kind: Kind;
@@ -62,6 +63,7 @@ export function framesBetween(prev: DungeonRun, next: DungeonRun, factor: number
   const path = findPath(prev, b);
   if (!path?.length) return [{ target: next, kind: 'fade', seconds: TIMING.dungeonSimple, moved }];
   const step = (path.length > 1 ? TIMING.dungeonWalkStep : TIMING.dungeonStep) * factor;
+  const turn = TIMING.dungeonTurn * factor;
   const frames: Frame[] = [];
   const seen = new Set(prev.seen ?? []);
   let cur = { ...a };
@@ -70,31 +72,57 @@ export function framesBetween(prev: DungeonRun, next: DungeonRun, factor: number
     if (d !== cur.facing) {
       const kind = turnKind(cur.facing, d);
       cur = { ...cur, facing: d };
-      frames.push({ target: midRun(next, cur, seen), kind, seconds: step, moved: false });
+      frames.push({ target: midRun(next, cur, seen), kind, seconds: turn, moved: false });
     }
     const [dx, dy] = [[0, 1], [1, 0], [0, -1], [-1, 0]][d];
     cur = { x: cur.x + dx, y: cur.y + dy, facing: d };
     frames.push({ target: midRun(next, cur, seen), kind: 'forward', seconds: step, moved: true });
   }
   // 着いた後に向きを変えた（扉の前まで歩いて北を向く など）
-  if (cur.facing !== b.facing) frames.push({ target: next, kind: turnKind(cur.facing, b.facing), seconds: TIMING.dungeonTurn * factor, moved: false });
+  if (cur.facing !== b.facing) frames.push({ target: next, kind: turnKind(cur.facing, b.facing), seconds: turn, moved: false });
   else frames[frames.length - 1] = { ...frames[frames.length - 1], target: next };
-  return frames;
+  return shortenWalk(frames, factor);
 }
 
-type Pose = { x: string | number; scale: number; opacity: number };
+/** 遠くまで歩く時に見せる、最初と最後のコマの数（間は暗転1回にまとめる） */
+const WALK_EDGE = 2;
+/**
+ * 遠くまで歩く時は、ズームの切り替えを最初と最後の WALK_EDGE コマずつだけにし、間はふわっと暗転してつなぐ（画面酔いの手直し）。
+ * 間の景色は飛ばすが、見えたマスは間のコマまでの分を引き継いでいる（midRun が順に足している）ので、着いた後の景色は今と同じ
+ */
+export function shortenWalk(frames: Frame[], factor: number): Frame[] {
+  if (frames.length <= WALK_EDGE * 2 + 1) return frames;
+  const mid = frames.slice(WALK_EDGE, -WALK_EDGE);
+  const dim: Frame = { target: mid[mid.length - 1].target, kind: 'dim', seconds: TIMING.dungeonWalkFade * factor, moved: true };
+  return [...frames.slice(0, WALK_EDGE), dim, ...frames.slice(-WALK_EDGE)];
+}
+
+type Val = string | number;
+type Pose = { x: Val | Val[]; scale: Val | Val[]; opacity: Val | Val[]; filter: Val | Val[] };
+const B = (n: number) => `brightness(${n})`;
+const P = (x: string, scale: number, opacity: number, b = 1): Pose => ({ x, scale, opacity, filter: B(b) });
+/** 遠くまで歩く間の暗転の暗さ（0〜1。真っ暗にはしない＝チカチカに見えないように） */
+const DIM = 0.55;
 /**
  * 1コマの動き（前の景色 = old、次の景色 = new）。どちらも不透明な絵なので、黒い隙間が見えないように組む:
- * - 前進: 前の景色は奥へ寄りながら（拡大して）下に残り、次の景色がその上に浮かび上がる
+ * - 前進: 前の景色は奥へ少し寄りながら（拡大して）下に残り、次の景色がその上に浮かび上がる（画面酔いの手直しで寄る幅を小さく）
  * - 横を向く: 2つの景色が横に並んで流れる（パノラマ）。隙間も二重にもならない
  * - 振り向く・簡易: 次の景色が上に浮かび上がる
+ * - 暗転（遠くまで歩く間）: 前の景色が少し暗くなり、暗いまま次の景色に入れ替わって、明るく戻る
+ * 急な加速・減速が無いように、簡易の切り替え以外は easeInOut。filter はいつも書いて、暗転の後に暗さが残らないようにする
  */
-const MOVES: Record<Kind, { old: [Pose, Pose]; new: [Pose, Pose]; ease: 'easeOut' | 'easeInOut' }> = {
-  forward: { old: [{ x: '0%', scale: 1, opacity: 1 }, { x: '0%', scale: 1.45, opacity: 1 }], new: [{ x: '0%', scale: 0.86, opacity: 0 }, { x: '0%', scale: 1, opacity: 1 }], ease: 'easeOut' },
-  left: { old: [{ x: '0%', scale: 1, opacity: 1 }, { x: '100%', scale: 1, opacity: 1 }], new: [{ x: '-100%', scale: 1, opacity: 1 }, { x: '0%', scale: 1, opacity: 1 }], ease: 'easeInOut' },
-  right: { old: [{ x: '0%', scale: 1, opacity: 1 }, { x: '-100%', scale: 1, opacity: 1 }], new: [{ x: '100%', scale: 1, opacity: 1 }, { x: '0%', scale: 1, opacity: 1 }], ease: 'easeInOut' },
-  back: { old: [{ x: '0%', scale: 1, opacity: 1 }, { x: '0%', scale: 1.08, opacity: 1 }], new: [{ x: '0%', scale: 1.08, opacity: 0 }, { x: '0%', scale: 1, opacity: 1 }], ease: 'easeOut' },
-  fade: { old: [{ x: '0%', scale: 1, opacity: 1 }, { x: '0%', scale: 1, opacity: 1 }], new: [{ x: '0%', scale: 1, opacity: 0 }, { x: '0%', scale: 1, opacity: 1 }], ease: 'easeOut' },
+const MOVES: Record<Kind, { old: [Pose, Pose]; new: [Pose, Pose]; ease: 'easeOut' | 'easeInOut'; times?: number[] }> = {
+  forward: { old: [P('0%', 1, 1), P('0%', 1.16, 1)], new: [P('0%', 0.94, 0), P('0%', 1, 1)], ease: 'easeInOut' },
+  left: { old: [P('0%', 1, 1), P('100%', 1, 1)], new: [P('-100%', 1, 1), P('0%', 1, 1)], ease: 'easeInOut' },
+  right: { old: [P('0%', 1, 1), P('-100%', 1, 1)], new: [P('100%', 1, 1), P('0%', 1, 1)], ease: 'easeInOut' },
+  back: { old: [P('0%', 1, 1), P('0%', 1.06, 1)], new: [P('0%', 1.06, 0), P('0%', 1, 1)], ease: 'easeInOut' },
+  fade: { old: [P('0%', 1, 1), P('0%', 1, 1)], new: [P('0%', 1, 0), P('0%', 1, 1)], ease: 'easeOut' },
+  dim: {
+    old: [P('0%', 1, 1), { x: '0%', scale: [1, 1.04, 1.04], opacity: 1, filter: [B(1), B(DIM), B(DIM)] }],
+    new: [P('0%', 0.98, 0, DIM), { x: '0%', scale: [0.98, 0.98, 1], opacity: [0, 1, 1], filter: [B(DIM), B(DIM), B(1)] }],
+    ease: 'easeInOut',
+    times: [0, 0.5, 1],
+  },
 };
 
 /**
@@ -164,7 +192,7 @@ export function AnimatedDungeonView({ run, background, omens, onShown, onDoor }:
     const newC = ctl[1 - top];
     oldC.set({ ...m.old[0], zIndex: 0, visibility: 'visible' });
     newC.set({ ...m.new[0], zIndex: 1, visibility: 'visible' });
-    const transition = { duration: f.seconds, ease: m.ease };
+    const transition = { duration: f.seconds, ease: m.ease, ...(m.times ? { times: m.times } : {}) };
     const { id, i, frames } = seq;
     let alive = true;
     Promise.all([oldC.start({ ...m.old[1], transition }), newC.start({ ...m.new[1], transition })]).then(() => {
@@ -191,7 +219,7 @@ export function AnimatedDungeonView({ run, background, omens, onShown, onDoor }:
   // 動いていない時: 上の景色を今の景色にそろえ、下の景色は隠す（置いたまま。次の1歩で使う）
   useLayoutEffect(() => {
     if (seq) return;
-    ctl[top].set({ x: '0%', scale: 1, opacity: 1, zIndex: 1, visibility: 'visible' });
+    ctl[top].set({ x: '0%', scale: 1, opacity: 1, filter: B(1), zIndex: 1, visibility: 'visible' });
     ctl[1 - top].set({ zIndex: 0, visibility: 'hidden' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seq, top]);
@@ -275,7 +303,7 @@ export function DoorOpenScene({ door }: { door: DoorOpen }) {
           className="absolute inset-0"
           style={{ transformOrigin: '50% 58%' }}
           initial={{ scale: 1 }}
-          animate={{ scale: simple ? 1 : 2.6 }}
+          animate={{ scale: simple ? 1 : 2.0 }}
           transition={{ duration: simple ? seconds : seconds * 0.6, delay: simple ? 0 : seconds * 0.4, ease: 'easeIn' }}
           onAnimationComplete={() => finish(door.id)}
         >

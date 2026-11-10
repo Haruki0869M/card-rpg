@@ -195,6 +195,16 @@ for (const w of windows) {
     writeFileSync(`${OUT}/flash-${windows.indexOf(w)}.png`, Buffer.from(worstFrame.data, 'base64'));
   }
   if (!mid.length) report.push(`${w.name}: 途中のコマが無い（演出が短すぎる？）`);
+  report.push(`${w.name}: 歩く時間 ${((w.t1 - w.t0) / 1000).toFixed(2)}秒`);
+  // 前後の見比べ用（DUNGEON_FRAMES_STRIP=1）: 歩く間のコマを 0.1秒おきに保存する
+  if (process.env.DUNGEON_FRAMES_STRIP) {
+    let next = -Infinity, n = 0;
+    for (const f of [before, ...mid, after]) {
+      if (f !== after && f.t < next) continue;
+      next = f.t + 100;
+      writeFileSync(`${OUT}/strip-${windows.indexOf(w)}-${String(n++).padStart(2, '0')}.png`, Buffer.from(f.data, 'base64'));
+    }
+  }
 }
 await lab.close();
 
