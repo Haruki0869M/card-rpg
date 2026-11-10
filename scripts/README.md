@@ -25,8 +25,8 @@
 | `gameData.mjs` | （道具）確認スクリプトから、ゲームのデータ（転職のレベル・条件の数）をそのまま読む |
 | `ops-save-resume.mjs` | 保存して再開（世界マップ・ダンジョン・戦闘・報酬。再開しても保存が同じ／同じ操作で同じ結果。360・390・480） |
 | `dice-shots.mjs` | 移動のサイコロ |
-| `dungeon-view.mjs` | 扉を選ぶダンジョン |
-| `dungeon-frames.mjs` | ダンジョンの歩く演出のチカチカ |
+| `dungeon-view.mjs` | 扉を選ぶダンジョン（扉の絵とボタンが同じ並び・扉の予兆・周囲の警戒と先読み・中ボスの重い扉・休憩所の3択と技を磨く） |
+| `dungeon-frames.mjs` | （旧）ダンジョンの歩く演出のチカチカ。見直しの段階2で歩く演出が無くなったので、今は「歩く演出なし」と出て通るだけ |
 | `chest-show.mjs` | 宝箱の演出 |
 | `online.mjs`・`dungeon-coop.mjs`・`coop-talk.mjs` | オンライン協力（Firebase のエミュレーター `npm run emulators` が要る。本番には書かない） |
 | `perf.mjs`・`world-perf.mjs` | 重さ（CPU を4倍遅くしたフレーム時間） |

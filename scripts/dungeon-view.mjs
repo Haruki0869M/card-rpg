@@ -27,9 +27,10 @@ async function run(width, height, reduced = false, three = false) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   const shot = (n) => page.screenshot({ path: `${OUT}/${tag}-${n}.png` });
-  const check = async (where) => {
+  const check = async (where, view = true) => {
     const list = (await layoutIssues(page)).filter((s) => !s.startsWith('small button: ""')); // 地図のマス（文字なし）は除く
     if (list.length) problems.push(`${tag} ${where}: ${list.join(' / ')}`);
+    if (!view) return;
     const h = await page.locator('[data-dungeon-view]').evaluate((e) => e.getBoundingClientRect().height).catch(() => 0);
     if (h < 200) problems.push(`${tag} ${where}: 通路の絵の高さが ${Math.round(h)}px（200px未満）`);
   };
@@ -237,6 +238,43 @@ async function run(width, height, reduced = false, three = false) {
   await check('大きな地図');
   await shot('5-map');
   await page.getByLabel('地図を閉じる').click();
+  // 休憩所の3択（休む・瞑想・技を磨く）。HP・フォーカスが満タンの選択肢は薄く「満タン」。技を磨く → 1人ずつカードを1枚選んで＋に
+  await edit((g) => {
+    const x = g.expeditions[0];
+    x.mode = 'rest';
+    x.dungeon.opened = true;
+    for (const h of g.heroes) {
+      h.hp = 9999;
+      h.focus = 0;
+      h.pet = undefined;
+    }
+  });
+  await page.locator('[data-rest-choices]').waitFor({ timeout: 4000 }).catch(() => problems.push(`${tag}: 休憩所の3択が出ない`));
+  if ((await page.locator('[data-rest]').count()) !== 3) problems.push(`${tag}: 休憩所の選択肢が3つでない`);
+  if (!(await page.locator('[data-rest="hp"][data-rest-full]').count())) problems.push(`${tag}: HPが満タンなのに「休む」が薄くなっていない`);
+  if (await page.locator('[data-rest="focus"][data-rest-full]').count()) problems.push(`${tag}: フォーカスが減っているのに「瞑想」が満タンの表示`);
+  await check('休憩所', false);
+  await shot('6-rest-three-choices');
+  const upgradedBefore = await page.evaluate(() => JSON.parse(localStorage.getItem('card-rpg/adventure')).game.heroes.map((h) => h.deck.filter((c) => c.upgraded).length));
+  await page.locator('[data-rest="upgrade"]').click();
+  for (let i = 0; i < 2; i++) {
+    const task = page.locator('[data-hero-task]');
+    if (!(await task.waitFor({ timeout: 4000 }).then(() => true).catch(() => false))) {
+      problems.push(`${tag}: 技を磨くの後、${i + 1}人目のカードを選ぶ画面が出ない`);
+      break;
+    }
+    if (i === 0) {
+      await check('技を磨く（カードを選ぶ）', false);
+      await shot('7-hone-pick-card');
+    }
+    await task.locator('button[aria-pressed]').first().click();
+    await task.getByRole('button', { name: /強化する|決める|これにする/ }).click();
+    await page.waitForTimeout(500);
+  }
+  await page.waitForTimeout(500);
+  const upgradedAfter = await page.evaluate(() => JSON.parse(localStorage.getItem('card-rpg/adventure')).game.heroes.map((h) => h.deck.filter((c) => c.upgraded).length));
+  if (!upgradedAfter.every((n, i) => n === upgradedBefore[i] + 1)) problems.push(`${tag}: 技を磨くで、全員のカードが1枚ずつ＋になっていない（${upgradedBefore} → ${upgradedAfter}）`);
+  if (!(await page.locator('[data-door-choice]').count())) problems.push(`${tag}: 技を磨いた後、扉の画面に戻らない`);
   if (errors.length) problems.push(`${tag}: 画面の例外 ${errors.join(' / ')}`);
   await page.close();
   console.log(`${tag}: 確認済み`);
@@ -251,4 +289,4 @@ if (problems.length) {
   console.log('NG:\n' + problems.join('\n'));
   process.exit(1);
 }
-console.log('OK: 扉の絵とボタンが同じ並び（1つ・2つ・3つ）・5色の予兆・周囲の警戒（フォーカス1）と先読み・中ボスの重い扉・扉の演出・ミニマップ・大きな地図（360/390/480・360×560・動作軽減）');
+console.log('OK: 扉の絵とボタンが同じ並び（1つ・2つ・3つ）・5色の予兆・周囲の警戒（フォーカス1）と先読み・中ボスの重い扉・扉の演出・ミニマップ・大きな地図・休憩所の3択と技を磨く（360/390/480・360×560・動作軽減）');

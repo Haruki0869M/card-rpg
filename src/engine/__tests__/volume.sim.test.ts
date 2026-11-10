@@ -265,7 +265,7 @@ export function table(all: Record<string, Record<string, Run[]>>): string {
     戦闘のそのほか: ['END_TURN', 'ENEMY_STEP', 'FINISH_BATTLE', 'ENCOUNTER_CHOOSE', 'ENCOUNTER_CONTINUE', 'ENCOUNTER_JOIN'],
     報酬・成長: ['PICK_CARD', 'CHOOSE_GROWTH', 'FINISH_REWARD', 'CLAIM_LOOT'],
     世界マップの移動: ['WORLD_ROLL_MOVE', 'WORLD_MOVE', 'WORLD_MOVE_AGREE', 'WORLD_WAIT', 'WORLD_INVITE', 'WORLD_INVITE_ANSWER', 'WORLD_INTERACT'],
-    ダンジョンの歩き: ['DUNGEON_STEP', 'ENTER_ROOM', 'EXPLORE_ROLL', 'EXPLORE_ROLLER', 'EXPLORE_END'],
+    ダンジョンの歩き: ['DUNGEON_STEP', 'ENTER_ROOM', 'DUNGEON_SCOUT'],
     イベント・話: ['CHOOSE_EVENT', 'FINISH_EVENT', 'STORY_CONTINUE'],
   };
   const known = new Set(Object.values(GROUPS).flat());
