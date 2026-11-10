@@ -1,0 +1,195 @@
+/* ===== 戦闘画面の見た目（2026-11 戦闘の手ごたえ改修）。見た目だけ。状態・乱数・同期には触れない =====
+ * 動きは transform と opacity だけ（軽い）。OS の「動きを減らす」と、設定の「簡易」（[data-calm]）では止める。
+ */
+
+/* ----- 段階A: 呼吸（足元を基準に、わずかに伸び縮みして揺れる。周期は個体ごとに --breath でずらす） ----- */
+@keyframes live-breathe {
+  0%, 100% { transform: translateY(0) scale(1, 1) rotate(0deg); }
+  25% { transform: translateY(-1px) scale(0.996, 1.012) rotate(var(--sway, 0.5deg)); }
+  50% { transform: translateY(-2.5px) scale(0.99, 1.03) rotate(0deg); }
+  75% { transform: translateY(-1px) scale(0.996, 1.012) rotate(calc(var(--sway, 0.5deg) * -1)); }
+}
+.idle-live {
+  transform-origin: 50% 100%;
+  animation: live-breathe var(--breath, 2.8s) ease-in-out infinite;
+  animation-delay: var(--breath-delay, 0s);
+  will-change: transform;
+}
+/* 足元の影: 息を吸うと少し縮む（体が浮く感じ） */
+@keyframes shadow-breathe {
+  0%, 100% { transform: translateX(-50%) scaleX(1); opacity: 0.9; }
+  50% { transform: translateX(-50%) scaleX(0.9); opacity: 0.7; }
+}
+.foot-shadow {
+  position: absolute;
+  left: 50%;
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.4) 55%, transparent);
+  animation: shadow-breathe var(--breath, 2.8s) ease-in-out infinite;
+  animation-delay: var(--breath-delay, 0s);
+  transform: translateX(-50%);
+}
+/* 属性のオーラ（次の攻撃の属性の色）。ゆっくり脈打つ */
+@keyframes aura-pulse {
+  0%, 100% { opacity: 0.35; transform: translateX(-50%) scale(0.9); }
+  50% { opacity: 0.85; transform: translateX(-50%) scale(1.06); }
+}
+.element-aura {
+  position: absolute;
+  left: 50%;
+  pointer-events: none;
+  border-radius: 50%;
+  animation: aura-pulse 1.8s ease-in-out infinite;
+  transform: translateX(-50%);
+  mix-blend-mode: screen;
+}
+
+/* ----- 段階A: 狙う敵のスポットライト・足元に回るターゲットリング ----- */
+@keyframes ring-spin { to { transform: rotate(360deg); } }
+.target-ring-spin { animation: ring-spin 3.2s linear infinite; transform-origin: 50% 50%; }
+@keyframes spotlight-in { from { opacity: 0; } to { opacity: 1; } }
+.spotlight-beam { animation: spotlight-in 0.18s ease-out both; }
+
+/* ----- 段階A: 操作パネル（すりガラス調の重い枠。戦場は縮めず、味方の下半身〜手札の上に重ねる） ----- */
+.glass-panel {
+  background:
+    linear-gradient(180deg, rgba(34, 28, 56, 0.8) 0%, rgba(14, 11, 26, 0.9) 60%, rgba(10, 8, 20, 0.94) 100%) padding-box,
+    linear-gradient(180deg, #fbe7a4 0%, #b88a36 30%, #5e4318 62%, #d7b05a 100%) border-box;
+  border: 2px solid transparent;
+  -webkit-backdrop-filter: blur(7px) saturate(1.15);
+  backdrop-filter: blur(7px) saturate(1.15);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 240, 200, 0.25),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 3px rgba(255, 215, 130, 0.08),
+    0 -6px 18px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(0, 0, 0, 0.7);
+}
+/* 上の縁の飾り（中央の宝石と金の線） */
+.glass-panel-crest {
+  position: absolute;
+  left: 50%;
+  top: -7px;
+  width: 12px;
+  height: 12px;
+  transform: translateX(-50%) rotate(45deg);
+  background: linear-gradient(135deg, #fff3c4, #e2a72a 55%, #7a4a08);
+  box-shadow: 0 0 8px rgba(255, 200, 90, 0.9), 0 0 0 1.5px #2a1a06;
+  pointer-events: none;
+}
+
+
+/* ----- 段階B: 技名の帯（シャープな平行四辺形・金の線・光が走る） ----- */
+.callout-band {
+  clip-path: polygon(16px 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+  overflow: hidden;
+}
+.callout-ally {
+  background:
+    linear-gradient(180deg, #fbe7a4, #b88a36) top / 100% 2px no-repeat,
+    linear-gradient(180deg, #b88a36, #fbe7a4) bottom / 100% 2px no-repeat,
+    linear-gradient(90deg, rgba(20, 34, 80, 0.2), rgba(30, 56, 130, 0.94) 18%, rgba(22, 40, 100, 0.94) 82%, rgba(20, 34, 80, 0.2));
+}
+.callout-enemy {
+  background:
+    linear-gradient(180deg, #ffb0a0, #a8302a) top / 100% 2px no-repeat,
+    linear-gradient(180deg, #a8302a, #ffb0a0) bottom / 100% 2px no-repeat,
+    linear-gradient(90deg, rgba(80, 10, 16, 0.2), rgba(130, 20, 30, 0.94) 18%, rgba(100, 14, 22, 0.94) 82%, rgba(80, 10, 16, 0.2));
+}
+.callout-gem {
+  transform: rotate(45deg);
+  border: 1.5px solid #fbe7a4;
+  background: radial-gradient(circle, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.85));
+  box-shadow: 0 0 6px rgba(255, 210, 120, 0.7);
+}
+.callout-gem > * { transform: rotate(-45deg); }
+@keyframes callout-sheen { from { transform: translateX(-120%) skewX(-20deg); } to { transform: translateX(260%) skewX(-20deg); } }
+.callout-sheen {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  animation: callout-sheen 0.5s ease-out both;
+  pointer-events: none;
+}
+
+/* ----- 段階B: 命中のエフェクト（粒は決まった角度に飛ぶ。乱数は使わない） ----- */
+@keyframes fx-spark-fly {
+  from { transform: translate(-50%, -50%) rotate(var(--a)) translateY(-6px) scaleY(1); opacity: 1; }
+  to { transform: translate(-50%, -50%) rotate(var(--a)) translateY(calc(var(--reach, 34px) * -1)) scaleY(0.3); opacity: 0; }
+}
+.fx-spark {
+  position: absolute; left: 50%; top: 50%; width: 3px; height: 14px; border-radius: 2px;
+  box-shadow: 0 0 5px rgba(255, 230, 150, 0.95);
+  animation: fx-spark-fly var(--d, 0.4s) ease-out both;
+}
+@keyframes fx-mote-fly {
+  0% { transform: translate(-50%, -50%) rotate(var(--a)) translateY(-4px) scale(1); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translate(-50%, -50%) rotate(var(--a)) translateY(calc(var(--reach, 32px) * -1)) scale(0.4); opacity: 0; }
+}
+.fx-mote {
+  position: absolute; left: 50%; top: 50%; width: 5px; height: 5px; border-radius: 50%;
+  animation: fx-mote-fly var(--d, 0.4s) ease-out both;
+}
+@keyframes fx-ring-grow { from { transform: translate(-50%, -50%) scale(0.2); opacity: 1; } to { transform: translate(-50%, -50%) scale(1.6); opacity: 0; } }
+.fx-ring {
+  position: absolute; left: 50%; top: 52%; width: 70%; aspect-ratio: 1; border-radius: 50%;
+  border: 4px solid #fff3c4; box-shadow: 0 0 10px rgba(255, 230, 160, 0.8), inset 0 0 8px rgba(255, 230, 160, 0.6);
+  animation: fx-ring-grow var(--d, 0.4s) ease-out both;
+}
+.fx-ring-small { width: 38%; }
+@keyframes fx-shot-fly { from { transform: translate(-50%, 70%) scaleY(0.4); opacity: 0; } 30% { opacity: 1; } to { transform: translate(-50%, -40%) scaleY(1); opacity: 0; } }
+.fx-shot {
+  position: absolute; left: 50%; top: 30%; width: 4px; height: 60%; border-radius: 2px;
+  box-shadow: 0 0 8px rgba(255, 240, 200, 0.9);
+  animation: fx-shot-fly var(--d, 0.2s) ease-in both;
+}
+@keyframes fx-pillar-rise { 0% { transform: scaleY(0); opacity: 0; } 30% { transform: scaleY(1); opacity: 1; } 100% { transform: scaleY(1); opacity: 0; } }
+.fx-pillar {
+  position: absolute; left: 18%; right: 18%; bottom: 0; top: -10%; border-radius: 40% 40% 0 0;
+  transform-origin: 50% 100%; mix-blend-mode: screen;
+  animation: fx-pillar-rise var(--d, 0.4s) ease-out both;
+}
+@keyframes fx-rise-up { from { transform: translateY(0); opacity: 0; } 25% { opacity: 1; } to { transform: translateY(-70px); opacity: 0; } }
+.fx-rise {
+  position: absolute; bottom: 8%; width: 4px; height: 4px; border-radius: 50%;
+  animation: fx-rise-up var(--d, 0.4s) ease-out both;
+}
+
+
+/* ----- 段階C: スロット（回る枠・リーチの強い光・フォーカスの確定枠・完全成功の弾ける輪） ----- */
+.slot-reel {
+  position: relative; display: block; width: 36px; height: 36px; overflow: hidden; border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  background: linear-gradient(180deg, #1a1626, #2c2640 50%, #1a1626);
+  box-shadow: inset 0 6px 6px -4px rgba(0, 0, 0, 0.8), inset 0 -6px 6px -4px rgba(0, 0, 0, 0.8);
+}
+@keyframes slot-reel-roll { from { transform: translateY(0); } to { transform: translateY(-108px); } }
+.slot-reel-strip { display: flex; flex-direction: column; animation: slot-reel-roll 0.16s linear infinite; }
+@keyframes slot-reach-glow {
+  0%, 100% { box-shadow: 0 0 8px 2px rgba(255, 200, 80, 0.7), inset 0 0 6px rgba(255, 220, 140, 0.6); }
+  50% { box-shadow: 0 0 18px 6px rgba(255, 210, 90, 1), inset 0 0 10px rgba(255, 236, 170, 0.9); }
+}
+.slot-reel-reach { border-color: #ffe9a8; animation: slot-reach-glow 0.22s ease-in-out infinite; }
+.slot-focus-locked { box-shadow: 0 0 10px rgba(255, 200, 80, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.7); }
+@keyframes slot-burst { from { transform: translate(-50%, -50%) scale(0.3); opacity: 1; } to { transform: translate(-50%, -50%) scale(2.2); opacity: 0; } }
+.slot-perfect-burst {
+  position: absolute; left: 50%; top: 50%; width: 120px; height: 120px; border-radius: 50%; pointer-events: none;
+  border: 4px solid #ffd76a;
+  box-shadow: 0 0 18px 6px rgba(255, 200, 80, 0.8), inset 0 0 14px rgba(255, 236, 170, 0.8);
+  animation: slot-burst 0.45s ease-out both;
+}
+
+/* ----- 段階C: 敵の行動順のバー ----- */
+@keyframes order-now { 0%, 100% { box-shadow: 0 0 6px rgba(255, 90, 80, 0.6); } 50% { box-shadow: 0 0 14px rgba(255, 110, 90, 1); } }
+.enemy-order-now { animation: order-now 0.7s ease-in-out infinite; }
+
+/* 動きを減らす（OS の設定・ゲームの設定「簡易」） */
+@media (prefers-reduced-motion: reduce) {
+  .idle-live, .foot-shadow, .element-aura, .target-ring-spin, .spotlight-beam, .callout-sheen, .fx-spark, .fx-mote, .fx-rise { animation: none; }
+  .fx-spark, .fx-mote, .fx-rise { display: none; }
+  .slot-reel-strip, .slot-reel-reach, .slot-perfect-burst, .enemy-order-now { animation: none; }
+}
+[data-calm] .idle-live, [data-calm] .foot-shadow, [data-calm] .element-aura, [data-calm] .target-ring-spin, [data-calm] .enemy-order-now { animation: none; }

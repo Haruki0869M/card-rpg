@@ -14,6 +14,8 @@ import { getRoomType } from '../data/rules';
 import { cardSound, damageSound, petCry, statusSound } from '../audio/cues';
 import { COMBO_NAME } from '../engine/battle/effects';
 import { petLoveLevel } from '../engine/game/pets';
+import { BIG_HIT, cardImpact, type ImpactStyle } from './hitStyle';
+import { slotTiming } from './slotTiming';
 import type { SoundId } from '../audio/ids';
 import type { AbilityNotice, BattleEvent, GameCommand, GameState } from '../types';
 
@@ -32,7 +34,18 @@ export interface PresentationFrame {
   quiet?: boolean;
   /** このコマで連携の演出（揺れ・輪）を始める段階（Step C。見た目だけ） */
   synergy?: SynergyTier;
+  /** 段階B: 技名の帯（味方のカード・敵の技。行動の最初のコマ） */
+  callout?: CalloutDraft;
+  /** 段階B: 命中・障壁・光の柱のエフェクト（受けたユニットの上に出す） */
+  impacts?: ImpactDraft[];
+  /** 段階B: 戦場全体を揺らす（大ダメージ・完全成功） */
+  shake?: boolean;
+  /** 段階B: 敵の攻撃を味方のブロックで防いだ（味方の前に盾を出して弾く） */
+  guards?: string[];
 }
+
+export interface CalloutDraft { side: 'ally' | 'enemy'; actorId: string; cardId?: string; actionName?: string }
+export interface ImpactDraft { unitId: string; style: ImpactStyle; color?: string; big?: boolean }
 
 /** 重なりの段階（Step C）。1 = いつもの完全成功、2 = 完全成功＋連携かジョブの能力、3 = 3つ以上の重なり */
 export type SynergyTier = 1 | 2 | 3;
@@ -62,14 +75,21 @@ export function battleFrames(events: BattleEvent[], allyIds: ReadonlySet<string>
   const tailSounds: SoundId[] = [];
   const roll = events.find(e => e.type === 'roll');
   const act = events.find(e => e.type === 'enemyAct');
+  // 段階B: 当たった時の見た目（味方のカード = 武器種・属性で決める。敵の技 = 赤い爪あと。ほか = 衝撃）
+  let actImpact: { style: ImpactStyle; color?: string } = { style: 'impact' };
+  const rollCard = roll?.type === 'roll' ? getCard(roll.cardId) : undefined;
   if (roll?.type === 'roll') {
     actors.add(roll.characterId);
-    const card = getCard(roll.cardId);
-    frames.push({ delay: 0, roll, motions: [{ unitId: roll.characterId, kind: card.target === 'self' ? 'cast' : 'attack' }], sounds: ['sfx_battle_card_play'] });
+    const card = rollCard!;
+    actImpact = cardImpact(card);
+    frames.push({ delay: 0, roll, motions: [{ unitId: roll.characterId, kind: card.target === 'self' ? 'cast' : 'attack' }], sounds: ['sfx_battle_card_play'], callout: { side: 'ally', actorId: roll.characterId, cardId: roll.cardId } });
     if (roll.successes > 0) pendingCast = cardSound(card);
   } else if (act?.type === 'enemyAct') {
-    actors.add(act.enemyUid); frames.push({ delay: 0, motions: [{ unitId: act.enemyUid, kind: 'attack' }], sounds: ['sfx_enemy_attack_start'] });
+    actImpact = { style: 'enemy' };
+    actors.add(act.enemyUid); frames.push({ delay: 0, motions: [{ unitId: act.enemyUid, kind: 'attack' }], sounds: ['sfx_enemy_attack_start'], callout: { side: 'enemy', actorId: act.enemyUid, actionName: act.actionName } });
   }
+  const actorId = roll?.type === 'roll' ? roll.characterId : act?.type === 'enemyAct' ? act.enemyUid : undefined;
+  let shaken = false;
   const notices = new Map<string, NoticeDraft>();
   // 重なりの段階（Step C）: 2以上なら、この行動で敵に出すダメージの数字を大きく金色にし、最初のコマで揺れ・輪を始める
   const synergy = synergyOf(events, allyIds), bigTier = synergy.tier >= 2 ? (synergy.tier as SynergyTier) : undefined;
@@ -78,6 +98,8 @@ export function battleFrames(events: BattleEvent[], allyIds: ReadonlySet<string>
   const hitCounts = new Map<string, number>();
   for (const e of events) {
     const popups: PopupDraft[] = [], motions: NonNullable<PresentationFrame['motions']> = [], sounds: SoundId[] = [];
+    const impacts: ImpactDraft[] = [], guards: string[] = [];
+    let shake = false;
     if (e.type === 'damage') {
       if (e.sourceId && !actors.has(e.sourceId)) {
         actors.add(e.sourceId); frames.push({ delay: 0, motions: [{ unitId: e.sourceId, kind: 'attack' }] }); firstEffect = true;
@@ -101,11 +123,21 @@ export function battleFrames(events: BattleEvent[], allyIds: ReadonlySet<string>
       if (e.blocked > 0 || e.amount === 0) popups.push({ unitId: e.unitId, tone: 'zero', text: e.blocked > 0 ? `防御${e.blocked}` : '0' });
       if (e.amount > 0 || e.blocked > 0) motions.push({ unitId: e.unitId, kind: 'hit' });
       sounds.push(damageSound(e.amount, e.blocked, allyIds.has(e.unitId)));
-    } else if (e.type === 'block' && e.amount > 0) { popups.push({ unitId: e.unitId, tone: 'block', text: `ブロック+${e.amount}` }); sounds.push('sfx_status_block_gain'); }
-    else if (e.type === 'heal' && e.amount > 0) { popups.push({ unitId: e.unitId, tone: 'heal', text: `HP+${e.amount}` }); sounds.push('sfx_status_heal'); }
+      // 段階B: 命中のエフェクト。行動した本人の攻撃ならその見た目、ほか（反撃・召喚など）は衝撃
+      const own = !e.sourceId || e.sourceId === actorId;
+      const look = own ? actImpact : allyIds.has(e.sourceId!) ? { style: 'impact' as const } : { style: 'enemy' as const };
+      if (e.amount > 0) impacts.push({ unitId: e.unitId, ...look, ...(e.amount >= BIG_HIT ? { big: true } : {}) });
+      // 味方がブロックで防いだ（敵の攻撃）: 盾を出して弾く
+      if (e.blocked > 0 && allyIds.has(e.unitId) && !allyIds.has(e.sourceId ?? actorId ?? '')) guards.push(e.unitId);
+      // 大ダメージ・完全成功（敵に当たった最初の一撃）は戦場を揺らす
+      if (e.amount >= BIG_HIT || (roll?.type === 'roll' && roll.perfect && e.amount > 0 && !allyIds.has(e.unitId) && !shaken)) shake = true;
+    } else if (e.type === 'block' && e.amount > 0) { popups.push({ unitId: e.unitId, tone: 'block', text: `ブロック+${e.amount}` }); sounds.push('sfx_status_block_gain'); impacts.push({ unitId: e.unitId, style: 'barrier' }); }
+    else if (e.type === 'heal' && e.amount > 0) { popups.push({ unitId: e.unitId, tone: 'heal', text: `HP+${e.amount}` }); sounds.push('sfx_status_heal'); impacts.push({ unitId: e.unitId, style: 'heal' }); }
     else if (e.type === 'status' && e.amount) {
       const def = getStatus(e.status);
       popups.push({ unitId: e.unitId, tone: 'status', text: `${def.name}${e.amount > 0 ? '+' : ''}${e.amount}` });
+      // 味方のカードで味方が強くなった（支援）: 金の光の柱
+      if (e.amount > 0 && allyIds.has(e.unitId) && roll?.type === 'roll' && !def.harmful) impacts.push({ unitId: e.unitId, style: 'buff' });
       const snd = statusSound(def, e.amount); if (snd) sounds.push(snd);
     }
     else if (e.type === 'resource' && e.amount > 0) { popups.push({ unitId: e.unitId, tone: 'resource', text: `${e.resource === 'focus' ? 'フォーカス' : 'マナ'}+${e.amount}` }); sounds.push(e.resource === 'focus' ? 'sfx_status_focus' : 'sfx_status_mana'); }
@@ -130,8 +162,13 @@ export function battleFrames(events: BattleEvent[], allyIds: ReadonlySet<string>
     }
     if (popups.length || motions.length) {
       if (pendingCast) { sounds.unshift(pendingCast); pendingCast = undefined; }
-      const frame: PresentationFrame = { delay: firstEffect && actors.size ? TIMING.actionLead : TIMING.effectStep, popups, motions };
+      // 段階C: カードの効果は、スロットが全部止まって結果が出てから（攻撃のエフェクトへつなぐ）。敵の行動は今までどおり
+      const lead = firstEffect && roll?.type === 'roll' && frames.length === 1 ? Math.max(TIMING.actionLead, slotTiming(roll.results).total) : TIMING.actionLead;
+      const frame: PresentationFrame = { delay: firstEffect && actors.size ? lead : TIMING.effectStep, popups, motions };
       if (sounds.length) frame.sounds = [...new Set(sounds)];
+      if (impacts.length) frame.impacts = impacts;
+      if (guards.length) frame.guards = guards;
+      if (shake) { frame.shake = true; shaken = true; }
       if (bigTier && !synergyStarted && popups.some((p) => p.tier)) { frame.synergy = bigTier; synergyStarted = true; }
       frames.push(frame); firstEffect = false;
     }
