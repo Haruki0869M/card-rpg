@@ -26,11 +26,13 @@ async function shot(name) {
   const issues = await layoutIssues(page); check(!issues.length, `${name}: ${issues}`);
   await page.screenshot({ path: `${dir}/${name}.png` });
 }
+// 特殊ジョブへ転職できるレベル（src/data/balance.ts の jobChange.special と合わせる）
+const SPECIAL_LV = 7;
 const config = [
   ['shrineMaiden', '巫女', 'bishop', 'prayers', 3, 'woodScepter', '癒やしの祝詞', 'divinePossession'],
   ['astrologer', '占星術師', 'bishop', 'perfects:luk', 5, 'apprenticeTome', '星の光条', 'starRay'],
   ['machinist', '機工士', 'archer', 'checks:mechanism', 5, 'antiqueGun', '精密射撃', 'placeTrap'],
-  ['bard', '吟遊詩人', 'phantomThief', 'support:others', 10, 'travelerLute', '勇気の歌', 'bardCourage'],
+  ['bard', '吟遊詩人', 'phantomThief', 'support:others', 30, 'travelerLute', '勇気の歌', 'bardCourage'],
   ['gambler', '賭博師', 'phantomThief', 'checks:luk', 10, 'rustyDagger', '勝負の一撃', 'gambleStrike'],
 ];
 try {
@@ -41,7 +43,7 @@ try {
     for (const [id, name, from, feat, count, weapon, signature, cardId] of config) {
       const d = structuredClone(base), g = d.game, h = g.heroes[0], w = g.world;
       g.expeditions = []; g.mode = 'world'; g.party = undefined; g.battle = undefined; g.dungeon = undefined; g.sanctuary = undefined;
-      h.classId = from; h.level = 3; h.feats = { [feat]: count }; delete h.equipment.weapon;
+      h.classId = from; h.level = SPECIAL_LV; h.feats = { [feat]: count }; delete h.equipment.weapon;
       w.story = undefined; w.turn = h.id; w.pos[h.id] = w.tiles.findIndex(t => t.f?.id === 'pilgrimTemple');
       await resume(d);
       await page.getByText('巡礼の神殿に入る', { exact: true }).click();

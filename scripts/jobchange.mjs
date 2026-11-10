@@ -1,7 +1,9 @@
-// 転職の画面の確認: 世界マップで剣士をLv6にして、パーティ → 転職先を見る → 剣豪に転職 → 専用カードを1枚選ぶ
+// 転職の画面の確認: 世界マップで剣士を転職できるレベルにして、パーティ → 転職先を見る → 剣豪に転職 → 専用カードを1枚選ぶ
 // 使い方: npx vite preview を起こしてから node scripts/jobchange.mjs
 import { chromium, layoutIssues, URL, depart } from './lib.mjs';
 
+// 転職に要るレベル（src/data/balance.ts の jobChange と合わせる。変わったらここも直す）
+const LV = { base: 9, top: 9 };
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 390, height: 780 }, deviceScaleFactor: 1 });
 const shot = (n) => page.screenshot({ path: `scripts/screenshots/job-${n}.png` });
@@ -23,15 +25,15 @@ await page.getByText('1人', { exact: true }).click();
 await page.getByText('キャラクター作成へ').click();
 await depart(page);
 await page.waitForTimeout(300);
-// 剣士をLv6に（物語も閉じる）
-await page.evaluate(() => {
+// 剣士を転職できるレベルに（物語も閉じる）
+await page.evaluate((lv) => {
   const k = 'card-rpg/adventure';
   const d = JSON.parse(localStorage.getItem(k));
   d.game.world.story = undefined;
-  d.game.heroes[0].level = 6;
+  d.game.heroes[0].level = lv;
   d.game.heroes[0].exp = 4;
   localStorage.setItem(k, JSON.stringify(d));
-});
+}, LV.base);
 await page.reload();
 await page.getByText('つづきから').click();
 await page.waitForTimeout(300);
@@ -62,7 +64,7 @@ const baseSave = await page.evaluate(() => JSON.parse(localStorage.getItem('card
 for (const width of [360, 390, 480]) {
   await page.setViewportSize({ width, height: 780 });
   const seed = structuredClone(baseSave);
-  seed.game.heroes[0].level = 6;
+  seed.game.heroes[0].level = LV.top - 1;
   seed.game.heroes[0].feats = { perfects: 7 };
   await page.evaluate((d) => localStorage.setItem('card-rpg/adventure', JSON.stringify(d)), seed);
   await page.reload();
@@ -73,13 +75,13 @@ for (const width of [360, 390, 480]) {
   const reqs = page.locator('[data-job-reqs]').filter({ hasText: '完全成功60回' });
   if (!(await reqs.first().isVisible())) await fail(`${width}px: 条件の一覧が見えない`);
   if (!(await reqs.first().getByText('7/60', { exact: true }).isVisible())) await fail(`${width}px: 条件の進捗（7/60）が見えない`);
-  if (!(await reqs.first().locator('[data-job-req="ng"]').filter({ hasText: 'Lv7以上（今 Lv6）' }).count())) await fail(`${width}px: レベルの不足（✗ Lv7以上）が見えない`);
+  if (!(await reqs.first().locator('[data-job-req="ng"]').filter({ hasText: `Lv${LV.top}以上（今 Lv${LV.top - 1}）` }).count())) await fail(`${width}px: レベルの不足（✗ Lv${LV.top}以上）が見えない`);
   if (!(await reqs.first().locator('[data-job-progress]').count())) await fail(`${width}px: 進み具合の棒が無い`);
   const dup = await page.getByText('完全成功60回', { exact: false }).count();
   if (dup !== await page.locator('[data-job-reqs]').filter({ hasText: '完全成功60回' }).count()) await fail(`${width}px: 条件の文が2回出ている（${dup}）`);
   await page.waitForTimeout(250);
   await shot(`top-progress-${width}`);
-  seed.game.heroes[0].level = 7;
+  seed.game.heroes[0].level = LV.top;
   seed.game.heroes[0].feats.perfects = 60;
   await page.evaluate((d) => localStorage.setItem('card-rpg/adventure', JSON.stringify(d)), seed);
   await page.reload();

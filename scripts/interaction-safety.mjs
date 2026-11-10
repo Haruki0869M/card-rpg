@@ -32,7 +32,7 @@ try {
     b.allies[1].statuses.possession = 3; b.enemies[0].intent.targetId = b.allies[1].id;
     await resume(d);
     const cb = await page.locator('[data-card-index]').first().boundingBox(); await page.mouse.click(cb.x+14, cb.y+70);
-    await page.locator(`[data-ally="${b.allies[2].id}"]`).click();
+    await page.locator(`[data-ally-target-chip="${b.allies[2].id}"]`).click(); // 味方の対象は、カードのパネルの中の「味方を選ぶ」ボタンで選ぶ（味方の枠はパネルの下に隠れる）
     check((await page.locator('[data-target-guide]').innerText()).includes('仲間3'), '味方の対象を変更できない');
     check(await page.locator(`[data-ally="${b.allies[2].id}"][data-selected-target]`).count(), '対象の強調がない');
     await shot(`${width}-ally-target`);
@@ -68,7 +68,7 @@ try {
     await resume(mixed);
     const mc = await page.locator('[data-card-index]').first().boundingBox(); await page.mouse.click(mc.x+14, mc.y+70);
     await page.locator('[data-enemy]').nth(1).click({ position: { x: 10, y: 20 } });
-    await page.locator(`[data-ally="${mb.allies[2].id}"]`).click();
+    await page.locator(`[data-ally-target-chip="${mb.allies[2].id}"]`).click();
     check((await page.locator('[data-secondary-target-guide]').innerText()).includes('仲間3'), '複合カードの回復先を選べない');
     await page.getByLabel('フォーカスを増やす').click(); await page.getByLabel('フォーカスを増やす').click();
     await page.locator('[data-preview-start]').click();

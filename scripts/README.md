@@ -22,6 +22,7 @@
 | `status-button.mjs` | 世界マップのステータスボタンと P1〜P4 の印 |
 | `world-steady-map.mjs` | 世界マップが歩く時にガックンと動かない（前から時々落ちる。何回中何回か見る） |
 | `explore.mjs` | 見晴らしの塔・出現スポット |
+| `ops-save-resume.mjs` | 保存して再開（世界マップ・ダンジョン・戦闘・報酬。再開しても保存が同じ／同じ操作で同じ結果。360・390・480） |
 | `dice-shots.mjs` | 移動のサイコロ |
 | `dungeon-view.mjs` | 扉を選ぶダンジョン |
 | `dungeon-frames.mjs` | ダンジョンの歩く演出のチカチカ |

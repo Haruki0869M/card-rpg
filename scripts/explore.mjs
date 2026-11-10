@@ -65,9 +65,13 @@ try {
     await page.setViewportSize({ width, height: 780 });
     const d = structuredClone(base), g = d.game, w = g.world;
     g.mode = 'world'; w.story = undefined; w.turn = 'h1';
-    const at = w.pos.h0;
-    const free = w.tiles.map((x, i) => i).filter((i) => !w.tiles[i].f && w.tiles[i].t === w.tiles[at].t && !w.wanderers.some((x) => x.tile === i) && i !== at && dist(w, at, i) >= 1 && dist(w, at, i) <= 3);
-    check(free.length >= 3, '置き場所が足りない');
+    // 地図は毎回ちがうので、始まりのマスの近くに空きが足りない時は、同じ地形で空きが3つある所へ2人を動かす
+    const freeAround = (at) => w.tiles.map((x, i) => i).filter((i) => !w.tiles[i].f && w.tiles[i].t === w.tiles[at].t && !w.wanderers.some((x) => x.tile === i) && i !== at && dist(w, at, i) >= 1 && dist(w, at, i) <= 3);
+    const start = w.pos.h0;
+    const at = [start, ...w.tiles.map((x, i) => i).filter((i) => !w.tiles[i].f && w.tiles[i].t === w.tiles[start].t).sort((p, q) => dist(w, start, p) - dist(w, start, q))].find((i) => freeAround(i).length >= 3);
+    check(at !== undefined, '置き場所が足りない（地図のどこにも、同じ地形の空きマスが3つ並ぶ所が無い）');
+    if (at !== start) { w.pos.h0 = w.pos.h1 = at; w.tiles[at].seen = true; console.log(`（${width}px: 始まりの近くに空きが足りないので、マス${at}へ動かして確かめる）`); }
+    const free = freeAround(at);
     const kinds = ['star', 'peddler', 'thief'];
     w.spawns = kinds.map((kind, k) => ({ id: `s${k + 1}`, kind, tile: free[k], until: w.worldTurn + k }));
     for (const s of w.spawns) w.tiles[s.tile].seen = true;
@@ -89,7 +93,10 @@ try {
     const d = structuredClone(base), g = d.game, w = g.world;
     g.mode = 'world'; w.story = undefined; w.turn = 'h1';
     const at = w.pos.h0;
-    const tile = w.tiles.map((x, i) => i).find((i) => !w.tiles[i].f && w.tiles[i].t === w.tiles[at].t && !w.wanderers.some((x) => x.tile === i) && dist(w, at, i) === 2);
+    const ok = (i) => !w.tiles[i].f && w.tiles[i].t === w.tiles[at].t && !w.wanderers.some((x) => x.tile === i) && i !== at;
+    // 近い順に探す（距離2が無い地図でも止まらないように）
+    const tile = w.tiles.map((x, i) => i).filter(ok).sort((p, q) => Math.abs(dist(w, at, p) - 2) - Math.abs(dist(w, at, q) - 2))[0];
+    check(tile !== undefined, `${kind}: 置き場所が無い`);
     w.spawns = [{ id: 's1', kind, tile, until: w.worldTurn + 1 }];
     w.pos.h1 = tile; w.tiles[tile].seen = true;
     await resume(d);
