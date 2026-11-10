@@ -1,6 +1,7 @@
 // J3d後半5職の転職・武器・能力と、星読みの保存再開・4人表示を確認する。
 import { mkdir } from 'node:fs/promises';
 import { chromium, layoutIssues, startBattle } from './lib.mjs';
+import { loadJobData } from './gameData.mjs';
 const dir = 'screenshots/final-special-jobs';
 await mkdir(dir, { recursive: true });
 const browser = await chromium.launch();
@@ -26,24 +27,27 @@ async function shot(name) {
   const issues = await layoutIssues(page); check(!issues.length, `${name}: ${issues}`);
   await page.screenshot({ path: `${dir}/${name}.png` });
 }
-// 特殊ジョブへ転職できるレベル（src/data/balance.ts の jobChange.special と合わせる）
-const SPECIAL_LV = 7;
+// 特殊ジョブへ転職できるレベルと条件の数は、ゲームのデータから読む（数が変わってもここは直さなくてよい）
+const { jobLevel, jobRequires } = await loadJobData();
 const config = [
-  ['shrineMaiden', '巫女', 'bishop', 'prayers', 3, 'woodScepter', '癒やしの祝詞', 'divinePossession'],
-  ['astrologer', '占星術師', 'bishop', 'perfects:luk', 5, 'apprenticeTome', '星の光条', 'starRay'],
-  ['machinist', '機工士', 'archer', 'checks:mechanism', 5, 'antiqueGun', '精密射撃', 'placeTrap'],
-  ['bard', '吟遊詩人', 'phantomThief', 'support:others', 30, 'travelerLute', '勇気の歌', 'bardCourage'],
-  ['gambler', '賭博師', 'phantomThief', 'checks:luk', 10, 'rustyDagger', '勝負の一撃', 'gambleStrike'],
+  ['shrineMaiden', '巫女', 'bishop', 'prayers', 'woodScepter', '癒やしの祝詞', 'divinePossession'],
+  ['astrologer', '占星術師', 'bishop', 'perfects:luk', 'apprenticeTome', '星の光条', 'starRay'],
+  ['machinist', '機工士', 'archer', 'checks:mechanism', 'antiqueGun', '精密射撃', 'placeTrap'],
+  ['bard', '吟遊詩人', 'phantomThief', 'support:others', 'travelerLute', '勇気の歌', 'bardCourage'],
+  ['gambler', '賭博師', 'phantomThief', 'checks:luk', 'rustyDagger', '勝負の一撃', 'gambleStrike'],
 ];
 try {
   await startBattle(page, 1, ['forestWolf']);
   const base = await read();
   for (const width of [360, 390, 480]) {
     await page.setViewportSize({ width, height: 780 });
-    for (const [id, name, from, feat, count, weapon, signature, cardId] of config) {
+    for (const [id, name, from, feat, weapon, signature, cardId] of config) {
+      const req = jobRequires(id);
+      check(req?.feat === feat, `${name}: 条件の種類がデータと違う（${req?.feat}）`);
+      const count = req?.count ?? 1;
       const d = structuredClone(base), g = d.game, h = g.heroes[0], w = g.world;
       g.expeditions = []; g.mode = 'world'; g.party = undefined; g.battle = undefined; g.dungeon = undefined; g.sanctuary = undefined;
-      h.classId = from; h.level = SPECIAL_LV; h.feats = { [feat]: count }; delete h.equipment.weapon;
+      h.classId = from; h.level = jobLevel(id); h.feats = { [feat]: count }; delete h.equipment.weapon;
       w.story = undefined; w.turn = h.id; w.pos[h.id] = w.tiles.findIndex(t => t.f?.id === 'pilgrimTemple');
       await resume(d);
       await page.getByText('巡礼の神殿に入る', { exact: true }).click();

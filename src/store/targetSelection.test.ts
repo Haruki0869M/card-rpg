@@ -43,6 +43,26 @@ describe('対象選択の画面状態', () => {
     useBattle.getState().setActive(b.allies[2].id); useBattle.getState().confirm();
     expect(useBattle.getState().selection).toBeNull(); expect(useBattle.getState().full!.battle!.allies[0].hand).toHaveLength(0);
   });
+  it('つづきから: 保存した時に選んでいたキャラを保つ（勝った後の画面でも・行動済みなら次のキャラへ）', () => {
+    const b = load(); setLocalPlayers(['P1']); b.allies[1].playerId = 'P1'; b.allies[1].hp = 20; giveHand(b, b.allies[1].id, ['mend']); b.allies[1].mana = 5;
+    const before = structuredClone(useBattle.getState().full);
+    // 味方の番の途中: 2人目を選んだまま再開 → 2人目のまま
+    useBattle.setState({ activeId: b.allies[1].id }); useBattle.getState().continueGame();
+    expect(useBattle.getState().activeId).toBe(b.allies[1].id);
+    // 勝った後の画面（もう誰も行動できない）: 2人目のまま
+    b.phase = 'victory'; useBattle.setState({ activeId: b.allies[1].id }); useBattle.getState().continueGame();
+    expect(useBattle.getState().activeId).toBe(b.allies[1].id);
+    // 選んでいたキャラが倒れている・他の人のキャラ・保存に無い時は、これまでどおり自分の先頭のキャラ
+    b.phase = 'ally'; b.allies[1].dead = true; useBattle.getState().continueGame();
+    expect(useBattle.getState().activeId).toBe(b.allies[0].id);
+    useBattle.setState({ activeId: b.allies[2].id }); useBattle.getState().continueGame();
+    expect(useBattle.getState().activeId).toBe(b.allies[0].id);
+    useBattle.setState({ activeId: '' }); useBattle.getState().continueGame();
+    expect(useBattle.getState().activeId).toBe(b.allies[0].id);
+    // ゲームの中身は変わらない（dead と phase はテストが書き換えた分だけ戻して比べる）
+    b.allies[1].dead = false;
+    expect(useBattle.getState().full).toEqual(before);
+  });
   it('冒険の初期化は保存待ちも取り消し、古いデータを復活させない', () => {
     load(); useBattle.getState().continueGame(); useBattle.getState().abandonGame(); useBattle.getState().setScreen('setup'); vi.runAllTimers();
     expect(useBattle.getState().screen).toBe('setup'); expect(useBattle.getState().full).toBeNull(); expect(values.has('card-rpg/adventure')).toBe(false);

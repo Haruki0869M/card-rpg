@@ -728,7 +728,12 @@ export const useBattle = create<StoreState>((set, get) => {
       const { game } = get();
       if (!game) return;
       set({ screen: 'game', sheet: null });
-      if (game.battle) set({ battle: game.battle, ...resetBattleUi(game.battle) });
+      if (game.battle) {
+        // 保存した時に選んでいたキャラを保つ（読み込み直すたびに先頭のキャラへ戻さない。画面の選択だけで、ゲームの中身は変えない）
+        const saved = get().activeId;
+        const keep = game.battle.allies.some((a) => a.id === saved && isLocalPlayer(a.playerId) && !a.dead);
+        set({ battle: game.battle, ...resetBattleUi(game.battle), ...(keep ? { activeId: nextActive(game.battle, saved) } : {}) });
+      }
       scheduleSave(get);
       setTimeout(scheduleEnemy, 300);
     },
