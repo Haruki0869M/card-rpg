@@ -112,18 +112,26 @@ function holeShapes(g: Geom, tiles: WorldState['tiles'], levels: readonly number
  * 境目は SVG のぼかし（filter）を使わず、太さと濃さを変えた線を重ねてやわらかくする
  * （拡大した時の縦に長い画像では、ブラウザがぼかしを途中で打ち切り、下の方に雲の線が出たため）
  */
-function maskSvg(w: number, top: number, h: number, soft: number, shapes0: Shape[], invert: boolean, reach: number) {
+/** 境目のぼかしの線（太さの倍率・濃さ）。瘴気は、雲海に溶けるように、もっと広く・段を多く */
+const FEATHER_SEA: [number, number][] = [
+  [2.4, 0.22],
+  [1.6, 0.4],
+  [0.9, 0.65],
+];
+// 段が線に見えないように、細かい段を多く重ねる（外ほど薄く）
+const FEATHER_MIASMA: [number, number][] = Array.from({ length: 12 }, (_, k) => {
+  const t = k / 11;
+  return [5.6 - t * 5, 0.04 + t * t * 0.55] as [number, number];
+});
+
+function maskSvg(w: number, top: number, h: number, soft: number, shapes0: Shape[], invert: boolean, reach: number, rings: [number, number][] = FEATHER_SEA, core = 1) {
   // この区切り（top〜top+h）に近い図形だけ。座標は区切りの上の端を0にする
   const body = `<g transform="translate(0,${(-top).toFixed(1)})">${shapes0.filter((x) => x.y > top - reach && x.y < top + h + reach).map((x) => x.s).join('')}</g>`;
   const c = invert ? 'black' : 'white';
-  const feather = [
-    [2.4, 0.22],
-    [1.6, 0.4],
-    [0.9, 0.65],
-  ]
+  const feather = rings
     .map(([k, o]) => `<g fill="none" stroke="${c}" stroke-opacity="${o}" stroke-width="${(soft * k).toFixed(1)}" stroke-linejoin="round">${body}</g>`)
     .join('');
-  const shapes = `${feather}<g fill="${c}">${body}</g>`;
+  const shapes = `${feather}<g fill="${c}" fill-opacity="${core}">${body}</g>`;
   const svg = invert
     ? `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><defs><mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="${w}" height="${h}"><rect width="${w}" height="${h}" fill="white"/>${shapes}</mask></defs><rect width="${w}" height="${h}" fill="white" mask="url(#m)"/></svg>`
     : `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">${shapes}</svg>`;
@@ -190,8 +198,11 @@ export const FogSea = memo(function FogSea({ tiles, geom, levels, padTop, padBot
     tiles.forEach((t, i) => {
       if (t.seen || !miasma(i)) return;
       const { x, y } = geom.center(i);
-      // 丸い形を重ねて、マスの形（六角形のキルト模様）を出さない
-      out.push({ y: y + padTop, s: `<ellipse cx="${x.toFixed(1)}" cy="${(y + padTop).toFixed(1)}" rx="${(R * 1.2).toFixed(1)}" ry="${(R * 1.1 * GROUND_K).toFixed(1)}"/>` });
+      // 丸い形を重ねて、マスの形（六角形のキルト模様）を出さない。大きさと位置をマスごとに少し変えて、
+      // 同じ丸を並べたスタンプの形に見えないようにする（乱数は使わず、マスの番号から決める）
+      const k = 0.85 + hash01(i, 120) * 0.35;
+      const ox = (hash01(i, 121) - 0.5) * R * 0.5, oy = (hash01(i, 122) - 0.5) * R * 0.35;
+      out.push({ y: y + padTop, s: `<ellipse cx="${(x + ox).toFixed(1)}" cy="${(y + padTop + oy).toFixed(1)}" rx="${(R * 1.05 * k).toFixed(1)}" ry="${(R * 0.95 * k * GROUND_K).toFixed(1)}"/>` });
     });
     return out;
   }, [tiles, miasma, geom, padTop, R]);
@@ -200,7 +211,7 @@ export const FogSea = memo(function FogSea({ tiles, geom, levels, padTop, padBot
   const seaMasks = useBlobUrls(() => chunks.map((c) => maskSvg(Wc, c.top, c.h, soft, holes, true, reach)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [holes, Wc, totalH, soft]);
-  const miasmaMasks = useBlobUrls(() => chunks.map((c) => (miasmaShapes.some((x) => x.y > c.top - reach && x.y < c.top + c.h + reach) ? maskSvg(Wc, c.top, c.h, soft, miasmaShapes, false, reach) : undefined)),
+  const miasmaMasks = useBlobUrls(() => chunks.map((c) => (miasmaShapes.some((x) => x.y > c.top - reach && x.y < c.top + c.h + reach) ? maskSvg(Wc, c.top, c.h, soft, miasmaShapes, false, reach + soft * 3, FEATHER_MIASMA) : undefined)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [miasmaShapes, Wc, totalH, soft]);
   const sea = [cloudTexture('sea', 0), cloudTexture('sea', 1)];

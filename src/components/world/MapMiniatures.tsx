@@ -94,17 +94,43 @@ function TempleShape() {
   );
 }
 
-/** 祭壇: 石の台と、上に浮かぶ光る結晶 */
+/** 祭壇: 苔むした石の段と台、両脇のろうそく、上に浮かぶ光る結晶（細い線で、周りの絵の描き込みに合わせる） */
 function AltarShape() {
   return (
     <>
-      <ellipse cx="50" cy="40" rx="26" ry="22" fill="#c8a0ff" opacity=".25" />
-      <path d="M26 80 L30 58 H70 L74 80 Z" fill="#7a6a8a" stroke="#241a30" strokeWidth="2" strokeLinejoin="round" />
-      <path d="M60 58 H70 L74 80 H62 Z" fill="#54486a" />
-      <rect x="24" y="52" width="52" height="7" rx="1.5" fill="#a898b8" stroke="#241a30" strokeWidth="2" />
-      <path d="M50 18 L59 34 L50 48 L41 34 Z" fill="#e0c8ff" stroke="#5a2a9a" strokeWidth="2" strokeLinejoin="round" />
-      <path d="M50 18 L59 34 L50 48 Z" fill="#a878f0" />
-      <circle cx="47" cy="30" r="2.2" fill="#fff" />
+      <defs>
+        <radialGradient id="altar-aura">
+          <stop offset="0" stopColor="#e6d0ff" stopOpacity=".55" />
+          <stop offset="1" stopColor="#b080ff" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <ellipse cx="50" cy="34" rx="24" ry="20" fill="url(#altar-aura)" />
+      {/* 下の段 */}
+      <path d="M20 80 L23 72 H77 L80 80 Z" fill="#8a8494" stroke="#2a2232" strokeWidth="1.2" strokeLinejoin="round" />
+      <path d="M66 72 H77 L80 80 H68 Z" fill="#5e5868" />
+      {/* 台 */}
+      <path d="M30 72 L32 56 H68 L70 72 Z" fill="#a49cae" stroke="#2a2232" strokeWidth="1.2" strokeLinejoin="round" />
+      <path d="M59 56 H68 L70 72 H61 Z" fill="#6e667a" />
+      <path d="M36 62 H56 M37 66 H55" stroke="#4a4256" strokeWidth=".8" strokeLinecap="round" opacity=".7" />
+      <circle cx="46" cy="64" r="2.4" fill="none" stroke="#c8a8ff" strokeWidth=".9" opacity=".8" />
+      {/* 天板 */}
+      <rect x="28" y="52" width="44" height="5" rx="1" fill="#c4bcce" stroke="#2a2232" strokeWidth="1.2" />
+      {/* 苔 */}
+      <path d="M23 72 q4 -2 8 0 M70 72 q3 -1.5 6 0 M31 57 q3 -1.5 6 0" stroke="#6a8a4a" strokeWidth="1.6" strokeLinecap="round" fill="none" opacity=".8" />
+      {/* ろうそく */}
+      {[24, 74].map((cx) => (
+        <g key={cx}>
+          <rect x={cx - 1.6} y="64" width="3.2" height="8" rx=".8" fill="#efe6d4" stroke="#5a4a3a" strokeWidth=".6" />
+          <ellipse cx={cx} cy="61.5" rx="1.4" ry="2.4" fill="#ffd27a" />
+          <circle cx={cx} cy="61.5" r="3.6" fill="#ffb84a" opacity=".3" />
+        </g>
+      ))}
+      {/* 光る結晶 */}
+      <path d="M50 16 L57 31 L50 46 L43 31 Z" fill="#e6d4ff" stroke="#4a2a7a" strokeWidth="1.1" strokeLinejoin="round" />
+      <path d="M50 16 L57 31 L50 46 Z" fill="#a882ee" />
+      <path d="M43 31 H57 M50 16 V46" stroke="#fff" strokeWidth=".6" opacity=".55" />
+      <circle cx="47" cy="26" r="1.4" fill="#fff" />
+      <path d="M38 22 l1.5 1.5 M63 24 l-1.5 1.5 M41 42 l1.2 -1.2" stroke="#f0e4ff" strokeWidth=".9" strokeLinecap="round" opacity=".8" />
     </>
   );
 }

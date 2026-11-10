@@ -42,11 +42,17 @@ function placeImage(f: NonNullable<WorldState['tiles'][number]['f']>): string | 
 }
 
 /** 夜・夕方の明かり（場所の種類 → 色と大きさ（R に対する半径）） */
+/** 施設のあるマス: 建物を少し奥（上）へ、駒を少し手前（下）へずらす（R を1とする。駒は奥行きの縮みも掛ける） */
+const FACILITY_LIFT = 0.22;
+const FACILITY_FRONT = 0.85;
+
 const GLOW: Record<string, { color: string; r: number }> = {
   town: { color: 'rgba(255,196,110,.85)', r: 1.7 },
   shrine: { color: 'rgba(150,255,210,.7)', r: 1.2 },
   temple: { color: 'rgba(255,233,168,.75)', r: 1.3 },
   altar: { color: 'rgba(200,160,255,.75)', r: 1.3 },
+  // 旅のテントのランタン
+  event: { color: 'rgba(255,176,84,.8)', r: 1.1 },
   finale: { color: 'rgba(255,80,50,.7)', r: 1.6 },
 };
 
@@ -138,9 +144,10 @@ const WaterLayer = memo(function WaterLayer({ tiles, geom, levels }: { tiles: Wo
         const { x, y } = center(i);
         const o = (hash01(i, 60 + phase) - 0.5) * R * 0.3;
         return (
-          <g key={i} stroke="#dff2ff" strokeLinecap="round" fill="none" strokeWidth={Math.max(1.2, R * 0.05)}>
-            <path d={`M${x - R * 0.45 + o} ${y - R * 0.18 + phase * R * 0.12} q${R * 0.12} ${-R * 0.08} ${R * 0.24} 0 t${R * 0.24} 0`} />
-            <path d={`M${x - R * 0.05 - o} ${y + R * 0.02 + phase * R * 0.08} q${R * 0.1} ${-R * 0.07} ${R * 0.2} 0 t${R * 0.2} 0`} />
+          // 細く淡い波（周りの絵の描き込みに合わせて、太い「≈」に見えないように）
+          <g key={i} stroke="#e8f6ff" strokeOpacity={0.7} strokeLinecap="round" fill="none" strokeWidth={Math.max(0.8, R * 0.028)}>
+            <path d={`M${x - R * 0.42 + o} ${y - R * 0.18 + phase * R * 0.12} q${R * 0.09} ${-R * 0.05} ${R * 0.18} 0 t${R * 0.18} 0`} />
+            <path d={`M${x - R * 0.02 - o} ${y + R * 0.02 + phase * R * 0.08} q${R * 0.07} ${-R * 0.04} ${R * 0.14} 0`} />
           </g>
         );
       })}
@@ -177,7 +184,7 @@ const FeatureLayer = memo(function FeatureLayer({ tiles, geom, finaleTiles, fall
         if (mini) {
           return (
             <g key={`f${i}`} opacity={used ? 0.45 : 1} data-feature={`${f.kind}:${f.id}`} data-used={used || undefined}>
-              <PlaceMini kind={mini} x={x} y={y} R={R} />
+              <PlaceMini kind={mini} x={x} y={y - R * FACILITY_LIFT} R={R} />
             </g>
           );
         }
@@ -187,8 +194,8 @@ const FeatureLayer = memo(function FeatureLayer({ tiles, geom, finaleTiles, fall
           const big = R * (f.kind === 'town' ? 1.75 : f.kind === 'chest' ? 1.25 : 1.55);
           return (
             <g key={`f${i}`} opacity={used ? 0.4 : 1} data-feature={`${f.kind}:${f.id}`} data-used={used || undefined}>
-              <ellipse cx={x} cy={y + big * 0.33} rx={big * 0.42} ry={big * 0.13} fill="rgba(0,0,0,.55)" />
-              <image href={img} x={x - big / 2} y={y - big * 0.62} width={big} height={big} filter="url(#place-shadow)" style={fallen ? { filter: 'grayscale(1) brightness(.6)' } : undefined} />
+              <ellipse cx={x} cy={y - R * FACILITY_LIFT + big * 0.33} rx={big * 0.42} ry={big * 0.13} fill="rgba(0,0,0,.55)" />
+              <image href={img} x={x - big / 2} y={y - R * FACILITY_LIFT - big * 0.62} width={big} height={big} filter="url(#place-shadow)" style={fallen ? { filter: 'grayscale(1) brightness(.6)' } : undefined} />
             </g>
           );
         }
@@ -576,6 +583,8 @@ export function WorldMap({
               return (
                 <g key={`r${i}`} data-reach={i} data-cost={cost}>
                   <polygon points={hexPoints(x, y, R * TOP_SCALE - 2)} fill="rgba(255,240,180,.2)" stroke="rgba(255,214,110,.85)" strokeWidth={1.8} />
+                  {/* 数字の下敷き（木・テント・建物と重なっても読めるように） */}
+                  <circle cx={x} cy={y + R * 0.62 * GROUND_K - Math.max(12, R * 0.42) * 0.36} r={Math.max(12, R * 0.42) * 0.72} fill="rgba(28,18,8,.78)" stroke="rgba(255,214,110,.9)" strokeWidth={1.2} />
                   <text x={x} y={y + R * 0.62 * GROUND_K} textAnchor="middle" fontSize={Math.max(12, R * 0.42)} fontWeight={800} fill="#fff3c4" stroke="#000" strokeWidth={2.5} paintOrder="stroke">
                     {cost}
                   </text>
@@ -679,6 +688,8 @@ export function WorldMap({
             if (!h) return null;
             const { x, y } = center(tile);
             const s = R * spot.size;
+            // 施設のあるマスでは、駒を少し手前（門の前あたり）に立たせる（建物が駒に隠れないように。見た目だけ）
+            const front = w.tiles[tile]?.f && w.tiles[tile].seen ? FACILITY_FRONT : 0;
             const active = id === w.turn;
             const moving = !!anim?.heroes.includes(id);
             const hopping = moving && anim!.i > 0 && !anim!.arrived;
@@ -691,7 +702,7 @@ export function WorldMap({
                 className="pointer-events-none absolute"
                 style={{
                   left: x - s / 2 + spot.dx * R,
-                  top: y - s * 0.62 + spot.dy * R * GROUND_K,
+                  top: y - s * 0.62 + (spot.dy + front) * R * GROUND_K,
                   width: s,
                   height: s,
                   zIndex: 2 + spot.z + (moving ? 10 : 0),
@@ -700,6 +711,21 @@ export function WorldMap({
                   transition: geomSettling ? 'none' : moving ? `left ${stepMs * 0.8}ms ease-out, top ${stepMs * 0.8}ms ease-out` : 'left .35s ease-out, top .35s ease-out',
                 }}
               >
+                {/* 夜と夕方は、駒の足元にも手元の明かり（駒といっしょに動く） */}
+                {light.glow > 0 && (
+                  <span
+                    className="pointer-events-none absolute rounded-full"
+                    data-hero-glow
+                    style={{
+                      left: s / 2 - R * 1.1,
+                      top: s * 0.86 - R * 1.1 * GROUND_K,
+                      width: R * 2.2,
+                      height: R * 2.2 * GROUND_K,
+                      opacity: light.glow,
+                      background: 'radial-gradient(closest-side, rgba(255,200,120,.55), rgba(255,170,90,.2) 55%, transparent)',
+                    }}
+                  />
+                )}
                 <HeroPiece hero={h} size={s} ringColor={PLAYER_COLORS[h.playerId]} active={active} hopping={hopping} stepKey={moving ? anim!.i : 'still'} stepMs={stepMs} simple={simple} />
                 {/* お供: 肩に乗る・足元で1歩遅れてぴょこぴょこ付いてくる */}
                 {h.pet && (() => {

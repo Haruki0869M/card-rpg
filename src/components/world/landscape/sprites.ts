@@ -244,10 +244,23 @@ function peak(ctx: CanvasRenderingContext2D, x: number, y: number, h: number, v:
   const w = p[7][0] - p[0][0];
   footShadow(ctx, x, y, w * 0.5, w * 0.12, 0.38);
   const top = p[3];
+  // 輪郭をごつごつさせる（辺の途中に、小さな岩の出っ張り・へこみ。形は v から決める）
+  const sd = Math.round(v * 1e6);
+  const jag: [number, number][] = [p[0]];
+  for (let k = 1; k < p.length; k++) {
+    const [ax, ay] = p[k - 1], [bx, by] = p[k];
+    for (const f of [0.35, 0.7]) {
+      const d = (hash01(sd + k * 3 + Math.round(f * 10), 99) - 0.45) * h * 0.09;
+      // 辺に直角な向きへずらす
+      const len = Math.hypot(bx - ax, by - ay) || 1;
+      jag.push([ax + (bx - ax) * f + ((by - ay) / len) * d, ay + (by - ay) * f - ((bx - ax) / len) * d]);
+    }
+    jag.push(p[k]);
+  }
   // 山の形（光の当たる左と、影の右）
   ctx.beginPath();
-  ctx.moveTo(p[0][0], p[0][1]);
-  for (const q of p.slice(1)) ctx.lineTo(q[0], q[1]);
+  ctx.moveTo(jag[0][0], jag[0][1]);
+  for (const q of jag.slice(1)) ctx.lineTo(q[0], q[1]);
   ctx.closePath();
   ctx.fillStyle = wash(ctx, p[0][0], top[1], p[7][0], y, volcano ? '#8a6a5a' : '#a8a0a8', volcano ? '#3a2422' : '#4a4450');
   ctx.fill();
@@ -277,10 +290,11 @@ function peak(ctx: CanvasRenderingContext2D, x: number, y: number, h: number, v:
     ctx.fillStyle = 'rgba(248,250,255,.95)';
     ctx.fill();
   }
+  rockFace(ctx, top, w, h, y, v, volcano);
   ctx.restore();
   ctx.beginPath();
-  ctx.moveTo(p[0][0], p[0][1]);
-  for (const q of p.slice(1)) ctx.lineTo(q[0], q[1]);
+  ctx.moveTo(jag[0][0], jag[0][1]);
+  for (const q of jag.slice(1)) ctx.lineTo(q[0], q[1]);
   stroke(ctx, Math.max(1, h * 0.025));
   // 墨のしわ（尾根の線）
   ctx.beginPath();
@@ -303,6 +317,93 @@ function peak(ctx: CanvasRenderingContext2D, x: number, y: number, h: number, v:
   }
 }
 
+/**
+ * 峰の岩肌（山の形で切り抜いた中に描く）: 斜面に沿った墨の筋・光の当たる面の岩の段、
+ * 雪山は谷に残る雪の筋、火山は火口から流れる溶岩の筋。形は v から決める（乱数は使わない）
+ */
+function rockFace(ctx: CanvasRenderingContext2D, top: [number, number], w: number, h: number, y: number, v: number, volcano: boolean) {
+  const sd = Math.round(v * 1e6);
+  ctx.lineCap = 'round';
+  // 斜面の筋（左 = 光の面は淡く、右 = 影の面は濃く）
+  for (let s = 0; s < 8; s++) {
+    const side = s % 2 ? 1 : -1;
+    const f = 0.2 + hash01(sd + s, 90) * 0.55;
+    const sx = top[0] + side * w * (0.03 + f * 0.3);
+    const sy = top[1] + h * f;
+    const len = h * (0.1 + hash01(sd + s, 91) * 0.14);
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.quadraticCurveTo(sx + side * len * 0.3, sy + len * 0.45, sx + side * len * 0.5, sy + len);
+    ctx.strokeStyle = side < 0 ? 'rgba(34,24,16,.26)' : 'rgba(20,12,24,.38)';
+    ctx.lineWidth = Math.max(0.7, h * 0.012);
+    ctx.stroke();
+  }
+  // 光の当たる面の岩の段（明るいかすれ）
+  for (let s = 0; s < 3; s++) {
+    const f = 0.34 + s * 0.17 + (hash01(sd + s, 92) - 0.5) * 0.06;
+    const lx = top[0] - w * (0.06 + f * 0.26), ly = top[1] + h * f;
+    ctx.beginPath();
+    ctx.moveTo(lx, ly);
+    ctx.lineTo(lx + w * (0.1 + f * 0.06), ly + h * 0.025);
+    ctx.strokeStyle = volcano ? 'rgba(255,214,180,.12)' : 'rgba(255,250,240,.16)';
+    ctx.lineWidth = Math.max(1, h * 0.028);
+    ctx.stroke();
+  }
+  // 岩の段の下の影（細い墨）
+  for (let s = 0; s < 3; s++) {
+    const f = 0.42 + s * 0.16 + (hash01(sd + s, 93) - 0.5) * 0.06;
+    const lx = top[0] + w * (0.02 + hash01(sd + s, 94) * 0.08), ly = top[1] + h * f;
+    ctx.beginPath();
+    ctx.moveTo(lx, ly);
+    ctx.lineTo(lx + w * 0.14, ly + h * 0.04);
+    ctx.strokeStyle = 'rgba(20,12,24,.3)';
+    ctx.lineWidth = Math.max(0.7, h * 0.01);
+    ctx.stroke();
+  }
+  if (volcano) {
+    // 火口から流れる溶岩（太い淡い光の上に、細い明るい筋）
+    for (let s = 0; s < 3; s++) {
+      const side = s === 1 ? 1 : -1;
+      const reach = 0.3 + hash01(sd + s, 95) * 0.28;
+      const x0 = top[0] + (s - 1) * w * 0.03, y0 = top[1] + h * 0.05;
+      const x1 = x0 + side * w * (0.06 + reach * 0.2), y1 = top[1] + h * reach;
+      const cx = x0 + side * w * 0.01 + (hash01(sd + s, 96) - 0.5) * w * 0.08, cy = (y0 + y1) / 2;
+      for (const [col, lw] of [
+        ['rgba(255,90,20,.28)', h * 0.06],
+        ['rgba(255,140,50,.9)', h * 0.02],
+        ['rgba(255,226,140,.8)', h * 0.007],
+      ] as const) {
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.quadraticCurveTo(cx, cy, x1, y1);
+        ctx.strokeStyle = col;
+        ctx.lineWidth = Math.max(0.6, lw);
+        ctx.stroke();
+      }
+    }
+    // 山すその溶岩の照り返し
+    const g = ctx.createLinearGradient(0, y - h * 0.3, 0, y);
+    g.addColorStop(0, 'rgba(255,90,20,0)');
+    g.addColorStop(1, 'rgba(255,90,20,.28)');
+    ctx.fillStyle = g;
+    ctx.fillRect(top[0] - w, y - h * 0.3, w * 2, h * 0.3);
+  } else {
+    // 谷に残る雪の筋（雪の帽子の下へ）
+    for (let s = 0; s < 4; s++) {
+      const side = s % 2 ? 1 : -1;
+      const f0 = 0.24 + hash01(sd + s, 97) * 0.06;
+      const x0 = top[0] + side * w * (0.02 + s * 0.025), y0 = top[1] + h * f0;
+      const len = h * (0.1 + hash01(sd + s, 98) * 0.16);
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x0 + side * len * 0.35, y0 + len);
+      ctx.strokeStyle = side < 0 ? 'rgba(250,252,255,.75)' : 'rgba(220,226,240,.55)';
+      ctx.lineWidth = Math.max(0.8, h * (0.03 - s * 0.004));
+      ctx.stroke();
+    }
+  }
+}
+
 /** 尾根: 2つの峰の足元を結ぶ、低い山並み（墨線と、峰と同じ色の水彩） */
 function ridge(ctx: CanvasRenderingContext2D, it: SceneItem) {
   const x1 = it.x, y1 = it.y, x2 = it.x2 ?? it.x, y2 = it.y2 ?? it.y;
@@ -322,6 +423,21 @@ function ridge(ctx: CanvasRenderingContext2D, it: SceneItem) {
   ctx.closePath();
   ctx.fillStyle = wash(ctx, Math.min(x1, x2), my - h, Math.max(x1, x2), my, '#9a94a0', '#4a4652');
   ctx.fill();
+  // 岩肌の筋（山並みの頂から、ふもとへ）
+  ctx.save();
+  ctx.clip();
+  ctx.lineCap = 'round';
+  for (let s = 1; s < n; s++) {
+    const [qx, qy] = top[s];
+    const len = h * (0.35 + hash01(Math.round(it.v * 1e6) + s, 82) * 0.3);
+    ctx.beginPath();
+    ctx.moveTo(qx, qy + h * 0.06);
+    ctx.lineTo(qx + (s % 2 ? 1 : -1) * len * 0.25, qy + len);
+    ctx.strokeStyle = 'rgba(20,12,24,.3)';
+    ctx.lineWidth = Math.max(0.7, h * 0.03);
+    ctx.stroke();
+  }
+  ctx.restore();
   ctx.beginPath();
   ctx.moveTo(top[0][0], top[0][1]);
   for (const q of top.slice(1)) ctx.lineTo(q[0], q[1]);

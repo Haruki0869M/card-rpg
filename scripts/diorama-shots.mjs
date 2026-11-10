@@ -115,6 +115,22 @@ await shot('4-mountain-silhouette');
 await page.evaluate(() => document.querySelector('[data-world-map]').scrollTo({ top: 0, behavior: 'instant' }));
 await page.waitForTimeout(400);
 await shot('5-horizon');
+// 6) 移動力の判定の後（行けるマスと、必要な移動力の数字）。始まりの辺りへ戻して判定する（最後に撮るので、ほかの写真に影響しない）
+await edit(`
+  const W = w.width;
+  w.tiles.forEach((t) => { t.seen = false; });
+  const start = w.tiles.findIndex((t) => t.f && t.f.kind === 'town');
+  w.pos[w.turn] = start;
+  const c0 = start % W, r0 = Math.floor(start / W);
+  w.tiles.forEach((t, i) => { const c = i % W, r = Math.floor(i / W); if (Math.abs(c - c0) <= 3 && Math.abs(r - r0) <= 3) t.seen = true; });
+  w.worldTurn = 3;
+`);
+await page.locator('[data-recenter]').click().catch(() => {});
+await page.getByText('移動力の判定').click();
+await page.waitForTimeout(3500);
+await closeOverlays();
+await page.waitForTimeout(600);
+await shot('6-reach');
 await browser.close();
 if (errors.length) console.log('ページのエラー:\n' + errors.join('\n'));
 console.log(`OK: ${OUT} に保存した`);
