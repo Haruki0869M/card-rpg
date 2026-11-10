@@ -2,7 +2,7 @@
 // ボスの手前に「物語の部屋」（event）を置き、ボスの正体や春を奪われた理由が分かるようにしている
 import type { DungeonDef } from '../../../../types';
 import { CASTLE_POOLS, CATHEDRAL_POOLS, CRYSTAL_POOLS, MINE_POOLS } from './pools';
-import { FINALE_EXTRA_FLOOR, KEY_EXTRA_FLOOR, withExtraFloor } from '../../extraFloor';
+import { FINALE_EXTRA_FLOOR, KEY_EXTRA_FLOOR, grownLayout } from '../../extraFloor';
 
 /** 氷晶の洞（8行。入門。道中のイベントと鍵の戦いまで） */
 export const crystalCave: DungeonDef = {
@@ -15,7 +15,7 @@ export const crystalCave: DungeonDef = {
   bossChest: 'epic',
   rewardKey: 'crystalWhite',
   clearStory: ['氷晶の主が、音を立てて砕け散った。', '最期に「…温かい」とつぶやいた。', '氷晶の鍵（白）を手に入れた！'],
-  layout: withExtraFloor([
+  layout: grownLayout([
     [{ type: 'battle', next: [0, 1] }],
     [
       { type: 'battle', next: [0, 1] },
@@ -53,7 +53,7 @@ export const sunkenCathedral: DungeonDef = {
   // 1つ目のダンジョンの鍵が要る（play-feedback-plan §4 C: 町や依頼を飛ばして、まっすぐ奥へ行けないように）
   requiresKeys: ['crystalWhite'],
   clearStory: ['司教は微笑み、光になって消えた。', '「どうか、姫様を止めて」', '氷晶の鍵（蒼）を手に入れた！'],
-  layout: withExtraFloor([
+  layout: grownLayout([
     [{ type: 'battle', next: [0, 1] }],
     [
       { type: 'event', eventId: 'iceSilhouette', next: [0, 1] },
@@ -92,7 +92,7 @@ export const giantMine: DungeonDef = {
   requiresKeys: ['crystalBlue'],
   requiresQuests: 1,
   clearStory: ['霜の巨人が、ゆっくり膝をついた。', '「女王様を…あたためてやってくれ」', '氷晶の鍵（銀）を手に入れた！'],
-  layout: withExtraFloor([
+  layout: grownLayout([
     [{ type: 'battle', next: [0, 1] }],
     [
       { type: 'battle', next: [0, 1] },
@@ -132,7 +132,7 @@ export const iceCastle: DungeonDef = {
   bossChest: 'legend',
   requiresKeys: ['crystalWhite', 'crystalBlue', 'crystalSilver'],
   finale: true,
-  layout: withExtraFloor([
+  layout: grownLayout([
     [{ type: 'battle', next: [0, 1] }],
     [
       { type: 'battle', next: [0, 1] },

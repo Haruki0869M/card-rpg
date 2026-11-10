@@ -147,8 +147,13 @@ export const BALANCE = {
   dungeonWatchSteps: 2,
   dungeonWatchSlots: 2,
   dungeonWatchInspired: 1,
-  /** 侵食度: 1ワールドターンごと / ダンジョンに入る時 / 町が陥落した時 */
+  /**
+   * 侵食度: 1ワールドターンごと（世界マップに1人でもいる時）/ ダンジョンに入る時 / 町が陥落した時。
+   * 0.25 刻みの小数にしてよい（画面では切り捨てて整数%で出す。corruptionShown）。難易度の corruptionPerTurn は倍率
+   */
   corruptionPerTurn: 1,
+  /** 侵食度: 1ワールドターンごと（生きているキャラが全員ダンジョンの中の時。ダンジョンが長いので小さめ） */
+  corruptionPerDungeonTurn: 0.5,
   corruptionOnDungeonEnter: 2,
   corruptionOnTownFall: 5,
   /**

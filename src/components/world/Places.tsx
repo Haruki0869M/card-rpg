@@ -35,6 +35,7 @@ import {
   sellPrice,
   shopPriceFor,
   statChance,
+  corruptionShown,
 } from '../../engine';
 import { isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
@@ -646,7 +647,7 @@ export function EndingScreen() {
           <span>かかった日数</span>
           <b className="text-right">{Math.ceil((game.world?.worldTurn ?? 1) / (BALANCE.turnsPerTimeOfDay * 4))}日</b>
           <span>最後の{corruptionName(game.scenarioId)}</span>
-          <b className="text-right">{game.world?.corruption ?? 0}%</b>
+          <b className="text-right">{corruptionShown(game.world?.corruption ?? 0)}%</b>
           <span>残った命の灯火</span>
           <b className="text-right">{game.lives}</b>
           <span>戦闘の勝利</span>

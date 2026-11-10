@@ -1,7 +1,7 @@
 // シナリオ3のダンジョン。
 // 制覇すると鍵（灯）が手に入り、3つそろうと最終ダンジョンに入れる。ボスの手前に「物語の部屋」（event）を置く
 import type { DungeonDef } from '../../../../types';
-import { FINALE_EXTRA_FLOOR, KEY_EXTRA_FLOOR, withExtraFloor } from '../../extraFloor';
+import { FINALE_EXTRA_FLOOR, KEY_EXTRA_FLOOR, grownLayout } from '../../extraFloor';
 
 // 敵の組（K4 手順2）。弱点が同じ敵だけの組にならないようにする（海の生き物は雷、幽霊は聖に弱い）
 const WRECK_CAVE_POOLS: DungeonDef['pools'] = {
@@ -121,7 +121,7 @@ export const wreckCave: DungeonDef = {
   bossChest: 'epic',
   rewardKey: 'lightStar',
   clearStory: ['海蛇の女王が、静かに海へ沈んでいった。', '洞窟に、星の灯がともった。', '星の灯を手に入れた！'],
-  layout: withExtraFloor(wreckCaveLayout, KEY_EXTRA_FLOOR),
+  layout: grownLayout(wreckCaveLayout, KEY_EXTRA_FLOOR),
 };
 
 export const pirateIsland: DungeonDef = {
@@ -136,7 +136,7 @@ export const pirateIsland: DungeonDef = {
   // 1つ目のダンジョンの鍵が要る（play-feedback-plan §4 C: 町や依頼を飛ばして、まっすぐ奥へ行けないように）
   requiresKeys: ['lightStar'],
   clearStory: ['海賊船長ガルドが、剣を落とした。', '「…灯台を、頼む」', '月の灯を手に入れた！'],
-  layout: withExtraFloor(pirateIslandLayout, KEY_EXTRA_FLOOR),
+  layout: grownLayout(pirateIslandLayout, KEY_EXTRA_FLOOR),
 };
 
 export const sunkenTemple: DungeonDef = {
@@ -152,7 +152,7 @@ export const sunkenTemple: DungeonDef = {
   requiresKeys: ['lightMoon'],
   requiresQuests: 1,
   clearStory: ['潮の神官が、祈りを止めて微笑んだ。', '「提督は、悲しんでおられる」', '日の灯を手に入れた！'],
-  layout: withExtraFloor(sunkenTempleLayout, KEY_EXTRA_FLOOR),
+  layout: grownLayout(sunkenTempleLayout, KEY_EXTRA_FLOOR),
 };
 
 export const ghostFlagship: DungeonDef = {
@@ -165,7 +165,7 @@ export const ghostFlagship: DungeonDef = {
   bossChest: 'legend',
   requiresKeys: ['lightStar', 'lightMoon', 'lightSun'],
   finale: true,
-  layout: withExtraFloor([
+  layout: grownLayout([
     [{ type: 'battle', next: [0, 1] }],
     [
       { type: 'battle', next: [0, 1] },

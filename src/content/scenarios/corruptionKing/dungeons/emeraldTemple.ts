@@ -1,7 +1,7 @@
 // シナリオダンジョン: 翠の神殿（部屋の並びが固定）
 import type { DungeonDef } from '../../../../types';
 import { FOREST_POOLS } from './pools';
-import { KEY_EXTRA_FLOOR, withExtraFloor } from '../../extraFloor';
+import { KEY_EXTRA_FLOOR, grownLayout } from '../../extraFloor';
 
 export const emeraldTemple: DungeonDef = {
   id: 'emeraldTemple',
@@ -14,7 +14,7 @@ export const emeraldTemple: DungeonDef = {
   rewardKey: 'emerald',
   clearStory: ['樹魔トレントキングが倒れた。', '森に、さわやかな風が戻ってくる。', '封印の鍵（翠）を手に入れた！'],
   // 行ごとの部屋。next は次の行の何番目の部屋につながるか
-  layout: withExtraFloor([
+  layout: grownLayout([
     [{ type: 'battle', next: [0, 1] }],
     [
       { type: 'battle', next: [0, 1] },

@@ -129,7 +129,11 @@ function endWorldTurn(game: GameState, rng: Rng) {
   w.acted = [];
   w.movedBy = undefined;
   w.relayCharged = undefined;
-  w.corruption = Math.min(100, w.corruption + (getDifficulty(game.difficulty).corruptionPerTurn ?? BALANCE.corruptionPerTurn));
+  // 時間による侵食度: 生きているキャラが全員ダンジョンの中なら、ダンジョンの番の量（ダンジョンが長いので小さめ）。難易度の値は倍率
+  const living = livingHeroes(game);
+  const allInside = living.length > 0 && living.every((x) => expeditionOf(game, x.id));
+  const perTurn = allInside ? BALANCE.corruptionPerDungeonTurn : BALANCE.corruptionPerTurn;
+  w.corruption = Math.min(100, w.corruption + perTurn * (getDifficulty(game.difficulty).corruptionPerTurn ?? 1));
   onCorruptionChange(game, rng, before);
   // 夜は魔物が増える
   const def = getScenario(game.scenarioId).map!;

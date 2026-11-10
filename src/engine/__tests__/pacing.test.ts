@@ -9,7 +9,7 @@ import { startTileOf } from '../game/world/start';
 import { spawnWanderer } from '../game/world/wanderers';
 import { nextGoalLines } from '../game/game';
 import { createRng } from '../rng';
-import { KEY_EXTRA_FLOOR, withExtraFloor } from '../../content/scenarios/extraFloor';
+import { KEY_EXTRA_FLOOR, withExtraFloor, growLayout, grownLayout, DUNGEON_ROWS, FINALE_EXTRA_FLOOR } from '../../content/scenarios/extraFloor';
 import { QUESTS, TOWNS } from '../../data/world';
 import type { GameCommand, GameState, PlayerId } from '../../types';
 import { applyGameCommand, createGame } from '../index';
@@ -188,6 +188,42 @@ describe('道を長くした地図（約20マス）と、1階増えたダンジ�
         L[r + 1].forEach((_, c) => expect(L[r].some((p) => p.next.includes(c)), `${d.id} ${r + 1}:${c}`).toBe(true));
       }
     }
+  });
+
+  it('鍵のダンジョンは40行・最後のダンジョンは52行（入口からボスまで）。最後は休憩→（物語）→ボスのまま', () => {
+    expect(DUNGEON_ROWS).toEqual({ key: 40, finale: 52 });
+    for (const d of DUNGEONS.all.filter((x) => (x.rewardKey || x.finale) && x.layout && !x.random)) {
+      const L = d.layout!;
+      expect(L.length, d.id).toBe(d.finale ? DUNGEON_ROWS.finale : DUNGEON_ROWS.key);
+      expect(L[L.length - 1][0].type, d.id).toBe('boss');
+      expect(L.slice(-4).some((row) => row.length === 1 && row[0].type === 'rest'), d.id).toBe(true);
+    }
+  });
+
+  it('中の行を繰り返して大きくする: 部屋の種類の割合は同じ・つなぎ目もつながる', () => {
+    const base = [
+      [{ type: 'battle', next: [0, 1] }],
+      [{ type: 'battle', next: [0, 1] }, { type: 'event', eventId: 'x', next: [1, 2] }],
+      [{ type: 'chest', chest: { rarity: 'rare' as const, locked: false }, next: [0] }, { type: 'battle', next: [0] }, { type: 'rest', next: [0] }],
+      [{ type: 'elite', next: [0] }],
+      [{ type: 'rest', next: [0] }],
+      [{ type: 'boss', next: [] }],
+    ];
+    const big = growLayout(base, 15);
+    expect(big).toHaveLength(15);
+    // 入口 1 + 階（中の3行＋休憩）× 3 = 12（最後の階の休憩はボス前の休憩と並ぶので、中の1行目に替える）+ 休憩・ボス 2
+    const middle = big.slice(1, -2).flat().map((x) => x.type);
+    const count = (list: string[], t: string) => list.filter((x) => x === t).length;
+    expect({ battle: count(middle, 'battle'), event: count(middle, 'event'), chest: count(middle, 'chest'), rest: count(middle, 'rest'), elite: count(middle, 'elite') }).toEqual({ battle: 7, event: 4, chest: 3, rest: 5, elite: 3 });
+    expect(big.slice(1, -2).filter((row) => row.length === 1 && row[0].type === 'rest')).toHaveLength(2);
+    for (let r = 0; r + 1 < big.length; r++) {
+      for (const room of big[r]) for (const n of room.next) expect(n).toBeLessThan(big[r + 1].length);
+      big[r + 1].forEach((_, c) => expect(big[r].some((p) => p.next.includes(c))).toBe(true));
+    }
+    // 元より小さい行の数を指定したら、そのまま
+    expect(growLayout(base, 4)).toEqual(base);
+    // grownLayout = 1階足してから大きくする
+    expect(grownLayout(base, FINALE_EXTRA_FLOOR)).toHaveLength(DUNGEON_ROWS.finale);
   });
 });
 

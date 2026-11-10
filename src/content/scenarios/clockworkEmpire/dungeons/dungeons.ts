@@ -1,7 +1,7 @@
 // シナリオ6のダンジョン。敵の組み合わせはダンジョンごと（雷だけが弱点の敵ばかりにならないよう、火・氷が弱点の敵を混ぜる）。
 // 制覇すると動力核が壊れて鍵になり、3つそろうと最終ダンジョンに入れる。ボスの手前に「物語の部屋」（event）を置く
 import type { DungeonDef } from '../../../../types';
-import { FINALE_EXTRA_FLOOR, KEY_EXTRA_FLOOR, withExtraFloor } from '../../extraFloor';
+import { FINALE_EXTRA_FLOOR, KEY_EXTRA_FLOOR, grownLayout } from '../../extraFloor';
 
 const FACTORY_POOLS: DungeonDef['pools'] = {
   battle: [['smokeStackCrow', 'brokenAutomaton'], ['conveyorBot', 'oilSlime'], ['riveter', 'sparkTurret'], ['voltGearBug', 'brokenAutomaton'], ['gearBug', 'conveyorBot', 'oilSlime']],
@@ -125,7 +125,7 @@ export const gearFactory: DungeonDef = {
   bossChest: 'epic',
   rewardKey: 'coreGear',
   clearStory: ['工場長ゴーレムが、動かなくなった。', '工場のベルトが、静かに止まる。', '動力核（歯車）を壊した！'],
-  layout: withExtraFloor(factoryLayout, KEY_EXTRA_FLOOR),
+  layout: grownLayout(factoryLayout, KEY_EXTRA_FLOOR),
 };
 
 export const steamPlant: DungeonDef = {
@@ -140,7 +140,7 @@ export const steamPlant: DungeonDef = {
   // 1つ目のダンジョンの鍵が要る（play-feedback-plan §4 C: 町や依頼を飛ばして、まっすぐ奥へ行けないように）
   requiresKeys: ['coreGear'],
   clearStory: ['暴走ボイラーの炎が、消えた。', '発電所から、蒸気が引いていく。', '動力核（蒸気）を壊した！'],
-  layout: withExtraFloor(plantLayout, KEY_EXTRA_FLOOR),
+  layout: grownLayout(plantLayout, KEY_EXTRA_FLOOR),
 };
 
 export const clockTower: DungeonDef = {
@@ -156,7 +156,7 @@ export const clockTower: DungeonDef = {
   requiresKeys: ['coreSteam'],
   requiresQuests: 1,
   clearStory: ['時計仕掛けの賢者の針が、止まった。', '「大機械を…止めてやってくれ」', '動力核（時間）を壊した！'],
-  layout: withExtraFloor(towerLayout, KEY_EXTRA_FLOOR),
+  layout: grownLayout(towerLayout, KEY_EXTRA_FLOOR),
 };
 
 export const machineHeart: DungeonDef = {
@@ -169,7 +169,7 @@ export const machineHeart: DungeonDef = {
   bossChest: 'legend',
   requiresKeys: ['coreGear', 'coreSteam', 'coreTime'],
   finale: true,
-  layout: withExtraFloor([
+  layout: grownLayout([
     [{ type: 'battle', next: [0, 1] }],
     [
       { type: 'battle', next: [0, 1] },

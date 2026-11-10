@@ -1,7 +1,7 @@
 // 最終ダンジョン: 魔王城。3つの封印の鍵で扉が開く。途中に門番（中ボス）、最奥に侵食の魔王ヴァルグリム
 import type { DungeonDef } from '../../../../types';
 import { CASTLE_POOLS } from './pools';
-import { FINALE_EXTRA_FLOOR, withExtraFloor } from '../../extraFloor';
+import { FINALE_EXTRA_FLOOR, grownLayout } from '../../extraFloor';
 
 export const demonCastle: DungeonDef = {
   id: 'demonCastle',
@@ -13,7 +13,7 @@ export const demonCastle: DungeonDef = {
   bossChest: 'legend',
   requiresKeys: ['emerald', 'azure', 'crimson'],
   finale: true,
-  layout: withExtraFloor([
+  layout: grownLayout([
     [{ type: 'battle', next: [0, 1] }],
     [
       { type: 'battle', next: [0] },

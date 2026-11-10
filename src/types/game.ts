@@ -532,7 +532,7 @@ export interface DifficultyDef {
   enemyHp?: number;
   enemyAttack?: number;
   reward?: number;
-  /** 世界マップの1巡ごとに増える侵食度（省略は BALANCE.corruptionPerTurn） */
+  /** 時間による侵食度の倍率（BALANCE.corruptionPerTurn・corruptionPerDungeonTurn に掛ける。省略は1） */
   corruptionPerTurn?: number;
   /** 説明文（省略すると数値から自動で作る） */
   description?: string;
