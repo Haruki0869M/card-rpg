@@ -29,7 +29,6 @@ describe('扉が開く演出の待ち', () => {
     const s = useBattle.getState();
     expect(s.dispatchWire({ type: 'WORLD_INTERACT', playerId: 'P1', heroId: 'h0', party: ['h0'] })).toBeUndefined();
     const x = useBattle.getState().scene;
-    useBattle.getState().dispatchGame({ type: 'EXPLORE_ROLL', playerId: 'P1', heroId: 'h0' });
     expect(useBattle.getState().doorOpen).toBeNull();
     expect(useBattle.getState().dispatchGame({ type: 'ENTER_ROOM', playerId: 'P1', roomId: 'r0c0' })).toBeUndefined();
     const d = useBattle.getState().doorOpen!;
@@ -43,7 +42,6 @@ describe('扉が開く演出の待ち', () => {
   it('歩くだけ・向きを変えるだけでは出ない。場面を切り替えると捨てる', () => {
     useBattle.getState().loadRemote(inTemple().g);
     useBattle.getState().dispatchWire({ type: 'WORLD_INTERACT', playerId: 'P1', heroId: 'h0', party: ['h0'] });
-    useBattle.getState().dispatchGame({ type: 'EXPLORE_ROLL', playerId: 'P1', heroId: 'h0' });
     useBattle.getState().dispatchGame({ type: 'DUNGEON_TURN', playerId: 'P1', heroId: 'h0', dir: 'back' });
     expect(useBattle.getState().doorOpen).toBeNull();
     useBattle.getState().dispatchGame({ type: 'DUNGEON_TURN', playerId: 'P1', heroId: 'h0', dir: 'back' });

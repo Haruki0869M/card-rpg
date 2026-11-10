@@ -561,6 +561,12 @@ export const useBattle = create<StoreState>((set, get) => {
     // ダンジョンに入った: この端末のキャラが入ったなら、その場面を見る
     const added = (full.expeditions ?? []).find((x) => !before?.expeditions?.some((y) => y.id === x.id));
     if (added && added.heroes.some((id) => isLocalPlayer(full.heroes.find((h) => h.id === id)?.playerId ?? 'P1'))) scene = added.id;
+    // 先に入った仲間の組に合流した: この端末のキャラが加わったなら、その組の場面を見る（タブは1つのまま）
+    const joined = (full.expeditions ?? []).find((x) => {
+      const old = before?.expeditions?.find((y) => y.id === x.id);
+      return !!old && x.heroes.some((id) => !old.heroes.includes(id) && isLocalPlayer(full.heroes.find((h) => h.id === id)?.playerId ?? 'P1'));
+    });
+    if (joined) scene = joined.id;
     // 手番が移った: この端末のキャラの番なら、そのキャラのいる場面（世界マップかダンジョン）を見る（M3-D）
     const turn = full.world?.turn;
     if (turn && turn !== before?.world?.turn && isLocalPlayer(full.heroes.find((h) => h.id === turn)?.playerId ?? 'P1')) scene = sceneOfHero(full, turn);

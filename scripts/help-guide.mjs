@@ -74,7 +74,6 @@ for (const [width, height] of SIZES) {
   const enterDungeon = async () => {
     await page.getByText('翠の神殿に入る').click();
     await page.waitForTimeout(200);
-    if (await page.locator('[data-explore-roll-button]').count()) await page.locator('[data-explore-roll-button]').click();
     await page.waitForTimeout(200);
   };
   const openDoor = async () => {

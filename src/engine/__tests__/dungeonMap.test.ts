@@ -1,6 +1,5 @@
 // ===== 第3段階: ダンジョンの通路の地図・歩く・オートマッピング・歩数・保存の移行 =====
 import { afterEach, describe, expect, it } from 'vitest';
-import { BALANCE } from '../../data/balance';
 import { DUNGEONS } from '../../data/dungeons';
 import { EVENTS } from '../../data/events';
 import { actorOf, setLocalPlayers } from '../../store/battleConfig';
@@ -38,7 +37,7 @@ const tileOf = (g: GameState, kind: string, id: string) => g.world!.tiles.findIn
 const inScene = (x: string, command: GameCommand): GameCommand => ({ type: 'SCENE', scene: x, command });
 const dun = (g: GameState, x: string) => viewOf(g, x).dungeon!;
 
-/** 2人（P1・P2、または同じプレイヤー）で翠の神殿に入り、h0 の番で探索のサイコロを振る（確認しやすいように、選べる扉は3にそろえる） */
+/** 2人（P1・P2、または同じプレイヤー）で翠の神殿に入る（h0 の番） */
 function inTemple(players: PlayerId[] = ['P1', 'P2']) {
   let g = createGame({ seed: 3, scenarioId: 'corruptionKing', difficulty: 'normal', party: party(players) });
   g = run(g, { type: 'STORY_CONTINUE', playerId: 'P1' });
@@ -50,14 +49,6 @@ function inTemple(players: PlayerId[] = ['P1', 'P2']) {
   g = run(g, { type: 'WORLD_INTERACT', playerId: 'P1', heroId: 'h0', party: ['h0', 'h1'] });
   const x = g.expeditions![0].id;
   g.heroes[0].focus = 2;
-  // 2人のプレイヤー: 判定するキャラを先にみんなで決める
-  if (players[1] !== players[0]) {
-    g = run(g, inScene(x, { type: 'VOTE', playerId: 'P1', command: { type: 'EXPLORE_ROLLER', playerId: 'P1', heroId: 'h0' } }));
-    g = run(g, inScene(x, { type: 'VOTE', playerId: players[1], command: { type: 'EXPLORE_ROLLER', playerId: players[1], heroId: 'h0' } }));
-  }
-  g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: 'P1', heroId: 'h0' }));
-  g.expeditions![0].dungeon!.explore = 3;
-  g.expeditions![0].dungeon!.exploreDice!.total = 3;
   return { g, x };
 }
 
@@ -131,27 +122,26 @@ describe('通路の地図（部屋のつながりから決まった手順で作�
 });
 
 describe('通路を歩く', () => {
-  it('歩く・向きを変えるのは数えない。扉1つで1。見えたマスが地図に描き足される', () => {
+  it('歩く・向きを変えるのは手番を使わない。扉を開けると「この手番に扉を開けた」になる。見えたマスが地図に描き足される', () => {
     let { g, x } = inTemple(['P1', 'P1']);
-    const n = dun(g, x).explore!;
-    expect(n).toBe(3);
     const seen0 = dun(g, x).seen!.length;
     g = run(g, inScene(x, { type: 'DUNGEON_TURN', playerId: 'P1', heroId: 'h0', dir: 'right' }));
     expect(dun(g, x).pos!.facing).toBe(1);
-    expect(dun(g, x).explore).toBe(n);
+    expect(dun(g, x).opened).toBeUndefined();
     // 1行目の部屋に入り（右を向いていても、扉を選ぶだけで開く）、出口から通路へ
     g = run(g, inScene(x, { type: 'ENTER_ROOM', playerId: 'P1', roomId: 'r0c0' }));
-    expect(dun(g, x).explore).toBe(n - 1);
+    expect(dun(g, x).opened).toBe(true);
     g.expeditions![0].mode = 'dungeon';
     g.expeditions![0].battle = undefined;
     g.expeditions![0].dungeon!.rooms.find((r) => r.id === 'r0c0')!.cleared = true;
     g = run(g, inScene(x, { type: 'DUNGEON_STEP', playerId: 'P1', heroId: 'h0', dir: 'forward' }));
-    expect(dun(g, x).explore).toBe(n - 1);
+    // 通路に戻ったので、この組の手番は終わった（印は消える）
+    expect(dun(g, x).opened).toBeUndefined();
     expect(dun(g, x).seen!.length).toBeGreaterThan(seen0);
     expect(exploredPercent(dun(g, x))).toBeGreaterThan(0);
   });
 
-  it('壁には歩いて入れない。離れた扉でも、扉を選ぶと自動で歩いて開けて、使うのは1だけ', () => {
+  it('壁には歩いて入れない。離れた扉でも、扉を選ぶと自動で歩いて開ける', () => {
     let { g, x } = inTemple(['P1', 'P1']);
     // 入口の通路は1マスだけ（1行目は1部屋）なので、左右は壁、前は扉
     expect(err(g, inScene(x, { type: 'DUNGEON_STEP', playerId: 'P1', heroId: 'h0', dir: 'left' }))).toMatch(/進めません/);
@@ -164,22 +154,12 @@ describe('通路を歩く', () => {
     const d = dun(g, x);
     const far = reachableRooms(d).map((r) => ({ r, len: findPath(d, doorFront(d, r.id)!)!.length })).sort((a, b) => b.len - a.len)[0];
     expect(far.len).toBeGreaterThan(1);
-    const before = d.explore!;
     g = run(g, inScene(x, { type: 'ENTER_ROOM', playerId: 'P1', roomId: far.r.id }));
-    expect(dun(g, x).explore).toBe(before - 1);
     expect(dun(g, x).currentRoomId).toBe(far.r.id);
     expect(dun(g, x).pos!.facing).toBe(0);
-    // 残りが0の時は、扉を選べない
-    g.expeditions![0].mode = 'dungeon';
-    g.expeditions![0].battle = undefined;
-    g.expeditions![0].dungeon!.rooms.find((r) => r.id === far.r.id)!.cleared = true;
-    g.expeditions![0].dungeon!.explore = 0;
-    g.expeditions![0].dungeon!.watchedAt = far.r.id;
-    const next = reachableRooms(dun(g, x))[0];
-    if (next) expect(err(g, inScene(x, { type: 'ENTER_ROOM', playerId: 'P1', roomId: next.id }))).toMatch(/もうありません/);
   });
 
-  it('見えていない場所へは「ここまで歩く」できない。歩いても数えない', () => {
+  it('見えていない場所へは「ここまで歩く」できない', () => {
     let { g, x } = inTemple(['P1', 'P1']);
     g = run(g, inScene(x, { type: 'ENTER_ROOM', playerId: 'P1', roomId: 'r0c0' }));
     g.expeditions![0].mode = 'dungeon';
@@ -190,10 +170,8 @@ describe('通路を歩く', () => {
     if (far) expect(err(g, inScene(x, { type: 'DUNGEON_WALK', playerId: 'P1', heroId: 'h0', x: far[0], y: far[1] }))).toMatch(/見ていない/);
     const front = doorFront(d, 'r1c0')!;
     g = run(g, inScene(x, { type: 'DUNGEON_STEP', playerId: 'P1', heroId: 'h0', dir: 'forward' }));
-    const before = dun(g, x).explore!;
     if (dun(g, x).seen!.includes(cellKey(front.x, front.y))) {
       g = run(g, inScene(x, { type: 'DUNGEON_WALK', playerId: 'P1', heroId: 'h0', x: front.x, y: front.y, face: 0 }));
-      expect(dun(g, x).explore).toBe(before);
       expect(dun(g, x).pos).toEqual({ ...front, facing: 0 });
     }
   });
@@ -213,7 +191,7 @@ describe('通路を歩く', () => {
     expect(findPath(d, front)).toBeUndefined();
   });
 
-  it('扉を選び終えても、この通路でまだ警戒できるなら番は続く。警戒か「手番を終える」で次の人の番', () => {
+  it('扉1つ＝手番1回: 部屋の途中は番が続き、部屋を済ませて通路に戻ると次の人の番。サイコロも「手番を終える」も無い', () => {
     let g = createGame({ seed: 3, scenarioId: 'corruptionKing', difficulty: 'normal', party: party(['P1', 'P1']) });
     g = run(g, { type: 'STORY_CONTINUE', playerId: 'P1' });
     g.world!.pos.h0 = tileOf(g, 'dungeon', 'emeraldTemple');
@@ -221,22 +199,40 @@ describe('通路を歩く', () => {
     g = run(g, { type: 'WORLD_INTERACT', playerId: 'P1', heroId: 'h0', party: ['h0'] });
     const x = g.expeditions![0].id;
     g = run(g, { type: 'WORLD_WAIT', playerId: 'P1', heroId: 'h1' });
-    g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: 'P1', heroId: 'h0' }));
-    // 残り1で扉を開ける → 0。戦闘の途中なので番は続く
-    g.expeditions![0].dungeon!.explore = 1;
-    g = run(g, inScene(x, { type: 'ENTER_ROOM', playerId: 'P1', roomId: 'r0c0' }));
-    expect(dun(g, x).explore).toBe(0);
     expect(g.world!.turn).toBe('h0');
-    // 部屋を終えて通路に戻った: この通路でまだ警戒していないので、番は続く
+    // サイコロを振らずに、すぐ扉を開けられる。戦闘の途中なので番は続く
+    g = run(g, inScene(x, { type: 'ENTER_ROOM', playerId: 'P1', roomId: 'r0c0' }));
+    expect(g.expeditions![0].mode).toBe('battle');
+    expect(g.world!.turn).toBe('h0');
+    // 部屋を終えて通路に戻った: 次の人（h1）の番
     g.expeditions![0].mode = 'dungeon';
     g.expeditions![0].battle = undefined;
     g.expeditions![0].dungeon!.rooms.find((r) => r.id === 'r0c0')!.cleared = true;
-    g = run(g, inScene(x, { type: 'DUNGEON_STEP', playerId: 'P1', heroId: 'h0', dir: 'forward' }));
-    expect(g.world!.turn).toBe('h0');
-    // 警戒は0でもできる。警戒すると次の人（h1）の番
-    g = run(g, inScene(x, { type: 'DUNGEON_WATCH', playerId: 'P1', heroId: 'h0', focusUsed: 0 }));
+    g = run(g, inScene(x, { type: 'DUNGEON_TURN', playerId: 'P1', heroId: 'h0', dir: 'left' }));
     expect(g.world!.turn).toBe('h1');
-    expect(g.expeditions![0].dungeon!.explore).toBeNull();
+    expect(g.expeditions![0].dungeon!.opened).toBeUndefined();
+    // h1 の番の間は、扉を開けられない
+    expect(err(g, inScene(x, { type: 'ENTER_ROOM', playerId: 'P1', roomId: reachableRooms(dun(g, x))[0].id }))).toMatch(/ほかのキャラの番/);
+    // h1 が動くと、また h0 の番（1回の番に扉1つ）
+    g = run(g, { type: 'WORLD_WAIT', playerId: 'P1', heroId: 'h1' });
+    expect(g.world!.turn).toBe('h0');
+    g = run(g, inScene(x, { type: 'ENTER_ROOM', playerId: 'P1', roomId: reachableRooms(dun(g, x))[0].id }));
+    expect(dun(g, x).opened).toBe(true);
+  });
+
+  it('全員がダンジョンの中なら、部屋を済ませるとすぐ同じ組の番に戻る（ワールドターンが1つ進む）', () => {
+    let { g, x } = inTemple(['P1', 'P1']);
+    const wt = g.world!.worldTurn;
+    g = run(g, inScene(x, { type: 'ENTER_ROOM', playerId: 'P1', roomId: 'r0c0' }));
+    g.expeditions![0].mode = 'dungeon';
+    g.expeditions![0].battle = undefined;
+    g.expeditions![0].dungeon!.rooms.find((r) => r.id === 'r0c0')!.cleared = true;
+    g = run(g, inScene(x, { type: 'DUNGEON_TURN', playerId: 'P1', heroId: 'h0', dir: 'left' }));
+    expect(g.world!.worldTurn).toBe(wt + 1);
+    expect(g.expeditions![0].heroes).toContain(g.world!.turn);
+    // すぐ次の扉を選べる
+    g = run(g, inScene(x, { type: 'ENTER_ROOM', playerId: 'P1', roomId: reachableRooms(dun(g, x))[0].id }));
+    expect(dun(g, x).currentRoomId).not.toBe('r0c0');
   });
 });
 
@@ -283,7 +279,7 @@ describe('歩くのは手番のキャラの担当の人だけ（扉は全員一�
 });
 
 describe('古い保存（v14）の移行', () => {
-  it('ダンジョンの途中: 今の部屋に立ち、通った部屋が見え、探索力は歩数（×2）になる', () => {
+  it('ダンジョンの途中: 今の部屋に立ち、通った部屋が見える。古い「探索力」の項目は捨てる', () => {
     let { g, x } = inTemple(['P1', 'P1']);
     g = run(g, inScene(x, { type: 'ENTER_ROOM', playerId: 'P1', roomId: 'r0c0' }));
     const old = structuredClone(g) as GameState & { version: number };
@@ -291,7 +287,7 @@ describe('古い保存（v14）の移行', () => {
     d.rooms.find((r) => r.id === 'r0c0')!.cleared = true;
     delete d.pos;
     delete d.seen;
-    d.explore = 3;
+    (d as unknown as Record<string, unknown>).explore = 3;
     old.version = 14;
     if (old.expeditions![0].battle) old.expeditions![0].battle.version = 14;
     const m = migrateGame(JSON.parse(JSON.stringify(old)))!;
@@ -301,7 +297,7 @@ describe('古い保存（v14）の移行', () => {
     const c = dungeonGrid(md).roomCell.get('r0c0')!;
     expect(md.pos).toEqual({ x: c.x, y: c.y, facing: 0 });
     expect(md.seen).toContain(cellKey(c.x, c.y));
-    expect(md.explore).toBe(3 * BALANCE.dungeonStepsPerExplore);
+    expect('explore' in md).toBe(false);
     expect(m.expeditions![0].battle?.version).toBe(17);
     // 移した後も、次の部屋の扉まで歩いて行ける
     const next = reachableRooms(md);
@@ -309,18 +305,18 @@ describe('古い保存（v14）の移行', () => {
     for (const r of next) expect(findPath(md, doorFront(md, r.id)!)).toBeDefined();
   });
 
-  it('まだ部屋に入っていない保存は入口に立ち、判定前（null）はそのまま', () => {
+  it('まだ部屋に入っていない保存は入口に立つ（判定前の null も捨てる）', () => {
     const { g } = inTemple(['P1', 'P1']);
     const old = structuredClone(g) as GameState & { version: number };
     const d = old.expeditions![0].dungeon!;
     delete d.pos;
     delete d.seen;
-    d.explore = null;
+    (d as unknown as Record<string, unknown>).explore = null;
     old.version = 14;
     const m = migrateGame(JSON.parse(JSON.stringify(old)))!;
     const md = m.expeditions![0].dungeon!;
     expect(md.pos).toEqual({ ...dungeonGrid(md).start, facing: 0 });
-    expect(md.explore).toBeNull();
+    expect('explore' in md).toBe(false);
     expect(md.seen!.length).toBeGreaterThan(0);
   });
 });

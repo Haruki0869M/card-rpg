@@ -122,8 +122,6 @@ let g = await A.evaluate(() => window.__online.game());
 check(g.expeditions[0].heroes.includes(h2), 'P2 のキャラも一緒にダンジョンに入った');
 // 歩数を持たせ、手番は P1 のキャラ
 g.world.turn = h1;
-g.expeditions[0].dungeon.explore = 3;
-g.expeditions[0].dungeon.exploreDice = { sides: 3, face: 3, bonus: [], total: 3, seq: -1 };
 // お供の印が欄の上で切れないかも見る（オカメインコ）
 g.heroes.find((h) => h.id === h1).pet = { petId: 'cockatiel', color: 'lutino', name: 'ピー', love: 0, acts: 0 };
 await inject(g);

@@ -1,6 +1,6 @@
 // ===== みんなで決める操作の表示（M3-C）: だれがどれを選んだか・だれを待っているか =====
 import { PLAYER_COLOR } from '../../data/theme';
-import { currentVote, needsVote, notVoted, voters, votesFor } from '../../engine';
+import { currentVote, doorKind, needsVote, notVoted, OMEN_INFO, omenOfType, voters, votesFor } from '../../engine';
 import { isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
 import { useOnline } from '../../store/onlineStore';
@@ -9,22 +9,31 @@ import type { GameCommand, GameState, PlayerId } from '../../types';
 
 const name = (p: PlayerId) => useOnline.getState().room?.seatName(p) ?? p;
 
+/** 扉の票の説明（予兆の名前で。例「魔物の群れの扉」「ボスの扉」） */
+function doorVoteLabel(game: GameState, roomId: string): string {
+  const room = game.dungeon?.rooms.find((r) => r.id === roomId);
+  if (!room) return '扉を開ける';
+  const kind = doorKind(room);
+  if (kind !== 'door') return kind === 'boss' ? 'ボスの扉' : '中ボスの扉';
+  const omen = omenOfType(room.type);
+  return omen ? `${OMEN_INFO[omen].name}の扉` : '扉を開ける';
+}
+
 /** 選んだ操作の短い説明 */
 function voteLabel(game: GameState, cmd: GameCommand): string {
   switch (cmd.type) {
     case 'ENTER_ROOM':
-      // 第3段階: 部屋の中身は開けるまで分からないので、種類は出さない
-      return '扉を開ける';
+      // 扉の予兆の名前で出す（例「魔物の群れの扉」。どの扉に票が入ったか分かるように）
+      return doorVoteLabel(game, cmd.roomId);
     case 'RETREAT':
       return '撤退';
     case 'CHOOSE_EVENT':
       return game.event ? `「${EVENTS.get(game.event.eventId).options[cmd.optionIndex]?.label ?? ''}」` : '選択';
     case 'REST':
-      return cmd.kind === 'hp' ? '休む' : '瞑想';
+      return cmd.kind === 'hp' ? '休む' : cmd.kind === 'focus' ? '瞑想' : '技を磨く';
     case 'LEAVE_CHEST':
       return '先へ進む';
     case 'CHEST_OPENER':
-    case 'EXPLORE_ROLLER':
       return `${game.heroes.find((h) => h.id === cmd.heroId)?.name ?? ''}に任せる`;
     default:
       return '続ける';

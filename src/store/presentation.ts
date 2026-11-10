@@ -8,7 +8,7 @@ import { timeOfDay } from '../engine/game/world/time';
 import { visionOf } from '../engine/game/world/fog';
 import { hexDistance } from '../engine/game/world/hex';
 import { heroMaxHp } from '../engine/game/hero';
-import { doorOmen, type DoorOmen } from '../engine/game/dungeonOmen';
+import { doorBeyond, doorDetail, doorOmen, type DoorOmen } from '../engine/game/dungeonOmen';
 import { restMultiplierOf } from '../engine/game/common';
 import { getRoomType } from '../data/rules';
 import { cardSound, damageSound, petCry, statusSound } from '../audio/cues';
@@ -242,12 +242,13 @@ export function explorationNotices(before: GameState, after: GameState, wire: Ga
       if (after.world.tiles.some((t, i) => t.seen && !before.world!.tiles[i].seen && hexDistance(after.world!, at, i) > base && hexDistance(after.world!, at, i) <= withPet)) add(id, `視界+${pe.vision}`);
     }
   }
-  // フクロウ: 扉の気配が新しく見えた（第3段階C1）
+  // フクロウ: 扉の先（中身・その先の扉）が新しく読めた（先読み。抜本的な見直し §2-4）
   if (prev.dungeon && next.dungeon && prev.dungeon.dungeonId === next.dungeon.dungeonId) {
-    const omens = (g: GameState) => g.dungeon!.rooms.filter((r) => doorOmen(g, r)).length;
-    if (omens(next) > omens(prev)) {
+    const read = (g: GameState) => new Set(g.dungeon!.rooms.filter((r) => doorDetail(g, r) !== undefined || doorBeyond(g, r).length > 0).map((r) => r.id));
+    const was = read(prev);
+    if ([...read(next)].some((id) => !was.has(id))) {
       const owl = next.heroes.find((h) => (!next.party || next.party.includes(h.id)) && h.hp > 0 && h.pet?.petId === 'owl');
-      if (owl) add(owl.id, '何かの気配！');
+      if (owl) add(owl.id, '扉の先を見通した');
     }
   }
   if (before.world && after.world && timeOfDay(before.world.worldTurn) !== 'night' && timeOfDay(after.world.worldTurn) === 'night') {
@@ -256,7 +257,8 @@ export function explorationNotices(before: GameState, after: GameState, wire: Ga
   return result;
 }
 
-const OMEN_SOUND: Record<DoorOmen, SoundId> = { danger: 'sfx_dungeon_omen_danger', treasure: 'sfx_dungeon_omen_treasure', rest: 'sfx_dungeon_omen_other', mystery: 'sfx_dungeon_omen_other' };
+/** 新しい扉の予兆が見えた時の音（予兆はいつも見えるので、強敵と宝の扉だけ鳴らす。静かめに） */
+const OMEN_SOUND: Partial<Record<DoorOmen, SoundId>> = { elite: 'sfx_dungeon_omen_danger', treasure: 'sfx_dungeon_omen_treasure' };
 const PLACE_SOUND: Partial<Record<string, SoundId>> = { town: 'sfx_world_enter_town', shrine: 'sfx_world_shrine', sanctuary: 'sfx_world_shrine', rest: 'sfx_world_rest', event: 'sfx_world_event' };
 
 /**
@@ -269,15 +271,16 @@ export function explorationSounds(before: GameState, after: GameState, wire: Gam
   if (cmd.type === 'VOTE') { if (!cmd.command) return []; cmd = cmd.command; }
   const out: SoundId[] = [];
   const t = cmd.type;
-  if (((t === 'WORLD_ROLL_MOVE' || t === 'WORLD_REROLL_MOVE') && !!next.world?.moveDice && next.world.moveDice.seq !== prev.world?.moveDice?.seq) || ((t === 'EXPLORE_ROLL' || t === 'EXPLORE_REROLL') && !!next.dungeon?.exploreDice && next.dungeon.exploreDice.seq !== prev.dungeon?.exploreDice?.seq)) out.push('sfx_world_dice');
+  if ((t === 'WORLD_ROLL_MOVE' || t === 'WORLD_REROLL_MOVE') && !!next.world?.moveDice && next.world.moveDice.seq !== prev.world?.moveDice?.seq) out.push('sfx_world_dice');
   if (t === 'WORLD_CAMP') out.push('sfx_world_camp');
-  if (t === 'DUNGEON_WATCH' && next.dungeon?.watchRoll && next.dungeon.watchRoll !== prev.dungeon?.watchRoll) out.push('sfx_dungeon_watch');
+  if (t === 'DUNGEON_SCOUT' && next.dungeon?.watchedAt !== prev.dungeon?.watchedAt) out.push('sfx_dungeon_watch');
   if ((t === 'TOWN_BUY' || t === 'PEDDLER_BUY') && after !== before) out.push('sfx_ui_buy');
   if (t === 'EQUIP') out.push('sfx_ui_equip');
   // 場所に入った（町・祠・聖域・休憩・イベント）
   if (prev.mode !== next.mode && PLACE_SOUND[next.mode]) out.push(PLACE_SOUND[next.mode]!);
   // ダンジョンに入った（新しい場面ができた）
-  if ((after.expeditions ?? []).some((x) => !before.expeditions?.some((y) => y.id === x.id))) out.push('sfx_world_enter_dungeon');
+  // ダンジョンに入った（新しい場面ができた・先の組に合流した）
+  if ((after.expeditions ?? []).some((x) => { const old = before.expeditions?.find((y) => y.id === x.id); return !old || x.heroes.length > old.heroes.length; })) out.push('sfx_world_enter_dungeon');
   // 夜になった
   if (before.world && after.world && timeOfDay(before.world.worldTurn) !== 'night' && timeOfDay(after.world.worldTurn) === 'night') out.push('sfx_world_night');
   // 扉を開けて部屋に入った（ボスの部屋は重い門の音）
@@ -285,14 +288,12 @@ export function explorationSounds(before: GameState, after: GameState, wire: Gam
     const room = next.dungeon.rooms.find((r) => r.id === next.dungeon!.currentRoomId);
     out.push(room && getRoomType(room.type).battle?.boss ? 'sfx_dungeon_gate' : 'sfx_dungeon_door');
   }
-  // 歩数を使い切った
-  if (prev.dungeon && next.dungeon && prev.dungeon.dungeonId === next.dungeon.dungeonId && (prev.dungeon.explore ?? 0) > 0 && next.dungeon.explore === 0) out.push('sfx_dungeon_steps_out');
-  // 扉の気配が新しく見えた（一番気になる気配の音）
+  // 新しい扉の予兆が見えた（強敵・宝の扉だけ）
   if (prev.dungeon && next.dungeon && prev.dungeon.dungeonId === next.dungeon.dungeonId) {
     const seen = new Set(prev.dungeon.rooms.filter((r) => doorOmen(prev, r)).map((r) => r.id));
     const fresh = next.dungeon.rooms.map((r) => !seen.has(r.id) && doorOmen(next, r)).filter((o): o is DoorOmen => !!o);
-    const omen = (['danger', 'treasure', 'mystery', 'rest'] as const).find((o) => fresh.includes(o));
-    if (omen) out.push(OMEN_SOUND[omen]);
+    const omen = (['elite', 'treasure'] as const).find((o) => fresh.includes(o));
+    if (omen) out.push(OMEN_SOUND[omen]!);
   }
   // キャラごとの変化（転職・レベルアップ・お金・お供）
   let classChange = false, levelUp = false, coin = false, cry: SoundId | undefined, heart = false, ribbon = false;

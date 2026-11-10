@@ -130,7 +130,7 @@ for (const width of WIDTHS) {
       await page.waitForTimeout(1500);
     });
 
-    // 2. ダンジョンの入口（探索のサイコロ）。全員を翠の神殿の入口へ動かして入る
+    // 2. ダンジョンの入口（周囲の警戒）。全員を翠の神殿の入口へ動かして入る
     {
       const d = await read();
       const w = d.game.world;
@@ -144,9 +144,11 @@ for (const width of WIDTHS) {
       await closeStory();
     }
     await scene('dungeon', async () => {
-      if (await page.locator('[data-explore-roller]').count()) await page.locator('[data-explore-roller] button').first().click();
-      await page.locator('[data-explore-roll-button]').click();
-      await page.waitForTimeout(1500);
+      // 通路（扉の予兆が出ている）で保存して再開し、同じ操作（周囲の警戒: フォーカス1で先読み）をする。サイコロは無くなった
+      await page.locator('[data-door-choice]').first().waitFor({ timeout: 5000 });
+      await page.locator('[data-scout-open]').click();
+      await page.locator('[data-scout-hero]').first().click();
+      await page.waitForTimeout(1000);
     });
 
     // 3. 戦闘の最初（カードを1枚使う）。最初の部屋の敵を森のオオカミ2体にして扉を開ける
@@ -154,9 +156,7 @@ for (const width of WIDTHS) {
       const d = await read();
       (d.game.expeditions?.[0]?.dungeon ?? d.game.dungeon).rooms.find((r) => r.id === 'r0c0').enemies = ['forestWolf', 'forestWolf'].map((defId) => ({ defId, level: 3 }));
       await resume(d);
-      if (await page.locator('[data-explore-roller]').count()) await page.locator('[data-explore-roller] button').first().click();
-      if (await page.locator('[data-explore-roll-button]').count()) await page.locator('[data-explore-roll-button]').click();
-      await page.waitForTimeout(1200);
+      await page.waitForTimeout(600);
       await page.getByRole('button', { name: /扉を開ける/ }).first().click();
       await page.waitForTimeout(800);
       if (await page.getByText('戦闘開始', { exact: true }).count()) await page.getByText('戦闘開始', { exact: true }).click();

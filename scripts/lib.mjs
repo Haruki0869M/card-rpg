@@ -62,8 +62,6 @@ export async function startBattle(page, partySize, enemies, fast = true) {
       (g.expeditions?.[0]?.dungeon ?? g.dungeon).rooms.find((r) => r.id === 'r0c0').enemies = enemies.map((defId) => ({ defId, level: 3 }));
     }, enemies);
   }
-  // ダンジョンの番の最初に探索力を決める（M3-D）
-  if (await page.locator('[data-explore-roll-button]').count()) await page.locator('[data-explore-roll-button]').click();
   await page.waitForTimeout(200);
   // 第3段階: 入口は1行目の扉の前（北向き）。扉を開けて最初の部屋へ
   await page.getByRole('button', { name: /扉を開ける/ }).click();

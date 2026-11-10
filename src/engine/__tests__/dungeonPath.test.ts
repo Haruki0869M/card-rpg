@@ -14,7 +14,6 @@ import {
   doorFront,
   dungeonGrid,
   exploredPercent,
-  exploreRollerOf,
   findPath,
   revealSeen,
   viewOf,
@@ -164,43 +163,21 @@ function enterTemple(players: PlayerId[]) {
   return { g, x: g.expeditions![0].id };
 }
 
-describe('探索力の判定をだれがするか（2人以上のプレイヤー）', () => {
-  it('1人で遊ぶ時は今までどおり、すぐ判定できる', () => {
+describe('扉1つ＝手番1回（2人のプレイヤー）', () => {
+  it('サイコロも「だれが振る？」も無い。入ったらすぐ、全員一致で扉を開けられる', () => {
+    let { g, x } = enterTemple(['P1', 'P2']);
+    const enter = { type: 'ENTER_ROOM', roomId: 'r0c0' } as const;
+    g = run(g, inScene(x, { type: 'VOTE', playerId: 'P1', command: { ...enter, playerId: 'P1' } }));
+    expect(viewOf(g, x).dungeon!.currentRoomId).toBeUndefined();
+    g = run(g, inScene(x, { type: 'VOTE', playerId: 'P2', command: { ...enter, playerId: 'P2' } }));
+    expect(viewOf(g, x).dungeon!.currentRoomId).toBe('r0c0');
+    expect(viewOf(g, x).dungeon!.opened).toBe(true);
+  });
+
+  it('無くなった操作（探索のサイコロ・手番を終える）は受け付けない', () => {
     const { g, x } = enterTemple(['P1', 'P1']);
-    const g2 = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: 'P1', heroId: 'h1' }));
-    expect(viewOf(g2, x).dungeon!.explore).toBeGreaterThan(0);
-    expect(err(g, inScene(x, { type: 'VOTE', playerId: 'P1', command: { type: 'EXPLORE_ROLLER', playerId: 'P1', heroId: 'h1' } }))).toBeTruthy();
-  });
-
-  it('2人の時は、先にみんなで決める。全員が同じキャラを選ぶと決まり、そのキャラの担当の人だけが判定する', () => {
-    let { g, x } = enterTemple(['P1', 'P2']);
-    expect(err(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: 'P1', heroId: 'h0' }))).toMatch('みんなで決めます');
-    // 意見が分かれると決まらない
-    g = run(g, inScene(x, { type: 'VOTE', playerId: 'P1', command: { type: 'EXPLORE_ROLLER', playerId: 'P1', heroId: 'h0' } }));
-    g = run(g, inScene(x, { type: 'VOTE', playerId: 'P2', command: { type: 'EXPLORE_ROLLER', playerId: 'P2', heroId: 'h1' } }));
-    expect(exploreRollerOf(viewOf(g, x))).toBeUndefined();
-    // P1 が選び直して一致
-    const rng0 = g.rngState;
-    g = run(g, inScene(x, { type: 'VOTE', playerId: 'P1', command: { type: 'EXPLORE_ROLLER', playerId: 'P1', heroId: 'h1' } }));
-    expect(exploreRollerOf(viewOf(g, x))).toBe('h1');
-    // 決めるだけでは乱数を引かない（自動プレイの流れが変わらない）
-    expect(g.rngState).toBe(rng0);
-    expect(err(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: 'P1', heroId: 'h0' }))).toMatch('判定するのは');
-    g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: 'P2', heroId: 'h1' }));
-    expect(viewOf(g, x).dungeon!.explore).toBeGreaterThan(0);
-  });
-
-  it('決めたのは、その手番の間だけ（次の手番ではまた決める）', () => {
-    let { g, x } = enterTemple(['P1', 'P2']);
-    g = run(g, inScene(x, { type: 'VOTE', playerId: 'P1', command: { type: 'EXPLORE_ROLLER', playerId: 'P1', heroId: 'h0' } }));
-    g = run(g, inScene(x, { type: 'VOTE', playerId: 'P2', command: { type: 'EXPLORE_ROLLER', playerId: 'P2', heroId: 'h0' } }));
-    g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: 'P1', heroId: 'h0' }));
-    const turn0 = `${g.world!.worldTurn}:${g.world!.turn}`;
-    g = run(g, inScene(x, { type: 'VOTE', playerId: 'P1', command: { type: 'EXPLORE_END', playerId: 'P1' } }));
-    g = run(g, inScene(x, { type: 'VOTE', playerId: 'P2', command: { type: 'EXPLORE_END', playerId: 'P2' } }));
-    expect(`${g.world!.worldTurn}:${g.world!.turn}`).not.toBe(turn0);
-    const v = viewOf(g, x);
-    expect(v.dungeon!.explore ?? null).toBeNull();
-    expect(exploreRollerOf(v)).toBeUndefined();
+    for (const type of ['EXPLORE_ROLL', 'EXPLORE_REROLL', 'EXPLORE_ROLLER', 'EXPLORE_END']) {
+      expect(err(g, inScene(x, { type, playerId: 'P1', heroId: 'h0' } as unknown as GameCommand))).toBeTruthy();
+    }
   });
 });

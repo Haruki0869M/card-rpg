@@ -13,9 +13,10 @@ import { DIRS, doorFront, findPath, posOf, revealSeen, visibleFrom } from '../..
 import { useBattle } from '../../store/battleStore';
 import type { DoorOpen } from '../../store/battleStore';
 import type { DungeonRun, Facing } from '../../types';
-import type { DoorOmen } from '../../engine';
 import { Screen } from '../ui/game';
-import { DungeonView } from './DungeonView';
+import { DungeonView, viewUnit } from './DungeonView';
+import { doorChoices, doorWallView, WALL_SLOT_X, wallDoors, type WallDoor } from './doors';
+import { useElementSize } from '../../hooks/useElementSize';
 
 type Kind = 'forward' | 'left' | 'right' | 'back' | 'fade' | 'dim';
 export interface Frame {
@@ -130,10 +131,11 @@ const MOVES: Record<Kind, { old: [Pose, Pose]; new: [Pose, Pose]; ease: 'easeOut
  * 景色は2枚（0・1）をずっと置いたまま、交互に「前の景色」「次の景色」に使う（1歩ごとに作り直さない）。
  * onShown: 演出の間、画面のほかの所（ミニマップ・探索度・扉の札・ボタン）に出す景色。演出が無い時は null（今の景色）
  */
-export function AnimatedDungeonView({ run, background, omens, onShown, onDoor }: {
+export function AnimatedDungeonView({ run, background, doors, onShown, onDoor }: {
   run: DungeonRun;
   background: string;
-  omens?: Record<string, DoorOmen>;
+  /** 扉の壁の構図で描く扉（通路で扉を選ぶ時。選択肢と同じ順番） */
+  doors?: WallDoor[];
   onShown?: (shown: DungeonRun | null) => void;
   /** 一人称の絵の扉をタップした（部屋のID）。演出の間は押せない */
   onDoor?: (roomId: string) => void;
@@ -236,7 +238,7 @@ export function AnimatedDungeonView({ run, background, omens, onShown, onDoor }:
     <div className="absolute inset-0 overflow-hidden bg-black" data-dungeon-layers>
       {([0, 1] as const).map((n) => (
         <motion.div key={n} className="absolute inset-0" animate={ctl[n]} initial={false} style={{ willChange: 'transform, opacity' }} data-dungeon-layer={n}>
-          <DungeonView run={shown[n]} background={background} omens={omens} main={n === top} onDoor={n === top && !seq ? onDoor : undefined} />
+          <DungeonView run={shown[n]} background={background} doors={!seq ? doors : undefined} main={n === top} onDoor={n === top && !seq ? onDoor : undefined} />
         </motion.div>
       ))}
       {/* 確認スクリプトの目印: 演出の間だけ */}
@@ -263,8 +265,8 @@ export function walkedToDoor(run: DungeonRun, roomId: string | undefined): Dunge
 }
 
 /**
- * 扉が開く演出。扉を選ぶだけの形（オーナーの案）では、まず扉の前まで自動で歩き（通路の演出と同じ）、
- * それから扉へ寄りながら暗くなる。終わったら部屋の画面（戦闘など）へ。タップで飛ばせる
+ * 扉が開く演出（抜本的な見直し §1-2）: 扉を選んだ時の「扉の壁」をそのまま見せて、選んだ扉へ寄りながら、その扉が開いて暗くなる。
+ * 終わったら部屋の画面（戦闘など）へ。タップで飛ばせる。歩く演出は無い（扉の壁は、いつも目の前にある）
  */
 export function DoorOpenScene({ door }: { door: DoorOpen }) {
   const finish = useBattle((s) => s.finishDoorOpen);
@@ -273,46 +275,33 @@ export function DoorOpenScene({ door }: { door: DoorOpen }) {
   const factor = settings.fastMode ? 1 / TIMING.fastModeFactor : 1;
   const seconds = simple ? TIMING.dungeonSimple * 2 : TIMING.dungeonDoor * factor;
   const background = DUNGEONS.tryGet(door.run.dungeonId)?.background ?? door.run.background;
-  // 歩き始め（いつも前を向いて見せている）と、扉の前に着いた様子
-  const start = useMemo(() => ({ ...door.run, pos: { ...posOf(door.run), facing: 0 as Facing } }), [door.run]);
-  const walked = useMemo(() => walkedToDoor(door.run, door.roomId), [door.run, door.roomId]);
-  const walkSeconds = useMemo(() => framesBetween(start, walked, factor, simple).reduce((n, f) => n + f.seconds, 0), [start, walked, factor, simple]);
-  const [phase, setPhase] = useState<'walk' | 'open'>(walkSeconds > 0 ? 'walk' : 'open');
-  const [walkRun, setWalkRun] = useState<DungeonRun>(start);
-  useEffect(() => {
-    if (phase !== 'walk') return;
-    setWalkRun(walked);
-    const t = setTimeout(() => setPhase('open'), walkSeconds * 1000 + 60);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  if (phase === 'walk') {
-    return (
-      <Screen>
-        <button className="relative min-h-0 flex-1 overflow-hidden" onClick={() => finish(door.id)} aria-label="扉の演出を飛ばす" data-door-open="walk">
-          <AnimatedDungeonView run={walkRun} background={background} />
-        </button>
-      </Screen>
-    );
-  }
-  const run = walked;
+  // 扉を選んだ時の景色（選択肢と同じ並びの扉の壁）
+  const run = useMemo(() => ({ ...door.run, pos: { ...posOf(door.run), facing: 0 as Facing } }), [door.run]);
+  const doors = useMemo(() => wallDoors(doorChoices(run)), [run]);
+  const [ref, size] = useElementSize<HTMLDivElement>();
+  // 選んだ扉の位置（画面の真ん中からの横のずれ）へ寄る
+  const slot = door.roomId ? doorWallView(doors).slotOf[door.roomId] : undefined;
+  const dx = Math.round((slot ? WALL_SLOT_X[slot] : 0) * viewUnit(size.width, size.height));
+  const origin = `calc(50% + ${dx}px) 56%`;
   return (
     <Screen>
-      <button className="relative min-h-0 flex-1 overflow-hidden" onClick={() => finish(door.id)} aria-label="扉の演出を飛ばす" data-door-open>
-        <motion.div
-          className="absolute inset-0"
-          style={{ transformOrigin: '50% 58%' }}
-          initial={{ scale: 1 }}
-          animate={{ scale: simple ? 1 : 2.0 }}
-          transition={{ duration: simple ? seconds : seconds * 0.6, delay: simple ? 0 : seconds * 0.4, ease: 'easeIn' }}
-          onAnimationComplete={() => finish(door.id)}
-        >
-          <DungeonView run={run} background={background} opening={simple ? undefined : seconds * 0.55} />
-        </motion.div>
+      <button className="relative min-h-0 flex-1 overflow-hidden" onClick={() => finish(door.id)} aria-label="扉の演出を飛ばす" data-door-open data-door-open-slot={slot ?? 'center'}>
+        <div ref={ref} className="absolute inset-0">
+          <motion.div
+            className="absolute inset-0"
+            style={{ transformOrigin: origin }}
+            initial={{ scale: 1 }}
+            animate={{ scale: simple ? 1 : slot && slot !== 'center' ? 2.6 : 2.0 }}
+            transition={{ duration: simple ? seconds : seconds * 0.6, delay: simple ? 0 : seconds * 0.4, ease: 'easeIn' }}
+            onAnimationComplete={() => finish(door.id)}
+          >
+            <DungeonView run={run} background={background} doors={doors} opening={simple ? undefined : seconds * 0.55} openingRoomId={door.roomId} />
+          </motion.div>
+        </div>
         {/* 扉の奥の暗がりが広がる */}
         <motion.div
           className="pointer-events-none absolute inset-0"
-          style={{ background: 'radial-gradient(circle at 50% 58%, #000 0%, #000 30%, transparent 62%)' }}
+          style={{ background: `radial-gradient(circle at ${origin}, #000 0%, #000 30%, transparent 62%)` }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: seconds * 0.6, delay: seconds * 0.4, ease: 'easeIn' }}

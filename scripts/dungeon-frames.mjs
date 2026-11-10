@@ -1,3 +1,5 @@
+// ※ 抜本的な見直し 段階2 から、扉の前まで歩く演出は無くなった（扉の壁がいつも目の前にあり、選んだ扉へ寄って開くだけ）。
+//   このスクリプトは「歩く演出なし」と出て通るだけになる。歩く演出を戻した時のために残してある。
 // ダンジョンの通路のチカチカの確認（手直し → 扉を選ぶだけの形）: 1倍速で扉のボタンを押し、扉の前まで自動で歩く演出の間に、
 // (1) 歩く演出の通路の絵（2枚の景色）が歩く途中で作り直されていないか（DOM の要素が同じまま）
 // (2) 演出の途中のコマで、黒い所が急に増えていないか（押す前の止まった景色と、歩き終えた景色と比べる）
@@ -55,8 +57,6 @@ await edit((g) => {
 });
 await page.getByText('翠の神殿に入る').click();
 await page.waitForTimeout(800);
-await page.locator('[data-explore-roll-button]').click();
-await page.locator('[data-dice-overlay]').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
 await page.waitForTimeout(300);
 await page.locator('[data-door-choice]').first().click();
 await page.getByText('ターン終了').waitFor({ timeout: 8000 }).catch(() => problems.push('扉の後に戦闘にならない'));
@@ -67,7 +67,9 @@ await edit((g) => {
   x.battle = undefined;
   x.battleInfo = undefined;
   x.dungeon.rooms.find((r) => r.id === x.dungeon.currentRoomId).cleared = true;
-  x.dungeon.explore = 3;
+  x.dungeon.opened = undefined;
+  g.world.turn = x.heroes[0];
+  g.world.acted = [];
   for (const h of g.heroes) h.focus = 4;
 });
 
@@ -139,7 +141,9 @@ const back = async () =>
     x.event = undefined;
     x.chest = undefined;
     x.dungeon.rooms.find((r) => r.id === x.dungeon.currentRoomId).cleared = true;
-    x.dungeon.explore = 3;
+    x.dungeon.opened = undefined;
+  g.world.turn = x.heroes[0];
+  g.world.acted = [];
   });
 await page.waitForTimeout(400);
 await act('右の扉（遠い扉まで歩く）', 'last');

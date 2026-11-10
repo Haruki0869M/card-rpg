@@ -31,8 +31,7 @@ import {
   needsVote,
   notVoted,
   chestShared,
-  exploreRollerOf,
-  exploreShared,
+  dungeonJoin,
 } from './index';
 
 export interface BotLog {
@@ -196,6 +195,8 @@ function worldStep(g: GameState, log: BotLog, memo: BotMemo): GameState {
   // 目的地に着いたら入る（1手番に1回だけ）
   if (at === target.tile && !memo.interacted.has(key)) {
     memo.interacted.add(key);
+    // 先に入った仲間の組が通路にいない（戦闘中など）時は合流できない: 入口で待つ
+    if (target.why !== 'grind' && dungeonJoin(g, at)?.blocked) return send(g, { type: 'WORLD_WAIT', playerId: p, heroId: h.id }, log);
     if (target.why !== 'grind') {
       const ng = send(g, { type: 'WORLD_INTERACT', playerId: p, heroId: h.id, party: livingHeroes(g).filter((x) => w.pos[x.id] === at).map((x) => x.id) }, log);
       if (ng !== g) return ng;
@@ -334,26 +335,12 @@ export function botStep(g: GameState, log: BotLog, memo: BotMemo, inScene = fals
       return send(g, { type: 'FINISH_REWARD', playerId: pid(g) }, log);
     }
     case 'dungeon': {
-      // 手番の最初に探索のサイコロを振る（世界マップのあるシナリオ。1〜3 = 選べる扉の数）
       const run = g.dungeon!;
-      if (g.world && run.explore == null) {
-        const chosen = exploreRollerOf(g);
-        const h = (chosen ? findHero(g, chosen) : undefined) ?? livingHeroes(g).find((x) => !g.party || g.party.includes(x.id))!;
-        // 2人以上: 振るキャラをみんなで決めてから
-        if (exploreShared(g) && !chosen) return send(g, { type: 'EXPLORE_ROLLER', playerId: h.playerId, heroId: h.id }, log);
-        return send(g, { type: 'EXPLORE_ROLL', playerId: h.playerId, heroId: h.id }, log);
-      }
-      // 1が出て、振ったキャラのフォーカスに余裕があれば1回だけ振り直す（まだ扉を選ぶ前）
-      const d = run.exploreDice;
-      const dh = d?.heroId ? findHero(g, d.heroId) : undefined;
-      if (g.world && d && dh && !d.rerolled && d.face === 1 && dh.focus >= 2 && run.explore === d.total) return send(g, { type: 'EXPLORE_REROLL', playerId: dh.playerId, heroId: dh.id }, log);
-      // 扉を選び終えた（警戒ができる時は手番が続く）: 手番を終える
-      if (g.world && run.explore === 0) return send(g, { type: 'EXPLORE_END', playerId: pid(g) }, log);
       const rooms = reachableRooms(run);
       const hurt = livingHeroes(g).some((h) => h.hp < heroMaxHp(h) * 0.5);
       const pick = rooms.find((r) => (hurt ? r.type === 'rest' : r.type === 'chest')) ?? rooms[0];
       // 扉を選ぶだけ: 扉の前まではエンジンが自動で歩く（bot はテスト用なので、部屋の中身を知っている）
-      if (!pick) return send(g, { type: 'EXPLORE_END', playerId: pid(g) }, log);
+      if (!pick) return g;
       return send(g, { type: 'ENTER_ROOM', playerId: pid(g), roomId: pick.id }, log);
     }
     case 'chest': {

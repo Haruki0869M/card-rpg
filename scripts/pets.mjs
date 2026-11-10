@@ -141,7 +141,6 @@ await edit((g) => {
 });
 await page.getByText('翠の神殿に入る').click();
 await page.waitForTimeout(300);
-if (await page.locator('[data-explore-roll-button]').count()) await page.locator('[data-explore-roll-button]').click();
 await page.waitForTimeout(200);
 // 第3段階: 入口は1行目の扉の前（北向き）。扉を開けて最初の部屋へ
 await page.getByRole('button', { name: /扉を開ける/ }).click();

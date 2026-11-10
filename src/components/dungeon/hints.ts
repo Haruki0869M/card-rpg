@@ -8,11 +8,3 @@ import type { PlayerId } from '../../types';
 export function showVoteHint(voters: PlayerId[], isLocal: (p: PlayerId) => boolean, mapOpen: boolean): boolean {
   return !mapOpen && voters.length > 1 && voters.some((p) => !isLocal(p));
 }
-
-/** 扉のボタンの上に出す案内（まだサイコロを振っていない・扉を選び終えた）。出さない時は undefined */
-export function moveGuide(opts: { myTurn: boolean; inDungeon: boolean; explore: number | null | undefined; onWorld: boolean }): string | undefined {
-  if (!opts.myTurn || !opts.inDungeon || !opts.onWorld) return undefined;
-  if (opts.explore == null) return 'まずは下の『サイコロを振る』で、選べる扉の数を決めよう';
-  if (opts.explore <= 0) return '扉は選び終えた。『手番を終える』で次の人へ';
-  return undefined;
-}

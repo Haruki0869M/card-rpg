@@ -11,6 +11,7 @@ export const roomTypes: RoomTypeDef[] = [
     color: '#d9a2ff',
     bg: '#34104a',
     behavior: 'battle',
+    heavyDoor: true,
     // 装備のエピック率 30% は提案（強敵は 10%）
     battle: { pool: 'midboss', levelBonus: 2, cardOdds: 'boss', noEscape: true, equipmentDrop: { epicChance: 30 } },
   },

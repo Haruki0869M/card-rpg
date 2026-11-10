@@ -2,13 +2,13 @@
 import { ItemInfoArea } from '../ItemDetail';
 import { VoteChips, VoteStatus } from '../ui/Votes';
 import { motion } from 'framer-motion';
-import { ArrowUpCircle, Coins, Flame, Sparkles, Star } from 'lucide-react';
+import { ArrowUpCircle, Coins, Flame, Hammer, Sparkles, Star } from 'lucide-react';
 import { useState } from 'react';
 import { BattleBackground } from '../../art';
 import { BALANCE, TIMING } from '../../data/balance';
 import { EVENTS } from '../../data/events';
 import { getItem } from '../../data/items';
-import { eventOptionState, heroFocusMax, heroMaxHp, statChance, sceneBackground, sceneHeroes, successDistribution } from '../../engine';
+import { canHoneCards, eventOptionState, heroFocusMax, heroMaxHp, statChance, sceneBackground, sceneHeroes, successDistribution } from '../../engine';
 import { STAT_LABEL } from '../../data/terms';
 import { LOCAL_PLAYER, isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
@@ -239,6 +239,10 @@ export function RestScreen() {
   const game = useBattle((s) => s.game)!;
   const dispatchGame = useBattle((s) => s.dispatchGame);
   const openSheet = useBattle((s) => s.openSheet);
+  const party = sceneHeroes(game);
+  const hpFull = party.every((h) => h.hp >= heroMaxHp(h));
+  const focusFull = party.every((h) => h.focus >= heroFocusMax(h));
+  const canHone = party.some(canHoneCards);
   return (
     <Screen>
       <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -253,7 +257,7 @@ export function RestScreen() {
             <Flame size={56} className="text-amber-300" />
           </motion.span>
           <div className="font-display text-outline mt-2 text-[26px] text-amber-100">休憩所</div>
-          <div className="text-[13px] text-zinc-300">焚き火の前で、ひと息つける。どちらか1つを選ぼう。</div>
+          <div className="text-[13px] text-zinc-300">焚き火の前で、ひと息つける。3つから1つを選ぼう。</div>
           <div className="mt-4 flex w-full flex-col gap-2">
             {sceneHeroes(game).map((h) => (
               <div key={h.id} className="panel flex items-center gap-2 rounded-lg p-1.5 text-[13px]">
@@ -284,21 +288,30 @@ export function RestScreen() {
           </div>
         </div>
       </div>
-      <div className="grid shrink-0 grid-cols-2 gap-2 px-3 pt-2 pb-3">
-        <VoteStatus className="col-span-2" />
-        <button onClick={() => dispatchGame({ type: 'REST', playerId: LOCAL_PLAYER, kind: 'hp' })} className="btn btn-gold flex h-16 flex-col items-center justify-center rounded-xl">
-          <span className="font-display text-[18px]">
+      {/* 休憩の3択（みんなで1つ選ぶ）。HP・フォーカスが満タンの時は、その選択肢を薄くして「満タン」と出す（押すことはできる） */}
+      <div className="grid shrink-0 grid-cols-3 gap-1.5 px-2 pt-2 pb-3" data-rest-choices>
+        <VoteStatus className="col-span-3" />
+        <button onClick={() => dispatchGame({ type: 'REST', playerId: LOCAL_PLAYER, kind: 'hp' })} className={`btn btn-gold flex min-h-16 min-w-0 flex-col items-center justify-center rounded-xl px-1 py-1 ${hpFull ? 'opacity-55' : ''}`} data-rest="hp" data-rest-full={hpFull ? '' : undefined}>
+          <span className="font-display text-[17px]">
             休む
             <VoteChips cmd={{ type: 'REST', playerId: LOCAL_PLAYER, kind: 'hp' }} />
           </span>
-          <span className="text-[12px]">全員のHPを最大の{Math.round(BALANCE.restHpRatio * 100)}%回復</span>
+          <span className="text-center text-[12px] leading-4">{hpFull ? '全員のHPは満タン' : `全員のHPを${Math.round(BALANCE.restHpRatio * 100)}%回復`}</span>
         </button>
-        <button onClick={() => dispatchGame({ type: 'REST', playerId: LOCAL_PLAYER, kind: 'focus' })} className="btn btn-dark flex h-16 flex-col items-center justify-center rounded-xl">
-          <span className="font-display text-[18px] text-amber-200">
+        <button onClick={() => dispatchGame({ type: 'REST', playerId: LOCAL_PLAYER, kind: 'focus' })} className={`btn btn-dark flex min-h-16 min-w-0 flex-col items-center justify-center rounded-xl px-1 py-1 ${focusFull ? 'opacity-55' : ''}`} data-rest="focus" data-rest-full={focusFull ? '' : undefined}>
+          <span className="font-display text-[17px] text-amber-200">
             瞑想する
             <VoteChips cmd={{ type: 'REST', playerId: LOCAL_PLAYER, kind: 'focus' }} />
           </span>
-          <span className="text-[12px]">全員のフォーカス+{BALANCE.restFocus}</span>
+          <span className="text-center text-[12px] leading-4">{focusFull ? '全員のフォーカスは満タン' : `全員のフォーカス+${BALANCE.restFocus}`}</span>
+        </button>
+        <button onClick={() => dispatchGame({ type: 'REST', playerId: LOCAL_PLAYER, kind: 'upgrade' })} disabled={!canHone} className="btn btn-dark flex min-h-16 min-w-0 flex-col items-center justify-center rounded-xl border border-sky-300/50 px-1 py-1 disabled:opacity-40" data-rest="upgrade">
+          <span className="font-display flex items-center gap-0.5 text-[17px] text-sky-100">
+            <Hammer size={15} className="shrink-0" />
+            技を磨く
+            <VoteChips cmd={{ type: 'REST', playerId: LOCAL_PLAYER, kind: 'upgrade' }} />
+          </span>
+          <span className="text-center text-[12px] leading-4">{canHone ? '1人1枚、カードを＋に強化' : '磨けるカードが無い'}</span>
         </button>
       </div>
     </Screen>
