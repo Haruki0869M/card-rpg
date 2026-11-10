@@ -826,9 +826,6 @@ export function storyContinue(game: GameState): string | undefined {
   return undefined;
 }
 
-/** 世界マップのイベントで出るイベント（名所・普通のイベント） */
-export const isMapEvent = (id: string) => EVENTS.tryGet(id)?.where === 'map';
-
 /** 今の場面の背景（ダンジョンならダンジョン、世界マップならそのマスの地形） */
 export function sceneBackground(game: GameState): string {
   if (game.dungeon) return game.dungeon.background;

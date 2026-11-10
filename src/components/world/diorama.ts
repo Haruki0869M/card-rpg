@@ -73,13 +73,6 @@ export function neighborAt(w: Pick<WorldState, 'width' | 'height'>, i: number, k
   return r2 * w.width + c2;
 }
 
-/** 色を暗くする（k = 0〜1。1で黒） */
-export function darken(hex: string, k: number): string {
-  const n = parseInt(hex.slice(1), 16);
-  const f = (v: number) => Math.round(v * (1 - k));
-  return `rgb(${f((n >> 16) & 255)},${f((n >> 8) & 255)},${f(n & 255)})`;
-}
-
 /** 道でつなぐ場所（町・神殿・祭壇・ダンジョン・祠・名所・イベント） */
 const ROAD_PLACES = new Set(['town', 'temple', 'altar', 'dungeon', 'shrine', 'landmark', 'event']);
 
@@ -135,25 +128,6 @@ export function roadLinks(w: Pick<WorldState, 'width' | 'height' | 'tiles'>, roa
     grow([i]);
   }
   return out;
-}
-
-/** 辺 k の真ん中（中心 x,y・半径 r） */
-export function edgeMid(x: number, y: number, r: number, k: number): [number, number] {
-  const a = (Math.PI / 180) * (60 * k - 60);
-  const d = r * (Math.sqrt(3) / 2);
-  return [x + d * Math.cos(a), y + d * Math.sin(a) * GROUND_K];
-}
-
-/**
- * 1マスの中の道の形（SVG の path）。2本なら中心を通るなめらかな曲線、1本なら中心まで、3本以上は中心で合わさる。
- * 隣のマスの道とは辺の真ん中でつながる
- */
-export function roadPath(x: number, y: number, r: number, ks: number[]): string {
-  const m = ks.map((k) => edgeMid(x, y, r, k));
-  const f = (p: [number, number]) => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`;
-  if (m.length === 1) return `M${f(m[0])} Q${f([(m[0][0] + x) / 2, (m[0][1] + y) / 2])} ${x.toFixed(1)} ${y.toFixed(1)}`;
-  if (m.length === 2) return `M${f(m[0])} Q${x.toFixed(1)} ${y.toFixed(1)} ${f(m[1])}`;
-  return m.map((p) => `M${f(p)} Q${f([(p[0] + x) / 2, (p[1] + y) / 2])} ${x.toFixed(1)} ${y.toFixed(1)}`).join(' ');
 }
 
 /** 侵食度の段階（0〜3）: 25%・50%・75% で一段ずつ世界の色を変える */

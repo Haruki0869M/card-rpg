@@ -103,8 +103,8 @@ describe('移動と手番', () => {
   });
   it('手番でないキャラ・担当でないプレイヤーは動かせない', () => {
     const g = started();
-    expect(applyGameCommand(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h1', focusUsed: 0 }).error).toBeDefined();
-    expect(applyGameCommand(g, { type: 'WORLD_ROLL_MOVE', playerId: 'P2', heroId: 'h0', focusUsed: 0 }).error).toBeDefined();
+    expect(applyGameCommand(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h1' }).error).toBeDefined();
+    expect(applyGameCommand(g, { type: 'WORLD_ROLL_MOVE', playerId: 'P2', heroId: 'h0' }).error).toBeDefined();
   });
   it('侵食度100%でゲームオーバー', () => {
     let g = started();
@@ -136,7 +136,7 @@ describe('遭遇・命の灯火', () => {
     // スタートの隣に敵を置いて、そこへ移動する
     const next = neighbors(w, w.pos.h0).find((n) => TERRAINS.get(w.tiles[n].t).moveCost > 0 && !w.tiles[n].f)!;
     w.wanderers.push({ id: 'wx', tile: next, enemies: [{ defId: 'goblinScout', level: 1 }] });
-    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0', focusUsed: 4 });
+    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0' });
     g = run(g, { type: 'WORLD_MOVE', playerId: P, heroId: 'h0', to: next, companions: [] });
     return g;
   }
@@ -326,13 +326,13 @@ describe('ダンジョンも世界マップの手番の順番で動く（M3-D）
   it('入ると手番は次の人へ。ダンジョンの番が来るまで、ダンジョンの中は動かせない', () => {
     let { g, x } = h0InTemple();
     expect(g.world!.turn).toBe('h1');
-    expect(applyGameCommand(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0', focusUsed: 0 })).error).toMatch(/ほかのキャラの番/);
+    expect(applyGameCommand(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0' })).error).toMatch(/ほかのキャラの番/);
     // h1 が手番を終えると、ワールドターンが進み、h0（ダンジョン）の番
     g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h1' });
     expect(g.world!.worldTurn).toBe(2);
     expect(g.world!.turn).toBe('h0');
     // 世界マップの操作はできない
-    expect(applyGameCommand(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0', focusUsed: 0 }).error).toMatch(/ダンジョン/);
+    expect(applyGameCommand(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0' }).error).toMatch(/ダンジョン/);
   });
 
   it('探索のサイコロ（1〜3）→ 選べる扉の数。扉を開けると1使う。手番を終えると次の人の番', () => {
@@ -365,7 +365,7 @@ describe('ダンジョンも世界マップの手番の順番で動く（M3-D）
     expect(g.world!.turn).toBe('h1');
     g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h1' });
     expect(g.world!.turn).toBe('h0');
-    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0', focusUsed: 0 });
+    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0' });
   });
 
   it('全員がダンジョンの中でも、時間（ワールドターン・侵食度）は進む', () => {
@@ -373,7 +373,7 @@ describe('ダンジョンも世界マップの手番の順番で動く（M3-D）
     const turn = g.world!.worldTurn;
     expect(g.world!.turn).toBe('h0');
     expect(turn).toBe(2);
-    g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0', focusUsed: 0 }));
+    g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0' }));
     const c = g.world!.corruption;
     g = run(g, inScene(x, { type: 'EXPLORE_END', playerId: P }));
     expect(g.world!.worldTurn).toBe(turn + 1);

@@ -5,7 +5,7 @@ import { Copy, Crown, LogIn, Share2, Swords, Users, Wifi, WifiOff } from 'lucide
 import { useEffect, useState } from 'react';
 import { BALANCE } from '../../data/balance';
 import { CLASSES } from '../../data/classes';
-import { DIFFICULTIES, getDifficulty } from '../../data/rules';
+import { DIFFICULTIES } from '../../data/rules';
 import { SCENARIOS, isScenarioUnlocked } from '../../data/scenarios';
 import { clearedScenarioIds } from '../../store/profile';
 import { useProfile } from '../../store/profileStore';
@@ -445,5 +445,4 @@ export function OthersTurnNote({ seat, name, what }: { seat: PlayerId; name: str
   );
 }
 
-export const difficultyName = (id: string) => getDifficulty(id).name;
 export { SEATS };

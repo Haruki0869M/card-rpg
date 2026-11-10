@@ -86,7 +86,7 @@ describe('表示専用タイマーと能力カットイン', () => {
   it('移動力のお供は操作確定時に1回だけ通知し、同じ判定は再送しても増えない', () => {
     const g = setup(); g.mode = 'world'; g.battle = undefined; g.world!.story = undefined; g.heroes[0].pet!.petId = 'rabbit'; g.heroes[0].pet!.color = 'white';
     useBattle.getState().loadRemote(g);
-    const cmd = { type: 'WORLD_ROLL_MOVE' as const, playerId: 'P1' as const, heroId: 'h0', focusUsed: 0 };
+    const cmd = { type: 'WORLD_ROLL_MOVE' as const, playerId: 'P1' as const, heroId: 'h0' };
     const r = applyGameCommand(g, cmd); expect(r.error).toBeUndefined(); useBattle.getState().applyRemote(r, cmd);
     expect(useBattle.getState().cutins).toHaveLength(1); expect(useBattle.getState().cutins[0].name).toBe('移動力+1');
     expect(useBattle.getState().dispatchWire(cmd)).toBeTruthy(); expect(useBattle.getState().cutins).toHaveLength(1);

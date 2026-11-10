@@ -22,7 +22,6 @@ import {
 import type { ReactNode } from 'react';
 import { artImage, BattleBackground, CharacterArt, ItemImage } from '../../art';
 import { getClass } from '../../data/classes';
-import { getItem } from '../../data/items';
 import { describeAbility, describeEffect, expToNext, heroFocusMax, heroMaxHp } from '../../engine';
 import type { Hero, ItemDef, Rarity, StatId } from '../../types';
 
@@ -84,8 +83,6 @@ export function itemSummary(item: ItemDef): string {
   if (item.ability) parts.unshift(`《${item.ability.name}》${describeAbility(item.ability)}`);
   return parts.join('・') || item.description;
 }
-
-export const itemDef = (itemId: string) => getItem(itemId);
 
 /** キャラの顔（丸） */
 export function HeroFace({ hero, size = 40, dim }: { hero: Pick<Hero, 'classId' | 'gender'>; size?: number; dim?: boolean }) {

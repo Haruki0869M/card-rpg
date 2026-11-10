@@ -33,7 +33,7 @@ const LAIR_POOLS: DungeonDef['pools'] = {
 
 type Layout = NonNullable<DungeonDef['layout']>;
 
-/** 氷の記憶の洞（8行。入門。終わらない階段と記憶の宝箱） */
+/** 氷の記憶の洞（元の並びは8行。extraFloor.ts で40行に広げる。入門。終わらない階段と記憶の宝箱） */
 const iceLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
@@ -58,7 +58,7 @@ const iceLayout: Layout = [
   [{ type: 'boss', next: [] }],
 ];
 
-/** 砂の幻影の墓（8行。壁画と泉。強敵が2回） */
+/** 砂の幻影の墓（元の並びは8行。extraFloor.ts で40行に広げる。壁画と泉。強敵が2回） */
 const sandLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
@@ -83,7 +83,7 @@ const sandLayout: Layout = [
   [{ type: 'boss', next: [] }],
 ];
 
-/** 幽霊船の悪夢（9行。悪夢の罠と夢の行商人。分かれ道が多い） */
+/** 幽霊船の悪夢（元の並びは9行。extraFloor.ts で40行に広げる。悪夢の罠と夢の行商人。分かれ道が多い） */
 const ghostLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [

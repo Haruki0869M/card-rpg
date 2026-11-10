@@ -1,0 +1,294 @@
+<title>クリスタリア テストプレイ記録</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
+<style>
+/* レイアウト: スマホ縦1列。場面ごとに「横に流せるスクショの帯」＋「気になった点の一覧（重要度の札つき）」 */
+:root {
+  --bg: #f4f1f8; --panel: #ffffff; --fg: #1f1a2b; --muted: #645c75; --line: #ddd5e8;
+  --gold: #9a6a12; --gold-soft: #f6ead2;
+  --big: #c0263b; --big-soft: #fde7ea; --mid: #b5650c; --mid-soft: #fdf0dc; --small: #5d6577; --small-soft: #eceef3;
+  --good: #1f7a4d; --good-soft: #e3f4ea;
+  --display: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #15121d; --panel: #1f1a2b; --fg: #ece6f5; --muted: #a79fb9; --line: #362e47;
+  --gold: #e7bd62; --gold-soft: #3a2f1a;
+  --big: #ff7387; --big-soft: #43202a; --mid: #f2a54a; --mid-soft: #3f2e17; --small: #aab2c4; --small-soft: #2a2836;
+  --good: #6fd39f; --good-soft: #1b3428; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #15121d; --panel: #1f1a2b; --fg: #ece6f5; --muted: #a79fb9; --line: #362e47;
+  --gold: #e7bd62; --gold-soft: #3a2f1a;
+  --big: #ff7387; --big-soft: #43202a; --mid: #f2a54a; --mid-soft: #3f2e17; --small: #aab2c4; --small-soft: #2a2836;
+  --good: #6fd39f; --good-soft: #1b3428; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.75; }
+.wrap { max-width: 760px; margin: 0 auto; padding-block: 24px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 28px; }
+h1, h2 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.35; }
+h1 { font-size: 1.75rem; }
+h2 { font-size: 1.3rem; display: flex; gap: .5em; align-items: baseline; }
+h2 .no { color: var(--gold); font-size: 1rem; }
+p { margin: 0; }
+.lead { color: var(--muted); font-size: .92rem; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.how { font-size: .85rem; color: var(--muted); background: var(--gold-soft); border-radius: 10px; padding: 8px 12px; }
+.how b { color: var(--gold); }
+.strip { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x mandatory; }
+.strip figure { margin: 0; flex: 0 0 auto; width: min(62vw, 230px); scroll-snap-align: start; display: flex; flex-direction: column; gap: 4px; }
+.strip img { width: 100%; border-radius: 8px; border: 1px solid var(--line); display: block; }
+.strip figcaption { font-size: .78rem; color: var(--muted); line-height: 1.45; }
+.hint { font-size: .75rem; color: var(--muted); }
+ul.fx { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+ul.fx li { display: grid; grid-template-columns: 2.2em 1fr; gap: 8px; align-items: start; }
+ul.fx li > span:last-child { min-width: 0; }
+.sev { font-size: .78rem; font-weight: 700; text-align: center; border-radius: 6px; padding: 1px 0; line-height: 1.6; margin-top: 3px; }
+.s-big { color: var(--big); background: var(--big-soft); }
+.s-mid { color: var(--mid); background: var(--mid-soft); }
+.s-small { color: var(--small); background: var(--small-soft); }
+.s-good { color: var(--good); background: var(--good-soft); }
+.top ol { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 6px; }
+.count { display: flex; gap: 8px; flex-wrap: wrap; font-size: .85rem; }
+.count span { border-radius: 999px; padding: 2px 12px; font-weight: 700; }
+.req { white-space: pre-wrap; font-size: .9rem; background: var(--bg); border: 1px dashed var(--line); border-radius: 10px; padding: 12px; margin: 0; font-family: var(--body); }
+button.copy { align-self: flex-start; font: inherit; font-weight: 700; color: var(--panel); background: var(--gold); border: 0; border-radius: 999px; padding: 6px 18px; cursor: pointer; }
+button.copy:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+.small { font-size: .82rem; color: var(--muted); }
+</style>
+
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:8px">
+    <p class="small">DESTINY OF CRYSTALIA ／ 2026年11月9日 ／ スマホ幅 390×844</p>
+    <h1>テストプレイ記録：プレイヤー目線の手触り</h1>
+    <p class="lead">主ブランチの最新（c0f153f）を自分でビルドして、2人・ふつう・「侵食の魔王」で10の場面を遊びました。コードは直していません。気づいた点を、良い所も含めて正直に書いています。重要度は「大＝遊ぶ人が困る・誤解する」「中＝気になる・迷う」「小＝できれば直したい」です。</p>
+    <div class="count"><span class="s-big">大 8</span><span class="s-mid">中 22</span><span class="s-small">小 15</span><span class="s-good">良 10</span></div>
+  </header>
+
+  <section class="box top">
+    <h2>まず直したい「大」8つ</h2>
+    <ol>
+      <li><b>世界マップ:</b> 行き先を選んだ時・歩いている間、下のパネルが画面の半分まで広がり、駒が地図の下の端で隠れる。歩く様子がほとんど見えない（場面3・4）。</li>
+      <li><b>世界マップ:</b> 最初の画面で地図の上の半分以上が暗い霧で、見えている地面と駒は下の方に小さく寄っている（場面3）。</li>
+      <li><b>戦闘:</b> 敵の狙いが「→P1」とだけ出る。2人とも P1 のままだと、誰が狙われるかは小さな顔の丸でしか分からない（場面8）。</li>
+      <li><b>戦闘:</b> 狙う敵を選ぶと、その敵の上に「予測 下の一覧へ」の札が出て、敵の絵がほぼ隠れる（場面8）。</li>
+      <li><b>戦闘:</b> 結果の帯が1行で横にはみ出して切れる（「! 4 DMG 7 BLOCK ぴーちゃんの応援の歌（応…」）。英語の DMG・BLOCK も混ざる（場面9）。</li>
+      <li><b>戦闘:</b> 「ターン終了」を1回押すと、まだ5枚持っている仲間の番も一緒に終わる。小さな注意書きだけで確認が出ない（場面9）。</li>
+      <li><b>報酬:</b> カードの3択がほとんど同じ（レオンは2枚が数字まで同じ。セシルには最初から持っている「ガード」が出た）。選ぶ楽しさが弱い（場面10）。</li>
+      <li><b>戦闘:</b> 敵の番が約1.2秒で終わり、数字や「敵のターン」「ターン2」の帯が次々に重なる。何をされたか追えない（場面9）。</li>
+    </ol>
+  </section>
+
+  <section class="box">
+    <h2><span class="no">場面1</span>タイトル → はじめから → 冒険の準備</h2>
+    <p class="how"><b>出し方:</b> ふつうに操作。「はじめから」の確認は、保存データを置いてから「新しい冒険」を押して確かめました。</p>
+    <div class="strip">
+      <figure><img src="img/01a-title-empty.jpg" alt="タイトル画面" loading="lazy"><figcaption>保存データが無い時のタイトル</figcaption></figure>
+      <figure><img src="img/01e-title-confirm.jpg" alt="つづきからがあるタイトル" loading="lazy"><figcaption>保存データがある時。「・拠点・60G」</figcaption></figure>
+      <figure><img src="img/01b-setup.jpg" alt="冒険の準備" loading="lazy"><figcaption>冒険の準備（2人・ふつう）</figcaption></figure>
+    </div>
+    <p class="hint">← 写真は横に流せます</p>
+    <ul class="fx">
+      <li><span class="sev s-mid">中</span><span>「新しい冒険」を押した時の確認が、ブラウザ標準の確認の窓（「〜よろしいですか？」）。ゲームの見た目と合わず、スマホではサイトの住所が見出しに出ます。自動の撮影では標準の窓を写せないので、出ることはプログラムの中身で確かめました。</span></li>
+      <li><span class="sev s-small">小</span><span>「つづきから」の下が「・拠点・60G」。世界マップにいるのに「拠点」と出て、先頭に「・」だけ残ります。お金は2人の合計。</span></li>
+      <li><span class="sev s-small">小</span><span>「ふつう」を選ぶと説明が「敵のHP×1.55・敵の攻撃×1.55」。ふつうなのに倍率が付いて見え、「ふつう＝そのまま」と思う人は驚きます。</span></li>
+      <li><span class="sev s-good">良</span><span>準備画面は1画面にまとまっていて、押す所が迷わない。シナリオの絵も雰囲気があります。</span></li>
+    </ul>
+  </section>
+
+  <section class="box">
+    <h2><span class="no">場面2</span>キャラクターを作る</h2>
+    <p class="how"><b>出し方:</b> ふつうに操作（1人目は剣士のまま、2人目を僧侶・女に）。</p>
+    <div class="strip">
+      <figure><img src="img/02a-create-p1.jpg" alt="1人目" loading="lazy"><figcaption>1人目。2人目は「未設定」</figcaption></figure>
+      <figure><img src="img/02f-create-p2-radar.jpg" alt="2人目とレーダー" loading="lazy"><figcaption>2人目（僧侶）。下へ動かした所</figcaption></figure>
+    </div>
+    <ul class="fx">
+      <li><span class="sev s-mid">中</span><span>2人目の「担当プレイヤー」が最初から P1。「この端末で2人」で遊ぶ時に P2 へ変える必要があると気づきにくく、後の戦闘で「→P1」の表示が2人とも同じになります（大の3つ目の原因）。</span></li>
+      <li><span class="sev s-mid">中</span><span>「冒険に出発」がいつも下に見えているので、2人目を開かなくても出発できます（2人目は魔道士で決まる）。能力のレーダー・特殊能力・名前は下へ動かさないと見えません。</span></li>
+      <li><span class="sev s-small">小</span><span>下へ動かすと、上に止まっている「1人目／2人目」の帯にジョブの顔の列が半分隠れます。</span></li>
+      <li><span class="sev s-good">良</span><span>立ち絵が大きく、レーダーと「物理の成功率 +5%」などの±が並んでいて、ジョブの違いがすぐ分かります。</span></li>
+    </ul>
+  </section>
+
+  <section class="box">
+    <h2><span class="no">場面3</span>世界マップの始まり</h2>
+    <p class="how"><b>出し方:</b> ふつうに操作（物語の窓 → つづける → 同行を切る・戻す → 移動力の判定）。</p>
+    <div class="strip">
+      <figure><img src="img/03a-world-start.jpg" alt="物語の窓" loading="lazy"><figcaption>始まりの物語。最後の段落が下のボタンに隠れる</figcaption></figure>
+      <figure><img src="img/03d-world-map.jpg" alt="世界マップ" loading="lazy"><figcaption>地図の上半分以上が霧</figcaption></figure>
+      <figure><img src="img/03e-companion-off.jpg" alt="同行を切った" loading="lazy"><figcaption>同行を切ると顔が灰色に</figcaption></figure>
+      <figure><img src="img/03g-roll-11.jpg" alt="移動力の判定の結果" loading="lazy"><figcaption>判定はほぼ一瞬。4枠とも×で移動力2</figcaption></figure>
+    </div>
+    <ul class="fx">
+      <li><span class="sev s-big">大</span><span>見えている地面と駒が画面の下の方に小さく寄り、上の半分以上が暗い霧。最初に「どこへ行けるか」が分かりにくいです。判定の後はパネルが大きくなって、駒がさらに下へ押されます。</span></li>
+      <li><span class="sev s-mid">中</span><span>「移動力の判定」を押すと、0.3秒以内に結果が出ています。スロットが回るドキドキがほとんど無く、全部×の時の「くやしさ」も伝わりにくいです。</span></li>
+      <li><span class="sev s-mid">中</span><span>始まりの物語は、最後の段落（「侵食度が100%に達すれば…」）が下の「つづける」の後ろに隠れて読めません。</span></li>
+      <li><span class="sev s-small">小</span><span>上の「×3」（炎の印）と「★4/6」が何の数か、説明がありません（残りの命・フォーカス？）。</span></li>
+      <li><span class="sev s-good">良</span><span>2人の駒は同じマスで左右に並び、重なりません。同行の ON/OFF は顔の色で分かり、1回押すだけで切り替わります。</span></li>
+    </ul>
+  </section>
+
+  <section class="box">
+    <h2><span class="no">場面4</span>移動 → 到着 → 突発イベント（0.3秒おき）</h2>
+    <p class="how"><b>出し方:</b> 保存データを書き換え（移動力を3、乱数の状態を7、所持金200G）。突発イベントが起きる乱数の値を探して使いました。</p>
+    <div class="strip">
+      <figure><img src="img/04b-target.jpg" alt="行き先を選んだ" loading="lazy"><figcaption>行き先を選ぶと駒が下の帯に隠れる</figcaption></figure>
+      <figure><img src="img/04e-film-00.jpg" alt="0秒" loading="lazy"><figcaption>0.0秒 歩き始め。駒が下の端で切れる</figcaption></figure>
+      <figure><img src="img/04e-film-01.jpg" alt="0.3秒" loading="lazy"><figcaption>0.3秒 地図が急に動き、霧が晴れる</figcaption></figure>
+      <figure><img src="img/04e-film-02.jpg" alt="0.6秒" loading="lazy"><figcaption>0.6秒 「！ 到着しました」</figcaption></figure>
+      <figure><img src="img/04e-film-03.jpg" alt="0.9秒" loading="lazy"><figcaption>0.9秒 暗くなって「！」</figcaption></figure>
+      <figure><img src="img/04e-film-06.jpg" alt="1.8秒" loading="lazy"><figcaption>1.8秒 突発イベントの窓</figcaption></figure>
+    </div>
+    <ul class="fx">
+      <li><span class="sev s-big">大</span><span>移動を決めた瞬間、下のパネルが画面の半分まで広がり（中身は「移動中… 0/2マス」の1行だけ）、地図が狭くなって駒が地図の下の端で半分切れます。行き先を選んだ時も、駒が「丘（移動力2）」の帯の後ろに隠れます。</span></li>
+      <li><span class="sev s-mid">中</span><span>行き先のマスには「3」と出ていたのに、歩く時は「1/2マス」。「使う移動力」と「マスの数」が別の数字なので混乱します。</span></li>
+      <li><span class="sev s-mid">中</span><span>歩くのは約0.6秒と速いのに、到着 → 暗転 →「！」→ 窓まで約1.2秒待ちます。歩く所を見せて、待ちを短くしたほうがテンポが良さそうです。</span></li>
+      <li><span class="sev s-small">小</span><span>到着の瞬間、2人の駒が横に4〜5px動きました（地図の位置の調整）。目で見て気になる程ではありません。駒の重なりはありませんでした。</span></li>
+      <li><span class="sev s-good">良</span><span>「！」の演出と窓は重ならず、順番に出ます。</span></li>
+    </ul>
+  </section>
+
+  <section class="box">
+    <h2><span class="no">場面5</span>お供を迎える（迷い鳥の口笛）</h2>
+    <p class="how"><b>出し方:</b> 場面4の続きをそのまま操作（エサを買う → 先へ進む → 名前「ぴーちゃん」）。</p>
+    <div class="strip">
+      <figure><img src="img/05a-choice.jpg" alt="結果" loading="lazy"><figcaption>「肩から離れなくなった！」</figcaption></figure>
+      <figure><img src="img/05d-named.jpg" alt="迎える画面" loading="lazy"><figcaption>毛色は最初から「黄緑」で決まっている</figcaption></figure>
+      <figure><img src="img/05e-map-3.jpg" alt="マップにお供" loading="lazy"><figcaption>地図では勇者の右横に小さく</figcaption></figure>
+    </div>
+    <ul class="fx">
+      <li><span class="sev s-mid">中</span><span>毛色の「抽選」の演出がありません。迎える画面を開いた時にはもう「黄緑 出会った時の毛色です」と出ています（0.3秒おきに2.4秒撮って変化なし）。「何色かな？」のワクワクを作れる場面です。</span></li>
+      <li><span class="sev s-mid">中</span><span>迎える画面の下半分が空いていて、後ろの地図が透けて見えます。お供の絵は画面の幅の4分の1ほど。愛着を作る一番の場面なので、もっと大きく見せたいです。</span></li>
+      <li><span class="sev s-small">小</span><span>地図でも戦闘でも、インコは勇者の横の胸の高さに浮いていて、「肩に乗っている」ようには見えにくいです。</span></li>
+      <li><span class="sev s-small">小</span><span>「お供のおやつを差し出す」の下に「お供のおやつを払う」「お供のおやつを持っていません」と似た文が2行。上の「突発」の札は字が小さく読みにくいです。</span></li>
+      <li><span class="sev s-good">良</span><span>セキセイインコの絵がとても可愛いです。名前を付けたらすぐ地図で一緒にいる流れも短くて良いです。</span></li>
+    </ul>
+  </section>
+
+  <section class="box">
+    <h2><span class="no">場面6</span>町（切り替え・買い物・聖堂）</h2>
+    <p class="how"><b>出し方:</b> 保存データを書き換え（2人を王都へ戻す・所持金300G・レオンを剣士Lv5／中位の剣豪Lv3に）。転職の条件「0/10」などを見るため、剣豪の状態も作りました。</p>
+    <div class="strip">
+      <figure><img src="img/06b-town.jpg" alt="町" loading="lazy"><figcaption>町。上の2つがどちらも「利用中」</figcaption></figure>
+      <figure><img src="img/06e-cecil.jpg" alt="セシルに切り替え" loading="lazy"><figcaption>セシルにすると、上は270G・中は300G</figcaption></figure>
+      <figure><img src="img/06h-cards-scrolled.jpg" alt="ジョブのカード" loading="lazy"><figcaption>ジョブのカードは一番下</figcaption></figure>
+      <figure><img src="img/06f-temple.jpg" alt="聖堂 剣士" loading="lazy"><figcaption>聖堂（剣士Lv5 → 中位）</figcaption></figure>
+      <figure><img src="img/06i-temple-master.jpg" alt="聖堂 剣豪" loading="lazy"><figcaption>聖堂（剣豪Lv3）。条件が2回書かれる</figcaption></figure>
+    </div>
+    <ul class="fx">
+      <li><span class="sev s-mid">中</span><span>上の「P1・レオン：利用中」「P1・セシル：利用中」がどちらも「利用中」。今どちらを操作しているかは枠の色だけで分かります。</span></li>
+      <li><span class="sev s-mid">中</span><span>セシルに切り替えても、上の帯のお金はレオンの「270G」のまま。中の行は「300G」で、食い違います。</span></li>
+      <li><span class="sev s-mid">中</span><span>買った時の手応えがありません（ボタンが「売り切れ」に変わるだけ）。指輪を誰が着けたのかも出ません。</span></li>
+      <li><span class="sev s-mid">中</span><span>聖堂: 侍・魔剣士は「条件：刀を装備して敵を10体倒す（0/10）」が、鍵の欄にもう一度出ます。剣聖は「条件 0/15」と「Lv4で転職できる」の2つがあり、両方要るのか分かりにくいです。</span></li>
+      <li><span class="sev s-small">小</span><span>タブの「売却」が右で切れていて、横に動かせると気づきにくいです。カードの「0／1／2」の行（成功の数）や記号は、初めての人には意味が分かりません。「8ワールドターン」も分かりにくい言葉です。</span></li>
+      <li><span class="sev s-good">良</span><span>転職先の能力が《》で2つ並び、◎○で得意な武器も分かります。「中位」「最上位」「特殊」の札も見やすいです。</span></li>
+    </ul>
+  </section>
+
+  <section class="box">
+    <h2><span class="no">場面7</span>ダンジョン（探索力の判定 → 歩く）</h2>
+    <p class="how"><b>出し方:</b> 保存データを書き換え（2人を翠の神殿の入口へ・セシルに子狼のお供「ころ」）。歩く画面は、場面10の戦闘の後に続けて操作しました。</p>
+    <div class="strip">
+      <figure><img src="img/07b-enter-0.jpg" alt="入った直後" loading="lazy"><figcaption>入った直後。扉や前進が暗い</figcaption></figure>
+      <figure><img src="img/07c-explore-4.jpg" alt="探索力の判定の後" loading="lazy"><figcaption>判定の後。残り6歩</figcaption></figure>
+      <figure><img src="img/07d-room.jpg" alt="部屋" loading="lazy"><figcaption>戦闘の後の部屋。左右が真っ黒</figcaption></figure>
+      <figure><img src="img/07e-walk-0-2.jpg" alt="前進の後" loading="lazy"><figcaption>前進の後。左右に扉</figcaption></figure>
+    </div>
+    <ul class="fx">
+      <li><span class="sev s-mid">中</span><span>入った直後は「扉を開ける」も矢印もすべて暗く、先に「探索力の判定」を押す必要があります。押せない理由が書かれていません。</span></li>
+      <li><span class="sev s-mid">中</span><span>戦闘の後の部屋で、左右の通路の先が真っ黒な四角に見えます（壁の絵が抜けているように見える）。</span></li>
+      <li><span class="sev s-small">小</span><span>「1歩・扉で1歩（向くのは0歩）」が折り返して読みにくいです。「左へ」を押すと歩数が1減るので、「向きを変えるだけ」だと思うと驚きます。</span></li>
+      <li><span class="sev s-small">小</span><span>誰の番かが、右上の小さな顔2つでしか分かりません。</span></li>
+      <li><span class="sev s-good">良</span><span>一人称の通路の絵に雰囲気があり、扉の赤い縁取りとドクロで「この先は戦闘」と分かります。</span></li>
+    </ul>
+  </section>
+
+  <section class="box">
+    <h2><span class="no">場面8</span>戦闘：敵を選ぶ・味方を選ぶ</h2>
+    <p class="how"><b>出し方:</b> 保存データを書き換え（最初の部屋の敵を森の狼2体・毒キノコ1体に）。</p>
+    <div class="strip">
+      <figure><img src="img/08a-battle-start-7.jpg" alt="戦闘開始" loading="lazy"><figcaption>敵3体。狙いはどれも「→P1」</figcaption></figure>
+      <figure><img src="img/08b-card-selected.jpg" alt="カードを選んだ" loading="lazy"><figcaption>ストライクを選ぶと敵が縮む</figcaption></figure>
+      <figure><img src="img/08d-attack-2.jpg" alt="敵を選んだ" loading="lazy"><figcaption>選んだ毒キノコが札で隠れる</figcaption></figure>
+      <figure><img src="img/08f-heal-selected.jpg" alt="癒しを選んだ" loading="lazy"><figcaption>癒し：最初はレオンが選ばれている</figcaption></figure>
+      <figure><img src="img/08h-heal-pick-cecil.jpg" alt="セシルを選んだ" loading="lazy"><figcaption>セシル自身も選べる</figcaption></figure>
+    </div>
+    <ul class="fx">
+      <li><span class="sev s-big">大</span><span>敵の狙いが「→P1」。今回のように2人とも P1 だと、どちらが狙われるかは小さな顔の丸でしか分かりません。名前（レオン・セシル）で出したほうが確実です。</span></li>
+      <li><span class="sev s-big">大</span><span>狙う敵をタップすると、その敵の上に「予測 下の一覧へ」の札が出て、毒キノコの絵がほぼ隠れます。カードを選んだ時点で敵の絵も小さく縮みます。</span></li>
+      <li><span class="sev s-mid">中</span><span>流れが「カード → 敵 → 発動」の3回。敵を選ぶ前の「発動 敵をタップ」は押せるのか分からない見た目で、選んだ後の「発動 運に任せる」は言葉の意味が分かりにくいです。</span></li>
+      <li><span class="sev s-mid">中</span><span>ダメージの予測が2か所で違います。色の帯の下は「完全 7」、下の一覧は「完全：ダメージ9」。</span></li>
+      <li><span class="sev s-mid">中</span><span>回復カードでは、「使う人（セシル・金色の枠）」と「回復する相手（レオン・青い枠）」の区別が枠の色だけ。下の予測は「効果は上の表示を確認」が3行並ぶだけで役に立っていません。</span></li>
+      <li><span class="sev s-mid">中</span><span>セシルのお供の子狼が、レオンの足元に立っています。誰のお供か分かりにくいです。</span></li>
+      <li><span class="sev s-small">小</span><span>HPが満タンの味方にも回復を使えて、何も起きません（注意が出ない）。手札が重なって「ストライク」が「ストライ」で切れます。</span></li>
+      <li><span class="sev s-good">良</span><span>敵の上に「誰に・何を・いくつ」の予告が出るので、作戦を立てやすいです。味方を選ぶ時は「選択中：セシル」と文字でも出ます。</span></li>
+    </ul>
+  </section>
+
+  <section class="box">
+    <h2><span class="no">場面9</span>戦闘：お供のカットイン・能力・数字の重なり</h2>
+    <p class="how"><b>出し方:</b> 場面8の続きをそのまま操作（レオンがカードを3枚使う → ターン終了）。0.25秒おきに撮りました。</p>
+    <div class="strip">
+      <figure><img src="img/09-021-c3.jpg" alt="3枚目" loading="lazy"><figcaption>3枚目：帯がはみ出す・左上にお供の札</figcaption></figure>
+      <figure><img src="img/09-032-end.jpg" alt="敵のターン" loading="lazy"><figcaption>「敵のターン」が予告に重なる</figcaption></figure>
+      <figure><img src="img/09-035-end.jpg" alt="ターン2" loading="lazy"><figcaption>「ターン2」の帯と -6 -6</figcaption></figure>
+      <figure><img src="img/09-036-end.jpg" alt="数字の重なり" loading="lazy"><figcaption>「HP+3【癒しの祈り】」が -6 に重なる</figcaption></figure>
+    </div>
+    <ul class="fx">
+      <li><span class="sev s-big">大</span><span>3枚目を使った時の結果の帯が1行で、画面の外にはみ出して切れます（「! 4 DMG 7 BLOCK ぴーちゃんの応援の歌（応…」）。英語の「DMG」「BLOCK」も混ざります。</span></li>
+      <li><span class="sev s-big">大</span><span>レオンの番の後に「ターン終了」を押すと、カードを5枚持ったままのセシルの番も終わりました。「まだ行動できるキャラがいます」は小さな字で出るだけで、確認がありません。</span></li>
+      <li><span class="sev s-big">大</span><span>敵の番は約1.2秒。「-3」「防御7」「毒+3」「-6」「-6」「HP+3」が画面の真ん中に次々と出て、「敵のターン」「ターン2」の大きな帯が敵の予告や数字の上に重なります。何をされたか追えません。</span></li>
+      <li><span class="sev s-mid">中</span><span>ダメージの数字が、キャラの体ではなく画面の真ん中の黒い札に出ます。誰が受けたのか分かりにくいです。</span></li>
+      <li><span class="sev s-small">小</span><span>お供のカットインは、左上の小さな札（「ぴーちゃん：応援の歌！」）だけで、侵食度の帯に重なります。アイコンもインコの絵ではなく赤い鳥です。せっかくの見せ場なので、もっと大きく可愛く出したいです。</span></li>
+      <li><span class="sev s-good">良</span><span>ジョブの能力が「【癒しの祈り】」と名前つきで出るので、何が起きたか分かります。レオンが動き終わると自動でセシルに切り替わるのも楽です。</span></li>
+    </ul>
+  </section>
+
+  <section class="box">
+    <h2><span class="no">場面10</span>勝利 → 報酬 → カードを選ぶ</h2>
+    <p class="how"><b>出し方:</b> 保存データを書き換え（敵3体のHPを2にして1回で勝つ）。</p>
+    <div class="strip">
+      <figure><img src="img/10a-win-0.jpg" alt="勝利" loading="lazy"><figcaption>勝利の記録</figcaption></figure>
+      <figure><img src="img/10c-reward-0.jpg" alt="レベルアップ" loading="lazy"><figcaption>先にレベルアップのボーナス</figcaption></figure>
+      <figure><img src="img/10f-card-leon.jpg" alt="レオンのカード" loading="lazy"><figcaption>レオン：2枚が同じ数字</figcaption></figure>
+      <figure><img src="img/10h-card-cecil.jpg" alt="セシルのカード" loading="lazy"><figcaption>セシル：3枚目は「ガード」（回転中）</figcaption></figure>
+    </div>
+    <ul class="fx">
+      <li><span class="sev s-big">大</span><span>3択の違いが小さすぎます。レオンは「払い斬り」「まとめ打ち」が数字まで同じ（75%・2／3／5）で、3枚とも剣の攻撃。セシルには最初から持っている「ガード」が出ました。予定の「1枚はジョブ・系統・武器種のカード」に変えると、ここは大きく良くなりそうです。</span></li>
+      <li><span class="sev s-mid">中</span><span>カードに説明文が無く、数字と記号だけ。「払い斬り」と「まとめ打ち」の違いが画面から分かりません。</span></li>
+      <li><span class="sev s-mid">中</span><span>カードを1回押すと、すぐ山札に入ります（確認なし）。押し間違えると戻せません。</span></li>
+      <li><span class="sev s-small">小</span><span>「コモン72%・レア24%・エピック4%」と出ますが、カードの見た目（枠の色）で格が分かりません。</span></li>
+      <li><span class="sev s-small">小</span><span>3枚目が裏返る途中は押せない時間があります。2人分だと「ボーナス → ボーナス → カード → カード → 先へ進む」で5回押します。</span></li>
+      <li><span class="sev s-small">小</span><span>お金は「+10G（2人で山分け）」で、1人5G。少なく感じます（数値の判断はおまかせします）。</span></li>
+      <li><span class="sev s-good">良</span><span>勝利の記録（完全成功・特殊能力の発動の回数）が楽しいです。P1 → P2 の順に「○○の山札に1枚加える」と名前つきで出るので、受け取り方に迷いません。</span></li>
+    </ul>
+  </section>
+
+  <section class="box">
+    <h2>確かめ方の記録</h2>
+    <ul class="fx">
+      <li><span class="sev s-small">注</span><span>主ブランチの最新（c0f153f）を自分のワークツリーでビルドしました。指定の 4211 番は別のプログラムが使っていて、配信されていたビルドも自分のものと違ったため（止めてはいけないので触らず）、空いていた <b>4219 番</b>で配信しました。配信の中身が自分のビルドと同じこと（index-DzIHPvF1.js）を確かめています。</span></li>
+      <li><span class="sev s-small">注</span><span>速く進める設定は切って（ふつうの演出の速さで）撮りました。画面の自動の確認（はみ出し・小さすぎるボタン・12px未満の文字）は、どの場面でも0件でした。ブラウザのエラーも0件です。</span></li>
+      <li><span class="sev s-small">注</span><span>撮影の手順は scripts/archive/playtest/ に置きました（コードは変えていません）。</span></li>
+    </ul>
+  </section>
+
+  <section class="box">
+    <h2>Gemini へのレビューのお願い（そのまま貼れます）</h2>
+    <pre class="req" id="req">カードRPG「DESTINY OF CRYSTALIA」のテストプレイ記録です。スマホ幅（390×844）で、2人・ふつうの10場面を遊び、気になった点を重要度（大・中・小）つきでまとめました。
+企画・レビュアーとして、次の3つを見てください。
+1. 「大」の8つについて、直す順番の提案（プレイヤーの体験への影響が大きい順）
+2. 重要度の付け方に、違うと思う所があれば（上げる・下げる・理由）
+3. ここに無いけれど、プレイヤー目線で気になりそうな点
+前提: 難易度は今のまま（難しめが良い）。カードの報酬は「1枚はジョブ・系統・武器種のカード」に変える予定です。お供は可愛さと愛着を最優先にしています。最新の基準は spec.md・docs/STATUS.md・docs/design-v2.md です。</pre>
+    <button class="copy" id="copy" type="button">文をコピー</button>
+  </section>
+</div>
+
+<script>
+document.getElementById('copy').addEventListener('click', () => {
+  const t = document.getElementById('req').textContent;
+  const done = () => { document.getElementById('copy').textContent = 'コピーしました'; };
+  const fallback = () => { const r = document.createRange(); r.selectNodeContents(document.getElementById('req')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.getElementById('copy').textContent = '選んだので長押しでコピー'; };
+  try { navigator.clipboard.writeText(t).then(done, fallback); } catch (e) { fallback(); }
+});
+</script>

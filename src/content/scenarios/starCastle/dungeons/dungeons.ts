@@ -36,7 +36,7 @@ const CAVE_POOLS: DungeonDef['pools'] = {
 
 type Layout = NonNullable<DungeonDef['layout']>;
 
-/** 風車の塔（8行。入門。突風と星屑の箱） */
+/** 風車の塔（元の並びは8行。extraFloor.ts で40行に広げる。入門。突風と星屑の箱） */
 const windmillLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
@@ -61,7 +61,7 @@ const windmillLayout: Layout = [
   [{ type: 'boss', next: [] }],
 ];
 
-/** 星見の天文台（8行。壁画と時計仕掛けの罠。強敵が2回） */
+/** 星見の天文台（元の並びは8行。extraFloor.ts で40行に広げる。壁画と時計仕掛けの罠。強敵が2回） */
 const observatoryLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
@@ -86,7 +86,7 @@ const observatoryLayout: Layout = [
   [{ type: 'boss', next: [] }],
 ];
 
-/** 月光の庭（9行。泉と飛行船の行商人。分かれ道が多い） */
+/** 月光の庭（元の並びは9行。extraFloor.ts で40行に広げる。泉と飛行船の行商人。分かれ道が多い） */
 const moonGardenLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [

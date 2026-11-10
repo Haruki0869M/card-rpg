@@ -1,4 +1,4 @@
-// 防具（K2）。量産は docs/tasks/K2-equipment.md のとおりに足す
+// 防具（K2）。量産は docs/archive/tasks/K2-equipment.md のとおりに足す
 import type { ItemDef } from '../../../types';
 
 export const armors2: ItemDef[] = [

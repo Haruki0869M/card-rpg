@@ -102,7 +102,7 @@ src/content/
    - `weak` / `resist`: 弱点・耐性の属性ID（例 `weak: ['fire']`）。弱点はダメージ×1.5、耐性はダメージ×0.5で、その属性の状態異常も効かない
    - 行動のダメージにも属性を付けられます（`{ kind: 'damage', amount: 8, element: 'fire' }`）
 3. 出す場所はダンジョンの `pools` に ID を書きます。
-4. **亜種**（K3）: 元の敵の絵を使い回し、属性か開幕の特性を変えた敵は `makeVariant`（`src/data/enemyVariant.ts`）で作ります。`aura` で足元の色が付きます。詳しくは `docs/tasks/K3-enemies.md`。
+4. **亜種**（K3）: 元の敵の絵を使い回し、属性か開幕の特性を変えた敵は `makeVariant`（`src/data/enemyVariant.ts`）で作ります。`aura` で足元の色が付きます。詳しくは `docs/archive/tasks/K3-enemies.md`。
 5. **絵が必要です。** 描いた絵を `src/assets/art/enemy/<敵ID>.webp` に置きます（ボスの第2段階は `<敵ID>-1.webp`）。無ければ `src/art/enemies/` の SVG の絵（`export const enemyArt = { 敵ID: 絵 }`）、それも無ければ仮の絵（頭文字の丸）が出ます。敵どうしの大きさの差は、敵のデータの `size` で決めます。
 
 ## 武器・防具・装飾品・消費アイテムを足す
@@ -189,7 +189,7 @@ src/content/
 
 - **K2で足した条件**: `selfStatus`（自分が状態異常を持つ）・`selfHpAtLeast`（HPが○%以上）・`foeCount`（敵の数）・`cardCost`・`cardSlots`・`hasPet`。
 - **K2で足した常時型**: `elementGuard`（属性攻撃を無効・吸収・半減）・`convertElement`（属性の無い物理攻撃を別の属性に）。
-- 詳しい使い方は `docs/tasks/K2-equipment.md`。装備には `explore`（世界マップの視界・野営の回復）と `scenario`（そのシナリオだけで出る）も書ける。
+- 詳しい使い方は `docs/archive/tasks/K2-equipment.md`。装備には `explore`（世界マップの視界・野営の回復）と `scenario`（そのシナリオだけで出る）も書ける。
 
 ## 効果の部品（`kind`）
 

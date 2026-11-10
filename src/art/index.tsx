@@ -42,7 +42,6 @@ export function preloadEnemyPhases(defIds: string[]) {
   }
   preloadImages(keys);
 }
-export const hasEnemyArt = (defId: string) => !!ENEMY_ART[artIdOf(defId)] || !!artImage(`enemy/${artIdOf(defId)}`);
 
 const heroKey = (classId: string, gender: Gender, face?: boolean, weapon?: Rarity) =>
   `hero:${classId}:${gender}:${face ? 'face' : 'full'}:${weapon ?? '-'}`;
@@ -167,7 +166,6 @@ function EnemySvgArt({ defId, phase = 0, className }: { defId: string; phase?: n
 
 /** 背景の登録表（ダンジョンの background の値で選ぶ。無ければ平原）。src/art/backgrounds/ に置き export const background = { ID: 絵 } と書く */
 const BACKGROUNDS = collectArt<ComponentType>(import.meta.glob('./backgrounds/*.tsx', { eager: true }), 'background');
-export const hasBackground = (id: string) => !!BACKGROUNDS[id] || !!artImage(`bg/${id}`);
 
 export function BattleBackground({ kind = 'plains', className, style }: { kind?: string; className?: string; style?: CSSProperties }) {
   const img = artImage(`bg/${kind}`) ?? (BACKGROUNDS[kind] ? undefined : artImage('bg/plains'));

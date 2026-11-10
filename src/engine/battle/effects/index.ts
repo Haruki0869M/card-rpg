@@ -1,7 +1,7 @@
 // ===== 効果の部品の登録表と、共通の処理（対象の決め方・ダメージの与え方） =====
 // 新しい効果: kinds/ にファイルを1つ置いて export const effect: EffectHandler<'種類'> = {...} と書くだけ。
 // カード・敵の行動・消費アイテム・特殊能力のデータから、その日から使える。
-import type { AbilityDef, BattleEvent, BattleState, CardDef, Effect, EffectKind, EffectTarget } from '../../../types';
+import type { AbilityDef, BattleEvent, BattleState, CardDef, Effect, EffectTarget } from '../../../types';
 import { convertedElement, coverChance, damageModifiers, elementGuardOf, fireAbilities } from '../../abilities';
 import type { Rng } from '../../rng';
 import { BALANCE } from '../../../data/balance';
@@ -31,7 +31,6 @@ export function effectHandler(kind: string): EffectHandler {
   return h;
 }
 export const hasEffectKind = (kind: string) => HANDLERS.has(kind);
-export const effectKinds = () => [...HANDLERS.keys()] as EffectKind[];
 
 /** 効果の対象（省略時は種類ごとの既定） */
 export const targetOf = (e: Effect): EffectTarget => e.to ?? effectHandler(e.kind).defaultTo;

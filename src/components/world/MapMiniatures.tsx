@@ -4,21 +4,11 @@
 //   飾り:   prop/forest.webp・prop/mountain.webp・prop/volcano.webp
 // 絵が無い間は、ここの SVG の図（仮のミニチュア）を描く。見た目だけで、ゲームの状態には関係しない。
 import { artImage } from '../../art';
-import { GROUND_K, hash01 } from './diorama';
+import { GROUND_K } from './diorama';
 
 /** 場所の種類 → 絵のキー（絵があればそれを使う。イベントは箱庭の試作のテントの絵） */
 export type MiniKind = 'event' | 'temple' | 'altar' | 'finale';
-export type PropKind = 'forest' | 'mountain' | 'volcano';
 export const MINI_ART_KEY: Record<MiniKind, string> = { event: 'landscape/place-tent', temple: 'place/temple', altar: 'place/altar', finale: 'place/finale' };
-export const PROP_ART_KEY: Record<PropKind, string> = { forest: 'prop/forest', mountain: 'prop/mountain', volcano: 'prop/volcano' };
-
-/** 地形の飾り（枠から飛び出す木・山）の種類 */
-export function propOf(terrainId: string): PropKind | undefined {
-  if (terrainId === 'forest') return 'forest';
-  if (terrainId === 'mountain') return 'mountain';
-  if (terrainId === 'lava') return 'volcano';
-  return undefined;
-}
 
 /**
  * 場所のミニチュア。x, y = マスの上の面の中心、R = マスの半径。
@@ -150,83 +140,5 @@ function FinaleShape() {
       ))}
       <path d="M44 80 V68 Q50 60 56 68 V80 Z" fill="#120c18" />
     </>
-  );
-}
-
-/**
- * 地形の飾り（森の木・山の頂・火山）。上の面の中に根元を置き、奥の方は上の辺より上へ飛び出す。
- * i = マスの番号（木の数・場所をマスごとに少し変える）
- */
-export function TerrainProp({ kind, x, y, R, i }: { kind: PropKind; x: number; y: number; R: number; i: number }) {
-  const img = artImage(PROP_ART_KEY[kind]);
-  if (img) {
-    const big = R * 1.6;
-    return <image href={img} x={x - big / 2} y={y - big * 0.7} width={big} height={big} pointerEvents="none" />;
-  }
-  if (kind === 'forest') {
-    // 奥から手前へ（上から下へ）描く。手前の木が奥の木を隠す
-    const spots: [number, number, number][] = [
-      [-0.38, -0.32, 0.95],
-      [0.3, -0.38, 1.05],
-      [-0.02, -0.06, 1.15],
-      [-0.42, 0.22, 0.85],
-      [0.4, 0.18, 0.9],
-    ];
-    const n = 3 + Math.floor(hash01(i, 3) * 3);
-    return (
-      <g pointerEvents="none">
-        {spots.slice(0, n).map(([dx, dy, k], j) => {
-          const jx = (hash01(i, 10 + j) - 0.5) * 0.14;
-          return <Pine key={j} x={x + (dx + jx) * R} y={y + dy * R * GROUND_K} h={R * 0.78 * k} dark={hash01(i, 20 + j) < 0.5} />;
-        })}
-      </g>
-    );
-  }
-  if (kind === 'mountain') {
-    const h = R * (1.15 + hash01(i, 4) * 0.25);
-    const wd = R * 0.78;
-    const bx = x + (hash01(i, 5) - 0.5) * R * 0.16;
-    const by = y + R * 0.38 * GROUND_K;
-    const tx = bx + wd * 0.05;
-    const ty = by - h;
-    const snow = h * 0.3;
-    return (
-      <g pointerEvents="none">
-        {/* 奥の小さな峰 */}
-        <path d={`M${bx + wd * 0.1} ${by - R * 0.18} L${bx + wd * 0.62} ${by - h * 0.62} L${bx + wd * 1.05} ${by - R * 0.18} Z`} fill="#5a5258" stroke="#1e1a1e" strokeWidth={R * 0.04} strokeLinejoin="round" />
-        <path d={`M${bx - wd} ${by} L${tx} ${ty} L${bx + wd} ${by} Z`} fill="#8a8288" stroke="#1e1a1e" strokeWidth={R * 0.05} strokeLinejoin="round" />
-        <path d={`M${tx} ${ty} L${bx + wd} ${by} L${bx + wd * 0.15} ${by} Z`} fill="#5e565c" />
-        <path d={`M${tx} ${ty} L${tx - wd * (snow / h)} ${ty + snow} L${tx - wd * 0.1} ${ty + snow * 0.75} L${tx + wd * 0.05} ${ty + snow * 1.05} L${tx + wd * (snow / h) * 0.9} ${ty + snow} Z`} fill="#f4f6fa" stroke="#1e1a1e" strokeWidth={R * 0.03} strokeLinejoin="round" />
-      </g>
-    );
-  }
-  // 火山: 黒い山と、光る火口
-  const h = R * 1.0;
-  const wd = R * 0.8;
-  const by = y + R * 0.36 * GROUND_K;
-  return (
-    <g pointerEvents="none">
-      <path d={`M${x - wd} ${by} L${x - wd * 0.25} ${by - h} H${x + wd * 0.25} L${x + wd} ${by} Z`} fill="#3a2a28" stroke="#140c0a" strokeWidth={R * 0.05} strokeLinejoin="round" />
-      <path d={`M${x + wd * 0.25} ${by - h} L${x + wd} ${by} H${x + wd * 0.3} Z`} fill="#241816" />
-      <path d={`M${x - wd * 0.06} ${by - h} L${x - wd * 0.2} ${by - h * 0.55} L${x} ${by - h * 0.7} L${x + wd * 0.12} ${by - h * 0.45} L${x + wd * 0.12} ${by - h}`} fill="none" stroke="#ff8a2a" strokeWidth={R * 0.06} strokeLinecap="round" />
-      <ellipse cx={x} cy={by - h} rx={wd * 0.27} ry={R * 0.08} fill="#ffb84a" stroke="#140c0a" strokeWidth={R * 0.03} />
-    </g>
-  );
-}
-
-/** 針葉樹1本（x, y = 根元） */
-function Pine({ x, y, h, dark }: { x: number; y: number; h: number; dark: boolean }) {
-  const w = h * 0.42;
-  const c1 = dark ? '#1f4a2a' : '#2a6034';
-  const c2 = dark ? '#14321c' : '#1c4424';
-  const st = h * 0.05;
-  return (
-    <g>
-      <ellipse cx={x + w * 0.2} cy={y} rx={w * 0.85} ry={h * 0.1} fill="rgba(0,0,0,.35)" />
-      <rect x={x - h * 0.04} y={y - h * 0.16} width={h * 0.08} height={h * 0.16} fill="#4a3018" />
-      <path d={`M${x - w} ${y - h * 0.14} L${x} ${y - h * 0.62} L${x + w} ${y - h * 0.14} Z`} fill={c1} stroke="#0a1a0e" strokeWidth={st} strokeLinejoin="round" />
-      <path d={`M${x - w * 0.78} ${y - h * 0.46} L${x} ${y - h} L${x + w * 0.78} ${y - h * 0.46} Z`} fill={c1} stroke="#0a1a0e" strokeWidth={st} strokeLinejoin="round" />
-      <path d={`M${x} ${y - h} L${x + w * 0.78} ${y - h * 0.46} L${x + w * 0.1} ${y - h * 0.46} Z M${x} ${y - h * 0.62} L${x + w} ${y - h * 0.14} L${x + w * 0.1} ${y - h * 0.14} Z`} fill={c2} />
-    </g>
   );
 }

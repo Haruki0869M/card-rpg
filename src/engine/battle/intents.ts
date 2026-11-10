@@ -11,10 +11,6 @@ export function livingAllies(state: BattleState): AllyState[] {
   return state.allies.filter((a) => !a.dead);
 }
 
-export function livingEnemies(state: BattleState): EnemyState[] {
-  return state.enemies.filter((e) => !e.dead);
-}
-
 /** 単体攻撃を含む行動か（挑発の対象になる） */
 export function isSingleAttack(action: EnemyActionDef): boolean {
   return action.effects.some((e) => e.kind === 'damage' && targetOf(e) === 'target');
