@@ -265,19 +265,25 @@ async function run(party, difficulty) {
       const reach = page.locator('[data-reach]');
       const n = await reach.count();
       if (n) {
-        const goal = page.locator(`[data-feature="dungeon:${FIRST_DUNGEON[SCENARIO].id}"]`);
-        const gb = (await goal.count()) ? await goal.boundingBox() : null;
-        const target = gb ? { x: gb.x + gb.width / 2, y: gb.y + gb.height / 2 } : { x: 180, y: -100000 };
+        // 目的地は、保存データの地図から「マスの番号」で決める。
+        // （前は、目的のダンジョンがまだ霧の中だと「まっすぐ上」へ歩いていた。ダンジョンは道の左の列にあるので、
+        //   夜などで視界が狭いと見つけないまま通り過ぎ、地図の一番上で動けなくなって侵食度100%で終わることがあった。種 59675323）
+        const nav = await page.evaluate((id) => {
+          const w = JSON.parse(localStorage.getItem('card-rpg/adventure'))?.game?.world;
+          if (!w) return null;
+          return { width: w.width, goal: w.tiles.findIndex((t) => t.f?.kind === 'dungeon' && t.f.id === id), hero: w.pos[w.turn] };
+        }, FIRST_DUNGEON[SCENARIO].id);
+        if (!nav || nav.goal < 0) issues.add('目的のダンジョンが地図に無い');
+        // 六角形のマス（行ごとに半マスずれる）のだいたいの距離。近づくマスを選ぶだけなので、ずれの向きは気にしない
+        const at = (i) => ({ x: (i % nav.width) + (Math.floor(i / nav.width) % 2 ? 0.5 : 0), y: Math.floor(i / nav.width) * 0.866 });
+        const dist = (i) => (nav && nav.goal >= 0 ? (at(i).x - at(nav.goal).x) ** 2 + (at(i).y - at(nav.goal).y) ** 2 : Infinity);
         let best = null;
         let bestD = Infinity;
         for (let i = 0; i < n; i++) {
-          const b = await reach.nth(i).boundingBox();
-          if (!b) continue;
-          const d = (b.x + b.width / 2 - target.x) ** 2 + (b.y + b.height / 2 - target.y) ** 2;
+          const d = dist(Number(await reach.nth(i).getAttribute('data-reach')));
           if (d < bestD) (bestD = d), (best = i);
         }
-        const hb = await page.locator('[data-hero][data-active]').boundingBox();
-        const hd = hb ? (hb.x + hb.width / 2 - target.x) ** 2 + (hb.y + hb.height / 2 - target.y) ** 2 : Infinity;
+        const hd = nav && nav.hero != null ? dist(nav.hero) : Infinity;
         if (best !== null && bestD < hd) {
           await reach.nth(best).scrollIntoViewIfNeeded();
           const b = await reach.nth(best).boundingBox();
