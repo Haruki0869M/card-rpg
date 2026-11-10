@@ -1,4 +1,4 @@
-// 見直しの段階3の戦闘の表示: 大技の印・BREAK の手がかりと演出・完全成功の状態異常の手がかり・連携の段階（連携／大連携／極連携）。
+// 見直しの段階3の戦闘の表示: 大技の印・BREAK の手がかりと演出・弱点の案内（弱点×1.5！）・連携の段階（連携／大連携／極連携）。
 // 4人で樹の番人（弱点は火・大技 = 根の拘束）と戦う形を保存の上で作り、360・390・480 の幅で見る。
 // 使い方: URL=http://127.0.0.1:<番号>/card-rpg/ node scripts/break-combo.mjs
 import { mkdir } from 'node:fs/promises';
@@ -81,7 +81,10 @@ async function run(width) {
   const hintText = await hints.innerText().catch(() => '');
   if (!hintText.includes('BREAK')) ng(`手がかりに BREAK が無い（${hintText}）`);
   if (!hintText.includes('この攻撃で')) ng(`弱点の火球なのに「この攻撃で BREAK」になっていない（${hintText}）`);
-  if (!hintText.includes('完全成功で火傷')) ng(`「完全成功で火傷」の手がかりが無い（${hintText}）`);
+  // 弱点の案内は、的の札に出る（新しい依頼文 パート5-1）。同じ事を下の手がかりに重ねて出さない
+  const weakText = await page.locator('[data-weak-chip="fire"] [data-weak-guide]').innerText().catch(() => '');
+  if (!weakText.includes('弱点×1.5！') || !weakText.includes('完全成功で火傷確定')) ng(`的の札に「弱点×1.5！（完全成功で火傷確定）」が出ない（${weakText}）`);
+  if (hintText.includes('完全成功で火傷')) ng(`弱点の案内が、的の札と下の手がかりに重なって出ている（${hintText}）`);
   if ((await page.locator('[data-break-chip]').getAttribute('data-break-chip').catch(() => null)) !== 'now') ng('狙う敵のチップに BREAK の印が無い');
   await shot('2-hints-weak');
   await page.getByLabel('キャンセル').click();
@@ -89,6 +92,7 @@ async function run(width) {
   // 戦士（1人目）のヘビースイング: 弱点でないので「完全で BREAK」。フォーカス3で完全成功にして崩す
   await pick(0);
   const t2 = await hints.innerText().catch(() => '');
+  if (await page.locator('[data-weak-chip]').count()) ng('弱点でないカードなのに、的の札に弱点の案内が出ている');
   if (!t2.includes('完全で BREAK') && !t2.includes('完全')) ng(`ヘビースイングの手がかりが「完全で BREAK」でない（${t2}）`);
   await shot('3-hints-perfect');
   await fire(3);
@@ -130,4 +134,4 @@ if (problems.length) {
   console.log('NG:\n' + problems.join('\n'));
   process.exit(1);
 }
-console.log('OK: 大技の印・BREAK の手がかりと結果（威力半分・弱体1・ブロック0）・完全成功の状態異常の手がかり・連携の段階（360/390/480）');
+console.log('OK: 大技の印・BREAK の手がかりと結果（威力半分・弱体1・ブロック0）・的の札の「弱点×1.5！（完全成功で火傷確定）」・連携の段階（360/390/480）');

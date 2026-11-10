@@ -466,7 +466,8 @@ export function DungeonScreen() {
             <span className="panel flex h-7 shrink-0 items-center gap-1 rounded-full px-2 text-[12px] font-bold text-violet-200 tabular-nums" data-depth>
               <ArrowDown size={13} /> 深さ {depthRow}/{dungeonRows(vr)}
               {!oldShape && depthTier(Math.max(0, depthRow - 1)) > 0 && (
-                <span className="text-amber-200">
+                <span className="flex items-center gap-0.5 text-amber-200" data-depth-bonus>
+                  <Flame size={12} className="text-orange-300" />
                   {DEPTH_TIER_NAME[depthTier(depthRow - 1)]} 報酬+{Math.round(BALANCE.depthBonus.reward[depthTier(depthRow - 1)] * 100)}%
                 </span>
               )}

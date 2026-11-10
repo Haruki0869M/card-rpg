@@ -15,7 +15,7 @@ export const roomTypes: RoomTypeDef[] = [
     behavior: 'chest',
     omen: 'treasure',
     omenName: '封魔の宝箱',
-    omenText: '罠・戦闘つき高レア箱',
+    omenText: '戦闘つき高レア箱',
     sealedChest: true,
     battle: { pool: 'elite', levelBonus: 2, cardOdds: 'elite' },
   },

@@ -9,6 +9,6 @@ export const holyKing: ClassDef = {
   stats: { ...paladin.stats, vit: paladin.stats.vit + 8, str: paladin.stats.str + 8 },
   battleAbility: { name: '再臨', effect: { when: 'allyDown', if: [{ kind: 'targetDead' }, { kind: 'perBattle', key: 'resurrection', max: 1 }], do: [{ kind: 'revive', pct: 30 }] } },
   exploreAbility: { id: 'holyKingExplore', name: '王の威光', description: '町の買い物20%引き', effect: { kind: 'shopDiscount', percent: 20 } },
-  requires: { feat: 'support', count: 25, text: '仲間を助けるカードを25回使う' },
+  requires: { feat: 'support', count: 20, text: '仲間を助けるカードを20回使う' },
   cardPool: ["royalHammer","royalAegis","royalGrace","holyOath","royalJudgment"], signature: ["royalHammer","royalAegis","royalGrace"], subWeapons: ['sword', 'spear'],
 };

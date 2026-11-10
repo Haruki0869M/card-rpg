@@ -19,7 +19,7 @@ import { breakPreview } from '../format';
 import { rollChanceFor, findAlly, tierDistribution, toPercents, slotPreviewLimitOf } from '../../engine';
 import { useBattle } from '../../store/battleStore';
 import { CATEGORY_STYLE, EffectChip, ELEMENT_ICONS } from '../ui/icons';
-import { TargetChips } from './TargetChips';
+import { TargetChips, weakGuide } from './TargetChips';
 
 const TIER_COLORS = ['#5a4a5e', '#7a6a8a', '#4a8cff', '#3ad08a', '#ffc94a'];
 
@@ -64,6 +64,8 @@ function counterHints(battle: BattleState, ally: AllyState, card: CardDef, targe
       const el = id ? getElement(id) : undefined;
       if (!el?.status || seen.has(el.status)) continue;
       if (!foes.some((e) => !resistsElement(e, el.id))) continue;
+      // 狙う敵がみんな弱点なら、的の札に「弱点×1.5！（完全成功で…）」が出るので、ここには重ねて出さない
+      if (card.target === 'enemy' && foes.every((e) => weakGuide(ally, card, e)?.note)) continue;
       seen.add(el.status);
       const st = getStatus(el.status);
       out.push({ kind: 'status', color: el.color, icon: el.icon, text: `完全成功で${st.name}${STATUS_HINT[el.status] ? `（${STATUS_HINT[el.status]}）` : ''}` });
