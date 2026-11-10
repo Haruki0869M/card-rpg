@@ -284,11 +284,13 @@ export const TIMING = {
   /** 1人で全員を操作する時（担当が全員 P1）の、世界マップの手番の帯（ステップB。毎回待たされないように短く） */
   turnCutinSolo: 0.5,
   turnNotice: 1.0,
-  /** ダンジョンの演出（第3段階B2）: 1歩・ここまで歩くの1歩・向きを変える・扉が開く・簡易の時の切り替え。秒 */
-  dungeonStep: 0.25,
-  dungeonWalkStep: 0.15,
-  dungeonTurn: 0.25,
-  dungeonDoor: 0.45,
+  /** ダンジョンの演出（第3段階B2）: 1歩・ここまで歩くの1歩・向きを変える・扉が開く・簡易の時の切り替え。秒
+   *  （画面酔いの手直し: ゆっくりに。遠い扉は最初と最後の2コマずつだけ歩いて見せ、間は dungeonWalkFade の暗転でつなぐ） */
+  dungeonStep: 0.4,
+  dungeonWalkStep: 0.32,
+  dungeonTurn: 0.4,
+  dungeonDoor: 0.6,
+  dungeonWalkFade: 0.45,
   dungeonSimple: 0.1,
   /** 移動のサイコロ: 転がる時間・目が出てから消えるまで。秒（高速モードは半分） */
   diceRoll: 1.0,
