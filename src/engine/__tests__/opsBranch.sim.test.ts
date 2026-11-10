@@ -769,7 +769,7 @@ function runReward() {
   }
   const sec = (Date.now() - t0) / 1000;
   writeFileSync(`${OUT}/reward.json`, JSON.stringify({ build: buildId(), mode: 'reward', SEEDS, seconds: sec, runs }, null, 1));
-  const hist = (xs: number[]) => { const m: Record<string, number> = {}; for (const x of xs) { const k = x >= 5 ? '5以上' : String(x); m[k] = (m[k] ?? 0) + 1; } return Object.entries(m).map(([k, v]) => `${k}戦:${v}`).join('・'); };
+  const hist = (xs: number[]) => { const m: Record<string, number> = {}; for (const x of xs) { const k = x >= 5 ? '5戦以上' : `${x}戦`; m[k] = (m[k] ?? 0) + 1; } return Object.entries(m).map(([k, v]) => `${k}:${v}`).join('・'); };
   const md = [
     `# T7 報酬がすぐ役に立つか（reward）`,
     ``,
