@@ -66,7 +66,7 @@ export const TOP_JOB_CARDS: CardDef[] = [
   // 教皇: 回復と浄化。
   c('papalBlessing', '大いなる祝福', 'magic', 2, 'self', [[h(4, 'allies')], [h(6, 'allies')], [h(8, 'allies')]], { stat: 'per' }),
   c('papalLight', '教皇の聖光', 'magic', 2, 'enemy', [[d(5, 'holy')], [d(10, 'holy'), h(2, 'allyTarget')], [d(15, 'holy'), h(4, 'allyTarget')]], { secondaryTarget: 'ally', rarity: 'epic', trait: focusTrait, stat: 'per' }),
-  c('papalSanctuary', '聖域', 'magic', 2, 'self', [[b(3, 'allies')], [b(5, 'allies'), h(2, 'allies')], [b(7, 'allies'), h(3, 'allies')]], { rarity: 'epic', trait: focusTrait, stat: 'per' }),
+  c('papalSanctuary', '教皇の加護', 'magic', 2, 'self', [[b(3, 'allies')], [b(5, 'allies'), h(2, 'allies')], [b(7, 'allies'), h(3, 'allies')]], { rarity: 'epic', trait: focusTrait, stat: 'per' }),
   c('papalPrayer', '慈愛の祈り', 'magic', 1, 'ally', [[h(3, 'target')], [h(6, 'target')], [h(9, 'target'), { kind: 'cleanse', to: 'target' }]], { stat: 'per' }),
   c('miracle', '奇跡', 'magic', 0, 'self', [[{ kind: 'fullRestore' }], [{ kind: 'fullRestore' }]], { rarity: 'legend', exhaust: true, trait: { name: 'ただ一度の奇跡', description: '1戦闘1回。成功数にかかわらず味方全員を全回復する', effect: { modifier: 'exhaust' } }, stat: 'per' }),
   // 弓聖: フォーカスを使った単体攻撃が必中。

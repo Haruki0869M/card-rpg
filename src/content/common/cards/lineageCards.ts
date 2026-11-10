@@ -25,7 +25,7 @@ export const LINEAGE_CARDS: CardDef[] = [
   c('lnBuBreath', '闘気の構え', 'skill', 0, 85, 'self', [[b(2)], [b(3), focus(1)]], L('bu')),
   c('lnBuStack', '重ね打ち', 'physical', 1, 75, 'enemy', [[d(3)], [d(6)], [d(8)]], L('bu')),
   c('lnBuIronBreath', '鉄壁の呼吸', 'skill', 1, 80, 'self', [[b(5)], [b(7)], [b(9)]], L('bu')),
-  c('lnBuSweepLeg', '足払い', 'physical', 1, 75, 'enemy', [[d(2)], [d(4), st('weak', 1)], [d(6), st('weak', 1)]], L('bu')),
+  c('lnBuSweepLeg', '下段払い', 'physical', 1, 75, 'enemy', [[d(2)], [d(4), st('weak', 1)], [d(6), st('weak', 1)]], L('bu')),
   c('lnBuSwipe', '払い斬り', 'physical', 1, 70, 'allEnemies', [[d(2)], [d(3)], [d(5)]], L('bu')),
   c('lnBuPride', '戦士の矜持', 'skill', 0, 80, 'self', [[mana(1)], [mana(1), b(2)]], L('bu')),
   c('lnBuAllIn', '渾身撃', 'physical', 2, 65, 'enemy', [[d(6)], [d(12)], [d(18)]], { ...L('bu'), rarity: 'rare', stat: 'str', tags: ['heavy'] }),

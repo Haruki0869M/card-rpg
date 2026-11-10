@@ -20,7 +20,7 @@ const W = (weaponType: string) => ({ weaponType });
 export const WEAPON_TYPE_CARDS: CardDef[] = [
   // ===== 剣（正統派。バランスと一撃） =====
   c('wtSwordLunge', '踏み込み斬り', 'physical', 1, 80, 'enemy', [[d(3)], [d(6)], [d(8)]], W('sword')),
-  c('wtSwordSwallow', '燕返し', 'physical', 1, 70, 'enemy', [[d(2)], [dh(3, 2)], [dh(4, 2)]], { ...W('sword'), stat: 'dex', tags: ['combo'] }),
+  c('wtSwordSwallow', '返し斬り', 'physical', 1, 70, 'enemy', [[d(2)], [dh(3, 2)], [dh(4, 2)]], { ...W('sword'), stat: 'dex', tags: ['combo'] }),
   c('wtSwordGuard', '剣の構え', 'skill', 1, 80, 'self', [[b(4)], [b(6), focus(1)], [b(8), focus(1)]], W('sword')),
   c('wtSwordWhirl', '大回転斬り', 'physical', 2, 65, 'allEnemies', [[d(3)], [d(6)], [d(9)]], { ...W('sword'), rarity: 'rare' }),
   c('wtSwordNotch', '刃こぼし', 'physical', 1, 75, 'enemy', [[d(3)], [d(5), st('vulnerable', 1)], [d(7), st('vulnerable', 2)]], { ...W('sword'), rarity: 'rare' }),

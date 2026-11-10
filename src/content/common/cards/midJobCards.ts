@@ -45,7 +45,7 @@ export const MID_JOB_CARDS: CardDef[] = [
   c('bloodRage', '血の怒り', 'skill', 0, 85, 'self', [[mana(1), me('vulnerable', 1)], [mana(1), draw(1)]], { rarity: 'rare', stat: 'vit' }),
   c('ragingStorm', '大暴れ', 'physical', 2, 60, 'allEnemies', [[d(4)], [d(7)], [d(10), all('weak', 1)]], { rarity: 'epic', stat: 'str', trait: { name: '狂乱', effect: { when: 'kill', do: [mana(1)] } } }),
   c('cleaveThrough', '薙ぎ払い', 'physical', 1, 70, 'allEnemies', [[d(2)], [d(4)], [d(6)]]),
-  c('warHowl', '雄叫び', 'skill', 1, 80, 'self', [[b(5)], [b(7), all('weak', 1)], [b(9), all('weak', 1)]]),
+  c('warHowl', '狂戦の咆哮', 'skill', 1, 80, 'self', [[b(5)], [b(7), all('weak', 1)], [b(9), all('weak', 1)]]),
   c('bloodFeast', '血の饗宴', 'physical', 2, 65, 'enemy', [[d(6), drain(30)], [d(10), drain(40)], [d(15), drain(50)]], { rarity: 'epic', trait: { name: '血に飢えて', effect: { when: 'kill', do: [heal(5)] } }, stat: 'str' }),
 
   // ===== 闘士（拳。手数と弱体） =====

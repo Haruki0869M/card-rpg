@@ -32,7 +32,7 @@ export const WEAPON_TYPE_CARDS_3: CardDef[] = [
   // ===== 槍（間合いと貫き） =====
   c('wtSpearThrust', '突き', 'physical', 1, 80, 'enemy', [[d(3)], [d(6)], [d(8)]], W('spear')),
   c('wtSpearDouble', '二段突き', 'physical', 1, 70, 'enemy', [[d(2)], [dh(3, 2)], [dh(4, 2)]], { ...W('spear'), tags: ['combo'] }),
-  c('wtSpearWall', '槍衾', 'skill', 1, 80, 'self', [[b(5)], [b(7)], [b(9)]], W('spear')),
+  c('wtSpearWall', '槍構え', 'skill', 1, 80, 'self', [[b(5)], [b(7)], [b(9)]], W('spear')),
   c('wtSpearSweep', '横薙ぎ', 'physical', 2, 65, 'allEnemies', [[d(2)], [d(5)], [d(8), all('weak', 1)]], { ...W('spear'), rarity: 'rare' }),
   c('wtSpearHook', '引っ掛け', 'physical', 1, 75, 'enemy', [[d(2)], [d(4), st('vulnerable', 1)], [d(6), st('vulnerable', 2)]], { ...W('spear'), rarity: 'rare' }),
   c('wtSpearPierce', '貫き', 'physical', 2, 60, 'enemy', [[d(5)], [d(9)], [d(14)]], { ...W('spear'), rarity: 'epic', trait: pierce('貫通') }),
@@ -51,7 +51,7 @@ export const WEAPON_TYPE_CARDS_3: CardDef[] = [
   c('wtFistStraight', '正拳突き', 'physical', 1, 80, 'enemy', [[d(3)], [d(5)], [d(8)]], { ...W('fist'), stat: 'agi' }),
   c('wtFistRush', '連打', 'physical', 1, 70, 'enemy', [[d(2)], [dh(2, 3)], [dh(3, 3)]], { ...W('fist'), stat: 'agi', tags: ['combo'] }),
   c('wtFistBreath', '息吹', 'skill', 0, 85, 'self', [[focus(1)], [focus(1), b(2)]], { ...W('fist'), stat: 'vit' }),
-  c('wtFistPalm', '掌底', 'physical', 1, 75, 'enemy', [[d(3)], [d(5), st('weak', 1)], [d(7), st('weak', 2)]], { ...W('fist'), rarity: 'rare', stat: 'vit' }),
+  c('wtFistPalm', '裂空掌', 'physical', 1, 75, 'enemy', [[d(3)], [d(5), st('weak', 1)], [d(7), st('weak', 2)]], { ...W('fist'), rarity: 'rare', stat: 'vit' }),
   c('wtFistTurn', '回し受け', 'skill', 1, 80, 'self', [[b(3)], [b(5), focus(1)], [b(7), focus(1)]], { ...W('fist'), rarity: 'rare', stat: 'agi' }),
   c('wtFistThousand', '千手連打', 'physical', 2, 60, 'enemy', [[dh(1, 4)], [dh(2, 5)], [dh(3, 6)]], { ...W('fist'), rarity: 'epic', stat: 'agi', tags: ['combo'], trait: { name: '無心', effect: { when: 'perfect', do: [draw(1)] } } }),
   c('wtFistKiBlast', '気功砲', 'physical', 3, 55, 'enemy', [[d(6)], [d(12)], [d(19)], [d(28)]], { ...W('fist'), rarity: 'epic', stat: 'vit', tags: ['heavy'], trait: pierce('浸透') }),
@@ -63,7 +63,7 @@ export const WEAPON_TYPE_CARDS_3: CardDef[] = [
   c('wtScepterHalo', '光輪', 'magic', 2, 65, 'allEnemies', [[el('holy', 3)], [el('holy', 5)], [el('holy', 8)]], { ...W('scepter'), rarity: 'rare' }),
   c('wtScepterBlessing', '加護', 'skill', 1, 80, 'self', [[ba(3)], [ba(5)], [ba(7)]], { ...W('scepter'), rarity: 'rare', tags: ['support'] }),
   c('wtScepterMiracle', '小さな奇跡', 'magic', 2, 60, 'ally', [[heal(5)], [heal(8)], [heal(12)]], { ...W('scepter'), rarity: 'epic', tags: ['support'], trait: { name: '慈愛', effect: { when: 'perfect', do: [healAll(3)] } } }),
-  c('wtScepterJudgment', '裁きの光', 'magic', 3, 55, 'enemy', [[el('holy', 6)], [el('holy', 12)], [el('holy', 18)], [el('holy', 27)]], { ...W('scepter'), rarity: 'epic', tags: ['heavy'], trait: { name: '浄化の光', effect: { when: 'kill', do: [healAll(4)] } } }),
+  c('wtScepterJudgment', '天罰の光', 'magic', 3, 55, 'enemy', [[el('holy', 6)], [el('holy', 12)], [el('holy', 18)], [el('holy', 27)]], { ...W('scepter'), rarity: 'epic', tags: ['heavy'], trait: { name: '浄化の光', effect: { when: 'kill', do: [healAll(4)] } } }),
 
   // ===== 鎌（呪いと魂の刈り取り） =====
   c('wtScytheReap', '刈り取り', 'physical', 1, 75, 'enemy', [[d(3)], [d(6)], [d(8)]], W('scythe')),
@@ -77,7 +77,7 @@ export const WEAPON_TYPE_CARDS_3: CardDef[] = [
   // ===== 刀（見切りと一太刀） =====
   c('wtKatanaDraw', '抜き打ち', 'physical', 1, 80, 'enemy', [[d(3)], [d(6)], [d(9)]], { ...W('katana'), stat: 'per' }),
   c('wtKatanaFlow', '流水', 'physical', 1, 70, 'enemy', [[d(2)], [dh(3, 2)], [dh(4, 2)]], { ...W('katana'), stat: 'per', tags: ['combo'] }),
-  c('wtKatanaPoise', '残心', 'skill', 1, 80, 'self', [[b(4)], [b(6), focus(1)], [b(8), focus(1)]], { ...W('katana'), stat: 'per' }),
+  c('wtKatanaPoise', '納刀の構え', 'skill', 1, 80, 'self', [[b(4)], [b(6), focus(1)], [b(8), focus(1)]], { ...W('katana'), stat: 'per' }),
   c('wtKatanaMoon', '月影', 'physical', 1, 75, 'enemy', [[d(3)], [d(5), st('vulnerable', 1)], [d(7), st('vulnerable', 2)]], { ...W('katana'), rarity: 'rare', stat: 'per' }),
   c('wtKatanaZen', '心頭滅却', 'skill', 1, 80, 'self', [[b(3), focus(1)], [b(5), focus(1)], [b(7), focus(2)]], { ...W('katana'), rarity: 'rare', stat: 'per' }),
   c('wtKatanaSplit', '一刀両断', 'physical', 2, 55, 'enemy', [[d(5)], [d(10)], [d(16)]], { ...W('katana'), rarity: 'epic', stat: 'per', trait: pierce('斬鉄') }),

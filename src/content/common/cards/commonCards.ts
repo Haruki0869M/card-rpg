@@ -35,7 +35,7 @@ export const COMMON_CARDS: CardDef[] = [
   c('cmCover', 'かばう構え', 'skill', 1, 80, 'ally', [[bt(4)], [bt(6)], [bt(8)]], { tags: ['support'] }),
 
   // ===== レア =====
-  c('cmAllOut', '渾身の一撃', 'physical', 2, 65, 'enemy', [[d(6)], [d(11)], [d(17)]], { rarity: 'rare', tags: ['heavy'] }),
+  c('cmAllOut', '全力の一撃', 'physical', 2, 65, 'enemy', [[d(6)], [d(11)], [d(17)]], { rarity: 'rare', tags: ['heavy'] }),
   c('cmStratagem', '奇策', 'skill', 1, 80, 'self', [[draw(1), mana(1)], [draw(2), mana(1)], [draw(2), mana(2)]], { rarity: 'rare' }),
   c('cmIntimidate', '威嚇', 'skill', 1, 80, 'allEnemies', [[all('weak', 1)], [all('weak', 1), all('vulnerable', 1)], [all('weak', 2), all('vulnerable', 1)]], { rarity: 'rare' }),
   c('cmTeamwork', '連携攻撃', 'physical', 1, 70, 'enemy', [[d(2)], [dh(3, 2)], [dh(3, 3)]], { rarity: 'rare', tags: ['combo'] }),
