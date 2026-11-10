@@ -66,7 +66,7 @@ export interface DoorOpen {
   roomId?: string;
 }
 
-/** 手番のカットイン（docs/tasks/turn-cutin.md） */
+/** 手番のカットイン（docs/archive/tasks/turn-cutin.md） */
 export interface TurnCutin {
   id: number;
   heroId: string;

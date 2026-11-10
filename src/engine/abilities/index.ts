@@ -150,18 +150,6 @@ export function coverChance(u: Unit): { chance: number; name: string; source?: A
   return best;
 }
 
-/** 条件付きで今働いている常時型の能力の名前（表示用。例: HPが半分以下の間の「闘志」） */
-export function activePassiveNames(u: Unit): string[] {
-  if (u.dead) return [];
-  const names: string[] = [];
-  for (const ab of abilitiesOf(u)) {
-    const e = ab.effect;
-    if ('modifier' in e && e.modifier !== 'coverLethal' && e.if?.some((x) => x.kind === 'selfHpAtMost') && testConditions(e.if?.filter((x) => x.kind === 'selfHpAtMost'), { self: u }))
-      names.push(ab.name);
-  }
-  return names;
-}
-
 // ---------- 発動型 ----------
 
 /**

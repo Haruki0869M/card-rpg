@@ -81,7 +81,7 @@ describe('周囲の警戒', () => {
     g = run(g, inScene(x, { type: 'DUNGEON_WATCH', playerId: 'P1', heroId: 'h0', focusUsed: 2 }));
     const v = view(g, x);
     const d = v.dungeon!;
-    expect(d.explore).toBe(before - BALANCE.dungeonWatchSteps);
+    expect(d.explore).toBe(before); // 警戒は扉の数を使わない
     expect(d.watchRoll).toEqual(['focus', 'focus']);
     const reach = reachableRooms(d);
     expect(reach.length).toBeGreaterThan(0);

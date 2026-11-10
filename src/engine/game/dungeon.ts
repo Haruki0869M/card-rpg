@@ -9,7 +9,6 @@ import { initDungeonPos } from './dungeonMap';
 export const RARITIES: Rarity[] = ['common', 'rare', 'epic', 'legend'];
 export const rarityIndex = (r: Rarity) => RARITIES.indexOf(r);
 export { RARITY_NAME };
-export const raiseRarity = (r: Rarity, n = 1): Rarity => RARITIES[Math.min(RARITIES.length - 1, rarityIndex(r) + n)];
 
 const pick = <T,>(list: readonly T[], rng: Rng) => list[rng.int(list.length)];
 

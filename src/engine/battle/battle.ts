@@ -182,9 +182,6 @@ function consumeChanceBonus(st: Statuses) {
   for (const [id, v] of Object.entries(st)) if (v && getStatus(id).chanceBonus) st[id] = 0;
 }
 
-/** 対象として敵を選ぶ必要があるカードか */
-export const needsEnemyTarget = (card: CardDef) => card.target === 'enemy';
-
 /** カードが使えない理由（使えるなら null） */
 export function unusableReason(state: BattleState, ally: AllyState, card: CardDef): string | null {
   if (state.slotPreview) return '星読みの結果を確定してください';

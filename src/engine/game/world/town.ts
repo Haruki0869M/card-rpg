@@ -19,14 +19,11 @@ import { addFeat, heroCardPool } from '../jobs';
 import { cardRewardOdds, newItem, pickWeighted } from '../loot';
 import { applyOutcome, makeOutcomeCtx } from '../outcomes';
 import { objectiveHandler } from './objectives';
-import { backToWorld, heroesAt } from './world';
+import { backToWorld } from './world';
 
 type Cmd<T extends GameCommand['type']> = Extract<GameCommand, { type: T }>;
 
 const isEquipped = (game: GameState, uid: string) => game.heroes.some((h) => Object.values(h.equipment).some((e) => e?.uid === uid));
-
-/** 町にいるキャラ */
-export const heroesInTown = (game: GameState) => (game.town && game.world ? heroesAt(game, game.world.pos[game.town.heroId]) : []);
 
 /** 売値 */
 export const sellPrice = (itemId: string) => Math.floor((BALANCE.itemPrice[getItem(itemId).rarity] ?? 30) * BALANCE.sellRatio);

@@ -167,14 +167,14 @@ function enterTemple(players: PlayerId[]) {
 describe('探索力の判定をだれがするか（2人以上のプレイヤー）', () => {
   it('1人で遊ぶ時は今までどおり、すぐ判定できる', () => {
     const { g, x } = enterTemple(['P1', 'P1']);
-    const g2 = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: 'P1', heroId: 'h1', focusUsed: 0 }));
+    const g2 = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: 'P1', heroId: 'h1' }));
     expect(viewOf(g2, x).dungeon!.explore).toBeGreaterThan(0);
     expect(err(g, inScene(x, { type: 'VOTE', playerId: 'P1', command: { type: 'EXPLORE_ROLLER', playerId: 'P1', heroId: 'h1' } }))).toBeTruthy();
   });
 
   it('2人の時は、先にみんなで決める。全員が同じキャラを選ぶと決まり、そのキャラの担当の人だけが判定する', () => {
     let { g, x } = enterTemple(['P1', 'P2']);
-    expect(err(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: 'P1', heroId: 'h0', focusUsed: 0 }))).toMatch('みんなで決めます');
+    expect(err(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: 'P1', heroId: 'h0' }))).toMatch('みんなで決めます');
     // 意見が分かれると決まらない
     g = run(g, inScene(x, { type: 'VOTE', playerId: 'P1', command: { type: 'EXPLORE_ROLLER', playerId: 'P1', heroId: 'h0' } }));
     g = run(g, inScene(x, { type: 'VOTE', playerId: 'P2', command: { type: 'EXPLORE_ROLLER', playerId: 'P2', heroId: 'h1' } }));
@@ -185,8 +185,8 @@ describe('探索力の判定をだれがするか（2人以上のプレイヤー
     expect(exploreRollerOf(viewOf(g, x))).toBe('h1');
     // 決めるだけでは乱数を引かない（自動プレイの流れが変わらない）
     expect(g.rngState).toBe(rng0);
-    expect(err(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: 'P1', heroId: 'h0', focusUsed: 0 }))).toMatch('判定するのは');
-    g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: 'P2', heroId: 'h1', focusUsed: 0 }));
+    expect(err(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: 'P1', heroId: 'h0' }))).toMatch('判定するのは');
+    g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: 'P2', heroId: 'h1' }));
     expect(viewOf(g, x).dungeon!.explore).toBeGreaterThan(0);
   });
 
@@ -194,7 +194,7 @@ describe('探索力の判定をだれがするか（2人以上のプレイヤー
     let { g, x } = enterTemple(['P1', 'P2']);
     g = run(g, inScene(x, { type: 'VOTE', playerId: 'P1', command: { type: 'EXPLORE_ROLLER', playerId: 'P1', heroId: 'h0' } }));
     g = run(g, inScene(x, { type: 'VOTE', playerId: 'P2', command: { type: 'EXPLORE_ROLLER', playerId: 'P2', heroId: 'h0' } }));
-    g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: 'P1', heroId: 'h0', focusUsed: 0 }));
+    g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: 'P1', heroId: 'h0' }));
     const turn0 = `${g.world!.worldTurn}:${g.world!.turn}`;
     g = run(g, inScene(x, { type: 'VOTE', playerId: 'P1', command: { type: 'EXPLORE_END', playerId: 'P1' } }));
     g = run(g, inScene(x, { type: 'VOTE', playerId: 'P2', command: { type: 'EXPLORE_END', playerId: 'P2' } }));

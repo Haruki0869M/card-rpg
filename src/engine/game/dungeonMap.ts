@@ -38,7 +38,6 @@ export const DIRS: readonly (readonly [number, number])[] = [
   [0, -1],
   [-1, 0],
 ];
-export const FACING_NAME = ['北', '東', '南', '西'] as const;
 
 export const cellKey = (x: number, y: number) => `${x},${y}`;
 
@@ -179,13 +178,6 @@ export function canMove(run: DungeonRun, from: { x: number; y: number }, dir: Fa
   if (a.kind === 'room') return dir === 0 && b.kind === 'hall';
   if (b.kind === 'room') return dir === 2;
   return dy === 0;
-}
-
-/** 目の前（北）の扉の部屋（通路に立っていて、北が部屋のマスの時） */
-export function doorAhead(run: DungeonRun): Room | undefined {
-  const p = posOf(run);
-  if (p.facing !== 0) return undefined;
-  return doorNorthOf(run, p);
 }
 
 /** そのマスの北にある部屋（扉）。今いる部屋の出口側ではなく、通路から入る扉 */

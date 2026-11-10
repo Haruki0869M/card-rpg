@@ -1,4 +1,4 @@
-// ===== 冒険の長さ・転職の速さの見直し（docs/tasks/play-feedback-plan.md §4・§5） =====
+// ===== 冒険の長さ・転職の速さの見直し（docs/archive/tasks/play-feedback-plan.md §4・§5） =====
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../data/balance';
 import { DUNGEONS } from '../../data/dungeons';
@@ -44,13 +44,13 @@ describe('交代運転には時間がかかる（§4 A）', () => {
     let g = run(newWorld(), { type: 'STORY_CONTINUE', playerId: P });
     const c0 = g.world!.corruption;
     // h0 の番: h1 を連れて動く（初めて動くので上がらない）
-    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0', focusUsed: 2 });
+    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0' });
     g = calm(run(g, { type: 'WORLD_MOVE', playerId: P, heroId: 'h0', to: cheapStep(g, 'h0'), companions: ['h1'] }));
     expect(g.world!.corruption).toBe(c0);
     g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h0' });
     expect(g.world!.turn).toBe('h1');
     // h1 の番: h0 を連れてまた動く → 交代運転
-    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h1', focusUsed: 2 });
+    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h1' });
     g = calm(run(g, { type: 'WORLD_MOVE', playerId: P, heroId: 'h1', to: cheapStep(g, 'h1'), companions: ['h0'] }));
     expect(g.world!.corruption).toBe(c0 + BALANCE.corruptionPerRelayMove);
     expect(g.log.some((l) => l.text.includes('交代で先へ進んだ'))).toBe(true);
@@ -65,7 +65,7 @@ describe('交代運転には時間がかかる（§4 A）', () => {
     const c1 = g.world!.corruption;
     expect(c1).toBe(c0 + BALANCE.corruptionPerRelayMove + BALANCE.corruptionPerTurn);
     // 次のワールドターン: 最初に動く人は上がらない
-    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0', focusUsed: 2 });
+    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0' });
     g = calm(run(g, { type: 'WORLD_MOVE', playerId: P, heroId: 'h0', to: cheapStep(g, 'h0'), companions: [] }));
     expect(g.world!.corruption).toBe(c1);
   });
@@ -73,10 +73,10 @@ describe('交代運転には時間がかかる（§4 A）', () => {
   it('別々に動くだけ（同じキャラを2回動かさない）なら上がらない', () => {
     let g = run(newWorld(), { type: 'STORY_CONTINUE', playerId: P });
     const c0 = g.world!.corruption;
-    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0', focusUsed: 2 });
+    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0' });
     g = calm(run(g, { type: 'WORLD_MOVE', playerId: P, heroId: 'h0', to: cheapStep(g, 'h0'), companions: [] }));
     g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h0' });
-    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h1', focusUsed: 2 });
+    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h1' });
     g = calm(run(g, { type: 'WORLD_MOVE', playerId: P, heroId: 'h1', to: cheapStep(g, 'h1'), companions: [] }));
     expect(g.world!.corruption).toBe(c0);
   });

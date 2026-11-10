@@ -4,7 +4,6 @@
 import { BALANCE } from '../../data/balance';
 import { CARDS } from '../../data/cards';
 import { CLASSES, getClass } from '../../data/classes';
-import { getItem } from '../../data/items';
 import type { CardDef, Effect, Hero } from '../../types';
 import type { Rng } from '../rng';
 import { equippedItems } from './hero';
@@ -103,5 +102,3 @@ export function pickCard(cands: string[], hero: Hero, rng: Rng, smart: boolean, 
   }
   return cands[cands.length - 1];
 }
-
-export const itemTags = (itemId: string) => getItem(itemId).tags ?? [];

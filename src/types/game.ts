@@ -586,7 +586,7 @@ export type GameCommand =
   | { type: 'GIVE'; playerId: PlayerId; fromHeroId: string; toHeroId: string; itemUid?: string; gold?: number }
   // ---------- 世界マップ（spec §8） ----------
   /** 移動力の判定 */
-  | { type: 'WORLD_ROLL_MOVE'; playerId: PlayerId; heroId: string; /** 使わない（前の形のなごり） */ focusUsed?: number }
+  | { type: 'WORLD_ROLL_MOVE'; playerId: PlayerId; heroId: string }
   /** フォーカス1で移動のサイコロを振り直す（1回目の目を見た後、まだ動く前。2回目の目で決まる） */
   | { type: 'WORLD_REROLL_MOVE'; playerId: PlayerId; heroId: string }
   /** 移動（同行するキャラも一緒に動く。同行したキャラはこのワールドターンの行動を終える） */
@@ -624,13 +624,16 @@ export type GameCommand =
   /** 世界マップと別に進んでいる場面（ダンジョン）の中の操作 */
   | { type: 'SCENE'; scene: string; command: GameCommand }
   /** ダンジョンのパーティの手番: 探索力の判定（素早さ）/ 手番を終える */
-  | { type: 'EXPLORE_ROLL'; playerId: PlayerId; heroId: string; /** 使わない（前の形のなごり） */ focusUsed?: number }
+  | { type: 'EXPLORE_ROLL'; playerId: PlayerId; heroId: string }
   /** フォーカス1で探索のサイコロを振り直す（振ったキャラ。まだ扉を選ぶ前。2回目の目で決まる） */
   | { type: 'EXPLORE_REROLL'; playerId: PlayerId; heroId: string }
   /** 探索力の判定をするキャラを、みんなで決める（ダンジョンのパーティに2人以上のプレイヤーがいる時。全員一致） */
   | { type: 'EXPLORE_ROLLER'; playerId: PlayerId; heroId: string }
   | { type: 'EXPLORE_END'; playerId: PlayerId }
-  /** ダンジョンの通路を1歩進む（左・右・後ろは、その向きを向いて1歩）。歩くのは手番のキャラの担当の人（第3段階） */
+  /**
+   * ダンジョンの通路を1歩進む（左・右・後ろは、その向きを向いて1歩）。歩くのは手番のキャラの担当の人（第3段階）。
+   * DUNGEON_STEP・DUNGEON_TURN・DUNGEON_WALK は、扉を選ぶだけの形になってから画面では使わない。テストでキャラの位置を動かす道具として残している
+   */
   | { type: 'DUNGEON_STEP'; playerId: PlayerId; heroId: string; dir: 'forward' | 'left' | 'right' | 'back' }
   /** その場で向きを変える（歩数は使わない） */
   | { type: 'DUNGEON_TURN'; playerId: PlayerId; heroId: string; dir: 'left' | 'right' | 'back' }

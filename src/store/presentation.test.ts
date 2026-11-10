@@ -112,7 +112,7 @@ describe('探索のお供通知と旧設定', () => {
   it('移動力の加算は判定時だけで、拒否された同じ操作や描画では通知しない', () => {
     const g = fresh(), h = g.heroes[0]; g.world!.story = undefined;
     h.pet = { petId: 'rabbit', color: 'white', name: 'ぴょん', love: 0, acts: 0 };
-    const cmd = { type: 'WORLD_ROLL_MOVE' as const, playerId: 'P1' as const, heroId: h.id, focusUsed: 0 };
+    const cmd = { type: 'WORLD_ROLL_MOVE' as const, playerId: 'P1' as const, heroId: h.id };
     const r = applyGameCommand(g, cmd); expect(r.error).toBeUndefined();
     expect(explorationNotices(g, r.state, cmd).map(n => n.name)).toEqual(['移動力+1']);
     expect(explorationNotices(r.state, r.state, cmd)).toEqual([]);
