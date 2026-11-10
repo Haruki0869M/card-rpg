@@ -86,8 +86,8 @@ const CardView = memo(function CardView({
         // 位置は CSS の transform + transition で動かす（軽く、確実に最新の位置へ移動する）
         transform: `translate3d(${x}px, ${y}px, 0) rotate(${selected ? 0 : pos.rotate}deg)`,
         transformOrigin: '50% 100%',
-        // 選んだカードはその場で大きくなる（移動のアニメーションは浮き上がりの演出に任せる）
-        transition: selected ? 'none' : 'transform 120ms ease-out',
+        // 選んだカードはスッと浮く（段階A。位置の移動も同じ速さでつなぐ）
+        transition: 'transform 140ms ease-out',
         willChange: 'transform',
       }}
     >
@@ -137,9 +137,9 @@ function layout(n: number, W: number) {
       const off = m > 1 ? (i - center) / Math.max(center, 1) : 0;
       positions[cardIdx] = {
         left: startX + step * i,
-        // 扇形: 外側ほど下がって、外へ傾く
-        top: r * rowOffset + 6 + off * off * 12,
-        rotate: off * 6,
+        // 扇形（段階A）: 中央が少し高く、外側ほど下がって外へ傾く（両端で約3.5度）
+        top: r * rowOffset + 6 + off * off * 11,
+        rotate: off * 3.5,
         z: r * 20 + i + 1,
       };
     });
@@ -160,7 +160,8 @@ export function Hand() {
   const { cardW, positions, height } = useMemo(() => layout(hand.length, W), [hand.length, W]);
 
   return (
-    <div ref={ref} className="relative mx-1" style={{ height: Math.max(height, CARD_H + 14) }}>
+    // カードを選んでいる間は、上に操作パネルが重なる（手札は押せない。高さはそのまま＝戦場が縮まない）
+    <div ref={ref} className={`relative isolate z-0 mx-1 ${selection ? 'pointer-events-none' : ''}`} style={{ height: Math.max(height, CARD_H + 14) }} data-hand-covered={selection ? true : undefined}>
       {hand.length === 0 && (
         <div className="font-display flex h-full items-center justify-center text-[15px] text-zinc-500">
           {battle.phase === 'enemy' ? '敵の行動中…' : ally?.dead ? '戦闘不能（勝利でHP1復帰）' : '手札なし'}

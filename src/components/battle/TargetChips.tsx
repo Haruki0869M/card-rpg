@@ -98,3 +98,44 @@ export function TargetChips({ allyId, cardUid, focus, tier, tierLabel, targetId,
     </div>
   );
 }
+
+/**
+ * 回復・支援する味方のチップ（段階A）。操作パネルが味方の枠の上に重なるので、パネルの中でも相手を選べるようにする。
+ * 押すと、味方の枠・立ち絵を押した時と同じ store の setActive（選択中のカードの相手を変える）
+ */
+export function AllyTargetChips({ allyId, candidates, chosen }: { allyId: string; candidates: string[]; chosen?: string }) {
+  const allies = useBattle((s) => s.battle.allies);
+  const setActive = useBattle((s) => s.setActive);
+  const list = allies.filter((a) => candidates.includes(a.id));
+  if (!list.length) return null;
+  return (
+    <div className="mt-1 grid gap-1" style={{ gridTemplateColumns: `repeat(${list.length}, minmax(0,1fr))` }} data-ally-target-chips={allyId}>
+      {list.map((a) => {
+        const on = a.id === chosen;
+        const pct = a.maxHp ? Math.max(0, Math.min(100, (a.hp / a.maxHp) * 100)) : 0;
+        return (
+          <button
+            key={a.id}
+            onClick={(ev) => {
+              ev.stopPropagation();
+              setActive(a.id);
+            }}
+            aria-pressed={on}
+            aria-label={`${a.name}を選ぶ（HP ${a.hp}/${a.maxHp}）`}
+            data-ally-target-chip={a.id}
+            data-chip-selected={on || undefined}
+            className={`flex min-h-11 min-w-0 flex-col justify-center gap-0.5 rounded-lg border px-1 py-0.5 text-left leading-4 ${on ? 'border-sky-300 bg-sky-900/60 ring-2 ring-sky-300' : 'border-zinc-600 bg-black/40'}`}
+          >
+            <span className={`truncate text-[12px] font-bold ${on ? 'text-sky-50' : 'text-zinc-200'}`}>{a.name}</span>
+            <span className="flex items-center gap-1">
+              <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-black/70">
+                <span className="block h-full rounded-full bg-emerald-400" style={{ width: `${pct}%` }} />
+              </span>
+              <span className="text-[12px] font-bold text-zinc-100 tabular-nums">{a.dead ? '戦闘不能' : `${a.hp}/${a.maxHp}`}</span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
