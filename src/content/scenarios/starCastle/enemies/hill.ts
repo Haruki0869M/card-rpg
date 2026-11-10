@@ -73,7 +73,7 @@ export const starDustScribe: EnemyDef = {
   resist: ['dark'],
   pattern: 'sequence',
   actions: [
-    { id: 'quill', name: '星屑の筆', effects: [{ kind: 'damage', amount: 11 }] },
+    { id: 'quill', name: '星屑の筆', big: true, effects: [{ kind: 'damage', amount: 11 }] },
     { id: 'mark', name: '綴じられた運命', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'foes' }] },
     { id: 'page', name: '呪いの頁', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }, { kind: 'damage', amount: 6 }] },
     { id: 'binding', name: '頁の盾', effects: [{ kind: 'block', amount: 11 }] },
@@ -95,7 +95,7 @@ export const starLibrarian: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'index', name: '星の索引', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'foes' }, { kind: 'block', amount: 8 }] },
-    { id: 'tome', name: '星図の一撃', effects: [{ kind: 'damage', amount: 19, element: 'holy' }] },
+    { id: 'tome', name: '星図の一撃', big: true, effects: [{ kind: 'damage', amount: 19, element: 'holy' }] },
     { id: 'curse', name: '禁書の呪い', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2, to: 'foes' }, { kind: 'damage', amount: 7 }] },
   ],
   abilities: [{ name: '閉じた書架', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 6 }] } }],
@@ -105,10 +105,10 @@ export const starLibrarian: EnemyDef = {
       name: '星の雨を呼ぶ司書',
       pattern: 'sequence',
       actions: [
-        { id: 'rain', name: '星の雨', effects: [{ kind: 'damage', amount: 12, element: 'holy', to: 'foes' }] },
+        { id: 'rain', name: '星の雨', big: true, effects: [{ kind: 'damage', amount: 12, element: 'holy', to: 'foes' }] },
         { id: 'shelf', name: '書架の壁', effects: [{ kind: 'block', amount: 16 }, { kind: 'damage', amount: 7 }] },
-        { id: 'meteor', name: '落ちる一番星', effects: [{ kind: 'damage', amount: 26 }] },
-        { id: 'fate', name: '書かれた結末', effects: [{ kind: 'applyStatus', status: 'weak', amount: 1, to: 'foes' }, { kind: 'damage', amount: 6, to: 'foes' }] },
+        { id: 'meteor', name: '落ちる一番星', big: true, effects: [{ kind: 'damage', amount: 26 }] },
+        { id: 'fate', name: '書かれた結末', big: true, effects: [{ kind: 'applyStatus', status: 'weak', amount: 1, to: 'foes' }, { kind: 'damage', amount: 6, to: 'foes' }] },
       ],
     },
   ],
@@ -119,7 +119,7 @@ export const shadowStarDustScribe: EnemyDef = makeVariant(starDustScribe, {
   name: '影の星屑の書記',
   aura: 'shadow',
   actions: [
-    { id: 'quill', name: '影の筆', effects: [{ kind: 'damage', amount: 11, element: 'dark' }] },
+    { id: 'quill', name: '影の筆', big: true, effects: [{ kind: 'damage', amount: 11, element: 'dark' }] },
     { id: 'mark', name: '影に綴じる', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'foes' }] },
     { id: 'page', name: '闇の頁', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }, { kind: 'damage', amount: 6, element: 'dark' }] },
     { id: 'binding', name: '影の盾', effects: [{ kind: 'block', amount: 11 }] },

@@ -1,5 +1,6 @@
 // ===== 扉の予兆（抜本的な見直し §2-4） =====
 // 次の行の扉は、だれでも・いつでも種類（5色）が分かる。乱数は使わず、今の状態から毎回計算する。
+// 名前と説明は、依頼（docs/review/2026-11-10-overhaul-request.md）の表の文に合わせてある（段階3で寄せた）。
 // 先読み（2段階目）: 感知が高いキャラ・フクロウのお供・霊感がいるか、その通路で「周囲の警戒」（フォーカス1）を使うと、
 // 扉の先の具体的な中身（敵の名前・宝箱の格・イベントの題）と、その次の行の扉の色まで分かる。
 import { BALANCE } from '../../data/balance';
@@ -19,10 +20,10 @@ export type DoorKind = 'door' | 'midboss' | 'boss';
 
 export const OMEN_INFO: Record<DoorOmen, { name: string; color: string; text: string }> = {
   danger: { name: '魔物の群れ', color: '#ff5a5a', text: 'カード報酬＋ゴールド' },
-  elite: { name: '強敵の棲処', color: '#c98bff', text: '高難度・レア以上と装備が出やすい' },
+  elite: { name: '強敵の棲処', color: '#c98bff', text: '高難度／レア以上カード＆装備率大UP！' },
   treasure: { name: '宝物庫', color: '#ffd24a', text: '宝箱' },
-  rest: { name: '焚き火の休憩所', color: '#6aff9a', text: 'HP回復・フォーカス回復・技を磨く' },
-  mystery: { name: '未知の出来事', color: '#6ab8ff', text: '能力アップ・取引など' },
+  rest: { name: '焚き火の休憩所', color: '#6aff9a', text: 'HP回復／フォーカス回復／カード強化' },
+  mystery: { name: '未知の祭壇・行商人', color: '#6ab8ff', text: '能力アップ・カード変異・特殊取引' },
 };
 
 /** 部屋の動き → 予兆（部屋の種類のデータに omen があればそれ） */
@@ -33,6 +34,17 @@ export function omenOfType(type: string): DoorOmen | undefined {
   const t = getRoomType(type);
   if (t.battle?.boss || t.heavyDoor) return undefined;
   return t.omen ?? BY_BEHAVIOR[t.behavior];
+}
+
+/**
+ * 扉の予兆の見た目（色・名前・説明）。部屋の種類のデータに omenName・omenText があれば、同じ色のまま、その名前で出す
+ * （金の扉の「宝物庫」と「封魔の宝箱」）。ボス・中ボスは undefined
+ */
+export function omenInfoOf(type: string): { omen: DoorOmen; name: string; color: string; text: string } | undefined {
+  const omen = omenOfType(type);
+  if (!omen) return undefined;
+  const t = getRoomType(type);
+  return { omen, color: OMEN_INFO[omen].color, name: t.omenName ?? OMEN_INFO[omen].name, text: t.omenText ?? OMEN_INFO[omen].text };
 }
 
 /** 扉の見た目（ボスの門・中ボスの重い扉・ふつうの扉） */
@@ -90,6 +102,8 @@ export function doorDetail(game: GameState, room: Room): string | undefined {
   const run = game.dungeon;
   if (!run || !isNextDoor(run, room) || !hasForesight(game)) return undefined;
   const t = getRoomType(room.type);
+  // 封魔の宝箱: 箱の種類と、番人の名前
+  if (t.behavior === 'chest' && t.battle) return `${CHEST_NAME[room.chest?.rarity ?? 'epic']}・番人：${enemyNames(room) || '？'}`;
   if (t.battle) return enemyNames(room) || undefined;
   if (t.behavior === 'chest') return `${CHEST_NAME[room.chest?.rarity ?? 'common']}${room.chest?.locked ? '（鍵つき）' : ''}`;
   if (t.behavior === 'event') return room.eventId ? EVENTS.tryGet(room.eventId)?.title : undefined;

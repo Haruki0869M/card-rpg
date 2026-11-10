@@ -68,14 +68,14 @@ export const treeWarden: EnemyDef = {
   actions: [
     {
       id: 'rootBind',
-      name: '根の拘束',
+      name: '根の拘束', big: true,
       effects: [
         { kind: 'damage', amount: 6 },
         { kind: 'applyStatus', status: 'weak', amount: 2 },
       ],
     },
     { id: 'barkGuard', name: '樹皮の守り', effects: [{ kind: 'block', amount: 15 }] },
-    { id: 'branchSweep', name: '大枝の薙ぎ払い', effects: [{ kind: 'damage', amount: 9, to: 'foes' }] },
+    { id: 'branchSweep', name: '大枝の薙ぎ払い', big: true, effects: [{ kind: 'damage', amount: 9, to: 'foes' }] },
   ],
 };
 
@@ -92,7 +92,7 @@ export const treantKing: EnemyDef = {
   gold: 80,
   pattern: 'sequence',
   actions: [
-    { id: 'earthRoots', name: '大地の根', effects: [{ kind: 'damage', amount: 7, to: 'foes' }] },
+    { id: 'earthRoots', name: '大地の根', big: true, effects: [{ kind: 'damage', amount: 7, to: 'foes' }] },
     {
       id: 'sapCurse',
       name: '樹液の呪い',
@@ -103,7 +103,7 @@ export const treantKing: EnemyDef = {
     },
     {
       id: 'ancientBark',
-      name: '古木の鎧',
+      name: '古木の鎧', big: true,
       effects: [
         { kind: 'block', amount: 18 },
         { kind: 'damage', amount: 8 },
@@ -116,11 +116,11 @@ export const treantKing: EnemyDef = {
       name: '怒れる古樹',
       pattern: 'sequence',
       actions: [
-        { id: 'rageStorm', name: '怒りの暴風', effects: [{ kind: 'damage', amount: 11, to: 'foes' }] },
-        { id: 'stranglingVine', name: '絞め殺す蔓', effects: [{ kind: 'damage', amount: 20 }] },
+        { id: 'rageStorm', name: '怒りの暴風', big: true, effects: [{ kind: 'damage', amount: 11, to: 'foes' }] },
+        { id: 'stranglingVine', name: '絞め殺す蔓', big: true, effects: [{ kind: 'damage', amount: 20 }] },
         {
           id: 'rotSpores',
-          name: '腐蝕の胞子',
+          name: '腐蝕の胞子', big: true,
           effects: [
             { kind: 'damage', element: 'poison', amount: 5, to: 'foes' },
             { kind: 'applyStatus', status: 'poison', amount: 3, to: 'foes' },

@@ -121,22 +121,23 @@ describe('ランダムダンジョンの偏り防止', () => {
   });
 });
 
-describe('深さ（3行ごとに +1）', () => {
+describe('深さ（2行ごとに +1。段階3で 3行ごと → 2行ごと）', () => {
   it('段と深層ボーナスの段', () => {
-    expect([0, 2, 3, 5, 6, 8, 9, 12].map(depthStep)).toEqual([0, 0, 1, 1, 2, 2, 3, 4]);
-    expect([0, 3, 6, 9, 12].map(depthTier)).toEqual([0, 1, 2, 3, 3]);
+    expect(BALANCE.depthBonus.rowsPerStep).toBe(2);
+    expect([0, 1, 2, 3, 4, 5, 6, 8, 9, 12].map(depthStep)).toEqual([0, 0, 1, 1, 2, 2, 3, 4, 4, 6]);
+    expect([0, 2, 4, 6, 9, 12].map(depthTier)).toEqual([0, 1, 2, 3, 3, 3]);
     expect(BALANCE.depthBonus.reward).toEqual([0, 0.15, 0.3, 0.5]);
     expect(DEPTH_TIER_NAME).toHaveLength(BALANCE.depthBonus.reward.length);
   });
 
-  it.each(fixed().map((d) => [d.id, d] as const))('%s: 敵のレベル = 基準 + 行÷3 + 部屋の種類の加算。7行目以降の戦闘・強敵は1体多い（最大4）', (_id, d) => {
+  it.each(fixed().map((d) => [d.id, d] as const))('%s: 敵のレベル = 基準 + 行÷2 + 部屋の種類の加算。5行目以降の戦闘・強敵は1体多い（最大4）', (_id, d) => {
     const run = buildDungeon(d.id, createRng(7), 0, []);
     expect(dungeonRows(run)).toBe(d.layout!.length);
     expect(isLegacyLayout(run)).toBe(false);
     for (const room of run.rooms) {
       const b = getRoomType(room.type).battle;
       if (!b) continue;
-      const lv = d.baseLevel + Math.floor(room.row / 3) + b.levelBonus;
+      const lv = d.baseLevel + depthStep(room.row) + b.levelBonus;
       expect(
         room.enemies!.every((e) => e.level === lv),
         `${room.id}`,
@@ -148,27 +149,34 @@ describe('深さ（3行ごとに +1）', () => {
       else {
         const pools = d.pools[b.pool].map((g) => g.join());
         const battleIds = d.pools.battle.flat();
-        if (room.row >= 6 && !(ids.length === BALANCE.maxEnemies && pools.includes(ids.join()))) {
+        if (depthStep(room.row) >= BALANCE.depthBonus.extraEnemyFromStep && !(ids.length === BALANCE.maxEnemies && pools.includes(ids.join()))) {
           // 元の組 ＋ そのダンジョンの戦闘の敵が1体
           expect(pools, room.id).toContain(ids.slice(0, -1).join());
           expect(battleIds, room.id).toContain(ids[ids.length - 1]);
         } else expect(pools, room.id).toContain(ids.join());
       }
     }
-    // 鍵8行のボスは入口の戦闘より Lv+4、10行は Lv+5、最後13行は Lv+6
+    // 鍵8行のボスは入口の戦闘より Lv+5、10行は Lv+6、最後13行は Lv+8（深さの段 ＋ ボスの加算2）
     const boss = run.rooms[run.rooms.length - 1].enemies![0].level;
     const first = run.rooms[0].enemies![0].level;
-    expect(boss - first).toBe(Math.floor((d.layout!.length - 1) / 3) + 2);
+    expect(boss - first).toBe(depthStep(d.layout!.length - 1) + 2);
   });
 
-  it('カードの報酬の確率: 中層はコモン−8→レア、深層はコモン−15→レア+10・エピック+5。合計は100のまま', () => {
+  it('カードの報酬の確率: レア以上の確率が、浅層 +15%・中層 +30%・深層 +50%。合計は100のまま', () => {
     expect(cardRewardOdds('battle')).toEqual([72, 24, 4]);
-    expect(cardRewardOdds('battle', 1)).toEqual([72, 24, 4]);
-    expect(cardRewardOdds('battle', 2)).toEqual([64, 32, 4]);
-    expect(cardRewardOdds('battle', 3)).toEqual([57, 34, 9]);
-    expect(cardRewardOdds('elite', 3)).toEqual([40, 45, 15]);
-    expect(cardRewardOdds('boss', 3)).toEqual([20, 55, 25]);
-    for (const k of Object.keys(BALANCE.cardRewardOdds)) for (let t = 0; t < 4; t++) expect(cardRewardOdds(k, t).reduce((a, b) => a + b, 0)).toBe(100);
+    // レア以上の確率が +15% / +30% / +50%（依頼の数字。増えた分だけコモンが減る）
+    expect(cardRewardOdds('battle', 1)).toEqual([67.8, 27.6, 4.6]);
+    expect(cardRewardOdds('battle', 2)).toEqual([63.6, 31.2, 5.2]);
+    expect(cardRewardOdds('battle', 3)).toEqual([58, 36, 6]);
+    expect(cardRewardOdds('elite', 3)).toEqual([32.5, 52.5, 15]);
+    expect(cardRewardOdds('boss', 3)).toEqual([2.5, 67.5, 30]);
+    for (const k of Object.keys(BALANCE.cardRewardOdds)) for (let t = 0; t < 4; t++) {
+      const o = cardRewardOdds(k, t);
+      expect(o.reduce((a, b) => a + b, 0)).toBeCloseTo(100);
+      expect(o.every((v) => v >= 0)).toBe(true);
+      const base = cardRewardOdds(k, 0);
+      expect(o[1] + o[2]).toBeCloseTo((base[1] + base[2]) * (1 + BALANCE.depthBonus.reward[t]), 0);
+    }
   });
 });
 
@@ -200,10 +208,13 @@ function expAtRow(row: number, mutate?: (g: GameState) => void): { exp: number; 
 describe('深層ボーナス（お金・経験値 +15% / +30% / +50%）', () => {
   it('奥の行ほど経験値が増え、カードのコモンが減る', () => {
     const base = expAtRow(0);
-    expect(expAtRow(3).exp / base.exp).toBeCloseTo(1.15, 1);
-    expect(expAtRow(6).exp / base.exp).toBeCloseTo(1.3, 1);
+    // 浅層 = 3行目（行2）から、中層 = 5行目（行4）から、深層 = 7行目（行6）から
+    expect(expAtRow(2).exp / base.exp).toBeCloseTo(1.15, 1);
+    expect(expAtRow(4).exp / base.exp).toBeCloseTo(1.3, 1);
+    expect(expAtRow(6).exp / base.exp).toBeCloseTo(1.5, 1);
     expect(base.odds).toEqual([72, 24, 4]);
-    expect(expAtRow(6).odds).toEqual([64, 32, 4]);
+    expect(expAtRow(4).odds).toEqual([63.6, 31.2, 5.2]);
+    expect(expAtRow(6).odds).toEqual([58, 36, 6]);
   });
 
   it('古い形（40行）のダンジョンには付けない', () => {

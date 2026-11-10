@@ -96,7 +96,7 @@ function doorRim(bg: string) {
 }
 
 /** 扉（壁の面の中に描く） */
-function Door({ bg, themeBg = bg, face, shade, opening, omen, heavy, roomId, onTap }: { /** 中ボスの重い扉（ボスの門の絵を、鉄の色と紫の縁で見せる） */ heavy?: boolean; /** 確認用の目印（扉の壁の構図の時） */ roomId?: string; bg: string; /** 絵が無い時の色を決める背景（通路の絵の名前と、部屋の背景が違う時） */ themeBg?: string; face: ViewFace; shade: number; opening?: number; omen?: DoorOmen; /** タップでその扉へ（開けられる扉・ボスの扉だけ） */ onTap?: () => void }) {
+function Door({ bg, themeBg = bg, face, shade, opening, omen, heavy, sealed, roomId, onTap }: { /** 封魔の宝箱の扉（金の扉に、紫の封印の印） */ sealed?: boolean; /** 中ボスの重い扉（ボスの門の絵を、鉄の色と紫の縁で見せる） */ heavy?: boolean; /** 確認用の目印（扉の壁の構図の時） */ roomId?: string; bg: string; /** 絵が無い時の色を決める背景（通路の絵の名前と、部屋の背景が違う時） */ themeBg?: string; face: ViewFace; shade: number; opening?: number; omen?: DoorOmen; /** タップでその扉へ（開けられる扉・ボスの扉だけ） */ onTap?: () => void }) {
   const t = themeOf(themeBg);
   const boss = face === 'boss';
   // ボスの門は専用の絵（両開きの門）があれば使い、無ければふつうの扉の絵
@@ -169,9 +169,18 @@ function Door({ bg, themeBg = bg, face, shade, opening, omen, heavy, roomId, onT
       {face === 'door' && <span className="absolute right-[14%] top-1/2 h-[7%] w-[7%] rounded-full bg-amber-300/80" />}
       {/* 気配（第3段階C1）: 扉の上に小さな印 */}
       {omen && <OmenMark omen={omen} />}
+      {/* 封魔の宝箱: 金の扉の真ん中に、紫の封印（どくろ）の印 */}
+      {sealed && (
+        <span className="absolute left-1/2 top-[40%] flex -translate-x-1/2 items-center justify-center rounded-full" style={{ width: '30%', aspectRatio: '1', background: 'rgba(30,8,44,.8)', boxShadow: `0 0 10px ${SEAL_COLOR}, inset 0 0 6px ${SEAL_COLOR}`, border: `2px solid ${SEAL_COLOR}` }} data-wall-door-sealed>
+          <Skull style={{ width: '64%', height: '64%', color: SEAL_COLOR }} />
+        </span>
+      )}
     </div>
   );
 }
+
+/** 封魔の宝箱の封印の色（紫。強敵の扉と同じ系統） */
+const SEAL_COLOR = '#c98bff';
 
 /** 中ボスの重い扉の見た目（新しい絵は足さず、ボスの門の絵を鉄の色にして、紫の縁と光を付ける） */
 const HEAVY = { border: '#d9a2ff', glow: '0 0 18px rgba(200,130,255,.55), inset 0 0 12px rgba(120,60,180,.6)', filter: 'saturate(.45) brightness(.82)' };
@@ -237,7 +246,7 @@ export function DungeonView({ run, background, opening, openingRoomId, doors, ma
   /** 扉に渡すもの（予兆の色・重い扉・開く演出・確認用の目印） */
   const doorProps = (roomId?: string) => {
     const d = wall && roomId ? doors!.find((x) => x.roomId === roomId) : undefined;
-    return { omen: d?.omen, heavy: d?.kind === 'midboss', roomId: d?.roomId, opening: opening && d && (openingRoomId ?? end.roomId) === d.roomId ? opening : undefined };
+    return { omen: d?.omen, heavy: d?.kind === 'midboss', sealed: d?.sealed, roomId: d?.roomId, opening: opening && d && (openingRoomId ?? end.roomId) === d.roomId ? opening : undefined };
   };
   const art = corridorArt(run.dungeonId, background);
   const U = viewUnit(size.width, size.height);

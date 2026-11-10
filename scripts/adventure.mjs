@@ -425,6 +425,19 @@ async function run(party, difficulty) {
       continue;
     }
     if (await clickText(page, '隠し宝箱へ')) continue;
+    // 封魔の宝箱（見直しの段階3）: 封印を解く → 番人と戦う → 勝つと、ふつうの宝箱と同じく運のスロットで開ける
+    if (await page.locator('[data-chest-open="sealed"], [data-chest-open="guard"]').count()) {
+      const b = page.locator('[data-chest-open="sealed"], [data-chest-open="guard"]').last();
+      const step = await b.getAttribute('data-chest-open');
+      if (!seen.has(`sealed-${step}`)) {
+        seen.add(`sealed-${step}`);
+        await check(page, `sealed-${step}`);
+        await page.screenshot({ path: `screenshots/adv-sealed-${step}.png` });
+      }
+      await b.click();
+      await page.waitForTimeout(150);
+      continue;
+    }
     // 宝箱
     if (await page.locator('button:has-text("開ける"), button:has-text("鍵を開ける")').count()) {
       if (!seen.has('chest')) {

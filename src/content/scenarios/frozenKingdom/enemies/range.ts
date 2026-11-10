@@ -73,8 +73,8 @@ export const blizzardBeast: EnemyDef = {
   resist: ["ice"],
   pattern: "sequence",
   actions: [
-    {"id": "sweep", "name": "白い爪の薙ぎ払い", "effects": [{"kind": "damage", "amount": 8, "to": "foes"}]},
-    {"id": "bite", "name": "吹雪の牙", "effects": [{"kind": "damage", "amount": 16}]},
+    {"id": "sweep", "name": "白い爪の薙ぎ払い", big: true, "effects": [{"kind": "damage", "amount": 8, "to": "foes"}]},
+    {"id": "bite", "name": "吹雪の牙", big: true, "effects": [{"kind": "damage", "amount": 16}]},
     {"id": "roar", "name": "雪嵐の咆哮", "effects": [{"kind": "applyStatus", "status": "weak", "amount": 1, "to": "foes"}]},
     {"id": "fur", "name": "吹雪をまとう", "effects": [{"kind": "block", "amount": 14}]},
   ],
@@ -94,8 +94,8 @@ export const frostDrakeling: EnemyDef = {
   resist: ["ice"],
   pattern: "sequence",
   actions: [
-    {"id": "breath", "name": "凍土のブレス", "effects": [{"kind": "damage", "amount": 8, "element": "ice", "to": "foes"}]},
-    {"id": "bite", "name": "幼竜の牙", "effects": [{"kind": "damage", "amount": 14}]},
+    {"id": "breath", "name": "凍土のブレス", big: true, "effects": [{"kind": "damage", "amount": 8, "element": "ice", "to": "foes"}]},
+    {"id": "bite", "name": "幼竜の牙", big: true, "effects": [{"kind": "damage", "amount": 14}]},
     {"id": "scales", "name": "氷鱗の守り", "effects": [{"kind": "block", "amount": 16}]},
     {"id": "tail", "name": "尾の二連打", "effects": [{"kind": "damage", "amount": 6, "hits": 2}]},
   ],
@@ -115,16 +115,16 @@ export const frostGiant: EnemyDef = {
   resist: ["ice"],
   pattern: "sequence",
   actions: [
-    {"id": "hammer", "name": "巨人の重打", "effects": [{"kind": "damage", "amount": 22}]},
+    {"id": "hammer", "name": "巨人の重打", big: true, "effects": [{"kind": "damage", "amount": 22}]},
     {"id": "brace", "name": "鉱石の構え", "effects": [{"kind": "block", "amount": 20}]},
-    {"id": "hail", "name": "砕ける氷岩", "effects": [{"kind": "damage", "amount": 8, "element": "ice", "to": "foes"}]},
+    {"id": "hail", "name": "砕ける氷岩", big: true, "effects": [{"kind": "damage", "amount": 8, "element": "ice", "to": "foes"}]},
   ],
   abilities: [{"name": "霜の厚皮", "effect": {"when": "battleStart", "do": [{"kind": "block", "amount": 8}]}}],
   phases: [
     { belowHpPct: 50, name: "怒れる霜の巨人", pattern: 'sequence', actions: [
-      {"id": "rage", "name": "怒りの大槌", "effects": [{"kind": "damage", "amount": 28}]},
+      {"id": "rage", "name": "怒りの大槌", big: true, "effects": [{"kind": "damage", "amount": 28}]},
       {"id": "guard", "name": "怒りの構え", "effects": [{"kind": "block", "amount": 24}]},
-      {"id": "quake", "name": "鉱山を揺らす", "effects": [{"kind": "damage", "amount": 12, "to": "foes"}]},
+      {"id": "quake", "name": "鉱山を揺らす", big: true, "effects": [{"kind": "damage", "amount": 12, "to": "foes"}]},
     ] },
   ],
 };

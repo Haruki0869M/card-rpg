@@ -4,7 +4,8 @@
 // 予測の数字は、パネルの「予測」と同じ predictCardTotals の「HP減少」（ブロック差し引き後）を使う。
 // 成功数ごとに値が違うので、チップには「一番出やすい成功数」の時の値を出す（同じ確率なら上の成功数）。
 import { useMemo } from 'react';
-import { predictCardTotals, rangeText } from '../../engine/battle/battle';
+import { predictCardTotals, rangeText, type PredictTotals } from '../../engine/battle/battle';
+import { canBreak } from '../../engine/battle/effects';
 import { unitName } from '../../engine/battle/units';
 import { getElement } from '../../data/elements';
 import { cardOf } from '../../data/cards';
@@ -54,6 +55,8 @@ function useChipPredictions(battle: BattleState, allyId: string, cardUid: string
   return useMemo(() => {
     const preds: Record<string, [number, number] | undefined> = {};
     const badges: Record<string, KillBadge> = {};
+    // 大技の予告を崩せるか（BREAK）: now = 一番出やすい段で崩せる / perfect = 完全成功なら崩せる
+    const breaks: Record<string, 'now' | 'perfect' | undefined> = {};
     const ally = battle.allies.find((a) => a.id === allyId);
     const inst = ally?.hand.find((c) => c.uid === cardUid);
     const tiers = inst ? cardOf(inst).tiers.map((t) => t.minSuccesses) : [];
@@ -62,24 +65,26 @@ function useChipPredictions(battle: BattleState, allyId: string, cardUid: string
     const top = tiers.length - 1;
     for (const e of battle.enemies) {
       if (e.dead) continue;
-      const cache = new Map<number, [number, number] | undefined>();
-      const loss = (t: number) => {
-        if (!cache.has(t)) cache.set(t, predictCardTotals(battle, allyId, cardUid, e.uid, focus, t, allyTargetId).find((x) => x.id === e.uid)?.hpLoss);
+      const cache = new Map<number, PredictTotals | undefined>();
+      const total = (t: number) => {
+        if (!cache.has(t)) cache.set(t, predictCardTotals(battle, allyId, cardUid, e.uid, focus, t, allyTargetId).find((x) => x.id === e.uid));
         return cache.get(t);
       };
+      const loss = (t: number) => total(t)?.hpLoss;
+      if (canBreak(e)) breaks[e.uid] = total(tier)?.breaks ? 'now' : top >= 0 && total(top)?.breaks ? 'perfect' : undefined;
       preds[e.uid] = loss(tier);
       const s = sure >= 0 ? loss(sure) : undefined;
       if (s && s[0] >= e.hp) badges[e.uid] = 'sure';
       else if (top >= 0 && (loss(top)?.[0] ?? 0) >= e.hp) badges[e.uid] = 'perfect';
     }
-    return { preds, badges };
+    return { preds, badges, breaks };
   }, [battle, allyId, cardUid, focus, tier, allyTargetId]);
 }
 
 export function TargetChips({ allyId, cardUid, focus, tier, tierLabel, targetId, allyTargetId }: { allyId: string; cardUid: string; focus: number; tier: number; tierLabel: string; targetId?: string; allyTargetId?: string }) {
   const battle = useBattle((s) => s.battle);
   const tapEnemy = useBattle((s) => s.tapEnemy);
-  const { preds, badges } = useChipPredictions(battle, allyId, cardUid, focus, tier, allyTargetId);
+  const { preds, badges, breaks } = useChipPredictions(battle, allyId, cardUid, focus, tier, allyTargetId);
   const alive = battle.enemies.filter((e) => !e.dead);
   if (!alive.length) return null;
   return (
@@ -103,6 +108,7 @@ export function TargetChips({ allyId, cardUid, focus, tier, tierLabel, targetId,
               data-chip-selected={on || undefined}
               data-chip-prediction={text}
               data-kill-badge={badges[e.uid]}
+              data-break-chip={breaks[e.uid]}
               className={`relative flex min-h-11 min-w-0 flex-col justify-center rounded-lg border px-1 py-0.5 text-left leading-4 ${on ? 'border-sky-300 bg-sky-900/60 ring-2 ring-sky-300' : 'border-zinc-600 bg-black/40'}`}
             >
               {badges[e.uid] && (
@@ -121,6 +127,8 @@ export function TargetChips({ allyId, cardUid, focus, tier, tierLabel, targetId,
               <span className={`flex flex-wrap gap-x-1 text-[12px] font-bold tabular-nums ${kill ? 'text-amber-300' : 'text-zinc-100'}`}>
                 {text.split(' → ').map((t, i) => <span key={i} className="whitespace-nowrap">{i ? `→ ${t}` : t}</span>)}
               </span>
+              {/* 大技の予告を出している敵: この攻撃で体勢を崩せるか */}
+              {breaks[e.uid] && !kill && <span className="text-[12px] font-black whitespace-nowrap text-amber-300">{breaks[e.uid] === 'now' ? '⚡BREAK!' : '⚡完全でBREAK'}</span>}
             </button>
           );
         })}

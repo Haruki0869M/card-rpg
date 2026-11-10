@@ -73,14 +73,14 @@ export const sandScorpionKing: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'tail', name: '王の毒針', effects: [{ kind: 'damage', amount: 8 }, { kind: 'applyStatus', status: 'poison', amount: 3 }] },
-    { id: 'claws', name: '大きなはさみ', effects: [{ kind: 'damage', amount: 7, hits: 2 }] },
+    { id: 'claws', name: '大きなはさみ', big: true, effects: [{ kind: 'damage', amount: 7, hits: 2 }] },
     { id: 'armor', name: '墓所の甲殻', effects: [{ kind: 'block', amount: 16 }] },
   ],
   abilities: [{ name: '王の甲殻', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 6 }] } }],
   phases: [
     { belowHpPct: 50, name: '毒を撒く蠍王', pattern: 'sequence', actions: [
-      { id: 'miasma', name: '墓所に満ちる毒', effects: [{ kind: 'applyStatus', status: 'poison', amount: 3, to: 'foes' }, { kind: 'damage', amount: 4, to: 'foes' }] },
-      { id: 'crush', name: 'はさみで締め潰す', effects: [{ kind: 'damage', amount: 18 }] },
+      { id: 'miasma', name: '墓所に満ちる毒', big: true, effects: [{ kind: 'applyStatus', status: 'poison', amount: 3, to: 'foes' }, { kind: 'damage', amount: 4, to: 'foes' }] },
+      { id: 'crush', name: 'はさみで締め潰す', big: true, effects: [{ kind: 'damage', amount: 18 }] },
       { id: 'armor', name: '割れた甲殻', effects: [{ kind: 'block', amount: 18 }] },
     ] },
   ],

@@ -8,7 +8,7 @@ import { Check, ChevronsRight, Lock, Sparkles, Star, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BattleBackground, ChestImage } from '../../art';
 import { BALANCE, REVEAL_TIMING, VIBRATION } from '../../data/balance';
-import { chestOdds, chestShared, expectedChestOdds, findHero, rarityIndex, statChance, sceneBackground, sceneHeroes } from '../../engine';
+import { chestOdds, chestShared, expectedChestOdds, findHero, rarityIndex, sealStep, statChance, sceneBackground, sceneHeroes } from '../../engine';
 import { PLAYER_COLOR } from '../../data/theme';
 import { useOnline } from '../../store/onlineStore';
 import { ClaimPanel } from '../ui/ClaimPanel';
@@ -214,8 +214,10 @@ export function ChestScreen() {
   const dispatchGame = useBattle((s) => s.dispatchGame);
   const chest = game.chest!;
   const locked = !chest.unlocked;
+  // 封魔の宝箱の今の段（sealed = 封印を解く前 / guard = 封印を解いた。番人との戦闘の前）
+  const seal = sealStep(chest);
   const look = chest.spec.rarity;
-  const [heroId, setHeroId] = useState(() => (!game.activeScene && game.world?.turn) || bestHero(sceneHeroes(game), (h) => statChance(h, locked ? 'dex' : 'luk')));
+  const [heroId, setHeroId] = useState(() => (!game.activeScene && game.world?.turn) || bestHero(sceneHeroes(game), (h) => statChance(h, locked || seal ? 'dex' : 'luk')));
   const [focus, setFocus] = useState(0);
   const [recipientId, setRecipientId] = useState<string>();
   useOnline((s) => s.tick);
@@ -303,7 +305,8 @@ export function ChestScreen() {
   const shownOdds = !opened ? expected : roll?.odds && (passed('shift') || showResult || !roll.oddsBefore) ? roll.odds : (roll?.oddsBefore ?? chestOdds(look, 0));
 
   const r = RARITY_STYLE[showResult ? grade : look];
-  const title = chest.spec.big ? `大宝箱（${CHEST_NAME[look]}）` : CHEST_NAME[look];
+  const title = chest.spec.big ? `大宝箱（${CHEST_NAME[look]}）` : chest.spec.sealed ? `封魔の宝箱（${CHEST_NAME[look]}）` : CHEST_NAME[look];
+  const sealTrap = `全員に最大HPの${BALANCE.sealedChest.trapHpPct}%ダメージ＋戦闘の初めに脆弱${BALANCE.sealedChest.trapVulnerable}`;
   const reach = step?.kind === 'reach';
   const premium = step?.kind === 'premium' || (showResult && grade === 'legend' && stepIdx !== null);
   const shakeClass = step?.kind === 'omen' ? 'chest-rattle' : step?.kind === 'shake' || step?.kind === 'light' ? (light >= 2 ? 'chest-shake-hard' : 'chest-shake') : '';
@@ -354,7 +357,14 @@ export function ChestScreen() {
             </div>
           )}
 
-          {!opened && !shared && <label className="flex items-center gap-2 text-[13px]">報酬を受け取る人<select aria-label="報酬を受け取る人" value={recipientId ?? heroId} onChange={e => setRecipientId(e.target.value)} className="min-h-11 max-w-[180px] rounded bg-zinc-900 px-2 text-[13px]">{sceneHeroes(game).map(h => <option key={h.id} value={h.id}>{h.playerId}・{h.name}</option>)}</select></label>}
+          {/* 封魔の宝箱: 何が起きるかを先に見せる（開けるか立ち去るかを選ぶ） */}
+          {seal === 'sealed' && (
+            <div className="mt-1 w-full max-w-[380px] rounded-xl border px-2 py-1 text-center text-[13px] leading-5 text-fuchsia-100" style={{ borderColor: '#c98bff', background: 'rgba(40,10,60,.7)' }} data-seal-note>
+              <b>封印されている。</b>解くと、罠の判定（器用）の後、<b>番人との戦闘</b>になる。
+              <span className="block text-[12px] text-zinc-300">勝てば、この箱を開けられる（逃げると箱は消える）</span>
+            </div>
+          )}
+          {!opened && !shared && !seal && <label className="flex items-center gap-2 text-[13px]">報酬を受け取る人<select aria-label="報酬を受け取る人" value={recipientId ?? heroId} onChange={e => setRecipientId(e.target.value)} className="min-h-11 max-w-[180px] rounded bg-zinc-900 px-2 text-[13px]">{sceneHeroes(game).map(h => <option key={h.id} value={h.id}>{h.playerId}・{h.name}</option>)}</select></label>}
           {/* 宝箱 */}
           <motion.div
             animate={reach || step?.kind === 'premium' ? { y: -14, scale: 1.12 } : showResult ? { y: 0, scale: [0.85, 1.15, 1] } : { y: 0, scale: 1 }}
@@ -414,8 +424,8 @@ export function ChestScreen() {
           {/* 確率の帯 */}
           {!showResult && (
             <div className="mt-2 w-full max-w-[380px] rounded-xl border border-amber-300/25 bg-black/55 px-2 py-1.5" data-chest-odds>
-              <OddsBar odds={shownOdds} label={!opened ? (locked ? '中身の格の確率（鍵を開けた後に運で上げられる）' : `${hero.name}・フォーカス${focus}で開けた時の確率`) : passed('shift') ? 'スロットの結果で確率が上がった！' : '中身の格の確率'} duration={REVEAL_TIMING.oddsShift / speed} height={18} />
-              {!opened && !locked && (
+              <OddsBar odds={shownOdds} label={!opened ? (seal ? '中身の格の確率（番人を倒した後に運で上げられる）' : locked ? '中身の格の確率（鍵を開けた後に運で上げられる）' : `${hero.name}・フォーカス${focus}で開けた時の確率`) : passed('shift') ? 'スロットの結果で確率が上がった！' : '中身の格の確率'} duration={REVEAL_TIMING.oddsShift / speed} height={18} />
+              {!opened && !locked && !seal && (
                 <div className="mt-1 opacity-80">
                   <OddsBar odds={perfectOdds} label="完全成功（3つ全部成功）なら" height={12} />
                 </div>
@@ -452,6 +462,17 @@ export function ChestScreen() {
               )}
             </div>
           )}
+
+          {/* 封印を解いた結果（番人との戦闘の前） */}
+          {chest.lastRoll?.kind === 'seal' && seal === 'guard' && (
+            <div className="flex flex-col items-center gap-1" data-seal-result={chest.lastRoll.success ? 'ok' : 'trap'}>
+              <RollStrip results={chest.lastRoll.results} />
+              {chest.lastRoll.success ? <div className="text-[15px] font-bold text-emerald-300">罠を避けて、封印を解いた！</div> : <div className="text-center text-[15px] font-bold text-red-300">{chest.lastRoll.trap}</div>}
+              <div className="font-display text-outline text-[18px] text-fuchsia-200">番人が現れた！</div>
+            </div>
+          )}
+          {/* 番人を倒した後 */}
+          {chest.spec.sealed && chest.seal === 'cleared' && !opened && <div className="text-[15px] font-bold text-emerald-300" data-seal-cleared>番人を倒した！ 運のスロットで宝箱を開けよう</div>}
 
           {/* 結果 */}
           {showResult && (
@@ -500,7 +521,7 @@ export function ChestScreen() {
           <>
             <OpenerPicker chest={chest} heroes={sceneHeroes(game).filter((h) => !h.retired)} />
             <div className="mt-2 grid grid-cols-2 gap-2">
-              {leaveGate.canLeave ? (
+              {seal === 'guard' ? null : leaveGate.canLeave ? (
                 <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} className="btn btn-dark h-12 rounded-xl text-[14px] font-bold">
                   {chest.spec.big ? '開けずに去る' : '立ち去る'}
                   <VoteChips cmd={{ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER }} />
@@ -524,7 +545,7 @@ export function ChestScreen() {
                   {opener.playerId}
                 </span>{' '}
                 <b>{opener.name}</b>が開けます
-                <span className="block text-[12px] text-zinc-400">{useOnline.getState().room?.seatName(opener.playerId) ?? opener.playerId}さんが{locked ? '鍵を開ける' : '運のスロットを回す'}のを待っています</span>
+                <span className="block text-[12px] text-zinc-400">{useOnline.getState().room?.seatName(opener.playerId) ?? opener.playerId}さんが{seal === 'sealed' ? '封印を解く' : seal === 'guard' ? '番人との戦闘を始める' : locked ? '鍵を開ける' : '運のスロットを回す'}のを待っています</span>
               </span>
             </div>
             <button onClick={() => setPickAgain(true)} className="btn btn-dark h-11 rounded-xl text-[13px] font-bold">
@@ -541,21 +562,23 @@ export function ChestScreen() {
                 </button>
               </div>
             )}
+            {seal === 'guard' ? null : (
             <CheckPanel
               heroes={opener ? [opener] : sceneHeroes(game).filter(h => !game.world || game.activeScene || chest.tile === undefined || h.id === game.world.turn)}
               heroId={opener?.id ?? heroId}
               setHeroId={setHeroId}
               focus={focus}
               setFocus={setFocus}
-              stat={locked ? 'dex' : 'luk'}
-              tag={locked ? 'lock' : 'luck'}
-              slots={locked ? BALANCE.lockSlots : slots}
-              need={locked ? BALANCE.lockNeed : slots}
-              successLabel={locked ? '鍵が開く（0成功は罠：全員5ダメージ）' : '完全成功'}
-              bonusOnly={!locked}
+              stat={locked || seal ? 'dex' : 'luk'}
+              tag={locked || seal ? 'lock' : 'luck'}
+              slots={locked || seal ? BALANCE.lockSlots : slots}
+              need={locked || seal ? BALANCE.lockNeed : slots}
+              successLabel={seal ? `罠を避ける（0成功は罠：${sealTrap}）` : locked ? '鍵が開く（0成功は罠：全員5ダメージ）' : '完全成功'}
+              bonusOnly={!locked && !seal}
             />
-            <div className="mt-2 grid grid-cols-[1fr_2fr] gap-2">
-              {leaveGate.canLeave ? (
+            )}
+            <div className={`mt-2 grid gap-2 ${seal === 'guard' ? 'grid-cols-1' : 'grid-cols-[1fr_2fr]'}`}>
+              {seal === 'guard' ? null : leaveGate.canLeave ? (
                 <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} className="btn btn-dark h-12 rounded-xl text-[14px] font-bold">
                   {chest.spec.big ? '開けずに去る' : '立ち去る'}
                   <VoteChips cmd={{ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER }} />
@@ -565,16 +588,18 @@ export function ChestScreen() {
               )}
               <button
                 onClick={() => {
-                  if (!locked) {
+                  if (!locked && !seal) {
                     pendingOpen.current = true;
                     useVideo.current = !!videoUrl;
                   }
-                  dispatchGame(opener ? { type: 'OPEN_CHEST', playerId: LOCAL_PLAYER, heroId: opener.id, focusUsed: focus } : { type: 'OPEN_CHEST', playerId: LOCAL_PLAYER, heroId, recipientId: recipientId ?? heroId, focusUsed: focus });
+                  const f = seal === 'guard' ? 0 : focus;
+                  dispatchGame(opener ? { type: 'OPEN_CHEST', playerId: LOCAL_PLAYER, heroId: opener.id, focusUsed: f } : { type: 'OPEN_CHEST', playerId: LOCAL_PLAYER, heroId, recipientId: recipientId ?? heroId, focusUsed: f });
                   setFocus(0);
                 }}
                 className="btn btn-gold font-display h-12 rounded-xl text-[18px]"
+                data-chest-open={seal ?? (locked ? 'lock' : 'luck')}
               >
-                {locked ? '鍵を開ける' : '運のスロットで開ける'}
+                {seal === 'sealed' ? '封印を解く' : seal === 'guard' ? '番人と戦う' : locked ? '鍵を開ける' : '運のスロットで開ける'}
               </button>
             </div>
           </>

@@ -1,5 +1,6 @@
 import { CATEGORY_LABEL } from '../data/terms';
 import { getStatus } from '../data/statuses';
+import { BALANCE } from '../data/balance';
 import { activeStatuses, actionFailChanceOf, skipActionStatus } from '../engine';
 import { getElement } from '../data/elements';
 import { getEnemyAction } from '../data/enemies';
@@ -38,6 +39,10 @@ export interface IntentView {
   parts: IntentPart[];
   name: string;
   details: string[];
+  /** 大技の予告（体勢を崩せる。BREAK） */
+  big?: boolean;
+  /** もう体勢を崩した（威力が半分になっている） */
+  broken?: boolean;
 }
 
 /** インテントの表示（敵のレベル・弱体・味方の脆弱を反映した実際の値） */
@@ -49,7 +54,10 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
   const targetName = target ? target.name : '（対象なし）';
   const parts: IntentPart[] = [];
   const details: string[] = [];
-  for (const eff of action.effects) {
+  // 強奪・BREAK で次の行動の数値が変わっている時は、その値で出す（実際の行動と同じ計算）
+  const mul = enemy.nextActionMultiplier ?? 1;
+  for (const raw of action.effects) {
+    const eff = mul !== 1 && 'amount' in raw ? { ...raw, amount: Math.floor(raw.amount * mul) } : raw;
     const to = targetOf(eff);
     if (eff.kind === 'damage') {
       const hits = eff.hits ?? 1;
@@ -86,7 +94,19 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
     for (const { def } of activeStatuses(enemy.statuses))
       if (def.dealtMultiplier !== undefined) details.push(`（${def.name}によりダメージ×${def.dealtMultiplier} 反映済み）`);
   }
-  return { parts, name: action.name, details };
+  if (mul !== 1) details.push(`（次の行動の威力 ×${mul} 反映済み）`);
+  if (enemy.broken) details.unshift('体勢が崩れている（BREAK）: この行動の威力は半分');
+  else if (action.big) details.unshift(`大技！ 弱点の属性で攻撃・完全成功で攻撃・このターンに最大HPの${BALANCE.breakDamagePct}%のダメージ、のどれかで体勢を崩せる（BREAK: 威力が半分・弱体${BALANCE.breakWeak}・ブロック0）`);
+  return { parts, name: action.name, details, big: !!action.big, broken: !!enemy.broken };
+}
+
+/** 体勢を崩した時の、その予告の最初の攻撃の値（今の値 → 崩した後の値。大技でない・もう崩した・攻撃でない時は undefined） */
+export function breakPreview(state: BattleState, enemy: EnemyState): { name: string; from?: number; to?: number } | undefined {
+  const now = intentView(state, enemy);
+  if (!now?.big || now.broken || enemy.skipNextAction) return undefined;
+  const after = intentView(state, { ...enemy, broken: true, nextActionMultiplier: (enemy.nextActionMultiplier ?? 1) * BALANCE.breakPower, statuses: { ...enemy.statuses, weak: (enemy.statuses.weak ?? 0) + BALANCE.breakWeak } });
+  const dmg = (v: IntentView | null) => { const p = v?.parts.find((x) => x.kind === 'attack' || x.kind === 'attackAll'); return p && (p.kind === 'attack' || p.kind === 'attackAll') ? p.damage * p.hits : undefined; };
+  return { name: now.name, from: dmg(now), to: dmg(after) };
 }
 
 /** 属性の名前（無属性なら空） */

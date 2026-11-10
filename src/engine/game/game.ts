@@ -28,6 +28,7 @@ import type {
   SlotResult,
   EncounterSpec,
   Facing,
+  ChestState,
 } from '../../types';
 import { applyCommand, createBattle, STATE_VERSION } from '../battle/battle';
 import { createRng, type Rng } from '../rng';
@@ -672,6 +673,8 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
     syncHeroesFromBattle(game, false);
     const participants = b.allies.map((a) => a.id);
     game.battle = undefined;
+    // 封魔の宝箱の番人に負けた: 宝箱は消える
+    if (room) game.chest = undefined;
     // 命の灯火（spec §11.4）。世界マップが無い時は今までどおりゲームオーバー
     if (game.world) handleDefeat(game, participants, rng);
     else {
@@ -685,6 +688,11 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
     game.battle = undefined;
     if (room) {
       room.cleared = true;
+      // 封魔の宝箱の番人から逃げた: 宝箱は、また封印の中に消える
+      if (game.chest?.roomId === room.id) {
+        game.chest = undefined;
+        addLog(game, '封魔の宝箱は、再び封印の中に消えた…');
+      }
       game.mode = 'dungeon';
     } else {
       // 世界マップ: 前のマスへ下がる
@@ -768,7 +776,9 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
       addItem(game, to, item, true);
     }
   }
-  if (!drop?.boss && rng.next() * 100 < hiddenChestChance(game)) {
+  // 封魔の宝箱の番人との戦闘: 勝つと、その宝箱を開ける（隠し宝箱の抽選はしない）
+  const sealedFight = !!room && game.chest?.roomId === room.id && !!game.chest.spec.sealed;
+  if (!drop?.boss && !sealedFight && rng.next() * 100 < hiddenChestChance(game)) {
     reward.hiddenChest = { rarity: RARITIES[rng.next() < 0.3 ? 1 : 0], locked: rng.next() < 0.5 };
   }
   if (room) room.cleared = true;
@@ -874,7 +884,13 @@ function finishReward(game: GameState, playerId: string, rng: Rng): string | und
     return undefined;
   }
   const room = findRoom(run, run.currentRoomId ?? '')!;
-  if (isBossRoom(room)) {
+  if (game.chest?.roomId === room.id && game.chest.spec.sealed) {
+    // 封魔の宝箱の番人を倒した: 宝箱の画面へ戻り、運のスロットで開ける
+    game.chest.seal = 'cleared';
+    game.chest.lastRoll = undefined;
+    addLog(game, '番人を倒した。封魔の宝箱が開けられる！');
+    game.mode = 'chest';
+  } else if (isBossRoom(room)) {
     const def = DUNGEON_BOSS_CHEST(run.dungeonId);
     game.chest = { roomId: room.id, spec: { rarity: def, locked: false, big: true }, unlocked: true };
     game.mode = 'chest';
@@ -903,6 +919,12 @@ function worldTurnError(game: GameState, playerId: string, onTile: boolean): str
   if (ownedBy(turnHero, playerId)) return undefined;
   // だれの番かが分かる文に（2026-11-10 の実機で「だれが押すのか分からない」と言われたため）
   return turnHero ? `${turnHero.playerId} ${turnHero.name}の手番です（担当の人が操作します）` : '手番のキャラの担当の人が操作します';
+}
+
+/** 封魔の宝箱の今の段（sealed = 封印されている / guard = 封印を解いた。番人との戦闘の前 / undefined = ふつうの宝箱か、番人を倒した後） */
+export function sealStep(c: Pick<ChestState, 'spec'> & Partial<Pick<ChestState, 'seal' | 'contents'>>): 'sealed' | 'guard' | undefined {
+  if (!c.spec.sealed || c.contents) return undefined;
+  return !c.seal ? 'sealed' : c.seal === 'broken' ? 'guard' : undefined;
 }
 
 /** 宝箱を2人以上のプレイヤーで開けるか（開け役をみんなで決め、中身を取り合う。ステップ2） */
@@ -935,9 +957,36 @@ function openChest(game: GameState, playerId: string, heroId: string, focusUsed:
   const h = findHero(game, heroId);
   if (!h || h.hp <= 0 || !sceneHeroes(game).some(x => x.id === h.id)) return 'そのキャラは動けません';
   if (!ownedBy(h, playerId)) return '担当していないキャラです';
-  const slots = c.unlocked ? BALANCE.chestLuckSlots : BALANCE.lockSlots;
+  // 封魔の宝箱: (1) 封印を解く（器用の判定。失敗すると罠）→ (2) 番人との戦闘 → 勝つと (3) 運のスロットで開ける
+  const sealed = sealStep(c);
+  const slots = sealed === 'guard' ? 0 : c.unlocked && !sealed ? BALANCE.chestLuckSlots : BALANCE.lockSlots;
   if (!Number.isInteger(focusUsed) || focusUsed < 0 || focusUsed > Math.min(slots, h.focus)) return 'フォーカスの数が不正です';
+  if (sealed === 'guard') {
+    const room = game.dungeon && c.roomId ? findRoom(game.dungeon, c.roomId) : undefined;
+    if (!room) return '宝箱がありません';
+    addLog(game, '封魔の宝箱の番人が襲いかかってきた！');
+    startRoomBattle(game, room, rng);
+    return undefined;
+  }
   h.focus -= focusUsed;
+  if (sealed === 'sealed') {
+    const s = BALANCE.sealedChest;
+    const results = rollWithFocus(slots, focusUsed, statChance(h, 'dex', 'lock'), rng);
+    const ok = successes(results) >= BALANCE.lockNeed;
+    recordCheck(h, 'dex', results, BALANCE.lockNeed, 'mechanism');
+    c.seal = 'broken';
+    if (ok) c.lastRoll = { kind: 'seal', heroId, results, success: true };
+    else {
+      for (const x of sceneHeroes(game)) {
+        if (x.hp <= 0 || x.retired) continue;
+        x.hp = Math.max(1, x.hp - Math.ceil((heroMaxHp(x) * s.trapHpPct) / 100));
+        x.nextBattleStatuses.vulnerable = (x.nextBattleStatuses.vulnerable ?? 0) + s.trapVulnerable;
+      }
+      c.lastRoll = { kind: 'seal', heroId, results, success: false, trap: `封印の罠が作動した！ 全員に最大HPの${s.trapHpPct}%のダメージ。番人との戦闘の初めに「脆弱」${s.trapVulnerable}` };
+    }
+    addLog(game, `${h.name}が封魔の宝箱の封印を解いた${ok ? '' : '（罠が作動した！）'}。番人が現れる…`);
+    return undefined;
+  }
   if (!c.unlocked) {
     const results = rollWithFocus(slots, focusUsed, statChance(h, 'dex', 'lock'), rng);
     const ok = successes(results) >= BALANCE.lockNeed;
@@ -984,6 +1033,7 @@ function leaveChest(game: GameState, playerId: string, rng: Rng): string | undef
   const run = game.dungeon;
   if (game.mode !== 'chest' || !c) return '宝箱がありません';
   if (c.claims?.some((x) => !x.rolls)) return '宝箱の中身の取り合いが終わっていません';
+  if (sealStep(c) === 'guard') return '封印を解いた。番人からは、もう立ち去れない';
   const te = worldTurnError(game, playerId, c.tile !== undefined);
   if (te) return te;
   // 世界マップの宝箱（マスの宝箱は使い終わり。隠し宝箱はそのまま）

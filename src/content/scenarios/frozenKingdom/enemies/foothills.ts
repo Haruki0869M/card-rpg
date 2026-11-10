@@ -35,7 +35,7 @@ export const frostWolf: EnemyDef = {
   actions: [
     {"id": "bite", "name": "噛みつき", "effects": [{"kind": "damage", "amount": 6}]},
     {"id": "howl", "name": "雪原の遠吠え", "effects": [{"kind": "block", "amount": 5}]},
-    {"id": "pounce", "name": "雪上の跳躍", "effects": [{"kind": "damage", "amount": 4, "hits": 2}]},
+    {"id": "pounce", "name": "雪上の跳躍", big: true, "effects": [{"kind": "damage", "amount": 4, "hits": 2}]},
   ],
 };
 

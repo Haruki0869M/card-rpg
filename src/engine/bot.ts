@@ -32,6 +32,9 @@ import {
   notVoted,
   chestShared,
   dungeonJoin,
+  omenOfType,
+  sealStep,
+  dungeonEnemyLevel,
 } from './index';
 
 export interface BotLog {
@@ -157,7 +160,8 @@ function worldTarget(g: GameState, at: number, straight = false): { tile: number
   const w = g.world!;
   const heroes = livingHeroes(g);
   const goal = goalDungeon(g, straight);
-  const need = DUNGEONS.get(goal).baseLevel + (DUNGEONS.get(goal).finale ? 1 : 0);
+  // 目的のダンジョンの敵の基準レベル（ダンジョンの順番ごとの上乗せを入れた値）に届くまで、近くの敵で育てる
+  const need = dungeonEnemyLevel(DUNGEONS.get(goal)) + (DUNGEONS.get(goal).finale ? 1 : 0);
   const avgLv = heroes.reduce((n, h) => n + h.level, 0) / heroes.length;
   // 船がもらえる依頼がまだなら、まずその町へ（海を渡るシナリオ）
   if (!w.ship) {
@@ -336,10 +340,12 @@ export function botStep(g: GameState, log: BotLog, memo: BotMemo, inScene = fals
     }
     case 'dungeon': {
       const run = g.dungeon!;
-      const rooms = reachableRooms(run);
+      // 扉は左から右の順（画面の扉のボタンと同じ並び）
+      const rooms = [...reachableRooms(run)].sort((a, b) => a.col - b.col);
       const hurt = livingHeroes(g).some((h) => h.hp < heroMaxHp(h) * 0.5);
-      const pick = rooms.find((r) => (hurt ? r.type === 'rest' : r.type === 'chest')) ?? rooms[0];
-      // 扉を選ぶだけ: 扉の前まではエンジンが自動で歩く（bot はテスト用なので、部屋の中身を知っている）
+      // 普通の bot は、扉の予兆の色だけを見て選ぶ（人と同じ情報。部屋の中身は読まない）: 傷ついていれば緑（休憩）、そうでなければ金（宝）、無ければ左端。
+      // 直行 bot は予兆を見ない: いつも左端の扉（抜本的な見直し §3-1）
+      const pick = memo.straight ? rooms[0] : (rooms.find((r) => omenOfType(r.type) === (hurt ? 'rest' : 'treasure')) ?? rooms[0]);
       if (!pick) return g;
       return send(g, { type: 'ENTER_ROOM', playerId: pid(g), roomId: pick.id }, log);
     }
@@ -353,6 +359,8 @@ export function botStep(g: GameState, log: BotLog, memo: BotMemo, inScene = fals
         return send(g, { type: 'CLAIM_LOOT', playerId: pid(g, id), heroId: id, choice: id === cl.heroes[0] ? 'need' : 'greed', index: ci }, log);
       }
       if (c.contents) return send(g, { type: 'LEAVE_CHEST', playerId: pid(g) }, log);
+      // 封魔の宝箱: 普通の bot は、だれかのHPが半分より少ない時は封印を解かずに立ち去る。直行 bot はいつも解く
+      if (sealStep(c) === 'sealed' && !memo.straight && livingHeroes(g).some((x) => (!g.party || g.party.includes(x.id)) && x.hp < heroMaxHp(x) * 0.5)) return send(g, { type: 'LEAVE_CHEST', playerId: pid(g) }, log);
       // 世界マップの宝箱は、手番のキャラの担当の人のキャラで開ける
       const turnOwner = g.world && c.tile !== undefined && !g.activeScene ? findHero(g, g.world.turn)?.playerId : undefined;
       const inParty = livingHeroes(g).filter((x) => !g.party || g.party.includes(x.id));
