@@ -1,6 +1,8 @@
 // ===== 宝箱の画面: 運のスロット → 確率が上へずれる → 揺れと光の段階アップ → リーチ → レジェンド演出（spec §10.3） =====
 // 格はエンジンが1回だけ抽選済み。ここは結果を「段階的に見せる」だけ（ガセ演出なし: 光・リーチ・予告は本当の格のときだけ出る）
-import { VoteChips } from '../ui/Votes';
+import { VoteChips, VoteStatus } from '../ui/Votes';
+import { chestLeaveGate } from './worldTurnGate';
+import { OthersTurnNote } from './OnlineScreens';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Check, ChevronsRight, Lock, Sparkles, Star, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -232,6 +234,14 @@ export function ChestScreen() {
     return (open.find(({ c }) => c.heroes.some((id) => !c.choices[id] && isLocalPlayer(findHero(game, id)?.playerId ?? 'P1'))) ?? open[0])?.i ?? -1;
   })();
   const opened = !!chest.contents;
+  // 世界マップの宝箱の「立ち去る」「先へ進む」は手番のキャラの担当だけ（エンジンと同じ決まり。オーナーの決定 4-B）。ほかの人には待っている表示
+  const leaveGate = chestLeaveGate(game, isLocalPlayer);
+  const leaveWait = (what: string) =>
+    leaveGate.waitFor ? (
+      <div className="flex h-12 items-center justify-center rounded-xl bg-black/40 px-2" data-leave-wait>
+        <OthersTurnNote seat={leaveGate.waitFor.playerId} name={`${useOnline.getState().room?.seatName(leaveGate.waitFor.playerId) ?? leaveGate.waitFor.playerId}さん`} what={what} />
+      </div>
+    ) : null;
   const roll = chest.lastRoll?.kind === 'luck' ? chest.lastRoll : undefined;
   const grade: Rarity = chest.grade ?? roll?.grade ?? look;
   const speed = speedFactor(settings);
@@ -480,6 +490,8 @@ export function ChestScreen() {
       </div>
 
       <div className="panel relative z-20 shrink-0 rounded-t-2xl px-3 pt-2 pb-3">
+        {/* みんなの選択を待っている時の枠は、ボタンの上に普通に置く（重ねない） */}
+        {!animating && <VoteStatus className="mb-2" />}
         {animating ? (
           <button onClick={skip} className="btn btn-dark flex h-12 w-full items-center justify-center gap-1 rounded-xl text-[15px] font-bold">
             <ChevronsRight size={20} /> タップで結果まで飛ばす
@@ -488,10 +500,14 @@ export function ChestScreen() {
           <>
             <OpenerPicker chest={chest} heroes={sceneHeroes(game).filter((h) => !h.retired)} />
             <div className="mt-2 grid grid-cols-2 gap-2">
-              <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} className="btn btn-dark h-12 rounded-xl text-[14px] font-bold">
-                {chest.spec.big ? '開けずに去る' : '立ち去る'}
-                <VoteChips cmd={{ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER }} />
-              </button>
+              {leaveGate.canLeave ? (
+                <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} className="btn btn-dark h-12 rounded-xl text-[14px] font-bold">
+                  {chest.spec.big ? '開けずに去る' : '立ち去る'}
+                  <VoteChips cmd={{ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER }} />
+                </button>
+              ) : (
+                leaveWait('立ち去るか決めます')
+              )}
               {opener && (
                 <button onClick={() => setPickAgain(false)} className="btn btn-dark h-12 rounded-xl text-[14px] font-bold">
                   もどる
@@ -539,10 +555,14 @@ export function ChestScreen() {
               bonusOnly={!locked}
             />
             <div className="mt-2 grid grid-cols-[1fr_2fr] gap-2">
-              <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} className="btn btn-dark h-12 rounded-xl text-[14px] font-bold">
-                {chest.spec.big ? '開けずに去る' : '立ち去る'}
-                <VoteChips cmd={{ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER }} />
-              </button>
+              {leaveGate.canLeave ? (
+                <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} className="btn btn-dark h-12 rounded-xl text-[14px] font-bold">
+                  {chest.spec.big ? '開けずに去る' : '立ち去る'}
+                  <VoteChips cmd={{ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER }} />
+                </button>
+              ) : (
+                leaveWait('立ち去るか決めます')
+              )}
               <button
                 onClick={() => {
                   if (!locked) {
@@ -564,6 +584,9 @@ export function ChestScreen() {
             <ClaimPanel claim={chest.claims![claimIdx]} index={claimIdx} title={`中身を取り合う（${claimIdx + 1}/${chest.claims!.length}）`} />
             <div className="mt-1 text-center text-[12px] text-zinc-400">残り{claimsLeft}つ。全部決まると先へ進めます</div>
           </div>
+        ) : claimsLeft === 0 && !leaveGate.canLeave ? (
+          // 世界マップの宝箱: 手番のキャラの担当の人が「先へ進む」を押す。ほかの人にはだれを待っているかを出す
+          leaveWait('先へ進めるのを待っています')
         ) : (
           <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} disabled={claimsLeft > 0} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px] disabled:opacity-40">
             {claimsLeft > 0 ? `取り合いを待っています（残り${claimsLeft}）` : chest.spec.big ? 'ダンジョン制覇！' : '先へ進む'}

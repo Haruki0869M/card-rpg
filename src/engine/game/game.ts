@@ -1016,7 +1016,10 @@ const GRADE_NAME = RARITY_NAME;
  */
 function worldTurnError(game: GameState, playerId: string, onTile: boolean): string | undefined {
   if (!onTile || game.activeScene || !game.world) return undefined;
-  return ownedBy(findHero(game, game.world.turn), playerId) ? undefined : '手番のキャラの担当の人が操作します';
+  const turnHero = findHero(game, game.world.turn);
+  if (ownedBy(turnHero, playerId)) return undefined;
+  // だれの番かが分かる文に（2026-11-10 の実機で「だれが押すのか分からない」と言われたため）
+  return turnHero ? `${turnHero.playerId} ${turnHero.name}の手番です（担当の人が操作します）` : '手番のキャラの担当の人が操作します';
 }
 
 /** 宝箱を2人以上のプレイヤーで開けるか（開け役をみんなで決め、中身を取り合う。ステップ2） */

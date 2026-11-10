@@ -218,6 +218,63 @@ await B.getByRole('button', { name: /先へ進む/ }).click();
 await until(async () => (await A.evaluate(() => window.__online.mode())) === 'dungeon', 8000, 'back to dungeon');
 check(true, '2人とも「先へ進む」でダンジョンに戻る');
 
+// ===== 2b. 世界マップのマスの宝箱（2026-11-10 の実機の不具合: P2 が押せない） =====
+// P1 の番で、同行している P2 のキャラと一緒にマスの宝箱を開ける。開け役は2人で決め、「先へ進む」は手番の P1 だけ
+{
+  const gw = atPlace('chest');
+  const ti = gw.world.pos[h1];
+  gw.world.tiles[ti].f.chest = { rarity: 'rare', locked: false };
+  gw.world.tiles[ti].f.used = false;
+  await inject(gw);
+  await send(A, { type: 'WORLD_INTERACT', playerId: 'P1', heroId: h1 });
+  await until(async () => (await B.locator('[data-opener-picker]').count()) > 0, 8000, 'world chest picker on B');
+  check((await B.locator('[data-turn-lock]').count()) === 0, 'P2 の画面に「選んでいます」の覆いが出ない（開け役は全員で決めるため）');
+  // P2 の「任せる」が、何にも隠れずに押せる位置にある
+  const covered = await B.locator(`[data-opener="${h1}"] button`).evaluate((btn) => {
+    const r = btn.getBoundingClientRect();
+    const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return el && !btn.contains(el) ? `${el.tagName}.${el.className}`.slice(0, 60) : '';
+  });
+  check(!covered, `P2 の「任せる」が別の物に隠れていない${covered ? `（${covered}）` : ''}`);
+  check((await B.locator('[data-leave-wait]').count()) === 1 && (await B.getByRole('button', { name: /立ち去る/ }).count()) === 0, 'P2 には「立ち去る」の代わりに、待っている相手の表示');
+  check((await A.getByRole('button', { name: /立ち去る/ }).count()) === 1, '手番の P1 には「立ち去る」が出る');
+  await layout(B, '世界マップの宝箱（開け役の一覧・P2）');
+  await shot(B, 'world-chest-picker-P2');
+  // P1 が先に選ぶ → P2 の画面に「あなたの選択を待っています」の枠が、ボタンの上に（重ならずに）出る
+  await A.locator(`[data-opener="${h1}"] button`).click();
+  await until(async () => (await B.locator('[data-vote-status]').count()) > 0, 5000, 'vote status on B');
+  const vs = B.locator('[data-vote-status]');
+  check((await vs.innerText()).includes('あなたの選択を待っています'), 'P2 の画面に「あなたの選択を待っています」');
+  const vsBox = await vs.boundingBox();
+  const pickBox = await B.locator('[data-opener-picker]').boundingBox();
+  check(vsBox.y + vsBox.height <= pickBox.y + 0.5, `待っている枠が一覧のボタンに重ならない（枠の下 ${(vsBox.y + vsBox.height).toFixed(0)} / 一覧の上 ${pickBox.y.toFixed(0)}）`);
+  await shot(B, 'world-chest-vote-P2');
+  await B.locator(`[data-opener="${h1}"] button`).click();
+  await until(async () => (await A.evaluate(() => window.__online.game())).chest?.opener === h1, 8000, 'world chest opener');
+  check(true, '世界マップの宝箱でも、全員が同じ人を選ぶと開け役が決まる');
+  await A.getByText('運のスロットで開ける').click();
+  await wait(400);
+  if (await A.getByText('タップで結果まで飛ばす').count()) await A.getByText('タップで結果まで飛ばす').click();
+  await until(async () => !!(await A.evaluate(() => window.__online.game())).chest?.contents, 10000, 'world chest opened');
+  const wc = (await A.evaluate(() => window.__online.game())).chest;
+  const n = wc.claims?.length ?? 0;
+  for (let i = 0; i < n; i++) {
+    await A.locator(`[data-claim="${i}"]`).getByRole('button', { name: '欲しい' }).click();
+    await wait(400);
+    await B.locator(`[data-claim="${i}"]`).getByRole('button', { name: '余れば' }).click();
+    await wait(600);
+  }
+  await until(async () => (await A.getByRole('button', { name: /先へ進む/ }).count()) > 0, 8000, 'world chest leave on A');
+  await wait(400);
+  check((await B.getByRole('button', { name: /先へ進む/ }).count()) === 0 && (await B.locator('[data-leave-wait]').innerText()).includes('先へ進めるのを待っています'), 'P2 には「先へ進む」の代わりに「P1 さんが先へ進めるのを待っています」');
+  check((await B.locator('[data-turn-lock]').count()) === 0, '開けた後も P2 の画面に覆いが出ない');
+  await layout(B, '世界マップの宝箱（開けた後・P2）');
+  await shot(B, 'world-chest-opened-P2');
+  await A.getByRole('button', { name: /先へ進む/ }).click();
+  await until(async () => (await Promise.all([A, B].map((p) => p.evaluate(() => window.__online.mode())))).every((m) => m === 'world'), 8000, 'back to world');
+  check(true, 'P1 の「先へ進む」で2人とも世界マップに戻る');
+}
+
 // ===== 3. 店 =====
 await inject(atPlace('town'));
 await send(A, { type: 'WORLD_INTERACT', playerId: 'P1', heroId: h1 });

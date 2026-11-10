@@ -4,7 +4,7 @@ import { facilityMembers, facilityVisit } from '../../engine/game/world/faciliti
 // ===== 世界マップの場面: 遭遇（spec §8.5）・町（§17）・祠（§8.4）・エンディング =====
 import { motion } from 'framer-motion';
 import { ArrowUpCircle, BedDouble, Check, Coins, Eye, HandCoins, ScrollText, Sparkles, Store, Swords, Trash2, Wind } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Heart } from 'lucide-react';
 import { usePins } from '../../store/pins';
 import { PinChips } from '../ui/PinChips';
@@ -221,6 +221,11 @@ export function TownScreen() {
   const dispatchGame = useBattle((s) => s.dispatchGame);
   const openSheet = useBattle((s) => s.openSheet);
   const [tab, setTab] = useState<TownTab>('shop');
+  // タブを替えたらスクロールを一番上に戻す（店で下まで見た後に「カードを消す」へ替えると、説明の1行目が隠れて「くはできません）」だけ見えた。2026-11-10）
+  const bodyRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    bodyRef.current?.scrollTo(0, 0);
+  }, [tab]);
   const t = game.town!;
   const def = TOWNS.get(t.townId);
   const w = game.world!;
@@ -299,7 +304,7 @@ export function TownScreen() {
           </button>
         ))}
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-6" data-town-body>
+      <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-6" data-town-body>
         {tab === 'shop' && stock && (
           <div className="flex flex-col gap-1">
             {stock.items.map((s, i) => {
