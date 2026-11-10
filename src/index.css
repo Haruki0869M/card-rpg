@@ -171,17 +171,9 @@ button {
   0%, 100% { transform: translateY(0) scaleY(1); }
   50% { transform: translateY(-1.5px) scaleY(1.018); }
 }
-@keyframes hover-bob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
-}
 .idle-breathe {
   transform-origin: 50% 100%;
   animation: breathe 2.6s ease-in-out infinite;
-  will-change: transform;
-}
-.idle-bob {
-  animation: hover-bob 3.2s ease-in-out infinite;
   will-change: transform;
 }
 
@@ -219,7 +211,7 @@ button {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .idle-breathe, .idle-bob, .ember, .blink-red, .glow-pulse, .btn-gold::after, .card-foil { animation: none; }
+  .idle-breathe, .ember, .blink-red, .glow-pulse, .btn-gold::after, .card-foil { animation: none; }
 }
 
 /* 手札のカードが配られる時の演出 */
@@ -400,16 +392,8 @@ textarea {
   box-shadow: 0 0 8px #ffc84a;
   animation: footprint 0.9s ease-out forwards;
 }
-@keyframes token-hop {
-  0% { transform: translateY(0); }
-  45% { transform: translateY(-9px); }
-  100% { transform: translateY(0); }
-}
-.token-hop {
-  animation: token-hop 0.16s ease-out;
-}
 @media (prefers-reduced-motion: reduce) {
-  .token-hop, .footprint { animation: none; }
+  .footprint { animation: none; }
 }
 /* ワールドマップの駒: 持ち上げる → 隣のマスへ → カツンと置く（少しつぶれる）。影は床に残って小さくなる */
 @keyframes piece-lift {
@@ -522,11 +506,6 @@ textarea {
 
 /* ===== 世界マップの箱庭（play-feedback-plan §8）。動くのは transform と opacity だけ（地図の描き直しを起こさない） ===== */
 /* 霧が晴れたマスが、下からふわっとせり上がる（0.4秒） */
-@keyframes hex-rise {
-  from { transform: translateY(var(--rise, 12px)); opacity: 0; }
-  to { transform: none; opacity: 1; }
-}
-.hex-rise { animation: hex-rise 0.42s cubic-bezier(.2,.8,.3,1.1) both; }
 /* 雲の海: 遠い層はゆっくり、近い層は少し速く流れる（雲の模様1枚分ずつ動かすので、つなぎ目が出ない） */
 @keyframes fog-far {
   from { transform: translate3d(0, 0, 0); }
@@ -572,7 +551,7 @@ textarea {
 }
 .region-banner { animation: region-banner 2.2s ease-out both; }
 @media (prefers-reduced-motion: reduce) {
-  .hex-rise, .fog-far, .fog-near, .water-shimmer, .map-glow, .enemy-breathe { animation: none; }
+  .fog-far, .fog-near, .water-shimmer, .map-glow, .enemy-breathe { animation: none; }
   .cloud-tear { animation: none; opacity: 0; }
   .region-banner { animation: none; }
 }

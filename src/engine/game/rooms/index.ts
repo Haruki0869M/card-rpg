@@ -23,5 +23,3 @@ export function roomBehavior(id: string): RoomBehavior {
 export const roomTypeOf = (room: Pick<Room, 'type'>): RoomTypeDef => getRoomType(room.type);
 /** ボスの部屋か */
 export const isBossRoom = (room: Pick<Room, 'type'> | undefined) => !!room && !!roomTypeOf(room).battle?.boss;
-/** 戦闘の部屋か */
-export const isBattleRoom = (room: Pick<Room, 'type'>) => !!roomTypeOf(room).battle;

@@ -182,6 +182,4 @@ export const useOnline = create<OnlineState>((set, get) => {
   };
 });
 
-/** 自分の席 */
-export const mySeat = (): PlayerId | undefined => useOnline.getState().room?.seat;
 export type { Stamp };
