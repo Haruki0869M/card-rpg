@@ -5,7 +5,7 @@ import { getScenario } from '../../../data/scenarios';
 import { TERRAINS } from '../../../data/world';
 import type { GameState, Wanderer, WorldState } from '../../../types';
 import type { Rng } from '../../rng';
-import { hexDistance, neighbors, rowOf } from './hex';
+import { hexDistance, neighbors } from './hex';
 import { timeOfDay } from './time';
 
 /** 侵食度の段階による敵のレベルの加算 */
@@ -25,7 +25,7 @@ export function wandererLevel(game: GameState, w: WorldState, region: number): n
 const blocked = (w: WorldState, i: number, sea = false) => {
   const t = TERRAINS.get(w.tiles[i].t);
   const wrongTerrain = sea ? !t.sea : t.moveCost <= 0;
-  return !!w.tiles[i].f || wrongTerrain || w.wanderers.some((x) => x.tile === i) || Object.values(w.pos).includes(i);
+  return !!w.tiles[i].f || wrongTerrain || w.wanderers.some((x) => x.tile === i) || Object.values(w.pos).includes(i) || !!w.spawns?.some((x) => x.tile === i);
 };
 
 /** 地域の海のマスに、海の敵（幽霊船など）を1組置く（K4 段3）。置けたら返す */
@@ -35,8 +35,8 @@ export function spawnSeaWanderer(game: GameState, w: WorldState, rng: Rng, regio
   const heroes = Object.values(w.pos);
   const cands: number[] = [];
   for (let i = 0; i < w.tiles.length; i++) {
-    const r = rowOf(w, i);
-    if (r < reg.rows[0] || r > reg.rows[1] || blocked(w, i, true)) continue;
+    // 地域はマスに記録した番号で見る（道を長くする前の古い地図でも、行の範囲がずれない）
+    if (w.tiles[i].r !== region || blocked(w, i, true)) continue;
     if (heroes.some((h) => hexDistance(w, h, i) <= 2)) continue;
     cands.push(i);
   }
@@ -58,8 +58,7 @@ export function spawnWanderer(game: GameState, w: WorldState, rng: Rng, region: 
     const heroes = Object.values(w.pos);
     const cands: number[] = [];
     for (let i = 0; i < w.tiles.length; i++) {
-      const r = rowOf(w, i);
-      if (r < reg.rows[0] || r > reg.rows[1] || blocked(w, i)) continue;
+      if (w.tiles[i].r !== region || blocked(w, i)) continue;
       if (heroes.some((h) => hexDistance(w, h, i) <= 2)) continue;
       cands.push(i);
     }

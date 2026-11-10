@@ -1,5 +1,5 @@
 // ===== ワールドマップの駒（チェスの駒のようなミニチュア） =====
-// 金色の丸い台座に、プレイヤーの色の輪。台座の上に立つのは:
+// 丸い台座（上面も側面もプレイヤーの色・ふちは金）。台座の上に立つのは:
 //   - src/assets/art/piece/<職業ID>-<male|female>.webp があれば、そのミニチュアの絵
 //   - 無ければ、今の顔の絵をメダルにして立てる（仮の見た目）
 // 移動では「持ち上げる → 隣のマスへ → カツンと置く」。見た目だけで、ゲームの状態や乱数には関係しない。
@@ -57,9 +57,9 @@ export function HeroPiece({ hero, size: s, ringColor, active, hopping, stepKey, 
         <svg className="absolute" style={{ left: s * 0.06, top: s * 0.62, width: s * 0.88, height: s * 0.36, overflow: 'visible' }} viewBox="0 0 100 40" aria-hidden>
           <defs>
             <linearGradient id={`top${uid}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor="#fff1b8" />
-              <stop offset="0.55" stopColor="#d9a93c" />
-              <stop offset="1" stopColor="#8a5d16" />
+              <stop offset="0" stopColor="#fff" stopOpacity="0.55" />
+              <stop offset="0.5" stopColor="#fff" stopOpacity="0.05" />
+              <stop offset="1" stopColor="#000" stopOpacity="0.35" />
             </linearGradient>
             <linearGradient id={`side${uid}`} x1="0" y1="0" x2="1" y2="0">
               <stop offset="0" stopColor="#000" stopOpacity="0.45" />
@@ -72,7 +72,9 @@ export function HeroPiece({ hero, size: s, ringColor, active, hopping, stepKey, 
           <rect x="3" y="14" width="94" height="13" fill={`url(#side${uid})`} />
           <line x1="3" y1="14" x2="3" y2="27" stroke="#1a1208" strokeWidth="2" />
           <line x1="97" y1="14" x2="97" y2="27" stroke="#1a1208" strokeWidth="2" />
-          <ellipse cx="50" cy="14" rx="47" ry="12" fill={`url(#top${uid})`} stroke="#5a3c0c" strokeWidth="2" />
+          {/* 上面もプレイヤーの色（P1 青・P2 赤・P3 緑・P4 黄）。ふちは金 */}
+          <ellipse cx="50" cy="14" rx="47" ry="12" fill={ringColor} stroke="#d9a93c" strokeWidth="3" />
+          <ellipse cx="50" cy="14" rx="46" ry="11" fill={`url(#top${uid})`} />
           <ellipse cx="50" cy="13" rx="34" ry="7.5" fill="none" stroke="#fff6cf" strokeOpacity="0.7" strokeWidth="1.5" />
         </svg>
         {img ? (

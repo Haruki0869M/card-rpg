@@ -1,4 +1,4 @@
-// 手番のカットイン（docs/tasks/turn-cutin.md）: 手番が移った時だけ出る。自分のキャラなら大きく、ほかの人のキャラなら小さなお知らせ
+// 手番のカットイン（docs/archive/tasks/turn-cutin.md）: 手番が移った時だけ出る。自分のキャラなら大きく、ほかの人のキャラなら小さなお知らせ
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createGame, WORLD_SCENE } from '../engine';
 import type { GameState, PlayerId } from '../types';
@@ -42,7 +42,7 @@ describe('手番のカットイン', () => {
   it('1台で2人（担当が同じ P1）: 手番が2人目に移ると大きなカットイン。同じ手番のままの操作では出ない', () => {
     useBattle.getState().loadRemote(twoPlayers(['P1', 'P1']));
     expect(useBattle.getState().turnCutin).toBeNull();
-    expect(useBattle.getState().dispatchWire({ type: 'WORLD_ROLL_MOVE', playerId: 'P1', heroId: 'h0', focusUsed: 0 })).toBeUndefined();
+    expect(useBattle.getState().dispatchWire({ type: 'WORLD_ROLL_MOVE', playerId: 'P1', heroId: 'h0' })).toBeUndefined();
     expect(useBattle.getState().turnCutin).toBeNull();
     expect(useBattle.getState().dispatchWire({ type: 'WORLD_WAIT', playerId: 'P1', heroId: 'h0' })).toBeUndefined();
     const c = useBattle.getState().turnCutin!;

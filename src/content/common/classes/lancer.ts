@@ -17,7 +17,7 @@ export const lancer: ClassDef = {
     description: '戦闘の1ターン目：攻撃のダメージ×1.5',
     effect: { modifier: 'damageDealt', multiplier: 1.5, if: [{ kind: 'turnAtMost', turn: 1 }, { kind: 'cardHasDamage' }] },
   },
-  exploreAbility: { id: 'mounted', name: '騎乗', description: '移動力の判定のスロット+1', effect: { kind: 'moveSlots', slots: 1 } },
+  exploreAbility: { id: 'mounted', name: '騎乗', description: '移動のサイコロ+1', effect: { kind: 'moveSlots', slots: 1 } },
   names: { male: ['ランス', 'ジークフリート', 'カイン', 'ヴォルフ'], female: ['ブリュンヒルデ', 'フレイヤ', 'エイル', 'ヴァルキリア'] },
   unlocked: true,
   hpPerLevel: 7,

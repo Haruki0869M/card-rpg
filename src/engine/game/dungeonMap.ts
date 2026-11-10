@@ -38,7 +38,6 @@ export const DIRS: readonly (readonly [number, number])[] = [
   [0, -1],
   [-1, 0],
 ];
-export const FACING_NAME = ['北', '東', '南', '西'] as const;
 
 export const cellKey = (x: number, y: number) => `${x},${y}`;
 
@@ -105,13 +104,65 @@ export function posOf(run: DungeonRun): NonNullable<DungeonRun['pos']> {
   return run.pos ?? { ...dungeonGrid(run).start, facing: 0 };
 }
 
-/** 今の手番で歩けるマス（今いる部屋と、その後ろの通路だけ。部屋に入ると後ろの扉は閉まる） */
+const ACTIVE = new WeakMap<object, { sig: string; keys: Set<string> }>();
+
+/**
+ * 選んだ道の上にあるマス（オーナーの案: 選ばなかった扉はただの壁になり、その扉へだけ続いていた通路も無くなる）。
+ * 行ごとに「選んだ部屋」（今いる部屋か、通った部屋）を決め、
+ * - 部屋のマス: 選んだ部屋。まだ選んでいない行は、1つ前の行の選んだ部屋から行ける部屋（1行目は全部）。ボスの部屋はいつも
+ * - 通路のマス: その通路の両側の「残った部屋」（入口の通路は入口のマス）の列の、いちばん左から右まで
+ * 保存するものは増やさない（部屋の cleared と currentRoomId から毎回決める。古い保存データもそのまま）
+ */
+export function activeCells(run: DungeonRun): Set<string> {
+  const grid = dungeonGrid(run);
+  const sig = `${run.currentRoomId ?? ''}|${run.pos ? `${run.pos.x},${run.pos.y}` : ''}|${run.rooms.map((r) => (r.cleared ? 1 : 0)).join('')}`;
+  const hit = ACTIVE.get(run.rooms);
+  if (hit && hit.sig === sig) return hit.keys;
+  const rows = Math.max(0, ...run.rooms.map((r) => r.row)) + 1;
+  const bossRow = rows - 1;
+  const keep: Room[][] = [];
+  let allowed: Set<string> | null = null;
+  for (let row = 0; row < rows; row++) {
+    const inRow = run.rooms.filter((r) => r.row === row);
+    const chosen = inRow.filter((r) => r.cleared || r.id === run.currentRoomId);
+    const cand = inRow.filter((r) => !allowed || allowed.has(r.id) || (row === bossRow && r.next.length === 0));
+    const act = chosen.length ? chosen : cand.length ? cand : inRow;
+    keep.push(act);
+    allowed = new Set(act.flatMap((r) => r.next));
+  }
+  const xOf = (r: Room) => grid.roomCell.get(r.id)!.x;
+  const keys = new Set<string>();
+  for (const row of keep) for (const r of row) keys.add(cellKey(xOf(r), 2 * r.row + 1));
+  // 古い保存データで、無くなる通路の上に立っていた時は、そこから戻れるように立っている所までは残す
+  const p = run.pos;
+  for (let s = -1; s < rows - 1; s++) {
+    const xs = [...(s < 0 ? [grid.start.x] : keep[s].map(xOf)), ...keep[s + 1].map(xOf), ...(p && p.y === 2 * s + 2 ? [p.x] : [])];
+    const lo = Math.min(...xs);
+    const hi = Math.max(...xs);
+    for (let x = lo; x <= hi; x++) if (grid.at.has(cellKey(x, 2 * s + 2))) keys.add(cellKey(x, 2 * s + 2));
+  }
+  ACTIVE.set(run.rooms, { sig, keys });
+  return keys;
+}
+
+/** 選んだ道の上のマスだけを引く（選ばなかった扉・通路は「無い」＝壁として扱う） */
+export function activeAt(run: DungeonRun): (x: number, y: number) => MapCell | undefined {
+  const grid = dungeonGrid(run);
+  const act = activeCells(run);
+  return (x, y) => {
+    const k = cellKey(x, y);
+    return act.has(k) ? grid.at.get(k) : undefined;
+  };
+}
+
+/** 今の手番で歩けるマス（今いる部屋と、その後ろの通路だけ。部屋に入ると後ろの扉は閉まる。選ばなかった扉へだけ続く通路は除く） */
 export function walkableKeys(run: DungeonRun): Set<string> {
   const grid = dungeonGrid(run);
+  const act = activeCells(run);
   const cur = run.currentRoomId ? grid.roomCell.get(run.currentRoomId) : undefined;
   const section = cur ? cur.section : -1;
   const out = new Set<string>();
-  for (const c of grid.cells) if (c.kind === 'hall' && c.section === section) out.add(cellKey(c.x, c.y));
+  for (const c of grid.cells) if (c.kind === 'hall' && c.section === section && act.has(cellKey(c.x, c.y))) out.add(cellKey(c.x, c.y));
   if (cur) out.add(cellKey(cur.x, cur.y));
   return out;
 }
@@ -129,19 +180,12 @@ export function canMove(run: DungeonRun, from: { x: number; y: number }, dir: Fa
   return dy === 0;
 }
 
-/** 目の前（北）の扉の部屋（通路に立っていて、北が部屋のマスの時） */
-export function doorAhead(run: DungeonRun): Room | undefined {
-  const p = posOf(run);
-  if (p.facing !== 0) return undefined;
-  return doorNorthOf(run, p);
-}
-
 /** そのマスの北にある部屋（扉）。今いる部屋の出口側ではなく、通路から入る扉 */
 export function doorNorthOf(run: DungeonRun, p: { x: number; y: number }): Room | undefined {
-  const grid = dungeonGrid(run);
-  const here = grid.at.get(cellKey(p.x, p.y));
+  const at = activeAt(run);
+  const here = at(p.x, p.y);
   if (!here || here.kind !== 'hall') return undefined;
-  const c = grid.at.get(cellKey(p.x, p.y + 1));
+  const c = at(p.x, p.y + 1);
   return c?.roomId ? run.rooms.find((r) => r.id === c.roomId) : undefined;
 }
 
@@ -153,23 +197,25 @@ export function doorFront(run: DungeonRun, roomId: string): { x: number; y: numb
 
 /** 今の位置から見えるマス（自分のマス・前後左右の隣・前の3マス先まで。部屋のマスの先は見えない。通路の壁の扉も見える） */
 export function visibleFrom(run: DungeonRun, p: NonNullable<DungeonRun['pos']>): string[] {
-  const grid = dungeonGrid(run);
+  // 選ばなかった扉・その扉へだけ続く通路は「無い」（壁）なので見えない
+  const at = activeAt(run);
   const out = new Set<string>([cellKey(p.x, p.y)]);
-  for (const [dx, dy] of DIRS) if (grid.at.has(cellKey(p.x + dx, p.y + dy))) out.add(cellKey(p.x + dx, p.y + dy));
+  for (const [dx, dy] of DIRS) if (at(p.x + dx, p.y + dy)) out.add(cellKey(p.x + dx, p.y + dy));
   const [fx, fy] = DIRS[p.facing];
   for (let i = 1; i <= 3; i++) {
-    const c = grid.at.get(cellKey(p.x + fx * i, p.y + fy * i));
+    const c = at(p.x + fx * i, p.y + fy * i);
     if (!c) break;
     out.add(cellKey(c.x, c.y));
     if (c.kind === 'room') break;
   }
   // 通路に立っている時は、見えた通路のマスの壁にある扉（北と南）も見える
-  const here = grid.at.get(cellKey(p.x, p.y));
+  const here = at(p.x, p.y);
   if (here?.kind === 'hall') {
     for (const k of [...out]) {
-      const c = grid.at.get(k);
+      const [x, y] = k.split(',').map(Number);
+      const c = at(x, y);
       if (c?.kind !== 'hall' || c.y !== p.y) continue;
-      for (const dy of [1, -1]) if (grid.at.get(cellKey(c.x, c.y + dy))?.kind === 'room') out.add(cellKey(c.x, c.y + dy));
+      for (const dy of [1, -1]) if (at(c.x, c.y + dy)?.kind === 'room') out.add(cellKey(c.x, c.y + dy));
     }
   }
   return [...out];
@@ -184,10 +230,11 @@ export function revealSeen(run: DungeonRun) {
 
 /** 探索度（見たマス ÷ 全部のマス。%） */
 export function exploredPercent(run: DungeonRun): number {
-  const grid = dungeonGrid(run);
+  // 選ばなかった扉と、その扉へだけ続く通路は数えない（100% まで届くように）
+  const act = activeCells(run);
   const seen = new Set(run.seen ?? []);
-  const n = grid.cells.filter((c) => seen.has(cellKey(c.x, c.y))).length;
-  return Math.floor((n / Math.max(1, grid.cells.length)) * 100);
+  const n = [...act].filter((k) => seen.has(k)).length;
+  return Math.floor((n / Math.max(1, act.size)) * 100);
 }
 
 /** 今の位置から目的のマスまでの道順（向きの列）。行けなければ undefined */
@@ -292,12 +339,12 @@ function reachableKeysOf(run: DungeonRun): Set<string> {
 
 /** 今の位置と向きから見える通路（手前から奥へ）と、正面の突き当たり */
 export function viewSlices(run: DungeonRun): { slices: ViewSlice[]; end: ViewEnd } {
-  const grid = dungeonGrid(run);
   const seen = new Set(run.seen ?? []);
   const p = posOf(run);
   const [fx, fy] = DIRS[p.facing];
   const [rx, ry] = DIRS[((p.facing + 1) % 4) as Facing];
-  const at = (x: number, y: number) => grid.at.get(cellKey(x, y));
+  // 選ばなかった扉・その扉へだけ続く通路は壁として描く
+  const at = activeAt(run);
   const slices: ViewSlice[] = [];
   let x = p.x;
   let y = p.y;

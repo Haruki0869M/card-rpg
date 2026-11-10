@@ -136,6 +136,8 @@ export function changeJob(game: GameState, hero: Hero, jobId: string): string | 
   hero.carried = prev;
   hero.classId = jobId;
   hero.level = 1;
+  // 中位に転職したら、記録（転職の条件）を数え直す。最上位・特殊職の条件は、中位になってからの記録で数える（§5）
+  if (opt.job.tier === 'mid') hero.feats = {};
   // 次のレベルに向けて貯めた経験値は持ち越す（新しいジョブのLv2の手前まで）
   hero.exp = Math.max(0, Math.min(hero.exp, expToNext(1, jobId) - 1));
   // 新しいジョブで使えない武器は持ち物へ。武器が無ければ、そのジョブの最初の武器を持つ

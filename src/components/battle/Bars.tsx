@@ -3,7 +3,7 @@ import { corruptionName } from '../../data/scenarios';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Backpack, Flame, Layers, Menu, Skull, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { findAlly, isDone, waitingPlayers } from '../../engine';
+import { corruptionShown, findAlly, isDone, waitingPlayers } from '../../engine';
 import { isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
 import { useHelp } from '../../store/help';
@@ -35,7 +35,7 @@ export function TopBar() {
         <div className="min-w-0 flex-1">
           <div className="flex justify-between text-[12px] leading-[13px]">
             <span className="font-display text-fuchsia-200">{corruptionLabel}</span>
-            <span className="font-bold text-fuchsia-200 tabular-nums">{corruption}%</span>
+            <span className="font-bold text-fuchsia-200 tabular-nums">{corruptionShown(corruption)}%</span>
           </div>
           <div className="mt-0.5 h-[7px] overflow-hidden rounded-full border border-fuchsia-900 bg-black/70">
             <div

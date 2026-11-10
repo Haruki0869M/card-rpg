@@ -1,0 +1,50 @@
+import { describe, expect, it } from 'vitest';
+import type { WorldState } from '../../../types';
+import { neighborAt, terrainLevel } from '../diorama';
+import { riverLinks, scatter } from './scatter';
+
+// 8×6 の小さな地図: 上の2行が丘と山、真ん中が平原と森、右下に湖、(3,3) に町
+const W = 8, H = 6;
+const terrain = (c: number, r: number) => (r === 0 ? (c < 4 ? 'mountain' : 'hills') : r === 1 && c % 3 === 0 ? 'hills' : r >= 4 && c >= 6 ? 'water' : c < 3 ? 'forest' : 'plains');
+const tiles = Array.from({ length: W * H }, (_, i) => {
+  const c = i % W, r = Math.floor(i / W);
+  return { t: terrain(c, r), r: 0, seen: true, ...(c === 3 && r === 3 ? { f: { kind: 'town', id: 'x' } } : {}) };
+}) as unknown as WorldState['tiles'];
+const w = { width: W, height: H, tiles };
+const levels = tiles.map((t) => terrainLevel(t.t));
+const geom = { R: 20, center: (i: number) => ({ x: (i % W) * 35, y: Math.floor(i / W) * 20 }) };
+
+describe('景色の置き方（見た目だけ）', () => {
+  it('川は毎回同じで、町・水・丘・山のマスを通らず、つながりは両側からそろう', () => {
+    const a = riverLinks(w, levels);
+    const b = riverLinks(w, levels);
+    expect([...a]).toEqual([...b]);
+    expect(a.size).toBeGreaterThan(0);
+    for (const [i, ks] of a) {
+      expect(tiles[i].f).toBeUndefined();
+      expect(levels[i]).toBe(1);
+      for (const k of ks) {
+        const j = neighborAt(w, i, k);
+        // 隣が普通のマスなら、隣からもこちらへつながっている（丘・山＝水源、水＝注ぐ所、地図の外＝端へ流れ出る）
+        if (j !== undefined && levels[j] === 1) expect(a.get(j)).toContain((k + 3) % 6);
+      }
+    }
+  });
+
+  it('立つ物は毎回同じで、場所のマスには置かず、森には木・山には峰がある', () => {
+    const inp = { w, geom, levels, links: new Map(), rivers: riverLinks(w, levels), blocked: (i: number) => !!tiles[i].f, stage: 0 };
+    const a = scatter(inp);
+    expect(scatter(inp)).toEqual(a);
+    expect(a.some((it) => it.tile === 3 * W + 3 && it.k !== 'ridge')).toBe(false);
+    expect(a.some((it) => it.k === 'pine' || it.k === 'broadleaf')).toBe(true);
+    expect(a.some((it) => it.k === 'peak')).toBe(true);
+    expect(a.some((it) => it.k === 'ridge')).toBe(true);
+    // 侵食度の段階が上がると、結晶・亀裂が出る
+    expect(scatter({ ...inp, stage: 3 }).some((it) => it.k === 'crystal' || it.k === 'crack')).toBe(true);
+  });
+
+  it('見ていないマスには何も置かない', () => {
+    const hidden = tiles.map((t) => ({ ...t, seen: false })) as WorldState['tiles'];
+    expect(scatter({ w: { ...w, tiles: hidden }, geom, levels, links: new Map(), rivers: new Map(), blocked: () => false, stage: 3 })).toEqual([]);
+  });
+});

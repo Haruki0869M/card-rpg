@@ -1,3 +1,5 @@
+import { clampZoom } from '../components/world/mapZoom';
+
 export interface Settings {
   fastMode: boolean;
   vibration: boolean;
@@ -10,6 +12,8 @@ export interface Settings {
   petVolume: number;
   /** はじめての戦闘の案内（Step A ④）。未設定 = この端末で初めて（戦闘に勝ったことが無ければ出す）。最後まで見るか×で false */
   firstGuide?: boolean;
+  /** 世界マップの拡大（1〜2.5倍。この端末だけ。冒険の保存データには入れない） */
+  worldZoom: number;
 }
 
 export const DEFAULT_SFX_VOLUME = 5;
@@ -29,6 +33,7 @@ export function normalizeSettings(raw: unknown): Settings {
     sfxVolume: volume(s.sfxVolume, DEFAULT_SFX_VOLUME),
     bgmVolume: volume(s.bgmVolume, DEFAULT_BGM_VOLUME),
     petVolume: volume(s.petVolume, DEFAULT_PET_VOLUME),
+    worldZoom: clampZoom(s.worldZoom),
     ...(typeof s.firstGuide === 'boolean' ? { firstGuide: s.firstGuide } : {}),
   };
 }

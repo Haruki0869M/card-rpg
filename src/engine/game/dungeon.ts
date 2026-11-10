@@ -9,15 +9,19 @@ import { initDungeonPos } from './dungeonMap';
 export const RARITIES: Rarity[] = ['common', 'rare', 'epic', 'legend'];
 export const rarityIndex = (r: Rarity) => RARITIES.indexOf(r);
 export { RARITY_NAME };
-export const raiseRarity = (r: Rarity, n = 1): Rarity => RARITIES[Math.min(RARITIES.length - 1, rarityIndex(r) + n)];
 
 const pick = <T,>(list: readonly T[], rng: Rng) => list[rng.int(list.length)];
 
+/** 深さの数え方の元になる行の数（大きくする前の鍵のダンジョンの行の数） */
+const DEPTH_ROWS = 9;
+
 /** 部屋の敵を決める（組み合わせと加算レベルは部屋の種類のデータ。レベルはダンジョンの基準 + 深さ + 難易度） */
-function rollEnemies(def: DungeonDef, type: RoomType, row: number, levelBonus: number, rng: Rng) {
+function rollEnemies(def: DungeonDef, type: RoomType, row: number, levelBonus: number, rng: Rng, rows = 0) {
   const b = getRoomType(type).battle!;
   const ids = b.pool === 'boss' ? def.pools.boss : pick(def.pools[b.pool], rng);
-  const depthBonus = Math.floor(row / 3);
+  // 深さ: 3行ごとに+1。大きくしたダンジョン（9行より長い）は、元の9行の深さに直して数える（40行で+13にならないように。奥のボスで+2まで）
+  const depthRow = rows > DEPTH_ROWS ? (row * (DEPTH_ROWS - 1)) / (rows - 1) : row;
+  const depthBonus = Math.floor(depthRow / 3);
   const lv = def.baseLevel + depthBonus + levelBonus + b.levelBonus;
   return ids.map((defId) => ({ defId, level: Math.max(1, lv) }));
 }
@@ -97,7 +101,7 @@ export function buildDungeon(dungeonId: string, rng: Rng, levelBonus: number, ev
       col: c,
       type: spec.type,
       next: spec.next.map((n) => id(r + 1, n)),
-      enemies: getRoomType(spec.type).battle ? rollEnemies(def, spec.type, r, levelBonus, rng) : undefined,
+      enemies: getRoomType(spec.type).battle ? rollEnemies(def, spec.type, r, levelBonus, rng, layout.length) : undefined,
       chest: spec.chest ? { ...spec.chest } : undefined,
       eventId: spec.eventId,
       cleared: false,

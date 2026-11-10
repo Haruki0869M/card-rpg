@@ -1,6 +1,7 @@
 // シナリオ6のダンジョン。敵の組み合わせはダンジョンごと（雷だけが弱点の敵ばかりにならないよう、火・氷が弱点の敵を混ぜる）。
 // 制覇すると動力核が壊れて鍵になり、3つそろうと最終ダンジョンに入れる。ボスの手前に「物語の部屋」（event）を置く
 import type { DungeonDef } from '../../../../types';
+import { FINALE_EXTRA_FLOOR, KEY_EXTRA_FLOOR, grownLayout } from '../../extraFloor';
 
 const FACTORY_POOLS: DungeonDef['pools'] = {
   battle: [['smokeStackCrow', 'brokenAutomaton'], ['conveyorBot', 'oilSlime'], ['riveter', 'sparkTurret'], ['voltGearBug', 'brokenAutomaton'], ['gearBug', 'conveyorBot', 'oilSlime']],
@@ -35,7 +36,7 @@ const SCRAP_POOLS: DungeonDef['pools'] = {
 
 type Layout = NonNullable<DungeonDef['layout']>;
 
-/** 歯車の工場（8行。入門。ベルトコンベアとプレス機） */
+/** 歯車の工場（元の並びは8行。extraFloor.ts で40行に広げる。入門。ベルトコンベアとプレス機） */
 const factoryLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
@@ -60,7 +61,7 @@ const factoryLayout: Layout = [
   [{ type: 'boss', next: [] }],
 ];
 
-/** 蒸気の発電所（8行。蒸気のバルブと冷却水。強敵が2回） */
+/** 蒸気の発電所（元の並びは8行。extraFloor.ts で40行に広げる。蒸気のバルブと冷却水。強敵が2回） */
 const plantLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
@@ -85,7 +86,7 @@ const plantLayout: Layout = [
   [{ type: 'boss', next: [] }],
 ];
 
-/** 時計塔（9行。スクラップと行商ロボット。分かれ道が多い） */
+/** 時計塔（元の並びは9行。extraFloor.ts で40行に広げる。スクラップと行商ロボット。分かれ道が多い） */
 const towerLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
@@ -123,9 +124,8 @@ export const gearFactory: DungeonDef = {
   pools: FACTORY_POOLS,
   bossChest: 'epic',
   rewardKey: 'coreGear',
-  corruptionOnClear: 5,
   clearStory: ['工場長ゴーレムが、動かなくなった。', '工場のベルトが、静かに止まる。', '動力核（歯車）を壊した！'],
-  layout: factoryLayout,
+  layout: grownLayout(factoryLayout, KEY_EXTRA_FLOOR),
 };
 
 export const steamPlant: DungeonDef = {
@@ -137,9 +137,10 @@ export const steamPlant: DungeonDef = {
   pools: PLANT_POOLS,
   bossChest: 'epic',
   rewardKey: 'coreSteam',
-  corruptionOnClear: 5,
+  // 1つ目のダンジョンの鍵が要る（play-feedback-plan §4 C: 町や依頼を飛ばして、まっすぐ奥へ行けないように）
+  requiresKeys: ['coreGear'],
   clearStory: ['暴走ボイラーの炎が、消えた。', '発電所から、蒸気が引いていく。', '動力核（蒸気）を壊した！'],
-  layout: plantLayout,
+  layout: grownLayout(plantLayout, KEY_EXTRA_FLOOR),
 };
 
 export const clockTower: DungeonDef = {
@@ -151,9 +152,11 @@ export const clockTower: DungeonDef = {
   pools: TOWER_POOLS,
   bossChest: 'legend',
   rewardKey: 'coreTime',
-  corruptionOnClear: 5,
+  // 2つ目の鍵と、町の依頼を1つ（報告まで）が要る（冒険を長くする。町に寄る理由を作る）
+  requiresKeys: ['coreSteam'],
+  requiresQuests: 1,
   clearStory: ['時計仕掛けの賢者の針が、止まった。', '「大機械を…止めてやってくれ」', '動力核（時間）を壊した！'],
-  layout: towerLayout,
+  layout: grownLayout(towerLayout, KEY_EXTRA_FLOOR),
 };
 
 export const machineHeart: DungeonDef = {
@@ -166,7 +169,7 @@ export const machineHeart: DungeonDef = {
   bossChest: 'legend',
   requiresKeys: ['coreGear', 'coreSteam', 'coreTime'],
   finale: true,
-  layout: [
+  layout: grownLayout([
     [{ type: 'battle', next: [0, 1] }],
     [
       { type: 'battle', next: [0, 1] },
@@ -183,7 +186,7 @@ export const machineHeart: DungeonDef = {
     [{ type: 'battle', next: [0] }],
     [{ type: 'event', eventId: 'machineHeartRoom', next: [0] }],
     [{ type: 'boss', next: [] }],
-  ],
+  ], FINALE_EXTRA_FLOOR),
 };
 
 // ランダムダンジョン: 廃品の洞窟（部屋の並びを自動生成）

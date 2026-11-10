@@ -1,4 +1,6 @@
-import { needsCardTarget, selectedCardTarget, secondaryCardTarget, targetGuide } from '../../engine/battle/targets';
+import { cardTargets, isAllyCard, needsCardTarget, secondaryCard, selectedCardTarget, secondaryCardTarget, targetGuide } from '../../engine/battle/targets';
+import { unitIdOf } from '../../engine/battle/units';
+import { AllyTargetChips } from './TargetChips';
 import { unitName } from '../../engine/battle/units';
 import { predictCardTotals, predictTexts, rangeText, type PredictTotals } from '../../engine/battle/battle';
 import { nameOf } from '../../engine/battle/units';
@@ -10,6 +12,7 @@ import { cardOf } from '../../data/cards';
 import { rollChanceFor, findAlly, tierDistribution, toPercents, slotPreviewLimitOf } from '../../engine';
 import { useBattle } from '../../store/battleStore';
 import { CATEGORY_STYLE, EffectChip } from '../ui/icons';
+import { TargetChips } from './TargetChips';
 
 const TIER_COLORS = ['#5a4a5e', '#7a6a8a', '#4a8cff', '#3ad08a', '#ffc94a'];
 
@@ -63,6 +66,9 @@ export function FocusPanel() {
     return t.minSuccesses === hi ? `${hi}成功` : `${t.minSuccesses}-${hi}`;
   };
 
+  // 一番出やすい成功数（同じ確率なら上の成功数）。狙う敵のチップの予測に使う
+  const likelyTier = probs.reduce((best, p, i) => (p >= probs[best] ? i : best), 0);
+
   // 確率の帯の下の数字: 下の詳しい予測と同じ「今の相手に対する計算後の値」。同じ種類の効果が2つ以上ある時は、最初の1つに合計を出す
   const chipsOf = (i: number) => {
     const p = preds?.[i];
@@ -90,13 +96,17 @@ export function FocusPanel() {
 
   return (
     <motion.div
-      initial={{ y: 28, opacity: 0 }}
+      initial={{ y: 40, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      exit={{ y: 28, opacity: 0 }}
-      transition={{ duration: 0.1 }}
+      exit={{ y: 40, opacity: 0 }}
+      transition={{ duration: 0.14, ease: 'easeOut' }}
       onClick={(e) => e.stopPropagation()}
-      className="panel panel-gold-edge mx-1.5 max-h-[44dvh] min-h-0 overflow-y-auto rounded-xl p-1.5"
+      // 段階A: 戦場を縮めず、味方の枠と手札の上に重ねる（すりガラス調の重い枠。下の端は手札の下の端にそろえる）
+      className="absolute inset-x-1.5 bottom-0.5 z-50"
+      data-focus-panel
     >
+      {/* 高さ: 味方の枠と手札の高さ＋味方の下半身まで（頭と上半身は見える）。低い画面でも操作できる高さは残す */}
+      <div className="glass-panel relative min-h-0 overflow-y-auto overscroll-contain rounded-xl p-1.5" style={{ maxHeight: 'min(46dvh, max(250px, calc(var(--dock-h, 220px) + var(--ally-reach, 60px))))' }}>
       <div className="flex items-center gap-1.5">
         <button onClick={cancel} aria-label="キャンセル" className="btn btn-dark flex h-11 w-11 shrink-0 items-center justify-center rounded-lg">
           <X size={22} />
@@ -120,7 +130,10 @@ export function FocusPanel() {
       </div>
 
       {needsCardTarget(card) && <div className="mt-1 text-center text-[12px] text-sky-100" data-target-guide>{targetGuide(card)}{selected && `（選択中：${nameOf(selected)}）`}</div>}
+      {card.target === 'enemy' && <TargetChips allyId={ally.id} cardUid={inst.uid} focus={selection.focus} tier={likelyTier} tierLabel={label(likelyTier)} targetId={selection.targetId} allyTargetId={selection.allyTargetId} />}
+      {isAllyCard(card) && !card.secondaryTarget && <AllyTargetChips allyId={ally.id} candidates={cardTargets(battle, ally, card).map(unitIdOf)} chosen={selection.targetId} />}
       {card.secondaryTarget && <div className="text-center text-[12px] text-sky-100" data-secondary-target-guide>回復・支援する味方をタップしてください{secondary && `（選択中：${nameOf(secondary)}）`}</div>}
+      {card.secondaryTarget && <AllyTargetChips allyId={ally.id} candidates={cardTargets(battle, ally, secondaryCard(card)).map(unitIdOf)} chosen={selection.allyTargetId} />}
       {(ally.slotPreviewUsed ?? 0) < slotPreviewLimitOf(ally) && <button onClick={preview} disabled={needsTarget} className="btn btn-dark mt-1 min-h-11 w-full rounded-lg text-[14px] font-bold" data-preview-start>星読みで結果を見る（1戦闘1回）</button>}
 
       <div className="mt-1.5 flex items-center gap-2">
@@ -191,6 +204,8 @@ export function FocusPanel() {
       <div className="mt-0.5 text-center text-[12px] leading-4 text-zinc-500">
         予測は成功数ごとの目安です（抽選・追加効果で変動）。残りフォーカス {ally.focus - selection.focus} / {ally.focus}
       </div>
+      </div>
+      <span className="glass-panel-crest" />
     </motion.div>
   );
 }

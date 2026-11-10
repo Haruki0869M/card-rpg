@@ -1,4 +1,4 @@
-// 装飾品（K2）。ルールを書き換える効果の見本。ここから先の量産は docs/tasks/K2-equipment.md のとおりに足す
+// 装飾品（K2）。ルールを書き換える効果の見本。ここから先の量産は docs/archive/tasks/K2-equipment.md のとおりに足す
 import type { ItemDef } from '../../../types';
 
 export const accessories2: ItemDef[] = [

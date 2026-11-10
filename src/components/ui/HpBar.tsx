@@ -1,5 +1,7 @@
 import { Shield } from 'lucide-react';
 import { memo } from 'react';
+import { TIMING } from '../../data/balance';
+import { speedFactor, useBattle } from '../../store/battleStore';
 
 /** HPバー（減った分が少し遅れて縮む「残像」付き。transform だけで動かす） */
 export const HpBar = memo(function HpBar({
@@ -19,6 +21,7 @@ export const HpBar = memo(function HpBar({
   incoming?: number;
 }) {
   const ratio = Math.max(0, Math.min(1, hp / max));
+  const k = useBattle((s) => 1 / speedFactor(s.settings));
   const fill = tone === 'enemy' ? 'linear-gradient(180deg,#ff6a5a,#c41e2a 55%,#7a0a14)' : 'linear-gradient(180deg,#7dffa8,#22b45a 55%,#0d6a30)';
   return (
     <div className="flex w-full items-center gap-0.5">
@@ -32,9 +35,11 @@ export const HpBar = memo(function HpBar({
         className="relative min-w-0 flex-1 overflow-hidden rounded-[4px] border border-black/80 bg-[#140c10]"
         style={{ height, boxShadow: block > 0 ? '0 0 0 1.5px #7ac8ff' : 'inset 0 1px 2px rgba(0,0,0,.8)' }}
       >
+        {/* 減った分の残像（白〜黄色）: 0.35秒残ってから追いかけて減る（段階B。高速モードは半分） */}
         <div
-          className="absolute inset-y-0 left-0 w-full origin-left bg-[#f6e3a0]"
-          style={{ transform: `scaleX(${ratio})`, transition: 'transform 500ms ease-out 250ms' }}
+          className="absolute inset-y-0 left-0 w-full origin-left"
+          style={{ transform: `scaleX(${ratio})`, transition: `transform ${Math.round(TIMING.hpGhostChase * 1000 * k)}ms ease-in ${Math.round(TIMING.hpGhostHold * 1000 * k)}ms`, background: 'linear-gradient(180deg,#ffffff,#fff3b0 45%,#ffd24a)' }}
+          data-hp-ghost
         />
         <div
           className="absolute inset-y-0 left-0 w-full origin-left"

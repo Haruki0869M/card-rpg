@@ -2,7 +2,7 @@
 // 図鑑（お供・ジョブ・カード・装備・敵）と記録。この端末の記録（store/profileStore）を読むだけ。
 // 強さを上げる物は置かない（オーナーの方針）。
 import { BookOpen, Layers, PawPrint, ScrollText, Shield, Skull, Users, X } from 'lucide-react';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { CharacterArt, EnemyArt } from '../../art';
 import { CARDS } from '../../data/cards';
 import { CLASSES } from '../../data/classes';
@@ -22,7 +22,9 @@ import { CardFace } from '../ui/CardFace';
 import { CATEGORY_STYLE, ElementTag } from '../ui/icons';
 import { ItemIcon, itemSummary, RARITY_STYLE } from '../ui/game';
 import { PetToken } from '../ui/PetToken';
-import { UchinokoDetail, UchinokoSection } from './MyPets';
+import { LoreReadOnly, UchinokoDetail, UchinokoSection } from './MyPets';
+import { hiddenBosses, rareEnemyIds } from './loreSections';
+import { useLore } from '../../store/lore';
 
 type Tab = 'pets' | 'jobs' | 'cards' | 'items' | 'enemies' | 'record';
 const TABS: { id: Tab; label: string; Icon: typeof BookOpen }[] = [
@@ -228,22 +230,50 @@ function ItemsTab({ onDetail }: { onDetail: (d: Detail) => void }) {
 }
 
 // ---------- 敵 ----------
+const RARE_IDS = rareEnemyIds();
+const HIDDEN = hiddenBosses();
+const SPECIAL = new Set([...RARE_IDS, ...HIDDEN.map((h) => h.enemyId)]);
 function EnemiesTab({ onDetail }: { onDetail: (d: Detail) => void }) {
   const enemies = useProfile((s) => s.profile.enemies);
   const sg: SeenGot = useMemo(() => ({ seen: enemies.seen, got: Object.keys(enemies.kills) }), [enemies]);
+  const cell = (e: EnemyDef) => {
+    const mark = markOf(e.id, sg);
+    return (
+      <Cell key={e.id} mark={mark} label={e.name} onTap={() => onDetail({ kind: 'enemy', def: e, mark, kills: enemies.kills[e.id] ?? 0 })}>
+        <span className="text-[28px] leading-none">{e.icon}</span>
+      </Cell>
+    );
+  };
+  const seenRare = RARE_IDS.filter((id) => sg.seen.includes(id)).length;
+  const seenHidden = HIDDEN.filter((h) => sg.seen.includes(h.enemyId)).length;
   return (
     <>
       <Progress total={ENEMIES.all.length} seen={sg.seen.length} got={sg.got.length} gotLabel="倒した" />
-      <Grid>
-        {ENEMIES.all.map((e) => {
-          const mark = markOf(e.id, sg);
-          return (
-            <Cell key={e.id} mark={mark} label={e.name} onTap={() => onDetail({ kind: 'enemy', def: e, mark, kills: enemies.kills[e.id] ?? 0 })}>
-              <span className="text-[28px] leading-none">{e.icon}</span>
-            </Cell>
-          );
-        })}
-      </Grid>
+      {/* Step C ②: めったに会えない敵・隠しボスは、別の節にまとめる（数はデータから） */}
+      <section className="mb-3" data-lore-rare>
+        <div className="mb-1 font-display text-[15px] text-sky-200">✨めったに会えない敵（{seenRare}/{RARE_IDS.length}）</div>
+        <Grid>{RARE_IDS.map((id) => cell(ENEMIES.get(id)))}</Grid>
+      </section>
+      <section className="mb-3" data-lore-hidden>
+        <div className="mb-1 font-display text-[15px] text-amber-200">👑隠しボス（{seenHidden}/{HIDDEN.length}）</div>
+        <div className="flex flex-col gap-1.5">
+          {HIDDEN.map((h) => {
+            const e = ENEMIES.get(h.enemyId), mark = markOf(e.id, sg);
+            if (mark !== 'none') return <div key={h.enemyId} className="grid grid-cols-4 gap-1.5">{cell(e)}<div className="col-span-3 flex items-center text-[12px] leading-4 text-zinc-300">{h.scenarioName}・{h.regionName}</div></div>;
+            return (
+              <div key={h.enemyId} className="flex min-h-[52px] items-center gap-2 rounded-lg border border-white/5 bg-black/30 px-2 py-1.5" data-lore-hidden-hint={h.enemyId}>
+                <span className="w-10 shrink-0 text-center text-[22px] text-zinc-600">？</span>
+                <span className="min-w-0 flex-1 text-[12px] leading-4">
+                  <span className="block text-zinc-500">？？？（{h.scenarioName}）</span>
+                  <span className="block text-amber-100/80">{h.hint}</span>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+      <div className="mb-1 font-display text-[15px] text-zinc-200">そのほかの敵</div>
+      <Grid>{ENEMIES.all.filter((e) => !SPECIAL.has(e.id)).map(cell)}</Grid>
     </>
   );
 }
@@ -397,20 +427,33 @@ function DetailBody({ d }: { d: Detail }) {
   }
 }
 
-export function Lorebook({ onClose }: { onClose: () => void }) {
+/**
+ * inAdventure = 冒険の途中にメニューから開いた（Step C ②）。読むだけ（マイペットの登録・解除もしない）。
+ * 「戻る」は画面全体（App）がまとめて受け、useLore の backInBook を呼ぶ（メニューまで一緒に閉じないように）
+ */
+export function Lorebook({ onClose, inAdventure = false }: { onClose: () => void; inAdventure?: boolean }) {
   const [tab, setTab] = useState<Tab>('pets');
   const [detail, setDetail] = useState<Detail | null>(null);
-  // Android の「戻る」: 詳細 → 本の順に閉じる
-  useBackButton(true, () => {
+  const back = () => {
     if (detail) {
       setDetail(null);
       return true;
     }
     onClose();
     return false;
-  });
+  };
+  // Android の「戻る」: 詳細 → 本の順に閉じる（冒険の途中は App が受ける）
+  useBackButton(!inAdventure, () => (inAdventure ? false : back()));
+  const backRef = useRef(back);
+  backRef.current = back;
+  useEffect(() => {
+    if (!inAdventure) return;
+    useLore.setState({ backInBook: () => void backRef.current() });
+    return () => useLore.setState({ backInBook: null });
+  }, [inAdventure]);
   return (
-    <div className="game-bg safe-pad absolute inset-0 z-50 flex flex-col" data-lorebook>
+    <LoreReadOnly.Provider value={inAdventure}>
+    <div className="game-bg safe-pad absolute inset-0 z-50 flex flex-col" data-lorebook={inAdventure ? 'adventure' : 'title'}>
       <div className="flex items-center gap-2 border-b border-amber-300/30 px-3 py-2">
         <BookOpen size={22} className="text-amber-300" />
         <div className="font-display flex-1 text-[20px] text-amber-100">伝承の書</div>
@@ -455,5 +498,6 @@ export function Lorebook({ onClose }: { onClose: () => void }) {
         </div>
       )}
     </div>
+    </LoreReadOnly.Provider>
   );
 }

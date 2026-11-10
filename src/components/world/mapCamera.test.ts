@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cameraTop, mapPadY, revealTop } from './mapCamera';
+import { cameraTop, mapPadBottom, mapPadY, revealTop, visibleH } from './mapCamera';
 
 describe('世界マップのカメラ（フェーズ2-D）', () => {
   it('余白は枠の半分。地図の一番下のマスでも、駒を枠の真ん中に置ける', () => {
@@ -13,6 +13,19 @@ describe('世界マップのカメラ（フェーズ2-D）', () => {
     expect(top + viewH / 2 - pad).toBeCloseTo(y);
     // 一番上のマスも
     expect(cameraTop(34, viewH)).toBeGreaterThanOrEqual(0);
+  });
+  it('下のパネルが地図に重なっている時: 駒は見えている所（枠の上の端〜パネルの上の端）の真ん中。余白はパネルの高さによらない', () => {
+    const viewH = 500, inset = 300, mapH = 1126;
+    const top = cameraTop(600, viewH, inset);
+    // 駒の画面の上の位置 = 見えている高さ（200）の半分
+    expect(600 + mapPadY(viewH) - top).toBeCloseTo(visibleH(viewH, inset) / 2);
+    // 一番下のマスも見えている所の真ん中に置ける（下の余白が足りる）
+    expect(cameraTop(mapH - 34, viewH, inset)).toBeLessThanOrEqual(mapH + mapPadY(viewH) + mapPadBottom(viewH) - viewH);
+    // 余白はパネルの高さを使わない（帯に縮んでも内容の高さが変わらず、地図が動かない）
+    expect(mapPadBottom(viewH)).toBe(500);
+    // 選んだマスがパネルの下に隠れていれば、見えている所へ動かす
+    expect(revealTop(600, 760, top, viewH, 30, inset)).toBeDefined();
+    expect(revealTop(600, 640, top, viewH, 30, inset)).toBeUndefined();
   });
   it('選んだマスが見えていれば動かさない。見えていなければ中間を真ん中に', () => {
     const viewH = 400, pad = mapPadY(viewH);

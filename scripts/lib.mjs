@@ -63,10 +63,10 @@ export async function startBattle(page, partySize, enemies, fast = true) {
     }, enemies);
   }
   // ダンジョンの番の最初に探索力を決める（M3-D）
-  if (await page.getByText('探索力の判定').count()) await page.getByText('探索力の判定').click();
+  if (await page.locator('[data-explore-roll-button]').count()) await page.locator('[data-explore-roll-button]').click();
   await page.waitForTimeout(200);
   // 第3段階: 入口は1行目の扉の前（北向き）。扉を開けて最初の部屋へ
-  await page.getByRole('button', { name: /^扉を開ける/ }).click();
+  await page.getByRole('button', { name: /扉を開ける/ }).click();
   await page.waitForTimeout(400);
 }
 
@@ -76,7 +76,8 @@ export async function layoutIssues(page) {
     const de = document.documentElement;
     if (de.scrollHeight > innerHeight + 1 || de.scrollWidth > innerWidth + 1) out.push(`page overflow ${de.scrollWidth}x${de.scrollHeight}`);
     // 遊び方・用語集（Step A ③）を開いている時は、その画面を確かめる（後ろの画面は隠れていて押せない）
-    const game = document.querySelector('[data-help]') ?? document.querySelector('.game-bg') ?? document.body;
+    // 伝承の書（タイトル・冒険の途中。Step C ②）を開いている時も、その画面を確かめる
+    const game = document.querySelector('[data-help]') ?? document.querySelector('[data-lorebook]') ?? document.querySelector('.game-bg') ?? document.body;
     const visible = (el) => {
       const r = el.getBoundingClientRect();
       return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden';

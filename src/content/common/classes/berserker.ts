@@ -16,7 +16,7 @@ export const berserker: ClassDef = {
     name: '血の滾り',
     effect: { modifier: 'damageDealt', multiplier: 1, if: [{ kind: 'cardHasDamage' }], scale: { by: 'missingHp', per: 0.6, max: 0.5 } },
   },
-  exploreAbility: { id: 'charge', name: '突進', description: '移動力の判定のスロット+1', effect: { kind: 'moveSlots', slots: 1 } },
+  exploreAbility: { id: 'charge', name: '突進', description: '移動のサイコロ+1', effect: { kind: 'moveSlots', slots: 1 } },
   names: { male: ['グラム', 'ボルグ', 'ザイン', 'ドラン'], female: ['ヒルダ', 'ブレンダ', 'イグニス', 'ロゼ'] },
   unlocked: true,
   hpPerLevel: 7,

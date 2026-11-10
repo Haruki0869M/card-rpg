@@ -1,5 +1,5 @@
 // ===== 音の名前の一覧（K6） =====
-// docs/audio-list.md と docs/tasks/stage3-dungeon-plan.md §11 の ID をそのまま並べる。
+// docs/audio-list.md と docs/archive/tasks/stage3-dungeon-plan.md §11 の ID をそのまま並べる。
 // ファイルは src/assets/audio/<sfx|bgm|pet>/<ID>.mp3 に置くだけで鳴る（無ければ何もしない）。
 
 export const SFX_IDS = [
@@ -7,6 +7,8 @@ export const SFX_IDS = [
   'sfx_battle_slash', 'sfx_battle_blunt', 'sfx_battle_pierce', 'sfx_battle_shoot', 'sfx_battle_gun',
   'sfx_magic_fire', 'sfx_magic_ice', 'sfx_magic_thunder', 'sfx_magic_wind', 'sfx_magic_light', 'sfx_magic_dark',
   'sfx_battle_summon', 'sfx_battle_self', 'sfx_battle_card_play',
+  // 連携・ジョブの能力（Step C。合成: scripts/audio/synth-synergy.mjs）
+  'sfx_battle_combo', 'sfx_battle_ability',
   // ダメージ・防御
   'sfx_hit_small', 'sfx_hit_mid', 'sfx_hit_big', 'sfx_hurt_small', 'sfx_hurt_mid', 'sfx_hurt_big',
   'sfx_guard_ok', 'sfx_damage_zero', 'sfx_enemy_down',

@@ -4,7 +4,11 @@ import { facilityMembers, facilityVisit } from '../../engine/game/world/faciliti
 // ===== 世界マップの場面: 遭遇（spec §8.5）・町（§17）・祠（§8.4）・エンディング =====
 import { motion } from 'framer-motion';
 import { ArrowUpCircle, BedDouble, Check, Coins, Eye, HandCoins, ScrollText, Sparkles, Store, Swords, Trash2, Wind } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { Heart } from 'lucide-react';
+import { usePins } from '../../store/pins';
+import { PinChips } from '../ui/PinChips';
+import { severalPlayers, shopLeft, useShopNotices } from './shopTalk';
 import { BattleBackground, EnemyArt } from '../../art';
 import { BALANCE } from '../../data/balance';
 import { cardOf, getCard } from '../../data/cards';
@@ -31,6 +35,7 @@ import {
   sellPrice,
   shopPriceFor,
   statChance,
+  corruptionShown,
 } from '../../engine';
 import { isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
@@ -236,9 +241,21 @@ export function TownScreen() {
   const closeCardSel = useCallback(() => setCardSel(null), []);
   const selCard = cardSel !== null ? stock?.cards[cardSel] : undefined;
   const closeBought = useCallback(() => setBought(null), []);
-  const buy = (kind: 'item' | 'card', index: number) => {
+  // 店の相談（ステップ2）: 仲間が買ったらお知らせ・最後の1つは1回確かめる・「ほしい！」の印
+  const pins = usePins();
+  const showToast = useBattle((s) => s.showToast);
+  const myBuys = useMemo(() => new Set<string>(), []);
+  const notify = useCallback((text: string) => showToast(text), [showToast]);
+  useShopNotices(game, stock, myBuys, notify);
+  const [lastOne, setLastOne] = useState<number | null>(null);
+  const buy = (kind: 'item' | 'card', index: number, confirmed = false) => {
     const entry = kind === 'item' ? stock?.items[index] : stock?.cards[index];
     if (!entry) return;
+    if ('item' in entry && stock && !confirmed && severalPlayers(game) && shopLeft(stock, entry.item.itemId) === 1) {
+      setLastOne(index);
+      return;
+    }
+    if ('item' in entry) myBuys.add(entry.item.uid);
     const err = dispatchGame({ type: 'TOWN_BUY', heroId: v.id, playerId: p, kind, index });
     if (err) return;
     const id = ++buySeq;
@@ -287,17 +304,35 @@ export function TownScreen() {
           <div className="flex flex-col gap-1">
             {stock.items.map((s, i) => {
               const it = getItem(s.item.itemId);
+              const left = shopLeft(stock, s.item.itemId);
+              const wants = pins.at({ kind: 'shopItem', id: s.item.uid });
               return (
-                <div key={s.item.uid} className={`flex items-center gap-2 rounded-lg bg-black/30 p-1.5 ${s.sold ? 'opacity-40' : ''}`}>
+                <div key={s.item.uid} className={`relative flex items-center gap-2 rounded-lg bg-black/30 p-1.5 ${s.sold ? 'opacity-40' : ''}`} data-shop-row={s.item.uid}>
                   <ItemInfoArea itemId={it.id} heroId={v.id} className="flex flex-1 items-center gap-2">
                     <ItemIcon item={it} size={42} />
                     <span className="min-w-0 flex-1 leading-4">
-                      <span className="block text-[14px] font-bold" style={{ color: RARITY_STYLE[it.rarity].color }}>
-                        {it.name}
+                      <span className="flex items-baseline gap-1">
+                        <span className="min-w-0 truncate text-[14px] font-bold" style={{ color: RARITY_STYLE[it.rarity].color }}>
+                          {it.name}
+                        </span>
+                        {!s.sold && <span className={`shrink-0 text-[12px] ${left === 1 ? 'font-bold text-amber-300' : 'text-zinc-400'}`} data-shop-left>残り{left}</span>}
                       </span>
+                      {/* 「ほしい！」の札（行の中に置く。スクロールの欄の上で切れないように） */}
+                      <PinChips pins={wants} className="mt-0.5" />
                       <span className="block truncate text-[12px] text-zinc-400">{itemSummary(it)}</span>
                     </span>
                   </ItemInfoArea>
+                  {pins.enabled && !s.sold && (
+                    <button
+                      onClick={() => pins.toggle({ kind: 'shopItem', id: s.item.uid })}
+                      aria-label={`${it.name}がほしい！と伝える`}
+                      aria-pressed={wants.some((x) => x.mine)}
+                      className={`btn flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${wants.some((x) => x.mine) ? 'btn-gold' : 'btn-dark'}`}
+                      data-shop-want
+                    >
+                      <Heart size={16} />
+                    </button>
+                  )}
                   <button
                     disabled={!mine || s.sold || v.gold < shopPriceFor(v, s.price)}
                     onClick={() => buy('item', i)}
@@ -482,6 +517,20 @@ export function TownScreen() {
         <FacilityExit game={game} />
       </div>
       <BuyNotice game={game} bought={bought} onClose={closeBought} />
+      {lastOne !== null && stock?.items[lastOne] && (
+        <ConfirmDialog
+          title="残り1つです"
+          text={`「${getItem(stock.items[lastOne].item.itemId).name}」は、これが最後の1つです。仲間も欲しいかもしれません。買いますか？`}
+          ok="買う"
+          danger={false}
+          onOk={() => {
+            const i = lastOne;
+            setLastOne(null);
+            buy('item', i, true);
+          }}
+          onCancel={() => setLastOne(null)}
+        />
+      )}
       {confirmRemove && (
         <ConfirmDialog
           title="カードを取り除きますか？"
@@ -512,7 +561,7 @@ export function SanctuaryScreen() {
         <FacilityRoster game={game} />
         <h1 className="font-display text-[24px] text-amber-100">{def.name}</h1>
         <p className="panel mt-3 rounded-xl p-3 text-[15px] leading-6">{def.text}</p>
-        <p className="mt-3 text-[14px] leading-6">{def.kind === 'temple' ? '中位Lv3と条件を満たすと特殊職、中位Lv4と条件を満たすと最上位職へ進めます。' : '中位Lv3と条件を満たすと、この祭壇に対応する特殊職へ進めます。'}</p>
+        <p className="mt-3 text-[14px] leading-6">{def.kind === 'temple' ? `中位Lv${BALANCE.jobChange.special}と条件を満たすと特殊職、中位Lv${BALANCE.jobChange.mid}と条件を満たすと最上位職へ進めます。` : `中位Lv${BALANCE.jobChange.special}と条件を満たすと、この祭壇に対応する特殊職へ進めます。`}</p>
         <button onClick={() => openSheet('jobs')} className="btn btn-gold mt-4 min-h-12 w-full rounded-xl px-3 text-[15px] font-bold">転職先を見る</button>
       </div>
       <div className="shrink-0 px-3 pb-3">
@@ -598,7 +647,7 @@ export function EndingScreen() {
           <span>かかった日数</span>
           <b className="text-right">{Math.ceil((game.world?.worldTurn ?? 1) / (BALANCE.turnsPerTimeOfDay * 4))}日</b>
           <span>最後の{corruptionName(game.scenarioId)}</span>
-          <b className="text-right">{game.world?.corruption ?? 0}%</b>
+          <b className="text-right">{corruptionShown(game.world?.corruption ?? 0)}%</b>
           <span>残った命の灯火</span>
           <b className="text-right">{game.lives}</b>
           <span>戦闘の勝利</span>

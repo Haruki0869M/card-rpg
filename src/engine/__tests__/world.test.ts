@@ -19,6 +19,7 @@ import {
   viewOf,
   handleDefeat,
   createRng,
+  corruptionShown,
 } from '../index';
 import { playToEnd } from '../bot';
 
@@ -79,11 +80,13 @@ describe('移動と手番', () => {
   }
   it('移動力を判定 → 経路の移動力だけ減る。同行したキャラは一緒に動き、自分の手番も持つ', () => {
     let g = started();
-    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0', focusUsed: 2 });
+    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0' });
     const w = g.world!;
-    expect(w.move).toBeGreaterThanOrEqual(BALANCE.moveBase + 2);
+    expect(w.move).toBeGreaterThanOrEqual(1);
     const reach = reachable(w, w.pos.h0, w.move!);
-    const [to, info] = [...reach].find(([i, v]) => i !== w.pos.h0 && v.cost <= w.move! && !w.wanderers.some((x) => x.tile === i))!;
+    // 施設・敵のいないマスへ。移動中のランダムイベントは、この確認では起こさない（直前に起きたことにする。乱数の順番で変わるため）
+    g.heroes[0].lastRandomEvent = w.worldTurn;
+    const [to, info] = [...reach].find(([i, v]) => i !== w.pos.h0 && v.cost <= w.move! && !w.tiles[i].f && !w.wanderers.some((x) => x.tile === i))!;
     const before = w.move!;
     g = run(g, { type: 'WORLD_MOVE', playerId: P, heroId: 'h0', to, companions: ['h1'] });
     expect(g.world!.pos.h0).toBe(to);
@@ -100,8 +103,8 @@ describe('移動と手番', () => {
   });
   it('手番でないキャラ・担当でないプレイヤーは動かせない', () => {
     const g = started();
-    expect(applyGameCommand(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h1', focusUsed: 0 }).error).toBeDefined();
-    expect(applyGameCommand(g, { type: 'WORLD_ROLL_MOVE', playerId: 'P2', heroId: 'h0', focusUsed: 0 }).error).toBeDefined();
+    expect(applyGameCommand(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h1' }).error).toBeDefined();
+    expect(applyGameCommand(g, { type: 'WORLD_ROLL_MOVE', playerId: 'P2', heroId: 'h0' }).error).toBeDefined();
   });
   it('侵食度100%でゲームオーバー', () => {
     let g = started();
@@ -133,7 +136,7 @@ describe('遭遇・命の灯火', () => {
     // スタートの隣に敵を置いて、そこへ移動する
     const next = neighbors(w, w.pos.h0).find((n) => TERRAINS.get(w.tiles[n].t).moveCost > 0 && !w.tiles[n].f)!;
     w.wanderers.push({ id: 'wx', tile: next, enemies: [{ defId: 'goblinScout', level: 1 }] });
-    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0', focusUsed: 4 });
+    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0' });
     g = run(g, { type: 'WORLD_MOVE', playerId: P, heroId: 'h0', to: next, companions: [] });
     return g;
   }
@@ -300,8 +303,11 @@ describe('町・祠・依頼', () => {
     expect(g.mode).toBe('world');
     expect(g.expeditions?.length).toBe(1);
     expect(viewOf(g, g.expeditions![0].id).mode).toBe('dungeon');
-    // 入ると手番が終わり、1人なのでワールドターンも進む
-    expect(g.world!.corruption).toBe(BALANCE.corruptionOnDungeonEnter + (getDifficulty(g.difficulty).corruptionPerTurn ?? BALANCE.corruptionPerTurn));
+    // 入ると手番が終わり、1人なのでワールドターンも進む。全員がダンジョンの中なので、ダンジョンの番の量（難易度の値は倍率）
+    expect(g.world!.corruption).toBe(BALANCE.corruptionOnDungeonEnter + BALANCE.corruptionPerDungeonTurn * (getDifficulty(g.difficulty).corruptionPerTurn ?? 1));
+    // 画面では切り捨てて整数%
+    expect(corruptionShown(2.5)).toBe(2);
+    expect(corruptionShown(12.75)).toBe(12);
   });
 });
 
@@ -320,26 +326,25 @@ describe('ダンジョンも世界マップの手番の順番で動く（M3-D）
   it('入ると手番は次の人へ。ダンジョンの番が来るまで、ダンジョンの中は動かせない', () => {
     let { g, x } = h0InTemple();
     expect(g.world!.turn).toBe('h1');
-    expect(applyGameCommand(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0', focusUsed: 0 })).error).toMatch(/ほかのキャラの番/);
+    expect(applyGameCommand(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0' })).error).toMatch(/ほかのキャラの番/);
     // h1 が手番を終えると、ワールドターンが進み、h0（ダンジョン）の番
     g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h1' });
     expect(g.world!.worldTurn).toBe(2);
     expect(g.world!.turn).toBe('h0');
     // 世界マップの操作はできない
-    expect(applyGameCommand(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0', focusUsed: 0 }).error).toMatch(/ダンジョン/);
+    expect(applyGameCommand(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0' }).error).toMatch(/ダンジョン/);
   });
 
-  it('探索力を判定（2〜4）→ 歩数は×2。扉を開けると1歩使う。使い切って通路に戻ると次の人の番', () => {
+  it('探索のサイコロ（1〜3）→ 選べる扉の数。扉を開けると1使う。手番を終えると次の人の番', () => {
     let { g, x } = h0InTemple();
     g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h1' });
-    expect(applyGameCommand(g, inScene(x, { type: 'ENTER_ROOM', playerId: P, roomId: 'r0c0' })).error).toMatch(/探索力/);
-    // フォーカスを2つ使えば、探索力は必ず4
-    g.heroes[0].focus = 2;
-    g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0', focusUsed: 2 }));
-    const steps = (BALANCE.exploreBase + BALANCE.exploreSlots) * BALANCE.dungeonStepsPerExplore;
-    expect(viewOf(g, x).dungeon!.explore).toBe(steps);
+    expect(applyGameCommand(g, inScene(x, { type: 'ENTER_ROOM', playerId: P, roomId: 'r0c0' })).error).toMatch(/サイコロ/);
+    g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0' }));
+    const n = viewOf(g, x).dungeon!.explore!;
+    expect(n).toBeGreaterThanOrEqual(1);
+    expect(n).toBeLessThanOrEqual(BALANCE.exploreDiceSides);
     g = run(g, inScene(x, { type: 'ENTER_ROOM', playerId: P, roomId: 'r0c0' }));
-    expect(viewOf(g, x).dungeon!.explore).toBe(steps - 1);
+    expect(viewOf(g, x).dungeon!.explore).toBe(n - 1);
     // 手番を終える → h1 の番（ワールドターンは同じ）
     g.expeditions![0].mode = 'dungeon';
     g.expeditions![0].battle = undefined;
@@ -360,7 +365,7 @@ describe('ダンジョンも世界マップの手番の順番で動く（M3-D）
     expect(g.world!.turn).toBe('h1');
     g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h1' });
     expect(g.world!.turn).toBe('h0');
-    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0', focusUsed: 0 });
+    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0' });
   });
 
   it('全員がダンジョンの中でも、時間（ワールドターン・侵食度）は進む', () => {
@@ -368,7 +373,7 @@ describe('ダンジョンも世界マップの手番の順番で動く（M3-D）
     const turn = g.world!.worldTurn;
     expect(g.world!.turn).toBe('h0');
     expect(turn).toBe(2);
-    g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0', focusUsed: 0 }));
+    g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0' }));
     const c = g.world!.corruption;
     g = run(g, inScene(x, { type: 'EXPLORE_END', playerId: P }));
     expect(g.world!.worldTurn).toBe(turn + 1);

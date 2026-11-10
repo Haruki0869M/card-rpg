@@ -7,7 +7,7 @@ import { create } from 'zustand';
 import { normalizeSettings, type Settings } from './settings';
 import { playSound, setAudioVolumes } from '../audio/player';
 import { petCry } from '../audio/cues';
-import { battleFrames, explorationNotices, explorationSounds, type PopupDraft, type PopupTone, type NoticeDraft, type PresentationFrame } from './presentation';
+import { battleFrames, explorationNotices, explorationSounds, type CalloutDraft, type ImpactDraft, type PopupDraft, type PopupTone, type SynergyTier, type NoticeDraft, type PresentationFrame } from './presentation';
 export type { Settings } from './settings';
 import { TIMING, VIBRATION } from '../data/balance';
 import { cardOf } from '../data/cards';
@@ -62,9 +62,11 @@ export interface DoorOpen {
   id: number;
   scene: string;
   run: DungeonRun;
+  /** 開けた扉の部屋（扉の前まで自動で歩く様子を見せる） */
+  roomId?: string;
 }
 
-/** 手番のカットイン（docs/tasks/turn-cutin.md） */
+/** 手番のカットイン（docs/archive/tasks/turn-cutin.md） */
 export interface TurnCutin {
   id: number;
   heroId: string;
@@ -80,7 +82,13 @@ export interface Popup {
   text: string;
   tone: PopupTone;
   lane: number;
+  /** 重なりの段階（Step C。2 = 大きな金の数字、3 = さらに広がる輪） */
+  tier?: SynergyTier;
 }
+
+/** 段階B: 技名の帯・命中のエフェクト・戦場の揺れ・盾（見た目だけ。状態・乱数・同期には触れない） */
+export type Callout = CalloutDraft & { id: number };
+export type ImpactFx = Omit<ImpactDraft, 'unitId'> & { id: number };
 
 /** ユニットごとの動きの演出 */
 export interface UnitFx {
@@ -135,14 +143,22 @@ interface StoreState {
   activeId: string;
   selection: Selection | null;
   sheet: Sheet;
+  /** パーティの窓で最初に見せるキャラ */
+  sheetHeroId: string | null;
   /** 冒険の放棄・リセットの確認 */
   confirmAbandon: boolean;
   /** 「ターン終了」の確認（この端末の担当で、まだ行動できる仲間がいる時だけ出す） */
   confirmEndTurn: boolean;
   setConfirmEndTurn: (v: boolean) => void;
   rollFx: RollFx | null;
+  /** 重なりの演出（Step C）: 揺れ・広がる輪を始めた合図。見た目だけ（状態・乱数・同期は変えない） */
+  synergyFx: { id: number; tier: 2 | 3 } | null;
   popups: Popup[];
   unitFx: Record<string, UnitFx>;
+  callout: Callout | null;
+  impactFx: Record<string, ImpactFx>;
+  fieldShake: { id: number } | null;
+  guardFx: Record<string, { id: number }>;
   retargets: Record<string, number>;
   flash: { cardUid: string; text: string; id: number } | null;
   hint: { text: string; id: number } | null;
@@ -170,7 +186,8 @@ interface StoreState {
   /** 道具を使う（userId = 袋の持ち主。戦闘中は操作中のキャラ） */
   usePouch: (itemUid: string, targetHeroId: string, userId?: string) => string | undefined;
   setSettings: (s: Partial<Settings>) => void;
-  openSheet: (s: Sheet) => void;
+  /** heroId: パーティの窓で最初に見せるキャラ（世界マップの顔を押した時など） */
+  openSheet: (s: Sheet, heroId?: string) => void;
   setConfirmAbandon: (v: boolean) => void;
   /** tone: error = 操作が通らなかった（音を変える。K6）、offline = 通信できなかった */
   showToast: (text: string, tone?: 'info' | 'error' | 'offline') => void;
@@ -405,7 +422,7 @@ export const useBattle = create<StoreState>((set, get) => {
     presentationTimer = null; frames = []; pendingNotices = [];
     for (const timer of uiTimers) clearTimeout(timer);
     uiTimers.clear();
-    set({ presentationBusy: false, phaseBanner: null, cutins: [], petPulses: {}, popups: [], unitFx: {}, rollFx: null });
+    set({ presentationBusy: false, phaseBanner: null, cutins: [], petPulses: {}, popups: [], unitFx: {}, rollFx: null, synergyFx: null, callout: null, impactFx: {}, fieldShake: null, guardFx: {} });
     if (enemyWaiting) { enemyWaiting = false; setTimeout(scheduleEnemy, 0); }
   };
   /** 見ている戦闘の手番が変わっていたら、帯を出す手番を返す（出したことにする） */
@@ -465,7 +482,12 @@ export const useBattle = create<StoreState>((set, get) => {
       if (e.perfect) vibrate(get().settings, VIBRATION.perfect);
     }
     playFrameSounds(frame);
+    if (frame.synergy && frame.synergy >= 2) set({ synergyFx: { id: fxId++, tier: frame.synergy as 2 | 3 } });
     if (frame.motions?.length) set(s => ({ unitFx: { ...s.unitFx, ...Object.fromEntries(frame.motions!.map(m => [m.unitId, { kind: m.kind, id: fxId++ }])) } }));
+    if (frame.callout) set({ callout: { ...frame.callout, id: fxId++ } });
+    if (frame.impacts?.length) set(s => ({ impactFx: { ...s.impactFx, ...Object.fromEntries(frame.impacts!.map(({ unitId, ...rest }) => [unitId, { ...rest, id: fxId++ }])) } }));
+    if (frame.guards?.length) set(s => ({ guardFx: { ...s.guardFx, ...Object.fromEntries(frame.guards!.map(id => [id, { id: fxId++ }])) } }));
+    if (frame.shake) set({ fieldShake: { id: fxId++ } });
     for (const p of frame.popups ?? []) addPopup(p);
     showNotices(frame.notices ?? []);
   };
@@ -515,8 +537,13 @@ export const useBattle = create<StoreState>((set, get) => {
   const resetBattleUi = (b: BattleState): Partial<StoreState> => { clearPresentation(); bannerKey = ''; return ({
     selection: null,
     rollFx: null,
+    synergyFx: null,
     popups: [],
     unitFx: {},
+    callout: null,
+    impactFx: {},
+    fieldShake: null,
+    guardFx: {},
     retargets: {},
     flash: null,
     hint: null,
@@ -563,7 +590,7 @@ export const useBattle = create<StoreState>((set, get) => {
     // 扉を開けて部屋に入った（見ている場面）: 扉が開く演出が終わるまで、部屋の画面への切り替えを待つ（第3段階B2）
     const was = before ? viewOf(before, cmdScene) : undefined;
     if (was?.mode === 'dungeon' && was.dungeon && next.dungeon && cmdScene === scene && next.mode !== 'dungeon' && next.dungeon.currentRoomId !== was.dungeon.currentRoomId && !reducedMotion()) {
-      patch.doorOpen = { id: fxId++, scene, run: was.dungeon };
+      patch.doorOpen = { id: fxId++, scene, run: was.dungeon, roomId: next.dungeon.currentRoomId };
     }
     // 手番が移った: カットイン（自分のキャラなら大きく、ほかの人のキャラなら小さなお知らせ）
     if (before && turn && turn !== before.world?.turn) {
@@ -647,11 +674,17 @@ export const useBattle = create<StoreState>((set, get) => {
     activeId: saved?.activeId ?? '',
     selection: null,
     sheet: null,
+    sheetHeroId: null,
     confirmAbandon: false,
     confirmEndTurn: false,
     rollFx: null,
+    synergyFx: null,
     popups: [],
     unitFx: {},
+    callout: null,
+    impactFx: {},
+    fieldShake: null,
+    guardFx: {},
     retargets: {},
     flash: null,
     hint: null,
@@ -930,7 +963,7 @@ export const useBattle = create<StoreState>((set, get) => {
       }
     },
 
-    openSheet: (sheet) => set({ sheet, selection: sheet ? null : get().selection }),
+    openSheet: (sheet, heroId) => set({ sheet, sheetHeroId: heroId ?? null, selection: sheet ? null : get().selection }),
     setConfirmAbandon: (v) => set({ confirmAbandon: v }),
     setConfirmEndTurn: (v) => set({ confirmEndTurn: v }),
     showToast: (text, tone = 'info') => {

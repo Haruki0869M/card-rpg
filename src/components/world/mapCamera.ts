@@ -1,20 +1,41 @@
 // ===== 世界マップのカメラ（フェーズ2-D）。見た目だけ =====
-// 地図の上下に「見えている枠の半分」の余白を足して、地図の端のマスでも駒を枠の真ん中に置けるようにする
+// 地図の上下に余白を足して、地図の端のマスでも駒を「見えている所」の真ん中に置けるようにする
 // （始めの町が地図の下の端にあると、スクロールが一番下で止まって、駒が枠の下の端に寄っていた）。
+// 地図の枠の大きさはいつも同じ。下の操作パネル（移動中は小さな帯）は地図の上に重ねる。
+// inset = 地図の下の端からパネルが隠している高さ。カメラは「枠の上の端〜パネルの上の端」の真ん中に合わせる。
 
-/** 地図の上下の余白（px）。見えている枠の高さの半分 */
+/** 地図の上の余白（px）。枠の高さの半分 */
 export const mapPadY = (viewH: number) => Math.max(0, Math.round(viewH / 2));
 
-/** マスの中心 y（地図の中の座標）を枠の真ん中に置くスクロールの位置 */
-export const cameraTop = (y: number, viewH: number) => y + mapPadY(viewH) - viewH / 2;
+/**
+ * 地図の下の余白（px）。パネルの高さによらず同じ（パネルが縮んだり戻ったりしても、内容の高さが変わらず地図が動かない）。
+ * パネルが枠の高さまで隠しても、一番下のマスを見えている所の真ん中に置ける大きさ
+ */
+export const mapPadBottom = (viewH: number) => Math.max(0, Math.round(viewH));
+
+/** 見えている所（枠からパネルの分を引いた高さ）。パネルが大きすぎても少しは残す */
+export const visibleH = (viewH: number, inset = 0) => Math.max(viewH * 0.25, viewH - inset);
+
+/** マスの中心 y（地図の中の座標）を、見えている所の真ん中に置くスクロールの位置 */
+export const cameraTop = (y: number, viewH: number, inset = 0) => y + mapPadY(viewH) - visibleH(viewH, inset) / 2;
 
 /**
- * 行き先を選んだ時: 選んだマスが枠の中に見えていれば動かさない（タップした所がずれないように）。
+ * 行き先を選んだ時: 選んだマスが見えている所に入っていれば動かさない（タップした所がずれないように）。
  * 見えていなければ、今の駒と選んだマスの中間を真ん中にする。戻り値は新しいスクロールの位置（動かさない時は undefined）
  */
-export function revealTop(hereY: number, selY: number, scrollTop: number, viewH: number, margin: number): number | undefined {
+export function revealTop(hereY: number, selY: number, scrollTop: number, viewH: number, margin: number, inset = 0): number | undefined {
   const pad = mapPadY(viewH);
+  const vh = visibleH(viewH, inset);
   const sy = selY + pad;
-  if (sy >= scrollTop + margin && sy <= scrollTop + viewH - margin) return undefined;
-  return (hereY + selY) / 2 + pad - viewH / 2;
+  if (sy >= scrollTop + margin && sy <= scrollTop + vh - margin) return undefined;
+  return (hereY + selY) / 2 + pad - vh / 2;
+}
+
+/**
+ * 横も同じ決まり（拡大して地図が枠より広い時）。選んだマスが枠の中に見えていれば動かさない。
+ * 見えていなければ、今の駒と選んだマスの中間を真ん中にする。横には余白が無い
+ */
+export function revealLeft(hereX: number, selX: number, scrollLeft: number, viewW: number, margin: number): number | undefined {
+  if (selX >= scrollLeft + margin && selX <= scrollLeft + viewW - margin) return undefined;
+  return (hereX + selX) / 2 - viewW / 2;
 }

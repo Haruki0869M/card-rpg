@@ -36,11 +36,11 @@ all.push(...await measure('世界マップ', [['移動力の判定', 'button:has
 await overlay(false);
 await edit((g) => { const w = g.world; const t = w.tiles.findIndex((x) => x.f && x.f.kind === 'dungeon' && x.f.id === 'emeraldTemple'); for (const id of Object.keys(w.pos)) w.pos[id] = t; w.story = undefined; });
 await tap(page.getByText('翠の神殿に入る'), 1200);
-await tryTap(page.getByText('探索力の判定'), 1300);
+await tryTap(page.locator('[data-explore-roll-button]'), 1300);
 await overlay(true); await beat(600); await shot('02-dungeon-zone');
 all.push(...await measure('ダンジョン', [['扉を開ける', 'button:has-text("扉を開ける")'], ['前進・左右', 'button:has-text("前進"), button:has-text("左へ"), button:has-text("右へ")'], ['手番を終える', 'button:has-text("手番を終える")'], ['撤退', 'button:has-text("撤退")']]));
 await overlay(false);
-await tap(page.getByRole('button', { name: /^扉を開ける/ }), 2600);
+await tap(page.getByRole('button', { name: /扉を開ける/ }), 2600);
 await overlay(true); await beat(500); await shot('03-battle-zone');
 all.push(...await measure('戦闘', [['ターン終了', 'button:has-text("ターン終了")'], ['手札のカード', '[data-card-index]'], ['敵', '[data-enemy]'], ['敵の予告', '[data-intent]'], ['味方の欄', '[data-ally]'], ['メニュー', '[aria-label="メニュー"]']]));
 await overlay(false);

@@ -28,7 +28,7 @@ import {
   update,
 } from 'firebase/database';
 import type { Backend, Unsubscribe } from './backend';
-import { FIREBASE_CONFIG, hasFirebaseConfig } from './firebaseConfig';
+import { FIREBASE_CONFIG } from './firebaseConfig';
 
 export interface FirebaseOptions {
   /** エミュレーターのホスト（例 '127.0.0.1'）。省略で本番 */
@@ -37,15 +37,6 @@ export interface FirebaseOptions {
   appName?: string;
 }
 
-/** URL の ?emu=1（または ?emu=ホスト名）でエミュレーターを使う */
-export function emulatorFromUrl(): string | undefined {
-  if (typeof location === 'undefined') return undefined;
-  const v = new URLSearchParams(location.search).get('emu');
-  if (v === null) return undefined;
-  return v === '' || v === '1' ? location.hostname || '127.0.0.1' : v;
-}
-
-export const onlineAvailable = () => hasFirebaseConfig() || !!emulatorFromUrl();
 
 class FirebaseBackend implements Backend {
   private offset = 0;

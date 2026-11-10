@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { slotTiming } from './slotTiming';
 import { TIMING } from '../data/balance';
 import { applyGameCommand, createBattle, createGame, stateHash, toPartyMember } from '../engine';
 import type { BattleEvent, GameCommand } from '../types';
@@ -27,7 +28,10 @@ describe('表示専用タイマーと能力カットイン', () => {
     const events: BattleEvent[] = [{ type: 'damage', sourceId: 'h0', unitId: 'e0', amount: 5, blocked: 0 }, { type: 'roll', characterId: 'h0', cardId: 'strike', targetId: 'e0', chance: 80, results: ['hit'], successes: 1, perfect: true, summary: '確認' }];
     useBattle.getState().applyRemote({ state: g, battleEvents: events }, wire);
     vi.advanceTimersByTime(1); expect(useBattle.getState().unitFx.h0.kind).toBe('attack'); expect(useBattle.getState().unitFx.e0).toBeUndefined();
-    vi.advanceTimersByTime(TIMING.actionLead * 1000 + 1); expect(useBattle.getState().unitFx.e0.kind).toBe('hit');
+    // 段階C（2026-11）: カードの効果は、スロットが全部止まってから出る（スロットの途中では、まだ被弾しない）
+    const slot = slotTiming(['hit']).total;
+    vi.advanceTimersByTime(TIMING.actionLead * 1000 + 1); expect(useBattle.getState().unitFx.e0).toBeUndefined();
+    vi.advanceTimersByTime((slot - TIMING.actionLead) * 1000); expect(useBattle.getState().unitFx.e0.kind).toBe('hit');
     expect(useBattle.getState().popups.some(p => p.text === '-5')).toBe(true);
     vi.advanceTimersByTime(2000); expect(useBattle.getState().popups).toEqual([]); expect(useBattle.getState().presentationBusy).toBe(false);
     expect(stateHash(useBattle.getState().full)).toBe(hash);
@@ -82,7 +86,7 @@ describe('表示専用タイマーと能力カットイン', () => {
   it('移動力のお供は操作確定時に1回だけ通知し、同じ判定は再送しても増えない', () => {
     const g = setup(); g.mode = 'world'; g.battle = undefined; g.world!.story = undefined; g.heroes[0].pet!.petId = 'rabbit'; g.heroes[0].pet!.color = 'white';
     useBattle.getState().loadRemote(g);
-    const cmd = { type: 'WORLD_ROLL_MOVE' as const, playerId: 'P1' as const, heroId: 'h0', focusUsed: 0 };
+    const cmd = { type: 'WORLD_ROLL_MOVE' as const, playerId: 'P1' as const, heroId: 'h0' };
     const r = applyGameCommand(g, cmd); expect(r.error).toBeUndefined(); useBattle.getState().applyRemote(r, cmd);
     expect(useBattle.getState().cutins).toHaveLength(1); expect(useBattle.getState().cutins[0].name).toBe('移動力+1');
     expect(useBattle.getState().dispatchWire(cmd)).toBeTruthy(); expect(useBattle.getState().cutins).toHaveLength(1);

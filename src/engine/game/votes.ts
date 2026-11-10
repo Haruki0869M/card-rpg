@@ -7,9 +7,9 @@ import { findHero, sceneHeroes } from './heroes';
 
 /** みんなで決める操作の種類 */
 /** 全員一致で決める操作（多数決にしない） */
-export const UNANIMOUS = new Set<GameCommand['type']>(['ENTER_ROOM']);
+export const UNANIMOUS = new Set<GameCommand['type']>(['ENTER_ROOM', 'CHEST_OPENER', 'EXPLORE_ROLLER']);
 
-export const VOTED_COMMANDS = new Set<GameCommand['type']>(['ENTER_ROOM', 'RETREAT', 'CHOOSE_EVENT', 'FINISH_EVENT', 'REST', 'LEAVE_CHEST', 'RETURN_TO_HUB', 'FINISH_REWARD', 'EXPLORE_END']);
+export const VOTED_COMMANDS = new Set<GameCommand['type']>(['ENTER_ROOM', 'RETREAT', 'CHOOSE_EVENT', 'FINISH_EVENT', 'REST', 'LEAVE_CHEST', 'RETURN_TO_HUB', 'FINISH_REWARD', 'EXPLORE_END', 'CHEST_OPENER', 'EXPLORE_ROLLER']);
 
 /** 選べるプレイヤー（場面にいる、生きているキャラの担当） */
 export const voters = (game: GameState): PlayerId[] => [...new Set(sceneHeroes(game).map((h) => h.playerId))];
@@ -23,14 +23,16 @@ export const voteCtx = (game: GameState) => `${game.mode}:${game.dungeon?.curren
 /** その操作を、みんなで決める必要があるか（ダンジョンの中か、戦闘の報酬で、プレイヤーが2人以上） */
 export function needsVote(game: GameState, cmd: GameCommand): boolean {
   if (!VOTED_COMMANDS.has(cmd.type)) return false;
-  if (!game.activeScene && cmd.type !== 'FINISH_REWARD') return false;
+  // 宝箱の開け役は、世界マップの宝箱でも（同行した仲間がいれば）みんなで決める
+  if (!game.activeScene && cmd.type !== 'FINISH_REWARD' && cmd.type !== 'CHEST_OPENER') return false;
   return voters(game).length > 1;
 }
 
 /** 同じ選択とみなす目印（だれが出したか・判定するキャラは別でも、同じ選択肢なら同じ） */
 export function voteKey(cmd: GameCommand): string {
   const c = cmd as Record<string, unknown>;
-  return JSON.stringify([cmd.type, c.roomId ?? null, c.optionIndex ?? null, c.kind ?? null]);
+  // 宝箱の開け役は「だれに任せるか」が選択肢そのもの
+  return JSON.stringify([cmd.type, c.roomId ?? null, c.optionIndex ?? null, c.kind ?? null, cmd.type === 'CHEST_OPENER' || cmd.type === 'EXPLORE_ROLLER' ? cmd.heroId : null]);
 }
 
 /** 今の票（場面が変わっていたら空） */

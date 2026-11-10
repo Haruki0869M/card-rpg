@@ -185,7 +185,8 @@ async function run(party, difficulty) {
   let result = 'timeout';
   let previous = '';
   let unchanged = 0;
-  for (let step = 0; step < 900; step++) {
+  // 手数の上限: ダンジョンを大きくした（鍵40行）ので、4人で最初のダンジョンを抜けるまで900では足りない
+  for (let step = 0; step < 2400; step++) {
     await page.waitForTimeout(60);
     if (await page.locator('[data-world-moving]').count()) {
       await waitForWorldMovement(page);
@@ -217,7 +218,7 @@ async function run(party, difficulty) {
         } else issues.add('制覇後の物語が出ない');
       }
       // 地上に戻ったあと: 世界マップか、手番が来た別の組のダンジョン（M3-D）
-      if (!(await page.locator('[data-world-map]').count()) && !(await page.getByText('探索力の判定').count())) { issues.add('世界マップに戻れない'); await page.screenshot({ path: `screenshots/adv-${party}p-noworld.png` }); console.log((await page.locator('body').innerText()).slice(0, 300)); }
+      if (!(await page.locator('[data-world-map]').count()) && !(await page.locator('[data-explore-roll-button]').count())) { issues.add('世界マップに戻れない'); await page.screenshot({ path: `screenshots/adv-${party}p-noworld.png` }); console.log((await page.locator('body').innerText()).slice(0, 300)); }
       break;
     }
     if (await page.getByText('世界の終わり…', { exact: true }).count()) {
@@ -257,8 +258,8 @@ async function run(party, difficulty) {
         await page.screenshot({ path: `screenshots/adv-world.png` });
       }
       if (await clickText(page, `${FIRST_DUNGEON[SCENARIO].name}に入る`)) continue;
-      if (await page.getByText('移動力の判定').count()) {
-        await page.getByText('移動力の判定').click({ timeout: 3000 }).catch(() => {});
+      if (await page.locator('[data-roll-move]').count()) {
+        await page.locator('[data-roll-move]').click({ timeout: 3000 }).catch(() => {});
         continue;
       }
       const reach = page.locator('[data-reach]');
@@ -311,38 +312,26 @@ async function run(party, difficulty) {
         seen.add('dungeon');
         await check(page, 'dungeon');
       }
-      // 手番の最初は探索力を決める。使い切ったら「手番を終える」（M3-D）
-      if (await page.getByText('探索力の判定').count()) {
-        await page.getByText('探索力の判定').click();
+      // 2人以上のプレイヤー: 先に「だれが判定する？」をみんなで決める（おすすめの人＝一番上に任せる）
+      if (await page.locator('[data-explore-roller]').count()) {
+        await page.locator('[data-explore-roller] button').first().click();
         continue;
       }
-      // 第3段階: 通路を歩いて扉を開ける。目の前に開けられる扉があれば開け、地図に見えている扉があればその前まで歩く
-      const enabled = async (loc) => (await loc.count()) > 0 && (await loc.first().isEnabled());
-      const open = page.getByRole('button', { name: /^扉を開ける/ });
-      if (await enabled(open)) {
-        await open.first().click();
+      // 手番の最初は探索のサイコロを振る（1〜3 = 選べる扉の数）。選び終えたら「手番を終える」
+      if (await page.locator('[data-explore-roll-button]').count()) {
+        await page.locator('[data-explore-roll-button]').click();
         continue;
       }
-      // 段階B: 大きな地図はミニマップから開く
-      if (!(await page.locator('[data-map-overlay]').count())) await page.getByLabel('地図を開く').click();
-      const door = page.locator('[data-door="open"]');
-      const closeMap = () => page.getByLabel('地図を閉じる').click().catch(() => {});
-      if (await door.count()) {
-        await door.first().click({ force: true });
-        const walk = page.getByRole('button', { name: '歩く', exact: true });
-        if (await enabled(walk)) {
-          await walk.click();
-          continue;
-        }
-        // 扉は見えているが、歩数が足りない（または今いる所が扉の前）: 扉を向くか、手番を終える
-        await closeMap();
-        if (await clickEnabled(page, '扉を向く')) continue;
-        await clickText(page, '手番を終える');
+      // 扉を選ぶだけ: 前にある扉のボタン（左の扉を先に）。押すと扉の前まで自動で歩いて開ける
+      const doorBtn = page.locator('[data-door-choice]:not([disabled])');
+      if ((await doorBtn.count()) && (await page.locator('[data-dungeon-controls="ready"]').count())) {
+        await doorBtn.first().click();
         continue;
       }
-      await closeMap();
-      // まだ扉が見えていない: 前・右・左の順に歩いて探す。歩けなければ手番を終える
-      if ((await clickEnabled(page, '扉を向く')) || (await clickEnabled(page, '前進')) || (await clickEnabled(page, '右へ')) || (await clickEnabled(page, '左へ'))) continue;
+      if (await page.locator('[data-dungeon-controls="busy"]').count()) {
+        await page.waitForTimeout(100);
+        continue;
+      }
       await clickText(page, '手番を終える');
       continue;
     }

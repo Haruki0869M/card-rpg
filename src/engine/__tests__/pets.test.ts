@@ -141,7 +141,7 @@ describe('突発イベント', () => {
       let g = createGame({ seed, scenarioId: 'corruptionKing', difficulty: 'normal', party: [{ classId: 'warrior', gender: 'male', name: 'a', playerId: P }] });
       g.world!.story = undefined;
       const h = g.heroes[0];
-      g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: h.id, focusUsed: 0 });
+      g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: h.id });
       const w = g.world!;
       const from = w.pos[h.id];
       const to = w.tiles.findIndex((t, i) => i !== from && !t.f && Math.abs(i - from) === 1 && !w.wanderers.some((x) => x.tile === i));

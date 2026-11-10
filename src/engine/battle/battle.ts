@@ -39,7 +39,7 @@ import { abilityTriggered, addLog, enemyName, findAlly, healUnit, loseHp, nameOf
 
 export { enemyName, findAlly, findEnemy, unitName } from './units';
 
-export const STATE_VERSION = 16;
+export const STATE_VERSION = 17;
 export { slotPreviewLimitOf } from './preview';
 
 // ---------- 生成 ----------
@@ -181,9 +181,6 @@ export function statusChanceBonus(st: Statuses): number {
 function consumeChanceBonus(st: Statuses) {
   for (const [id, v] of Object.entries(st)) if (v && getStatus(id).chanceBonus) st[id] = 0;
 }
-
-/** 対象として敵を選ぶ必要があるカードか */
-export const needsEnemyTarget = (card: CardDef) => card.target === 'enemy';
 
 /** カードが使えない理由（使えるなら null） */
 export function unusableReason(state: BattleState, ally: AllyState, card: CardDef): string | null {

@@ -15,6 +15,8 @@ export default defineConfig({
           groups: [
             { name: 'react', test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
             { name: 'motion', test: /node_modules[\\/](framer-motion|motion-dom|motion-utils)[\\/]/ },
+            // オンラインの部品は、オンラインを始める時だけ読む（onlineStore.ts の import()）。vendor に混ぜると最初から読まれる
+            { name: 'firebase', test: /node_modules[\\/](firebase|@firebase)[\\/]/ },
             { name: 'vendor', test: /node_modules[\\/]/ },
           ],
         },

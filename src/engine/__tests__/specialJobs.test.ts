@@ -52,11 +52,11 @@ describe('特殊職5職のデータと転職', () => {
     const j = CLASSES.get(id); expect(j.weaponType).toBe(main); expect(j.subWeapons).toEqual([sub]);
     expect(ITEMS.get(j.startingEquipment.weapon!).weaponType).toBe(main);
   });
-  it.each(jobs)('%sはLv3・実績・神殿を満たして転職し、初期武器と代表3枚を得る', id => {
-    let g = inTemple(); const j = CLASSES.get(id), h = g.heroes[0]; h.classId = j.from![0]; h.level = 2; delete h.equipment.weapon;
+  it.each(jobs)('%sは特殊職のLv・実績・神殿を満たして転職し、初期武器と代表3枚を得る', id => {
+    let g = inTemple(); const j = CLASSES.get(id), h = g.heroes[0]; h.classId = j.from![0]; h.level = BALANCE.jobChange.special - 1; delete h.equipment.weapon;
     h.feats = { [j.requires!.feat]: j.requires!.count };
     expect(jobOptions(h, g).find(o => o.job.id === id)?.ready).toBe(false);
-    h.level = 3; h.feats[j.requires!.feat]--;
+    h.level = BALANCE.jobChange.special; h.feats[j.requires!.feat]--;
     expect(jobOptions(h, g).find(o => o.job.id === id)?.progress).toBe(j.requires!.count - 1);
     h.feats[j.requires!.feat]++;
     const r = applyGameCommand(g, { type: 'CHANGE_JOB', playerId: 'P1', heroId: h.id, jobId: id }); expect(r.error).toBeUndefined(); g = r.state;
@@ -67,7 +67,7 @@ describe('特殊職5職のデータと転職', () => {
   });
   it.each(jobs)('%sは共用する祭壇で転職でき、別の祭壇では条件が揃っていても転職できない', id => {
     const g = fresh(), h = g.heroes[0], j = CLASSES.get(id), w = g.world!;
-    h.classId = j.from![0]; h.level = 3; h.feats = { [j.requires!.feat]: j.requires!.count };
+    h.classId = j.from![0]; h.level = BALANCE.jobChange.special; h.feats = { [j.requires!.feat]: j.requires!.count };
     const own = SANCTUARIES.all.find(s => s.altars?.includes(id))!, other = SANCTUARIES.all.find(s => s.kind === 'altar' && !s.altars?.includes(id))!;
     for (const [def, ready] of [[own, true], [other, false]] as const) {
       const tile = w.tiles.findIndex(t => t.f?.id === def.id); w.pos.h0 = tile;
@@ -211,7 +211,7 @@ describe('祭壇の半減と保存再開', () => {
     const tile = w.tiles.findIndex(t => t.f?.id === 'necromancerAltar'); old.mode = 'sanctuary'; old.party = ['h0'];
     old.sanctuary = { sanctuaryId: 'necromancerAltar', heroId: 'h0', tile }; w.pos.h0 = tile;
     const before = structuredClone(old), next = migrateGame(structuredClone(old))!;
-    expect(next.version).toBe(16); expect(next.world!.tiles.filter(t => t.f?.kind === 'altar')).toHaveLength(5);
+    expect(next.version).toBe(17); expect(next.world!.tiles.filter(t => t.f?.kind === 'altar')).toHaveLength(5);
     expect(next.sanctuary).toEqual({ sanctuaryId: 'timeMageAltar', heroId: 'h0', tile }); expect(next.world!.tiles[tile].f?.id).toBe('timeMageAltar');
     expect(next.rngState).toBe(before.rngState); expect(next.world!.pos).toEqual(before.world!.pos);
     next.world!.tiles.forEach((t, i) => { expect(t.t).toBe(before.world!.tiles[i].t); expect(t.seen).toBe(before.world!.tiles[i].seen); });

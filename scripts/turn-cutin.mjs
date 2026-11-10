@@ -1,4 +1,4 @@
-// 手番のカットインの画面確認（docs/tasks/turn-cutin.md）
+// 手番のカットインの画面確認（docs/archive/tasks/turn-cutin.md）
 // 1台2人で、世界マップの P1→P2 の受け渡し（大きなカットイン・「スマホを P2 さんに渡してください」・自動で消える）、
 // タップですぐ消せること、世界マップ→ダンジョンの組の番（カットインの後ろでダンジョンに切り替わっている）を、360/390/480px で確かめる。
 // 使い方: npx vite build && npx vite preview --port 4173 を起こしてから node scripts/turn-cutin.mjs（URL で変更可）

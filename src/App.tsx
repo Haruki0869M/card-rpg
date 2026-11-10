@@ -4,6 +4,7 @@ import { BottomBar, TopBar } from './components/battle/Bars';
 import { ConfirmDialog } from './components/ui/ConfirmDialog';
 import { Battlefield } from './components/battle/Battlefield';
 import { FocusPanel } from './components/battle/FocusPanel';
+import { useElementSize } from './hooks/useElementSize';
 import { SlotPreviewDialog } from './components/battle/SlotPreviewDialog';
 import { Hand } from './components/battle/Hand';
 import { PartyStrip } from './components/battle/PartyStrip';
@@ -34,6 +35,8 @@ import { findAlly } from './engine';
 import { useBackButton } from './hooks/useBackButton';
 import { HelpScreen } from './components/help/HelpScreen';
 import { useHelp } from './store/help';
+import { useLore } from './store/lore';
+import { Lorebook } from './components/lorebook/Lorebook';
 import { FirstBattleGuide } from './components/battle/FirstBattleGuide';
 import { useDetail } from './hooks/usePress';
 import { useBattle } from './store/battleStore';
@@ -46,6 +49,11 @@ function useKeyboard() {
       // 遊び方・用語集を開いている間は、Esc で閉じるだけ（下の画面は操作しない）
       if (useHelp.getState().open) {
         if (e.key === 'Escape') useHelp.getState().back();
+        return;
+      }
+      // 冒険の途中に開いた伝承の書: Esc で1つ戻るだけ（下の画面は操作しない）
+      if (useLore.getState().open) {
+        if (e.key === 'Escape') useLore.getState().back();
         return;
       }
       const s = useBattle.getState();
@@ -79,17 +87,20 @@ function BattleScreen() {
   const presenting = useBattle(s => s.presentationBusy);
   const selection = useBattle((s) => s.selection);
   const cancel = useBattle((s) => s.cancel);
-  const focus = (
-    <AnimatePresence>{selection && <FocusPanel key="focus" />}</AnimatePresence>
-  );
+  const calm = useBattle((s) => s.settings.cutinMode === 'simple');
+  const [dockRef, dock] = useElementSize<HTMLDivElement>();
   return (
-    <div className="game-bg safe-pad relative flex h-full w-full max-w-[480px] flex-col overflow-hidden" onClick={() => selection && cancel()} data-battle-presenting={presenting || undefined}>
+    <div className="game-bg safe-pad relative flex h-full w-full max-w-[480px] flex-col overflow-hidden" onClick={() => selection && cancel()} data-battle-presenting={presenting || undefined} data-calm={calm || undefined}>
       <TopBar />
       <FirstBattleGuide />
       <Battlefield />
-      <PartyStrip />
-      {/* 対象を押せるよう、操作パネルは手札と入れ替えて通常の配置に置く。 */}
-      {selection ? focus : <Hand />}
+      {/* 段階A: 味方の枠と手札はいつも同じ高さで置く（カードを選んでも戦場は縮まない）。
+          操作パネルはその上に重ねる（味方の下半身〜手札の上。戦場の敵・味方の上半身は押せるまま） */}
+      <div ref={dockRef} className="relative flex min-h-0 flex-col" data-battle-dock style={{ ['--dock-h' as string]: `${dock.height}px` }}>
+        <PartyStrip />
+        <Hand />
+        <AnimatePresence>{selection && <FocusPanel key="focus" />}</AnimatePresence>
+      </div>
       <BottomBar />
       {!presenting && <ResultScreen />}
       <SlotPreviewDialog />
@@ -208,7 +219,8 @@ export default function App() {
   const closeTop = useBattle((s) => s.closeTop);
   const detail = useDetail(s => s.detail);
   const helpOpen = useHelp((s) => s.open);
-  useEffect(() => { if (screen !== 'game') useDetail.getState().hide(); }, [screen]);
+  const loreOpen = useLore((s) => s.open);
+  useEffect(() => { if (screen !== 'game') { useDetail.getState().hide(); useLore.getState().close(); } }, [screen]);
   // 伝承の書（K5）: 冒険の状態が変わるたびに、見た物・手に入れた物をこの端末の記録に足す（見るだけ。状態・同期は変えない）
   useEffect(() => {
     useProfile.getState().observe(useBattle.getState().full);
@@ -217,9 +229,11 @@ export default function App() {
     });
   }, []);
 
-  useBackButton(helpOpen || !!detail || !!selection || !!sheet || confirmAbandon || screen === 'setup' || screen === 'create' || screen === 'join', () => {
+  useBackButton(helpOpen || loreOpen || !!detail || !!selection || !!sheet || confirmAbandon || screen === 'setup' || screen === 'create' || screen === 'join', () => {
     // 遊び方・用語集が一番上（項目 → 目次 → 閉じる）。閉じると開いた画面に戻る
     if (useHelp.getState().open) { useHelp.getState().back(); return true; }
+    // 伝承の書（冒険の途中）: 詳細 → 本の順に閉じる。閉じると開いたメニューに戻る
+    if (useLore.getState().open) { useLore.getState().back(); return true; }
     if (useDetail.getState().detail) { useDetail.getState().back(); return true; }
     return closeTop();
   });
@@ -264,6 +278,12 @@ export default function App() {
             {screen === 'game' && <AbilityCutins />}
             {screen === 'game' && <TurnCutin />}
           </>}
+          {/* 伝承の書（Step C ②）: 冒険の途中にメニューから開く。読むだけ。閉じると開いたメニューに戻る */}
+          {loreOpen && screen === 'game' && (
+            <div className="absolute inset-0 z-[70]">
+              <Lorebook inAdventure onClose={() => useLore.getState().close()} />
+            </div>
+          )}
           <HelpScreen />
           <Toast />
         </div>

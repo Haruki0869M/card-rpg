@@ -1,0 +1,12 @@
+import { open, URL } from './common.mjs';
+import { readFileSync } from 'node:fs';
+const { browser, page, shot, text, errors } = await open();
+await page.goto(URL);
+const d = readFileSync('scripts/archive/playtest/shots/save-start.json', 'utf8');
+await page.evaluate((d) => { localStorage.clear(); localStorage.setItem('card-rpg/adventure', d); }, d);
+await page.reload(); await page.waitForTimeout(800);
+await shot('01d-title-save'); console.log(await text());
+await page.getByRole('button', { name: /新しい冒険/ }).click(); await page.waitForTimeout(1500); console.log(await page.evaluate(() => [...document.querySelectorAll('button')].map(b => b.textContent.trim()).join(' ; ')));
+await shot('01e-title-confirm'); console.log(await text());
+await browser.close();
+console.log('errors', errors);

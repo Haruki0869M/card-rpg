@@ -30,8 +30,8 @@ await edit((g) => {
 });
 await tap(page.getByText('翠の神殿に入る'), 1200);
 await edit((g) => { (g.expeditions?.[0]?.dungeon ?? g.dungeon).rooms.find((r) => r.id === 'r0c0').enemies = ['forestWolf', 'toxicShroom', 'forestWolf'].map((defId) => ({ defId, level: 3 })); });
-await tryTap(page.getByText('探索力の判定'), 1300);
-await tap(page.getByRole('button', { name: /^扉を開ける/ }), 2600);
+await tryTap(page.locator('[data-explore-roll-button]'), 1300);
+await tap(page.getByRole('button', { name: /扉を開ける/ }), 2600);
 await shot('01-battle');
 note(`戦闘の始め: ${(await text()).slice(0, 400)}`);
 await arm();

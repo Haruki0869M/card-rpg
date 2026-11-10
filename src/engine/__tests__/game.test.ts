@@ -396,11 +396,13 @@ function autoPlay(g: GameState, dungeonId: string, maxSteps = 4000): GameState {
         if (ev.result) g = run(g, { type: 'FINISH_EVENT', playerId: P });
         else {
           const def = EVENTS.get(ev.eventId);
-          const idx = def.options.findIndex((_, i) => {
-            const st = eventOptionState(g, ev.eventId, i);
-            return st.visible && !st.reason;
-          });
-          g = run(g, { type: 'CHOOSE_EVENT', playerId: P, optionIndex: idx, heroId: g.heroes.find((h) => h.hp > 0)!.id, focusUsed: 0 });
+          // 選ぶキャラは、その選択肢を選べる（お金がいる時は払える）キャラ
+          let pick = { idx: -1, heroId: '' };
+          for (let i = 0; i < def.options.length && pick.idx < 0; i++) {
+            const h = g.heroes.find((x) => x.hp > 0 && (() => { const st = eventOptionState(g, ev.eventId, i, x); return st.visible && !st.reason; })());
+            if (h) pick = { idx: i, heroId: h.id };
+          }
+          g = run(g, { type: 'CHOOSE_EVENT', playerId: P, optionIndex: pick.idx, heroId: pick.heroId, focusUsed: 0 });
         }
         break;
       }

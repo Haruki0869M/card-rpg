@@ -145,7 +145,7 @@ describe('探索・画面の操作・BGM の音（K6②）', () => {
   const fresh = () => createGame({ seed: 7, scenarioId: 'corruptionKing', difficulty: 'normal', party: [{ classId: 'warrior', name: '確認', gender: 'male', playerId: 'P1' }] });
   it('サイコロを振ると音が鳴り、同じ状態どうし（描画のやり直し）では鳴らない', () => {
     const g = fresh(); g.world!.story = undefined;
-    const cmd = { type: 'WORLD_ROLL_MOVE' as const, playerId: 'P1' as const, heroId: g.heroes[0].id, focusUsed: 0 };
+    const cmd = { type: 'WORLD_ROLL_MOVE' as const, playerId: 'P1' as const, heroId: g.heroes[0].id };
     const r = applyGameCommand(g, cmd); expect(r.error).toBeUndefined();
     expect(explorationSounds(g, r.state, cmd)).toContain('sfx_world_dice');
     expect(explorationSounds(r.state, r.state, cmd)).toEqual([]);

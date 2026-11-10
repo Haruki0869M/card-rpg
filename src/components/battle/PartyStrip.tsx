@@ -36,7 +36,7 @@ const AllyCard = memo(function AllyCard({ ally }: { ally: AllyState }) {
       data-dead={ally.dead || undefined}
       data-done={done || undefined}
       className={`panel ${chosen ? 'ring-2 ring-sky-300' : ''} relative flex min-w-0 flex-1 flex-col gap-[3px] rounded-xl px-1.5 pt-1 pb-1 transition-[transform,opacity,filter,box-shadow] duration-150 active:scale-[.97] ${
-        ally.dead ? 'opacity-50 grayscale' : done && !active ? 'opacity-60' : ''
+        ally.dead ? 'grayscale' : done && !active ? 'opacity-60' : ''
       }`}
       style={
         active
@@ -79,11 +79,18 @@ const AllyCard = memo(function AllyCard({ ally }: { ally: AllyState }) {
             ally.focus
           )}
         </span>
-        <span className={`ml-auto ${usable > 0 ? 'text-zinc-200' : 'text-zinc-500'}`}>{ally.dead ? '戦闘不能' : !mine ? '' : done ? '済' : `${usable}枚`}</span>
+        <span className={`ml-auto ${usable > 0 ? 'text-zinc-200' : 'text-zinc-500'}`}>{ally.dead ? '' : !mine ? '' : done ? '済' : `${usable}枚`}</span>
       </div>
       <div className="relative mt-1">
         <StatusChips s={ally.statuses} side="ally" onTap={() => setActive(ally.id)} />
       </div>
+      {/* 戦闘不能: 枠を暗くして、勝てば戻ることを書く（全文「戦闘不能（勝利でHP1復帰）」は詳細に。ステップB） */}
+      {ally.dead && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center rounded-xl bg-black/60 text-center text-[12px] leading-4 font-bold" data-fallen-note>
+          <span className="text-red-300">戦闘不能</span>
+          <span className="text-zinc-100">勝てばHP1</span>
+        </div>
+      )}
       {/* 呼び出したお供（幻獣・獣など）: 枠の左上に小さく。ターン終了時に攻撃する */}
       {!ally.dead && ally.airborne && <span className="absolute -top-3 left-7 rounded-full bg-sky-950 px-1 text-[12px] text-sky-100" data-airborne>跳躍中</span>}
       {!ally.dead && (!!ally.summons?.length || !!ally.attackCharge || !!ally.imbuedElement) && (

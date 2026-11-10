@@ -1,6 +1,6 @@
 # 星降る天空城：敵の絵の指示文
 
-> 作業書 `docs/tasks/K4-star-enemies.md` の §4。形は `prompts-enemies-frozenKingdom-mj.md` と同じ（Midjourney に貼る形）。
+> 作業書 `docs/archive/tasks/K4-star-enemies.md` の §4。形は `prompts-enemies-frozenKingdom-mj.md` と同じ（Midjourney に貼る形）。
 
 新規23体分。亜種5体は元の絵を使い回す。ボスの変身5段階を含め、画像は計28枚。
 

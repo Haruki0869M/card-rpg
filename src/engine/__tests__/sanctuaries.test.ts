@@ -60,7 +60,7 @@ describe('神殿と祭壇の配置・旧保存の引き継ぎ', () => {
     old.event = { eventId: 'rStrayBird', tile: old.world!.pos.h1, random: true };
     const before = structuredClone(old);
     const m = migrateGame(structuredClone(old))!;
-    expect(m).not.toBeNull(); expect(m.version).toBe(16);
+    expect(m).not.toBeNull(); expect(m.version).toBe(17);
     expect(m.rngState).toBe(before.rngState); expect(m.event).toEqual(before.event); expect(m.party).toEqual(before.party); expect(m.mode).toBe('event');
     const withoutFeatures = (g: GameState) => ({ ...g.world!, tiles: g.world!.tiles.map(({ f: _f, ...t }) => t) });
     expect(withoutFeatures(m)).toEqual(withoutFeatures(before));
@@ -76,7 +76,7 @@ describe('神殿と祭壇の配置・旧保存の引き継ぎ', () => {
     old.expeditions = [{ id: 'x1', heroes: ['h0'], mode: 'battle', battle: b }];
     const before = structuredClone(old);
     const m = migrateGame(old)!;
-    expect(m.expeditions?.[0].battle?.version).toBe(16);
+    expect(m.expeditions?.[0].battle?.version).toBe(17);
     expect(m.expeditions?.[0].battle?.rngState).toBe(before.expeditions![0].battle!.rngState);
     expect(m.expeditions?.[0].battle?.allies[0].equippedWeaponType).toBe('sword');
     expect(m.expeditions?.[0].heroes).toEqual(['h0']);
@@ -117,14 +117,14 @@ describe('施設の担当者と転職場所', () => {
     g = enter(fresh()); h = g.heroes[0];
     expect(jobPlaceAllows(g, h, special)).toBe(true); expect(jobPlaceAllows(g, h, CLASSES.get('swordSaint'))).toBe(true);
   });
-  it('特殊はLv3、最上位はLv4で、未達の実績も7/10と表示できる', () => {
-    const g = enter(fresh()), h = g.heroes[0]; h.classId = 'swordmaster'; h.level = 2;
-    h.feats = { 'kills:weapon:katana': 7, perfects: 15 };
+  it('特殊・最上位はそれぞれのLvで転職でき、未達の実績も7/条件の数と表示できる', () => {
+    const g = enter(fresh()), h = g.heroes[0]; h.classId = 'swordmaster'; h.level = BALANCE.jobChange.special - 1;
+    h.feats = { 'kills:weapon:katana': 7, perfects: CLASSES.get('swordSaint').requires!.count };
     expect(jobOptions(h, g).find(o => o.job.id === special.id)).toMatchObject({ ready: false, progress: 7 });
-    h.level = 3; h.feats['kills:weapon:katana'] = 10;
+    h.level = Math.min(BALANCE.jobChange.special, BALANCE.jobChange.mid - 1); h.feats['kills:weapon:katana'] = special.requires!.count;
     expect(jobOptions(h, g).find(o => o.job.id === special.id)?.ready).toBe(true);
     expect(jobOptions(h, g).find(o => o.job.id === 'swordSaint')?.ready).toBe(false);
-    h.level = 4; expect(jobOptions(h, g).find(o => o.job.id === 'swordSaint')?.ready).toBe(true);
+    h.level = BALANCE.jobChange.mid; expect(jobOptions(h, g).find(o => o.job.id === 'swordSaint')?.ready).toBe(true);
     h.classId = special.id; expect(jobOptions(h, g)).toEqual([]);
   });
   it('神殿と同じ位置でも、別の場面のキャラは転職できない', () => {

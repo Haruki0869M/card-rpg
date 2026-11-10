@@ -2,6 +2,7 @@
 // 敵の組み合わせはダンジョンごと（enemies/ の専用の敵）。
 // 制覇すると星環が手に入り、3つそろうと最終ダンジョンに入れる。ボスの手前に「物語の部屋」（event）を置く
 import type { DungeonDef } from '../../../../types';
+import { FINALE_EXTRA_FLOOR, KEY_EXTRA_FLOOR, grownLayout } from '../../extraFloor';
 
 const WINDMILL_POOLS: DungeonDef['pools'] = {
   battle: [['windSprite', 'clockworkSoldier'], ['starJelly', 'gearBeetle'], ['stormWindSprite', 'clockworkSoldier'], ['windSprite', 'starJelly', 'gearBeetle']],
@@ -35,7 +36,7 @@ const CAVE_POOLS: DungeonDef['pools'] = {
 
 type Layout = NonNullable<DungeonDef['layout']>;
 
-/** 風車の塔（8行。入門。突風と星屑の箱） */
+/** 風車の塔（元の並びは8行。extraFloor.ts で40行に広げる。入門。突風と星屑の箱） */
 const windmillLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
@@ -60,7 +61,7 @@ const windmillLayout: Layout = [
   [{ type: 'boss', next: [] }],
 ];
 
-/** 星見の天文台（8行。壁画と時計仕掛けの罠。強敵が2回） */
+/** 星見の天文台（元の並びは8行。extraFloor.ts で40行に広げる。壁画と時計仕掛けの罠。強敵が2回） */
 const observatoryLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
@@ -85,7 +86,7 @@ const observatoryLayout: Layout = [
   [{ type: 'boss', next: [] }],
 ];
 
-/** 月光の庭（9行。泉と飛行船の行商人。分かれ道が多い） */
+/** 月光の庭（元の並びは9行。extraFloor.ts で40行に広げる。泉と飛行船の行商人。分かれ道が多い） */
 const moonGardenLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
@@ -123,9 +124,8 @@ export const windmillTower: DungeonDef = {
   pools: WINDMILL_POOLS,
   bossChest: 'epic',
   rewardKey: 'ringWind',
-  corruptionOnClear: 5,
   clearStory: ['風の番人が、風になって消えた。', '塔の風車が、静かに回りだす。', '星環（風）を手に入れた！'],
-  layout: windmillLayout,
+  layout: grownLayout(windmillLayout, KEY_EXTRA_FLOOR),
 };
 
 export const observatory: DungeonDef = {
@@ -137,9 +137,10 @@ export const observatory: DungeonDef = {
   pools: OBSERVATORY_POOLS,
   bossChest: 'epic',
   rewardKey: 'ringStar',
-  corruptionOnClear: 5,
+  // 1つ目のダンジョンの鍵が要る（play-feedback-plan §4 C: 町や依頼を飛ばして、まっすぐ奥へ行けないように）
+  requiresKeys: ['ringWind'],
   clearStory: ['星の司書は、本を閉じて微笑んだ。', '「女王様を…お願いします」', '星環（星）を手に入れた！'],
-  layout: observatoryLayout,
+  layout: grownLayout(observatoryLayout, KEY_EXTRA_FLOOR),
 };
 
 export const moonlitGarden: DungeonDef = {
@@ -151,9 +152,11 @@ export const moonlitGarden: DungeonDef = {
   pools: GARDEN_POOLS,
   bossChest: 'legend',
   rewardKey: 'ringMoon',
-  corruptionOnClear: 5,
+  // 2つ目の鍵と、町の依頼を1つ（報告まで）が要る（冒険を長くする。町に寄る理由を作る）
+  requiresKeys: ['ringStar'],
+  requiresQuests: 1,
   clearStory: ['月の乙女が、花びらになって舞った。', '「ありがとう。女王様を、どうか」', '星環（月）を手に入れた！'],
-  layout: moonGardenLayout,
+  layout: grownLayout(moonGardenLayout, KEY_EXTRA_FLOOR),
 };
 
 export const skyCastle: DungeonDef = {
@@ -166,7 +169,7 @@ export const skyCastle: DungeonDef = {
   bossChest: 'legend',
   requiresKeys: ['ringWind', 'ringStar', 'ringMoon'],
   finale: true,
-  layout: [
+  layout: grownLayout([
     [{ type: 'battle', next: [0, 1] }],
     [
       { type: 'battle', next: [0, 1] },
@@ -183,7 +186,7 @@ export const skyCastle: DungeonDef = {
     [{ type: 'battle', next: [0] }],
     [{ type: 'event', eventId: 'starQueenThrone', next: [0] }],
     [{ type: 'boss', next: [] }],
-  ],
+  ], FINALE_EXTRA_FLOOR),
 };
 
 // ランダムダンジョン: 星屑の洞窟（部屋の並びを自動生成）

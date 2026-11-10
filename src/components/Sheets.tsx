@@ -10,7 +10,8 @@ import { cardOf } from '../data/cards';
 import { getClass } from '../data/classes';
 import { getItem, POUCH_LIMIT } from '../data/items';
 import { EQUIP_SLOTS, STAT_IDS, affinityFromStats, jobOptions, battleDeck, canEquip, describeAbility, expToNext, findAlly, heroFocusMax, heroMaxHp, heroStats, weaponRarity } from '../engine';
-import { LOCAL_PLAYER, isLocalPlayer } from '../store/battleConfig';
+import { LOCAL_PLAYER, isLocalPlayer, isOnlinePlay } from '../store/battleConfig';
+import { PLAYER_COLOR } from '../data/theme';
 import { useBattle } from '../store/battleStore';
 import { useOnline } from '../store/onlineStore';
 import { OnlinePanel } from './screens/OnlineScreens';
@@ -20,8 +21,9 @@ import { CandidateLine, ItemInfoArea } from './ItemDetail';
 import { usePress } from '../hooks/usePress';
 import { canChangeNow, JobSheetBody } from './JobSheet';
 import { PetPanel } from './ui/PetToken';
-import { HelpCircle } from 'lucide-react';
+import { BookOpen, HelpCircle } from 'lucide-react';
 import { useHelp } from '../store/help';
+import { useLore } from '../store/lore';
 
 /** 同じ場所にいる仲間（ダンジョンの中なら同じパーティ、世界マップなら同じマス） */
 function placeMates(game: GameState, hero: Hero): Hero[] {
@@ -88,6 +90,11 @@ function MenuSheet() {
         {/* 遊び方・用語集（Step A ③）: メニューの上に重ねて開く。閉じるとこのメニューに戻る */}
         <button onClick={() => useHelp.getState().openHelp()} className={row} data-menu-help>
           <HelpCircle size={18} className="text-amber-300" /> 遊び方・用語集
+          <ChevronRight size={18} className="ml-auto" />
+        </button>
+        {/* 伝承の書（Step C ②）: メニューの上に重ねて開く。読むだけ。閉じるとこのメニューに戻る */}
+        <button onClick={() => useLore.getState().openLore()} className={row} data-menu-lore>
+          <BookOpen size={18} className="text-amber-300" /> 伝承の書（図鑑）
           <ChevronRight size={18} className="ml-auto" />
         </button>
         <SettingsControls />
@@ -202,11 +209,29 @@ function PileSheet({ kind }: { kind: 'draw' | 'discard' }) {
 
 const SLOT_NAME: Record<EquipSlot, string> = { weapon: '武器', armor: '防具', accessory: '装飾品' };
 
+/** 遊ぶ人が2人以上か（1人で全員を動かす時は、持ち主を出さない） */
+export function showOwners(game: Pick<GameState, 'heroes'>) {
+  return isOnlinePlay() || new Set(game.heroes.map((h) => h.playerId)).size > 1;
+}
+
+/** どのプレイヤーのキャラか（P1〜P4。オンラインで自分のキャラは「自分」） */
+export function PlayerTag({ hero }: { hero: Pick<Hero, 'playerId'> }) {
+  const self = isOnlinePlay() && isLocalPlayer(hero.playerId);
+  return (
+    <span className="inline-block rounded px-1 text-[12px] leading-[14px] font-bold text-black" style={{ background: PLAYER_COLOR[hero.playerId] }} data-player-tag={hero.playerId}>
+      {self ? '自分' : hero.playerId}
+    </span>
+  );
+}
+
 function PartySheet() {
   const game = useBattle((s) => s.game)!;
   const dispatchGame = useBattle((s) => s.dispatchGame);
   const openSheet = useBattle((s) => s.openSheet);
   const [idx, setIdx] = useState(() => {
+    // 顔を押して開いた時は、そのキャラを見せる（ほかの人のキャラも見るだけならできる）
+    const asked = game.heroes.findIndex((h) => h.id === useBattle.getState().sheetHeroId);
+    if (asked >= 0) return asked;
     const preferred = game.mode === 'world' ? game.world?.turn : useBattle.getState().activeId;
     const i = game.heroes.findIndex(h => isLocalPlayer(h.playerId) && (h.id === preferred));
     return i >= 0 ? i : Math.max(0, game.heroes.findIndex(h => isLocalPlayer(h.playerId)));
@@ -224,6 +249,8 @@ function PartySheet() {
   const mates = inBattle ? [] : placeMates(game, hero);
   const [give, setGive] = useState<{ itemUid?: string; gold?: number } | null>(null);
   const [giveTo, setGiveTo] = useState<string | null>(null);
+  // 遊ぶ人が2人以上の時だけ、どのプレイヤーのキャラかを出す
+  const owners = showOwners(game);
 
   return (
     <BottomSheet title="パーティ・装備" onClose={() => openSheet(null)} tall>
@@ -238,7 +265,10 @@ function PartySheet() {
             className={`btn flex min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border-b-2 py-1 ${i === idx ? 'sel-on' : 'border-transparent bg-black/30'}`}
           >
             <HeroFace hero={h} size={30} dim={h.hp <= 0} />
-            <span className="truncate text-[12px] font-bold">{h.name}</span>
+            <span className="flex min-w-0 flex-col items-start leading-[14px]">
+              <span className="max-w-full truncate text-[12px] font-bold">{h.name}</span>
+              {owners && <PlayerTag hero={h} />}
+            </span>
           </button>
         ))}
       </div>
@@ -249,6 +279,11 @@ function PartySheet() {
           <div className="font-display text-[20px] leading-6">
             {hero.name} <span className="text-[13px]" style={{ color: cls.color }}>{cls.name}</span>
           </div>
+          {owners && (
+            <div className="text-[12px] text-zinc-300" data-sheet-owner>
+              <PlayerTag hero={hero} /> {mine ? 'のキャラ' : 'のキャラ（見るだけ）'}
+            </div>
+          )}
           <div className="text-[13px] text-amber-300">
             Lv{hero.level} <span className="text-zinc-400">EXP {hero.exp}/{expToNext(hero.level, hero.classId)}</span>
           </div>

@@ -9,6 +9,6 @@ export const bowSaint: ClassDef = {
   stats: { ...archer.stats, per: archer.stats.per + 8, dex: archer.stats.dex + 8 },
   battleAbility: { name: '必中', effect: { modifier: 'completeSlots', if: [{ kind: 'usedFocus' }, { kind: 'cardSingleTarget' }, { kind: 'cardHasDamage' }] } },
   exploreAbility: { id: 'bowSaintExplore', name: '鷹の目', description: '視界+2・奇襲の判定+15%', effect: { kind: 'combined', effects: [{ kind: 'tracking', vision: 2, hiddenFindBonus: 0 }, { kind: 'checkBonus', check: 'ambush', bonus: 15 }] } },
-  requires: { feat: 'perfects', count: 12, text: '完全成功12回' },
+  requires: { feat: 'perfects', count: 50, text: '完全成功50回' },
   cardPool: ["saintArrow","hawkVolley","skyPiercer","hawkFocus","heavenRain"], signature: ["saintArrow","hawkVolley","skyPiercer"],
 };

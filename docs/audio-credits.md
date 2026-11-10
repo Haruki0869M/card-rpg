@@ -88,7 +88,7 @@
 | sfx_step_snow | impact-sounds | footstep_snow_000.ogg | 0.5 | 6000 |
 | sfx_step_stone | impact-sounds | footstep_concrete_000.ogg | 0.5 | 6000 |
 | sfx_world_arrive | interface-sounds | drop_002.ogg | 0.45 | 6000 |
-| sfx_world_dice | casino-audio | dice-throw-3.ogg | 0.6 | 6000 |
+| sfx_world_dice | 合成（scripts/audio/synth-dice.mjs。素材なし） | - | 0.22 | 3000 |
 | sfx_world_night | music-jingles | jingles_PIZZI13.ogg | 0.6 | 6000 |
 | sfx_world_enter_town | music-jingles | jingles_PIZZI10.ogg | 0.6 | 6000 |
 | sfx_world_enter_dungeon | rpg-audio | doorClose_3.ogg | 0.6 | 6000 |
@@ -118,6 +118,12 @@
 - `scripts/audio/synth-pets.mjs` で合成（素材なし・ライセンスの心配なし）。12種 × A・B の2案。
 - オーナーが試聴ページ（https://claude.ai/artifact/TurtNWMNfWW3D7aBBeKs9Z ）で選んだ案を入れた: A = オカメインコ・子狼・黒猫・子亀・小竜・フクロウ・文鳥・シマエナガ、B = うさぎ・子狐・セキセイインコ・レッサーパンダ。
 - 高い声がしんどかったので、合成の時に 5kHz から上をなだらかに削り、声が高いほど小さくした（6kHz で約 −9dB）。鳴き声は効果音と別の音量（最初は 30%）で、同じお供の声は3秒空ける。
+
+## 2b. Claude が合成した音 — 連携・ジョブの能力（Step C）
+
+- `scripts/audio/synth-synergy.mjs` で合成（素材なし・ライセンスの心配なし）。作り直しはこのスクリプトの数値を変えて実行する。
+- `sfx_battle_combo`（連携: 880Hz→1175Hz のやわらかい2音）・`sfx_battle_ability`（ジョブの能力: 660Hz に薄く 990Hz を重ねた1音）。
+- オーナーの方針（静かでやさしい音）に合わせ、3.5kHz から上を削り、殴った音（sfx_hit_small: ピーク −7.5dB・平均 −21.9dB）より小さくした（連携 ピーク −14.0dB・平均 −25.9dB、能力 ピーク −14.9dB・平均 −27.0dB）。効果音の音量の設定に従う。
 
 ## 3. まだ音が無いもの
 
