@@ -193,7 +193,7 @@ export function FocusPanel() {
       {isAllyCard(card) && !card.secondaryTarget && <AllyTargetChips allyId={ally.id} candidates={cardTargets(battle, ally, card).map(unitIdOf)} chosen={selection.targetId} />}
       {card.secondaryTarget && <div className="text-center text-[12px] text-sky-100" data-secondary-target-guide>回復・支援する味方をタップしてください{secondary && `（選択中：${nameOf(secondary)}）`}</div>}
       {card.secondaryTarget && <AllyTargetChips allyId={ally.id} candidates={cardTargets(battle, ally, secondaryCard(card)).map(unitIdOf)} chosen={selection.allyTargetId} />}
-      {(ally.slotPreviewUsed ?? 0) < slotPreviewLimitOf(ally) && <button onClick={preview} disabled={needsTarget} className="btn btn-dark mt-1 min-h-11 w-full rounded-lg text-[14px] font-bold" data-preview-start>星読みで結果を見る（1戦闘1回）</button>}
+      {(ally.slotPreviewUsed ?? 0) < slotPreviewLimitOf(ally) && <button onClick={preview} disabled={needsTarget} className="btn btn-dark mt-1 min-h-11 w-full rounded-lg text-[14px] font-bold" data-preview-start>星読みで結果を見る（この戦闘であと{slotPreviewLimitOf(ally) - (ally.slotPreviewUsed ?? 0)}回）</button>}
 
       <div className="mt-1.5 flex items-center gap-2">
         <button

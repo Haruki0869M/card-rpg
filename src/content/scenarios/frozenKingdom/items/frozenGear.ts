@@ -18,13 +18,13 @@ export const frozenGear: ItemDef[] = [
   },
   {
     id: 'whiteWolfFang', name: '白狼の牙', slot: 'weapon', weaponType: 'dagger', rarity: 'rare', icon: 'dagger', scenario: 'frozenKingdom',
-    description: '白い狼の牙で作った短剣。素早い者に馴染む。', stats: { dex: 4, agi: 3 }, tags: ['physical'],
-    cards: [{ cardId: 'wtDaggerVenom', count: 2 }],
+    description: '白い狼の牙で作った短剣。力のある者にも馴染む。踊るように何度も斬る技が付く。', stats: { str: 3, dex: 4 }, tags: ['physical'],
+    cards: [{ cardId: 'wtDaggerDance', count: 2 }],
   },
   {
     id: 'blizzardBow', name: '吹雪の弓', slot: 'weapon', weaponType: 'bow', rarity: 'rare', icon: 'bow', scenario: 'frozenKingdom',
-    description: '吹雪の中でも的を外さない弓。', stats: { dex: 5, per: 3 }, tags: ['physical'],
-    cards: [{ cardId: 'wDoubleShot', count: 2 }],
+    description: '吹雪のように、敵全員へ矢を降らせる弓。', stats: { dex: 5, per: 3 }, tags: ['physical'],
+    cards: [{ cardId: 'wtBowShower', count: 2 }],
   },
   {
     id: 'springbringerScepter', name: '春告げの錫杖', slot: 'weapon', weaponType: 'scepter', rarity: 'legend', icon: 'scepter', scenario: 'frozenKingdom',
