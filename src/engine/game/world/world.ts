@@ -734,6 +734,9 @@ export function interact(game: GameState, cmd: Cmd<'WORLD_INTERACT'>, rng: Rng):
       const def = DUNGEONS.get(f.id);
       const gate = dungeonGateError(game, def);
       if (gate) return gate;
+      // 先に入った仲間の組がいれば、新しいダンジョンは作らずに合流する（組が通路にいる時だけ。断る時は何も変えない）
+      const join = dungeonJoin(game, tile);
+      if (join?.blocked) return join.blocked;
       // 一緒に入るのは、自分のキャラか、誘いを承知した他の人のキャラ
       const party = (cmd.party?.length ? cmd.party : here).filter((id) => here.includes(id) && (findHero(game, id)?.playerId === h.playerId || followingGroup(game, h.id).includes(id)));
       if (!party.includes(h.id)) party.unshift(h.id);
@@ -744,8 +747,12 @@ export function interact(game: GameState, cmd: Cmd<'WORLD_INTERACT'>, rng: Rng):
       onCorruptionChange(game, rng, before);
       if (game.mode === 'gameover') return undefined;
       for (const id of party) if (!w.acted.includes(id) && id !== h.id) w.acted.push(id);
+      if (join) {
+        joinExpedition(game, join.exp, party, rng);
+        return undefined;
+      }
       enterDungeonFromWorld(game, f.id, party, rng);
-      detachExpedition(game, rng);
+      detachExpedition(game, rng, tile);
       return undefined;
     }
   }
@@ -756,12 +763,13 @@ export function interact(game: GameState, cmd: Cmd<'WORLD_INTERACT'>, rng: Rng):
  * 入ったダンジョンを「世界マップと別の場面」にする。
  * 入ったキャラは世界マップの手番から外れ、世界マップは残りのキャラで続く（spec M3-C）
  */
-function detachExpedition(game: GameState, rng: Rng) {
+function detachExpedition(game: GameState, rng: Rng, entranceTile?: number) {
   const n = game.nextExpeditionId ?? 1;
   game.nextExpeditionId = n + 1;
   const exp: Expedition = {
     id: `x${n}`,
     heroes: [...(game.party ?? [])],
+    entranceTile,
     mode: game.mode,
     dungeon: game.dungeon,
     battle: game.battle,
@@ -775,6 +783,41 @@ function detachExpedition(game: GameState, rng: Rng) {
   game.dungeon = game.battle = game.reward = game.chest = game.event = game.battleInfo = game.battleBackground = undefined;
   game.party = undefined;
   game.mode = 'world';
+  advanceTurn(game, rng);
+}
+
+/** 組が通路にいない時の、今している事（合流を断る文に使う） */
+const BUSY_TEXT: Record<string, string> = { battle: '戦闘中', reward: '戦利品を分けている所', chest: '宝箱を開けている所', event: '出来事の途中', rest: '休憩中', cleared: 'ボスを倒して帰る所' };
+
+/**
+ * そのマスのダンジョンに、先に入った仲間の組がいるか（合流の相手。抜本的な見直し §1-4・オーナーの決定 5-B）。
+ * 同じダンジョンの見分け: ダンジョンのIDと入口のマスが同じ組。入口のマスの記録が無い組（古い保存）は、固定のダンジョンならIDだけで見分け、
+ * ランダムダンジョン（同じIDが別のマスにもある）は合流の相手にしない。
+ * 合流できるのは、組が通路にいる時だけ。それ以外は blocked に断る文が入る（手番も侵食度も変えない）
+ */
+export function dungeonJoin(game: GameState, tile: number): { exp: Expedition; blocked?: string } | undefined {
+  const f = game.world?.tiles[tile]?.f;
+  if (!f || f.kind !== 'dungeon') return undefined;
+  const same = (game.expeditions ?? []).filter((x) => x.dungeon?.dungeonId === f.id && (x.entranceTile !== undefined ? x.entranceTile === tile : !x.dungeon.random));
+  if (!same.length) return undefined;
+  const open = same.find((x) => x.mode === 'dungeon');
+  if (open) return { exp: open };
+  const exp = same[0];
+  const lead = exp.heroes.map((id) => findHero(game, id)).find((x) => x && x.hp > 0 && !x.retired) ?? findHero(game, exp.heroes[0]);
+  return { exp, blocked: `${lead?.name ?? '仲間'}たちは今、${BUSY_TEXT[exp.mode] ?? '手が離せない所'}です。終わってから合流しよう` };
+}
+
+/**
+ * 先に入った組に合流する: 組の今の通路に追いつく（位置は組で1つ。入口から別々に歩く形は作らない）。乱数は引かない。
+ * 合流したキャラの手番は終わる（組の手番の順番は、今までの先頭のキャラのまま。後から来た人は末尾）。出しかけの票は無効にする
+ */
+function joinExpedition(game: GameState, exp: Expedition, party: string[], rng: Rng) {
+  const joined = party.filter((id) => !exp.heroes.includes(id));
+  exp.heroes.push(...joined);
+  exp.vote = undefined;
+  const names = joined.map((id) => findHero(game, id)?.name).filter(Boolean).join('と');
+  addLog(game, `${names}が${exp.dungeon?.name ?? 'ダンジョン'}の仲間に追いついた！`);
+  game.party = undefined;
   advanceTurn(game, rng);
 }
 

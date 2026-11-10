@@ -31,6 +31,7 @@ import {
   worldDiceBonus,
   diceAverage,
   corruptionShown,
+  dungeonJoin,
 } from '../../engine';
 import { isLocalPlayer, isOnlinePlay } from '../../store/battleConfig';
 import { useBattle, type WorldMovePresentation } from '../../store/battleStore';
@@ -308,7 +309,12 @@ function interactLabel(game: GameState, tile: number): string | undefined {
   if (!f && sp) return sp.kind === 'peddler' ? '行商人と話す' : sp.kind === 'thief' ? 'コソ泥に近づく' : '落ちた星を調べる';
   if (!f) return undefined;
   if (f.kind === 'town') return game.world!.fallenTowns.includes(f.id) ? undefined : `${TOWNS.get(f.id).name}に入る`;
-  if (f.kind === 'dungeon') return `${DUNGEONS.get(f.id).name}に入る`;
+  if (f.kind === 'dungeon') {
+    // 先に入った仲間の組がいれば、合流する（組が通路にいる時だけ。戦闘中などは、押すと「終わってから」と知らせる）
+    const join = dungeonJoin(game, tile);
+    const lead = join ? game.heroes.find((h) => join.exp.heroes.includes(h.id) && h.hp > 0) : undefined;
+    return join ? `${lead?.name ?? '仲間'}たちに合流する（${DUNGEONS.get(f.id).name}）` : `${DUNGEONS.get(f.id).name}に入る`;
+  }
   if (f.kind === 'temple' || f.kind === 'altar') return `${SANCTUARIES.get(f.id).name}に入る`;
   if (f.used) return undefined;
   return { shrine: '祠で祈る', event: '調べる', landmark: '調べる', chest: '宝箱を開ける', tower: '見晴らしの塔に登る' }[f.kind];

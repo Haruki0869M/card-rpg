@@ -31,6 +31,7 @@ import {
   needsVote,
   notVoted,
   chestShared,
+  dungeonJoin,
 } from './index';
 
 export interface BotLog {
@@ -194,6 +195,8 @@ function worldStep(g: GameState, log: BotLog, memo: BotMemo): GameState {
   // 目的地に着いたら入る（1手番に1回だけ）
   if (at === target.tile && !memo.interacted.has(key)) {
     memo.interacted.add(key);
+    // 先に入った仲間の組が通路にいない（戦闘中など）時は合流できない: 入口で待つ
+    if (target.why !== 'grind' && dungeonJoin(g, at)?.blocked) return send(g, { type: 'WORLD_WAIT', playerId: p, heroId: h.id }, log);
     if (target.why !== 'grind') {
       const ng = send(g, { type: 'WORLD_INTERACT', playerId: p, heroId: h.id, party: livingHeroes(g).filter((x) => w.pos[x.id] === at).map((x) => x.id) }, log);
       if (ng !== g) return ng;

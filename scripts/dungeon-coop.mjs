@@ -2,6 +2,7 @@
 // - 探索のサイコロ・「だれが振る？」・「手番を終える」は無い。入ったらすぐ、2人が同じ扉を選ぶと開く（扉1つ＝手番1回）
 // - 絵の扉とボタンが同じ数・同じ並び。扉の予兆。P2 が自分のキャラのフォーカス1で「周囲の警戒」→ 2台とも先読みが見える
 // - 手番でない人が扉を押すと「こっち！」。選ばなかった扉は地図に残らない
+// - 合流: P1 が先に入り、P2 が後から同じ入口で「合流する」→ タブ1つ・顔2人・扉の投票が2人分。先の組が休憩中の時は断られて何も変わらない
 // 事前に: npx vite build && npx vite preview --port 4245 --host 127.0.0.1 &   と   npm run emulators &
 // 使い方: URL=http://127.0.0.1:4245/card-rpg/ WIDTH=390 node scripts/dungeon-coop.mjs（WIDTH は 360・390・480）
 import { mkdirSync } from 'node:fs';
@@ -255,6 +256,100 @@ await A.getByLabel('地図を閉じる').click();
 await shot(A, '11-room');
 await layout(A, '部屋の中');
 check((await A.locator('[data-room-here]').count()) === 1, `部屋の中では、部屋の種類を文字で出す（${(await A.locator('[data-room-here]').innerText().catch(() => '')).trim()}）`);
+
+// ===== 5. 合流（抜本的な見直し §1-4・オーナーの決定 5-B）: P1 が先に入り、P2 が後から合流 → タブ1つ・顔2人・扉の投票が2人分 =====
+{
+  // 2人を入口のマスに戻す（同行はしていない）。P1 のキャラの番
+  const g = structuredClone(g0);
+  const w = g.world;
+  const t = w.tiles.findIndex((x) => x.f && x.f.kind === 'dungeon' && x.f.id === 'emeraldTemple');
+  for (const h of g.heroes) {
+    w.pos[h.id] = t;
+    h.lastRandomEvent = w.worldTurn;
+    h.focus = 3;
+  }
+  w.follow = undefined;
+  w.turn = h1;
+  w.acted = [];
+  w.move = null;
+  w.story = undefined;
+  w.wanderers = [];
+  w.visitedRegions = Array.from({ length: 200 }, (_, i) => i);
+  await inject(g);
+  for (const p of [A, B]) await closeStory(p);
+}
+const game = () => A.evaluate(() => window.__online.game());
+const tabs = (p) => p.locator('[role="tablist"] [role="tab"]').count();
+// P1 だけが先に入る（画面のボタンで）
+await A.locator('[data-interact]').waitFor({ timeout: 8000 }).catch(() => {});
+check(((await A.locator('[data-interact]').innerText().catch(() => '')) || '').includes('翠の神殿に入る'), 'P1: 先に入る人のボタンは「翠の神殿に入る」');
+await A.locator('[data-interact]').click();
+await until(async () => ((await game()).expeditions?.length ?? 0) === 1, 8000, 'P1 entered').catch(() => {});
+let gj = await game();
+check(gj.expeditions?.length === 1 && gj.expeditions[0].heroes.join() === h1, 'P1 のキャラだけがダンジョンに入った');
+check(gj.world.turn === h2, '次は P2 のキャラの番（世界マップ）');
+for (const p of [A, B]) await closeStory(p);
+// P2 の画面: 「〇〇たちに合流する（翠の神殿）」
+await B.locator('[data-interact]').waitFor({ timeout: 8000 }).catch(() => {});
+const joinLabel = (await B.locator('[data-interact]').innerText().catch(() => '')) || '';
+check(joinLabel.includes('合流する') && joinLabel.includes('翠の神殿'), `P2: ボタンが「〇〇たちに合流する（翠の神殿）」になる（${joinLabel.replace(/\n/g, ' ')}）`);
+await shot(B, '12-join-button-P2');
+await layout(B, '合流のボタン（P2）');
+// 先の組が通路にいない時（休憩中）は断られる: 手番も侵食度も変わらない
+{
+  const g = await game();
+  g.expeditions[0].mode = 'rest';
+  await inject(g);
+  for (const p of [A, B]) await closeStory(p);
+}
+const c0 = (await game()).world.corruption;
+await B.locator('[data-interact]').click();
+await wait(900);
+gj = await game();
+check(gj.expeditions[0].heroes.length === 1 && gj.world.turn === h2 && gj.world.corruption === c0, '先の組が休憩中の時は合流できず、手番も侵食度も変わらない');
+check((await B.getByText(/終わってから合流しよう/).count()) > 0, 'P2 に「〇〇たちは今、休憩中です。終わってから合流しよう」と出る');
+await shot(B, '13-join-refused-P2');
+// 通路に戻ったら合流できる
+{
+  const g = await game();
+  g.expeditions[0].mode = 'dungeon';
+  await inject(g);
+  for (const p of [A, B]) await closeStory(p);
+}
+await B.locator('[data-interact]').click();
+await until(async () => ((await game()).expeditions?.[0]?.heroes.length ?? 0) === 2, 8000, 'joined').catch(() => {});
+gj = await game();
+check(gj.expeditions.length === 1, '合流しても、組（場面）は1つのまま');
+check(gj.expeditions[0].heroes.join() === [h1, h2].join(), '先の組に P2 のキャラが加わる（後から来た人は末尾）');
+check(gj.world.corruption >= c0 + 2, `合流でも侵食度 +2%（${c0} → ${gj.world.corruption}）`);
+await wait(1200);
+for (const p of [A, B]) await closeStory(p);
+// 2台とも: タブは1つ・顔は2人・扉のボタン
+for (const [p, n] of [[A, 'P1'], [B, 'P2']]) {
+  await p.locator('[data-door-choice]').first().waitFor({ timeout: 8000 }).catch(() => {});
+  check((await p.locator('[data-door-choice]').count()) >= 1, `${n}: 合流の後、ダンジョンの扉の画面が出る`);
+  check((await tabs(p)) === 1, `${n}: 場面のタブは1つ（「翠の神殿」が2つに分かれない。今 ${await tabs(p)}）`);
+  check((await p.locator('[data-dungeon-bar] button[aria-label*="HP"]').count()) === 2, `${n}: 下の顔の列が2人`);
+}
+await shot(A, '14-joined-P1');
+await shot(B, '14-joined-P2');
+await layout(A, '合流の後（P1）');
+await layout(B, '合流の後（P2）');
+// 扉の投票が2人分: P1 だけでは開かず、票の様子に2人の名前。P2 も選ぶと開く
+const room0 = (await dun()).currentRoomId;
+await A.locator('[data-door-choice]').first().click();
+await wait(900);
+check((await dun()).currentRoomId === room0, '合流の後: P1 だけが扉を選んでも開かない（2人分の投票）');
+const voteRows = await B.locator('[data-vote-status] > div').count();
+check(voteRows === 3, `P2 の票の様子に2人分の行が出る（見出し1＋2人。今 ${voteRows}）`);
+await shot(B, '15-vote-two-P2');
+await B.locator('[data-door-choice]').first().click();
+await until(async () => (await dun())?.currentRoomId !== room0, 8000, 'opened by two').catch(() => {});
+check((await dun()).currentRoomId !== room0, '合流の後: 2人が同じ扉を選ぶと開く');
+await wait(2500);
+const battle = (await game()).expeditions[0].battle;
+check(!!battle && battle.allies.length === 2, `合流した人も、次の戦闘に参加する（味方 ${battle?.allies.length ?? 0}人）`);
+await shot(A, '16-battle-two-P1');
 
 await browser.close();
 if (problems.length) {

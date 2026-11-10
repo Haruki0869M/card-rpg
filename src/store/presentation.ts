@@ -279,7 +279,8 @@ export function explorationSounds(before: GameState, after: GameState, wire: Gam
   // 場所に入った（町・祠・聖域・休憩・イベント）
   if (prev.mode !== next.mode && PLACE_SOUND[next.mode]) out.push(PLACE_SOUND[next.mode]!);
   // ダンジョンに入った（新しい場面ができた）
-  if ((after.expeditions ?? []).some((x) => !before.expeditions?.some((y) => y.id === x.id))) out.push('sfx_world_enter_dungeon');
+  // ダンジョンに入った（新しい場面ができた・先の組に合流した）
+  if ((after.expeditions ?? []).some((x) => { const old = before.expeditions?.find((y) => y.id === x.id); return !old || x.heroes.length > old.heroes.length; })) out.push('sfx_world_enter_dungeon');
   // 夜になった
   if (before.world && after.world && timeOfDay(before.world.worldTurn) !== 'night' && timeOfDay(after.world.worldTurn) === 'night') out.push('sfx_world_night');
   // 扉を開けて部屋に入った（ボスの部屋は重い門の音）
