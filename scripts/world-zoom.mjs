@@ -163,7 +163,7 @@ for (const [width, height] of sizes) {
   await shot('3-reloaded');
 
   // 4) 最大の拡大で移動。歩いている間も拡大はそのまま、駒は枠の中
-  const roll = page.getByText('移動力の判定', { exact: true });
+  const roll = page.locator('[data-roll-move]');
   if (!(await roll.count())) ng('移動力の判定のボタンが無い');
   else {
     await roll.click();

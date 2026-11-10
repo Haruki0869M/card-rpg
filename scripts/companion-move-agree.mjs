@@ -40,7 +40,7 @@ async function run(n) {
     }
     const g1 = await read();
     check(Object.keys(g1.world.follow ?? {}).length === n - 1, `${n}人: 誘った仲間が同行にならない ${JSON.stringify(g1.world.follow)}`);
-    await page.getByText('移動力の判定').click(); await page.waitForTimeout(400);
+    await page.locator('[data-roll-move]').click(); await page.waitForTimeout(400);
     const t = page.locator('[data-reach]').filter({ hasText: /^[1-9]$/ }).first();
     await t.scrollIntoViewIfNeeded(); const b = await t.boundingBox();
     await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2); await page.waitForTimeout(200);

@@ -62,6 +62,8 @@ export interface DoorOpen {
   id: number;
   scene: string;
   run: DungeonRun;
+  /** 開けた扉の部屋（扉の前まで自動で歩く様子を見せる） */
+  roomId?: string;
 }
 
 /** 手番のカットイン（docs/tasks/turn-cutin.md） */
@@ -569,7 +571,7 @@ export const useBattle = create<StoreState>((set, get) => {
     // 扉を開けて部屋に入った（見ている場面）: 扉が開く演出が終わるまで、部屋の画面への切り替えを待つ（第3段階B2）
     const was = before ? viewOf(before, cmdScene) : undefined;
     if (was?.mode === 'dungeon' && was.dungeon && next.dungeon && cmdScene === scene && next.mode !== 'dungeon' && next.dungeon.currentRoomId !== was.dungeon.currentRoomId && !reducedMotion()) {
-      patch.doorOpen = { id: fxId++, scene, run: was.dungeon };
+      patch.doorOpen = { id: fxId++, scene, run: was.dungeon, roomId: next.dungeon.currentRoomId };
     }
     // 手番が移った: カットイン（自分のキャラなら大きく、ほかの人のキャラなら小さなお知らせ）
     if (before && turn && turn !== before.world?.turn) {

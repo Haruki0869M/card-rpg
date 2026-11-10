@@ -12,6 +12,7 @@ import { getEnemy } from '../../data/enemies';
 import { EVENTS } from '../../data/events';
 import { getItem, POUCH_LIMIT } from '../../data/items';
 import type {
+  DungeonRun,
   EventBattle,
   BattleEvent,
   EventOutcome,
@@ -55,6 +56,7 @@ import {
   onWandererDefeated,
   questSignal,
   rollMove,
+  rerollMove,
   storyContinue,
   waitTurn,
   reviveAlly,
@@ -65,6 +67,7 @@ import { leaveSanctuary, leaveShrine, leaveTown, questAccept, questReport, shrin
 import { getRoomType } from '../../data/rules';
 import { TERRAINS } from '../../data/world';
 import { buildDungeon, findRoom, RARITIES, rarityIndex, reachableRooms } from './dungeon';
+import { newDice, rerollDice } from './dice';
 import { canMove, cellKey, DIRS, doorFront, doorNorthOf, dungeonGrid, findPath, moveIntoRoom, posOf, revealSeen, turnTo } from './dungeonMap';
 import { watchSpot } from './dungeonOmen';
 import {
@@ -219,10 +222,12 @@ function runInScene(game: GameState, cmd: Extract<GameCommand, { type: 'SCENE' }
     if (game.world && exp.heroes.includes(game.world.turn)) endExpeditionTurn(game, exp.heroes, rng);
     return r;
   }
-  // 探索力を使い切って、部屋の出来事も終わった（通路に戻った）: 次のキャラの番へ
-  if (game.world && exp.mode === 'dungeon' && exp.dungeon?.explore === 0) {
+  // 扉を選べる数を使い切って、部屋の出来事も終わった（通路に戻った）: 次のキャラの番へ。
+  // ただし、この通路でまだ「警戒」ができる時は待つ（警戒してから「手番を終える」。警戒すると自動で次へ）
+  if (game.world && exp.mode === 'dungeon' && exp.dungeon?.explore === 0 && (exp.dungeon.ended || !canWatchHere(exp.dungeon))) {
     exp.dungeon.explore = null;
-    exp.dungeon.exploreRoll = undefined;
+    exp.dungeon.exploreDice = undefined;
+    exp.dungeon.ended = undefined;
     endExpeditionTurn(game, exp.heroes, rng);
   }
   return r;
@@ -253,7 +258,7 @@ function exploreRoller(game: GameState, heroId: string): string | undefined {
   return undefined;
 }
 
-/** 探索力の判定（ダンジョンのパーティの手番の最初。素早さ。探索力 = exploreBase + 成功数） */
+/** 探索のサイコロ（ダンジョンのパーティの手番の最初。1〜3。出た目 = この手番に選べる扉の数） */
 function exploreRoll(game: GameState, cmd: Extract<GameCommand, { type: 'EXPLORE_ROLL' }>, rng: Rng): string | undefined {
   const run = game.dungeon;
   if (!game.world || !game.activeScene || game.mode !== 'dungeon' || !run) return 'ダンジョンの通路でのみ判定できます';
@@ -267,22 +272,43 @@ function exploreRoll(game: GameState, cmd: Extract<GameCommand, { type: 'EXPLORE
     if (!chosen) return 'だれが判定するか、先にみんなで決めます';
     if (chosen !== h.id) return `判定するのは${findHero(game, chosen)?.name ?? '決めたキャラ'}です`;
   }
-  const slots = BALANCE.exploreSlots;
-  if (!Number.isInteger(cmd.focusUsed) || cmd.focusUsed < 0 || cmd.focusUsed > Math.min(slots, h.focus)) return 'フォーカスの数が不正です';
-  h.focus -= cmd.focusUsed;
-  const results = rollWithFocus(slots, cmd.focusUsed, statChance(h, 'agi', 'move'), rng);
-  run.exploreRoll = results;
-  const power = BALANCE.exploreBase + successes(results);
-  run.explore = power * BALANCE.dungeonStepsPerExplore;
-  addLog(game, `探索力 ${power}（この手番で歩ける数 ${run.explore}歩）`);
+  const d = { ...newDice(game, BALANCE.exploreDiceSides, [], rng), heroId: h.id };
+  run.exploreDice = d;
+  run.explore = d.total;
+  addLog(game, `${h.name}の探索のサイコロ: ${d.face}（この手番に選べる扉 ${d.total}つ）`);
   return undefined;
 }
+
+/** フォーカス1で探索のサイコロを振り直す（振ったキャラ。まだ扉を選ぶ前に1回だけ。2回目の目で決まる） */
+function exploreReroll(game: GameState, cmd: Extract<GameCommand, { type: 'EXPLORE_REROLL' }>, rng: Rng): string | undefined {
+  const run = game.dungeon;
+  if (!game.world || !game.activeScene || game.mode !== 'dungeon' || !run) return 'ダンジョンの通路でのみ振り直せます';
+  const d = run.exploreDice;
+  if (run.explore == null || !d) return '先に探索のサイコロを振ってください';
+  if (d.rerolled) return '振り直しは1回だけです';
+  if (d.heroId && d.heroId !== cmd.heroId) return '振り直すのはサイコロを振ったキャラです';
+  if (run.explore !== d.total) return '扉を選んだ後は振り直せません';
+  const h = findHero(game, cmd.heroId);
+  if (!h || h.hp <= 0) return 'このキャラは振り直せません';
+  if (!ownedBy(h, cmd.playerId)) return '担当していないキャラです';
+  if (h.focus < 1) return 'フォーカスがありません';
+  h.focus -= 1;
+  const n = rerollDice(game, d, rng);
+  run.exploreDice = n;
+  run.explore = n.total;
+  addLog(game, `${h.name}がフォーカスで振り直した: ${n.face}（この手番に選べる扉 ${n.total}つ）`);
+  return undefined;
+}
+
+/** この通路で、まだ「警戒」ができるか */
+export const canWatchHere = (run: DungeonRun) => run.watchedAt !== (run.currentRoomId ?? 'entrance');
 
 /** ダンジョンのパーティの手番を終える（探索力が残っていても） */
 function exploreEnd(game: GameState): string | undefined {
   const run = game.dungeon;
   if (!game.world || !game.activeScene || game.mode !== 'dungeon' || !run) return 'ダンジョンの通路でのみ終えられます';
   run.explore = 0;
+  run.ended = true;
   return undefined;
 }
 
@@ -321,11 +347,8 @@ function dungeonNav(game: GameState, cmd: Extract<GameCommand, { type: 'DUNGEON_
     path = found;
     face = cmd.face;
   }
-  if (limited) {
-    if (run.explore == null) return '先に探索力を判定してください';
-    if (run.explore < path.length) return `歩数が足りません（あと${run.explore}歩）`;
-    run.explore -= path.length;
-  }
+  // 歩くのは数えない（扉を選んだ回数だけ数える。オーナーの案）。サイコロの前は歩けない
+  if (limited && run.explore == null) return '先に探索のサイコロを振ってください';
   for (const d of path) {
     const cur = posOf(run);
     run.pos = { x: cur.x + DIRS[d][0], y: cur.y + DIRS[d][1], facing: d };
@@ -350,12 +373,8 @@ function dungeonWatch(game: GameState, cmd: Extract<GameCommand, { type: 'DUNGEO
   if (run.watchedAt === watchSpot(game)) return 'この通路ではもう警戒しました';
   const slots = BALANCE.dungeonWatchSlots;
   if (!Number.isInteger(cmd.focusUsed) || cmd.focusUsed < 0 || cmd.focusUsed > Math.min(slots, h.focus)) return 'フォーカスの数が不正です';
-  const cost = BALANCE.dungeonWatchSteps;
-  if (game.world && game.activeScene) {
-    if (run.explore == null) return '先に探索力を判定してください';
-    if (run.explore < cost) return `歩数が足りません（${cost}歩いります）`;
-    run.explore -= cost;
-  }
+  // 扉の数は使わない（残りが0でもできる）。サイコロの前はできない
+  if (game.world && game.activeScene && run.explore == null) return '先に探索のサイコロを振ってください';
   h.focus -= cmd.focusUsed;
   const results = rollWithFocus(slots, cmd.focusUsed, statChance(h, 'per'), rng);
   run.watchRoll = results;
@@ -535,6 +554,9 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
       case 'EXPLORE_ROLL':
         error = exploreRoll(game, cmd, rng);
         break;
+      case 'EXPLORE_REROLL':
+        error = exploreReroll(game, cmd, rng);
+        break;
       case 'EXPLORE_ROLLER':
         error = exploreRoller(game, cmd.heroId);
         break;
@@ -551,6 +573,9 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
         break;
       case 'WORLD_ROLL_MOVE':
         error = rollMove(game, cmd, rng);
+        break;
+      case 'WORLD_REROLL_MOVE':
+        error = rerollMove(game, cmd, rng);
         break;
       case 'WORLD_MOVE_AGREE':
         error = agreeMove(game, cmd, rng);
@@ -664,16 +689,22 @@ function enterRoom(game: GameState, playerId: string, roomId: string, rng: Rng):
   if (game.mode !== 'dungeon' || !run) return 'ダンジョンにいません';
   const room = findRoom(run, roomId);
   if (!room || !reachableRooms(run).some((r) => r.id === roomId)) return 'その部屋には進めません';
-  // 第3段階: 扉の前（部屋の1つ南の通路）に立っている時だけ開けられる
+  // 扉を選ぶだけ（オーナーの案）: 扉の前まで自動で歩き、扉の方を向いて開ける。どれだけ歩いても、扉1つで1
   const front = doorFront(run, room.id);
-  const p = posOf(run);
-  if (!front || front.x !== p.x || front.y !== p.y) return '扉の前まで歩いてください';
-  // 世界マップのあるシナリオ: 部屋に入るたびに探索力を1使う
+  const path = front ? findPath(run, front) : undefined;
+  if (!front || !path) return 'その扉までは歩いて行けません';
   if (game.world && game.activeScene) {
-    if (run.explore == null) return '先に探索力を判定してください';
-    if (run.explore <= 0) return '探索力が残っていません';
+    if (run.explore == null) return '先に探索のサイコロを振ってください';
+    if (run.explore <= 0) return 'この手番に選べる扉は、もうありません';
     run.explore -= 1;
   }
+  for (const d of path) {
+    const cur = posOf(run);
+    run.pos = { x: cur.x + DIRS[d][0], y: cur.y + DIRS[d][1], facing: d };
+    revealSeen(run);
+  }
+  run.pos = { ...posOf(run), facing: 0 };
+  revealSeen(run);
   run.currentRoomId = room.id;
   moveIntoRoom(run, room.id);
   roomBehavior(roomTypeOf(room).behavior).enter(game, room, rng);

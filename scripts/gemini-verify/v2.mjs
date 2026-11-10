@@ -18,8 +18,8 @@ await tryTap(page.getByText('つづける'));
 await edit((g) => { const w = g.world; const t = w.tiles.findIndex((x) => x.f && x.f.kind === 'dungeon' && x.f.id === 'emeraldTemple'); for (const id of Object.keys(w.pos)) w.pos[id] = t; w.story = undefined; });
 await tap(page.getByText('翠の神殿に入る'), 1200);
 await edit((g) => { (g.expeditions?.[0]?.dungeon ?? g.dungeon).rooms.find((r) => r.id === 'r0c0').enemies = ['forestWolf', 'forestWolf', 'toxicShroom'].map((defId) => ({ defId, level: 3 })); });
-await tryTap(page.getByText('探索力の判定'), 1300);
-await tap(page.getByRole('button', { name: /^扉を開ける/ }), 2600);
+await tryTap(page.locator('[data-explore-roll-button]'), 1300);
+await tap(page.getByRole('button', { name: /扉を開ける/ }), 2600);
 // 僧侶のHPを3に（敵の狙いも僧侶に）
 await edit((g) => { const b = g.expeditions[0].battle; b.allies[1].hp = 3; });
 await shot('01-priest-low');

@@ -11,7 +11,7 @@ import { ENEMIES } from '../../data/enemies';
 import { applyEffect, dealDamage, makeCtx } from '../battle/effects';
 import { loseHp } from '../battle/units';
 import { checkBonus, earnGold, restMultiplierOf, statChance } from '../game/common';
-import { moveBonusOf, moveSlotsOf } from '../game/common';
+import { worldDiceBonus } from '../game/dice';
 import { visionOf } from '../game/world/fog';
 import { BALANCE } from '../../data/balance';
 import type { BattleState } from '../../types';
@@ -429,13 +429,13 @@ describe('最上位の探索能力と実績', () => {
     expect(statChance(h, 'luk', undefined, true) - statChance(h, 'luk')).toBe(20);
     h.classId = 'bowSaint'; expect(checkBonus(h, 'ambush')).toBe(15); expect(visionOf(g, g.world!, h.id)).toBe(BALANCE.visionRange + 2);
     h.classId = 'grandThief'; expect(checkBonus(h, 'luck')).toBe(20); expect(shopPriceFor(h, 100)).toBe(75);
-    h.classId = 'dragoon'; expect(moveSlotsOf(h)).toBe(BALANCE.moveSlots + 2);
+    h.classId = 'dragoon'; expect(worldDiceBonus(h).find((b) => b.label === '竜の翼')?.value).toBe(BALANCE.moveDiceSlotBonus);
     h.classId = 'pope'; expect(restMultiplierOf(h)).toBe(2);
   });
   it('ビーストマスターは夜も視界が狭まらない', () => {
     const g = newGame(); const h = g.heroes[0]; h.classId = 'beastMaster'; g.world!.worldTurn = BALANCE.turnsPerTimeOfDay * 3 + 1;
     expect(visionOf(g, g.world!, h.id)).toBe(BALANCE.visionRange);
-    expect(moveBonusOf(h)).toBe(1);
+    expect(worldDiceBonus(h).find((b) => b.label === '群れの導き')?.value).toBe(1);
   });
   it('稼いだ金額は支出後も残り、初期所持金を含めない', () => {
     const g = newGame(); const h = g.heroes[0]; expect(h.feats?.goldEarned ?? 0).toBe(0);

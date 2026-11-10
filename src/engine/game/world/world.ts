@@ -1,7 +1,7 @@
 import { followingGroup, detachFollower } from './group';
 // ===== 世界マップの進行（spec §8）: 手番・移動・遭遇・野営・侵食度・町への襲撃・命の灯火 =====
 import { BALANCE } from '../../../data/balance';
-import { moveBonusOf } from '../common';
+import { newDice, rerollDice, worldDiceBonus } from '../dice';
 import { getClass } from '../../../data/classes';
 import { DUNGEONS } from '../../../data/dungeons';
 import { EVENTS } from '../../../data/events';
@@ -11,7 +11,7 @@ import { QUESTS, SANCTUARIES, TERRAINS, TOWNS } from '../../../data/world';
 import type { EncounterState, Expedition, GameCommand, GameState, Hero, QuestState, WorldState } from '../../../types';
 import type { Rng } from '../../rng';
 import { addPetLove, petExplore } from '../pets';
-import { addLog, campFocusOf, moveSlotsOf, ownedBy, restMultiplierOf, rollWithFocus, splitGold, statChance, successes } from '../common';
+import { addLog, campFocusOf, ownedBy, restMultiplierOf, rollWithFocus, splitGold, statChance, successes } from '../common';
 import { enterDungeonFromWorld, startBattleWith } from '../game';
 import { equippedItems, heroFocusMax, heroMaxHp } from '../hero';
 import { activeHeroes, expeditionOf, findHero, livingHeroes, mapHeroes, sceneHeroes } from '../heroes';
@@ -78,7 +78,7 @@ export function advanceTurn(game: GameState, rng: Rng) {
   const w = game.world!;
   if (w.turn && !w.acted.includes(w.turn)) w.acted.push(w.turn);
   w.move = null;
-  w.moveRoll = undefined;
+  w.moveDice = undefined;
   w.invites = undefined;
   w.moveProposal = undefined;
   // 同行は、同じマスにいる間は続く（手番が変わっても。ダンジョンに入る時も一緒に入る。指摘1）
@@ -106,7 +106,7 @@ function setTurn(game: GameState, heroId: string) {
   const exp = expeditionOf(game, heroId);
   if (exp?.dungeon) {
     exp.dungeon.explore = null;
-    exp.dungeon.exploreRoll = undefined;
+    exp.dungeon.exploreDice = undefined;
   }
 }
 
@@ -211,22 +211,40 @@ export function questSignal(game: GameState, s: QuestSignal) {
 
 // ---------- コマンド ----------
 
-/** 移動力の判定（素早さ。移動力 = moveBase + 成功数） */
+/** 移動のサイコロ（1d6 ＋ 素早さ・探索の能力・お供のボーナス。オーナーの案） */
 export function rollMove(game: GameState, cmd: Cmd<'WORLD_ROLL_MOVE'>, rng: Rng): string | undefined {
   const t = turnCheck(game, cmd.playerId, cmd.heroId);
   if (typeof t === 'string') return t;
   const { w, h } = t;
   if (w.move !== null) return 'もう移動力を決めました';
-  const slots = moveSlotsOf(h);
-  if (!Number.isInteger(cmd.focusUsed) || cmd.focusUsed < 0 || cmd.focusUsed > Math.min(slots, h.focus)) return 'フォーカスの数が不正です';
-  h.focus -= cmd.focusUsed;
-  const results = rollWithFocus(slots, cmd.focusUsed, statChance(h, 'agi', 'move'), rng);
-  w.moveRoll = results;
-  // お供（うさぎ）: 移動力の判定の成功数+N
-  w.move = BALANCE.moveBase + successes(results) + moveBonusOf(h);
+  const d = newDice(game, BALANCE.moveDiceSides, worldDiceBonus(h), rng);
+  w.moveDice = d;
+  w.move = d.total;
   w.prevTile = w.pos[h.id];
+  addLog(game, `${h.name}の移動のサイコロ: ${d.face}${diceBonusText(d)} → 移動力${d.total}`);
   return undefined;
 }
+
+/** フォーカス1で移動のサイコロを振り直す（目を見た後・まだ動く前に1回だけ。2回目の目で決まる） */
+export function rerollMove(game: GameState, cmd: Cmd<'WORLD_REROLL_MOVE'>, rng: Rng): string | undefined {
+  const t = turnCheck(game, cmd.playerId, cmd.heroId);
+  if (typeof t === 'string') return t;
+  const { w, h } = t;
+  const d = w.moveDice;
+  if (w.move === null || !d) return '先に移動のサイコロを振ってください';
+  if (d.rerolled) return '振り直しは1回だけです';
+  if (w.move !== d.total || w.pos[h.id] !== w.prevTile) return '動いた後は振り直せません';
+  if (h.focus < 1) return 'フォーカスがありません';
+  h.focus -= 1;
+  const n = rerollDice(game, d, rng);
+  w.moveDice = n;
+  w.move = n.total;
+  addLog(game, `${h.name}がフォーカスで振り直した: ${n.face}${diceBonusText(n)} → 移動力${n.total}`);
+  return undefined;
+}
+
+/** ボーナスの文字（例: 「＋1（素早さ）」） */
+export const diceBonusText = (d: { bonus: { label: string; value: number }[] }) => d.bonus.map((b) => `＋${b.value}（${b.label}）`).join('');
 
 /** 移動（経路はエンジンが決める。敵のいるマスに入ったら遭遇） */
 export function moveHero(game: GameState, cmd: Cmd<'WORLD_MOVE'>, rng: Rng): string | undefined {

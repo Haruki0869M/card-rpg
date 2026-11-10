@@ -182,6 +182,19 @@ const MIGRATIONS: Record<number, (g: Loose) => void> = {
   },
 };
 
+/**
+ * 移動のサイコロ（版を上げずに直す）: 前の「スロットの判定」の結果は捨てる。
+ * 世界マップの移動力はそのまま。ダンジョンの途中の「残り歩数」は「選べる扉の数」に直す（歩数÷2 を切り上げ、3まで）
+ */
+function normalizeDice(g: Loose) {
+  if (g.world && Array.isArray(g.world.moveRoll)) delete g.world.moveRoll;
+  for (const d of [g.dungeon, ...(g.expeditions ?? []).map((x: Loose) => x.dungeon)] as Loose[]) {
+    if (!d || !Array.isArray(d.exploreRoll)) continue;
+    delete d.exploreRoll;
+    if (typeof d.explore === 'number') d.explore = Math.min(BALANCE.exploreDiceSides, Math.ceil(d.explore / BALANCE.dungeonStepsPerExplore));
+  }
+}
+
 /** 古い版の冒険を今の版に直す。直せなければ null */
 export function migrateGame(raw: unknown): GameState | null {
   const g = raw as Loose;
@@ -193,6 +206,7 @@ export function migrateGame(raw: unknown): GameState | null {
     g.version += 1;
   }
   if (g.version !== STATE_VERSION) return null;
+  normalizeDice(g);
   return validateGame(g as GameState) ? (g as GameState) : null;
 }
 

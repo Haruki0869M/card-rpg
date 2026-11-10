@@ -1,5 +1,5 @@
 // ===== 冒険（ゲーム全体）の型 =====
-import type { EncounterState, ScenarioMapDef, ScenarioStory, ShrineVisit, SanctuaryVisit, TownVisit, WorldState } from './world';
+import type { DiceRoll, EncounterState, ScenarioMapDef, ScenarioStory, ShrineVisit, SanctuaryVisit, TownVisit, WorldState } from './world';
 import type {
   AbilityDef,
   BattleState,
@@ -225,9 +225,12 @@ export interface DungeonRun {
   currentRoomId?: string;
   /** このダンジョンで手に入れたもの（撤退時に1つ失う候補） */
   gained: ItemInstance[];
-  /** 残りの歩数（この手番で歩ける数。判定前は null。世界マップのあるシナリオだけ。M3-D → 第3段階で「部屋の数」から「歩数」に） */
+  /** この手番で、あと何回扉を選べるか（判定前は null。世界マップのあるシナリオだけ。サイコロ1〜3。扉を1つ選ぶたびに1減る） */
   explore?: number | null;
-  exploreRoll?: ('focus' | 'hit' | 'miss')[];
+  /** 探索のサイコロの結果 */
+  exploreDice?: DiceRoll;
+  /** 「手番を終える」を選んだ（警戒ができても次の人へ） */
+  ended?: boolean;
   /** 探索力の判定をするキャラ（2人以上のプレイヤーの時にみんなで決める）。turn = 決めた手番の目印（ワールドターン:手番のキャラ）。違う手番のものは使わない */
   exploreRoller?: { heroId: string; turn: string };
   /** 通路の地図の上の位置と向き（地図は部屋のつながりから毎回作る。engine/game/dungeonMap.ts） */
@@ -581,7 +584,9 @@ export type GameCommand =
   | { type: 'GIVE'; playerId: PlayerId; fromHeroId: string; toHeroId: string; itemUid?: string; gold?: number }
   // ---------- 世界マップ（spec §8） ----------
   /** 移動力の判定 */
-  | { type: 'WORLD_ROLL_MOVE'; playerId: PlayerId; heroId: string; focusUsed: number }
+  | { type: 'WORLD_ROLL_MOVE'; playerId: PlayerId; heroId: string; /** 使わない（前の形のなごり） */ focusUsed?: number }
+  /** フォーカス1で移動のサイコロを振り直す（1回目の目を見た後、まだ動く前。2回目の目で決まる） */
+  | { type: 'WORLD_REROLL_MOVE'; playerId: PlayerId; heroId: string }
   /** 移動（同行するキャラも一緒に動く。同行したキャラはこのワールドターンの行動を終える） */
   | { type: 'WORLD_MOVE'; playerId: PlayerId; heroId: string; to: number; companions: string[] }
   /** 他の人のキャラと一緒に動く時: 移動先の提案に同意する / 断る（断ると同行をやめる。M3-D 指摘1） */
@@ -617,7 +622,9 @@ export type GameCommand =
   /** 世界マップと別に進んでいる場面（ダンジョン）の中の操作 */
   | { type: 'SCENE'; scene: string; command: GameCommand }
   /** ダンジョンのパーティの手番: 探索力の判定（素早さ）/ 手番を終える */
-  | { type: 'EXPLORE_ROLL'; playerId: PlayerId; heroId: string; focusUsed: number }
+  | { type: 'EXPLORE_ROLL'; playerId: PlayerId; heroId: string; /** 使わない（前の形のなごり） */ focusUsed?: number }
+  /** フォーカス1で探索のサイコロを振り直す（振ったキャラ。まだ扉を選ぶ前。2回目の目で決まる） */
+  | { type: 'EXPLORE_REROLL'; playerId: PlayerId; heroId: string }
   /** 探索力の判定をするキャラを、みんなで決める（ダンジョンのパーティに2人以上のプレイヤーがいる時。全員一致） */
   | { type: 'EXPLORE_ROLLER'; playerId: PlayerId; heroId: string }
   | { type: 'EXPLORE_END'; playerId: PlayerId }

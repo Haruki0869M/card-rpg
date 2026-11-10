@@ -187,7 +187,10 @@ describe('同行（指摘1）', () => {
     g = run(g, { type: 'WORLD_INVITE', playerId: 'P1', heroId: 'h0', targetId: 'h1' });
     g = run(g, { type: 'WORLD_INVITE_ANSWER', playerId: 'P2', heroId: 'h1', accept: true });
     g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: 'P1', heroId: 'h0', focusUsed: 4 });
-    const to = [...reachableFrom(g, start)].find((t) => t !== start)!;
+    // 施設・敵のいない、ただのマスへ（サイコロの目で行ける所が変わっても、出来事が起きないように）
+    // 移動中のランダムイベントは、この確認では起こさない（直前に起きたことにする。乱数の順番で変わるため）
+    g.heroes[0].lastRandomEvent = g.world!.worldTurn;
+    const to = [...reachableFrom(g, start)].find((t) => t !== start && !g.world!.tiles[t].f && !g.world!.wanderers.some((x) => x.tile === t))!;
     g = run(g, { type: 'WORLD_MOVE', playerId: 'P1', heroId: 'h0', to, companions: ['h1'] });
     // 提案だけ。P2 が同意するまで動かない
     expect(g.world!.pos.h0).toBe(start);

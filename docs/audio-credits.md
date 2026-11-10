@@ -88,7 +88,7 @@
 | sfx_step_snow | impact-sounds | footstep_snow_000.ogg | 0.5 | 6000 |
 | sfx_step_stone | impact-sounds | footstep_concrete_000.ogg | 0.5 | 6000 |
 | sfx_world_arrive | interface-sounds | drop_002.ogg | 0.45 | 6000 |
-| sfx_world_dice | casino-audio | dice-throw-3.ogg | 0.6 | 6000 |
+| sfx_world_dice | 合成（scripts/audio/synth-dice.mjs。素材なし） | - | 0.22 | 3000 |
 | sfx_world_night | music-jingles | jingles_PIZZI13.ogg | 0.6 | 6000 |
 | sfx_world_enter_town | music-jingles | jingles_PIZZI10.ogg | 0.6 | 6000 |
 | sfx_world_enter_dungeon | rpg-audio | doorClose_3.ogg | 0.6 | 6000 |

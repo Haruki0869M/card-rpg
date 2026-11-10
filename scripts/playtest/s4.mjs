@@ -2,7 +2,7 @@ import { open, loadSave } from './common.mjs';
 const { browser, page, shot, text, issues, errors } = await open();
 // 移動力の判定の演出（50ms おき）
 await loadSave(page, 'scripts/playtest/shots/save-start.json', (g) => { g.world.story = undefined; });
-await page.getByText('移動力の判定').click();
+await page.locator('[data-roll-move]').click();
 for (let i = 0; i < 6; i++) { await page.waitForTimeout(80); await shot(`04a-roll-${i}`); }
 // 移動 → 到着 → 突発イベント（0.3秒おき）
 await loadSave(page, 'scripts/playtest/shots/save-rolled.json', (g, s) => { g.world.move = 3; g.rngState = s; g.heroes.forEach(h => h.gold = 200); }, 7);

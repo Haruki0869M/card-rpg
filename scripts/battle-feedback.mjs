@@ -74,10 +74,10 @@ try {
       h.pet = { petId: species[i], color: colors[i], name: ['ぴーちゃん', 'カメキチ', 'ふうた', 'ぴょん'][i], love: 0, acts: 0 };
     }); g.heroes[0].carried = 'swordmaster';
     await resume(d); await page.getByText('翠の神殿に入る', { exact: true }).click();
-    if (await page.getByText('探索力の判定').count()) await page.getByText('探索力の判定').click();
+    if (await page.locator('[data-explore-roll-button]').count()) await page.locator('[data-explore-roll-button]').click();
     // 第3段階: 入口は1行目の扉の前（北向き）。扉を開けて最初の部屋へ
     await observe();
-    await page.getByRole('button', { name: /^扉を開ける/ }).click();
+    await page.getByRole('button', { name: /扉を開ける/ }).click();
     await page.locator('[data-ability-cutin]').first().waitFor(); await shot(`opening-four-${width}`);
     // フェーズ1: お供は持ち主の立ち絵の幅の中（隣の仲間の足元に立たない）。カットインは上の帯に重ならず、お供の本物の絵を出す
     const petPlace = await page.evaluate(() => [...document.querySelectorAll('[data-ally-sprite] [data-pet-owner]')].map((el) => {

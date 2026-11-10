@@ -21,7 +21,7 @@ export const monk: ClassDef = {
     name: '連撃',
     effect: { modifier: 'damageDealt', multiplier: 1.25, if: [{ kind: 'cardCategory', category: 'physical' }, { kind: 'playedThisTurn', atLeast: 1 }] },
   },
-  exploreAbility: { id: 'swiftFeet', name: '健脚', description: '移動力の判定のスロット+1', effect: { kind: 'moveSlots', slots: 1 } },
+  exploreAbility: { id: 'swiftFeet', name: '健脚', description: '移動のサイコロ+1', effect: { kind: 'moveSlots', slots: 1 } },
   names: { male: ['リュウ', 'ガロウ', 'ジン', 'テツ'], female: ['メイリン', 'シャオ', 'リン', 'カエデ'] },
   unlocked: true,
   hpPerLevel: 6,

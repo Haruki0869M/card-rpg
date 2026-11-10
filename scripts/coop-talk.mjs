@@ -122,22 +122,23 @@ let g = await A.evaluate(() => window.__online.game());
 check(g.expeditions[0].heroes.includes(h2), 'P2 のキャラも一緒にダンジョンに入った');
 // 歩数を持たせ、手番は P1 のキャラ
 g.world.turn = h1;
-g.expeditions[0].dungeon.explore = 8;
-g.expeditions[0].dungeon.exploreRoll = ['hit', 'hit'];
+g.expeditions[0].dungeon.explore = 3;
+g.expeditions[0].dungeon.exploreDice = { sides: 3, face: 3, bonus: [], total: 3, seq: -1 };
 // お供の印が欄の上で切れないかも見る（オカメインコ）
 g.heroes.find((h) => h.id === h1).pet = { petId: 'cockatiel', color: 'lutino', name: 'ピー', love: 0, acts: 0 };
 await inject(g);
 for (const p of [A, B]) await closeStory(p);
-await A.locator('[data-dungeon-moves]').waitFor();
-await B.locator('[data-dungeon-moves]').waitFor();
+await A.locator('[data-door-choice]').first().waitFor();
+await B.locator('[data-door-choice]').first().waitFor();
 check((await A.locator('[data-pin-guide]').count()) === 0, 'P1（歩く人）には「こっち！」の案内が出ない');
 check((await B.locator('[data-pin-guide]').count()) === 1, 'P2（手番でない人）には「こっち！」の案内が出る');
-await B.locator('[data-dir="right"]').click();
+// 扉を選ぶだけの形: 手番でない人が扉のボタンを押すと「こっち！」
+await B.locator('[data-door-choice]').first().click();
 await until(async () => (await A.locator('[data-pin-banner]').count()) > 0, 5000, 'pin banner on A');
 await wait(400);
 const bannerA = await A.locator('[data-pin-banner]').innerText();
-check(/P2/.test(bannerA) && /こっち！（右）/.test(bannerA), `P1 の画面に「P2: こっち！（右）」が出る（${bannerA.replace(/\n/g, ' ')}）`);
-check((await A.locator('[data-dir="right"] ~ [data-pin-chips]').count()) === 1, 'P1 の「右へ」のボタンにも P2 の札');
+check(/P2/.test(bannerA) && /こっち！（.*扉）/.test(bannerA), `P1 の画面に「P2: こっち！（…扉）」が出る（${bannerA.replace(/\n/g, ' ')}）`);
+check((await A.locator('[data-door-choice] ~ [data-pin-chips]').count()) === 1, 'P1 の扉のボタンにも P2 の札');
 check((await B.locator('[data-pin-banner]').count()) === 1, 'P2 自身の画面にも出る');
 await shot(A, 'dungeon-pin-P1');
 await shot(B, 'dungeon-pin-P2');
@@ -145,12 +146,6 @@ await layout(B, 'ダンジョン（P2・ピンあり）');
 // 約8秒で消える
 await wait(8600);
 check((await A.locator('[data-pin-banner]').count()) === 0, '約8秒でピンが消える');
-// 手番の人が向きを変えると消える
-await B.locator('[data-dir="forward"]').click();
-await until(async () => (await A.locator('[data-pin-banner]').count()) > 0, 5000, 'pin again');
-await A.locator('[data-dir="back"]').click();
-await wait(900);
-check((await A.locator('[data-pin-banner]').count()) === 0 && (await B.locator('[data-pin-banner]').count()) === 0, '手番の人が振り向くとピンが消える（両方の画面）');
 // 地図の扉を指す
 await B.locator('[data-minimap]').click();
 await B.locator('[data-map-overlay]').waitFor();
@@ -161,7 +156,7 @@ if (await door.count()) {
   await until(async () => (await A.locator('[data-pin-banner]').count()) > 0, 5000, 'door pin');
   const t = await A.locator('[data-pin-banner]').innerText();
   check(/扉/.test(t), `地図の扉を指すと P1 に「こっち！（…扉）」（${t.replace(/\n/g, ' ')}）`);
-  check((await A.locator('[data-minimap] [data-cell-pin]').count()) + (await A.locator('[data-door-ahead] [data-pin-chips]').count()) >= 1, 'P1 のミニマップか目の前の扉に P2 の印');
+  check((await A.locator('[data-minimap] [data-cell-pin]').count()) + (await A.locator('[data-door-choice] ~ [data-pin-chips]').count()) >= 1, 'P1 のミニマップか扉のボタンに P2 の印');
   await shot(A, 'dungeon-door-pin-P1');
 } else check(false, '地図に開けられる扉が見つからない');
 await B.locator('[aria-label="地図を閉じる"]').click();

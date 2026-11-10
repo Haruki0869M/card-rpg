@@ -54,12 +54,12 @@ await btns();
 await tryClick(page.getByText('翠の神殿に入る'), 2000);
 await shot('v2-13-dungeon-enter');
 console.log(await text()); await btns();
-await tryClick(page.getByText('探索力の判定'), 1500);
+await tryClick(page.locator('[data-explore-roll-button]'), 1500);
 await shot('v2-14-explore-roll');
 // 装備の画面
 if (await tryClick(page.getByRole('button', { name: /^装備/ }), 1200)) { await shot('v2-15-equip'); console.log('EQUIP', await text()); await btns(); await tryClick(page.getByRole('button', { name: /閉じる|戻る/ }), 900); }
 // 扉は全員の投票：P1 が「開ける」を押した所
-await tryClick(page.getByRole('button', { name: /^扉を開ける/ }), 1500);
+await tryClick(page.getByRole('button', { name: /扉を開ける/ }), 1500);
 await shot('v2-16-door-vote');
 console.log('VOTE', (await text()).slice(0, 500)); await btns();
 // 歩く場面（書き換え: 最初の部屋の戦闘に勝った直後の保存から。P1/P2 に分ける）

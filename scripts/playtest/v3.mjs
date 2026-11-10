@@ -13,7 +13,7 @@ await putSave(loadFile('scripts/playtest/shots/save-dungeon.json'), (g) => {
   const dg = g.expeditions?.[0]?.dungeon ?? g.dungeon;
   dg.rooms.find((r) => r.id === 'r0c0').enemies = ['forestWolf', 'toxicShroom', 'forestWolf', 'toxicShroom'].map((defId) => ({ defId, level: 3 }));
 });
-await tryClick(page.getByRole('button', { name: /^扉を開ける/ }), 2500);
+await tryClick(page.getByRole('button', { name: /扉を開ける/ }), 2500);
 await handoff();
 await shot('v3-01-battle-4enemies');
 console.log(await text()); await btns();

@@ -23,7 +23,8 @@ function pastFirstRoom(classId = 'warrior', players: PlayerId[] = ['P1', 'P1']) 
   const x = g.expeditions![0].id;
   g = run(g, { type: 'WORLD_WAIT', playerId: players[1], heroId: 'h1' });
   g.heroes[0].focus = 4;
-  g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: 'P1', heroId: 'h0', focusUsed: 2 }));
+  g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: 'P1', heroId: 'h0' }));
+  g.expeditions![0].dungeon!.explore = 3;
   g = run(g, inScene(x, { type: 'ENTER_ROOM', playerId: 'P1', roomId: 'r0c0' }));
   const e = g.expeditions![0];
   e.mode = 'dungeon';
@@ -93,18 +94,20 @@ describe('周囲の警戒', () => {
     expect(g.heroes[0].nextBattleStatuses.inspired).toBe(BALANCE.dungeonWatchInspired);
   });
 
-  it('1つの通路で1回だけ。歩数が足りない時・判定前は使えない', () => {
+  it('1つの通路で1回だけ。扉の数は使わない（0でもできる）。サイコロの前は使えない', () => {
     let { g, x } = pastFirstRoom('warrior');
+    const before = viewOf(g, x).dungeon!.explore;
     g = run(g, inScene(x, { type: 'DUNGEON_WATCH', playerId: 'P1', heroId: 'h0', focusUsed: 0 }));
+    expect(viewOf(g, x).dungeon!.explore).toBe(before);
     expect(err(g, inScene(x, { type: 'DUNGEON_WATCH', playerId: 'P1', heroId: 'h0', focusUsed: 0 }))).toMatch(/もう警戒/);
     const fresh = pastFirstRoom('warrior');
-    fresh.g.expeditions![0].dungeon!.explore = 1;
-    expect(err(fresh.g, inScene(fresh.x, { type: 'DUNGEON_WATCH', playerId: 'P1', heroId: 'h0', focusUsed: 0 }))).toMatch(/歩数が足りません/);
+    fresh.g.expeditions![0].dungeon!.explore = 0;
+    expect(err(fresh.g, inScene(fresh.x, { type: 'DUNGEON_WATCH', playerId: 'P1', heroId: 'h0', focusUsed: 0 }))).toBeUndefined();
     fresh.g.expeditions![0].dungeon!.explore = null;
-    expect(err(fresh.g, inScene(fresh.x, { type: 'DUNGEON_WATCH', playerId: 'P1', heroId: 'h0', focusUsed: 0 }))).toMatch(/探索力/);
+    expect(err(fresh.g, inScene(fresh.x, { type: 'DUNGEON_WATCH', playerId: 'P1', heroId: 'h0', focusUsed: 0 }))).toMatch(/サイコロ/);
   });
 
-  it('成功0なら何も分からない（歩数だけ使う）。同じ操作なら同じ結果', () => {
+  it('成功0なら何も分からない。同じ操作なら同じ結果', () => {
     // 感知の低い職でフォーカスを使わずに振り、成功0になる種を探す（乱数の種は Rng だけ）
     const play = () => {
       const { g, x } = pastFirstRoom('warrior');

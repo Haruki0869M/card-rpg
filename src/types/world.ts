@@ -225,9 +225,9 @@ export interface WorldState {
   /** 今の手番のキャラ / このワールドターンで行動を終えたキャラ */
   turn: string;
   acted: string[];
-  /** 移動力（判定前は null）と判定の結果 */
+  /** 移動力（判定前は null）と、移動のサイコロの結果 */
   move: number | null;
-  moveRoll?: ('focus' | 'hit' | 'miss')[];
+  moveDice?: DiceRoll;
   /** 移動の前にいたマス（逃走で戻る先） */
   prevTile?: number;
   worldTurn: number;
@@ -295,4 +295,23 @@ export interface ShrineVisit extends FacilityVisit {
   tile: number;
   heroId: string;
   result?: { optionIndex: number; text: string };
+}
+
+/** 移動のサイコロ（世界マップは1d6＋ボーナス、ダンジョンは1〜3）。seq = 振るたびに変わる目印（画面の演出を全員で1回だけ出す） */
+export interface DiceRoll {
+  /** サイコロの面の数（6 か 3） */
+  sides: number;
+  /** 出た目 */
+  face: number;
+  /** 足すもの（素早さ・探索の能力・お供など。0 のものは入れない） */
+  bonus: { label: string; value: number }[];
+  /** 出た目＋ボーナス */
+  total: number;
+  /** フォーカスで振り直した時の、1回目の目 */
+  first?: number;
+  /** 振り直したか（振り直しは1回だけ） */
+  rerolled?: boolean;
+  /** 振ったキャラ（ダンジョン。振り直せるのはこのキャラ） */
+  heroId?: string;
+  seq: number;
 }
