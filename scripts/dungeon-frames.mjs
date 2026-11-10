@@ -1,14 +1,12 @@
-// ダンジョンの通路のチカチカの確認（手直し）: 1倍速で歩いた・向きを変えた時に、
-// (1) 通路の絵（2枚の景色）が作り直されていないか（DOM の要素が同じまま）
-// (2) 演出の途中のコマで、黒い所が急に増えていないか（前後の止まった景色と比べる）
+// ダンジョンの通路のチカチカの確認（手直し → 扉を選ぶだけの形）: 1倍速で扉のボタンを押し、扉の前まで自動で歩く演出の間に、
+// (1) 歩く演出の通路の絵（2枚の景色）が歩く途中で作り直されていないか（DOM の要素が同じまま）
+// (2) 演出の途中のコマで、黒い所が急に増えていないか（押す前の止まった景色と、歩き終えた景色と比べる）
 // を調べる。CDP の画面の流し撮り（screencast）で全部のコマを受け取り、別のタブのキャンバスで暗い画素の割合を数える。
-// SLOW=0.1 などを付けると、ゆっくり再生して途中の絵も保存する（報告用。判定は1倍速の分だけ）。
 // 使い方: npx vite build && npx vite preview --port 4173 を起こしてから node scripts/dungeon-frames.mjs（URL・DUNGEON_FRAMES_OUTPUT で変更可）
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { chromium, depart, URL } from './lib.mjs';
 
 const OUT = process.env.DUNGEON_FRAMES_OUTPUT ?? 'screenshots/dungeon-frames';
-const SLOW = Number(process.env.SLOW ?? 0);
 const [W, H] = (process.env.SIZE ?? '390x844').split('x').map(Number);
 mkdirSync(OUT, { recursive: true });
 const browser = await chromium.launch();
@@ -57,9 +55,10 @@ await edit((g) => {
 });
 await page.getByText('翠の神殿に入る').click();
 await page.waitForTimeout(800);
-await page.getByText('探索力の判定').click();
-await page.waitForTimeout(1500);
-await page.getByRole('button', { name: /^扉を開ける/ }).click();
+await page.locator('[data-explore-roll-button]').click();
+await page.locator('[data-dice-overlay]').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+await page.waitForTimeout(300);
+await page.locator('[data-door-choice]').first().click();
 await page.getByText('ターン終了').waitFor({ timeout: 8000 }).catch(() => problems.push('扉の後に戦闘にならない'));
 await page.waitForTimeout(500);
 await edit((g) => {
@@ -68,28 +67,39 @@ await edit((g) => {
   x.battle = undefined;
   x.battleInfo = undefined;
   x.dungeon.rooms.find((r) => r.id === x.dungeon.currentRoomId).cleared = true;
-  x.dungeon.explore = 40;
+  x.dungeon.explore = 3;
   for (const h of g.heroes) h.focus = 4;
 });
 
-// (1) 作り直しの見張り: 2枚の景色の入れ物と、その中の通路の絵の根元の要素に印を付け、変わったら数える
-await page.evaluate(() => {
-  const s = (window.__mount = { layers: 0, roots: new Set(), removed: 0, steps: 0 });
-  const tag = (el) => (el.__tag ??= Math.random().toString(36).slice(2, 8));
-  const layers = document.querySelector('[data-dungeon-layers]');
-  s.layersTag = tag(layers);
-  const loop = () => {
-    const l = document.querySelector('[data-dungeon-layers]');
-    if (l && tag(l) !== s.layersTag) s.layers++;
-    for (const v of document.querySelectorAll('[data-dungeon-layer] > div')) s.roots.add(tag(v));
+// (1) 作り直しの見張り: 歩く演出（扉の演出の中）の2枚の景色の入れ物と、通路の絵の根元の要素に印を付け、歩く途中で変わったら数える
+// （保存を書き換えると読み込み直すので、読み込むたびに付け直し、扉1つごとに数を足す）
+const mount = { layers: 0, roots: 0 };
+const installWatch = async () => {
+  await page.evaluate(() => {
+    const s = (window.__mount = { layers: 0, roots: 0, seen: null, rootTags: null });
+    const tag = (el) => (el.__tag ??= Math.random().toString(36).slice(2, 8));
+    const loop = () => {
+      const l = document.querySelector('[data-door-open="walk"] [data-dungeon-layers]');
+      if (!l) s.seen = null;
+      else {
+        if (s.seen && tag(l) !== s.seen) s.layers++;
+        s.seen = tag(l);
+        s.rootTags ??= new Set();
+        for (const v of l.querySelectorAll('[data-dungeon-layer] > div')) s.rootTags.add(tag(v));
+        s.roots = Math.max(s.roots, s.rootTags.size);
+      }
+      if (!l) s.rootTags = null;
+      requestAnimationFrame(loop);
+    };
     requestAnimationFrame(loop);
-  };
-  requestAnimationFrame(loop);
-  // 面（壁・床など）の要素が消えた数（参考。景色が変われば少しは入れ替わる）
-  new MutationObserver((ms) => {
-    for (const m of ms) s.removed += [...m.removedNodes].filter((n) => n.nodeType === 1).length;
-  }).observe(layers, { childList: true, subtree: true });
-});
+  });
+};
+const readWatch = async () => {
+  const m = await page.evaluate(() => window.__mount ?? { layers: 0, roots: 0 });
+  mount.layers += m.layers;
+  mount.roots = Math.max(mount.roots, m.roots);
+};
+await installWatch();
 
 // (2) 1倍速の流し撮り
 const cdp = await ctx.newCDPSession(page);
@@ -104,41 +114,41 @@ const rect = await page.locator('[data-dungeon-layers]').evaluate((e) => {
   return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) };
 });
 const windows = [];
-const act = async (name, click) => {
+// 扉のボタンを押す → 扉の前まで歩く演出（data-door-open="walk"）→ 扉が開く。歩く間だけを調べる
+const act = async (name, pick) => {
+  const btns = page.locator('[data-door-choice]:not([disabled])');
+  if (!(await btns.count())) return console.log(`  （${name}: 押せない。とばす）`);
   const t0 = Date.now();
-  if (!(await click())) return console.log(`  （${name}: 押せない。とばす）`);
-  await page.locator('[data-dungeon-anim]').waitFor({ timeout: 1000 }).catch(() => {});
-  await page.locator('[data-dungeon-anim]').waitFor({ state: 'detached', timeout: 5000 }).catch(() => problems.push(`${name}: 演出が終わらない`));
+  await (pick === 'last' ? btns.last() : btns.first()).click();
+  const walk = page.locator('[data-door-open="walk"]');
+  if (!(await walk.waitFor({ timeout: 1000 }).then(() => true).catch(() => false))) return console.log(`  （${name}: 歩く演出なし＝扉の前にいた）`);
+  await walk.waitFor({ state: 'detached', timeout: 5000 }).catch(() => problems.push(`${name}: 歩く演出が終わらない`));
   const t1 = Date.now();
-  await page.waitForTimeout(250);
-  windows.push({ name, t0: t0 - 40, t1: t1 + 40, rest0: t0 - 400, rest1: Date.now() });
+  windows.push({ name, t0: t0 + 40, t1: t1 - 30, rest0: t0 - 400, rest1: t1 + 60 });
   console.log(`  ${name}`);
+  await readWatch();
+  await page.getByText('ターン終了').waitFor({ timeout: 8000 }).catch(() => {});
+  await page.waitForTimeout(500);
 };
-const btn = (name) => async () => {
-  const b = page.getByRole('button', { name, exact: true });
-  if (!(await b.isEnabled().catch(() => false))) return false;
-  await b.click();
-  return true;
-};
-const route = async () => {
-  const b = page.locator('[data-door-route]').first();
-  if (!(await b.isEnabled().catch(() => false))) return false;
-  await b.click();
-  return true;
-};
+const back = async () =>
+  edit((g) => {
+    const x = g.expeditions[0];
+    x.mode = 'dungeon';
+    x.battle = undefined;
+    x.battleInfo = undefined;
+    x.event = undefined;
+    x.chest = undefined;
+    x.dungeon.rooms.find((r) => r.id === x.dungeon.currentRoomId).cleared = true;
+    x.dungeon.explore = 3;
+  });
 await page.waitForTimeout(400);
-await act('前進（部屋から通路へ）', btn('前進'));
-await act('右へ（横に1歩）', btn('右へ'));
-await act('左へ（横に1歩）', btn('左へ'));
-await act('振り向く', btn('振り向く'));
-await act('振り向く（戻す）', btn('振り向く'));
-await act('扉への近道（数歩・扉を向く）', route);
-await act('右へ（横に1歩）', btn('右へ'));
-await act('扉を向く', btn('扉を向く'));
+await act('右の扉（遠い扉まで歩く）', 'last');
+await back();
+await installWatch();
+await act('左の扉', 'first');
 await page.waitForTimeout(300);
 await cdp.send('Page.stopScreencast');
-const mount = await page.evaluate(() => ({ layers: window.__mount.layers, roots: window.__mount.roots.size, removed: window.__mount.removed }));
-if (mount.layers) problems.push(`景色の入れ物が ${mount.layers} 回作り直された`);
+if (mount.layers) problems.push(`歩く途中で景色の入れ物が ${mount.layers} 回作り直された`);
 if (mount.roots > 2) problems.push(`通路の絵の根元が ${mount.roots} 個できた（2枚のはず＝作り直されている）`);
 
 // 暗い画素の割合（輝度 < 14）を別のタブで数える
@@ -188,31 +198,8 @@ for (const w of windows) {
 }
 await lab.close();
 
-// 報告用: ゆっくり再生で途中の絵を保存（判定には使わない）
-if (SLOW > 0) {
-  await cdp.send('Animation.enable').catch(() => {});
-  await cdp.send('Animation.setPlaybackRate', { playbackRate: SLOW }).catch(() => {});
-  await page.evaluate((s) => window.__setSpeed(s), SLOW);
-  const snap = async (name, click, at = [0.25, 0.5, 0.75]) => {
-    if (!(await click())) return;
-    const dur = 250 / SLOW;
-    let last = 0;
-    for (const p of at) {
-      await page.waitForTimeout(dur * p - last);
-      last = dur * p;
-      await page.screenshot({ path: `${OUT}/slow-${name}-${Math.round(p * 100)}.png` });
-    }
-    await page.locator('[data-dungeon-anim]').waitFor({ state: 'detached', timeout: 20000 }).catch(() => {});
-    await page.waitForTimeout(300);
-  };
-  await snap('back', btn('振り向く'));
-  await snap('back2', btn('振り向く'));
-  await snap('right', btn('右へ'));
-  await snap('forward', btn('前進'));
-}
-
-writeFileSync(`${OUT}/report.txt`, [...report, `景色の入れ物の作り直し ${mount.layers}回・絵の根元 ${mount.roots}個・消えた面 ${mount.removed}個`, ...problems.map((p) => `問題: ${p}`), ...errors.map((e) => `例外: ${e}`)].join('\n'));
-console.log(`景色の入れ物の作り直し ${mount.layers}回・絵の根元 ${mount.roots}個・消えた面 ${mount.removed}個`);
+writeFileSync(`${OUT}/report.txt`, [...report, `景色の入れ物の作り直し ${mount.layers}回・絵の根元 ${mount.roots}個・`, ...problems.map((p) => `問題: ${p}`), ...errors.map((e) => `例外: ${e}`)].join('\n'));
+console.log(`景色の入れ物の作り直し ${mount.layers}回・絵の根元 ${mount.roots}個・`);
 if (errors.length) problems.push(`画面の例外 ${errors.join(' / ')}`);
 await browser.close();
 if (problems.length) {

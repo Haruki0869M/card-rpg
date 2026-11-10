@@ -37,7 +37,7 @@ for (const [width, height] of [[360, 640], [390, 844], [480, 854]]) {
   await shot('1-start');
   if (Math.abs(a.ratio - 0.5) > 0.2) ng(`始めの画面で駒が枠の真ん中にいない（上から${(a.ratio * 100).toFixed(0)}%）`);
   // 移動力の判定: スロットが回ってから止まる
-  await page.getByText('移動力の判定', { exact: true }).click();
+  await page.locator('[data-roll-move]').click();
   const spun = await page.locator('[data-roll-spinning]').waitFor({ timeout: 600 }).then(() => true).catch(() => false);
   if (!spun) ng('移動力の判定でスロットが回らない');
   await page.locator('[data-roll-spinning]').waitFor({ state: 'detached', timeout: 1500 }).catch(() => ng('スロットが止まらない'));

@@ -17,8 +17,8 @@ describe('ダンジョンの案内（フェーズ2-B）', () => {
   });
   it('移動の案内: 判定の前・使い切った時だけ出す', () => {
     const base = { myTurn: true, inDungeon: true, onWorld: true };
-    expect(moveGuide({ ...base, explore: null })).toContain('『探索力』の判定');
-    expect(moveGuide({ ...base, explore: undefined })).toContain('『探索力』の判定');
+    expect(moveGuide({ ...base, explore: null })).toContain('『サイコロを振る』');
+    expect(moveGuide({ ...base, explore: undefined })).toContain('『サイコロを振る』');
     expect(moveGuide({ ...base, explore: 0 })).toContain('手番を終える');
     expect(moveGuide({ ...base, explore: 3 })).toBeUndefined();
     expect(moveGuide({ ...base, myTurn: false, explore: null })).toBeUndefined();

@@ -232,7 +232,7 @@ export function explorationSounds(before: GameState, after: GameState, wire: Gam
   if (cmd.type === 'VOTE') { if (!cmd.command) return []; cmd = cmd.command; }
   const out: SoundId[] = [];
   const t = cmd.type;
-  if ((t === 'WORLD_ROLL_MOVE' && prev.world?.move === null && next.world?.move !== null) || (t === 'EXPLORE_ROLL' && !!next.dungeon?.exploreRoll && next.dungeon.exploreRoll !== prev.dungeon?.exploreRoll)) out.push('sfx_world_dice');
+  if (((t === 'WORLD_ROLL_MOVE' || t === 'WORLD_REROLL_MOVE') && !!next.world?.moveDice && next.world.moveDice.seq !== prev.world?.moveDice?.seq) || ((t === 'EXPLORE_ROLL' || t === 'EXPLORE_REROLL') && !!next.dungeon?.exploreDice && next.dungeon.exploreDice.seq !== prev.dungeon?.exploreDice?.seq)) out.push('sfx_world_dice');
   if (t === 'WORLD_CAMP') out.push('sfx_world_camp');
   if (t === 'DUNGEON_WATCH' && next.dungeon?.watchRoll && next.dungeon.watchRoll !== prev.dungeon?.watchRoll) out.push('sfx_dungeon_watch');
   if ((t === 'TOWN_BUY' || t === 'PEDDLER_BUY') && after !== before) out.push('sfx_ui_buy');

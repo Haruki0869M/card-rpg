@@ -128,23 +128,30 @@ export const BALANCE = {
   nightVisionPenalty: 1,
   /** 1つの時間帯（朝・昼・夕方・夜）が何ワールドターン続くか */
   turnsPerTimeOfDay: 2,
-  /** 移動力の判定: 素早さの枠数。移動力 = moveBase + 成功数 */
-  moveSlots: 4,
+  /**
+   * 移動のサイコロ（オーナーの案）: 移動力 = 1d6 ＋ 素早さのボーナス（判定の成功率がこの値以上で+1ずつ。+0〜+2）＋ 探索の能力・お供。
+   * 前の「2 ＋ 素早さ%×4枠の成功数」と平均がほぼ同じか少し低くなる値（難しめのまま）
+   */
+  moveDiceSides: 6,
+  moveDiceSpeed: [60, 80] as readonly number[],
+  /** 探索の能力「移動力の判定のスロット+N」（突進・騎乗・健脚・竜の翼）は、サイコロでは+1 */
+  moveDiceSlotBonus: 1,
+  /** 野営できる移動力の下限（まだ動いていない目安） */
   moveBase: 2,
   /** 体力と最大HP: 体力が vitHpBase を超えた分 × vitHpRate だけ最大HPが増える（M3-C6） */
   vitHpBase: 60,
   vitHpRate: 0.5,
   /** 連携攻撃: このターンに別の味方が攻撃した敵へのダメージの倍率の上乗せ（M3-C5） */
   comboBonus: 0.2,
-  /** ダンジョンの探索力（手番に入れる部屋の数）= exploreBase + 素早さの判定の成功数（exploreSlots 枠）。M3-D */
-  exploreSlots: 2,
-  exploreBase: 2,
-  /** 第3段階: 歩数 = 探索力 × これ（部屋から次の部屋へは、まっすぐなら「出口→扉」で2歩。今までの「探索力＝入れる部屋の数」と同じ速さ） */
+  /** ダンジョンの探索のサイコロ（1〜この数）。出た目 = この手番に選べる扉の数（扉1つで1。歩く距離は数えない） */
+  exploreDiceSides: 3,
+  /** 古い保存データの直し方だけで使う（前の「歩数 = 探索力 × これ」） */
   dungeonStepsPerExplore: 2,
   /** 第3段階C1: 扉の気配が分かる感知の成功率（%）。フクロウのお供・霊感の探索能力でも分かる */
   dungeonSensePer: 70,
   /** 周囲の警戒: 使う歩数・感知の判定の枠・完全成功で次の戦闘に付く「応援」の数 */
-  dungeonWatchSteps: 2,
+  /** 警戒は扉の数を使わない（扉を選ぶだけの形になったので。1つの通路で1回だけ） */
+  dungeonWatchSteps: 0,
   dungeonWatchSlots: 2,
   dungeonWatchInspired: 1,
   /**
@@ -183,6 +190,26 @@ export const BALANCE = {
   /** 町への襲撃: 陥落までのワールドターン / 守った時の報酬 */
   raidTurns: 8,
   raidRewardGold: 80,
+  /**
+   * 段階6 探索の仕組み（数値はすべて提案）。
+   * 見晴らしの塔: 立ち寄ると半径 watchtowerRadius の霧が晴れ、さらに半径 watchtowerSpotRadius 以内の宝箱・神殿・祭壇・レアの敵のマスも見える。
+   * 地図の高さが watchtowerTallMap 以上なら3か所、それより低ければ2か所。道から徒歩1〜3マス（2マスを優先）の寄り道の場所に置く。
+   */
+  watchtowerRadius: 4,
+  watchtowerSpotRadius: 7,
+  watchtowerTallMap: 24,
+  /**
+   * 時間で消える出現スポット: 最初は spawnFirstAt ワールドターン目、その後は spawnEveryMin〜Max ターンごとに1つ。
+   * 残るターン数 / 出やすさ / キャラから何マス離れた所に出るか（一番近いキャラからの距離）。
+   */
+  spawnFirstAt: 5,
+  /** 古い保存（v16）を読み込んだ時、最初の出現までのワールドターン */
+  spawnMigrateDelay: 2,
+  spawnEveryMin: 6,
+  spawnEveryMax: 8,
+  spawnLife: { star: 3, peddler: 4, thief: 3 },
+  spawnWeight: { star: 4, peddler: 3, thief: 3 },
+  spawnDistance: [3, 6] as readonly [number, number],
   /** 祠の永続の加護の上限（1人あたり） */
   maxBlessings: 3,
   /** ショップ: 品揃えが入れ替わる間隔（ワールドターン）、格ごとの値段、売値の割合 */
@@ -245,6 +272,9 @@ export const TIMING = {
   dungeonTurn: 0.25,
   dungeonDoor: 0.45,
   dungeonSimple: 0.1,
+  /** 移動のサイコロ: 転がる時間・目が出てから消えるまで。秒（高速モードは半分） */
+  diceRoll: 1.0,
+  diceHold: 1.1,
 } as const;
 
 /** 宝箱・カード報酬の演出時間（秒）。高速モードでは fastModeFactor で割る。spec §10.3 */

@@ -24,10 +24,6 @@ import {
   rarityIndex,
   reachable,
   reachableRooms,
-  doorFront,
-  dungeonNavigator,
-  findPath,
-  posOf,
   unusableReason,
   viewOf,
   waitingPlayers,
@@ -125,8 +121,10 @@ function questGateTarget(g: GameState, at: number, goal: string): { tile: number
   const near = (tiles: number[]) => tiles.filter((i) => hexDistance(w, at, i) <= reach).sort((a, b) => hexDistance(w, at, a) - hexDistance(w, at, b))[0];
   // 報告できる依頼があれば、報告する町へ
   const reportTowns = w.quests.flatMap((q) => {
-    if (q.reported || !canReportQuest(g, q.id)) return [];
-    const i = tileOf(g, 'town', QUESTS.get(q.id).reportTown ?? q.town);
+    const town = QUESTS.get(q.id).reportTown ?? q.town;
+    // 陥落した町では報告できない
+    if (q.reported || w.fallenTowns.includes(town) || !canReportQuest(g, q.id)) return [];
+    const i = tileOf(g, 'town', town);
     return i === undefined ? [] : [i];
   });
   const report = near(reportTowns);
@@ -203,7 +201,10 @@ function worldStep(g: GameState, log: BotLog, memo: BotMemo): GameState {
       if (ng !== g) return ng;
     }
   }
-  if (w.move === null) return send(g, { type: 'WORLD_ROLL_MOVE', playerId: p, heroId: h.id, focusUsed: 0 }, log);
+  if (w.move === null) return send(g, { type: 'WORLD_ROLL_MOVE', playerId: p, heroId: h.id }, log);
+  // 移動のサイコロの目が小さく、フォーカスに余裕があれば1回だけ振り直す（まだ動く前）
+  const md = w.moveDice;
+  if (md && !md.rerolled && md.face <= 2 && h.focus >= 2 && w.move === md.total && w.pos[h.id] === w.prevTile) return send(g, { type: 'WORLD_REROLL_MOVE', playerId: p, heroId: h.id }, log);
   // 同じマスの他の人のキャラは、誘って承知してもらってから一緒に動く（自動プレイは全員の代わりに答える）
   {
     for (const c of livingHeroes(g)) {
@@ -333,27 +334,27 @@ export function botStep(g: GameState, log: BotLog, memo: BotMemo, inScene = fals
       return send(g, { type: 'FINISH_REWARD', playerId: pid(g) }, log);
     }
     case 'dungeon': {
-      // 手番の最初に探索力を決める（世界マップのあるシナリオ）
-      if (g.world && g.dungeon!.explore == null) {
+      // 手番の最初に探索のサイコロを振る（世界マップのあるシナリオ。1〜3 = 選べる扉の数）
+      const run = g.dungeon!;
+      if (g.world && run.explore == null) {
         const chosen = exploreRollerOf(g);
         const h = (chosen ? findHero(g, chosen) : undefined) ?? livingHeroes(g).find((x) => !g.party || g.party.includes(x.id))!;
-        // 2人以上: 判定するキャラをみんなで決めてから
+        // 2人以上: 振るキャラをみんなで決めてから
         if (exploreShared(g) && !chosen) return send(g, { type: 'EXPLORE_ROLLER', playerId: h.playerId, heroId: h.id }, log);
-        return send(g, { type: 'EXPLORE_ROLL', playerId: h.playerId, heroId: h.id, focusUsed: 0 }, log);
+        return send(g, { type: 'EXPLORE_ROLL', playerId: h.playerId, heroId: h.id }, log);
       }
-      const rooms = reachableRooms(g.dungeon!);
+      // 1が出て、振ったキャラのフォーカスに余裕があれば1回だけ振り直す（まだ扉を選ぶ前）
+      const d = run.exploreDice;
+      const dh = d?.heroId ? findHero(g, d.heroId) : undefined;
+      if (g.world && d && dh && !d.rerolled && d.face === 1 && dh.focus >= 2 && run.explore === d.total) return send(g, { type: 'EXPLORE_REROLL', playerId: dh.playerId, heroId: dh.id }, log);
+      // 扉を選び終えた（警戒ができる時は手番が続く）: 手番を終える
+      if (g.world && run.explore === 0) return send(g, { type: 'EXPLORE_END', playerId: pid(g) }, log);
+      const rooms = reachableRooms(run);
       const hurt = livingHeroes(g).some((h) => h.hp < heroMaxHp(h) * 0.5);
       const pick = rooms.find((r) => (hurt ? r.type === 'rest' : r.type === 'chest')) ?? rooms[0];
-      // 第3段階: 扉の前まで1歩ずつ歩いてから開ける（bot はテスト用なので、部屋の中身を知っている）
-      const run = g.dungeon!;
-      const front = doorFront(run, pick.id)!;
-      const p = posOf(run);
-      if (p.x === front.x && p.y === front.y) return send(g, { type: 'ENTER_ROOM', playerId: pid(g), roomId: pick.id }, log);
-      const path = findPath(run, front);
-      const nav = dungeonNavigator(g);
-      if (!path?.length || !nav) return send(g, { type: 'EXPLORE_END', playerId: pid(g) }, log);
-      const rel = (['forward', 'right', 'back', 'left'] as const)[(path[0] - p.facing + 4) % 4];
-      return send(g, { type: 'DUNGEON_STEP', playerId: nav.playerId, heroId: nav.id, dir: rel }, log);
+      // 扉を選ぶだけ: 扉の前まではエンジンが自動で歩く（bot はテスト用なので、部屋の中身を知っている）
+      if (!pick) return send(g, { type: 'EXPLORE_END', playerId: pid(g) }, log);
+      return send(g, { type: 'ENTER_ROOM', playerId: pid(g), roomId: pick.id }, log);
     }
     case 'chest': {
       const c = g.chest!;

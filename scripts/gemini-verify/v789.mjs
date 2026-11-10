@@ -49,8 +49,8 @@ if (which === '7') {
   await tap(page.getByText('翠の神殿に入る'), 1200);
   await shot('10-dungeon');
   await probe('11-explore-help', page.getByText('探索力', { exact: false }).first());
-  await tryTap(page.getByText('探索力の判定'), 1300);
-  await tap(page.getByRole('button', { name: /^扉を開ける/ }), 2600);
+  await tryTap(page.locator('[data-explore-roll-button]'), 1300);
+  await tap(page.getByRole('button', { name: /扉を開ける/ }), 2600);
   await shot('12-battle');
   await tap(page.getByLabel('メニュー'), 800);
   await shot('13-battle-menu');
@@ -80,8 +80,8 @@ if (which === '8') {
   await edit((g) => { const w = g.world; const t = w.tiles.findIndex((x) => x.f && x.f.kind === 'dungeon' && x.f.id === 'emeraldTemple'); for (const id of Object.keys(w.pos)) w.pos[id] = t; w.story = undefined; });
   await tap(page.getByText('翠の神殿に入る'), 1200);
   await probe('08-dungeon-omen', page.locator('[data-omen], [data-room-omen]').first());
-  await tryTap(page.getByText('探索力の判定'), 1300);
-  await tap(page.getByRole('button', { name: /^扉を開ける/ }), 2600);
+  await tryTap(page.locator('[data-explore-roll-button]'), 1300);
+  await tap(page.getByRole('button', { name: /扉を開ける/ }), 2600);
   await probe('09-enemy-tap', page.locator('[data-enemy]').first());
   await close();
   await probe('10-enemy-long', page.locator('[data-enemy]').first(), { long: true });
@@ -118,7 +118,7 @@ if (which === '9') {
   await shot('05-story'); note(`物語: ${(await text()).slice(0, 500)}`);
   await tryTap(page.getByText('つづける'), 1200);
   await shot('06-world'); note(`最初の世界マップ: ${(await text()).slice(0, 600)}`);
-  await tap(page.getByText('移動力の判定', { exact: true }), 1600);
+  await tap(page.locator('[data-roll-move]'), 1600);
   await shot('07-rolled'); note(`判定の後: ${(await text()).slice(0, 500)}`);
   const t = page.locator('[data-reach]').filter({ hasText: /^[1-9]$/ }).first();
   const b = await t.boundingBox(); await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2); await beat(900);
@@ -129,9 +129,9 @@ if (which === '9') {
   await edit((g) => { const w = g.world; const t = w.tiles.findIndex((x) => x.f && x.f.kind === 'dungeon' && x.f.id === 'emeraldTemple'); for (const id of Object.keys(w.pos)) w.pos[id] = t; w.story = undefined; w.turn = g.heroes[0].id; g.mode = 'world'; delete g.event; });
   await tap(page.getByText('翠の神殿に入る'), 1500);
   await shot('10-dungeon'); note(`ダンジョン: ${(await text()).slice(0, 500)}`);
-  await tryTap(page.getByText('探索力の判定'), 1500);
+  await tryTap(page.locator('[data-explore-roll-button]'), 1500);
   await shot('11-explored');
-  await tap(page.getByRole('button', { name: /^扉を開ける/ }), 2800);
+  await tap(page.getByRole('button', { name: /扉を開ける/ }), 2800);
   await shot('12-battle'); note(`最初の戦闘: ${(await text()).slice(0, 600)}`);
   await tap(page.locator('[data-card-index]').first(), 1000);
   await shot('13-card'); note(`カードを押した後: ${(await text()).slice(0, 600)}`);

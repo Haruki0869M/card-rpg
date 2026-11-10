@@ -3,12 +3,12 @@
 // 時間は balance.ts の TIMING。高速は半分、カットイン「簡易」は短い切り替えだけ、OS の動作軽減では演出なし。
 // 手直し（チカチカ）: 景色は2枚をずっと置いたまま交互に使う（1歩ごとに作り直さない）。途中の景色は、その位置までに見えたマスだけで描く
 import { motion, useAnimationControls, useReducedMotion } from 'framer-motion';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { dungeonStepSound } from '../../audio/cues';
 import { playSound } from '../../audio/player';
 import { TIMING } from '../../data/balance';
 import { DUNGEONS } from '../../data/dungeons';
-import { findPath, posOf, visibleFrom } from '../../engine';
+import { DIRS, doorFront, findPath, posOf, revealSeen, visibleFrom } from '../../engine';
 import { useBattle } from '../../store/battleStore';
 import type { DoorOpen } from '../../store/battleStore';
 import type { DungeonRun, Facing } from '../../types';
@@ -217,15 +217,57 @@ export function AnimatedDungeonView({ run, background, omens, onShown, onDoor }:
   );
 }
 
-/** 扉が開く演出（扉へ寄りながら暗くなる）。終わったら部屋の画面（戦闘など）へ。タップで飛ばせる */
+/** 扉の前まで歩いて、北（扉）を向いた様子（扉を選ぶだけの形。エンジンと同じ道順。見たマスも描き足す） */
+export function walkedToDoor(run: DungeonRun, roomId: string | undefined): DungeonRun {
+  const front = roomId ? doorFront(run, roomId) : undefined;
+  const path = front ? findPath(run, front) : undefined;
+  if (!front || !path) return { ...run, pos: { ...posOf(run), facing: 0 } };
+  const out: DungeonRun = { ...run, seen: [...(run.seen ?? [])] };
+  let p = posOf(run);
+  for (const d of path) {
+    p = { x: p.x + DIRS[d][0], y: p.y + DIRS[d][1], facing: d };
+    out.pos = p;
+    revealSeen(out);
+  }
+  out.pos = { ...p, facing: 0 };
+  revealSeen(out);
+  return out;
+}
+
+/**
+ * 扉が開く演出。扉を選ぶだけの形（オーナーの案）では、まず扉の前まで自動で歩き（通路の演出と同じ）、
+ * それから扉へ寄りながら暗くなる。終わったら部屋の画面（戦闘など）へ。タップで飛ばせる
+ */
 export function DoorOpenScene({ door }: { door: DoorOpen }) {
   const finish = useBattle((s) => s.finishDoorOpen);
   const settings = useBattle((s) => s.settings);
   const simple = settings.cutinMode === 'simple';
-  const seconds = simple ? TIMING.dungeonSimple * 2 : TIMING.dungeonDoor * (settings.fastMode ? 1 / TIMING.fastModeFactor : 1);
+  const factor = settings.fastMode ? 1 / TIMING.fastModeFactor : 1;
+  const seconds = simple ? TIMING.dungeonSimple * 2 : TIMING.dungeonDoor * factor;
   const background = DUNGEONS.tryGet(door.run.dungeonId)?.background ?? door.run.background;
-  // 扉の前に立って北を向いた景色（ここまで歩いた時は、もう扉の前にいる）
-  const run = { ...door.run, pos: { ...posOf(door.run), facing: 0 as Facing } };
+  // 歩き始め（いつも前を向いて見せている）と、扉の前に着いた様子
+  const start = useMemo(() => ({ ...door.run, pos: { ...posOf(door.run), facing: 0 as Facing } }), [door.run]);
+  const walked = useMemo(() => walkedToDoor(door.run, door.roomId), [door.run, door.roomId]);
+  const walkSeconds = useMemo(() => framesBetween(start, walked, factor, simple).reduce((n, f) => n + f.seconds, 0), [start, walked, factor, simple]);
+  const [phase, setPhase] = useState<'walk' | 'open'>(walkSeconds > 0 ? 'walk' : 'open');
+  const [walkRun, setWalkRun] = useState<DungeonRun>(start);
+  useEffect(() => {
+    if (phase !== 'walk') return;
+    setWalkRun(walked);
+    const t = setTimeout(() => setPhase('open'), walkSeconds * 1000 + 60);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  if (phase === 'walk') {
+    return (
+      <Screen>
+        <button className="relative min-h-0 flex-1 overflow-hidden" onClick={() => finish(door.id)} aria-label="扉の演出を飛ばす" data-door-open="walk">
+          <AnimatedDungeonView run={walkRun} background={background} />
+        </button>
+      </Screen>
+    );
+  }
+  const run = walked;
   return (
     <Screen>
       <button className="relative min-h-0 flex-1 overflow-hidden" onClick={() => finish(door.id)} aria-label="扉の演出を飛ばす" data-door-open>

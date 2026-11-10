@@ -25,7 +25,7 @@ export function wandererLevel(game: GameState, w: WorldState, region: number): n
 const blocked = (w: WorldState, i: number, sea = false) => {
   const t = TERRAINS.get(w.tiles[i].t);
   const wrongTerrain = sea ? !t.sea : t.moveCost <= 0;
-  return !!w.tiles[i].f || wrongTerrain || w.wanderers.some((x) => x.tile === i) || Object.values(w.pos).includes(i);
+  return !!w.tiles[i].f || wrongTerrain || w.wanderers.some((x) => x.tile === i) || Object.values(w.pos).includes(i) || !!w.spawns?.some((x) => x.tile === i);
 };
 
 /** 地域の海のマスに、海の敵（幽霊船など）を1組置く（K4 段3）。置けたら返す */

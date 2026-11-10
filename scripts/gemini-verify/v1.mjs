@@ -39,7 +39,7 @@ await shot('01-world-start');
 // P1 が2人目を連れて動く（「1人で全員」は最初から同行、「スマホを回して」は誘う）
 const invite = page.getByRole('button', { name: /を誘う$/ });
 if (await invite.count()) { await tap(invite); await shot('02-invited'); note(`誘った後: ${(await text()).slice(0, 200)}`); }
-await tap(page.getByText('移動力の判定', { exact: true }), 1200);
+await tap(page.locator('[data-roll-move]'), 1200);
 await pickTile();
 await shot('03-picked');
 await tap(page.locator('button:has-text("移動する")'), 200);
@@ -58,8 +58,8 @@ note(`世界マップ P1→2人目: 受け渡し ${h1 ? 'あり' : 'なし'}`);
 await shot('05-second-turn');
 note(`2人目の番: ${(await text()).slice(0, 160)}`);
 // 2人目も動く
-if (await page.getByText('移動力の判定', { exact: true }).count()) {
-  await tap(page.getByText('移動力の判定', { exact: true }), 1200);
+if (await page.locator('[data-roll-move]').count()) {
+  await tap(page.locator('[data-roll-move]'), 1200);
   await pickTile();
   await tap(page.locator('button:has-text("移動する")'), 200);
   await page.locator('[data-world-moving]').waitFor({ state: 'detached', timeout: 15000 }).catch(() => {});
@@ -76,9 +76,9 @@ await edit((g) => { const w = g.world; const t = w.tiles.findIndex((x) => x.f &&
 await watch();
 await tap(page.getByText('翠の神殿に入る'), 1200);
 await handoff('dungeon-enter');
-await tryTap(page.getByText('探索力の判定'), 1200);
+await tryTap(page.locator('[data-explore-roll-button]'), 1200);
 await shot('07-dungeon');
-await tap(page.getByRole('button', { name: /^扉を開ける/ }), 2500);
+await tap(page.getByRole('button', { name: /扉を開ける/ }), 2500);
 await handoff('battle-start');
 await shot('08-battle');
 // 1人目: カードを1枚使って次の仲間へ

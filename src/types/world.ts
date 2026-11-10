@@ -69,7 +69,7 @@ export interface FixedFeature {
   at: [col: number, row: number];
 }
 
-export type FeatureKind = 'town' | 'dungeon' | 'shrine' | 'event' | 'chest' | 'landmark' | 'temple' | 'altar';
+export type FeatureKind = 'town' | 'dungeon' | 'shrine' | 'event' | 'chest' | 'landmark' | 'temple' | 'altar' | 'tower';
 
 /** 転職の施設。祭壇の対応先は職の altar と照合する印で指定する。 */
 export interface SanctuaryDef {
@@ -185,6 +185,16 @@ export interface Tile {
   seen: boolean;
 }
 
+/** 時間で消える出現スポット（段階6）: 流れ星の落下地点・さすらいの行商人・黄金のコソ泥 */
+export type SpawnKind = 'star' | 'peddler' | 'thief';
+export interface TimedSpawn {
+  id: string;
+  kind: SpawnKind;
+  tile: number;
+  /** このワールドターンまで残る（次のワールドターンの初めに消える） */
+  until: number;
+}
+
 /** 徘徊する敵（マップ上に見えている） */
 export interface Wanderer {
   id: string;
@@ -225,9 +235,9 @@ export interface WorldState {
   /** 今の手番のキャラ / このワールドターンで行動を終えたキャラ */
   turn: string;
   acted: string[];
-  /** 移動力（判定前は null）と判定の結果 */
+  /** 移動力（判定前は null）と、移動のサイコロの結果 */
   move: number | null;
-  moveRoll?: ('focus' | 'hit' | 'miss')[];
+  moveDice?: DiceRoll;
   /** 移動の前にいたマス（逃走で戻る先） */
   prevTile?: number;
   worldTurn: number;
@@ -254,6 +264,10 @@ export interface WorldState {
   shops: Record<string, ShopStock>;
   /** 画面に出す物語（冒頭・地域の紹介・エンディング） */
   story?: { title: string; lines: string[] };
+  /** 時間で消える出現スポット（段階6・v17）。無ければ空 / 次に出るワールドターン / 次の番号 */
+  spawns?: TimedSpawn[];
+  nextSpawnAt?: number;
+  nextSpawnId?: number;
   /** 同行の誘い（誘われたキャラ → 誘ったキャラ）と、承知した同行（同じ形）。手番が変わると消える */
   invites?: Record<string, string>;
   follow?: Record<string, string>;
@@ -295,4 +309,23 @@ export interface ShrineVisit extends FacilityVisit {
   tile: number;
   heroId: string;
   result?: { optionIndex: number; text: string };
+}
+
+/** 移動のサイコロ（世界マップは1d6＋ボーナス、ダンジョンは1〜3）。seq = 振るたびに変わる目印（画面の演出を全員で1回だけ出す） */
+export interface DiceRoll {
+  /** サイコロの面の数（6 か 3） */
+  sides: number;
+  /** 出た目 */
+  face: number;
+  /** 足すもの（素早さ・探索の能力・お供など。0 のものは入れない） */
+  bonus: { label: string; value: number }[];
+  /** 出た目＋ボーナス */
+  total: number;
+  /** フォーカスで振り直した時の、1回目の目 */
+  first?: number;
+  /** 振り直したか（振り直しは1回だけ） */
+  rerolled?: boolean;
+  /** 振ったキャラ（ダンジョン。振り直せるのはこのキャラ） */
+  heroId?: string;
+  seq: number;
 }

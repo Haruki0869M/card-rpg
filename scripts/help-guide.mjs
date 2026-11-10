@@ -74,11 +74,11 @@ for (const [width, height] of SIZES) {
   const enterDungeon = async () => {
     await page.getByText('翠の神殿に入る').click();
     await page.waitForTimeout(200);
-    if (await page.getByText('探索力の判定').count()) await page.getByText('探索力の判定').click();
+    if (await page.locator('[data-explore-roll-button]').count()) await page.locator('[data-explore-roll-button]').click();
     await page.waitForTimeout(200);
   };
   const openDoor = async () => {
-    await page.getByRole('button', { name: /^扉を開ける/ }).click();
+    await page.getByRole('button', { name: /扉を開ける/ }).click();
     await page.locator('[data-card-index]').first().waitFor({ timeout: 8000 });
     await waitForBattlePresentation(page);
     await page.waitForTimeout(1000); // 敵が出てくる動きが終わるまで（はみ出しの確認が動きの途中を拾わないように）

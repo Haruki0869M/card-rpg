@@ -1,8 +1,9 @@
 import { followingGroup } from '../../engine/game/world/group';
+import { spawnAt, spawnTurnsLeft, SPAWN_NAME } from '../../engine/game/world/explore';
 // ===== 世界マップの画面（spec §8・§20.3）=====
 // 上: 侵食度・命の灯火・ゴールド・時間帯 / 中: 地図 / 下: 手番のキャラの操作（移動力の判定・移動・入る・野営・待機）
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Coins, Flame, Footprints, Hourglass, Menu, Minus, Moon, Plus, ScrollText, Star, Sun, Sunrise, Sunset, Tent, Users } from 'lucide-react';
+import { Coins, Dices, Flame, Hourglass, Menu, Moon, ScrollText, Star, Sun, Sunrise, Sunset, Tent, Users } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { BALANCE } from '../../data/balance';
 import { DUNGEONS } from '../../data/dungeons';
@@ -24,12 +25,11 @@ import {
   pathTo,
   reachable,
   statChance,
-  successDistribution,
   TIME_NAME,
   timeOfDay,
   turnsUntilNightChange,
-  moveSlotsOf,
-  moveBonusOf,
+  worldDiceBonus,
+  diceAverage,
   corruptionShown,
 } from '../../engine';
 import { isLocalPlayer, isOnlinePlay } from '../../store/battleConfig';
@@ -38,7 +38,7 @@ import { useOnline } from '../../store/onlineStore';
 import { useHelp } from '../../store/help';
 import type { GameState, Hero, PlayerId, TimeOfDay } from '../../types';
 import { autoAgreeCommands } from './companionMove';
-import { SpinRollStrip, useFreshRoll } from '../ui/CheckPanel';
+import { DiceOverlay, DiceResult, bonusText } from '../ui/DiceRoll';
 import { Bar, HeroFace, Screen } from '../ui/game';
 import { WorldMap } from './WorldMap';
 import { arrivalView, moveButtonText, MoveStatus, useMovePlayback } from './WorldMoveScene';
@@ -270,6 +270,9 @@ function tileInfo(game: GameState, i: number): string {
   if (f?.kind === 'shrine') parts.push(SHRINES.get(f.id).name + (f.used ? '（祈り済み）' : ''));
   if (f?.kind === 'event' || f?.kind === 'landmark') parts.push((EVENTS.tryGet(f.id)?.title ?? '何かがある') + (f.used ? '（調べた）' : ''));
   if (f?.kind === 'chest') parts.push(f.used ? '空の宝箱' : '宝箱');
+  if (f?.kind === 'tower') parts.push(f.used ? '見晴らしの塔（登った）' : '見晴らしの塔（登ると、まわりの霧が晴れる）');
+  const sp = spawnAt(w, i);
+  if (sp) parts.push(`${SPAWN_NAME[sp.kind]}（あと${spawnTurnsLeft(w, sp)}ターン）`);
   const wd = w.wanderers.find((x) => x.tile === i);
   if (wd) parts.push(`敵: ${wd.enemies.map((e) => `${getEnemy(e.defId).name} Lv${e.level ?? 1}`).join('・')}${wd.raidTown ? '（町を襲撃中）' : ''}`);
   return parts.join(' / ');
@@ -278,12 +281,14 @@ function tileInfo(game: GameState, i: number): string {
 /** 今いるマスで「入る」ボタンの文字（入れる物が無ければ undefined） */
 function interactLabel(game: GameState, tile: number): string | undefined {
   const f = game.world!.tiles[tile].f;
+  const sp = spawnAt(game.world!, tile);
+  if (!f && sp) return sp.kind === 'peddler' ? '行商人と話す' : sp.kind === 'thief' ? 'コソ泥に近づく' : '落ちた星を調べる';
   if (!f) return undefined;
   if (f.kind === 'town') return game.world!.fallenTowns.includes(f.id) ? undefined : `${TOWNS.get(f.id).name}に入る`;
   if (f.kind === 'dungeon') return `${DUNGEONS.get(f.id).name}に入る`;
   if (f.kind === 'temple' || f.kind === 'altar') return `${SANCTUARIES.get(f.id).name}に入る`;
   if (f.used) return undefined;
-  return { shrine: '祠で祈る', event: '調べる', landmark: '調べる', chest: '宝箱を開ける' }[f.kind];
+  return { shrine: '祠で祈る', event: '調べる', landmark: '調べる', chest: '宝箱を開ける', tower: '見晴らしの塔に登る' }[f.kind];
 }
 
 export function WorldScreen({ movement }: { movement?: WorldMovePresentation } = {}) {
@@ -300,7 +305,6 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
   const w = game.world!;
   const hero = game.heroes.find((h) => h.id === w.turn);
   const here = hero ? w.pos[hero.id] : undefined;
-  const [focus, setFocus] = useState(0);
   const [selected, setSelected] = useState<number | undefined>();
   const [info, setInfo] = useState<string | undefined>();
   const [withMe, setWithMe] = useState<Record<string, boolean>>({});
@@ -323,12 +327,10 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
   useEffect(() => {
     setSelected(undefined);
     setInfo(undefined);
-    setFocus(0);
   }, [w.turn, w.move]);
 
-  // 移動力の判定のスロット（フェーズ2-D）: この画面を開いた後に新しく判定した時だけ回す
-  const moveRollKey = w.moveRoll ? `move:${game.seed}:${w.worldTurn}:${w.turn}` : undefined;
-  const freshRoll = useFreshRoll(moveRollKey);
+  // 移動のサイコロ: この画面を開いた後に新しく振った時だけ、真ん中で転がす（オンラインの仲間の画面でも）
+  const moveDiceKey = w.moveDice ? `move:${game.seed}:${w.moveDice.seq}` : undefined;
 
   // 1台で遊ぶ時（フェーズ2-C）: 同行している仲間の担当も全員この端末にいるので、「一緒に行く」の確認を出さずに、
   // その担当の同行キャラとして返事を送ってすぐ一緒に動く（オンラインで別の端末の人を連れて動く時だけ同意を取る）
@@ -362,11 +364,12 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
   };
   const label = interactLabel(game, here);
   const chance = statChance(hero, 'agi', 'move');
-  const moveSlots = moveSlotsOf(hero);
-  const maxFocus = Math.min(moveSlots, hero.focus);
-  const dist = successDistribution(moveSlots, Math.min(focus, maxFocus), chance);
-  const moveBase = BALANCE.moveBase + moveBonusOf(hero);
-  const avg = moveBase + dist.reduce((n, p, k) => n + p * k, 0);
+  const diceBonus = worldDiceBonus(hero);
+  const bonusSum = diceBonus.reduce((n, b) => n + b.value, 0);
+  const avg = diceAverage(BALANCE.moveDiceSides, diceBonus);
+  // フォーカスで振り直せるか（目を見た後・まだ動く前・1回だけ）
+  const md = w.moveDice;
+  const canReroll = mine && !!md && !md.rerolled && w.move === md.total && w.pos[hero.id] === w.prevTile && hero.focus >= 1;
   const ambush = campAmbushChance(game, hero.id);
   const climate = climateAt(game, here);
   const onTown = w.tiles[here].f?.kind === 'town';
@@ -477,10 +480,16 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
           )}
         </div>
 
-        {w.moveRoll && (
+        {md && (
           <div className="mt-1 flex items-center gap-2">
-            <SpinRollStrip results={w.moveRoll} small spinKey={moveRollKey ?? ''} fresh={freshRoll} />
-            <span className="text-[12px] leading-4 text-zinc-300">{w.move ? (selected !== undefined ? 'もう一度タップか下のボタンで決定' : 'マスの数字は、そこまでに使う移動力') : '移動力を使い切った'}</span>
+            <DiceResult dice={md} unit="移動力" />
+            {canReroll ? (
+              <button onClick={() => dispatchGame({ type: 'WORLD_REROLL_MOVE', playerId: pid, heroId: hero.id })} className="btn btn-dark ml-auto flex h-11 shrink-0 flex-col items-center justify-center rounded-lg px-2 text-[12px] leading-4 font-bold" data-reroll>
+                <span className="flex items-center gap-0.5"><Star size={11} className="fill-amber-400/70 text-amber-300" />1で</span>振り直す
+              </button>
+            ) : (
+              <span className="ml-auto max-w-[45%] shrink-0 text-right text-[12px] leading-4 text-zinc-300">{w.move ? (selected !== undefined ? 'もう一度タップか下のボタンで決定' : 'マスの数字は使う移動力') : '移動力を使い切った'}</span>
+            )}
           </div>
         )}
 
@@ -535,31 +544,24 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
             </button>
           )}
         {w.move === null && (
-          <div className="mt-1.5 flex items-center gap-2">
-            <button onClick={() => setFocus(Math.max(0, focus - 1))} disabled={focus <= 0} aria-label="フォーカスを減らす" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-lg">
-              <Minus size={18} />
-            </button>
-            <div className="flex flex-1 flex-col items-center leading-4">
-              <span className="text-[12px] text-zinc-300">
-                素早さ{chance}%×{moveSlots}枠・フォーカス<b className="text-amber-200">{Math.min(focus, maxFocus)}</b>
-              </span>
-              <span className="text-[12px] text-zinc-400">
-                移動力 {moveBase + Math.min(focus, maxFocus)}〜{moveBase + moveSlots}（平均{avg.toFixed(1)}）
-              </span>
-            </div>
-            <button onClick={() => setFocus(Math.min(maxFocus, focus + 1))} disabled={focus >= maxFocus} aria-label="フォーカスを増やす" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-lg">
-              <Plus size={18} />
-            </button>
+          <div className="mt-1.5 flex flex-col items-center leading-4" data-dice-preview>
+            <span className="text-[12px] text-zinc-300">
+              サイコロ1つ{diceBonus.length ? <b className="text-sky-200">{bonusText({ bonus: diceBonus } as never)}</b> : `（素早さ${chance}%: ボーナスなし）`}
+            </span>
+            <span className="text-[12px] text-zinc-400">
+              移動力 {1 + bonusSum}〜{BALANCE.moveDiceSides + bonusSum}（平均{avg.toFixed(1)}）・フォーカス1で1回振り直せる
+            </span>
           </div>
         )}
 
         <div className="mt-2 flex flex-col gap-1.5">
           {w.move === null ? (
             <button
-              onClick={() => dispatchGame({ type: 'WORLD_ROLL_MOVE', playerId: pid, heroId: hero.id, focusUsed: Math.min(focus, maxFocus) })}
+              onClick={() => dispatchGame({ type: 'WORLD_ROLL_MOVE', playerId: pid, heroId: hero.id })}
               className="btn btn-gold font-display flex h-12 items-center justify-center gap-1 rounded-xl text-[18px]"
+              data-roll-move
             >
-              <Footprints size={20} /> 移動力の判定
+              <Dices size={20} /> サイコロを振る
             </button>
           ) : selected !== undefined ? (
             <button onClick={() => tapTile(selected)} className="btn btn-gold font-display h-12 rounded-xl text-[17px] leading-5">
@@ -609,6 +611,7 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
       </div>
       </div>
 
+      <DiceOverlay dice={w.moveDice} diceKey={moveDiceKey} title={`${hero.name}の移動のサイコロ`} />
       {/* 移動の演出中は、上の情報欄・仲間の列・地図のタップも受け付けない（以前の移動画面と同じ） */}
       {movement && <div className="absolute inset-0 z-30" aria-hidden data-move-blocker />}
       <AnimatePresence>
