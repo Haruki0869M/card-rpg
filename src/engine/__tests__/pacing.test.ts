@@ -100,7 +100,7 @@ describe('鍵のダンジョン（§4 B・C）', () => {
     });
     expect(doable.length, sid).toBeGreaterThanOrEqual(2);
     for (const d of keyed) expect(d.corruptionOnClear, d.id).toBeUndefined();
-    expect(BALANCE.corruptionOnKeyDungeonClear).toBe(2);
+    expect(BALANCE.corruptionOnKeyDungeonClear).toBe(3);
   });
 
   it('鍵が無いと扉が開かず、どこで鍵が手に入るかを伝える。鍵があれば入れる', () => {
@@ -224,6 +224,21 @@ describe('道を長くした地図（約20マス）と、1階増えたダンジ�
     expect(growLayout(base, 4)).toEqual(base);
     // grownLayout = 1階足してから大きくする
     expect(grownLayout(base, FINALE_EXTRA_FLOOR)).toHaveLength(DUNGEON_ROWS.finale);
+  });
+});
+
+describe('ダンジョンの中の番の侵食度（提案 +0.5%）', () => {
+  it('1人でもダンジョンの中にいるワールドターンは +0.5%、だれもいない時は +1%', () => {
+    let g = run(newWorld(['warrior', 'mage']), { type: 'STORY_CONTINUE', playerId: P });
+    const w = g.world!;
+    w.pos.h0 = w.tiles.findIndex((t) => t.f?.kind === 'dungeon' && t.f.id === 'emeraldTemple');
+    g = run(g, { type: 'WORLD_INTERACT', playerId: P, heroId: 'h0', party: ['h0'] });
+    const c0 = g.world!.corruption;
+    // h1 は外で待つ。手番を終えるとワールドターンが終わる
+    g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h1' });
+    expect(g.world!.corruption).toBe(c0 + BALANCE.corruptionPerDungeonTurn);
+    expect(BALANCE.corruptionPerDungeonTurn).toBe(0.5);
+    expect(BALANCE.corruptionPerTurn).toBe(1);
   });
 });
 

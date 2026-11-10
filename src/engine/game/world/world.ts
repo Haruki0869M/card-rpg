@@ -130,10 +130,10 @@ function endWorldTurn(game: GameState, rng: Rng) {
   w.acted = [];
   w.movedBy = undefined;
   w.relayCharged = undefined;
-  // 時間による侵食度: 生きているキャラが全員ダンジョンの中なら、ダンジョンの番の量（ダンジョンが長いので小さめ）。難易度の値は倍率
-  const living = livingHeroes(game);
-  const allInside = living.length > 0 && living.every((x) => expeditionOf(game, x.id));
-  const perTurn = allInside ? BALANCE.corruptionPerDungeonTurn : BALANCE.corruptionPerTurn;
+  // 時間による侵食度: 生きているキャラが1人でもダンジョンの中なら、ダンジョンの番の量（ダンジョンが長いので小さめ）。難易度の値は倍率。
+  // 「全員が中」にすると、パーティが分かれた時（外で待つ仲間がいる時）だけ長いダンジョンの間ずっと+1%になり、侵食度が持たない
+  const inside = livingHeroes(game).some((x) => expeditionOf(game, x.id));
+  const perTurn = inside ? BALANCE.corruptionPerDungeonTurn : BALANCE.corruptionPerTurn;
   w.corruption = Math.min(100, w.corruption + perTurn * (getDifficulty(game.difficulty).corruptionPerTurn ?? 1));
   onCorruptionChange(game, rng, before);
   // 夜は魔物が増える

@@ -155,11 +155,11 @@ export const BALANCE = {
   dungeonWatchSlots: 2,
   dungeonWatchInspired: 1,
   /**
-   * 侵食度: 1ワールドターンごと（世界マップに1人でもいる時）/ ダンジョンに入る時 / 町が陥落した時。
+   * 侵食度: 1ワールドターンごと（だれもダンジョンに入っていない時）/ ダンジョンに入る時 / 町が陥落した時。
    * 0.25 刻みの小数にしてよい（画面では切り捨てて整数%で出す。corruptionShown）。難易度の corruptionPerTurn は倍率
    */
   corruptionPerTurn: 1,
-  /** 侵食度: 1ワールドターンごと（生きているキャラが全員ダンジョンの中の時。ダンジョンが長いので小さめ） */
+  /** 侵食度: 1ワールドターンごと（1人でもダンジョンの中にいる時。ダンジョンが長いので小さめ） */
   corruptionPerDungeonTurn: 0.5,
   corruptionOnDungeonEnter: 2,
   corruptionOnTownFall: 5,
@@ -168,8 +168,8 @@ export const BALANCE = {
    * 同じワールドターンのうちに、前の人の手番ですでに動いたキャラを、別の人の手番でまた動かした時に上がる（1手番に1回まで）
    */
   corruptionPerRelayMove: 1,
-  /** 侵食度: 鍵のダンジョンを制覇した時に下がる量（ダンジョンごとの corruptionOnClear が無い時。§4 B で 5→2） */
-  corruptionOnKeyDungeonClear: 2,
+  /** 侵食度: 鍵のダンジョンを制覇した時に下がる量（ダンジョンごとの corruptionOnClear が無い時。§4 B で 5→2、ダンジョンを大きくした時に 2→3（提案）） */
+  corruptionOnKeyDungeonClear: 3,
   /** 野営の回復（HPは最大HPの割合）と、夜に野営した時の夜襲の確率（%） */
   campHpRatio: 0.2,
   campFocus: 1,

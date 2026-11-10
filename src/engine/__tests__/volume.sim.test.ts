@@ -128,7 +128,7 @@ function runOne(scen: string, classes: string[], seed: number): Run {
       if (post.world.worldTurn > pre.world.worldTurn) {
         const living = post.heroes.filter((h) => !h.retired && h.hp > 0);
         const ins = inside(pre);
-        if (living.length && living.every((h) => ins.includes(h.id))) counts.turnsDungeon++;
+        if (living.some((h) => ins.includes(h.id))) counts.turnsDungeon++;
         else counts.turnsMap++;
       }
       if ((post.world.relayCharged?.length ?? 0) > (pre.world.relayCharged?.length ?? 0)) counts.relays++;
