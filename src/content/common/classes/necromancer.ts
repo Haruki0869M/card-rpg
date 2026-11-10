@@ -12,6 +12,6 @@ export const necromancer: ClassDef = {
   startingEquipment: { ...hexer.startingEquipment, weapon: 'rustyScythe' },
   battleAbility: { name: '屍兵', effect: { when: 'kill', do: [{ kind: 'summon', id: 'skeletonSoldier', name: '屍兵', icon: '💀', damage: BALANCE.specialJobs.minionDamage, turns: 99, stackLimit: BALANCE.specialJobs.minionLimit }] } },
   exploreAbility: { id: 'necromancerExplore', name: '死者の知恵', description: '石碑・魔法陣の判定+20%', effect: { kind: 'checkBonus', check: 'arcane', bonus: 20 } },
-  requires: { feat: 'kills:cursed', count: 5, text: '呪われた敵を5体倒す' },
+  requires: { feat: 'kills:cursed', count: 3, text: '呪われた敵を3体倒す' },
   cardPool: ['graveBolt', 'graveCurse', 'graveFeast', 'graveGuard', 'graveWhisper', 'graveFuneral'], signature: ['graveBolt', 'graveCurse', 'graveFeast'],
 };

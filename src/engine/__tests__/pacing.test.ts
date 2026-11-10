@@ -1,6 +1,7 @@
 // ===== 冒険の長さ・転職の速さの見直し（docs/archive/tasks/play-feedback-plan.md §4・§5） =====
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../data/balance';
+import { CLASSES } from '../../data/classes';
 import { DUNGEONS } from '../../data/dungeons';
 import { SCENARIOS } from '../../data/scenarios';
 import { reachable } from '../game/world/hex';
@@ -9,7 +10,6 @@ import { startTileOf } from '../game/world/start';
 import { spawnWanderer } from '../game/world/wanderers';
 import { nextGoalLines } from '../game/game';
 import { createRng } from '../rng';
-import { KEY_EXTRA_FLOOR, withExtraFloor, growLayout, grownLayout, DUNGEON_ROWS, FINALE_EXTRA_FLOOR } from '../../content/scenarios/extraFloor';
 import { QUESTS, TOWNS } from '../../data/world';
 import type { GameCommand, GameState, PlayerId } from '../../types';
 import { applyGameCommand, createGame } from '../index';
@@ -152,78 +152,28 @@ describe('3つ目の鍵のダンジョンの関門（町の依頼）', () => {
   });
 });
 
-describe('道を長くした地図（約20マス）と、1階増えたダンジョン', () => {
-  it.each(SCENARIOS.all.map((s) => [s.id] as const))('%s: 鍵のダンジョンまでの行の差が 16・13・14、高さ49', (sid) => {
+describe('引き締めた地図（高さ35。抜本的な見直し §2-6）', () => {
+  it.each(SCENARIOS.all.map((s) => [s.id] as const))('%s: 鍵のダンジョンまでの行の差が 11・9・10、高さ35', (sid) => {
     const map = SCENARIOS.get(sid).map!;
-    expect(map.height).toBe(49);
+    expect(map.height).toBe(35);
+    expect(map.start).toEqual([3, 33]);
     const keyed = DUNGEONS.forScenario(sid).filter((d) => d.rewardKey && !d.random).sort((a, b) => a.baseLevel - b.baseLevel);
     const row = (id: string) => map.features.find((f) => f.id === id)!.at[1];
-    expect(map.start[1] - row(keyed[0].id)).toBe(16);
-    expect(row(keyed[0].id) - row(keyed[1].id)).toBe(13);
-    expect(row(keyed[1].id) - row(keyed[2].id)).toBeGreaterThanOrEqual(13);
+    expect(map.start[1] - row(keyed[0].id)).toBe(11);
+    expect(row(keyed[0].id) - row(keyed[1].id)).toBe(9);
+    expect(row(keyed[1].id) - row(keyed[2].id)).toBe(10);
+    expect(row(DUNGEONS.forScenario(sid).find((d) => d.finale)!.id)).toBe(0);
     // 地域は隙間なく、上から下までつながっている
     const regions = [...map.regions].sort((a, b) => a.rows[0] - b.rows[0]);
     expect(regions[0].rows[0]).toBe(0);
     for (let i = 1; i < regions.length; i++) expect(regions[i].rows[0]).toBe(regions[i - 1].rows[1] + 1);
-    expect(regions[regions.length - 1].rows[1]).toBe(48);
-  });
-
-  it('1階足しても、どの部屋も入口からボスまでつながっている', () => {
-    const layout = withExtraFloor(
-      [
-        [{ type: 'battle', next: [0, 1] }],
-        [{ type: 'battle', next: [0] }, { type: 'event', eventId: 'x', next: [0] }],
-        [{ type: 'rest', next: [0] }],
-        [{ type: 'boss', next: [] }],
-      ],
-      KEY_EXTRA_FLOOR,
-    );
-    expect(layout.map((r) => r.map((x) => x.type))).toEqual([['battle'], ['battle', 'event'], ['battle', 'chest'], ['rest'], ['boss']]);
-    expect(layout[1].map((x) => x.next)).toEqual([[0], [1]]);
-    expect(layout[2].map((x) => x.next)).toEqual([[0], [0]]);
-    for (const d of DUNGEONS.all.filter((x) => (x.rewardKey || x.finale) && x.layout)) {
-      const L = d.layout!;
-      for (let r = 0; r + 1 < L.length; r++) {
-        for (const room of L[r]) for (const n of room.next) expect(n, d.id).toBeLessThan(L[r + 1].length);
-        L[r + 1].forEach((_, c) => expect(L[r].some((p) => p.next.includes(c)), `${d.id} ${r + 1}:${c}`).toBe(true));
-      }
-    }
-  });
-
-  it('鍵のダンジョンは40行・最後のダンジョンは52行（入口からボスまで）。最後は休憩→（物語）→ボスのまま', () => {
-    expect(DUNGEON_ROWS).toEqual({ key: 40, finale: 52 });
-    for (const d of DUNGEONS.all.filter((x) => (x.rewardKey || x.finale) && x.layout && !x.random)) {
-      const L = d.layout!;
-      expect(L.length, d.id).toBe(d.finale ? DUNGEON_ROWS.finale : DUNGEON_ROWS.key);
-      expect(L[L.length - 1][0].type, d.id).toBe('boss');
-      expect(L.slice(-4).some((row) => row.length === 1 && row[0].type === 'rest'), d.id).toBe(true);
-    }
-  });
-
-  it('中の行を繰り返して大きくする: 部屋の種類の割合は同じ・つなぎ目もつながる', () => {
-    const base = [
-      [{ type: 'battle', next: [0, 1] }],
-      [{ type: 'battle', next: [0, 1] }, { type: 'event', eventId: 'x', next: [1, 2] }],
-      [{ type: 'chest', chest: { rarity: 'rare' as const, locked: false }, next: [0] }, { type: 'battle', next: [0] }, { type: 'rest', next: [0] }],
-      [{ type: 'elite', next: [0] }],
-      [{ type: 'rest', next: [0] }],
-      [{ type: 'boss', next: [] }],
-    ];
-    const big = growLayout(base, 15);
-    expect(big).toHaveLength(15);
-    // 入口 1 + 階（中の3行＋休憩）× 3 = 12（最後の階の休憩はボス前の休憩と並ぶので、中の1行目に替える）+ 休憩・ボス 2
-    const middle = big.slice(1, -2).flat().map((x) => x.type);
-    const count = (list: string[], t: string) => list.filter((x) => x === t).length;
-    expect({ battle: count(middle, 'battle'), event: count(middle, 'event'), chest: count(middle, 'chest'), rest: count(middle, 'rest'), elite: count(middle, 'elite') }).toEqual({ battle: 7, event: 4, chest: 3, rest: 5, elite: 3 });
-    expect(big.slice(1, -2).filter((row) => row.length === 1 && row[0].type === 'rest')).toHaveLength(2);
-    for (let r = 0; r + 1 < big.length; r++) {
-      for (const room of big[r]) for (const n of room.next) expect(n).toBeLessThan(big[r + 1].length);
-      big[r + 1].forEach((_, c) => expect(big[r].some((p) => p.next.includes(c))).toBe(true));
-    }
-    // 元より小さい行の数を指定したら、そのまま
-    expect(growLayout(base, 4)).toEqual(base);
-    // grownLayout = 1階足してから大きくする
-    expect(grownLayout(base, FINALE_EXTRA_FLOOR)).toHaveLength(DUNGEON_ROWS.finale);
+    expect(regions[regions.length - 1].rows[1]).toBe(34);
+    // 町・ダンジョン・名所は地図の中で、同じマスに重ならない
+    const at = map.features.map((f) => f.at.join());
+    expect(new Set(at).size).toBe(at.length);
+    for (const f of map.features) expect(f.at[1], f.id).toBeLessThan(map.height);
+    // 見晴らしの塔は3か所のまま（高さ24以上）
+    expect(map.height).toBeGreaterThanOrEqual(BALANCE.watchtowerTallMap);
   });
 });
 
@@ -242,11 +192,11 @@ describe('ダンジョンの中の番の侵食度（提案 +0.5%）', () => {
   });
 });
 
-describe('古い保存データ（道を長くする前の地図）', () => {
+describe('古い保存データ（高さの違う前の地図）', () => {
   it('地図を作り直さず、徘徊する敵は記録した地域のマスに出る。スタートの町はそのまま見つかる', () => {
     const g = run(newWorld(['warrior']), { type: 'STORY_CONTINUE', playerId: P });
     const w = g.world!;
-    // 高さ28の古い地図に見せかける（上の28行だけ残し、スタートの町を元の位置に置く）
+    // 高さ28の古い地図に見せかける（上の28行だけ残し、スタートの町を元の位置に置く）。高さ49の地図も同じ考え方で、保存されたマスをそのまま使う
     const old = { ...w, height: 28, tiles: w.tiles.slice(0, 28 * w.width).map((t) => ({ ...t, f: t.f?.kind === 'town' && t.f.id === 'royalCapital' ? undefined : t.f })) };
     old.tiles[26 * w.width + 3].f = { kind: 'town', id: 'royalCapital' };
     expect(startTileOf(g, old)).toBe(26 * w.width + 3);
@@ -260,8 +210,21 @@ describe('古い保存データ（道を長くする前の地図）', () => {
 });
 
 describe('転職の速さ（§5）', () => {
-  it('転職できるレベルは 中位9・最上位9・特殊7（道を長くした分）', () => {
-    expect(BALANCE.jobChange).toEqual({ base: 9, mid: 9, special: 7 });
+  it('転職できるレベルは 中位5・最上位6・特殊5（抜本的な見直し。戦闘25〜32回の冒険に合わせた）', () => {
+    expect(BALANCE.jobChange).toEqual({ base: 5, mid: 6, special: 5 });
+  });
+  it('最上位・特殊職の条件の数（計画書 §2-6 の表）', () => {
+    const want: Record<string, number> = {
+      swordSaint: 22, bowSaint: 20, holyKing: 25, bard: 12, phantomKing: 90, timeMage: 70, fistKing: 35, pope: 22, grandThief: 250, overlord: 10, beastMaster: 8,
+      greatSage: 6, magicKnight: 6, hadesLord: 4, necromancer: 3, ninja: 6, dragoon: 2, darkKnight: 3, samurai: 6, gambler: 6, astrologer: 3, machinist: 3, shrineMaiden: 2,
+    };
+    const withReq = CLASSES.all.filter((c) => c.requires);
+    expect(withReq.map((c) => c.id).sort()).toEqual(Object.keys(want).sort());
+    for (const c of withReq) {
+      expect(c.requires!.count, c.id).toBe(want[c.id]);
+      // 説明の文の数字も同じ
+      expect(c.requires!.text, c.id).toContain(String(want[c.id]));
+    }
   });
   it('中位に転職すると記録を数え直す（最上位・特殊職の条件は、中位になってからの数）', () => {
     let g = run(newWorld(['warrior']), { type: 'STORY_CONTINUE', playerId: P });

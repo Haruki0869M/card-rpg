@@ -9,6 +9,6 @@ export const overlord: ClassDef = {
   stats: { ...berserker.stats, str: berserker.stats.str + 8, vit: berserker.stats.vit + 8 },
   battleAbility: { name: '覇気', effect: { when: 'allyKill', do: [{ kind: 'rallyDamage', amount: 0.1, max: 0.5 }] } },
   exploreAbility: { id: 'overlordExplore', name: '威圧', description: '逃げる判定+20%', effect: { kind: 'checkBonus', check: 'flee', bonus: 20 } },
-  requires: { feat: 'kills', count: 20, text: '敵を20体倒す' },
+  requires: { feat: 'kills', count: 10, text: '敵を10体倒す' },
   cardPool: ["kingCleaver","domination","conquerorRoar","bloodThrone","worldBreaker"], signature: ["kingCleaver","domination","conquerorRoar"],
 };

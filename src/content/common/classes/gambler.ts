@@ -10,6 +10,6 @@ export const gambler: ClassDef = {
   weaponType: 'dagger', subWeapons: ['instrument'], startingEquipment: { ...phantomThief.startingEquipment, weapon: 'rustyDagger' },
   battleAbility: { name: '勝負勘', effect: { when: 'afterCard', if: [{ kind: 'cardHasDamage' }, { kind: 'successesAtMost', count: 0 }, { kind: 'focusNotFull' }, { kind: 'oncePerTurn', key: 'gambleRecovery' }], do: [{ kind: 'gainFocus', amount: BALANCE.specialJobs.failureFocus }] } },
   exploreAbility: { id: 'gamblerExplore', name: '運の嗅覚', description: '宝箱の運の判定+15%', effect: { kind: 'checkBonus', check: 'luck', bonus: 15 } },
-  requires: { feat: 'checks:luk', count: 10, text: '運の判定を10回成功' },
+  requires: { feat: 'checks:luk', count: 6, text: '運の判定を6回成功' },
   cardPool: ['gambleStrike', 'gambleTwin', 'gambleGuard', 'gambleFocus', 'gambleDraw', 'gambleFinale'], signature: ['gambleStrike', 'gambleTwin', 'gambleGuard'],
 };

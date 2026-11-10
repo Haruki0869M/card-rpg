@@ -2,7 +2,6 @@
 // 敵の組み合わせはダンジョンごと（enemies/ の専用の敵）。
 // 制覇すると星環が手に入り、3つそろうと最終ダンジョンに入れる。ボスの手前に「物語の部屋」（event）を置く
 import type { DungeonDef } from '../../../../types';
-import { FINALE_EXTRA_FLOOR, KEY_EXTRA_FLOOR, grownLayout } from '../../extraFloor';
 
 const WINDMILL_POOLS: DungeonDef['pools'] = {
   battle: [['windSprite', 'clockworkSoldier'], ['starJelly', 'gearBeetle'], ['stormWindSprite', 'clockworkSoldier'], ['windSprite', 'starJelly', 'gearBeetle']],
@@ -25,6 +24,8 @@ const GARDEN_POOLS: DungeonDef['pools'] = {
 const CASTLE_POOLS: DungeonDef['pools'] = {
   battle: [['holyMoonWolf', 'venomThornFairy'], ['skyKnight', 'venomThornFairy'], ['skyKnight', 'moonWolf'], ['venomThornFairy', 'skyKnight', 'starFragment'], ['skyKnight', 'shadowMoonRabbit'], ['holyAngelStatue', 'venomThornFairy']],
   elite: [['skyPaladin']],
+  // 7行目の中ボス（提案）
+  midboss: ['skyPaladin', 'skyKnight'],
   boss: ['starSeerQueen'],
 };
 
@@ -36,7 +37,7 @@ const CAVE_POOLS: DungeonDef['pools'] = {
 
 type Layout = NonNullable<DungeonDef['layout']>;
 
-/** 風車の塔（元の並びは8行。extraFloor.ts で40行に広げる。入門。突風と星屑の箱） */
+/** 風車の塔（入門。突風と星屑の箱） */
 const windmillLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
@@ -44,13 +45,13 @@ const windmillLayout: Layout = [
     { type: 'event', eventId: 'skyWindGap', next: [1, 2] },
   ],
   [
-    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [0] },
-    { type: 'battle', next: [0, 1] },
-    { type: 'rest', next: [1] },
+    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [0, 1] },
+    { type: 'elite', next: [0, 1] },
+    { type: 'rest', next: [0] },
   ],
   [
+    { type: 'battle', next: [0, 1] },
     { type: 'event', eventId: 'starDustChest', next: [0] },
-    { type: 'elite', next: [0, 1] },
   ],
   [
     { type: 'battle', next: [0] },
@@ -61,7 +62,7 @@ const windmillLayout: Layout = [
   [{ type: 'boss', next: [] }],
 ];
 
-/** 星見の天文台（元の並びは8行。extraFloor.ts で40行に広げる。壁画と時計仕掛けの罠。強敵が2回） */
+/** 星見の天文台（壁画と時計仕掛けの罠。強敵が2回） */
 const observatoryLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
@@ -78,37 +79,45 @@ const observatoryLayout: Layout = [
     { type: 'event', eventId: 'clockworkTrap', next: [1] },
   ],
   [
+    { type: 'battle', next: [0, 1] },
+    { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
+  ],
+  [
     { type: 'battle', next: [0] },
-    { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
+    { type: 'elite', next: [0] },
   ],
   [{ type: 'rest', next: [0] }],
   [{ type: 'event', eventId: 'librarianDesk', next: [0] }],
   [{ type: 'boss', next: [] }],
 ];
 
-/** 月光の庭（元の並びは9行。extraFloor.ts で40行に広げる。泉と飛行船の行商人。分かれ道が多い） */
+/** 月光の庭（泉と飛行船の行商人。分かれ道が多い） */
 const moonGardenLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
     { type: 'battle', next: [0, 1] },
-    { type: 'battle', next: [1, 2] },
+    { type: 'event', eventId: 'moonPetalFountain', next: [1, 2] },
   ],
   [
-    { type: 'event', eventId: 'moonPetalFountain', next: [0] },
-    { type: 'battle', next: [0, 1] },
-    { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [1] },
-  ],
-  [
+    { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
     { type: 'elite', next: [0, 1] },
-    { type: 'rest', next: [1] },
+    { type: 'battle', next: [1] },
   ],
   [
-    { type: 'battle', next: [0] },
-    { type: 'event', eventId: 'skyPeddler', next: [0, 1] },
+    { type: 'rest', next: [0, 1] },
+    { type: 'event', eventId: 'skyPeddler', next: [1] },
+  ],
+  [
+    { type: 'battle', next: [0, 1] },
+    { type: 'battle', next: [1] },
   ],
   [
     { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
-    { type: 'elite', next: [0] },
+    { type: 'elite', next: [0, 1] },
+  ],
+  [
+    { type: 'battle', next: [0] },
+    { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
   ],
   [{ type: 'rest', next: [0] }],
   [{ type: 'event', eventId: 'moonMaidenGarden', next: [0] }],
@@ -125,7 +134,7 @@ export const windmillTower: DungeonDef = {
   bossChest: 'epic',
   rewardKey: 'ringWind',
   clearStory: ['風の番人が、風になって消えた。', '塔の風車が、静かに回りだす。', '星環（風）を手に入れた！'],
-  layout: grownLayout(windmillLayout, KEY_EXTRA_FLOOR),
+  layout: windmillLayout,
 };
 
 export const observatory: DungeonDef = {
@@ -140,7 +149,7 @@ export const observatory: DungeonDef = {
   // 1つ目のダンジョンの鍵が要る（play-feedback-plan §4 C: 町や依頼を飛ばして、まっすぐ奥へ行けないように）
   requiresKeys: ['ringWind'],
   clearStory: ['星の司書は、本を閉じて微笑んだ。', '「女王様を…お願いします」', '星環（星）を手に入れた！'],
-  layout: grownLayout(observatoryLayout, KEY_EXTRA_FLOOR),
+  layout: observatoryLayout,
 };
 
 export const moonlitGarden: DungeonDef = {
@@ -156,7 +165,7 @@ export const moonlitGarden: DungeonDef = {
   requiresKeys: ['ringStar'],
   requiresQuests: 1,
   clearStory: ['月の乙女が、花びらになって舞った。', '「ありがとう。女王様を、どうか」', '星環（月）を手に入れた！'],
-  layout: grownLayout(moonGardenLayout, KEY_EXTRA_FLOOR),
+  layout: moonGardenLayout,
 };
 
 export const skyCastle: DungeonDef = {
@@ -169,24 +178,42 @@ export const skyCastle: DungeonDef = {
   bossChest: 'legend',
   requiresKeys: ['ringWind', 'ringStar', 'ringMoon'],
   finale: true,
-  layout: grownLayout([
+  layout: [
     [{ type: 'battle', next: [0, 1] }],
     [
-      { type: 'battle', next: [0, 1] },
+      { type: 'battle', next: [0] },
+      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0, 1] },
+    ],
+    [
+      { type: 'elite', next: [0, 1] },
       { type: 'battle', next: [1] },
     ],
     [
-      { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
+      { type: 'rest', next: [0, 1] },
+      { type: 'event', eventId: 'skyPeddler', next: [1] },
+    ],
+    [
+      { type: 'battle', next: [0, 1] },
+      { type: 'elite', next: [1] },
+    ],
+    [
+      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
+      { type: 'battle', next: [0] },
+    ],
+    [{ type: 'midboss', next: [0] }],
+    [{ type: 'rest', next: [0, 1] }],
+    [
+      { type: 'battle', next: [0, 1] },
+      { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
+    ],
+    [
+      { type: 'elite', next: [0] },
       { type: 'battle', next: [0] },
     ],
     [{ type: 'rest', next: [0] }],
-    [{ type: 'elite', next: [0] }],
-    [{ type: 'battle', next: [0] }],
-    [{ type: 'rest', next: [0] }],
-    [{ type: 'battle', next: [0] }],
     [{ type: 'event', eventId: 'starQueenThrone', next: [0] }],
     [{ type: 'boss', next: [] }],
-  ], FINALE_EXTRA_FLOOR),
+  ],
 };
 
 // ランダムダンジョン: 星屑の洞窟（部屋の並びを自動生成）

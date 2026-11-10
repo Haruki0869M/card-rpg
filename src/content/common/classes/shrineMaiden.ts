@@ -9,7 +9,7 @@ export const shrineMaiden: ClassDef = {
   weaponType: 'scepter', subWeapons: ['hammer'], startingEquipment: { ...bishop.startingEquipment, weapon: 'woodScepter' },
   battleAbility: { name: '祈りの余韻', effect: { when: 'turnStart', do: [{ kind: 'heal', amount: 1, to: 'allies' }] } },
   exploreAbility: { id: 'shrineMaidenExplore', name: '清めの鈴', description: '瘴気の判定+20%', effect: { kind: 'checkBonus', check: 'miasma', bonus: 20 } },
-  requires: { feat: 'prayers', count: 3, text: '祠で3回祈る' },
+  requires: { feat: 'prayers', count: 2, text: '祠で2回祈る' },
   cardPool: ['maidenHeal', 'maidenPurify', 'maidenWard', 'maidenFocus', 'maidenLight', 'divinePossession'], signature: ['maidenHeal', 'maidenPurify', 'maidenWard'],
   jobCards: ['divinePossession'],
 };

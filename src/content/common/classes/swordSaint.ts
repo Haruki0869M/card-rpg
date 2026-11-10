@@ -9,6 +9,6 @@ export const swordSaint: ClassDef = {
   stats: { ...swordmaster.stats, str: swordmaster.stats.str + 8, dex: swordmaster.stats.dex + 8 },
   battleAbility: { name: '二の太刀', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'physical' }, { kind: 'oncePerTurn', key: 'repeatPhysical' }], do: [{ kind: 'repeatCard' }] } },
   exploreAbility: { id: 'swordSaintExplore', name: '剣気', description: '奇襲の判定+25%', effect: { kind: 'checkBonus', check: 'ambush', bonus: 25 } },
-  requires: { feat: 'perfects', count: 60, text: '完全成功60回' },
+  requires: { feat: 'perfects', count: 22, text: '完全成功22回' },
   cardPool: ["saintSlash","heavenBlade","swordSanctuary","calmBlade","saintFinale"], signature: ["saintSlash","heavenBlade","swordSanctuary"],
 };
