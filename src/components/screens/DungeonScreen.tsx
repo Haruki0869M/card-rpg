@@ -26,7 +26,7 @@ import {
   depthTier,
   DEPTH_TIER_NAME,
   dungeonRows,
-  isOldShapeRun,
+  isLegacyLayout,
   findPath,
   heroMaxHp,
   notVoted,
@@ -377,7 +377,7 @@ export function DungeonScreen() {
   const partyHeroes = game.heroes.filter((h) => !game.party || game.party.includes(h.id));
   const loss = retreatLoss(game);
   // 古い形（40行・52行）のダンジョンか / 今いる行（入口の通路は0）
-  const oldShape = isOldShapeRun(run);
+  const oldShape = isLegacyLayout(run);
   const depthRow = (vr.rooms.find((r) => r.id === vr.currentRoomId)?.row ?? -1) + 1;
   const nav = dungeonNavigator(game);
   // 扉を選べるか（手番・担当・サイコロの後・残りがある）
@@ -464,7 +464,7 @@ export function DungeonScreen() {
             </span>
             {oldShape && (
               <span className="rounded-lg bg-black/75 px-2 py-0.5 text-[12px] leading-4 font-bold text-amber-200" data-old-shape>
-                前の長い形のダンジョンです。撤退して入り直すと、新しい短い形になります（何も失いません）
+                このダンジョンは古い形です。撤退しても何も失いません。入り直すと新しい短い形になります
               </span>
             )}
           </div>
@@ -555,7 +555,7 @@ export function DungeonScreen() {
               <div className="font-display text-[18px] text-red-200">ダンジョンから撤退する</div>
               <div className="mt-1 text-[13px] text-zinc-300">
                 {oldShape
-                  ? '前の長い形のダンジョンです。今だけ、何も失わずに撤退できます。入り直すと新しい短い形になり、その時は侵食度も上がりません（進んだ部屋は最初からになります）。'
+                  ? 'このダンジョンは古い形です。撤退しても何も失いません。入り直すと新しい短い形になります（進んだ部屋は最初からになります。入り直す時の侵食度と手番は、いつもどおりかかります）。'
                   : '拠点に戻ると全員が全回復します。ただし、このダンジョンで手に入れた宝を1つ失います。'}
               </div>
               {loss ? (

@@ -7,7 +7,7 @@ import { ENEMIES } from '../../data/enemies';
 import { EVENTS } from '../../data/events';
 import { getRoomType } from '../../data/rules';
 import { SCENARIOS } from '../../data/scenarios';
-import { DEPTH_TIER_NAME, depthStep, depthTier, dungeonRows, isOldShapeRun } from '../game/dungeon';
+import { DEPTH_TIER_NAME, depthStep, depthTier, dungeonRows, isLegacyLayout } from '../game/dungeon';
 import { cardRewardOdds } from '../game/loot';
 import type { DungeonDef, GameCommand, GameState, PlayerId } from '../../types';
 import { applyGameCommand, buildDungeon, createGame, createRng } from '../index';
@@ -115,7 +115,7 @@ describe('ランダムダンジョンの偏り防止', () => {
         const layout: Layout = [];
         for (const room of run.rooms) (layout[room.row] ??= [])[room.col] = { type: room.type, next: room.next.map((id) => Number(id.split('c')[1])) };
         for (const p of allPaths(layout)) expect(biasOf(p), `${d.id} seed${seed}: ${p.join('→')}`).toBeUndefined();
-        expect(isOldShapeRun(run)).toBe(false);
+        expect(isLegacyLayout(run)).toBe(false);
       }
     }
   });
@@ -132,7 +132,7 @@ describe('深さ（3行ごとに +1）', () => {
   it.each(fixed().map((d) => [d.id, d] as const))('%s: 敵のレベル = 基準 + 行÷3 + 部屋の種類の加算。7行目以降の戦闘・強敵は1体多い（最大4）', (_id, d) => {
     const run = buildDungeon(d.id, createRng(7), 0, []);
     expect(dungeonRows(run)).toBe(d.layout!.length);
-    expect(isOldShapeRun(run)).toBe(false);
+    expect(isLegacyLayout(run)).toBe(false);
     for (const room of run.rooms) {
       const b = getRoomType(room.type).battle;
       if (!b) continue;
@@ -212,7 +212,7 @@ describe('深層ボーナス（お金・経験値 +15% / +30% / +50%）', () => 
     const old = expAtRow(6, (g) => {
       const last = g.dungeon!.rooms[g.dungeon!.rooms.length - 1];
       g.dungeon!.rooms.push({ ...last, id: 'r39c0', row: 39, col: 0, next: [] });
-      expect(isOldShapeRun(g.dungeon!)).toBe(true);
+      expect(isLegacyLayout(g.dungeon!)).toBe(true);
     });
     expect(old.exp).toBe(base.exp);
     expect(old.odds).toEqual([72, 24, 4]);

@@ -67,7 +67,7 @@ import { questGatedNext } from './world/questGate';
 import { leaveSanctuary, leaveShrine, leaveTown, questAccept, questReport, shrineChoose, bringMyPet, townBuy, townInn, townRemoveCard, townSell } from './world/town';
 import { getRoomType } from '../../data/rules';
 import { TERRAINS } from '../../data/world';
-import { buildDungeon, depthTier, findRoom, isOldShapeRun, RARITIES, rarityIndex, reachableRooms } from './dungeon';
+import { buildDungeon, depthTier, findRoom, isLegacyLayout, RARITIES, rarityIndex, reachableRooms } from './dungeon';
 import { newDice, rerollDice } from './dice';
 import { canMove, cellKey, DIRS, doorFront, doorNorthOf, dungeonGrid, findPath, moveIntoRoom, posOf, revealSeen, turnTo } from './dungeonMap';
 import { watchSpot } from './dungeonOmen';
@@ -827,7 +827,7 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
   const rt = getRoomType(room?.type ?? game.battleInfo?.roomType ?? 'battle');
   if (!room) onWandererDefeated(game, rng);
   // 深層ボーナス: ダンジョンの奥の部屋ほど、お金・経験値が増え、カードのコモンが減る（古い形のダンジョンには付けない）
-  const tier = room && run && !isOldShapeRun(run) ? depthTier(room.row) : 0;
+  const tier = room && run && !isLegacyLayout(run) ? depthTier(room.row) : 0;
   const rewardMul = (getDifficulty(game.difficulty).reward ?? 1) * (1 + BALANCE.depthBonus.reward[tier]);
   for (const e of b.enemies) {
     // 逃げた敵（黄金のコソ泥など）は倒していないので報酬なし
@@ -1281,7 +1281,7 @@ function rest(game: GameState, playerId: string, kind: 'hp' | 'focus'): string |
 /** 撤退すると失うもの（このダンジョンで最後に手に入れた装備） */
 export function retreatLoss(game: GameState): ItemInstance | undefined {
   // 古い形（40行・52行）のダンジョンは、損をせずに撤退できる（入り直すと新しい形になる。オーナーの決定 6-B）
-  if (game.dungeon && isOldShapeRun(game.dungeon)) return undefined;
+  if (game.dungeon && isLegacyLayout(game.dungeon)) return undefined;
   const g = game.dungeon?.gained ?? [];
   for (let i = g.length - 1; i >= 0; i--) if (game.heroes.some((h) => h.stash.some((s) => s.uid === g[i].uid)) || isEquipped(game, g[i].uid)) return g[i];
   return undefined;
@@ -1300,12 +1300,7 @@ function retreat(game: GameState, playerId: string, rng: Rng): string | undefine
     addLog(game, `撤退の途中で「${getItem(lost.itemId).name}」を落としてしまった…`);
   }
   addLog(game, `${game.dungeon.name}から撤退した`);
-  if (game.world && isOldShapeRun(game.dungeon)) {
-    // 入り直す時の侵食度（ダンジョンに入る時の分）を1回だけ無しにする
-    const free = (game.world.freeReentry ??= []);
-    if (!free.includes(game.dungeon.dungeonId)) free.push(game.dungeon.dungeonId);
-    addLog(game, 'このダンジョンは新しい形に変わった。何も失わずに引き返せた（次に入る時は侵食度が上がらない）');
-  }
+  if (isLegacyLayout(game.dungeon)) addLog(game, '古い形のダンジョンだったので、何も失わずに引き返せた。入り直すと新しい短い形になる');
   leaveDungeon(game, rng);
   return undefined;
 }

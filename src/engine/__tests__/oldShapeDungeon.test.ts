@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../data/balance';
 import { DUNGEONS } from '../../data/dungeons';
-import { dungeonRows, isOldShapeRun } from '../game/dungeon';
+import { dungeonRows, isLegacyLayout } from '../game/dungeon';
 import type { DungeonRun, GameCommand, GameState, PlayerId, Room } from '../../types';
 import { applyGameCommand, createGame, migrateGame, reachableRooms, retreatLoss, validateGame, viewOf, GAME_VERSION } from '../index';
 
@@ -55,11 +55,11 @@ describe('古い形のダンジョンの見分け', () => {
     const { g, x } = inTemple();
     const d = viewOf(g, x).dungeon!;
     expect(dungeonRows(d)).toBe(DUNGEONS.get('emeraldTemple').layout!.length);
-    expect(isOldShapeRun(d)).toBe(false);
+    expect(isLegacyLayout(d)).toBe(false);
     makeOldShape(g.expeditions![0].dungeon!);
     expect(dungeonRows(g.expeditions![0].dungeon!)).toBe(40);
-    expect(isOldShapeRun(g.expeditions![0].dungeon!)).toBe(true);
-    expect(isOldShapeRun({ ...g.expeditions![0].dungeon!, random: true })).toBe(false);
+    expect(isLegacyLayout(g.expeditions![0].dungeon!)).toBe(true);
+    expect(isLegacyLayout({ ...g.expeditions![0].dungeon!, random: true })).toBe(false);
   });
 });
 
@@ -77,7 +77,7 @@ describe('古い保存（40行のダンジョンの途中）', () => {
     expect(validateGame(m)).toBe(true);
     const d = m.expeditions!.find((e) => e.id === x)!.dungeon!;
     expect(dungeonRows(d)).toBe(40);
-    expect(isOldShapeRun(d)).toBe(true);
+    expect(isLegacyLayout(d)).toBe(true);
     // 1部屋目に入れる（敵は保存された時のまま）
     const first = reachableRooms(d)[0];
     const after = run(m, inScene(x, { type: 'ENTER_ROOM', playerId: P, roomId: first.id }));
@@ -86,7 +86,7 @@ describe('古い保存（40行のダンジョンの途中）', () => {
 });
 
 describe('古い形のダンジョンからの撤退（損をしない）', () => {
-  it('手に入れた宝を失わない。入り直すと新しい形になり、その時は侵食度が上がらない（1回だけ）', () => {
+  it('手に入れた宝を失わない。入り直すと新しい形になる（入り直す時の侵食度は、いつもどおり上がる）', () => {
     let { g, x } = inTemple();
     const exp = g.expeditions![0];
     makeOldShape(exp.dungeon!);
@@ -98,8 +98,8 @@ describe('古い形のダンジョンからの撤退（損をしない）', () =
     g = run(g, inScene(x, { type: 'RETREAT', playerId: P }));
     expect(g.heroes[0].stash.some((s) => s.uid === 'old-1')).toBe(true);
     expect(g.expeditions?.some((e) => e.id === x) ?? false).toBe(false);
-    expect(g.world!.freeReentry).toEqual(['emeraldTemple']);
-    // 入り直す: 新しい形（8行）。侵食度はダンジョンに入る分が上がらない
+    expect(g.log.some((l) => l.text.includes('何も失わずに引き返せた'))).toBe(true);
+    // 入り直す: 新しい形（8行）
     g.world!.pos.h0 = tileOf(g, 'emeraldTemple');
     g.world!.turn = 'h0';
     g.world!.acted = g.world!.acted.filter((id) => id !== 'h0');
@@ -107,12 +107,11 @@ describe('古い形のダンジョンからの撤退（損をしない）', () =
     g = run(g, { type: 'WORLD_INTERACT', playerId: P, heroId: 'h0', party: ['h0'] });
     const d = g.expeditions![g.expeditions!.length - 1].dungeon!;
     expect(dungeonRows(d)).toBe(8);
-    expect(isOldShapeRun(d)).toBe(false);
-    expect(g.world!.corruption).toBe(before);
-    expect(g.world!.freeReentry).toEqual([]);
+    expect(isLegacyLayout(d)).toBe(false);
+    expect(g.world!.corruption).toBe(before + BALANCE.corruptionOnDungeonEnter);
   });
 
-  it('新しい形のダンジョンの撤退は今までどおり（宝を1つ失う。入り直すと侵食度が上がる）', () => {
+  it('新しい形のダンジョンの撤退は今までどおり（宝を1つ失う）', () => {
     let { g, x } = inTemple();
     const exp = g.expeditions![0];
     const item = { uid: 'new-1', itemId: 'steelSword' };
@@ -121,7 +120,6 @@ describe('古い形のダンジョンからの撤退（損をしない）', () =
     expect(retreatLoss(viewOf(g, x))?.uid).toBe('new-1');
     g = run(g, inScene(x, { type: 'RETREAT', playerId: P }));
     expect(g.heroes[0].stash.some((s) => s.uid === 'new-1')).toBe(false);
-    expect(g.world!.freeReentry ?? []).toEqual([]);
     g.world!.pos.h0 = tileOf(g, 'emeraldTemple');
     g.world!.turn = 'h0';
     g.world!.acted = g.world!.acted.filter((id) => id !== 'h0');

@@ -27,7 +27,7 @@ export const dungeonRows = (run: Pick<DungeonRun, 'rooms'>) => Math.max(0, ...ru
  * 古い形のダンジョンか（40行・52行に大きくしていた頃に入った、固定のダンジョン）。
  * 保存に目印は足さない: 「今のデータの行の数」と「入った時に保存した部屋の行の数」が違えば古い形。ランダムダンジョンは形が変わっていないので当てはまらない
  */
-export function isOldShapeRun(run: Pick<DungeonRun, 'dungeonId' | 'rooms' | 'random'>): boolean {
+export function isLegacyLayout(run: Pick<DungeonRun, 'dungeonId' | 'rooms' | 'random'>): boolean {
   if (run.random) return false;
   const layout = getDungeon(run.dungeonId).layout;
   return !!layout && layout.length !== dungeonRows(run);
