@@ -69,7 +69,7 @@ export interface FixedFeature {
   at: [col: number, row: number];
 }
 
-export type FeatureKind = 'town' | 'dungeon' | 'shrine' | 'event' | 'chest' | 'landmark' | 'temple' | 'altar';
+export type FeatureKind = 'town' | 'dungeon' | 'shrine' | 'event' | 'chest' | 'landmark' | 'temple' | 'altar' | 'tower';
 
 /** 転職の施設。祭壇の対応先は職の altar と照合する印で指定する。 */
 export interface SanctuaryDef {
@@ -185,6 +185,16 @@ export interface Tile {
   seen: boolean;
 }
 
+/** 時間で消える出現スポット（段階6）: 流れ星の落下地点・さすらいの行商人・黄金のコソ泥 */
+export type SpawnKind = 'star' | 'peddler' | 'thief';
+export interface TimedSpawn {
+  id: string;
+  kind: SpawnKind;
+  tile: number;
+  /** このワールドターンまで残る（次のワールドターンの初めに消える） */
+  until: number;
+}
+
 /** 徘徊する敵（マップ上に見えている） */
 export interface Wanderer {
   id: string;
@@ -254,6 +264,10 @@ export interface WorldState {
   shops: Record<string, ShopStock>;
   /** 画面に出す物語（冒頭・地域の紹介・エンディング） */
   story?: { title: string; lines: string[] };
+  /** 時間で消える出現スポット（段階6・v17）。無ければ空 / 次に出るワールドターン / 次の番号 */
+  spawns?: TimedSpawn[];
+  nextSpawnAt?: number;
+  nextSpawnId?: number;
   /** 同行の誘い（誘われたキャラ → 誘ったキャラ）と、承知した同行（同じ形）。手番が変わると消える */
   invites?: Record<string, string>;
   follow?: Record<string, string>;

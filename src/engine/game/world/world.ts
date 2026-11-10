@@ -17,6 +17,7 @@ import { equippedItems, heroFocusMax, heroMaxHp } from '../hero';
 import { activeHeroes, expeditionOf, findHero, livingHeroes, mapHeroes, sceneHeroes } from '../heroes';
 import { applyClimate, climateAt } from './climate';
 import { revealAround } from './fog';
+import { climbWatchtower, enterSpawn, spawnAt, tickSpawns } from './explore';
 import { hexDistance, moveCostOf, neighbors, pathTo, reachable } from './hex';
 import { objectiveHandler, type QuestSignal } from './objectives';
 import { timeOfDay } from './time';
@@ -134,6 +135,8 @@ function endWorldTurn(game: GameState, rng: Rng) {
   const def = getScenario(game.scenarioId).map!;
   if (timeOfDay(w.worldTurn) === 'night' && rng.next() * 100 < BALANCE.nightSpawnChance) spawnWanderer(game, w, rng, rng.int(def.regions.length));
   moveWanderers(w, rng);
+  // 時間で消える出現スポット（段階6）: 期限切れを消し、出る番なら1つ出す
+  tickSpawns(game, w, rng);
   // 町への襲撃の期限
   for (const raid of [...w.raids]) {
     if (w.worldTurn <= raid.deadline) continue;
@@ -352,7 +355,7 @@ function doMove(game: GameState, w: WorldState, h: Hero, companions: Hero[], to:
  * 同じキャラに2手番続けては起きない。夜・侵食度が高い時は悪いイベントが出やすい。終わっても手番は続く
  */
 function maybeRandomEvent(game: GameState, w: WorldState, h: Hero, group: Hero[], tile: number, rng: Rng) {
-  if (w.tiles[tile].f || w.story) return;
+  if (w.tiles[tile].f || w.story || spawnAt(w, tile)) return;
   if (h.lastRandomEvent !== undefined && h.lastRandomEvent >= w.worldTurn - 1) return;
   if (rng.next() * 100 >= BALANCE.randomEventChance) return;
   const ev = pickRandomEvent(game, rng, tile, group);
@@ -682,10 +685,18 @@ export function interact(game: GameState, cmd: Cmd<'WORLD_INTERACT'>, rng: Rng):
   const { w, h } = t;
   const tile = w.pos[h.id];
   const f = w.tiles[tile].f;
+  const here = heroesAt(game, tile).filter(x => x.playerId === h.playerId || followingGroup(game, h.id).includes(x.id)).map((x) => x.id);
+  const spawn = spawnAt(w, tile);
+  if (!f && spawn) {
+    enterSpawn(game, w, spawn, here);
+    return undefined;
+  }
   if (!f) return 'ここには何もありません';
   if (f.used && f.kind !== 'town' && f.kind !== 'dungeon') return 'もう調べました';
-  const here = heroesAt(game, tile).filter(x => x.playerId === h.playerId || followingGroup(game, h.id).includes(x.id)).map((x) => x.id);
   switch (f.kind) {
+    case 'tower':
+      climbWatchtower(game, w, tile);
+      return undefined;
     case 'temple':
     case 'altar': {
       const def = SANCTUARIES.tryGet(f.id);

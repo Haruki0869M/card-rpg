@@ -17,10 +17,22 @@ import { createRng } from '../rng';
 import { rollPetOfferColors } from './pets';
 import { heroAbilities } from './hero';
 import { addSanctuaries, consolidateSanctuaries } from './world/sanctuaries';
+import { addWatchtowers } from './world/explore';
 
 type Loose = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 const MIGRATIONS: Record<number, (g: Loose) => void> = {
+  // v16 → v17: 段階6 探索の仕組み。見晴らしの塔（施設 'tower'）と、時間で消える出現スポット（w.spawns）を足した。
+  // 地図は作り直さない。塔は空いたマスにだけ置き（足りなければ置かない）、最初の出現は読み込んだターンの少し後にする
+  16(g) {
+    for (const b of [g.battle, ...(g.expeditions ?? []).map((x: Loose) => x.battle)]) if (b) b.version = 17;
+    const w = g.world as Loose | undefined;
+    if (!w || !Array.isArray(w.tiles)) return;
+    addWatchtowers(g as GameState, w as GameState['world'] & object);
+    w.spawns ??= [];
+    w.nextSpawnId ??= 1;
+    w.nextSpawnAt ??= Math.max(BALANCE.spawnFirstAt, (w.worldTurn ?? 1) + BALANCE.spawnMigrateDelay);
+  },
   // v15 → v16: 伝承の書（K5）でマイペットを呼ぶ操作（BRING_MY_PET）と、お供・キャラの任意の項目（myPetUid・dungeonClears・myPetCalled）を足した。
   // 形は変わらないので直す所は無い（版を上げるのは、古い版の端末と同じ部屋に入らないため）。戦闘の版だけそろえる
   15(g) {

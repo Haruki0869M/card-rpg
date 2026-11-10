@@ -185,6 +185,26 @@ export const BALANCE = {
   /** 町への襲撃: 陥落までのワールドターン / 守った時の報酬 */
   raidTurns: 8,
   raidRewardGold: 80,
+  /**
+   * 段階6 探索の仕組み（数値はすべて提案）。
+   * 見晴らしの塔: 立ち寄ると半径 watchtowerRadius の霧が晴れ、さらに半径 watchtowerSpotRadius 以内の宝箱・神殿・祭壇・レアの敵のマスも見える。
+   * 地図の高さが watchtowerTallMap 以上なら3か所、それより低ければ2か所。道から徒歩1〜3マス（2マスを優先）の寄り道の場所に置く。
+   */
+  watchtowerRadius: 4,
+  watchtowerSpotRadius: 7,
+  watchtowerTallMap: 24,
+  /**
+   * 時間で消える出現スポット: 最初は spawnFirstAt ワールドターン目、その後は spawnEveryMin〜Max ターンごとに1つ。
+   * 残るターン数 / 出やすさ / キャラから何マス離れた所に出るか（一番近いキャラからの距離）。
+   */
+  spawnFirstAt: 5,
+  /** 古い保存（v16）を読み込んだ時、最初の出現までのワールドターン */
+  spawnMigrateDelay: 2,
+  spawnEveryMin: 6,
+  spawnEveryMax: 8,
+  spawnLife: { star: 3, peddler: 4, thief: 3 },
+  spawnWeight: { star: 4, peddler: 3, thief: 3 },
+  spawnDistance: [3, 6] as readonly [number, number],
   /** 祠の永続の加護の上限（1人あたり） */
   maxBlessings: 3,
   /** ショップ: 品揃えが入れ替わる間隔（ワールドターン）、格ごとの値段、売値の割合 */

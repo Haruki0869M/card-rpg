@@ -657,7 +657,7 @@ function enterDungeon(game: GameState, playerId: string, dungeonId: string, rng:
   if (!availableDungeons(game).includes(dungeonId)) return 'そのダンジョンには行けません';
   const levelBonus = getDifficulty(game.difficulty).enemyLevel;
   const eventIds = EVENTS.forScenario(game.scenarioId)
-    .filter((e) => e.where !== 'map')
+    .filter((e) => e.where !== 'map' && e.where !== 'spawn')
     .map((e) => e.id);
   // ランダムダンジョンは拠点ごとの種で作る（同じ種なら同じ構造）
   const random = !!DUNGEONS.get(dungeonId).random;
@@ -672,7 +672,7 @@ function enterDungeon(game: GameState, playerId: string, dungeonId: string, rng:
 export function enterDungeonFromWorld(game: GameState, dungeonId: string, party: string[], rng: Rng) {
   const levelBonus = getDifficulty(game.difficulty).enemyLevel + (game.world ? corruptionLevelBonus(game, game.world) : 0);
   const eventIds = EVENTS.forScenario(game.scenarioId)
-    .filter((e) => e.where !== 'map')
+    .filter((e) => e.where !== 'map' && e.where !== 'spawn')
     .map((e) => e.id);
   const random = !!DUNGEONS.get(dungeonId).random;
   const dRng = random ? createRng(game.randomDungeonSeed) : rng;

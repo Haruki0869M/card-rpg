@@ -1,4 +1,5 @@
 import { followingGroup } from '../../engine/game/world/group';
+import { spawnAt, spawnTurnsLeft, SPAWN_NAME } from '../../engine/game/world/explore';
 // ===== 世界マップの画面（spec §8・§20.3）=====
 // 上: 侵食度・命の灯火・ゴールド・時間帯 / 中: 地図 / 下: 手番のキャラの操作（移動力の判定・移動・入る・野営・待機）
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
@@ -268,6 +269,9 @@ function tileInfo(game: GameState, i: number): string {
   if (f?.kind === 'shrine') parts.push(SHRINES.get(f.id).name + (f.used ? '（祈り済み）' : ''));
   if (f?.kind === 'event' || f?.kind === 'landmark') parts.push((EVENTS.tryGet(f.id)?.title ?? '何かがある') + (f.used ? '（調べた）' : ''));
   if (f?.kind === 'chest') parts.push(f.used ? '空の宝箱' : '宝箱');
+  if (f?.kind === 'tower') parts.push(f.used ? '見晴らしの塔（登った）' : '見晴らしの塔（登ると、まわりの霧が晴れる）');
+  const sp = spawnAt(w, i);
+  if (sp) parts.push(`${SPAWN_NAME[sp.kind]}（あと${spawnTurnsLeft(w, sp)}ターン）`);
   const wd = w.wanderers.find((x) => x.tile === i);
   if (wd) parts.push(`敵: ${wd.enemies.map((e) => `${getEnemy(e.defId).name} Lv${e.level ?? 1}`).join('・')}${wd.raidTown ? '（町を襲撃中）' : ''}`);
   return parts.join(' / ');
@@ -276,12 +280,14 @@ function tileInfo(game: GameState, i: number): string {
 /** 今いるマスで「入る」ボタンの文字（入れる物が無ければ undefined） */
 function interactLabel(game: GameState, tile: number): string | undefined {
   const f = game.world!.tiles[tile].f;
+  const sp = spawnAt(game.world!, tile);
+  if (!f && sp) return sp.kind === 'peddler' ? '行商人と話す' : sp.kind === 'thief' ? 'コソ泥に近づく' : '落ちた星を調べる';
   if (!f) return undefined;
   if (f.kind === 'town') return game.world!.fallenTowns.includes(f.id) ? undefined : `${TOWNS.get(f.id).name}に入る`;
   if (f.kind === 'dungeon') return `${DUNGEONS.get(f.id).name}に入る`;
   if (f.kind === 'temple' || f.kind === 'altar') return `${SANCTUARIES.get(f.id).name}に入る`;
   if (f.used) return undefined;
-  return { shrine: '祠で祈る', event: '調べる', landmark: '調べる', chest: '宝箱を開ける' }[f.kind];
+  return { shrine: '祠で祈る', event: '調べる', landmark: '調べる', chest: '宝箱を開ける', tower: '見晴らしの塔に登る' }[f.kind];
 }
 
 export function WorldScreen({ movement }: { movement?: WorldMovePresentation } = {}) {

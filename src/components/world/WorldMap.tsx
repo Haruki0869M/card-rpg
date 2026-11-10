@@ -14,6 +14,7 @@ import type { GameState, WorldState } from '../../types';
 import { HeroFace } from '../ui/game';
 import { petSpot, PetToken } from '../ui/PetToken';
 import { HeroPiece } from './HeroPiece';
+import { SpawnMarks, TowerMini } from './ExploreMarks';
 import { orderOnTile, pieceSpots, PLAYER_COLORS } from './pieceLayout';
 import { cameraTop, mapPadBottom, mapPadY, revealLeft, revealTop, visibleH } from './mapCamera';
 import { anchorScroll, clampZoom, stepZoom, ZOOM_MAX, ZOOM_MIN } from './mapZoom';
@@ -443,6 +444,7 @@ export function WorldMap({
             const used = f.used && f.kind !== 'town' && f.kind !== 'dungeon';
             const sz = R * (f.kind === 'town' || finale ? 1.15 : 0.95);
             const color = fallen ? '#7a6a7a' : f.kind === 'chest' && f.chest?.rarity ? undefined : FEATURE_COLOR[f.kind];
+            if (f.kind === 'tower') return <TowerMini key={`f${i}`} x={x} y={y} R={R} used={f.used} />;
             const img = finale ? undefined : placeImage(f);
             if (img) {
               // 描いた絵の場所: マスより少し大きく、影をつけて地形から浮かせる
@@ -463,6 +465,8 @@ export function WorldMap({
               </g>
             );
           })}
+          {/* 時間で消える出現スポット（段階6） */}
+          <SpawnMarks w={w} R={R} center={center} />
           {/* 襲撃されている町 */}
           {w.raids.map((r) => {
             const i = w.tiles.findIndex((t) => t.f?.kind === 'town' && t.f.id === r.townId);
