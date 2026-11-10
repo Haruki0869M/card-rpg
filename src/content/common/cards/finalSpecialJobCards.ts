@@ -34,7 +34,7 @@ export const FINAL_SPECIAL_CARDS: CardDef[] = [
 
   c('machineShot', '精密射撃', 'physical', 1, 'enemy', [[d(3)], [d(6)], [d(9)]], { stat: 'dex' }),
   c('placeTurret', '砲台設置', 'skill', 1, 'enemy', [[turret()], [turret()], [turret(), b(3)]], { stat: 'int', tags: ['summon'] }),
-  c('placeTrap', '罠設置', 'skill', 1, 'enemy', [[trap()], [trap()], [trap(), b(3)]], { stat: 'dex', tags: ['summon'] }),
+  c('placeTrap', '仕掛け罠', 'skill', 1, 'enemy', [[trap()], [trap()], [trap(), b(3)]], { stat: 'dex', tags: ['summon'] }),
   c('machineVolley', '二連射', 'physical', 2, 'enemy', [[{ kind: 'damage', amount: 3, hits: 2 }], [{ kind: 'damage', amount: 6, hits: 2 }], [{ kind: 'damage', amount: 9, hits: 2 }]], { stat: 'dex', rarity: 'epic', trait: focus }),
   c('machineGuard', '装甲整備', 'skill', 1, 'self', [[b(4)], [b(7)], [b(10)]], { stat: 'int' }),
   c('machineCannon', '大砲撃', 'physical', 3, 'allEnemies', [[d(5)], [d(9)], [d(14)], [d(19)]], { stat: 'dex', rarity: 'epic', trait: pierce }),

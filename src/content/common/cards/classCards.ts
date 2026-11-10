@@ -39,7 +39,7 @@ export const CLASS_CARDS: CardDef[] = [
   },
   {
     id: 'sweep',
-    name: '薙ぎ払い',
+    name: '旋風撃',
     category: 'physical',
     cost: 1,
     slots: 2,

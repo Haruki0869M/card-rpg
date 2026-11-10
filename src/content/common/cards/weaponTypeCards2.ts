@@ -52,20 +52,20 @@ export const WEAPON_TYPE_CARDS_2: CardDef[] = [
   c('wtHammerTitan', '巨人の鉄槌', 'physical', 3, 50, 'enemy', [[d(8)], [d(15)], [d(22)], [d(32)]], { ...W('hammer'), rarity: 'epic', stat: 'str', tags: ['heavy'], trait: { name: 'めり込み', effect: { when: 'kill', do: [b(6)] } } }),
 
   // ===== 弓（遠くから手数と狙い） =====
-  c('wtBowQuick', '速射', 'physical', 1, 80, 'enemy', [[d(3)], [d(5)], [d(8)]], { ...W('bow'), stat: 'dex' }),
+  c('wtBowQuick', '早矢', 'physical', 1, 80, 'enemy', [[d(3)], [d(5)], [d(8)]], { ...W('bow'), stat: 'dex' }),
   c('wtBowTriple', '三連射', 'physical', 1, 70, 'enemy', [[d(2)], [dh(3, 2)], [dh(3, 3)]], { ...W('bow'), stat: 'dex', tags: ['combo'] }),
   c('wtBowAim', '狙いを定める', 'skill', 0, 85, 'self', [[focus(1)], [focus(1), draw(1)]], { ...W('bow'), stat: 'per' }),
-  c('wtBowShower', '矢の雨', 'physical', 2, 65, 'allEnemies', [[d(2)], [d(5)], [d(8)]], { ...W('bow'), rarity: 'rare', stat: 'dex' }),
+  c('wtBowShower', '降り注ぐ矢', 'physical', 2, 65, 'allEnemies', [[d(2)], [d(5)], [d(8)]], { ...W('bow'), rarity: 'rare', stat: 'dex' }),
   c('wtBowFire', '火矢', 'physical', 1, 75, 'enemy', [[el('fire', 3)], [el('fire', 5)], [el('fire', 7), st('burn', 1)]], { ...W('bow'), rarity: 'rare', stat: 'dex' }),
-  c('wtBowSniper', '狙撃', 'physical', 2, 55, 'enemy', [[d(5)], [d(10)], [d(16)]], { ...W('bow'), rarity: 'epic', stat: 'per', tags: ['heavy'], trait: { name: '急所', effect: { when: 'perfect', do: [draw(1)] } } }),
+  c('wtBowSniper', '遠当て', 'physical', 2, 55, 'enemy', [[d(5)], [d(10)], [d(16)]], { ...W('bow'), rarity: 'epic', stat: 'per', tags: ['heavy'], trait: { name: '急所', effect: { when: 'perfect', do: [draw(1)] } } }),
   c('wtBowWindPierce', '風穿ちの一矢', 'physical', 3, 55, 'enemy', [[d(6)], [d(12)], [d(19)], [d(28)]], { ...W('bow'), rarity: 'epic', stat: 'dex', trait: pierce }),
 
   // ===== 短剣（軽い手数と状態異常） =====
   c('wtDaggerBackhand', '逆手斬り', 'physical', 0, 85, 'enemy', [[d(2)], [d(3)]], { ...W('dagger'), stat: 'dex' }),
   c('wtDaggerDance', '踊り刃', 'physical', 1, 70, 'enemy', [[d(2)], [dh(2, 2)], [dh(3, 3)]], { ...W('dagger'), stat: 'dex', tags: ['combo'] }),
-  c('wtDaggerDodge', '身かわし', 'skill', 1, 80, 'self', [[b(4)], [b(6)], [b(8), focus(1)]], { ...W('dagger'), stat: 'agi' }),
+  c('wtDaggerDodge', '紙一重', 'skill', 1, 80, 'self', [[b(4)], [b(6)], [b(8), focus(1)]], { ...W('dagger'), stat: 'agi' }),
   c('wtDaggerVenom', '毒塗りの刃', 'physical', 1, 75, 'enemy', [[d(2)], [d(3), st('poison', 2)], [d(4), st('poison', 3)]], { ...W('dagger'), rarity: 'rare', stat: 'dex' }),
-  c('wtDaggerShadow', '影縫い', 'physical', 1, 75, 'enemy', [[d(2)], [d(3), st('weak', 1)], [d(4), st('weak', 1), st('vulnerable', 1)]], { ...W('dagger'), rarity: 'rare', stat: 'dex' }),
+  c('wtDaggerShadow', '影刺し', 'physical', 1, 75, 'enemy', [[d(2)], [d(3), st('weak', 1)], [d(4), st('weak', 1), st('vulnerable', 1)]], { ...W('dagger'), rarity: 'rare', stat: 'dex' }),
   c('wtDaggerAssassinate', '暗殺', 'physical', 2, 60, 'enemy', [[d(4)], [d(8)], [d(13)]], { ...W('dagger'), rarity: 'epic', stat: 'dex', trait: { name: '無音', effect: { when: 'perfect', do: [draw(1)] } } }),
   c('wtDaggerMirage', '幻影の刃', 'physical', 1, 65, 'enemy', [[dh(1, 2)], [dh(2, 3)], [dh(2, 5)]], { ...W('dagger'), rarity: 'epic', stat: 'dex', tags: ['combo'], trait: { name: '残像', effect: { when: 'kill', do: [focus(1)] } } }),
 ];

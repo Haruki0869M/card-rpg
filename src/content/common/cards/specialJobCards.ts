@@ -19,7 +19,7 @@ export const SPECIAL_JOB_CARDS: CardDef[] = [
   c('samuraiDrawCut', '抜刀一閃', 'physical', 1, 'enemy', [[d(3)], [d(6)], [d(9)]], { stat: 'dex' }),
   c('samuraiPoise', '残心', 'skill', 1, 'self', [[b(4)], [b(6), f(1)], [b(9), f(1)]], { stat: 'per' }),
   c('samuraiSwallow', '燕返し', 'physical', 2, 'enemy', [[d(3, undefined, 2)], [d(6, undefined, 2)], [d(9, undefined, 2)]], { rarity: 'epic', trait: focus }),
-  c('samuraiFocus', '精神統一', 'skill', 0, 'self', [[f(1)], [f(2)]], { stat: 'per' }),
+  c('samuraiFocus', '無念無想', 'skill', 0, 'self', [[f(1)], [f(2)]], { stat: 'per' }),
   c('samuraiBlunt', '峰打ち', 'physical', 1, 'enemy', [[d(3)], [d(5), s('weak', 1)], [d(8), s('weak', 1)]]),
   c('samuraiMoon', '奥義・月下断', 'physical', 3, 'enemy', [[d(8)], [d(15)], [d(23)], [d(31)]], { rarity: 'epic', trait: pierce }),
 

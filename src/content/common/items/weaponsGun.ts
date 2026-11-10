@@ -47,9 +47,9 @@ export const weaponsGun: ItemDef[] = [
   },
   {
     id: "breachingGun", name: "突破銃", slot: "weapon", weaponType: "gun", rarity: "epic", icon: "gun",
-    description: "HPが半分以下なら、コスト2以上の物理カードがブロックを無視。", stats: {"per": 4, "vit": 4}, tags: ["physical", "heavy"],
+    description: "コスト2以上の物理カードがブロックを無視。", stats: {"per": 4, "vit": 4}, tags: ["physical", "heavy"],
     cards: [{"cardId": "wtGunHeadshot", "count": 2}],
-    ability: {"name": "突破弾", "effect": {"modifier": "ignoreBlock", "if": [{"kind": "cardCategory", "category": "physical"}, {"kind": "cardCost", "min": 2}, {"kind": "selfHpAtMost", "pct": 50}]}},
+    ability: {"name": "突破弾", "effect": {"modifier": "ignoreBlock", "if": [{"kind": "cardCategory", "category": "physical"}, {"kind": "cardCost", "min": 2}]}},
   },
   // レジェンド
   // 既存にレジェンド用カードがないため、エピック以下の武器種カードを共有する。

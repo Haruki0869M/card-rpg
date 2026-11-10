@@ -29,7 +29,7 @@ export const HERESY_CARDS_2: CardDef[] = [
   c('heresyLifeAdvance', '命の前借り', 'skill', 0, 90, 'self', [[pay(6), mana(3)], [pay(6), mana(3), focus(1)]], t('利子', { when: 'turnStart', do: [mana(1)] }), { exhaust: true }),
   c('heresyCursedBlade', '呪われた刃', 'physical', 1, 70, 'enemy', [[d(8), me('curse', 1)], [d(14), me('curse', 1)], [d(20), me('curse', 2)]], t('呪詛の斬撃', { modifier: 'damageDealt', multiplier: 1.25 }), { tags: ['heavy'] }),
   c('heresyBerserkBlood', '狂戦士の血', 'physical', 2, 60, 'enemy', [[d(9), pay(4)], [d(16), pay(4)], [d(24), pay(4)]], t('血の昂り', { modifier: 'damageDealt', multiplier: 1.5, if: [{ kind: 'selfHpAtMost', pct: 50 }] }), { tags: ['heavy'] }),
-  c('heresySoulEater', '魂喰らい', 'physical', 2, 60, 'enemy', [[d(6), drain(60), me('vulnerable', 2)], [d(11), drain(80), me('vulnerable', 2)], [d(16), drain(100), me('vulnerable', 2)]], t('魂の糧', { when: 'kill', do: [heal(5)] })),
+  c('heresySoulEater', '魂の捕食', 'physical', 2, 60, 'enemy', [[d(6), drain(60), me('vulnerable', 2)], [d(11), drain(80), me('vulnerable', 2)], [d(16), drain(100), me('vulnerable', 2)]], t('魂の糧', { when: 'kill', do: [heal(5)] })),
   c('heresyDoomSpell', '破滅の呪文', 'magic', 3, 50, 'allEnemies', [[d(8), pay(5)], [d(14), pay(5)], [d(20), pay(5)], [d(28), pay(5)]], t('世界を貫く', { modifier: 'ignoreBlock' }), { tags: ['heavy'] }),
   c('heresyForbiddenRite', '禁断の儀式', 'skill', 1, 80, 'self', [[pay(8), ba(6)], [pay(8), ba(10)], [pay(8), ba(14)]], t('生贄の加護', { when: 'perfect', do: [healAll(3)] })),
   c('heresyTimeTheft', '時の盗み', 'skill', 0, 90, 'self', [[pay(6), draw(2), focus(1)], [pay(6), draw(2), focus(2)]], t('盗んだ時間', { when: 'perfect', do: [mana(1)] }), { exhaust: true }),
