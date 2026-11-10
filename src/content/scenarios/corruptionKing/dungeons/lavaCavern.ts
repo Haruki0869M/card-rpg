@@ -1,6 +1,7 @@
 // シナリオダンジョン: 溶岩の大空洞（灼熱の火山。封印の鍵（紅））
 import type { DungeonDef } from '../../../../types';
 import { VOLCANO_POOLS } from './pools';
+import { KEY_EXTRA_FLOOR, grownLayout } from '../../extraFloor';
 
 export const lavaCavern: DungeonDef = {
   id: 'lavaCavern',
@@ -11,8 +12,11 @@ export const lavaCavern: DungeonDef = {
   pools: VOLCANO_POOLS,
   bossChest: 'legend',
   rewardKey: 'crimson',
+  // 2つ目の鍵と、町の依頼を1つ（報告まで）が要る（冒険を長くする。町に寄る理由を作る）
+  requiresKeys: ['azure'],
+  requiresQuests: 1,
   clearStory: ['炎竜イグナヴァルが地に伏した。', '溶岩の流れが、少しずつ静まっていく。', '封印の鍵（紅）を手に入れた！'],
-  layout: [
+  layout: grownLayout([
     [{ type: 'battle', next: [0, 1] }],
     [
       { type: 'battle', next: [0, 1] },
@@ -33,5 +37,5 @@ export const lavaCavern: DungeonDef = {
     ],
     [{ type: 'rest', next: [0] }],
     [{ type: 'boss', next: [] }],
-  ],
+  ], KEY_EXTRA_FLOOR),
 };

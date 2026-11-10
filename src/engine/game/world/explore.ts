@@ -8,7 +8,8 @@ import type { GameState, SpawnKind, TimedSpawn, WorldState } from '../../../type
 import type { Rng } from '../../rng';
 import { addLog } from '../common';
 import { mapHeroes } from '../heroes';
-import { hexDistance, idxOf, neighbors, rowOf } from './hex';
+import { hexDistance, neighbors, rowOf } from './hex';
+import { startTileOf } from './start';
 
 export const SPAWN_KINDS: SpawnKind[] = ['star', 'peddler', 'thief'];
 /** 出現スポットで始まるイベント（src/content/common/randomEvents/spawnEvents.ts。where: 'spawn'） */
@@ -48,7 +49,7 @@ export function addWatchtowers(game: GameState, w: WorldState): number {
   const existing = w.tiles.flatMap((t, i) => (t.f?.kind === 'tower' ? [i] : []));
   const want = w.height >= BALANCE.watchtowerTallMap ? 3 : 2;
   if (existing.length >= want) return 0;
-  const start = idxOf(w, map.start[0], map.start[1]);
+  const start = startTileOf(game, w); // 道を長くする前の古い地図でも、スタートの町のマスを使う
   const reach = walkableFrom(w, [start]);
   // 道から歩いて何マスか
   const roadDist = new Map<number, number>();

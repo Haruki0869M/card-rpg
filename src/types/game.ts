@@ -204,6 +204,8 @@ export interface DungeonDef {
   clearStory?: string[];
   /** 入るのに必要な鍵 */
   requiresKeys?: string[];
+  /** 入るのに必要な、報告まで済ませた町の依頼の数（船を借りる依頼は数えない。冒険を長くする関門） */
+  requiresQuests?: number;
   /** 制覇すると侵食度がこれだけ下がる（無ければ、鍵のダンジョンは BALANCE.corruptionOnKeyDungeonClear・それ以外は0） */
   corruptionOnClear?: number;
   /** 制覇するとシナリオのクリア（ラスボスのダンジョン） */
@@ -533,7 +535,7 @@ export interface DifficultyDef {
   enemyHp?: number;
   enemyAttack?: number;
   reward?: number;
-  /** 世界マップの1巡ごとに増える侵食度（省略は BALANCE.corruptionPerTurn） */
+  /** 時間による侵食度の倍率（BALANCE.corruptionPerTurn・corruptionPerDungeonTurn に掛ける。省略は1） */
   corruptionPerTurn?: number;
   /** 説明文（省略すると数値から自動で作る） */
   description?: string;

@@ -10,6 +10,7 @@ import { EVENTS } from '../data/events';
 import { getItem } from '../data/items';
 import { QUESTS, TOWNS } from '../data/world';
 import { canReportQuest } from './game/world/town';
+import { questsShort } from './game/world/questGate';
 import type { GameCommand, GameState, PlayerId } from '../types';
 import {
   applyGameCommand,
@@ -97,6 +98,61 @@ function tileOf(g: GameState, kind: string, id: string): number | undefined {
   return i < 0 ? undefined : i;
 }
 
+/** 自動プレイで果たせる依頼か（徘徊する敵・名所・もう制覇したダンジョン。船の依頼は別に扱う） */
+function botQuestOk(g: GameState, qid: string): boolean {
+  const def = QUESTS.get(qid);
+  if (def.reward.some((o) => o.kind === 'ship')) return false;
+  const o = def.objective;
+  return o.kind === 'defeatWanderers' || o.kind === 'visitLandmark' || (o.kind === 'clearDungeon' && g.clearedDungeons.includes(o.dungeonId));
+}
+
+/**
+ * 「町の依頼」の関門のための行き先（関門が無い・満たした時は undefined）。
+ * 目的のダンジョンが関門で開かない時（urgent）は遠くても行く。まだ先の時は、人と同じように「通り道の近くで」だけ
+ * 依頼を受け・進め・報告する（関門のダンジョンに着いてから遠くの町へ戻ると、侵食度が上がりすぎるため）
+ */
+function questGateTarget(g: GameState, at: number, goal: string): { tile: number; why: 'town' | 'grind' | 'dungeon' } | undefined {
+  const w = g.world!;
+  const gated = DUNGEONS.forScenario(g.scenarioId).filter((d) => !d.random && !g.clearedDungeons.includes(d.id) && questsShort(g, d) > 0);
+  if (!gated.length) return undefined;
+  const goalDef = DUNGEONS.get(goal);
+  const urgent = gated.includes(goalDef) && (goalDef.requiresKeys ?? []).every((k) => w.keys.includes(k));
+  const reach = urgent ? Infinity : BOT_QUEST_DETOUR;
+  const near = (tiles: number[]) => tiles.filter((i) => hexDistance(w, at, i) <= reach).sort((a, b) => hexDistance(w, at, a) - hexDistance(w, at, b))[0];
+  // 報告できる依頼があれば、報告する町へ
+  const reportTowns = w.quests.flatMap((q) => {
+    const town = QUESTS.get(q.id).reportTown ?? q.town;
+    // 陥落した町では報告できない
+    if (q.reported || w.fallenTowns.includes(town) || !canReportQuest(g, q.id)) return [];
+    const i = tileOf(g, 'town', town);
+    return i === undefined ? [] : [i];
+  });
+  const report = near(reportTowns);
+  if (report !== undefined) return { tile: report, why: 'town' };
+  // 受けた依頼を進める（名所を訪ねる・徘徊する敵を倒す）
+  for (const q of w.quests) {
+    if (q.done || q.reported) continue;
+    const o = QUESTS.get(q.id).objective;
+    if (o.kind === 'visitLandmark') {
+      const i = near([tileOf(g, 'landmark', o.landmarkId)].filter((x): x is number => x !== undefined));
+      if (i !== undefined) return { tile: i, why: 'dungeon' };
+    }
+    if (o.kind === 'defeatWanderers') {
+      const i = near(w.wanderers.filter((x) => !x.raidTown && (urgent || w.tiles[x.tile].seen)).map((x) => x.tile));
+      if (i !== undefined) return { tile: i, why: 'grind' };
+    }
+  }
+  // まだ受けていない依頼のある町へ（もう1つ果たしていれば、新しくは受けに行かない）
+  const towns = w.tiles.flatMap((t, i) =>
+    t.f?.kind === 'town' && !w.fallenTowns.includes(t.f.id) && (TOWNS.get(t.f.id).quests ?? []).some((qid) => botQuestOk(g, qid) && !w.quests.some((q) => q.id === qid)) ? [i] : [],
+  );
+  const i = near(towns);
+  return i === undefined ? undefined : { tile: i, why: 'town' };
+}
+
+/** 関門がまだ先の時に、依頼のために寄り道してよい距離（マス） */
+const BOT_QUEST_DETOUR = 6;
+
 /** 世界マップでの行き先（HPが減ったら町、レベルが足りなければ近くの敵、それ以外は次のダンジョン） */
 function worldTarget(g: GameState, at: number, straight = false): { tile: number; why: 'town' | 'grind' | 'dungeon' } {
   const w = g.world!;
@@ -124,6 +180,8 @@ function worldTarget(g: GameState, at: number, straight = false): { tile: number
     const near = w.wanderers.filter((x) => w.tiles[x.tile].seen).sort((a, b) => hexDistance(w, at, a.tile) - hexDistance(w, at, b.tile))[0];
     if (near && hexDistance(w, at, near.tile) <= 6) return { tile: near.tile, why: 'grind' };
   }
+  const gate = questGateTarget(g, at, goal);
+  if (gate) return gate;
   return { tile: tileOf(g, 'dungeon', goal)!, why: 'dungeon' };
 }
 
@@ -353,6 +411,15 @@ export function botStep(g: GameState, log: BotLog, memo: BotMemo, inScene = fals
         .map(id => findHero(g, id)!)
         .find(h => h.hp > 0 && h.hp < heroMaxHp(h) && h.gold >= TOWNS.get(t.townId).innCost);
       if (v) return send(g, { type: 'TOWN_INN', playerId: v.playerId, heroId: v.id }, log);
+      // ほかの依頼（3つ目の鍵のダンジョンの関門）: 果たせそうなものを受け、果たしたものは報告する
+      for (const qid of TOWNS.get(t.townId).quests ?? []) {
+        const q = g.world!.quests.find((x) => x.id === qid);
+        if (!q && botQuestOk(g, qid)) return send(g, { type: 'QUEST_ACCEPT', playerId: pid(g), questId: qid }, log);
+      }
+      for (const q of g.world!.quests) {
+        if (q.reported || (QUESTS.get(q.id).reportTown ?? q.town) !== t.townId || !canReportQuest(g, q.id)) continue;
+        return send(g, { type: 'QUEST_REPORT', playerId: pid(g), questId: q.id }, log);
+      }
       return send(g, { type: 'LEAVE_TOWN', playerId: pid(g) }, log);
     }
     case 'sanctuary':

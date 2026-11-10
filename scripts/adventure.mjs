@@ -185,7 +185,8 @@ async function run(party, difficulty) {
   let result = 'timeout';
   let previous = '';
   let unchanged = 0;
-  for (let step = 0; step < 900; step++) {
+  // 手数の上限: ダンジョンを大きくした（鍵40行）ので、4人で最初のダンジョンを抜けるまで900では足りない
+  for (let step = 0; step < 2400; step++) {
     await page.waitForTimeout(60);
     if (await page.locator('[data-world-moving]').count()) {
       await waitForWorldMovement(page);

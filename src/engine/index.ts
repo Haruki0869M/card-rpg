@@ -27,6 +27,7 @@ export * from './game/rooms';
 export * from './game/migrations';
 export * from './game/world/hex';
 export * from './game/world/time';
+export * from './game/world/corruptionShown';
 export * from './game/world/fog';
 export * from './game/world/wanderers';
 export * from './game/world/world';

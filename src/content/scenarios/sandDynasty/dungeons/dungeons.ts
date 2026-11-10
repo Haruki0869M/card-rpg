@@ -1,6 +1,7 @@
 // シナリオ4のダンジョン。敵の組み合わせは砂塵の王朝の専用の敵（enemies/）。
 // 制覇すると聖印が手に入り、3つそろうと最終ダンジョンに入れる。ボスの手前に「物語の部屋」（event）を置く
 import type { DungeonDef } from '../../../../types';
+import { FINALE_EXTRA_FLOOR, KEY_EXTRA_FLOOR, grownLayout } from '../../extraFloor';
 
 /** 蠍の墓所: 廃墟の敵と王家の衛兵ミイラ */
 const TOMB_POOLS: DungeonDef['pools'] = {
@@ -128,7 +129,7 @@ export const scorpionTomb: DungeonDef = {
   bossChest: 'epic',
   rewardKey: 'sealScarab',
   clearStory: ['砂蠍王が、砂になって崩れた。', '墓所に、風が通り抜ける。', '聖印（甲虫）を手に入れた！'],
-  layout: scorpionTombLayout,
+  layout: grownLayout(scorpionTombLayout, KEY_EXTRA_FLOOR),
 };
 
 export const shadowLibrary: DungeonDef = {
@@ -143,7 +144,7 @@ export const shadowLibrary: DungeonDef = {
   // 1つ目のダンジョンの鍵が要る（play-feedback-plan §4 C: 町や依頼を飛ばして、まっすぐ奥へ行けないように）
   requiresKeys: ['sealScarab'],
   clearStory: ['影の宰相は、書を閉じて消えた。', '「王を、救ってくれ」', '聖印（眼）を手に入れた！'],
-  layout: shadowLibraryLayout,
+  layout: grownLayout(shadowLibraryLayout, KEY_EXTRA_FLOOR),
 };
 
 export const statueTemple: DungeonDef = {
@@ -155,8 +156,11 @@ export const statueTemple: DungeonDef = {
   pools: TEMPLE_POOLS,
   bossChest: 'legend',
   rewardKey: 'sealBeast',
+  // 2つ目の鍵と、町の依頼を1つ（報告まで）が要る（冒険を長くする。町に寄る理由を作る）
+  requiresKeys: ['sealEye'],
+  requiresQuests: 1,
   clearStory: ['守護獣の石の体に、ひびが走った。', '「王を…頼む」', '聖印（獣）を手に入れた！'],
-  layout: statueTempleLayout,
+  layout: grownLayout(statueTempleLayout, KEY_EXTRA_FLOOR),
 };
 
 export const sandPalace: DungeonDef = {
@@ -169,7 +173,7 @@ export const sandPalace: DungeonDef = {
   bossChest: 'legend',
   requiresKeys: ['sealScarab', 'sealEye', 'sealBeast'],
   finale: true,
-  layout: [
+  layout: grownLayout([
     [{ type: 'battle', next: [0, 1] }],
     [
       { type: 'battle', next: [0, 1] },
@@ -186,7 +190,7 @@ export const sandPalace: DungeonDef = {
     [{ type: 'battle', next: [0] }],
     [{ type: 'event', eventId: 'pharaohThrone', next: [0] }],
     [{ type: 'boss', next: [] }],
-  ],
+  ], FINALE_EXTRA_FLOOR),
 };
 
 // ランダムダンジョン: 砂の洞窟（部屋の並びを自動生成）

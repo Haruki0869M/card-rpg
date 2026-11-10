@@ -7,7 +7,7 @@ import { getItem, ITEMS } from '../../../data/items';
 import { QUESTS, SHRINES, TOWNS } from '../../../data/world';
 import { PETS } from '../../../data/pets';
 import { getScenario } from '../../../data/scenarios';
-import { idxOf } from './hex';
+import { startTileOf } from './start';
 import type { GameCommand, GameState, ShopStock } from '../../../types';
 import type { Rng } from '../../rng';
 import { addItem, addLog, addLoot, earnGold, ownedBy, shopPriceFor } from '../common';
@@ -115,7 +115,7 @@ export function inStartTown(game: GameState): boolean {
   const map = getScenario(game.scenarioId).map;
   const w = game.world;
   if (!map || !w || game.mode !== 'town' || !game.town) return false;
-  const f = w.tiles[idxOf(w, map.start[0], map.start[1])]?.f;
+  const f = w.tiles[startTileOf(game, w)]?.f;
   return f?.kind === 'town' && f.id === game.town.townId;
 }
 

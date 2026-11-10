@@ -6,7 +6,7 @@ import { EVENTS } from '../../data/events';
 import { ITEMS } from '../../data/items';
 import { QUESTS, TERRAINS, TOWNS } from '../../data/world';
 import { createRng } from '../rng';
-import { applyGameCommand, canReportQuest, createGame, handleDefeat, neighbors } from '../index';
+import { applyGameCommand, canReportQuest, createGame, handleDefeat, hexDistance, neighbors } from '../index';
 
 const newGame = (seed = 5) =>
   createGame({ seed, scenarioId: 'cursedArchipelago', difficulty: 'normal', party: ['warrior', 'mage'].map((c, i) => ({ classId: c, gender: 'male' as const, name: `${c}${i}`, playerId: 'P1' })) });
@@ -85,8 +85,12 @@ describe('戦闘に負けた時の復活の町（船が無い時に、島から�
       const g = newGame(seed);
       const w = g.world!;
       const h = g.heroes[0];
-      // 最初のダンジョン（難破船の洞窟）の上で負けた
-      const dungeon = w.tiles.findIndex((t) => t.f?.kind === 'dungeon' && t.f.id === 'wreckCave');
+      // 最初のダンジョン（難破船の洞窟）の上で負けた。
+      // 道を長くしてから、船が無いと洞窟まで歩いて行けない種が多い。その時は、船なしで歩いて行けるマスのうち洞窟に一番近いマスで負けたことにする
+      const cave = w.tiles.findIndex((t) => t.f?.kind === 'dungeon' && t.f.id === 'wreckCave');
+      const start = w.pos[h.id];
+      const onFoot = [...flood(g, start, false)];
+      const dungeon = onFoot.includes(cave) ? cave : onFoot.sort((a, b) => hexDistance(w, a, cave) - hexDistance(w, b, cave) || a - b)[0];
       w.pos[h.id] = dungeon;
       g.lives = 3;
       handleDefeat(g, [h.id], createRng(1));

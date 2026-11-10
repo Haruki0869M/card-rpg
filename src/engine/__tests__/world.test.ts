@@ -19,6 +19,7 @@ import {
   viewOf,
   handleDefeat,
   createRng,
+  corruptionShown,
 } from '../index';
 import { playToEnd } from '../bot';
 
@@ -302,8 +303,11 @@ describe('町・祠・依頼', () => {
     expect(g.mode).toBe('world');
     expect(g.expeditions?.length).toBe(1);
     expect(viewOf(g, g.expeditions![0].id).mode).toBe('dungeon');
-    // 入ると手番が終わり、1人なのでワールドターンも進む
-    expect(g.world!.corruption).toBe(BALANCE.corruptionOnDungeonEnter + (getDifficulty(g.difficulty).corruptionPerTurn ?? BALANCE.corruptionPerTurn));
+    // 入ると手番が終わり、1人なのでワールドターンも進む。全員がダンジョンの中なので、ダンジョンの番の量（難易度の値は倍率）
+    expect(g.world!.corruption).toBe(BALANCE.corruptionOnDungeonEnter + BALANCE.corruptionPerDungeonTurn * (getDifficulty(g.difficulty).corruptionPerTurn ?? 1));
+    // 画面では切り捨てて整数%
+    expect(corruptionShown(2.5)).toBe(2);
+    expect(corruptionShown(12.75)).toBe(12);
   });
 });
 

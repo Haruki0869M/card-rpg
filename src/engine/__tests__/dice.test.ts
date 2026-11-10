@@ -189,8 +189,9 @@ describe('ダンジョンの探索のサイコロと扉', () => {
   });
 
   it('自動プレイ（bot）は新しいルールで最後まで遊べる', () => {
-    const { game, log } = playToEnd(newWorld(11, ['warrior', 'priest']), 30000);
+    const { game, log } = playToEnd(newWorld(11, ['warrior', 'priest']), 60000);
     expect(log.errors.filter((e) => e.startsWith('stuck'))).toEqual([]);
     expect(['ending', 'gameover']).toContain(game.mode);
-  });
+    // ダンジョンを大きくした（鍵40行・最後52行）ので、最後まで遊ぶのに時間がかかる
+  }, 180_000);
 });

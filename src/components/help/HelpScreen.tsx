@@ -4,7 +4,7 @@
 import { ChevronLeft, ChevronRight, HelpCircle, X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { corruptionName } from '../../data/scenarios';
-import { nextCorruptionStage } from '../../engine';
+import { corruptionShown, nextCorruptionStage } from '../../engine';
 import { useBattle } from '../../store/battleStore';
 import { useHelp } from '../../store/help';
 import { GLOSSARY, HELP_TOPICS, topicOf, type HelpTopicId } from './helpTopics';
@@ -18,7 +18,7 @@ function CorruptionNow() {
   return (
     <div className="mb-2 rounded-lg border border-fuchsia-400/40 bg-fuchsia-950/40 px-3 py-2 text-[14px] leading-5" data-help-corruption-now>
       <div className="font-bold text-fuchsia-100">
-        今の{name}: <span className="tabular-nums">{game.world.corruption}%</span>
+        今の{name}: <span className="tabular-nums">{corruptionShown(game.world.corruption)}%</span>
       </div>
       <div className="text-fuchsia-100/90">{next ? `次: ${next.at}%で${next.text}` : 'これ以上の変化はありません'}</div>
     </div>

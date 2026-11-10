@@ -11,6 +11,9 @@
 //   VOL_DIFF=normal                         難易度
 //   VOL_STRAIGHT=0                          0 にすると、従来の bot（ダンジョンの前にレベル上げをする）で比べられる
 //   VOL_OUT=screenshots/volume              書き出し先（.json = 生データ、.md = 表）
+//   VOL_RATES=turn=0,dturn=0,relay=0,enter=0,clear=0   侵食度の量を差し替える（BALANCE の corruptionPerTurn・corruptionPerDungeonTurn・
+//                                           corruptionPerRelayMove・corruptionOnDungeonEnter・corruptionOnKeyDungeonClear）。全部0にすると、
+//                                           侵食度で終わらない時の「番の数・交代運転・入った回数」を数えられる（侵食度の設計用）
 //
 // 時間の見積もり: 操作1回あたりの秒数（下の SEC。カード6秒・移動5秒など）を全員分足した値。
 // docs/tasks/play-feedback-plan.md（測り方）・冒険の長さの測定（pacing）と同じ式（ただし戦闘の操作の数え方を直した。unwrap を参照）。
@@ -57,6 +60,11 @@ const ANY = ['map', 'town', 'shrine', 'temple', 'altar', 'rest', 'hub'];
 const SACRED = ['town', 'shrine', 'temple'];
 const jc = BALANCE.jobChange as { base: number; mid: number; special: number };
 const LV = { mid: jc.base, top: jc.mid, special: jc.special };
+const RATE_KEYS: Record<string, string> = { turn: 'corruptionPerTurn', dturn: 'corruptionPerDungeonTurn', relay: 'corruptionPerRelayMove', enter: 'corruptionOnDungeonEnter', clear: 'corruptionOnKeyDungeonClear' };
+for (const kv of (process.env.VOL_RATES ?? '').split(',').filter(Boolean)) {
+  const [k, v] = kv.split('=');
+  (BALANCE as unknown as Record<string, number>)[RATE_KEYS[k] ?? k] = Number(v);
+}
 
 // 包んだ操作（VOTE・SCENE・BATTLE）は中身の種類で数える。
 // 注意: 以前の測定（pacing の pace2）は BATTLE を開けておらず、戦闘の操作がすべて「1回4秒」になっていた。
@@ -89,6 +97,8 @@ interface Run {
   /** 最後に最終ダンジョンへ入った時 */
   finaleLast?: Mark;
   final: Mark;
+  /** 侵食度の元の回数: 世界マップの番・全員ダンジョンの中の番・交代運転・ダンジョンに入った・鍵のダンジョンの制覇 */
+  counts: { turnsMap: number; turnsDungeon: number; relays: number; enters: number; clears: number };
   /** 最後までの操作の回数（種類ごと） */
   byType: Record<string, number>;
   /** キャラごとの「転職していたら」の時期（中位・特殊の Lv・最上位の Lv・最上位に転職できる場所に着いた時） */
@@ -107,14 +117,26 @@ function runOne(scen: string, classes: string[], seed: number): Run {
   const prev: Record<string, number> = {};
   const V: Record<string, { tier: number; level: number; exp: number; ev: Run['jobs'][number] }> = {};
   for (const h of g0.heroes) { prev[h.id] = 0; V[h.id] = { tier: 0, level: 1, exp: 0, ev: {} }; }
+  const counts = { turnsMap: 0, turnsDungeon: 0, relays: 0, enters: 0, clears: 0 };
+  const inside = (g: GameState) => (g.expeditions ?? []).flatMap((x) => x.heroes);
   const mark = (g: GameState): Mark => ({ min: minutes(byType), round: g.world?.worldTurn ?? 0, battle: g.stats.battlesWon, corr: g.world?.corruption ?? 0, keys: keyClear.length });
   H.hook = (pre, cmd, post) => {
     const u = unwrap(cmd);
     byType[u.type] = (byType[u.type] ?? 0) + 1;
     if (post.stats.battlesWon > pre.stats.battlesWon) lastWinRound = post.world?.worldTurn ?? 0;
+    if (pre.world && post.world) {
+      if (post.world.worldTurn > pre.world.worldTurn) {
+        const living = post.heroes.filter((h) => !h.retired && h.hp > 0);
+        const ins = inside(pre);
+        if (living.some((h) => ins.includes(h.id))) counts.turnsDungeon++;
+        else counts.turnsMap++;
+      }
+      if ((post.world.relayCharged?.length ?? 0) > (pre.world.relayCharged?.length ?? 0)) counts.relays++;
+      if ((post.expeditions?.length ?? 0) > (pre.expeditions?.length ?? 0)) counts.enters++;
+    }
     for (const d of post.clearedDungeons) {
       const def = DUNGEONS.get(d);
-      if (!pre.clearedDungeons.includes(d) && !def.random && !def.finale) keyClear.push(mark(post));
+      if (!pre.clearedDungeons.includes(d) && !def.random && !def.finale) { keyClear.push(mark(post)); counts.clears++; }
     }
     if (inFinale(post) && !inFinale(pre)) {
       finaleTries++;
@@ -146,7 +168,7 @@ function runOne(scen: string, classes: string[], seed: number): Run {
   const end = game.mode === 'ending' ? 'clear' : (game.world?.corruption ?? 0) >= 100 ? 'corr100' : game.mode;
   // 侵食度100で終わり、その前の長い間1度も勝てていない = bot が詰まった（遊びの長さの数には入れない）
   const stuck = end === 'corr100' && final.round - lastWinRound > 25;
-  return { seed, end, stuck, keyClear, finaleEnter, finaleTries, finaleLast, final, byType, jobs: Object.values(V).map((v) => v.ev) };
+  return { seed, end, stuck, keyClear, finaleEnter, finaleTries, finaleLast, final, counts, byType, jobs: Object.values(V).map((v) => v.ev) };
 }
 
 // ----- 表にする -----
@@ -184,6 +206,14 @@ export function table(all: Record<string, Record<string, Run[]>>): string {
     const cl = rs.filter((r) => r.end === 'clear');
     const ev = rs.flatMap((r) => r.jobs);
     L.push(`| ${p} | ${cl.length}/${rs.length} | ${f(avg(cl.map((r) => r.keyClear[0]?.min)))} | ${f(avg(cl.map((r) => r.keyClear[1]?.min)))} | ${f(avg(cl.map((r) => r.keyClear[2]?.min)))} | ${f(avg(cl.map((r) => r.finaleEnter?.min)))} | **${f(avg(cl.map((r) => r.final.min)))}** | ${f(avg(cl.map((r) => r.final.battle)))} | ${f(avg(cl.map((r) => r.final.corr)))}% | ${cell(ev.map((e) => e.mid))} | ${cell(ev.map((e) => e.topLv))} |`);
+  }
+  L.push('', '### 侵食度の元の回数（クリアした冒険の平均。侵食度の設計用）', '');
+  L.push('| 人数 | 世界マップの番 | ダンジョンの中の番 | 交代運転 | ダンジョンに入る | 鍵の制覇 | 最後の侵食度 |');
+  L.push('|---|---|---|---|---|---|---|');
+  for (const p of PS) {
+    const cl = Object.values(all).flatMap((x) => x[p] ?? []).filter((r) => r.end === 'clear' && r.counts);
+    const c = (k: keyof Run['counts']) => f(avg(cl.map((r) => r.counts[k])), 1);
+    L.push(`| ${p} | ${c('turnsMap')} | ${c('turnsDungeon')} | ${c('relays')} | ${c('enters')} | ${c('clears')} | ${f(avg(cl.map((r) => r.final.corr)), 1)}% |`);
   }
   // 時間の内訳（どの操作に時間がかかっているか。人の速さと比べる時の手がかり）
   L.push('', '### 時間の内訳（クリアした冒険の平均・分）', '');

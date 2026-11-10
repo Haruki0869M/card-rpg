@@ -47,9 +47,11 @@ export const BALANCE = {
   expPerLevel: 25,
   /**
    * 転職（spec §6.4）: 転職できるレベル（基本→中位 / 中位→最上位 / 中位→特殊）。
-   * play-feedback-plan §5（オーナー承認）で 5/4/3 → 6/7/5。中位のLv7までの経験値は合わせて584
+   * play-feedback-plan §5（オーナー承認）で 5/4/3 → 6/7/5。中位のLv7までの経験値は合わせて584。
+   * 道を長くして戦闘が約4倍になったので（longer-routes・提案、オーナー承認）6/7/5 → 9/9/7。
+   * 中位は鍵2つ目のころ、特殊は鍵2つ目と3つ目の間、最上位は鍵3つ目〜最後のダンジョンの前に届く見込み
    */
-  jobChange: { base: 6, mid: 7, special: 5 },
+  jobChange: { base: 9, mid: 9, special: 7 },
   /** 段が上がるごとの、次のレベルに必要な経験値の倍率（基本1・中位×1.2・最上位と特殊×1.44） */
   tierExpMul: 1.2,
   /** お供: 懐き度の段階（♡1〜5）に必要な点数・撫でた時の点数・戦闘に勝った時の点数・めったに出ない子の出やすさ（%）・名前の長さ */
@@ -154,8 +156,13 @@ export const BALANCE = {
   dungeonWatchSteps: 0,
   dungeonWatchSlots: 2,
   dungeonWatchInspired: 1,
-  /** 侵食度: 1ワールドターンごと / ダンジョンに入る時 / 町が陥落した時 */
+  /**
+   * 侵食度: 1ワールドターンごと（だれもダンジョンに入っていない時）/ ダンジョンに入る時 / 町が陥落した時。
+   * 0.25 刻みの小数にしてよい（画面では切り捨てて整数%で出す。corruptionShown）。難易度の corruptionPerTurn は倍率
+   */
   corruptionPerTurn: 1,
+  /** 侵食度: 1ワールドターンごと（1人でもダンジョンの中にいる時。ダンジョンが長いので小さめ） */
+  corruptionPerDungeonTurn: 0.5,
   corruptionOnDungeonEnter: 2,
   corruptionOnTownFall: 5,
   /**
@@ -163,8 +170,8 @@ export const BALANCE = {
    * 同じワールドターンのうちに、前の人の手番ですでに動いたキャラを、別の人の手番でまた動かした時に上がる（1手番に1回まで）
    */
   corruptionPerRelayMove: 1,
-  /** 侵食度: 鍵のダンジョンを制覇した時に下がる量（ダンジョンごとの corruptionOnClear が無い時。§4 B で 5→2） */
-  corruptionOnKeyDungeonClear: 2,
+  /** 侵食度: 鍵のダンジョンを制覇した時に下がる量（ダンジョンごとの corruptionOnClear が無い時。§4 B で 5→2、ダンジョンを大きくした時に 2→3（提案）） */
+  corruptionOnKeyDungeonClear: 3,
   /** 野営の回復（HPは最大HPの割合）と、夜に野営した時の夜襲の確率（%） */
   campHpRatio: 0.2,
   campFocus: 1,

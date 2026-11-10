@@ -22,6 +22,7 @@ import { hexDistance, moveCostOf, neighbors, pathTo, reachable } from './hex';
 import { objectiveHandler, type QuestSignal } from './objectives';
 import { timeOfDay } from './time';
 import { ensureShop } from './town';
+import { dungeonGateError } from './questGate';
 import { moveWanderers, spawnWanderer } from './wanderers';
 
 type Cmd<T extends GameCommand['type']> = Extract<GameCommand, { type: T }>;
@@ -129,7 +130,11 @@ function endWorldTurn(game: GameState, rng: Rng) {
   w.acted = [];
   w.movedBy = undefined;
   w.relayCharged = undefined;
-  w.corruption = Math.min(100, w.corruption + (getDifficulty(game.difficulty).corruptionPerTurn ?? BALANCE.corruptionPerTurn));
+  // 時間による侵食度: 生きているキャラが1人でもダンジョンの中なら、ダンジョンの番の量（ダンジョンが長いので小さめ）。難易度の値は倍率。
+  // 「全員が中」にすると、パーティが分かれた時（外で待つ仲間がいる時）だけ長いダンジョンの間ずっと+1%になり、侵食度が持たない
+  const inside = livingHeroes(game).some((x) => expeditionOf(game, x.id));
+  const perTurn = inside ? BALANCE.corruptionPerDungeonTurn : BALANCE.corruptionPerTurn;
+  w.corruption = Math.min(100, w.corruption + perTurn * (getDifficulty(game.difficulty).corruptionPerTurn ?? 1));
   onCorruptionChange(game, rng, before);
   // 夜は魔物が増える
   const def = getScenario(game.scenarioId).map!;
@@ -732,17 +737,8 @@ export function interact(game: GameState, cmd: Cmd<'WORLD_INTERACT'>, rng: Rng):
       return undefined;
     case 'dungeon': {
       const def = DUNGEONS.get(f.id);
-      const missing = (def.requiresKeys ?? []).filter((k) => !w.keys.includes(k));
-      if (missing.length) {
-        const names = getScenario(game.scenarioId).story?.keys ?? {};
-        const keyNames = missing.map((k) => names[k] ?? k).join('・');
-        // 最後のダンジョン以外は、どこで鍵が手に入るかも伝える（§4 C）
-        if (!def.finale) {
-          const from = missing.map((k) => DUNGEONS.forScenario(game.scenarioId).find((d) => d.rewardKey === k)?.name).filter(Boolean);
-          if (from.length) return `扉が開かない…。${keyNames}が要る。先に「${from.join('」「')}」を制覇しよう`;
-        }
-        return `扉が開かない…（必要: ${keyNames}）`;
-      }
+      const gate = dungeonGateError(game, def);
+      if (gate) return gate;
       // 一緒に入るのは、自分のキャラか、誘いを承知した他の人のキャラ
       const party = (cmd.party?.length ? cmd.party : here).filter((id) => here.includes(id) && (findHero(game, id)?.playerId === h.playerId || followingGroup(game, h.id).includes(id)));
       if (!party.includes(h.id)) party.unshift(h.id);

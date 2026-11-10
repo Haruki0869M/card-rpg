@@ -63,6 +63,7 @@ import {
   agreeMove,
   heroesAt,
 } from './world/world';
+import { questGatedNext } from './world/questGate';
 import { leaveSanctuary, leaveShrine, leaveTown, questAccept, questReport, shrineChoose, bringMyPet, townBuy, townInn, townRemoveCard, townSell } from './world/town';
 import { getRoomType } from '../../data/rules';
 import { TERRAINS } from '../../data/world';
@@ -1129,7 +1130,11 @@ export function nextGoalLines(game: GameState): string[] {
   const total = Object.keys(getScenario(game.scenarioId).story?.keys ?? {}).length;
   if (!total) return [];
   const left = total - w.keys.length;
-  if (left > 0) return [`鍵はあと${left}つ。`];
+  if (left > 0) {
+    // 鍵はそろったのに、町の依頼が足りなくて開かない扉がある時は、それも伝える
+    const gated = questGatedNext(game);
+    return gated ? [`鍵はあと${left}つ。`, `「${gated.name}」は、町の依頼を果たしてから。`] : [`鍵はあと${left}つ。`];
+  }
   const finale = DUNGEONS.forScenario(game.scenarioId).find((d) => d.finale);
   return finale ? [`鍵がそろった。${finale.name}へ向かおう。`] : [];
 }

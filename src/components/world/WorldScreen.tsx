@@ -30,6 +30,7 @@ import {
   turnsUntilNightChange,
   worldDiceBonus,
   diceAverage,
+  corruptionShown,
 } from '../../engine';
 import { isLocalPlayer, isOnlinePlay } from '../../store/battleConfig';
 import { useBattle, type WorldMovePresentation } from '../../store/battleStore';
@@ -67,7 +68,7 @@ export function WorldTopBar({ game, goldHeroId }: { game: GameState; /** 所持�
       >
         <span className="flex items-center justify-between text-[12px] leading-4">
           <span className="font-display text-fuchsia-200">{cName}</span>
-          <b className="tabular-nums text-fuchsia-100">{w.corruption}%</b>
+          <b className="tabular-nums text-fuchsia-100">{corruptionShown(w.corruption)}%</b>
         </span>
         <Bar value={w.corruption} max={100} color="linear-gradient(90deg,#6a2a9a,#e04aff)" height={6} />
         {/* 次の段階は省略せずに全文（2行まで） */}
