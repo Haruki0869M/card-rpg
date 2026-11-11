@@ -5,22 +5,16 @@ import type { ItemDef } from '../../../../types';
 export const frozenGear: ItemDef[] = [
   // ----- 武器 -----
   {
-    id: 'crystalStaff', name: '氷晶の杖', slot: 'weapon', weaponType: 'staff', rarity: 'epic', icon: 'staff', scenario: 'frozenKingdom',
-    description: '魔法の完全成功でランダムな敵1体に氷属性の追撃4。1ターンに1回。', stats: { int: 8, per: 2 }, tags: ['magic', 'ice'],
-    cards: [{ cardId: 'wLightning', count: 2 }],
-    ability: { name: '氷晶の輝き', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'magic' }, { kind: 'dealtDamage' }, { kind: 'oncePerTurn', key: 'crystalStaff' }], do: [{ kind: 'damage', amount: 4, element: 'ice', to: 'randomFoe' }] } },
-  },
-  {
     id: "blizzardBow", name: "吹雪の弓", slot: "weapon", weaponType: "bow", rarity: "rare", icon: "bow", scenario: "frozenKingdom",
     description: "敵全体を狙うカードが完全成功した時、ランダムな敵1体に「凍結」1（ボスには代わりに「弱体」1）。1ターンに1回。", stats: {"dex":5,"per":3}, tags: ["physical","ice","freeze","aoe"],
     cards: [{"cardId":"wtBowShower","count":2}],
     ability: {"name":"吹雪","description":"敵全体を狙うカードが完全成功した時、ランダムな敵1体に「凍結」1（ボスには代わりに「弱体」1）。1ターンに1回。","effect":{"when":"perfect","if":[{"kind":"cardAoe"},{"kind":"oncePerTurn","key":"blizzardBow"}],"do":[{"kind":"applyStatus","status":"freeze","amount":1,"bossStatus":"weak","to":"randomFoe"}]}},
   },
   {
-    id: 'springbringerScepter', name: '春告げの錫杖', slot: 'weapon', weaponType: 'scepter', rarity: 'legend', icon: 'scepter', scenario: 'frozenKingdom',
-    description: '毎ターンの始めに、味方全員のHPを少し回復する。百年ぶりの、春の光。', stats: { int: 8, vit: 4 }, tags: ['holy', 'heal'],
-    cards: [{ cardId: 'wtScepterJudgment', count: 2 }],
-    ability: { name: '春の光', effect: { when: 'turnStart', do: [{ kind: 'heal', amount: 4, to: 'allies' }] } },
+    id: "springbringerScepter", name: "春告げの錫杖", slot: "weapon", weaponType: "scepter", rarity: "legend", icon: "scepter", scenario: "frozenKingdom",
+    description: "ターン開始時、味方全員の悪い状態異常を1つ治す。", stats: {"int":8,"vit":4}, tags: ["heal","support"],
+    cards: [{"cardId":"wtScepterMiracle","count":2}],
+    ability: {"name":"雪解けの光","description":"ターン開始時、味方全員の悪い状態異常を1つ治す。","effect":{"when":"turnStart","do":[{"kind":"cleanseOne","to":"allies"}]}},
   },
   // ----- 鎧 -----
   { id: 'whiteWolfFur', name: '白狼の毛皮', slot: 'armor', rarity: 'rare', icon: 'robe', description: '氷属性のダメージを半分に和らげる。戦闘の始めにブロックを得る。', maxHp: 8, startBlock: 3, tags: ['ice'], ability: { name: '雪狼の守り', effect: { modifier: 'elementGuard', element: 'ice', mode: 'half' } } },

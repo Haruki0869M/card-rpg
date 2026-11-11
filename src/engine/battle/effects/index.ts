@@ -2,7 +2,7 @@
 // 新しい効果: kinds/ にファイルを1つ置いて export const effect: EffectHandler<'種類'> = {...} と書くだけ。
 // カード・敵の行動・消費アイテム・特殊能力のデータから、その日から使える。
 import type { AbilityDef, BattleEvent, BattleState, CardDef, Effect, EffectTarget, EnemyState } from '../../../types';
-import { convertedElement, coverChance, damageModifiers, elementGuardOf, fireAbilities, guardStatus } from '../../abilities';
+import { convertedElement, coverChance, damageModifiers, elementGuardOf, fireAbilities, guardStatus, statusBonusOf } from '../../abilities';
 import type { Rng } from '../../rng';
 import { BALANCE } from '../../../data/balance';
 import { getElement } from '../../../data/elements';
@@ -40,7 +40,7 @@ export function makeCtx(
   rng: Rng,
   events: BattleEvent[],
   source: Unit,
-  opts: { target?: Unit; allyTarget?: Unit; attacker?: Unit; card?: CardDef; cardAbilities?: AbilityDef[]; dealt?: number; depth?: number; perfect?: boolean; tierEffects?: Effect[] } = {},
+  opts: { target?: Unit; allyTarget?: Unit; attacker?: Unit; card?: CardDef; cardAbilities?: AbilityDef[]; dealt?: number; depth?: number; perfect?: boolean; tierEffects?: Effect[]; via?: 'pet' | 'summon'; weakTarget?: Unit; helped?: Unit[] } = {},
 ): EffectCtx {
   return {
     state,
@@ -54,6 +54,9 @@ export function makeCtx(
     cardAbilities: opts.cardAbilities,
     perfect: opts.perfect,
     tierEffects: opts.tierEffects,
+    via: opts.via,
+    weakTarget: opts.weakTarget,
+    helped: opts.helped,
     dealt: opts.dealt ?? 0,
     parts: [],
     hitIds: [],
@@ -79,6 +82,10 @@ export function resolveTargets(ctx: EffectCtx, to: EffectTarget): Unit[] {
     case 'attacker':
       // 攻撃してきた相手（ダメージを受けた時・防いだ時のきっかけ。毒などの継続ダメージには相手がいない）
       return ctx.attacker && !ctx.attacker.dead && isEnemy(ctx.attacker) !== isEnemy(source) ? [ctx.attacker] : [];
+    case 'weakHit':
+      return ctx.weakTarget && !ctx.weakTarget.dead ? [ctx.weakTarget] : [];
+    case 'helped':
+      return (ctx.helped ?? []).filter((u) => !u.dead);
     case 'otherFoes':
       // 狙った敵以外の敵全員（感電など）
       return foesOf(state, source).filter((u) => u !== ctx.target);
@@ -126,6 +133,8 @@ const WHO: Record<EffectTarget, { ally: string; enemy: string }> = {
   randomFoe: { ally: 'ランダムな敵1体に', enemy: 'ランダムな味方1人に' },
   lowestAlly: { ally: 'HPが一番低い味方に', enemy: 'HPが一番低い敵に' },
   randomAlly: { ally: 'ランダムな味方1人に', enemy: 'ランダムな敵1体に' },
+  weakHit: { ally: '弱点を突いた敵に', enemy: '弱点を突いた相手に' },
+  helped: { ally: '支援した味方に', enemy: '支援した相手に' },
 };
 
 /** 効果の説明文（side = 使う側。味方なら「敵全員に」、敵なら「味方全員に」） */
@@ -219,11 +228,11 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   // 武器に宿った属性: 属性の無い物理攻撃がその属性になる（妖精の泉）
   element = convertedElement(source, ctx.card, attackElement(source, ctx.card, element));
   let v = victim;
-  let mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities, ctx.perfect, element);
+  let mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities, ctx.perfect, element, ctx.via);
   // 属性を強める状態異常（聖光など）: この一撃で使い切る
   const boost = element ? elementBoost(source, element) : 1;
   base = Math.round(base * boost);
-  let dmg = calcDamage(base + mods.add, source.statuses, v.statuses, extraMultiplier * mods.multiplier * elementMultiplier(v, element) * comboMultiplier(source, v));
+  let dmg = calcDamage(base + mods.add + (ctx.addOnceUsed ? 0 : mods.addOnce), source.statuses, v.statuses, extraMultiplier * mods.multiplier * elementMultiplier(v, element) * comboMultiplier(source, v));
   // かばう: 相手の攻撃でこのままだとHP0になる場合、同じ側の他の仲間が確率で代わりに受ける
   if (isEnemy(source) !== isEnemy(v) && dmg - (mods.ignoreBlock ? 0 : v.block) >= v.hp) {
     for (const other of sideOf(state, v)) {
@@ -234,17 +243,20 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
         abilityTriggered(state, unitIdOf(other), cov.name, events, cov.source);
         addLog(state, `${nameOf(other)}の「${cov.name}」！ ${nameOf(v)}をかばった`);
         v = other;
-        mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities, ctx.perfect, element);
-        dmg = calcDamage(base + mods.add, source.statuses, v.statuses, extraMultiplier * mods.multiplier * elementMultiplier(v, element) * comboMultiplier(source, v));
+        mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities, ctx.perfect, element, ctx.via);
+        dmg = calcDamage(base + mods.add + (ctx.addOnceUsed ? 0 : mods.addOnce), source.statuses, v.statuses, extraMultiplier * mods.multiplier * elementMultiplier(v, element) * comboMultiplier(source, v));
         break;
       }
     }
   }
+  // 「最初の1回の攻撃にだけ足すダメージ」は、ここで使い切る（×N回・全体のカードでも1回だけ）
+  if (mods.addOnce) ctx.addOnceUsed = true;
   for (const n of mods.active) recordActivation(ctx, n);
   const stage = comboStage(source, v);
   if (stage > 0) recordActivation(ctx, { name: COMBO_NAMES[stage] ?? COMBO_NAME, source: { kind: 'other' } });
   // 弱点の属性で攻撃したか（BREAK のきっかけ。かばう・属性の変換の後の、実際の相手と属性で見る）
   const weakHit = !!element && isEnemy(v) && !!getEnemy(v.defId).weak?.includes(element);
+  if (weakHit && dmg > 0 && !isEnemy(source) && !(ctx.weakHitIds ??= []).includes(unitIdOf(v))) ctx.weakHitIds.push(unitIdOf(v));
   // 連携攻撃の記録（このターンにこの敵を攻撃した味方）
   if (isEnemy(v) && !isEnemy(source)) {
     const id = unitIdOf(source);
@@ -293,9 +305,10 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
     const el = getElement(element);
     // 乱数の順番を変えないように、先に確率を引いてから「防ぐ能力」を見る
     if (el.status && !resistsElement(v, element) && (ctx.perfect || rng.next() * 100 < (el.chance ?? 0)) && !(isEnemy(source) !== isEnemy(v) && guardStatus(state, events, v, el.status))) {
-      addStatus(v.statuses, el.status, el.amount ?? 1);
-      events.push({ type: 'status', unitId: unitIdOf(v), status: el.status, amount: el.amount ?? 1 });
-      ctx.parts.push(`${getStatus(el.status).name}${el.amount ?? 1}`);
+      const n = (el.amount ?? 1) + (isEnemy(source) !== isEnemy(v) ? statusBonusOf(source, el.status, ctx.card, v, state, true) : 0);
+      addStatus(v.statuses, el.status, n);
+      events.push({ type: 'status', unitId: unitIdOf(v), status: el.status, amount: n });
+      ctx.parts.push(`${getStatus(el.status).name}${n}`);
       // きっかけ: 相手に状態異常を与えた
       if (ctx.depth < 3 && isEnemy(source) !== isEnemy(v) && !source.dead) fireAbilities(state, rng, events, source, 'inflict', { target: v, statusId: el.status, depth: ctx.depth + 1 });
     }

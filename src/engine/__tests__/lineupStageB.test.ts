@@ -478,8 +478,8 @@ describe('区切りB: 弓（狙う）', () => {
 });
 
 describe('区切りB: 保存の版', () => {
-  it('今の版は v19。今の保存データは読める。v18 は読まない（壊れずに null）', () => {
-    expect(STATE_VERSION).toBe(19);
+  it('今の保存データは読める。v18 は読まない（壊れずに null。今の版は区切りCで v20。lineupStageC.test.ts）', () => {
+    expect(STATE_VERSION).toBeGreaterThanOrEqual(19);
     const g = game(['warrior'], ['steelSword']);
     expect(migrateGame(structuredClone(g))).toEqual(g);
     const old = structuredClone(g) as GameState & { version: number };

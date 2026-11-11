@@ -56,15 +56,17 @@ export interface DamageMods {
   ignoreBlockNotice?: AbilityNotice;
   /** 1回の攻撃ごとに足すダメージ（倍率を掛ける前。盾打ち・疾走） */
   add: number;
+  /** そのカード・効果の最初の1回の攻撃にだけ足すダメージ（弾込め） */
+  addOnce: number;
 }
 
 /**
  * source が victim に与えるダメージの倍率（敵のレベル × 常時型の能力）とブロック無視。
  * cardAbilities = 使っているカードの特殊能力（そのカードだけで働く）。予測表示でも同じ関数を使う
  */
-export function damageModifiers(state: BattleState | undefined, source: Unit, card: CardDef | undefined, victim: Unit | undefined, cardAbilities?: AbilityDef[], perfect?: boolean, element?: string): DamageMods {
-  const out: DamageMods = { multiplier: isEnemy(source) ? source.attackMul : 1 + (source.damageBonus ?? 0), active: [], ignoreBlock: false, add: 0 };
-  const c: CondCtx = { state, self: source, card, target: victim, perfect };
+export function damageModifiers(state: BattleState | undefined, source: Unit, card: CardDef | undefined, victim: Unit | undefined, cardAbilities?: AbilityDef[], perfect?: boolean, element?: string, via?: 'pet' | 'summon'): DamageMods {
+  const out: DamageMods = { multiplier: isEnemy(source) ? source.attackMul : 1 + (source.damageBonus ?? 0), active: [], ignoreBlock: false, add: 0, addOnce: 0 };
+  const c: CondCtx = { state, self: source, card, target: victim, perfect, via };
   // 弱点のダメージを増やす能力は、まとめて上限を掛ける（弱点 ×1.5 と合わせて BALANCE.elementWeakMax まで）
   let weak = 1;
   for (const ab of cardAbilities?.length ? [...abilitiesOf(source), ...cardAbilities] : abilitiesOf(source)) {
@@ -84,7 +86,8 @@ export function damageModifiers(state: BattleState | undefined, source: Unit, ca
       const m = e.multiplier * scaleOf(e.scale, source, victim);
       if (m === 1 && !e.add) continue;
       out.multiplier *= m;
-      out.add += e.add ?? 0;
+      if (e.once) out.addOnce += e.add ?? 0;
+      else out.add += e.add ?? 0;
       out.active.push({ name: ab.name, source: ab.source ?? { kind: 'card', id: card?.id, label: card?.name } });
     } else if (e.modifier === 'ignoreBlock') {
       out.ignoreBlock = true;
@@ -192,11 +195,12 @@ export function markCostUsed(state: BattleState, u: Unit, keys: string[]) {
 }
 
 /** 自分が付ける状態異常の量の上乗せ（呪詛など） */
-export function statusBonusOf(u: Unit, status: string, card?: CardDef, target?: Unit): number {
+/** viaElement = 属性ダメージに付いてくる状態異常の時（element: true の能力だけが乗る） */
+export function statusBonusOf(u: Unit, status: string, card?: CardDef, target?: Unit, state?: BattleState, viaElement?: boolean): number {
   let n = 0;
   for (const ab of abilitiesOf(u)) {
     const e = ab.effect;
-    if ('modifier' in e && e.modifier === 'statusBonus' && e.statuses.includes(status) && testConditions(e.if, { self: u, card, target })) n += e.amount;
+    if ('modifier' in e && e.modifier === 'statusBonus' && (!viaElement || e.element) && e.statuses.includes(status) && testConditions(e.if, { state, self: u, card, target })) n += e.amount;
   }
   return n;
 }
@@ -283,15 +287,17 @@ export function fireAbilities(
   events: BattleEvent[],
   owner: Unit,
   when: AbilityTrigger,
-  opts: { card?: CardDef; /** 条件を見る時だけ使うカード（敵を倒した時。効果はカード無しで動かす） */ condCard?: CardDef; multi?: { total: number; landed: number }; target?: Unit; allyTarget?: Unit; attacker?: Unit; dealt?: number; list?: AbilityDef[]; depth?: number; focusUsed?: number; statusId?: string; tierEffects?: Effect[]; perfect?: boolean; successes?: number; supportedOthers?: boolean } = {},
+  opts: { card?: CardDef; /** 条件を見る時だけ使うカード（敵を倒した時。効果はカード無しで動かす） */ condCard?: CardDef; multi?: { total: number; landed: number }; target?: Unit; allyTarget?: Unit; attacker?: Unit; dealt?: number; list?: AbilityDef[]; depth?: number; focusUsed?: number; statusId?: string; tierEffects?: Effect[]; perfect?: boolean; successes?: number; supportedOthers?: boolean; supportedSelf?: boolean; helped?: Unit[]; weakTarget?: Unit; wasFull?: boolean } = {},
 ): string[] {
   const out: string[] = [];
   if (owner.dead && when !== 'hurt' && !(when === 'allyDown' && opts.target === owner)) return out;
   for (const ab of opts.list ?? abilitiesOf(owner)) {
     const e = ab.effect;
     if (!isTriggered(e) || e.when !== when) continue;
-    if (!testConditions(e.if, { state, rng, self: owner, card: opts.card ?? opts.condCard, multi: opts.multi, target: opts.target, dealt: opts.dealt, focusUsed: opts.focusUsed, perfect: opts.perfect, successes: opts.successes, supportedOthers: opts.supportedOthers, statusId: opts.statusId })) continue;
-    const ctx = makeCtx(state, rng, events, owner, { target: opts.target, allyTarget: opts.allyTarget, attacker: opts.attacker, card: opts.card, dealt: opts.dealt, depth: opts.depth, tierEffects: opts.tierEffects, perfect: opts.perfect, cardAbilities: opts.card?.trait ? [opts.card.trait] : undefined });
+    // お供の行動は、全部合わせて1ターンに4回まで
+    if (ab.pet && petCapped(owner)) continue;
+    if (!testConditions(e.if, { state, rng, self: owner, card: opts.card ?? opts.condCard, multi: opts.multi, target: opts.target, dealt: opts.dealt, focusUsed: opts.focusUsed, perfect: opts.perfect, successes: opts.successes, supportedOthers: opts.supportedOthers, supportedSelf: opts.supportedSelf, weakHit: !!opts.weakTarget, wasFull: opts.wasFull, statusId: opts.statusId })) continue;
+    const ctx = makeCtx(state, rng, events, owner, { target: opts.target, allyTarget: opts.allyTarget, attacker: opts.attacker, card: opts.card, dealt: opts.dealt, depth: opts.depth, tierEffects: opts.tierEffects, perfect: opts.perfect, cardAbilities: opts.card?.trait ? [opts.card.trait] : undefined, via: ab.pet ? 'pet' : undefined, weakTarget: opts.weakTarget, helped: opts.helped });
     let any = false;
     for (const eff of e.do) any = applyEffect(ctx, eff) || any;
     if (!any) continue;
@@ -305,10 +311,15 @@ export function fireAbilities(
   return out;
 }
 
+/** お供の行動の上限（1ターンに、全部合わせてこの回数まで。数えは味方のフェーズの始めに0へ戻す） */
+export const PET_ACTS_PER_TURN = 4;
+const petCapped = (owner: Unit) => ((owner as { counters?: Record<string, number> }).counters?.petActsTurn ?? 0) >= PET_ACTS_PER_TURN;
+
 /** お供が行動した後: 活躍の回数（戦績に出す）を数え、きっかけ「お供が行動した時」（相棒の鈴など）を起こす */
 function afterPetAct(state: BattleState, rng: Rng, events: BattleEvent[], owner: Unit, depth: number) {
   const c = ((owner as { counters?: Record<string, number> }).counters ??= {});
   c.petActs = (c.petActs ?? 0) + 1;
+  c.petActsTurn = (c.petActsTurn ?? 0) + 1;
   if (depth < 3) fireAbilities(state, rng, events, owner, 'petAct', { depth: depth + 1 });
 }
 
@@ -318,11 +329,11 @@ function afterPetAct(state: BattleState, rng: Rng, events: BattleEvent[], owner:
  * 何も起きなかった時（例: まだカードを使っていないターンの子狼）は undefined
  */
 export function petActOnce(state: BattleState, rng: Rng, events: BattleEvent[], owner: Unit, depth = 0): string | undefined {
-  if (owner.dead || isEnemy(owner)) return undefined;
+  if (owner.dead || isEnemy(owner) || petCapped(owner)) return undefined;
   const list = abilitiesOf(owner).filter((ab) => ab.pet && isTriggered(ab.effect));
   const ab = list.find((a) => isTriggered(a.effect) && a.effect.when !== 'battleStart') ?? list[0];
   if (!ab || !isTriggered(ab.effect)) return undefined;
-  const ctx = makeCtx(state, rng, events, owner, { target: foesOf(state, owner)[0], depth });
+  const ctx = makeCtx(state, rng, events, owner, { target: foesOf(state, owner)[0], depth, via: 'pet' });
   let any = false;
   for (const eff of ab.effect.do) any = applyEffect(ctx, eff) || any;
   if (!any) return undefined;
@@ -350,6 +361,10 @@ const TRIGGER_TEXT: Record<AbilityTrigger, string> = {
   inflict: '敵に状態異常を与えた時',
   foeTick: '敵が継続ダメージを受けた時',
   petAct: 'お供が行動した時',
+  summonHit: '自分の砲台・罠・召喚が敵にダメージを与えた後',
+  overheal: '回復がHPからあふれた時',
+  cheerPerfect: '自分が応援を付けた味方のカードが完全成功した時',
+  detonate: '状態異常を起爆して消した時',
 };
 
 const condText = (conds?: AbilityCondition[]) => (conds ?? []).map((c) => conditionHandler(c.kind).describe(c as never));
@@ -382,7 +397,7 @@ export function describeAbility(ab: AbilityDef, side: 'ally' | 'enemy' = 'ally')
     if (e.modifier === 'convertElement') return `${head}属性の無い物理攻撃が${getElement(e.into).name}属性になる`;
     if (e.modifier === 'weaknessDamage') return `${head}弱点属性のダメージ×${Math.round(e.multiplier * 100) / 100}（弱点の倍率は合わせて×${BALANCE.elementWeakMax}まで）`;
     if (e.modifier === 'statusBonus') return `${head}自分が付ける${e.statuses.map((x) => `「${getStatus(x).name}」`).join('')}+${e.amount}`;
-    if (e.modifier === 'damageDealt') return `${head}${e.add ? `1回の攻撃ごとにダメージ+${e.add}${e.multiplier !== 1 || e.scale ? '、' : ''}` : ''}${e.multiplier !== 1 ? `与えるダメージ×${e.multiplier}${e.scale ? '、さらに' : ''}` : ''}${e.scale ? scaleText(e.scale) : ''}`;
+    if (e.modifier === 'damageDealt') return `${head}${e.add ? `${e.once ? '最初の1回の攻撃の' : '1回の攻撃ごとに'}ダメージ+${e.add}${e.multiplier !== 1 || e.scale ? '、' : ''}` : ''}${e.multiplier !== 1 ? `与えるダメージ×${e.multiplier}${e.scale ? '、さらに' : ''}` : ''}${e.scale ? scaleText(e.scale) : ''}`;
     return `${head}ダメージが敵のブロックを無視する`;
   }
   const cs = condText(e.if);

@@ -94,9 +94,8 @@ function ratio(s: BattleState, cardId: string, name: string, prepare?: (c: Battl
   return on / damageModifiers(c, c.allies[0], getCard(cardId), c.enemies[0], undefined, true, element).multiplier;
 }
 
-describe('11個の装備のデータ（能力の名前・説明・印）', () => {
+describe('10個の装備のデータ（能力の名前・説明・印。区切りCで王家の杖を外した）', () => {
   const rows: { id: string; name: string; text: string; tags: string[] }[] = [
-    { id: 'pharaohStaff', name: '王の裁き', text: '魔法カード：弱点属性のダメージ×1.25（弱点の倍率は合わせて×2まで）', tags: ['magic'] },
     { id: 'constellationStaff', name: '星座を結ぶ', text: '魔法カード：対象の悪い状態異常1種類につき与えるダメージ+8%（最大+24%）', tags: ['magic'] },
     { id: 'tideStaff', name: '満ち潮', text: '', tags: [] },
     { id: 'memoryStaff', name: '追憶', text: 'コスト2以上の魔法カードが完全成功した時（1回の戦闘で1回まで）：使ったカードの効果をもう一度発動', tags: ['magic', 'highCost'] },
@@ -123,7 +122,7 @@ describe('11個の装備のデータ（能力の名前・説明・印）', () =>
   }
   it('レア度・場所・シナリオは変えていない', () => {
     const keep: [string, string, string, string][] = [
-      ['pharaohStaff', 'weapon', 'epic', 'sandDynasty'], ['constellationStaff', 'weapon', 'epic', 'starCastle'], ['tideStaff', 'weapon', 'epic', 'cursedArchipelago'], ['memoryStaff', 'weapon', 'epic', 'dreamLabyrinth'],
+      ['constellationStaff', 'weapon', 'epic', 'starCastle'], ['tideStaff', 'weapon', 'epic', 'cursedArchipelago'], ['memoryStaff', 'weapon', 'epic', 'dreamLabyrinth'],
       ['sunScepter', 'weapon', 'epic', 'sandDynasty'], ['lighthouseScepter', 'weapon', 'epic', 'cursedArchipelago'], ['starScepter', 'weapon', 'epic', 'starCastle'],
       ['gearGuardian', 'armor', 'legend', 'clockworkEmpire'], ['dawnMantle', 'armor', 'legend', 'dreamLabyrinth'], ['stardustArmor', 'armor', 'legend', 'starCastle'], ['sparkRing', 'accessory', 'epic', ''], // 区切りA: 散る火花は、どのシナリオでも出るようにした
     ];
@@ -132,27 +131,6 @@ describe('11個の装備のデータ（能力の名前・説明・印）', () =>
       expect(getItem(id).scenario ?? '', id).toBe(scenario);
       expect(['epic', 'legend'], id).toContain(getItem(id).rarity);
     }
-  });
-});
-
-describe('王家の杖《王の裁き》', () => {
-  it('魔法で弱点を突いた時だけ、ダメージが1.25倍', () => {
-    const weak = battle(['mage'], [{ weapon: 'pharaohStaff' }], { enemy: 'extraGearWeakFire' });
-    const on = dmg(weak, 'fireball').loss, off = dmg(weak, 'fireball', without('王の裁き')).loss;
-    expect(off).toBeGreaterThan(20);
-    expect(on).toBeGreaterThan(off);
-    expect(ratio(weak, 'fireball', '王の裁き', undefined, 'fire')).toBeCloseTo(1.25, 6);
-    expect(ratio(weak, 'iceLance', '王の裁き', undefined, 'ice')).toBe(1);
-    expect(ratio(weak, 'strike', '王の裁き', undefined, 'fire')).toBe(1);
-    // 弱点でない属性（氷）は増えない
-    expect(dmg(weak, 'iceLance').loss).toBe(dmg(weak, 'iceLance', without('王の裁き')).loss);
-  });
-  it('弱点の無い敵には何も起きない', () => {
-    const plain = battle(['mage'], [{ weapon: 'pharaohStaff' }]);
-    expect(dmg(plain, 'fireball').loss).toBe(dmg(plain, 'fireball', without('王の裁き')).loss);
-  });
-  it('条件は「魔法カード」', () => {
-    expect(getItem('pharaohStaff').ability!.effect).toEqual({ modifier: 'weaknessDamage', multiplier: 1.25, if: [{ kind: 'cardCategory', category: 'magic' }] });
   });
 });
 

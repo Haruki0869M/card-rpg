@@ -4,7 +4,7 @@ import type { EffectHandler } from '../types';
 
 declare module '../../../../types' {
   interface EffectParams {
-    counter: { key: string; set?: number; add?: number; max?: number; silent?: boolean; text?: string };
+    counter: { key: string; set?: number; add?: number; max?: number; silent?: boolean; text?: string; /** 今の自分のマナの数にする（弾込め。0なら何も表示しない） */ fromMana?: boolean };
   }
 }
 
@@ -13,9 +13,9 @@ export const effect: EffectHandler<'counter'> = {
   defaultTo: 'self',
   apply(ctx, e) {
     const cs = ((ctx.source as { counters?: Record<string, number> }).counters ??= {});
-    const next = e.set !== undefined ? e.set : (cs[e.key] ?? 0) + (e.add ?? 0);
+    const next = e.fromMana ? ((ctx.source as { mana?: number }).mana ?? 0) : e.set !== undefined ? e.set : (cs[e.key] ?? 0) + (e.add ?? 0);
     cs[e.key] = e.max !== undefined ? Math.min(e.max, next) : next;
-    if (e.silent) return false;
+    if (e.silent || (e.fromMana && cs[e.key] <= 0)) return false;
     if (e.text) ctx.parts.push(e.text);
     return true;
   },

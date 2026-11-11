@@ -62,7 +62,6 @@ const justOverHalf = (maxHp: number) => Math.floor(maxHp / 2) + 1;
 
 describe.each([
   ['breachingAxe', '破城の斧'],
-  ['breachingGun', '突破銃'],
 ])('%s（%s）: コスト2以上の物理カードがブロックを無視（HPの条件は無し）', (itemId) => {
   const name = abilityOf(itemId).name;
 

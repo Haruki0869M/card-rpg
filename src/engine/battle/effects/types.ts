@@ -22,6 +22,16 @@ export interface EffectCtx {
   /** カードが完全成功した（属性の状態異常は必ず付く） */
   perfect?: boolean;
   tierEffects?: Effect[];
+  /** カードではない攻撃の出どころ（pet = お供の能力 / summon = 砲台・罠・召喚。追い込み） */
+  via?: 'pet' | 'summon';
+  /** 今のカードが弱点を突いた敵（効果の対象 weakHit） */
+  weakTarget?: Unit;
+  /** 今のカードで支援が成立した味方（効果の対象 helped） */
+  helped?: Unit[];
+  /** この効果のまとまりで、弱点の属性で攻撃した敵のID */
+  weakHitIds?: string[];
+  /** 「最初の1回の攻撃にだけ足すダメージ」を、もう使った */
+  addOnceUsed?: boolean;
   /** HPに与えたダメージの合計（吸収などが読む） */
   dealt: number;
   /** 結果の短い表示（ログ・カードの結果の表示） */

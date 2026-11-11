@@ -5,6 +5,9 @@ export function attackElement(source: Unit, card?: CardDef, element?: string): s
   return element ?? (!isEnemy(source) && card?.category === 'physical' ? source.imbuedElement ?? source.weaponElement : undefined);
 }
 
+/** カードが持つ属性（どの段のダメージ効果でも。属性の無いカードは空） */
+export const cardElements = (card?: CardDef): string[] => [...new Set((card?.tiers ?? []).flatMap((t) => t.effects.flatMap((e) => (e.kind === 'damage' && e.element ? [e.element] : []))))];
+
 export function chargedMultiplier(source: Unit, card?: CardDef): number {
   if (isEnemy(source) || !card || card.category !== source.attackCharge?.category) return 1;
   return source.attackCharge.multiplier;

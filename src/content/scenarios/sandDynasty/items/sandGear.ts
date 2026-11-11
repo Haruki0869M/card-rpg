@@ -11,12 +11,6 @@ export const sandGear: ItemDef[] = [
     ability: {"name":"砂嵐","description":"1ターンに物理カードを3枚使うと、敵全員に「脆弱」1。1ターンに1回。","effect":{"when":"afterCard","if":[{"kind":"cardCategory","category":"physical"},{"kind":"playedCategoryCount","category":"physical","min":2},{"kind":"oncePerTurn","key":"sandstormBlade"}],"do":[{"kind":"applyStatus","status":"vulnerable","amount":1,"to":"foes"}]}},
   },
   {
-    id: 'pharaohStaff', name: '王家の杖', slot: 'weapon', weaponType: 'staff', rarity: 'epic', icon: 'staff', scenario: 'sandDynasty',
-    description: '魔法で敵の弱点を突くと、ダメージがさらに1.25倍になる。弱点の無い敵には何も起きない。', stats: { int: 8, per: 2 }, tags: ['magic'],
-    cards: [{ cardId: 'wLightning', count: 2 }],
-    ability: { name: '王の裁き', effect: { modifier: 'weaknessDamage', multiplier: 1.25, if: [{ kind: 'cardCategory', category: 'magic' }] } },
-  },
-  {
     id: "scorpionSting", name: "蠍の針", slot: "weapon", weaponType: "dagger", rarity: "rare", icon: "dagger", scenario: "sandDynasty",
     description: "まだ毒が付いていない敵に毒を付ける時、毒+2。", stats: {"dex":4,"agi":3}, tags: ["physical","poison"],
     cards: [{"cardId":"wtDaggerVenom","count":2}],

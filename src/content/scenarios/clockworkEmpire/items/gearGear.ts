@@ -5,12 +5,6 @@ import type { ItemDef } from '../../../../types';
 export const gearGearItems: ItemDef[] = [
   // ----- 武器 -----
   {
-    id: 'teslaStaff', name: '放電の杖', slot: 'weapon', weaponType: 'staff', rarity: 'epic', icon: 'staff', scenario: 'clockworkEmpire',
-    description: '魔法の完全成功でランダムな敵1体に雷属性の追撃4。1ターンに1回。', stats: { int: 8, dex: 2 }, tags: ['magic', 'thunder'],
-    cards: [{ cardId: 'wLightning', count: 2 }],
-    ability: { name: '放電', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'magic' }, { kind: 'dealtDamage' }, { kind: 'oncePerTurn', key: 'teslaStaff' }], do: [{ kind: 'damage', amount: 4, element: 'thunder', to: 'randomFoe' }] } },
-  },
-  {
     id: 'sageScepter', name: '賢者の錫杖', slot: 'weapon', weaponType: 'scepter', rarity: 'legend', icon: 'scepter', scenario: 'clockworkEmpire',
     description: '毎ターン、コスト3以上のカード1枚のコストが1下がる。時を刻む杖。', stats: { int: 8, vit: 4 }, tags: ['holy', 'highCost'],
     cards: [{ cardId: 'wtScepterJudgment', count: 2 }],
