@@ -171,6 +171,8 @@
 
 ## 3. フェーズ2（決め技18枚と、6つの新しい軸のカード）
 
+> **1枚ずつの案は `docs/tasks/lineup-phase2-cards.md`（2026-11-11。決め技18枚＋軸のカード92枚の全部の表）。** Gemini のレビューとオーナーの OK の後で作る。
+
 ### 2-A 決め技（レジェンド・1戦闘に1回）18枚
 
 変えるファイル: 新しい `src/content/common/cards/finisherCards.ts`（カードの定義）、18職の `src/content/common/classes/<ジョブ>.ts`（`jobCards` に足す。転職の時に山札へ入る今の仕組みをそのまま使う）、新しい部品。
