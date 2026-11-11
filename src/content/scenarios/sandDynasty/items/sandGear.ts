@@ -5,10 +5,10 @@ import type { ItemDef } from '../../../../types';
 export const sandGear: ItemDef[] = [
   // ----- 武器 -----
   {
-    id: 'sandstormBlade', name: '砂嵐の曲刀', slot: 'weapon', weaponType: 'sword', rarity: 'epic', icon: 'sword', scenario: 'sandDynasty',
-    description: '完全成功で、対象に毒2。1ターンに1回。蠍の毒を刃に宿す。', stats: { str: 6, dex: 4 }, tags: ['physical', 'poison'],
-    cards: [{ cardId: 'wMithrilSlash', count: 2 }],
-    ability: { name: '蠍の毒', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'physical' }, { kind: 'dealtDamage' }, { kind: 'oncePerTurn', key: 'sandstormBlade' }], do: [{ kind: 'applyStatus', status: 'poison', amount: 2 }] } },
+    id: "sandstormBlade", name: "砂嵐の曲刀", slot: "weapon", weaponType: "sword", rarity: "epic", icon: "sword", scenario: "sandDynasty",
+    description: "1ターンに物理カードを3枚使うと、敵全員に「脆弱」1。1ターンに1回。", stats: {"str":6,"dex":4}, tags: ["physical","combo","vulnerable"],
+    cards: [{"cardId":"wMithrilSlash","count":2}],
+    ability: {"name":"砂嵐","description":"1ターンに物理カードを3枚使うと、敵全員に「脆弱」1。1ターンに1回。","effect":{"when":"afterCard","if":[{"kind":"cardCategory","category":"physical"},{"kind":"playedCategoryCount","category":"physical","min":2},{"kind":"oncePerTurn","key":"sandstormBlade"}],"do":[{"kind":"applyStatus","status":"vulnerable","amount":1,"to":"foes"}]}},
   },
   {
     id: 'pharaohStaff', name: '王家の杖', slot: 'weapon', weaponType: 'staff', rarity: 'epic', icon: 'staff', scenario: 'sandDynasty',
@@ -17,14 +17,10 @@ export const sandGear: ItemDef[] = [
     ability: { name: '王の裁き', effect: { modifier: 'weaknessDamage', multiplier: 1.25, if: [{ kind: 'cardCategory', category: 'magic' }] } },
   },
   {
-    id: 'scorpionSting', name: '蠍の針', slot: 'weapon', weaponType: 'dagger', rarity: 'rare', icon: 'dagger', scenario: 'sandDynasty',
-    description: '蠍の尾の針で作った短剣。素早い者に馴染む。', stats: { dex: 4, agi: 3 }, tags: ['physical', 'poison'],
-    cards: [{ cardId: 'wtDaggerVenom', count: 2 }],
-  },
-  {
-    id: 'desertBow', name: '砂漠の弓', slot: 'weapon', weaponType: 'bow', rarity: 'rare', icon: 'bow', scenario: 'sandDynasty',
-    description: '乾いた風の中でも、まっすぐ飛ぶ弓。火の矢を放つ技が付く。', stats: { dex: 4, per: 4 }, tags: ['physical', 'fire'],
-    cards: [{ cardId: 'wtBowFire', count: 2 }],
+    id: "scorpionSting", name: "蠍の針", slot: "weapon", weaponType: "dagger", rarity: "rare", icon: "dagger", scenario: "sandDynasty",
+    description: "まだ毒が付いていない敵に毒を付ける時、毒+2。", stats: {"dex":4,"agi":3}, tags: ["physical","poison"],
+    cards: [{"cardId":"wtDaggerVenom","count":2}],
+    ability: {"name":"蠍毒","description":"まだ毒が付いていない敵に毒を付ける時、毒+2。","effect":{"modifier":"statusBonus","statuses":["poison"],"amount":2,"if":[{"kind":"targetNoStatus","status":"poison"}]}},
   },
   {
     id: 'sunScepter', name: '太陽の錫杖', slot: 'weapon', weaponType: 'scepter', rarity: 'legend', icon: 'scepter', scenario: 'sandDynasty',

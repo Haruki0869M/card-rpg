@@ -15,6 +15,8 @@ export const statuses: StatusDef[] = [
   // 良い効果（万能薬では消えない）
   { id: 'regen', name: '再生', icon: 'heartPulse', color: '#6ad8ff', bg: '#0a2e4a', harmful: false, tickHeal: 'stacks' },
   // 応援: 次に使うカードの成功率+10%（1つにつき。カードを使うと消える。セキセイインコ）
+  // 構え: 竜王の槍。敵の番を無傷でしのぐたび1（最大3）。1つにつき物理ダメージ+15%。HPが減ると全部消える
+  { id: 'stance', name: '構え', icon: 'shield', color: '#ffd9a0', bg: '#4a2e0a', harmful: false, decay: 0, maxStacks: 3, loseOnHpLoss: true, description: '1つにつき、与える物理ダメージ+15%（最大3）。HPが減ると全部消える' },
   { id: 'inspired', name: '応援', icon: 'sparkles', color: '#9affc8', bg: '#0a3a24', harmful: false, decay: 0, maxStacks: 3, chanceBonus: 10, description: '次に使うカードの成功率+10%（1つにつき。カードを使うと消える）' },
   // 聖騎士の聖光: 次の聖属性の攻撃が1つにつき+15%（その攻撃で消える。減らない・最大5）
   { id: 'holyLight', name: '聖光', icon: 'sun', color: '#fff2a0', bg: '#4a3e0a', harmful: false, decay: 0, maxStacks: 5, boostElement: { element: 'holy', per: 0.15 } },

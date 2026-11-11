@@ -28,6 +28,8 @@ export interface EffectCtx {
   parts: string[];
   /** 効果を受けた相手のID（敵の行動の演出用） */
   hitIds: string[];
+  /** 「×N回」の攻撃の数え（total = 当てた回数 / landed = HPに当たった回数。二の矢） */
+  multi?: { total: number; landed: number };
   /** 働いた常時型の能力の名前（重複なし。演出用） */
   fired: AbilityNotice[];
   /** 能力の連鎖の深さ（無限に続かないように） */

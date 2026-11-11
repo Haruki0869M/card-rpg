@@ -11,7 +11,7 @@ import { getStatus } from '../../../data/statuses';
 import { absorb, calcDamage } from '../damage';
 import { addStatus } from '../statuses';
 import { attackElement } from '../cardState';
-import { abilityTriggered, addLog, afterHpLoss, findAlly, foesOf, healUnit, isEnemy, nameOf, sideOf, type Unit, unitIdOf } from '../units';
+import { abilityTriggered, addLog, afterHpLoss, findAlly, foesOf, healUnit, isEnemy, nameOf, noteHpLoss, sideOf, type Unit, unitIdOf } from '../units';
 import { recordActivation, type EffectCtx, type EffectHandler } from './types';
 
 export type { EffectCtx, EffectHandler } from './types';
@@ -223,7 +223,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   // 属性を強める状態異常（聖光など）: この一撃で使い切る
   const boost = element ? elementBoost(source, element) : 1;
   base = Math.round(base * boost);
-  let dmg = calcDamage(base, source.statuses, v.statuses, extraMultiplier * mods.multiplier * elementMultiplier(v, element) * comboMultiplier(source, v));
+  let dmg = calcDamage(base + mods.add, source.statuses, v.statuses, extraMultiplier * mods.multiplier * elementMultiplier(v, element) * comboMultiplier(source, v));
   // かばう: 相手の攻撃でこのままだとHP0になる場合、同じ側の他の仲間が確率で代わりに受ける
   if (isEnemy(source) !== isEnemy(v) && dmg - (mods.ignoreBlock ? 0 : v.block) >= v.hp) {
     for (const other of sideOf(state, v)) {
@@ -235,7 +235,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
         addLog(state, `${nameOf(other)}の「${cov.name}」！ ${nameOf(v)}をかばった`);
         v = other;
         mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities, ctx.perfect, element);
-        dmg = calcDamage(base, source.statuses, v.statuses, extraMultiplier * mods.multiplier * elementMultiplier(v, element) * comboMultiplier(source, v));
+        dmg = calcDamage(base + mods.add, source.statuses, v.statuses, extraMultiplier * mods.multiplier * elementMultiplier(v, element) * comboMultiplier(source, v));
         break;
       }
     }
@@ -274,6 +274,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   const r = absorb(dmg, mods.ignoreBlock ? 0 : v.block, v.hp);
   if (!mods.ignoreBlock) v.block = r.block;
   v.hp = r.hp;
+  if (r.hpLoss > 0) noteHpLoss(v);
   events.push({ type: 'damage', unitId: unitIdOf(v), amount: r.hpLoss, rawAmount: dmg, blocked: r.blocked, sourceId: unitIdOf(source) });
   if (isEnemy(v)) state.stats.totalDamage += r.hpLoss;
   ctx.dealt += r.hpLoss;
@@ -316,7 +317,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
     if (r.hpLoss > 0 && !v.dead) fireAbilities(state, rng, events, v, 'hurt', { attacker: source, depth: ctx.depth + 1 });
     // きっかけ: 相手の攻撃を、ブロックで完全に防いだ
     if (r.hpLoss === 0 && r.blocked > 0 && !v.dead && isEnemy(source) !== isEnemy(v)) fireAbilities(state, rng, events, v, 'blocked', { attacker: source, depth: ctx.depth + 1 });
-    if (v.dead && isEnemy(source) !== isEnemy(v) && !source.dead) fireAbilities(state, rng, events, source, 'kill', { target: v, depth: ctx.depth + 1 });
+    if (v.dead && isEnemy(source) !== isEnemy(v) && !source.dead) fireAbilities(state, rng, events, source, 'kill', { target: v, condCard: ctx.card, depth: ctx.depth + 1 });
     if (v.dead && isEnemy(v) && !isEnemy(source)) for (const a of state.allies) if (!a.dead) fireAbilities(state, rng, events, a, 'allyKill', { target: v, depth: ctx.depth + 1 });
   }
   return r.hpLoss;

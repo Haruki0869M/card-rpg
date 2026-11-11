@@ -429,8 +429,8 @@ describe('レア以下の「中身が同じ」装備に付けた差', () => {
     expect(same).toEqual([]);
   });
 
-  it('槍・弓・短剣: 付く技がそれぞれ違い、付く技は実在する', () => {
-    for (const group of [['harpoon', 'lullabySpear', 'angelSpear', 'gearSpear'], ['blizzardBow', 'desertBow', 'clockworkBow'], ['mermaidDagger', 'pillowDagger', 'whiteWolfFang', 'moonDagger', 'scorpionSting']]) {
+  it('槍・弓・短剣: 付く技は実在する（区切りBで、シナリオの武器は 銛・吹雪の弓・蠍の針 の3本に絞った）', () => {
+    for (const group of [['harpoon'], ['blizzardBow'], ['scorpionSting']]) {
       const cards = group.map((id) => cardsOf(id).join('+'));
       expect(new Set(cards).size, group.join('/')).toBe(group.length);
       for (const id of group) for (const c of cardsOf(id)) expect(getCard(c).name.length).toBeGreaterThan(0);
@@ -439,7 +439,7 @@ describe('レア以下の「中身が同じ」装備に付けた差', () => {
 
   it('能力値の合計は、直す前と同じ（強さは変えず、向きだけ変えた）', () => {
     const totals: Record<string, number> = {
-      harpoon: 8, lullabySpear: 8, angelSpear: 8, blizzardBow: 8, desertBow: 8, mermaidDagger: 7, pillowDagger: 7, whiteWolfFang: 7, moonDagger: 7,
+      harpoon: 8, blizzardBow: 8,
       // 区切りA: 技師のゴーグル・夢の捕まえ網・古い星図・古い羅針盤は能力値を外して、役割のある効果に変えた（lineupStageA.test.ts）
     };
     for (const [id, n] of Object.entries(totals)) expect(sum(id), id).toBe(n);

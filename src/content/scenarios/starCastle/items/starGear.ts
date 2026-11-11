@@ -5,26 +5,10 @@ import type { ItemDef } from '../../../../types';
 export const starGear: ItemDef[] = [
   // ----- 武器 -----
   {
-    id: 'meteorAxe', name: '流星の斧', slot: 'weapon', weaponType: 'axe', rarity: 'epic', icon: 'axe', scenario: 'starCastle',
-    description: '完全成功でランダムな敵1体に聖属性の追撃4。1ターンに1回。', stats: { str: 8, luk: 2 }, tags: ['physical', 'holy'],
-    cards: [{ cardId: 'wtAxeBloodlust', count: 2 }],
-    ability: { name: '流星の一撃', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'physical' }, { kind: 'dealtDamage' }, { kind: 'oncePerTurn', key: 'meteorAxe' }], do: [{ kind: 'damage', amount: 4, element: 'holy', to: 'randomFoe' }] } },
-  },
-  {
     id: 'constellationStaff', name: '星座の杖', slot: 'weapon', weaponType: 'staff', rarity: 'epic', icon: 'staff', scenario: 'starCastle',
     description: '相手に付いている悪い状態異常が多いほど、魔法のダメージが増える。1種類につき+8%（最大+24%）。', stats: { int: 8, per: 2 }, tags: ['magic'],
     cards: [{ cardId: 'wLightning', count: 2 }],
     ability: { name: '星座を結ぶ', effect: { modifier: 'damageDealt', multiplier: 1, scale: { by: 'targetStatuses', per: 0.08, max: 0.24 }, if: [{ kind: 'cardCategory', category: 'magic' }] } },
-  },
-  {
-    id: 'angelSpear', name: '天使の槍', slot: 'weapon', weaponType: 'spear', rarity: 'rare', icon: 'spear', scenario: 'starCastle',
-    description: '白い羽根のついた槍。力と体力が上がる。槍を構えて身を守る技が付く。', stats: { str: 4, vit: 4 }, tags: ['physical', 'holy'],
-    cards: [{ cardId: 'wtSpearWall', count: 2 }],
-  },
-  {
-    id: 'moonDagger', name: '三日月の短剣', slot: 'weapon', weaponType: 'dagger', rarity: 'rare', icon: 'dagger', scenario: 'starCastle',
-    description: '三日月の形をした短剣。素早い者に馴染む。マナを使わない軽い技が付く。', stats: { dex: 3, agi: 4 }, tags: ['physical', 'free'],
-    cards: [{ cardId: 'wtDaggerBackhand', count: 2 }],
   },
   {
     id: 'starScepter', name: '星環の錫杖', slot: 'weapon', weaponType: 'scepter', rarity: 'legend', icon: 'scepter', scenario: 'starCastle',

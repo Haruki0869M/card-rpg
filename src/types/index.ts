@@ -119,12 +119,12 @@ export type AbilityCondition = { [K in keyof ConditionParams]: { kind: K } & Con
  */
 export type AbilityEffect =
   | { when: AbilityTrigger; if?: AbilityCondition[]; do: Effect[] }
-  | { modifier: 'damageDealt'; multiplier: number; if?: AbilityCondition[]; scale?: DamageScale }
+  | { modifier: 'damageDealt'; multiplier: number; /** 1回の攻撃ごとに足すダメージ（倍率を掛ける前） */ add?: number; if?: AbilityCondition[]; scale?: DamageScale }
   | { modifier: 'ignoreBlock'; if?: AbilityCondition[] }
   | { modifier: 'coverLethal'; chance: number }
   /** カードの成功率+bonus（狙い撃ちなど） */
   | { modifier: 'cardChance'; bonus: number; if?: AbilityCondition[] }
-  | { modifier: 'completeSlots'; if?: AbilityCondition[] }
+  | { modifier: 'completeSlots'; /** 1ターンに1枚だけ（この名前で数える） */ turnKey?: string; if?: AbilityCondition[] }
   | { modifier: 'exhaust'; if?: AbilityCondition[] }
   | { modifier: 'slotPreview'; uses: number; if?: AbilityCondition[] }
   /** カードのコストを変える（set = その値にする / delta = 足す。0より下にはならない）。turnKey があると1ターンに1枚だけ（使った時に数える） */
@@ -416,6 +416,8 @@ export interface EncounterSpec {
   enemies: { defId: string; level?: number }[];
   /** ボスの部屋の戦闘（ボスには効き方が変わる効果が見る） */
   boss?: boolean;
+  /** 中ボスの部屋の戦闘 */
+  midboss?: boolean;
 }
 
 // ---------- 戦闘の状態 ----------
@@ -460,6 +462,8 @@ export interface StatusDef {
   boostElement?: { element: string; per: number };
   /** 味方: 次に使うカードの成功率 +数×この値。カードを使うと消える（応援など） */
   chanceBonus?: number;
+  /** 味方: HPが減ると全部消える（竜王の槍の「構え」） */
+  loseOnHpLoss?: boolean;
   /** 残りターン数によらず一定の成功率を加える。カード使用では消費しない。 */
   flatChanceBonus?: number;
   /** 説明文（省略すると数値から自動で作る） */
@@ -617,6 +621,8 @@ export interface BattleState {
   bonusGold?: number;
   /** ボスの部屋の戦闘 */
   boss?: boolean;
+  /** 中ボスの部屋の戦闘（大物狩り） */
+  midboss?: boolean;
 }
 
 /** 呼び出したお供（turns = 残りのターン数。0になったら帰る） */

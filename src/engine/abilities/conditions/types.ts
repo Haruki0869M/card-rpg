@@ -21,6 +21,8 @@ export interface CondCtx {
   /** きっかけになった状態異常（状態異常を与えた時・敵が継続ダメージを受けた時） */
   statusId?: string;
   supportedOthers?: boolean;
+  /** 今のカードの「×N回」の攻撃（total = 当てた回数 / landed = HPに当たった回数） */
+  multi?: { total: number; landed: number };
 }
 
 /** 条件の種類1つ分。src/engine/abilities/conditions/ に1ファイル1種類で置く（export const condition = ...） */

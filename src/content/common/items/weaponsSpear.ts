@@ -1,80 +1,33 @@
-// 槍：各レア度に火力・属性・状態異常・特殊を1本ずつ。
+// 槍（守って返す）。区切りB（2026-11-11）で6本に絞った。1本ごとに、ほかに無い役割を持つ。
 import type { ItemDef } from '../../../types';
 
 export const weaponsSpear: ItemDef[] = [
   // レア
   {
     id: "temperedSpear", name: "鍛鋼の槍", slot: "weapon", weaponType: "spear", rarity: "rare", icon: "spear",
-    description: "よく鍛えた穂先が、突きの威力を高める。", stats: {"str": 5}, tags: ["physical"],
-    cards: [{"cardId": "wtSpearHook", "count": 2}],
-  },
-  {
-    id: "dawnSpear", name: "朝光の槍", slot: "weapon", weaponType: "spear", rarity: "rare", icon: "spear",
-    description: "物理攻撃でHPを削った完全成功時、ランダムな敵に聖の追撃2。毎ターン1回。", stats: {"str": 2, "int": 2}, tags: ["physical", "holy"],
-    cards: [{"cardId": "wtSpearHook", "count": 2}],
-    ability: {"name": "朝光", "effect": {"when": "perfect", "if": [{"kind": "cardCategory", "category": "physical"}, {"kind": "dealtDamage"}, {"kind": "oncePerTurn", "key": "dawnSpear"}], "do": [{"kind": "damage", "element": "holy", "amount": 2, "to": "randomFoe"}]}},
-  },
-  {
-    id: "venomtipSpear", name: "毒穂の槍", slot: "weapon", weaponType: "spear", rarity: "rare", icon: "spear",
-    description: "物理攻撃でHPを削った完全成功時、対象に毒2。毎ターン1回。", stats: {"str": 2, "dex": 2}, tags: ["physical", "poison"],
-    cards: [{"cardId": "wtSpearHook", "count": 2}],
-    ability: {"name": "毒穂", "effect": {"when": "perfect", "if": [{"kind": "cardCategory", "category": "physical"}, {"kind": "dealtDamage"}, {"kind": "oncePerTurn", "key": "venomtipSpear"}], "do": [{"kind": "applyStatus", "status": "poison", "amount": 2}]}},
+    description: "物理カードでダメージを与えた後、ブロック3。1ターンに1回。", stats: {"str":5}, tags: ["physical","block"],
+    cards: [{"cardId":"wtSpearHook","count":2}],
+    ability: {"name":"槍構え","description":"物理カードでダメージを与えた後、ブロック3。1ターンに1回。","effect":{"when":"afterCard","if":[{"kind":"cardCategory","category":"physical"},{"kind":"dealtDamage"},{"kind":"oncePerTurn","key":"temperedSpear"}],"do":[{"kind":"block","amount":3,"to":"self"}]}},
   },
   {
     id: "balancedSpear", name: "均衡の槍", slot: "weapon", weaponType: "spear", rarity: "rare", icon: "spear",
-    description: "2枠以上の物理カードの成功率+3%。", stats: {"str": 2, "dex": 2}, tags: ["physical", "multi"],
-    cards: [{"cardId": "wtSpearHook", "count": 2}],
-    ability: {"name": "ぶれない柄", "effect": {"modifier": "cardChance", "bonus": 3, "if": [{"kind": "cardCategory", "category": "physical"}, {"kind": "cardSlots", "min": 2}]}},
+    description: "敵の番にHPが減らなかったら、次のターン最初の物理カードのダメージ×1.25。", stats: {"str":2,"dex":2}, tags: ["physical","block"],
+    cards: [{"cardId":"wtSpearHook","count":2}],
+    ability: {"name":"返しの穂先","description":"敵の番にHPが減らなかったら、次のターン最初の物理カードのダメージ×1.25。","effect":{"modifier":"damageDealt","multiplier":1.25,"if":[{"kind":"cardCategory","category":"physical"},{"kind":"playedCategoryCount","category":"physical","max":0},{"kind":"counterAtLeast","key":"unhurtTurn","n":1,"label":"敵の番にHPが減らなかった次のターン"}]}},
   },
   // エピック
-  {
-    id: "duelistsSpear", name: "一騎の槍", slot: "weapon", weaponType: "spear", rarity: "epic", icon: "spear",
-    description: "敵が1体でHPが半分以上なら、物理ダメージが1.2倍。", stats: {"str": 8}, tags: ["physical"],
-    cards: [{"cardId": "wtSpearPierce", "count": 2}],
-    ability: {"name": "一騎", "effect": {"modifier": "damageDealt", "multiplier": 1.2, "if": [{"kind": "cardCategory", "category": "physical"}, {"kind": "foeCount", "max": 1}, {"kind": "selfHpAtLeast", "pct": 50}]}},
-  },
-  {
-    id: "sunriseSpear", name: "日輪の槍", slot: "weapon", weaponType: "spear", rarity: "epic", icon: "spear",
-    description: "HPが半分以上なら、無属性の物理攻撃が聖属性になる。", stats: {"str": 4, "int": 4}, tags: ["physical", "holy"],
-    cards: [{"cardId": "wtSpearPierce", "count": 2}],
-    ability: {"name": "日輪の穂先", "effect": {"modifier": "convertElement", "into": "holy", "if": [{"kind": "selfHpAtLeast", "pct": 50}]}},
-  },
-  {
-    id: "witheringSpear", name: "枯葉の槍", slot: "weapon", weaponType: "spear", rarity: "epic", icon: "spear",
-    description: "物理攻撃でHPを削った完全成功時、対象に脱力1。毎ターン1回。", stats: {"str": 4, "per": 4}, tags: ["physical", "weak"],
-    cards: [{"cardId": "wtSpearPierce", "count": 2}],
-    ability: {"name": "力削ぎ", "effect": {"when": "perfect", "if": [{"kind": "cardCategory", "category": "physical"}, {"kind": "dealtDamage"}, {"kind": "oncePerTurn", "key": "witheringSpear"}], "do": [{"kind": "applyStatus", "status": "weak", "amount": 1}]}},
-  },
-  {
-    id: "calmSpear", name: "静心の槍", slot: "weapon", weaponType: "spear", rarity: "epic", icon: "spear",
-    description: "物理攻撃でHPを削った完全成功時、フォーカス1を得る。毎ターン1回。", stats: {"str": 4, "agi": 4}, tags: ["physical", "focus"],
-    cards: [{"cardId": "wtSpearPierce", "count": 2}],
-    ability: {"name": "静心", "effect": {"when": "perfect", "if": [{"kind": "cardCategory", "category": "physical"}, {"kind": "dealtDamage"}, {"kind": "oncePerTurn", "key": "calmSpear"}], "do": [{"kind": "gainFocus", "amount": 1}]}},
-  },
   // レジェンド
   // 既存にレジェンド用カードがないため、エピックの武器種カードを共有する。
   {
     id: "dragonlordSpear", name: "竜王の槍", slot: "weapon", weaponType: "spear", rarity: "legend", icon: "spear",
-    description: "HP75%以上なら、コスト2以上の物理ダメージが1.25倍。", stats: {"str": 12}, tags: ["physical", "heavy"],
-    cards: [{"cardId": "wtSpearDragon", "count": 2}],
-    ability: {"name": "竜王の構え", "effect": {"modifier": "damageDealt", "multiplier": 1.25, "if": [{"kind": "cardCategory", "category": "physical"}, {"kind": "selfHpAtLeast", "pct": 75}, {"kind": "cardCost", "min": 2}]}},
+    description: "敵の番を無傷でしのぐたび「構え」1（最大3）。構え1つにつき、与える物理ダメージ+15%。HPが減ると構えは全部消える。", stats: {"str":12}, tags: ["physical","block"],
+    cards: [{"cardId":"wtSpearDragon","count":2}],
+    ability: {"name":"竜王の構え","description":"敵の番を無傷でしのぐたび「構え」1（最大3）。構え1つにつき、与える物理ダメージ+15%。HPが減ると構えは全部消える。","effect":{"when":"turnStart","if":[{"kind":"counterAtLeast","key":"unhurtTurn","n":1,"label":"敵の番にHPが減らなかった次のターン"}],"do":[{"kind":"applyStatus","status":"stance","amount":1,"to":"self"}]},"also":[{"modifier":"damageDealt","multiplier":1,"scale":{"by":"selfStatus","status":"stance","per":0.15,"max":0.45},"if":[{"kind":"cardCategory","category":"physical"}]}]},
   },
   {
-    id: "blazingSpear", name: "炎天の槍", slot: "weapon", weaponType: "spear", rarity: "legend", icon: "spear",
-    description: "物理攻撃でHPを削った完全成功時、ランダムな敵に火の追撃4。毎ターン1回。", stats: {"str": 8, "int": 4}, tags: ["physical", "fire"],
-    cards: [{"cardId": "wtSpearDragon", "count": 2}],
-    ability: {"name": "炎天", "effect": {"when": "perfect", "if": [{"kind": "cardCategory", "category": "physical"}, {"kind": "dealtDamage"}, {"kind": "oncePerTurn", "key": "blazingSpear"}], "do": [{"kind": "damage", "element": "fire", "amount": 4, "to": "randomFoe"}]}},
-  },
-  {
-    id: "plagueSpear", name: "疫毒の槍", slot: "weapon", weaponType: "spear", rarity: "legend", icon: "spear",
-    description: "物理攻撃でHPを削った完全成功時、対象に毒4。毎ターン1回。", stats: {"str": 10, "dex": 2}, tags: ["physical", "poison"],
-    cards: [{"cardId": "wtSpearDragon", "count": 2}],
-    ability: {"name": "疫毒", "effect": {"when": "perfect", "if": [{"kind": "cardCategory", "category": "physical"}, {"kind": "dealtDamage"}, {"kind": "oncePerTurn", "key": "plagueSpear"}], "do": [{"kind": "applyStatus", "status": "poison", "amount": 4}]}},
-  },
-  {
-    id: "sentinelSpear", name: "不動の槍", slot: "weapon", weaponType: "spear", rarity: "legend", icon: "spear",
-    description: "物理攻撃でHPを削った完全成功時、ブロック4とフォーカス1を得る。毎ターン1回。", stats: {"str": 10, "vit": 2}, tags: ["physical", "block", "focus"],
-    cards: [{"cardId": "wtSpearDragon", "count": 2}],
-    ability: {"name": "不動", "effect": {"when": "perfect", "if": [{"kind": "cardCategory", "category": "physical"}, {"kind": "dealtDamage"}, {"kind": "oncePerTurn", "key": "sentinelSpear"}], "do": [{"kind": "block", "amount": 4, "to": "self"}, {"kind": "gainFocus", "amount": 1}]}},
+    id: "sentinelSpear", name: "不動の槍", slot: "weapon", weaponType: "spear", rarity: "epic", icon: "spear",
+    description: "攻撃カードの後、ブロック4（1ターンに1回）。敵の番にHPが減らなかったら、次のターン最初の物理カードのダメージ×1.3。", stats: {"str":4,"vit":4}, tags: ["physical","block"],
+    cards: [{"cardId":"wtSpearPierce","count":2}],
+    ability: {"name":"不動","description":"攻撃カードの後、ブロック4（1ターンに1回）。敵の番にHPが減らなかったら、次のターン最初の物理カードのダメージ×1.3。","effect":{"when":"afterCard","if":[{"kind":"cardHasDamage"},{"kind":"oncePerTurn","key":"sentinelSpear"}],"do":[{"kind":"block","amount":4,"to":"self"}]},"also":[{"modifier":"damageDealt","multiplier":1.3,"if":[{"kind":"cardCategory","category":"physical"},{"kind":"playedCategoryCount","category":"physical","max":0},{"kind":"counterAtLeast","key":"unhurtTurn","n":1,"label":"敵の番にHPが減らなかった次のターン"}]}]},
   },
 ];

@@ -614,7 +614,7 @@ export function startBattleWith(game: GameState, enemies: EncounterSpec['enemies
   game.battle = createBattle({
     seed: rng.int(1_000_000_000),
     party,
-    encounter: { id: game.battleInfo?.wandererId ?? game.dungeon?.currentRoomId ?? 'battle', name: getRoomType(roomType).name, enemies, ...(getRoomType(roomType).battle?.boss ? { boss: true } : {}) },
+    encounter: { id: game.battleInfo?.wandererId ?? game.dungeon?.currentRoomId ?? 'battle', name: getRoomType(roomType).name, enemies, ...(getRoomType(roomType).battle?.boss ? { boss: true } : {}), ...(getRoomType(roomType).battle?.pool === 'midboss' ? { midboss: true } : {}) },
     enemyHpMul: diff.enemyHp,
     enemyAttackMul: (diff.enemyAttack ?? 1) * partyAttackMul(game, party.length),
     surprise: opts.surprise,

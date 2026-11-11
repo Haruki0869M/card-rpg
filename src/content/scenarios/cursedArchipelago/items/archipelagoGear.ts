@@ -5,26 +5,16 @@ import type { ItemDef } from '../../../../types';
 export const archipelagoGear: ItemDef[] = [
   // ----- 武器 -----
   {
-    id: 'tempestAxe', name: '嵐呼びの斧', slot: 'weapon', weaponType: 'axe', rarity: 'epic', icon: 'axe', scenario: 'cursedArchipelago',
-    description: '完全成功でランダムな敵1体に雷属性の追撃4。1ターンに1回。', stats: { str: 8, agi: 2 }, tags: ['physical', 'thunder'],
-    cards: [{ cardId: 'wtAxeBloodlust', count: 2 }],
-    ability: { name: '嵐の一撃', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'physical' }, { kind: 'dealtDamage' }, { kind: 'oncePerTurn', key: 'tempestAxe' }], do: [{ kind: 'damage', amount: 4, element: 'thunder', to: 'randomFoe' }] } },
-  },
-  {
     id: 'tideStaff', name: '潮騒の杖', slot: 'weapon', weaponType: 'staff', rarity: 'epic', icon: 'staff', scenario: 'cursedArchipelago',
     description: '自分のブロックが8以上ある間、魔法のダメージが1.25倍になる。守りを固めてから撃つ。', stats: { int: 8, vit: 2 }, tags: ['magic', 'block'],
     cards: [{ cardId: 'wLightning', count: 2 }],
     ability: { name: '満ち潮', effect: { modifier: 'damageDealt', multiplier: 1.25, if: [{ kind: 'cardCategory', category: 'magic' }, { kind: 'selfBlockAtLeast', n: 8 }] } },
   },
   {
-    id: 'harpoon', name: '大物狩りの銛', slot: 'weapon', weaponType: 'spear', rarity: 'rare', icon: 'spear', scenario: 'cursedArchipelago',
-    description: '大きな魚も一突き。力のある者に馴染む。二度続けて突く技が付く。', stats: { str: 6, dex: 2 }, tags: ['physical'],
-    cards: [{ cardId: 'wtSpearDouble', count: 2 }],
-  },
-  {
-    id: 'mermaidDagger', name: '人魚の短剣', slot: 'weapon', weaponType: 'dagger', rarity: 'rare', icon: 'dagger', scenario: 'cursedArchipelago',
-    description: '真珠色の刃を持つ短剣。紙一重で身をかわす技が付く。', stats: { dex: 4, agi: 3 }, tags: ['physical'],
-    cards: [{ cardId: 'wtDaggerDodge', count: 2 }],
+    id: "harpoon", name: "大物狩りの銛", slot: "weapon", weaponType: "spear", rarity: "rare", icon: "spear", scenario: "cursedArchipelago",
+    description: "ボス・中ボスとの戦闘の間、物理カードの成功率+10%。", stats: {"str":6,"dex":2}, tags: ["physical"],
+    cards: [{"cardId":"wtSpearDouble","count":2}],
+    ability: {"name":"大物狩り","description":"ボス・中ボスとの戦闘の間、物理カードの成功率+10%。","effect":{"modifier":"cardChance","bonus":10,"if":[{"kind":"cardCategory","category":"physical"},{"kind":"bossBattle"}]}},
   },
   {
     id: 'lighthouseScepter', name: '灯台守の錫杖', slot: 'weapon', weaponType: 'scepter', rarity: 'legend', icon: 'scepter', scenario: 'cursedArchipelago',

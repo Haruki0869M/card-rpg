@@ -5,26 +5,16 @@ import type { ItemDef } from '../../../../types';
 export const frozenGear: ItemDef[] = [
   // ----- 武器 -----
   {
-    id: 'frostbreakerAxe', name: '霜砕きの斧', slot: 'weapon', weaponType: 'axe', rarity: 'epic', icon: 'axe', scenario: 'frozenKingdom',
-    description: '完全成功でランダムな敵1体に氷片の追撃4。1ターンに1回。', stats: { str: 8, vit: 2 }, tags: ['physical', 'ice'],
-    cards: [{ cardId: 'wtAxeBloodlust', count: 2 }],
-    ability: { name: '氷砕き', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'physical' }, { kind: 'dealtDamage' }, { kind: 'oncePerTurn', key: 'frostbreakerAxe' }], do: [{ kind: 'damage', amount: 4, element: 'ice', to: 'randomFoe' }] } },
-  },
-  {
     id: 'crystalStaff', name: '氷晶の杖', slot: 'weapon', weaponType: 'staff', rarity: 'epic', icon: 'staff', scenario: 'frozenKingdom',
     description: '魔法の完全成功でランダムな敵1体に氷属性の追撃4。1ターンに1回。', stats: { int: 8, per: 2 }, tags: ['magic', 'ice'],
     cards: [{ cardId: 'wLightning', count: 2 }],
     ability: { name: '氷晶の輝き', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'magic' }, { kind: 'dealtDamage' }, { kind: 'oncePerTurn', key: 'crystalStaff' }], do: [{ kind: 'damage', amount: 4, element: 'ice', to: 'randomFoe' }] } },
   },
   {
-    id: 'whiteWolfFang', name: '白狼の牙', slot: 'weapon', weaponType: 'dagger', rarity: 'rare', icon: 'dagger', scenario: 'frozenKingdom',
-    description: '白い狼の牙で作った短剣。力のある者にも馴染む。踊るように何度も斬る技が付く。', stats: { str: 3, dex: 4 }, tags: ['physical'],
-    cards: [{ cardId: 'wtDaggerDance', count: 2 }],
-  },
-  {
-    id: 'blizzardBow', name: '吹雪の弓', slot: 'weapon', weaponType: 'bow', rarity: 'rare', icon: 'bow', scenario: 'frozenKingdom',
-    description: '吹雪のように、敵全員へ矢を降らせる弓。', stats: { dex: 5, per: 3 }, tags: ['physical'],
-    cards: [{ cardId: 'wtBowShower', count: 2 }],
+    id: "blizzardBow", name: "吹雪の弓", slot: "weapon", weaponType: "bow", rarity: "rare", icon: "bow", scenario: "frozenKingdom",
+    description: "敵全体を狙うカードが完全成功した時、ランダムな敵1体に「凍結」1（ボスには代わりに「弱体」1）。1ターンに1回。", stats: {"dex":5,"per":3}, tags: ["physical","ice","freeze","aoe"],
+    cards: [{"cardId":"wtBowShower","count":2}],
+    ability: {"name":"吹雪","description":"敵全体を狙うカードが完全成功した時、ランダムな敵1体に「凍結」1（ボスには代わりに「弱体」1）。1ターンに1回。","effect":{"when":"perfect","if":[{"kind":"cardAoe"},{"kind":"oncePerTurn","key":"blizzardBow"}],"do":[{"kind":"applyStatus","status":"freeze","amount":1,"bossStatus":"weak","to":"randomFoe"}]}},
   },
   {
     id: 'springbringerScepter', name: '春告げの錫杖', slot: 'weapon', weaponType: 'scepter', rarity: 'legend', icon: 'scepter', scenario: 'frozenKingdom',

@@ -99,7 +99,7 @@ export function FocusPanel() {
   if (!selection || !ally || !inst) return null;
   const card = cardOf(inst);
   const cat = CATEGORY_STYLE[card.category];
-  const chance = rollChanceFor(ally, card, selection.focus);
+  const chance = rollChanceFor(ally, card, selection.focus, selectedCardTarget(battle, ally, card, selection.targetId), battle);
   const max = Math.min(card.slots, ally.focus);
   const probs = tierDistribution(card, selection.focus, chance);
   const pcts = toPercents(probs);
