@@ -2,7 +2,7 @@
 // 新しい効果: kinds/ にファイルを1つ置いて export const effect: EffectHandler<'種類'> = {...} と書くだけ。
 // カード・敵の行動・消費アイテム・特殊能力のデータから、その日から使える。
 import type { AbilityDef, BattleEvent, BattleState, CardDef, Effect, EffectTarget, EnemyState } from '../../../types';
-import { convertedElement, coverChance, damageModifiers, elementGuardOf, fireAbilities, guardStatus, statusBonusOf } from '../../abilities';
+import { cardModifier, convertedElement, coverChance, damageModifiers, elementGuardOf, enduresOf, fireAbilities, guardStatus, statusBonusOf, testConditions } from '../../abilities';
 import type { Rng } from '../../rng';
 import { BALANCE } from '../../../data/balance';
 import { getElement } from '../../../data/elements';
@@ -172,12 +172,17 @@ export const COMBO_NAMES = ['', '連携', '大連携', '極連携'] as const;
 export function comboStage(source: Unit | undefined, victim: Unit | undefined): number {
   if (!source || !victim || isEnemy(source) || !isEnemy(victim)) return 0;
   const id = unitIdOf(source);
-  return Math.min(BALANCE.comboBonus.length - 1, victim.hitBy?.filter((x) => x !== id).length ?? 0);
+  let n = victim.hitBy?.filter((x) => x !== id).length ?? 0;
+  // 区切りD: 挟撃の陣の敵は、1人でも連携になる。アシスト・パスは段階+1
+  if (victim.pincer) n = Math.max(n, 1);
+  n += source.comboBoost ?? 0;
+  return Math.min(BALANCE.comboBonus.length - 1, n);
 }
 /** 連携の段階の上乗せ（0.2 / 0.35 / 0.5） */
 export const comboBonusOf = (stage: number) => BALANCE.comboBonus[Math.max(0, Math.min(BALANCE.comboBonus.length - 1, stage))] ?? 0;
-export function comboMultiplier(source: Unit | undefined, victim: Unit | undefined): number {
-  return 1 + comboBonusOf(comboStage(source, victim));
+export function comboMultiplier(source: Unit | undefined, victim: Unit | undefined, scale = 1): number {
+  // 区切りD: ファイナル・ユニゾンなど、連携の上乗せの倍率。合計は +200% まで
+  return 1 + Math.min(BALANCE.comboBonusMax, comboBonusOf(comboStage(source, victim)) * scale);
 }
 
 // ---------- BREAK（大技の予告を崩す。抜本的な見直し §3-2） ----------
@@ -189,7 +194,7 @@ export function canBreak(enemy: Unit | undefined): boolean {
 }
 
 /** 大技の予告を崩す: 威力が半分・弱体1・ブロック0（オーナーの決定 3-A）。乱数は使わない */
-function breakEnemy(ctx: EffectCtx, enemy: EnemyState, why: 'weak' | 'perfect' | 'damage') {
+export function breakEnemy(ctx: EffectCtx, enemy: EnemyState, why: 'weak' | 'perfect' | 'damage') {
   enemy.broken = true;
   enemy.nextActionMultiplier = (enemy.nextActionMultiplier ?? 1) * BALANCE.breakPower;
   enemy.block = 0;
@@ -201,14 +206,16 @@ function breakEnemy(ctx: EffectCtx, enemy: EnemyState, why: 'weak' | 'perfect' |
 }
 
 /** 属性を強める状態異常（聖光など）の倍率。使った分は消す */
-function elementBoost(source: Unit, element: string): number {
+function elementBoost(source: Unit, element: string, turn: number): number {
   let m = 1;
+  // 区切りD: 光の蓄え — このターンは聖光が消えない
+  const keep = !isEnemy(source) && source.holdLight === turn;
   for (const [id, n] of Object.entries(source.statuses)) {
     if (!n) continue;
     const b = getStatus(id).boostElement;
     if (b?.element !== element) continue;
     m *= 1 + b.per * n;
-    source.statuses[id] = 0;
+    if (!keep) source.statuses[id] = 0;
   }
   return m;
 }
@@ -222,17 +229,25 @@ export const resistsElement = (victim: Unit, element: string) => isEnemy(victim)
  * victim にダメージを与える。倍率（敵のレベル・特殊能力・状態異常）、ブロック、かばう、戦闘不能まで処理する。
  * HPに入った量を返す
  */
-export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?: string, extraMultiplier = 1): number {
+/** cap = 倍率を全部掛けた後のダメージの上限（決め技などの「最大〇〇」。区切りD） */
+export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?: string, extraMultiplier = 1, cap?: number): number {
   const { state, rng, events, source } = ctx;
   if (victim.dead) return 0;
   // 武器に宿った属性: 属性の無い物理攻撃がその属性になる（妖精の泉）
   element = convertedElement(source, ctx.card, attackElement(source, ctx.card, element));
+  // 区切りD: エレメンタル・チェイン — 属性が無ければ、狙った敵の弱点の属性になる（耐性の無い最初の物）
+  if (!element && isEnemy(victim) && cardModifier(ctx.cardAbilities, 'weaknessElement').length) element = getEnemy(victim.defId).weak?.find((w) => !getEnemy(victim.defId).resist?.includes(w));
   let v = victim;
   let mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities, ctx.perfect, element, ctx.via);
   // 属性を強める状態異常（聖光など）: この一撃で使い切る
-  const boost = element ? elementBoost(source, element) : 1;
+  const boost = element ? elementBoost(source, element, state.turn) : 1;
   base = Math.round(base * boost);
-  let dmg = calcDamage(base + mods.add + (ctx.addOnceUsed ? 0 : mods.addOnce), source.statuses, v.statuses, extraMultiplier * mods.multiplier * elementMultiplier(v, element) * comboMultiplier(source, v));
+  // 区切りD: 連携の上乗せの倍率（このカードの力）・弱点看破の印（弱点の属性でなくても ×1.5）
+  const comboScale = cardModifier(ctx.cardAbilities, 'comboScale').reduce((m, e) => m * e.multiplier, 1);
+  // ラグナロク・ブレード: いつでも弱点を突いた扱い
+  const alwaysWeak = !isEnemy(source) && cardModifier(ctx.cardAbilities, 'alwaysWeak').length > 0;
+  const exposedMul = (u: Unit) => isEnemy(u) && !isEnemy(source) && (u.exposed || alwaysWeak) && elementMultiplier(u, element) < BALANCE.elementWeakMul ? BALANCE.elementWeakMul : 1;
+  let dmg = calcDamage(base + mods.add + (ctx.addOnceUsed ? 0 : mods.addOnce), source.statuses, v.statuses, extraMultiplier * mods.multiplier * elementMultiplier(v, element) * exposedMul(v) * comboMultiplier(source, v, comboScale));
   // かばう: 相手の攻撃でこのままだとHP0になる場合、同じ側の他の仲間が確率で代わりに受ける
   if (isEnemy(source) !== isEnemy(v) && dmg - (mods.ignoreBlock ? 0 : v.block) >= v.hp) {
     for (const other of sideOf(state, v)) {
@@ -244,24 +259,43 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
         addLog(state, `${nameOf(other)}の「${cov.name}」！ ${nameOf(v)}をかばった`);
         v = other;
         mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities, ctx.perfect, element, ctx.via);
-        dmg = calcDamage(base + mods.add + (ctx.addOnceUsed ? 0 : mods.addOnce), source.statuses, v.statuses, extraMultiplier * mods.multiplier * elementMultiplier(v, element) * comboMultiplier(source, v));
+        dmg = calcDamage(base + mods.add + (ctx.addOnceUsed ? 0 : mods.addOnce), source.statuses, v.statuses, extraMultiplier * mods.multiplier * elementMultiplier(v, element) * exposedMul(v) * comboMultiplier(source, v, comboScale));
         break;
       }
     }
   }
+  if (cap !== undefined) dmg = Math.min(dmg, cap);
   // 「最初の1回の攻撃にだけ足すダメージ」は、ここで使い切る（×N回・全体のカードでも1回だけ）
   if (mods.addOnce) ctx.addOnceUsed = true;
   for (const n of mods.active) recordActivation(ctx, n);
   const stage = comboStage(source, v);
   if (stage > 0) recordActivation(ctx, { name: COMBO_NAMES[stage] ?? COMBO_NAME, source: { kind: 'other' } });
+  if (stage > 0 && dmg > 0) ctx.comboLanded = true;
   // 弱点の属性で攻撃したか（BREAK のきっかけ。かばう・属性の変換の後の、実際の相手と属性で見る）
-  const weakHit = !!element && isEnemy(v) && !!getEnemy(v.defId).weak?.includes(element);
+  // 区切りD: 弱点看破の印のある敵・導きの光の味方の攻撃も、弱点を突いた扱い（印は1回で消える）
+  const exposed = isEnemy(v) && !isEnemy(source) && (!!v.exposed || alwaysWeak) && dmg > 0;
+  const guided = !isEnemy(source) && !!source.guided && isEnemy(v) && dmg > 0;
+  if (exposed && isEnemy(v)) delete v.exposed;
+  const weakHit = (!!element && isEnemy(v) && !!getEnemy(v.defId).weak?.includes(element)) || exposed || guided;
   if (weakHit && dmg > 0 && !isEnemy(source) && !(ctx.weakHitIds ??= []).includes(unitIdOf(v))) ctx.weakHitIds.push(unitIdOf(v));
   // 連携攻撃の記録（このターンにこの敵を攻撃した味方）
   if (isEnemy(v) && !isEnemy(source)) {
     const id = unitIdOf(source);
     if (!(v.hitBy ??= []).includes(id)) v.hitBy.push(id);
+    // 区切りD: 挟撃の陣（2 = ブロック3 / 3 = ブロック4・フォーカス+1。ブロックはカード1枚に1回、フォーカスは1人1回）
+    if ((v.pincer ?? 0) >= 2 && !ctx.pincerPaid && dmg > 0) {
+      ctx.pincerPaid = true;
+      const gain = v.pincer! >= 3 ? 4 : 3;
+      source.block = Math.min(BALANCE.blockMax, source.block + gain);
+      events.push({ type: 'block', unitId: id, amount: gain });
+      if (v.pincer! >= 3 && !(v.pincerFocus ??= []).includes(id)) {
+        v.pincerFocus.push(id);
+        if (!isEnemy(source)) source.focus = Math.min(source.focusMax, source.focus + 1);
+      }
+    }
   }
+  // 区切りD: 不動の拳 — この敵の番に受けた攻撃の量（防いだ分も入れる）を数える
+  if (!isEnemy(v) && isEnemy(source) && v.counters?.fudoOn) v.counters.fudoStore = (v.counters.fudoStore ?? 0) + dmg;
   if (mods.ignoreBlock && v.block > 0 && mods.ignoreBlockNotice) recordActivation(ctx, mods.ignoreBlockNotice);
   if (!isEnemy(v) && dmg > 0 && isEnemy(source)) {
     if (v.airborne) return 0;
@@ -270,6 +304,11 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
       const [s] = v.summons!.splice(shield, 1);
       abilityTriggered(state, v.id, s.name, events, { kind: 'summon', id: s.id, label: s.name });
       events.push({ type: 'damage', unitId: v.id, amount: 0, blocked: dmg, sourceId: unitIdOf(source) });
+      // 無明逆流れ: 受け止めた攻撃者に返す
+      if (s.counter && !source.dead && ctx.depth < 3) {
+        const back = dealDamage(makeCtx(state, rng, events, v, { depth: ctx.depth + 1 }), source, s.counter);
+        addLog(state, `${nameOf(v)}の「${s.name}」！ ${nameOf(source)}に${back}ダメージで返した`);
+      }
       return 0;
     }
   }
@@ -285,8 +324,10 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   }
   const r = absorb(dmg, mods.ignoreBlock ? 0 : v.block, v.hp);
   if (!mods.ignoreBlock) v.block = r.block;
+  // 区切りD: 命綱 — HPは1より下がらない
+  if (r.hp <= 0 && v.hp > 0 && enduresOf(v)) { r.hpLoss -= 1 - r.hp; r.hp = 1; }
   v.hp = r.hp;
-  if (r.hpLoss > 0) noteHpLoss(v);
+  if (r.hpLoss > 0) noteHpLoss(v, r.hpLoss);
   events.push({ type: 'damage', unitId: unitIdOf(v), amount: r.hpLoss, rawAmount: dmg, blocked: r.blocked, sourceId: unitIdOf(source) });
   if (isEnemy(v)) state.stats.totalDamage += r.hpLoss;
   ctx.dealt += r.hpLoss;
@@ -294,9 +335,13 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   afterHpLoss(state, v, rng, events);
   // BREAK: 大技の予告を出している敵に、弱点の属性で攻撃／完全成功で攻撃／このターンの合計ダメージが最大HPの2割以上
   if (isEnemy(v) && !isEnemy(source)) {
-    v.turnDamage = (v.turnDamage ?? 0) + r.hpLoss;
+    // 区切りD: 鎧通しの一撃 — BREAK の数えを2倍に
+    const breakMul = cardModifier(ctx.cardAbilities, 'breakCount').filter((e) => testConditions(e.if, { state, self: source, card: ctx.card, target: v })).reduce((m, e) => m * e.multiplier, 1);
+    v.turnDamage = (v.turnDamage ?? 0) + r.hpLoss * breakMul;
+    // 区切りD: 魔力の楔 — 成功1でも、完全成功と同じに崩せる
+    const earlyBreak = cardModifier(ctx.cardAbilities, 'breakOnSuccess').some((e) => (ctx.successes ?? 0) >= e.min);
     if (dmg > 0 && canBreak(v)) {
-      const why = weakHit ? 'weak' : ctx.perfect && ctx.card ? 'perfect' : v.turnDamage * 100 >= v.maxHp * BALANCE.breakDamagePct ? 'damage' : undefined;
+      const why = weakHit ? 'weak' : (ctx.perfect || earlyBreak) && ctx.card ? 'perfect' : v.turnDamage * 100 >= v.maxHp * BALANCE.breakDamagePct ? 'damage' : undefined;
       if (why) breakEnemy(ctx, v, why);
     }
   }

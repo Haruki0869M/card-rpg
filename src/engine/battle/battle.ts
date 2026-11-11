@@ -23,7 +23,7 @@ import type {
   SlotResult,
   Statuses,
 } from '../../types';
-import { cardChanceBonus, cardCostOf, completeSlotsOf, damageModifiers, fireAbilities, keepBlockOf, markCostUsed, summonTwiceOf } from '../abilities';
+import { cardChanceBonus, cardCostOf, cardTraitAbilities, completeSlotsOf, damageModifiers, fireAbilities, keepBlockOf, markCostUsed, summonTwiceOf } from '../abilities';
 import { createRng, type Rng, shuffle } from '../rng';
 import { affinityOf } from '../stats';
 import { calcDamage } from './damage';
@@ -34,13 +34,16 @@ import { finalChance, selectTier } from './probability';
 import { helpedAllies, recordSupport, selfSnapshot, supportSnapshot } from './support';
 import { afterAttackCard, attackElement, cardElements, cardHpCost, chargedMultiplier, tierHpCost } from './cardState';
 import { slotPreviewLimitOf } from './preview';
+import { isStrikingSummon, summonStrikeOnce } from './summons';
 import { activeStatuses, actionFailChanceOf, applyTick, chancePenaltyOf, consumeStatus, decayStatuses, emptyStatuses, skipActionStatus, takeDrawPenalty, takeManaPenalty, tickHealOf } from './statuses';
 import { abilityTriggered, addLog, enemyName, findAlly, healUnit, loseHp, nameOf, unitIdOf } from './units';
 
 export { enemyName, findAlly, findEnemy, unitName } from './units';
 
 // v18（2026-11-11）: 鎧・装飾品の作り直し。古い保存データは読まない（オーナーの決定。v17 からの移行は作らない）
-export const STATE_VERSION = 20;
+// v21（2026-11-12）: 区切りD-1 同じ中身のカードをまとめた。古い保存は読まない
+// v22（2026-11-12）: 区切りD-2〜D-4 軸のカード・決め技・武器のカードの付け替え。古い保存は読まない
+export const STATE_VERSION = 22;
 export { slotPreviewLimitOf } from './preview';
 
 // ---------- 生成 ----------
@@ -194,7 +197,7 @@ export function unusableReason(state: BattleState, ally: AllyState, card: CardDe
   if (ally.dead) return '戦闘不能です';
   if (ally.exhaustedCards?.includes(card.id)) return 'この戦闘ではもう使いました';
   if (ally.mana < cardCostOf(state, ally, card).cost) return 'マナが足りません';
-  if (ally.hp <= cardHpCost(card)) return 'HPを払うと戦闘不能になります';
+  if (ally.hp <= cardHpCost(card, ally.hp)) return 'HPを払うと戦闘不能になります';
   if (needsCardTarget(card) && !cardTargets(state, ally, card).length) return '対象がいません';
   if ((card.target === 'enemy' || card.target === 'allEnemies') && !state.enemies.some((e) => !e.dead)) return '対象がいません';
   return null;
@@ -221,12 +224,12 @@ export function isDone(state: BattleState, ally: AllyState): boolean {
 /** カードのダメージ効果が対象に与える実際の値（Tierごとの合計。特殊能力の倍率・状態異常も反映） */
 export function tierDamageAgainst(ally: AllyState, card: CardDef, target: EnemyState): number[] {
   return card.tiers.map((t) => {
-    const source = { ...ally, hp: ally.hp - tierHpCost(t) };
+    const source = { ...ally, hp: ally.hp - tierHpCost(t, ally.hp) };
     let onceUsed = false;
     return t.effects.reduce((sum, e) => {
       if (e.kind !== 'damage' || (targetOf(e) !== 'target' && targetOf(e) !== 'foes')) return sum;
       const element = attackElement(source, card, e.element);
-      const { multiplier, add, addOnce } = damageModifiers(undefined, source, card, target, card.trait ? [card.trait] : undefined, t.minSuccesses === card.slots, element);
+      const { multiplier, add, addOnce } = damageModifiers(undefined, source, card, target, cardTraitAbilities(card), t.minSuccesses === card.slots, element);
       // 「最初の1回の攻撃にだけ足すダメージ」（弾込め）は、その段の最初の1回分だけ足す
       const first = addOnce && !onceUsed ? calcDamage(e.amount + add + addOnce, source.statuses, target.statuses, chargedMultiplier(source, card) * multiplier * elementMultiplier(target, element) * comboMultiplier(source, target)) - calcDamage(e.amount + add, source.statuses, target.statuses, chargedMultiplier(source, card) * multiplier * elementMultiplier(target, element) * comboMultiplier(source, target)) : 0;
       if (addOnce) onceUsed = true;
@@ -249,9 +252,14 @@ function startAllyPhase(state: BattleState, rng: Rng, events: BattleEvent[]) {
     // BREAK の数えも、ターンごとに消す（予告は敵フェーズの終わりに決め直している）
     delete e.turnDamage;
     delete e.broken;
+    // 区切りD: このターンの印（弱点看破・挟撃の陣）
+    delete e.exposed;
+    delete e.pincer;
+    delete e.pincerFocus;
   }
   for (const a of state.allies) {
     a.played = 0;
+    a.playedZero = 0;
     a.playedBy = {};
   }
   for (const a of state.allies) {
@@ -260,6 +268,16 @@ function startAllyPhase(state: BattleState, rng: Rng, events: BattleEvent[]) {
     // 装備の能力の数え: 前のターンから残ったブロック（守りの祈り）・敵の番を無傷でしのいだか（返しの穂先・竜王の構え）
     const cs = (a.counters ??= {});
     cs.blockLeft = a.block;
+    // 区切りD: このターンだけの印・期間の過ぎたカードの能力を消す（ブロックの持ち越しを決める前。不落の城塞は1ターン残る）
+    delete a.guided;
+    delete a.comboBoost;
+    delete a.reversal;
+    delete a.extraHits;
+    if (cs.bloodAdd) cs.bloodAdd = 0;
+    if (a.abilities?.some((ab) => ab.untilTurn !== undefined && ab.untilTurn < state.turn)) a.abilities = a.abilities.filter((ab) => ab.untilTurn === undefined || ab.untilTurn >= state.turn);
+    // 区切りD: 不動の拳 — 前の敵の番に受けた攻撃の量を、このターンの最初の物理カードに足す数にする
+    if (cs.fudoOn) { cs.fudo = Math.min(cs.fudoMax ?? 12, Math.floor(((cs.fudoStore ?? 0) * (cs.fudoPct ?? 50)) / 100)); delete cs.fudoOn; delete cs.fudoStore; }
+    else cs.fudo = 0;
     // お供の行動の数え（1ターンに4回まで）
     cs.petActsTurn = 0;
     cs.unhurtTurn = state.turn > 1 && cs.unhurt === 1 ? 1 : 0;
@@ -484,8 +502,9 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   const selfBefore = selfSnapshot(ally);
 
   // 効果（効果の部品を順に使う）
-  const cardAbilities = card.trait ? [card.trait] : undefined;
+  const cardAbilities = cardTraitAbilities(card);
   const ctx = makeCtx(state, rng, events, ally, { target, allyTarget, card, cardAbilities, perfect, tierEffects: tier.effects });
+  ctx.successes = successes;
   if (target && tier.effects.some(e => e.kind === 'damage')) ally.lastTargetId = unitIdOf(target);
   for (const eff of tier.effects) applyEffect(ctx, eff);
   const supportedOthers = recordSupport(ally, state.allies, supportBefore);
@@ -522,6 +541,13 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   }
   abilityParts.push(...fireAbilities(state, rng, events, ally, 'afterCard', fireOpts));
   if (perfect) abilityParts.push(...fireAbilities(state, rng, events, ally, 'perfect', fireOpts));
+  // 区切りD: このカードで連携が起きた（コンビネーション・輪唱）
+  if (ctx.comboLanded) {
+    if (cardAbilities) abilityParts.push(...fireAbilities(state, rng, events, ally, 'combo', { ...fireOpts, list: cardAbilities }));
+    abilityParts.push(...fireAbilities(state, rng, events, ally, 'combo', fireOpts));
+  }
+  // 区切りD: 導きの光・アシスト・パスの印・血の代価は、攻撃カードを1枚使ったら消える
+  if (hasDamage) { delete ally.guided; delete ally.comboBoost; if (ally.counters?.bloodAdd) ally.counters.bloodAdd = 0; if (ally.counters?.nextAtkPct) ally.counters.nextAtkPct = 0; }
   // きっかけ: 自分が応援を付けた味方のカードが完全成功した（自分の応援は、1人パーティの時だけ数える）
   if (perfect && cheerer && !cheerer.dead && (cheerer !== ally || state.allies.length === 1)) fireAbilities(state, rng, events, cheerer, 'cheerPerfect', { allyTarget: ally, depth: 1 });
   // 分身は攻撃効果を半分の威力で繰り返す。追撃から再帰しない。
@@ -541,6 +567,10 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   } else ally.discard.push(inst);
   // このターンに使った枚数（連撃などの条件。カードの効果の後に数える）
   ally.played = (ally.played ?? 0) + 1;
+  // 区切りD: コスト0のカードの枚数（流れる連撃）
+  if (card.cost === 0) ally.playedZero = (ally.playedZero ?? 0) + 1;
+  // 区切りD: この戦闘で使った物理カードの枚数（無想阿修羅拳）
+  if (card.category === 'physical') (ally.counters ??= {}).physBattle = (ally.counters.physBattle ?? 0) + 1;
   afterAttackCard(ally, card, tier);
   (ally.playedBy ??= {})[card.category] = (ally.playedBy[card.category] ?? 0) + 1;
 
@@ -636,16 +666,11 @@ function summonsAttack(state: BattleState, ally: AllyState, rng: Rng, events: Ba
   if (!ally.summons?.length) return;
   const twice = summonTwiceOf(ally);
   for (const s of [...ally.summons]) {
-    if (s.echoPct || s.trigger) continue;
+    if (!isStrikingSummon(s)) continue;
     const foes = state.enemies.filter((e) => !e.dead);
     if (!foes.length) break;
     const t = s.targetId ? foes.find(e => e.uid === s.targetId) ?? foes[0] : foes[rng.int(foes.length)];
-    const ctx = makeCtx(state, rng, events, ally, { target: t, via: 'summon' });
-    const loss = dealDamage(ctx, t, s.damage, s.element);
-    // きっかけ: 自分の砲台・召喚が敵にダメージを与えた（観測射撃）
-    if (loss > 0 && !ally.dead) fireAbilities(state, rng, events, ally, 'summonHit', { target: t, depth: 1 });
-    abilityTriggered(state, ally.id, s.name, events, { kind: 'summon', id: s.id, label: s.name });
-    addLog(state, `${ally.name}の${s.name}が${enemyName(t)}を攻撃！ ${loss}ダメージ`);
+    summonStrikeOnce(state, ally, s, t, rng, events);
     // 永久機関: もう1回攻撃する（残りターンは1回分だけ減る）
     const again = twice ? state.enemies.filter((e) => !e.dead) : [];
     if (again.length) {
@@ -702,6 +727,8 @@ function endTurn(state: BattleState, playerId: string, rng: Rng, events: BattleE
   if (checkEnd(state, events)) return undefined;
   // 敵のブロックは敵フェーズ開始時に0へ
   for (const e of state.enemies) e.block = 0;
+  // 区切りD: 血の代価の数え（失ったHP）は、敵の番の始めから数え直す
+  for (const a of state.allies) if (a.counters?.hpLostTurn) a.counters.hpLostTurn = 0;
   state.phase = 'enemy';
   state.enemyCursor = 0;
   addLog(state, `--- 敵フェーズ ---`);
@@ -793,7 +820,7 @@ function executeIntent(state: BattleState, enemy: EnemyState, rng: Rng, events: 
   events.push({ type: 'enemyAct', enemyUid: enemy.uid, actionName: action.name, targetIds: ctx.hitIds });
   const actionMultiplier = enemy.nextActionMultiplier ?? 1;
   delete enemy.nextActionMultiplier;
-  for (const eff of action.effects) applyEffect(ctx, 'amount' in eff ? { ...eff, amount: Math.floor(eff.amount * actionMultiplier) } : eff);
+  for (const eff of action.effects) applyEffect(ctx, 'amount' in eff && eff.amount !== undefined ? { ...eff, amount: Math.floor(eff.amount * actionMultiplier) } : eff);
   for (const n of ctx.fired) abilityTriggered(state, enemy.uid, n.name, events, n.source);
   addLog(state, `${enemyName(enemy)}「${action.name}」${ctx.parts.join(' / ')}`);
   enemy.intent = undefined;

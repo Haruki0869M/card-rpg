@@ -52,13 +52,12 @@ export const MID_JOB_CARDS: CardDef[] = [
   c('comboRush', '連環撃', 'physical', 1, 75, 'enemy', [[d(2)], [dh(2, 2)], [dh(3, 3)]], { rarity: 'rare', stat: 'agi', tags: ['combo'] }),
   c('chiBurst', '発勁', 'physical', 1, 70, 'enemy', [[d(4)], [d(7), st('weak', 1)], [d(10), st('weak', 2)]], { rarity: 'rare', stat: 'vit' }),
   c('hundredKicks', '百烈脚', 'physical', 2, 60, 'enemy', [[dh(2, 3)], [dh(3, 4)], [dh(3, 6)]], { rarity: 'epic', stat: 'agi', trait: { name: '闘魂', effect: { when: 'perfect', do: [draw(1)] } } }),
-  c('jab2', '刻み突き', 'physical', 0, 85, 'enemy', [[d(2)], [d(3)]], { stat: 'agi', tags: ['combo'] }),
   c('guardBreak', '崩し', 'physical', 1, 75, 'enemy', [[d(3)], [d(4), st('vulnerable', 1)], [d(6), st('vulnerable', 1), st('weak', 1)]]),
   c('fistOfFury', '怒涛の拳', 'physical', 2, 60, 'enemy', [[d(6)], [d(10), mana(1)], [d(15), mana(1), focus(1)]], { rarity: 'epic', trait: { name: '破竹', effect: { when: 'kill', do: [draw(1)] } }, stat: 'str' }),
 
   // ===== 大魔導士（杖・魔導書。属性の大魔法） =====
   c('flameStorm', '炎の嵐', 'magic', 2, 65, 'allEnemies', [[el('fire', 3)], [el('fire', 6)], [el('fire', 9)]], { rarity: 'rare' }),
-  c('frostNova', '氷結陣', 'magic', 2, 65, 'allEnemies', [[el('ice', 3)], [el('ice', 5)], [el('ice', 8), all('weak', 1)]], { rarity: 'rare' }),
+  { ...c('frostNova', '氷結陣', 'magic', 2, 65, 'allEnemies', [[el('ice', 3)], [el('ice', 5)], [el('ice', 8), all('weak', 1)]], { rarity: 'rare' }), lineages: ['ma'] }, // 区切りD: 氷結陣＝氷結領域 をまとめた
   c('arcaneSurge', '魔力の奔流', 'magic', 1, 75, 'self', [[mana(1)], [mana(1), draw(1)], [mana(2), draw(1)]], { rarity: 'epic', stat: 'int', trait: { name: '集中', effect: { when: 'perfect', do: [focus(1)] } } }),
   c('chainLightning', '連鎖雷', 'magic', 1, 70, 'allEnemies', [[el('thunder', 2)], [el('thunder', 3)], [el('thunder', 5)]]),
   c('manaBarrier', '魔力障壁', 'magic', 1, 80, 'self', [[b(4)], [b(7)], [b(10), focus(1)]]),
@@ -77,7 +76,6 @@ export const MID_JOB_CARDS: CardDef[] = [
   c('phantomLink', '幻獣同調', 'magic', 1, 75, 'enemy', [[d(3)], [d(5), b(3)], [d(7), b(5)]], { rarity: 'rare', tags: ['summon'] }),
   c('summonPhoenix', '朱雀招来', 'magic', 3, 60, 'self', [[summon('phoenix', '朱雀', '🔥', 6, 2, 'fire')], [summon('phoenix', '朱雀', '🔥', 8, 3, 'fire')], [summon('phoenix', '朱雀', '🔥', 10, 3, 'fire'), heal(5, 'allies')]], { rarity: 'epic', trait: { name: '再生の炎', effect: { when: 'perfect', do: [{ kind: 'applyStatus', status: 'regen', amount: 2, to: 'allies' }] } }, tags: ['summon'] }),
   c('spiritShield', '霊獣の盾', 'magic', 1, 80, 'self', [[b(4)], [b(6)], [b(8), heal(2)]]),
-  c('beckon', '呼び声', 'skill', 0, 85, 'self', [[draw(1)], [draw(1), focus(1)]], { stat: 'int' }),
   c('summonTortoise', '玄武招来', 'magic', 2, 65, 'self', [[b(6)], [b(9), summon('tortoise', '玄武', '🐢', 3, 3, 'ice')], [b(12), summon('tortoise', '玄武', '🐢', 5, 3, 'ice')]], { rarity: 'epic', trait: { name: '甲羅の守り', effect: { when: 'afterCard', do: [b(2)] } }, tags: ['summon'] }),
 
   // ===== 聖騎士（槌・剣。かばって聖光をためる） =====
@@ -89,7 +87,7 @@ export const MID_JOB_CARDS: CardDef[] = [
   c('martyr', '殉教の祈り', 'skill', 2, 70, 'ally', [[b(8)], [b(12), heal(4, 'target')], [b(16), heal(6, 'target'), { kind: 'taunt' }]], { rarity: 'epic', trait: { name: '殉教', effect: { when: 'perfect', do: [{ kind: 'applyStatus', status: 'holyLight', amount: 2, to: 'self' }] } }, stat: 'vit' }),
 
   // ===== 槍騎士（槍。初手の突撃と貫き） =====
-  c('lanceCharge', '突進突き', 'physical', 2, 65, 'enemy', [[d(6)], [d(12)], [d(18), st('vulnerable', 1)]], { rarity: 'rare', stat: 'str', tags: ['heavy'] }),
+  c('lanceCharge', '突進突き', 'physical', 2, 65, 'enemy', [[d(6)], [d(12)], [d(18), st('vulnerable', 1)]], { rarity: 'rare', stat: 'str', tags: ['heavy'] }), // 区切りD: 突進突き＝昇竜脚 をまとめた
   c('spearWall', '槍衾', 'skill', 1, 80, 'self', [[b(5)], [b(8)], [b(10), all('weak', 1)]], { rarity: 'rare', stat: 'vit' }),
   c('skewer', '串刺し', 'physical', 2, 60, 'allEnemies', [[d(4)], [d(6)], [d(9), all('vulnerable', 1)]], { rarity: 'epic', trait: { name: '貫通', effect: { modifier: 'ignoreBlock' } } }),
   c('quickThrust', '素早い突き', 'physical', 1, 80, 'enemy', [[d(3)], [d(5)], [d(7)]], { stat: 'agi' }),
@@ -124,7 +122,7 @@ export const MID_JOB_CARDS: CardDef[] = [
   c('vitalStab', '急所刺し', 'physical', 1, 75, 'enemy', [[d(3)], [d(6)], [d(9), st('vulnerable', 1)]], { rarity: 'rare', stat: 'dex' }),
   c('caltrops', '撒き菱', 'skill', 1, 80, 'self', [[all('weak', 1)], [all('weak', 1), all('poison', 1)], [all('weak', 1), all('poison', 2)]], { rarity: 'rare', stat: 'dex' }),
   c('shadowKill', '影縫い', 'physical', 2, 60, 'enemy', [[d(5), st('paralysis', 1)], [d(9), st('paralysis', 1)], [d(14), st('paralysis', 1), st('vulnerable', 1)]], { rarity: 'epic', stat: 'agi', trait: { name: '闇討ち', effect: { modifier: 'damageDealt', multiplier: 1, scale: { by: 'targetStatuses', per: 0.2 } } } }),
-  c('smokeVeil', '煙幕', 'skill', 1, 80, 'self', [[b(4)], [b(6), draw(1)], [b(8), draw(1)]], { stat: 'agi' }),
+  c('smokeVeil', '煙幕', 'skill', 1, 80, 'self', [[b(4)], [b(6), draw(1)], [b(8), draw(1)]], { stat: 'agi' }), // 区切りD: 煙幕＝煙玉 をまとめた
   c('poisonNeedle', '毒針', 'physical', 0, 85, 'enemy', [[st('poison', 1)], [d(2), st('poison', 2)]], { stat: 'dex', tags: ['poison'] }),
   c('assassinate', '暗殺術', 'physical', 3, 55, 'enemy', [[d(8)], [d(14)], [d(20)], [d(28), st('vulnerable', 2)]], { rarity: 'epic', trait: { name: '必殺', effect: { modifier: 'damageDealt', multiplier: 1, scale: { by: 'targetStatuses', per: 0.25 } } }, stat: 'dex' }),
 

@@ -407,21 +407,21 @@ describe('区切りB: 弓（狙う）', () => {
     expect(cardChanceBonus(s.allies[0], strike(), s.enemies[0], s)).toBe(0);
   });
   it('均衡の弓《二の矢》: 「×N回」の攻撃が全部HPに当たったら1枚引く。ブロックで止められた回があれば引かない', () => {
-    const s = use(battle(['warrior'], ['balancedBow']), 'cmTeamwork', { focus: 'max' }).state;
+    const s = use(battle(['warrior'], ['balancedBow']), 'lnBuFlurry', { focus: 'max' }).state;
     expect(s.allies[0].hand).toHaveLength(1);
     // 最後の1回だけがHPに届く量のブロック（ほかの回はブロックで止まる）→ 引かない
     const b = battle(['warrior'], ['balancedBow']);
     b.enemies[0].block = s.enemies[0].maxHp - s.enemies[0].hp - 1;
-    const rb = use(b, 'cmTeamwork', { focus: 'max' }).state;
+    const rb = use(b, 'lnBuFlurry', { focus: 'max' }).state;
     expect(rb.enemies[0].hp).toBe(rb.enemies[0].maxHp - 1);
     expect(rb.allies[0].hand).toHaveLength(0);
     // 1回だけの攻撃では起きない
     expect(use(battle(['warrior'], ['balancedBow']), 'strike', { focus: 'max' }).state.allies[0].hand).toHaveLength(0);
   });
   it('吹雪の弓《吹雪》: 敵全体を狙うカードの完全成功で、敵1体に凍結1。ボス戦では代わりに弱体1', () => {
-    const s = use(battle(['warrior'], ['blizzardBow'], { enemies: ['stageBIdler', 'stageBIdler'] }), 'cmFlurryAll', { focus: 'max' }).state;
+    const s = use(battle(['warrior'], ['blizzardBow'], { enemies: ['stageBIdler', 'stageBIdler'] }), 'lnBuSwipe', { focus: 'max' }).state;
     expect(s.enemies.reduce((n, e) => n + st(e, 'freeze'), 0)).toBe(1);
-    const boss = use(battle(['warrior'], ['blizzardBow'], { enemies: ['stageBIdler'], boss: true }), 'cmFlurryAll', { focus: 'max' }).state;
+    const boss = use(battle(['warrior'], ['blizzardBow'], { enemies: ['stageBIdler'], boss: true }), 'lnBuSwipe', { focus: 'max' }).state;
     expect([st(boss.enemies[0], 'freeze'), st(boss.enemies[0], 'weak')]).toEqual([0, 1]);
     // 1体を狙うカードでは起きない
     const one = use(battle(['warrior'], ['blizzardBow']), 'strike', { focus: 'max' }).state;
@@ -436,7 +436,7 @@ describe('区切りB: 弓（狙う）', () => {
   it('天穿つ弓《天穿ち》: BREAK した敵を狙う次のカード1枚が、必ず完全成功。1ターンに1回。同じ操作なら同じ結果', () => {
     const s = battle(['warrior'], ['skyBow'], { enemies: ['stageBIdler', 'stageBIdler'] });
     const a = s.allies[0];
-    expect(rollChanceFor(a, getCard('cmFlurryAll'), 0, s.enemies[0], s)).toBeLessThan(100);
+    expect(rollChanceFor(a, getCard('lnBuSwipe'), 0, s.enemies[0], s)).toBeLessThan(100);
     s.enemies[0].broken = true;
     expect(rollChanceFor(a, getCard('wtSpearPierce'), 0, s.enemies[0], s)).toBe(100);
     expect(rollChanceFor(a, getCard('wtSpearPierce'), 0, s.enemies[1], s)).toBeLessThan(100);

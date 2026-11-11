@@ -609,7 +609,9 @@ function partyAttackMul(game: GameState, n: number): number {
 
 /** 戦闘を始める（今の場面の参加者で）。surprise = 奇襲成功（敵は1ターン目に動けない） */
 export function startBattleWith(game: GameState, enemies: EncounterSpec['enemies'], roomType: string, rng: Rng, opts: { surprise?: boolean; background?: string } = {}) {
-  const party = sceneHeroes(game).map(toPartyMember);
+  // 区切りD: 戦闘に1人だけの時は、武器のカードが1人用に変わる物がある（湧泉のリュート）
+  const inScene = sceneHeroes(game);
+  const party = inScene.map((h) => toPartyMember(h, inScene.length === 1));
   const diff = getDifficulty(game.difficulty);
   game.battle = createBattle({
     seed: rng.int(1_000_000_000),

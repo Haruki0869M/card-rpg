@@ -84,10 +84,11 @@ export function damageModifiers(state: BattleState | undefined, source: Unit, ca
     if (!testConditions(e.if, c)) continue;
     if (e.modifier === 'damageDealt') {
       const m = e.multiplier * scaleOf(e.scale, source, victim);
-      if (m === 1 && !e.add) continue;
+      const add = (e.add ?? 0) + (e.addFromCounter ? ((source as { counters?: Record<string, number> }).counters?.[e.addFromCounter] ?? 0) : 0);
+      if (m === 1 && !add) continue;
       out.multiplier *= m;
-      if (e.once) out.addOnce += e.add ?? 0;
-      else out.add += e.add ?? 0;
+      if (e.once) out.addOnce += add;
+      else out.add += add;
       out.active.push({ name: ab.name, source: ab.source ?? { kind: 'card', id: card?.id, label: card?.name } });
     } else if (e.modifier === 'ignoreBlock') {
       out.ignoreBlock = true;
@@ -95,8 +96,23 @@ export function damageModifiers(state: BattleState | undefined, source: Unit, ca
     }
   }
   out.multiplier *= Math.min(weak, BALANCE.elementWeakMax / BALANCE.elementWeakMul);
+  // 区切りD: 英雄たちの交響曲 — 次の攻撃カードのダメージ倍率
+  const nextPct = isEnemy(source) ? 0 : (source.counters?.nextAtkPct ?? 0);
+  if (nextPct > 0 && card && card.tiers.some((t) => t.effects.some((x) => x.kind === 'damage'))) {
+    out.multiplier *= 1 + nextPct / 100;
+    out.active.push({ name: '英雄たちの交響曲', source: { kind: 'card', label: '英雄たちの交響曲' } });
+  }
+  // 区切りD: 血の代価 — 次の攻撃カードの最初の1回に足す
+  const blood = isEnemy(source) ? 0 : (source.counters?.bloodAdd ?? 0);
+  if (blood > 0 && card && card.tiers.some((t) => t.effects.some((x) => x.kind === 'damage'))) {
+    out.addOnce += blood;
+    out.active.push({ name: '血の代価', source: { kind: 'card', label: '血の代価' } });
+  }
   return out;
 }
+
+/** HPが1より下がらない（命綱。区切りD） */
+export const enduresOf = (u: Unit) => !isEnemy(u) && abilitiesOf(u).some((ab) => 'modifier' in ab.effect && ab.effect.modifier === 'endure');
 
 /** 属性 element の攻撃を受ける時の守り（無効・吸収・半減）。複数あれば無効 > 吸収 > 半減 */
 export function elementGuardOf(victim: Unit, element: string | undefined): 'immune' | 'absorb' | 'half' | undefined {
@@ -127,6 +143,8 @@ function scaleOf(sc: DamageScale | undefined, self: Unit, target: Unit | undefin
   else if (sc.by === 'targetStatuses') v = target ? Object.entries(target.statuses).filter(([id, n]) => (n ?? 0) > 0 && getStatus(id).harmful).length : 0;
   else if (sc.by === 'selfStatus') v = sc.status ? (self.statuses[sc.status] ?? 0) : 0;
   else if (sc.by === 'gold') v = Math.floor(((self as { gold?: number }).gold ?? 0) / Math.max(1, sc.step ?? 1));
+  // 区切りD: 群れの狩り — 自分のお供・召喚（砲台・罠・幻獣・群れの獣・屍兵・分身）の数
+  else if (sc.by === 'companions') v = isEnemy(self) ? 0 : (self.pet ? 1 : 0) + (self.summons?.length ?? 0);
   const add = sc.per * v;
   return 1 + (sc.max !== undefined ? Math.min(sc.max, add) : add);
 }
@@ -208,8 +226,22 @@ export function statusBonusOf(u: Unit, status: string, card?: CardDef, target?: 
 /** ターンの始めに残るブロックの上限（不動の錨。持っていなければ0。複数あれば一番大きい物） */
 export function keepBlockOf(u: Unit): number {
   let n = 0;
-  for (const ab of abilitiesOf(u)) if ('modifier' in ab.effect && ab.effect.modifier === 'keepBlock') n = Math.max(n, ab.effect.max);
-  return n;
+  let fortify = false;
+  for (const ab of abilitiesOf(u)) if ('modifier' in ab.effect && ab.effect.modifier === 'keepBlock') { n = Math.max(n, ab.effect.max); if (ab.effect.fortify) fortify = true; }
+  // 何を重ねても、残せるのは25まで（不落の城塞を使ったターンだけ50。区切りD）
+  return Math.min(n, fortify ? BALANCE.keepBlockFortify : BALANCE.keepBlockCap);
+}
+
+/** カードの特殊能力を、also まで広げた一覧（区切りD: 1枚のカードに2つの力を持たせる） */
+export function cardTraitAbilities(card: CardDef | undefined): AbilityDef[] | undefined {
+  if (!card?.trait) return undefined;
+  const t = card.trait;
+  return [t, ...(t.also ?? []).map((effect) => ({ name: t.name, effect }))];
+}
+
+/** 使っているカードの、ある種類の常時型の能力（区切りD: 連携の倍率・BREAK の数え） */
+export function cardModifier<K extends string>(abilities: AbilityDef[] | undefined, kind: K): Extract<AbilityEffect, { modifier: K }>[] {
+  return (abilities ?? []).map((a) => a.effect).filter((e): e is Extract<AbilityEffect, { modifier: K }> => 'modifier' in e && e.modifier === kind);
 }
 
 /** 砲台・罠・召喚が2回ずつ発動する能力（永久機関）。持っていればその能力 */
@@ -297,7 +329,7 @@ export function fireAbilities(
     // お供の行動は、全部合わせて1ターンに4回まで
     if (ab.pet && petCapped(owner)) continue;
     if (!testConditions(e.if, { state, rng, self: owner, card: opts.card ?? opts.condCard, multi: opts.multi, target: opts.target, dealt: opts.dealt, focusUsed: opts.focusUsed, perfect: opts.perfect, successes: opts.successes, supportedOthers: opts.supportedOthers, supportedSelf: opts.supportedSelf, weakHit: !!opts.weakTarget, wasFull: opts.wasFull, statusId: opts.statusId })) continue;
-    const ctx = makeCtx(state, rng, events, owner, { target: opts.target, allyTarget: opts.allyTarget, attacker: opts.attacker, card: opts.card, dealt: opts.dealt, depth: opts.depth, tierEffects: opts.tierEffects, perfect: opts.perfect, cardAbilities: opts.card?.trait ? [opts.card.trait] : undefined, via: ab.pet ? 'pet' : undefined, weakTarget: opts.weakTarget, helped: opts.helped });
+    const ctx = makeCtx(state, rng, events, owner, { target: opts.target, allyTarget: opts.allyTarget, attacker: opts.attacker, card: opts.card, dealt: opts.dealt, depth: opts.depth, tierEffects: opts.tierEffects, perfect: opts.perfect, cardAbilities: cardTraitAbilities(opts.card), via: ab.pet ? 'pet' : undefined, weakTarget: opts.weakTarget, helped: opts.helped });
     let any = false;
     for (const eff of e.do) any = applyEffect(ctx, eff) || any;
     if (!any) continue;
@@ -365,6 +397,7 @@ const TRIGGER_TEXT: Record<AbilityTrigger, string> = {
   overheal: '回復がHPからあふれた時',
   cheerPerfect: '自分が応援を付けた味方のカードが完全成功した時',
   detonate: '状態異常を起爆して消した時',
+  combo: 'このカードで連携が起きた時',
 };
 
 const condText = (conds?: AbilityCondition[]) => (conds ?? []).map((c) => conditionHandler(c.kind).describe(c as never));
@@ -385,8 +418,14 @@ export function describeAbility(ab: AbilityDef, side: 'ally' | 'enemy' = 'ally')
       if (e.perBattle !== undefined) return `1回の戦闘で${e.perBattle}回、${e.allies ? '味方全員が、それぞれ' : ''}敵から受ける${what}を防ぐ${tail}`;
       return `${e.allies ? '味方全員が、' : ''}敵から${what}を受けない${tail}`;
     }
+    if (e.modifier === 'comboScale') return `このカードの連携の上乗せ×${e.multiplier}（連携は合わせて+${Math.round(BALANCE.comboBonusMax * 100)}%まで）`;
+    if (e.modifier === 'endure') return 'HPが1より下がらない';
+    if (e.modifier === 'alwaysWeak') return '弱点の属性でなくても、弱点を突いた扱い（ダメージ×1.5・BREAK のきっかけ）';
+    if (e.modifier === 'weaknessElement') return '属性は、狙った敵の弱点の属性に変わる（弱点が無い敵には無属性）';
+    if (e.modifier === 'breakOnSuccess') return `大技を予告している敵は、成功${e.min}以上でも BREAK できる`;
     const cs = condText(e.if);
     const head = cs.length ? `${cs.join('・')}：` : '';
+    if (e.modifier === 'breakCount') return `${head}BREAK の数え（このターンの合計ダメージ）が${e.multiplier}倍`;
     if (e.modifier === 'cardChance') return `${head}成功率+${e.bonus}%`;
     if (e.modifier === 'completeSlots') return `${head}残りの枠も全て成功する`;
     if (e.modifier === 'exhaust') return '1戦闘1回。使ったカードは戦闘が終わるまで山札から除く';
@@ -397,6 +436,7 @@ export function describeAbility(ab: AbilityDef, side: 'ally' | 'enemy' = 'ally')
     if (e.modifier === 'convertElement') return `${head}属性の無い物理攻撃が${getElement(e.into).name}属性になる`;
     if (e.modifier === 'weaknessDamage') return `${head}弱点属性のダメージ×${Math.round(e.multiplier * 100) / 100}（弱点の倍率は合わせて×${BALANCE.elementWeakMax}まで）`;
     if (e.modifier === 'statusBonus') return `${head}自分が付ける${e.statuses.map((x) => `「${getStatus(x).name}」`).join('')}+${e.amount}`;
+    if (e.modifier === 'damageDealt' && e.addFromCounter) return `${head}最初の1回の攻撃のダメージ+（ためた量）`;
     if (e.modifier === 'damageDealt') return `${head}${e.add ? `${e.once ? '最初の1回の攻撃の' : '1回の攻撃ごとに'}ダメージ+${e.add}${e.multiplier !== 1 || e.scale ? '、' : ''}` : ''}${e.multiplier !== 1 ? `与えるダメージ×${e.multiplier}${e.scale ? '、さらに' : ''}` : ''}${e.scale ? scaleText(e.scale) : ''}`;
     return `${head}ダメージが敵のブロックを無視する`;
   }
@@ -409,6 +449,7 @@ function scaleText(sc: DamageScale): string {
   const cap = sc.max !== undefined ? `（最大+${Math.round(sc.max * 100)}%）` : '';
   if (sc.by === 'missingHp') return `減ったHPが多いほど与えるダメージが増える${cap}`;
   if (sc.by === 'targetStatuses') return `対象の悪い状態異常1種類につき与えるダメージ+${pct}%${cap}`;
+  if (sc.by === 'companions') return `自分のお供・召喚1体につき与えるダメージ+${pct}%${cap}`;
   if (sc.by === 'gold') return `所持金${sc.step ?? 1}Gごとに与えるダメージ+${pct}%${cap}`;
   return `自分の「${sc.status ? getStatus(sc.status).name : ''}」1つにつき与えるダメージ+${pct}%${cap}`;
 }

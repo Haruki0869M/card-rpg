@@ -89,10 +89,16 @@ export interface CardDef {
   exhaust?: boolean;
   /** 武器種カード: この武器種を装備できるジョブの報酬に出る（K1） */
   weaponType?: string;
+  /** ほかにも置く武器種（1枚のカードを複数の武器種に置く。区切りD） */
+  weaponTypes?: string[];
   /** 系統カード: この系統のジョブの報酬に出る（K1） */
   lineage?: Lineage;
+  /** ほかにも置く系統（区切りD） */
+  lineages?: Lineage[];
   /** 共通カード: どのジョブの報酬にも出る（K1） */
   common?: boolean;
+  /** 仲間がいる時だけ報酬・店に出る（連携のカード。1人プレイでは出さない。オーナーの決定） */
+  teamOnly?: boolean;
   /** 異端カード: 代償付きでルールを壊す。報酬・ショップには出ず、イベントでだけ手に入る（K1） */
   heresy?: boolean;
 }
@@ -107,7 +113,7 @@ export interface CardDef {
  * summonHit 自分の砲台・罠・召喚が敵のHPにダメージを与えた後 / overheal 自分の回復が味方のHPからあふれた時（満タンの味方を回復した時も） /
  * cheerPerfect 自分が「応援」を付けた味方のカードが完全成功した時（1人パーティなら自分でも） / detonate 状態異常を起爆して消した時
  */
-export type AbilityTrigger = 'battleStart' | 'turnStart' | 'turnEnd' | 'afterCard' | 'perfect' | 'kill' | 'hurt' | 'allyKill' | 'allyDown' | 'blocked' | 'inflict' | 'foeTick' | 'petAct' | 'summonHit' | 'overheal' | 'cheerPerfect' | 'detonate';
+export type AbilityTrigger = 'battleStart' | 'turnStart' | 'turnEnd' | 'afterCard' | 'perfect' | 'kill' | 'hurt' | 'allyKill' | 'allyDown' | 'blocked' | 'inflict' | 'foeTick' | 'petAct' | 'summonHit' | 'overheal' | 'cheerPerfect' | 'detonate' | 'combo';
 
 /** 発動の条件の種類ごとの数値。条件のファイル（src/engine/abilities/conditions/）が declare module で種類を足す */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -121,7 +127,19 @@ export type AbilityCondition = { [K in keyof ConditionParams]: { kind: K } & Con
  */
 export type AbilityEffect =
   | { when: AbilityTrigger; if?: AbilityCondition[]; do: Effect[] }
-  | { modifier: 'damageDealt'; multiplier: number; /** 1回の攻撃ごとに足すダメージ（倍率を掛ける前） */ add?: number; /** add を、そのカード・効果の最初の1回の攻撃にだけ足す（弾込め） */ once?: boolean; if?: AbilityCondition[]; scale?: DamageScale }
+  | { modifier: 'damageDealt'; multiplier: number; /** 1回の攻撃ごとに足すダメージ（倍率を掛ける前） */ add?: number; /** add を、そのカード・効果の最初の1回の攻撃にだけ足す（弾込め） */ once?: boolean; if?: AbilityCondition[]; scale?: DamageScale; /** 自分の数え（counters）の値を add に足す（不動の拳。区切りD） */ addFromCounter?: string }
+  /** このカードの連携の上乗せの倍率（ファイナル・ユニゾン。区切りD） */
+  | { modifier: 'comboScale'; multiplier: number }
+  /** 属性の無い攻撃が、狙った敵の弱点の属性になる（エレメンタル・チェイン。区切りD） */
+  | { modifier: 'weaknessElement' }
+  /** HPが1より下がらない（命綱。区切りD） */
+  | { modifier: 'endure' }
+  /** 弱点の属性でなくても、弱点を突いた扱い（×1.5・BREAK。ラグナロク・ブレード。区切りD） */
+  | { modifier: 'alwaysWeak' }
+  /** BREAK の「合計ダメージ」の数えを multiplier 倍にする（鎧通しの一撃。区切りD） */
+  | { modifier: 'breakCount'; multiplier: number; if?: AbilityCondition[] }
+  /** 成功が min 以上なら、完全成功でなくても BREAK のきっかけになる（魔力の楔。区切りD） */
+  | { modifier: 'breakOnSuccess'; min: number }
   | { modifier: 'ignoreBlock'; if?: AbilityCondition[] }
   | { modifier: 'coverLethal'; chance: number }
   /** カードの成功率+bonus（狙い撃ちなど） */
@@ -132,7 +150,7 @@ export type AbilityEffect =
   /** カードのコストを変える（set = その値にする / delta = 足す。0より下にはならない）。turnKey があると1ターンに1枚だけ（使った時に数える） */
   | { modifier: 'cardCost'; delta?: number; set?: number; turnKey?: string; if?: AbilityCondition[] }
   /** ターンの始めに、前のターンのブロックが max まで残る（不動の錨） */
-  | { modifier: 'keepBlock'; max: number }
+  | { modifier: 'keepBlock'; max: number; /** 不落の城塞: 持ち越しの上限を BALANCE.keepBlockFortify まで上げる（区切りD） */ fortify?: boolean }
   /** 自分の砲台・罠・召喚が2回ずつ発動する（永久機関） */
   | { modifier: 'summonTwice' }
   /** HPを回復した時、その pct 倍のブロックも得る（福音。0.5 = 50%） */
@@ -159,7 +177,7 @@ export type AbilityEffect =
  * missingHp = 自分の減ったHPの割合（0〜1） / targetStatuses = 対象の悪い状態異常の種類の数 / selfStatus = 自分の状態異常 status の量 /
  * gold = 戦闘を始めた時の自分の所持金（step ゴールドごとに1）
  */
-export type DamageScale = { by: 'missingHp' | 'targetStatuses' | 'selfStatus' | 'gold'; per: number; max?: number; status?: string; step?: number };
+export type DamageScale = { by: 'missingHp' | 'targetStatuses' | 'selfStatus' | 'gold' | 'companions'; per: number; max?: number; status?: string; step?: number };
 
 /** 演出用の出所。効果の判定には使わない。 */
 export interface AbilitySource {
@@ -180,6 +198,8 @@ export interface AbilityDef {
   effect: AbilityEffect;
   /** 同じ名前で一緒に持つ、ほかの中身（1つの装備に2つのきっかけ・常時型を持たせる時） */
   also?: AbilityEffect[];
+  /** カードで得た一時的な能力: このターン（戦闘の通し番号）まで働く。次のターンの始めに消える（区切りD） */
+  untilTurn?: number;
 }
 
 /** 探索の特殊能力（世界マップ・イベントで効く） */
@@ -504,6 +524,17 @@ export interface AllyState {
   counters?: Record<string, number>;
   /** 今付いている「応援」をくれた味方のID（輪唱。応援を使ったら消える） */
   cheeredBy?: string;
+  /** 区切りD: 次の攻撃カードが弱点扱い（導きの光）・連携の段階+1（アシスト・パス） */
+  guided?: boolean;
+  comboBoost?: number;
+  /** 区切りD: 反転の呪印（このターン、味方1人を回復するカードが、この敵への聖ダメージになる） */
+  reversal?: { targetId: string; pct: number; max: number; turn: number };
+  /** 区切りD: 光の蓄え（このターンの番号。聖光が消えない） */
+  holdLight?: number;
+  /** 区切りD: 弾込め（次の「×N回」のカードの回数+） */
+  extraHits?: number;
+  /** 区切りD: このターンに使ったコスト0のカードの枚数（流れる連撃） */
+  playedZero?: number;
   /** 呼び出したお供（幻獣・獣など。ターン終了時に攻撃する。足元のトークンで表示） */
   summons?: SummonState[];
   /** このターンに使ったカードの枚数（種類ごと。子狼など） */
@@ -577,6 +608,10 @@ export interface EnemyState {
   hitBy?: string[];
   /** このターンに味方から受けたHPのダメージの合計（BREAK の「最大HPの2割」の判定。ターンの初めに消す） */
   turnDamage?: number;
+  /** 区切りD: このターンの印（弱点看破 = 次の攻撃が弱点扱い / 挟撃の陣の強さ / 挟撃の陣でフォーカスをもらった味方） */
+  exposed?: boolean;
+  pincer?: number;
+  pincerFocus?: string[];
   /** このターンの予告は、もう体勢を崩された（BREAK は1つの予告に1回。ターンの初めに消す） */
   broken?: boolean;
 }
@@ -639,6 +674,8 @@ export interface SummonState {
   /** カード攻撃への追撃と、被弾の身代わりをする召喚 */
   echoPct?: number;
   intercept?: boolean;
+  /** 身代わりで攻撃を受けた時、攻撃者にこのダメージを返す（無明逆流れ。区切りD） */
+  counter?: number;
   id: string;
   name: string;
   icon: string;

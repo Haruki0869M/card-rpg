@@ -8,7 +8,6 @@ const el = (element: string, amount: number): Effect => ({ kind: 'damage', amoun
 const elh = (element: string, amount: number, hits: number): Effect => ({ kind: 'damage', amount, element, hits });
 const b = (amount: number): Effect => ({ kind: 'block', amount });
 const ba = (amount: number): Effect => ({ kind: 'block', amount, to: 'allies' });
-const bt = (amount: number): Effect => ({ kind: 'block', amount, to: 'target' });
 const st = (status: string, amount: number): Effect => ({ kind: 'applyStatus', status, amount });
 const all = (status: string, amount: number): Effect => ({ kind: 'applyStatus', status, amount, to: 'foes' });
 const heal = (amount: number): Effect => ({ kind: 'heal', amount });
@@ -31,13 +30,10 @@ const pierce = (name: string): AbilityDef => ({ name, effect: { modifier: 'ignor
 export const LINEAGE_CARDS_2: CardDef[] = [
   // ===== 魔（マナと属性。手札とマナのやりくり） =====
   c('lnMaSpark', '魔力の火花', 'magic', 0, 85, 'enemy', [[d(2)], [d(3)]], L('ma')),
-  c('lnMaBolt', '魔弾', 'magic', 1, 80, 'enemy', [[d(3)], [d(6)], [d(8)]], L('ma')),
+  { ...c('lnMaBolt', '魔弾', 'magic', 1, 80, 'enemy', [[d(3)], [d(6)], [d(8)]], L('ma')), weaponTypes: ['staff'] }, // 区切りD: 魔弾＝魔力の閃き をまとめた
   c('lnMaConcentrate', '精神集中', 'skill', 1, 85, 'self', [[focus(1)], [focus(1), mana(1)], [focus(2), mana(1)]], L('ma')),
-  c('lnMaBarrier', '魔法障壁', 'skill', 1, 80, 'self', [[b(4)], [b(6)], [b(8)]], L('ma')),
   c('lnMaScatter', '魔力散布', 'magic', 1, 70, 'allEnemies', [[d(2)], [d(3)], [d(5)]], L('ma')),
-  c('lnMaStudy', '魔導の探求', 'skill', 0, 85, 'self', [[draw(1)], [draw(1), mana(1)]], L('ma')),
   c('lnMaFlameLance', '炎槍', 'magic', 2, 65, 'enemy', [[el('fire', 6)], [el('fire', 11)], [el('fire', 17)]], { ...L('ma'), rarity: 'rare' }),
-  c('lnMaFreezeField', '氷結領域', 'magic', 2, 65, 'allEnemies', [[el('ice', 3)], [el('ice', 5)], [el('ice', 8), all('weak', 1)]], { ...L('ma'), rarity: 'rare' }),
   c('lnMaChainBolt', '走る稲妻', 'magic', 1, 70, 'enemy', [[el('thunder', 2)], [elh('thunder', 3, 2)], [elh('thunder', 3, 3)]], { ...L('ma'), rarity: 'rare', tags: ['combo'] }),
   c('lnMaWither', '衰弱の呪い', 'magic', 1, 75, 'enemy', [[st('weak', 1)], [d(2), st('weak', 1)], [d(3), st('weak', 2), st('vulnerable', 1)]], { ...L('ma'), rarity: 'rare' }),
   c('lnMaMeditate', '深き瞑想', 'skill', 1, 80, 'self', [[mana(1)], [mana(2)], [mana(2), draw(1)]], { ...L('ma'), rarity: 'rare' }),
@@ -47,15 +43,11 @@ export const LINEAGE_CARDS_2: CardDef[] = [
   c('lnMaArcana', '大魔導の秘奥', 'magic', 3, 55, 'enemy', [[d(7)], [d(14)], [d(21)], [d(30)]], { ...L('ma'), rarity: 'epic', tags: ['heavy'], trait: pierce('魔貫') }),
 
   // ===== 聖（回復と守り。仲間を支える） =====
-  c('lnSeiLight', '破邪の光', 'magic', 1, 80, 'enemy', [[el('holy', 3)], [el('holy', 6)], [el('holy', 8)]], L('sei')),
+  { ...c('lnSeiLight', '破邪の光', 'magic', 1, 80, 'enemy', [[el('holy', 3)], [el('holy', 6)], [el('holy', 8)]], L('sei')), weaponTypes: ['scepter'] }, // 区切りD: 破邪の光＝聖光 をまとめた
   c('lnSeiMend', '手当て', 'skill', 1, 80, 'ally', [[heal(4)], [heal(7)], [heal(10)]], { ...L('sei'), tags: ['support'] }),
-  c('lnSeiWall', '加護の壁', 'skill', 1, 80, 'self', [[b(5)], [b(7)], [b(9)]], L('sei')),
   c('lnSeiPrayer', '静かな祈り', 'skill', 0, 85, 'self', [[heal(2)], [heal(3), focus(1)]], L('sei')),
-  c('lnSeiShelter', '庇護', 'skill', 1, 80, 'ally', [[bt(4)], [bt(6)], [bt(9)]], { ...L('sei'), tags: ['support'] }),
   c('lnSeiSmite', '聖打', 'physical', 1, 75, 'enemy', [[d(3)], [d(5)], [d(7), b(2)]], L('sei')),
-  c('lnSeiSanctuary', '聖域の光', 'magic', 2, 65, 'allEnemies', [[el('holy', 3)], [el('holy', 5)], [el('holy', 8)]], { ...L('sei'), rarity: 'rare' }),
   c('lnSeiRegen', '再生の祈り', 'skill', 1, 80, 'ally', [[st('regen', 1)], [heal(3), st('regen', 2)], [heal(4), st('regen', 3)]], { ...L('sei'), rarity: 'rare', tags: ['support'] }),
-  c('lnSeiGroupBless', '集団の加護', 'skill', 1, 80, 'self', [[ba(3)], [ba(5)], [ba(7)]], { ...L('sei'), rarity: 'rare', tags: ['support'] }),
   c('lnSeiPurify', '清めの祈り', 'skill', 1, 80, 'ally', [[cleanse], [cleanse, heal(3)], [cleanse, heal(6)]], { ...L('sei'), rarity: 'rare', tags: ['support'] }),
   c('lnSeiWrath', '聖なる怒り', 'magic', 2, 65, 'enemy', [[el('holy', 6)], [el('holy', 11)], [el('holy', 16)]], { ...L('sei'), rarity: 'rare' }),
   c('lnSeiRain', '恵みの雨', 'skill', 2, 60, 'self', [[healAll(2)], [healAll(4)], [healAll(6)]], { ...L('sei'), rarity: 'epic', tags: ['support'], trait: { name: '恵みの余韻', effect: { when: 'perfect', do: [ba(2)] } } }),
@@ -64,10 +56,9 @@ export const LINEAGE_CARDS_2: CardDef[] = [
   c('lnSeiMartyr', '殉教者の祈り', 'skill', 1, 80, 'self', [[pay(3), healAll(3)], [pay(3), healAll(5)], [pay(3), healAll(8)]], { ...L('sei'), rarity: 'epic', tags: ['support'], trait: { name: '献身', effect: { when: 'perfect', do: [healAll(3)] } } }),
 
   // ===== 技（器用さと素早さ。手数・状態異常・手札のやりくり） =====
-  c('lnGiStab', '素早い一突き', 'physical', 0, 85, 'enemy', [[d(2)], [d(3)]], { ...L('gi'), stat: 'dex' }),
-  c('lnGiQuick', '手早い攻撃', 'physical', 1, 80, 'enemy', [[d(3)], [d(5)], [d(8)]], { ...L('gi'), stat: 'dex' }),
-  c('lnGiDodge', '回避', 'skill', 1, 80, 'self', [[b(4)], [b(6)], [b(8)]], { ...L('gi'), stat: 'agi' }),
-  c('lnGiTrick', '小細工', 'skill', 0, 85, 'self', [[draw(1)], [draw(1), focus(1)]], { ...L('gi'), stat: 'dex' }),
+  { ...c('lnGiQuick', '手早い攻撃', 'physical', 1, 80, 'enemy', [[d(3)], [d(5)], [d(8)]], { ...L('gi'), stat: 'dex' }), weaponTypes: ['bow', 'fist', 'whip'] }, // 区切りD: 手早い攻撃＝早矢＝正拳突き＝打ち据え をまとめた
+  { ...c('lnGiDodge', '回避', 'skill', 1, 80, 'self', [[b(4)], [b(6)], [b(8)]], { ...L('gi'), stat: 'agi' }), weaponTypes: ['axe'], lineages: ['ma'], stat: undefined }, // 区切りD: 回避＝魔法障壁＝斧で受ける をまとめた
+  c('lnGiTrick', '小細工', 'skill', 0, 85, 'self', [[draw(1)], [draw(1), focus(1)]], { ...L('gi'), stat: 'dex' }), // 区切りD: 小細工＝呼び声 をまとめた
   c('lnGiNeedle', '毒の吹き矢', 'physical', 1, 75, 'enemy', [[d(2)], [d(2), st('poison', 2)], [d(3), st('poison', 3)]], { ...L('gi'), stat: 'dex' }),
   c('lnGiFeint', '牽制', 'physical', 1, 75, 'enemy', [[d(2)], [d(3), st('weak', 1)], [d(4), st('weak', 1)]], { ...L('gi'), stat: 'dex' }),
   c('lnGiFlurry', '乱れ斬り', 'physical', 1, 70, 'enemy', [[d(2)], [dh(2, 3)], [dh(3, 3)]], { ...L('gi'), rarity: 'rare', stat: 'dex', tags: ['combo'] }),

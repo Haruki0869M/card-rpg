@@ -27,6 +27,6 @@ export const phantomThief: ClassDef = {
   from: ['thief'],
   signature: ['swipe', 'flourish', 'grandHeist'],
   startingEquipment: { weapon: 'rustyDagger', armor: 'travelerClothes' },
-  cardPool: ['swipe', 'flourish', 'grandHeist', 'feint', 'luckyCoin', 'phantomDance'],
+  cardPool: ['swipe', 'flourish', 'grandHeist', 'feint', 'luckyCoin', 'phantomDance', 'axFlowingStrikes'],
   growthWeights: { luk: 3, dex: 2, agi: 2 },
 };

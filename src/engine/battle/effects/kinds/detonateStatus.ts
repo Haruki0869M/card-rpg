@@ -7,7 +7,7 @@ import type { EffectHandler } from '../types';
 
 declare module '../../../../types' {
   interface EffectParams {
-    detonateStatus: { status: string; damagePer?: number };
+    detonateStatus: { status: string; damagePer?: number; /** ダメージの上限（呪いの刈り入れ。区切りD） */ maxDamage?: number };
   }
 }
 
@@ -21,12 +21,12 @@ export const effect: EffectHandler<'detonateStatus'> = {
       if (n <= 0) continue;
       t.statuses[e.status] = 0;
       total += n;
-      if (e.damagePer) dealDamage(ctx, t, n * e.damagePer);
+      if (e.damagePer) dealDamage(ctx, t, Math.min(e.maxDamage ?? Infinity, n * e.damagePer));
     }
     if (total <= 0) return false;
     ctx.parts.push(`${getStatus(e.status).name}${total}を起爆`);
     if (ctx.depth < 3 && !ctx.source.dead) fireAbilities(ctx.state, ctx.rng, ctx.events, ctx.source, 'detonate', { statusId: e.status, dealt: total, depth: ctx.depth + 1 });
     return true;
   },
-  describe: (e, who) => `${who.replace(/に$/, 'の')}「${getStatus(e.status).name}」を全部起爆して消す${e.damagePer ? `（消した1つにつき${e.damagePer}ダメージ）` : ''}`,
+  describe: (e, who) => `${who.replace(/に$/, 'の')}「${getStatus(e.status).name}」を全部起爆して消す${e.damagePer ? `（消した1つにつき${e.damagePer}ダメージ${e.maxDamage ? `・最大${e.maxDamage}` : ''}）` : ''}`,
 };

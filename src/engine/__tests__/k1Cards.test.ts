@@ -1,11 +1,12 @@
 // K1 スキルカード: 武器種カード・系統カード・異端カードの候補と決まり
 import { describe, expect, it } from 'vitest';
-import { CARDS } from '../../data/cards';
+import { CARDS, cardLineages, cardWeaponTypes } from '../../data/cards';
 import { CLASSES, getClass } from '../../data/classes';
 import { createGame, heroCardPool } from '../index';
 import { jobWeapons } from '../game/hero';
 import { pickCard, poolWeight } from '../game/cardTags';
 import { createRng } from '../index';
+const k1 = (id: string) => !id.startsWith('ax'); // 区切りD の軸のカード（ax…）は、K1・職の専用カードの数に入れない
 
 const newGame = (classes: string[]) =>
   createGame({ seed: 3, scenarioId: 'corruptionKing', difficulty: 'normal', party: classes.map((c, i) => ({ classId: c, gender: 'male', name: `${c}${i}`, playerId: 'P1' })) });
@@ -48,7 +49,8 @@ describe('K1 武器種・系統・異端のカード', () => {
 
   it('4系統とも15枚ずつ（コモン6・レア5・エピック4）', () => {
     for (const lineage of ['bu', 'ma', 'sei', 'gi']) {
-      const cards = CARDS.all.filter((c) => c.lineage === lineage);
+      // 区切りD: 1枚を複数の系統に置けるので、置き場所で数える
+      const cards = CARDS.all.filter((c) => k1(c.id) && cardLineages(c).includes(lineage));
       expect(cards, lineage).toHaveLength(15);
       const n = (r: string) => cards.filter((c) => (c.rarity ?? 'common') === r).length;
       expect([n('common'), n('rare'), n('epic')], lineage).toEqual([6, 5, 4]);
@@ -57,7 +59,7 @@ describe('K1 武器種・系統・異端のカード', () => {
 
   it('全15の武器種が7枚ずつ（コモン3・レア2・エピック2）', () => {
     for (const type of ['sword', 'staff', 'tome', 'hammer', 'bow', 'dagger', 'spear', 'axe', 'fist', 'scepter', 'scythe', 'katana', 'whip', 'gun', 'instrument']) {
-      const cards = CARDS.all.filter((c) => c.weaponType === type);
+      const cards = CARDS.all.filter((c) => k1(c.id) && cardWeaponTypes(c).includes(type));
       expect(cards, type).toHaveLength(7);
       const n = (r: string) => cards.filter((c) => (c.rarity ?? 'common') === r).length;
       expect([n('common'), n('rare'), n('epic')], type).toEqual([3, 2, 2]);
@@ -66,8 +68,8 @@ describe('K1 武器種・系統・異端のカード', () => {
 
   it('共通カードは24枚（コモン10・レア8・エピック6）で、どのジョブの候補にも入る', () => {
     const common = CARDS.all.filter((c) => c.common);
-    expect(common).toHaveLength(24);
-    const n = (r: string) => common.filter((c) => (c.rarity ?? 'common') === r).length;
+    expect(common.filter((c) => k1(c.id))).toHaveLength(24);
+    const n = (r: string) => common.filter((c) => k1(c.id) && (c.rarity ?? 'common') === r).length;
     expect([n('common'), n('rare'), n('epic')]).toEqual([10, 8, 6]);
     for (const cls of CLASSES.all) {
       const pool = heroCardPool(newGame([cls.id]).heroes[0]);

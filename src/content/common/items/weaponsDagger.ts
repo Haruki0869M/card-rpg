@@ -12,7 +12,7 @@ export const weaponsDagger: ItemDef[] = [
   {
     id: "guardDagger", name: "受け流しの短剣", slot: "weapon", weaponType: "dagger", rarity: "rare", icon: "dagger",
     description: "毎ターン、最初のコスト0のカードの後、1枚引く。", stats: {"dex":2,"agi":2}, tags: ["physical","free","draw"],
-    cards: [{"cardId":"wtDaggerVenom","count":2}],
+    cards: [{"cardId":"axFlowingStrikes","count":2}],
     ability: {"name":"軽業","description":"毎ターン、最初のコスト0のカードの後、1枚引く。","effect":{"when":"afterCard","if":[{"kind":"cardCost","max":0},{"kind":"oncePerTurn","key":"guardDagger"}],"do":[{"kind":"draw","amount":1}]}},
   },
   // エピック

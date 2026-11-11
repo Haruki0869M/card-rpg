@@ -13,7 +13,7 @@ export const weaponsTome: ItemDef[] = [
   {
     id: "deepthoughtTome", name: "深思の魔導書", slot: "weapon", weaponType: "tome", rarity: "epic", icon: "tome",
     description: "幻獣・召喚（砲台なども）が一緒に戦うターンが+1。", stats: {"int":8}, tags: ["magic","support"],
-    cards: [{"cardId":"wtTomeForbidden","count":2}],
+    cards: [{"cardId":"axBlazeCatalyst","count":2}],
     ability: {"name":"契約の書","description":"幻獣・召喚（砲台なども）が一緒に戦うターンが+1。","effect":{"modifier":"summonTurns","add":1}},
   },
   {

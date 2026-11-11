@@ -13,7 +13,7 @@ export const effect: EffectHandler<'stealIntent'> = {
       t.nextActionMultiplier = remaining * e.multiplier;
       // 攻撃は回数・属性を保って盗んだ敵へ返し、それ以外は自分が受け取る。
       for (const actionEffect of getEnemyAction(t.defId, t.intent.actionId).effects) {
-        if (!('amount' in actionEffect)) continue;
+        if (!('amount' in actionEffect) || actionEffect.amount === undefined) continue;
         const amount = Math.floor(actionEffect.amount * remaining * (1 - e.multiplier));
         if (amount <= 0) continue;
         if (actionEffect.kind === 'damage') {

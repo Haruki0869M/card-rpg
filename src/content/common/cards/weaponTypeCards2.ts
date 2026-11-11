@@ -25,7 +25,6 @@ const pierce: AbilityDef = { name: '貫通', effect: { modifier: 'ignoreBlock' }
 
 export const WEAPON_TYPE_CARDS_2: CardDef[] = [
   // ===== 杖（魔力の扱い。マナを増やして撃つ） =====
-  c('wtStaffSpark', '魔力の閃き', 'magic', 1, 80, 'enemy', [[d(3)], [d(6)], [d(8)]], W('staff')),
   c('wtStaffTwin', '双星弾', 'magic', 1, 70, 'enemy', [[d(2)], [dh(3, 2)], [dh(4, 2)]], { ...W('staff'), tags: ['combo'] }),
   c('wtStaffWard', '魔力の障壁', 'skill', 1, 80, 'self', [[b(4)], [b(6)], [b(8), mana(1)]], W('staff')),
   c('wtStaffRain', '星屑の雨', 'magic', 2, 65, 'allEnemies', [[d(3)], [d(6)], [d(9)]], { ...W('staff'), rarity: 'rare' }),
@@ -43,8 +42,7 @@ export const WEAPON_TYPE_CARDS_2: CardDef[] = [
   c('wtTomeElements', '四元の大魔導', 'magic', 3, 55, 'allEnemies', [[el('fire', 3)], [el('ice', 6)], [el('thunder', 10)], [el('fire', 13), st('burn', 2)]], { ...W('tome'), rarity: 'epic', trait: { name: '元素の祝福', effect: { when: 'kill', do: [mana(1)] } } }),
 
   // ===== 槌（重い一撃と守り） =====
-  c('wtHammerSmash', '打ち下ろし', 'physical', 1, 70, 'enemy', [[d(3)], [d(7)], [d(9)]], { ...W('hammer'), stat: 'str' }),
-  c('wtHammerGuard', '鉄槌の構え', 'skill', 1, 80, 'self', [[b(5)], [b(7)], [b(9)]], W('hammer')),
+  { ...c('wtHammerSmash', '打ち下ろし', 'physical', 1, 70, 'enemy', [[d(3)], [d(7)], [d(9)]], { ...W('hammer'), stat: 'str' }), weaponTypes: ['axe'] }, // 区切りD: 打ち下ろし＝薪割り をまとめた
   c('wtHammerSkull', '脳天割り', 'physical', 1, 70, 'enemy', [[d(2)], [d(4)], [d(6), st('paralysis', 1)]], { ...W('hammer'), stat: 'str' }),
   c('wtHammerQuake', '地鳴らし', 'physical', 2, 65, 'allEnemies', [[d(3)], [d(6)], [d(8), all('vulnerable', 1)]], { ...W('hammer'), rarity: 'rare', stat: 'str' }),
   c('wtHammerBulwark', '護りの槌', 'physical', 1, 75, 'enemy', [[b(4)], [d(4), b(4)], [d(6), b(6)]], { ...W('hammer'), rarity: 'rare' }),
@@ -52,7 +50,6 @@ export const WEAPON_TYPE_CARDS_2: CardDef[] = [
   c('wtHammerTitan', '巨人の鉄槌', 'physical', 3, 50, 'enemy', [[d(8)], [d(15)], [d(22)], [d(32)]], { ...W('hammer'), rarity: 'epic', stat: 'str', tags: ['heavy'], trait: { name: 'めり込み', effect: { when: 'kill', do: [b(6)] } } }),
 
   // ===== 弓（遠くから手数と狙い） =====
-  c('wtBowQuick', '早矢', 'physical', 1, 80, 'enemy', [[d(3)], [d(5)], [d(8)]], { ...W('bow'), stat: 'dex' }),
   c('wtBowTriple', '三連射', 'physical', 1, 70, 'enemy', [[d(2)], [dh(3, 2)], [dh(3, 3)]], { ...W('bow'), stat: 'dex', tags: ['combo'] }),
   c('wtBowAim', '狙いを定める', 'skill', 0, 85, 'self', [[focus(1)], [focus(1), draw(1)]], { ...W('bow'), stat: 'per' }),
   c('wtBowShower', '降り注ぐ矢', 'physical', 2, 65, 'allEnemies', [[d(2)], [d(5)], [d(8)]], { ...W('bow'), rarity: 'rare', stat: 'dex' }),
@@ -61,9 +58,8 @@ export const WEAPON_TYPE_CARDS_2: CardDef[] = [
   c('wtBowWindPierce', '風穿ちの一矢', 'physical', 3, 55, 'enemy', [[d(6)], [d(12)], [d(19)], [d(28)]], { ...W('bow'), rarity: 'epic', stat: 'dex', trait: pierce }),
 
   // ===== 短剣（軽い手数と状態異常） =====
-  c('wtDaggerBackhand', '逆手斬り', 'physical', 0, 85, 'enemy', [[d(2)], [d(3)]], { ...W('dagger'), stat: 'dex' }),
   c('wtDaggerDance', '踊り刃', 'physical', 1, 70, 'enemy', [[d(2)], [dh(2, 2)], [dh(3, 3)]], { ...W('dagger'), stat: 'dex', tags: ['combo'] }),
-  c('wtDaggerDodge', '紙一重', 'skill', 1, 80, 'self', [[b(4)], [b(6)], [b(8), focus(1)]], { ...W('dagger'), stat: 'agi' }),
+  { ...c('wtDaggerDodge', '紙一重', 'skill', 1, 80, 'self', [[b(4)], [b(6)], [b(8), focus(1)]], { ...W('dagger'), stat: 'agi' }), weaponTypes: ['gun'] }, // 区切りD: 紙一重＝遮蔽 をまとめた
   c('wtDaggerVenom', '毒塗りの刃', 'physical', 1, 75, 'enemy', [[d(2)], [d(3), st('poison', 2)], [d(4), st('poison', 3)]], { ...W('dagger'), rarity: 'rare', stat: 'dex' }),
   c('wtDaggerShadow', '影刺し', 'physical', 1, 75, 'enemy', [[d(2)], [d(3), st('weak', 1)], [d(4), st('weak', 1), st('vulnerable', 1)]], { ...W('dagger'), rarity: 'rare', stat: 'dex' }),
   c('wtDaggerAssassinate', '暗殺', 'physical', 2, 60, 'enemy', [[d(4)], [d(8)], [d(13)]], { ...W('dagger'), rarity: 'epic', stat: 'dex', trait: { name: '無音', effect: { when: 'perfect', do: [draw(1)] } } }),

@@ -6,7 +6,7 @@ export const weaponsScythe: ItemDef[] = [
   {
     id: "temperedScythe", name: "鍛鋼の大鎌", slot: "weapon", weaponType: "scythe", rarity: "rare", icon: "scythe",
     description: "「呪い」を起爆して消した時、消した呪い1つにつきHPを1回復（最大6）。", stats: {"str":3,"int":2}, tags: ["curse","heal"],
-    cards: [{"cardId":"wtScytheHarvest","count":2}],
+    cards: [{"cardId":"axCurseHarvest","count":2}],
     ability: {"name":"呪い刈り","description":"「呪い」を起爆して消した時、消した呪い1つにつきHPを1回復（最大6）。","effect":{"when":"detonate","if":[{"kind":"statusIs","status":"curse"}],"do":[{"kind":"healPctOfDealt","pct":100,"max":6}]}},
   },
   {

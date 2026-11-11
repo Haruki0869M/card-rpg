@@ -42,21 +42,6 @@ export const BASE_JOB_CARDS: CardDef[] = [
     ],
   },
   {
-    id: 'risingKick',
-    name: '昇竜脚',
-    category: 'physical',
-    cost: 2,
-    slots: 2,
-    baseChance: 65,
-    target: 'enemy',
-    rarity: 'rare',
-    tiers: [
-      { minSuccesses: 0, effects: [d(6)] },
-      { minSuccesses: 1, effects: [d(12)] },
-      { minSuccesses: 2, effects: [d(18), st('vulnerable', 1)] },
-    ],
-  },
-  {
     id: 'focusBreath',
     name: '気息',
     category: 'skill',
@@ -224,21 +209,6 @@ export const BASE_JOB_CARDS: CardDef[] = [
       { minSuccesses: 0, effects: [d(3)] },
       { minSuccesses: 1, effects: [d(5), { kind: 'steal', amount: 4 }] },
       { minSuccesses: 2, effects: [d(7), { kind: 'steal', amount: 8 }] },
-    ],
-  },
-  {
-    id: 'smokeStep',
-    name: '煙玉',
-    category: 'skill',
-    stat: 'agi',
-    cost: 1,
-    slots: 2,
-    baseChance: 80,
-    target: 'self',
-    tiers: [
-      { minSuccesses: 0, effects: [b(4)] },
-      { minSuccesses: 1, effects: [b(6), { kind: 'draw', amount: 1 }] },
-      { minSuccesses: 2, effects: [b(8), { kind: 'draw', amount: 1 }] },
     ],
   },
   {

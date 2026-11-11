@@ -20,7 +20,7 @@ export const weaponsInstrument: ItemDef[] = [
   {
     id: "wellspringLute", name: "湧泉のリュート", slot: "weapon", weaponType: "instrument", rarity: "epic", icon: "instrument",
     description: "自分が「応援」を付けた味方のカードが完全成功したら、自分が1枚引く。1ターンに1回。（1人の時は、自分でも成立）", stats: {"luk":4,"vit":4}, tags: ["support","draw"],
-    cards: [{"cardId":"wtInstFinale","count":1},{"cardId":"wtInstHymn","count":1}],
+    cards: [{"cardId":"axRoundSong","count":2,"soloCardId":"wtInstFinale"}],
     ability: {"name":"輪唱","description":"自分が「応援」を付けた味方のカードが完全成功したら、自分が1枚引く。1ターンに1回。（1人の時は、自分でも成立）","effect":{"when":"cheerPerfect","if":[{"kind":"oncePerTurn","key":"wellspringLute"}],"do":[{"kind":"draw","amount":1}]}},
   },
   // レジェンド

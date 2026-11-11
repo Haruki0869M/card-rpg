@@ -30,6 +30,6 @@ export const priest: ClassDef = {
   tier: 'base',
   lineage: 'sei',
   startingEquipment: { weapon: 'woodScepter', armor: 'travelerClothes' },
-  cardPool: ['mend', 'smite', 'blessing', 'prayerOfLight', 'guard', 'sacredHymn', 'judgmentLight', 'shieldOfFaith', 'renew'],
+  cardPool: ['mend', 'smite', 'blessing', 'prayerOfLight', 'guard', 'sacredHymn', 'judgmentLight', 'shieldOfFaith', 'renew', 'axOverflowBlessing'],
   growthWeights: { per: 3, vit: 2, int: 1 },
 };

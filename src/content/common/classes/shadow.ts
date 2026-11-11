@@ -27,6 +27,6 @@ export const shadow: ClassDef = {
   from: ['thief'],
   signature: ['vitalStab', 'caltrops', 'shadowKill'],
   startingEquipment: { weapon: 'rustyDagger', armor: 'travelerClothes' },
-  cardPool: ['vitalStab', 'caltrops', 'shadowKill', 'smokeVeil', 'poisonNeedle', 'assassinate'],
+  cardPool: ['vitalStab', 'caltrops', 'shadowKill', 'smokeVeil', 'poisonNeedle', 'assassinate', 'axVenomBurst', 'axCollapse'],
   growthWeights: { agi: 3, dex: 3, per: 1 },
 };

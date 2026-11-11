@@ -11,4 +11,5 @@ export const swordSaint: ClassDef = {
   exploreAbility: { id: 'swordSaintExplore', name: '剣気', description: '奇襲の判定+25%', effect: { kind: 'checkBonus', check: 'ambush', bonus: 25 } },
   requires: { feat: 'perfects', count: 22, text: '完全成功22回' },
   cardPool: ["saintSlash","heavenBlade","swordSanctuary","calmBlade","saintFinale"], signature: ["saintSlash","heavenBlade","swordSanctuary"],
+  jobCards: ['fxHeavenDragon'], // 区切りD: 決め技（転職した時に山札へ1枚）
 };

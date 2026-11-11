@@ -2,7 +2,7 @@
 // カードの印は効果から自動で付ける（属性・状態異常・ブロック・回復・連撃・一撃・コスト…）＋ カードの tags。
 // 報酬の3枚のうち2枚は、今の山札・装備の印と重なるほど出やすい。残り1枚は完全ランダム（新しい方向の発見）。
 import { BALANCE } from '../../data/balance';
-import { CARDS } from '../../data/cards';
+import { CARDS, cardLineages, cardWeaponTypes } from '../../data/cards';
 import { CLASSES, getClass } from '../../data/classes';
 import type { CardDef, Effect, Hero } from '../../types';
 import type { Rng } from '../rng';
@@ -83,10 +83,17 @@ export function synergyWeight(card: CardDef, profile: Map<string, number>, stren
 /** 候補の基本の重み: ジョブ専用は1、武器種・系統のカードは balance.cardPoolWeight（候補が増えても専用カードが埋もれないように） */
 export function poolWeight(card: CardDef, hero: Hero): number {
   const W = BALANCE.cardPoolWeight;
-  if (card.weaponType) return getClass(hero.classId).weaponType === card.weaponType ? W.mainWeapon : W.subWeapon;
-  if (card.lineage) return W.lineage;
+  const wts = cardWeaponTypes(card);
+  if (wts.length) {
+    const cls = getClass(hero.classId);
+    if (wts.includes(cls.weaponType)) return W.mainWeapon;
+    // 武器種のほかに、このジョブの専用・系統にも置かれているカード（区切りD）は、その重みで
+    if ((cls.subWeapons ?? []).some((w) => wts.includes(w))) return W.subWeapon;
+  }
+  if ([hero.classId, ...(hero.jobs ?? [])].some((id) => getClass(id).cardPool.includes(card.id))) return card.common ? W.common : 1;
+  if (cardLineages(card).length) return W.lineage;
   if (card.common) return W.common;
-  return 1;
+  return wts.length ? W.subWeapon : 1;
 }
 
 /** 候補から1枚選ぶ。smart = 好みで重み付けする */

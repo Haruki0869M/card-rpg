@@ -57,7 +57,7 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
   // 強奪・BREAK で次の行動の数値が変わっている時は、その値で出す（実際の行動と同じ計算）
   const mul = enemy.nextActionMultiplier ?? 1;
   for (const raw of action.effects) {
-    const eff = mul !== 1 && 'amount' in raw ? { ...raw, amount: Math.floor(raw.amount * mul) } : raw;
+    const eff = mul !== 1 && 'amount' in raw && raw.amount !== undefined ? { ...raw, amount: Math.floor(raw.amount * mul) } : raw;
     const to = targetOf(eff);
     if (eff.kind === 'damage') {
       const hits = eff.hits ?? 1;

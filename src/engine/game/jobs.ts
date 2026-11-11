@@ -4,7 +4,7 @@ import { facilityMembers, facilityVisit } from './world/facilities';
 // 転職するとLv1に戻る。成長ボーナス・山札・装備は引き継ぎ、前のジョブの戦闘の特殊能力を1つ持ち越す。
 // 基本→中位 = 戦闘・探索中以外 / 中位→最上位 = 町の聖堂・祠・神殿 / 中位→特殊 = 神殿・対応する祭壇
 import { BALANCE } from '../../data/balance';
-import { CARDS } from '../../data/cards';
+import { CARDS, cardLineages, cardWeaponTypes } from '../../data/cards';
 import { CLASSES, getClass } from '../../data/classes';
 import { getItem } from '../../data/items';
 import { SANCTUARIES } from '../../data/world';
@@ -185,8 +185,8 @@ export function announceJobs(game: GameState, hero: Hero) {
  * ジョブ寄りの候補（報酬のカードの「必ず1枚」に使う。K7）: 今と前のジョブの専用カード・今のジョブの系統のカード・
  * 装備している武器の種類のカード（武器が無ければ、そのジョブの得意な武器）。共通カード・異端カードは入れない
  */
-export function heroJobCardPool(hero: Hero): string[] {
-  const pool = heroCardPool(hero);
+export function heroJobCardPool(hero: Hero, solo = false): string[] {
+  const pool = heroCardPool(hero, solo);
   const own = new Set<string>();
   for (const cls of [hero.classId, ...(hero.jobs ?? [])]) for (const id of getClass(cls).cardPool) own.add(id);
   const w = hero.equipment.weapon;
@@ -194,21 +194,26 @@ export function heroJobCardPool(hero: Hero): string[] {
   const lineage = getClass(hero.classId).lineage;
   return pool.filter((id) => {
     const c = CARDS.get(id);
-    if (c.common || c.heresy) return false;
-    if (c.weaponType) return c.weaponType === weapon;
-    if (c.lineage) return c.lineage === lineage;
-    return own.has(id);
+    if (c.heresy) return false;
+    // 1枚が複数の場所に置かれている時（区切りD）: 自分のジョブのカード・今の武器・系統のどれかに当たれば入る
+    if (own.has(id)) return true;
+    if (c.common) return false;
+    const wts = cardWeaponTypes(c);
+    const lins = cardLineages(c);
+    if (!wts.length && !lins.length) return own.has(id);
+    return wts.includes(weapon) || (!!lineage && lins.includes(lineage));
   });
 }
 
-export function heroCardPool(hero: Hero): string[] {
+/** solo = 1人プレイ（キャラが1人）。連携のカード（teamOnly）は入れない */
+export function heroCardPool(hero: Hero, solo = false): string[] {
   const ids = new Set<string>();
   for (const cls of [hero.classId, ...(hero.jobs ?? [])]) for (const id of getClass(cls).cardPool) if (CARDS.has(id)) ids.add(id);
   const weapons = new Set(jobWeapons(hero.classId));
   const lineage = getClass(hero.classId).lineage;
   for (const c of CARDS.all) {
-    if (c.heresy) continue;
-    if (c.common || (c.weaponType && weapons.has(c.weaponType)) || (c.lineage && c.lineage === lineage)) ids.add(c.id);
+    if (c.heresy || (solo && c.teamOnly)) continue;
+    if (c.common || cardWeaponTypes(c).some((w) => weapons.has(w)) || (!!lineage && cardLineages(c).includes(lineage))) ids.add(c.id);
   }
-  return [...ids];
+  return solo ? [...ids].filter((id) => !CARDS.get(id).teamOnly) : [...ids];
 }

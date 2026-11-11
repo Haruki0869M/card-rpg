@@ -13,8 +13,9 @@ export function chargedMultiplier(source: Unit, card?: CardDef): number {
   return source.attackCharge.multiplier;
 }
 
-export const tierHpCost = (tier: CardTier) => tier.effects.reduce((n, e) => n + (e.kind === 'payHp' ? e.amount : 0), 0);
-export const cardHpCost = (card: CardDef) => Math.max(0, ...card.tiers.map(tierHpCost));
+/** カードで払うHP。hp = 今のHP（「今のHPの〇%」を払うカードのため。区切りD） */
+export const tierHpCost = (tier: CardTier, hp = 0) => tier.effects.reduce((n, e) => n + (e.kind === 'payHp' ? (e.pct ? Math.max(1, Math.floor((hp * e.pct) / 100)) : (e.amount ?? 0)) : 0), 0);
+export const cardHpCost = (card: CardDef, hp = 0) => Math.max(0, ...card.tiers.map((t) => tierHpCost(t, hp)));
 export function afterAttackCard(ally: AllyState, card: CardDef, tier: CardTier) {
   if (!tier.effects.some(e => e.kind === 'damage')) return;
   if (ally.attackCharge?.category === card.category) delete ally.attackCharge;

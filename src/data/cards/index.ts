@@ -24,5 +24,15 @@ export function getCard(id: string, upgraded?: boolean): CardDef {
   return u;
 }
 
+/** カードを置く武器種の全部（weaponType ＋ weaponTypes） */
+export function cardWeaponTypes(c: CardDef): string[] {
+  return [...(c.weaponType ? [c.weaponType] : []), ...(c.weaponTypes ?? [])];
+}
+
+/** カードを置く系統の全部（lineage ＋ lineages） */
+export function cardLineages(c: CardDef): string[] {
+  return [...(c.lineage ? [c.lineage] : []), ...(c.lineages ?? [])];
+}
+
 /** カードの実体から定義を引く（強化の有無を反映） */
 export const cardOf = (c: Pick<CardInstance, 'cardId' | 'upgraded'>) => getCard(c.cardId, c.upgraded);

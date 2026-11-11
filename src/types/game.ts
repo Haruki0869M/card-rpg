@@ -55,7 +55,8 @@ export interface ItemDef {
   goldBonus?: number;
   extraDraw?: number;
   /** 装備中に山札へ加わるカード（武器） */
-  cards?: { cardId: string; count: number }[];
+  /** soloCardId = 戦闘に1人だけの時は、こちらのカードになる（湧泉のリュート: 輪唱 → 終曲。区切りD） */
+  cards?: { cardId: string; count: number; soloCardId?: string }[];
   /** 報酬のスマート抽選に使う印（この装備と相性の良いカードが出やすくなる。例: "fire"・"poison"） */
   tags?: string[];
   /** 消費アイテムの効果 */
