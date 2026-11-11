@@ -32,7 +32,7 @@ import { applyEffect, checkEffect, comboMultiplier, dealDamage, elementMultiplie
 import { decideAllIntents } from './intents';
 import { finalChance, selectTier } from './probability';
 import { helpedAllies, recordSupport, selfSnapshot, supportSnapshot } from './support';
-import { afterAttackCard, attackElement, cardElements, cardHpCost, chargedMultiplier, tierHpCost } from './cardState';
+import { afterAttackCard, attackElement, consumeAttackCharge, cardElements, cardHpCost, chargedMultiplier, tierHpCost } from './cardState';
 import { slotPreviewLimitOf } from './preview';
 import { isStrikingSummon, summonStrikeOnce } from './summons';
 import { activeStatuses, actionFailChanceOf, applyTick, chancePenaltyOf, consumeStatus, decayStatuses, emptyStatuses, skipActionStatus, takeDrawPenalty, takeManaPenalty, tickHealOf } from './statuses';
@@ -507,6 +507,7 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   ctx.successes = successes;
   if (target && tier.effects.some(e => e.kind === 'damage')) ally.lastTargetId = unitIdOf(target);
   for (const eff of tier.effects) applyEffect(ctx, eff);
+  consumeAttackCharge(ally, card, tier);
   const supportedOthers = recordSupport(ally, state.allies, supportBefore);
   // 支援が成立した味方（1人パーティの時は、自分への支援でも成立。伴奏・助け合いの調べ）
   const supportedSelf = helpedAllies(state.allies, selfBefore).length > 0;

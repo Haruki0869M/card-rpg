@@ -9,6 +9,7 @@ import { ENEMIES } from '../../data/enemies';
 import type { BattleState, CardDef, Command, GameState, PlayerId } from '../../types';
 import { applyCommand, createBattle, createGame, toPartyMember } from '../index';
 import { STATE_VERSION } from '../battle/battle';
+import { SHARPEN_TRAITS } from '../../content/common/sharpenTraits';
 import { heroCardPool, heroJobCardPool } from '../game/jobs';
 import { cardTraitAbilities, damageModifiers } from '../abilities';
 import { applyEffect, comboMultiplier, comboStage, makeCtx } from '../battle/effects';
@@ -111,7 +112,8 @@ describe('区切りD-1: 例外の2組', () => {
     expect(s.allies[0].summons?.some((x) => x.id === 'turret')).toBe(true);
     const before = s.enemies[0].hp;
     const r = use(s, 'machineVolley', { focus: 'max' });
-    expect(r.state.allies[0].summons?.find((x) => x.id === 'turret')?.turns, '残りターンは減らない').toBe(s.allies[0].summons!.find((x) => x.id === 'turret')!.turns);
+    // 残りターンは減らない（完全成功なので、区切りD-5 の《弾幕》で+1）
+    expect(r.state.allies[0].summons?.find((x) => x.id === 'turret')?.turns).toBe(s.allies[0].summons!.find((x) => x.id === 'turret')!.turns + 1);
     expect(r.state.log.some((l) => l.text.includes('砲台が') && l.text.includes('号令'))).toBe(true);
     const s2 = battle(['machinist']);
     const r2 = use(s2, 'samuraiSwallow', { focus: 'max' });
@@ -648,5 +650,38 @@ describe('区切りD: 「最大〇〇」は、倍率を掛けた後のダメー�
     const g = battle(['guardian']);
     g.allies[0].block = 99;
     expect(lostHp(g, use(g, 'axShieldSlam', { focus: 'max' }).state)).toBe(60);
+  });
+});
+
+// ===================== 区切りD-5: 《研ぎ澄まし》の差し替え =====================
+describe('区切りD-5: 《研ぎ澄まし》25枚を、ジョブに合う力へ', () => {
+  it('《研ぎ澄まし》の付いたカードは、もう無い。差し替えた25枚の能力の名前は全部ちがう', () => {
+    expect(CARDS.all.filter((c) => c.trait?.name === '研ぎ澄まし').map((c) => c.id)).toEqual([]);
+    const names = Object.keys(SHARPEN_TRAITS).map((id) => getCard(id).trait?.name);
+    expect(names).toHaveLength(25);
+    expect(new Set(names).size).toBe(25);
+  });
+  it('燕返し《残心》: 完全成功で居合を1段（次の物理×2）', () => {
+    const r = use(battle(['samurai']), 'samuraiSwallow', { focus: 'max' });
+    expect(r.state.allies[0].attackCharge?.multiplier).toBe(2);
+  });
+  it('魂喰らい《魂の収穫》: 完全成功で屍兵を1体', () => {
+    const r = use(battle(['necromancer']), 'graveFeast', { focus: 'max' });
+    expect(r.state.allies[0].summons?.filter((x) => x.group === 'skeletonSoldier').length).toBe(1);
+  });
+  it('星明かりの恵み《星の巡り》: 星読みを1回分取り戻す', () => {
+    const s = battle(['astrologer']);
+    s.allies[0].slotPreviewUsed = 1;
+    const r = use(s, 'starGift', { focus: 'max' });
+    expect(r.state.allies[0].slotPreviewUsed).toBe(0);
+  });
+  it('閃光拳《連打》: 使った枚数を1枚多く数える', () => {
+    const r = use(battle(['brawler']), 'fistFlurry', { focus: 'max' });
+    expect(r.state.allies[0].played).toBe(2);
+  });
+  it('吸命剣《血の契り》: 1戦闘1回だけ、HPが1より下がらなくなる', () => {
+    const s = battle(['darkKnight']);
+    const r = use(s, 'bloodDrain', { focus: 'max' });
+    expect(r.state.allies[0].abilities?.some((a) => a.name === '血の契り')).toBe(true);
   });
 });

@@ -93,7 +93,11 @@ describe('侍の居合', () => {
   it('2回攻撃の各回に倍率とブロックを適用し、1枚使うと消費する', () => {
     let s = nextTurn(battle('samurai')); const e = s.enemies[0]; e.block = 5;
     const hp = e.hp; s = use(s, 'samuraiSwallow');
-    expect(hp - s.enemies[0].hp).toBe(31); expect(s.allies[0].attackCharge).toBeUndefined();
+    expect(hp - s.enemies[0].hp).toBe(31);
+    // 蓄えた×4は使い切る。完全成功なら、燕返し《残心》（区切りD-5）で新しく×2を蓄える
+    const perfect = s.log.at(-1)!.text.includes('完全成功');
+    expect(s.allies[0].attackCharge?.multiplier).toBe(perfect ? 2 : undefined);
+    delete s.allies[0].attackCharge;
     const hp2 = s.enemies[0].hp; s = use(s, 'machineShot'); expect(hp2 - s.enemies[0].hp).toBe(9);
   });
   it('予測と実ダメージが一致し、魔法攻撃では消費しない', () => {
