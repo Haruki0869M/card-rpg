@@ -3,13 +3,14 @@
 //  - 新しい条件: conditions/ にファイルを1つ置く
 //  - 新しい効果: src/engine/battle/effects/kinds/ にファイルを1つ置く
 //  - 職業IDや能力名による分岐は書かない
+import { BALANCE } from '../../data/balance';
 import { getClass } from '../../data/classes';
 import { getElement } from '../../data/elements';
 import { getEnemy } from '../../data/enemies';
 import { getStatus } from '../../data/statuses';
 import type { AbilityCondition, AbilityDef, AbilityNotice, AbilitySource, AbilityEffect, AbilityTrigger, BattleEvent, BattleState, CardDef, DamageScale, Effect } from '../../types';
 import { applyEffect, describeEffect, makeCtx } from '../battle/effects';
-import { abilityTriggered, addLog, isEnemy, nameOf, type Unit, unitIdOf } from '../battle/units';
+import { abilityTriggered, addLog, foesOf, isEnemy, nameOf, type Unit, unitIdOf } from '../battle/units';
 import type { Rng } from '../rng';
 import type { CondCtx, ConditionHandler } from './conditions/types';
 
@@ -62,13 +63,15 @@ export interface DamageMods {
 export function damageModifiers(state: BattleState | undefined, source: Unit, card: CardDef | undefined, victim: Unit | undefined, cardAbilities?: AbilityDef[], perfect?: boolean, element?: string): DamageMods {
   const out: DamageMods = { multiplier: isEnemy(source) ? source.attackMul : 1 + (source.damageBonus ?? 0), active: [], ignoreBlock: false };
   const c: CondCtx = { state, self: source, card, target: victim, perfect };
+  // 弱点のダメージを増やす能力は、まとめて上限を掛ける（弱点 ×1.5 と合わせて BALANCE.elementWeakMax まで）
+  let weak = 1;
   for (const ab of cardAbilities?.length ? [...abilitiesOf(source), ...cardAbilities] : abilitiesOf(source)) {
     const e = ab.effect;
     if (!('modifier' in e)) continue;
     if (e.modifier === 'weaknessDamage') {
       const el = element ?? (card?.category === 'physical' && !isEnemy(source) ? source.weaponElement : undefined);
       if (el && victim && isEnemy(victim) && getEnemy(victim.defId).weak?.includes(el) && !getEnemy(victim.defId).resist?.includes(el) && testConditions(e.if, c)) {
-        out.multiplier *= e.multiplier;
+        weak *= e.multiplier;
         out.active.push({ name: ab.name, source: ab.source ?? { kind: 'card', id: card?.id, label: card?.name } });
       }
       continue;
@@ -85,6 +88,7 @@ export function damageModifiers(state: BattleState | undefined, source: Unit, ca
       out.ignoreBlockNotice ??= { name: ab.name, source: ab.source ?? { kind: 'card', id: card?.id, label: card?.name } };
     }
   }
+  out.multiplier *= Math.min(weak, BALANCE.elementWeakMax / BALANCE.elementWeakMul);
   return out;
 }
 
@@ -183,6 +187,44 @@ export function summonTwiceOf(u: Unit): AbilityDef | undefined {
   return abilitiesOf(u).find((ab) => 'modifier' in ab.effect && ab.effect.modifier === 'summonTwice');
 }
 
+/** 砲台・罠・召喚の残りターンの上乗せ（歯車の目。合計） */
+export function summonTurnsBonus(u: Unit): number {
+  let n = 0;
+  for (const ab of abilitiesOf(u)) if ('modifier' in ab.effect && ab.effect.modifier === 'summonTurns') n += ab.effect.add;
+  return n;
+}
+
+/**
+ * 敵から悪い状態異常を受けるはずの時に、防ぐ能力（statusGuard）があれば防ぐ。防いだら true（状態異常は付けない）。
+ * 自分の能力を先に見て、次に生きている仲間の「味方全員を守る」能力を見る。
+ * 回数は「守られる人」の counters に数える（乱数は使わない。保存して再開しても・オンラインでも同じ結果）
+ */
+export function guardStatus(state: BattleState, events: BattleEvent[], victim: Unit, status: string): boolean {
+  if (isEnemy(victim) || victim.dead || !getStatus(status).harmful) return false;
+  const counters = ((victim as { counters?: Record<string, number> }).counters ??= {});
+  for (const holder of [victim, ...state.allies.filter((u) => u !== victim && !u.dead)]) {
+    for (const ab of abilitiesOf(holder)) {
+      const e = ab.effect;
+      if (!('modifier' in e) || e.modifier !== 'statusGuard') continue;
+      if (holder !== victim && !e.allies) continue;
+      if (e.statuses && !e.statuses.includes(status)) continue;
+      const k = `battle:statusGuard:${unitIdOf(holder)}:${ab.name}`;
+      if (e.perBattle !== undefined) {
+        if ((counters[k] ?? 0) >= e.perBattle) continue;
+        counters[k] = (counters[k] ?? 0) + 1;
+      }
+      if (e.block) {
+        victim.block += e.block;
+        events.push({ type: 'block', unitId: unitIdOf(victim), amount: e.block });
+      }
+      abilityTriggered(state, unitIdOf(holder), ab.name, events, ab.source);
+      addLog(state, `${nameOf(holder)}の「${ab.name}」！ ${nameOf(victim)}は「${getStatus(status).name}」を防いだ${e.block ? `（ブロック${e.block}）` : ''}`);
+      return true;
+    }
+  }
+  return false;
+}
+
 /** 回復した量をブロックにも変える能力（福音）。割合が一番大きい物 */
 export function healToBlockOf(u: Unit): { pct: number; ability: AbilityDef } | undefined {
   let best: { pct: number; ability: AbilityDef } | undefined;
@@ -229,16 +271,41 @@ export function fireAbilities(
     if (!any) continue;
     abilityTriggered(state, unitIdOf(owner), ab.name, events, ab.source ?? (opts.list ? { kind: 'card', id: opts.card?.id, label: opts.card?.name } : undefined));
     for (const n of ctx.fired) abilityTriggered(state, unitIdOf(owner), n.name, events, n.source);
-    // お供の活躍の回数（戦績に出す）
-    if (ab.pet) {
-      const c = ((owner as { counters?: Record<string, number> }).counters ??= {});
-      c.petActs = (c.petActs ?? 0) + 1;
-    }
+    if (ab.pet) afterPetAct(state, rng, events, owner, opts.depth ?? 0);
     const res = ctx.parts.join(' ');
     out.push(res ? `${ab.name}（${res}）` : ab.name);
     addLog(state, `${nameOf(owner)}の「${ab.name}」！ ${res}`);
   }
   return out;
+}
+
+/** お供が行動した後: 活躍の回数（戦績に出す）を数え、きっかけ「お供が行動した時」（相棒の鈴など）を起こす */
+function afterPetAct(state: BattleState, rng: Rng, events: BattleEvent[], owner: Unit, depth: number) {
+  const c = ((owner as { counters?: Record<string, number> }).counters ??= {});
+  c.petActs = (c.petActs ?? 0) + 1;
+  if (depth < 3) fireAbilities(state, rng, events, owner, 'petAct', { depth: depth + 1 });
+}
+
+/**
+ * お供が1回行動する（夢つかみ）。お供の発動型の能力を1つだけ、きっかけと条件を見ずに発動する。
+ * 戦闘開始時ではない能力を先に選ぶ（無ければ戦闘開始時の能力をもう1回）。対象が要る効果は、先頭の生きている敵へ。
+ * 何も起きなかった時（例: まだカードを使っていないターンの子狼）は undefined
+ */
+export function petActOnce(state: BattleState, rng: Rng, events: BattleEvent[], owner: Unit, depth = 0): string | undefined {
+  if (owner.dead || isEnemy(owner)) return undefined;
+  const list = abilitiesOf(owner).filter((ab) => ab.pet && isTriggered(ab.effect));
+  const ab = list.find((a) => isTriggered(a.effect) && a.effect.when !== 'battleStart') ?? list[0];
+  if (!ab || !isTriggered(ab.effect)) return undefined;
+  const ctx = makeCtx(state, rng, events, owner, { target: foesOf(state, owner)[0], depth });
+  let any = false;
+  for (const eff of ab.effect.do) any = applyEffect(ctx, eff) || any;
+  if (!any) return undefined;
+  abilityTriggered(state, unitIdOf(owner), ab.name, events, ab.source);
+  for (const n of ctx.fired) abilityTriggered(state, unitIdOf(owner), n.name, events, n.source);
+  afterPetAct(state, rng, events, owner, depth);
+  const res = ctx.parts.join(' ');
+  addLog(state, `${nameOf(owner)}の「${ab.name}」！ ${res}`);
+  return res ? `${ab.name}（${res}）` : ab.name;
 }
 
 // ---------- 説明文（データの中身から自動で作る） ----------
@@ -256,6 +323,7 @@ const TRIGGER_TEXT: Record<AbilityTrigger, string> = {
   blocked: '攻撃をブロックで完全に防いだ時',
   inflict: '敵に状態異常を与えた時',
   foeTick: '敵が継続ダメージを受けた時',
+  petAct: 'お供が行動した時',
 };
 
 const condText = (conds?: AbilityCondition[]) => (conds ?? []).map((c) => conditionHandler(c.kind).describe(c as never));
@@ -269,6 +337,13 @@ export function describeAbility(ab: AbilityDef, side: 'ally' | 'enemy' = 'ally')
     if (e.modifier === 'keepBlock') return `ターンの始めに、前のターンのブロックが最大${e.max}まで残る`;
     if (e.modifier === 'summonTwice') return '自分の砲台・罠・召喚が2回ずつ発動する';
     if (e.modifier === 'healToBlock') return `HPを回復した時、回復した量の${Math.round(e.pct * 100)}%のブロックも得る`;
+    if (e.modifier === 'summonTurns') return `自分の砲台・罠・召喚の残りターン+${e.add}`;
+    if (e.modifier === 'statusGuard') {
+      const what = e.statuses ? e.statuses.map((x) => `「${getStatus(x).name}」`).join('') : '悪い状態異常';
+      const tail = e.block ? `。防いだ時、ブロック${e.block}` : '';
+      if (e.perBattle !== undefined) return `1回の戦闘で${e.perBattle}回、${e.allies ? '味方全員が、それぞれ' : ''}敵から受ける${what}を防ぐ${tail}`;
+      return `${e.allies ? '味方全員が、' : ''}敵から${what}を受けない${tail}`;
+    }
     const cs = condText(e.if);
     const head = cs.length ? `${cs.join('・')}：` : '';
     if (e.modifier === 'cardChance') return `${head}成功率+${e.bonus}%`;
@@ -279,7 +354,7 @@ export function describeAbility(ab: AbilityDef, side: 'ally' | 'enemy' = 'ally')
     if (e.modifier === 'chestChance') return `宝箱の運の判定+${e.bonus}%`;
     if (e.modifier === 'elementGuard') return `${head}${getElement(e.element).name}属性のダメージを${e.mode === 'immune' ? '無効にする' : e.mode === 'absorb' ? '受けず、その分回復する' : '半分にする'}`;
     if (e.modifier === 'convertElement') return `${head}属性の無い物理攻撃が${getElement(e.into).name}属性になる`;
-    if (e.modifier === 'weaknessDamage') return `${head}弱点属性のダメージ×${e.multiplier}`;
+    if (e.modifier === 'weaknessDamage') return `${head}弱点属性のダメージ×${Math.round(e.multiplier * 100) / 100}（弱点の倍率は合わせて×${BALANCE.elementWeakMax}まで）`;
     if (e.modifier === 'statusBonus') return `${head}自分が付ける${e.statuses.map((x) => `「${getStatus(x).name}」`).join('')}+${e.amount}`;
     if (e.modifier === 'damageDealt') return `${head}${e.multiplier !== 1 ? `与えるダメージ×${e.multiplier}${e.scale ? '、さらに' : ''}` : ''}${e.scale ? scaleText(e.scale) : ''}`;
     return `${head}ダメージが敵のブロックを無視する`;

@@ -15,7 +15,6 @@ import {
   dungeonNavigator,
   exploredPercent,
   findPath,
-  migrateGame,
   posOf,
   reachableRooms,
   revealSeen,
@@ -275,49 +274,6 @@ describe('歩くのは手番のキャラの担当の人だけ（扉は全員一�
       return g;
     };
     expect(play()).toEqual(play());
-  });
-});
-
-describe('古い保存（v14）の移行', () => {
-  it('ダンジョンの途中: 今の部屋に立ち、通った部屋が見える。古い「探索力」の項目は捨てる', () => {
-    let { g, x } = inTemple(['P1', 'P1']);
-    g = run(g, inScene(x, { type: 'ENTER_ROOM', playerId: 'P1', roomId: 'r0c0' }));
-    const old = structuredClone(g) as GameState & { version: number };
-    const d = old.expeditions![0].dungeon!;
-    d.rooms.find((r) => r.id === 'r0c0')!.cleared = true;
-    delete d.pos;
-    delete d.seen;
-    (d as unknown as Record<string, unknown>).explore = 3;
-    old.version = 14;
-    if (old.expeditions![0].battle) old.expeditions![0].battle.version = 14;
-    const m = migrateGame(JSON.parse(JSON.stringify(old)))!;
-    expect(m).not.toBeNull();
-    expect(m.version).toBe(17);
-    const md = m.expeditions![0].dungeon!;
-    const c = dungeonGrid(md).roomCell.get('r0c0')!;
-    expect(md.pos).toEqual({ x: c.x, y: c.y, facing: 0 });
-    expect(md.seen).toContain(cellKey(c.x, c.y));
-    expect('explore' in md).toBe(false);
-    expect(m.expeditions![0].battle?.version).toBe(17);
-    // 移した後も、次の部屋の扉まで歩いて行ける
-    const next = reachableRooms(md);
-    expect(next.length).toBeGreaterThan(0);
-    for (const r of next) expect(findPath(md, doorFront(md, r.id)!)).toBeDefined();
-  });
-
-  it('まだ部屋に入っていない保存は入口に立つ（判定前の null も捨てる）', () => {
-    const { g } = inTemple(['P1', 'P1']);
-    const old = structuredClone(g) as GameState & { version: number };
-    const d = old.expeditions![0].dungeon!;
-    delete d.pos;
-    delete d.seen;
-    (d as unknown as Record<string, unknown>).explore = null;
-    old.version = 14;
-    const m = migrateGame(JSON.parse(JSON.stringify(old)))!;
-    const md = m.expeditions![0].dungeon!;
-    expect(md.pos).toEqual({ ...dungeonGrid(md).start, facing: 0 });
-    expect('explore' in md).toBe(false);
-    expect(md.seen!.length).toBeGreaterThan(0);
   });
 });
 

@@ -41,6 +41,8 @@ import {
   voters,
   walkableKeys,
   activeCells,
+  mapKnowledge,
+  partyMapReveal,
   type MapCell,
 } from '../../engine';
 import { BALANCE } from '../../data/balance';
@@ -179,7 +181,8 @@ function MapCells({ run, cell, x0, yTop, left = 0, top = 0, only, target, onTap,
   const game = useBattle((s) => s.game);
   const grid = dungeonGrid(run);
   const pos = posOf(run);
-  const seen = new Set(run.seen ?? []);
+  // 見たマス ＋ 装備の力（羅針盤・星図）で最初から出るマス。typed = 入る前から種類が分かる部屋
+  const { seen, typed } = mapKnowledge(run, game ? partyMapReveal(game) : undefined);
   const walk = walkableKeys(run);
   // 選ばなかった扉・その扉へだけ続いていた通路は描かない（古い保存データで見たことになっていても）
   const act = activeCells(run);
@@ -194,11 +197,13 @@ function MapCells({ run, cell, x0, yTop, left = 0, top = 0, only, target, onTap,
         const isTarget = !!target && target.x === c.x && target.y === c.y;
         const room = c.roomId ? run.rooms.find((r) => r.id === c.roomId) : undefined;
         const known = !!room && (room.cleared || room.id === run.currentRoomId);
+        // 絵と色だけ、種類が分かる部屋（羅針盤の休憩部屋）も「分かっている」見た目にする。扉の開け閉めの決まりは変えない
+        const shown = known || (!!room && typed.has(room.id));
         const t = room ? roomStyle(room.type) : undefined;
         const openable = !!room && !known && reach.has(room.id);
         const omen = room && game ? doorOmen(game, room) : undefined;
         // 次の行の扉は予兆の色が付く。それより先の扉は、入るまで分からない（ボスの扉だけは見て分かる）
-        const Icon = !room || !t ? null : known ? t.Icon : t.boss ? Crown : openable ? DoorClosed : DoorClosedLocked;
+        const Icon = !room || !t ? null : shown ? t.Icon : t.boss ? Crown : openable ? DoorClosed : DoorClosedLocked;
         const Tag = onTap ? 'button' : 'span';
         const cellPins = pinsOf?.(c) ?? [];
         return (
@@ -219,17 +224,17 @@ function MapCells({ run, cell, x0, yTop, left = 0, top = 0, only, target, onTap,
               width: cell - 2,
               height: cell - 2,
               borderRadius: room ? Math.max(3, cell / 6) : 2,
-              background: room && t ? (known ? t.bg : '#2a2018') : walk.has(k) ? '#3a3328' : '#211d18',
+              background: room && t ? (shown ? t.bg : '#2a2018') : walk.has(k) ? '#3a3328' : '#211d18',
               border: `${small ? 1 : 2}px solid ${cellPins.length ? PLAYER_COLOR[cellPins[0].seat] : isTarget ? '#fff' : omen ? OMEN_INFO[omen].color : openable ? '#ffd76a' : room ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.08)'}`,
               boxShadow: omen && !small ? `0 0 10px ${OMEN_INFO[omen].color}` : openable && !small ? '0 0 10px rgba(255,215,106,.6)' : undefined,
-              opacity: room && t && !known && !openable && !t.boss ? 0.55 : 1,
+              opacity: room && t && !shown && !openable && !t.boss ? 0.55 : 1,
             }}
             data-cell={onTap ? k : undefined}
             data-room={room && !known && openable ? room.id : undefined}
             data-door={onTap && room && !known ? (openable ? 'open' : 'closed') : undefined}
             aria-label={onTap ? (room && t ? (known ? t.name : t.boss ? 'ボスの扉' : openable ? '扉' : '開かない扉') : '通路') : undefined}
           >
-            {Icon && t && !here && <Icon size={Math.round(cell * 0.55)} strokeWidth={2.2} style={{ color: known ? t.color : t.boss ? '#ffcf4a' : openable ? '#ffd76a' : '#9a9080' }} />}
+            {Icon && t && !here && <Icon size={Math.round(cell * 0.55)} strokeWidth={2.2} style={{ color: shown ? t.color : t.boss ? '#ffcf4a' : openable ? '#ffd76a' : '#9a9080' }} />}
             {omen && !here && <OmenMark omen={omen} className="absolute -right-1.5 -top-1.5 !w-[46%]" />}
             {cellPins.length > 0 && (small ? (
               <span className="pin-pop absolute -inset-[2px] rounded-[4px] border-2" style={{ borderColor: PLAYER_COLOR[cellPins[0].seat], boxShadow: `0 0 6px ${PLAYER_COLOR[cellPins[0].seat]}` }} data-cell-pin />

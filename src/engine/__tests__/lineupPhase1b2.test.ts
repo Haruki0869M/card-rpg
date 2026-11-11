@@ -60,12 +60,12 @@ function without(s: BattleState, name: string) {
 }
 const lost = (s: BattleState, i = 0) => s.enemies[i].maxHp - s.enemies[i].hp;
 
-describe('9個の装備のデータ', () => {
+describe('7個の装備のデータ', () => {
   const rows: [id: string, ability: string, slot: string, rarity: string][] = [
     ['masterCore', '永久機関', 'accessory', 'legend'], ['goldenAnchor', '不動の錨', 'accessory', 'legend'],
     ['steelPlate', '蒸気反撃', 'armor', 'epic'], ['barnacleArmor', '棘の殻', 'armor', 'epic'], ['angelRobe', '福音', 'armor', 'epic'],
-    ['burnShelterPendant', '紅蓮の連鎖', 'accessory', 'epic'], ['burnRecoveryPendant', '紅蓮の大連鎖', 'accessory', 'legend'],
-    ['poisonShelterPendant', '猛毒の触媒', 'accessory', 'epic'], ['poisonRecoveryPendant', '猛毒の大触媒', 'accessory', 'legend'],
+    ['burnShelterPendant', '紅蓮の連鎖', 'accessory', 'epic'],
+    ['poisonShelterPendant', '猛毒の触媒', 'accessory', 'epic'],
   ];
   for (const [id, name, slot, rarity] of rows) {
     it(`${id}《${name}》: 名前が重ならず、説明が読め、場所とレア度は元のまま`, () => {
@@ -207,7 +207,7 @@ describe('天使の羽衣《福音》', () => {
   });
 });
 
-describe('紅蓮の飾り・紅蓮の大飾り', () => {
+describe('紅蓮の飾り（大飾りは区切りAで外した）', () => {
   it('エピック: 敵に「火傷」を与えるとブロック2', () => {
     const r = use(battle({ accessory: 'burnShelterPendant' }), 'fireball');
     const n = fired(r.events, '紅蓮の連鎖');
@@ -220,21 +220,11 @@ describe('紅蓮の飾り・紅蓮の大飾り', () => {
     expect(fired(r.events, '紅蓮の連鎖')).toBe(0);
     expect(r.state.allies[0].block).toBe(0);
   });
-  it('レジェンド: ブロックに加えて、火傷のダメージをすぐに与える。付ける「火傷」+1。火傷は減らない', () => {
-    const s = battle({ accessory: 'burnRecoveryPendant' });
-    const on = use(structuredClone(s), 'fireball');
-    const off = use(without(s, '紅蓮の大連鎖'), 'fireball');
-    const n = fired(on.events, '紅蓮の大連鎖');
-    expect(n).toBeGreaterThanOrEqual(1);
-    expect(on.state.allies[0].block).toBe(2 * n);
-    expect(st(on.state.enemies[0], 'burn')).toBe(st(off.state.enemies[0], 'burn') + 1);
-    expect(lost(on.state) - lost(off.state)).toBe(4 * n);
-  });
 });
 
-describe('猛毒の飾り・猛毒の大飾り', () => {
+describe('猛毒の飾り（大飾りは区切りAで外した）', () => {
   it('すでに「毒」の敵に付ける「毒」が+2。毒でない敵には増えない', () => {
-    for (const id of ['poisonShelterPendant', 'poisonRecoveryPendant']) {
+    for (const id of ['poisonShelterPendant']) {
       const s = battle({ accessory: id });
       const [a, e] = [s.allies[0], s.enemies[0]];
       expect(statusBonusOf(a, 'poison', undefined, e)).toBe(0);
@@ -249,24 +239,5 @@ describe('猛毒の飾り・猛毒の大飾り', () => {
     const on = use(structuredClone(s), 'poisonArrow');
     const off = use(without(s, '猛毒の触媒'), 'poisonArrow');
     expect(st(on.state.enemies[0], 'poison')).toBe(st(off.state.enemies[0], 'poison') + 2);
-  });
-  it('レジェンド: 敵が毒でダメージを受けるたびに、HPを2回復', () => {
-    const s = battle({ accessory: 'poisonRecoveryPendant' }, { enemies: 2 });
-    s.allies[0].hp -= 20;
-    const hp = s.allies[0].hp;
-    s.enemies[0].statuses.poison = 5;
-    s.enemies[1].statuses.poison = 3;
-    const r = endTurn(s);
-    expect(fired(r.events, '猛毒の大触媒')).toBe(2);
-    expect(r.state.allies[0].hp).toBe(hp + 4);
-  });
-  it('毒以外の継続ダメージ（火傷）では回復しない', () => {
-    const s = battle({ accessory: 'poisonRecoveryPendant' });
-    s.allies[0].hp -= 20;
-    const hp = s.allies[0].hp;
-    s.enemies[0].statuses.burn = 3;
-    const r = endTurn(s);
-    expect(fired(r.events, '猛毒の大触媒')).toBe(0);
-    expect(r.state.allies[0].hp).toBe(hp);
   });
 });

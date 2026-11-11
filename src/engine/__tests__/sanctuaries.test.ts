@@ -7,7 +7,7 @@ import { getScenario } from '../../data/scenarios';
 import { SANCTUARIES, TERRAINS } from '../../data/world';
 import type { ClassDef, GameCommand, GameState } from '../../types';
 import { actorOf, setLocalPlayers } from '../../store/battleConfig';
-import { applyCommand, applyGameCommand, createBattle, createGame, createRng, migrateGame } from '../index';
+import { applyCommand, applyGameCommand, createBattle, createGame, createRng } from '../index';
 import { makeCtx, dealDamage } from '../battle/effects';
 import { recordCheck } from '../game/checks';
 import { toPartyMember } from '../game/hero';
@@ -52,34 +52,6 @@ describe('神殿と祭壇の配置・旧保存の引き継ぎ', () => {
       }
       expect(fresh(seed)).toEqual(g);
     }
-  });
-  it('v8の地図・位置・霧・既存施設・乱数・進行中イベントを保ち、二重追加しない', () => {
-    const old = fresh(874651857); old.version = 8;
-    for (const t of old.world!.tiles) if (t.f?.kind === 'temple' || t.f?.kind === 'altar') delete t.f;
-    old.mode = 'event'; old.party = ['h1']; old.world!.turn = 'h1';
-    old.event = { eventId: 'rStrayBird', tile: old.world!.pos.h1, random: true };
-    const before = structuredClone(old);
-    const m = migrateGame(structuredClone(old))!;
-    expect(m).not.toBeNull(); expect(m.version).toBe(17);
-    expect(m.rngState).toBe(before.rngState); expect(m.event).toEqual(before.event); expect(m.party).toEqual(before.party); expect(m.mode).toBe('event');
-    const withoutFeatures = (g: GameState) => ({ ...g.world!, tiles: g.world!.tiles.map(({ f: _f, ...t }) => t) });
-    expect(withoutFeatures(m)).toEqual(withoutFeatures(before));
-    before.world!.tiles.forEach((t, i) => { if (t.f) expect(m.world!.tiles[i].f).toEqual(t.f); });
-    expect(m.world!.tiles.filter(t => t.f?.kind === 'temple' || t.f?.kind === 'altar')).toHaveLength(7);
-    expect(migrateGame(structuredClone(m))).toEqual(m);
-    const again = structuredClone(m); expect(addSanctuaries(again, again.world!)).toEqual([]); expect(again).toEqual(m);
-  });
-  it('v8の分離した戦闘を維持し、装備武器種を補って更新できる', () => {
-    const old = fresh(); old.version = 8;
-    const b = createBattle({ ...setup(2), party: [toPartyMember(old.heroes[0])] }); b.version = 8;
-    delete b.allies[0].equippedWeaponType;
-    old.expeditions = [{ id: 'x1', heroes: ['h0'], mode: 'battle', battle: b }];
-    const before = structuredClone(old);
-    const m = migrateGame(old)!;
-    expect(m.expeditions?.[0].battle?.version).toBe(17);
-    expect(m.expeditions?.[0].battle?.rngState).toBe(before.expeditions![0].battle!.rngState);
-    expect(m.expeditions?.[0].battle?.allies[0].equippedWeaponType).toBe('sword');
-    expect(m.expeditions?.[0].heroes).toEqual(['h0']);
   });
   it('空きマスがない地図では既存施設を上書きせず不足を返す', () => {
     const g = fresh(), w = g.world!;

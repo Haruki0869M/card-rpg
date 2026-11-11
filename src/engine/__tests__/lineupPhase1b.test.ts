@@ -63,12 +63,12 @@ function ratio(s: BattleState, cardId: string, name: string, prepare?: (c: Battl
   return on / damageModifiers(c, c.allies[0], getCard(cardId), c.enemies[0], undefined, true).multiplier;
 }
 
-describe('10個の装備のデータ', () => {
+describe('8個の装備のデータ', () => {
   const rows: [id: string, ability: string, slot: string, rarity: string][] = [
     ['everIceBracer', '絶対零度', 'accessory', 'legend'], ['kingSignet', '黄金律', 'accessory', 'legend'], ['sixWorldsBadge', '万華鏡', 'accessory', 'legend'],
     ['echoArmor', 'やまびこ', 'armor', 'epic'], ['sageScepter', '時の短縮', 'weapon', 'legend'], ['mummyWrappings', '千年の呪い', 'armor', 'legend'],
-    ['paralysisShelterPendant', '感電回路', 'accessory', 'epic'], ['paralysisRecoveryPendant', '感電大回路', 'accessory', 'legend'],
-    ['weakShelterPendant', '追い打ち', 'accessory', 'epic'], ['weakRecoveryPendant', '弱り目に祟り目', 'accessory', 'legend'],
+    ['paralysisShelterPendant', '感電回路', 'accessory', 'epic'],
+    ['weakShelterPendant', '追い打ち', 'accessory', 'epic'],
   ];
   for (const [id, name, slot, rarity] of rows) {
     it(`${id}《${name}》: 名前が重ならず、説明が読め、場所とレア度は元のまま`, () => {
@@ -283,7 +283,7 @@ describe('千年の包帯《千年の呪い》', () => {
   });
 });
 
-describe('感電の飾り・感電の大飾り', () => {
+describe('感電の飾り（大飾りは区切りAで外した）', () => {
   const start = (id: string) => { const s = battle(['warrior'], [{ accessory: id }], { enemies: 3 }); s.enemies[0].statuses.paralysis = 5; return s; };
   const lost = (before: BattleState, after: BattleState) => after.enemies.map((e, i) => before.enemies[i].hp - e.hp);
   it('エピック: 「痺れ」の敵を攻撃すると、他の敵全員に雷4。1ターンに1回', () => {
@@ -314,24 +314,9 @@ describe('感電の飾り・感電の大飾り', () => {
     r = use(r.state, 'strike', 10, 0);
     expect(fired(r.events, '感電回路')).toBe(1);
   });
-  it('レジェンド: 雷6を、1ターンに2回まで', () => {
-    const s = start('paralysisRecoveryPendant');
-    let r = use(clone(s), 'strike');
-    const epic = start('paralysisShelterPendant');
-    const d = lost(s, r.state), e = lost(epic, use(clone(epic), 'strike').state);
-    expect(d[1]).toBeGreaterThan(e[1]);
-    expect(d[1]).toBeGreaterThanOrEqual(6);
-    expect(d[2]).toBe(d[1]);
-    r = use(r.state, 'strike');
-    expect(fired(r.events, '感電大回路')).toBe(1);
-    r = use(r.state, 'strike');
-    expect(fired(r.events, '感電大回路')).toBe(0);
-    r = use(endTurn(r.state), 'strike');
-    expect(fired(r.events, '感電大回路')).toBe(1);
-  });
 });
 
-describe('追い打ちの飾り・追い打ちの大飾り', () => {
+describe('追い打ちの飾り（大飾りは区切りAで外した）', () => {
   const start = (id: string, enemies = 2) => { const s = battle(['warrior'], [{ accessory: id }], { enemies }); s.enemies[0].statuses.weak = 5; return s; };
   it('エピック: 「弱体」の敵を攻撃するとブロック3。1ターンに2回まで', () => {
     const s = start('weakShelterPendant');
@@ -350,21 +335,5 @@ describe('追い打ちの飾り・追い打ちの大飾り', () => {
     const k = clone(s);
     k.enemies[0].hp = 1;
     expect(st(use(k, 'strike').state.enemies[1], 'weak')).toBe(0);
-  });
-  it('レジェンド: ブロックに加えて、「弱体」の敵を倒すと別の敵に「弱体」2', () => {
-    const s = start('weakRecoveryPendant');
-    const b0 = s.allies[0].block;
-    s.enemies[0].hp = 1;
-    const r = use(clone(s), 'strike');
-    expect(r.state.enemies[0].dead).toBe(true);
-    expect(r.state.allies[0].block).toBe(b0 + 3);
-    expect(st(r.state.enemies[1], 'weak')).toBe(2);
-    expect(fired(r.events, '弱り目に祟り目')).toBe(2);
-    // 「弱体」でない敵を倒しても、うつらない
-    const c = clone(s);
-    c.enemies[1].hp = 1;
-    const r2 = use(c, 'strike', 10, 1);
-    expect(r2.state.enemies[1].dead).toBe(true);
-    expect(st(r2.state.enemies[0], 'weak')).toBe(5);
   });
 });

@@ -39,7 +39,8 @@ import { abilityTriggered, addLog, enemyName, findAlly, healUnit, loseHp, nameOf
 
 export { enemyName, findAlly, findEnemy, unitName } from './units';
 
-export const STATE_VERSION = 17;
+// v18（2026-11-11）: 鎧・装飾品の作り直し。古い保存データは読まない（オーナーの決定。v17 からの移行は作らない）
+export const STATE_VERSION = 18;
 export { slotPreviewLimitOf } from './preview';
 
 // ---------- 生成 ----------

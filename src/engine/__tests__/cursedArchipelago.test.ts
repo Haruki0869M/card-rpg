@@ -103,9 +103,9 @@ describe('戦闘に負けた時の復活の町（船が無い時に、島から�
 });
 
 describe('呪われた群島の中身（手順4）', () => {
-  it('固有装備13個・突発イベント5つは、このシナリオだけで使われる', () => {
+  it('固有装備10個・突発イベント5つは、このシナリオだけで使われる', () => {
     const gear = ITEMS.all.filter((i) => i.scenario === 'cursedArchipelago');
-    expect(gear.length).toBe(13);
+    expect(gear.length).toBe(10);
     const own = ['seaStorm', 'seaDriftingSailor', 'seaFloatingChest', 'seaDolphin', 'mistPetSeasick'];
     const mine = EVENTS.forScenario('cursedArchipelago').map((e) => e.id);
     for (const id of own) {

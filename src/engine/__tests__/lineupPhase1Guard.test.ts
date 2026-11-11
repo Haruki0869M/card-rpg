@@ -8,10 +8,8 @@ import { applyCommand, createBattle, createGame, describeAbility, toPartyMember 
 import { giveHand, nextTurn, play, setup } from './helpers';
 
 const CURSE_EPIC = 'curseShelterPendant';
-const CURSE_LEGEND = 'curseRecoveryPendant';
 const VULN_EPIC = 'vulnerableShelterPendant';
-const VULN_LEGEND = 'vulnerableRecoveryPendant';
-const CHANGED = [CURSE_EPIC, CURSE_LEGEND, VULN_EPIC, VULN_LEGEND];
+const CHANGED = [CURSE_EPIC, VULN_EPIC];
 
 const HP = 5000;
 const FOE_HP = 999;
@@ -175,66 +173,6 @@ describe('深淵の飾り（エピック）: 「呪い」の敵にダメージ�
   });
 });
 
-describe('深淵の大飾り（レジェンド）: エピックの効果 + マナ+1', () => {
-  it('回復に加えてマナ+1。どちらも1ターンに1回', () => {
-    const s = battleWith(CURSE_LEGEND);
-    const me = s.allies[0];
-    s.enemies[0].statuses.curse = 3;
-    giveHand(s, me.id, ['strike', 'strike']);
-    const first = use(s, me.id, 't0', s.enemies[0].uid, 1);
-    expect(first.state.allies[0].hp).toBe(HP + 2);
-    expect(first.state.allies[0].mana).toBe(9 - 1 + 1);
-    expect(fired(first.events, '深淵の大共鳴')).toEqual([
-      { type: 'ability', unitId: me.id, name: '深淵の大共鳴', source: { kind: 'equipment', id: CURSE_LEGEND, label: '深淵の大飾り' } },
-    ]);
-    const second = use(first.state, me.id, 't1', s.enemies[0].uid, 1);
-    expect(second.state.allies[0].hp).toBe(HP + 2);
-    expect(second.state.allies[0].mana).toBe(9 - 1);
-    expect(fired(second.events, '深淵の大共鳴')).toHaveLength(0);
-  });
-
-  it('次のターンにはまた働く', () => {
-    const s = battleWith(CURSE_LEGEND);
-    s.enemies[0].statuses.curse = 3;
-    giveHand(s, s.allies[0].id, ['strike']);
-    const first = use(s, s.allies[0].id, 't0', s.enemies[0].uid, 1);
-    const next = nextTurn(first.state);
-    steady(next);
-    next.enemies[0].statuses.curse = 3;
-    giveHand(next, next.allies[0].id, ['strike']);
-    const again = use(next, next.allies[0].id, 't0', next.enemies[0].uid, 1);
-    expect(again.state.allies[0].hp).toBe(HP + 2);
-    expect(again.state.allies[0].mana).toBe(9 - 1 + 1);
-  });
-
-  it('「呪い」が無い敵・持ち主以外のカードでは、回復もマナも無い', () => {
-    const s = battleWith(CURSE_LEGEND);
-    const [me, mate] = s.allies;
-    s.enemies[1].statuses.curse = 3;
-    giveHand(s, me.id, ['strike']);
-    const plain = use(s, me.id, 't0', s.enemies[0].uid, 1); // 持ち主が、呪いの無い敵へ
-    expect(plain.state.allies[0].hp).toBe(HP);
-    expect(plain.state.allies[0].mana).toBe(9 - 1);
-    giveHand(plain.state, mate.id, ['strike']);
-    const byMate = use(plain.state, mate.id, 't0', s.enemies[1].uid, 1); // 仲間が、呪いの敵へ
-    expect(byMate.state.allies.map((a) => a.hp)).toEqual([HP, HP]);
-    expect(byMate.state.allies.map((a) => a.mana)).toEqual([9 - 1, 9 - 1]);
-    expect(fired([...plain.events, ...byMate.events], '深淵の大共鳴')).toHaveLength(0);
-  });
-
-  it('HPが満タンでもマナ+1は入る', () => {
-    const s = battleWith(CURSE_LEGEND);
-    const me = s.allies[0];
-    me.hp = me.maxHp;
-    s.enemies[0].statuses.curse = 3;
-    giveHand(s, me.id, ['strike']);
-    const { state, events } = use(s, me.id, 't0', s.enemies[0].uid, 1);
-    expect(state.allies[0].hp).toBe(state.allies[0].maxHp);
-    expect(state.allies[0].mana).toBe(9 - 1 + 1);
-    expect(fired(events, '深淵の大共鳴')).toHaveLength(1);
-  });
-});
-
 describe('急所の飾り（エピック）: 「脆弱」の敵に完全成功すると、カードを1枚引く', () => {
   it('「脆弱」の敵1体を狙ったカードが完全成功すると、1枚引く（フォーカスは戻らない）', () => {
     const s = battleWith(VULN_EPIC);
@@ -370,96 +308,23 @@ describe('急所の飾り（エピック）: 「脆弱」の敵に完全成功�
   });
 });
 
-describe('急所の大飾り（レジェンド）: エピックの効果 + フォーカス+1', () => {
-  it('1枚引き、フォーカス+1。どちらも1ターンに1回', () => {
-    const s = battleWith(VULN_LEGEND);
-    const me = s.allies[0];
-    s.enemies[0].statuses.vulnerable = 3;
-    giveHand(s, me.id, ['strike', 'strike', 'strike']);
-    const first = use(s, me.id, 't0', s.enemies[0].uid, 1);
-    expect(first.state.allies[0].hand).toHaveLength(3);
-    expect(first.state.allies[0].focus).toBe(4 - 1 + 1);
-    expect(fired(first.events, '急所の極み')).toEqual([
-      { type: 'ability', unitId: me.id, name: '急所の極み', source: { kind: 'equipment', id: VULN_LEGEND, label: '急所の大飾り' } },
-    ]);
-    const second = use(first.state, me.id, 't1', s.enemies[0].uid, 1);
-    expect(wasPerfect(second.events)).toBe(true);
-    expect(second.state.allies[0].hand).toHaveLength(2);
-    expect(second.state.allies[0].focus).toBe(4 - 1);
-    expect(fired(second.events, '急所の極み')).toHaveLength(0);
-  });
-
-  it('次のターンにはまた働く', () => {
-    const s = battleWith(VULN_LEGEND);
-    s.enemies[0].statuses.vulnerable = 3;
-    giveHand(s, s.allies[0].id, ['strike']);
-    const first = use(s, s.allies[0].id, 't0', s.enemies[0].uid, 1);
-    const next = nextTurn(first.state);
-    steady(next);
-    next.enemies[0].statuses.vulnerable = 3;
-    giveHand(next, next.allies[0].id, ['strike']);
-    const again = use(next, next.allies[0].id, 't0', next.enemies[0].uid, 1);
-    expect(again.state.allies[0].hand).toHaveLength(1);
-    expect(again.state.allies[0].focus).toBe(4 - 1 + 1);
-  });
-
-  it('「脆弱」が無い敵・持ち主以外のカードでは、引かず、フォーカスも増えない', () => {
-    const s = battleWith(VULN_LEGEND);
-    const [me, mate] = s.allies;
-    s.enemies[1].statuses.vulnerable = 3;
-    giveHand(s, me.id, ['strike']);
-    giveHand(s, mate.id, ['strike']);
-    const plain = use(s, me.id, 't0', s.enemies[0].uid, 1); // 持ち主が、脆弱の無い敵へ
-    expect(plain.state.allies[0].hand).toHaveLength(0);
-    expect(plain.state.allies[0].focus).toBe(4 - 1);
-    const byMate = use(plain.state, mate.id, 't0', s.enemies[1].uid, 1); // 仲間が、脆弱の敵へ
-    expect(byMate.state.allies.map((a) => a.hand.length)).toEqual([0, 0]);
-    expect(byMate.state.allies.map((a) => a.focus)).toEqual([4 - 1, 4 - 1]);
-    expect(fired([...plain.events, ...byMate.events], '急所の極み')).toHaveLength(0);
-  });
-});
-
-describe('作り替えた4つの飾りのデータ', () => {
+describe('作り替えた2つの飾りのデータ（レジェンドの大飾りは、区切りAで外した）', () => {
   it('説明文（自動で作る文）が、効果と合っている', () => {
     expect(describeAbility(ITEMS.get(CURSE_EPIC).ability!)).toBe(
       'カードを使った後（敵1体を狙うカード・対象が「呪い」の時・ダメージを与えた時・1ターンに1回）：HPに与えたダメージの25%だけHPを回復',
     );
-    expect(describeAbility(ITEMS.get(CURSE_LEGEND).ability!)).toBe(
-      'カードを使った後（敵1体を狙うカード・対象が「呪い」の時・ダメージを与えた時・1ターンに1回）：HPに与えたダメージの25%だけHPを回復、マナ+1',
-    );
     expect(describeAbility(ITEMS.get(VULN_EPIC).ability!)).toBe('完全成功時（敵1体を狙うカード・対象が「脆弱」の時・1ターンに1回）：カードを1枚引く');
-    expect(describeAbility(ITEMS.get(VULN_LEGEND).ability!)).toBe(
-      '完全成功時（敵1体を狙うカード・対象が「脆弱」の時・1ターンに1回）：カードを1枚引く、フォーカス+1',
-    );
   });
 
-  it('名前は対で分かり、ほかの装備の名前と重ならない', () => {
-    expect(CHANGED.map((id) => ITEMS.get(id).name)).toEqual(['深淵の飾り', '深淵の大飾り', '急所の飾り', '急所の大飾り']);
+  it('名前がほかの装備の名前と重ならない', () => {
+    expect(CHANGED.map((id) => ITEMS.get(id).name)).toEqual(['深淵の飾り', '急所の飾り']);
     const names = ITEMS.all.map((i) => i.name);
     for (const id of CHANGED) expect(names.filter((n) => n === ITEMS.get(id).name), id).toHaveLength(1);
   });
 
-  it('エピックとレジェンドで能力の名前が違う（装備の見比べは名前で「変わった」を判定するため）', () => {
-    expect(ITEMS.get(CURSE_EPIC).ability!.name).not.toBe(ITEMS.get(CURSE_LEGEND).ability!.name);
-    expect(ITEMS.get(VULN_EPIC).ability!.name).not.toBe(ITEMS.get(VULN_LEGEND).ability!.name);
-  });
-
-  it('id・部位・レア度は元のまま。印は「block」を外し、状態異常の印だけ', () => {
-    expect(CHANGED.map((id) => [ITEMS.get(id).slot, ITEMS.get(id).rarity])).toEqual([
-      ['accessory', 'epic'],
-      ['accessory', 'legend'],
-      ['accessory', 'epic'],
-      ['accessory', 'legend'],
-    ]);
-    expect(CHANGED.map((id) => ITEMS.get(id).tags)).toEqual([['curse'], ['curse'], ['vulnerable'], ['vulnerable']]);
-  });
-
-  it('1ターン1回のブレーキは、エピックとレジェンドで別々に数える', () => {
-    const keys = CHANGED.map((id) => {
-      const e = ITEMS.get(id).ability!.effect;
-      const once = 'if' in e ? e.if?.find((c) => c.kind === 'oncePerTurn') : undefined;
-      return once && 'key' in once ? once.key : undefined;
-    });
-    expect(keys).toEqual(CHANGED);
+  it('id・部位・レア度は元のまま。印は状態異常の印だけ。大飾りはもう無い', () => {
+    expect(CHANGED.map((id) => [ITEMS.get(id).slot, ITEMS.get(id).rarity])).toEqual([['accessory', 'epic'], ['accessory', 'epic']]);
+    expect(CHANGED.map((id) => ITEMS.get(id).tags)).toEqual([['curse'], ['vulnerable']]);
+    for (const id of ['curseRecoveryPendant', 'vulnerableRecoveryPendant']) expect(ITEMS.tryGet(id), id).toBeUndefined();
   });
 });

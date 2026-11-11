@@ -64,14 +64,14 @@ describe('古い形のダンジョンの見分け', () => {
 });
 
 describe('古い保存（40行のダンジョンの途中）', () => {
-  it('読み込める（版は v17 のまま）。そのまま扉を選んで遊べる', () => {
+  it('読み込める（版は 今の版のまま）。そのまま扉を選んで遊べる', () => {
     const { g, x } = inTemple();
     makeOldShape(g.expeditions![0].dungeon!);
     // 前の版が保存していた項目（サイコロの残り）もそのまま
     (g.expeditions![0].dungeon! as unknown as Record<string, unknown>).explore = 2;
     const saved = JSON.parse(JSON.stringify(g));
     expect(saved.version).toBe(GAME_VERSION);
-    expect(GAME_VERSION).toBe(17);
+    expect(GAME_VERSION).toBe(18);
     const m = migrateGame(saved)!;
     expect(m).not.toBeNull();
     expect(validateGame(m)).toBe(true);

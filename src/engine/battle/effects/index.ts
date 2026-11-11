@@ -2,7 +2,7 @@
 // 新しい効果: kinds/ にファイルを1つ置いて export const effect: EffectHandler<'種類'> = {...} と書くだけ。
 // カード・敵の行動・消費アイテム・特殊能力のデータから、その日から使える。
 import type { AbilityDef, BattleEvent, BattleState, CardDef, Effect, EffectTarget, EnemyState } from '../../../types';
-import { convertedElement, coverChance, damageModifiers, elementGuardOf, fireAbilities } from '../../abilities';
+import { convertedElement, coverChance, damageModifiers, elementGuardOf, fireAbilities, guardStatus } from '../../abilities';
 import type { Rng } from '../../rng';
 import { BALANCE } from '../../../data/balance';
 import { getElement } from '../../../data/elements';
@@ -290,7 +290,8 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   // 属性の状態異常（HPに当たった時。完全成功なら必ず。耐性があれば効かない）
   if (element && r.hpLoss > 0 && !v.dead) {
     const el = getElement(element);
-    if (el.status && !resistsElement(v, element) && (ctx.perfect || rng.next() * 100 < (el.chance ?? 0))) {
+    // 乱数の順番を変えないように、先に確率を引いてから「防ぐ能力」を見る
+    if (el.status && !resistsElement(v, element) && (ctx.perfect || rng.next() * 100 < (el.chance ?? 0)) && !(isEnemy(source) !== isEnemy(v) && guardStatus(state, events, v, el.status))) {
       addStatus(v.statuses, el.status, el.amount ?? 1);
       events.push({ type: 'status', unitId: unitIdOf(v), status: el.status, amount: el.amount ?? 1 });
       ctx.parts.push(`${getStatus(el.status).name}${el.amount ?? 1}`);

@@ -12,7 +12,7 @@ export * from './game/dungeonMap';
 export * from './game/dungeonOmen';
 export * from './game/dice';
 export * from './game/game';
-export { campFocusOf, partySenses, restMultiplierOf, shopPriceFor } from './game/common';
+export { campFocusOf, partyMapReveal, partySenses, petEventBonusOf, restMultiplierOf, shopPriceFor } from './game/common';
 export * from './game/jobs';
 export * from './game/pets';
 export { cardTags, heroTagProfile, synergyWeight } from './game/cardTags';

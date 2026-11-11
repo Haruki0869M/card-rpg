@@ -75,10 +75,10 @@ const fired = (events: BattleEvent[], name: string) => events.filter((e) => e.ty
 const st = (u: { statuses: Record<string, number | undefined> }, id: string) => u.statuses[id] ?? 0;
 
 describe('7つの装備のデータ（id・能力値・能力の説明・印）', () => {
-  const rows: { id: string; slot: string; rarity: string; scenario: string; stats?: Record<string, number>; maxHp?: number; tags: string[]; name: string; text: string }[] = [
+  const rows: { id: string; slot: string; rarity: string; scenario: string | undefined; stats?: Record<string, number>; maxHp?: number; tags: string[]; name: string; text: string }[] = [
     { id: 'starRingCrown', slot: 'accessory', rarity: 'legend', scenario: 'starCastle', stats: { per: 8, int: 6 }, tags: ['mana', 'draw'], name: '星々の導き', text: '戦闘開始時：マナ+2、カードを1枚引く' },
     { id: 'royalBreastplate', slot: 'armor', rarity: 'epic', scenario: 'sandDynasty', maxHp: 12, tags: ['weak', 'vulnerable'], name: '王の威厳', text: '戦闘開始時：敵全員に「弱体」1、敵全員に「脆弱」1' },
-    { id: 'coolantFlask', slot: 'accessory', rarity: 'epic', scenario: 'clockworkEmpire', stats: { vit: 4 }, tags: ['draw', 'free'], name: '冷却', text: 'カードを使った後（そのターンの3枚目から・1ターンに1回）：カードを1枚引く' },
+    { id: 'coolantFlask', slot: 'accessory', rarity: 'epic', scenario: undefined, stats: { vit: 4 }, tags: ['draw', 'free'], name: '冷却', text: 'カードを使った後（そのターンの3枚目から・1ターンに1回）：カードを1枚引く' },
     { id: 'mistLantern', slot: 'accessory', rarity: 'epic', scenario: 'cursedArchipelago', stats: { vit: 4 }, tags: ['heavy', 'highCost'], name: '霧を払う光', text: 'そのターンに最初に使うカードの成功率+15%' },
     { id: 'clearMindCharm', slot: 'accessory', rarity: 'epic', scenario: 'dreamLabyrinth', stats: { vit: 4 }, tags: ['focus'], name: '澄みわたる心', text: '完全成功時（1ターンに1回）：悪い状態異常をすべて治す' },
     { id: 'moonAmulet', slot: 'accessory', rarity: 'epic', scenario: 'sandDynasty', stats: { vit: 4 }, tags: ['mana', 'heal'], name: '月の満ち欠け', text: '3ターンごとの開始時（3・6・9ターン目…）：マナ+1、HPを3回復' },
@@ -102,12 +102,11 @@ describe('7つの装備のデータ（id・能力値・能力の説明・印）'
     });
   }
 
-  it('能力の名前が、ほかの装備と重ならない（「目覚め」は目覚めの首飾りだけ）', () => {
+  it('能力の名前が、ほかの装備と重ならない', () => {
     for (const row of rows) {
       const same = ITEMS.all.filter((i) => i.ability?.name === row.name).map((i) => i.id);
       expect(same, row.name).toEqual([row.id]);
     }
-    expect(ITEMS.all.filter((i) => i.ability?.name === '目覚め').map((i) => i.id)).toEqual(['openingFocusPendant']);
   });
 
   it('説明文を上書きした3つは、実際の部品と意味が合っている', () => {
