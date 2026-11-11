@@ -11,4 +11,5 @@ export const ninja: ClassDef = {
   exploreAbility: { id: 'ninjaExplore', name: '忍び足', description: '逃げる判定+35%', effect: { kind: 'checkBonus', check: 'flee', bonus: 35 } },
   requires: { feat: 'kills:status', count: 6, text: '状態異常の敵を6体倒す' },
   cardPool: ["shadowShuriken","ninjaVenom","shadowStep","ninjaBreath","nightExecution","axCollapse"], signature: ["shadowShuriken","ninjaVenom","shadowStep"],
+  jobCards: ['fxYatagarasu'], // 区切りD: 決め技（転職した時に山札へ1枚）
 };

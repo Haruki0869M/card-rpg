@@ -42,7 +42,8 @@ export { enemyName, findAlly, findEnemy, unitName } from './units';
 
 // v18（2026-11-11）: 鎧・装飾品の作り直し。古い保存データは読まない（オーナーの決定。v17 からの移行は作らない）
 // v21（2026-11-12）: 区切りD-1 同じ中身のカードをまとめた。古い保存は読まない
-export const STATE_VERSION = 21;
+// v22（2026-11-12）: 区切りD-2〜D-4 軸のカード・決め技・武器のカードの付け替え。古い保存は読まない
+export const STATE_VERSION = 22;
 export { slotPreviewLimitOf } from './preview';
 
 // ---------- 生成 ----------
@@ -546,7 +547,7 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
     abilityParts.push(...fireAbilities(state, rng, events, ally, 'combo', fireOpts));
   }
   // 区切りD: 導きの光・アシスト・パスの印・血の代価は、攻撃カードを1枚使ったら消える
-  if (hasDamage) { delete ally.guided; delete ally.comboBoost; if (ally.counters?.bloodAdd) ally.counters.bloodAdd = 0; }
+  if (hasDamage) { delete ally.guided; delete ally.comboBoost; if (ally.counters?.bloodAdd) ally.counters.bloodAdd = 0; if (ally.counters?.nextAtkPct) ally.counters.nextAtkPct = 0; }
   // きっかけ: 自分が応援を付けた味方のカードが完全成功した（自分の応援は、1人パーティの時だけ数える）
   if (perfect && cheerer && !cheerer.dead && (cheerer !== ally || state.allies.length === 1)) fireAbilities(state, rng, events, cheerer, 'cheerPerfect', { allyTarget: ally, depth: 1 });
   // 分身は攻撃効果を半分の威力で繰り返す。追撃から再帰しない。
@@ -568,6 +569,8 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   ally.played = (ally.played ?? 0) + 1;
   // 区切りD: コスト0のカードの枚数（流れる連撃）
   if (card.cost === 0) ally.playedZero = (ally.playedZero ?? 0) + 1;
+  // 区切りD: この戦闘で使った物理カードの枚数（無想阿修羅拳）
+  if (card.category === 'physical') (ally.counters ??= {}).physBattle = (ally.counters.physBattle ?? 0) + 1;
   afterAttackCard(ally, card, tier);
   (ally.playedBy ??= {})[card.category] = (ally.playedBy[card.category] ?? 0) + 1;
 

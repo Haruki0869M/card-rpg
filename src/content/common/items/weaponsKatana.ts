@@ -12,7 +12,7 @@ export const weaponsKatana: ItemDef[] = [
   {
     id: "guardKatana", name: "受け流しの刀", slot: "weapon", weaponType: "katana", rarity: "rare", icon: "katana",
     description: "そのターンに物理カードを1枚だけ使ったら、ターン終了時にブロック5。", stats: {"per":2,"agi":2}, tags: ["physical","block"],
-    cards: [{"cardId":"wtSwordNotch","count":2}],
+    cards: [{"cardId":"axParry","count":2}],
     ability: {"name":"残心","description":"そのターンに物理カードを1枚だけ使ったら、ターン終了時にブロック5。","effect":{"when":"turnEnd","if":[{"kind":"playedCategoryCount","category":"physical","min":1,"max":1}],"do":[{"kind":"block","amount":5,"to":"self"}]}},
   },
   // エピック

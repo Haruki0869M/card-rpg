@@ -57,18 +57,19 @@ export const jobWeapons = (classId: string): string[] => {
 };
 
 /** 武器の専用カード（戦闘時に山札へ加わる） */
-export function weaponCards(hero: Hero): CardInstance[] {
+export function weaponCards(hero: Hero, solo = false): CardInstance[] {
   const w = hero.equipment.weapon;
   if (!w) return [];
   const def = getItem(w.itemId);
   return (def.cards ?? []).flatMap((c) =>
-    Array.from({ length: c.count }, (_, i) => ({ uid: `${w.uid}-${c.cardId}-${i}`, cardId: c.cardId, fromWeapon: true })),
+    Array.from({ length: c.count }, (_, i) => ({ uid: `${w.uid}-${c.cardId}-${i}`, cardId: solo && c.soloCardId ? c.soloCardId : c.cardId, fromWeapon: true })),
   );
 }
 
 /** 戦闘で使う山札（自分の山札 + 武器のカード） */
-export function battleDeck(hero: Hero): CardInstance[] {
-  return [...hero.deck, ...weaponCards(hero)];
+/** solo = 戦闘に1人だけ（武器のカードが1人用に変わる物がある） */
+export function battleDeck(hero: Hero, solo = false): CardInstance[] {
+  return [...hero.deck, ...weaponCards(hero, solo)];
 }
 
 /** 次のレベルまでに必要な経験値 */
@@ -84,7 +85,8 @@ export function expToNext(level: number, classId?: string): number {
 export const jobTierIndex = (tier: JobTier | undefined) => (tier === 'mid' ? 1 : tier === 'top' || tier === 'special' ? 2 : 0);
 
 /** 戦闘に参加する時の設定 */
-export function toPartyMember(hero: Hero): PartyMemberSpec {
+/** solo は true の時だけ1人用（.map(toPartyMember) で渡る番号は使わない） */
+export function toPartyMember(hero: Hero, solo?: unknown): PartyMemberSpec {
   return {
     heroId: hero.id,
     classId: hero.classId,
@@ -97,7 +99,7 @@ export function toPartyMember(hero: Hero): PartyMemberSpec {
     focus: hero.focus,
     focusMax: heroFocusMax(hero),
     stats: heroStats(hero),
-    deck: battleDeck(hero),
+    deck: battleDeck(hero, solo === true),
     startBlock: heroStartBlock(hero),
     gold: hero.gold,
     extraDraw: heroExtraDraw(hero),

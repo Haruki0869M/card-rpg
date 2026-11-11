@@ -134,6 +134,8 @@ export type AbilityEffect =
   | { modifier: 'weaknessElement' }
   /** HPが1より下がらない（命綱。区切りD） */
   | { modifier: 'endure' }
+  /** 弱点の属性でなくても、弱点を突いた扱い（×1.5・BREAK。ラグナロク・ブレード。区切りD） */
+  | { modifier: 'alwaysWeak' }
   /** BREAK の「合計ダメージ」の数えを multiplier 倍にする（鎧通しの一撃。区切りD） */
   | { modifier: 'breakCount'; multiplier: number; if?: AbilityCondition[] }
   /** 成功が min 以上なら、完全成功でなくても BREAK のきっかけになる（魔力の楔。区切りD） */
@@ -672,6 +674,8 @@ export interface SummonState {
   /** カード攻撃への追撃と、被弾の身代わりをする召喚 */
   echoPct?: number;
   intercept?: boolean;
+  /** 身代わりで攻撃を受けた時、攻撃者にこのダメージを返す（無明逆流れ。区切りD） */
+  counter?: number;
   id: string;
   name: string;
   icon: string;

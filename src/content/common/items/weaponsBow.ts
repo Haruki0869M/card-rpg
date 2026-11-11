@@ -6,7 +6,7 @@ export const weaponsBow: ItemDef[] = [
   {
     id: "balancedBow", name: "均衡の弓", slot: "weapon", weaponType: "bow", rarity: "rare", icon: "bow",
     description: "「×N回」の攻撃が全部HPに当たったら、1枚引く。1ターンに1回。", stats: {"dex":2,"agi":2}, tags: ["physical","multi","draw"],
-    cards: [{"cardId":"wDoubleShot","count":2}],
+    cards: [{"cardId":"wtBowTriple","count":2}],
     ability: {"name":"二の矢","description":"「×N回」の攻撃が全部HPに当たったら、1枚引く。1ターンに1回。","effect":{"when":"afterCard","if":[{"kind":"allHitsLanded","min":2},{"kind":"oncePerTurn","key":"balancedBow"}],"do":[{"kind":"draw","amount":1}]}},
   },
   // エピック

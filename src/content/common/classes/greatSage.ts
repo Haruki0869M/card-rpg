@@ -11,4 +11,5 @@ export const greatSage: ClassDef = {
   exploreAbility: { id: 'greatSageExplore', name: '叡智', description: 'イベントの判定+20%', effect: { kind: 'checkBonus', check: 'event', bonus: 20 } },
   requires: { feat: 'kills:element', count: 6, text: '属性攻撃で敵を6体倒す' },
   cardPool: ["sageFlame","sageFrost","sageThunder","sageMeditation","elementRevelation"], signature: ["sageFlame","sageFrost","sageThunder"],
+  jobCards: ['fxBigBang'], // 区切りD: 決め技（転職した時に山札へ1枚）
 };

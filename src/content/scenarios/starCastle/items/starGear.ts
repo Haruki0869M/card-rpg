@@ -7,7 +7,7 @@ export const starGear: ItemDef[] = [
   {
     id: 'constellationStaff', name: '星座の杖', slot: 'weapon', weaponType: 'staff', rarity: 'epic', icon: 'staff', scenario: 'starCastle',
     description: '相手に付いている悪い状態異常が多いほど、魔法のダメージが増える。1種類につき+8%（最大+24%）。', stats: { int: 8, per: 2 }, tags: ['magic'],
-    cards: [{ cardId: 'wLightning', count: 2 }],
+    cards: [{"cardId":"axElementChain","count":2}],
     ability: { name: '星座を結ぶ', effect: { modifier: 'damageDealt', multiplier: 1, scale: { by: 'targetStatuses', per: 0.08, max: 0.24 }, if: [{ kind: 'cardCategory', category: 'magic' }] } },
   },
   {

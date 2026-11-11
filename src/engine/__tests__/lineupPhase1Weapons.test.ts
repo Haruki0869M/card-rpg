@@ -81,27 +81,22 @@ describe.each([
     expect(text).not.toContain('HP');
   });
 
-  it('武器に付いているカードは、その武器の能力の条件を満たす', () => {
-    for (const c of getItem(itemId).cards ?? []) {
-      const card = getCard(c.cardId);
-      expect(card.category, card.id).toBe('physical');
-      expect(card.cost, card.id).toBeGreaterThanOrEqual(2);
-    }
+  it('付くカードは ★「ブロック砕き」（区切りD。自分で敵のブロックを壊すので、能力の条件の外。重い物理カードと組み合わせる）', () => {
+    expect((getItem(itemId).cards ?? []).map((c) => c.cardId)).toEqual(['axBlockBreaker']);
   });
 
   it('HPが満タンでも、コスト2以上の物理カードはブロックを無視する', () => {
     const { s, a, e } = battleWith(itemId);
     expect(a.hp).toBe(a.maxHp);
-    expect(damageModifiers(s, a, ownCard(itemId), e).ignoreBlock).toBe(true);
     expect(damageModifiers(s, a, withCost('strike', 2), e).ignoreBlock).toBe(true);
     expect(damageModifiers(s, a, withCost('strike', 3), e).ignoreBlock).toBe(true);
     // HPが減っていても同じ（HPは条件に関係しない）
     a.hp = 1;
-    expect(damageModifiers(s, a, ownCard(itemId), e).ignoreBlock).toBe(true);
+    expect(damageModifiers(s, a, withCost('strike', 2), e).ignoreBlock).toBe(true);
   });
 
   it('戦闘: 敵のブロックは残ったまま、ダメージがそのままHPに入る', () => {
-    const cardId = ownCard(itemId).id;
+    const cardId = 'heavySwing'; // コスト2の物理カード（付くカードのブロック砕きはコスト1）
     const BLOCK = 5;
     const plain = hit(null, cardId); // 能力なし・ブロックなしの素のダメージ
     expect(plain.lost).toBeGreaterThan(0);

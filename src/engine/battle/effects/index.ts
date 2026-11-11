@@ -194,7 +194,7 @@ export function canBreak(enemy: Unit | undefined): boolean {
 }
 
 /** 大技の予告を崩す: 威力が半分・弱体1・ブロック0（オーナーの決定 3-A）。乱数は使わない */
-function breakEnemy(ctx: EffectCtx, enemy: EnemyState, why: 'weak' | 'perfect' | 'damage') {
+export function breakEnemy(ctx: EffectCtx, enemy: EnemyState, why: 'weak' | 'perfect' | 'damage') {
   enemy.broken = true;
   enemy.nextActionMultiplier = (enemy.nextActionMultiplier ?? 1) * BALANCE.breakPower;
   enemy.block = 0;
@@ -243,7 +243,9 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   base = Math.round(base * boost);
   // 区切りD: 連携の上乗せの倍率（このカードの力）・弱点看破の印（弱点の属性でなくても ×1.5）
   const comboScale = cardModifier(ctx.cardAbilities, 'comboScale').reduce((m, e) => m * e.multiplier, 1);
-  const exposedMul = (u: Unit) => isEnemy(u) && !isEnemy(source) && u.exposed && elementMultiplier(u, element) < BALANCE.elementWeakMul ? BALANCE.elementWeakMul : 1;
+  // ラグナロク・ブレード: いつでも弱点を突いた扱い
+  const alwaysWeak = !isEnemy(source) && cardModifier(ctx.cardAbilities, 'alwaysWeak').length > 0;
+  const exposedMul = (u: Unit) => isEnemy(u) && !isEnemy(source) && (u.exposed || alwaysWeak) && elementMultiplier(u, element) < BALANCE.elementWeakMul ? BALANCE.elementWeakMul : 1;
   let dmg = calcDamage(base + mods.add + (ctx.addOnceUsed ? 0 : mods.addOnce), source.statuses, v.statuses, extraMultiplier * mods.multiplier * elementMultiplier(v, element) * exposedMul(v) * comboMultiplier(source, v, comboScale));
   // かばう: 相手の攻撃でこのままだとHP0になる場合、同じ側の他の仲間が確率で代わりに受ける
   if (isEnemy(source) !== isEnemy(v) && dmg - (mods.ignoreBlock ? 0 : v.block) >= v.hp) {
@@ -269,7 +271,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   if (stage > 0 && dmg > 0) ctx.comboLanded = true;
   // 弱点の属性で攻撃したか（BREAK のきっかけ。かばう・属性の変換の後の、実際の相手と属性で見る）
   // 区切りD: 弱点看破の印のある敵・導きの光の味方の攻撃も、弱点を突いた扱い（印は1回で消える）
-  const exposed = isEnemy(v) && !isEnemy(source) && !!v.exposed && dmg > 0;
+  const exposed = isEnemy(v) && !isEnemy(source) && (!!v.exposed || alwaysWeak) && dmg > 0;
   const guided = !isEnemy(source) && !!source.guided && isEnemy(v) && dmg > 0;
   if (exposed && isEnemy(v)) delete v.exposed;
   const weakHit = (!!element && isEnemy(v) && !!getEnemy(v.defId).weak?.includes(element)) || exposed || guided;
@@ -300,6 +302,11 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
       const [s] = v.summons!.splice(shield, 1);
       abilityTriggered(state, v.id, s.name, events, { kind: 'summon', id: s.id, label: s.name });
       events.push({ type: 'damage', unitId: v.id, amount: 0, blocked: dmg, sourceId: unitIdOf(source) });
+      // 無明逆流れ: 受け止めた攻撃者に返す
+      if (s.counter && !source.dead && ctx.depth < 3) {
+        const back = dealDamage(makeCtx(state, rng, events, v, { depth: ctx.depth + 1 }), source, s.counter);
+        addLog(state, `${nameOf(v)}の「${s.name}」！ ${nameOf(source)}に${back}ダメージで返した`);
+      }
       return 0;
     }
   }

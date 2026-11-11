@@ -11,4 +11,5 @@ export const holyKing: ClassDef = {
   exploreAbility: { id: 'holyKingExplore', name: '王の威光', description: '町の買い物20%引き', effect: { kind: 'shopDiscount', percent: 20 } },
   requires: { feat: 'support', count: 20, text: '仲間を助けるカードを20回使う' },
   cardPool: ["royalHammer","royalAegis","royalGrace","holyOath","royalJudgment","axFortress","axSeraphim","axLightHoard"], signature: ["royalHammer","royalAegis","royalGrace"], subWeapons: ['sword', 'spear'],
+  jobCards: ['fxHolySanctum'], // 区切りD: 決め技（転職した時に山札へ1枚）
 };

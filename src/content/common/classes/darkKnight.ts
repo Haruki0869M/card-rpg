@@ -14,4 +14,5 @@ export const darkKnight: ClassDef = {
   exploreAbility: { id: 'darkKnightExplore', name: '闇への耐性', description: '瘴気の判定+20%', effect: { kind: 'checkBonus', check: 'miasma', bonus: 20 } },
   requires: { feat: 'kills:lowHp', count: 3, text: '自分のHPが30%以下の時に敵を3体倒す' },
   cardPool: ['bloodBlade', 'bloodShield', 'bloodDrain', 'bloodOffering', 'bloodSweep', 'bloodAbyss', 'axCurseReturn', 'axAdversity', 'axBloodPrice', 'axLifeline'], signature: ['bloodBlade', 'bloodShield', 'bloodDrain'],
+  jobCards: ['fxBloodEclipse'], // 区切りD: 決め技（転職した時に山札へ1枚）
 };

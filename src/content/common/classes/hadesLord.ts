@@ -11,4 +11,5 @@ export const hadesLord: ClassDef = {
   exploreAbility: { id: 'hadesLordExplore', name: '瘴気の主', description: '瘴気の判定+30%', effect: { kind: 'checkBonus', check: 'miasma', bonus: 30 } },
   requires: { feat: 'kills:cursed', count: 4, text: '呪われた敵を4体倒す' },
   cardPool: ["abyssScythe","underworldCurse","soulBanquet","bloodOffering","deathJudgment","axCurseReturn"], signature: ["abyssScythe","underworldCurse","soulBanquet"],
+  jobCards: ['fxAbyssVerdict'], // 区切りD: 決め技（転職した時に山札へ1枚）
 };

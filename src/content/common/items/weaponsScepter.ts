@@ -6,7 +6,7 @@ export const weaponsScepter: ItemDef[] = [
   {
     id: "dawnScepter", name: "朝光の錫杖", slot: "weapon", weaponType: "scepter", rarity: "rare", icon: "scepter",
     description: "HPが満タンの味方を回復した時、その味方にブロック3。1ターンに1回。", stats: {"int":2,"per":2}, tags: ["heal","block","support"],
-    cards: [{"cardId":"wtScepterHalo","count":1},{"cardId":"cmRally","count":1}],
+    cards: [{"cardId":"axOverflowBlessing","count":2}],
     ability: {"name":"朝の祈り","description":"HPが満タンの味方を回復した時、その味方にブロック3。1ターンに1回。","effect":{"when":"overheal","if":[{"kind":"healedFull"},{"kind":"oncePerTurn","key":"dawnScepter"}],"do":[{"kind":"block","amount":3,"to":"allyTarget"}]}},
   },
 ];

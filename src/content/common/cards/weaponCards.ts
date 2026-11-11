@@ -22,18 +22,6 @@ export const WEAPON_CARDS: CardDef[] = [
     tiers: [{ minSuccesses: 0, effects: [d(4)] }, { minSuccesses: 1, effects: [d(8)] }, { minSuccesses: 2, effects: [d(13)] }],
   },
   {
-    id: 'wMithrilSlash',
-    rarity: 'epic',
-    trait: { name: '貫通', effect: { modifier: 'ignoreBlock' } },
-    name: 'ミスリル斬り',
-    category: 'physical',
-    cost: 1,
-    slots: 2,
-    baseChance: 80,
-    target: 'enemy',
-    tiers: [{ minSuccesses: 0, effects: [d(6)] }, { minSuccesses: 1, effects: [d(11)] }, { minSuccesses: 2, effects: [d(17)] }],
-  },
-  {
     id: 'wFlameSlash',
     rarity: 'legend',
     trait: { name: '焼き尽くし', effect: { modifier: 'damageDealt', multiplier: 1.5, if: [{ kind: 'targetHpAtMost', pct: 30 }] } },
@@ -140,17 +128,6 @@ export const WEAPON_CARDS: CardDef[] = [
   },
   // ---------- 弓 ----------
   { id: 'wAimedShot', name: '狙い射ち', category: 'physical', cost: 1, slots: 1, baseChance: 80, target: 'enemy', tiers: [{ minSuccesses: 0, effects: [d(4)] }, { minSuccesses: 1, effects: [d(8)] }] },
-  {
-    id: 'wDoubleShot',
-    rarity: 'rare',
-    name: '二の矢',
-    category: 'physical',
-    cost: 1,
-    slots: 2,
-    baseChance: 75,
-    target: 'enemy',
-    tiers: [{ minSuccesses: 0, effects: [d(4)] }, { minSuccesses: 1, effects: [d(4), d(4)] }, { minSuccesses: 2, effects: [d(6), d(6)] }],
-  },
   {
     id: 'wGaleArrow',
     rarity: 'epic',

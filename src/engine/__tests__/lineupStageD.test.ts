@@ -3,6 +3,8 @@
 import { describe, expect, it } from 'vitest';
 import { CARDS, cardLineages, cardWeaponTypes, getCard } from '../../data/cards';
 import { CLASSES } from '../../data/classes';
+import { ITEMS } from '../../data/items';
+import { battleDeck } from '../game/hero';
 import { ENEMIES } from '../../data/enemies';
 import type { BattleState, CardDef, Command, GameState, PlayerId } from '../../types';
 import { applyCommand, createBattle, createGame, toPartyMember } from '../index';
@@ -521,5 +523,119 @@ describe('区切りD-3: 背水', () => {
     const t2 = nextTurn(r.state).state;
     expect(t2.allies[0].dead).toBe(false);
     expect(t2.allies[0].hp).toBe(1);
+  });
+});
+
+// ===================== 区切りD-4: 決め技・武器のカードの付け替え =====================
+describe('区切りD-4: 決め技', () => {
+  it('最上位・特殊の23職すべてが、決め技（レジェンド・1戦闘1回）を1枚ずつ持つ', () => {
+    const jobs = CLASSES.all.filter((j) => j.tier === 'top' || j.tier === 'special');
+    expect(jobs).toHaveLength(23);
+    const seen = new Set<string>();
+    for (const j of jobs) {
+      expect(j.jobCards ?? [], j.id).toHaveLength(1);
+      const card = getCard(j.jobCards![0]);
+      expect(card.rarity, card.id).toBe('legend');
+      expect(card.exhaust, card.id).toBe(true);
+      expect(card.trait, card.id).toBeDefined();
+      expect(seen.has(card.id), card.id).toBe(false);
+      seen.add(card.id);
+    }
+  });
+  it('秘剣・天翔龍閃（成功2）: 大技の予告をすぐに BREAK。完全成功でマナ+2', () => {
+    const s = battle(['warrior'], ['stageDBig']);
+    s.allies[0].mana = 5;
+    const r = use(s, 'fxHeavenDragon', { focus: 'max' });
+    expect(r.state.enemies[0].broken).toBe(true);
+    expect(r.state.allies[0].abilities?.some((a) => a.name === '剣聖の極み')).toBe(true);
+  });
+  it('覇王滅砕撃: 倒した敵1体につき、味方全員のフォーカス+1', () => {
+    ENEMIES.register({ ...dummy, id: 'stageDWeak', name: '確認用の弱い置物', maxHp: 1, actions: wait });
+    const s = battle(['warrior', 'mage'], ['stageDWeak', 'stageDWeak', 'stageDIdler']);
+    for (const a of s.allies) a.focus = 1;
+    const r = use(s, 'fxConquerorCrush', { focus: 'max' });
+    expect(r.state.allies[1].focus).toBe(3);
+  });
+  it('無想阿修羅拳: この戦闘の物理カード3枚ごとに回数+1（最大+3）', () => {
+    const s = battle(['brawler']);
+    s.allies[0].counters = { ...(s.allies[0].counters ?? {}), physBattle: 30 };
+    const r = use(s, 'fxAsuraFist', { focus: 'max' });
+    expect(r.state.log.at(-1)?.text).toContain('10連打');
+  });
+  it('死の宣告・アビス: 呪い・毒・火傷の合計×4を足し、悪い状態異常を全部2倍に', () => {
+    const s = battle(['hexer']);
+    s.enemies[0].statuses.poison = 3;
+    const r = use(s, 'fxAbyssVerdict', { focus: 'max' });
+    expect(r.state.enemies[0].statuses.poison).toBe(6);
+  });
+  it('聖王の絶対領域: 味方全員のブロックが次の番まで残り（上限50）、悪い状態異常を受けない', () => {
+    const s = battle(['paladin', 'warrior']);
+    const r = use(s, 'fxHolySanctum', { focus: 'max' });
+    expect(r.state.allies.every((a) => a.block === 25)).toBe(true);
+    const t2 = nextTurn(r.state).state;
+    expect(t2.allies.every((a) => a.block === 25)).toBe(true);
+  });
+  it('忍法・八咫烏: 分身を2つまで戻し、霞（次の攻撃1回を0）を得る', () => {
+    const s = battle(['ninja']);
+    s.allies[0].summons = [];
+    const r = use(s, 'fxYatagarasu', { focus: 'max' });
+    expect(r.state.allies[0].summons?.filter((x) => x.intercept).length).toBe(3);
+  });
+  it('奥義・無明逆流れ（成功1）: 居合（次の物理×4）と、最初の攻撃を無効にして25で返す', () => {
+    const s = battle(['samurai'], ['stageDHitter20']);
+    const r = use(s, 'fxMumyou', { focus: 'max' });
+    expect(r.state.allies[0].attackCharge?.multiplier).toBe(4);
+    const before = r.state.allies[0].hp;
+    const t2 = nextTurn(r.state).state;
+    expect(t2.allies[0].hp).toBe(before);
+    expect(lostHp(r.state, t2)).toBeGreaterThan(0);
+  });
+  it('ラグナロク・ブレード: 弱点が無い敵にも、弱点を突いた扱い（BREAK）', () => {
+    const s = battle(['swordmaster'], ['stageDBig']);
+    const r = use(s, 'fxRagnarok', { focus: 0 });
+    expect(r.state.enemies[0].broken).toBe(true);
+  });
+  it('百鬼夜行: 屍兵を3体まで呼ぶ', () => {
+    const s = battle(['necromancer']);
+    const r = use(s, 'fxHundredNight', { focus: 'max' });
+    expect(r.state.allies[0].summons?.filter((x) => x.group === 'skeletonSoldier').length).toBe(3);
+  });
+  it('ブラッド・イクリプス: 今のHPの半分を払い、減っているHP×2.0（最大100）', () => {
+    const s = battle(['darkKnight']);
+    s.allies[0].hp = 400;
+    const r = use(s, 'fxBloodEclipse', { focus: 'max' });
+    expect(r.state.allies[0].hp).toBeGreaterThanOrEqual(200);
+    expect(lostHp(s, r.state)).toBeGreaterThan(0);
+  });
+  it('運命のグランドクロス（成功1）: 味方それぞれ、次に使う1枚だけ完全成功', () => {
+    const s = battle(['priest', 'warrior']);
+    const r = use(s, 'fxGrandCross', { focus: 'max' });
+    expect(r.state.allies.every((a) => a.abilities?.some((x) => x.name === '運命のグランドクロス'))).toBe(true);
+    const r2 = use(r.state, 'strike', { ally: 1, focus: 0 });
+    expect(r2.state.log.at(-1)?.text).toContain('完全成功');
+  });
+  it('英雄たちの交響曲: 1人の時は自分に効く', () => {
+    const s = battle(['bard']);
+    s.allies[0].focus = 1;
+    const r = use(s, 'fxSymphonia', { focus: 'max' });
+    expect(r.state.allies[0].counters?.nextAtkPct).toBe(50);
+  });
+  it('オール・オア・ナッシング: 完全成功で敵全員に77（＋77G）', () => {
+    const s = battle(['phantomThief']);
+    const r = use(s, 'fxAllOrNothing', { focus: 'max' });
+    expect(lostHp(s, r.state)).toBeGreaterThanOrEqual(77);
+  });
+});
+
+describe('区切りD-4: 武器のカードの付け替え', () => {
+  it('★ の武器23本は、決めたカードが付く', () => {
+    const want: Record<string, string> = { mithrilSword: 'axArmorPierce', rifledGun: 'axLoadRound', duelistsGun: 'axQuickDraw', companionWhip: 'axPetCharge', rendingWhip: 'axPackHunt', deepthoughtTome: 'axBlazeCatalyst', dawnScepter: 'axOverflowBlessing', temperedScythe: 'axCurseHarvest', wellspringLute: 'axRoundSong' };
+    for (const [item, card] of Object.entries(want)) expect(ITEMS.get(item).cards?.[0]?.cardId, item).toBe(card);
+  });
+  it('湧泉のリュート: 戦闘に1人だけの時は、輪唱の代わりに終曲', () => {
+    const g = game(['bard']);
+    g.heroes[0].equipment.weapon = { uid: 'lute', itemId: 'wellspringLute' };
+    expect(battleDeck(g.heroes[0], true).filter((c) => c.fromWeapon).every((c) => c.cardId === 'wtInstFinale')).toBe(true);
+    expect(battleDeck(g.heroes[0], false).filter((c) => c.fromWeapon).every((c) => c.cardId === 'axRoundSong')).toBe(true);
   });
 });

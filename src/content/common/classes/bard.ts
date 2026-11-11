@@ -12,4 +12,5 @@ export const bard: ClassDef = {
   exploreAbility: { id: 'bardExplore', name: '旅の歌', description: 'イベントの判定+15%', effect: { kind: 'checkBonus', check: 'event', bonus: 15 } },
   requires: { feat: 'support:others', count: 12, text: '仲間を助けるカードを12回' },
   cardPool: ['bardCourage', 'bardFocus', 'bardHeal', 'maidenWard', 'bardStrike', 'bardFinale', 'axAssistPass', 'axRoundSong'], signature: ['bardCourage', 'bardFocus', 'bardHeal'],
+  jobCards: ['fxSymphonia'], // 区切りD: 決め技（転職した時に山札へ1枚）
 };

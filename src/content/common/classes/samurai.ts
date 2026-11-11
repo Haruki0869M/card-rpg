@@ -14,4 +14,5 @@ export const samurai: ClassDef = {
   exploreAbility: { id: 'samuraiExplore', name: '心眼', description: '障害物の判定+15%', effect: { kind: 'checkBonus', check: 'obstacle', bonus: 15 } },
   requires: { feat: 'kills:weapon:katana', count: 6, text: '刀を装備して敵を6体倒す' },
   cardPool: ['machineShot', 'samuraiPoise', 'samuraiSwallow', 'samuraiFocus', 'samuraiBlunt', 'samuraiMoon'], signature: ['machineShot', 'samuraiPoise', 'samuraiSwallow'],
+  jobCards: ['fxMumyou'], // 区切りD: 決め技（転職した時に山札へ1枚）
 };

@@ -7,7 +7,7 @@ import type { EffectHandler } from '../types';
 
 declare module '../../../../types' {
   interface EffectParams {
-    summon: { id: string; name: string; icon: string; damage: number; turns: number; element?: string; echoPct?: number; intercept?: boolean; stackLimit?: number; replace?: boolean; targeted?: boolean; trigger?: 'enemyBeforeAction'; effects?: Effect[] };
+    summon: { id: string; name: string; icon: string; damage: number; turns: number; element?: string; echoPct?: number; intercept?: boolean; counter?: number; stackLimit?: number; replace?: boolean; targeted?: boolean; trigger?: 'enemyBeforeAction'; effects?: Effect[] };
   }
 }
 
@@ -32,7 +32,7 @@ export const effect: EffectHandler<'summon'> = {
         const counters = (ctx.source.counters ??= {});
         id = `${e.id}:${counters[`summon:${e.id}`] = (counters[`summon:${e.id}`] ?? 0) + 1}`;
       }
-      list.push({ id, group: e.stackLimit ? e.id : undefined, name: e.name, icon: e.icon, damage: e.damage, turns, element: e.element, echoPct: e.echoPct, intercept: e.intercept, targetId, trigger: e.trigger, effects: e.effects });
+      list.push({ id, group: e.stackLimit ? e.id : undefined, name: e.name, icon: e.icon, damage: e.damage, turns, element: e.element, echoPct: e.echoPct, intercept: e.intercept, ...(e.counter ? { counter: e.counter } : {}), targetId, trigger: e.trigger, effects: e.effects });
     }
     ctx.events.push({ type: 'ability', unitId: unitIdOf(ctx.source), name: e.name, source: { kind: 'summon', id: e.id, label: e.name } });
     ctx.parts.push(`${e.name}を呼んだ`);

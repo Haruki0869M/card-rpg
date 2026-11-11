@@ -11,4 +11,5 @@ export const fistKing: ClassDef = {
   exploreAbility: { id: 'fistKingExplore', name: '拳圧', description: '障害物の判定+30%', effect: { kind: 'checkBonus', check: 'obstacle', bonus: 30 } },
   requires: { feat: 'success:physical', count: 35, text: '物理カードの成功35回' },
   cardPool: ["hundredFists","kingCounter","fistFlurry","ninjaBreath","earthShatter","axFlurryGuard"], signature: ["hundredFists","kingCounter","fistFlurry"],
+  jobCards: ['fxAsuraFist'], // 区切りD: 決め技（転職した時に山札へ1枚）
 };

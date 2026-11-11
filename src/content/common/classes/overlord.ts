@@ -11,4 +11,5 @@ export const overlord: ClassDef = {
   exploreAbility: { id: 'overlordExplore', name: '威圧', description: '逃げる判定+20%', effect: { kind: 'checkBonus', check: 'flee', bonus: 20 } },
   requires: { feat: 'kills', count: 10, text: '敵を10体倒す' },
   cardPool: ["kingCleaver","domination","conquerorRoar","bloodThrone","worldBreaker","axLifeline"], signature: ["kingCleaver","domination","conquerorRoar"],
+  jobCards: ['fxConquerorCrush'], // 区切りD: 決め技（転職した時に山札へ1枚）
 };

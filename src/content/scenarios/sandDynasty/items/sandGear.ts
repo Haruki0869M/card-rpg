@@ -7,7 +7,7 @@ export const sandGear: ItemDef[] = [
   {
     id: "sandstormBlade", name: "砂嵐の曲刀", slot: "weapon", weaponType: "sword", rarity: "epic", icon: "sword", scenario: "sandDynasty",
     description: "1ターンに物理カードを3枚使うと、敵全員に「脆弱」1。1ターンに1回。", stats: {"str":6,"dex":4}, tags: ["physical","combo","vulnerable"],
-    cards: [{"cardId":"wMithrilSlash","count":2}],
+    cards: [{"cardId":"axReturnStroke","count":2}],
     ability: {"name":"砂嵐","description":"1ターンに物理カードを3枚使うと、敵全員に「脆弱」1。1ターンに1回。","effect":{"when":"afterCard","if":[{"kind":"cardCategory","category":"physical"},{"kind":"playedCategoryCount","category":"physical","min":2},{"kind":"oncePerTurn","key":"sandstormBlade"}],"do":[{"kind":"applyStatus","status":"vulnerable","amount":1,"to":"foes"}]}},
   },
   {
@@ -19,7 +19,7 @@ export const sandGear: ItemDef[] = [
   {
     id: 'sunScepter', name: '太陽の錫杖', slot: 'weapon', weaponType: 'scepter', rarity: 'legend', icon: 'scepter', scenario: 'sandDynasty',
     description: '回復のカードを使うと、自分に「聖光」が1つたまる（1ターンに1回・最大5）。ためた光で、次の聖属性の攻撃が強くなる。', stats: { int: 8, vit: 4 }, tags: ['holy', 'heal'],
-    cards: [{ cardId: 'wtScepterJudgment', count: 2 }],
+    cards: [{"cardId":"axLightHoard","count":2}],
     ability: { name: '日輪の祈り', description: '回復のカードを使った後（1ターンに1回）：自分に「聖光」1（最大5。次の聖属性の攻撃が1つにつき+15%。撃つと消える）', effect: { when: 'afterCard', if: [{ kind: 'cardHasHeal' }, { kind: 'oncePerTurn', key: 'sunScepter' }], do: [{ kind: 'applyStatus', status: 'holyLight', amount: 1, to: 'self' }] } },
   },
   // ----- 鎧 -----

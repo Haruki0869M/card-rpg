@@ -96,6 +96,12 @@ export function damageModifiers(state: BattleState | undefined, source: Unit, ca
     }
   }
   out.multiplier *= Math.min(weak, BALANCE.elementWeakMax / BALANCE.elementWeakMul);
+  // 区切りD: 英雄たちの交響曲 — 次の攻撃カードのダメージ倍率
+  const nextPct = isEnemy(source) ? 0 : (source.counters?.nextAtkPct ?? 0);
+  if (nextPct > 0 && card && card.tiers.some((t) => t.effects.some((x) => x.kind === 'damage'))) {
+    out.multiplier *= 1 + nextPct / 100;
+    out.active.push({ name: '英雄たちの交響曲', source: { kind: 'card', label: '英雄たちの交響曲' } });
+  }
   // 区切りD: 血の代価 — 次の攻撃カードの最初の1回に足す
   const blood = isEnemy(source) ? 0 : (source.counters?.bloodAdd ?? 0);
   if (blood > 0 && card && card.tiers.some((t) => t.effects.some((x) => x.kind === 'damage'))) {
@@ -414,6 +420,7 @@ export function describeAbility(ab: AbilityDef, side: 'ally' | 'enemy' = 'ally')
     }
     if (e.modifier === 'comboScale') return `このカードの連携の上乗せ×${e.multiplier}（連携は合わせて+${Math.round(BALANCE.comboBonusMax * 100)}%まで）`;
     if (e.modifier === 'endure') return 'HPが1より下がらない';
+    if (e.modifier === 'alwaysWeak') return '弱点の属性でなくても、弱点を突いた扱い（ダメージ×1.5・BREAK のきっかけ）';
     if (e.modifier === 'weaknessElement') return '属性は、狙った敵の弱点の属性に変わる（弱点が無い敵には無属性）';
     if (e.modifier === 'breakOnSuccess') return `大技を予告している敵は、成功${e.min}以上でも BREAK できる`;
     const cs = condText(e.if);

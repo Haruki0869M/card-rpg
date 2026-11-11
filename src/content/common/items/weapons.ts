@@ -13,7 +13,7 @@ export const weapons: ItemDef[] = [
   {
     id: "mithrilSword", name: "ミスリルソード", slot: "weapon", weaponType: "sword", rarity: "epic", icon: "sword",
     description: "カードが完全成功した後、自分に「応援」1（1ターンに1回）。「応援」を持ったままターンを終えると、応援1つにつきブロック3。", stats: {"str":8,"agi":5}, tags: ["physical","block"],
-    cards: [{"cardId":"wMithrilSlash","count":2}],
+    cards: [{"cardId":"axArmorPierce","count":2}],
     ability: {"name":"白銀の冴え","description":"カードが完全成功した後、自分に「応援」1（1ターンに1回）。「応援」を持ったままターンを終えると、応援1つにつきブロック3。","effect":{"when":"perfect","if":[{"kind":"oncePerTurn","key":"mithrilSword"}],"do":[{"kind":"applyStatus","status":"inspired","amount":1,"to":"self"}]},"also":[{"when":"turnEnd","if":[{"kind":"selfStatus","status":"inspired","min":1}],"do":[{"kind":"blockFromStatus","status":"inspired","of":"self","mult":3}]}]},
   },
   { id: 'flameSword', name: '炎の大剣', slot: 'weapon', weaponType: 'sword', rarity: 'legend', icon: 'sword', description: '刀身に炎の精霊が宿る大剣。', stats: { str: 12 }, cards: [{ cardId: 'wFlameSlash', count: 2 }] , ability: { name: '炎の精霊', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'physical' }, { kind: 'cardHasDamage' }], do: [{ kind: 'applyStatus', status: 'burn', amount: 2 }] } } },
@@ -36,7 +36,7 @@ export const weapons: ItemDef[] = [
   {
     id: "steelHammer", name: "鋼の槌", slot: "weapon", weaponType: "hammer", rarity: "rare", icon: "hammer",
     description: "自分にブロックがある間、物理カードの基本ダメージ+3（1回の攻撃ごと。力などの倍率もかかる）。", stats: {"str":4,"vit":3}, tags: ["physical","block"],
-    cards: [{"cardId":"wIronHammer","count":2}],
+    cards: [{"cardId":"axShieldSlam","count":2}],
     ability: {"name":"盾打ち","description":"自分にブロックがある間、物理カードの基本ダメージ+3（1回の攻撃ごと。力などの倍率もかかる）。","effect":{"modifier":"damageDealt","multiplier":1,"add":3,"if":[{"kind":"cardCategory","category":"physical"},{"kind":"selfBlockAtLeast","n":1}]}},
   },
   {
@@ -51,7 +51,7 @@ export const weapons: ItemDef[] = [
   {
     id: "steelBow", name: "鋼の弓", slot: "weapon", weaponType: "bow", rarity: "rare", icon: "bow",
     description: "大技を予告している敵を狙うカードの成功率+15%。", stats: {"dex":4}, tags: ["physical","single"],
-    cards: [{"cardId":"wDoubleShot","count":2}],
+    cards: [{"cardId":"axVitalShot","count":2}],
     ability: {"name":"崩しの矢","description":"大技を予告している敵を狙うカードの成功率+15%。","effect":{"modifier":"cardChance","bonus":15,"if":[{"kind":"targetBigIntent"}]}},
   },
   {

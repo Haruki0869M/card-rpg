@@ -12,4 +12,5 @@ export const machinist: ClassDef = {
   exploreAbility: { id: 'machinistExplore', name: '機構の知恵', description: '鍵開けの判定+20%', effect: { kind: 'checkBonus', check: 'lock', bonus: 20 } },
   requires: { feat: 'checks:mechanism', count: 3, text: '罠・仕掛けの判定を3回成功' },
   cardPool: ['machineShot', 'placeTurret', 'placeTrap', 'machineVolley', 'gambleGuard', 'machineCannon'], signature: ['machineShot', 'placeTurret', 'placeTrap'],
+  jobCards: ['fxOmegaLaser'], // 区切りD: 決め技（転職した時に山札へ1枚）
 };
