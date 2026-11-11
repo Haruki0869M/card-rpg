@@ -25,7 +25,7 @@ export const effect: EffectHandler<'applyStatus'> = {
     let guarded = 0;
     for (const t of ts) {
       const foe = isEnemy(ctx.source) !== isEnemy(t);
-      const n = foe ? e.amount + statusBonusOf(ctx.source, e.status, ctx.card, t) : e.amount;
+      const n = foe ? e.amount + statusBonusOf(ctx.source, e.status, ctx.card, t, ctx.state) : e.amount;
       // 敵から受ける悪い状態異常を防ぐ能力（春を待つ・暖かい灯）
       if (foe && guardStatus(ctx.state, ctx.events, t, e.status)) {
         guarded++;
@@ -33,6 +33,8 @@ export const effect: EffectHandler<'applyStatus'> = {
       }
       if (foe) { amount = Math.max(amount, n); inflicted.push(t); }
       addStatus(t.statuses, e.status, n);
+      // 輪唱: 味方が味方に付けた「応援」は、誰がくれたかを覚えておく
+      if (e.status === 'inspired' && !isEnemy(ctx.source) && !isEnemy(t)) t.cheeredBy = ctx.source.id;
       if (isEnemy(ctx.source) !== isEnemy(t) && !ctx.hitIds.includes(unitIdOf(t))) ctx.hitIds.push(unitIdOf(t));
       ctx.events.push({ type: 'status', unitId: unitIdOf(t), status: e.status, amount: n });
     }

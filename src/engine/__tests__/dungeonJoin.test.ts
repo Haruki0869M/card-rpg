@@ -186,7 +186,7 @@ describe('ダンジョンへの合流', () => {
     const old = JSON.parse(JSON.stringify(g));
     delete old.expeditions[0].entranceTile;
     expect(old.version).toBe(GAME_VERSION);
-    expect(GAME_VERSION).toBe(19);
+    expect(GAME_VERSION).toBe(20);
     const m = migrateGame(old)!;
     expect(m).not.toBeNull();
     expect(validateGame(m)).toBe(true);

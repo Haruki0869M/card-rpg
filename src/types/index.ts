@@ -43,7 +43,7 @@ export interface ElementDef {
  * target = 選んだ対象（カードの対象の敵 / 敵の行動の対象の味方 / アイテムを使う相手。全体カードなら相手全員）
  * self = 自分 / allies = 自分の側の全員 / otherAllies = 自分以外の自分の側 / foes = 相手の側の全員 / randomFoe = 相手からランダムに1人
  */
-export type EffectTarget = 'target' | 'self' | 'allies' | 'otherAllies' | 'foes' | 'randomFoe' | 'lowestAlly' | 'randomAlly' | 'allyTarget' | 'otherFoes' | 'attacker';
+export type EffectTarget = 'target' | 'self' | 'allies' | 'otherAllies' | 'foes' | 'randomFoe' | 'lowestAlly' | 'randomAlly' | 'allyTarget' | 'otherFoes' | 'attacker' | /** 今のカードが弱点を突いた敵（最初の1体） */ 'weakHit' | /** 今のカードで支援が成立した味方 */ 'helped';
 
 /**
  * 効果の種類ごとの数値。効果のファイル（src/engine/battle/effects/）が declare module でここに種類を足す。
@@ -103,9 +103,11 @@ export interface CardDef {
  * 発動のきっかけ。戦闘の流れの決まった場面で呼ばれる。
  * battleStart 戦闘開始時 / turnStart 自分の側のフェーズ開始時 / turnEnd 自分の側のフェーズ終了時 /
  * afterCard カードを使った後 / perfect カードが完全成功した時 / kill 敵を倒した時 / hurt HPにダメージを受けた時 /
- * petAct 自分のお供が行動した時（お供の発動型の能力が働いた時）
+ * petAct 自分のお供が行動した時（お供の発動型の能力が働いた時）/
+ * summonHit 自分の砲台・罠・召喚が敵のHPにダメージを与えた後 / overheal 自分の回復が味方のHPからあふれた時（満タンの味方を回復した時も） /
+ * cheerPerfect 自分が「応援」を付けた味方のカードが完全成功した時（1人パーティなら自分でも） / detonate 状態異常を起爆して消した時
  */
-export type AbilityTrigger = 'battleStart' | 'turnStart' | 'turnEnd' | 'afterCard' | 'perfect' | 'kill' | 'hurt' | 'allyKill' | 'allyDown' | 'blocked' | 'inflict' | 'foeTick' | 'petAct';
+export type AbilityTrigger = 'battleStart' | 'turnStart' | 'turnEnd' | 'afterCard' | 'perfect' | 'kill' | 'hurt' | 'allyKill' | 'allyDown' | 'blocked' | 'inflict' | 'foeTick' | 'petAct' | 'summonHit' | 'overheal' | 'cheerPerfect' | 'detonate';
 
 /** 発動の条件の種類ごとの数値。条件のファイル（src/engine/abilities/conditions/）が declare module で種類を足す */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -119,7 +121,7 @@ export type AbilityCondition = { [K in keyof ConditionParams]: { kind: K } & Con
  */
 export type AbilityEffect =
   | { when: AbilityTrigger; if?: AbilityCondition[]; do: Effect[] }
-  | { modifier: 'damageDealt'; multiplier: number; /** 1回の攻撃ごとに足すダメージ（倍率を掛ける前） */ add?: number; if?: AbilityCondition[]; scale?: DamageScale }
+  | { modifier: 'damageDealt'; multiplier: number; /** 1回の攻撃ごとに足すダメージ（倍率を掛ける前） */ add?: number; /** add を、そのカード・効果の最初の1回の攻撃にだけ足す（弾込め） */ once?: boolean; if?: AbilityCondition[]; scale?: DamageScale }
   | { modifier: 'ignoreBlock'; if?: AbilityCondition[] }
   | { modifier: 'coverLethal'; chance: number }
   /** カードの成功率+bonus（狙い撃ちなど） */
@@ -150,7 +152,7 @@ export type AbilityEffect =
   /** 属性の無い物理攻撃を属性 into に変える（K2。炎の指輪など） */
   | { modifier: 'convertElement'; into: string; if?: AbilityCondition[] }
   /** 自分が付ける状態異常の量+amount（呪詛など） */
-  | { modifier: 'statusBonus'; statuses: string[]; amount: number; if?: AbilityCondition[] };
+  | { modifier: 'statusBonus'; statuses: string[]; amount: number; if?: AbilityCondition[]; /** 属性ダメージに付いてくる状態異常（火傷・毒など）にも乗る（種まき） */ element?: boolean };
 
 /**
  * ダメージの倍率を状況で増やす（倍率 × (1 + per × 値)。max は上乗せの上限）。
@@ -500,6 +502,8 @@ export interface AllyState {
   gold?: number;
   /** 能力の数え（幻獣ゲージなど。キーは能力ごと） */
   counters?: Record<string, number>;
+  /** 今付いている「応援」をくれた味方のID（輪唱。応援を使ったら消える） */
+  cheeredBy?: string;
   /** 呼び出したお供（幻獣・獣など。ターン終了時に攻撃する。足元のトークンで表示） */
   summons?: SummonState[];
   /** このターンに使ったカードの枚数（種類ごと。子狼など） */

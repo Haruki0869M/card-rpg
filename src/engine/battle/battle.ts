@@ -31,8 +31,8 @@ import { discardHand, drawCards } from './deck';
 import { applyEffect, checkEffect, comboMultiplier, dealDamage, elementMultiplier, makeCtx, targetOf } from './effects';
 import { decideAllIntents } from './intents';
 import { finalChance, selectTier } from './probability';
-import { recordSupport, supportSnapshot } from './support';
-import { afterAttackCard, attackElement, cardHpCost, chargedMultiplier, tierHpCost } from './cardState';
+import { helpedAllies, recordSupport, selfSnapshot, supportSnapshot } from './support';
+import { afterAttackCard, attackElement, cardElements, cardHpCost, chargedMultiplier, tierHpCost } from './cardState';
 import { slotPreviewLimitOf } from './preview';
 import { activeStatuses, actionFailChanceOf, applyTick, chancePenaltyOf, consumeStatus, decayStatuses, emptyStatuses, skipActionStatus, takeDrawPenalty, takeManaPenalty, tickHealOf } from './statuses';
 import { abilityTriggered, addLog, enemyName, findAlly, healUnit, loseHp, nameOf, unitIdOf } from './units';
@@ -40,7 +40,7 @@ import { abilityTriggered, addLog, enemyName, findAlly, healUnit, loseHp, nameOf
 export { enemyName, findAlly, findEnemy, unitName } from './units';
 
 // v18（2026-11-11）: 鎧・装飾品の作り直し。古い保存データは読まない（オーナーの決定。v17 からの移行は作らない）
-export const STATE_VERSION = 19;
+export const STATE_VERSION = 20;
 export { slotPreviewLimitOf } from './preview';
 
 // ---------- 生成 ----------
@@ -222,11 +222,15 @@ export function isDone(state: BattleState, ally: AllyState): boolean {
 export function tierDamageAgainst(ally: AllyState, card: CardDef, target: EnemyState): number[] {
   return card.tiers.map((t) => {
     const source = { ...ally, hp: ally.hp - tierHpCost(t) };
+    let onceUsed = false;
     return t.effects.reduce((sum, e) => {
       if (e.kind !== 'damage' || (targetOf(e) !== 'target' && targetOf(e) !== 'foes')) return sum;
       const element = attackElement(source, card, e.element);
-      const { multiplier, add } = damageModifiers(undefined, source, card, target, card.trait ? [card.trait] : undefined, t.minSuccesses === card.slots, element);
-      return sum + calcDamage(e.amount + add, source.statuses, target.statuses, chargedMultiplier(source, card) * (e.outcomes?.length ? e.outcomes.reduce((n, o) => n + o.weight * o.multiplier, 0) / e.outcomes.reduce((n, o) => n + o.weight, 0) : 1) * multiplier * elementMultiplier(target, element) * comboMultiplier(source, target)) * (e.hits ?? 1);
+      const { multiplier, add, addOnce } = damageModifiers(undefined, source, card, target, card.trait ? [card.trait] : undefined, t.minSuccesses === card.slots, element);
+      // 「最初の1回の攻撃にだけ足すダメージ」（弾込め）は、その段の最初の1回分だけ足す
+      const first = addOnce && !onceUsed ? calcDamage(e.amount + add + addOnce, source.statuses, target.statuses, chargedMultiplier(source, card) * multiplier * elementMultiplier(target, element) * comboMultiplier(source, target)) - calcDamage(e.amount + add, source.statuses, target.statuses, chargedMultiplier(source, card) * multiplier * elementMultiplier(target, element) * comboMultiplier(source, target)) : 0;
+      if (addOnce) onceUsed = true;
+      return sum + first + calcDamage(e.amount + add, source.statuses, target.statuses, chargedMultiplier(source, card) * (e.outcomes?.length ? e.outcomes.reduce((n, o) => n + o.weight * o.multiplier, 0) / e.outcomes.reduce((n, o) => n + o.weight, 0) : 1) * multiplier * elementMultiplier(target, element) * comboMultiplier(source, target)) * (e.hits ?? 1);
     }, 0);
   });
 }
@@ -256,6 +260,8 @@ function startAllyPhase(state: BattleState, rng: Rng, events: BattleEvent[]) {
     // 装備の能力の数え: 前のターンから残ったブロック（守りの祈り）・敵の番を無傷でしのいだか（返しの穂先・竜王の構え）
     const cs = (a.counters ??= {});
     cs.blockLeft = a.block;
+    // お供の行動の数え（1ターンに4回まで）
+    cs.petActsTurn = 0;
     cs.unhurtTurn = state.turn > 1 && cs.unhurt === 1 ? 1 : 0;
     a.block = Math.min(a.block, keepBlockOf(a));
     a.mana = BALANCE.manaPerTurn;
@@ -456,6 +462,9 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   const chance = reserved?.chance ?? (complete.active ? 100 : chanceFor(ally, card, target, state));
   const results = reserved?.results ?? rollSlots(card.slots, focusUsed, chance, rng);
   // 次のカードの成功率が上がる状態異常（応援など）は、使ったら消える
+  // 輪唱: この応援をくれた味方を覚えておく（完全成功したら、その味方のきっかけを起こす）
+  const cheerer = (ally.statuses.inspired ?? 0) > 0 && ally.cheeredBy ? findAlly(state, ally.cheeredBy) : undefined;
+  delete ally.cheeredBy;
   consumeChanceBonus(ally.statuses);
   const successes = results.filter((r) => r !== 'miss').length;
   const perfect = successes === card.slots;
@@ -472,6 +481,7 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   }
   const tier = selectTier(card, successes);
   const supportBefore = supportSnapshot(state.allies, ally);
+  const selfBefore = selfSnapshot(ally);
 
   // 効果（効果の部品を順に使う）
   const cardAbilities = card.trait ? [card.trait] : undefined;
@@ -479,6 +489,22 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   if (target && tier.effects.some(e => e.kind === 'damage')) ally.lastTargetId = unitIdOf(target);
   for (const eff of tier.effects) applyEffect(ctx, eff);
   const supportedOthers = recordSupport(ally, state.allies, supportBefore);
+  // 支援が成立した味方（1人パーティの時は、自分への支援でも成立。伴奏・助け合いの調べ）
+  const supportedSelf = helpedAllies(state.allies, selfBefore).length > 0;
+  const helpedOthers = helpedAllies(state.allies, supportBefore);
+  const helped = helpedOthers.length ? helpedOthers : supportedSelf && state.allies.length === 1 ? [ally] : [];
+  // 装備の能力の数え: このターンに使った属性（四元）・最後に使った属性（書き分け）・攻撃カードを使ったターン（間奏）
+  {
+    const cs = (ally.counters ??= {});
+    const els = cardElements(card);
+    if (els.length) {
+      for (const k of Object.keys(cs)) if (k.startsWith('elLast:')) delete cs[k];
+      for (const el of els) { cs[`elLast:${el}`] = 1; cs[`elTurn:${el}`] = state.turn; }
+    }
+    if (card.tiers.some((t) => t.effects.some((e) => e.kind === 'damage'))) cs.atkTurn = state.turn;
+  }
+  // 弱点を突いた敵（最初の1体。弱点突き）
+  const weakTarget = (ctx.weakHitIds ?? []).map((id) => state.enemies.find((e) => e.uid === id)).find((e) => e && !e.dead);
   const parts = ctx.parts;
   const hasDamage = tier.effects.some((e) => e.kind === 'damage');
   if (hasDamage) parts.unshift(`${ctx.dealt}ダメージ`);
@@ -486,7 +512,7 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   for (const n of ctx.fired) abilityTriggered(state, ally.id, n.name, events, n.source);
 
   // きっかけ: カードの特殊能力 → 自分の能力（カードを使った後 → 完全成功時）
-  const fireOpts = { card, target, allyTarget, dealt: ctx.dealt, focusUsed, tierEffects: tier.effects, perfect, successes, supportedOthers, multi: ctx.multi };
+  const fireOpts = { card, target, allyTarget, dealt: ctx.dealt, focusUsed, tierEffects: tier.effects, perfect, successes, supportedOthers, supportedSelf, helped, weakTarget, multi: ctx.multi };
   // 発動した能力（お供・ジョブ・カードの特殊能力）の名前は、結果の帯には入れず、記録にだけ残す（帯が長くなって切れるため。
   // 能力はカットイン・キャラの上の【能力名】で見せる）
   const abilityParts: string[] = [];
@@ -496,6 +522,8 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   }
   abilityParts.push(...fireAbilities(state, rng, events, ally, 'afterCard', fireOpts));
   if (perfect) abilityParts.push(...fireAbilities(state, rng, events, ally, 'perfect', fireOpts));
+  // きっかけ: 自分が応援を付けた味方のカードが完全成功した（自分の応援は、1人パーティの時だけ数える）
+  if (perfect && cheerer && !cheerer.dead && (cheerer !== ally || state.allies.length === 1)) fireAbilities(state, rng, events, cheerer, 'cheerPerfect', { allyTarget: ally, depth: 1 });
   // 分身は攻撃効果を半分の威力で繰り返す。追撃から再帰しない。
   for (const summon of ally.summons ?? []) {
     if (!summon.echoPct) continue;
@@ -612,15 +640,18 @@ function summonsAttack(state: BattleState, ally: AllyState, rng: Rng, events: Ba
     const foes = state.enemies.filter((e) => !e.dead);
     if (!foes.length) break;
     const t = s.targetId ? foes.find(e => e.uid === s.targetId) ?? foes[0] : foes[rng.int(foes.length)];
-    const ctx = makeCtx(state, rng, events, ally, { target: t });
+    const ctx = makeCtx(state, rng, events, ally, { target: t, via: 'summon' });
     const loss = dealDamage(ctx, t, s.damage, s.element);
+    // きっかけ: 自分の砲台・召喚が敵にダメージを与えた（観測射撃）
+    if (loss > 0 && !ally.dead) fireAbilities(state, rng, events, ally, 'summonHit', { target: t, depth: 1 });
     abilityTriggered(state, ally.id, s.name, events, { kind: 'summon', id: s.id, label: s.name });
     addLog(state, `${ally.name}の${s.name}が${enemyName(t)}を攻撃！ ${loss}ダメージ`);
     // 永久機関: もう1回攻撃する（残りターンは1回分だけ減る）
     const again = twice ? state.enemies.filter((e) => !e.dead) : [];
     if (again.length) {
       const t2 = s.targetId ? again.find(e => e.uid === s.targetId) ?? again[0] : again[rng.int(again.length)];
-      const loss2 = dealDamage(makeCtx(state, rng, events, ally, { target: t2 }), t2, s.damage, s.element);
+      const loss2 = dealDamage(makeCtx(state, rng, events, ally, { target: t2, via: 'summon' }), t2, s.damage, s.element);
+      if (loss2 > 0 && !ally.dead) fireAbilities(state, rng, events, ally, 'summonHit', { target: t2, depth: 1 });
       abilityTriggered(state, ally.id, twice!.name, events, twice!.source);
       addLog(state, `${ally.name}の${s.name}がもう1回攻撃！ ${enemyName(t2)}に${loss2}ダメージ`);
     }
@@ -743,7 +774,7 @@ function executeIntent(state: BattleState, enemy: EnemyState, rng: Rng, events: 
     for (const token of [...(owner.summons ?? [])]) {
       if (token.trigger !== 'enemyBeforeAction' || token.targetId !== enemy.uid || enemy.dead) continue;
       owner.summons = owner.summons!.filter(s => s !== token);
-      const trap = makeCtx(state, rng, events, owner, { target: enemy });
+      const trap = makeCtx(state, rng, events, owner, { target: enemy, via: 'summon' });
       for (const eff of token.effects ?? []) applyEffect(trap, eff);
       abilityTriggered(state, owner.id, token.name, events, { kind: 'summon', id: token.id, label: token.name });
       // 永久機関: 罠ももう1回発動する
@@ -753,6 +784,8 @@ function executeIntent(state: BattleState, enemy: EnemyState, rng: Rng, events: 
         abilityTriggered(state, owner.id, twice.name, events, twice.source);
       }
       addLog(state, `${owner.name}の${token.name}が発動した`);
+      // きっかけ: 自分の罠が敵にダメージを与えた（観測射撃）
+      if (trap.dealt > 0 && !owner.dead) fireAbilities(state, rng, events, owner, 'summonHit', { target: enemy, depth: 1 });
     }
   }
   if (enemy.dead) { enemy.intent = undefined; return; }

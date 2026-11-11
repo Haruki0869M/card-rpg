@@ -8,13 +8,13 @@ import { SCENARIOS, getScenario, isScenarioUnlocked } from '../../data/scenarios
 import { QUESTS, SHRINES, TOWNS } from '../../data/world';
 import { createGame } from '../index';
 
-/** 固有装備の数は、区切りB（物理の武器を46本に）の後の数。 [シナリオID, 固有装備の数, 前の本（解放条件）, このシナリオだけの突発イベントのID] */
+/** 固有装備の数は、区切りC（残り7種類の武器を40本に）の後の数。 [シナリオID, 固有装備の数, 前の本（解放条件）, このシナリオだけの突発イベントのID] */
 const PACKS: [string, number, string | string[], string[]][] = [
-  ['frozenKingdom', 8, 'corruptionKing', ['frozenBlizzard', 'frozenTraveler', 'frozenIceTreasure', 'frozenWolfPup', 'frozenPetShiver']],
+  ['frozenKingdom', 7, 'corruptionKing', ['frozenBlizzard', 'frozenTraveler', 'frozenIceTreasure', 'frozenWolfPup', 'frozenPetShiver']],
   ['cursedArchipelago', 8, 'frozenKingdom', ['seaStorm', 'seaDriftingSailor', 'seaFloatingChest', 'seaDolphin', 'mistPetSeasick']],
-  ['sandDynasty', 9, 'cursedArchipelago', ['sandStorm', 'sandLostCaravan', 'sandMirage', 'sandFennec', 'sandPetHeat']],
+  ['sandDynasty', 8, 'cursedArchipelago', ['sandStorm', 'sandLostCaravan', 'sandMirage', 'sandFennec', 'sandPetHeat']],
   ['dreamLabyrinth', 7, ['corruptionKing', 'frozenKingdom', 'cursedArchipelago', 'sandDynasty', 'starCastle', 'clockworkEmpire'], ['dreamNightmareMist', 'dreamLostTraveler', 'dreamSnowSand', 'dreamSleepyCat', 'dreamPetMemory']],
-  ['clockworkEmpire', 6, 'starCastle', ['steamVentBurst', 'mechBrokenAutomaton', 'gearScrapPile', 'mechKitten', 'mechPetOily']],
+  ['clockworkEmpire', 5, 'starCastle', ['steamVentBurst', 'mechBrokenAutomaton', 'gearScrapPile', 'mechKitten', 'mechPetOily']],
   ['starCastle', 7, 'sandDynasty', ['skyGust', 'starShower', 'starLostAstronomer', 'starBirdOnCloud', 'skyPetStarGazer']],
 ];
 

@@ -11,10 +11,10 @@ export const dreamGear: ItemDef[] = [
     ability: { name: '追憶', description: 'コスト2以上の魔法カードが完全成功した時（1回の戦闘で1回まで）：使ったカードの効果をもう一度発動', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'magic' }, { kind: 'cardCost', min: 2 }, { kind: 'perBattle', key: 'memoryStaff', max: 1 }], do: [{ kind: 'repeatCard' }] } },
   },
   {
-    id: 'awakeningScepter', name: '目覚めの錫杖', slot: 'weapon', weaponType: 'scepter', rarity: 'legend', icon: 'scepter', scenario: 'dreamLabyrinth',
-    description: '毎ターンの始めに、味方全員のHPを回復し、ブロック2を得る。朝を呼ぶ光。', stats: { int: 8, vit: 4 }, tags: ['holy', 'heal'],
-    cards: [{ cardId: 'wtScepterJudgment', count: 2 }],
-    ability: { name: '朝の光', effect: { when: 'turnStart', do: [{ kind: 'heal', amount: 3, to: 'allies' }, { kind: 'block', amount: 2, to: 'allies' }] } },
+    id: "awakeningScepter", name: "目覚めの錫杖", slot: "weapon", weaponType: "scepter", rarity: "legend", icon: "scepter", scenario: "dreamLabyrinth",
+    description: "毎ターンの始めに、味方全員のHPを回復し、ブロック2を得る。朝を呼ぶ光。", stats: {"int":8,"vit":4}, tags: ["holy","heal"],
+    cards: [{"cardId":"wtScepterMiracle","count":2}],
+    ability: {"name":"朝の光","effect":{"when":"turnStart","do":[{"kind":"heal","amount":3,"to":"allies"},{"kind":"block","amount":2,"to":"allies"}]}},
   },
   // ----- 鎧 -----
   { id: 'nightgown', name: '夢見のローブ', slot: 'armor', rarity: 'rare', icon: 'robe', description: '闇属性のダメージを半分に和らげる。戦闘の始めにブロックを得る。', maxHp: 8, startBlock: 3, tags: ['dark'], ability: { name: '悪夢除け', effect: { modifier: 'elementGuard', element: 'dark', mode: 'half' } } },

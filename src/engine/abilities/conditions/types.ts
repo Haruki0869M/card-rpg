@@ -21,6 +21,14 @@ export interface CondCtx {
   /** きっかけになった状態異常（状態異常を与えた時・敵が継続ダメージを受けた時） */
   statusId?: string;
   supportedOthers?: boolean;
+  /** 今のカードで、自分への支援が成立した（1人パーティの時の「支援」） */
+  supportedSelf?: boolean;
+  /** カードではない攻撃の出どころ（お供・召喚） */
+  via?: 'pet' | 'summon';
+  /** 今のカードが弱点を突いた */
+  weakHit?: boolean;
+  /** 回復した相手のHPが、回復の前から満タンだった */
+  wasFull?: boolean;
   /** 今のカードの「×N回」の攻撃（total = 当てた回数 / landed = HPに当たった回数） */
   multi?: { total: number; landed: number };
 }

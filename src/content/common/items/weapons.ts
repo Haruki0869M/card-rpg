@@ -19,9 +19,18 @@ export const weapons: ItemDef[] = [
   { id: 'flameSword', name: '炎の大剣', slot: 'weapon', weaponType: 'sword', rarity: 'legend', icon: 'sword', description: '刀身に炎の精霊が宿る大剣。', stats: { str: 12 }, cards: [{ cardId: 'wFlameSlash', count: 2 }] , ability: { name: '炎の精霊', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'physical' }, { kind: 'cardHasDamage' }], do: [{ kind: 'applyStatus', status: 'burn', amount: 2 }] } } },
   // 杖
   { id: 'oakStaff', name: '樫の杖', slot: 'weapon', weaponType: 'staff', rarity: 'common', icon: 'staff', description: '魔法を学ぶ者が最初に持つ杖。', cards: [{ cardId: 'wManaBolt', count: 2 }] },
-  { id: 'magusStaff', name: '魔導士の杖', slot: 'weapon', weaponType: 'staff', rarity: 'rare', icon: 'staff', description: '魔力を増幅する宝玉付きの杖。', stats: { int: 5 }, cards: [{ cardId: 'wManaTorrent', count: 2 }] },
-  { id: 'thunderStaff', name: '雷霆の杖', slot: 'weapon', weaponType: 'staff', rarity: 'epic', icon: 'staff', description: '天の雷を呼ぶ杖。', stats: { int: 8 }, focusMax: 1, cards: [{ cardId: 'wLightning', count: 2 }] , ability: { name: '雷鳴', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'magic' }], do: [{ kind: 'damage', amount: 6, to: 'randomFoe' }] } } },
-  { id: 'starStaff', name: '星詠みの杖', slot: 'weapon', weaponType: 'staff', rarity: 'legend', icon: 'staff', description: '星の運行を読む賢者の杖。', stats: { int: 12, luk: 5 }, focusMax: 1, cards: [{ cardId: 'wStarfall', count: 2 }] , ability: { name: '星の加護', effect: { modifier: 'damageDealt', multiplier: 1.25, if: [{ kind: 'cardCategory', category: 'magic' }] } } },
+  {
+    id: "magusStaff", name: "魔導士の杖", slot: "weapon", weaponType: "staff", rarity: "rare", icon: "staff",
+    description: "魔法カードが弱点を突いた時、その敵に追加で4ダメージ。1ターンに1回。", stats: {"int":5}, tags: ["magic"],
+    cards: [{"cardId":"wManaTorrent","count":2}],
+    ability: {"name":"弱点突き","description":"魔法カードが弱点を突いた時、その敵に追加で4ダメージ。1ターンに1回。","effect":{"when":"afterCard","if":[{"kind":"cardCategory","category":"magic"},{"kind":"weakHit"},{"kind":"oncePerTurn","key":"magusStaff"}],"do":[{"kind":"damage","amount":4,"to":"weakHit"}]}},
+  },
+  {
+    id: "starStaff", name: "星詠みの杖", slot: "weapon", weaponType: "staff", rarity: "legend", icon: "staff",
+    description: "弱点を突く魔法カードの成功率+15%。", stats: {"int":12,"luk":5}, focusMax: 1, tags: ["magic"],
+    cards: [{"cardId":"wStarfall","count":2}],
+    ability: {"name":"星詠み","description":"弱点を突く魔法カードの成功率+15%。","effect":{"modifier":"cardChance","bonus":15,"if":[{"kind":"cardCategory","category":"magic"},{"kind":"cardWeakness"}]}},
+  },
   // 槌
   { id: 'oakHammer', name: '樫の槌', slot: 'weapon', weaponType: 'hammer', rarity: 'common', icon: 'hammer', description: '頑丈な樫で作られた槌。', cards: [{ cardId: 'wPound', count: 2 }] },
   {
