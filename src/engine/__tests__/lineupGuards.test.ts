@@ -40,10 +40,7 @@ function sameAbilityGroups(items: readonly ItemDef[]): string[][] {
  * フェーズ1後半・追加の装備の回で直す。直したら、ここから消す（この一覧は減る一方。増やさない）。
  * 2026-11-11 の時点のデータを実際に読んで作った。
  */
-const KNOWN_SAME_ABILITY_GROUPS: string[][] = [
-  ['angelRobe', 'barnacleArmor', 'steelPlate'],
-  ['goldenAnchor', 'masterCore'],
-];
+const KNOWN_SAME_ABILITY_GROUPS: string[][] = [];
 
 describe('ラインナップの見張り（フェーズ1 1-E）', () => {
   it('カードの名前は重ならない', () => {

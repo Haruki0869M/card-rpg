@@ -34,7 +34,7 @@ export const starGear: ItemDef[] = [
   },
   // ----- 鎧 -----
   { id: 'cloudCloak', name: '雲の外套', slot: 'armor', rarity: 'rare', icon: 'robe', scenario: 'starCastle', description: '雷属性のダメージを半分に和らげる。雲のように軽く、素早さが上がる。', maxHp: 6, stats: { agi: 2 }, tags: ['thunder'], ability: { name: '雷除け', effect: { modifier: 'elementGuard', element: 'thunder', mode: 'half' } } },
-  { id: 'angelRobe', name: '天使の羽衣', slot: 'armor', rarity: 'epic', icon: 'robe', scenario: 'starCastle', description: 'ダメージを受けるたびに、ブロック3を得る。', maxHp: 12, tags: ['block'], ability: { name: '羽の守り', effect: { when: 'hurt', do: [{ kind: 'block', amount: 3 }] } } },
+  { id: 'angelRobe', name: '天使の羽衣', slot: 'armor', rarity: 'epic', icon: 'robe', scenario: 'starCastle', description: 'HPを回復するたびに、回復した量の半分のブロックも得る。', maxHp: 12, tags: ['heal', 'block'], ability: { name: '福音', description: 'HPを回復した時、回復した量の50%のブロックも得る', effect: { modifier: 'healToBlock', pct: 0.5 } } },
   { id: 'stardustArmor', name: '星屑の鎧', slot: 'armor', rarity: 'legend', icon: 'armor', scenario: 'starCastle', description: '2枠以上のカードが完全成功すると、味方全員に「応援」1（次のカードの成功率+10%・最大3）。1ターンに1回。野営でよく休める。', maxHp: 20, explore: { campHeal: 0.5 }, tags: ['focus'], ability: { name: '降る星屑', description: '2枠以上のカードが完全成功した時（1ターンに1回）：味方全員に「応援」1（次に使うカードの成功率+10%。最大3）', effect: { when: 'perfect', if: [{ kind: 'cardSlots', min: 2 }, { kind: 'oncePerTurn', key: 'stardustArmor' }], do: [{ kind: 'applyStatus', status: 'inspired', amount: 1, to: 'allies' }] } } },
   // ----- 装飾品 -----
   { id: 'oldStarChart', name: '古い星図', slot: 'accessory', rarity: 'rare', icon: 'charm', scenario: 'starCastle', description: '星の位置から、道が分かる。知力が上がり、世界マップで遠くまで見渡せる。', stats: { int: 4 }, explore: { vision: 1 } },

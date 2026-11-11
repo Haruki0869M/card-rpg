@@ -1,6 +1,6 @@
 // ===== 戦闘のユニット（味方・敵）の共通処理: 名前・ログ・ダメージ・回復・戦闘不能 =====
 import { BALANCE } from '../../data/balance';
-import { fireAbilities } from '../abilities';
+import { fireAbilities, healToBlockOf } from '../abilities';
 import { getEnemy } from '../../data/enemies';
 import type { AbilitySource, AllyState, BattleEvent, BattleState, EnemyState } from '../../types';
 import type { Rng } from '../rng';
@@ -114,5 +114,13 @@ export function healUnit(u: Unit, amount: number, events: BattleEvent[]): number
   const healed = Math.max(0, Math.min(amt, u.maxHp - u.hp));
   u.hp += healed;
   if (healed > 0) events.push({ type: 'heal', unitId: unitIdOf(u), amount: healed });
+  // 福音など: 回復した量の一部が、ブロックにもなる
+  const toBlock = healed > 0 ? healToBlockOf(u) : undefined;
+  const gain = toBlock ? Math.floor(healed * toBlock.pct) : 0;
+  if (gain > 0) {
+    u.block += gain;
+    events.push({ type: 'block', unitId: unitIdOf(u), amount: gain });
+    events.push({ type: 'ability', unitId: unitIdOf(u), name: toBlock!.ability.name, ...(toBlock!.ability.source ? { source: toBlock!.ability.source } : {}) });
+  }
   return healed;
 }

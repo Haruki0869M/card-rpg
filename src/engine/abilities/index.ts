@@ -162,13 +162,35 @@ export function markCostUsed(state: BattleState, u: Unit, keys: string[]) {
 }
 
 /** 自分が付ける状態異常の量の上乗せ（呪詛など） */
-export function statusBonusOf(u: Unit, status: string, card?: CardDef): number {
+export function statusBonusOf(u: Unit, status: string, card?: CardDef, target?: Unit): number {
   let n = 0;
   for (const ab of abilitiesOf(u)) {
     const e = ab.effect;
-    if ('modifier' in e && e.modifier === 'statusBonus' && e.statuses.includes(status) && testConditions(e.if, { self: u, card })) n += e.amount;
+    if ('modifier' in e && e.modifier === 'statusBonus' && e.statuses.includes(status) && testConditions(e.if, { self: u, card, target })) n += e.amount;
   }
   return n;
+}
+
+/** ターンの始めに残るブロックの上限（不動の錨。持っていなければ0。複数あれば一番大きい物） */
+export function keepBlockOf(u: Unit): number {
+  let n = 0;
+  for (const ab of abilitiesOf(u)) if ('modifier' in ab.effect && ab.effect.modifier === 'keepBlock') n = Math.max(n, ab.effect.max);
+  return n;
+}
+
+/** 砲台・罠・召喚が2回ずつ発動する能力（永久機関）。持っていればその能力 */
+export function summonTwiceOf(u: Unit): AbilityDef | undefined {
+  return abilitiesOf(u).find((ab) => 'modifier' in ab.effect && ab.effect.modifier === 'summonTwice');
+}
+
+/** 回復した量をブロックにも変える能力（福音）。割合が一番大きい物 */
+export function healToBlockOf(u: Unit): { pct: number; ability: AbilityDef } | undefined {
+  let best: { pct: number; ability: AbilityDef } | undefined;
+  for (const ab of abilitiesOf(u)) {
+    const e = ab.effect;
+    if ('modifier' in e && e.modifier === 'healToBlock' && (!best || e.pct > best.pct)) best = { pct: e.pct, ability: ab };
+  }
+  return best;
 }
 
 /** かばう能力の発動確率（複数あれば一番高いもの。持っていなければ null） */
@@ -193,14 +215,14 @@ export function fireAbilities(
   events: BattleEvent[],
   owner: Unit,
   when: AbilityTrigger,
-  opts: { card?: CardDef; target?: Unit; allyTarget?: Unit; attacker?: Unit; dealt?: number; list?: AbilityDef[]; depth?: number; focusUsed?: number; tierEffects?: Effect[]; perfect?: boolean; successes?: number; supportedOthers?: boolean } = {},
+  opts: { card?: CardDef; target?: Unit; allyTarget?: Unit; attacker?: Unit; dealt?: number; list?: AbilityDef[]; depth?: number; focusUsed?: number; statusId?: string; tierEffects?: Effect[]; perfect?: boolean; successes?: number; supportedOthers?: boolean } = {},
 ): string[] {
   const out: string[] = [];
   if (owner.dead && when !== 'hurt' && !(when === 'allyDown' && opts.target === owner)) return out;
   for (const ab of opts.list ?? abilitiesOf(owner)) {
     const e = ab.effect;
     if (!isTriggered(e) || e.when !== when) continue;
-    if (!testConditions(e.if, { state, rng, self: owner, card: opts.card, target: opts.target, dealt: opts.dealt, focusUsed: opts.focusUsed, perfect: opts.perfect, successes: opts.successes, supportedOthers: opts.supportedOthers })) continue;
+    if (!testConditions(e.if, { state, rng, self: owner, card: opts.card, target: opts.target, dealt: opts.dealt, focusUsed: opts.focusUsed, perfect: opts.perfect, successes: opts.successes, supportedOthers: opts.supportedOthers, statusId: opts.statusId })) continue;
     const ctx = makeCtx(state, rng, events, owner, { target: opts.target, allyTarget: opts.allyTarget, attacker: opts.attacker, card: opts.card, dealt: opts.dealt, depth: opts.depth, tierEffects: opts.tierEffects, perfect: opts.perfect, cardAbilities: opts.card?.trait ? [opts.card.trait] : undefined });
     let any = false;
     for (const eff of e.do) any = applyEffect(ctx, eff) || any;
@@ -231,6 +253,9 @@ const TRIGGER_TEXT: Record<AbilityTrigger, string> = {
   hurt: 'ダメージを受けた時',
   allyKill: '味方が敵を倒した時',
   allyDown: '味方が倒れた時',
+  blocked: '攻撃をブロックで完全に防いだ時',
+  inflict: '敵に状態異常を与えた時',
+  foeTick: '敵が継続ダメージを受けた時',
 };
 
 const condText = (conds?: AbilityCondition[]) => (conds ?? []).map((c) => conditionHandler(c.kind).describe(c as never));
@@ -241,6 +266,9 @@ export function describeAbility(ab: AbilityDef, side: 'ally' | 'enemy' = 'ally')
   const e = ab.effect;
   if ('modifier' in e) {
     if (e.modifier === 'coverLethal') return `他の味方がHP0になるダメージを受ける時、${e.chance}%の確率で代わりに受ける（ブロックで防げる）`;
+    if (e.modifier === 'keepBlock') return `ターンの始めに、前のターンのブロックが最大${e.max}まで残る`;
+    if (e.modifier === 'summonTwice') return '自分の砲台・罠・召喚が2回ずつ発動する';
+    if (e.modifier === 'healToBlock') return `HPを回復した時、回復した量の${Math.round(e.pct * 100)}%のブロックも得る`;
     const cs = condText(e.if);
     const head = cs.length ? `${cs.join('・')}：` : '';
     if (e.modifier === 'cardChance') return `${head}成功率+${e.bonus}%`;

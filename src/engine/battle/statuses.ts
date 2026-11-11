@@ -41,6 +41,12 @@ export function takenMultiplier(s: Statuses | undefined): number {
 
 const tickOf = (def: StatusDef, amount: number) => (def.tickDamage === 'stacks' ? amount : (def.tickDamage ?? 0));
 
+/** 状態異常1種類の、今の継続ダメージ（かかっていなければ0。数は変えない） */
+export function tickDamageOfStatus(s: Statuses | undefined, id: string): number {
+  const amount = s?.[id] ?? 0;
+  return amount > 0 ? tickOf(getStatus(id), amount) : 0;
+}
+
 /** フェーズの終わりに受ける継続ダメージの合計（予測用。数は変えない） */
 export function tickDamageOf(s: Statuses | undefined): number {
   let n = 0;

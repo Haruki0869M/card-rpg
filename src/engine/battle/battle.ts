@@ -23,7 +23,7 @@ import type {
   SlotResult,
   Statuses,
 } from '../../types';
-import { abilitiesOf, cardChanceBonus, cardCostOf, damageModifiers, fireAbilities, markCostUsed, testConditions } from '../abilities';
+import { abilitiesOf, cardChanceBonus, cardCostOf, damageModifiers, fireAbilities, keepBlockOf, markCostUsed, summonTwiceOf, testConditions } from '../abilities';
 import { createRng, type Rng, shuffle } from '../rng';
 import { affinityOf } from '../stats';
 import { calcDamage } from './damage';
@@ -249,7 +249,8 @@ function startAllyPhase(state: BattleState, rng: Rng, events: BattleEvent[]) {
   }
   for (const a of state.allies) {
     if (a.dead) continue;
-    a.block = 0;
+    // 不動の錨など: 前のターンのブロックが、上限まで残る
+    a.block = Math.min(a.block, keepBlockOf(a));
     a.mana = BALANCE.manaPerTurn;
     // 凍結など: マナが減る（効いたら1減る）
     const pen = takeManaPenalty(a.statuses);
@@ -307,10 +308,13 @@ function tickDamageOverTime(state: BattleState, side: 'ally' | 'enemy', rng: Rng
   const units = side === 'ally' ? state.allies : state.enemies;
   for (const u of units) {
     if (u.dead) continue;
+    const ticking = side === 'enemy' ? activeStatuses(u.statuses).filter(({ def }) => def.tickDamage !== undefined).map(({ def }) => def.id) : [];
     const { damage, names } = applyTick(u.statuses);
     if (damage <= 0) continue;
     addLog(state, `${nameOf(u)}は${names.join('・')}で${Math.min(u.hp, damage)}ダメージ`);
     loseHp(state, u, damage, rng, events);
+    // きっかけ: 敵が継続ダメージ（毒など）を受けた
+    for (const id of ticking) for (const a of state.allies) if (!a.dead) fireAbilities(state, rng, events, a, 'foeTick', { target: u, statusId: id });
   }
 }
 
@@ -589,6 +593,7 @@ export function predictTexts(list: PredictTotals[]): { id: string; text: string 
 /** 呼び出したお供（幻獣・獣など）の攻撃。ターン終了時にランダムな敵へ。残りターンが0になったら帰る */
 function summonsAttack(state: BattleState, ally: AllyState, rng: Rng, events: BattleEvent[]) {
   if (!ally.summons?.length) return;
+  const twice = summonTwiceOf(ally);
   for (const s of [...ally.summons]) {
     if (s.echoPct || s.trigger) continue;
     const foes = state.enemies.filter((e) => !e.dead);
@@ -598,6 +603,14 @@ function summonsAttack(state: BattleState, ally: AllyState, rng: Rng, events: Ba
     const loss = dealDamage(ctx, t, s.damage, s.element);
     abilityTriggered(state, ally.id, s.name, events, { kind: 'summon', id: s.id, label: s.name });
     addLog(state, `${ally.name}の${s.name}が${enemyName(t)}を攻撃！ ${loss}ダメージ`);
+    // 永久機関: もう1回攻撃する（残りターンは1回分だけ減る）
+    const again = twice ? state.enemies.filter((e) => !e.dead) : [];
+    if (again.length) {
+      const t2 = s.targetId ? again.find(e => e.uid === s.targetId) ?? again[0] : again[rng.int(again.length)];
+      const loss2 = dealDamage(makeCtx(state, rng, events, ally, { target: t2 }), t2, s.damage, s.element);
+      abilityTriggered(state, ally.id, twice!.name, events, twice!.source);
+      addLog(state, `${ally.name}の${s.name}がもう1回攻撃！ ${enemyName(t2)}に${loss2}ダメージ`);
+    }
     if (s.turns < 99) s.turns -= 1;
   }
   ally.summons = ally.summons.filter((s) => s.turns > 0);
@@ -718,6 +731,12 @@ function executeIntent(state: BattleState, enemy: EnemyState, rng: Rng, events: 
       const trap = makeCtx(state, rng, events, owner, { target: enemy });
       for (const eff of token.effects ?? []) applyEffect(trap, eff);
       abilityTriggered(state, owner.id, token.name, events, { kind: 'summon', id: token.id, label: token.name });
+      // 永久機関: 罠ももう1回発動する
+      const twice = enemy.dead ? undefined : summonTwiceOf(owner);
+      if (twice) {
+        for (const eff of token.effects ?? []) applyEffect(trap, eff);
+        abilityTriggered(state, owner.id, twice.name, events, twice.source);
+      }
       addLog(state, `${owner.name}の${token.name}が発動した`);
     }
   }

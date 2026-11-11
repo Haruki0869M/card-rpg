@@ -18,6 +18,8 @@ export interface CondCtx {
   /** 今のカードで使ったフォーカス */
   focusUsed?: number;
   successes?: number;
+  /** きっかけになった状態異常（状態異常を与えた時・敵が継続ダメージを受けた時） */
+  statusId?: string;
   supportedOthers?: boolean;
 }
 

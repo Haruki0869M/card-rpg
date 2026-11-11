@@ -76,6 +76,9 @@ export function resolveTargets(ctx: EffectCtx, to: EffectTarget): Unit[] {
       return sideOf(state, source).filter((u) => u !== source);
     case 'foes':
       return foesOf(state, source);
+    case 'attacker':
+      // 攻撃してきた相手（ダメージを受けた時・防いだ時のきっかけ。毒などの継続ダメージには相手がいない）
+      return ctx.attacker && !ctx.attacker.dead && isEnemy(ctx.attacker) !== isEnemy(source) ? [ctx.attacker] : [];
     case 'otherFoes':
       // 狙った敵以外の敵全員（感電など）
       return foesOf(state, source).filter((u) => u !== ctx.target);
@@ -119,6 +122,7 @@ const WHO: Record<EffectTarget, { ally: string; enemy: string }> = {
   otherAllies: { ally: '他の味方全員に', enemy: '他の敵全員に' },
   foes: { ally: '敵全員に', enemy: '味方全員に' },
   otherFoes: { ally: '他の敵全員に', enemy: '他の味方全員に' },
+  attacker: { ally: '攻撃してきた相手に', enemy: '攻撃してきた相手に' },
   randomFoe: { ally: 'ランダムな敵1体に', enemy: 'ランダムな味方1人に' },
   lowestAlly: { ally: 'HPが一番低い味方に', enemy: 'HPが一番低い敵に' },
   randomAlly: { ally: 'ランダムな味方1人に', enemy: 'ランダムな敵1体に' },
@@ -290,6 +294,8 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
       addStatus(v.statuses, el.status, el.amount ?? 1);
       events.push({ type: 'status', unitId: unitIdOf(v), status: el.status, amount: el.amount ?? 1 });
       ctx.parts.push(`${getStatus(el.status).name}${el.amount ?? 1}`);
+      // きっかけ: 相手に状態異常を与えた
+      if (ctx.depth < 3 && isEnemy(source) !== isEnemy(v) && !source.dead) fireAbilities(state, rng, events, source, 'inflict', { target: v, statusId: el.status, depth: ctx.depth + 1 });
     }
   }
   // 転職の条件の記録: 味方が敵を倒した（属性・呪い・自分のHPが少ない時）
@@ -307,6 +313,8 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   // きっかけ: ダメージを受けた / 倒した
   if (ctx.depth < 3) {
     if (r.hpLoss > 0 && !v.dead) fireAbilities(state, rng, events, v, 'hurt', { attacker: source, depth: ctx.depth + 1 });
+    // きっかけ: 相手の攻撃を、ブロックで完全に防いだ
+    if (r.hpLoss === 0 && r.blocked > 0 && !v.dead && isEnemy(source) !== isEnemy(v)) fireAbilities(state, rng, events, v, 'blocked', { attacker: source, depth: ctx.depth + 1 });
     if (v.dead && isEnemy(source) !== isEnemy(v) && !source.dead) fireAbilities(state, rng, events, source, 'kill', { target: v, depth: ctx.depth + 1 });
     if (v.dead && isEnemy(v) && !isEnemy(source)) for (const a of state.allies) if (!a.dead) fireAbilities(state, rng, events, a, 'allyKill', { target: v, depth: ctx.depth + 1 });
   }
