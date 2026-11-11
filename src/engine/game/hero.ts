@@ -41,7 +41,8 @@ export const heroAbilities = (hero: Hero) => [
   ...(hero.carried && hero.carried !== hero.classId ? [{ ...getClass(hero.carried).battleAbility, source: { kind: 'inherited' as const, id: hero.carried, label: getClass(hero.carried).name } }] : []),
   ...equippedItems(hero)
     .filter((i) => i.ability)
-    .map((i) => ({ ...i.ability!, source: { kind: 'equipment' as const, id: i.id, label: i.name } })),
+    // also（同じ名前で持つ2つ目の中身）は、別々の能力として並べる
+    .flatMap((i) => [i.ability!.effect, ...(i.ability!.also ?? [])].map((effect) => ({ name: i.ability!.name, ...(i.ability!.description ? { description: i.ability!.description } : {}), effect, source: { kind: 'equipment' as const, id: i.id, label: i.name } }))),
   // お供の能力（獣使い系統は2倍）
   ...petAbilities(hero),
 ];
@@ -98,6 +99,7 @@ export function toPartyMember(hero: Hero): PartyMemberSpec {
     stats: heroStats(hero),
     deck: battleDeck(hero),
     startBlock: heroStartBlock(hero),
+    gold: hero.gold,
     extraDraw: heroExtraDraw(hero),
     abilities: heroAbilities(hero),
     statuses: hero.nextBattleStatuses,

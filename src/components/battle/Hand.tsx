@@ -5,6 +5,7 @@ import { memo, useEffect, useMemo, useState } from 'react';
 import { TIMING } from '../../data/balance';
 import { cardOf } from '../../data/cards';
 import { chanceFor, findAlly, unusableReason } from '../../engine';
+import { cardCostOf } from '../../engine/abilities';
 import { useElementSize } from '../../hooks/useElementSize';
 import { usePress } from '../../hooks/usePress';
 import { useTallScreen } from '../../hooks/useTallScreen';
@@ -36,6 +37,7 @@ const CardView = memo(function CardView({
   selected,
   focus,
   reason,
+  cost,
   containerW,
   tall,
 }: {
@@ -50,6 +52,7 @@ const CardView = memo(function CardView({
   selected: boolean;
   focus: number;
   reason: string | null;
+  cost: number;
   containerW: number;
   /** 画面が高い時だけ、選んだカードを大きく浮かせる（低い画面では敵が隠れないように少し上げるだけ） */
   tall: boolean;
@@ -93,7 +96,7 @@ const CardView = memo(function CardView({
       }}
     >
     <div className={`relative h-full w-full transition-[filter] duration-100 active:scale-[.96] ${selected ? 'card-pop' : 'card-enter'}`}>
-      <CardBody card={card} chance={chance} width={w} height={h} focus={focus} selected={selected} dim={!!reason} compact={!big}>
+      <CardBody card={card} cost={cost} chance={chance} width={w} height={h} focus={focus} selected={selected} dim={!!reason} compact={!big}>
         <AnimatePresence>
           {showFlash && flash && (
             <motion.div
@@ -185,6 +188,7 @@ export function Hand() {
               selected={selection?.cardUid === c.uid}
               focus={selection?.cardUid === c.uid ? selection.focus : 0}
               reason={unusableReason(battle, ally, cardOf(c))}
+              cost={cardCostOf(battle, ally, cardOf(c)).cost}
               containerW={W}
               tall={tall}
             />

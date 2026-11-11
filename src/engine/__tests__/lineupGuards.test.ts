@@ -41,8 +41,8 @@ function sameAbilityGroups(items: readonly ItemDef[]): string[][] {
  * 2026-11-11 の時点のデータを実際に読んで作った。
  */
 const KNOWN_SAME_ABILITY_GROUPS: string[][] = [
-  ['angelRobe', 'barnacleArmor', 'echoArmor', 'steelPlate'],
-  ['everIceBracer', 'goldenAnchor', 'kingSignet', 'masterCore', 'sixWorldsBadge'],
+  ['angelRobe', 'barnacleArmor', 'steelPlate'],
+  ['goldenAnchor', 'masterCore'],
 ];
 
 describe('ラインナップの見張り（フェーズ1 1-E）', () => {

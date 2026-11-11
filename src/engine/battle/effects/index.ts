@@ -76,6 +76,9 @@ export function resolveTargets(ctx: EffectCtx, to: EffectTarget): Unit[] {
       return sideOf(state, source).filter((u) => u !== source);
     case 'foes':
       return foesOf(state, source);
+    case 'otherFoes':
+      // 狙った敵以外の敵全員（感電など）
+      return foesOf(state, source).filter((u) => u !== ctx.target);
     case 'lowestAlly': {
       // 味方で、HPの割合が一番低い1人
       const alive = sideOf(state, source).filter((u) => !u.dead);
@@ -115,6 +118,7 @@ const WHO: Record<EffectTarget, { ally: string; enemy: string }> = {
   allies: { ally: '味方全員に', enemy: '敵全員に' },
   otherAllies: { ally: '他の味方全員に', enemy: '他の敵全員に' },
   foes: { ally: '敵全員に', enemy: '味方全員に' },
+  otherFoes: { ally: '他の敵全員に', enemy: '他の味方全員に' },
   randomFoe: { ally: 'ランダムな敵1体に', enemy: 'ランダムな味方1人に' },
   lowestAlly: { ally: 'HPが一番低い味方に', enemy: 'HPが一番低い敵に' },
   randomAlly: { ally: 'ランダムな味方1人に', enemy: 'ランダムな敵1体に' },

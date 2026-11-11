@@ -43,7 +43,7 @@ export interface ElementDef {
  * target = 選んだ対象（カードの対象の敵 / 敵の行動の対象の味方 / アイテムを使う相手。全体カードなら相手全員）
  * self = 自分 / allies = 自分の側の全員 / otherAllies = 自分以外の自分の側 / foes = 相手の側の全員 / randomFoe = 相手からランダムに1人
  */
-export type EffectTarget = 'target' | 'self' | 'allies' | 'otherAllies' | 'foes' | 'randomFoe' | 'lowestAlly' | 'randomAlly' | 'allyTarget';
+export type EffectTarget = 'target' | 'self' | 'allies' | 'otherAllies' | 'foes' | 'randomFoe' | 'lowestAlly' | 'randomAlly' | 'allyTarget' | 'otherFoes';
 
 /**
  * 効果の種類ごとの数値。効果のファイル（src/engine/battle/effects/）が declare module でここに種類を足す。
@@ -126,6 +126,8 @@ export type AbilityEffect =
   | { modifier: 'completeSlots'; if?: AbilityCondition[] }
   | { modifier: 'exhaust'; if?: AbilityCondition[] }
   | { modifier: 'slotPreview'; uses: number; if?: AbilityCondition[] }
+  /** カードのコストを変える（set = その値にする / delta = 足す。0より下にはならない）。turnKey があると1ターンに1枚だけ（使った時に数える） */
+  | { modifier: 'cardCost'; delta?: number; set?: number; turnKey?: string; if?: AbilityCondition[] }
   | { modifier: 'chestChance'; bonus: number; if?: AbilityCondition[] }
   | { modifier: 'weaknessDamage'; multiplier: number; if?: AbilityCondition[] }
   /** 属性の攻撃を受ける時: immune = 無効 / absorb = 受けるダメージ分回復 / half = 半分（K2。敵の攻撃から守る） */
@@ -137,9 +139,10 @@ export type AbilityEffect =
 
 /**
  * ダメージの倍率を状況で増やす（倍率 × (1 + per × 値)。max は上乗せの上限）。
- * missingHp = 自分の減ったHPの割合（0〜1） / targetStatuses = 対象の悪い状態異常の種類の数 / selfStatus = 自分の状態異常 status の量
+ * missingHp = 自分の減ったHPの割合（0〜1） / targetStatuses = 対象の悪い状態異常の種類の数 / selfStatus = 自分の状態異常 status の量 /
+ * gold = 戦闘を始めた時の自分の所持金（step ゴールドごとに1）
  */
-export type DamageScale = { by: 'missingHp' | 'targetStatuses' | 'selfStatus'; per: number; max?: number; status?: string };
+export type DamageScale = { by: 'missingHp' | 'targetStatuses' | 'selfStatus' | 'gold'; per: number; max?: number; status?: string; step?: number };
 
 /** 演出用の出所。効果の判定には使わない。 */
 export interface AbilitySource {
@@ -158,6 +161,8 @@ export interface AbilityDef {
   /** 説明文（省略すると中身から自動で作る。雰囲気の文を足したい時だけ書く） */
   description?: string;
   effect: AbilityEffect;
+  /** 同じ名前で一緒に持つ、ほかの中身（1つの装備に2つのきっかけ・常時型を持たせる時） */
+  also?: AbilityEffect[];
 }
 
 /** 探索の特殊能力（世界マップ・イベントで効く） */
@@ -315,6 +320,8 @@ export interface PartyMemberSpec {
   deck?: CardInstance[];
   /** 戦闘開始時のブロック（装備） */
   startBlock?: number;
+  /** 所持金（所持金で変わる能力が見る） */
+  gold?: number;
   /** 毎ターンのドロー枚数の追加（装備） */
   extraDraw?: number;
   /** 戦闘開始時の状態異常 */
@@ -392,6 +399,8 @@ export interface EncounterSpec {
   id: string;
   name: string;
   enemies: { defId: string; level?: number }[];
+  /** ボスの部屋の戦闘（ボスには効き方が変わる効果が見る） */
+  boss?: boolean;
 }
 
 // ---------- 戦闘の状態 ----------
@@ -468,6 +477,8 @@ export interface AllyState {
   feats?: Record<string, number>;
   /** このターンに使ったカードの枚数（連撃など） */
   played?: number;
+  /** 戦闘を始めた時の所持金（所持金で変わる能力が見る。戦闘中は変わらない） */
+  gold?: number;
   /** 能力の数え（幻獣ゲージなど。キーは能力ごと） */
   counters?: Record<string, number>;
   /** 呼び出したお供（幻獣・獣など。ターン終了時に攻撃する。足元のトークンで表示） */
@@ -589,6 +600,8 @@ export interface BattleState {
   ready?: PlayerId[];
   /** 戦闘中に手に入れたお金（掠め取りなど。勝った時の報酬に足す） */
   bonusGold?: number;
+  /** ボスの部屋の戦闘 */
+  boss?: boolean;
 }
 
 /** 呼び出したお供（turns = 残りのターン数。0になったら帰る） */
