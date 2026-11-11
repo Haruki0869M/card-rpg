@@ -5,26 +5,10 @@ import type { ItemDef } from '../../../../types';
 export const dreamGear: ItemDef[] = [
   // ----- 武器 -----
   {
-    id: 'dreamEdge', name: '夢の刃', slot: 'weapon', weaponType: 'sword', rarity: 'epic', icon: 'sword', scenario: 'dreamLabyrinth',
-    description: '完全成功で、ランダムな敵1体に闇属性の追撃4。1ターンに1回。悪夢を切る刃。', stats: { str: 6, dex: 4 }, tags: ['physical', 'dark'],
-    cards: [{ cardId: 'wMithrilSlash', count: 2 }],
-    ability: { name: '悪夢斬り', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'physical' }, { kind: 'dealtDamage' }, { kind: 'oncePerTurn', key: 'dreamEdge' }], do: [{ kind: 'damage', amount: 4, element: 'dark', to: 'randomFoe' }] } },
-  },
-  {
     id: 'memoryStaff', name: '記憶の杖', slot: 'weapon', weaponType: 'staff', rarity: 'epic', icon: 'staff', scenario: 'dreamLabyrinth',
     description: 'コスト2以上の魔法が完全成功すると、その効果がもう一度起きる。1回の戦闘で1回だけ。', stats: { int: 8, vit: 2 }, tags: ['magic', 'highCost'],
     cards: [{ cardId: 'wLightning', count: 2 }],
     ability: { name: '追憶', description: 'コスト2以上の魔法カードが完全成功した時（1回の戦闘で1回まで）：使ったカードの効果をもう一度発動', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'magic' }, { kind: 'cardCost', min: 2 }, { kind: 'perBattle', key: 'memoryStaff', max: 1 }], do: [{ kind: 'repeatCard' }] } },
-  },
-  {
-    id: 'lullabySpear', name: '子守歌の槍', slot: 'weapon', weaponType: 'spear', rarity: 'rare', icon: 'spear', scenario: 'dreamLabyrinth',
-    description: '眠りを誘う穂先を持つ槍。敵をまとめて薙ぎ払う技が付く。', stats: { str: 5, dex: 3 }, tags: ['physical'],
-    cards: [{ cardId: 'wtSpearSweep', count: 2 }],
-  },
-  {
-    id: 'pillowDagger', name: '枕元の短剣', slot: 'weapon', weaponType: 'dagger', rarity: 'rare', icon: 'dagger', scenario: 'dreamLabyrinth',
-    description: '枕元に置かれていた小さな短剣。影から刺して、敵を弱らせる技が付く。', stats: { dex: 4, agi: 3 }, tags: ['physical'],
-    cards: [{ cardId: 'wtDaggerShadow', count: 2 }],
   },
   {
     id: 'awakeningScepter', name: '目覚めの錫杖', slot: 'weapon', weaponType: 'scepter', rarity: 'legend', icon: 'scepter', scenario: 'dreamLabyrinth',

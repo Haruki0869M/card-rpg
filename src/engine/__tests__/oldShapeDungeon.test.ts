@@ -71,7 +71,7 @@ describe('古い保存（40行のダンジョンの途中）', () => {
     (g.expeditions![0].dungeon! as unknown as Record<string, unknown>).explore = 2;
     const saved = JSON.parse(JSON.stringify(g));
     expect(saved.version).toBe(GAME_VERSION);
-    expect(GAME_VERSION).toBe(18);
+    expect(GAME_VERSION).toBe(19);
     const m = migrateGame(saved)!;
     expect(m).not.toBeNull();
     expect(validateGame(m)).toBe(true);

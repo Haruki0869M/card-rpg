@@ -24,12 +24,17 @@ export const effect: EffectHandler<'damage'> = {
       for (const o of e.outcomes) { multiplier = o.multiplier; roll -= o.weight; if (roll < 0) break; }
       ctx.parts.push(`勝負×${multiplier}`);
     }
+    const multi = (e.hits ?? 1) >= 2 && !isEnemy(ctx.source) ? (ctx.multi ??= { total: 0, landed: 0 }) : undefined;
     for (let h = 0; h < (e.hits ?? 1); h++) {
       for (const t of resolveTargets(ctx, targetOf(e))) {
         const charge = chargedMultiplier(ctx.source, ctx.card);
         if (charge > 1) recordActivation(ctx, { name: '蓄えた力', source: { kind: 'other' } });
         const loss = dealDamage(ctx, t, e.amount, e.element, charge * multiplier);
         any = true;
+        if (multi) {
+          multi.total += 1;
+          if (loss > 0) multi.landed += 1;
+        }
         if (isEnemy(ctx.source)) ctx.parts.push(`${nameOf(t)}に${loss}`);
       }
     }

@@ -75,9 +75,9 @@ describe('凍てつく王国', () => {
     }
   });
 
-  it('固有装備10個は、凍てつく王国の宝箱にだけ出る', () => {
+  it('固有装備8個は、凍てつく王国の宝箱にだけ出る', () => {
     const gear = ITEMS.all.filter((i) => i.scenario === 'frozenKingdom');
-    expect(gear.length).toBe(10);
+    expect(gear.length).toBe(8);
     const g = newWorld();
     const seen = new Set<string>();
     for (let n = 0; n < 300; n++) {

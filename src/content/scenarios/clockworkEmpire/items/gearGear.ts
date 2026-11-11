@@ -5,26 +5,10 @@ import type { ItemDef } from '../../../../types';
 export const gearGearItems: ItemDef[] = [
   // ----- 武器 -----
   {
-    id: 'steamHammerAxe', name: '蒸気ハンマー斧', slot: 'weapon', weaponType: 'axe', rarity: 'epic', icon: 'axe', scenario: 'clockworkEmpire',
-    description: '完全成功でランダムな敵1体に火属性の追撃4。1ターンに1回。', stats: { str: 8, vit: 2 }, tags: ['physical', 'fire'],
-    cards: [{ cardId: 'wtAxeBloodlust', count: 2 }],
-    ability: { name: '蒸気噴射', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'physical' }, { kind: 'dealtDamage' }, { kind: 'oncePerTurn', key: 'steamHammerAxe' }], do: [{ kind: 'damage', amount: 4, element: 'fire', to: 'randomFoe' }] } },
-  },
-  {
     id: 'teslaStaff', name: '放電の杖', slot: 'weapon', weaponType: 'staff', rarity: 'epic', icon: 'staff', scenario: 'clockworkEmpire',
     description: '魔法の完全成功でランダムな敵1体に雷属性の追撃4。1ターンに1回。', stats: { int: 8, dex: 2 }, tags: ['magic', 'thunder'],
     cards: [{ cardId: 'wLightning', count: 2 }],
     ability: { name: '放電', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'magic' }, { kind: 'dealtDamage' }, { kind: 'oncePerTurn', key: 'teslaStaff' }], do: [{ kind: 'damage', amount: 4, element: 'thunder', to: 'randomFoe' }] } },
-  },
-  {
-    id: 'gearSpear', name: '歯車の槍', slot: 'weapon', weaponType: 'spear', rarity: 'rare', icon: 'spear', scenario: 'clockworkEmpire',
-    description: '穂先が歯車になった槍。力のある者に馴染む。', stats: { str: 5, dex: 3 }, tags: ['physical'],
-    cards: [{ cardId: 'wtSpearHook', count: 2 }],
-  },
-  {
-    id: 'clockworkBow', name: '機械仕掛けの弓', slot: 'weapon', weaponType: 'bow', rarity: 'rare', icon: 'bow', scenario: 'clockworkEmpire',
-    description: 'ゼンマイ仕掛けで連射できる弓。', stats: { dex: 5, per: 3 }, tags: ['physical'],
-    cards: [{ cardId: 'wDoubleShot', count: 2 }],
   },
   {
     id: 'sageScepter', name: '賢者の錫杖', slot: 'weapon', weaponType: 'scepter', rarity: 'legend', icon: 'scepter', scenario: 'clockworkEmpire',

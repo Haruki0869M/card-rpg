@@ -216,8 +216,8 @@ describe('区切りA: 地図に最初から出る物', () => {
 });
 
 describe('区切りA: 保存の版', () => {
-  it('今の版は v18。今の保存データは読める', () => {
-    expect(STATE_VERSION).toBe(18);
+  it('今の保存データは読める（今の版は区切りBで v19。lineupStageB.test.ts）', () => {
+    expect(STATE_VERSION).toBeGreaterThanOrEqual(18);
     const g = game(['warrior'], [{ accessory: 'partnerBell' }]);
     expect(migrateGame(structuredClone(g))).toEqual(g);
   });

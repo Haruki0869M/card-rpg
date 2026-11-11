@@ -23,7 +23,7 @@ import type {
   SlotResult,
   Statuses,
 } from '../../types';
-import { abilitiesOf, cardChanceBonus, cardCostOf, damageModifiers, fireAbilities, keepBlockOf, markCostUsed, summonTwiceOf, testConditions } from '../abilities';
+import { cardChanceBonus, cardCostOf, completeSlotsOf, damageModifiers, fireAbilities, keepBlockOf, markCostUsed, summonTwiceOf } from '../abilities';
 import { createRng, type Rng, shuffle } from '../rng';
 import { affinityOf } from '../stats';
 import { calcDamage } from './damage';
@@ -40,7 +40,7 @@ import { abilityTriggered, addLog, enemyName, findAlly, healUnit, loseHp, nameOf
 export { enemyName, findAlly, findEnemy, unitName } from './units';
 
 // v18（2026-11-11）: 鎧・装飾品の作り直し。古い保存データは読まない（オーナーの決定。v17 からの移行は作らない）
-export const STATE_VERSION = 18;
+export const STATE_VERSION = 19;
 export { slotPreviewLimitOf } from './preview';
 
 // ---------- 生成 ----------
@@ -136,6 +136,7 @@ export function createBattle(setup: BattleSetup): BattleState {
     nextUid: uid,
     encounterId: encounter.id,
     ...(encounter.boss ? { boss: true } : {}),
+    ...(encounter.midboss ? { midboss: true } : {}),
     ...(setup.readyCheck ? { readyCheck: true, ready: [] } : {}),
   };
   addLog(state, `戦闘開始（${party.length}人 / ${encounter.name}）`);
@@ -162,16 +163,17 @@ export function createBattle(setup: BattleSetup): BattleState {
 // ---------- 参照用ヘルパー ----------
 
 /** カードの成功率（適性・痺れなどの状態異常を反映） */
-export function chanceFor(ally: AllyState, card: CardDef): number {
-  const bonus = cardChanceBonus(ally, card) + statusChanceBonus(ally.statuses);
+/** target・state = 狙う相手で変わる能力（崩しの矢など）を見る時に渡す */
+export function chanceFor(ally: AllyState, card: CardDef, target?: AllyState | EnemyState, state?: BattleState): number {
+  const bonus = cardChanceBonus(ally, card, target, state) + statusChanceBonus(ally.statuses);
   const base = bonus ? Math.min(BALANCE.chanceMax, finalChance(card, affinityOf(ally)) + bonus) : finalChance(card, affinityOf(ally));
   const pen = chancePenaltyOf(ally.statuses);
   return pen ? Math.max(BALANCE.chanceMin, base - pen) : base;
 }
 
 /** フォーカス使用後の成功率。必中の予測表示と実際の判定で共有する。 */
-export function rollChanceFor(ally: AllyState, card: CardDef, focusUsed: number): number {
-  return abilitiesOf(ally).some(ab => 'modifier' in ab.effect && ab.effect.modifier === 'completeSlots' && testConditions(ab.effect.if, { self: ally, card, focusUsed })) ? 100 : chanceFor(ally, card);
+export function rollChanceFor(ally: AllyState, card: CardDef, focusUsed: number, target?: AllyState | EnemyState, state?: BattleState): number {
+  return completeSlotsOf(state, ally, card, focusUsed, target).active ? 100 : chanceFor(ally, card, target, state);
 }
 
 /** 次のカードの成功率の上乗せ（状態異常の chanceBonus × 数） */
@@ -223,8 +225,8 @@ export function tierDamageAgainst(ally: AllyState, card: CardDef, target: EnemyS
     return t.effects.reduce((sum, e) => {
       if (e.kind !== 'damage' || (targetOf(e) !== 'target' && targetOf(e) !== 'foes')) return sum;
       const element = attackElement(source, card, e.element);
-      const { multiplier } = damageModifiers(undefined, source, card, target, card.trait ? [card.trait] : undefined, t.minSuccesses === card.slots, element);
-      return sum + calcDamage(e.amount, source.statuses, target.statuses, chargedMultiplier(source, card) * (e.outcomes?.length ? e.outcomes.reduce((n, o) => n + o.weight * o.multiplier, 0) / e.outcomes.reduce((n, o) => n + o.weight, 0) : 1) * multiplier * elementMultiplier(target, element) * comboMultiplier(source, target)) * (e.hits ?? 1);
+      const { multiplier, add } = damageModifiers(undefined, source, card, target, card.trait ? [card.trait] : undefined, t.minSuccesses === card.slots, element);
+      return sum + calcDamage(e.amount + add, source.statuses, target.statuses, chargedMultiplier(source, card) * (e.outcomes?.length ? e.outcomes.reduce((n, o) => n + o.weight * o.multiplier, 0) / e.outcomes.reduce((n, o) => n + o.weight, 0) : 1) * multiplier * elementMultiplier(target, element) * comboMultiplier(source, target)) * (e.hits ?? 1);
     }, 0);
   });
 }
@@ -251,6 +253,10 @@ function startAllyPhase(state: BattleState, rng: Rng, events: BattleEvent[]) {
   for (const a of state.allies) {
     if (a.dead) continue;
     // 不動の錨など: 前のターンのブロックが、上限まで残る
+    // 装備の能力の数え: 前のターンから残ったブロック（守りの祈り）・敵の番を無傷でしのいだか（返しの穂先・竜王の構え）
+    const cs = (a.counters ??= {});
+    cs.blockLeft = a.block;
+    cs.unhurtTurn = state.turn > 1 && cs.unhurt === 1 ? 1 : 0;
     a.block = Math.min(a.block, keepBlockOf(a));
     a.mana = BALANCE.manaPerTurn;
     // 凍結など: マナが減る（効いたら1減る）
@@ -400,7 +406,7 @@ function reserveCard(state: BattleState, cmd: Extract<Command, { type: 'PREVIEW_
   if (!Number.isInteger(cmd.focusUsed) || cmd.focusUsed < 0 || cmd.focusUsed > Math.min(card.slots, ally.focus)) return 'フォーカスの数が不正です';
   if (needsCardTarget(card) && !selectedCardTarget(state, ally, card, cmd.targetId)) return '対象を選んでください';
   if (card.secondaryTarget && !secondaryCardTarget(state, ally, card, cmd.allyTargetId)) return '回復・支援する味方を選んでください';
-  const chance = rollChanceFor(ally, card, cmd.focusUsed);
+  const chance = rollChanceFor(ally, card, cmd.focusUsed, selectedCardTarget(state, ally, card, cmd.targetId), state);
   const results = rollSlots(card.slots, cmd.focusUsed, chance, rng);
   const rerollResults = rollSlots(card.slots, cmd.focusUsed, chance, rng);
   state.slotPreview = { allyTargetId: cmd.allyTargetId, characterId: ally.id, cardInstanceId: inst.uid, targetId: needsCardTarget(card) ? cmd.targetId : undefined, focusUsed: cmd.focusUsed, chance, results, rerollResults, rerolled: false };
@@ -434,6 +440,8 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   // 支払い
   const paid = cardCostOf(state, ally, card);
   ally.mana -= paid.cost;
+  // 陣割りなど: 今のカードに払ったマナを覚えておく
+  (ally.counters ??= {}).lastCost = paid.cost;
   markCostUsed(state, ally, paid.keys);
   for (const n of paid.active) abilityTriggered(state, ally.id, n.name, events, n.source);
   ally.focus -= focusUsed;
@@ -441,7 +449,11 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   state.stats.focusUsed += focusUsed;
 
   // 判定
-  const chance = reserved?.chance ?? rollChanceFor(ally, card, focusUsed);
+  // 天穿ちなど: 残りの枠も全部成功になる能力（1ターンに1枚の物は、ここで使った事にする。星読みで予約した時も同じ）
+  const complete = completeSlotsOf(state, ally, card, focusUsed, target);
+  markCostUsed(state, ally, complete.keys);
+  for (const n of complete.notices) abilityTriggered(state, ally.id, n.name, events, n.source);
+  const chance = reserved?.chance ?? (complete.active ? 100 : chanceFor(ally, card, target, state));
   const results = reserved?.results ?? rollSlots(card.slots, focusUsed, chance, rng);
   // 次のカードの成功率が上がる状態異常（応援など）は、使ったら消える
   consumeChanceBonus(ally.statuses);
@@ -474,7 +486,7 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   for (const n of ctx.fired) abilityTriggered(state, ally.id, n.name, events, n.source);
 
   // きっかけ: カードの特殊能力 → 自分の能力（カードを使った後 → 完全成功時）
-  const fireOpts = { card, target, allyTarget, dealt: ctx.dealt, focusUsed, tierEffects: tier.effects, perfect, successes, supportedOthers };
+  const fireOpts = { card, target, allyTarget, dealt: ctx.dealt, focusUsed, tierEffects: tier.effects, perfect, successes, supportedOthers, multi: ctx.multi };
   // 発動した能力（お供・ジョブ・カードの特殊能力）の名前は、結果の帯には入れず、記録にだけ残す（帯が長くなって切れるため。
   // 能力はカットイン・キャラの上の【能力名】で見せる）
   const abilityParts: string[] = [];
@@ -547,10 +559,10 @@ export function predictCardTotals(state: BattleState, characterId: string, cardI
       e.outcomes = [{ weight: 1, multiplier: (high ? Math.max : Math.min)(...e.outcomes.map(o => o.multiplier)) }];
     }
     const rng = createRng(state.rngState);
-    if (!state.slotPreview) rollSlots(card.slots, focusUsed, rollChanceFor(a, card, focusUsed), rng);
+    if (!state.slotPreview) rollSlots(card.slots, focusUsed, rollChanceFor(a, card, focusUsed, selectedCardTarget(copy, a, card, targetId), copy), rng);
     const results: SlotResult[] = Array.from({ length: card.slots }, (_, i) => i < success ? 'hit' : 'miss');
     const events: BattleEvent[] = [];
-    const error = playCard(copy, { type: 'PLAY_CARD', playerId: a.playerId, characterId, cardInstanceId, targetId, allyTargetId, focusUsed }, rng, events, { chance: rollChanceFor(a, card, focusUsed), results, card: modified });
+    const error = playCard(copy, { type: 'PLAY_CARD', playerId: a.playerId, characterId, cardInstanceId, targetId, allyTargetId, focusUsed }, rng, events, { chance: rollChanceFor(a, card, focusUsed, selectedCardTarget(copy, a, card, targetId), copy), results, card: modified });
     if (error) return [];
     samples.push(events);
   }
@@ -648,6 +660,8 @@ function endTurn(state: BattleState, playerId: string, rng: Rng, events: BattleE
     if (waitingPlayers(state).length > 0) return undefined;
     state.ready = [];
   }
+  // 装備の能力の数え: ここから次の自分の番までに、HPが減らなければ「無傷」
+  for (const a of state.allies) if (!a.dead) (a.counters ??= {}).unhurt = 1;
   for (const a of state.allies) discardHand(a);
   // きっかけ: ターン終了時 → 継続ダメージ → 状態異常を1減らす
   for (const a of state.allies) if (!a.dead) fireAbilities(state, rng, events, a, 'turnEnd');

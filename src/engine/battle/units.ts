@@ -6,6 +6,7 @@ import type { AbilitySource, AllyState, BattleEvent, BattleState, EnemyState } f
 import type { Rng } from '../rng';
 import { retargetAfterDeath } from './intents';
 import { emptyStatuses, healMultiplier } from './statuses';
+import { getStatus } from '../../data/statuses';
 
 export type Unit = AllyState | EnemyState;
 
@@ -97,11 +98,19 @@ export function afterHpLoss(state: BattleState, u: Unit, rng: Rng, events: Battl
   } else if (isEnemy(u)) checkEnemyPhase(state, u, events);
 }
 
+/** 味方のHPが減った時の数え: 「敵の番を無傷でしのいだか」を0に戻し、HPが減ると消える状態異常（構え）を消す。乱数は使わない */
+export function noteHpLoss(u: Unit) {
+  if (isEnemy(u)) return;
+  (u.counters ??= {}).unhurt = 0;
+  for (const [id, n] of Object.entries(u.statuses)) if (n && getStatus(id).loseOnHpLoss) u.statuses[id] = 0;
+}
+
 /** HPを直接減らす（ブロック無視。継続ダメージなど）。減った量を返す */
 export function loseHp(state: BattleState, u: Unit, amount: number, rng: Rng, events: BattleEvent[]): number {
   if (u.dead || amount <= 0) return 0;
   const loss = Math.min(u.hp, amount);
   u.hp -= loss;
+  noteHpLoss(u);
   events.push({ type: 'damage', unitId: unitIdOf(u), amount: loss, blocked: 0 });
   afterHpLoss(state, u, rng, events);
   return loss;

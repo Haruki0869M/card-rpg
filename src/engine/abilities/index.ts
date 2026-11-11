@@ -54,6 +54,8 @@ export interface DamageMods {
   active: AbilityNotice[];
   ignoreBlock: boolean;
   ignoreBlockNotice?: AbilityNotice;
+  /** 1回の攻撃ごとに足すダメージ（倍率を掛ける前。盾打ち・疾走） */
+  add: number;
 }
 
 /**
@@ -61,7 +63,7 @@ export interface DamageMods {
  * cardAbilities = 使っているカードの特殊能力（そのカードだけで働く）。予測表示でも同じ関数を使う
  */
 export function damageModifiers(state: BattleState | undefined, source: Unit, card: CardDef | undefined, victim: Unit | undefined, cardAbilities?: AbilityDef[], perfect?: boolean, element?: string): DamageMods {
-  const out: DamageMods = { multiplier: isEnemy(source) ? source.attackMul : 1 + (source.damageBonus ?? 0), active: [], ignoreBlock: false };
+  const out: DamageMods = { multiplier: isEnemy(source) ? source.attackMul : 1 + (source.damageBonus ?? 0), active: [], ignoreBlock: false, add: 0 };
   const c: CondCtx = { state, self: source, card, target: victim, perfect };
   // 弱点のダメージを増やす能力は、まとめて上限を掛ける（弱点 ×1.5 と合わせて BALANCE.elementWeakMax まで）
   let weak = 1;
@@ -80,8 +82,9 @@ export function damageModifiers(state: BattleState | undefined, source: Unit, ca
     if (!testConditions(e.if, c)) continue;
     if (e.modifier === 'damageDealt') {
       const m = e.multiplier * scaleOf(e.scale, source, victim);
-      if (m === 1) continue;
+      if (m === 1 && !e.add) continue;
       out.multiplier *= m;
+      out.add += e.add ?? 0;
       out.active.push({ name: ab.name, source: ab.source ?? { kind: 'card', id: card?.id, label: card?.name } });
     } else if (e.modifier === 'ignoreBlock') {
       out.ignoreBlock = true;
@@ -126,13 +129,36 @@ function scaleOf(sc: DamageScale | undefined, self: Unit, target: Unit | undefin
 }
 
 /** カードの成功率の上乗せ（狙い撃ちなど。常時型 cardChance の合計） */
-export function cardChanceBonus(u: Unit, card: CardDef): number {
+export function cardChanceBonus(u: Unit, card: CardDef, target?: Unit, state?: BattleState): number {
   let n = 0;
   for (const ab of abilitiesOf(u)) {
     const e = ab.effect;
-    if ('modifier' in e && e.modifier === 'cardChance' && testConditions(e.if, { self: u, card })) n += e.bonus;
+    if ('modifier' in e && e.modifier === 'cardChance' && testConditions(e.if, { state, self: u, card, target })) n += e.bonus;
   }
   return n;
+}
+
+/**
+ * 残りの枠も全部成功になる能力（completeSlots）が、今のカードに効くか。
+ * keys = 効いた「1ターンに1枚だけ」の能力の数えの名前（カードを使った時に markCostUsed で数える）。ここでは何も書き換えない・乱数も使わない
+ */
+export function completeSlotsOf(state: BattleState | undefined, u: Unit, card: CardDef, focusUsed: number, target?: Unit): { active: boolean; keys: string[]; notices: AbilityNotice[] } {
+  const keys: string[] = [];
+  const notices: AbilityNotice[] = [];
+  let active = false;
+  const counters = (u as { counters?: Record<string, number> }).counters ?? {};
+  for (const ab of abilitiesOf(u)) {
+    const e = ab.effect;
+    if (!('modifier' in e) || e.modifier !== 'completeSlots') continue;
+    if (e.turnKey && counters[`once:${e.turnKey}`] === (state?.turn ?? 0)) continue;
+    if (!testConditions(e.if, { state, self: u, card, target, focusUsed })) continue;
+    active = true;
+    if (e.turnKey) {
+      keys.push(e.turnKey);
+      notices.push({ name: ab.name, source: ab.source });
+    }
+  }
+  return { active, keys, notices };
 }
 
 /**
@@ -257,14 +283,14 @@ export function fireAbilities(
   events: BattleEvent[],
   owner: Unit,
   when: AbilityTrigger,
-  opts: { card?: CardDef; target?: Unit; allyTarget?: Unit; attacker?: Unit; dealt?: number; list?: AbilityDef[]; depth?: number; focusUsed?: number; statusId?: string; tierEffects?: Effect[]; perfect?: boolean; successes?: number; supportedOthers?: boolean } = {},
+  opts: { card?: CardDef; /** 条件を見る時だけ使うカード（敵を倒した時。効果はカード無しで動かす） */ condCard?: CardDef; multi?: { total: number; landed: number }; target?: Unit; allyTarget?: Unit; attacker?: Unit; dealt?: number; list?: AbilityDef[]; depth?: number; focusUsed?: number; statusId?: string; tierEffects?: Effect[]; perfect?: boolean; successes?: number; supportedOthers?: boolean } = {},
 ): string[] {
   const out: string[] = [];
   if (owner.dead && when !== 'hurt' && !(when === 'allyDown' && opts.target === owner)) return out;
   for (const ab of opts.list ?? abilitiesOf(owner)) {
     const e = ab.effect;
     if (!isTriggered(e) || e.when !== when) continue;
-    if (!testConditions(e.if, { state, rng, self: owner, card: opts.card, target: opts.target, dealt: opts.dealt, focusUsed: opts.focusUsed, perfect: opts.perfect, successes: opts.successes, supportedOthers: opts.supportedOthers, statusId: opts.statusId })) continue;
+    if (!testConditions(e.if, { state, rng, self: owner, card: opts.card ?? opts.condCard, multi: opts.multi, target: opts.target, dealt: opts.dealt, focusUsed: opts.focusUsed, perfect: opts.perfect, successes: opts.successes, supportedOthers: opts.supportedOthers, statusId: opts.statusId })) continue;
     const ctx = makeCtx(state, rng, events, owner, { target: opts.target, allyTarget: opts.allyTarget, attacker: opts.attacker, card: opts.card, dealt: opts.dealt, depth: opts.depth, tierEffects: opts.tierEffects, perfect: opts.perfect, cardAbilities: opts.card?.trait ? [opts.card.trait] : undefined });
     let any = false;
     for (const eff of e.do) any = applyEffect(ctx, eff) || any;
@@ -356,7 +382,7 @@ export function describeAbility(ab: AbilityDef, side: 'ally' | 'enemy' = 'ally')
     if (e.modifier === 'convertElement') return `${head}属性の無い物理攻撃が${getElement(e.into).name}属性になる`;
     if (e.modifier === 'weaknessDamage') return `${head}弱点属性のダメージ×${Math.round(e.multiplier * 100) / 100}（弱点の倍率は合わせて×${BALANCE.elementWeakMax}まで）`;
     if (e.modifier === 'statusBonus') return `${head}自分が付ける${e.statuses.map((x) => `「${getStatus(x).name}」`).join('')}+${e.amount}`;
-    if (e.modifier === 'damageDealt') return `${head}${e.multiplier !== 1 ? `与えるダメージ×${e.multiplier}${e.scale ? '、さらに' : ''}` : ''}${e.scale ? scaleText(e.scale) : ''}`;
+    if (e.modifier === 'damageDealt') return `${head}${e.add ? `1回の攻撃ごとにダメージ+${e.add}${e.multiplier !== 1 || e.scale ? '、' : ''}` : ''}${e.multiplier !== 1 ? `与えるダメージ×${e.multiplier}${e.scale ? '、さらに' : ''}` : ''}${e.scale ? scaleText(e.scale) : ''}`;
     return `${head}ダメージが敵のブロックを無視する`;
   }
   const cs = condText(e.if);

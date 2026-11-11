@@ -1,50 +1,21 @@
-// 斧：レア以上で火力・属性・状態異常・特殊を各1本。
+// 斧（捨て身）。区切りB（2026-11-11）で6本に絞った。1本ごとに、ほかに無い役割を持つ。
 import type { ItemDef } from '../../../types';
 
 export const weaponsAxe: ItemDef[] = [
   // レア
   {
-    id: 'ironwoodAxe', name: '鉄割りの斧', slot: 'weapon', weaponType: 'axe', rarity: 'rare', icon: 'axe',
-    description: '重い刃で力強い一撃を放つ。', stats: { str: 5 }, tags: ['physical', 'heavy'],
-    cards: [{ cardId: 'wtAxeWhirl', count: 2 }],
+    id: "ironwoodAxe", name: "鉄割りの斧", slot: "weapon", weaponType: "axe", rarity: "rare", icon: "axe",
+    description: "HPが半分以下の間、物理カードの成功率+10%。", stats: {"str":5}, tags: ["physical","heavy"],
+    cards: [{"cardId":"wtAxeWhirl","count":2}],
+    ability: {"name":"捨て身","description":"HPが半分以下の間、物理カードの成功率+10%。","effect":{"modifier":"cardChance","bonus":10,"if":[{"kind":"cardCategory","category":"physical"},{"kind":"selfHpAtMost","pct":50}]}},
   },
   {
-    id: 'emberAxe', name: '火打ちの斧', slot: 'weapon', weaponType: 'axe', rarity: 'rare', icon: 'axe',
-    description: '完全成功でランダムな敵1体に火属性の追撃2。1ターンに1回。', stats: { str: 2, int: 2 }, tags: ['physical', 'fire'],
-    cards: [{ cardId: 'wtAxeWhirl', count: 2 }],
-    ability: { name: '火花', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'physical' }, { kind: 'dealtDamage' }, { kind: 'oncePerTurn', key: 'emberAxe' }], do: [{ kind: 'damage', amount: 2, element: 'fire', to: 'randomFoe' }] } },
-  },
-  {
-    id: 'notchedAxe', name: '傷刻みの斧', slot: 'weapon', weaponType: 'axe', rarity: 'rare', icon: 'axe',
-    description: '完全成功で脆弱1を与える。1ターンに1回。', stats: { str: 2, per: 2 }, tags: ['physical', 'vulnerable'],
-    cards: [{ cardId: 'wtAxeWhirl', count: 2 }],
-    ability: { name: '傷刻み', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'physical' }, { kind: 'dealtDamage' }, { kind: 'oncePerTurn', key: 'notchedAxe' }], do: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1 }] } },
-  },
-  {
-    id: 'bulwarkAxe', name: '堅守の斧', slot: 'weapon', weaponType: 'axe', rarity: 'rare', icon: 'axe',
-    description: '物理カードでダメージを与えるとブロック2。1ターンに1回。', stats: { str: 2, vit: 2 }, tags: ['physical', 'block'],
-    cards: [{ cardId: 'wtAxeWhirl', count: 2 }],
-    ability: { name: '踏ん張り', effect: { when: 'afterCard', if: [{ kind: 'cardCategory', category: 'physical' }, { kind: 'dealtDamage' }, { kind: 'oncePerTurn', key: 'bulwarkAxe' }], do: [{ kind: 'block', amount: 2, to: 'self' }] } },
+    id: "notchedAxe", name: "傷刻みの斧", slot: "weapon", weaponType: "axe", rarity: "rare", icon: "axe",
+    description: "敵を倒した時、HPを4回復。1ターンに1回。", stats: {"str":2,"per":2}, tags: ["physical","heal"],
+    cards: [{"cardId":"wtAxeWhirl","count":2}],
+    ability: {"name":"返り血","description":"敵を倒した時、HPを4回復。1ターンに1回。","effect":{"when":"kill","if":[{"kind":"oncePerTurn","key":"notchedAxe"}],"do":[{"kind":"heal","amount":4,"to":"self"}]}},
   },
   // エピック
-  {
-    id: 'giantAxe', name: '巨人の斧', slot: 'weapon', weaponType: 'axe', rarity: 'epic', icon: 'axe',
-    description: 'コスト2以上の物理カードのダメージが1.2倍。', stats: { str: 8 }, tags: ['physical', 'heavy'],
-    cards: [{ cardId: 'wtAxeBloodlust', count: 2 }],
-    ability: { name: '重い一撃', effect: { modifier: 'damageDealt', multiplier: 1.2, if: [{ kind: 'cardCategory', category: 'physical' }, { kind: 'cardCost', min: 2 }] } },
-  },
-  {
-    id: 'furnaceAxe', name: '炉火の斧', slot: 'weapon', weaponType: 'axe', rarity: 'epic', icon: 'axe',
-    description: '完全成功でランダムな敵1体に火属性の追撃3。1ターンに1回。', stats: { str: 4, int: 4 }, tags: ['physical', 'fire'],
-    cards: [{ cardId: 'wtAxeBloodlust', count: 2 }],
-    ability: { name: '炉の息吹', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'physical' }, { kind: 'dealtDamage' }, { kind: 'oncePerTurn', key: 'furnaceAxe' }], do: [{ kind: 'damage', amount: 3, element: 'fire', to: 'randomFoe' }] } },
-  },
-  {
-    id: 'rendingAxe', name: '裂傷の斧', slot: 'weapon', weaponType: 'axe', rarity: 'epic', icon: 'axe',
-    description: '完全成功で脆弱2を与える。1ターンに1回。', stats: { str: 4, per: 4 }, tags: ['physical', 'vulnerable'],
-    cards: [{ cardId: 'wtAxeBloodlust', count: 2 }],
-    ability: { name: '深い傷', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'physical' }, { kind: 'dealtDamage' }, { kind: 'oncePerTurn', key: 'rendingAxe' }], do: [{ kind: 'applyStatus', status: 'vulnerable', amount: 2 }] } },
-  },
   {
     id: 'breachingAxe', name: '破城の斧', slot: 'weapon', weaponType: 'axe', rarity: 'epic', icon: 'axe',
     description: 'コスト2以上の物理カードがブロックを無視。', stats: { str: 4, vit: 4 }, tags: ['physical', 'heavy'],
@@ -57,18 +28,6 @@ export const weaponsAxe: ItemDef[] = [
     description: 'HPが半分以下なら、物理カードのダメージが1.25倍。', stats: { str: 12 }, tags: ['physical', 'heavy'],
     cards: [{ cardId: 'wtAxeExecute', count: 2 }],
     ability: { name: '背水の一撃', effect: { modifier: 'damageDealt', multiplier: 1.25, if: [{ kind: 'cardCategory', category: 'physical' }, { kind: 'selfHpAtMost', pct: 50 }] } },
-  },
-  {
-    id: 'volcanoAxe', name: '火山の大斧', slot: 'weapon', weaponType: 'axe', rarity: 'legend', icon: 'axe',
-    description: '完全成功でランダムな敵1体に火属性の追撃4。1ターンに1回。', stats: { str: 8, int: 4 }, tags: ['physical', 'fire'],
-    cards: [{ cardId: 'wtAxeExecute', count: 2 }],
-    ability: { name: '噴火', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'physical' }, { kind: 'dealtDamage' }, { kind: 'oncePerTurn', key: 'volcanoAxe' }], do: [{ kind: 'damage', amount: 4, element: 'fire', to: 'randomFoe' }] } },
-  },
-  {
-    id: 'ruinAxe', name: '崩壊の大斧', slot: 'weapon', weaponType: 'axe', rarity: 'legend', icon: 'axe',
-    description: '完全成功で脆弱2と脱力1を与える。1ターンに1回。', stats: { str: 10, per: 2 }, tags: ['physical', 'vulnerable', 'weak'],
-    cards: [{ cardId: 'wtAxeExecute', count: 2 }],
-    ability: { name: '戦意砕き', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'physical' }, { kind: 'dealtDamage' }, { kind: 'oncePerTurn', key: 'ruinAxe' }], do: [{ kind: 'applyStatus', status: 'vulnerable', amount: 2 }, { kind: 'applyStatus', status: 'weak', amount: 1 }] } },
   },
   {
     id: 'lifedrinkerAxe', name: '命喰らいの斧', slot: 'weapon', weaponType: 'axe', rarity: 'legend', icon: 'axe',
