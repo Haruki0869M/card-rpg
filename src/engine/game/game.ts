@@ -73,6 +73,7 @@ import { canWatchHere, watchSpot } from './dungeonOmen';
 import {
   canEquip,
   clampHero,
+  equippedItems,
   expToNext,
   heroFocusMax,
   heroMaxHp,
@@ -613,7 +614,7 @@ export function startBattleWith(game: GameState, enemies: EncounterSpec['enemies
   game.battle = createBattle({
     seed: rng.int(1_000_000_000),
     party,
-    encounter: { id: game.battleInfo?.wandererId ?? game.dungeon?.currentRoomId ?? 'battle', name: getRoomType(roomType).name, enemies },
+    encounter: { id: game.battleInfo?.wandererId ?? game.dungeon?.currentRoomId ?? 'battle', name: getRoomType(roomType).name, enemies, ...(getRoomType(roomType).battle?.boss ? { boss: true } : {}) },
     enemyHpMul: diff.enemyHp,
     enemyAttackMul: (diff.enemyAttack ?? 1) * partyAttackMul(game, party.length),
     surprise: opts.surprise,
@@ -731,6 +732,9 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
   gold = Math.round(gold * (game.battleInfo?.goldMul ?? 1)) + (b.bonusGold ?? 0);
   // お金は生き残った参加者で山分け
   const survivorHeroes = survivors.map((id) => findHero(game, id)!).filter(Boolean);
+  // 装備の「勝った時のゴールド+○%」（王の印章指輪など）。生き残った仲間の中で一番大きい物だけ効く（重ならない）
+  const goldBonus = Math.max(0, ...survivorHeroes.flatMap((h) => equippedItems(h).map((i) => i.goldBonus ?? 0)));
+  if (goldBonus > 0) gold = Math.round(gold * (1 + goldBonus));
   splitGold(survivorHeroes, gold);
   // お供: 一緒に勝つと懐く
   for (const h of survivorHeroes) addPetLove(game, h, BALANCE.petLoveBattle);

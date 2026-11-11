@@ -28,9 +28,9 @@ export const gearGearItems: ItemDef[] = [
   },
   {
     id: 'sageScepter', name: '賢者の錫杖', slot: 'weapon', weaponType: 'scepter', rarity: 'legend', icon: 'scepter', scenario: 'clockworkEmpire',
-    description: '毎ターンの始めに、味方全員がブロック4を得る。時を刻む杖。', stats: { int: 8, vit: 4 }, tags: ['holy', 'block'],
+    description: '毎ターン、コスト3以上のカード1枚のコストが1下がる。時を刻む杖。', stats: { int: 8, vit: 4 }, tags: ['holy', 'highCost'],
     cards: [{ cardId: 'wtScepterJudgment', count: 2 }],
-    ability: { name: '時の守り', effect: { when: 'turnStart', do: [{ kind: 'block', amount: 4, to: 'allies' }] } },
+    ability: { name: '時の短縮', description: '1ターンに1枚、コスト3以上のカードのコスト-1', effect: { modifier: 'cardCost', delta: -1, turnKey: 'sageScepter', if: [{ kind: 'cardCost', min: 3 }] } },
   },
   // ----- 鎧 -----
   { id: 'insulatedCoat', name: '断熱コート', slot: 'armor', rarity: 'rare', icon: 'robe', scenario: 'clockworkEmpire', description: '火属性のダメージを半分に和らげる。厚手で、最大HPが多めに上がる。戦闘の始めにブロックを得る。', maxHp: 10, startBlock: 2, tags: ['fire'], ability: { name: '熱除け', effect: { modifier: 'elementGuard', element: 'fire', mode: 'half' } } },

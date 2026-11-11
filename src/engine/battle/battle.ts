@@ -23,7 +23,7 @@ import type {
   SlotResult,
   Statuses,
 } from '../../types';
-import { abilitiesOf, cardChanceBonus, damageModifiers, fireAbilities, testConditions } from '../abilities';
+import { abilitiesOf, cardChanceBonus, cardCostOf, damageModifiers, fireAbilities, markCostUsed, testConditions } from '../abilities';
 import { createRng, type Rng, shuffle } from '../rng';
 import { affinityOf } from '../stats';
 import { calcDamage } from './damage';
@@ -78,6 +78,7 @@ export function createBattle(setup: BattleSetup): BattleState {
       focusMax: m.focusMax ?? BALANCE.focusMax,
       stats: m.stats ?? def.stats,
       extraDraw: m.extraDraw ?? 0,
+      ...(m.gold ? { gold: m.gold } : {}),
       ...(m.abilities?.length ? { abilities: structuredClone(m.abilities) } : {}),
       ...(m.pet ? { pet: { ...m.pet } } : {}),
       ...(m.weaponElement ? { weaponElement: m.weaponElement } : {}),
@@ -133,6 +134,7 @@ export function createBattle(setup: BattleSetup): BattleState {
     nextLogId: 1,
     nextUid: uid,
     encounterId: encounter.id,
+    ...(encounter.boss ? { boss: true } : {}),
     ...(setup.readyCheck ? { readyCheck: true, ready: [] } : {}),
   };
   addLog(state, `戦闘開始（${party.length}人 / ${encounter.name}）`);
@@ -188,7 +190,7 @@ export function unusableReason(state: BattleState, ally: AllyState, card: CardDe
   if (state.phase !== 'ally') return '味方フェーズではありません';
   if (ally.dead) return '戦闘不能です';
   if (ally.exhaustedCards?.includes(card.id)) return 'この戦闘ではもう使いました';
-  if (ally.mana < card.cost) return 'マナが足りません';
+  if (ally.mana < cardCostOf(state, ally, card).cost) return 'マナが足りません';
   if (ally.hp <= cardHpCost(card)) return 'HPを払うと戦闘不能になります';
   if (needsCardTarget(card) && !cardTargets(state, ally, card).length) return '対象がいません';
   if ((card.target === 'enemy' || card.target === 'allEnemies') && !state.enemies.some((e) => !e.dead)) return '対象がいません';
@@ -425,7 +427,10 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   if (card.secondaryTarget && !allyTarget) return '回復・支援する味方を選び直してください';
 
   // 支払い
-  ally.mana -= card.cost;
+  const paid = cardCostOf(state, ally, card);
+  ally.mana -= paid.cost;
+  markCostUsed(state, ally, paid.keys);
+  for (const n of paid.active) abilityTriggered(state, ally.id, n.name, events, n.source);
   ally.focus -= focusUsed;
   ally.hand.splice(idx, 1);
   state.stats.focusUsed += focusUsed;
@@ -442,7 +447,7 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   {
     const f = (ally.feats ??= {});
     const add = (k: string, n = 1) => (f[k] = (f[k] ?? 0) + n);
-    add('mana', card.cost);
+    add('mana', paid.cost);
     if (perfect) add('perfects');
     if (successes > 0) add(`success:${card.category}`);
     if (successes > 0 && card.tiers.some(t => t.effects.some(e => e.kind === 'heal'))) add('success:heal');

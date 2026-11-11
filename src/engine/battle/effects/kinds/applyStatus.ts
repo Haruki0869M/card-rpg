@@ -8,7 +8,7 @@ import type { EffectHandler } from '../types';
 
 declare module '../../../../types' {
   interface EffectParams {
-    applyStatus: { status: string; amount: number };
+    applyStatus: { status: string; amount: number; /** ボスの部屋の戦闘では、代わりにこの状態異常を付ける */ bossStatus?: string };
   }
 }
 
@@ -17,6 +17,7 @@ export const effect: EffectHandler<'applyStatus'> = {
   defaultTo: 'target',
   apply(ctx, e) {
     const ts = resolveTargets(ctx, targetOf(e));
+    if (e.bossStatus && ctx.state.boss) e = { ...e, status: e.bossStatus };
     // 相手に付ける時は、自分の能力（呪詛など）で量が増える
     const bonus = ts.some((t) => isEnemy(ctx.source) !== isEnemy(t)) ? statusBonusOf(ctx.source, e.status, ctx.card) : 0;
     const amount = e.amount + bonus;
@@ -33,6 +34,6 @@ export const effect: EffectHandler<'applyStatus'> = {
     }
     return ts.length > 0;
   },
-  describe: (e, who) => `${who}「${getStatus(e.status).name}」${e.amount}`,
+  describe: (e, who) => `${who}「${getStatus(e.status).name}」${e.amount}${e.bossStatus ? `（ボスには代わりに「${getStatus(e.bossStatus).name}」${e.amount}）` : ''}`,
   short: (e) => `${e.amount}`,
 };

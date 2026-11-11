@@ -116,6 +116,7 @@ function scaleOf(sc: DamageScale | undefined, self: Unit, target: Unit | undefin
   if (sc.by === 'missingHp') v = 1 - Math.max(0, self.hp) / Math.max(1, self.maxHp);
   else if (sc.by === 'targetStatuses') v = target ? Object.entries(target.statuses).filter(([id, n]) => (n ?? 0) > 0 && getStatus(id).harmful).length : 0;
   else if (sc.by === 'selfStatus') v = sc.status ? (self.statuses[sc.status] ?? 0) : 0;
+  else if (sc.by === 'gold') v = Math.floor(((self as { gold?: number }).gold ?? 0) / Math.max(1, sc.step ?? 1));
   const add = sc.per * v;
   return 1 + (sc.max !== undefined ? Math.min(sc.max, add) : add);
 }
@@ -128,6 +129,36 @@ export function cardChanceBonus(u: Unit, card: CardDef): number {
     if ('modifier' in e && e.modifier === 'cardChance' && testConditions(e.if, { self: u, card })) n += e.bonus;
   }
   return n;
+}
+
+/**
+ * カードのコスト（常時型 cardCost を全部当てた後。0より下にはならない）。
+ * keys = 効いた「1ターンに1枚だけ」の能力の数えの名前（カードを使った時に markCostUsed で数える）。ここでは何も書き換えない
+ */
+export function cardCostOf(state: BattleState | undefined, u: Unit, card: CardDef): { cost: number; keys: string[]; active: AbilityNotice[] } {
+  let cost = card.cost;
+  const keys: string[] = [], active: AbilityNotice[] = [];
+  if (isEnemy(u)) return { cost, keys, active };
+  const counters = (u as { counters?: Record<string, number> }).counters ?? {};
+  for (const ab of abilitiesOf(u)) {
+    const e = ab.effect;
+    if (!('modifier' in e) || e.modifier !== 'cardCost') continue;
+    if (e.turnKey && counters[`once:${e.turnKey}`] === (state?.turn ?? 0)) continue;
+    if (!testConditions(e.if, { state, self: u, card })) continue;
+    const next = Math.max(0, e.set !== undefined ? Math.min(cost, e.set) : cost + (e.delta ?? 0));
+    if (next === cost) continue;
+    cost = next;
+    if (e.turnKey) keys.push(e.turnKey);
+    active.push({ name: ab.name, source: ab.source });
+  }
+  return { cost, keys, active };
+}
+
+/** コストを変えた「1ターンに1枚だけ」の能力を、このターンは使った事にする */
+export function markCostUsed(state: BattleState, u: Unit, keys: string[]) {
+  if (!keys.length) return;
+  const counters = ((u as { counters?: Record<string, number> }).counters ??= {});
+  for (const k of keys) counters[`once:${k}`] = state.turn;
 }
 
 /** 自分が付ける状態異常の量の上乗せ（呪詛など） */
@@ -216,6 +247,7 @@ export function describeAbility(ab: AbilityDef, side: 'ally' | 'enemy' = 'ally')
     if (e.modifier === 'completeSlots') return `${head}残りの枠も全て成功する`;
     if (e.modifier === 'exhaust') return '1戦闘1回。使ったカードは戦闘が終わるまで山札から除く';
     if (e.modifier === 'slotPreview') return `1戦闘${e.uses}回、次のカードのスロットを先読みし、1回だけ振り直せる`;
+    if (e.modifier === 'cardCost') return `${head}カードのコスト${e.set !== undefined ? `が${e.set}になる` : `${(e.delta ?? 0) > 0 ? '+' : ''}${e.delta ?? 0}`}${e.turnKey ? '（1ターンに1枚）' : ''}`;
     if (e.modifier === 'chestChance') return `宝箱の運の判定+${e.bonus}%`;
     if (e.modifier === 'elementGuard') return `${head}${getElement(e.element).name}属性のダメージを${e.mode === 'immune' ? '無効にする' : e.mode === 'absorb' ? '受けず、その分回復する' : '半分にする'}`;
     if (e.modifier === 'convertElement') return `${head}属性の無い物理攻撃が${getElement(e.into).name}属性になる`;
@@ -233,5 +265,6 @@ function scaleText(sc: DamageScale): string {
   const cap = sc.max !== undefined ? `（最大+${Math.round(sc.max * 100)}%）` : '';
   if (sc.by === 'missingHp') return `減ったHPが多いほど与えるダメージが増える${cap}`;
   if (sc.by === 'targetStatuses') return `対象の悪い状態異常1種類につき与えるダメージ+${pct}%${cap}`;
+  if (sc.by === 'gold') return `所持金${sc.step ?? 1}Gごとに与えるダメージ+${pct}%${cap}`;
   return `自分の「${sc.status ? getStatus(sc.status).name : ''}」1つにつき与えるダメージ+${pct}%${cap}`;
 }

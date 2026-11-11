@@ -34,12 +34,13 @@ import {
   validateGame,
 } from '../index';
 
-const TARGETS = ['target', 'self', 'allies', 'otherAllies', 'foes', 'randomFoe', 'lowestAlly', 'allyTarget'];
+const TARGETS = ['target', 'self', 'allies', 'otherAllies', 'foes', 'randomFoe', 'lowestAlly', 'allyTarget', 'otherFoes'];
 
 /** 効果1つを検査（種類・対象・状態異常のID・説明文） */
 function checkEffect(e: Effect, where: string) {
   expect(hasEffectKind(e.kind), `${where}: 未登録の効果 ${e.kind}`).toBe(true);
   if (e.to) expect(TARGETS, `${where}: 対象 ${e.to}`).toContain(e.to);
+  if (e.kind === 'applyStatus' && e.bossStatus) expect(STATUSES.has(e.bossStatus), `${where}: ボス用の状態異常 ${e.bossStatus}`).toBe(true);
   if (e.kind === 'applyStatus') expect(STATUSES.has(e.status), `${where}: 未登録の状態異常 ${e.status}`).toBe(true);
   if (e.kind === 'damage' && e.element) expect(ELEMENTS.has(e.element), `${where}: 未登録の属性 ${e.element}`).toBe(true);
   expect(() => describeEffect(e), where).not.toThrow();
@@ -90,6 +91,8 @@ describe('コンテンツの検査', () => {
     for (const i of ITEMS.all) {
       if (i.weaponType) expect(WEAPON_TYPES.has(i.weaponType), `item ${i.id}`).toBe(true);
       if (i.ability) checkAbility(i.ability, `item ${i.id}`);
+      // also（同じ名前で持つ2つ目の中身）も同じように調べる
+      for (const effect of i.ability?.also ?? []) checkAbility({ name: i.ability!.name, effect }, `item ${i.id} also`);
       for (const e of i.use ?? []) checkEffect(e, `item ${i.id} use`);
     }
   });

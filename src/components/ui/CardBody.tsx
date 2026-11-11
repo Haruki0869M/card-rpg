@@ -56,10 +56,11 @@ function CardArt({ card, height }: { card: CardDef; height: number }) {
 }
 
 /** コストの宝石 */
-function CostGem({ cost }: { cost: number }) {
+function CostGem({ cost, changed }: { cost: number; changed?: boolean }) {
   return (
     <span
-      className="font-display absolute top-[3px] left-[3px] z-10 flex h-[24px] w-[24px] items-center justify-center text-[15px] leading-none text-white"
+      className={`font-display absolute top-[3px] left-[3px] z-10 flex h-[24px] w-[24px] items-center justify-center text-[15px] leading-none ${changed ? 'text-lime-200' : 'text-white'}`}
+      data-cost-changed={changed || undefined}
       style={{
         clipPath: 'polygon(50% 0,100% 30%,100% 70%,50% 100%,0 70%,0 30%)',
         background: 'linear-gradient(160deg,#d8f0ff 0%,#4aa0ff 40%,#1a4ab0 75%,#0a1e5a 100%)',
@@ -88,6 +89,7 @@ function SlotPips({ slots, focus = 0 }: { slots: number; focus?: number }) {
 
 export function CardBody({
   card,
+  cost,
   chance,
   width,
   height,
@@ -98,6 +100,8 @@ export function CardBody({
   children,
 }: {
   card: CardDef;
+  /** 今のコスト（装備などで変わっている時。無ければカードの元のコスト） */
+  cost?: number;
   chance?: number;
   width: number;
   height: number;
@@ -133,7 +137,7 @@ export function CardBody({
       }}
     >
       <div className="relative flex h-full flex-col overflow-hidden rounded-[7px]" style={{ background: cat.inner, boxShadow: `inset 0 0 0 1px ${cat.frame}` }}>
-        <CostGem cost={card.cost} />
+        <CostGem cost={cost ?? card.cost} changed={cost !== undefined && cost !== card.cost} />
         <SlotPips slots={card.slots} focus={focus} />
         <CardArt card={card} height={artH} />
         {/* 名前の帯（種類の色の縁） */}

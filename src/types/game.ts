@@ -51,6 +51,8 @@ export interface ItemDef {
   maxHp?: number;
   focusMax?: number;
   startBlock?: number;
+  /** 戦闘に勝った時のゴールドの上乗せ（0.25 = +25%。生き残った仲間の中で一番大きい物だけ効く） */
+  goldBonus?: number;
   extraDraw?: number;
   /** 装備中に山札へ加わるカード（武器） */
   cards?: { cardId: string; count: number }[];
