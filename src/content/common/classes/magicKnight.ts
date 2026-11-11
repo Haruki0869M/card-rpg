@@ -12,5 +12,5 @@ export const magicKnight: ClassDef = {
   battleAbility: { name: '魔法剣', effect: { when: 'afterCard', if: [{ kind: 'cardCategory', category: 'magic' }], do: [{ kind: 'rememberElement' }] } },
   exploreAbility: { id: 'magicKnightExplore', name: '魔紋の知識', description: '石碑・魔法陣の判定+15%', effect: { kind: 'checkBonus', check: 'arcane', bonus: 15 } },
   requires: { feat: 'kills:element', count: 6, text: '属性攻撃で敵を6体倒す' },
-  cardPool: ['bladeFire', 'bladeIce', 'bladeStrike', 'bladeThunder', 'bladeBarrier', 'bladeRelease'], signature: ['bladeFire', 'bladeIce', 'bladeStrike'],
+  cardPool: ['bladeFire', 'bladeIce', 'machineShot', 'bladeThunder', 'gambleGuard', 'bladeRelease'], signature: ['bladeFire', 'bladeIce', 'machineShot'],
 };

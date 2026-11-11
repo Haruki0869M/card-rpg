@@ -10,5 +10,5 @@ export const astrologer: ClassDef = {
   battleAbility: { name: '星読み', effect: { modifier: 'slotPreview', uses: 1 } },
   exploreAbility: { id: 'astrologerExplore', name: '星の道しるべ', description: 'イベントの判定+15%', effect: { kind: 'checkBonus', check: 'event', bonus: 15 } },
   requires: { feat: 'perfects:luk', count: 3, text: '運の判定で完全成功を3回' },
-  cardPool: ['starRay', 'starWard', 'starFocus', 'starPages', 'starGift', 'starFall'], signature: ['starRay', 'starWard', 'starFocus'],
+  cardPool: ['starRay', 'gambleGuard', 'samuraiFocus', 'gambleDraw', 'starGift', 'starFall'], signature: ['starRay', 'gambleGuard', 'samuraiFocus'],
 };

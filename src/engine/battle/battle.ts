@@ -34,13 +34,15 @@ import { finalChance, selectTier } from './probability';
 import { helpedAllies, recordSupport, selfSnapshot, supportSnapshot } from './support';
 import { afterAttackCard, attackElement, cardElements, cardHpCost, chargedMultiplier, tierHpCost } from './cardState';
 import { slotPreviewLimitOf } from './preview';
+import { isStrikingSummon, summonStrikeOnce } from './summons';
 import { activeStatuses, actionFailChanceOf, applyTick, chancePenaltyOf, consumeStatus, decayStatuses, emptyStatuses, skipActionStatus, takeDrawPenalty, takeManaPenalty, tickHealOf } from './statuses';
 import { abilityTriggered, addLog, enemyName, findAlly, healUnit, loseHp, nameOf, unitIdOf } from './units';
 
 export { enemyName, findAlly, findEnemy, unitName } from './units';
 
 // v18（2026-11-11）: 鎧・装飾品の作り直し。古い保存データは読まない（オーナーの決定。v17 からの移行は作らない）
-export const STATE_VERSION = 20;
+// v21（2026-11-12）: 区切りD-1 同じ中身のカードをまとめた。古い保存は読まない
+export const STATE_VERSION = 21;
 export { slotPreviewLimitOf } from './preview';
 
 // ---------- 生成 ----------
@@ -194,7 +196,7 @@ export function unusableReason(state: BattleState, ally: AllyState, card: CardDe
   if (ally.dead) return '戦闘不能です';
   if (ally.exhaustedCards?.includes(card.id)) return 'この戦闘ではもう使いました';
   if (ally.mana < cardCostOf(state, ally, card).cost) return 'マナが足りません';
-  if (ally.hp <= cardHpCost(card)) return 'HPを払うと戦闘不能になります';
+  if (ally.hp <= cardHpCost(card, ally.hp)) return 'HPを払うと戦闘不能になります';
   if (needsCardTarget(card) && !cardTargets(state, ally, card).length) return '対象がいません';
   if ((card.target === 'enemy' || card.target === 'allEnemies') && !state.enemies.some((e) => !e.dead)) return '対象がいません';
   return null;
@@ -221,7 +223,7 @@ export function isDone(state: BattleState, ally: AllyState): boolean {
 /** カードのダメージ効果が対象に与える実際の値（Tierごとの合計。特殊能力の倍率・状態異常も反映） */
 export function tierDamageAgainst(ally: AllyState, card: CardDef, target: EnemyState): number[] {
   return card.tiers.map((t) => {
-    const source = { ...ally, hp: ally.hp - tierHpCost(t) };
+    const source = { ...ally, hp: ally.hp - tierHpCost(t, ally.hp) };
     let onceUsed = false;
     return t.effects.reduce((sum, e) => {
       if (e.kind !== 'damage' || (targetOf(e) !== 'target' && targetOf(e) !== 'foes')) return sum;
@@ -636,16 +638,11 @@ function summonsAttack(state: BattleState, ally: AllyState, rng: Rng, events: Ba
   if (!ally.summons?.length) return;
   const twice = summonTwiceOf(ally);
   for (const s of [...ally.summons]) {
-    if (s.echoPct || s.trigger) continue;
+    if (!isStrikingSummon(s)) continue;
     const foes = state.enemies.filter((e) => !e.dead);
     if (!foes.length) break;
     const t = s.targetId ? foes.find(e => e.uid === s.targetId) ?? foes[0] : foes[rng.int(foes.length)];
-    const ctx = makeCtx(state, rng, events, ally, { target: t, via: 'summon' });
-    const loss = dealDamage(ctx, t, s.damage, s.element);
-    // きっかけ: 自分の砲台・召喚が敵にダメージを与えた（観測射撃）
-    if (loss > 0 && !ally.dead) fireAbilities(state, rng, events, ally, 'summonHit', { target: t, depth: 1 });
-    abilityTriggered(state, ally.id, s.name, events, { kind: 'summon', id: s.id, label: s.name });
-    addLog(state, `${ally.name}の${s.name}が${enemyName(t)}を攻撃！ ${loss}ダメージ`);
+    summonStrikeOnce(state, ally, s, t, rng, events);
     // 永久機関: もう1回攻撃する（残りターンは1回分だけ減る）
     const again = twice ? state.enemies.filter((e) => !e.dead) : [];
     if (again.length) {
@@ -793,7 +790,7 @@ function executeIntent(state: BattleState, enemy: EnemyState, rng: Rng, events: 
   events.push({ type: 'enemyAct', enemyUid: enemy.uid, actionName: action.name, targetIds: ctx.hitIds });
   const actionMultiplier = enemy.nextActionMultiplier ?? 1;
   delete enemy.nextActionMultiplier;
-  for (const eff of action.effects) applyEffect(ctx, 'amount' in eff ? { ...eff, amount: Math.floor(eff.amount * actionMultiplier) } : eff);
+  for (const eff of action.effects) applyEffect(ctx, 'amount' in eff && eff.amount !== undefined ? { ...eff, amount: Math.floor(eff.amount * actionMultiplier) } : eff);
   for (const n of ctx.fired) abilityTriggered(state, enemy.uid, n.name, events, n.source);
   addLog(state, `${enemyName(enemy)}「${action.name}」${ctx.parts.join(' / ')}`);
   enemy.intent = undefined;

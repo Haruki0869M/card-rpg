@@ -53,8 +53,8 @@ try {
       return `成功${range}: ${fx}`;
     }).join(' ／ ');
     const marks = [];
-    if (c.weaponType) marks.push(`武器種:${wname(c.weaponType)}`);
-    if (c.lineage) marks.push(`系統:${LIN[c.lineage] ?? c.lineage}`);
+    for (const w of [c.weaponType, ...(c.weaponTypes ?? [])].filter(Boolean)) marks.push(`武器種:${wname(w)}`);
+    for (const l of [c.lineage, ...(c.lineages ?? [])].filter(Boolean)) marks.push(`系統:${LIN[l] ?? l}`);
     if (c.common) marks.push('共通');
     if (c.heresy) marks.push('異端');
     if (c.exhaust) marks.push('戦闘中1回');

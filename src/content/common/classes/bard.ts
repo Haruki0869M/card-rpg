@@ -11,5 +11,5 @@ export const bard: ClassDef = {
   battleAbility: { name: '歌の余韻', effect: { when: 'afterCard', if: [{ kind: 'supportedOthers' }, { kind: 'oncePerTurn', key: 'songAfterglow' }], do: [{ kind: 'block', amount: BALANCE.specialJobs.supportBlock }] } },
   exploreAbility: { id: 'bardExplore', name: '旅の歌', description: 'イベントの判定+15%', effect: { kind: 'checkBonus', check: 'event', bonus: 15 } },
   requires: { feat: 'support:others', count: 12, text: '仲間を助けるカードを12回' },
-  cardPool: ['bardCourage', 'bardFocus', 'bardHeal', 'bardWard', 'bardStrike', 'bardFinale'], signature: ['bardCourage', 'bardFocus', 'bardHeal'],
+  cardPool: ['bardCourage', 'bardFocus', 'bardHeal', 'maidenWard', 'bardStrike', 'bardFinale'], signature: ['bardCourage', 'bardFocus', 'bardHeal'],
 };

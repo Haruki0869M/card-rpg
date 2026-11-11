@@ -101,8 +101,8 @@ describe('区切りC: 数', () => {
     expect(getItem('springbringerScepter').cards).toEqual([{ cardId: 'wtScepterMiracle', count: 2 }]);
   });
   it('保存の版は v20', () => {
-    expect(STATE_VERSION).toBe(20);
-    expect(GAME_VERSION).toBe(20);
+    expect(STATE_VERSION).toBeGreaterThanOrEqual(20);
+    expect(GAME_VERSION).toBeGreaterThanOrEqual(20);
   });
   it('単発射撃は 成功率85%・4/8', () => {
     const c = getCard('wGunShot');

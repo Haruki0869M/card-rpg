@@ -245,7 +245,8 @@ describe('最上位13職の転職とカード', () => {
   const topJobs = CLASSES.all.filter(c => c.tier === 'top');
   it('13職それぞれが専用5枚・代表3枚を持つ', () => {
     expect(topJobs).toHaveLength(13);
-    expect(new Set(topJobs.flatMap(j => j.cardPool)).size).toBe(65);
+    // 区切りD: 同じ中身のカードをまとめた（65 → 62）
+    expect(new Set(topJobs.flatMap(j => j.cardPool)).size).toBe(62);
     for (const j of topJobs) { expect(j.cardPool).toHaveLength(5); expect(j.signature).toEqual(j.cardPool.slice(0, 3)); }
   });
   it.each(topJobs.map(j => [j.id, j] as const))('%s: レベル・実績・場所を満たした時だけ転職できる', (_, j) => {
@@ -299,7 +300,7 @@ describe('最上位の戦闘能力', () => {
     for (const a of s.allies) expect(a.damageBonus).toBeCloseTo(0.5);
   });
   it('拳王: 最後の攻撃対象へ使ったカード数×2の追撃', () => {
-    let s = topBattle(['fistKing']); s = topPlay(s, 'saintSlash'); s = topPlay(s, 'breathControl');
+    let s = topBattle(['fistKing']); s = topPlay(s, 'saintSlash'); s = topPlay(s, 'ninjaBreath');
     const hp = s.enemies[0].hp;
     s = applyCommand(s, { type: 'END_TURN', playerId: P }).state;
     expect(hp - s.enemies[0].hp).toBe(4);

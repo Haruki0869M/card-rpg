@@ -13,7 +13,7 @@ export const thief: ClassDef = {
   deck: [
     { cardId: 'pilfer', count: 3 },
     { cardId: 'guard', count: 2 },
-    { cardId: 'smokeStep', count: 2 },
+    { cardId: 'smokeVeil', count: 2 },
     { cardId: 'strike', count: 2 },
     { cardId: 'poisonBlade', count: 1 },
   ],
@@ -29,6 +29,6 @@ export const thief: ClassDef = {
   tier: 'base',
   lineage: 'gi',
   startingEquipment: { weapon: 'rustyDagger', armor: 'travelerClothes' },
-  cardPool: ['pilfer', 'smokeStep', 'poisonBlade', 'backstab', 'strike', 'shadowSteal', 'venomRain', 'dirtyTrick', 'quickFingers'],
+  cardPool: ['pilfer', 'smokeVeil', 'poisonBlade', 'backstab', 'strike', 'shadowSteal', 'venomRain', 'dirtyTrick', 'quickFingers'],
   growthWeights: { agi: 3, dex: 2, luk: 2 },
 };

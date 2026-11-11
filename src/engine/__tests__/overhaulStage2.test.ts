@@ -137,7 +137,7 @@ describe('古い保存（探索のサイコロの途中の状態が残ってい�
   it('読める（今の版のまま）。サイコロの項目は捨てて、そのまま扉を1つ選べる。部屋を済ませると手番が終わる', () => {
     const { old, x } = oldSave();
     expect(old.version).toBe(GAME_VERSION);
-    expect(GAME_VERSION).toBe(20);
+    expect(GAME_VERSION).toBeGreaterThanOrEqual(21);
     const m = migrateGame(old)!;
     expect(m).not.toBeNull();
     expect(validateGame(m)).toBe(true);

@@ -89,8 +89,12 @@ export interface CardDef {
   exhaust?: boolean;
   /** 武器種カード: この武器種を装備できるジョブの報酬に出る（K1） */
   weaponType?: string;
+  /** ほかにも置く武器種（1枚のカードを複数の武器種に置く。区切りD） */
+  weaponTypes?: string[];
   /** 系統カード: この系統のジョブの報酬に出る（K1） */
   lineage?: Lineage;
+  /** ほかにも置く系統（区切りD） */
+  lineages?: Lineage[];
   /** 共通カード: どのジョブの報酬にも出る（K1） */
   common?: boolean;
   /** 異端カード: 代償付きでルールを壊す。報酬・ショップには出ず、イベントでだけ手に入る（K1） */

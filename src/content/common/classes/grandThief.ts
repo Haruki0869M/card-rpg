@@ -10,6 +10,6 @@ export const grandThief: ClassDef = {
   battleAbility: { name: '獲物の目', effect: { modifier: 'chestChance', bonus: 20 } },
   exploreAbility: { id: 'grandThiefExplore', name: '変装', description: '町の買い物25%引き', effect: { kind: 'shopDiscount', percent: 25 } },
   requires: { feat: 'goldEarned', count: 250, text: 'お金を合わせて250G稼ぐ' },
-  cardPool: ["royalSwipe","thiefDecoy","treasureBlade","thiefFortune","plunder"], signature: ["royalSwipe","thiefDecoy","treasureBlade"],
+  cardPool: ["royalSwipe","thiefDecoy","treasureBlade","sageMeditation","plunder"], signature: ["royalSwipe","thiefDecoy","treasureBlade"],
   jobCards: ['plunder'],
 };
