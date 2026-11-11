@@ -169,7 +169,9 @@ J4_JOBS = ['monk', 'thief', 'priest', 'summoner',
            'pope', 'bowSaint', 'beastMaster', 'ninja', 'grandThief',
            'samurai', 'magicKnight', 'timeMage', 'necromancer', 'darkKnight', 'shrineMaiden', 'astrologer',
            'machinist', 'bard', 'gambler']
-for _cls in J4_JOBS:
+# 区切りF の新ジョブ4職（2026-11-12。jobId は仮）。元画像は C:/dev/card-rpg-assets/new-jobs/。指示文は docs/art/prompts-new-jobs-and-chatgpt-trial.md
+NEW_JOBS_F = ['fistSaint', 'bulwark', 'dragonVein', 'petTrainer']
+for _cls in J4_JOBS + NEW_JOBS_F:
     for _g in ('male', 'female'):
         HEROES[(_cls, _g)] = f'{_cls}-{_g}'
 # 顔の位置（切り抜いて余白を除いた絵の中の割合: 中心x, 中心y, 大きさ）。目で確認して決めた値
@@ -186,7 +188,12 @@ FACES.update({
     ('overlord', 'female'): (0.598, 0.196, 0.156),
     ('pope', 'female'): (0.50, 0.172, 0.156), ('pope', 'male'): (0.553, 0.178, 0.156),
     ('lancer', 'female'): (0.559, 0.168, 0.156), ('hexer', 'female'): (0.535, 0.192, 0.156),
+    # 区切りF（槍の先が頭より上にあるため）
+    ('bulwark', 'male'): (0.466, 0.158, 0.156), ('bulwark', 'female'): (0.485, 0.118, 0.156),
 })
+# 穴埋め（fill_holes）をしない元画像。重装衛士は、細い槍を戻すため切り抜きを直している（.cut の絵を
+# scripts/art/fix_thin_cut.py で作り直し済み）。槍と足の間の背景が穴として埋まるので、穴埋めをしない
+NO_FILL_HOLES = {'bulwark-female', 'bulwark-male'}
 # 表に無い職は、この値（x=0.5 は頭の位置を自動で探す）
 FACE_DEFAULT = (0.5, 0.085, 0.17)
 
@@ -211,7 +218,9 @@ def build_heroes():
         if not has_src(n):
             print(f'{name:32s} (元画像 {n} が無いので飛ばす)')
             continue
-        fig = trim(despeckle(fill_holes(cutout(n), n)))
+        cut = cutout(n)
+        # 槍と足の間の背景（明るい色むら）を「穴」と見て埋めてしまう絵は、穴埋めをしない
+        fig = trim(despeckle(cut if n in NO_FILL_HOLES else fill_holes(cut, n)))
         save(rim(place(fig, 480, 660), (8, 6, 12), 0.75, 2), f'{name}.webp')
         fx, fy, fs = FACES.get((cls, g), FACE_DEFAULT)
         if fx == 0.5: fx = head_center(fig)
