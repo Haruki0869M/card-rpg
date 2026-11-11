@@ -1,6 +1,6 @@
 // 状態異常を付ける（状態異常の種類は src/content の statuses）
 import { resolveTargets, targetOf } from '..';
-import { fireAbilities, statusBonusOf } from '../../../abilities';
+import { fireAbilities, guardStatus, statusBonusOf } from '../../../abilities';
 import { getStatus } from '../../../../data/statuses';
 import { addStatus } from '../../statuses';
 import { isEnemy, nameOf, unitIdOf } from '../../units';
@@ -22,9 +22,15 @@ export const effect: EffectHandler<'applyStatus'> = {
     // （対象ごとに数える。「すでに毒なら+2」のように、相手の状態で変わる物があるため）
     let amount = e.amount;
     const inflicted: typeof ts = [];
+    let guarded = 0;
     for (const t of ts) {
       const foe = isEnemy(ctx.source) !== isEnemy(t);
       const n = foe ? e.amount + statusBonusOf(ctx.source, e.status, ctx.card, t) : e.amount;
+      // 敵から受ける悪い状態異常を防ぐ能力（春を待つ・暖かい灯）
+      if (foe && guardStatus(ctx.state, ctx.events, t, e.status)) {
+        guarded++;
+        continue;
+      }
       if (foe) { amount = Math.max(amount, n); inflicted.push(t); }
       addStatus(t.statuses, e.status, n);
       if (isEnemy(ctx.source) !== isEnemy(t) && !ctx.hitIds.includes(unitIdOf(t))) ctx.hitIds.push(unitIdOf(t));
@@ -34,7 +40,8 @@ export const effect: EffectHandler<'applyStatus'> = {
     if (ctx.depth < 3 && !ctx.source.dead) for (const t of inflicted) fireAbilities(ctx.state, ctx.rng, ctx.events, ctx.source, 'inflict', { target: t, statusId: e.status, depth: ctx.depth + 1 });
     if (ts.length) {
       const name = `${getStatus(e.status).name}${amount}`;
-      if (isEnemy(ctx.source)) ctx.parts.push(`${ts.length > 1 ? '全員' : nameOf(ts[0])}に${name}`);
+      if (guarded >= ts.length) ctx.parts.push(`${name}は防がれた`);
+      else if (isEnemy(ctx.source)) ctx.parts.push(`${ts.length > 1 ? '全員' : nameOf(ts[0])}に${name}`);
       else ctx.parts.push(name);
     }
     return ts.length > 0;

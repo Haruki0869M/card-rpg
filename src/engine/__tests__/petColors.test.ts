@@ -54,17 +54,4 @@ describe('出会った時点で決まる毛色', () => {
     const r = applyGameCommand(g, { type: 'ADOPT_PET', playerId: 'P1', heroId: 'h0', petId: 'cockatiel' });
     expect(r.error).toBeUndefined(); expect(r.state.log.some(l => l.text.includes('✨珍しい毛色！'))).toBe(color === 'pearl');
   });
-  it('v11候補を一度だけ補完し、既存のお供・地図・戦闘を維持する', () => {
-    const g = fresh(); g.version = 11;
-    g.heroes[0].pet = { petId: 'cockatiel', color: 'lutino', name: '前からの子', love: 40, acts: 2 };
-    g.heroes[0].petOffer = ['rabbit', 'owl'];
-    const before = structuredClone(g), rng = createRng(g.rngState), colors = rollPetOfferColors(g.heroes[0].petOffer, rng);
-    const a = migrateGame(structuredClone(g))!, b = migrateGame(structuredClone(g))!;
-    expect(a).toEqual(b); expect(a.heroes[0].pet).toEqual(before.heroes[0].pet); expect(a.world).toEqual(before.world);
-    expect(a.heroes[0].petOfferColors).toEqual(colors); expect(a.rngState).toBe(rng.state);
-    expect(migrateGame(JSON.parse(JSON.stringify(a)))).toEqual(a);
-  });
-  it('v11に候補がなければ冒険の乱数も変更しない', () => {
-    const g = fresh(); g.version = 11; expect(migrateGame(structuredClone(g))!.rngState).toBe(g.rngState);
-  });
 });

@@ -1,4 +1,4 @@
-// 段階6 探索の仕組み: 見晴らしの塔・時間で消える出現スポット・保存 v16 → v17
+// 段階6 探索の仕組み: 見晴らしの塔・時間で消える出現スポット
 import { afterEach, describe, expect, it } from 'vitest';
 import { BALANCE } from '../../data/balance';
 import { DUNGEONS } from '../../data/dungeons';
@@ -9,7 +9,7 @@ import { TERRAINS } from '../../data/world';
 import type { GameCommand, GameState } from '../../types';
 import { actorOf, setLocalPlayers } from '../../store/battleConfig';
 import { applyGameCommand, createGame, createRng, migrateGame } from '../index';
-import { addWatchtowers, placeSpawn, spawnAt, spawnTurnsLeft, tickSpawns } from '../game/world/explore';
+import { placeSpawn, spawnAt, spawnTurnsLeft, tickSpawns } from '../game/world/explore';
 import { hexDistance, neighbors } from '../game/world/hex';
 
 afterEach(() => setLocalPlayers(null));
@@ -200,44 +200,5 @@ describe('時間で消える出現スポット', () => {
     g = run(g, { type: 'WORLD_INTERACT', playerId: 'P1', heroId: 'h0' });
     const rooms = g.expeditions?.flatMap((x) => x.dungeon?.rooms ?? []) ?? [];
     expect(rooms.some((r) => String(r.eventId ?? '').startsWith('spawn'))).toBe(false);
-  });
-});
-
-describe('保存 v16 → v17', () => {
-  it('地図・位置・霧・乱数を変えず、塔を空きマスに足し、最初の出現は少し後。2回直しても同じ', () => {
-    const old = fresh(7);
-    old.version = 16;
-    for (const t of old.world!.tiles) if (t.f?.kind === 'tower') delete t.f;
-    delete old.world!.spawns;
-    delete old.world!.nextSpawnAt;
-    delete old.world!.nextSpawnId;
-    old.world!.worldTurn = 12;
-    const before = structuredClone(old);
-    const m = migrateGame(structuredClone(old))!;
-    expect(m).not.toBeNull();
-    expect(m.version).toBe(17);
-    expect(m.rngState).toBe(before.rngState);
-    const terrain = (g: GameState) => g.world!.tiles.map((t) => [t.t, t.r, t.seen]);
-    expect(terrain(m)).toEqual(terrain(before));
-    before.world!.tiles.forEach((t, i) => { if (t.f) expect(m.world!.tiles[i].f).toEqual(t.f); });
-    expect(m.world!.pos).toEqual(before.world!.pos);
-    expect(towers(m).length).toBe(3);
-    for (const i of towers(m)) expect(before.world!.tiles[i].f).toBeUndefined();
-    expect(m.world!.spawns).toEqual([]);
-    expect(m.world!.nextSpawnAt).toBe(12 + BALANCE.spawnMigrateDelay);
-    const again = structuredClone(m);
-    expect(addWatchtowers(again, again.world!)).toBe(0);
-    expect(again).toEqual(m);
-  });
-
-  it('空きマスが無い古い地図には、塔を無理に置かない', () => {
-    const old = fresh(8);
-    old.version = 16;
-    for (const t of old.world!.tiles) if (t.f?.kind === 'tower') delete t.f;
-    // 空きマスをすべて埋める（宝箱を開けた跡）
-    for (const t of old.world!.tiles) if (!t.f) t.f = { kind: 'chest', id: 'mapChest', used: true };
-    const m = migrateGame(structuredClone(old))!;
-    expect(m).not.toBeNull();
-    expect(towers(m)).toEqual([]);
   });
 });

@@ -96,7 +96,7 @@ function ratio(s: BattleState, cardId: string, name: string, prepare?: (c: Battl
 
 describe('11個の装備のデータ（能力の名前・説明・印）', () => {
   const rows: { id: string; name: string; text: string; tags: string[] }[] = [
-    { id: 'pharaohStaff', name: '王の裁き', text: '魔法カード：弱点属性のダメージ×1.25', tags: ['magic'] },
+    { id: 'pharaohStaff', name: '王の裁き', text: '魔法カード：弱点属性のダメージ×1.25（弱点の倍率は合わせて×2まで）', tags: ['magic'] },
     { id: 'constellationStaff', name: '星座を結ぶ', text: '魔法カード：対象の悪い状態異常1種類につき与えるダメージ+8%（最大+24%）', tags: ['magic'] },
     { id: 'tideStaff', name: '満ち潮', text: '', tags: [] },
     { id: 'memoryStaff', name: '追憶', text: 'コスト2以上の魔法カードが完全成功した時（1回の戦闘で1回まで）：使ったカードの効果をもう一度発動', tags: ['magic', 'highCost'] },
@@ -125,11 +125,11 @@ describe('11個の装備のデータ（能力の名前・説明・印）', () =>
     const keep: [string, string, string, string][] = [
       ['pharaohStaff', 'weapon', 'epic', 'sandDynasty'], ['constellationStaff', 'weapon', 'epic', 'starCastle'], ['tideStaff', 'weapon', 'epic', 'cursedArchipelago'], ['memoryStaff', 'weapon', 'epic', 'dreamLabyrinth'],
       ['sunScepter', 'weapon', 'epic', 'sandDynasty'], ['lighthouseScepter', 'weapon', 'epic', 'cursedArchipelago'], ['starScepter', 'weapon', 'epic', 'starCastle'],
-      ['gearGuardian', 'armor', 'legend', 'clockworkEmpire'], ['dawnMantle', 'armor', 'legend', 'dreamLabyrinth'], ['stardustArmor', 'armor', 'legend', 'starCastle'], ['sparkRing', 'accessory', 'epic', 'clockworkEmpire'],
+      ['gearGuardian', 'armor', 'legend', 'clockworkEmpire'], ['dawnMantle', 'armor', 'legend', 'dreamLabyrinth'], ['stardustArmor', 'armor', 'legend', 'starCastle'], ['sparkRing', 'accessory', 'epic', ''], // 区切りA: 散る火花は、どのシナリオでも出るようにした
     ];
     for (const [id, slot, , scenario] of keep) {
       expect(getItem(id).slot, id).toBe(slot);
-      expect(getItem(id).scenario, id).toBe(scenario);
+      expect(getItem(id).scenario ?? '', id).toBe(scenario);
       expect(['epic', 'legend'], id).toContain(getItem(id).rarity);
     }
   });
@@ -440,18 +440,16 @@ describe('レア以下の「中身が同じ」装備に付けた差', () => {
   it('能力値の合計は、直す前と同じ（強さは変えず、向きだけ変えた）', () => {
     const totals: Record<string, number> = {
       harpoon: 8, lullabySpear: 8, angelSpear: 8, blizzardBow: 8, desertBow: 8, mermaidDagger: 7, pillowDagger: 7, whiteWolfFang: 7, moonDagger: 7,
-      engineerGoggles: 4, dreamCatcher: 4, oldStarChart: 4, oldCompass: 4, pearlNecklace: 9, sacredScarab: 9,
+      // 区切りA: 技師のゴーグル・夢の捕まえ網・古い星図・古い羅針盤は能力値を外して、役割のある効果に変えた（lineupStageA.test.ts）
     };
     for (const [id, n] of Object.entries(totals)) expect(sum(id), id).toBe(n);
   });
 
-  it('断熱コート・砂漠の外套・雲の外套: 軽減する属性は元のまま、守りの形が違う', () => {
-    expect([getItem('insulatedCoat').maxHp, getItem('insulatedCoat').startBlock]).toEqual([10, 2]);
-    expect([getItem('desertCloak').maxHp, getItem('desertCloak').startBlock]).toEqual([6, 4]);
-    expect([getItem('cloudCloak').maxHp, getItem('cloudCloak').startBlock, getItem('cloudCloak').stats]).toEqual([6, undefined, { agi: 2 }]);
+  it('断熱コート・砂漠の外套・雲の外套: 区切りAで、属性除けの6着（火・毒・聖…）にそろえた', () => {
+    for (const id of ['insulatedCoat', 'desertCloak', 'cloudCloak']) expect([getItem(id).maxHp, getItem(id).startBlock, getItem(id).stats], id).toEqual([8, 3, undefined]);
     expect(getItem('insulatedCoat').ability!.effect).toMatchObject({ modifier: 'elementGuard', element: 'fire', mode: 'half' });
-    expect(getItem('desertCloak').ability!.effect).toMatchObject({ modifier: 'elementGuard', element: 'fire', mode: 'half' });
-    expect(getItem('cloudCloak').ability!.effect).toMatchObject({ modifier: 'elementGuard', element: 'thunder', mode: 'half' });
+    expect(getItem('desertCloak').ability!.effect).toMatchObject({ modifier: 'elementGuard', element: 'poison', mode: 'half' });
+    expect(getItem('cloudCloak').ability!.effect).toMatchObject({ modifier: 'elementGuard', element: 'holy', mode: 'half' });
     expect(getItem('insulatedCoat').ability!.name).not.toBe(getItem('desertCloak').ability!.name);
   });
 });

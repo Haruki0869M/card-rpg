@@ -34,6 +34,8 @@ export const BALANCE = {
   /** 属性: 弱点のダメージ倍率・耐性のダメージ倍率（spec §14） */
   elementWeakMul: 1.5,
   elementResistMul: 0.5,
+  /** 弱点の倍率の上限（弱点 ×1.5 と「弱点のダメージを増やす能力」を全部掛けた後。元素のプリズム＋万象でもここまで） */
+  elementWeakMax: 2.0,
   /** 能力値 → 戦闘の適性補正: (能力値 - statPivot) / statDivisor（端数切り捨て） */
   statPivot: 60,
   statDivisor: 2,

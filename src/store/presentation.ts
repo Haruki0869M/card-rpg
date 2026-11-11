@@ -9,7 +9,7 @@ import { visionOf } from '../engine/game/world/fog';
 import { hexDistance } from '../engine/game/world/hex';
 import { heroMaxHp } from '../engine/game/hero';
 import { doorBeyond, doorDetail, doorOmen, type DoorOmen } from '../engine/game/dungeonOmen';
-import { restMultiplierOf } from '../engine/game/common';
+import { petEventBonusOf, restMultiplierOf } from '../engine/game/common';
 import { getRoomType } from '../data/rules';
 import { cardSound, damageSound, petCry, statusSound } from '../audio/cues';
 import { COMBO_NAMES } from '../engine/battle/effects';
@@ -230,7 +230,8 @@ export function explorationNotices(before: GameState, after: GameState, wire: Ga
   if (cmd.type === 'CHOOSE_EVENT' && !prev.event?.result && next.event?.result) {
     const resolved = next.event.result, option = prev.event && EVENTS.get(prev.event.eventId).options[resolved.optionIndex];
     if (option?.check && resolved.heroId) {
-      const bonus = petExplore(after.heroes.find(h => h.id === resolved.heroId)).eventBonus;
+      const who = after.heroes.find(h => h.id === resolved.heroId);
+      const bonus = (petExplore(who).eventBonus ?? 0) + petEventBonusOf(who);
       if (bonus) add(resolved.heroId, `イベントの判定+${bonus}%`);
     }
   }

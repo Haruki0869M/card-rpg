@@ -75,14 +75,14 @@ describe('エピック以上の特殊能力（spec §12.7・§13.1）', () => {
   it('装備の能力は戦闘に引き継がれる（ターン開始時のブロック）', () => {
     const g = createGame({ seed: 1, scenarioId: 'corruptionKing', difficulty: 'normal', party: [{ classId: 'warrior', gender: 'male', name: 'a', playerId: 'P1' }] });
     const h = g.heroes[0];
-    h.equipment.armor = { uid: 'x', itemId: 'mithrilMail' };
+    h.equipment.armor = { uid: 'x', itemId: 'knightArmor' };
     const m = toPartyMember(h);
-    expect(m.abilities).toEqual([{ name: '聖銀の守り', effect: { when: 'turnStart', do: [{ kind: 'block', amount: 5 }] }, source: { kind: 'equipment', id: 'mithrilMail', label: 'ミスリルメイル' } }]);
+    expect(m.abilities).toEqual([{ name: '鉄壁の構え', effect: { when: 'turnStart', do: [{ kind: 'block', amount: 3 }] }, source: { kind: 'equipment', id: 'knightArmor', label: '騎士の鎧' } }]);
     const s = createBattle({ ...setup(1, ['warrior']), party: [m] });
-    // 開始時ブロック（startBlock 8）+ ターン開始の能力 5
-    expect(s.allies[0].block).toBe(8 + 5);
+    // 開始時ブロック（startBlock 6）+ ターン開始の能力 3
+    expect(s.allies[0].block).toBe(6 + 3);
     const after = applyCommand(s, END).state;
-    if (!after.allies[0].dead && after.phase === 'ally') expect(after.allies[0].block).toBeGreaterThanOrEqual(5);
+    if (!after.allies[0].dead && after.phase === 'ally') expect(after.allies[0].block).toBeGreaterThanOrEqual(3);
   });
   it('装備の能力: 完全成功でフォーカス+1（見切り）', () => {
     const s = createBattle(setup(5, ['warrior', 'mage']));

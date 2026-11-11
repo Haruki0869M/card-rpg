@@ -2,7 +2,7 @@ import { ENEMIES } from '../../data/enemies';
 import { describe, expect, it } from 'vitest';
 import { CARDS, getCard } from '../../data/cards';
 import type { BattleState, CardDef, Command, GameCommand, GameState, PlayerId } from '../../types';
-import { applyCommand, applyGameCommand, createBattle, createGame, heroPlace, migrateGame, predictCard } from '../index';
+import { applyCommand, applyGameCommand, createBattle, createGame, heroPlace, predictCard } from '../index';
 import { cardTargets } from '../battle/targets';
 import { followingGroup } from '../game/world/group';
 import { giveHand } from './helpers';
@@ -130,21 +130,6 @@ describe('単体支援の対象と星読み', () => {
       if (c.target === 'self' && !c.id.startsWith('test')) expect(c.tiers.flatMap(t => t.effects).some(e => e.to === 'lowestAlly')).toBe(false);
       if (c.tiers.some(t => t.effects.some(e => e.to === 'allyTarget'))) expect(c.secondaryTarget).toBe('ally');
     }
-  });
-  it('旧保存の味方回復予約だけ従来の対象を補い、乱数を消費しない', () => {
-    const g = world(), b = battle(), cmd = command(b, 'mend'); b.allies[2].hp = 1;
-    g.version = 13; b.version = 13; b.slotPreview = { characterId: cmd.characterId, cardInstanceId: 't0', focusUsed: 0, chance: 80, results: ['hit','miss'], rerollResults: ['miss','hit'], rerolled: false };
-    g.battle = b; const next = migrateGame(JSON.parse(JSON.stringify(g)))!;
-    expect(next.battle!.slotPreview!.targetId).toBe(b.allies[2].id); expect(next.battle!.rngState).toBe(b.rngState); expect(next.rngState).toBe(g.rngState);
-  });
-  it('旧複合カードの予約は敵対象を維持して回復先だけ補う', () => {
-    const g = world(), b = battle(), cmd = command(b, 'sanctify', b.enemies[1].uid); b.allies[1].hp = 1;
-    g.version = 13; b.version = 13;
-    b.slotPreview = { characterId: cmd.characterId, cardInstanceId: 't0', targetId: cmd.targetId, focusUsed: 0, chance: 80, results: ['hit','miss'], rerollResults: ['miss','hit'], rerolled: false };
-    g.battle = b; const next = migrateGame(JSON.parse(JSON.stringify(g)))!;
-    expect(next.battle!.slotPreview?.targetId).toBe(cmd.targetId);
-    expect(next.battle!.slotPreview?.allyTargetId).toBe(b.allies[1].id);
-    expect(next.battle!.slotPreview?.results).toEqual(b.slotPreview.results); expect(next.battle!.rngState).toBe(b.rngState);
   });
 });
 

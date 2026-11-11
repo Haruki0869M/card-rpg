@@ -102,9 +102,10 @@ export interface CardDef {
 /**
  * 発動のきっかけ。戦闘の流れの決まった場面で呼ばれる。
  * battleStart 戦闘開始時 / turnStart 自分の側のフェーズ開始時 / turnEnd 自分の側のフェーズ終了時 /
- * afterCard カードを使った後 / perfect カードが完全成功した時 / kill 敵を倒した時 / hurt HPにダメージを受けた時
+ * afterCard カードを使った後 / perfect カードが完全成功した時 / kill 敵を倒した時 / hurt HPにダメージを受けた時 /
+ * petAct 自分のお供が行動した時（お供の発動型の能力が働いた時）
  */
-export type AbilityTrigger = 'battleStart' | 'turnStart' | 'turnEnd' | 'afterCard' | 'perfect' | 'kill' | 'hurt' | 'allyKill' | 'allyDown' | 'blocked' | 'inflict' | 'foeTick';
+export type AbilityTrigger = 'battleStart' | 'turnStart' | 'turnEnd' | 'afterCard' | 'perfect' | 'kill' | 'hurt' | 'allyKill' | 'allyDown' | 'blocked' | 'inflict' | 'foeTick' | 'petAct';
 
 /** 発動の条件の種類ごとの数値。条件のファイル（src/engine/abilities/conditions/）が declare module で種類を足す */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -134,6 +135,14 @@ export type AbilityEffect =
   | { modifier: 'summonTwice' }
   /** HPを回復した時、その pct 倍のブロックも得る（福音。0.5 = 50%） */
   | { modifier: 'healToBlock'; pct: number }
+  /** 自分の砲台・罠・召喚の残りターン+add（歯車の目。戦闘の間ずっといる物は変わらない） */
+  | { modifier: 'summonTurns'; add: number }
+  /**
+   * 敵から悪い状態異常を受けるはずの時に防ぐ（春を待つ・暖かい灯）。
+   * statuses = その種類だけ（省略は悪い状態異常の全部） / block = 防いだ時に得るブロック /
+   * allies = 味方全員を守る（省略は自分だけ） / perBattle = 守られる1人につき、1回の戦闘で何回まで（省略は何回でも）
+   */
+  | { modifier: 'statusGuard'; statuses?: string[]; block?: number; allies?: boolean; perBattle?: number }
   | { modifier: 'chestChance'; bonus: number; if?: AbilityCondition[] }
   | { modifier: 'weaknessDamage'; multiplier: number; if?: AbilityCondition[] }
   /** 属性の攻撃を受ける時: immune = 無効 / absorb = 受けるダメージ分回復 / half = 半分（K2。敵の攻撃から守る） */

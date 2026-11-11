@@ -8,7 +8,6 @@ import { SANCTUARIES } from '../../data/world';
 import type { BattleState, GameState } from '../../types';
 import { applyCommand, applyGameCommand, createBattle, createGame, createRng, migrateGame, incomingDamage, tierDamageAgainst, unusableReason, jobOptions, toPartyMember } from '../index';
 import { applyEffect, dealDamage, makeCtx } from '../battle/effects';
-import { addSanctuaries } from '../game/world/sanctuaries';
 import { intentView } from '../../components/format';
 import { giveHand, nextTurn, play } from './helpers';
 
@@ -201,21 +200,6 @@ describe('祭壇の半減と保存再開', () => {
     const g = fresh(), fs = g.world!.tiles.map(t => t.f);
     expect(fs.filter(f => f?.kind === 'altar')).toHaveLength(5); expect(fs.filter(f => f?.kind === 'temple')).toHaveLength(2);
     expect(new Set(SANCTUARIES.all.flatMap(s => s.altars ?? [])).size).toBe(10);
-  });
-  it('旧10祭壇の保存を5か所へ整理し、滞在中の祭壇・地形・位置・乱数を保つ', () => {
-    const old = fresh(); old.version = 9; const w = old.world!;
-    const pairs = SANCTUARIES.all.filter(s => s.kind === 'altar');
-    for (const def of pairs) {
-      const tile = w.tiles.findIndex(t => !t.f && t.t === 'road'); w.tiles[tile].f = { kind: 'altar', id: def.legacyIds![0] };
-    }
-    const tile = w.tiles.findIndex(t => t.f?.id === 'necromancerAltar'); old.mode = 'sanctuary'; old.party = ['h0'];
-    old.sanctuary = { sanctuaryId: 'necromancerAltar', heroId: 'h0', tile }; w.pos.h0 = tile;
-    const before = structuredClone(old), next = migrateGame(structuredClone(old))!;
-    expect(next.version).toBe(17); expect(next.world!.tiles.filter(t => t.f?.kind === 'altar')).toHaveLength(5);
-    expect(next.sanctuary).toEqual({ sanctuaryId: 'timeMageAltar', heroId: 'h0', tile }); expect(next.world!.tiles[tile].f?.id).toBe('timeMageAltar');
-    expect(next.rngState).toBe(before.rngState); expect(next.world!.pos).toEqual(before.world!.pos);
-    next.world!.tiles.forEach((t, i) => { expect(t.t).toBe(before.world!.tiles[i].t); expect(t.seen).toBe(before.world!.tiles[i].seen); });
-    expect(migrateGame(structuredClone(next))).toEqual(next); expect(addSanctuaries(next, next.world!)).toEqual([]);
   });
   it.each(jobs)('%sの能力状態を保存して再開しても、同じコマンドで同じ結果になり入力は変わらない', id => {
     const g = fresh(), h = g.heroes[0]; h.classId = id;

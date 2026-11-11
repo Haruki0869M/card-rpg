@@ -1,6 +1,7 @@
 // お供を呼ぶ: ターン終了時に damage で攻撃するお供（幻獣・獣など）を turns ターン呼び出す。同じ id がいれば呼び直し（残りターンを戻す）
 import { getElement } from '../../../../data/elements';
 import { describeEffect } from '..';
+import { summonTurnsBonus } from '../../../abilities';
 import { isEnemy, unitIdOf } from '../../units';
 import type { EffectHandler } from '../types';
 
@@ -15,21 +16,23 @@ export const effect: EffectHandler<'summon'> = {
   defaultTo: 'self',
   apply(ctx, e) {
     if (isEnemy(ctx.source)) return false;
+    // 残りターンの上乗せ（歯車の目）。戦闘の間ずっといる物（99）は変えない
+    const turns = e.turns >= 99 ? e.turns : e.turns + summonTurnsBonus(ctx.source);
     const targetId = e.targeted ? (ctx.target && isEnemy(ctx.target) && !ctx.target.dead ? ctx.target.uid : ctx.card ? undefined : ctx.state.enemies.find(t => !t.dead)?.uid) : undefined;
     if (e.targeted && !targetId) return false;
     const list = (ctx.source.summons ??= []);
     if (e.stackLimit && list.filter(s => s.group === e.id).length >= e.stackLimit) return false;
     const cur = e.stackLimit ? undefined : list.find((x) => x.id === e.id);
     if (cur) {
-      if (e.replace) Object.assign(cur, { turns: e.turns, damage: e.damage, targetId, trigger: e.trigger, effects: e.effects, element: e.element });
-      else { cur.turns = Math.max(cur.turns, e.turns); cur.damage = Math.max(cur.damage, e.damage); }
+      if (e.replace) Object.assign(cur, { turns, damage: e.damage, targetId, trigger: e.trigger, effects: e.effects, element: e.element });
+      else { cur.turns = Math.max(cur.turns, turns); cur.damage = Math.max(cur.damage, e.damage); }
     } else {
       let id = e.id;
       if (e.stackLimit) {
         const counters = (ctx.source.counters ??= {});
         id = `${e.id}:${counters[`summon:${e.id}`] = (counters[`summon:${e.id}`] ?? 0) + 1}`;
       }
-      list.push({ id, group: e.stackLimit ? e.id : undefined, name: e.name, icon: e.icon, damage: e.damage, turns: e.turns, element: e.element, echoPct: e.echoPct, intercept: e.intercept, targetId, trigger: e.trigger, effects: e.effects });
+      list.push({ id, group: e.stackLimit ? e.id : undefined, name: e.name, icon: e.icon, damage: e.damage, turns, element: e.element, echoPct: e.echoPct, intercept: e.intercept, targetId, trigger: e.trigger, effects: e.effects });
     }
     ctx.events.push({ type: 'ability', unitId: unitIdOf(ctx.source), name: e.name, source: { kind: 'summon', id: e.id, label: e.name } });
     ctx.parts.push(`${e.name}を呼んだ`);

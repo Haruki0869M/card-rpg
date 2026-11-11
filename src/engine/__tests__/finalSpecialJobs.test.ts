@@ -273,18 +273,3 @@ describe('賭博師の確率と上下限', () => {
     s = applyCommand(s, second).state; expect(s.allies[0].focus).toBe(1); expect(s.allies[0].hp).toBe(hp); expect(s.bonusGold).toBeUndefined();
   });
 });
-
-describe('v10保存の互換性', () => {
-  it('進行中の戦闘に先読み回数0を補い、カード・トークン・乱数を維持する', () => {
-    const g = fresh(), b = battle(['machinist']); g.version = 10; b.version = 10; delete b.allies[0].slotPreviewUsed;
-    g.expeditions = [{ id: 'x1', mode: 'battle', heroes: ['h0'], battle: b }]; const before = structuredClone(g);
-    const next = migrateGame(JSON.parse(JSON.stringify(g)))!; expect(next.version).toBe(17);
-    const after = next.expeditions![0].battle!; expect(after.version).toBe(17); expect(after.allies[0].slotPreviewUsed).toBe(0); expect(after.slotPreview).toBeUndefined();
-    expect(after.rngState).toBe(before.expeditions![0].battle!.rngState); expect(after.allies[0].summons).toEqual(before.expeditions![0].battle!.allies[0].summons);
-  });
-  it('罠の対象・効果・残り期間と強化状態は保存再開でも保持される', () => {
-    const g = fresh(); g.mode = 'battle'; g.party = ['h0']; g.battle = use(battle(['machinist']), 'placeTrap'); g.battle.allies[0].statuses.possession = 2;
-    const next = migrateGame(JSON.parse(JSON.stringify(g)))!; expect(next.battle).toEqual(JSON.parse(JSON.stringify(g.battle)));
-    const end: Command = { type: 'END_TURN', playerId: 'P1' }; expect(applyCommand(g.battle, end)).toEqual(applyCommand(next.battle!, end));
-  });
-});

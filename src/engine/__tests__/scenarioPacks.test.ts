@@ -10,12 +10,12 @@ import { createGame } from '../index';
 
 /** [シナリオID, 固有装備の数, 前の本（解放条件）, このシナリオだけの突発イベントのID] */
 const PACKS: [string, number, string | string[], string[]][] = [
-  ['frozenKingdom', 13, 'corruptionKing', ['frozenBlizzard', 'frozenTraveler', 'frozenIceTreasure', 'frozenWolfPup', 'frozenPetShiver']],
-  ['cursedArchipelago', 13, 'frozenKingdom', ['seaStorm', 'seaDriftingSailor', 'seaFloatingChest', 'seaDolphin', 'mistPetSeasick']],
-  ['sandDynasty', 13, 'cursedArchipelago', ['sandStorm', 'sandLostCaravan', 'sandMirage', 'sandFennec', 'sandPetHeat']],
-  ['dreamLabyrinth', 13, ['corruptionKing', 'frozenKingdom', 'cursedArchipelago', 'sandDynasty', 'starCastle', 'clockworkEmpire'], ['dreamNightmareMist', 'dreamLostTraveler', 'dreamSnowSand', 'dreamSleepyCat', 'dreamPetMemory']],
-  ['clockworkEmpire', 13, 'starCastle', ['steamVentBurst', 'mechBrokenAutomaton', 'gearScrapPile', 'mechKitten', 'mechPetOily']],
-  ['starCastle', 13, 'sandDynasty', ['skyGust', 'starShower', 'starLostAstronomer', 'starBirdOnCloud', 'skyPetStarGazer']],
+  ['frozenKingdom', 10, 'corruptionKing', ['frozenBlizzard', 'frozenTraveler', 'frozenIceTreasure', 'frozenWolfPup', 'frozenPetShiver']],
+  ['cursedArchipelago', 10, 'frozenKingdom', ['seaStorm', 'seaDriftingSailor', 'seaFloatingChest', 'seaDolphin', 'mistPetSeasick']],
+  ['sandDynasty', 10, 'cursedArchipelago', ['sandStorm', 'sandLostCaravan', 'sandMirage', 'sandFennec', 'sandPetHeat']],
+  ['dreamLabyrinth', 10, ['corruptionKing', 'frozenKingdom', 'cursedArchipelago', 'sandDynasty', 'starCastle', 'clockworkEmpire'], ['dreamNightmareMist', 'dreamLostTraveler', 'dreamSnowSand', 'dreamSleepyCat', 'dreamPetMemory']],
+  ['clockworkEmpire', 9, 'starCastle', ['steamVentBurst', 'mechBrokenAutomaton', 'gearScrapPile', 'mechKitten', 'mechPetOily']],
+  ['starCastle', 10, 'sandDynasty', ['skyGust', 'starShower', 'starLostAstronomer', 'starBirdOnCloud', 'skyPetStarGazer']],
 ];
 
 describe.each(PACKS)('追加シナリオ %s', (sid, gearCount, prevRaw, randomIds) => {

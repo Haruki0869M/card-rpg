@@ -228,6 +228,28 @@ export function revealSeen(run: DungeonRun) {
   run.seen = [...seen];
 }
 
+/**
+ * 地図に描くマス（見たマス ＋ 装備の力で最初から出るマス）と、入る前から種類が分かる部屋。
+ * 保存はしない（その場で計算する）ので、探索度・一人称の景色・保存データは変わらない。
+ * rest = 休憩部屋のマスが出て、種類も分かる（羅針盤） / layout = 通路と扉のマスが全部出る。種類は出ない（星図）
+ */
+export function mapKnowledge(run: DungeonRun, reveal: { rest?: boolean; layout?: boolean } = {}): { seen: Set<string>; typed: Set<string> } {
+  const seen = new Set(run.seen ?? []);
+  const typed = new Set<string>();
+  if (!reveal.rest && !reveal.layout) return { seen, typed };
+  const act = activeCells(run);
+  for (const c of dungeonGrid(run).cells) {
+    const k = cellKey(c.x, c.y);
+    if (!act.has(k)) continue;
+    if (reveal.layout) seen.add(k);
+    if (reveal.rest && c.roomId && run.rooms.find((r) => r.id === c.roomId)?.type === 'rest') {
+      seen.add(k);
+      typed.add(c.roomId);
+    }
+  }
+  return { seen, typed };
+}
+
 /** 探索度（見たマス ÷ 全部のマス。%） */
 export function exploredPercent(run: DungeonRun): number {
   // 選ばなかった扉と、その扉へだけ続く通路は数えない（100% まで届くように）

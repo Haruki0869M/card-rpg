@@ -77,6 +77,7 @@ try {
     for (const e of it.use ?? []) p.push(safe(() => describeEffect(e).replace('対象', '味方1人'), e.kind));
     if (it.explore?.vision) p.push(`視界+${it.explore.vision}`);
     if (it.explore?.campHeal) p.push(`野営の回復+${Math.round(it.explore.campHeal * 100)}%`);
+    if (it.explore?.petEvent) p.push(`お供を連れている時、イベントの判定+${it.explore.petEvent}%`);
     const ab = it.ability ? ` 《${it.ability.name}》${safe(() => describeAbility(it.ability))}` : '';
     const sc = it.scenario ? `｛シナリオ限定:${it.scenario}｝` : '';
     return `- **${it.name}**［${RAR[it.rarity]}］${p.join('・')}${ab}${p.length || ab ? '' : it.description}${sc}`;

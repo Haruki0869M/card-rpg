@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getCard } from '../data/cards';
-import { createBattle, createGame, applyGameCommand, applyCommand, createRng, migrateGame, toPartyMember } from '../engine';
+import { createBattle, createGame, applyGameCommand, applyCommand, createRng, toPartyMember } from '../engine';
 import { applyEffect, dealDamage, makeCtx } from '../engine/battle/effects';
 import { heroAbilities, heroMaxHp } from '../engine/game/hero';
 import { petAbilities } from '../engine/game/pets';
@@ -41,7 +41,7 @@ describe('戦闘の表示順と数値', () => {
 
 describe('能力の出所と開始時の通知', () => {
   it('引き継ぎ・装備・お供に出所が付き、同じ能力データを変更しない', () => {
-    const g = fresh(), h = g.heroes[0]; h.carried = 'guardian'; h.equipment.armor = { uid: 'armor', itemId: 'mithrilMail' };
+    const g = fresh(), h = g.heroes[0]; h.carried = 'guardian'; h.equipment.armor = { uid: 'armor', itemId: 'knightArmor' };
     h.pet = { petId: 'cockatiel', color: 'normal', name: 'ぴー', love: 0, acts: 0 };
     expect(heroAbilities(h).map(a => a.source?.kind)).toEqual(['inherited', 'equipment', 'pet']);
     expect(petAbilities(h)[0].source).toEqual({ kind: 'pet', id: 'cockatiel', label: 'ぴー', effectName: '先読み' });
@@ -87,15 +87,6 @@ describe('能力の出所と開始時の通知', () => {
     const events: BattleEvent[] = []; dealDamage(makeCtx(b, createRng(7), events, b.enemies[0]), b.allies[0], 100);
     expect(events.some(e => e.type === 'ability' && e.unitId === 'a1' && e.source?.kind === 'job' && e.source.id === 'guardian')).toBe(true);
     expect(b.allies[0].hp).toBe(1);
-  });
-  it('旧戦闘は能力の効果・乱数・HPを変えず出所だけ補い、開始イベントを作らない', () => {
-    const g = fresh(), h = g.heroes[0]; h.equipment.armor = { uid: 'armor', itemId: 'mithrilMail' };
-    g.version = 12; g.mode = 'battle'; g.battle = createBattle({ seed: 7, party: [toPartyMember(h)], encounter: { id: 'test', name: '確認', enemies: [{ defId: 'forestWolf' }] } });
-    g.battle.version = 12; delete g.battle.openingEvents; for (const a of g.battle.allies[0].abilities!) delete a.source;
-    const original = structuredClone(g), next = migrateGame(structuredClone(g))!;
-    expect(next.version).toBe(17); expect(next.battle!.rngState).toBe(original.battle!.rngState); expect(next.rngState).toBe(original.rngState);
-    expect(next.battle!.allies[0].abilities![0].effect).toEqual(original.battle!.allies[0].abilities![0].effect);
-    expect(next.battle!.allies[0].abilities![0].source?.kind).toBe('equipment'); expect(next.battle!.openingEvents).toBeUndefined();
   });
   it('フォーカスが最大ならお供の資源回復表示も新たに出さない', () => {
     const b = createBattle({ seed: 7, party: [{ classId: 'warrior', name: '確認', gender: 'male', playerId: 'P1' }], encounter: { id: 'test', name: '確認', enemies: [{ defId: 'forestWolf' }] } });

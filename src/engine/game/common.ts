@@ -8,7 +8,7 @@ import type { Rng } from '../rng';
 import { finalChanceOf } from './checks';
 import { rarityIndex } from './dungeon';
 import { findHero, livingHeroes, sceneHeroes } from './heroes';
-import { heroStats } from './hero';
+import { equippedItems, heroStats } from './hero';
 import { petExplore } from './pets';
 import { exploreEffects } from './exploreAbilities';
 
@@ -124,10 +124,22 @@ export function hiddenChestChance(game: GameState): number {
   return BALANCE.hiddenChestBase + bonus;
 }
 
+/** 装備の「お供を連れている時、イベントの判定+N%」（夢つかみ）の合計。お供がいなければ 0 */
+export function petEventBonusOf(hero: Hero | undefined): number {
+  if (!hero?.pet) return 0;
+  return equippedItems(hero).reduce((n, it) => n + (it.explore?.petEvent ?? 0), 0);
+}
+
+/** ダンジョンの地図に最初から出る物（生きている仲間の装備。羅針盤 = 休憩部屋 / 星図 = 通路と扉の全部） */
+export function partyMapReveal(game: GameState): { rest: boolean; layout: boolean } {
+  const kinds = new Set(livingHeroes(game).flatMap((h) => equippedItems(h).map((it) => it.explore?.reveal)));
+  return { rest: kinds.has('rest'), layout: kinds.has('layout') };
+}
+
 /** 能力値による判定の成功率 */
 export function statChance(hero: Hero, stat: StatId, tag?: string, event?: boolean): number {
-  // イベントの判定: お供（子狐）の上乗せ
-  return finalChanceOf(heroStats(hero)[stat] + checkBonus(hero, tag) + (event ? checkBonus(hero, 'event') + (petExplore(hero).eventBonus ?? 0) : 0));
+  // イベントの判定: お供（子狐）の上乗せ・装備（夢つかみ）の上乗せ
+  return finalChanceOf(heroStats(hero)[stat] + checkBonus(hero, tag) + (event ? checkBonus(hero, 'event') + (petExplore(hero).eventBonus ?? 0) + petEventBonusOf(hero) : 0));
 }
 
 

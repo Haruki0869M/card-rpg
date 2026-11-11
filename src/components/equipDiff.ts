@@ -38,6 +38,9 @@ export function itemOwnStats(it: ItemDef): string[] {
   if (it.extraDraw) out.push(`毎ターンのドロー+${it.extraDraw}`);
   if (it.explore?.vision) out.push(`世界マップの視界+${it.explore.vision}`);
   if (it.explore?.campHeal) out.push(`野営の回復+${Math.round(it.explore.campHeal * 100)}%`);
+  if (it.explore?.petEvent) out.push(`お供を連れている時、イベントの判定+${it.explore.petEvent}%`);
+  if (it.explore?.reveal === 'rest') out.push('ダンジョンの地図に、休憩部屋が最初から出る');
+  if (it.explore?.reveal === 'layout') out.push('ダンジョンの地図に、通路と扉の場所が最初から出る');
   return out;
 }
 
