@@ -40,6 +40,10 @@ export interface EffectCtx {
   hitIds: string[];
   /** 「×N回」の攻撃の数え（total = 当てた回数 / landed = HPに当たった回数。二の矢） */
   multi?: { total: number; landed: number };
+  /** 区切りD: このカードで連携が起きた・挟撃の陣のブロックをもらった・カードの成功の数 */
+  comboLanded?: boolean;
+  pincerPaid?: boolean;
+  successes?: number;
   /** 働いた常時型の能力の名前（重複なし。演出用） */
   fired: AbilityNotice[];
   /** 能力の連鎖の深さ（無限に続かないように） */

@@ -84,10 +84,11 @@ export function damageModifiers(state: BattleState | undefined, source: Unit, ca
     if (!testConditions(e.if, c)) continue;
     if (e.modifier === 'damageDealt') {
       const m = e.multiplier * scaleOf(e.scale, source, victim);
-      if (m === 1 && !e.add) continue;
+      const add = (e.add ?? 0) + (e.addFromCounter ? ((source as { counters?: Record<string, number> }).counters?.[e.addFromCounter] ?? 0) : 0);
+      if (m === 1 && !add) continue;
       out.multiplier *= m;
-      if (e.once) out.addOnce += e.add ?? 0;
-      else out.add += e.add ?? 0;
+      if (e.once) out.addOnce += add;
+      else out.add += add;
       out.active.push({ name: ab.name, source: ab.source ?? { kind: 'card', id: card?.id, label: card?.name } });
     } else if (e.modifier === 'ignoreBlock') {
       out.ignoreBlock = true;
@@ -208,8 +209,22 @@ export function statusBonusOf(u: Unit, status: string, card?: CardDef, target?: 
 /** ターンの始めに残るブロックの上限（不動の錨。持っていなければ0。複数あれば一番大きい物） */
 export function keepBlockOf(u: Unit): number {
   let n = 0;
-  for (const ab of abilitiesOf(u)) if ('modifier' in ab.effect && ab.effect.modifier === 'keepBlock') n = Math.max(n, ab.effect.max);
-  return n;
+  let fortify = false;
+  for (const ab of abilitiesOf(u)) if ('modifier' in ab.effect && ab.effect.modifier === 'keepBlock') { n = Math.max(n, ab.effect.max); if (ab.effect.fortify) fortify = true; }
+  // 何を重ねても、残せるのは25まで（不落の城塞を使ったターンだけ50。区切りD）
+  return Math.min(n, fortify ? BALANCE.keepBlockFortify : BALANCE.keepBlockCap);
+}
+
+/** カードの特殊能力を、also まで広げた一覧（区切りD: 1枚のカードに2つの力を持たせる） */
+export function cardTraitAbilities(card: CardDef | undefined): AbilityDef[] | undefined {
+  if (!card?.trait) return undefined;
+  const t = card.trait;
+  return [t, ...(t.also ?? []).map((effect) => ({ name: t.name, effect }))];
+}
+
+/** 使っているカードの、ある種類の常時型の能力（区切りD: 連携の倍率・BREAK の数え） */
+export function cardModifier<K extends string>(abilities: AbilityDef[] | undefined, kind: K): Extract<AbilityEffect, { modifier: K }>[] {
+  return (abilities ?? []).map((a) => a.effect).filter((e): e is Extract<AbilityEffect, { modifier: K }> => 'modifier' in e && e.modifier === kind);
 }
 
 /** 砲台・罠・召喚が2回ずつ発動する能力（永久機関）。持っていればその能力 */
@@ -297,7 +312,7 @@ export function fireAbilities(
     // お供の行動は、全部合わせて1ターンに4回まで
     if (ab.pet && petCapped(owner)) continue;
     if (!testConditions(e.if, { state, rng, self: owner, card: opts.card ?? opts.condCard, multi: opts.multi, target: opts.target, dealt: opts.dealt, focusUsed: opts.focusUsed, perfect: opts.perfect, successes: opts.successes, supportedOthers: opts.supportedOthers, supportedSelf: opts.supportedSelf, weakHit: !!opts.weakTarget, wasFull: opts.wasFull, statusId: opts.statusId })) continue;
-    const ctx = makeCtx(state, rng, events, owner, { target: opts.target, allyTarget: opts.allyTarget, attacker: opts.attacker, card: opts.card, dealt: opts.dealt, depth: opts.depth, tierEffects: opts.tierEffects, perfect: opts.perfect, cardAbilities: opts.card?.trait ? [opts.card.trait] : undefined, via: ab.pet ? 'pet' : undefined, weakTarget: opts.weakTarget, helped: opts.helped });
+    const ctx = makeCtx(state, rng, events, owner, { target: opts.target, allyTarget: opts.allyTarget, attacker: opts.attacker, card: opts.card, dealt: opts.dealt, depth: opts.depth, tierEffects: opts.tierEffects, perfect: opts.perfect, cardAbilities: cardTraitAbilities(opts.card), via: ab.pet ? 'pet' : undefined, weakTarget: opts.weakTarget, helped: opts.helped });
     let any = false;
     for (const eff of e.do) any = applyEffect(ctx, eff) || any;
     if (!any) continue;
@@ -365,6 +380,7 @@ const TRIGGER_TEXT: Record<AbilityTrigger, string> = {
   overheal: '回復がHPからあふれた時',
   cheerPerfect: '自分が応援を付けた味方のカードが完全成功した時',
   detonate: '状態異常を起爆して消した時',
+  combo: 'このカードで連携が起きた時',
 };
 
 const condText = (conds?: AbilityCondition[]) => (conds ?? []).map((c) => conditionHandler(c.kind).describe(c as never));
@@ -385,8 +401,12 @@ export function describeAbility(ab: AbilityDef, side: 'ally' | 'enemy' = 'ally')
       if (e.perBattle !== undefined) return `1回の戦闘で${e.perBattle}回、${e.allies ? '味方全員が、それぞれ' : ''}敵から受ける${what}を防ぐ${tail}`;
       return `${e.allies ? '味方全員が、' : ''}敵から${what}を受けない${tail}`;
     }
+    if (e.modifier === 'comboScale') return `このカードの連携の上乗せ×${e.multiplier}（連携は合わせて+${Math.round(BALANCE.comboBonusMax * 100)}%まで）`;
+    if (e.modifier === 'weaknessElement') return '属性は、狙った敵の弱点の属性に変わる（弱点が無い敵には無属性）';
+    if (e.modifier === 'breakOnSuccess') return `大技を予告している敵は、成功${e.min}以上でも BREAK できる`;
     const cs = condText(e.if);
     const head = cs.length ? `${cs.join('・')}：` : '';
+    if (e.modifier === 'breakCount') return `${head}BREAK の数え（このターンの合計ダメージ）が${e.multiplier}倍`;
     if (e.modifier === 'cardChance') return `${head}成功率+${e.bonus}%`;
     if (e.modifier === 'completeSlots') return `${head}残りの枠も全て成功する`;
     if (e.modifier === 'exhaust') return '1戦闘1回。使ったカードは戦闘が終わるまで山札から除く';
@@ -397,6 +417,7 @@ export function describeAbility(ab: AbilityDef, side: 'ally' | 'enemy' = 'ally')
     if (e.modifier === 'convertElement') return `${head}属性の無い物理攻撃が${getElement(e.into).name}属性になる`;
     if (e.modifier === 'weaknessDamage') return `${head}弱点属性のダメージ×${Math.round(e.multiplier * 100) / 100}（弱点の倍率は合わせて×${BALANCE.elementWeakMax}まで）`;
     if (e.modifier === 'statusBonus') return `${head}自分が付ける${e.statuses.map((x) => `「${getStatus(x).name}」`).join('')}+${e.amount}`;
+    if (e.modifier === 'damageDealt' && e.addFromCounter) return `${head}最初の1回の攻撃のダメージ+（ためた量）`;
     if (e.modifier === 'damageDealt') return `${head}${e.add ? `${e.once ? '最初の1回の攻撃の' : '1回の攻撃ごとに'}ダメージ+${e.add}${e.multiplier !== 1 || e.scale ? '、' : ''}` : ''}${e.multiplier !== 1 ? `与えるダメージ×${e.multiplier}${e.scale ? '、さらに' : ''}` : ''}${e.scale ? scaleText(e.scale) : ''}`;
     return `${head}ダメージが敵のブロックを無視する`;
   }

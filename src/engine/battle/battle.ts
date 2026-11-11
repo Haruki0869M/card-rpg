@@ -23,7 +23,7 @@ import type {
   SlotResult,
   Statuses,
 } from '../../types';
-import { cardChanceBonus, cardCostOf, completeSlotsOf, damageModifiers, fireAbilities, keepBlockOf, markCostUsed, summonTwiceOf } from '../abilities';
+import { cardChanceBonus, cardCostOf, cardTraitAbilities, completeSlotsOf, damageModifiers, fireAbilities, keepBlockOf, markCostUsed, summonTwiceOf } from '../abilities';
 import { createRng, type Rng, shuffle } from '../rng';
 import { affinityOf } from '../stats';
 import { calcDamage } from './damage';
@@ -228,7 +228,7 @@ export function tierDamageAgainst(ally: AllyState, card: CardDef, target: EnemyS
     return t.effects.reduce((sum, e) => {
       if (e.kind !== 'damage' || (targetOf(e) !== 'target' && targetOf(e) !== 'foes')) return sum;
       const element = attackElement(source, card, e.element);
-      const { multiplier, add, addOnce } = damageModifiers(undefined, source, card, target, card.trait ? [card.trait] : undefined, t.minSuccesses === card.slots, element);
+      const { multiplier, add, addOnce } = damageModifiers(undefined, source, card, target, cardTraitAbilities(card), t.minSuccesses === card.slots, element);
       // 「最初の1回の攻撃にだけ足すダメージ」（弾込め）は、その段の最初の1回分だけ足す
       const first = addOnce && !onceUsed ? calcDamage(e.amount + add + addOnce, source.statuses, target.statuses, chargedMultiplier(source, card) * multiplier * elementMultiplier(target, element) * comboMultiplier(source, target)) - calcDamage(e.amount + add, source.statuses, target.statuses, chargedMultiplier(source, card) * multiplier * elementMultiplier(target, element) * comboMultiplier(source, target)) : 0;
       if (addOnce) onceUsed = true;
@@ -251,6 +251,10 @@ function startAllyPhase(state: BattleState, rng: Rng, events: BattleEvent[]) {
     // BREAK の数えも、ターンごとに消す（予告は敵フェーズの終わりに決め直している）
     delete e.turnDamage;
     delete e.broken;
+    // 区切りD: このターンの印（弱点看破・挟撃の陣）
+    delete e.exposed;
+    delete e.pincer;
+    delete e.pincerFocus;
   }
   for (const a of state.allies) {
     a.played = 0;
@@ -262,6 +266,13 @@ function startAllyPhase(state: BattleState, rng: Rng, events: BattleEvent[]) {
     // 装備の能力の数え: 前のターンから残ったブロック（守りの祈り）・敵の番を無傷でしのいだか（返しの穂先・竜王の構え）
     const cs = (a.counters ??= {});
     cs.blockLeft = a.block;
+    // 区切りD: このターンだけの印・期間の過ぎたカードの能力を消す（ブロックの持ち越しを決める前。不落の城塞は1ターン残る）
+    delete a.guided;
+    delete a.comboBoost;
+    if (a.abilities?.some((ab) => ab.untilTurn !== undefined && ab.untilTurn < state.turn)) a.abilities = a.abilities.filter((ab) => ab.untilTurn === undefined || ab.untilTurn >= state.turn);
+    // 区切りD: 不動の拳 — 前の敵の番に受けた攻撃の量を、このターンの最初の物理カードに足す数にする
+    if (cs.fudoOn) { cs.fudo = Math.min(cs.fudoMax ?? 12, Math.floor(((cs.fudoStore ?? 0) * (cs.fudoPct ?? 50)) / 100)); delete cs.fudoOn; delete cs.fudoStore; }
+    else cs.fudo = 0;
     // お供の行動の数え（1ターンに4回まで）
     cs.petActsTurn = 0;
     cs.unhurtTurn = state.turn > 1 && cs.unhurt === 1 ? 1 : 0;
@@ -486,8 +497,9 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   const selfBefore = selfSnapshot(ally);
 
   // 効果（効果の部品を順に使う）
-  const cardAbilities = card.trait ? [card.trait] : undefined;
+  const cardAbilities = cardTraitAbilities(card);
   const ctx = makeCtx(state, rng, events, ally, { target, allyTarget, card, cardAbilities, perfect, tierEffects: tier.effects });
+  ctx.successes = successes;
   if (target && tier.effects.some(e => e.kind === 'damage')) ally.lastTargetId = unitIdOf(target);
   for (const eff of tier.effects) applyEffect(ctx, eff);
   const supportedOthers = recordSupport(ally, state.allies, supportBefore);
@@ -524,6 +536,13 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   }
   abilityParts.push(...fireAbilities(state, rng, events, ally, 'afterCard', fireOpts));
   if (perfect) abilityParts.push(...fireAbilities(state, rng, events, ally, 'perfect', fireOpts));
+  // 区切りD: このカードで連携が起きた（コンビネーション・輪唱）
+  if (ctx.comboLanded) {
+    if (cardAbilities) abilityParts.push(...fireAbilities(state, rng, events, ally, 'combo', { ...fireOpts, list: cardAbilities }));
+    abilityParts.push(...fireAbilities(state, rng, events, ally, 'combo', fireOpts));
+  }
+  // 区切りD: 導きの光・アシスト・パスの印は、攻撃カードを1枚使ったら消える
+  if (hasDamage) { delete ally.guided; delete ally.comboBoost; }
   // きっかけ: 自分が応援を付けた味方のカードが完全成功した（自分の応援は、1人パーティの時だけ数える）
   if (perfect && cheerer && !cheerer.dead && (cheerer !== ally || state.allies.length === 1)) fireAbilities(state, rng, events, cheerer, 'cheerPerfect', { allyTarget: ally, depth: 1 });
   // 分身は攻撃効果を半分の威力で繰り返す。追撃から再帰しない。

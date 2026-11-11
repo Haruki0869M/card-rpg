@@ -9,6 +9,7 @@ import type { BattleState, Command, PlayerId } from '../../types';
 import { applyCommand, applyGameCommand, chanceFor, createBattle, createGame, createRng, describeEffect, effectShort, jobOptions, migrateGame, rollChanceFor, rollSlots, slotPreviewLimitOf } from '../index';
 import { applyEffect, dealDamage, makeCtx } from '../battle/effects';
 import { giveHand, nextTurn } from './helpers';
+const k1 = (id: string) => !id.startsWith('ax'); // 区切りD の軸のカード（ax…）は、K1・職の専用カードの数に入れない
 
 const jobs = ['shrineMaiden', 'astrologer', 'machinist', 'bard', 'gambler'];
 ENEMIES.register({ id: 'finalJobDummy', name: '確認用の敵', icon: 'T', maxHp: 100000, baseLevel: 1, exp: 1, gold: 1, pattern: 'sequence',
@@ -35,9 +36,9 @@ describe('後半5職のデータ・転職', () => {
   it('全44職・特殊10職、後半各6枚と代表3枚、エピック2枚以上を自動登録する', () => {
     expect(CLASSES.all).toHaveLength(44); expect(CLASSES.all.filter(j => j.tier === 'special')).toHaveLength(10);
     // 区切りD: 同じ中身のカードをまとめたので、職どうしで同じカードを使う所がある（30 → 24）
-    expect(new Set(jobs.flatMap(id => CLASSES.get(id).cardPool)).size).toBe(24);
+    expect(new Set(jobs.flatMap(id => CLASSES.get(id).cardPool.filter(k1))).size).toBe(24);
     for (const id of jobs) {
-      const j = CLASSES.get(id); expect(j.cardPool).toHaveLength(6); expect(j.signature).toEqual(j.cardPool.slice(0, 3));
+      const j = CLASSES.get(id); expect(j.cardPool.filter(k1)).toHaveLength(6); expect(j.signature).toEqual(j.cardPool.slice(0, 3));
       expect(j.cardPool.filter(c => getCard(c).rarity === 'epic').length).toBeGreaterThanOrEqual(2);
     }
   });

@@ -180,6 +180,12 @@ export const BALANCE = {
    * 添字 = 先に攻撃した別の味方の人数（0人=なし / 1人=連携 / 2人=大連携 / 3人以上=極連携）
    */
   comboBonus: [0, 0.2, 0.35, 0.5] as readonly number[],
+  /** 連携の上乗せの合計の上限（ファイナル・ユニゾンなどを重ねても +200% まで。区切りD・Gemini の判定） */
+  comboBonusMax: 2.0,
+  /** ブロックの上限・次のターンに残せるブロックの上限（不落の城塞を使ったターンだけ keepBlockFortify。区切りD） */
+  blockMax: 99,
+  keepBlockCap: 25,
+  keepBlockFortify: 50,
   /**
    * BREAK（体勢崩し。抜本的な見直し §3-2・オーナーの決定 3-A）: 敵が大技の予告を出しているターンに、
    * 弱点の属性で攻撃する／完全成功で攻撃を当てる／そのターンの合計ダメージが最大HPの breakDamagePct% 以上、のどれかで崩せる。

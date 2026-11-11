@@ -185,8 +185,8 @@ export function announceJobs(game: GameState, hero: Hero) {
  * ジョブ寄りの候補（報酬のカードの「必ず1枚」に使う。K7）: 今と前のジョブの専用カード・今のジョブの系統のカード・
  * 装備している武器の種類のカード（武器が無ければ、そのジョブの得意な武器）。共通カード・異端カードは入れない
  */
-export function heroJobCardPool(hero: Hero): string[] {
-  const pool = heroCardPool(hero);
+export function heroJobCardPool(hero: Hero, solo = false): string[] {
+  const pool = heroCardPool(hero, solo);
   const own = new Set<string>();
   for (const cls of [hero.classId, ...(hero.jobs ?? [])]) for (const id of getClass(cls).cardPool) own.add(id);
   const w = hero.equipment.weapon;
@@ -205,14 +205,15 @@ export function heroJobCardPool(hero: Hero): string[] {
   });
 }
 
-export function heroCardPool(hero: Hero): string[] {
+/** solo = 1人プレイ（キャラが1人）。連携のカード（teamOnly）は入れない */
+export function heroCardPool(hero: Hero, solo = false): string[] {
   const ids = new Set<string>();
   for (const cls of [hero.classId, ...(hero.jobs ?? [])]) for (const id of getClass(cls).cardPool) if (CARDS.has(id)) ids.add(id);
   const weapons = new Set(jobWeapons(hero.classId));
   const lineage = getClass(hero.classId).lineage;
   for (const c of CARDS.all) {
-    if (c.heresy) continue;
+    if (c.heresy || (solo && c.teamOnly)) continue;
     if (c.common || cardWeaponTypes(c).some((w) => weapons.has(w)) || (!!lineage && cardLineages(c).includes(lineage))) ids.add(c.id);
   }
-  return [...ids];
+  return solo ? [...ids].filter((id) => !CARDS.get(id).teamOnly) : [...ids];
 }

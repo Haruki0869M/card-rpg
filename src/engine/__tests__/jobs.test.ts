@@ -16,6 +16,7 @@ import { visionOf } from '../game/world/fog';
 import { BALANCE } from '../../data/balance';
 import type { BattleState } from '../../types';
 import { rollChanceFor, tierDamageAgainst } from '../battle/battle';
+const k1 = (id: string) => !id.startsWith('ax'); // 区切りD の軸のカード（ax…）は、K1・職の専用カードの数に入れない
 
 const P: PlayerId = 'P1';
 ENEMIES.register({ id: 'topJobDummy', name: '検証用の敵', icon: 'T', maxHp: 10000, baseLevel: 1, exp: 1, gold: 1, size: 1.5,
@@ -246,8 +247,8 @@ describe('最上位13職の転職とカード', () => {
   it('13職それぞれが専用5枚・代表3枚を持つ', () => {
     expect(topJobs).toHaveLength(13);
     // 区切りD: 同じ中身のカードをまとめた（65 → 62）
-    expect(new Set(topJobs.flatMap(j => j.cardPool)).size).toBe(62);
-    for (const j of topJobs) { expect(j.cardPool).toHaveLength(5); expect(j.signature).toEqual(j.cardPool.slice(0, 3)); }
+    expect(new Set(topJobs.flatMap(j => j.cardPool.filter(k1))).size).toBe(62);
+    for (const j of topJobs) { expect(j.cardPool.filter(k1)).toHaveLength(5); expect(j.signature).toEqual(j.cardPool.slice(0, 3)); }
   });
   it.each(topJobs.map(j => [j.id, j] as const))('%s: レベル・実績・場所を満たした時だけ転職できる', (_, j) => {
     let g = newGame(['warrior']);

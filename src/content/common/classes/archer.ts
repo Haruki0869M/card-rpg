@@ -28,6 +28,6 @@ export const archer: ClassDef = {
   from: ['hunter'],
   signature: ['aimedShot', 'arrowRain', 'piercingArrow'],
   startingEquipment: { weapon: 'hunterBow', armor: 'travelerClothes' },
-  cardPool: ['aimedShot', 'arrowRain', 'piercingArrow', 'quickShot', 'focusAim', 'stormOfArrows'],
+  cardPool: ['aimedShot', 'arrowRain', 'piercingArrow', 'quickShot', 'focusAim', 'stormOfArrows', 'axWeakSight', 'axVitalShot'],
   growthWeights: { per: 3, dex: 3, agi: 1 },
 };

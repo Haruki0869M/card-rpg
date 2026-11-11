@@ -16,7 +16,7 @@ export const outcome: OutcomeHandler<'card'> = {
   apply(ctx) {
     const h = ctx.actor ?? livingHeroes(ctx.game)[0];
     if (!h) return;
-    const pool = heroCardPool(h);
+    const pool = heroCardPool(h, ctx.game.heroes.length === 1);
     ctx.loot.push({ kind: 'card', cardId: pickCard(pool, h, ctx.rng, false), heroId: h.id });
   },
   describe: () => 'カード1枚',

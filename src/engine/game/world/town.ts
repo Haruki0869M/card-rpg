@@ -64,7 +64,7 @@ export function ensureShop(game: GameState, rng: Rng): ShopStock {
   for (let k = 0; k < town.shop.cards && heroes.length; k++) {
     const h = heroes[k % heroes.length];
     // 基本のカード（最初の山札の21種）は並べない（フェーズ3）
-    const pool = withoutStarterCards(heroCardPool(h));
+    const pool = withoutStarterCards(heroCardPool(h, game.heroes.length === 1));
     let g = pickWeighted(odds, rng);
     let cand: string[] = [];
     for (; g >= 0 && !cand.length; g--) cand = pool.filter((id) => rarityIndex(CARDS.get(id).rarity ?? 'common') === g);

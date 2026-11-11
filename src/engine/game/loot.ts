@@ -107,8 +107,8 @@ export function rollCardOffers(game: GameState, heroIds: string[], rng: Rng, odd
     // そのキャラの候補の先頭 cardRewardJobSlots 枚は、ジョブ専用・系統・装備している武器種のカードから（無ければ今までどおり。K7）
     const jobSlot = offers.filter((o) => o.heroId === h.id).length < BALANCE.cardRewardJobSlots;
     // 基本のカード（最初の山札の21種）は出さない（フェーズ3）
-    const jobPool = jobSlot ? withoutStarterCards(heroJobCardPool(h)) : [];
-    const pool = jobPool.length ? jobPool : withoutStarterCards(heroCardPool(h));
+    const jobPool = jobSlot ? withoutStarterCards(heroJobCardPool(h, game.heroes.length === 1)) : [];
+    const pool = jobPool.length ? jobPool : withoutStarterCards(heroCardPool(h, game.heroes.length === 1));
     if (!pool.length) continue;
     // 抽選した格のカード。その格が無ければ1つ下の格へ
     let grade = pickWeighted(odds, rng);

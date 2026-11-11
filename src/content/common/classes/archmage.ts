@@ -28,6 +28,6 @@ export const archmage: ClassDef = {
   from: ['mage'],
   signature: ['flameStorm', 'frostNova', 'arcaneSurge'],
   startingEquipment: { weapon: 'oakStaff', armor: 'travelerClothes' },
-  cardPool: ['flameStorm', 'frostNova', 'arcaneSurge', 'chainLightning', 'manaBarrier', 'starfall'],
+  cardPool: ['flameStorm', 'frostNova', 'arcaneSurge', 'chainLightning', 'manaBarrier', 'starfall', 'axElementChain'],
   growthWeights: { int: 4, per: 2 },
 };
