@@ -4,7 +4,7 @@ import { detachFollower } from './world/group';
 // 戦闘中の操作は BATTLE コマンドで戦闘エンジン（applyCommand）に渡す。
 
 import { BALANCE } from '../../data/balance';
-import { CARDS } from '../../data/cards';
+import { CARDS, getCard } from '../../data/cards';
 import { getClass } from '../../data/classes';
 import { DUNGEONS } from '../../data/dungeons';
 import { corruptionName, getScenario } from '../../data/scenarios';
@@ -373,7 +373,7 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
         break;
       }
       case 'USE_POUCH_ITEM': {
-        const r = usePouchItem(game, cmd);
+        const r = usePouchItem(game, cmd, rng);
         error = r.error;
         battleEvents = r.events;
         break;
@@ -623,7 +623,7 @@ export function startBattleWith(game: GameState, enemies: EncounterSpec['enemies
     readyCheck: game.online,
   });
   game.battleBackground = opts.background ?? worldBackground(game);
-  for (const h of sceneHeroes(game)) h.nextBattleStatuses = {};
+  for (const h of sceneHeroes(game)) { h.nextBattleStatuses = {}; delete h.petFeast; }
   game.mode = 'battle';
 }
 
@@ -731,7 +731,7 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
     gold += Math.max(0, Math.round(def.gold * k * (0.85 + rng.next() * 0.3)));
   }
   // 待ち伏せを迎え撃った時などのお金の倍率・戦闘中に手に入れたお金
-  gold = Math.round(gold * (game.battleInfo?.goldMul ?? 1)) + (b.bonusGold ?? 0);
+  gold = Math.round(gold * (game.battleInfo?.goldMul ?? 1) * (b.goldMul ?? 1)) + (b.bonusGold ?? 0);
   // お金は生き残った参加者で山分け
   const survivorHeroes = survivors.map((id) => findHero(game, id)!).filter(Boolean);
   // 装備の「勝った時のゴールド+○%」（王の印章指輪など）。生き残った仲間の中で一番大きい物だけ効く（重ならない）
@@ -1338,6 +1338,7 @@ function unequip(game: GameState, playerId: string, heroId: string, slot: keyof 
 function usePouchItem(
   game: GameState,
   cmd: Extract<GameCommand, { type: 'USE_POUCH_ITEM' }>,
+  rng: Rng,
 ): { error?: string; events: BattleEvent[] } {
   // 使うキャラ自身の袋から
   const owner = findHero(game, cmd.userId);
@@ -1369,6 +1370,25 @@ function usePouchItem(
   const other = otherSceneError(game, user.id) ?? otherSceneError(game, cmd.targetId);
   if (other) return { error: other, events: [] };
   if (!target || target.hp <= 0) return { error: '対象が戦闘不能です', events: [] };
+  // 区切りE: テントの設営具（その場で野営して手番を終える）・カード鍛錬の砥石（選んだカードを強化）
+  const field = def.use.find((e) => e.kind === 'fieldOnly');
+  if (field && field.kind === 'fieldOnly' && field.what === 'tent') {
+    if (game.mode !== 'world') return { error: '世界マップで使います', events: [] };
+    const err = camp(game, { type: 'WORLD_CAMP', playerId: cmd.playerId, heroId: user.id }, rng, { tent: true });
+    if (err) return { error: err, events: [] };
+    const at = owner.pouch.findIndex((p) => p.uid === cmd.itemUid);
+    if (at >= 0) owner.pouch.splice(at, 1);
+    return { events: [] };
+  }
+  if (field && field.kind === 'fieldOnly' && field.what === 'whetstone') {
+    const card = target.deck.find((c) => c.uid === cmd.cardUid);
+    if (!card) return { error: '強化するカードを選んでください', events: [] };
+    if (card.upgraded) return { error: 'そのカードは、もう強化されています', events: [] };
+    card.upgraded = true;
+    owner.pouch.splice(idx, 1);
+    addLog(game, `${user.name}が${def.name}で${target.name}の「${getCard(card.cardId).name}」を強化した`);
+    return { events: [] };
+  }
   // 戦闘の効果と同じ名前の冒険の効果を使う（無ければ戦闘中にしか使えない）
   if (!def.use.every((e) => hasOutcomeKind(e.kind))) return { error: '戦闘中にしか使えません', events: [] };
   const octx = makeOutcomeCtx(game, createRng(game.rngState), target);

@@ -23,7 +23,7 @@ import type {
   SlotResult,
   Statuses,
 } from '../../types';
-import { cardChanceBonus, cardCostOf, cardTraitAbilities, completeSlotsOf, damageModifiers, fireAbilities, keepBlockOf, markCostUsed, summonTwiceOf } from '../abilities';
+import { cardChanceBonus, cardCostOf, cardTraitAbilities, petActOnce, completeSlotsOf, damageModifiers, fireAbilities, keepBlockOf, markCostUsed, summonTwiceOf } from '../abilities';
 import { createRng, type Rng, shuffle } from '../rng';
 import { affinityOf } from '../stats';
 import { calcDamage } from './damage';
@@ -43,7 +43,8 @@ export { enemyName, findAlly, findEnemy, unitName } from './units';
 // v18（2026-11-11）: 鎧・装飾品の作り直し。古い保存データは読まない（オーナーの決定。v17 からの移行は作らない）
 // v21（2026-11-12）: 区切りD-1 同じ中身のカードをまとめた。古い保存は読まない
 // v22（2026-11-12）: 区切りD-2〜D-4 軸のカード・決め技・武器のカードの付け替え。古い保存は読まない
-export const STATE_VERSION = 22;
+// v23（2026-11-12）: 区切りE 消耗品 50→24。古い保存は読まない
+export const STATE_VERSION = 23;
 export { slotPreviewLimitOf } from './preview';
 
 // ---------- 生成 ----------
@@ -157,6 +158,10 @@ export function createBattle(setup: BattleSetup): BattleState {
   });
   // きっかけ: 戦闘開始時
   for (const u of [...state.allies, ...state.enemies]) if (!u.dead) fireAbilities(state, rng, openingEvents, u, 'battleStart');
+  // 区切りE: お供の特上ごちそう — 1ターン目にお供が何回も行動する（お供の行動の上限の中で）
+  party.forEach((m, i) => {
+    for (let k = 0; k < (m.petFeast ?? 0); k++) if (!allies[i].dead && allies[i].pet) petActOnce(state, rng, openingEvents, allies[i]);
+  });
   state.openingEvents = openingEvents;
   checkEnd(state, []);
   state.rngState = rng.state;
@@ -254,6 +259,7 @@ function startAllyPhase(state: BattleState, rng: Rng, events: BattleEvent[]) {
     delete e.broken;
     // 区切りD: このターンの印（弱点看破・挟撃の陣）
     delete e.exposed;
+    delete e.tempWeak;
     delete e.pincer;
     delete e.pincerFocus;
   }
@@ -693,7 +699,9 @@ function useItem(state: BattleState, cmd: Extract<Command, { type: 'USE_ITEM' }>
   if (!user || user.dead) return '使うキャラが戦闘不能です';
   if (user.playerId !== cmd.playerId) return '担当していないキャラです';
   const target = findAlly(state, cmd.targetId);
-  if (!target || (cmd.effects.some(e => e.kind === 'revive') ? !target.dead : target.dead)) return '道具の対象を選び直してください';
+  // 不死鳥の羽根は、倒れた味方にも生きている味方にも使える（区切りE）
+  const anyState = cmd.effects.some(e => e.kind === 'phoenix');
+  if (!target || (!anyState && (cmd.effects.some(e => e.kind === 'revive') ? !target.dead : target.dead))) return '道具の対象を選び直してください';
   const ctx = makeCtx(state, rng, events, user, { target });
   for (const e of cmd.effects) {
     const why = checkEffect(ctx, e);

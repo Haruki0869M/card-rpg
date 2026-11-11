@@ -160,7 +160,7 @@ export function elementMultiplier(victim: Unit | undefined, element: string | un
   if (!element || !victim || !isEnemy(victim)) return 1;
   const def = getEnemy(victim.defId);
   if (def.resist?.includes(element)) return BALANCE.elementResistMul;
-  if (def.weak?.includes(element)) return BALANCE.elementWeakMul;
+  if (def.weak?.includes(element) || victim.tempWeak === element) return BALANCE.elementWeakMul;
   return 1;
 }
 
@@ -276,7 +276,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   const exposed = isEnemy(v) && !isEnemy(source) && (!!v.exposed || alwaysWeak) && dmg > 0;
   const guided = !isEnemy(source) && !!source.guided && isEnemy(v) && dmg > 0;
   if (exposed && isEnemy(v)) delete v.exposed;
-  const weakHit = (!!element && isEnemy(v) && !!getEnemy(v.defId).weak?.includes(element)) || exposed || guided;
+  const weakHit = (!!element && isEnemy(v) && (!!getEnemy(v.defId).weak?.includes(element) || v.tempWeak === element)) || exposed || guided;
   if (weakHit && dmg > 0 && !isEnemy(source) && !(ctx.weakHitIds ??= []).includes(unitIdOf(v))) ctx.weakHitIds.push(unitIdOf(v));
   // 連携攻撃の記録（このターンにこの敵を攻撃した味方）
   if (isEnemy(v) && !isEnemy(source)) {

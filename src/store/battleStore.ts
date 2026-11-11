@@ -184,7 +184,8 @@ interface StoreState {
   /** force = 確認なしで終える（確認の窓の「ターンを終了する」） */
   endTurn: (force?: boolean) => void;
   /** 道具を使う（userId = 袋の持ち主。戦闘中は操作中のキャラ） */
-  usePouch: (itemUid: string, targetHeroId: string, userId?: string) => string | undefined;
+  /** cardUid = カード鍛錬の砥石で強化するカード（区切りE） */
+  usePouch: (itemUid: string, targetHeroId: string, userId?: string, cardUid?: string) => string | undefined;
   setSettings: (s: Partial<Settings>) => void;
   /** heroId: パーティの窓で最初に見せるキャラ（世界マップの顔を押した時など） */
   openSheet: (s: Sheet, heroId?: string) => void;
@@ -954,11 +955,11 @@ export const useBattle = create<StoreState>((set, get) => {
       get().dispatch({ type: 'END_TURN', playerId: LOCAL_PLAYER });
     },
 
-    usePouch: (itemUid, targetHeroId, userId) => {
+    usePouch: (itemUid, targetHeroId, userId, cardUid) => {
       const { game, activeId } = get();
       if (!game) return;
       const user = game.mode === 'battle' ? activeId : (userId ?? game.heroes.find((h) => h.pouch.some((p) => p.uid === itemUid))?.id ?? targetHeroId);
-      const err = get().dispatchGame({ type: 'USE_POUCH_ITEM', playerId: LOCAL_PLAYER, itemUid, userId: user, targetId: targetHeroId });
+      const err = get().dispatchGame({ type: 'USE_POUCH_ITEM', playerId: LOCAL_PLAYER, itemUid, userId: user, targetId: targetHeroId, ...(cardUid ? { cardUid } : {}) });
       if (!err) { set({ sheet: null }); get().showToast('道具を使いました'); }
       return err;
     },
