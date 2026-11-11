@@ -13,5 +13,5 @@ export const darkKnight: ClassDef = {
   battleAbility: { name: '暗黒の誓い', effect: { modifier: 'damageDealt', multiplier: 1, scale: { by: 'missingHp', per: BALANCE.specialJobs.missingHpPer, max: BALANCE.specialJobs.missingHpMax } } },
   exploreAbility: { id: 'darkKnightExplore', name: '闇への耐性', description: '瘴気の判定+20%', effect: { kind: 'checkBonus', check: 'miasma', bonus: 20 } },
   requires: { feat: 'kills:lowHp', count: 3, text: '自分のHPが30%以下の時に敵を3体倒す' },
-  cardPool: ['bloodBlade', 'bloodShield', 'bloodDrain', 'bloodOffering', 'bloodSweep', 'bloodAbyss'], signature: ['bloodBlade', 'bloodShield', 'bloodDrain'],
+  cardPool: ['bloodBlade', 'bloodShield', 'bloodDrain', 'bloodOffering', 'bloodSweep', 'bloodAbyss', 'axCurseReturn', 'axAdversity', 'axBloodPrice', 'axLifeline'], signature: ['bloodBlade', 'bloodShield', 'bloodDrain'],
 };

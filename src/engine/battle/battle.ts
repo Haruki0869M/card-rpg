@@ -258,6 +258,7 @@ function startAllyPhase(state: BattleState, rng: Rng, events: BattleEvent[]) {
   }
   for (const a of state.allies) {
     a.played = 0;
+    a.playedZero = 0;
     a.playedBy = {};
   }
   for (const a of state.allies) {
@@ -269,6 +270,9 @@ function startAllyPhase(state: BattleState, rng: Rng, events: BattleEvent[]) {
     // 区切りD: このターンだけの印・期間の過ぎたカードの能力を消す（ブロックの持ち越しを決める前。不落の城塞は1ターン残る）
     delete a.guided;
     delete a.comboBoost;
+    delete a.reversal;
+    delete a.extraHits;
+    if (cs.bloodAdd) cs.bloodAdd = 0;
     if (a.abilities?.some((ab) => ab.untilTurn !== undefined && ab.untilTurn < state.turn)) a.abilities = a.abilities.filter((ab) => ab.untilTurn === undefined || ab.untilTurn >= state.turn);
     // 区切りD: 不動の拳 — 前の敵の番に受けた攻撃の量を、このターンの最初の物理カードに足す数にする
     if (cs.fudoOn) { cs.fudo = Math.min(cs.fudoMax ?? 12, Math.floor(((cs.fudoStore ?? 0) * (cs.fudoPct ?? 50)) / 100)); delete cs.fudoOn; delete cs.fudoStore; }
@@ -541,8 +545,8 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
     if (cardAbilities) abilityParts.push(...fireAbilities(state, rng, events, ally, 'combo', { ...fireOpts, list: cardAbilities }));
     abilityParts.push(...fireAbilities(state, rng, events, ally, 'combo', fireOpts));
   }
-  // 区切りD: 導きの光・アシスト・パスの印は、攻撃カードを1枚使ったら消える
-  if (hasDamage) { delete ally.guided; delete ally.comboBoost; }
+  // 区切りD: 導きの光・アシスト・パスの印・血の代価は、攻撃カードを1枚使ったら消える
+  if (hasDamage) { delete ally.guided; delete ally.comboBoost; if (ally.counters?.bloodAdd) ally.counters.bloodAdd = 0; }
   // きっかけ: 自分が応援を付けた味方のカードが完全成功した（自分の応援は、1人パーティの時だけ数える）
   if (perfect && cheerer && !cheerer.dead && (cheerer !== ally || state.allies.length === 1)) fireAbilities(state, rng, events, cheerer, 'cheerPerfect', { allyTarget: ally, depth: 1 });
   // 分身は攻撃効果を半分の威力で繰り返す。追撃から再帰しない。
@@ -562,6 +566,8 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   } else ally.discard.push(inst);
   // このターンに使った枚数（連撃などの条件。カードの効果の後に数える）
   ally.played = (ally.played ?? 0) + 1;
+  // 区切りD: コスト0のカードの枚数（流れる連撃）
+  if (card.cost === 0) ally.playedZero = (ally.playedZero ?? 0) + 1;
   afterAttackCard(ally, card, tier);
   (ally.playedBy ??= {})[card.category] = (ally.playedBy[card.category] ?? 0) + 1;
 
@@ -718,6 +724,8 @@ function endTurn(state: BattleState, playerId: string, rng: Rng, events: BattleE
   if (checkEnd(state, events)) return undefined;
   // 敵のブロックは敵フェーズ開始時に0へ
   for (const e of state.enemies) e.block = 0;
+  // 区切りD: 血の代価の数え（失ったHP）は、敵の番の始めから数え直す
+  for (const a of state.allies) if (a.counters?.hpLostTurn) a.counters.hpLostTurn = 0;
   state.phase = 'enemy';
   state.enemyCursor = 0;
   addLog(state, `--- 敵フェーズ ---`);

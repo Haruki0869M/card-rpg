@@ -334,3 +334,192 @@ describe('区切りD-2: 軸③ 連携', () => {
     expect(r2.state.allies[1].hp).toBe(404);
   });
 });
+
+// ===================== 区切りD-3: 軸④〜⑥・背水 =====================
+describe('区切りD-3: 軸④ 状態異常の起爆', () => {
+  it('猛毒爆破: 毒×3のダメージ（最大75）。毒は半分になり、半分をほかの敵にうつす', () => {
+    const s = battle(['thief'], ['stageDIdler', 'stageDIdler']);
+    s.enemies[0].statuses.poison = 10;
+    const r = use(s, 'axVenomBurst', { focus: 'max' });
+    expect(lostHp(s, r.state, 0)).toBeGreaterThanOrEqual(30);
+    expect(r.state.enemies[0].statuses.poison).toBe(5);
+    expect(r.state.enemies[1].statuses.poison).toBe(5);
+  });
+  it('爆炎触媒（完全成功）: 火傷を2倍（1体+10まで）にして、すぐに1回燃やす', () => {
+    const s = battle(['mage'], ['stageDIdler', 'stageDIdler']);
+    s.enemies[0].statuses.burn = 4;
+    const r = use(s, 'axBlazeCatalyst', { focus: 'max' });
+    expect(r.state.enemies[0].statuses.burn).toBe(8);
+    expect(r.state.enemies[1].statuses.burn ?? 0).toBe(0);
+    expect(lostHp(s, r.state, 0)).toBeGreaterThan(0);
+  });
+  it('氷砕き: 凍結の敵に×2.5。凍結を消して、敵全員に氷片', () => {
+    const s = battle(['warrior'], ['stageDIdler', 'stageDIdler']);
+    s.enemies[0].statuses.freeze = 1;
+    const r = use(s, 'axIceShatter', { focus: 'max' });
+    expect(r.state.enemies[0].statuses.freeze).toBe(0);
+    expect(lostHp(s, r.state, 1)).toBeGreaterThan(0);
+  });
+  it('呪詛返しの契り: 自分の悪い状態異常を消し、種類の数×12の闇ダメージと呪い3を敵全員に', () => {
+    const s = battle(['hexer']);
+    s.allies[0].statuses.poison = 3;
+    s.allies[0].statuses.weak = 2;
+    const r = use(s, 'axCurseReturn', { focus: 'max' });
+    expect(r.state.allies[0].statuses.poison).toBe(0);
+    expect(r.state.allies[0].statuses.weak).toBe(0);
+    expect(r.state.enemies[0].statuses.curse).toBeGreaterThanOrEqual(3);
+    expect(lostHp(s, r.state)).toBeGreaterThan(0);
+  });
+  it('呪いの刈り入れ: 呪いを起爆して消す。鍛鋼の大鎌《呪い刈り》が働く', () => {
+    const g = game(['necromancer']);
+    g.heroes[0].equipment.weapon = { uid: 'w', itemId: 'temperedScythe' };
+    const s = createBattle({ seed: 11, party: g.heroes.map(toPartyMember), encounter: { id: 'stageD', name: '確認', enemies: [{ defId: 'stageDIdler' }] } });
+    for (const a of s.allies) { a.mana = 30; a.focus = 9; a.maxHp = 500; a.hp = 400; a.block = 0; a.hand = []; }
+    s.enemies[0].statuses.curse = 3;
+    const r = use(s, 'axCurseHarvest', { focus: 'max' });
+    expect(r.state.enemies[0].statuses.curse).toBe(0);
+    const g2 = game(['necromancer']);
+    const s2 = createBattle({ seed: 11, party: g2.heroes.map(toPartyMember), encounter: { id: 'stageD', name: '確認', enemies: [{ defId: 'stageDIdler' }] } });
+    for (const a of s2.allies) { a.mana = 30; a.focus = 9; a.maxHp = 500; a.hp = 400; a.block = 0; a.hand = []; }
+    s2.enemies[0].statuses.curse = 3;
+    // 闇属性の一撃で呪いが2増えてから起爆するので、消した呪いは5つ → HP+5
+    expect(r.state.allies[0].hp - use(s2, 'axCurseHarvest', { focus: 'max' }).state.allies[0].hp).toBe(5);
+  });
+  it('総崩れ: 悪い状態異常を消し、1種類につき×1.25（最大×2）', () => {
+    const plain = battle(['warrior']);
+    const a = lostHp(plain, use(plain, 'axCollapse', { focus: 'max' }).state);
+    const s = battle(['warrior']);
+    s.enemies[0].statuses.weak = 1;
+    s.enemies[0].statuses.poison = 1;
+    const r = use(s, 'axCollapse', { focus: 'max' });
+    expect(r.state.enemies[0].statuses.poison).toBe(0);
+    expect(lostHp(s, r.state)).toBeGreaterThan(a);
+  });
+});
+
+describe('区切りD-3: 軸⑤ オーバーヒール・聖光', () => {
+  it('溢れる祝福: あふれた分が、その味方のブロックと自分の聖光（5ごとに1）になる', () => {
+    const s = battle(['priest', 'warrior']);
+    s.allies[1].hp = s.allies[1].maxHp;
+    const a = s.allies[0];
+    a.hand.push({ uid: 'ob', cardId: 'axOverflowBlessing' });
+    a.focus = 9;
+    const r = applyCommand(s, { type: 'PLAY_CARD', playerId: 'P1', characterId: a.id, cardInstanceId: 'ob', targetId: s.allies[1].id, focusUsed: 2 });
+    expect(r.error).toBeUndefined();
+    expect(r.state.allies[1].block).toBe(12);
+    expect(r.state.allies[0].statuses.holyLight).toBe(2);
+  });
+  it('聖光の上限: 聖騎士・聖王は5、ほかは3', () => {
+    const s = battle(['priest', 'paladin']);
+    const ctx = makeCtx(s, createRng(1), [], s.allies[0]);
+    applyEffect(ctx, { kind: 'holyGain', amount: 9 });
+    expect(s.allies[0].statuses.holyLight).toBe(3);
+    applyEffect(makeCtx(s, createRng(1), [], s.allies[1]), { kind: 'holyGain', amount: 9 });
+    expect(s.allies[1].statuses.holyLight).toBe(5);
+  });
+  it('聖光解放・セラフィム: 聖光を全部使い、1つにつき+35%。味方全員を3回復', () => {
+    const s = battle(['paladin'], ['stageDIdler', 'stageDIdler']);
+    s.allies[0].statuses.holyLight = 4;
+    s.allies[0].hp = 400;
+    const r = use(s, 'axSeraphim', { focus: 'max' });
+    expect(r.state.allies[0].statuses.holyLight).toBe(0);
+    expect(r.state.allies[0].hp).toBe(403);
+    const none = battle(['paladin'], ['stageDIdler', 'stageDIdler']);
+    expect(lostHp(s, r.state, 0)).toBeGreaterThan(lostHp(none, use(none, 'axSeraphim', { focus: 'max' }).state, 0));
+  });
+  it('反転の呪印: このターン、味方1人を回復するカードが、呪印の敵への聖ダメージになる（最大45）', () => {
+    const s = battle(['priest', 'warrior']);
+    const r = use(s, 'axReversalSeal', { focus: 'max' });
+    const st2 = r.state;
+    const a = st2.allies[0];
+    a.hand.push({ uid: 'mend1', cardId: 'mend' });
+    st2.allies[1].hp = st2.allies[1].maxHp;
+    const r2 = applyCommand(st2, { type: 'PLAY_CARD', playerId: 'P1', characterId: a.id, cardInstanceId: 'mend1', targetId: st2.allies[1].id, focusUsed: 0 });
+    expect(r2.error).toBeUndefined();
+    expect(lostHp(st2, r2.state)).toBeGreaterThan(0);
+  });
+  it('光の蓄え: このターン、聖属性の攻撃をしても聖光が消えない', () => {
+    const s = battle(['paladin']);
+    s.allies[0].statuses.holyLight = 3;
+    const r = use(s, 'axLightHoard', { focus: 'max' });
+    expect(r.state.allies[0].statuses.holyLight).toBe(5); // 3 ＋ 完全成功1 ＋ 能力《蓄光》1
+    const ctx = makeCtx(r.state, createRng(1), [], r.state.allies[0], { target: r.state.enemies[0] });
+    applyEffect(ctx, { kind: 'damage', amount: 3, element: 'holy' });
+    expect(r.state.allies[0].statuses.holyLight).toBe(5); // 3 ＋ 完全成功1 ＋ 能力《蓄光》1
+  });
+});
+
+describe('区切りD-3: 軸⑥ 0コスト回転・お供号令', () => {
+  it('クイックドロー: このターンの4枚目なら、マナ+1（1ターン1回）', () => {
+    const s = battle(['thief']);
+    s.allies[0].played = 3;
+    const before = s.allies[0].mana;
+    const r = use(s, 'axQuickDraw', { focus: 'max' });
+    expect(r.state.allies[0].mana).toBe(before + 1);
+  });
+  it('お供の突撃号令（完全成功）: 自分の召喚がすぐに2回攻撃する', () => {
+    const s = battle(['machinist']);
+    const r = use(s, 'axPetCharge', { focus: 'max' });
+    expect(r.state.log.filter((l) => l.text.includes('攻撃（号令）')).length).toBe(2);
+  });
+  it('手数の極み: 使ったカードの枚数のブロック（最大10）', () => {
+    const s = battle(['brawler']);
+    s.allies[0].played = 6;
+    const r = use(s, 'axFlurryGuard', { focus: 'max' });
+    expect(r.state.allies[0].block).toBe(7);
+  });
+  it('ごほうび: お供の「ターン終了時」の能力が無ければ、フォーカス+1（1ターン1回）', () => {
+    const s = battle(['warrior']);
+    s.allies[0].focus = 2;
+    const r = use(s, 'axTreat', { focus: 1 });
+    expect(r.state.allies[0].focus).toBe(2);
+  });
+  it('群れの狩り: お供・召喚1体につき+20%（最大+80%）', () => {
+    const s = battle(['machinist']);
+    const card = getCard('axPackHunt');
+    const base = damageModifiers(s, s.allies[0], card, s.enemies[0]).multiplier;
+    expect(damageModifiers(s, s.allies[0], card, s.enemies[0], cardTraitAbilities(card)).multiplier).toBeCloseTo(base * 1.2);
+  });
+  it('弾込め: 次の「×N回」のカードの回数+1', () => {
+    const s = battle(['machinist']);
+    const r = use(s, 'axLoadRound', { focus: 'max' });
+    expect(r.state.allies[0].extraHits).toBe(1);
+    const r2 = use(r.state, 'samuraiSwallow', { focus: 'max' });
+    expect(r2.state.allies[0].extraHits).toBeUndefined();
+    expect(r2.state.log.at(-1)?.text).toContain('弾込め');
+  });
+  it('流れる連撃: このターンのコスト0のカードの数だけ回数（最大4）', () => {
+    const s = battle(['thief']);
+    s.allies[0].playedZero = 3;
+    const r = use(s, 'axFlowingStrikes', { focus: 'max' });
+    expect(r.state.log.at(-1)?.text).toContain('3連撃');
+  });
+});
+
+describe('区切りD-3: 背水', () => {
+  it('逆境の刃: 減っているHPの20%（最大+12）を足す', () => {
+    const full = battle(['berserker']);
+    const a = lostHp(full, use(full, 'axAdversity', { focus: 'max' }).state);
+    const hurt = battle(['berserker']);
+    hurt.allies[0].hp = 100;
+    expect(lostHp(hurt, use(hurt, 'axAdversity', { focus: 'max' }).state)).toBeGreaterThan(a);
+  });
+  it('血の代価: 失ったHPを、次の攻撃カードに足す（最大+15）。払った分も入る', () => {
+    const s = battle(['darkKnight']);
+    s.allies[0].counters = { ...(s.allies[0].counters ?? {}), hpLostTurn: 20 };
+    const r = use(s, 'axBloodPrice', { focus: 'max' });
+    expect(r.state.allies[0].counters?.bloodAdd).toBe(15);
+    expect(r.state.allies[0].block).toBe(7);
+    expect(damageModifiers(r.state, r.state.allies[0], getCard('strike'), r.state.enemies[0]).addOnce).toBe(15);
+    const r2 = use(r.state, 'strike', { focus: 'max' });
+    expect(r2.state.allies[0].counters?.bloodAdd).toBe(0);
+  });
+  it('命綱: 次の敵の番が終わるまで、HPは1より下がらない', () => {
+    const s = battle(['berserker'], ['stageDHitter20']);
+    s.allies[0].hp = 10;
+    const r = use(s, 'axLifeline', { focus: 'max' });
+    const t2 = nextTurn(r.state).state;
+    expect(t2.allies[0].dead).toBe(false);
+    expect(t2.allies[0].hp).toBe(1);
+  });
+});

@@ -96,8 +96,17 @@ export function damageModifiers(state: BattleState | undefined, source: Unit, ca
     }
   }
   out.multiplier *= Math.min(weak, BALANCE.elementWeakMax / BALANCE.elementWeakMul);
+  // 区切りD: 血の代価 — 次の攻撃カードの最初の1回に足す
+  const blood = isEnemy(source) ? 0 : (source.counters?.bloodAdd ?? 0);
+  if (blood > 0 && card && card.tiers.some((t) => t.effects.some((x) => x.kind === 'damage'))) {
+    out.addOnce += blood;
+    out.active.push({ name: '血の代価', source: { kind: 'card', label: '血の代価' } });
+  }
   return out;
 }
+
+/** HPが1より下がらない（命綱。区切りD） */
+export const enduresOf = (u: Unit) => !isEnemy(u) && abilitiesOf(u).some((ab) => 'modifier' in ab.effect && ab.effect.modifier === 'endure');
 
 /** 属性 element の攻撃を受ける時の守り（無効・吸収・半減）。複数あれば無効 > 吸収 > 半減 */
 export function elementGuardOf(victim: Unit, element: string | undefined): 'immune' | 'absorb' | 'half' | undefined {
@@ -128,6 +137,8 @@ function scaleOf(sc: DamageScale | undefined, self: Unit, target: Unit | undefin
   else if (sc.by === 'targetStatuses') v = target ? Object.entries(target.statuses).filter(([id, n]) => (n ?? 0) > 0 && getStatus(id).harmful).length : 0;
   else if (sc.by === 'selfStatus') v = sc.status ? (self.statuses[sc.status] ?? 0) : 0;
   else if (sc.by === 'gold') v = Math.floor(((self as { gold?: number }).gold ?? 0) / Math.max(1, sc.step ?? 1));
+  // 区切りD: 群れの狩り — 自分のお供・召喚（砲台・罠・幻獣・群れの獣・屍兵・分身）の数
+  else if (sc.by === 'companions') v = isEnemy(self) ? 0 : (self.pet ? 1 : 0) + (self.summons?.length ?? 0);
   const add = sc.per * v;
   return 1 + (sc.max !== undefined ? Math.min(sc.max, add) : add);
 }
@@ -402,6 +413,7 @@ export function describeAbility(ab: AbilityDef, side: 'ally' | 'enemy' = 'ally')
       return `${e.allies ? '味方全員が、' : ''}敵から${what}を受けない${tail}`;
     }
     if (e.modifier === 'comboScale') return `このカードの連携の上乗せ×${e.multiplier}（連携は合わせて+${Math.round(BALANCE.comboBonusMax * 100)}%まで）`;
+    if (e.modifier === 'endure') return 'HPが1より下がらない';
     if (e.modifier === 'weaknessElement') return '属性は、狙った敵の弱点の属性に変わる（弱点が無い敵には無属性）';
     if (e.modifier === 'breakOnSuccess') return `大技を予告している敵は、成功${e.min}以上でも BREAK できる`;
     const cs = condText(e.if);
@@ -430,6 +442,7 @@ function scaleText(sc: DamageScale): string {
   const cap = sc.max !== undefined ? `（最大+${Math.round(sc.max * 100)}%）` : '';
   if (sc.by === 'missingHp') return `減ったHPが多いほど与えるダメージが増える${cap}`;
   if (sc.by === 'targetStatuses') return `対象の悪い状態異常1種類につき与えるダメージ+${pct}%${cap}`;
+  if (sc.by === 'companions') return `自分のお供・召喚1体につき与えるダメージ+${pct}%${cap}`;
   if (sc.by === 'gold') return `所持金${sc.step ?? 1}Gごとに与えるダメージ+${pct}%${cap}`;
   return `自分の「${sc.status ? getStatus(sc.status).name : ''}」1つにつき与えるダメージ+${pct}%${cap}`;
 }

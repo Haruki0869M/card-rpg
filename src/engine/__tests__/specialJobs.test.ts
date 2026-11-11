@@ -10,6 +10,7 @@ import { applyCommand, applyGameCommand, createBattle, createGame, createRng, mi
 import { applyEffect, dealDamage, makeCtx } from '../battle/effects';
 import { intentView } from '../../components/format';
 import { giveHand, nextTurn, play } from './helpers';
+const k1 = (id: string) => !id.startsWith('ax'); // 区切りD の軸のカード（ax…）は、職の専用カードの数に入れない
 
 const jobs = ['samurai', 'magicKnight', 'timeMage', 'necromancer', 'darkKnight'];
 ENEMIES.register({ id: 'specialJobDummy', name: '検証用の敵', icon: 'T', maxHp: 100000, baseLevel: 1, exp: 1, gold: 1,
@@ -38,9 +39,9 @@ function inTemple(): GameState {
 describe('特殊職5職のデータと転職', () => {
   it('専用6枚ずつ計30枚が自動登録され、各職にエピック2枚以上ある', () => {
     // 区切りD: 同じ中身のカードをまとめた（30 → 27）
-    expect(new Set(jobs.flatMap(id => CLASSES.get(id).cardPool)).size).toBe(27);
+    expect(new Set(jobs.flatMap(id => CLASSES.get(id).cardPool.filter(k1))).size).toBe(27);
     for (const id of jobs) {
-      const j = CLASSES.get(id); expect(j.tier).toBe('special'); expect(j.cardPool).toHaveLength(6);
+      const j = CLASSES.get(id); expect(j.tier).toBe('special'); expect(j.cardPool.filter(k1)).toHaveLength(6);
       expect(j.signature).toEqual(j.cardPool.slice(0, 3));
       expect(j.cardPool.filter(c => getCard(c).rarity === 'epic').length).toBeGreaterThanOrEqual(2);
     }

@@ -27,6 +27,6 @@ export const hexer: ClassDef = {
   from: ['mage'],
   signature: ['hex', 'plague', 'soulHarvest'],
   startingEquipment: { weapon: 'rustyScythe', armor: 'travelerClothes' },
-  cardPool: ['hex', 'plague', 'soulHarvest', 'witherTouch', 'darkPact', 'doomSpell'],
+  cardPool: ['hex', 'plague', 'soulHarvest', 'witherTouch', 'darkPact', 'doomSpell', 'axVenomBurst', 'axCurseReturn', 'axBloodPrice'],
   growthWeights: { int: 4, per: 2 },
 };

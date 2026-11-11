@@ -184,6 +184,9 @@ export const BALANCE = {
   comboBonusMax: 2.0,
   /** ブロックの上限・次のターンに残せるブロックの上限（不落の城塞を使ったターンだけ keepBlockFortify。区切りD） */
   blockMax: 99,
+  /** 聖光の上限（聖騎士・聖王 / ほかの職。区切りD: 僧侶の系統にも聖光を開く） */
+  holyLightMaxPaladin: 5,
+  holyLightMaxOthers: 3,
   keepBlockCap: 25,
   keepBlockFortify: 50,
   /**

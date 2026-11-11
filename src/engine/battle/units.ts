@@ -1,6 +1,6 @@
 // ===== 戦闘のユニット（味方・敵）の共通処理: 名前・ログ・ダメージ・回復・戦闘不能 =====
 import { BALANCE } from '../../data/balance';
-import { fireAbilities, healToBlockOf } from '../abilities';
+import { fireAbilities, healToBlockOf, enduresOf } from '../abilities';
 import { getEnemy } from '../../data/enemies';
 import type { AbilitySource, AllyState, BattleEvent, BattleState, EnemyState } from '../../types';
 import type { Rng } from '../rng';
@@ -99,18 +99,22 @@ export function afterHpLoss(state: BattleState, u: Unit, rng: Rng, events: Battl
 }
 
 /** 味方のHPが減った時の数え: 「敵の番を無傷でしのいだか」を0に戻し、HPが減ると消える状態異常（構え）を消す。乱数は使わない */
-export function noteHpLoss(u: Unit) {
+export function noteHpLoss(u: Unit, amount = 0) {
   if (isEnemy(u)) return;
   (u.counters ??= {}).unhurt = 0;
+  // 区切りD: 血の代価 — 前の敵の番からこれまでに失ったHP
+  u.counters.hpLostTurn = (u.counters.hpLostTurn ?? 0) + amount;
   for (const [id, n] of Object.entries(u.statuses)) if (n && getStatus(id).loseOnHpLoss) u.statuses[id] = 0;
 }
 
 /** HPを直接減らす（ブロック無視。継続ダメージなど）。減った量を返す */
 export function loseHp(state: BattleState, u: Unit, amount: number, rng: Rng, events: BattleEvent[]): number {
   if (u.dead || amount <= 0) return 0;
-  const loss = Math.min(u.hp, amount);
+  // 区切りD: 命綱 — HPは1より下がらない
+  const floor = enduresOf(u) ? 1 : 0;
+  const loss = Math.max(0, Math.min(u.hp - floor, amount));
   u.hp -= loss;
-  noteHpLoss(u);
+  noteHpLoss(u, loss);
   events.push({ type: 'damage', unitId: unitIdOf(u), amount: loss, blocked: 0 });
   afterHpLoss(state, u, rng, events);
   return loss;

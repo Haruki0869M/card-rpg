@@ -10,5 +10,5 @@ export const fistKing: ClassDef = {
   battleAbility: { name: '百裂拳', effect: { when: 'turnEnd', do: [{ kind: 'playedDamage', per: 2 }] } },
   exploreAbility: { id: 'fistKingExplore', name: '拳圧', description: '障害物の判定+30%', effect: { kind: 'checkBonus', check: 'obstacle', bonus: 30 } },
   requires: { feat: 'success:physical', count: 35, text: '物理カードの成功35回' },
-  cardPool: ["hundredFists","kingCounter","fistFlurry","ninjaBreath","earthShatter"], signature: ["hundredFists","kingCounter","fistFlurry"],
+  cardPool: ["hundredFists","kingCounter","fistFlurry","ninjaBreath","earthShatter","axFlurryGuard"], signature: ["hundredFists","kingCounter","fistFlurry"],
 };

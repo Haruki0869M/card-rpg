@@ -30,6 +30,6 @@ export const tamer: ClassDef = {
   from: ['hunter'],
   signature: ['packHunt', 'beastRoar', 'callFalcon'],
   startingEquipment: { weapon: 'leatherWhip', armor: 'travelerClothes' },
-  cardPool: ['packHunt', 'beastRoar', 'callFalcon', 'whipCrack', 'feedBeast', 'stampede'],
+  cardPool: ['packHunt', 'beastRoar', 'callFalcon', 'whipCrack', 'feedBeast', 'stampede', 'axPetCharge', 'axPackHunt'],
   growthWeights: { per: 3, dex: 2, agi: 2 },
 };

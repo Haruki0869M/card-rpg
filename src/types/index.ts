@@ -132,6 +132,8 @@ export type AbilityEffect =
   | { modifier: 'comboScale'; multiplier: number }
   /** 属性の無い攻撃が、狙った敵の弱点の属性になる（エレメンタル・チェイン。区切りD） */
   | { modifier: 'weaknessElement' }
+  /** HPが1より下がらない（命綱。区切りD） */
+  | { modifier: 'endure' }
   /** BREAK の「合計ダメージ」の数えを multiplier 倍にする（鎧通しの一撃。区切りD） */
   | { modifier: 'breakCount'; multiplier: number; if?: AbilityCondition[] }
   /** 成功が min 以上なら、完全成功でなくても BREAK のきっかけになる（魔力の楔。区切りD） */
@@ -173,7 +175,7 @@ export type AbilityEffect =
  * missingHp = 自分の減ったHPの割合（0〜1） / targetStatuses = 対象の悪い状態異常の種類の数 / selfStatus = 自分の状態異常 status の量 /
  * gold = 戦闘を始めた時の自分の所持金（step ゴールドごとに1）
  */
-export type DamageScale = { by: 'missingHp' | 'targetStatuses' | 'selfStatus' | 'gold'; per: number; max?: number; status?: string; step?: number };
+export type DamageScale = { by: 'missingHp' | 'targetStatuses' | 'selfStatus' | 'gold' | 'companions'; per: number; max?: number; status?: string; step?: number };
 
 /** 演出用の出所。効果の判定には使わない。 */
 export interface AbilitySource {
@@ -523,6 +525,14 @@ export interface AllyState {
   /** 区切りD: 次の攻撃カードが弱点扱い（導きの光）・連携の段階+1（アシスト・パス） */
   guided?: boolean;
   comboBoost?: number;
+  /** 区切りD: 反転の呪印（このターン、味方1人を回復するカードが、この敵への聖ダメージになる） */
+  reversal?: { targetId: string; pct: number; max: number; turn: number };
+  /** 区切りD: 光の蓄え（このターンの番号。聖光が消えない） */
+  holdLight?: number;
+  /** 区切りD: 弾込め（次の「×N回」のカードの回数+） */
+  extraHits?: number;
+  /** 区切りD: このターンに使ったコスト0のカードの枚数（流れる連撃） */
+  playedZero?: number;
   /** 呼び出したお供（幻獣・獣など。ターン終了時に攻撃する。足元のトークンで表示） */
   summons?: SummonState[];
   /** このターンに使ったカードの枚数（種類ごと。子狼など） */

@@ -25,7 +25,11 @@ export const effect: EffectHandler<'damage'> = {
       ctx.parts.push(`勝負×${multiplier}`);
     }
     const multi = (e.hits ?? 1) >= 2 && !isEnemy(ctx.source) ? (ctx.multi ??= { total: 0, landed: 0 }) : undefined;
-    for (let h = 0; h < (e.hits ?? 1); h++) {
+    // 区切りD: 弾込め — 次の「×N回」のカードの回数+1（使ったら消える）
+    let hits = e.hits ?? 1;
+    const src = ctx.source;
+    if (hits >= 2 && !isEnemy(src) && src.extraHits && ctx.card) { hits += src.extraHits; delete src.extraHits; ctx.parts.push('弾込め'); }
+    for (let h = 0; h < hits; h++) {
       for (const t of resolveTargets(ctx, targetOf(e))) {
         const charge = chargedMultiplier(ctx.source, ctx.card);
         if (charge > 1) recordActivation(ctx, { name: '蓄えた力', source: { kind: 'other' } });

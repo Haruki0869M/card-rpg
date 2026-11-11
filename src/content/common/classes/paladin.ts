@@ -28,6 +28,6 @@ export const paladin: ClassDef = {
   from: ['guardian'],
   signature: ['holyStrike', 'aegis', 'divineJudgment'],
   startingEquipment: { weapon: 'oakHammer', armor: 'leatherArmor' },
-  cardPool: ['holyStrike', 'aegis', 'divineJudgment', 'oath', 'lightHammer', 'martyr', 'axShieldSlam', 'axIronMarch', 'axThornVow'],
+  cardPool: ['holyStrike', 'aegis', 'divineJudgment', 'oath', 'lightHammer', 'martyr', 'axShieldSlam', 'axIronMarch', 'axThornVow', 'axOverflowBlessing', 'axSeraphim', 'axLightHoard'],
   growthWeights: { vit: 4, str: 2 },
 };

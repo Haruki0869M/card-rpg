@@ -10,5 +10,5 @@ export const overlord: ClassDef = {
   battleAbility: { name: '覇気', effect: { when: 'allyKill', do: [{ kind: 'rallyDamage', amount: 0.1, max: 0.5 }] } },
   exploreAbility: { id: 'overlordExplore', name: '威圧', description: '逃げる判定+20%', effect: { kind: 'checkBonus', check: 'flee', bonus: 20 } },
   requires: { feat: 'kills', count: 10, text: '敵を10体倒す' },
-  cardPool: ["kingCleaver","domination","conquerorRoar","bloodThrone","worldBreaker"], signature: ["kingCleaver","domination","conquerorRoar"],
+  cardPool: ["kingCleaver","domination","conquerorRoar","bloodThrone","worldBreaker","axLifeline"], signature: ["kingCleaver","domination","conquerorRoar"],
 };

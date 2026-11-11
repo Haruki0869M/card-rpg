@@ -31,6 +31,6 @@ export const summoner: ClassDef = {
   tier: 'base',
   lineage: 'ma',
   startingEquipment: { weapon: 'apprenticeTome', armor: 'travelerClothes' },
-  cardPool: ['phantomClaw', 'spiritWard', 'pact', 'elementalBurst', 'magicArrow', 'gambleBolt', 'callIfrit', 'callSylph', 'summonSprite', 'manaWell'],
+  cardPool: ['phantomClaw', 'spiritWard', 'pact', 'elementalBurst', 'magicArrow', 'gambleBolt', 'callIfrit', 'callSylph', 'summonSprite', 'manaWell', 'axPetCharge'],
   growthWeights: { int: 3, per: 2, luk: 1 },
 };

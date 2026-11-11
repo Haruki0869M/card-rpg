@@ -2,7 +2,7 @@
 // 新しい効果: kinds/ にファイルを1つ置いて export const effect: EffectHandler<'種類'> = {...} と書くだけ。
 // カード・敵の行動・消費アイテム・特殊能力のデータから、その日から使える。
 import type { AbilityDef, BattleEvent, BattleState, CardDef, Effect, EffectTarget, EnemyState } from '../../../types';
-import { cardModifier, convertedElement, coverChance, damageModifiers, elementGuardOf, fireAbilities, guardStatus, statusBonusOf, testConditions } from '../../abilities';
+import { cardModifier, convertedElement, coverChance, damageModifiers, elementGuardOf, enduresOf, fireAbilities, guardStatus, statusBonusOf, testConditions } from '../../abilities';
 import type { Rng } from '../../rng';
 import { BALANCE } from '../../../data/balance';
 import { getElement } from '../../../data/elements';
@@ -206,14 +206,16 @@ function breakEnemy(ctx: EffectCtx, enemy: EnemyState, why: 'weak' | 'perfect' |
 }
 
 /** 属性を強める状態異常（聖光など）の倍率。使った分は消す */
-function elementBoost(source: Unit, element: string): number {
+function elementBoost(source: Unit, element: string, turn: number): number {
   let m = 1;
+  // 区切りD: 光の蓄え — このターンは聖光が消えない
+  const keep = !isEnemy(source) && source.holdLight === turn;
   for (const [id, n] of Object.entries(source.statuses)) {
     if (!n) continue;
     const b = getStatus(id).boostElement;
     if (b?.element !== element) continue;
     m *= 1 + b.per * n;
-    source.statuses[id] = 0;
+    if (!keep) source.statuses[id] = 0;
   }
   return m;
 }
@@ -237,7 +239,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   let v = victim;
   let mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities, ctx.perfect, element, ctx.via);
   // 属性を強める状態異常（聖光など）: この一撃で使い切る
-  const boost = element ? elementBoost(source, element) : 1;
+  const boost = element ? elementBoost(source, element, state.turn) : 1;
   base = Math.round(base * boost);
   // 区切りD: 連携の上乗せの倍率（このカードの力）・弱点看破の印（弱点の属性でなくても ×1.5）
   const comboScale = cardModifier(ctx.cardAbilities, 'comboScale').reduce((m, e) => m * e.multiplier, 1);
@@ -313,8 +315,10 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   }
   const r = absorb(dmg, mods.ignoreBlock ? 0 : v.block, v.hp);
   if (!mods.ignoreBlock) v.block = r.block;
+  // 区切りD: 命綱 — HPは1より下がらない
+  if (r.hp <= 0 && v.hp > 0 && enduresOf(v)) { r.hpLoss -= 1 - r.hp; r.hp = 1; }
   v.hp = r.hp;
-  if (r.hpLoss > 0) noteHpLoss(v);
+  if (r.hpLoss > 0) noteHpLoss(v, r.hpLoss);
   events.push({ type: 'damage', unitId: unitIdOf(v), amount: r.hpLoss, rawAmount: dmg, blocked: r.blocked, sourceId: unitIdOf(source) });
   if (isEnemy(v)) state.stats.totalDamage += r.hpLoss;
   ctx.dealt += r.hpLoss;
