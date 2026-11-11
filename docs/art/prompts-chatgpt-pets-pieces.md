@@ -440,7 +440,7 @@
 **02** 守護者・男 → 添付 `立ち絵-02-guardian-male.png`　保存の名前 `piece-guardian-male.png`
 ```
 次は、添付の立ち絵のキャラ（守護者・男性）をお願いします。
-持つ物: 鉄の槍
+持つ物: 鉄の槍（片手）と、大きな丸い木の盾（もう片手）
 見た目: 青い鋼の鎧・クリーム色の前垂れ・大きな丸い木の盾
 持たせない・描かないもの: sword, axe, bow, arrows, second spear, second weapon
 ```
@@ -448,7 +448,7 @@
 **03** 守護者・女 → 添付 `立ち絵-03-guardian-female.png`　保存の名前 `piece-guardian-female.png`
 ```
 次は、添付の立ち絵のキャラ（守護者・女性）をお願いします。
-持つ物: 鉄の槍
+持つ物: 鉄の槍（片手）と、大きな丸い赤い盾（もう片手）
 見た目: 銀と青の鎧・青いスカート・大きな丸い赤い盾
 持たせない・描かないもの: sword, axe, bow, arrows, second spear, second weapon
 ```
@@ -650,16 +650,16 @@
 **28** 聖騎士・男 → 添付 `立ち絵-28-paladin-male.png`　保存の名前 `piece-paladin-male.png`
 ```
 次は、添付の立ち絵のキャラ（聖騎士・男性）をお願いします。
-持つ物: 樫の槌
-見た目: 白と金の鎧・青い陣羽織・丸い盾（提案F: 盾あり）
+持つ物: 樫の槌（片手）と、丸い盾（もう片手）
+見た目: 白と金の鎧・青い陣羽織・丸い盾
 持たせない・描かないもの: sword, spear, second weapon, bow, arrows, quiver, second hammer
 ```
 
 **29** 聖騎士・女 → 添付 `立ち絵-29-paladin-female.png`　保存の名前 `piece-paladin-female.png`
 ```
 次は、添付の立ち絵のキャラ（聖騎士・女性）をお願いします。
-持つ物: 樫の槌
-見た目: 白と金の鎧・青い陣羽織・丸い盾（提案F: 盾あり）
+持つ物: 樫の槌（片手）と、丸い盾（もう片手）
+見た目: 白と金の鎧・青い陣羽織・丸い盾
 持たせない・描かないもの: sword, spear, second weapon, bow, arrows, quiver, second hammer
 ```
 
@@ -860,16 +860,16 @@
 **54** 聖王・男 → 添付 `立ち絵-54-holyKing-male.png`　保存の名前 `piece-holyKing-male.png`
 ```
 次は、添付の立ち絵のキャラ（聖王・男性）をお願いします。
-持つ物: 樫の槌
-見た目: 白と金の立派な鎧・青いマント・小さな冠・丸い盾（提案F）
+持つ物: 樫の槌（片手）と、丸い盾（もう片手）
+見た目: 白と金の立派な鎧・青いマント・小さな冠・丸い盾
 持たせない・描かないもの: sword, spear, second weapon, bow, arrows, quiver, second hammer
 ```
 
 **55** 聖王・女 → 添付 `立ち絵-55-holyKing-female.png`　保存の名前 `piece-holyKing-female.png`
 ```
 次は、添付の立ち絵のキャラ（聖王・女性）をお願いします。
-持つ物: 樫の槌
-見た目: 白と金の立派な鎧・青いマント・小さな冠・丸い盾（提案F）
+持つ物: 樫の槌（片手）と、丸い盾（もう片手）
+見た目: 白と金の立派な鎧・青いマント・小さな冠・丸い盾
 持たせない・描かないもの: sword, spear, second weapon, bow, arrows, quiver, second hammer
 ```
 
