@@ -22,8 +22,8 @@ export const effect: EffectHandler<'statusBurst'> = {
       const n = t.statuses[e.status] ?? 0;
       if (n <= 0 || t.dead) continue;
       any = true;
-      const dmg = Math.min(e.max ?? Infinity, (e.per ? n * e.per : 0) + (e.flat ?? 0));
-      if (dmg > 0) dealDamage(ctx, t, dmg);
+      const dmg = (e.per ? n * e.per : 0) + (e.flat ?? 0);
+      if (dmg > 0) dealDamage(ctx, t, dmg, undefined, 1, e.max);
       if (e.consume) t.statuses[e.status] = 0;
       else if (e.halve) t.statuses[e.status] = Math.floor(n / 2);
       if (e.spread && isEnemy(t)) {

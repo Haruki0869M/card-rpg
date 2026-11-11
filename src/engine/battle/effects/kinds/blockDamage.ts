@@ -16,10 +16,10 @@ export const effect: EffectHandler<'blockDamage'> = {
   apply(ctx, e) {
     const src = ctx.source;
     if (e.gain) src.block = Math.min(BALANCE.blockMax, src.block + e.gain);
-    const amount = Math.min(e.max ?? Infinity, Math.floor((src.block * e.pct) / 100));
+    const amount = Math.floor((src.block * e.pct) / 100);
     if (amount <= 0) { ctx.parts.push('ブロックが無い'); return false; }
     let any = false;
-    for (const t of resolveTargets(ctx, targetOf(e))) { dealDamage(ctx, t, amount); any = true; }
+    for (const t of resolveTargets(ctx, targetOf(e))) { dealDamage(ctx, t, amount, undefined, 1, e.max); any = true; }
     return any;
   },
   describe: (e, who) => `${e.gain ? `ブロック${e.gain}を得てから、` : ''}${who}自分の今のブロックの${e.pct}%のダメージ${e.max ? `（最大${e.max}）` : ''}`,

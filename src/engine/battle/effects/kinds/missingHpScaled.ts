@@ -12,10 +12,10 @@ export const effect: EffectHandler<'missingHpScaled'> = {
   kind: 'missingHpScaled',
   defaultTo: 'target',
   apply(ctx, e) {
-    const dmg = Math.min(e.max, Math.floor((ctx.source.maxHp - ctx.source.hp) * e.mul));
+    const dmg = Math.floor((ctx.source.maxHp - ctx.source.hp) * e.mul);
     if (dmg <= 0) return false;
     let any = false;
-    for (const t of resolveTargets(ctx, targetOf(e))) { dealDamage(ctx, t, dmg, e.element); any = true; }
+    for (const t of resolveTargets(ctx, targetOf(e))) { dealDamage(ctx, t, dmg, e.element, 1, e.max); any = true; }
     return any;
   },
   describe: (e, who) => `${who}自分の減っているHP×${e.mul}の${e.element === 'dark' ? '闇属性' : ''}ダメージ（最大${e.max}）`,

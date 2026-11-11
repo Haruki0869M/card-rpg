@@ -639,3 +639,14 @@ describe('区切りD-4: 武器のカードの付け替え', () => {
     expect(battleDeck(g.heroes[0], false).filter((c) => c.fromWeapon).every((c) => c.cardId === 'axRoundSong')).toBe(true);
   });
 });
+
+describe('区切りD: 「最大〇〇」は、倍率を掛けた後のダメージの上限', () => {
+  it('ブラッド・イクリプスは最大100・シールドスラムは最大60', () => {
+    const s = battle(['darkKnight']);
+    s.allies[0].hp = 120;
+    expect(lostHp(s, use(s, 'fxBloodEclipse', { focus: 'max' }).state)).toBe(100);
+    const g = battle(['guardian']);
+    g.allies[0].block = 99;
+    expect(lostHp(g, use(g, 'axShieldSlam', { focus: 'max' }).state)).toBe(60);
+  });
+});

@@ -229,7 +229,8 @@ export const resistsElement = (victim: Unit, element: string) => isEnemy(victim)
  * victim にダメージを与える。倍率（敵のレベル・特殊能力・状態異常）、ブロック、かばう、戦闘不能まで処理する。
  * HPに入った量を返す
  */
-export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?: string, extraMultiplier = 1): number {
+/** cap = 倍率を全部掛けた後のダメージの上限（決め技などの「最大〇〇」。区切りD） */
+export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?: string, extraMultiplier = 1, cap?: number): number {
   const { state, rng, events, source } = ctx;
   if (victim.dead) return 0;
   // 武器に宿った属性: 属性の無い物理攻撃がその属性になる（妖精の泉）
@@ -263,6 +264,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
       }
     }
   }
+  if (cap !== undefined) dmg = Math.min(dmg, cap);
   // 「最初の1回の攻撃にだけ足すダメージ」は、ここで使い切る（×N回・全体のカードでも1回だけ）
   if (mods.addOnce) ctx.addOnceUsed = true;
   for (const n of mods.active) recordActivation(ctx, n);

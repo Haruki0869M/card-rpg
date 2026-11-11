@@ -28,7 +28,7 @@ export const effect: EffectHandler<'heal'> = {
     // 区切りD: 反転の呪印 — 味方1人を回復するカードは、回復の代わりに、呪印の敵へ聖ダメージ
     const rev = reversalOf(ctx);
     if (rev) {
-      dealDamage(ctx, rev.foe, Math.min(rev.max, Math.floor((e.amount * rev.pct) / 100)), 'holy');
+      dealDamage(ctx, rev.foe, Math.floor((e.amount * rev.pct) / 100), 'holy', 1, rev.max);
       ctx.parts.push('反転の呪印');
       return true;
     }
