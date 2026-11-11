@@ -43,7 +43,7 @@ export interface ElementDef {
  * target = 選んだ対象（カードの対象の敵 / 敵の行動の対象の味方 / アイテムを使う相手。全体カードなら相手全員）
  * self = 自分 / allies = 自分の側の全員 / otherAllies = 自分以外の自分の側 / foes = 相手の側の全員 / randomFoe = 相手からランダムに1人
  */
-export type EffectTarget = 'target' | 'self' | 'allies' | 'otherAllies' | 'foes' | 'randomFoe' | 'lowestAlly' | 'randomAlly' | 'allyTarget' | 'otherFoes';
+export type EffectTarget = 'target' | 'self' | 'allies' | 'otherAllies' | 'foes' | 'randomFoe' | 'lowestAlly' | 'randomAlly' | 'allyTarget' | 'otherFoes' | 'attacker';
 
 /**
  * 効果の種類ごとの数値。効果のファイル（src/engine/battle/effects/）が declare module でここに種類を足す。
@@ -104,7 +104,7 @@ export interface CardDef {
  * battleStart 戦闘開始時 / turnStart 自分の側のフェーズ開始時 / turnEnd 自分の側のフェーズ終了時 /
  * afterCard カードを使った後 / perfect カードが完全成功した時 / kill 敵を倒した時 / hurt HPにダメージを受けた時
  */
-export type AbilityTrigger = 'battleStart' | 'turnStart' | 'turnEnd' | 'afterCard' | 'perfect' | 'kill' | 'hurt' | 'allyKill' | 'allyDown';
+export type AbilityTrigger = 'battleStart' | 'turnStart' | 'turnEnd' | 'afterCard' | 'perfect' | 'kill' | 'hurt' | 'allyKill' | 'allyDown' | 'blocked' | 'inflict' | 'foeTick';
 
 /** 発動の条件の種類ごとの数値。条件のファイル（src/engine/abilities/conditions/）が declare module で種類を足す */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -128,6 +128,12 @@ export type AbilityEffect =
   | { modifier: 'slotPreview'; uses: number; if?: AbilityCondition[] }
   /** カードのコストを変える（set = その値にする / delta = 足す。0より下にはならない）。turnKey があると1ターンに1枚だけ（使った時に数える） */
   | { modifier: 'cardCost'; delta?: number; set?: number; turnKey?: string; if?: AbilityCondition[] }
+  /** ターンの始めに、前のターンのブロックが max まで残る（不動の錨） */
+  | { modifier: 'keepBlock'; max: number }
+  /** 自分の砲台・罠・召喚が2回ずつ発動する（永久機関） */
+  | { modifier: 'summonTwice' }
+  /** HPを回復した時、その pct 倍のブロックも得る（福音。0.5 = 50%） */
+  | { modifier: 'healToBlock'; pct: number }
   | { modifier: 'chestChance'; bonus: number; if?: AbilityCondition[] }
   | { modifier: 'weaknessDamage'; multiplier: number; if?: AbilityCondition[] }
   /** 属性の攻撃を受ける時: immune = 無効 / absorb = 受けるダメージ分回復 / half = 半分（K2。敵の攻撃から守る） */
