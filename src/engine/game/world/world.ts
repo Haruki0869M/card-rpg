@@ -427,19 +427,23 @@ export function reviveAlly(game: GameState, cmd: Cmd<'WORLD_REVIVE'>, rng: Rng):
 }
 
 /** 野営（spec §8.6）: 少し回復して手番を終える。夜は夜襲の確率がある */
-export function camp(game: GameState, cmd: Cmd<'WORLD_CAMP'>, rng: Rng): string | undefined {
+/** opts.tent = テントの設営具（夜の魔物に襲われない・HPとフォーカスを50%回復。区切りE） */
+export function camp(game: GameState, cmd: Cmd<'WORLD_CAMP'>, rng: Rng, opts: { tent?: boolean } = {}): string | undefined {
   const t = turnCheck(game, cmd.playerId, cmd.heroId);
   if (typeof t === 'string') return t;
   const { w, h } = t;
   const tile = w.pos[h.id];
   if (w.tiles[tile].f?.kind === 'town') return '町の中では野営できません（宿屋を使えます）';
   if (w.move !== null && w.move < (BALANCE.moveBase as number)) return '移動した後は野営できません';
-  const chance = campAmbushChance(game, h.id);
+  const chance = opts.tent ? 0 : campAmbushChance(game, h.id);
   const climateMul = climateAt(game, tile) ? BALANCE.climateCampHealMul : 1;
-  h.hp = Math.min(heroMaxHp(h), h.hp + Math.ceil(heroMaxHp(h) * BALANCE.campHpRatio * climateMul * (restMultiplierOf(h) + (petExplore(h).campHeal ?? 0) + equippedItems(h).reduce((n, i) => n + (i.explore?.campHeal ?? 0), 0))));
-  h.focus = Math.min(heroFocusMax(h), h.focus + BALANCE.campFocus + campFocusOf(h));
+  if (opts.tent) {
+    h.hp = Math.min(heroMaxHp(h), h.hp + Math.ceil(heroMaxHp(h) * 0.5));
+    h.focus = Math.min(heroFocusMax(h), h.focus + Math.ceil(heroFocusMax(h) * 0.5));
+  } else h.hp = Math.min(heroMaxHp(h), h.hp + Math.ceil(heroMaxHp(h) * BALANCE.campHpRatio * climateMul * (restMultiplierOf(h) + (petExplore(h).campHeal ?? 0) + equippedItems(h).reduce((n, i) => n + (i.explore?.campHeal ?? 0), 0))));
+  if (!opts.tent) h.focus = Math.min(heroFocusMax(h), h.focus + BALANCE.campFocus + campFocusOf(h));
   (w.sheltered ??= []).push(h.id);
-  addLog(game, `${h.name}は野営して体を休めた${climateMul < 1 ? '（厳しい土地で、回復は半分）' : ''}`);
+  addLog(game, opts.tent ? `${h.name}はテントを張って、ぐっすり休んだ` : `${h.name}は野営して体を休めた${climateMul < 1 ? '（厳しい土地で、回復は半分）' : ''}`);
   if (chance > 0 && rng.next() * 100 < chance) {
     const wd = spawnWanderer(game, w, rng, w.tiles[tile].r, tile);
     if (wd) {

@@ -219,9 +219,9 @@ describe('町・祠・依頼', () => {
     expect(findHero(g, 'h0')!.hp).toBe(heroMaxHp(findHero(g, 'h0')!));
     g = run(g, { type: 'TOWN_BUY', playerId: P, kind: 'item', index: 0 });
     const stock = g.world!.shops.royalCapital;
-    expect(getItem(stock.items[0].item.itemId).id).toBe('holyWater');
+    expect(getItem(stock.items[0].item.itemId).id).toBe('antidote');
     // 町に入ったキャラ（h0）のお金で買い、h0 の袋に入る
-    expect(findHero(g, 'h0')!.pouch.some((i) => i.itemId === 'holyWater')).toBe(true);
+    expect(findHero(g, 'h0')!.pouch.some((i) => i.itemId === 'antidote')).toBe(true);
     expect(findHero(g, 'h1')!.gold).toBe(30);
     expect(applyGameCommand(g, { type: 'TOWN_BUY', playerId: P, kind: 'item', index: 0 }).error).toBeDefined();
   });

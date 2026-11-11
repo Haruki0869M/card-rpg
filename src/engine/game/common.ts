@@ -41,10 +41,10 @@ export const successes = (r: SlotResult[]) => r.filter((x) => x !== 'miss').leng
 export function addItem(game: GameState, hero: Hero, item: ItemInstance, gainedInDungeon: boolean): string {
   const def = getItem(item.itemId);
   if (def.slot === 'consumable') {
-    if (hero.pouch.length >= POUCH_LIMIT) {
+    if (hero.pouch.length >= POUCH_LIMIT || (def.pouchMax !== undefined && hero.pouch.filter((p) => p.itemId === def.id).length >= def.pouchMax)) {
       const g = rarityIndex(def.rarity) * 15 + 10;
       earnGold(hero, g);
-      return `${def.name}（${hero.name}の袋が満杯のため${g}Gに換えた）`;
+      return `${def.name}（${hero.name}の袋が${hero.pouch.length >= POUCH_LIMIT ? '満杯' : `${def.name}でいっぱい`}のため${g}Gに換えた）`;
     }
     hero.pouch.push(item);
   } else {

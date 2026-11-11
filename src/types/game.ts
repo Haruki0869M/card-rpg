@@ -71,6 +71,10 @@ export interface ItemDef {
   explore?: { vision?: number; campHeal?: number; petEvent?: number; reveal?: 'rest' | 'layout' };
   /** このシナリオの冒険でだけ宝箱・ショップに出る（K2/K4。省略は全シナリオ） */
   scenario?: string;
+  /** 区切りE: お店で売らない（レジェンドの消耗品） */
+  noShop?: boolean;
+  /** 区切りE: 1人が袋に持てる数（不死鳥の羽根は1） */
+  pouchMax?: number;
 }
 
 export interface ItemInstance {
@@ -99,6 +103,8 @@ export interface Hero {
   equipment: Partial<Record<EquipSlot, ItemInstance>>;
   /** 次の戦闘の開始時に付く状態異常（イベントの失敗など） */
   nextBattleStatuses: Partial<Record<StatusId, number>>;
+  /** 区切りE: 次の戦闘の1ターン目にお供が行動する回数（お供の特上ごちそう） */
+  petFeast?: number;
   /** 命の灯火が無い時に戦闘に負けて、冒険から退場した（spec §11.4） */
   retired?: boolean;
   /** 祠の永続の加護の数（上限あり） */
@@ -568,7 +574,7 @@ export type GameCommand =
   | { type: 'ENTER_DUNGEON'; playerId: PlayerId; dungeonId: string }
   | { type: 'ENTER_ROOM'; playerId: PlayerId; roomId: string }
   | { type: 'BATTLE'; command: Command }
-  | { type: 'USE_POUCH_ITEM'; playerId: PlayerId; itemUid: string; userId: string; targetId: string }
+  | { type: 'USE_POUCH_ITEM'; playerId: PlayerId; itemUid: string; userId: string; targetId: string; /** カード鍛錬の砥石: 強化するカード */ cardUid?: string }
   | { type: 'FINISH_BATTLE'; playerId: PlayerId }
   | { type: 'CHOOSE_GROWTH'; playerId: PlayerId; optionIndex: number; cardUid?: string }
   | { type: 'PICK_CARD'; playerId: PlayerId; offerIndex: number | null; /** 選ばない時: どのキャラの分か（省くと、その人のキャラ全員の分） */ heroId?: string }

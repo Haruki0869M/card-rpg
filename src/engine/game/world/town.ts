@@ -41,7 +41,7 @@ export function ensureShop(game: GameState, rng: Rng): ShopStock {
   for (const id of town.shop.fixed ?? []) items.push({ kind: 'item', item: newItem(game, getItem(id)), price: price(id) });
   const types = new Set(game.heroes.filter((h) => !h.retired).flatMap((h) => jobWeapons(h.classId)));
   const equip = ITEMS.all.filter((i) => i.slot !== 'consumable' && (!i.scenario || i.scenario === game.scenarioId) && (i.slot !== 'weapon' || types.has(i.weaponType!)));
-  const cons = ITEMS.all.filter((i) => i.slot === 'consumable' && !(town.shop.fixed ?? []).includes(i.id));
+  const cons = ITEMS.all.filter((i) => i.slot === 'consumable' && !i.noShop && !(town.shop.fixed ?? []).includes(i.id));
   const pickByRarity = (pool: typeof ITEMS.all) => {
     for (let tries = 0; tries < 10; tries++) {
       const r = pickWeighted(lowWeights, rng);

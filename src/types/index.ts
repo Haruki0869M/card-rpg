@@ -363,6 +363,8 @@ export interface PartyMemberSpec {
   extraDraw?: number;
   /** 戦闘開始時の状態異常 */
   statuses?: Partial<Statuses>;
+  /** 区切りE: 1ターン目にお供が行動する回数（お供の特上ごちそう） */
+  petFeast?: number;
   /** 職業以外から得た戦闘の特殊能力（装備・お供・持ち越し） */
   abilities?: AbilityDef[];
   /** 連れているお供（足元・肩の表示用） */
@@ -610,6 +612,8 @@ export interface EnemyState {
   turnDamage?: number;
   /** 区切りD: このターンの印（弱点看破 = 次の攻撃が弱点扱い / 挟撃の陣の強さ / 挟撃の陣でフォーカスをもらった味方） */
   exposed?: boolean;
+  /** 区切りE: このターンだけの弱点（紅蓮の油壺） */
+  tempWeak?: string;
   pincer?: number;
   pincerFocus?: string[];
   /** このターンの予告は、もう体勢を崩された（BREAK は1つの予告に1回。ターンの初めに消す） */
@@ -658,6 +662,9 @@ export interface BattleState {
   ready?: PlayerId[];
   /** 戦闘中に手に入れたお金（掠め取りなど。勝った時の報酬に足す） */
   bonusGold?: number;
+  /** 区切りE: この戦闘で得るお金の倍率（黄金の招き猫）・閃光の破砕玉をボスに使った */
+  goldMul?: number;
+  flashBreakUsed?: boolean;
   /** ボスの部屋の戦闘 */
   boss?: boolean;
   /** 中ボスの部屋の戦闘（大物狩り） */
