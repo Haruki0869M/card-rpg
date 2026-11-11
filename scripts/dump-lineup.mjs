@@ -1,7 +1,7 @@
-// 今のラインナップ（カード・武器・鎧・装飾品・消耗品・ジョブ）を、1つの文書に書き出す道具。
+// 今の全データ（ジョブ・カード・武器・鎧・装飾品・消耗品・敵・状態異常・属性・お供）を、1つの文書に書き出す道具。
 // 企画の相談（Gemini など）に見せるための物。ゲームのデータと説明文の関数をそのまま使う。
 // 使い方: node scripts/dump-lineup.mjs [出力先]   （既定は docs/review/lineup.md）
-import { writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
@@ -16,6 +16,13 @@ try {
   const { describeEffect } = await server.ssrLoadModule('/src/engine/battle/effects/index.ts');
   const { describeAbility } = await server.ssrLoadModule('/src/engine/abilities/index.ts');
   const { WEAPON_TYPES } = await server.ssrLoadModule('/src/data/rules/index.ts');
+  const { ENEMIES, ENCOUNTERS } = await server.ssrLoadModule('/src/data/enemies/index.ts');
+  const { STATUSES } = await server.ssrLoadModule('/src/data/statuses/index.ts');
+  const { ELEMENTS } = await server.ssrLoadModule('/src/data/elements/index.ts');
+  const { DUNGEONS } = await server.ssrLoadModule('/src/data/dungeons/index.ts');
+  const { PETS } = await server.ssrLoadModule('/src/data/pets/index.ts');
+  const { SCENARIOS } = await server.ssrLoadModule('/src/data/scenarios/index.ts');
+  const { describeStatus } = await server.ssrLoadModule('/src/engine/battle/statuses.ts');
   const wname = (id) => WEAPON_TYPES.tryGet(id)?.name ?? id;
   const RAR = { common: 'コモン', rare: 'レア', epic: 'エピック', legend: 'レジェンド' };
   const CAT = { physical: '物理', magic: '魔法', skill: 'スキル' };
@@ -129,8 +136,88 @@ try {
   out.push(`## 4. 鎧（${armors.length}）`, '', ...armors.sort(byRar).map(itemLine), '');
   out.push(`## 5. 装飾品（${accs.length}）`, '', ...accs.sort(byRar).map(itemLine), '');
   out.push(`## 6. 消耗品（${cons.length}）`, '', ...cons.sort(byRar).map(itemLine), '');
+  // ---------- 7. 敵 ----------
+  // 敵・戦闘の組み合わせが、どのフォルダ（共通 / シナリオ）のデータかを、ファイルから調べる
+  const walk = (dir) => readdirSync(dir).flatMap((n) => { const p = resolve(dir, n); return statSync(p).isDirectory() ? walk(p) : [p]; });
+  const home = new Map();
+  for (const p of walk(resolve(ROOT, 'src/content'))) {
+    const m = p.replace(/\\/g, '/').match(/src\/content\/(common|scenarios\/([^/]+))\/.*(enemies|encounters|dungeons)\/[^/]+\.ts$/); if (!m) continue;
+    for (const x of readFileSync(p, 'utf8').matchAll(/\bid: ['"]([^'"]+)['"]/g)) if (!home.has(m[3] + ':' + x[1])) home.set(m[3] + ':' + x[1], m[2] ?? 'common');
+  }
+  const scName = (id) => id === '?' ? '亜種（元の敵から道具で作った属性違い。出る場所は各ダンジョンの一覧を見る）' : id === 'common' ? '共通（どのシナリオにも出る）' : safe(() => SCENARIOS.get(id).name, id) + '（' + id + '）';
+  const elName = (id) => ELEMENTS.tryGet(id)?.name ?? id;
+  const AI = { sequence: '順番', random: 'ランダム' };
+  const actLine = (a) => `${a.big ? '【大技】' : ''}${a.name}: ${a.effects.map((e) => safe(() => describeEffect(e, 'enemy'), e.kind)).join('、') || '何もしない'}`;
+  const enemyLine = (e) => {
+    const marks = [];
+    if (e.rare) marks.push('★レア'); if (e.variantOf) marks.push('亜種（元:' + safe(() => ENEMIES.get(e.variantOf).name, e.variantOf) + '）');
+    if (e.weak?.length) marks.push('弱点:' + e.weak.map(elName).join('/')); if (e.resist?.length) marks.push('耐性:' + e.resist.map(elName).join('/'));
+    const ab = (e.abilities ?? []).map((a) => `《${a.name}》${safe(() => describeAbility(a))}`).join(' ');
+    const ph = (e.phases ?? []).map((p) => ` ▼HP${p.belowHpPct}%以下「${p.name}」（${AI[p.pattern] ?? p.pattern}）${p.actions.map(actLine).join(' ／ ')}`).join('');
+    return `- **${e.name}**［Lv${e.baseLevel}・HP${e.maxHp}・行動:${AI[e.pattern] ?? e.pattern}・経験値${e.exp}・${e.gold}G${marks.length ? '・' + marks.join('・') : ''}］${actLine ? e.actions.map(actLine).join(' ／ ') : ''}${ab ? ' ' + ab : ''}${ph}`;
+  };
+  const enemies = [...ENEMIES.all]; const encounters = [...ENCOUNTERS.all];
+  const dungeons = [...DUNGEONS.all];
+  const bossIds = new Set(dungeons.flatMap((d) => d.pools.boss));
+  const midIds = new Set(dungeons.flatMap((d) => d.pools.midboss ?? []));
+  const eliteIds = new Set(dungeons.flatMap((d) => d.pools.elite.flat()));
+  const usedIds = new Set(dungeons.flatMap((d) => [...d.pools.battle.flat(), ...d.pools.elite.flat(), ...d.pools.boss, ...(d.pools.midboss ?? [])]));
+  out.push(`## 7. 敵（${enemies.length}体。うち 亜種${enemies.filter((e) => e.variantOf).length}・レア${enemies.filter((e) => e.rare).length}・ダンジョンのボス${bossIds.size}・中ボス${midIds.size}）`, '');
+  out.push('読み方: ［そのデータのレベル・その時のHP・行動の決め方・倒した時の経験値とお金］。行動は「名前: 効果」。【大技】は、予告が出ているターンに体勢を崩せる（BREAK）行動。レベルが上がると HP と攻撃が増える。', '');
+  const homes = [...new Set(enemies.map((e) => home.get('enemies:' + e.id) ?? '?'))];
+  for (const h of homes) {
+    const list = enemies.filter((e) => (home.get('enemies:' + e.id) ?? '?') === h).sort((a, b) => a.baseLevel - b.baseLevel);
+    out.push(`### ${scName(h)}（${list.length}体）`, '', ...list.map((e) => enemyLine(e) + (bossIds.has(e.id) ? '｛ダンジョンのボス｝' : midIds.has(e.id) ? '｛中ボス｝' : eliteIds.has(e.id) ? '｛強敵の部屋｝' : usedIds.has(e.id) ? '' : '｛ダンジョンの外（世界マップ・イベントなど）｝')), '');
+  }
+  out.push(`## 8. 戦闘の組み合わせ（${encounters.length}）`, '');
+  for (const h of [...new Set(encounters.map((x) => home.get('encounters:' + x.id) ?? '?'))]) {
+    const list = encounters.filter((x) => (home.get('encounters:' + x.id) ?? '?') === h);
+    out.push(`### ${scName(h)}（${list.length}）`, '', ...list.map((x) => `- ${x.boss ? '【ボス】' : ''}${x.name}: ${x.enemies.map((y) => safe(() => ENEMIES.get(y.defId).name, y.defId) + (y.level ? '(Lv' + y.level + ')' : '')).join('・')}`), '');
+  }
+  out.push(`### ダンジョンごとの敵（${dungeons.length}か所）`, '', '読み方: 「戦闘」「強敵」は、／で区切った組のどれかが出る。', '');
+  const nm = (id) => safe(() => ENEMIES.get(id).name, id);
+  for (const h of [...new Set(dungeons.map((d) => home.get('dungeons:' + d.id) ?? '?'))]) {
+    out.push(`#### ${scName(h)}`, '');
+    for (const d of dungeons.filter((x) => (home.get('dungeons:' + x.id) ?? '?') === h)) {
+      const rows = d.layout ? d.layout.length + '行（固定）' : (d.rows ?? '?') + '行（自動生成）';
+      out.push(`- **${d.name}**［敵の基準Lv${d.baseLevel}・${rows}${d.random ? '・ランダムダンジョン' : ''}${d.finale ? '・最後のダンジョン' : ''}${d.rewardKey ? '・鍵のダンジョン' : ''}］戦闘: ${d.pools.battle.map((g) => g.map(nm).join('+')).join(' ／ ')} ｜ 強敵: ${d.pools.elite.map((g) => g.map(nm).join('+')).join(' ／ ')}${d.pools.midboss ? ' ｜ 中ボス: ' + d.pools.midboss.map(nm).join('+') : ''} ｜ ボス: ${d.pools.boss.map(nm).join('+')}`);
+    }
+    out.push('');
+  }
+
+  // ---------- 9. ジョブの能力値と最初の山札 ----------
+  out.push('## 9. ジョブの能力値と最初の山札', '');
+  for (const c of classes) {
+    const st = Object.entries(c.stats ?? {}).map(([k, v]) => `${STAT[k] ?? k}${v}`).join('・');
+    const deck = (c.deck ?? []).map((d) => `${safe(() => CARDS.get(d.cardId).name, d.cardId)}×${d.count}`).join('・');
+    const jc = (c.jobCards ?? []).map((id) => safe(() => CARDS.get(id).name, id)).join('・');
+    out.push(`- **${c.name}**（${TIER[c.tier ?? 'base']}）HP${c.baseMaxHp}・${st}${deck ? ' ／ 山札: ' + deck : ''}${jc ? ' ／ 転職でもらうカード: ' + jc : ''}`);
+  }
+  out.push('');
+
+  // ---------- 10. 状態異常・属性・お供 ----------
+  out.push('## 10. 状態異常・属性・お供', '', '### 状態異常', '');
+  for (const d of STATUSES.all) out.push(`- **${d.name}**（${d.harmful ? '悪い' : '良い'}）${safe(() => describeStatus(d))}`);
+  out.push('', '### 属性', '');
+  for (const d of ELEMENTS.all) out.push(`- **${d.name}**${d.status ? '（付ける状態異常: ' + (STATUSES.tryGet(d.status)?.name ?? d.status) + '）' : ''}`);
+  out.push('', `### お供（${[...PETS.all].length}種類）`, '');
+  for (const p of PETS.all) out.push(`- **${p.name}**${p.rare ? '（めったに出ない）' : ''}・色${p.colors.length}種類: ${p.description} ／ 戦闘: ${p.abilities.map((a) => safe(() => describeAbility(a))).join('、') || 'なし'} ／ 獣使いの系統: ${p.masterAbilities.map((a) => safe(() => describeAbility(a))).join('、') || 'なし'}`);
+  out.push('');
+
+  // ---------- 11. 同じ中身の物（名前だけ違う物） ----------
+  out.push('## 11. 同じ中身の物（名前だけ違う物。憲章5の確認用）', '', '名前・出どころの印を除いて、中身の行が1文字も違わない物の組です。数字が少しだけ違う物（例: 回復量が2ずつ違う薬）は、ここには出ません。', '');
+  const dupes = (title, list, line, nameOf) => {
+    const g = new Map();
+    for (const x of list) { const k = line(x).replace('**' + nameOf(x) + '**', '').replace(/｛.*?｝/g, ''); if (!g.has(k)) g.set(k, []); g.get(k).push(nameOf(x)); }
+    const groups = [...g.entries()].filter(([, v]) => v.length > 1);
+    out.push(`### ${title}: ${groups.length}組（${groups.reduce((n, [, v]) => n + v.length, 0)}個）`, '', ...groups.map(([k, v]) => `- ${v.join('＝')} … ${k.replace(/^- /, '').slice(0, 110)}`), '');
+  };
+  dupes('武器', weapons, itemLine, (x) => x.name); dupes('鎧', armors, itemLine, (x) => x.name);
+  dupes('装飾品', accs, itemLine, (x) => x.name); dupes('消耗品', cons, itemLine, (x) => x.name);
+  dupes('カード', cards, cardLine, (x) => x.name);
+  dupes('敵', enemies, (e) => enemyLine(e).replace(/亜種（元:.*?）/, ''), (x) => x.name);
   writeFileSync(OUT, out.join('\n').replace(/\r\n/g, '\n') + '\n');
-  console.log(`書き出し: ${OUT}（カード${cards.length}・武器${weapons.length}・鎧${armors.length}・装飾品${accs.length}・消耗品${cons.length}・ジョブ${classes.length}）`);
+  console.log(`書き出し: ${OUT}（カード${cards.length}・武器${weapons.length}・鎧${armors.length}・装飾品${accs.length}・消耗品${cons.length}・ジョブ${classes.length}・敵${enemies.length}）`);
 } finally {
   await server.close();
 }
