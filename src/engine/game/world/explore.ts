@@ -11,6 +11,8 @@ import { mapHeroes } from '../heroes';
 import { colOf, hexDistance, neighbors, rowOf } from './hex';
 import { startTileOf } from './start';
 import { isWideMap, laneOfCol } from './lanes';
+import { isRandomDungeonTile } from './randomDungeons';
+import { aliveScourges } from './scourgeCurse';
 
 export const SPAWN_KINDS: SpawnKind[] = ['star', 'peddler', 'thief'];
 /** 出現スポットで始まるイベント（src/content/common/randomEvents/spawnEvents.ts。where: 'spawn'） */
@@ -139,8 +141,20 @@ export function climbWatchtower(game: GameState, w: WorldState, tile: number) {
     if (t.f?.kind === 'temple' || t.f?.kind === 'altar') sanct++;
     if (rareTiles.has(i)) rares++;
   }
+  // 段階7b（overhaul-plan-v2 §3-1【提案】）: 地図全体の災厄の中ボスとランダムダンジョンの場所も見える（そのマスだけ霧を晴らす）
+  let scourges = 0, randoms = 0;
+  for (const { wd } of aliveScourges(w)) {
+    w.tiles[wd.tile].seen = true;
+    scourges++;
+  }
+  // ランダムダンジョンは、災厄の出る広い地図（シナリオ1）でだけ（ほかの6本の塔は今までどおり）
+  if (isWideMap(game, w)) w.tiles.forEach((t) => {
+    if (!isRandomDungeonTile(t.f) || t.f.used) return;
+    if (!t.seen) randoms++;
+    t.seen = true;
+  });
   w.tiles[tile].f!.used = true;
-  const found = [chests && `宝箱${chests}`, sanct && `転職の施設${sanct}`, rares && `レアの敵${rares}`].filter(Boolean).join('・');
+  const found = [chests && `宝箱${chests}`, sanct && `転職の施設${sanct}`, rares && `レアの敵${rares}`, scourges && `💀災厄${scourges}`, randoms && `ランダムダンジョン${randoms}`].filter(Boolean).join('・');
   addLog(game, `見晴らしの塔に登り、まわりを見渡した。${found ? `（${found}が見えた）` : ''}`);
 }
 

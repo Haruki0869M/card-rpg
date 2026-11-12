@@ -7,7 +7,8 @@ import type { EffectHandler } from '../types';
 
 declare module '../../../../types' {
   interface EffectParams {
-    dealtDamage: { element?: string; bossCap?: number };
+    /** cap = どの戦闘でも1回この値まで（段階7b: 強欲王の黄金冠） */
+    dealtDamage: { element?: string; bossCap?: number; cap?: number };
   }
 }
 
@@ -17,7 +18,8 @@ export const effect: EffectHandler<'dealtDamage'> = {
   apply(ctx, e) {
     if (ctx.dealt <= 0) return false;
     const boss = !!ctx.state.boss || !!ctx.state.midboss;
-    const amount = boss && e.bossCap !== undefined ? Math.min(e.bossCap, ctx.dealt) : ctx.dealt;
+    const capped = e.cap !== undefined ? Math.min(e.cap, ctx.dealt) : ctx.dealt;
+    const amount = boss && e.bossCap !== undefined ? Math.min(e.bossCap, capped) : capped;
     let any = false;
     for (const t of resolveTargets(ctx, targetOf(e))) {
       const loss = dealDamage(ctx, t, amount, e.element, 1, boss && e.bossCap !== undefined ? e.bossCap : undefined);
@@ -26,5 +28,5 @@ export const effect: EffectHandler<'dealtDamage'> = {
     }
     return any;
   },
-  describe: (e, who) => `${who}あふれた量と同じ${e.element ? `${getElement(e.element).name}属性の` : ''}ダメージ${e.bossCap !== undefined ? `（ボス・中ボスへは1回${e.bossCap}まで）` : ''}`,
+  describe: (e, who) => `${who}${e.cap !== undefined ? '得た量' : 'あふれた量'}と同じ${e.element ? `${getElement(e.element).name}属性の` : ''}ダメージ${e.cap !== undefined ? `（1回${e.cap}まで）` : ''}${e.bossCap !== undefined ? `（ボス・中ボスへは1回${e.bossCap}まで）` : ''}`,
 };

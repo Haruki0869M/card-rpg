@@ -370,7 +370,7 @@ export function fireAbilities(
     const twin = ab.pet ? petTwiceOf(owner) : undefined;
     for (let k = 0; k < (twin ? 2 : 1); k++) {
       if (k > 0 && (owner.dead || petCapped(owner))) break;
-      const ctx = makeCtx(state, rng, events, owner, { target: opts.target, allyTarget: opts.allyTarget, attacker: opts.attacker, card: opts.card, dealt: opts.dealt, depth: opts.depth, tierEffects: opts.tierEffects, perfect: opts.perfect, cardAbilities: cardTraitAbilities(opts.card), via: ab.pet ? 'pet' : undefined, weakTarget: opts.weakTarget, helped: opts.helped });
+      const ctx = makeCtx(state, rng, events, owner, { target: opts.target, allyTarget: opts.allyTarget, attacker: opts.attacker, card: opts.card, dealt: opts.dealt, statusId: opts.statusId, depth: opts.depth, tierEffects: opts.tierEffects, perfect: opts.perfect, cardAbilities: cardTraitAbilities(opts.card), via: ab.pet ? 'pet' : undefined, weakTarget: opts.weakTarget, helped: opts.helped });
       let any = false;
       for (const eff of e.do) any = applyEffect(ctx, eff) || any;
       if (!any) break;
@@ -447,6 +447,8 @@ const TRIGGER_TEXT: Record<AbilityTrigger, string> = {
   allyCombo: '味方（自分も）のカードで連携が起きた時',
   broke: '自分の攻撃で敵を BREAK させた時',
   itemUse: '戦闘中に自分が消耗品を使った時',
+  goldGain: '戦闘中に自分がお金を得た時',
+  statusTaken: '自分に悪い状態異常が付いた時',
 };
 
 const condText = (conds?: AbilityCondition[]) => (conds ?? []).map((c) => conditionHandler(c.kind).describe(c as never));

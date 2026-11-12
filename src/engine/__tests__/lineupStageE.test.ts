@@ -30,8 +30,10 @@ function useItem(s: BattleState, itemId: string, target = 0) {
 
 describe('区切りE: 数', () => {
   it('消耗品は24個（コモン5・レア9・エピック7・レジェンド3）。中身が同じ物は無い', () => {
-    const all = ITEMS.all.filter((i) => i.slot === 'consumable');
+    // 段階7b の「災厄討ちの秘薬」（災厄を倒した時だけ。source: 'scourge'）は、店・宝箱の24個とは別に数える
+    const all = ITEMS.all.filter((i) => i.slot === 'consumable' && !i.source);
     expect(all).toHaveLength(24);
+    expect(ITEMS.all.filter((i) => i.slot === 'consumable' && i.source).map((i) => i.id)).toEqual(['scourgeElixir']);
     const n = (r: string) => all.filter((i) => i.rarity === r).length;
     expect([n('common'), n('rare'), n('epic'), n('legend')]).toEqual([5, 9, 7, 3]);
     const uses = all.map((i) => JSON.stringify(i.use));

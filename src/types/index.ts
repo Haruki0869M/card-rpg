@@ -117,7 +117,7 @@ export interface CardDef {
  * 段階7a（ランダムダンジョンの専用の装備）: allyCombo = 味方（自分も入れる）のカードで連携が起きた時 / broke = 自分の攻撃で敵を BREAK させた時 /
  * itemUse = 戦闘中に自分が消耗品を使った時
  */
-export type AbilityTrigger = 'battleStart' | 'turnStart' | 'turnEnd' | 'afterCard' | 'perfect' | 'kill' | 'hurt' | 'allyKill' | 'allyDown' | 'blocked' | 'inflict' | 'foeTick' | 'petAct' | 'summonHit' | 'overheal' | 'cheerPerfect' | 'detonate' | 'combo' | 'guarded' | 'selfBoost' | 'allyCombo' | 'broke' | 'itemUse';
+export type AbilityTrigger = 'battleStart' | 'turnStart' | 'turnEnd' | 'afterCard' | 'perfect' | 'kill' | 'hurt' | 'allyKill' | 'allyDown' | 'blocked' | 'inflict' | 'foeTick' | 'petAct' | 'summonHit' | 'overheal' | 'cheerPerfect' | 'detonate' | 'combo' | 'guarded' | 'selfBoost' | 'allyCombo' | 'broke' | 'itemUse' | /** 段階7b: 戦闘中に自分がお金を得た時（強欲王の黄金冠） */ 'goldGain' | /** 段階7b: 自分に悪い状態異常が付いた時（悪夢の毛皮） */ 'statusTaken';
 
 /** 発動の条件の種類ごとの数値。条件のファイル（src/engine/abilities/conditions/）が declare module で種類を足す */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type

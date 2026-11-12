@@ -41,7 +41,7 @@ import { addItem, addLog, addLoot, restMultiplierOf, hiddenChestChance, isPartyP
 import { getDifficulty } from '../../data/rules';
 import { isBossRoom, roomBehavior, roomTypeOf } from './rooms';
 import { growthHandler, growthOptions } from './growth';
-import { RARITY_NAME } from '../../data/terms';
+import { RARITY_NAME, STAT_LABEL } from '../../data/terms';
 import { createWorld } from './world/generate';
 import { corruptionLevelBonus, wandererLevel } from './world/wanderers';
 import {
@@ -68,7 +68,8 @@ import {
 import { questGatedNext } from './world/questGate';
 import { leaveSanctuary, leaveShrine, leaveTown, questAccept, questReport, shrineChoose, bringMyPet, townBuy, townInn, townRemoveCard, townSell } from './world/town';
 import { getRoomType } from '../../data/rules';
-import { TERRAINS } from '../../data/world';
+import { SCOURGES, TERRAINS } from '../../data/world';
+import { onScourgeDefeated, scourgeLoot } from './world/scourges';
 import { buildDungeon, depthTier, findRoom, isLegacyLayout, RARITIES, rarityIndex, reachableRooms, themeReward } from './dungeon';
 import { canMove, cellKey, DIRS, doorFront, doorNorthOf, findPath, moveIntoRoom, posOf, revealSeen, turnTo } from './dungeonMap';
 import { canWatchHere, watchSpot } from './dungeonOmen';
@@ -81,6 +82,7 @@ import {
   heroMaxHp,
   heroStats,
   pouchLimitOf,
+  STAT_IDS,
   toPartyMember,
 } from './hero';
 import { needsVote, tally, VOTED_COMMANDS, voteCtx, voters } from './votes';
@@ -725,7 +727,7 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
   let exp = 0;
   let gold = 0;
   const rt = getRoomType(room?.type ?? game.battleInfo?.roomType ?? 'battle');
-  if (!room) onWandererDefeated(game, rng);
+  const defeatedWanderer = !room ? onWandererDefeated(game, rng) : undefined;
   // 深層ボーナス: ダンジョンの奥の部屋ほど、お金・経験値が増え、カードのコモンが減る（古い形のダンジョンには付けない）
   const tier = room && run && !isLegacyLayout(run) ? depthTier(room.row) : 0;
   const rewardMul = (getDifficulty(game.difficulty).reward ?? 1) * (1 + BALANCE.depthBonus.reward[tier]);
@@ -791,6 +793,12 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
       reward.loot.push({ kind: 'item', item, to: to.id });
       addItem(game, to, item, true);
     }
+  }
+  // 災厄の中ボス（段階7b）: 悪さが消え、お金・侵食度・物語の窓。専用の装備（必ず）と秘薬は報酬の画面で渡す
+  const scourge = defeatedWanderer?.scourge ? SCOURGES.tryGet(defeatedWanderer.scourge) : undefined;
+  if (scourge && survivorHeroes.length) {
+    onScourgeDefeated(game, scourge, survivorHeroes);
+    scourgeLoot(game, reward, survivorHeroes, scourge);
   }
   // 封魔の宝箱の番人との戦闘: 勝つと、その宝箱を開ける（隠し宝箱の抽選はしない）
   const sealedFight = !!room && game.chest?.roomId === room.id && !!game.chest.spec.sealed;
@@ -1416,6 +1424,15 @@ function usePouchItem(
     if (err) return { error: err, events: [] };
     const at = owner.pouch.findIndex((p) => p.uid === cmd.itemUid);
     if (at >= 0) owner.pouch.splice(at, 1);
+    return { events: [] };
+  }
+  // 段階7b: 災厄討ちの秘薬（選んだ能力値を、この冒険の間 +amount。冒険をまたいでは残らない）
+  if (field && field.kind === 'fieldOnly' && field.what === 'elixir') {
+    if (!cmd.stat || !STAT_IDS.includes(cmd.stat)) return { error: '上げる能力値を選んでください', events: [] };
+    const n = field.amount ?? BALANCE.scourge.elixirStat;
+    target.bonusStats[cmd.stat] = (target.bonusStats[cmd.stat] ?? 0) + n;
+    owner.pouch.splice(idx, 1);
+    addLog(game, `${user.name}が${def.name}を使った。${target.name}の${STAT_LABEL[cmd.stat]}が${n}上がった（この冒険の間）`);
     return { events: [] };
   }
   if (field && field.kind === 'fieldOnly' && field.what === 'whetstone') {

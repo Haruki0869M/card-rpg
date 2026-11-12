@@ -5,7 +5,7 @@ import type { OutcomeHandler } from '../types';
 
 declare module '../../../../types' {
   interface OutcomeParams {
-    fieldOnly: { what: 'purify' | 'tent' | 'whetstone' | 'petFeast'; amount?: number; focus?: number };
+    fieldOnly: { what: 'purify' | 'tent' | 'whetstone' | 'petFeast' | 'elixir'; amount?: number; focus?: number };
   }
 }
 
@@ -23,7 +23,7 @@ export const outcome: OutcomeHandler<'fieldOnly'> = {
   check: (ctx, o) => {
     if (o.what === 'purify' && !ctx.game.world) return '世界マップのある冒険で使います';
     if (o.what === 'petFeast' && !ctx.targets().some((h) => h.pet)) return 'お供がいません';
-    if (o.what === 'tent' || o.what === 'whetstone') return 'この道具は、道具袋から使ってください';
+    if (o.what === 'tent' || o.what === 'whetstone' || o.what === 'elixir') return 'この道具は、道具袋から使ってください';
     return null;
   },
   describe: (o) => (o.what === 'purify' ? `侵食度-${o.amount}%・味方全員のフォーカス+${o.focus}` : o.what === 'petFeast' ? `次の戦闘の1ターン目に、お供が${o.amount}回行動する` : ''),

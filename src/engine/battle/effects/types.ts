@@ -36,6 +36,8 @@ export interface EffectCtx {
   addOnceUsed?: boolean;
   /** HPに与えたダメージの合計（吸収などが読む） */
   dealt: number;
+  /** きっかけになった状態異常（段階7b: 自分に付いた悪い状態異常をうつす。悪夢の毛皮） */
+  statusId?: string;
   /** 結果の短い表示（ログ・カードの結果の表示） */
   parts: string[];
   /** 効果を受けた相手のID（敵の行動の演出用） */

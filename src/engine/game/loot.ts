@@ -86,7 +86,7 @@ export function blackMarketStock(game: GameState, h: Hero, rng: Rng): NonNullabl
 
 /** その格の消費アイテム（無ければそれより下で一番高い格） */
 export function rollConsumable(rarity: Rarity, rng: Rng): ItemDef {
-  const all = ITEMS.all.filter((i) => i.slot === 'consumable' && rarityIndex(i.rarity) <= rarityIndex(rarity));
+  const all = ITEMS.all.filter((i) => i.slot === 'consumable' && !i.source && rarityIndex(i.rarity) <= rarityIndex(rarity));
   const top = Math.max(...all.map((i) => rarityIndex(i.rarity)));
   return pick(
     all.filter((i) => rarityIndex(i.rarity) === top),

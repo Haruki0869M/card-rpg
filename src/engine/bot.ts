@@ -12,7 +12,7 @@ import { QUESTS, TOWNS } from '../data/world';
 import { canReportQuest } from './game/world/town';
 import { questsShort } from './game/world/questGate';
 import type { GameCommand, GameState, PlayerId, WorldState } from '../types';
-import { moveCostOf, neighbors } from './game/world/hex';
+import { moveCostOf, neighbors, pathTo } from './game/world/hex';
 import { isWideMap } from './game/world/lanes';
 import {
   applyGameCommand,
@@ -142,7 +142,7 @@ function questGateTarget(g: GameState, at: number, goal: string): { tile: number
       if (i !== undefined) return { tile: i, why: 'dungeon' };
     }
     if (o.kind === 'defeatWanderers') {
-      const i = near(w.wanderers.filter((x) => !x.raidTown && (urgent || w.tiles[x.tile].seen)).map((x) => x.tile));
+      const i = near(w.wanderers.filter((x) => !x.raidTown && !x.scourge && (urgent || w.tiles[x.tile].seen)).map((x) => x.tile));
       if (i !== undefined) return { tile: i, why: 'grind' };
     }
   }
@@ -182,7 +182,8 @@ function worldTarget(g: GameState, at: number, straight = false): { tile: number
     if (best !== undefined) return { tile: best, why: 'town' };
   }
   if (!straight && avgLv < need) {
-    const near = w.wanderers.filter((x) => w.tiles[x.tile].seen).sort((a, b) => hexDistance(w, at, a.tile) - hexDistance(w, at, b.tile))[0];
+    // 災厄の中ボス（段階7b）には、自動プレイは挑まない（寄り道は「工夫する bot」の段階で）
+    const near = w.wanderers.filter((x) => w.tiles[x.tile].seen && !x.scourge).sort((a, b) => hexDistance(w, at, a.tile) - hexDistance(w, at, b.tile))[0];
     if (near && hexDistance(w, at, near.tile) <= 6) return { tile: near.tile, why: 'grind' };
   }
   const gate = questGateTarget(g, at, goal);
@@ -248,7 +249,10 @@ function worldStep(g: GameState, log: BotLog, memo: BotMemo): GameState {
     // 広い地図（段階6a）: 仕切りの壁で行き止まりにならないように、歩いてかかる移動力で近い所を選ぶ。前の地図は今までどおり（まっすぐの距離）
     const far = isWideMap(g, w) ? walkCostTo(w, target.tile) : undefined;
     const dist = (i: number) => (far ? (far.get(i) ?? Infinity) : hexDistance(w, i, target.tile));
-    for (const [i] of reach) if (dist(i) < dist(best)) best = i;
+    // 災厄の中ボスの巣を通る道は選ばない（今の自動プレイは災厄に挑まない。段階7b）
+    const nests = new Set(w.wanderers.filter((x) => x.scourge).map((x) => x.tile));
+    const viaNest = (i: number) => nests.size > 0 && pathTo(reach, i).some((t) => nests.has(t));
+    for (const [i] of reach) if (dist(i) < dist(best) && !viaNest(i)) best = i;
     if (best !== at) {
       const companions = livingHeroes(g)
         .filter((x) => x.id !== h.id && w.pos[x.id] === at && !g.expeditions?.some((e) => e.heroes.includes(x.id)))

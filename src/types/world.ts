@@ -258,6 +258,36 @@ export interface Wanderer {
   raidTown?: string;
   /** レアの敵の組（地図に星印で出る。K3） */
   rare?: true;
+  /** 災厄の中ボス（段階7b・overhaul-plan-v2 §3）の ID。動かない。生きている間、世界に悪さをする */
+  scourge?: string;
+}
+
+/**
+ * 災厄の中ボス（段階7b・overhaul-plan-v2 §3）。src/content/common/scourges/ に1体ずつ置く（自動で登録）。
+ * 悪さは「種類＋数字」で書く（名前や ID で分岐しない）。生きている災厄の悪さは足し合わせる（world/scourges.ts の scourgeCurse）
+ */
+export interface ScourgeDef {
+  id: string;
+  order?: number;
+  /** 名前（強欲の盗賊王）と、札に出す短い名前（盗賊王） */
+  name: string;
+  short: string;
+  /** 災厄の本体の敵ID / 取り巻きの敵ID（前から順に、2人まで=2体・4人=3体） */
+  boss: string;
+  minions: string[];
+  /** 生きている間の悪さ。shopPrice = 町の店の値段 +N% / corruptionPerTurn = 世界マップの番の侵食度 +N% / campHeal = 野営のHPの回復の倍率 / nightLevel = 夜の敵のレベル +N */
+  curse: { shopPrice?: number; corruptionPerTurn?: number; campHeal?: number; nightLevel?: number };
+  /** 札に出す悪さの短い文（店+25%）と、知らせ・説明の文 */
+  curseShort: string;
+  curseText: string;
+  /** 倒した時の報酬。gold = 戦った全員で山分け / corruption = 侵食度を下げる量（寄り道の浄化とは別） / elixir = 秘薬の数 */
+  reward: { gold?: number; corruption?: number; elixir?: number };
+  /** 専用の装備（必ず落とす。ItemDef.source = 'scourge'） */
+  gear: string;
+  /** 倒した時の文（店の値段が元に戻った） */
+  clearText: string;
+  /** 出た時の文（物語の窓に出す。1〜2行） */
+  appearText: string;
 }
 
 export interface Raid {
@@ -325,6 +355,12 @@ export interface WorldState {
   /** 同行の誘い（誘われたキャラ → 誘ったキャラ）と、承知した同行（同じ形）。手番が変わると消える */
   invites?: Record<string, string>;
   follow?: Record<string, string>;
+  /**
+   * 災厄の中ボス（段階7b）: 出た回数（節目の数。古い保存は無く、最初のワールドターンの終わりに「もう越えた節目の数」にする）と、
+   * 出た災厄の ID（同じ種類は2回出ない）。広い地図だけで使う
+   */
+  scourgeCount?: number;
+  scourgesMet?: string[];
 }
 
 export interface ShopStock {
