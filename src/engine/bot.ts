@@ -38,6 +38,8 @@ import {
   sealStep,
   dungeonEnemyLevel,
 } from './index';
+import { cardTaskCommand, cleverBattleCommand, cleverDetour, effectiveLevel, jobCommand, newCleverMemo, noteEncounter, restKind, cleverUses, type CleverMemo, type CleverPart } from './botClever';
+import { isRandomDungeonTile } from './game/world/randomDungeons';
 
 export interface BotLog {
   steps: number;
@@ -80,6 +82,11 @@ export interface BotMemo {
    * レベル上げをせず、次に入れる鍵のダンジョン → 最終ダンジョンへ向かう。町は回復・船の依頼の時だけ寄る。
    */
   straight?: boolean;
+  /**
+   * 工夫する bot（計画書 第2版 §5-3。botClever.ts）。普通の bot に、寄り道（ランダムダンジョン・災厄）・転職・
+   * 戦闘の工夫（弱点・BREAK・連携・予告への手）・休憩で技を磨く を足す。無い時は、今までの bot と同じ動き
+   */
+  clever?: CleverMemo;
 }
 
 /** 目的のダンジョン（鍵の順。最後は魔王城） */
@@ -158,13 +165,14 @@ function questGateTarget(g: GameState, at: number, goal: string): { tile: number
 const BOT_QUEST_DETOUR = 6;
 
 /** 世界マップでの行き先（HPが減ったら町、レベルが足りなければ近くの敵、それ以外は次のダンジョン） */
-function worldTarget(g: GameState, at: number, straight = false): { tile: number; why: 'town' | 'grind' | 'dungeon' } {
+function worldTarget(g: GameState, at: number, straight = false, cm?: CleverMemo): { tile: number; why: 'town' | 'grind' | 'dungeon' } {
   const w = g.world!;
   const heroes = livingHeroes(g);
   const goal = goalDungeon(g, straight);
   // 目的のダンジョンの敵の基準レベル（ダンジョンの順番ごとの上乗せを入れた値）に届くまで、近くの敵で育てる
   const need = dungeonEnemyLevel(DUNGEONS.get(goal)) + (DUNGEONS.get(goal).finale ? 1 : 0);
-  const avgLv = heroes.reduce((n, h) => n + h.level, 0) / heroes.length;
+  // 工夫する bot は、転職で Lv1 に戻った分を足した「育ち具合」で比べる（botClever.ts の effectiveLevel）
+  const avgLv = heroes.reduce((n, h) => n + (cleverUses(cm, 'job') ? effectiveLevel(h) : h.level), 0) / heroes.length;
   // 船がもらえる依頼がまだなら、まずその町へ（海を渡るシナリオ）
   if (!w.ship) {
     const i = w.tiles.findIndex((t) => t.f?.kind === 'town' && (TOWNS.get(t.f.id).quests ?? []).some((qid) => QUESTS.get(qid).reward.some((o) => o.kind === 'ship') && !w.quests.some((q) => q.id === qid && q.reported)));
@@ -180,6 +188,11 @@ function worldTarget(g: GameState, at: number, straight = false): { tile: number
       if (best === undefined || hexDistance(w, at, i) < hexDistance(w, at, best)) best = i;
     });
     if (best !== undefined) return { tile: best, why: 'town' };
+  }
+  // 工夫する bot: 寄り道（災厄・見晴らしの塔・ランダムダンジョン）
+  if (cm && cleverUses(cm, 'detour')) {
+    const d = cleverDetour(g, at, cm);
+    if (d) return { tile: d.tile, why: d.why };
   }
   if (!straight && avgLv < need) {
     // 災厄の中ボス（段階7b）には、自動プレイは挑まない（寄り道は「工夫する bot」の段階で）
@@ -218,7 +231,7 @@ function worldStep(g: GameState, log: BotLog, memo: BotMemo): GameState {
   const h = findHero(g, w.turn)!;
   const p = pid(g, h.id);
   const at = w.pos[h.id];
-  const target = worldTarget(g, at, memo.straight);
+  const target = worldTarget(g, at, memo.straight, memo.clever);
   const key = `${w.worldTurn}:${h.id}:${at}`;
   // 目的地に着いたら入る（1手番に1回だけ）
   if (at === target.tile && !memo.interacted.has(key)) {
@@ -227,6 +240,8 @@ function worldStep(g: GameState, log: BotLog, memo: BotMemo): GameState {
     if (target.why !== 'grind' && dungeonJoin(g, at)?.blocked) return send(g, { type: 'WORLD_WAIT', playerId: p, heroId: h.id }, log);
     if (target.why !== 'grind') {
       const ng = send(g, { type: 'WORLD_INTERACT', playerId: p, heroId: h.id, party: livingHeroes(g).filter((x) => w.pos[x.id] === at).map((x) => x.id) }, log);
+      // 工夫する bot: ランダムダンジョンに入った回数を数える（挑み直しの上限のため）
+      if (memo.clever && ng !== g && isRandomDungeonTile(w.tiles[at].f)) memo.clever.randomTries++;
       if (ng !== g) return ng;
     }
   }
@@ -250,7 +265,8 @@ function worldStep(g: GameState, log: BotLog, memo: BotMemo): GameState {
     const far = isWideMap(g, w) ? walkCostTo(w, target.tile) : undefined;
     const dist = (i: number) => (far ? (far.get(i) ?? Infinity) : hexDistance(w, i, target.tile));
     // 災厄の中ボスの巣を通る道は選ばない（今の自動プレイは災厄に挑まない。段階7b）
-    const nests = new Set(w.wanderers.filter((x) => x.scourge).map((x) => x.tile));
+    // 工夫する bot は、目指している災厄の巣だけは通ってよい（そこが行き先）
+    const nests = new Set(w.wanderers.filter((x) => x.scourge && !(memo.clever && x.tile === target.tile)).map((x) => x.tile));
     const viaNest = (i: number) => nests.size > 0 && pathTo(reach, i).some((t) => nests.has(t));
     for (const [i] of reach) if (dist(i) < dist(best) && !viaNest(i)) best = i;
     if (best !== at) {
@@ -264,10 +280,16 @@ function worldStep(g: GameState, log: BotLog, memo: BotMemo): GameState {
   return send(g, { type: 'WORLD_WAIT', playerId: p, heroId: h.id }, log);
 }
 
-function battleStep(g: GameState, log: BotLog): GameState {
+function battleStep(g: GameState, log: BotLog, memo: BotMemo): GameState {
   const b = g.battle!;
+  if (b.phase === 'ally' && cleverUses(memo.clever, 'battle')) {
+    // 工夫する bot の戦闘（botClever.ts）。出す物が無ければ、下の普通の bot と同じく番を終える
+    const cmd = cleverBattleCommand(b);
+    if (cmd) return send(g, { type: 'BATTLE', command: cmd }, log);
+  }
   if (b.phase === 'ally') {
     for (const a of b.allies) {
+      if (cleverUses(memo.clever, 'battle')) break;
       if (isDone(b, a)) continue;
       const c = a.hand.find((x) => !unusableReason(b, a, cardOf(x), x.uid));
       if (!c) continue;
@@ -327,6 +349,12 @@ export function botStep(g: GameState, log: BotLog, memo: BotMemo, inScene = fals
       const eq = equipBest(g, log);
       if (eq !== g) return eq;
       const w = g.world!;
+      // 工夫する bot: 世界マップにいるキャラの、カードの作業（イベントの強化など）と転職
+      if (memo.clever && !w.story && !w.moveProposal) {
+        const onMap = livingHeroes(g).filter((x) => !g.expeditions?.some((e) => e.heroes.includes(x.id)));
+        const cmd = cardTaskCommand(onMap) ?? (cleverUses(memo.clever, 'job') ? jobCommand(g, onMap) : undefined);
+        if (cmd) return send(g, cmd, log);
+      }
       // 一緒に動く移動先の提案: 同行している人の分は同意する
       if (w.moveProposal) {
         const p = w.moveProposal.owners.find((o) => !w.moveProposal!.agreed.includes(o))!;
@@ -339,6 +367,7 @@ export function botStep(g: GameState, log: BotLog, memo: BotMemo, inScene = fals
     }
     case 'encounter': {
       const e = g.encounter!;
+      if (memo.clever) noteEncounter(g, memo.clever);
       // 近くにいる他の人のキャラは「加わる」と答えてから（自動プレイは全員の代わりに答える）
       const mover = findHero(g, e.heroId)!;
       const ask = e.candidates.map((id) => findHero(g, id)!).find((c) => c.playerId !== mover.playerId && g.world!.pos[c.id] !== e.tile && e.joins?.[c.id] === undefined);
@@ -347,7 +376,7 @@ export function botStep(g: GameState, log: BotLog, memo: BotMemo, inScene = fals
       return send(g, { type: 'ENCOUNTER_CHOOSE', playerId: pid(g, e.heroId), choice: 'fight', heroId: e.heroId, focusUsed: 0, participants: e.candidates }, log);
     }
     case 'battle':
-      return battleStep(g, log);
+      return battleStep(g, log, memo);
     case 'reward': {
       const r = g.reward!;
       if (r.levelUps.length) {
@@ -370,6 +399,11 @@ export function botStep(g: GameState, log: BotLog, memo: BotMemo, inScene = fals
     }
     case 'dungeon': {
       const run = g.dungeon!;
+      // 工夫する bot: 休憩で「技を磨く」を選んだ後などの、カードを1枚選ぶ作業
+      if (memo.clever) {
+        const cmd = cardTaskCommand(livingHeroes(g).filter((x) => !g.party || g.party.includes(x.id)));
+        if (cmd) return send(g, cmd, log);
+      }
       // 扉は左から右の順（画面の扉のボタンと同じ並び）
       const rooms = [...reachableRooms(run)].sort((a, b) => a.col - b.col);
       const hurt = livingHeroes(g).some((h) => h.hp < heroMaxHp(h) * 0.5);
@@ -417,12 +451,25 @@ export function botStep(g: GameState, log: BotLog, memo: BotMemo, inScene = fals
       }
       return g;
     }
-    case 'rest':
+    case 'rest': {
+      if (memo.clever) {
+        // 工夫する bot: 休憩部屋でも中位へ転職できる。HPに余裕があれば「技を磨く」
+        const scene = livingHeroes(g).filter((x) => !g.party || g.party.includes(x.id));
+        const job = cleverUses(memo.clever, 'job') ? jobCommand(g, scene) : undefined;
+        if (job) return send(g, job, log);
+        return send(g, { type: 'REST', playerId: pid(g), kind: cleverUses(memo.clever, 'hone') ? restKind(scene) : 'hp' }, log);
+      }
       return send(g, { type: 'REST', playerId: pid(g), kind: 'hp' }, log);
+    }
     case 'cleared':
       return send(g, { type: 'RETURN_TO_HUB', playerId: pid(g) }, log);
     case 'town': {
       const t = g.town!;
+      // 工夫する bot: 町（聖堂）で転職する（中位→最上位はここか祠・神殿）
+      if (cleverUses(memo.clever, 'job')) {
+        const job = jobCommand(g, livingHeroes(g).filter((x) => !g.expeditions?.some((e) => e.heroes.includes(x.id))));
+        if (job) return send(g, job, log);
+      }
       // 船がもらえる依頼（報酬に ship がある）は、受けてすぐ報告する（海を渡るシナリオの最初の町）
       for (const qid of TOWNS.get(t.townId).quests ?? []) {
         if (!QUESTS.get(qid).reward.some((o) => o.kind === 'ship')) continue;
@@ -447,10 +494,20 @@ export function botStep(g: GameState, log: BotLog, memo: BotMemo, inScene = fals
       }
       return send(g, { type: 'LEAVE_TOWN', playerId: pid(g) }, log);
     }
-    case 'sanctuary':
+    case 'sanctuary': {
+      // 工夫する bot: 神殿・祭壇で転職する（特殊職・最上位）
+      if (cleverUses(memo.clever, 'job')) {
+        const job = jobCommand(g, livingHeroes(g).filter((x) => !g.expeditions?.some((e) => e.heroes.includes(x.id))));
+        if (job) return send(g, job, log);
+      }
       return send(g, { type: 'LEAVE_SANCTUARY', playerId: pid(g) }, log);
+    }
     case 'shrine': {
       const s = g.shrine!;
+      if (cleverUses(memo.clever, 'job')) {
+        const job = jobCommand(g, livingHeroes(g).filter((x) => !g.expeditions?.some((e) => e.heroes.includes(x.id))));
+        if (job) return send(g, job, log);
+      }
       if (s.result) return send(g, { type: 'LEAVE_SHRINE', playerId: pid(g) }, log);
       return send(g, { type: 'SHRINE_CHOOSE', playerId: pid(g, s.heroId), optionIndex: 0, heroId: s.heroId }, log);
     }
@@ -472,10 +529,11 @@ export function botNextCommand(g: GameState, memo: BotMemo): GameCommand | null 
   }
 }
 
-/** エンディングかゲームオーバーまで自動で遊ぶ（opts.straight = 人のようにまっすぐ進む。BotMemo を参照） */
-export function playToEnd(g: GameState, maxSteps = 60000, opts: { straight?: boolean } = {}): { game: GameState; log: BotLog } {
+/** エンディングかゲームオーバーまで自動で遊ぶ（opts.straight = 人のようにまっすぐ進む。opts.clever = 工夫する bot。BotMemo を参照） */
+export function playToEnd(g: GameState, maxSteps = 60000, opts: { straight?: boolean; clever?: boolean; cleverOff?: CleverPart[] } = {}): { game: GameState; log: BotLog } {
   const log: BotLog = { steps: 0, errors: [], modes: {} };
   const memo: BotMemo = { interacted: new Set<string>(), straight: opts.straight };
+  if (opts.clever) memo.clever = newCleverMemo(opts.cleverOff);
   let stuck = 0;
   for (; log.steps < maxSteps; log.steps++) {
     if (g.mode === 'ending' || g.mode === 'gameover') break;
