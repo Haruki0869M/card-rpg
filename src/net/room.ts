@@ -107,6 +107,8 @@ export const normalizeCode = (s: string) =>
     .slice(0, 4);
 
 export class RoomError extends Error {}
+/** 合言葉の部屋が無い（消えた）時の文。タイトルの「前の部屋に戻る」で見分ける */
+export const ROOM_MISSING = 'その合言葉の部屋はありません';
 
 export class Room {
   meta: RoomMeta | null = null;
@@ -214,7 +216,7 @@ export class Room {
     const code = normalizeCode(rawCode);
     if (code.length !== 4) throw new RoomError('合言葉は4文字です');
     const meta = await backend.get<RoomMeta>(roomPath(code, 'meta'));
-    if (!meta) throw new RoomError('その合言葉の部屋はありません');
+    if (!meta) throw new RoomError(ROOM_MISSING);
     if (meta.version !== GAME_VERSION || meta.content !== contentVersion()) throw new RoomError('ゲームの版が部屋と違います。ページを読み込み直してください');
     const me = await backend.get<Member>(roomPath(code, 'members', backend.uid));
     if (!me) {

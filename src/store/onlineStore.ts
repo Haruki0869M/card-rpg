@@ -38,6 +38,8 @@ interface OnlineState {
   setPlayerName: (n: string) => void;
   createRoom: (opts: { scenarioId: string; difficulty: string; partySize: number }) => Promise<boolean>;
   joinRoom: (code: string) => Promise<boolean>;
+  /** 「前の部屋に戻る」を出さなくする（部屋がもう無い時） */
+  forgetLastRoom: () => void;
   leaveRoom: () => Promise<void>;
   claimSlot: (index: number, hero: Omit<Slot, 'ownerUid'>) => Promise<void>;
   releaseSlot: (index: number) => Promise<void>;
@@ -168,6 +170,10 @@ export const useOnline = create<OnlineState>((set, get) => {
         const b = await backend();
         attach(await Room.join(b, normalizeCode(code), get().playerName || 'プレイヤー'));
       }),
+    forgetLastRoom: () => {
+      set({ lastCode: null });
+      saveLast(null, get().playerName);
+    },
     leaveRoom: async () => {
       const r = get().room;
       set({ room: null, offlineSince: {}, editingSlot: null });
