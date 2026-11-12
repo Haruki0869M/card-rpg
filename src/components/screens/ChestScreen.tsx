@@ -8,7 +8,7 @@ import { Check, ChevronsRight, Lock, Sparkles, Star, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BattleBackground, ChestImage } from '../../art';
 import { BALANCE, REVEAL_TIMING, VIBRATION } from '../../data/balance';
-import { chestOdds, chestShared, expectedChestOdds, findHero, rarityIndex, sealStep, statChance, sceneBackground, sceneHeroes } from '../../engine';
+import { chestOdds, chestShared, expectedChestOdds, findHero, rarityIndex, sealStep, statChance, sceneBackground, sceneHeroes, themeReward } from '../../engine';
 import { PLAYER_COLOR } from '../../data/theme';
 import { useOnline } from '../../store/onlineStore';
 import { ClaimPanel } from '../ui/ClaimPanel';
@@ -300,9 +300,11 @@ export function ChestScreen() {
   const hero = opener ?? sceneHeroes(game).find((h) => h.id === heroId) ?? sceneHeroes(game)[0];
   const chance = statChance(hero, 'luk', 'luck');
   const slots = BALANCE.chestLuckSlots;
-  const expected = useMemo(() => expectedChestOdds(look, slots, Math.min(focus, slots, hero.focus), chance), [look, slots, focus, hero.focus, chance]);
-  const perfectOdds = useMemo(() => chestOdds(look, slots), [look, slots]);
-  const shownOdds = !opened ? expected : roll?.odds && (passed('shift') || showResult || !roll.oddsBefore) ? roll.odds : (roll?.oddsBefore ?? chestOdds(look, 0));
+  // 封魔の地下迷宮の宝箱はエピックが出やすい（ボスの黄金箱は別。段階7a。エンジンの openChest と同じ決め方）
+  const epicMul = chest.roomId && !chest.spec.big ? themeReward(game.dungeon).epicMul : 1;
+  const expected = useMemo(() => expectedChestOdds(look, slots, Math.min(focus, slots, hero.focus), chance, epicMul), [look, slots, focus, hero.focus, chance, epicMul]);
+  const perfectOdds = useMemo(() => chestOdds(look, slots, epicMul), [look, slots, epicMul]);
+  const shownOdds = !opened ? expected : roll?.odds && (passed('shift') || showResult || !roll.oddsBefore) ? roll.odds : (roll?.oddsBefore ?? chestOdds(look, 0, epicMul));
 
   const r = RARITY_STYLE[showResult ? grade : look];
   const title = chest.spec.big ? `大宝箱（${CHEST_NAME[look]}）` : chest.spec.sealed ? `封魔の宝箱（${CHEST_NAME[look]}）` : CHEST_NAME[look];

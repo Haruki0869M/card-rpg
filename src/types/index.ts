@@ -113,7 +113,11 @@ export interface CardDef {
  * summonHit 自分の砲台・罠・召喚が敵のHPにダメージを与えた後 / overheal 自分の回復が味方のHPからあふれた時（満タンの味方を回復した時も） /
  * cheerPerfect 自分が「応援」を付けた味方のカードが完全成功した時（1人パーティなら自分でも） / detonate 状態異常を起爆して消した時
  */
-export type AbilityTrigger = 'battleStart' | 'turnStart' | 'turnEnd' | 'afterCard' | 'perfect' | 'kill' | 'hurt' | 'allyKill' | 'allyDown' | 'blocked' | 'inflict' | 'foeTick' | 'petAct' | 'summonHit' | 'overheal' | 'cheerPerfect' | 'detonate' | 'combo' | 'guarded' | 'selfBoost';
+/**
+ * 段階7a（ランダムダンジョンの専用の装備）: allyCombo = 味方（自分も入れる）のカードで連携が起きた時 / broke = 自分の攻撃で敵を BREAK させた時 /
+ * itemUse = 戦闘中に自分が消耗品を使った時
+ */
+export type AbilityTrigger = 'battleStart' | 'turnStart' | 'turnEnd' | 'afterCard' | 'perfect' | 'kill' | 'hurt' | 'allyKill' | 'allyDown' | 'blocked' | 'inflict' | 'foeTick' | 'petAct' | 'summonHit' | 'overheal' | 'cheerPerfect' | 'detonate' | 'combo' | 'guarded' | 'selfBoost' | 'allyCombo' | 'broke' | 'itemUse';
 
 /** 発動の条件の種類ごとの数値。条件のファイル（src/engine/abilities/conditions/）が declare module で種類を足す */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -173,6 +177,18 @@ export type AbilityEffect =
   | { modifier: 'weaknessDamage'; multiplier: number; if?: AbilityCondition[] }
   /** 属性の攻撃を受ける時: immune = 無効 / absorb = 受けるダメージ分回復 / half = 半分（K2。敵の攻撃から守る） */
   | { modifier: 'elementGuard'; element: string; mode: 'immune' | 'absorb' | 'half'; if?: AbilityCondition[] }
+  /** 段階7a: 「×N回」の攻撃の回数+add（連装ガトリング銃。2回以上の攻撃だけ） */
+  | { modifier: 'extraHits'; add: number }
+  /** 段階7a: お供の自動の行動（お供の能力のきっかけで動いた時）が2回になる。カード・道具で動かした時は1回（双子の魂の鈴） */
+  | { modifier: 'petTwice' }
+  /** 段階7a: カードの成功が0だったら、完全成功に変わり、フォーカス+1（1ターンに1回。乱数は引かない。いかさま師の黄金賽） */
+  | { modifier: 'rigDice' }
+  /** 段階7a: ターンの始めに、使わずに残ったマナを最大 max まで持ち越す（過充填の魔導炉） */
+  | { modifier: 'carryMana'; max: number }
+  /** 段階7a: カードで自分が得たブロックの pct% を、HPの割合が一番低いほかの味方にも（共鳴する絆の指輪） */
+  | { modifier: 'shareBlock'; pct: number }
+  /** 段階7a: HPが減るたび、次の攻撃カード1枚のダメージ+pct%（最大+max%。使うと0に戻る。狂王の血鎧） */
+  | { modifier: 'rageStack'; pct: number; max: number }
   /** 属性の無い物理攻撃を属性 into に変える（K2。炎の指輪など） */
   | { modifier: 'convertElement'; into: string; if?: AbilityCondition[] }
   /** 自分が付ける状態異常の量+amount（呪詛など） */

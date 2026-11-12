@@ -1,14 +1,14 @@
 // ===== 冒険のエンジンの小さな道具（game.ts と world/ で共有する） =====
 import { BALANCE } from '../../data/balance';
 import { getClass } from '../../data/classes';
-import { getItem, POUCH_LIMIT } from '../../data/items';
+import { getItem } from '../../data/items';
 import { getPet } from '../../data/pets';
 import type { GameState, Hero, ItemInstance, Loot, SlotResult, StatId } from '../../types';
 import type { Rng } from '../rng';
 import { finalChanceOf } from './checks';
 import { rarityIndex } from './dungeon';
 import { findHero, livingHeroes, sceneHeroes } from './heroes';
-import { equippedItems, heroStats } from './hero';
+import { equippedItems, heroStats, pouchLimitOf } from './hero';
 import { petExplore } from './pets';
 import { exploreEffects } from './exploreAbilities';
 
@@ -41,10 +41,11 @@ export const successes = (r: SlotResult[]) => r.filter((x) => x !== 'miss').leng
 export function addItem(game: GameState, hero: Hero, item: ItemInstance, gainedInDungeon: boolean): string {
   const def = getItem(item.itemId);
   if (def.slot === 'consumable') {
-    if (hero.pouch.length >= POUCH_LIMIT || (def.pouchMax !== undefined && hero.pouch.filter((p) => p.itemId === def.id).length >= def.pouchMax)) {
+    const limit = pouchLimitOf(hero);
+    if (hero.pouch.length >= limit || (def.pouchMax !== undefined && hero.pouch.filter((p) => p.itemId === def.id).length >= def.pouchMax)) {
       const g = rarityIndex(def.rarity) * 15 + 10;
       earnGold(hero, g);
-      return `${def.name}（${hero.name}の袋が${hero.pouch.length >= POUCH_LIMIT ? '満杯' : `${def.name}でいっぱい`}のため${g}Gに換えた）`;
+      return `${def.name}（${hero.name}の袋が${hero.pouch.length >= limit ? '満杯' : `${def.name}でいっぱい`}のため${g}Gに換えた）`;
     }
     hero.pouch.push(item);
   } else {

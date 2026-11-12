@@ -8,7 +8,7 @@ import { cardOf, getCard } from '../data/cards';
 import { getItem } from '../data/items';
 import { getPet } from '../data/pets';
 import { BALANCE } from '../data/balance';
-import { affinityFromStats, finalChance, heroStats, isPetMaster } from '../engine';
+import { affinityFromStats, altarTransmutePool, finalChance, heroStats, isPetMaster } from '../engine';
 import { isLocalPlayer } from '../store/battleConfig';
 import { useBattle } from '../store/battleStore';
 import type { GameCommand, Hero } from '../types';
@@ -20,7 +20,14 @@ import { isNewPetCoat } from '../store/profile';
 
 const CALM = new Set(['world', 'dungeon', 'rest', 'town', 'hub', 'shrine']);
 
-const TASK_TEXT = { upgrade: '強化するカードを1枚選んでください', remove: '山札から外すカードを1枚選んでください', mutate: '捧げるカードを1枚選んでください（別の系統のレア以上のカードに変わります）' };
+const TASK_TEXT = {
+  upgrade: '強化するカードを1枚選んでください',
+  remove: '山札から外すカードを1枚選んでください',
+  mutate: '捧げるカードを1枚選んでください（別の系統のレア以上のカードに変わります）',
+  altar: '晶石の祭壇: カードを1枚、強化か変異ができます',
+};
+/** 晶石の祭壇の2つの選び方の説明（段階7a） */
+const ALTAR_TEXT = { upgrade: '選んだカードを＋に強化します', transmute: '選んだカードが、同じ格の別のカードに変わります（何になるかは変わるまで秘密）' };
 
 function Frame({ title, hero, children }: { title: string; hero: Hero; children: React.ReactNode }) {
   return (
@@ -138,15 +145,33 @@ function AdoptPet({ hero, send }: { hero: Hero; send: (c: GameCommand) => void }
 
 function CardTask({ hero, send }: { hero: Hero; send: (c: GameCommand) => void }) {
   const task = hero.cardTask!;
+  const full = useBattle((s) => s.full);
   const [sel, setSel] = useState<string | null>(null);
+  // 晶石の祭壇（段階7a）: 強化か変異か（最初は強化）
+  const [altar, setAltar] = useState<'upgrade' | 'transmute'>('upgrade');
   const aff = affinityFromStats(heroStats(hero));
-  const cards = hero.deck.filter((c) => task !== 'upgrade' || !c.upgraded);
+  const upgrading = task === 'upgrade' || (task === 'altar' && altar === 'upgrade');
+  const cards = hero.deck.filter((c) => (!upgrading || !c.upgraded) && (task !== 'altar' || altar !== 'transmute' || !full || altarTransmutePool(full, hero, c.cardId).length > 0));
+  const title = task === 'altar' ? '晶石の祭壇' : task === 'upgrade' ? 'カードの強化' : task === 'remove' ? 'カードを外す' : 'カードを捧げる';
+  const verb = task === 'altar' ? (altar === 'upgrade' ? '強化する' : '変異させる') : task === 'upgrade' ? '強化する' : task === 'remove' ? '外す' : '捧げる';
   return (
-    <Frame title={task === 'upgrade' ? 'カードの強化' : task === 'remove' ? 'カードを外す' : 'カードを捧げる'} hero={hero}>
+    <Frame title={title} hero={hero}>
       <div className="mt-1 text-center text-[13px] text-zinc-300">{TASK_TEXT[task]}</div>
+      {task === 'altar' && (
+        <>
+          <div className="mt-2 grid grid-cols-2 gap-1.5" data-altar-modes>
+            {(['upgrade', 'transmute'] as const).map((m) => (
+              <button key={m} onClick={() => { setAltar(m); setSel(null); }} aria-pressed={altar === m} data-altar-mode={m} className={`btn h-11 rounded-xl border-2 text-[15px] font-bold ${altar === m ? 'border-sky-300 bg-sky-500/20 text-sky-100' : 'border-white/15 bg-black/40 text-zinc-300'}`}>
+                {m === 'upgrade' ? '＋に強化' : '変異させる'}
+              </button>
+            ))}
+          </div>
+          <div className="mt-1 text-center text-[12px] leading-4 text-sky-100/80">{ALTAR_TEXT[altar]}</div>
+        </>
+      )}
       <div className="mt-2 grid min-h-0 flex-1 grid-cols-3 content-start gap-1.5 overflow-y-auto pb-2">
         {cards.map((c) => {
-          const card = task === 'upgrade' && sel === c.uid ? getCard(c.cardId, true) : cardOf(c);
+          const card = upgrading && sel === c.uid ? getCard(c.cardId, true) : cardOf(c);
           return (
             <button key={c.uid} onClick={() => setSel(c.uid)} className="btn" aria-label={card.name} aria-pressed={sel === c.uid}>
               <CardBody card={card} chance={finalChance(card, aff)} width={104} height={150} selected={sel === c.uid} compact />
@@ -158,8 +183,8 @@ function CardTask({ hero, send }: { hero: Hero; send: (c: GameCommand) => void }
         <button onClick={() => send({ type: 'CARD_TASK', playerId: hero.playerId, heroId: hero.id })} className="btn btn-dark h-12 rounded-xl text-[15px] font-bold">
           やめる
         </button>
-        <button disabled={!sel} onClick={() => sel && send({ type: 'CARD_TASK', playerId: hero.playerId, heroId: hero.id, cardUid: sel })} className="btn btn-gold font-display h-12 rounded-xl text-[18px] disabled:opacity-40">
-          {task === 'upgrade' ? '強化する' : task === 'remove' ? '外す' : '捧げる'}
+        <button disabled={!sel} onClick={() => sel && send({ type: 'CARD_TASK', playerId: hero.playerId, heroId: hero.id, cardUid: sel, ...(task === 'altar' ? { altar } : {}) })} className="btn btn-gold font-display h-12 rounded-xl text-[18px] disabled:opacity-40" data-card-task-go>
+          {verb}
         </button>
       </div>
     </Frame>
@@ -169,11 +194,14 @@ function CardTask({ hero, send }: { hero: Hero; send: (c: GameCommand) => void }
 function Peddler({ hero, send }: { hero: Hero; send: (c: GameCommand) => void }) {
   const shop = hero.peddler!;
   const aff = affinityFromStats(heroStats(hero));
+  // 闇商人（段階7a・無法者の隠れ処）: 行商人と同じ画面。名前と、専用の装備の案内だけが違う
+  const black = shop.kind === 'blackMarket';
   return (
-    <Frame title="さすらいの行商人" hero={hero}>
+    <Frame title={black ? '闇商人' : 'さすらいの行商人'} hero={hero}>
       <div className="mt-1 flex items-center justify-center gap-1 text-[14px] font-bold text-amber-200">
         <Coins size={15} /> 所持金 {hero.gold}G
       </div>
+      {black && <div className="mt-1 text-center text-[12px] leading-4 text-zinc-300" data-black-market>「専用」の装備は、ここと黄金箱でしか手に入らない。値段は町より高め。買わなくてもよい</div>}
       <div className="mt-2 flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto">
         {shop.items.map((s, i) => {
           const it = getItem(s.item.itemId);
@@ -183,6 +211,7 @@ function Peddler({ hero, send }: { hero: Hero; send: (c: GameCommand) => void })
                 <ItemIcon item={it} size={44} />
                 <span className="block min-w-0 flex-1 leading-4">
                   <span className="block text-[14px] font-bold" style={{ color: RARITY_STYLE[it.rarity].color }}>
+                    {it.source && <span className="mr-1 rounded bg-amber-500/80 px-1 text-[11px] text-black" data-exclusive-tag>専用</span>}
                     {it.name}
                   </span>
                   <span className="block truncate text-[12px] text-zinc-400">{itemSummary(it)}</span>
@@ -210,7 +239,7 @@ function Peddler({ hero, send }: { hero: Hero; send: (c: GameCommand) => void })
         </div>
       </div>
       <button onClick={() => send({ type: 'PEDDLER_BUY', playerId: hero.playerId, heroId: hero.id })} className="btn btn-dark mt-2 flex h-12 items-center justify-center gap-1.5 rounded-xl text-[15px] font-bold">
-        <X size={18} /> 行商人と別れる
+        <X size={18} /> {black ? '闇商人と別れる' : '行商人と別れる'}
       </button>
     </Frame>
   );

@@ -4,6 +4,7 @@ import { getElement } from '../../../../data/elements';
 import { getStatus } from '../../../../data/statuses';
 import { isEnemy, nameOf } from '../../units';
 import { chargedMultiplier } from '../../cardState';
+import { extraHitsOf } from '../../../abilities';
 import { type EffectHandler, upgradeAmount, recordActivation } from '../types';
 
 declare module '../../../../types' {
@@ -30,6 +31,9 @@ export const effect: EffectHandler<'damage'> = {
     let hits = e.hits ?? 1;
     const src = ctx.source;
     if (hits >= 2 && !isEnemy(src) && src.extraHits && ctx.card) { hits += src.extraHits; delete src.extraHits; ctx.parts.push('弾込め'); }
+    // 段階7a: 連装ガトリング銃 — 「×N回」のカードの攻撃は、いつも回数+1（カードの攻撃だけ。能力・お供の追撃には付かない）
+    const gatling = hits >= 2 && ctx.card && !ctx.via ? extraHitsOf(src) : 0;
+    if (gatling > 0) hits += gatling;
     for (let h = 0; h < hits; h++) {
       for (const t of resolveTargets(ctx, targetOf(e))) {
         const charge = chargedMultiplier(ctx.source, ctx.card);

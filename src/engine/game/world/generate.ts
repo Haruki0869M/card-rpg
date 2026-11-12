@@ -15,6 +15,7 @@ import { spawnSeaWanderer, spawnWanderer } from './wanderers';
 import { addSanctuaries } from './sanctuaries';
 import { addWatchtowers } from './explore';
 import { laneOfCol } from './lanes';
+import { assignDungeonThemes } from './randomDungeons';
 
 const pick = <T,>(list: readonly T[], rng: Rng) => list[rng.int(list.length)];
 
@@ -280,7 +281,9 @@ export function createWorld(game: GameState, rng: Rng): WorldState {
     // 薬草の群生地（段階6a）: 決めた帯に置く
     if (reg.herbs && EVENTS.tryGet(HERB_EVENT)) place(reg.herbs, () => ({ kind: 'event', id: HERB_EVENT }), def.prefer?.herb, true);
     if (shrineIds.length) place(reg.shrines ?? 0, () => ({ kind: 'shrine', id: pick(shrineIds, rng) }), def.prefer?.shrine);
-    for (const d of reg.randomDungeons ?? []) place(1, () => ({ kind: 'dungeon', id: d }), def.prefer?.randomDungeon, true);
+    // ランダムダンジョン: prefer が配列なら、1つ目は1つ目の帯・2つ目は2つ目の帯（段階7a: 西と東に1つずつ）
+    const rdLane = def.prefer?.randomDungeon;
+    (reg.randomDungeons ?? []).forEach((d, k) => place(1, () => ({ kind: 'dungeon', id: d }), Array.isArray(rdLane) ? rdLane[k] : rdLane, true));
   });
   // 隠しボスの名所（K3 C）: 決めた地域の空いたマスに1つずつ。ほかの物を置き終えてから置くので、無いシナリオの地図は変わらない
   for (const e of scenarioEvents) {
@@ -311,6 +314,8 @@ export function createWorld(game: GameState, rng: Rng): WorldState {
   w.spawns = [];
   w.nextSpawnAt = BALANCE.spawnFirstAt;
   w.nextSpawnId = 1;
+  // ランダムダンジョンのテーマ（段階7a）。最後に引くので、ほかの物の置き方は変わらない
+  assignDungeonThemes(w, rng);
   return w;
 }
 

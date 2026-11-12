@@ -21,7 +21,8 @@ ENEMIES.register({ ...dummy, id: 'stageBHitter', name: '確認用の殴る置物
 ENEMIES.register({ ...dummy, id: 'stageBBig', name: '確認用の大技の置物', maxHp: 100000, actions: [{ id: 'big', name: '大技', big: true, effects: [{ kind: 'damage', amount: 5 }] }] });
 
 const PHYS = ['sword', 'katana', 'spear', 'axe', 'hammer', 'fist', 'dagger', 'bow'];
-const physWeapons = () => ITEMS.all.filter((i) => i.slot === 'weapon' && PHYS.includes(i.weaponType ?? ''));
+// ランダムダンジョンの専用の装備（段階7a・source あり）は区切りBの数に入れない（数は randomDungeon7a.test.ts で確かめる）
+const physWeapons = () => ITEMS.all.filter((i) => i.slot === 'weapon' && !i.source && PHYS.includes(i.weaponType ?? ''));
 
 type Opt = { enemies?: string[]; players?: PlayerId[]; boss?: boolean; midboss?: boolean };
 function game(classes: string[], weapons: (string | undefined)[], players?: PlayerId[]): GameState {

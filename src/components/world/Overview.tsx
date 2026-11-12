@@ -7,7 +7,7 @@ import { useMemo } from 'react';
 import { DUNGEONS } from '../../data/dungeons';
 import { getScenario } from '../../data/scenarios';
 import { TERRAINS, TOWNS } from '../../data/world';
-import { colOf, nextGoalDungeon, rowOf } from '../../engine';
+import { colOf, nextGoalDungeon, randomDungeonView, rowOf } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
 import type { GameState, Tile } from '../../types';
 import { PLAYER_COLORS } from './pieceLayout';
@@ -22,6 +22,8 @@ interface Mark {
   label: string;
   done?: boolean;
   fallen?: boolean;
+  /** ランダムダンジョンのテーマの印（💎・⛓・🗡。段階7a） */
+  mark?: string;
 }
 
 export function Overview({ game, onPick, onClose }: { game: GameState; onPick: (tile: number) => void; onClose: () => void }) {
@@ -79,7 +81,10 @@ export function Overview({ game, onPick, onClose }: { game: GameState; onPick: (
       else if (f.kind === 'dungeon') {
         const d = DUNGEONS.tryGet(f.id);
         if (!d) return;
-        out.push({ tile: i, kind: d.finale ? 'finale' : d.random ? 'random' : 'dungeon', label: d.name, done: game.clearedDungeons.includes(f.id) });
+        // ランダムダンジョン（段階7a）: テーマの印つきの名前・踏破済みはマスごと（同じ洞窟が2か所ある）
+        const rd = randomDungeonView(w, i);
+        if (rd) out.push({ tile: i, kind: 'random', label: `${rd.theme?.mark ?? ''}${rd.name}`, done: rd.done, mark: rd.theme?.mark });
+        else out.push({ tile: i, kind: d.finale ? 'finale' : 'dungeon', label: d.name, done: game.clearedDungeons.includes(f.id) });
       }
     });
     return out;
@@ -146,7 +151,11 @@ export function Overview({ game, onPick, onClose }: { game: GameState; onPick: (
                   onClick={(e) => { e.stopPropagation(); onPick(m.tile); }}>
                   <circle cx={p.x} cy={p.y} r={M * 0.75} fill="transparent" />
                   <circle cx={p.x} cy={p.y} r={M * 0.5} fill="rgba(0,0,0,.7)" stroke={color(m)} strokeWidth={1.2} />
-                  <Icon x={p.x - M * 0.33} y={p.y - M * 0.33} width={M * 0.66} height={M * 0.66} color={color(m)} strokeWidth={2.4} />
+                  {m.mark ? (
+                    <text x={p.x} y={p.y + M * 0.22} textAnchor="middle" fontSize={M * 0.62} data-overview-theme={m.mark}>{m.mark}</text>
+                  ) : (
+                    <Icon x={p.x - M * 0.33} y={p.y - M * 0.33} width={M * 0.66} height={M * 0.66} color={color(m)} strokeWidth={2.4} />
+                  )}
                   {m.done && m.kind !== 'tower' && (
                     <g data-overview-cleared>
                       <circle cx={p.x + M * 0.42} cy={p.y - M * 0.42} r={M * 0.3} fill="#2f8a3a" />

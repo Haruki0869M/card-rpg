@@ -222,5 +222,6 @@ export const tideCave: DungeonDef = {
   pools: TIDE_CAVE_POOLS,
   bossChest: 'legend',
   random: true,
-  rows: 6,
+  // 段階7a: 全5行（4行＋ボスの行）
+  rows: 4,
 };

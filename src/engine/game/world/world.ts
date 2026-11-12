@@ -737,6 +737,8 @@ export function interact(game: GameState, cmd: Cmd<'WORLD_INTERACT'>, rng: Rng):
       return undefined;
     case 'dungeon': {
       const def = DUNGEONS.get(f.id);
+      // ランダムダンジョンは1か所1回（段階7a・オーナーの決定 6-A）。負けて出された時は f.used にならないので、また入れる
+      if (def.random && f.used) return 'このダンジョンは踏破済みです（黄金箱はもう開けた）';
       const gate = dungeonGateError(game, def);
       if (gate) return gate;
       // 先に入った仲間の組がいれば、新しいダンジョンは作らずに合流する（組が通路にいる時だけ。断る時は何も変えない）
@@ -756,7 +758,7 @@ export function interact(game: GameState, cmd: Cmd<'WORLD_INTERACT'>, rng: Rng):
         joinExpedition(game, join.exp, party, rng);
         return undefined;
       }
-      enterDungeonFromWorld(game, f.id, party, rng);
+      enterDungeonFromWorld(game, f.id, party, rng, tile);
       detachExpedition(game, rng, tile);
       return undefined;
     }

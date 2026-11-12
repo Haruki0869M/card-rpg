@@ -57,6 +57,8 @@ export function LootList({ loot }: { loot: Loot[] }) {
               <ItemIcon item={def} size={44} />
               <span className="min-w-0 flex-1 leading-4">
                 <span className="block text-[14px] font-bold" style={{ color: r.color }}>
+                  {/* ランダムダンジョンの専用の装備（段階7a）: 黄金箱と闇商人でしか手に入らない */}
+                  {def.source && <span className="mr-1 rounded bg-amber-500/80 px-1 text-[11px] text-black" data-exclusive-tag>✨専用</span>}
                   {def.name} <span className="text-[12px] font-normal opacity-80">{r.name}</span>
                 </span>
                 {l.to && <span className="block text-[12px] text-sky-200">→ {game.heroes.find((x) => x.id === l.to)?.name}が受け取った</span>}

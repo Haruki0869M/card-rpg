@@ -33,6 +33,7 @@ import {
   diceAverage,
   corruptionShown,
   dungeonJoin,
+  randomDungeonView,
 } from '../../engine';
 import { isLocalPlayer, isOnlinePlay } from '../../store/battleConfig';
 import { useBattle, type WorldMovePresentation } from '../../store/battleStore';
@@ -290,7 +291,10 @@ function tileInfo(game: GameState, i: number): string {
   const parts = [terr.sea ? `${terr.name}（${w.ship ? `船で移動力${terr.shipCost ?? 1}` : '船が必要です'}）` : `${terr.name}（移動力${terr.moveCost || '×'}）`];
   const f = t.f;
   if (f?.kind === 'town') parts.push(TOWNS.get(f.id).name + (w.fallenTowns.includes(f.id) ? '（陥落）' : ''));
-  if (f?.kind === 'dungeon') parts.push(DUNGEONS.get(f.id).name);
+  // ランダムダンジョン（段階7a）: テーマの印と名前・全5行・黄金箱・テーマの特徴。踏破済みならそう書く
+  const rd = randomDungeonView(w, i);
+  if (rd) parts.push(rd.done ? `${rd.theme?.mark ?? ''}${rd.name}（踏破済み）` : `${rd.theme?.mark ?? ''}${rd.name}：全5行・最奥に黄金箱。${rd.theme?.description ?? ''}`);
+  else if (f?.kind === 'dungeon') parts.push(DUNGEONS.get(f.id).name);
   if (f?.kind === 'temple' || f?.kind === 'altar') parts.push(SANCTUARIES.get(f.id).name);
   if (f?.kind === 'shrine') parts.push(SHRINES.get(f.id).name + (f.used ? '（祈り済み）' : ''));
   if (f?.kind === 'event' || f?.kind === 'landmark') parts.push((EVENTS.tryGet(f.id)?.title ?? '何かがある') + (f.used ? '（調べた）' : ''));
@@ -314,7 +318,11 @@ function interactLabel(game: GameState, tile: number): string | undefined {
     // 先に入った仲間の組がいれば、合流する（組が通路にいる時だけ。戦闘中などは、押すと「終わってから」と知らせる）
     const join = dungeonJoin(game, tile);
     const lead = join ? game.heroes.find((h) => join.exp.heroes.includes(h.id) && h.hp > 0) : undefined;
-    return join ? `${lead?.name ?? '仲間'}たちに合流する（${DUNGEONS.get(f.id).name}）` : `${DUNGEONS.get(f.id).name}に入る`;
+    // ランダムダンジョン（段階7a）: テーマの名前で出す。踏破済みは入れない（ボタンを出さない）
+    const rd = randomDungeonView(game.world!, tile);
+    if (rd?.done && !join) return undefined;
+    const name = rd ? `${rd.theme?.mark ?? ''}${rd.name}` : DUNGEONS.get(f.id).name;
+    return join ? `${lead?.name ?? '仲間'}たちに合流する（${name}）` : `${name}に入る`;
   }
   if (f.kind === 'temple' || f.kind === 'altar') return `${SANCTUARIES.get(f.id).name}に入る`;
   if (f.used) return undefined;

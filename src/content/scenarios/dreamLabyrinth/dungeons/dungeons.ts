@@ -223,5 +223,6 @@ export const dreamCave: DungeonDef = {
   pools: { ...LAIR_POOLS, boss: ['mirrorKnight', 'memoryEater'] },
   bossChest: 'legend',
   random: true,
-  rows: 6,
+  // 段階7a: 全5行（4行＋ボスの行）
+  rows: 4,
 };

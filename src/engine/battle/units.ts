@@ -1,6 +1,6 @@
 // ===== 戦闘のユニット（味方・敵）の共通処理: 名前・ログ・ダメージ・回復・戦闘不能 =====
 import { BALANCE } from '../../data/balance';
-import { fireAbilities, healToBlockOf, enduresOf } from '../abilities';
+import { fireAbilities, healToBlockOf, enduresOf, rageStackOf } from '../abilities';
 import { getEnemy } from '../../data/enemies';
 import type { AbilitySource, AllyState, BattleEvent, BattleState, EnemyState } from '../../types';
 import type { Rng } from '../rng';
@@ -107,6 +107,9 @@ export function noteHpLoss(u: Unit, amount = 0) {
   (u.counters ??= {}).unhurt = 0;
   // 区切りD: 血の代価 — このターンに失ったHP（自分たちの番の始めに0に戻る）
   u.counters.hpLostTurn = (u.counters.hpLostTurn ?? 0) + amount;
+  // 段階7a: 狂王の血鎧 — HPが減るたび、次の攻撃カード1枚の倍率をためる（上限まで。使うと playCard で0に戻る）
+  const rage = amount > 0 ? rageStackOf(u) : undefined;
+  if (rage) u.counters.rageAtkPct = Math.min(rage.effect.max, (u.counters.rageAtkPct ?? 0) + rage.effect.pct);
   for (const [id, n] of Object.entries(u.statuses)) if (n && getStatus(id).loseOnHpLoss) u.statuses[id] = 0;
 }
 

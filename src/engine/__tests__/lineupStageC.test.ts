@@ -20,7 +20,8 @@ ENEMIES.register({ ...dummy, id: 'stageCTiny', name: '確認用の小さな置�
 ENEMIES.register({ ...dummy, id: 'stageCFireWeak', name: '確認用の火に弱い置物', maxHp: 100000, weak: ['fire'], actions: wait });
 
 const TYPES = ['gun', 'whip', 'staff', 'tome', 'scepter', 'scythe', 'instrument'];
-const weaponsC = () => ITEMS.all.filter((i) => i.slot === 'weapon' && TYPES.includes(i.weaponType ?? ''));
+// ランダムダンジョンの専用の装備（段階7a・source あり）は区切りCの数に入れない（数は randomDungeon7a.test.ts で確かめる）
+const weaponsC = () => ITEMS.all.filter((i) => i.slot === 'weapon' && !i.source && TYPES.includes(i.weaponType ?? ''));
 
 type Opt = { enemies?: string[]; players?: PlayerId[]; boss?: boolean; midboss?: boolean };
 function game(classes: string[], weapons: (string | undefined)[], players?: PlayerId[]): GameState {
@@ -75,7 +76,7 @@ describe('区切りC: 数', () => {
     for (const w of weaponsC()) n[w.weaponType!] = (n[w.weaponType!] ?? 0) + 1;
     expect(n).toEqual({ gun: 5, whip: 5, staff: 7, tome: 5, scepter: 8, scythe: 5, instrument: 5 });
     expect(weaponsC()).toHaveLength(40);
-    expect(ITEMS.all.filter((i) => i.slot === 'weapon')).toHaveLength(86);
+    expect(ITEMS.all.filter((i) => i.slot === 'weapon' && !i.source)).toHaveLength(86);
   });
   it('外した物は無い。レア度を動かした2本・名前を直した1本', () => {
     for (const id of ['breachingGun', 'plagueGun', 'balancedWhip', 'steadfastWhip', 'thunderStaff', 'circulationStaff', 'pharaohStaff', 'cursewardTome', 'fellowshipScepter', 'judgesScepter', 'soulwellScythe', 'riftscythe', 'grandLute', 'plagueLute']) expect(ITEMS.tryGet(id), id).toBeUndefined();

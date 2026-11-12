@@ -51,7 +51,8 @@ export const corruptionKingMap: ScenarioMapDef = {
       events: 4,
       herbs: 1,
       shrines: 2,
-      randomDungeons: ['randomForest'],
+      // ランダムダンジョンは西と東に1つずつ（段階7a。同じ洞窟の敵で、テーマは別々）
+      randomDungeons: ['randomForest', 'randomForest'],
     },
     {
       id: 'forest',
@@ -125,7 +126,7 @@ export const corruptionKingMap: ScenarioMapDef = {
     { kind: 'basin', at: [1, 29], open: 3, wall: 'crag', content: 'shrine' },
     { kind: 'peninsula', at: [12, 38], open: 0, wall: 'water', content: 'chest' },
   ],
-  prefer: { shrine: 'west', herb: 'west', randomDungeon: 'west', altar: 'east', tower: ['east', 'west', 'east', 'west'] },
+  prefer: { shrine: 'west', herb: 'west', randomDungeon: ['west', 'east'], altar: 'east', tower: ['east', 'west', 'east', 'west'] },
   corruptionStages: [
     { at: 25, text: '徘徊する魔物が増え、町が襲われはじめる', spawn: 3, raid: true },
     { at: 50, text: '魔物が凶暴になる（敵のレベル+1）。町への襲撃が続く', spawn: 2, enemyLevel: 1, raid: true },
