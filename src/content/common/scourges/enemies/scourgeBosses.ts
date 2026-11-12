@@ -1,4 +1,4 @@
-// 災厄の中ボス4体の本体（段階7b・overhaul-plan-v2 §3-2）。取り巻きは今ある敵をそのまま使う（scourges/*.ts の minions）。
+// 災厄の中ボス5体の本体（5体目の業火の魔人は段階7c）（段階7b・overhaul-plan-v2 §3-2）。取り巻きは今ある敵をそのまま使う（scourges/*.ts の minions）。
 // 絵は今ある敵の絵を使い回す（variantOf。オーナーの決定 5-A。後から絵だけ差し替えられる）。足元のオーラの色で見分ける。
 // 戦い方は4体とも別々（憲章4・docs/tasks/enemy-behaviors-plan.md §2 の決まり）: 特殊な行動は1体に2種類まで。全部「大技の予告」と予告の文（hint）で見え、
 // BREAK・倒す順・守り・回復の前倒しのどれかで受けられる。味方の番を止める行動（凍結など）は使わない。
@@ -94,5 +94,31 @@ export const scourgeStormWitch: EnemyDef = {
     { id: 'lance', name: '氷槍・盾砕き', big: true, hint: '当たるとブロックを全部壊す。BREAK するか、ブロックに頼らずに受ける', effects: [{ kind: 'shieldBreak' }, { kind: 'damage', amount: 14, element: 'ice' }] },
     { id: 'mirror', name: '氷の鏡', effects: [{ kind: 'block', amount: 14 }, { kind: 'block', amount: 8, to: 'otherAllies' }] },
     { id: 'blizzard', name: '吹雪', big: true, hint: '味方全員に氷のダメージ。ブロックで受けるか、BREAK する', effects: [{ kind: 'damage', amount: 8, element: 'ice', to: 'foes' }] },
+  ],
+};
+
+/**
+ * 業火の魔人（段階7c。元の絵: 溶岩ゴーレム）: 味方全員に火傷を重ねて、まとめて起爆する。「火傷を治す・起爆の前に BREAK する・ブロックをためておく」。
+ * 取り巻きの火トカゲも火傷を付けるので、放っておくと起爆が大きくなる。数字は【提案】（ほかの4体と同じ基準 Lv7・HP160）
+ */
+export const scourgeInfernoDemon: EnemyDef = {
+  id: 'scourgeInfernoDemon',
+  name: '業火の魔人',
+  icon: '💀',
+  variantOf: 'magmaGolem',
+  aura: 'ember',
+  maxHp: 160,
+  baseLevel: 7,
+  size: 1.35,
+  exp: 90,
+  gold: 60,
+  weak: ['ice'],
+  resist: ['fire'],
+  pattern: 'sequence',
+  actions: [
+    { id: 'brand', name: '業火の烙印', effects: [{ kind: 'applyStatus', status: 'burn', amount: 2, to: 'foes' }] },
+    { id: 'eruption', name: '噴火', big: true, hint: '味方全員に火のダメージと「火傷」2。ブロックで受けるか、BREAK する', effects: [{ kind: 'damage', amount: 6, element: 'fire', to: 'foes' }, { kind: 'applyStatus', status: 'burn', amount: 2, to: 'foes' }] },
+    { id: 'fist', name: '灼熱の拳', effects: [{ kind: 'damage', amount: 14, element: 'fire' }] },
+    { id: 'inferno', name: '業火の炸裂', big: true, hint: '味方全員の「火傷」を起爆して消す（1つにつき4ダメージ・1人24まで）。先に火傷を治すか、BREAK する', effects: [{ kind: 'detonateStatus', status: 'burn', damagePer: 4, maxDamage: 24, to: 'foes' }] },
   ],
 };

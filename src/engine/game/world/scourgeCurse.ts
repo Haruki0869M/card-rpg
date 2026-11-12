@@ -1,5 +1,5 @@
 // ===== 災厄の中ボスの悪さ（段階7b）: 地図の上で生きている災厄の悪さを足し合わせる =====
-// データ（SCOURGES）と型だけを使う小さな部品（店の値段・野営・侵食度・夜の敵のレベルの所から読む）。乱数は引かない
+// データ（SCOURGES）と型だけを使う小さな部品（店の値段・野営・侵食度・夜の敵のレベル・戦闘の開始の所から読む）。乱数は引かない
 import { SCOURGES } from '../../../data/world';
 import type { GameState, ScourgeDef, Wanderer, WorldState } from '../../../types';
 
@@ -10,15 +10,16 @@ export const aliveScourges = (w: Pick<WorldState, 'wanderers'> | undefined): { w
     return def ? [{ wd, def }] : [];
   });
 
-/** 生きている災厄の悪さを足し合わせた物（店の値段 +%・世界マップの番の侵食度 +%・野営のHPの回復の倍率・夜の敵のレベル +N） */
-export interface ScourgeCurse { shopPrice: number; corruptionPerTurn: number; campHeal: number; nightLevel: number }
+/** 生きている災厄の悪さを足し合わせた物（店の値段 +%・世界マップの番の侵食度 +%・野営のHPの回復の倍率・夜の敵のレベル +N・戦闘の開始時の火傷 N） */
+export interface ScourgeCurse { shopPrice: number; corruptionPerTurn: number; campHeal: number; nightLevel: number; battleBurn: number }
 export function scourgeCurse(game: Pick<GameState, 'world'> | undefined): ScourgeCurse {
-  const out: ScourgeCurse = { shopPrice: 0, corruptionPerTurn: 0, campHeal: 1, nightLevel: 0 };
+  const out: ScourgeCurse = { shopPrice: 0, corruptionPerTurn: 0, campHeal: 1, nightLevel: 0, battleBurn: 0 };
   for (const { def } of aliveScourges(game?.world)) {
     out.shopPrice += def.curse.shopPrice ?? 0;
     out.corruptionPerTurn += def.curse.corruptionPerTurn ?? 0;
     out.campHeal *= def.curse.campHeal ?? 1;
     out.nightLevel += def.curse.nightLevel ?? 0;
+    out.battleBurn += def.curse.battleBurn ?? 0;
   }
   return out;
 }

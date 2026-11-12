@@ -69,7 +69,8 @@ import { questGatedNext } from './world/questGate';
 import { leaveSanctuary, leaveShrine, leaveTown, questAccept, questReport, shrineChoose, bringMyPet, townBuy, townInn, townRemoveCard, townSell } from './world/town';
 import { getRoomType } from '../../data/rules';
 import { SCOURGES, TERRAINS } from '../../data/world';
-import { onScourgeDefeated, scourgeLoot } from './world/scourges';
+import { onScourgeDefeated, scourgeCurse, scourgeLoot, scourgesWith } from './world/scourges';
+import { addLog as battleLog } from '../battle/units';
 import { buildDungeon, depthTier, findRoom, isLegacyLayout, RARITIES, rarityIndex, reachableRooms, themeReward } from './dungeon';
 import { canMove, cellKey, DIRS, doorFront, doorNorthOf, findPath, moveIntoRoom, posOf, revealSeen, turnTo } from './dungeonMap';
 import { canWatchHere, watchSpot } from './dungeonOmen';
@@ -632,6 +633,18 @@ export function startBattleWith(game: GameState, enemies: EncounterSpec['enemies
     surprise: opts.surprise,
     readyCheck: game.online,
   });
+  // 段階7c: 業火の魔人の悪さ — 生きている間、戦闘の開始時（1ターン目の始めの処理の後）に味方全員に「火傷」。1ターン目の間は見えていて、味方の番の終わりに燃える（今の火傷の決まり）。
+  // 敵の行動ではない（世界の悪さ）ので、敵からの状態異常を防ぐ能力・悪夢の毛皮のきっかけにはならない（罠の「次の戦闘の状態異常」と同じ扱い）
+  const burn = scourgeCurse(game).battleBurn;
+  if (burn > 0) {
+    const b = game.battle;
+    for (const a of b.allies) {
+      if (a.dead) continue;
+      a.statuses.burn = (a.statuses.burn ?? 0) + burn;
+      (b.openingEvents ??= []).push({ type: 'status', unitId: a.id, status: 'burn', amount: burn });
+    }
+    battleLog(b, `💀${scourgesWith(game, 'battleBurn').map((d) => d.short).join('・')}のせいで、全員に火傷${burn}`);
+  }
   game.battleBackground = opts.background ?? worldBackground(game);
   for (const h of sceneHeroes(game)) { h.nextBattleStatuses = {}; delete h.petFeast; }
   game.mode = 'battle';
