@@ -324,7 +324,7 @@ describe('最上位の戦闘能力', () => {
     let s = topBattle(['phantomKing', 'beastMaster']);
     expect(s.allies[0].summons?.map(x => x.damage)).toEqual([8]); expect(s.allies[1].summons?.map(x => x.damage)).toEqual([4, 4, 4]);
     s = nextTurn(s); expect(s.allies[0].summons?.[0].turns).toBe(99);
-    expect(s.enemies[0].hp).toBeLessThan(10000);
+    expect(s.enemies[0].hp).toBeLessThan(11000); // 10000 × 2人の敵HP倍率1.1
   });
   it('聖王: 味方が倒れると30%で復活、2回目は復活しない（継続ダメージも対象）', () => {
     const s = topBattle(['holyKing', 'warrior']); const a = s.allies[1];

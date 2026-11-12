@@ -9,6 +9,12 @@
 
 
 
+## 敵のHP +10%（2〜4人）（2026-11-12・作ったのは Opus 5.5 の作業役）
+
+- オーナーの決定: カードが強くなった分、敵を強くして難しさを戻す（カードは弱くしない）。balance.ts の enemyHpByPartySize を [0, 0.6, 1.1, 1.49, 2.42] に（1人は変えない）。
+- 測った数字（ふつう・各60回）: 変える前 4人8%・3人10%・2人13% → +10% で 4人3%・3人8%・2人7%。docs/tasks/difficulty-restore-plan.md。
+- 次: 敵の特殊な行動（docs/tasks/enemy-behaviors-plan.md。オーナーの OK = 7種類ともシナリオ1で試す）。全体の計画は docs/tasks/overall-plan-1112.md。
+
 ## 区切りG-2 を作った（2026-11-12・作ったのは Opus 5.5 の作業役、見直しとまとめは Fable）
 
 オーナーの返事「全部おすすめで」。くわしくは docs/tasks/lineup-stageG2-plan.md の最後。
