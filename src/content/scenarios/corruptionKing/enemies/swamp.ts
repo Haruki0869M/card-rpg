@@ -40,9 +40,11 @@ export const mireSlime: EnemyDef = {
   gold: 5,
   pattern: 'sequence',
   actions: [
-    { id: 'harden', name: '泥の膜', effects: [{ kind: 'block', amount: 8 }, { kind: 'damage', amount: 4 }] },
     { id: 'splash', name: '毒泥の飛沫', effects: [{ kind: 'applyStatus', status: 'poison', amount: 3, to: 'foes' }] },
     { id: 'tackle', name: '体当たり', effects: [{ kind: 'damage', element: 'poison', amount: 5, hits: 2 }] },
+    // 敵の特殊な行動 1回目（docs/tasks/enemy-behaviors-plan.md §7）: 守る行動「泥の膜」を浄化（脱皮）に置き換えた。ID は古い保存のために残す
+    // 1ターン目は状態異常がまだ付いていない事が多く空振りになるので、順番の最後に回した
+    { id: 'harden', name: '浄化の脱皮', big: true, hint: '状態異常を全部消して回復する。その前に起爆するか、BREAK する', effects: [{ kind: 'purify', amount: 6 }] },
   ],
 };
 

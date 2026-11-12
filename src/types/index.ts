@@ -396,6 +396,8 @@ export interface EnemyActionDef {
   fallbackIfAloneId?: string;
   /** 大技（強敵・ボスの強い一撃や全体攻撃）。この予告が出ているターンは、味方が体勢を崩せる（BREAK。抜本的な見直し §3-2） */
   big?: boolean;
+  /** 予告の説明（何が起きるか・どうすれば止まるか。予告をタップした説明に出す。敵の特殊な行動 1回目） */
+  hint?: string;
 }
 
 export interface EnemyDef {
@@ -636,6 +638,8 @@ export interface EnemyState {
   pincerFocus?: string[];
   /** このターンの予告は、もう体勢を崩された（BREAK は1つの予告に1回。ターンの初めに消す） */
   broken?: boolean;
+  /** かばう（魔王軍の騎士）: ほかの敵を狙った単体攻撃のカードのダメージを代わりに受ける。敵の番の始め・倒れた時に消える */
+  guarding?: boolean;
 }
 
 export type Phase = 'ally' | 'enemy' | 'victory' | 'defeat' | 'escaped';

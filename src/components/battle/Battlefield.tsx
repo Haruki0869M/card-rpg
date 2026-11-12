@@ -7,7 +7,7 @@ import type React from 'react';
 import { BattleBackground, CharacterArt, EnemyArt, preloadEnemyPhases } from '../../art';
 import { getPet } from '../../data/pets';
 import { PetToken } from '../ui/PetToken';
-import { TIMING } from '../../data/balance';
+import { BALANCE, TIMING } from '../../data/balance';
 import { PLAYER_COLOR } from '../../data/theme';
 import { cardOf } from '../../data/cards';
 import { getEnemy, getEnemyAction } from '../../data/enemies';
@@ -105,6 +105,16 @@ function TargetFace({ allyId }: { allyId?: string }) {
       <CharacterArt classId={ally.classId} gender={ally.gender} face className="h-full w-full" />
     </span>
   );
+}
+
+/**
+ * 戦場に並べる敵。ふつうは倒れた敵も並びに残す（途中で並びが動かないように）。
+ * 「仲間を呼ぶ」で並びが BALANCE.maxEnemies を超えた時だけ、倒れた敵を前から外して枠の数を保つ（生きている敵は最大数まで）
+ */
+export function fieldEnemies(enemies: EnemyState[]): EnemyState[] {
+  let extra = enemies.length - BALANCE.maxEnemies;
+  if (extra <= 0) return enemies;
+  return enemies.filter((e) => !(e.dead && extra-- > 0));
 }
 
 /** 予告の宛先に出す短い名前（長い名前は4文字＋「…」）。担当（P1など）は全員同じことがあるので出さない */
@@ -328,7 +338,7 @@ const EnemyUnit = memo(function EnemyUnit({
           {/* 次の行動の予告（HPのすぐ下。誰を狙っているかの顔つき） */}
           <IntentBubble enemy={enemy} onTap={onTap} />
           <AimMarks battle={battle} enemyUid={enemy.uid} />
-          <StatusChips s={enemy.statuses} side="enemy" onTap={onTap} tauntedBy={enemy.tauntedBy} />
+          <StatusChips s={enemy.statuses} side="enemy" onTap={onTap} tauntedBy={enemy.tauntedBy} guarding={enemy.guarding} />
         </div>
       )}
     </div>
@@ -496,7 +506,8 @@ const Embers = memo(function Embers() {
 
 export function Battlefield() {
   const [ref, size] = useElementSize<HTMLDivElement>();
-  const enemies = useBattle((s) => s.battle.enemies);
+  const allEnemies = useBattle((s) => s.battle.enemies);
+  const enemies = useMemo(() => fieldEnemies(allEnemies), [allEnemies]);
   const allies = useBattle((s) => s.battle.allies);
   const activeId = useBattle((s) => s.activeId);
   const phase = useBattle((s) => s.battle.phase);
@@ -592,7 +603,7 @@ function TargetLines({ W, H, enemySlotW, enemyTop, enemySpriteH, allyAreaW, ally
   const battle = useBattle((s) => s.battle);
   const nA = battle.allies.length;
   const lines: { x1: number; y1: number; x2: number; y2: number; key: string }[] = [];
-  battle.enemies.forEach((e, i) => {
+  fieldEnemies(battle.enemies).forEach((e, i) => {
     if (e.dead || !e.intent?.targetId) return;
     const view = intentView(battle, e);
     if (!view?.parts.some((p) => p.kind === 'attack')) return;

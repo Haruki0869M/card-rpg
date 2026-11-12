@@ -4,7 +4,7 @@ import { BALANCE } from '../data/balance';
 import { activeStatuses, actionFailChanceOf, skipActionStatus } from '../engine';
 import { getElement } from '../data/elements';
 import { getEnemyAction } from '../data/enemies';
-import { describeEffect, enemyHitDamage, findAlly, targetOf } from '../engine';
+import { breakStopsAction, describeEffect, enemyHitDamage, findAlly, lowHpMulOn, targetOf } from '../engine';
 import type { BattleState, CardDef, CardEffect, EnemyState, StatusId } from '../types';
 
 export { CATEGORY_LABEL };
@@ -43,6 +43,8 @@ export interface IntentView {
   big?: boolean;
   /** もう体勢を崩した（威力が半分になっている） */
   broken?: boolean;
+  /** 予告の説明（敵の特殊な行動。何が起きるか・どうすれば止まるか） */
+  hint?: string;
 }
 
 /** インテントの表示（敵のレベル・弱体・味方の脆弱を反映した実際の値） */
@@ -62,9 +64,11 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
     if (eff.kind === 'damage') {
       const hits = eff.hits ?? 1;
       if (to === 'target') {
-        const dmg = enemyHitDamage(enemy, eff.amount, target);
+        // 手負い狙い: 狙った相手のHPが今、半分以下なら倍率込みの値
+        const low = lowHpMulOn(eff.lowHpMul, target);
+        const dmg = enemyHitDamage(enemy, eff.amount, target, low);
         parts.push({ kind: 'attack', damage: dmg, hits, targetId: target?.id, element: eff.element });
-        details.push(`${targetName}に${dmg}の${elementText(eff.element)}ダメージ${hits > 1 ? `×${hits}回` : ''}${elementStatusText(eff.element)}`);
+        details.push(`${targetName}に${dmg}の${elementText(eff.element)}ダメージ${hits > 1 ? `×${hits}回` : ''}${elementStatusText(eff.element)}${eff.lowHpMul ? (low !== 1 ? `（HPが半分以下なので×${eff.lowHpMul} 反映済み）` : `（当たる時にHPが半分以下なら×${eff.lowHpMul}）`) : ''}`);
       } else {
         const dmg = enemyHitDamage(enemy, eff.amount, undefined);
         parts.push({ kind: 'attackAll', damage: dmg, hits, element: eff.element });
@@ -80,6 +84,11 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
     } else {
       parts.push({ kind: 'other', effect: eff });
       details.push(describeEffect(eff, 'enemy').replace('対象に', `${targetName}に`).replace('対象の', `${targetName}の`));
+      // 手数読み: 今このターンに使った枚数（予定のダメージが変わる）
+      if (eff.kind === 'punishPlays') {
+        const live = state.allies.filter((a) => !a.dead);
+        details.push(`今使った枚数: ${live.map((a) => `${a.name} ${a.played ?? 0}枚${(a.played ?? 0) >= eff.min ? `（${enemyHitDamage(enemy, (a.played ?? 0) * eff.amount, a)}ダメージ）` : ''}`).join('・')}`);
+      }
     }
   }
   // 凍結・痺れ（行動を休む・失敗する）
@@ -95,18 +104,22 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
       if (def.dealtMultiplier !== undefined) details.push(`（${def.name}によりダメージ×${def.dealtMultiplier} 反映済み）`);
   }
   if (mul !== 1) details.push(`（次の行動の威力 ×${mul} 反映済み）`);
-  if (enemy.broken) details.unshift('体勢が崩れている（BREAK）: この行動の威力は半分');
-  else if (action.big) details.unshift(`大技！ 弱点の属性で攻撃・完全成功で攻撃・このターンに最大HPの${BALANCE.breakDamagePct}%のダメージ、のどれかで体勢を崩せる（BREAK: 威力が半分・弱体${BALANCE.breakWeak}・ブロック0）`);
-  return { parts, name: action.name, details, big: !!action.big, broken: !!enemy.broken };
+  // ダメージの無い大技（浄化・仲間を呼ぶ・かばう・癒し封じ）は、BREAK すると起きない（battle.ts の executeIntent）
+  const stops = breakStopsAction(action);
+  if (enemy.broken) details.unshift(stops ? '体勢が崩れている（BREAK）: この行動は起きない' : '体勢が崩れている（BREAK）: この行動の威力は半分');
+  else if (action.big) details.unshift(`大技！ 弱点の属性で攻撃・完全成功で攻撃・このターンに最大HPの${BALANCE.breakDamagePct}%のダメージ、のどれかで体勢を崩せる（BREAK: ${stops ? 'この行動は起きない' : '威力が半分'}・弱体${BALANCE.breakWeak}・ブロック0）`);
+  return { parts, name: action.name, details, big: !!action.big, broken: !!enemy.broken, ...(action.hint ? { hint: action.hint } : {}) };
 }
 
 /** 体勢を崩した時の、その予告の最初の攻撃の値（今の値 → 崩した後の値。大技でない・もう崩した・攻撃でない時は undefined） */
-export function breakPreview(state: BattleState, enemy: EnemyState): { name: string; from?: number; to?: number } | undefined {
+/** stops = ダメージの無い大技（BREAK すると、その行動が起きない） */
+export function breakPreview(state: BattleState, enemy: EnemyState): { name: string; from?: number; to?: number; stops?: boolean } | undefined {
   const now = intentView(state, enemy);
   if (!now?.big || now.broken || enemy.skipNextAction) return undefined;
   const after = intentView(state, { ...enemy, broken: true, nextActionMultiplier: (enemy.nextActionMultiplier ?? 1) * BALANCE.breakPower, statuses: { ...enemy.statuses, weak: (enemy.statuses.weak ?? 0) + BALANCE.breakWeak } });
   const dmg = (v: IntentView | null) => { const p = v?.parts.find((x) => x.kind === 'attack' || x.kind === 'attackAll'); return p && (p.kind === 'attack' || p.kind === 'attackAll') ? p.damage * p.hits : undefined; };
-  return { name: now.name, from: dmg(now), to: dmg(after) };
+  const stops = breakStopsAction(getEnemyAction(enemy.defId, enemy.intent!.actionId));
+  return { name: now.name, from: dmg(now), to: dmg(after), ...(stops ? { stops } : {}) };
 }
 
 /** 属性の名前（無属性なら空） */
