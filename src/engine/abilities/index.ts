@@ -110,8 +110,34 @@ export function damageModifiers(state: BattleState | undefined, source: Unit, ca
     out.addOnce += blood;
     out.active.push({ name: '血の代価', source: { kind: 'card', label: '血の代価' } });
   }
+  // 段階7a: 狂王の血鎧 — HPが減るたびにためた分を、次の攻撃カード1枚の倍率に（使ったら playCard で0に戻す）
+  const rage = isEnemy(source) ? 0 : (source.counters?.rageAtkPct ?? 0);
+  if (rage > 0 && card && card.tiers.some((t) => t.effects.some((x) => x.kind === 'damage'))) {
+    out.multiplier *= 1 + rage / 100;
+    const ab = rageStackOf(source)?.ability;
+    out.active.push({ name: ab?.name ?? '狂王の怒り', source: ab?.source ?? { kind: 'equipment' } });
+  }
   return out;
 }
+
+/** 常時型の能力のうち、ある種類の最初の物（段階7a の専用の装備で使う） */
+function firstModifier<K extends string>(u: Unit, kind: K): { effect: Extract<AbilityEffect, { modifier: K }>; ability: AbilityDef } | undefined {
+  if (isEnemy(u)) return undefined;
+  for (const ab of abilitiesOf(u)) if ('modifier' in ab.effect && ab.effect.modifier === kind) return { effect: ab.effect as Extract<AbilityEffect, { modifier: K }>, ability: ab };
+  return undefined;
+}
+/** 「×N回」の攻撃の回数の上乗せ（連装ガトリング銃。合計） */
+export const extraHitsOf = (u: Unit) => (isEnemy(u) ? 0 : abilitiesOf(u).reduce((n, ab) => n + ('modifier' in ab.effect && ab.effect.modifier === 'extraHits' ? ab.effect.add : 0), 0));
+/** お供の自動の行動が2回になる能力（双子の魂の鈴） */
+export const petTwiceOf = (u: Unit) => firstModifier(u, 'petTwice')?.ability;
+/** 成功0を完全成功に変える能力（いかさま師の黄金賽） */
+export const rigDiceOf = (u: Unit) => firstModifier(u, 'rigDice')?.ability;
+/** 持ち越せるマナの上限（過充填の魔導炉。一番大きい物。無ければ0） */
+export const carryManaOf = (u: Unit) => (isEnemy(u) ? 0 : abilitiesOf(u).reduce((n, ab) => Math.max(n, 'modifier' in ab.effect && ab.effect.modifier === 'carryMana' ? ab.effect.max : 0), 0));
+/** 得たブロックを仲間に分ける能力（共鳴する絆の指輪） */
+export const shareBlockOf = (u: Unit) => firstModifier(u, 'shareBlock');
+/** HPが減るたびに次の攻撃をためる能力（狂王の血鎧） */
+export const rageStackOf = (u: Unit) => firstModifier(u, 'rageStack');
 
 /** HPが1より下がらない（命綱。区切りD） */
 export const enduresOf = (u: Unit) => !isEnemy(u) && abilitiesOf(u).some((ab) => 'modifier' in ab.effect && ab.effect.modifier === 'endure');
@@ -340,16 +366,23 @@ export function fireAbilities(
     // お供の行動は、全部合わせて1ターンに4回まで
     if (ab.pet && petCapped(owner)) continue;
     if (!testConditions(e.if, { state, rng, self: owner, card: opts.card ?? opts.condCard, multi: opts.multi, target: opts.target, dealt: opts.dealt, focusUsed: opts.focusUsed, perfect: opts.perfect, successes: opts.successes, supportedOthers: opts.supportedOthers, supportedSelf: opts.supportedSelf, weakHit: !!opts.weakTarget, wasFull: opts.wasFull, statusId: opts.statusId })) continue;
-    const ctx = makeCtx(state, rng, events, owner, { target: opts.target, allyTarget: opts.allyTarget, attacker: opts.attacker, card: opts.card, dealt: opts.dealt, depth: opts.depth, tierEffects: opts.tierEffects, perfect: opts.perfect, cardAbilities: cardTraitAbilities(opts.card), via: ab.pet ? 'pet' : undefined, weakTarget: opts.weakTarget, helped: opts.helped });
-    let any = false;
-    for (const eff of e.do) any = applyEffect(ctx, eff) || any;
-    if (!any) continue;
-    abilityTriggered(state, unitIdOf(owner), ab.name, events, ab.source ?? (opts.list ? { kind: 'card', id: opts.card?.id, label: opts.card?.name } : undefined));
-    for (const n of ctx.fired) abilityTriggered(state, unitIdOf(owner), n.name, events, n.source);
-    if (ab.pet) afterPetAct(state, rng, events, owner, opts.depth ?? 0);
-    const res = ctx.parts.join(' ');
-    out.push(res ? `${ab.name}（${res}）` : ab.name);
-    addLog(state, `${nameOf(owner)}の「${ab.name}」！ ${res}`);
+    // 段階7a: 双子の魂の鈴 — お供の自動の行動は2回（2回目は条件を見ずに同じ行動をもう1回。お供の行動の上限 PET_ACTS_PER_TURN の中で）
+    const twin = ab.pet ? petTwiceOf(owner) : undefined;
+    for (let k = 0; k < (twin ? 2 : 1); k++) {
+      if (k > 0 && (owner.dead || petCapped(owner))) break;
+      const ctx = makeCtx(state, rng, events, owner, { target: opts.target, allyTarget: opts.allyTarget, attacker: opts.attacker, card: opts.card, dealt: opts.dealt, depth: opts.depth, tierEffects: opts.tierEffects, perfect: opts.perfect, cardAbilities: cardTraitAbilities(opts.card), via: ab.pet ? 'pet' : undefined, weakTarget: opts.weakTarget, helped: opts.helped });
+      let any = false;
+      for (const eff of e.do) any = applyEffect(ctx, eff) || any;
+      if (!any) break;
+      // 2回目は別の名前で知らせる（同じ名前だと画面で1つのカットインにまとまり、お供が1回しか跳ねないため）
+      abilityTriggered(state, unitIdOf(owner), k > 0 ? `${ab.name}・もう1回` : ab.name, events, ab.source ?? (opts.list ? { kind: 'card', id: opts.card?.id, label: opts.card?.name } : undefined));
+      for (const n of ctx.fired) abilityTriggered(state, unitIdOf(owner), n.name, events, n.source);
+      if (k > 0 && twin) abilityTriggered(state, unitIdOf(owner), twin.name, events, twin.source);
+      if (ab.pet) afterPetAct(state, rng, events, owner, opts.depth ?? 0);
+      const res = ctx.parts.join(' ');
+      out.push(res ? `${ab.name}（${res}）` : ab.name);
+      addLog(state, `${nameOf(owner)}の「${ab.name}」！${k > 0 ? '（もう1回）' : ''} ${res}`);
+    }
   }
   return out;
 }
@@ -411,6 +444,9 @@ const TRIGGER_TEXT: Record<AbilityTrigger, string> = {
   combo: 'このカードで連携が起きた時',
   guarded: '敵の攻撃をブロックで防いだ時',
   selfBoost: 'カードで自分が回復かブロックを得た時',
+  allyCombo: '味方（自分も）のカードで連携が起きた時',
+  broke: '自分の攻撃で敵を BREAK させた時',
+  itemUse: '戦闘中に自分が消耗品を使った時',
 };
 
 const condText = (conds?: AbilityCondition[]) => (conds ?? []).map((c) => conditionHandler(c.kind).describe(c as never));
@@ -439,6 +475,12 @@ export function describeAbility(ab: AbilityDef, side: 'ally' | 'enemy' = 'ally')
     if (e.modifier === 'weaknessElement') return '属性は、狙った敵の弱点の属性に変わる（弱点が無い敵には無属性）';
     if (e.modifier === 'breakOnSuccess') return `大技を予告している敵は、成功${e.min}以上でも BREAK できる`;
     if (e.modifier === 'noPlayCount') return 'このカードは「このターンに使ったカード」に数えない（《居合》をためながら使える）';
+    if (e.modifier === 'extraHits') return `「×N回」の攻撃の回数+${e.add}`;
+    if (e.modifier === 'petTwice') return 'お供の自動の行動が2回になる（カードで動かした時は1回。お供の行動は1ターンに4回まで）';
+    if (e.modifier === 'rigDice') return 'カードの成功が0だったら、完全成功に変わり、フォーカス+1（1ターンに1回）';
+    if (e.modifier === 'carryMana') return `使わずに残ったマナを、次のターンに最大${e.max}持ち越す`;
+    if (e.modifier === 'shareBlock') return `カードで自分が得たブロックの${e.pct}%を、HPの割合が一番低いほかの味方にも`;
+    if (e.modifier === 'rageStack') return `HPが減るたび、次の攻撃カード1枚のダメージ+${e.pct}%（最大+${e.max}%。使うと0に戻る）`;
     const cs = condText(e.if);
     const head = cs.length ? `${cs.join('・')}：` : '';
     if (e.modifier === 'breakCount') return `${head}BREAK の数え（このターンの合計ダメージ）が${e.multiplier}倍`;

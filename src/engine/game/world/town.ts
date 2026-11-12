@@ -40,7 +40,8 @@ export function ensureShop(game: GameState, rng: Rng): ShopStock {
   const price = (id: string) => BALANCE.itemPrice[getItem(id).rarity] ?? 30;
   for (const id of town.shop.fixed ?? []) items.push({ kind: 'item', item: newItem(game, getItem(id)), price: price(id) });
   const types = new Set(game.heroes.filter((h) => !h.retired).flatMap((h) => jobWeapons(h.classId)));
-  const equip = ITEMS.all.filter((i) => i.slot !== 'consumable' && (!i.scenario || i.scenario === game.scenarioId) && (i.slot !== 'weapon' || types.has(i.weaponType!)));
+  // ランダムダンジョンの専用の装備（段階7a）は町の店に出さない
+  const equip = ITEMS.all.filter((i) => i.slot !== 'consumable' && !i.source && (!i.scenario || i.scenario === game.scenarioId) &&(i.slot !== 'weapon' || types.has(i.weaponType!)));
   const cons = ITEMS.all.filter((i) => i.slot === 'consumable' && !i.noShop && !(town.shop.fixed ?? []).includes(i.id));
   const pickByRarity = (pool: typeof ITEMS.all) => {
     for (let tries = 0; tries < 10; tries++) {

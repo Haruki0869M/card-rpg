@@ -9,7 +9,7 @@ import { CharacterArt } from '../art';
 import { cardOf } from '../data/cards';
 import { getClass } from '../data/classes';
 import { getItem, POUCH_LIMIT } from '../data/items';
-import { EQUIP_SLOTS, STAT_IDS, affinityFromStats, jobOptions, battleDeck, canBreak, canEquip, enemyName, itemTargetsEnemy, describeAbility, expToNext, findAlly, heroFocusMax, heroMaxHp, heroStats, weaponRarity } from '../engine';
+import { EQUIP_SLOTS, STAT_IDS, affinityFromStats, jobOptions, battleDeck, canBreak, canEquip, enemyName, itemTargetsEnemy, describeAbility, expToNext, findAlly, heroFocusMax, heroMaxHp, heroStats, pouchLimitOf, weaponRarity } from '../engine';
 import { LOCAL_PLAYER, isLocalPlayer, isOnlinePlay } from '../store/battleConfig';
 import { PLAYER_COLOR } from '../data/theme';
 import { useBattle } from '../store/battleStore';
@@ -535,7 +535,7 @@ function PouchSheet() {
     return { h, hp, max, dead: a ? a.dead : h.hp <= 0 };
   });
   return (
-    <BottomSheet title={`${owner?.name ?? ''}の道具袋（${pouch.length}/${POUCH_LIMIT}）`} onClose={() => openSheet(null)}>
+    <BottomSheet title={`${owner?.name ?? ''}の道具袋（${pouch.length}/${owner ? pouchLimitOf(owner) : POUCH_LIMIT}）`} onClose={() => openSheet(null)}>
       {!inBattle && own.length > 1 && (
         <div className="mb-1 flex gap-1">
           {own.map((h) => (

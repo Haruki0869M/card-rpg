@@ -162,7 +162,8 @@ export interface ScenarioMapDef {
   barriers?: BarrierDef[];
   pockets?: PocketDef[];
   /** 置く物を多く置く帯（帯の id）。tower は塔1つずつの帯（下から順） */
-  prefer?: { shrine?: string; herb?: string; randomDungeon?: string; altar?: string; tower?: string[] };
+  /** randomDungeon は、配列なら地域の randomDungeons の1つずつの帯（段階7a: 西と東に1つずつ） */
+  prefer?: { shrine?: string; herb?: string; randomDungeon?: string | string[]; altar?: string; tower?: string[] };
 }
 
 export interface ScenarioStory {
@@ -220,10 +221,12 @@ export type TimeOfDay = 'morning' | 'noon' | 'evening' | 'night';
 export interface MapFeature {
   kind: FeatureKind;
   id: string;
-  /** 使い終わった（宝箱・イベント・祠） */
+  /** 使い終わった（宝箱・イベント・祠。ランダムダンジョンは「踏破済み」= もう入れない。段階7a） */
   used?: boolean;
   /** ランダムに置いた宝箱の見た目 */
   chest?: { rarity: Rarity; locked: boolean };
+  /** ランダムダンジョンのテーマ（段階7a。地図を作る時に決める。古い保存には無く、初めて入る時に決める） */
+  theme?: string;
 }
 
 export interface Tile {

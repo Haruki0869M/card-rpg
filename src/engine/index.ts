@@ -38,6 +38,8 @@ export { spawnAt, spawnTurnsLeft, SPAWN_NAME, SPAWN_EVENT } from './game/world/e
 export { createWorld, regionOfRow } from './game/world/generate';
 export { isWideMap, laneOfTile, nextGoalDungeon, terrainDiceBonus } from './game/world/lanes';
 export { sceneHeroes, activeHeroes } from './game/heroes';
+export { altarTransmutePool } from './game/tasks';
+export { isRandomDungeonTile, randomDungeonView } from './game/world/randomDungeons';
 export * from './hash';
 export * from './game/scenes';
 export * from './game/votes';

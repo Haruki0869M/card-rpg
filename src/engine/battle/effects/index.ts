@@ -353,7 +353,11 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
     const earlyBreak = cardModifier(ctx.cardAbilities, 'breakOnSuccess').some((e) => (ctx.successes ?? 0) >= e.min);
     if (dmg > 0 && canBreak(v)) {
       const why = weakHit ? 'weak' : (ctx.perfect || earlyBreak) && ctx.card ? 'perfect' : v.turnDamage * 100 >= v.maxHp * BALANCE.breakDamagePct ? 'damage' : undefined;
-      if (why) breakEnemy(ctx, v, why);
+      if (why) {
+        breakEnemy(ctx, v, why);
+        // 段階7a: きっかけ「自分の攻撃で敵を BREAK させた」（処刑人の黒外套）
+        if (ctx.depth < 3 && !source.dead) fireAbilities(state, rng, events, source, 'broke', { target: v, depth: ctx.depth + 1 });
+      }
     }
   }
   // 属性の状態異常（HPに当たった時。完全成功なら必ず。耐性があれば効かない）

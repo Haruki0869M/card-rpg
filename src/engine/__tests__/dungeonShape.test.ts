@@ -102,16 +102,16 @@ describe('固定ダンジョン28か所の形', () => {
 });
 
 describe('ランダムダンジョンの偏り防止', () => {
-  it('種を変えても、どの道でも決まりを守る。行の数は 6＋ボス のまま', () => {
+  it('種を変えても、どの道でも決まりを守る。行の数は 4＋ボス（段階7a で全5行。テーマなしでも・3つのテーマでも）', () => {
     const randoms = DUNGEONS.all.filter((d) => d.random);
     expect(randoms).toHaveLength(7);
     const eventIds = EVENTS.forScenario('corruptionKing')
       .filter((e) => e.where !== 'map' && e.where !== 'spawn')
       .map((e) => e.id);
-    for (const d of randoms) {
+    for (const d of randoms) for (const theme of [undefined, 'crystalGrotto', 'sealedLabyrinth', 'outlawDen']) {
       for (let seed = 1; seed <= 60; seed++) {
-        const run = buildDungeon(d.id, createRng(seed), 0, eventIds);
-        expect(dungeonRows(run)).toBe(7);
+        const run = buildDungeon(d.id, createRng(seed), 0, eventIds, theme);
+        expect(dungeonRows(run)).toBe(5);
         const layout: Layout = [];
         for (const room of run.rooms) (layout[room.row] ??= [])[room.col] = { type: room.type, next: room.next.map((id) => Number(id.split('c')[1])) };
         for (const p of allPaths(layout)) expect(biasOf(p), `${d.id} seed${seed}: ${p.join('→')}`).toBeUndefined();

@@ -3,7 +3,7 @@
 import { VoteChips, VoteStatus } from '../ui/Votes';
 import { AnimatePresence, motion } from 'framer-motion';
 import { showVoteHint } from '../dungeon/hints';
-import { ArrowDown, ArrowUp, Backpack, Check, Coins, Compass, Crown, DoorClosed, DoorClosedLocked, Eye, Flame, Gift, LogOut, Menu, Skull, Sparkles, Star, Swords, Users, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Backpack, Check, Coins, Compass, Crown, DoorClosed, DoorClosedLocked, Eye, Flame, Gem, Gift, LogOut, Menu, Skull, Sparkles, Star, Swords, Users, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AnimatedDungeonView } from '../dungeon/DungeonAnim';
 import { corridorArt, OMEN_ICONS, OmenMark } from '../dungeon/DungeonView';
@@ -64,7 +64,7 @@ import { Bar, ItemIcon, Screen } from '../ui/game';
 export { doorChoices, type DoorChoice };
 
 /** 部屋のアイコン（部屋の種類のデータの icon のキー → アイコン）。新しいアイコンが要る時はここに1行足す */
-const ROOM_ICONS: Record<string, typeof Swords> = { swords: Swords, skull: Skull, crown: Crown, gift: Gift, sparkles: Sparkles, flame: Flame };
+const ROOM_ICONS: Record<string, typeof Swords> = { swords: Swords, skull: Skull, crown: Crown, gift: Gift, sparkles: Sparkles, flame: Flame, gem: Gem, coins: Coins };
 
 /** 部屋の種類の見た目（データから） */
 function roomStyle(type: string) {

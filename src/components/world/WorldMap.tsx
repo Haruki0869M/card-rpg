@@ -6,7 +6,7 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'rea
 import { artImage, EnemyArt } from '../../art';
 import { DUNGEONS } from '../../data/dungeons';
 import { getTerrain, QUESTS, TERRAINS, TOWNS } from '../../data/world';
-import { colOf, objectiveHandler, partySenses, rowOf, timeOfDay } from '../../engine';
+import { colOf, dungeonTheme, objectiveHandler, partySenses, rowOf, timeOfDay } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
 import { speedFactor, useBattle } from '../../store/battleStore';
 import { TIMING } from '../../data/balance';
@@ -174,9 +174,21 @@ function featureArt(t: WorldState['tiles'][number], i: number, geom: MapGeom, fi
     const f = t.f;
     const finale = finaleTiles.has(i);
     const fallen = f.kind === 'town' && w.fallenTowns.includes(f.id);
-    const used = f.used && f.kind !== 'town' && f.kind !== 'dungeon';
+    // ランダムダンジョンは、踏破済み（f.used）なら薄くする（段階7a。固定のダンジョンには f.used は付かない）
+    const used = f.used && f.kind !== 'town';
+    // ランダムダンジョンのテーマの印（💎・⛓・🗡。段階7a）
+    const themeMark = f.kind === 'dungeon' ? dungeonTheme(f.theme)?.mark : undefined;
+    const badge = themeMark ? (
+      <g key={`t${i}`} data-theme-mark={f.theme}>
+        <circle cx={x + R * 0.5} cy={y - R * 0.75} r={Math.max(9, R * 0.36)} fill="rgba(0,0,0,.72)" stroke="#c8a0ff" strokeWidth={1} />
+        <text x={x + R * 0.5} y={y - R * 0.75 + Math.max(12, R * 0.46) * 0.36} textAnchor="middle" fontSize={Math.max(12, R * 0.46)}>{themeMark}</text>
+      </g>
+    ) : null;
     // 縮小した時（段階6a。COMPACT_ZOOM より小さい）: 絵を描かず、印（丸とアイコン）だけ
-    if (compact) return featureMark(f.kind === 'dungeon' && finale ? 'finale' : f.kind, i, x, y, R, used, fallen, f);
+    if (compact) {
+      const mark = featureMark(f.kind === 'dungeon' && finale ? 'finale' : f.kind, i, x, y, R, used, fallen, f);
+      return badge ? <g key={`f${i}`}>{mark}{badge}</g> : mark;
+    }
     // 見晴らしの塔（段階6）: 仮のミニチュア。上の面から少し浮かせる
     if (f.kind === 'tower') return <TowerMini key={`f${i}`} x={x} y={y - R * FACILITY_LIFT} R={R} used={f.used} />;
     const mini: MiniKind | undefined = finale ? 'finale' : f.kind === 'event' || f.kind === 'temple' || f.kind === 'altar' ? f.kind : undefined;
@@ -195,10 +207,12 @@ function featureArt(t: WorldState['tiles'][number], i: number, geom: MapGeom, fi
         <g key={`f${i}`} opacity={used ? 0.4 : 1} data-feature={`${f.kind}:${f.id}`} data-used={used || undefined}>
           <ellipse cx={x} cy={y - R * FACILITY_LIFT + big * 0.33} rx={big * 0.42} ry={big * 0.13} fill="rgba(0,0,0,.55)" />
           <image href={img} x={x - big / 2} y={y - R * FACILITY_LIFT - big * 0.62} width={big} height={big} filter="url(#place-shadow)" style={fallen ? { filter: 'grayscale(1) brightness(.6)' } : undefined} />
+          {badge}
         </g>
       );
     }
-    return featureMark(f.kind, i, x, y, R, used, fallen, f);
+    const mark = featureMark(f.kind, i, x, y, R, used, fallen, f);
+    return badge ? <g key={`f${i}`}>{mark}{badge}</g> : mark;
 }
 
 /** 施設の印（丸とアイコン）。絵の無い施設と、縮小した時のすべての施設 */

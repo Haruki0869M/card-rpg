@@ -2,7 +2,7 @@
 import { BALANCE } from '../../data/balance';
 import { petAbilities } from './pets';
 import { getClass } from '../../data/classes';
-import { getItem } from '../../data/items';
+import { getItem, POUCH_LIMIT } from '../../data/items';
 import type { CardInstance, EquipSlot, Hero, ItemDef, JobTier, PartyMemberSpec, StatId, Stats } from '../../types';
 
 export const STAT_IDS: StatId[] = ['str', 'vit', 'int', 'per', 'dex', 'agi', 'luk'];
@@ -10,6 +10,14 @@ export const EQUIP_SLOTS: EquipSlot[] = ['weapon', 'armor', 'accessory'];
 
 export function equippedItems(hero: Hero): ItemDef[] {
   return EQUIP_SLOTS.map((s) => hero.equipment[s]).filter((x): x is NonNullable<typeof x> => !!x).map((i) => getItem(i.itemId));
+}
+
+/**
+ * 道具袋に持てる数（ふつうは POUCH_LIMIT。錬金術師のベルトなど、装備で増える。段階7a）。
+ * 外して数が減っても、入っている物は消さない（減った分は、使うか渡すまで新しく入らないだけ）
+ */
+export function pouchLimitOf(hero: Hero): number {
+  return POUCH_LIMIT + equippedItems(hero).reduce((n, i) => n + (i.pouchBonus ?? 0), 0);
 }
 
 /** 能力値 = 職業の初期値 + 成長ボーナス + 装備 */

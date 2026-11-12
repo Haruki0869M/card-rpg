@@ -30,10 +30,11 @@ export function pickWeighted(weights: readonly number[], rng: Rng): number {
  * 宝箱の中身の格の確率（%・コモン/レア/エピック/レジェンド。合計100）。spec §10.2〜10.3
  * look: 宝箱の見た目 / successes: 運のスロットの成功数（成功が多いほど上の格へずれる）
  */
-export function chestOdds(look: Rarity, successes = 0): number[] {
+export function chestOdds(look: Rarity, successes = 0, epicMul = 1): number[] {
   const base = BALANCE.chestOdds[look] ?? BALANCE.chestOdds.common;
   const boost = BALANCE.chestLuckBoost[Math.max(0, Math.min(BALANCE.chestLuckBoost.length - 1, successes))];
-  const w = base.map((v, i) => v * boost[i]);
+  // epicMul: エピックの重みの倍率（封魔の地下迷宮の宝箱。段階7a）
+  const w = base.map((v, i) => v * boost[i] * (i === 2 ? epicMul : 1));
   const total = w.reduce((a, b) => a + b, 0);
   return w.map((v) => (v * 100) / total);
 }
@@ -47,10 +48,40 @@ export const rollGrade = (odds: readonly number[], rng: Rng): Rarity => RARITIES
  */
 export function rollEquipment(rarity: Rarity, heroes: Hero[], rng: Rng, opts: { scenario?: string; slot?: ItemDef['slot'] } = {}): ItemDef {
   const types = new Set(heroes.flatMap((h) => jobWeapons(h.classId)));
-  const base = ITEMS.all.filter((i) => i.slot !== 'consumable' && (!opts.slot || i.slot === opts.slot) && (!i.scenario || i.scenario === opts.scenario));
+  // 出どころが決まっている装備（ランダムダンジョンの専用の装備）は、ふつうのくじ引きに入れない（段階7a）
+  const base = ITEMS.all.filter((i) => i.slot !== 'consumable' && !i.source && (!opts.slot || i.slot === opts.slot) && (!i.scenario || i.scenario === opts.scenario));
   const pool = base.filter((i) => i.rarity === rarity && (i.slot !== 'weapon' || types.has(i.weaponType!)));
   const fallback = base.filter((i) => rarityIndex(i.rarity) <= rarityIndex(rarity) && (i.slot !== 'weapon' || types.has(i.weaponType!)));
   return pick(pool.length ? pool : fallback.length ? fallback : base, rng);
+}
+
+/**
+ * ランダムダンジョンの専用の装備（段階7a・overhaul-plan-v2 §4-3）を1つ選ぶ。黄金箱のおまけと闇商人で使う。
+ * スマート抽選は rollEquipment と同じ: 武器は heroes のジョブが持てる武器種だけ。1人の冒険では「仲間がいる時だけ」の物を出さない。
+ * except = 選ばない装備（闇商人で同じ物を並べないため）。候補が無ければ undefined
+ */
+export function rollExclusive(game: GameState, heroes: Hero[], rng: Rng, except: string[] = []): ItemDef | undefined {
+  const types = new Set(heroes.flatMap((h) => jobWeapons(h.classId)));
+  const solo = game.heroes.length === 1;
+  const pool = ITEMS.all.filter((i) => i.source === 'randomDungeon' && !except.includes(i.id) && (!i.teamOnly || !solo) && (i.slot !== 'weapon' || types.has(i.weaponType!)));
+  return pool.length ? pick(pool, rng) : undefined;
+}
+
+/** 闇商人の品（段階7a）: 専用の装備1つ（そのキャラに合う物）＋ レア以上の品（町の店の値段 × 倍率）。カードは売らない */
+export function blackMarketStock(game: GameState, h: Hero, rng: Rng): NonNullable<Hero['peddler']> {
+  const k = BALANCE.randomDungeon.blackMarketPriceMul;
+  const price = (def: ItemDef) => Math.round((BALANCE.itemPrice[def.rarity] ?? 60) * k);
+  const items: NonNullable<Hero['peddler']>['items'] = [];
+  const ex = rollExclusive(game, [h], rng);
+  if (ex) items.push({ item: newItem(game, ex), price: price(ex) });
+  // ふつうの品: そのキャラが使える武器・鎧・装飾品のレア以上（ほかのシナリオの限定品と専用の装備は出さない）
+  const types = new Set(jobWeapons(h.classId));
+  const goods = ITEMS.all.filter((i) => i.slot !== 'consumable' && !i.source && (!i.scenario || i.scenario === game.scenarioId) && (i.slot !== 'weapon' || types.has(i.weaponType!)) && rarityIndex(i.rarity) >= 1);
+  for (let n = 0; n < BALANCE.randomDungeon.blackMarketGoods && goods.length; n++) {
+    const def = goods.splice(rng.int(goods.length), 1)[0];
+    items.push({ item: newItem(game, def), price: price(def) });
+  }
+  return { items, cards: [], kind: 'blackMarket' };
 }
 
 /** その格の消費アイテム（無ければそれより下で一番高い格） */
@@ -84,13 +115,14 @@ export function rollChestContents(game: GameState, grade: Rarity, big: boolean, 
 }
 
 /** カード報酬の格の確率（%・コモン/レア/エピック） */
-export function cardRewardOdds(roomType: string, depthTier = 0): number[] {
+export function cardRewardOdds(roomType: string, depthTier = 0, epicMul = 1): number[] {
   const base = BALANCE.cardRewardOdds[roomType] ?? BALANCE.cardRewardOdds.battle;
   // 深層ボーナス: 奥の部屋ほど、レア以上（レア・エピック）の確率が増える（+15% / +30% / +50%。お金・経験値と同じ割合）。増えた分だけコモンが減る
+  // epicMul: エピックの確率の倍率（封魔の地下迷宮。段階7a）。増えた分はコモンが減る
   const up = 1 + (BALANCE.depthBonus.reward[depthTier] ?? 0);
   const r1 = (v: number) => Math.round(v * 10) / 10;
   let rare = r1(base[1] * up);
-  let epic = r1(base[2] * up);
+  let epic = r1(base[2] * up * epicMul);
   // 合わせて100%を超える時は、レアを削る（今の値では起きない）
   if (rare + epic > 100) rare = r1(100 - epic);
   if (epic > 100) { epic = 100; rare = 0; }
@@ -127,9 +159,9 @@ export function rollCardOffers(game: GameState, heroIds: string[], rng: Rng, odd
  * このキャラ・フォーカスで開けた時の、中身の格の確率（%）。
  * 運のスロットの成功数の確率 × 成功数ごとの確率表 を足し合わせたもの（開ける前に見せる本当の確率）
  */
-export function expectedChestOdds(look: Rarity, slots: number, focus: number, chance: number): number[] {
+export function expectedChestOdds(look: Rarity, slots: number, focus: number, chance: number, epicMul = 1): number[] {
   const dist = successDistribution(slots, focus, chance);
   const out = [0, 0, 0, 0];
-  dist.forEach((p, s) => chestOdds(look, s).forEach((v, i) => (out[i] += p * v)));
+  dist.forEach((p, s) => chestOdds(look, s, epicMul).forEach((v, i) => (out[i] += p * v)));
   return out;
 }

@@ -75,6 +75,14 @@ export interface ItemDef {
   noShop?: boolean;
   /** 区切りE: 1人が袋に持てる数（不死鳥の羽根は1） */
   pouchMax?: number;
+  /**
+   * 出どころ（段階7a）。randomDungeon = ランダムダンジョンの黄金箱と闇商人だけで手に入る専用の装備（町の店・ふつうの宝箱・戦闘のドロップ・行商人には出ない）
+   */
+  source?: 'randomDungeon';
+  /** 仲間がいる時だけ出る（1人で遊ぶ冒険では出さない。共鳴する絆の指輪） */
+  teamOnly?: boolean;
+  /** 道具袋に持てる数を増やす（錬金術師のベルト） */
+  pouchBonus?: number;
 }
 
 export interface ItemInstance {
@@ -126,9 +134,10 @@ export interface Hero {
   /** 候補を出した時点で抽選・保存する毛色。採用時には引き直さない。 */
   petOfferColors?: Record<string, string>;
   /** イベントでカードを1枚選ぶ作業（強化 / 削除 / 変異。CARD_TASK で選ぶ） */
-  cardTask?: 'upgrade' | 'remove' | 'mutate';
-  /** さすらいの行商人の品物（PEDDLER_BUY で買う） */
-  peddler?: { items: { item: ItemInstance; price: number; sold?: boolean }[]; cards: { cardId: string; price: number; sold?: boolean }[] };
+  /** altar = 晶石の祭壇（段階7a。1枚を＋に強化するか、同じ格の別のカードに変異させるかを、本人が選ぶ） */
+  cardTask?: 'upgrade' | 'remove' | 'mutate' | 'altar';
+  /** さすらいの行商人の品物（PEDDLER_BUY で買う）。kind = blackMarket は無法者の隠れ処の闇商人（段階7a。品と値段だけが違う） */
+  peddler?: { items: { item: ItemInstance; price: number; sold?: boolean }[]; cards: { cardId: string; price: number; sold?: boolean }[]; kind?: 'blackMarket' };
   /** 武器に宿った属性（その武器を持っている間だけ） */
   weaponElement?: { uid: string; element: string };
   /** 最後に突発イベントが起きたワールドターン（2手番続けては起きない） */
@@ -183,6 +192,33 @@ export interface RoomTypeDef {
   sealedChest?: boolean;
   /** ランダムダンジョンの途中の行での出やすさ（0なら自動生成では出ない） */
   layoutWeight?: number;
+}
+
+/**
+ * ランダムダンジョンのテーマ（段階7a・overhaul-plan-v2 §4-2）。部屋の並びとご褒美だけを変える（敵はそのシナリオのランダムダンジョンのまま）。
+ * データは src/content/common/dungeonThemes/（自動で登録）
+ */
+export interface DungeonThemeDef {
+  id: string;
+  order?: number;
+  /** 名前（例: 古代の晶洞）。画面では「古代の晶洞（迷いの森の洞窟）」のように出す */
+  name: string;
+  /** 地図と見取り図の印（💎・⛓・🗡） */
+  mark: string;
+  /** 入口の説明（短く。全5行・黄金箱の文は画面が足す） */
+  description: string;
+  /** 2〜3行目の部屋の種類の割合（書いていない種類は出ない） */
+  weights: Partial<Record<RoomType, number>>;
+  /** 4行目（ボスの手前）の部屋の種類（1部屋だけ） */
+  fixedRoom: RoomType;
+  /** 敵のレベルの加算 */
+  enemyLevel?: number;
+  /** 戦闘・強敵の部屋の敵は、そのダンジョンの組のうち「数が多い」組から選ぶ */
+  largeGroups?: boolean;
+  /** 宝箱の部屋が封魔の宝箱になる確率（%。2行目から） */
+  sealedChance?: number;
+  /** ご褒美の倍率（ボスの黄金箱には掛けない）。chestGold = 宝箱のお金 / battleGold = 戦闘のお金 / epicMul = カードと装備のエピックの重み */
+  reward?: { chestGold?: number; battleGold?: number; epicMul?: number };
 }
 
 export interface ChestSpec {
@@ -255,6 +291,10 @@ export interface DungeonRun {
   gained: ItemInstance[];
   /** この手番に扉を開けた（扉1つ＝手番1回。部屋を済ませて通路に戻ったら、その組の手番は終わる。抜本的な見直し §2-3） */
   opened?: boolean;
+  /** ランダムダンジョンのテーマ（段階7a。古い保存の途中のダンジョンには無い = テーマなしの6行） */
+  theme?: string;
+  /** 入った世界マップのマス（ランダムダンジョンを制覇したら、そのマスを「踏破済み」にする。古い保存には無い） */
+  tile?: number;
   /** 通路の地図の上の位置と向き（地図は部屋のつながりから毎回作る。engine/game/dungeonMap.ts） */
   pos?: { x: number; y: number; facing: Facing };
   /** 見たマス（"x,y"。オートマッピング） */
@@ -285,6 +325,8 @@ export interface ChestState {
   contents?: Loot[];
   /** 抽選された中身の格（開ける前は undefined） */
   grade?: Rarity;
+  /** ランダムダンジョンの黄金箱から、専用の装備が余分に出た（中身の2つ目。段階7a。画面で知らせる） */
+  exclusive?: boolean;
   /** 判定の結果（演出用） */
   lastRoll?: ChestRoll;
   /** 戦闘の後に見つけた隠し宝箱（マスには残らない） */
@@ -589,7 +631,8 @@ export type GameCommand =
   /** お供を撫でる（野営・休憩部屋。1回の冒険で最初の1回はフォーカス+1） */
   | { type: 'PET_PAT'; playerId: PlayerId; heroId: string }
   /** イベントのカードの作業（cardUid を空にするとやめる） */
-  | { type: 'CARD_TASK'; playerId: PlayerId; heroId: string; cardUid?: string }
+  /** altar = 晶石の祭壇の時の選び方（upgrade = ＋に強化 / transmute = 同じ格の別のカードに変異） */
+  | { type: 'CARD_TASK'; playerId: PlayerId; heroId: string; cardUid?: string; altar?: 'upgrade' | 'transmute' }
   /** 行商人の品物を買う（index を省くと店を閉じる） */
   | { type: 'PEDDLER_BUY'; playerId: PlayerId; heroId: string; kind?: 'item' | 'card'; index?: number }
   | { type: 'CLAIM_LOOT'; playerId: PlayerId; heroId: string; choice: 'need' | 'greed' | 'pass'; /** 宝箱の取り合いの何番目か（戦闘の報酬では使わない） */ index?: number }

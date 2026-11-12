@@ -10,7 +10,7 @@ import { DUNGEONS } from '../../data/dungeons';
 import { corruptionName, getScenario } from '../../data/scenarios';
 import { getEnemy } from '../../data/enemies';
 import { EVENTS } from '../../data/events';
-import { getItem, POUCH_LIMIT } from '../../data/items';
+import { getItem } from '../../data/items';
 import type {
   EventBattle,
   BattleEvent,
@@ -29,7 +29,9 @@ import type {
   EncounterSpec,
   Facing,
   ChestState,
+  DungeonRun,
 } from '../../types';
+import { ensureTileTheme } from './world/randomDungeons';
 import { applyCommand, createBattle, STATE_VERSION } from '../battle/battle';
 import { createRng, type Rng } from '../rng';
 import { applyOutcome, checkOutcome, hasOutcomeKind, makeOutcomeCtx } from './outcomes';
@@ -67,7 +69,7 @@ import { questGatedNext } from './world/questGate';
 import { leaveSanctuary, leaveShrine, leaveTown, questAccept, questReport, shrineChoose, bringMyPet, townBuy, townInn, townRemoveCard, townSell } from './world/town';
 import { getRoomType } from '../../data/rules';
 import { TERRAINS } from '../../data/world';
-import { buildDungeon, depthTier, findRoom, isLegacyLayout, RARITIES, rarityIndex, reachableRooms } from './dungeon';
+import { buildDungeon, depthTier, findRoom, isLegacyLayout, RARITIES, rarityIndex, reachableRooms, themeReward } from './dungeon';
 import { canMove, cellKey, DIRS, doorFront, doorNorthOf, findPath, moveIntoRoom, posOf, revealSeen, turnTo } from './dungeonMap';
 import { canWatchHere, watchSpot } from './dungeonOmen';
 import {
@@ -78,6 +80,7 @@ import {
   heroFocusMax,
   heroMaxHp,
   heroStats,
+  pouchLimitOf,
   toPartyMember,
 } from './hero';
 import { needsVote, tally, VOTED_COMMANDS, voteCtx, voters } from './votes';
@@ -86,7 +89,7 @@ import { EXPEDITION_MODES, findExpedition, mount, restoreSceneFields, saveSceneF
 import { addFeat, announceJobs, changeJob, pickJobCard } from './jobs';
 import { addPetActs, addPetLove, adoptPet, patPet } from './pets';
 import { doCardTask, peddlerBuy } from './tasks';
-import { cardRewardOdds, chestOdds, newItem, rollCardOffers, rollChestContents, rollConsumable, rollEquipment, rollGrade } from './loot';
+import { cardRewardOdds, chestOdds, newItem, rollCardOffers, rollChestContents, rollConsumable, rollEquipment, rollExclusive, rollGrade } from './loot';
 
 export const GAME_VERSION = STATE_VERSION;
 
@@ -405,7 +408,7 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
         if (!h || !ownedBy(h, cmd.playerId)) error = '担当していないキャラです';
         else if (cmd.type === 'ADOPT_PET') error = adoptPet(game, h, cmd.petId, cmd.color, cmd.name);
         else if (cmd.type === 'PET_PAT') error = patPet(game, h);
-        else if (cmd.type === 'CARD_TASK') error = doCardTask(game, h, cmd.cardUid, rng);
+        else if (cmd.type === 'CARD_TASK') error = doCardTask(game, h, cmd.cardUid, rng, cmd.altar);
         else error = peddlerBuy(game, h, cmd.kind, cmd.index);
         break;
       }
@@ -555,8 +558,11 @@ function enterDungeon(game: GameState, playerId: string, dungeonId: string, rng:
   return undefined;
 }
 
-/** 世界マップのダンジョンの入口から入る（そのマスにいて参加するキャラだけ。spec §9.1） */
-export function enterDungeonFromWorld(game: GameState, dungeonId: string, party: string[], rng: Rng) {
+/**
+ * 世界マップのダンジョンの入口から入る（そのマスにいて参加するキャラだけ。spec §9.1）。
+ * tile = 入口のマス（ランダムダンジョンは、そのマスのテーマで作り、制覇したらそのマスを踏破済みにする。段階7a）
+ */
+export function enterDungeonFromWorld(game: GameState, dungeonId: string, party: string[], rng: Rng, tile?: number) {
   const levelBonus = getDifficulty(game.difficulty).enemyLevel + (game.world ? corruptionLevelBonus(game, game.world) : 0);
   const eventIds = EVENTS.forScenario(game.scenarioId)
     .filter((e) => e.where !== 'map' && e.where !== 'spawn')
@@ -564,7 +570,9 @@ export function enterDungeonFromWorld(game: GameState, dungeonId: string, party:
   const random = !!DUNGEONS.get(dungeonId).random;
   const dRng = random ? createRng(game.randomDungeonSeed) : rng;
   if (random) game.randomDungeonSeed = (Math.imul(game.randomDungeonSeed, 1103515245) + 12345) >>> 0;
-  game.dungeon = buildDungeon(dungeonId, dRng, levelBonus + (random ? game.clearedDungeons.length : 0), eventIds);
+  const theme = random && game.world && tile !== undefined ? ensureTileTheme(game.world, tile) : undefined;
+  game.dungeon = buildDungeon(dungeonId, dRng, levelBonus + (random ? game.clearedDungeons.length : 0), eventIds, theme);
+  if (random && tile !== undefined) game.dungeon.tile = tile;
   game.party = party;
   game.mode = 'dungeon';
   addLog(game, `${game.dungeon.name}に入った`);
@@ -731,7 +739,9 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
     gold += Math.max(0, Math.round(def.gold * k * (0.85 + rng.next() * 0.3)));
   }
   // 待ち伏せを迎え撃った時などのお金の倍率・戦闘中に手に入れたお金
-  gold = Math.round(gold * (game.battleInfo?.goldMul ?? 1) * (b.goldMul ?? 1)) + (b.bonusGold ?? 0);
+  // ランダムダンジョンのテーマ（無法者の隠れ処: 戦闘のお金+30%。封魔の地下迷宮: カードと装備のエピック2倍。段階7a）
+  const tr = themeReward(room ? run : undefined);
+  gold = Math.round(gold * (game.battleInfo?.goldMul ?? 1) * (b.goldMul ?? 1) * tr.battleGold) + (b.bonusGold ?? 0);
   // お金は生き残った参加者で山分け
   const survivorHeroes = survivors.map((id) => findHero(game, id)!).filter(Boolean);
   // 装備の「勝った時のゴールド+○%」（王の印章指輪など）。生き残った仲間の中で一番大きい物だけ効く（重ならない）
@@ -744,7 +754,7 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
   const onWin = game.battleInfo?.onWin;
   if (onWin?.length) applyOutcomes(game, onWin, survivorHeroes[0], rng);
 
-  const cardOdds = cardRewardOdds(rt.battle?.cardOdds ?? 'battle', tier);
+  const cardOdds = cardRewardOdds(rt.battle?.cardOdds ?? 'battle', tier, tr.epicMul);
   const reward: RewardState = { gold, exp: [], levelUps: [], cardOffers: survivors.flatMap((id) => rollCardOffers(game, [id], rng, cardOdds)), cardOdds, cardDone: [], cardPicked: false, loot: [] };
   for (const id of survivors) {
     const h = findHero(game, id)!;
@@ -766,7 +776,7 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
   // ドロップ（部屋の種類の設定どおり）。ボスの大宝箱は報酬の後に開ける
   const drop = rt.battle;
   if (drop?.equipmentDrop) {
-    const item = newItem(game, rollEquipment(rng.next() * 100 < drop.equipmentDrop.epicChance ? 'epic' : 'rare', game.heroes, rng, { scenario: game.scenarioId }));
+    const item = newItem(game, rollEquipment(rng.next() * 100 < drop.equipmentDrop.epicChance * tr.epicMul ? 'epic' : 'rare', game.heroes, rng, { scenario: game.scenarioId }));
     const to = leastLoaded(survivorHeroes);
     // 2人以上のプレイヤーが生き残ったら、みんなで取り合う（欲しい / 余れば / いらない → 運の判定）
     if (new Set(survivorHeroes.map((h) => h.playerId)).size > 1) reward.claim = { item, heroes: survivorHeroes.map((h) => h.id), choices: {} };
@@ -1012,13 +1022,24 @@ function openChest(game: GameState, playerId: string, heroId: string, focusUsed:
   const results = rollWithFocus(slots, focusUsed, statChance(h, 'luk', 'luck'), rng);
   const n = successes(results);
   recordCheck(h, 'luk', results, 1);
-  const oddsBefore = chestOdds(c.spec.rarity, 0);
-  const odds = chestOdds(c.spec.rarity, n);
+  // ランダムダンジョンのテーマのご褒美（ボスの黄金箱には掛けない。段階7a）
+  const tr = c.roomId && !c.spec.big ? themeReward(game.dungeon) : themeReward(undefined);
+  const oddsBefore = chestOdds(c.spec.rarity, 0, tr.epicMul);
+  const odds = chestOdds(c.spec.rarity, n, tr.epicMul);
   const grade = rollGrade(odds, rng);
   const omen = grade === 'legend' && rng.next() * 100 < BALANCE.chestOmenChance;
   c.grade = grade;
   c.lastRoll = { kind: 'luck', heroId, results, success: n === slots, oddsBefore, odds, grade, gradeChance: odds[rarityIndex(grade)], omen };
   c.contents = rollChestContents(game, grade, !!c.spec.big, rng);
+  if (tr.chestGold !== 1) for (const l of c.contents) if (l.kind === 'gold') l.amount = Math.round(l.amount * tr.chestGold);
+  // ランダムダンジョンのボスの黄金箱: 専用の装備が1つ「余分に」出ることがある（段階7a・overhaul-plan-v2 §4-3。ふつうの中身はそのまま）
+  if (c.spec.big && game.dungeon?.random && rng.next() * 100 < BALANCE.randomDungeon.exclusiveChance) {
+    const ex = rollExclusive(game, sceneHeroes(game), rng);
+    if (ex) {
+      c.contents.splice(1, 0, { kind: 'item', item: newItem(game, ex) });
+      c.exclusive = true;
+    }
+  }
   // 品物は指定した受取人へ。判定と実績は開けたキャラのまま。お金は、ふつうの宝箱も大宝箱も、場面のキャラで山分け（2026-11-10 オーナーの決定）。
   if (recipientId && !shared) for (const loot of c.contents) if (loot.kind === 'card') loot.heroId = recipient.id;
   if (shared) {
@@ -1061,6 +1082,7 @@ function leaveChest(game: GameState, playerId: string, rng: Rng): string | undef
     for (const h of sceneHeroes(game)) if (h.pet) h.pet.dungeonClears = (h.pet.dungeonClears ?? 0) + 1;
     if (!game.clearedDungeons.includes(run.dungeonId)) game.clearedDungeons.push(run.dungeonId);
     addLog(game, `${run.name}を制覇した！`);
+    if (game.world && run.random) onRandomDungeonCleared(game, run);
     if (game.world) onDungeonCleared(game, run.dungeonId, rng);
   } else game.mode = 'dungeon';
   return undefined;
@@ -1079,6 +1101,22 @@ export function nextGoalLines(game: GameState): string[] {
   }
   const finale = DUNGEONS.forScenario(game.scenarioId).find((d) => d.finale);
   return finale ? [`鍵がそろった。${finale.name}へ向かおう。`] : [];
+}
+
+/**
+ * ランダムダンジョンを制覇した時（段階7a・オーナーの決定 6-A と 3-A）: 入口のマスを「踏破済み」にして閉じ（1か所1回）、侵食度を少し下げる（寄り道の浄化）。
+ * 入口のマスは、入った時に記録したマス（古い保存の途中のダンジョンは、場面の入口のマス）
+ */
+function onRandomDungeonCleared(game: GameState, run: DungeonRun) {
+  const w = game.world!;
+  const tile = run.tile ?? (game.activeScene ? findExpedition(game, game.activeScene)?.entranceTile : undefined);
+  const f = tile !== undefined ? w.tiles[tile]?.f : undefined;
+  if (f?.kind === 'dungeon' && f.id === run.dungeonId) f.used = true;
+  const drop = BALANCE.corruptionOnRandomDungeonClear;
+  if (drop > 0 && w.corruption > 0) {
+    w.corruption = Math.max(0, w.corruption - drop);
+    addLog(game, `${corruptionName(game.scenarioId)}が${drop}%下がった`);
+  }
 }
 
 /** 世界マップのダンジョンを制覇した時（封印の鍵・侵食度・依頼・最終ダンジョンならエンディング） */
@@ -1424,7 +1462,7 @@ function give(game: GameState, cmd: Extract<GameCommand, { type: 'GIVE' }>): str
   for (const bag of ['stash', 'pouch'] as const) {
     const i = from[bag].findIndex((x) => x.uid === cmd.itemUid);
     if (i < 0) continue;
-    if (bag === 'pouch' && to.pouch.length >= POUCH_LIMIT) return `${to.name}の袋がいっぱいです`;
+    if (bag === 'pouch' && to.pouch.length >= pouchLimitOf(to)) return `${to.name}の袋がいっぱいです`;
     const [it] = from[bag].splice(i, 1);
     to[bag].push(it);
     addLog(game, `${from.name}が${to.name}に「${getItem(it.itemId).name}」を渡した`);

@@ -172,7 +172,7 @@ describe('段階6a: シナリオ1の広い地図の形', () => {
     }
   });
 
-  it('物の数（計画 §2-2 の表）: 宝箱18・イベント18（薬草3は西）・祠8・塔4（西2・東2）・町4・ランダムダンジョンは西・神殿2・祭壇5', () => {
+  it('物の数（計画 §2-2 の表）: 宝箱18・イベント18（薬草3は西）・祠8・塔4（西2・東2）・町4・ランダムダンジョンは西と東に1つずつ（段階7a）・神殿2・祭壇5', () => {
     for (let seed = 1; seed <= 20; seed++) {
       const g = fresh(seed);
       const w = g.world!;
@@ -188,7 +188,9 @@ describe('段階6a: シナリオ1の広い地図の形', () => {
       const tw = featureTiles(g, 'tower');
       expect(tw.map(lane).sort(), msg).toEqual(['east', 'east', 'west', 'west']);
       const rd = featureTiles(g, 'dungeon').filter((i) => DUNGEONS.get(w.tiles[i].f!.id).random);
-      expect(rd.map(lane), msg).toEqual(['west']);
+      expect(rd.map(lane).sort(), msg).toEqual(['east', 'west']);
+      // 2か所のテーマは別々（段階7a）
+      expect(new Set(rd.map((i) => w.tiles[i].f!.theme)).size, msg).toBe(2);
       expect(featureTiles(g, 'temple'), msg).toHaveLength(SANCTUARIES.forScenario(CK).filter((s) => s.kind === 'temple').length);
       expect(featureTiles(g, 'altar'), msg).toHaveLength(SANCTUARIES.forScenario(CK).filter((s) => s.kind === 'altar').length);
       // 徘徊する敵は36組（置けるマスが無い時だけ少なくなる）

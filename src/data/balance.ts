@@ -220,6 +220,15 @@ export const BALANCE = {
   corruptionPerRelayMove: 1,
   /** 侵食度: 鍵のダンジョンを制覇した時に下がる量（ダンジョンごとの corruptionOnClear が無い時。§4 B で 5→2、ダンジョンを大きくした時に 2→3（提案）） */
   corruptionOnKeyDungeonClear: 3,
+  /** 侵食度: ランダムダンジョンを制覇した時に下がる量（寄り道の浄化。overhaul-plan-v2 §7 の決定 3-A の始めの数字。段階8で測って決める） */
+  corruptionOnRandomDungeonClear: 2,
+  /**
+   * ランダムダンジョン（段階7a・overhaul-plan-v2 §4-3）。
+   * - exclusiveChance: ボスの黄金箱から、専用の装備が1つ「余分に」出る確率（%）
+   * - blackMarketPriceMul: 闇商人の値段の倍率（町の店の値段 × これ）【提案】
+   * - blackMarketGoods: 闇商人が専用の装備のほかに並べる、レア以上の品の数【提案】
+   */
+  randomDungeon: { exclusiveChance: 60, blackMarketPriceMul: 1.5, blackMarketGoods: 2 },
   /** 野営の回復（HPは最大HPの割合）と、夜に野営した時の夜襲の確率（%） */
   campHpRatio: 0.2,
   campFocus: 1,

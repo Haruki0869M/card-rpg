@@ -8,9 +8,24 @@ import type { Rng } from '../rng';
 import { addItem, addLog } from './common';
 import { rarityIndex } from './dungeon';
 import { STAT_IDS } from './hero';
+import { withoutStarterCards } from './cardTags';
+import { heroCardPool } from './jobs';
 
-/** 山札のカード1枚に作業をする（cardUid が無ければやめる） */
-export function doCardTask(game: GameState, h: Hero, cardUid: string | undefined, rng: Rng): string | undefined {
+/**
+ * 晶石の祭壇の「変異」の行き先の候補（段階7a）: そのキャラの報酬に出るカード（最初の山札の基本の札は除く）のうち、同じ格で別のカード。
+ * 名前が同じ札も除く。乱数は使わない（選ぶのは doCardTask で冒険の乱数）
+ */
+export function altarTransmutePool(game: GameState, h: Hero, cardId: string): string[] {
+  const from = CARDS.get(cardId);
+  const rarity = from.rarity ?? 'common';
+  return withoutStarterCards(heroCardPool(h, game.heroes.length === 1)).filter((id) => {
+    const c = CARDS.get(id);
+    return id !== cardId && c.name !== from.name && (c.rarity ?? 'common') === rarity;
+  });
+}
+
+/** 山札のカード1枚に作業をする（cardUid が無ければやめる）。altar = 晶石の祭壇の選び方（強化 / 変異） */
+export function doCardTask(game: GameState, h: Hero, cardUid: string | undefined, rng: Rng, altar?: 'upgrade' | 'transmute'): string | undefined {
   const task = h.cardTask;
   if (!task) return 'カードを選ぶ作業はありません';
   if (!cardUid) {
@@ -21,6 +36,22 @@ export function doCardTask(game: GameState, h: Hero, cardUid: string | undefined
   if (idx < 0) return '山札にないカードです';
   const inst = h.deck[idx];
   const name = CARDS.get(inst.cardId).name;
+  if (task === 'altar') {
+    if (altar === 'transmute') {
+      // 変異: 同じ格の別のカードに変わる（＋はそのまま引き継ぐ。能力値は上がらない）
+      const pool = altarTransmutePool(game, h, inst.cardId);
+      if (!pool.length) return 'このカードは変異できません（同じ格のほかのカードがありません）';
+      const to = pool[rng.int(pool.length)];
+      h.deck[idx] = { ...inst, cardId: to };
+      addLog(game, `晶石の祭壇で、${h.name}の「${name}」が「${CARDS.get(to).name}」に変わった`);
+    } else if (altar === 'upgrade') {
+      if (inst.upgraded) return 'もう強化してあります';
+      inst.upgraded = true;
+      addLog(game, `晶石の祭壇で、${h.name}の「${name}」を強化した`);
+    } else return '強化か変異かを選んでください';
+    delete h.cardTask;
+    return undefined;
+  }
   if (task === 'upgrade') {
     if (inst.upgraded) return 'もう強化してあります';
     inst.upgraded = true;

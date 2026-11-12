@@ -23,7 +23,7 @@ import type {
   SlotResult,
   Statuses,
 } from '../../types';
-import { cardChanceBonus, cardCostOf, cardModifier, cardTraitAbilities, petActOnce, completeSlotsOf, damageModifiers, fireAbilities, keepBlockOf, markCostUsed, summonTwiceOf } from '../abilities';
+import { cardChanceBonus, cardCostOf, cardModifier, cardTraitAbilities, carryManaOf, extraHitsOf, petActOnce, completeSlotsOf, damageModifiers, fireAbilities, keepBlockOf, markCostUsed, rigDiceOf, shareBlockOf, summonTwiceOf } from '../abilities';
 import { createRng, type Rng, shuffle } from '../rng';
 import { affinityOf } from '../stats';
 import { calcDamage } from './damage';
@@ -239,7 +239,7 @@ export function tierDamageAgainst(ally: AllyState, card: CardDef, target: EnemyS
       // 「最初の1回の攻撃にだけ足すダメージ」（弾込め）は、その段の最初の1回分だけ足す
       const first = addOnce && !onceUsed ? calcDamage(e.amount + add + addOnce, source.statuses, target.statuses, chargedMultiplier(source, card) * multiplier * elementMultiplier(target, element) * comboMultiplier(source, target)) - calcDamage(e.amount + add, source.statuses, target.statuses, chargedMultiplier(source, card) * multiplier * elementMultiplier(target, element) * comboMultiplier(source, target)) : 0;
       if (addOnce) onceUsed = true;
-      return sum + first + calcDamage(e.amount + add, source.statuses, target.statuses, chargedMultiplier(source, card) * (e.outcomes?.length ? e.outcomes.reduce((n, o) => n + o.weight * o.multiplier, 0) / e.outcomes.reduce((n, o) => n + o.weight, 0) : 1) * multiplier * elementMultiplier(target, element) * comboMultiplier(source, target)) * (e.hits ?? 1);
+      return sum + first + calcDamage(e.amount + add, source.statuses, target.statuses, chargedMultiplier(source, card) * (e.outcomes?.length ? e.outcomes.reduce((n, o) => n + o.weight * o.multiplier, 0) / e.outcomes.reduce((n, o) => n + o.weight, 0) : 1) * multiplier * elementMultiplier(target, element) * comboMultiplier(source, target)) * ((e.hits ?? 1) + ((e.hits ?? 1) >= 2 ? extraHitsOf(source) : 0));
     }, 0);
   });
 }
@@ -294,7 +294,10 @@ function startAllyPhase(state: BattleState, rng: Rng, events: BattleEvent[]) {
     cs.petActsTurn = 0;
     cs.unhurtTurn = state.turn > 1 && cs.unhurt === 1 ? 1 : 0;
     a.block = Math.min(a.block, keepBlockOf(a));
-    a.mana = BALANCE.manaPerTurn;
+    // 段階7a: 過充填の魔導炉 — 使わずに残ったマナを、上限まで持ち越す（1ターン目は残りが0）
+    const carry = Math.min(carryManaOf(a), Math.max(0, a.mana));
+    a.mana = BALANCE.manaPerTurn + carry;
+    if (carry > 0) addLog(state, `${a.name}は残ったマナを${carry}持ち越した`);
     // 凍結など: マナが減る（効いたら1減る）
     const pen = takeManaPenalty(a.statuses);
     if (pen.amount) {
@@ -499,7 +502,21 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   // 星の導き: 失敗した枠を成功に変える（このカードで使い切る。先読みの結果には、もう当ててある）
   const fix = ally.fixMiss;
   delete ally.fixMiss;
-  const results = reserved?.results ?? fixMisses(rollSlots(card.slots, focusUsed, chance, rng), fix);
+  let results = reserved?.results ?? fixMisses(rollSlots(card.slots, focusUsed, chance, rng), fix);
+  // 段階7a: いかさま師の黄金賽 — 成功が0なら完全成功に変える（1ターンに1回）。乱数は引かず、出た結果だけを書き換えるので、
+  // 星読みで先に決めた結果（保存してある）に当てても、保存して再開しても・オンラインでも同じになる
+  const rig = rigDiceOf(ally);
+  if (rig && !results.some((r) => r !== 'miss') && (ally.counters ??= {})['once:rigDice'] !== state.turn) {
+    ally.counters['once:rigDice'] = state.turn;
+    results = results.map(() => 'hit');
+    const gain = Math.min(1, ally.focusMax - ally.focus);
+    if (gain > 0) {
+      ally.focus += gain;
+      events.push({ type: 'resource', unitId: ally.id, resource: 'focus', amount: gain });
+    }
+    abilityTriggered(state, ally.id, rig.name, events, rig.source);
+    addLog(state, `${ally.name}の「${rig.name}」！ 失敗が完全成功に変わった${gain ? '（フォーカス+1）' : ''}`);
+  }
   // 次のカードの成功率が上がる状態異常（応援など）は、使ったら消える
   // 輪唱: この応援をくれた味方を覚えておく（完全成功したら、その味方のきっかけを起こす）
   const cheerer = (ally.statuses.inspired ?? 0) > 0 && ally.cheeredBy ? findAlly(state, ally.cheeredBy) : undefined;
@@ -521,6 +538,8 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   const tier = selectTier(card, successes);
   const supportBefore = supportSnapshot(state.allies, ally);
   const selfBefore = selfSnapshot(ally);
+  // 段階7a: 狂王の血鎧 — このカードを使う前にためていた分（このカードで使い切る）
+  const rageBefore = ally.counters?.rageAtkPct ?? 0;
 
   // 効果（効果の部品を順に使う）
   const cardAbilities = cardTraitAbilities(card);
@@ -571,9 +590,27 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   if (ctx.comboLanded) {
     if (cardAbilities) abilityParts.push(...fireAbilities(state, rng, events, ally, 'combo', { ...fireOpts, list: cardAbilities }));
     abilityParts.push(...fireAbilities(state, rng, events, ally, 'combo', fireOpts));
+    // 段階7a: 味方（自分も）の連携で動く能力（追撃の雷鳴刀）。狙うのは、連携が起きた敵（敵1体のカードなら、その敵）
+    const comboFoe = (target && state.enemies.includes(target as EnemyState) ? target : undefined) ?? state.enemies.find((e) => !e.dead && ctx.hitIds.includes(e.uid));
+    if (comboFoe && !comboFoe.dead) for (const a of state.allies) if (!a.dead) abilityParts.push(...fireAbilities(state, rng, events, a, 'allyCombo', { target: comboFoe, depth: 1 }));
   }
-  // 区切りD: 導きの光・アシスト・パスの印・血の代価は、攻撃カードを1枚使ったら消える
-  if (hasDamage) { delete ally.guided; delete ally.comboBoost; if (ally.counters?.bloodAdd) ally.counters.bloodAdd = 0; if (ally.counters?.nextAtkPct) ally.counters.nextAtkPct = 0; }
+  // 段階7a: 共鳴する絆の指輪 — このカードで自分が得たブロックの一部を、HPの割合が一番低いほかの味方にも（分けたブロックは、もう一度は分けない）
+  const share = shareBlockOf(ally);
+  const gainedBlock = ally.block - selfBefore[0].block;
+  if (share && gainedBlock > 0 && !ally.dead) {
+    const mates = state.allies.filter((x) => x !== ally && !x.dead);
+    const mate = mates.length ? mates.reduce((p, q) => (q.hp / q.maxHp < p.hp / p.maxHp ? q : p)) : undefined;
+    const give = mate ? Math.floor((gainedBlock * share.effect.pct) / 100) : 0;
+    if (mate && give > 0) {
+      mate.block = Math.min(BALANCE.blockMax, mate.block + give);
+      events.push({ type: 'block', unitId: mate.id, amount: give });
+      abilityTriggered(state, ally.id, share.ability.name, events, share.ability.source);
+      abilityParts.push(`${share.ability.name}（${mate.name}にブロック${give}）`);
+    }
+  }
+  // 区切りD: 導きの光・アシスト・パスの印・血の代価は、攻撃カードを1枚使ったら消える（段階7a: 狂王の血鎧のためた分も）
+  // （このカードを使っている間にためた分は、次の攻撃カードに残す）
+  if (hasDamage) { delete ally.guided; delete ally.comboBoost; if (ally.counters?.bloodAdd) ally.counters.bloodAdd = 0; if (ally.counters?.nextAtkPct) ally.counters.nextAtkPct = 0; if (ally.counters?.rageAtkPct) ally.counters.rageAtkPct = Math.max(0, ally.counters.rageAtkPct - rageBefore); }
   // きっかけ: 自分が応援を付けた味方のカードが完全成功した（自分の応援は、1人パーティの時だけ数える）
   if (perfect && cheerer && !cheerer.dead && (cheerer !== ally || state.allies.length === 1)) fireAbilities(state, rng, events, cheerer, 'cheerPerfect', { allyTarget: ally, depth: 1 });
   // 分身は攻撃効果を半分の威力で繰り返す。追撃から再帰しない。
@@ -745,6 +782,8 @@ function useItem(state: BattleState, cmd: Extract<Command, { type: 'USE_ITEM' }>
   }
   for (const e of cmd.effects) applyEffect(ctx, e);
   addLog(state, `${user.name}が${cmd.itemName}を使った${ctx.parts.length ? `（${ctx.parts.join(' ')}）` : ''}`);
+  // 段階7a: 消耗品を使った時の能力（錬金術師のベルト）。道具を使うたびに1回（道具は袋の数しか無いので、回数は自然に限られる）
+  if (!user.dead) fireAbilities(state, rng, events, user, 'itemUse', { depth: 1 });
   checkEnd(state, events);
   return undefined;
 }

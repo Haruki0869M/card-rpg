@@ -452,6 +452,9 @@ export const useBattle = create<StoreState>((set, get) => {
   const pumpNotices = () => {
     if (get().worldMoves.length) return;
     while (pendingNotices.length && get().cutins.length < TIMING.cutinVisible) {
+      // 同じキャラのお供のカットインは、前のが消えてから出す（双子の魂の鈴の2回の行動で、お供が2回、順に跳ねるように。段階7a）
+      const head = pendingNotices[0];
+      if (head.source?.kind === 'pet' && get().cutins.some((c) => c.unitId === head.unitId && c.source?.kind === 'pet')) break;
       const n = pendingNotices.shift()!, id = fxId++;
       set(s => ({ cutins: [...s.cutins, { ...n, id }], petPulses: { ...s.petPulses, [n.unitId]: { id } } }));
       // お供の能力カットイン: きらりと鳴いて知らせる（K6）

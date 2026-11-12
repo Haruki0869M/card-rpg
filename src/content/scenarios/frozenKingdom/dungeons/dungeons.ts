@@ -187,5 +187,6 @@ export const frozenCave: DungeonDef = {
   pools: { ...CRYSTAL_POOLS, boss: ['frostDrakeling', 'snowWitch'] },
   bossChest: 'legend',
   random: true,
-  rows: 6,
+  // 段階7a: 全5行（4行＋ボスの行）
+  rows: 4,
 };
