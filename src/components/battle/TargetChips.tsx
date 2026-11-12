@@ -10,12 +10,8 @@ import { unitName } from '../../engine/battle/units';
 import { getElement } from '../../data/elements';
 import { cardOf } from '../../data/cards';
 import { useBattle } from '../../store/battleStore';
-import type { AllyState, BattleState, CardDef, EnemyState } from '../../types';
-import { BALANCE } from '../../data/balance';
-import { getEnemy } from '../../data/enemies';
-import { getStatus } from '../../data/statuses';
-import { attackElement } from '../../engine/battle/cardState';
-import { convertedElement } from '../../engine/abilities';
+import type { BattleState, EnemyState } from '../../types';
+import { elementGuide } from './elementGuide';
 import { intentView, type IntentPart } from '../format';
 import { EffectChip, ELEMENT_ICONS, Shield, Skull, statusStyle, Swords } from '../ui/icons';
 
@@ -38,34 +34,6 @@ function MiniIntent({ p }: { p?: IntentPart }) {
     return <span className="flex shrink-0 items-center" style={{ color: st.color }}><st.Icon size={12} strokeWidth={2.6} /></span>;
   }
   return <span className="shrink-0"><EffectChip e={p.effect} size={12} /></span>;
-}
-
-/** 完全成功で必ず付く状態異常の、的の札での言い方（依頼の文: 火傷確定・凍結＝敵の行動阻止！） */
-const WEAK_STATUS: Record<string, string> = { burn: '火傷確定', freeze: '凍結＝敵の行動阻止！', paralysis: '痺れ＝30%で行動失敗', poison: '毒確定', curse: '呪い確定' };
-
-/**
- * そのカードの攻撃の属性（武器に宿った属性・属性の変換を入れた後。一番上の段から探す）と、完全成功の段にその属性の攻撃があるか。
- * 乱数の結果は使わない
- */
-export function cardAttackElement(ally: AllyState, card: CardDef): { element: string; perfect: boolean } | undefined {
-  for (let i = card.tiers.length - 1; i >= 0; i--) {
-    for (const eff of card.tiers[i].effects) {
-      if (eff.kind !== 'damage') continue;
-      const element = convertedElement(ally, card, attackElement(ally, card, eff.element));
-      if (element) return { element, perfect: i === card.tiers.length - 1 && card.tiers[i].minSuccesses === card.slots };
-    }
-  }
-  return undefined;
-}
-
-/** 弱点を突いている時の案内（例「弱点×1.5！（完全成功で火傷確定）」）。弱点でなければ undefined */
-export function weakGuide(ally: AllyState | undefined, card: CardDef | undefined, enemy: EnemyState): { text: string; note?: string; element: string } | undefined {
-  if (!ally || !card) return undefined;
-  const hit = cardAttackElement(ally, card);
-  if (!hit || !getEnemy(enemy.defId).weak?.includes(hit.element)) return undefined;
-  const el = getElement(hit.element);
-  const st = hit.perfect && el.status ? (WEAK_STATUS[el.status] ?? `${getStatus(el.status).name}確定`) : undefined;
-  return { element: hit.element, text: `弱点×${BALANCE.elementWeakMul}！`, note: st ? `（完全成功で${st}）` : undefined };
 }
 
 /** 予測の文字（HP 45 → 12 / HP 45 → 撃破！ / 幅がある時は → 撃破〜12） */
@@ -131,9 +99,12 @@ export function TargetChips({ allyId, cardUid, focus, tier, tierLabel, targetId,
           const on = e.uid === targetId;
           const text = predictionText(e, preds[e.uid]);
           const kill = text.includes('撃破！');
-          // 弱点を突いている時の案内（新しい依頼文 パート5-1）
-          const weak = weakGuide(ally, card, e);
-          const WeakIcon = weak ? ELEMENT_ICONS[getElement(weak.element).icon] : undefined;
+          // 弱点・耐性の案内（計画書 第2版 §5-1）。札の中は短い形だけ（長い文は札の下の1行）
+          const guide = elementGuide(battle, ally, card, e);
+          const el = guide?.element ? getElement(guide.element) : undefined;
+          const WeakIcon = guide?.kind === 'weak' && el ? ELEMENT_ICONS[el.icon] : undefined;
+          // 弱点なら札の縁を属性の色に（属性の無い「弱点を突いた扱い」は金色）
+          const edge = guide?.kind === 'weak' ? (el?.color ?? '#fcd34d') : undefined;
           return (
             <button
               key={e.uid}
@@ -148,8 +119,10 @@ export function TargetChips({ allyId, cardUid, focus, tier, tierLabel, targetId,
               data-chip-prediction={text}
               data-kill-badge={badges[e.uid]}
               data-break-chip={breaks[e.uid]}
-              data-weak-chip={weak ? weak.element : undefined}
+              data-weak-chip={guide?.kind === 'weak' ? (guide.element ?? 'any') : undefined}
+              data-resist-chip={guide?.kind === 'resist' ? guide.element : undefined}
               className={`relative flex min-h-11 min-w-0 flex-col justify-center rounded-lg border px-1 py-0.5 text-left leading-4 ${on ? 'border-sky-300 bg-sky-900/60 ring-2 ring-sky-300' : 'border-zinc-600 bg-black/40'}`}
+              style={edge ? { borderColor: edge, borderWidth: 2 } : undefined}
             >
               {badges[e.uid] && (
                 <span
@@ -167,15 +140,15 @@ export function TargetChips({ allyId, cardUid, focus, tier, tierLabel, targetId,
               <span className={`flex flex-wrap gap-x-1 text-[12px] font-bold tabular-nums ${kill ? 'text-amber-300' : 'text-zinc-100'}`}>
                 {text.split(' → ').map((t, i) => <span key={i} className="whitespace-nowrap">{i ? `→ ${t}` : t}</span>)}
               </span>
-              {weak && (
-                <span className="text-[12px] leading-4 font-black" style={{ color: getElement(weak.element).color }} data-weak-guide>
+              {/* 大技の予告を出している敵: この攻撃で体勢を崩せるか（順番: 撃破 → BREAK → 弱点） */}
+              {breaks[e.uid] && !kill && <span className="text-[12px] font-black whitespace-nowrap text-amber-300">{breaks[e.uid] === 'now' ? '⚡BREAK!' : '⚡完全でBREAK'}</span>}
+              {guide?.kind === 'weak' && (
+                <span className="truncate text-[12px] leading-4 font-black whitespace-nowrap" style={{ color: edge }} data-weak-guide>
                   {WeakIcon && <WeakIcon size={12} strokeWidth={2.8} className="mr-0.5 inline align-[-2px]" />}
-                  <span className="whitespace-nowrap">{weak.text}</span>
-                  {weak.note && <span className="font-bold">{weak.note}</span>}
+                  {guide.chip}
                 </span>
               )}
-              {/* 大技の予告を出している敵: この攻撃で体勢を崩せるか */}
-              {breaks[e.uid] && !kill && <span className="text-[12px] font-black whitespace-nowrap text-amber-300">{breaks[e.uid] === 'now' ? '⚡BREAK!' : '⚡完全でBREAK'}</span>}
+              {guide?.kind === 'resist' && <span className="truncate text-[12px] leading-4 font-bold whitespace-nowrap text-zinc-400" data-resist-guide>{guide.chip}</span>}
             </button>
           );
         })}

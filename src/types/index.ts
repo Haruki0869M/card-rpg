@@ -502,6 +502,8 @@ export interface StatusDef {
   flatChanceBonus?: number;
   /** 説明文（省略すると数値から自動で作る） */
   description?: string;
+  /** 弱点の案内で、名前の後に付ける短い一言（例: 凍結 →「凍結＝敵の行動阻止！」）。省略すると「〇〇確定」 */
+  guideNote?: string;
 }
 
 export interface CardInstance {

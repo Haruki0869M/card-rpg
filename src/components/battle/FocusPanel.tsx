@@ -19,7 +19,8 @@ import { breakPreview } from '../format';
 import { rollChanceFor, findAlly, tierDistribution, toPercents, slotPreviewLimitOf } from '../../engine';
 import { useBattle } from '../../store/battleStore';
 import { CATEGORY_STYLE, EffectChip, ELEMENT_ICONS } from '../ui/icons';
-import { TargetChips, weakGuide } from './TargetChips';
+import { TargetChips } from './TargetChips';
+import { elementGuide } from './elementGuide';
 
 const TIER_COLORS = ['#5a4a5e', '#7a6a8a', '#4a8cff', '#3ad08a', '#ffc94a'];
 
@@ -35,10 +36,11 @@ function pickValue(totals: PredictTotals[], kind: 'damage' | 'block' | 'heal', t
 /** 完全成功で必ず付く状態異常の、ひとことの効き目（依頼の文: 氷=行動を止める・雷=30%で行動失敗・火=火傷） */
 const STATUS_HINT: Record<string, string> = { freeze: '敵の行動を止める！', paralysis: '30%で敵の行動が失敗！', burn: '毎ターン火傷のダメージ！', poison: '毎ターン毒のダメージ！', curse: '敵の回復が半分！' };
 
-interface CounterHint { kind: 'break' | 'status'; text: string; color: string; icon?: string }
+interface CounterHint { kind: 'break' | 'weak' | 'status'; text: string; color: string; icon?: string }
 /**
  * 敵の予告を潰す手がかり。乱数の結果は使わない（完全成功の時に必ず起きる事と、成功数だけで決まる事だけを出す）。
  * - BREAK: 狙う敵（全体カードなら大技を出している敵）が、どの成功数から体勢を崩せるか（大技 48→18 の数字つき）
+ * - 弱点: 選んでいる敵の弱点を突く時の「弱点×1.5！（完全成功で火傷確定）」（計画書 第2版 §5-1。BREAK の後に並べる）
  * - 状態異常: 完全成功なら必ず付く、属性の状態異常（耐性のある敵には付かないので出さない）
  */
 function counterHints(battle: BattleState, ally: AllyState, card: CardDef, targetId: string | undefined, preds: PredictTotals[][], label: (i: number) => string): CounterHint[] {
@@ -54,6 +56,13 @@ function counterHints(battle: BattleState, ally: AllyState, card: CardDef, targe
     const power = bp.stops ? `（${bp.name}を止める）` : bp.from !== undefined && bp.to !== undefined ? `（${bp.name} ${bp.from}→${bp.to}）` : `（${bp.name}の威力が半分）`;
     out.push({ kind: 'break', color: '#fcd34d', text: `⚡${who}${from === 0 ? 'この攻撃' : `${label(from)}${from < preds.length - 1 ? '以上' : ''}`}で BREAK！${power}` });
   }
+  // 弱点の案内（選んでいる敵だけ）。「確定」は完全成功の予測で、その敵に本当に付く時だけ
+  const target = card.target === 'enemy' ? foes[0] : undefined;
+  const guide = target ? elementGuide(battle, ally, card, target, preds[preds.length - 1]?.find((t) => t.id === target.uid)?.statuses) : undefined;
+  if (guide?.kind === 'weak' && guide.line) {
+    const el = guide.element ? getElement(guide.element) : undefined;
+    out.push({ kind: 'weak', color: el?.color ?? '#fcd34d', icon: el?.icon, text: guide.line });
+  }
   // 完全成功の段の、最初の属性つきの攻撃
   const top = card.tiers[card.tiers.length - 1];
   if (top && top.minSuccesses === card.slots) {
@@ -64,8 +73,8 @@ function counterHints(battle: BattleState, ally: AllyState, card: CardDef, targe
       const el = id ? getElement(id) : undefined;
       if (!el?.status || seen.has(el.status)) continue;
       if (!foes.some((e) => !resistsElement(e, el.id))) continue;
-      // 狙う敵がみんな弱点なら、的の札に「弱点×1.5！（完全成功で…）」が出るので、ここには重ねて出さない
-      if (card.target === 'enemy' && foes.every((e) => weakGuide(ally, card, e)?.note)) continue;
+      // 選んでいる敵の弱点を突く時は、上の「弱点×1.5！（完全成功で…）」の行に任せて、重ねて出さない
+      if (guide?.kind === 'weak') continue;
       seen.add(el.status);
       const st = getStatus(el.status);
       out.push({ kind: 'status', color: el.color, icon: el.icon, text: `完全成功で${st.name}${STATUS_HINT[el.status] ? `（${STATUS_HINT[el.status]}）` : ''}` });
@@ -184,9 +193,9 @@ export function FocusPanel() {
       {needsCardTarget(card) && <div className="mt-1 text-center text-[12px] text-sky-100" data-target-guide>{targetGuide(card)}{selected && `（選択中：${nameOf(selected)}）`}</div>}
       {card.target === 'enemy' && <TargetChips allyId={ally.id} cardUid={inst.uid} focus={selection.focus} tier={likelyTier} tierLabel={label(likelyTier)} targetId={selection.targetId} allyTargetId={selection.allyTargetId} />}
       {hints.length > 0 && (
-        <div className="mt-1 flex flex-col items-center gap-0.5" data-counter-hints>
+        <div className="mt-1 flex flex-wrap items-center justify-center gap-0.5" data-counter-hints>
           {hints.map((h, i) => (
-            <div key={i} className="rounded-md bg-black/55 px-2 text-center text-[14px] leading-5 font-black" style={{ color: h.color, boxShadow: `0 0 0 1px ${h.color}` }} data-counter-hint={h.kind}>{h.icon && ELEMENT_ICONS[h.icon] ? (() => { const I = ELEMENT_ICONS[h.icon!]; return <I size={14} strokeWidth={2.8} className="mr-0.5 inline align-[-2px]" />; })() : null}{h.text}</div>
+            <div key={i} className={`max-w-full rounded-md bg-black/55 px-2 text-center text-[14px] leading-5 font-black ${h.kind === 'weak' ? '[overflow-wrap:anywhere] [word-break:keep-all]' : ''}`} style={{ color: h.color, boxShadow: `0 0 0 1px ${h.color}` }} data-counter-hint={h.kind}>{h.icon && ELEMENT_ICONS[h.icon] ? (() => { const I = ELEMENT_ICONS[h.icon!]; return <I size={14} strokeWidth={2.8} className="mr-0.5 inline align-[-2px]" />; })() : null}{h.text}</div>
           ))}
         </div>
       )}

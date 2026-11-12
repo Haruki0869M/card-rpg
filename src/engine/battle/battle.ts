@@ -29,7 +29,7 @@ import { affinityOf } from '../stats';
 import { calcDamage } from './damage';
 import { discardHand, drawCards } from './deck';
 import { applyEffect, checkEffect, comboMultiplier, dealDamage, elementMultiplier, makeCtx, targetOf } from './effects';
-import { breakStopsAction, decideAllIntents } from './intents';
+import { breakStopsAction, decideAllIntents, fallbackLoneIntents } from './intents';
 import { finalChance, selectTier } from './probability';
 import { helpedAllies, recordSupport, selfSnapshot, supportSnapshot } from './support';
 import { afterAttackCard, attackElement, consumeAttackCharge, cardElements, cardHpCost, chargedMultiplier, tierHpCost } from './cardState';
@@ -625,7 +625,7 @@ export function resultSummary(resultLabel: string, parts: string[]): string {
 }
 
 /** 予測の合計（1体ぶん）。値は [低い方, 高い方]（抽選のある攻撃は倍率の最小・最大） */
-export interface PredictTotals { id: string; damage: [number, number]; hpLoss: [number, number]; heal: [number, number]; block: [number, number]; hits: [number, number]; /** この成功数なら、この敵の大技の予告を崩せる（BREAK。低い方の見込みでも崩せる時だけ） */ breaks?: boolean }
+export interface PredictTotals { id: string; damage: [number, number]; hpLoss: [number, number]; heal: [number, number]; block: [number, number]; hits: [number, number]; /** この成功数なら、この敵の大技の予告を崩せる（BREAK。低い方の見込みでも崩せる時だけ） */ breaks?: boolean; /** 低い方・高い方のどちらの見込みでも付く状態異常（表示だけ。弱点の案内の「完全成功で〇〇確定」） */ statuses?: string[] }
 
 /**
  * 実際のカード処理を複製上で試し、キャラごとの合計を返す。元の状態・乱数・予約は一切進めない。
@@ -668,7 +668,9 @@ export function predictCardTotals(state: BattleState, characterId: string, cardI
     });
     const range = (k: keyof typeof totals[0]): [number, number] => [Math.min(...totals.map(t => t[k])), Math.max(...totals.map(t => t[k]))];
     const breaks = samples.every(events => events.some(e => e.type === 'break' && e.enemyUid === id));
-    return { id, damage: range('damage'), hpLoss: range('hpLoss'), heal: range('heal'), block: range('block'), hits: range('hits'), ...(breaks ? { breaks } : {}) };
+    const given = samples.map(events => new Set(events.flatMap(e => (e.type === 'status' && e.unitId === id ? [e.status] : []))));
+    const statuses = [...given[0]].filter(st => given.every(g => g.has(st)));
+    return { id, damage: range('damage'), hpLoss: range('hpLoss'), heal: range('heal'), block: range('block'), hits: range('hits'), ...(breaks ? { breaks } : {}), ...(statuses.length ? { statuses } : {}) };
   });
 }
 
@@ -817,6 +819,8 @@ function enemyStep(state: BattleState, rng: Rng, events: BattleEvent[]): string 
 }
 
 function executeIntent(state: BattleState, enemy: EnemyState, rng: Rng, events: BattleEvent[]) {
+  // 念のため: 行動する時にかばう相手がいなければ、代わりの行動にする（ふつうは敵が倒れた時点で変わっている。古い保存のため）
+  if (enemy.intent && !state.enemies.some((o) => !o.dead && o !== enemy)) fallbackLoneIntents(state, rng, events);
   const intent = enemy.intent;
   if (!intent) return;
   const action = getEnemyAction(enemy.defId, intent.actionId);
