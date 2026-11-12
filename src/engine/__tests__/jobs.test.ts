@@ -248,8 +248,9 @@ describe('最上位13職の転職とカード', () => {
   it('13職それぞれが専用5枚・代表3枚を持つ', () => {
     expect(topJobs).toHaveLength(13);
     // 区切りD: 同じ中身のカードをまとめた（65 → 62）。憲章5: 数字だけ違う札もまとめた（62 → 60。ビーストマスターは「群れの強襲」を置き換えずに消したので4枚）
-    expect(new Set(topJobs.flatMap(j => j.cardPool.filter(k1))).size).toBe(60);
-    for (const j of topJobs) { expect(j.cardPool.filter(k1)).toHaveLength(j.id === 'beastMaster' ? 4 : 5); expect(j.signature).toEqual(j.cardPool.slice(0, 3)); }
+    // 2026-11-12: 専用の札が足りなかった6職に1枚ずつ足した（docs/tasks/job-unique-cards-plan.md）。最上位では弓聖の「追い矢」・ビーストマスターの「狙いを合わせろ」（60 → 62。弓聖6枚・ビーストマスター5枚）
+    expect(new Set(topJobs.flatMap(j => j.cardPool.filter(k1))).size).toBe(62);
+    for (const j of topJobs) { expect(j.cardPool.filter(k1)).toHaveLength(j.id === 'bowSaint' ? 6 : 5); expect(j.signature).toEqual(j.cardPool.slice(0, 3)); }
   });
   it.each(topJobs.map(j => [j.id, j] as const))('%s: レベル・実績・場所を満たした時だけ転職できる', (_, j) => {
     let g = newGame(['warrior']);

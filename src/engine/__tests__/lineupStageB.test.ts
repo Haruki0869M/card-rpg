@@ -358,10 +358,10 @@ describe('区切りB: 短剣（毒と身軽さ）', () => {
     let s = battle(['warrior'], ['guardDagger']);
     s = use(s, 'strike').state;
     expect(s.allies[0].hand).toHaveLength(0);
-    s = use(s, 'wQuickStab').state;
+    s = use(s, 'cmProbe').state;
     expect(s.allies[0].hand).toHaveLength(1);
     s.allies[0].hand = [];
-    s = use(s, 'wQuickStab').state;
+    s = use(s, 'cmProbe').state;
     expect(s.allies[0].hand).toHaveLength(0);
   });
   it('蠍の針《蠍毒》: まだ毒が無い敵に毒を付ける時だけ、毒+2', () => {
@@ -375,9 +375,9 @@ describe('区切りB: 短剣（毒と身軽さ）', () => {
   });
   it('静心の短剣《影歩き》: コスト0のカードを3枚使うと、次の攻撃カード1枚が敵のブロックを無視する', () => {
     let s = battle(['warrior'], ['calmDagger']);
-    for (let i = 0; i < 2; i++) s = use(s, 'wQuickStab').state;
+    for (let i = 0; i < 2; i++) s = use(s, 'cmProbe').state;
     expect(s.allies[0].counters?.shadowStep ?? 0).toBe(0);
-    s = use(s, 'wQuickStab').state;
+    s = use(s, 'cmProbe').state;
     expect(s.allies[0].counters?.shadowStep).toBe(1);
     s.enemies[0].block = 999;
     const hp = s.enemies[0].hp;

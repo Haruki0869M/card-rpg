@@ -115,3 +115,79 @@ describe('憲章5: 職の名前の必殺技6枚', () => {
     expect(cardCostOf(t2, t2.allies[0], card).cost).toBe(3);
   });
 });
+
+// ===== 専用の札が足りなかった6職の、新しい札（docs/tasks/job-unique-cards-plan.md） =====
+describe('6職の新しい札', () => {
+  it('締めの拳（闘士）: このターンに使った物理カード1枚につき+2（最大+8）。このカード自身は数えない', () => {
+    const after = (n: number) => {
+      let s = battle(['warrior']);
+      for (let i = 0; i < n; i++) s = use(s, 'strike');
+      return lost(s, use(s, 'brFinishFist'));
+    };
+    const d0 = after(0), d2 = after(2), d4 = after(4), d6 = after(6);
+    expect(d2).toBeGreaterThan(d0);
+    expect(d4).toBeGreaterThan(d2);
+    expect(d6).toBe(d4); // 最大+8
+    // スキルは数えない
+    let s = battle(['warrior']);
+    s = use(s, 'guard'); s = use(s, 'guard');
+    expect(lost(s, use(s, 'brFinishFist'))).toBe(d0);
+  });
+  it('星の導き（占星術師）: 次に使うカードの、失敗した枠を成功に変える。1枚で使い切る', () => {
+    let missed = 0;
+    for (let seed = 1; seed <= 30; seed++) {
+      // 何もしない時: 成功率80%のストライク（枠1・フォーカスなし）は、外れる事がある
+      const plain = battle(['astrologer']); plain.rngState = seed;
+      if (!use(plain, 'strike', 0).log.at(-1)!.text.includes('完全成功')) missed++;
+      // 星の導きの後: 必ず成功する
+      let s = battle(['astrologer']); s.rngState = seed;
+      s = use(s, 'asStarGuide');
+      expect(s.allies[0].fixMiss).toBe(2);
+      s = use(s, 'strike', 0);
+      expect(s.log.at(-1)!.text, `seed ${seed}`).toContain('完全成功');
+      expect(s.allies[0].fixMiss).toBeUndefined();
+    }
+    expect(missed).toBeGreaterThan(0);
+  });
+  it('追い矢（弓聖）: このターンに完全成功したカード1枚につき、もう1回当たる（最大+3回）', () => {
+    const s0 = battle(['bowSaint']);
+    const one = lost(s0, use(s0, 'bsChaseArrow'));
+    let s = use(battle(['bowSaint']), 'strike', 1); // 《必中》で完全成功
+    expect(lost(s, use(s, 'bsChaseArrow'))).toBe(one * 2);
+    s = battle(['bowSaint']);
+    for (let i = 0; i < 5; i++) s = use(s, 'strike', 1);
+    expect(lost(s, use(s, 'bsChaseArrow'))).toBe(one * 4); // 最大+3回
+  });
+  it('狙いを合わせろ（ビーストマスター）: このターンの終わりの、群れの獣の攻撃が全部その敵に向かう', () => {
+    const s = use(battle(['beastMaster'], ['c5Idler', 'c5Idler']), 'bmFocusPack');
+    expect(s.allies[0].summons?.length).toBe(3);
+    const t = nextTurn(s);
+    expect(lost(s, t, 1)).toBe(0);
+    expect(lost(s, t, 0)).toBeGreaterThanOrEqual(12); // 4 × 3体（脆弱で増える）
+    // 次のターンは、いつもどおり
+    expect(t.allies[0].summonFocus?.turn).not.toBe(t.turn);
+  });
+  it('居合の構え（侍）: ブロックを得ても、《居合》がたまる。ほかのカードを使うと、たまらない', () => {
+    const still = use(battle(['samurai']), 'smStillStance');
+    expect(still.allies[0].block).toBe(12);
+    expect(nextTurn(still).allies[0].attackCharge?.multiplier).toBe(2);
+    const other = use(battle(['samurai']), 'cmPrepare');
+    expect(nextTurn(other).allies[0].attackCharge).toBeUndefined();
+  });
+  it('二重付与（魔剣士）: 宿した属性が、次の物理カード2枚に乗る', () => {
+    let s = use(battle(['magicKnight']), 'bladeFire');
+    expect(s.allies[0].imbuedElement).toBe('fire');
+    s = use(s, 'mkDoubleImbue');
+    s = use(s, 'strike');
+    expect(s.allies[0].imbuedElement).toBe('fire');
+    s = use(s, 'strike');
+    expect(s.allies[0].imbuedElement).toBeUndefined();
+    // 宿していない時は、何も起きない
+    const none = use(battle(['magicKnight']), 'mkDoubleImbue', 0);
+    expect(none.allies[0].imbueCards).toBeUndefined();
+    // ふつうは1枚で消える
+    let p = use(battle(['magicKnight']), 'bladeFire');
+    p = use(p, 'strike');
+    expect(p.allies[0].imbuedElement).toBeUndefined();
+  });
+});

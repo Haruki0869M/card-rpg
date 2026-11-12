@@ -40,9 +40,10 @@ function inTemple(): GameState {
 describe('特殊職5職のデータと転職', () => {
   it('専用6枚ずつ計30枚が自動登録され、各職にエピック2枚以上ある', () => {
     // 区切りD: 同じ中身のカードをまとめた（30 → 27）
-    expect(new Set(jobs.flatMap(id => CLASSES.get(id).cardPool.filter(k1))).size).toBe(27);
+    // 2026-11-12: 専用の札が足りなかった6職に1枚ずつ足した（docs/tasks/job-unique-cards-plan.md）。この5職では侍の「居合の構え」・魔剣士の「二重付与」（27 → 29・侍と魔剣士は7枚）
+    expect(new Set(jobs.flatMap(id => CLASSES.get(id).cardPool.filter(k1))).size).toBe(29);
     for (const id of jobs) {
-      const j = CLASSES.get(id); expect(j.tier).toBe('special'); expect(j.cardPool.filter(k1)).toHaveLength(6);
+      const j = CLASSES.get(id); expect(j.tier).toBe('special'); expect(j.cardPool.filter(k1)).toHaveLength(id === 'samurai' || id === 'magicKnight' ? 7 : 6);
       expect(j.signature).toEqual(j.cardPool.slice(0, 3));
       expect(j.cardPool.filter(c => getCard(c).rarity === 'epic').length).toBeGreaterThanOrEqual(2);
     }

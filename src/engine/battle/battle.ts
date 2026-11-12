@@ -23,7 +23,7 @@ import type {
   SlotResult,
   Statuses,
 } from '../../types';
-import { cardChanceBonus, cardCostOf, cardTraitAbilities, petActOnce, completeSlotsOf, damageModifiers, fireAbilities, keepBlockOf, markCostUsed, summonTwiceOf } from '../abilities';
+import { cardChanceBonus, cardCostOf, cardModifier, cardTraitAbilities, petActOnce, completeSlotsOf, damageModifiers, fireAbilities, keepBlockOf, markCostUsed, summonTwiceOf } from '../abilities';
 import { createRng, type Rng, shuffle } from '../rng';
 import { affinityOf } from '../stats';
 import { calcDamage } from './damage';
@@ -44,7 +44,7 @@ export { enemyName, findAlly, findEnemy, unitName } from './units';
 // v21（2026-11-12）: 区切りD-1 同じ中身のカードをまとめた。古い保存は読まない
 // v22（2026-11-12）: 区切りD-2〜D-4 軸のカード・決め技・武器のカードの付け替え。古い保存は読まない
 // v23（2026-11-12）: 区切りE 消耗品 50→24。古い保存は読まない
-export const STATE_VERSION = 24;
+export const STATE_VERSION = 25;
 export { slotPreviewLimitOf } from './preview';
 
 // ---------- 生成 ----------
@@ -421,6 +421,12 @@ export function applyCommand(input: BattleState, cmd: Command): CommandResult {
 }
 
 /** スロットを振る（フォーカス枠は左に並べて確定成功） */
+/** 星の導き: 失敗した枠を、前から n 個だけ成功に変える */
+function fixMisses(results: SlotResult[], n?: number): SlotResult[] {
+  let left = n ?? 0;
+  return left ? results.map((r) => (r === 'miss' && left-- > 0 ? 'hit' : r)) : results;
+}
+
 export function rollSlots(slots: number, focusUsed: number, chance: number, rng: Rng): SlotResult[] {
   const out: SlotResult[] = [];
   for (let i = 0; i < slots; i++) {
@@ -442,8 +448,8 @@ function reserveCard(state: BattleState, cmd: Extract<Command, { type: 'PREVIEW_
   if (needsCardTarget(card) && !selectedCardTarget(state, ally, card, cmd.targetId)) return '対象を選んでください';
   if (card.secondaryTarget && !secondaryCardTarget(state, ally, card, cmd.allyTargetId)) return '回復・支援する味方を選んでください';
   const chance = rollChanceFor(ally, card, cmd.focusUsed, selectedCardTarget(state, ally, card, cmd.targetId), state);
-  const results = rollSlots(card.slots, cmd.focusUsed, chance, rng);
-  const rerollResults = rollSlots(card.slots, cmd.focusUsed, chance, rng);
+  const results = fixMisses(rollSlots(card.slots, cmd.focusUsed, chance, rng), ally.fixMiss);
+  const rerollResults = fixMisses(rollSlots(card.slots, cmd.focusUsed, chance, rng), ally.fixMiss);
   state.slotPreview = { allyTargetId: cmd.allyTargetId, characterId: ally.id, cardInstanceId: inst.uid, targetId: needsCardTarget(card) ? cmd.targetId : undefined, focusUsed: cmd.focusUsed, chance, results, rerollResults, rerolled: false };
   ally.slotPreviewUsed = (ally.slotPreviewUsed ?? 0) + 1;
   if (state.ready) state.ready = state.ready.filter(p => p !== ally.playerId);
@@ -489,7 +495,10 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   markCostUsed(state, ally, complete.keys);
   for (const n of complete.notices) abilityTriggered(state, ally.id, n.name, events, n.source);
   const chance = reserved?.chance ?? (complete.active ? 100 : chanceFor(ally, card, target, state));
-  const results = reserved?.results ?? rollSlots(card.slots, focusUsed, chance, rng);
+  // 星の導き: 失敗した枠を成功に変える（このカードで使い切る。先読みの結果には、もう当ててある）
+  const fix = ally.fixMiss;
+  delete ally.fixMiss;
+  const results = reserved?.results ?? fixMisses(rollSlots(card.slots, focusUsed, chance, rng), fix);
   // 次のカードの成功率が上がる状態異常（応援など）は、使ったら消える
   // 輪唱: この応援をくれた味方を覚えておく（完全成功したら、その味方のきっかけを起こす）
   const cheerer = (ally.statuses.inspired ?? 0) > 0 && ally.cheeredBy ? findAlly(state, ally.cheeredBy) : undefined;
@@ -582,7 +591,9 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
     ally.discard = ally.discard.filter(c => c.cardId !== card.id);
   } else ally.discard.push(inst);
   // このターンに使った枚数（連撃などの条件。カードの効果の後に数える）
-  ally.played = (ally.played ?? 0) + 1;
+  const uncounted = cardModifier(cardAbilities, 'noPlayCount').length > 0;
+  if (!uncounted) ally.played = (ally.played ?? 0) + 1;
+  if (perfect) { const cs = (ally.counters ??= {}); if (cs.perfectTurn !== state.turn) { cs.perfectTurn = state.turn; cs.perfectCount = 0; } cs.perfectCount = (cs.perfectCount ?? 0) + 1; }
   // 区切りD: コスト0のカードの枚数（流れる連撃）
   if (card.cost === 0) ally.playedZero = (ally.playedZero ?? 0) + 1;
   // 区切りD: この戦闘で使った物理カードの枚数（無想阿修羅拳）
@@ -685,12 +696,15 @@ function summonsAttack(state: BattleState, ally: AllyState, rng: Rng, events: Ba
     if (!isStrikingSummon(s)) continue;
     const foes = state.enemies.filter((e) => !e.dead);
     if (!foes.length) break;
-    const t = s.targetId ? foes.find(e => e.uid === s.targetId) ?? foes[0] : foes[rng.int(foes.length)];
+    // 狙いを合わせろ: このターンは、選んだ敵へ（倒れていたら、いつもどおり）
+    const focus = ally.summonFocus?.turn === state.turn ? foes.find((e) => e.uid === ally.summonFocus!.uid) : undefined;
+    const t = focus ?? (s.targetId ? foes.find(e => e.uid === s.targetId) ?? foes[0] : foes[rng.int(foes.length)]);
     summonStrikeOnce(state, ally, s, t, rng, events);
     // 永久機関: もう1回攻撃する（残りターンは1回分だけ減る）
     const again = twice ? state.enemies.filter((e) => !e.dead) : [];
     if (again.length) {
-      const t2 = s.targetId ? again.find(e => e.uid === s.targetId) ?? again[0] : again[rng.int(again.length)];
+      const focus2 = ally.summonFocus?.turn === state.turn ? again.find((e) => e.uid === ally.summonFocus!.uid) : undefined;
+      const t2 = focus2 ?? (s.targetId ? again.find(e => e.uid === s.targetId) ?? again[0] : again[rng.int(again.length)]);
       const loss2 = dealDamage(makeCtx(state, rng, events, ally, { target: t2, via: 'summon' }), t2, s.damage, s.element);
       if (loss2 > 0 && !ally.dead) fireAbilities(state, rng, events, ally, 'summonHit', { target: t2, depth: 1 });
       abilityTriggered(state, ally.id, twice!.name, events, twice!.source);

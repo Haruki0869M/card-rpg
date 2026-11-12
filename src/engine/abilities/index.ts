@@ -438,6 +438,7 @@ export function describeAbility(ab: AbilityDef, side: 'ally' | 'enemy' = 'ally')
     if (e.modifier === 'alwaysWeak') return '弱点の属性でなくても、弱点を突いた扱い（ダメージ×1.5・BREAK のきっかけ）';
     if (e.modifier === 'weaknessElement') return '属性は、狙った敵の弱点の属性に変わる（弱点が無い敵には無属性）';
     if (e.modifier === 'breakOnSuccess') return `大技を予告している敵は、成功${e.min}以上でも BREAK できる`;
+    if (e.modifier === 'noPlayCount') return 'このカードは「このターンに使ったカード」に数えない（《居合》をためながら使える）';
     const cs = condText(e.if);
     const head = cs.length ? `${cs.join('・')}：` : '';
     if (e.modifier === 'breakCount') return `${head}BREAK の数え（このターンの合計ダメージ）が${e.multiplier}倍`;

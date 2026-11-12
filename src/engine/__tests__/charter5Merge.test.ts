@@ -11,7 +11,7 @@ import { migrateGame } from '../game/migrations';
 
 describe('憲章5: 数字だけ違うカードのまとめ', () => {
   it('消した札は登録表に無く、読み替え先は全部ある（85枚＋区切りFの2枚）', () => {
-    expect(Object.keys(MERGED_CARDS)).toHaveLength(87);
+    expect(Object.keys(MERGED_CARDS)).toHaveLength(98);
     for (const [gone, keep] of Object.entries(MERGED_CARDS)) {
       expect(CARDS.tryGet(gone), gone).toBeUndefined();
       expect(CARDS.tryGet(keep), `${gone} → ${keep}`).toBeDefined();
@@ -43,7 +43,7 @@ describe('憲章5: 数字だけ違うカードのまとめ', () => {
     expect(getCard('strike').tiers.map((t) => (t.effects[0] as { amount: number }).amount)).toEqual([4, 7]);
   });
   it('まとめなかった札: 勝負の一撃（当たり外れの幅がある）・急所の一矢・職の名前の必殺技6枚・武器だけに付く札', () => {
-    for (const id of ['gambleStrike', 'vitalShot', 'heavenBlade', 'dragonDive', 'samuraiMoon', 'skyPiercer', 'worldBreaker', 'dragonFang', 'wSlash', 'wIaiCut']) expect(CARDS.tryGet(id), id).toBeDefined();
+    for (const id of ['gambleStrike', 'vitalShot', 'heavenBlade', 'dragonDive', 'samuraiMoon', 'skyPiercer', 'worldBreaker', 'dragonFang', 'wSteelCombo']) expect(CARDS.tryGet(id), id).toBeDefined();
     expect(CLASSES.get('gambler').cardPool).toContain('gambleStrike');
   });
   it('古い保存データ（v23）: 消した札を、残した札に読み替える。敵の行動のIDには触らない', () => {
@@ -68,8 +68,8 @@ describe('憲章5: 数字だけ違うカードのまとめ', () => {
 describe('転職の時に選ぶ専用カード3枚（オーナーの決定 2026-11-12）', () => {
   it('そのジョブにしか無い札を先に並べる。共通の名前の札は、足りない時だけ', () => {
     const names = (id: string) => signatureCards(CLASSES.get(id)).map((c) => getCard(c).name);
-    // 弓聖: そのジョブにしか無い札は2枚（気合の集中は、竜騎士も持つ）。3枚目だけ、代表の並びの上から足す
-    expect(names('bowSaint')).toEqual(['天を貫く矢', '天穹の矢雨', '全力の一撃']);
+    // 弓聖: そのジョブにしか無い札は3枚（天を貫く矢・天穹の矢雨・2026-11-12 に足した追い矢。気合の集中は、竜騎士も持つ）。共通の札は入らない
+    expect(names('bowSaint')).toEqual(['天を貫く矢', '天穹の矢雨', '追い矢']);
     // 剣豪: 共通の名前の札は出ない（闘士は、そのジョブにしか無い札が1枚なので、残り2枚は代表の並びから足す）
     for (const id of ['swordmaster']) for (const n of names(id)) expect(['二連撃', '牽制', '不屈の闘志', '見切り反撃']).not.toContain(n);
     for (const j of CLASSES.all.filter((c) => c.tier !== 'base')) {

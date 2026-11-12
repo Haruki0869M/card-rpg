@@ -150,6 +150,8 @@ export type AbilityEffect =
   | { modifier: 'cardChance'; bonus: number; if?: AbilityCondition[] }
   | { modifier: 'completeSlots'; /** 1ターンに1枚だけ（この名前で数える） */ turnKey?: string; if?: AbilityCondition[] }
   | { modifier: 'exhaust'; if?: AbilityCondition[] }
+  /** このカードは「このターンに使ったカード」に数えない（不動の構え: 《居合》をためながら使える） */
+  | { modifier: 'noPlayCount' }
   | { modifier: 'slotPreview'; uses: number; if?: AbilityCondition[] }
   /** カードのコストを変える（set = その値にする / delta = 足す。0より下にはならない）。turnKey があると1ターンに1枚だけ（使った時に数える） */
   | { modifier: 'cardCost'; delta?: number; set?: number; turnKey?: string; if?: AbilityCondition[] }
@@ -510,6 +512,12 @@ export interface CardInstance {
 }
 
 export interface AllyState {
+  /** 星の導き: 次に使うカードの、失敗した枠をこの数だけ成功に変える */
+  fixMiss?: number;
+  /** 狙いを合わせろ: このターン（turn）の終わりの召喚の攻撃を、この敵（uid）に向ける */
+  summonFocus?: { uid: string; turn: number };
+  /** 二重付与: 宿した属性が、あと何枚の物理攻撃カードに乗るか（無ければ1枚） */
+  imbueCards?: number;
   /** 詠唱の栞: 引いたそのカード（uid）のコストを、このターン（turn）だけ delta する */
   cheapCard?: { uid: string; turn: number; delta: number };
   slotPreviewUsed?: number;

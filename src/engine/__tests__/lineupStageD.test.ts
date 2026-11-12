@@ -103,7 +103,7 @@ describe('区切りD-1: 例外の2組', () => {
   it('手斧投げ: 成功1で脆弱1（早業とは別の中身）', () => {
     const r = use(battle(['warrior']), 'wtAxeThrow', { focus: 'max' });
     expect(r.state.enemies[0].statuses.vulnerable).toBe(1);
-    const q = use(battle(['warrior']), 'wQuickStab', { focus: 'max' });
+    const q = use(battle(['warrior']), 'cmProbe', { focus: 'max' });
     expect(q.state.enemies[0].statuses.vulnerable ?? 0).toBe(0);
   });
   it('二連射: 砲台がいれば、砲台もすぐに1回撃つ（燕返しは撃たない）', () => {
