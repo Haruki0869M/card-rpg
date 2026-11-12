@@ -202,10 +202,10 @@ describe('暗黒騎士とHP支払い', () => {
 });
 
 describe('祭壇の半減と保存再開', () => {
-  it('新規地図は祭壇5・神殿2で、10職すべての印を共用祭壇がカバーする', () => {
+  it('新規地図は祭壇5・神殿2で、特殊職14職すべての印を共用祭壇がカバーする（区切りFで4職を足した）', () => {
     const g = fresh(), fs = g.world!.tiles.map(t => t.f);
     expect(fs.filter(f => f?.kind === 'altar')).toHaveLength(5); expect(fs.filter(f => f?.kind === 'temple')).toHaveLength(2);
-    expect(new Set(SANCTUARIES.all.flatMap(s => s.altars ?? [])).size).toBe(10);
+    expect(new Set(SANCTUARIES.all.flatMap(s => s.altars ?? [])).size).toBe(14);
   });
   it.each(jobs)('%sの能力状態を保存して再開しても、同じコマンドで同じ結果になり入力は変わらない', id => {
     const g = fresh(), h = g.heroes[0]; h.classId = id;

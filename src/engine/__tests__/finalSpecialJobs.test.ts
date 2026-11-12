@@ -34,7 +34,8 @@ const fresh = () => createGame({ seed: 17, scenarioId: 'corruptionKing', difficu
 
 describe('後半5職のデータ・転職', () => {
   it('全44職・特殊10職、後半各6枚と代表3枚、エピック2枚以上を自動登録する', () => {
-    expect(CLASSES.all).toHaveLength(44); expect(CLASSES.all.filter(j => j.tier === 'special')).toHaveLength(10);
+    // 区切りF: 新ジョブ4職を足した（44 → 48・特殊 10 → 14）
+    expect(CLASSES.all).toHaveLength(48); expect(CLASSES.all.filter(j => j.tier === 'special')).toHaveLength(14);
     // 区切りD: 同じ中身のカードをまとめたので、職どうしで同じカードを使う所がある（30 → 24）
     expect(new Set(jobs.flatMap(id => CLASSES.get(id).cardPool.filter(k1))).size).toBe(24);
     for (const id of jobs) {

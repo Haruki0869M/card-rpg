@@ -9,6 +9,7 @@ import type { Rng } from '../rng';
 import { addLog } from './common';
 import { heroFocusMax } from './hero';
 import { heroPlace } from './jobs';
+import { sceneHeroes } from './heroes';
 
 /** お供の扱いが得意なジョブか（獣使い系統） */
 export const isPetMaster = (hero: Pick<Hero, 'classId'>) => !!getClass(hero.classId).petMaster;
@@ -49,6 +50,8 @@ export function petLoveLevel(love: number): number {
 export function addPetLove(game: GameState, hero: Hero, n: number) {
   const p = hero.pet;
   if (!p || n <= 0) return;
+  // 区切りF: 調教師《懐き上手》— 懐き度の上がり方が2倍
+  if (hero.classId === 'petTrainer') n *= 2;
   const before = petLoveLevel(p.love);
   p.love += n;
   const after = petLoveLevel(p.love);
@@ -119,7 +122,12 @@ export function patPet(game: GameState, hero: Hero): string | undefined {
   if (heroPlace(game, hero) === 'busy') return '今は撫でられません';
   addPetLove(game, hero, BALANCE.petLovePat);
   const bird = getPet(p.petId).perch === 'shoulder';
-  if (!p.patted) {
+  if (!p.patted && hero.classId === 'petTrainer') {
+    // 区切りF: 調教師《懐き上手》— 撫でると、その場の仲間全員のフォーカス+1（休憩1回につき1回）
+    p.patted = true;
+    for (const h of sceneHeroes(game)) h.focus = Math.min(heroFocusMax(h), h.focus + 1);
+    addLog(game, `${hero.name}は${p.name}を${bird ? 'カキカキ' : 'なでなで'}した。みんなの心が和んだ（全員のフォーカス+1）`);
+  } else if (!p.patted) {
     p.patted = true;
     hero.focus = Math.min(heroFocusMax(hero), hero.focus + 1);
     addLog(game, `${hero.name}は${p.name}を${bird ? 'カキカキ' : 'なでなで'}した。心が和んだ（フォーカス+1）`);

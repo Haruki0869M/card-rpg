@@ -284,6 +284,9 @@ function startAllyPhase(state: BattleState, rng: Rng, events: BattleEvent[]) {
     // 区切りD: 不動の拳 — 前の敵の番に受けた攻撃の量を、このターンの最初の物理カードに足す数にする
     if (cs.fudoOn) { cs.fudo = Math.min(cs.fudoMax ?? 12, Math.floor(((cs.fudoStore ?? 0) * (cs.fudoPct ?? 50)) / 100)); delete cs.fudoOn; delete cs.fudoStore; }
     else cs.fudo = 0;
+    // 区切りF: 返し突き — 前の敵の番に防いだ量の半分（最大15）
+    cs.returnPower = Math.min(15, Math.floor((cs.blockedPhase ?? 0) / 2));
+    cs.blockedPhase = 0;
     // お供の行動の数え（1ターンに4回まで）
     cs.petActsTurn = 0;
     cs.unhurtTurn = state.turn > 1 && cs.unhurt === 1 ? 1 : 0;
@@ -548,6 +551,10 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   }
   abilityParts.push(...fireAbilities(state, rng, events, ally, 'afterCard', fireOpts));
   if (perfect) abilityParts.push(...fireAbilities(state, rng, events, ally, 'perfect', fireOpts));
+  // 区切りF: カードで自分が回復かブロックを得た（調教師《相棒の覚醒》）
+  if (!ally.dead && (ally.hp > selfBefore[0].hp || ally.block > selfBefore[0].block)) abilityParts.push(...fireAbilities(state, rng, events, ally, 'selfBoost', fireOpts));
+  // 区切りF: 転職の条件の記録 — 1ターンのうちにブロックを25以上にした（重装衛士）
+  if (ally.block >= 25 && (ally.counters ??= {}).bigBlockTurn !== state.turn) { ally.counters.bigBlockTurn = state.turn; const f = (ally.feats ??= {}); f.blockTurns25 = (f.blockTurns25 ?? 0) + 1; }
   // 区切りD: このカードで連携が起きた（コンビネーション・輪唱）
   if (ctx.comboLanded) {
     if (cardAbilities) abilityParts.push(...fireAbilities(state, rng, events, ally, 'combo', { ...fireOpts, list: cardAbilities }));

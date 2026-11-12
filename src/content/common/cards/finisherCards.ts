@@ -39,6 +39,11 @@ const GRAND_CROSS: Effect = { kind: 'grantAbility', turns: 0, to: 'allies', abil
 const SONG = { focus: { kind: 'symphony', focus: 1 } as Effect, mana: { kind: 'symphony', mana: 1 } as Effect, boost: { kind: 'symphony', boostPct: 50 } as Effect };
 const focusAll = (n: number): Effect => ({ kind: 'gainFocus', amount: n, to: 'allies' });
 
+/** 明鏡止水: 次の敵の番の間、《後の先》が2倍・上限なし */
+const MIRROR: Effect = { kind: 'grantAbility', turns: 0, abilities: [{ name: '明鏡止水', effect: { modifier: 'mirrorCounter' } }] };
+/** キズナ大暴走: お供の能力を3回 */
+const RAMPAGE: Effect = { kind: 'petRampage', times: 3 };
+
 export const FINISHER_CARDS: CardDef[] = [
   // 剣聖: 18/26/36。成功2で予告をすぐに BREAK。完全成功でマナ+2・このターンの物理×1.5
   c('fxHeavenDragon', '秘剣・天翔龍閃', 'physical', 2, 75, 'enemy', [[d(18)], [d(26)], [d(36), { kind: 'forceBreak' }]], { trait: t('剣聖の極み', { when: 'perfect', do: [{ kind: 'gainMana', amount: 2 }, SWORD_PEAK] }) }),
@@ -76,4 +81,14 @@ export const FINISHER_CARDS: CardDef[] = [
   c('fxSymphonia', '英雄たちの交響曲', 'skill', 1, 85, 'self', [[SONG.focus], [SONG.focus, SONG.mana], [SONG.focus, SONG.mana, SONG.boost]], { stat: 'luk', trait: t('交響', { modifier: 'exhaust' }) }),
   // 賭博師: 敵全員に7／17／27。完全成功（成功3）で敵全員に77＋77G
   c('fxAllOrNothing', 'オール・オア・ナッシング', 'physical', 1, 50, 'allEnemies', [[d(7)], [d(17)], [d(27)], [d(77), { kind: 'gainGold', amount: 77 }]], { stat: 'luk', tags: ['aoe'], trait: t('777', { modifier: 'exhaust' }) }),
+
+  // ===== 区切りF: 新ジョブ4職の決め技 =====
+  // 拳聖: ブロック10/14/18。次の敵の番の間、《後の先》が2倍・上限なし
+  c('fxMirrorHeart', '明鏡止水', 'skill', 1, 85, 'self', [10, 14, 18].map((n) => [{ kind: 'block', amount: n } as Effect, MIRROR]), { stat: 'vit', tags: ['block'], trait: t('明鏡止水', { modifier: 'exhaust' }) }),
+  // 重装衛士: 今のブロックの100/150/200%（最大60・ブロックは減らない）。完全成功で予告を BREAK
+  c('fxFortressBreaker', '城塞崩し', 'physical', 2, 75, 'enemy', [[{ kind: 'blockDamage', pct: 100, max: 60 }], [{ kind: 'blockDamage', pct: 150, max: 60 }], [{ kind: 'blockDamage', pct: 200, max: 60 }, { kind: 'forceBreak' }]], { stat: 'vit', tags: ['block'], trait: t('城塞崩し', { modifier: 'exhaust' }) }),
+  // 竜脈術師: 敵全員に10/14/20。悪い状態異常1種類につき+6（状態異常は消えない）
+  c('fxVeinRelease', '竜脈解放', 'magic', 2, 75, 'allEnemies', [10, 14, 20].map((n) => [{ kind: 'statusKindsDamage', amount: n, per: 6 } as Effect]), { stat: 'int', tags: ['aoe'], trait: t('竜脈解放', { modifier: 'exhaust' }) }),
+  // 調教師: お供の能力を3回（上限に数えない）。成功1で味方全員にブロック8、成功2でさらに応援2
+  c('fxBondRampage', '相棒とのキズナ大暴走', 'skill', 1, 85, 'self', [[RAMPAGE], [RAMPAGE, { kind: 'block', amount: 8, to: 'allies' }], [RAMPAGE, { kind: 'block', amount: 8, to: 'allies' }, { kind: 'applyStatus', status: 'inspired', amount: 2, to: 'allies' }]], { stat: 'luk', tags: ['pet'], trait: t('キズナ', { modifier: 'exhaust' }) }),
 ];
