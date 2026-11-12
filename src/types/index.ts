@@ -139,7 +139,7 @@ export type AbilityEffect =
   /** 明鏡止水: 《後の先》の反撃が2倍・上限なし（区切りF） */
   | { modifier: 'mirrorCounter' }
   /** 受けの型: 《後の先》の1回の上限+add（区切りF） */
-  | { modifier: 'counterCap'; add: number }
+  | { modifier: 'counterCap'; add: number; /** 《後の先》の1ターンの回数の上限に足す数（見切り） */ times?: number }
   /** BREAK の「合計ダメージ」の数えを multiplier 倍にする（鎧通しの一撃。区切りD） */
   | { modifier: 'breakCount'; multiplier: number; if?: AbilityCondition[] }
   /** 成功が min 以上なら、完全成功でなくても BREAK のきっかけになる（魔力の楔。区切りD） */

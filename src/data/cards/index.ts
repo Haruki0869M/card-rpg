@@ -27,6 +27,12 @@ export function getCard(id: string, upgraded?: boolean): CardDef {
   return u;
 }
 
+/**
+ * 能力の帯（特殊能力）を持たないエピック。spec §13.1 の「エピック以上は必ず特殊能力を持つ」の例外。
+ * オーナーの決定（2026-11-12）: 区切りDのこの5枚は、元の文（Gemini の依頼・計画）に能力が無いので、足さずにそのままにする
+ */
+export const EPIC_WITHOUT_TRAIT = ['axThornVow', 'axIronMarch', 'axCollapse', 'axReversalSeal', 'axLightHoard'];
+
 /** カードを置く武器種の全部（weaponType ＋ weaponTypes） */
 export function cardWeaponTypes(c: CardDef): string[] {
   return [...(c.weaponType ? [c.weaponType] : []), ...(c.weaponTypes ?? [])];

@@ -122,10 +122,22 @@ export function jobOptions(hero: Hero, game?: GameState): JobOption[] {
     }).map(o => ({ ...o, progress: o.job.requires ? featOf(hero, o.job.requires.feat) : undefined, needLevel: jobChangeLevel(o.job), count: o.job.requires?.count }));
 }
 
-/** 転職した時に選べる専用カード（3枚。無ければ報酬の候補の先頭から） */
+/** そのジョブにしか無い札か（共通・武器種・系統に置かれておらず、ほかのジョブの報酬にも無い） */
+export function jobOnlyCard(job: ClassDef, id: string): boolean {
+  const c = CARDS.tryGet(id);
+  if (!c || c.common || cardWeaponTypes(c).length || cardLineages(c).length) return false;
+  return !CLASSES.all.some((j) => j.id !== job.id && j.cardPool.includes(id));
+}
+
+/**
+ * 転職した時に選べる専用カード（3枚）。
+ * オーナーの決定（2026-11-12）: 「そのジョブにしか無い札」を先に並べる（代表の並び → 報酬の並びの順）。
+ * 3枚に足りないジョブだけ、残りを代表・報酬の並びの上から足す。
+ */
 export function signatureCards(job: ClassDef): string[] {
-  const ids = job.signature?.length ? job.signature : job.cardPool;
-  return ids.filter((id) => CARDS.has(id)).slice(0, 3);
+  const order = [...new Set([...(job.signature ?? []), ...job.cardPool])].filter((id) => CARDS.has(id));
+  const own = order.filter((id) => jobOnlyCard(job, id));
+  return [...own, ...order.filter((id) => !own.includes(id))].slice(0, 3);
 }
 
 /** 転職する。Lv1に戻り、前のジョブの戦闘の特殊能力を持ち越す */

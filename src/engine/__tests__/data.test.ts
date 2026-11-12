@@ -37,7 +37,8 @@ describe('データの整合性', () => {
       for (const f of c.from ?? []) expect(CLASSES.has(f), `${c.id} from ${f}`).toBe(true);
       expect(c.signature?.length, c.id).toBe(3);
       for (const id of c.signature ?? []) expect(c.cardPool, `${c.id}: ${id}`).toContain(id);
-      expect(c.cardPool.length, c.id).toBeGreaterThanOrEqual(c.tier === 'top' ? 5 : 6);
+      // 調教師は5枚（憲章5: 「相棒の守り」は、同じ役の札があるので無くした。数を合わせるための札は足さない）
+      expect(c.cardPool.length, c.id).toBeGreaterThanOrEqual(c.tier === 'top' || c.id === 'petTrainer' ? 5 : 6);
       expect(STARTER_WEAPON(c), c.id).toBe(true);
     }
   });

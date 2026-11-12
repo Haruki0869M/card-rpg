@@ -1,6 +1,6 @@
 // ラインナップの作り直し 区切りF（docs/tasks/lineup-stageF-plan.md）: 新ジョブ4職（拳聖・重装衛士・竜脈術師・調教師）
 import { describe, expect, it } from 'vitest';
-import { getCard } from '../../data/cards';
+import { CARDS, getCard } from '../../data/cards';
 import { CLASSES, getClass } from '../../data/classes';
 import { ENEMIES } from '../../data/enemies';
 import { SANCTUARIES } from '../../data/world';
@@ -121,10 +121,10 @@ describe('区切りF: 戦闘の力', () => {
   };
   const pecks = (s: BattleState) => s.log.filter((l) => l.text.includes('「つつく」')).length;
   it('調教師《相棒の覚醒》: カードでブロックを得たら、お供が動く（1ターン2回まで）', () => {
-    let s = use(trainer(), 'ptBuddyGuard').state;
+    let s = use(trainer(), 'cmPrepare').state;
     expect(pecks(s)).toBe(1);
-    s = use(s, 'ptBuddyGuard').state;
-    s = use(s, 'ptBuddyGuard').state;
+    s = use(s, 'cmPrepare').state;
+    s = use(s, 'cmPrepare').state;
     expect(pecks(s)).toBe(2);
   });
   it('調教師「なでなで」: HPを回復してお供が動く。満タンの時はブロック2で、やはりお供が動く（オーナーの決定）', () => {
@@ -143,8 +143,7 @@ describe('区切りF: 戦闘の力', () => {
     r.state.allies[0].block = 30;
     expect(lost(r.state, nextTurn(r.state))).toBe(18);
   });
-  it('重装衛士の専用カード（計画どおり）: 大盾構え = ブロック14／盾ごと突進 = ブロック+4／鉄の誓い = 全員8・自分はさらに+4', () => {
-    expect(use(battle(['bulwark']), 'bwBigShield').state.allies[0].block).toBe(14);
+  it('重装衛士の専用カード: 盾ごと突進 = ブロック+4／鉄の誓い = 全員8・自分はさらに+4', () => {
     expect(use(battle(['bulwark']), 'bwShieldCharge').state.allies[0].block).toBe(4);
     const r = use(battle(['bulwark', 'warrior']), 'bwIronOath');
     expect(r.state.allies.map((a) => a.block)).toEqual([12, 8]);
@@ -186,5 +185,39 @@ describe('区切りF: 決め技', () => {
     expect(r.state.log.filter((l) => l.text.includes('「つつく」')).length).toBeGreaterThanOrEqual(3);
     expect(r.state.allies[0].counters?.petActsTurn ?? 0).toBeLessThanOrEqual(2);
     expect(r.state.allies.every((a) => a.block >= 8)).toBe(true);
+  });
+});
+
+// ===================== 弱い札の作り直し（オーナーの OK 2026-11-12。docs/tasks/charter5-card-merge-plan.md §5） =====================
+describe('区切りF: 弱い札の作り直し', () => {
+  const total = (a: BattleState, b: BattleState) => a.enemies.reduce((n, e, i) => n + e.hp - b.enemies[i].hp, 0);
+  it('見切り: この敵の番の間、《後の先》の反撃の回数の上限が3回 → 4回', () => {
+    const four = ['stageFHitter', 'stageFHitter', 'stageFHitter', 'stageFHitter'];
+    const plain = battle(['fistSaint'], four);
+    plain.allies[0].block = 99;
+    expect(total(plain, nextTurn(plain))).toBe(36); // 12 × 3回
+    const r = use(battle(['fistSaint'], four), 'fsSeeThrough');
+    r.state.allies[0].block = 99;
+    expect(total(r.state, nextTurn(r.state))).toBe(48); // 12 × 4回
+  });
+  it('盾ごと突進: 殴った敵の単体攻撃を自分に向ける', () => {
+    const s = battle(['bulwark', 'warrior'], ['stageFHitter']);
+    s.enemies[0].intent = { ...s.enemies[0].intent!, targetId: s.allies[1].id };
+    const r = use(s, 'bwShieldCharge');
+    expect(r.state.enemies[0].tauntedBy).toBe(r.state.allies[0].id);
+    expect(r.state.enemies[0].intent?.targetId).toBe(r.state.allies[0].id);
+  });
+  it('竜脈の鱗盾: 状態異常1種類につき+2（最大+8）', () => {
+    const none = use(battle(['dragonVein']), 'dvScaleGuard').state.allies[0].block;
+    const two = battle(['dragonVein']);
+    two.enemies[0].statuses.burn = 1; two.enemies[0].statuses.weak = 1;
+    expect(use(two, 'dvScaleGuard').state.allies[0].block).toBe(none + 4);
+    const five = battle(['dragonVein']);
+    Object.assign(five.enemies[0].statuses, { burn: 1, weak: 1, vulnerable: 1, poison: 1, curse: 1 });
+    expect(use(five, 'dvScaleGuard').state.allies[0].block).toBe(none + 8);
+  });
+  it('大盾構え・相棒の守りは、無くした', () => {
+    expect(CARDS.tryGet('bwBigShield')).toBeUndefined();
+    expect(CARDS.tryGet('ptBuddyGuard')).toBeUndefined();
   });
 });

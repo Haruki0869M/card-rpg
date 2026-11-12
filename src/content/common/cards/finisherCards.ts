@@ -44,6 +44,9 @@ const MIRROR: Effect = { kind: 'grantAbility', turns: 0, abilities: [{ name: '�
 /** キズナ大暴走: お供の能力を3回 */
 const RAMPAGE: Effect = { kind: 'petRampage', times: 3 };
 
+/** ラグナロク・ブレード: この戦闘で使った属性それぞれの状態異常を1ずつ */
+const RAG: Effect = { kind: 'usedElementStatuses', amount: 1 };
+
 export const FINISHER_CARDS: CardDef[] = [
   // 剣聖: 18/26/36。成功2で予告をすぐに BREAK。完全成功でマナ+2・このターンの物理×1.5
   c('fxHeavenDragon', '秘剣・天翔龍閃', 'physical', 2, 75, 'enemy', [[d(18)], [d(26)], [d(36), { kind: 'forceBreak' }]], { trait: t('剣聖の極み', { when: 'perfect', do: [{ kind: 'gainMana', amount: 2 }, SWORD_PEAK] }) }),
@@ -67,8 +70,8 @@ export const FINISHER_CARDS: CardDef[] = [
   c('fxYatagarasu', '忍法・八咫烏', 'physical', 1, 80, 'enemy', [[...YATA, d(8)], [...YATA, d(12)], [...YATA, d(16)]], { stat: 'agi', trait: t('八咫烏', { modifier: 'exhaust' }) }),
   // 侍: すぐに居合（次の物理×4）。成功1で、この敵の番の最初の攻撃を無効にして25で返す
   c('fxMumyou', '奥義・無明逆流れ', 'physical', 1, 80, 'self', [[IAI], [IAI, MUMYOU]], { stat: 'per', trait: t('無明', { modifier: 'exhaust' }) }),
-  // 魔剣士: 16/24/34。必ず弱点を突く（弱点の属性があればその属性に、無くても弱点を突いた扱い）
-  c('fxRagnarok', 'ラグナロク・ブレード', 'physical', 2, 75, 'enemy', [[d(16)], [d(24)], [d(34)]], { trait: t('ラグナロク', { modifier: 'weaknessElement' }, [{ modifier: 'alwaysWeak' }]) }),
+  // 魔剣士: 16/24/34。この戦闘で使った属性を全部宿し（その属性の状態異常を1ずつ付ける。オーナーの決定 2026-11-12）、必ず弱点を突く
+  c('fxRagnarok', 'ラグナロク・ブレード', 'physical', 2, 75, 'enemy', [[d(16), RAG], [d(24), RAG], [d(34), RAG]], { trait: t('ラグナロク', { modifier: 'weaknessElement' }, [{ modifier: 'alwaysWeak' }]) }),
   // 死霊術師: 屍兵を上限まで。屍兵1体につき敵全員に7/10/14の闇。自分のHPを10回復
   c('fxHundredNight', '百鬼夜行', 'magic', 2, 75, 'allEnemies', [7, 10, 14].map((n) => [{ kind: 'minionNight', per: n }, { kind: 'heal', amount: 10, to: 'self' }]), { tags: ['aoe'], trait: t('百鬼', { modifier: 'exhaust' }) }),
   // 暗黒騎士: 今のHPの半分を払い、減っているHP×1.2/1.5/2.0の闇（最大100）。与えたダメージの50%を吸収

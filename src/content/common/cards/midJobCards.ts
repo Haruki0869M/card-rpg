@@ -85,7 +85,7 @@ export const MID_JOB_CARDS: CardDef[] = [
   c('spearWall', '槍衾', 'skill', 1, 80, 'self', [[b(5)], [b(8)], [b(10), all('weak', 1)]], { rarity: 'rare', stat: 'vit' }),
   c('skewer', '串刺し', 'physical', 2, 60, 'allEnemies', [[d(4)], [d(6)], [d(9), all('vulnerable', 1)]], { rarity: 'epic', trait: { name: '貫通', effect: { modifier: 'ignoreBlock' } } }),
   c('sweepLegs', '足払い', 'physical', 1, 75, 'enemy', [[d(2), st('weak', 1)], [d(4), st('weak', 1)], [d(5), st('weak', 2)]]),
-  c('dragonFang', '竜牙', 'physical', 3, 55, 'enemy', [[d(10)], [d(18)], [d(26)], [d(34), st('vulnerable', 2)]], { rarity: 'epic', trait: { name: '竜殺し', effect: { modifier: 'damageDealt', multiplier: 1.3, if: [{ kind: 'targetHpAtMost', pct: 50 }] } }, stat: 'str' }),
+  c('dragonFang', '竜牙', 'physical', 3, 55, 'enemy', [[d(10)], [d(18)], [d(26)], [d(34), st('vulnerable', 2)]], { rarity: 'epic', trait: { name: '先駆け', effect: { modifier: 'cardCost', delta: -2, if: [{ kind: 'turnAtMost', turn: 1 }] } }, stat: 'str' }), // 憲章5: 1ターン目はコスト1。《突撃》（1ターン目×1.5）を大技に乗せる札
 
   // ===== 司祭（錫杖。回復をためて全体回復） =====
   c('greaterHeal', '大いなる癒し', 'magic', 2, 75, 'ally', [[heal(5, 'target')], [heal(9, 'target')], [heal(14, 'target'), { kind: 'cleanse', to: 'target' }]], { rarity: 'rare', stat: 'per' }),

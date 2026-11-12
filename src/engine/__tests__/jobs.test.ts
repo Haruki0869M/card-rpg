@@ -1,5 +1,6 @@
 // 転職（J3a）: 場所・経験値の持ち越し・専用カードの3択・カードの候補・スマート抽選・中位ジョブの能力の部品
 import { describe, expect, it } from 'vitest';
+import { signatureCards } from '../game/jobs';
 import { getCard } from '../../data/cards';
 import { CLASSES } from '../../data/classes';
 import type { GameCommand, GameState, PlayerId } from '../../types';
@@ -77,7 +78,7 @@ describe('転職の場所と手順', () => {
     expect(n.level).toBe(1);
     expect(n.exp).toBe(expToNext(1, 'swordmaster') - 1);
     expect(n.carried).toBe('warrior');
-    expect(n.jobPick).toEqual(CLASSES.get('swordmaster').signature);
+    expect(n.jobPick).toEqual(signatureCards(CLASSES.get('swordmaster')));
     // 選ぶまで次の転職はできない・選べるのは3枚だけ
     expect(applyGameCommand(g, { type: 'PICK_JOB_CARD', playerId: P, heroId: n.id, cardId: 'strike' }).error).toBeTruthy();
     const before = n.deck.length;
@@ -265,7 +266,7 @@ describe('最上位13職の転職とカード', () => {
     g = run(g, { type: 'CHANGE_JOB', playerId: P, heroId: h.id, jobId: j.id });
     expect(g.heroes[0].level).toBe(1); expect(g.heroes[0].carried).toBe(j.from![0]);
     expect(g.heroes[0].deck.length).toBe(before + (j.jobCards?.length ?? 0));
-    expect(g.heroes[0].jobPick).toEqual(j.signature);
+    expect(g.heroes[0].jobPick).toEqual(signatureCards(j));
   });
   it.each(['miracle', 'plunder', 'jump'])('%s: 同名の複数枚も含め1戦闘1回、次の戦闘で使える', id => {
     let s = topBattle(['warrior']);

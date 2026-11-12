@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { signatureCards } from '../game/jobs';
 import { BALANCE } from '../../data/balance';
 import { getCard } from '../../data/cards';
 import { CLASSES } from '../../data/classes';
@@ -61,7 +62,7 @@ describe('特殊職5職のデータと転職', () => {
     expect(jobOptions(h, g).find(o => o.job.id === id)?.progress).toBe(j.requires!.count - 1);
     h.feats[j.requires!.feat]++;
     const r = applyGameCommand(g, { type: 'CHANGE_JOB', playerId: 'P1', heroId: h.id, jobId: id }); expect(r.error).toBeUndefined(); g = r.state;
-    expect(g.heroes[0].classId).toBe(id); expect(g.heroes[0].level).toBe(1); expect(g.heroes[0].jobPick).toEqual(j.signature);
+    expect(g.heroes[0].classId).toBe(id); expect(g.heroes[0].level).toBe(1); expect(g.heroes[0].jobPick).toEqual(signatureCards(j)); // そのジョブにしか無い札を先に（オーナーの決定 2026-11-12）
     expect(g.heroes[0].equipment.weapon?.itemId).toBe(j.startingEquipment.weapon);
     expect(jobOptions(g.heroes[0], g)).toEqual([]);
     if (id === 'timeMage') expect(g.heroes[0].deck.some(c => c.cardId === 'timeStop')).toBe(true);
