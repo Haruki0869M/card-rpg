@@ -133,9 +133,11 @@ export function jobOnlyCard(job: ClassDef, id: string): boolean {
  * 転職した時に選べる専用カード（3枚）。
  * オーナーの決定（2026-11-12）: 「そのジョブにしか無い札」を先に並べる（代表の並び → 報酬の並びの順）。
  * 3枚に足りないジョブだけ、残りを代表・報酬の並びの上から足す。
+ * 転職で必ず入る札（jobCards = 決め技）は候補に出さない（点検 2026-11-13 F4: 時魔道士の「時間停止」が2枚取れた）。
  */
 export function signatureCards(job: ClassDef): string[] {
-  const order = [...new Set([...(job.signature ?? []), ...job.cardPool])].filter((id) => CARDS.has(id));
+  const given = new Set(job.jobCards ?? []);
+  const order = [...new Set([...(job.signature ?? []), ...job.cardPool])].filter((id) => CARDS.has(id) && !given.has(id));
   const own = order.filter((id) => jobOnlyCard(job, id));
   return [...own, ...order.filter((id) => !own.includes(id))].slice(0, 3);
 }
