@@ -22,7 +22,23 @@ const MIGRATIONS: Record<number, (g: Loose) => void> = {
   23(g) { renameCards(g); },
   // v24 → v25（2026-11-12・区切りG-1）: 武器にだけ付いていた札11枚と、区切りFの2枚をまとめた
   24(g) { renameCards(g); },
+  // v25 → v26（2026-11-12・区切りG-2）: 鋼の連撃 → 手早い攻撃（MERGED_CARDS）。魔法の法衣 → 学び手の法衣
+  25(g) { renameCards(g); renameItems(g); },
 };
+
+/** 無くした装備 → 読み替える先（区切りG-2） */
+const RENAMED_ITEMS: Record<string, string> = { magicRobe: 'commonAdeptRobe' };
+
+/** 保存データの中の装備のID（itemId の項目。持ち物・袋・装備・行商人・町の店・宝箱の中身など、どこにあっても）を読み替える */
+function renameItems(v: unknown): void {
+  if (Array.isArray(v)) { v.forEach((x) => renameItems(x)); return; }
+  if (!v || typeof v !== 'object') return;
+  const o = v as Loose;
+  for (const k of Object.keys(o)) {
+    if (k === 'itemId' && typeof o[k] === 'string') { if (RENAMED_ITEMS[o[k]]) o[k] = RENAMED_ITEMS[o[k]]; }
+    else renameItems(o[k]);
+  }
+}
 
 /** 保存データの中のカードのID（cardId の項目と、名前に card が入る並び）を、まとめた先に読み替える。敵の行動のID（同じ文字の物がある）には触らない */
 function renameCards(v: unknown, key = ''): void {

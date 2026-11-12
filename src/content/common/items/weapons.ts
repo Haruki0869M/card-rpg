@@ -6,9 +6,10 @@ export const weapons: ItemDef[] = [
   { id: 'copperSword', name: '銅の剣', slot: 'weapon', weaponType: 'sword', rarity: 'common', icon: 'sword', description: '駆け出しの剣士の相棒。', cards: [{ cardId: 'strike', count: 2 }] },
   {
     id: "steelSword", name: "鋼の剣", slot: "weapon", weaponType: "sword", rarity: "rare", icon: "sword",
-    description: "物理カードが完全成功した後、自分に「応援」1（次のカードの成功率+10%）。1ターンに1回。", stats: {"str":4}, tags: ["physical"],
-    cards: [{"cardId":"wSteelCombo","count":2}],
-    ability: {"name":"見切り","description":"物理カードが完全成功した後、自分に「応援」1（次のカードの成功率+10%）。1ターンに1回。","effect":{"when":"perfect","if":[{"kind":"cardCategory","category":"physical"},{"kind":"oncePerTurn","key":"steelSword"}],"do":[{"kind":"applyStatus","status":"inspired","amount":1,"to":"self"}]}},
+    description: "物理カードが成功0だった後、次の物理カードの成功率+20%。1ターンに1回。", stats: {"str":4}, tags: ["physical"],
+    cards: [{"cardId":"cmAllOut","count":2}],
+    // 区切りG-2（2026-11-12）: 《見切り》→《立て直し》。熾火の剣《魔法剣》と同じ作り（数えを立てて、次の物理カードで消す）
+    ability: {"name":"立て直し","description":"物理カードが成功0だった後、次の物理カードの成功率+20%。1ターンに1回。","effect":{"modifier":"cardChance","bonus":20,"if":[{"kind":"cardCategory","category":"physical"},{"kind":"counterAtLeast","key":"steelRecover","n":1,"label":"物理カードが成功0だった後の"}]},"also":[{"when":"afterCard","if":[{"kind":"cardCategory","category":"physical"},{"kind":"counterAtLeast","key":"steelRecover","n":1}],"do":[{"kind":"counter","key":"steelRecover","set":0,"silent":true}]},{"when":"afterCard","if":[{"kind":"cardCategory","category":"physical"},{"kind":"cardSlots","min":1},{"kind":"successesAtMost","count":0},{"kind":"oncePerTurn","key":"steelSword"}],"do":[{"kind":"counter","key":"steelRecover","set":1,"text":"次の物理カードの成功率+20%"}]}]},
   },
   {
     id: "mithrilSword", name: "ミスリルソード", slot: "weapon", weaponType: "sword", rarity: "epic", icon: "sword",

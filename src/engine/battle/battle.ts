@@ -44,7 +44,8 @@ export { enemyName, findAlly, findEnemy, unitName } from './units';
 // v21（2026-11-12）: 区切りD-1 同じ中身のカードをまとめた。古い保存は読まない
 // v22（2026-11-12）: 区切りD-2〜D-4 軸のカード・決め技・武器のカードの付け替え。古い保存は読まない
 // v23（2026-11-12）: 区切りE 消耗品 50→24。古い保存は読まない
-export const STATE_VERSION = 25;
+// v26（2026-11-12）: 区切りG-2 魔法の法衣・鋼の連撃を無くした。古い保存は読み替える（engine/game/migrations.ts の 25）
+export const STATE_VERSION = 26;
 export { slotPreviewLimitOf } from './preview';
 
 // ---------- 生成 ----------

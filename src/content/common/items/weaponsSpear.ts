@@ -11,9 +11,9 @@ export const weaponsSpear: ItemDef[] = [
   },
   {
     id: "balancedSpear", name: "均衡の槍", slot: "weapon", weaponType: "spear", rarity: "rare", icon: "spear",
-    description: "敵の番にHPが減らなかったら、次のターン最初の物理カードのダメージ×1.25。", stats: {"str":2,"dex":2}, tags: ["physical","block"],
+    description: "敵の番にHPが減らなかったら、次のターンの始めにフォーカス+1。", stats: {"str":2,"dex":2}, tags: ["physical","block"],
     cards: [{"cardId":"axReturnStroke","count":2}],
-    ability: {"name":"返しの穂先","description":"敵の番にHPが減らなかったら、次のターン最初の物理カードのダメージ×1.25。","effect":{"modifier":"damageDealt","multiplier":1.25,"if":[{"kind":"cardCategory","category":"physical"},{"kind":"playedCategoryCount","category":"physical","max":0},{"kind":"counterAtLeast","key":"unhurtTurn","n":1,"label":"敵の番にHPが減らなかった次のターン"}]}},
+    ability: {"name":"返しの穂先","description":"敵の番にHPが減らなかったら、次のターンの始めにフォーカス+1。","effect":{"when":"turnStart","if":[{"kind":"counterAtLeast","key":"unhurtTurn","n":1,"label":"敵の番にHPが減らなかった次のターン"}],"do":[{"kind":"gainFocus","amount":1}]}},
   },
   // エピック
   // レジェンド

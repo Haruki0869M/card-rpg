@@ -148,8 +148,8 @@ describe('K2 装備のデータ', () => {
     for (const id of seen('corruptionKing')) expect(ITEMS.get(id).slot).toBe('accessory');
   });
 
-  it('レア以上の鎧は、固有の効果（特殊能力か探索効果）を持つ（K2以前の2つは例外）', () => {
-    const legacy = new Set(['ironArmor', 'magicRobe']);
+  it('レア以上の鎧は、固有の効果（特殊能力か探索効果）を持つ（K2以前の鉄の鎧は例外。魔法の法衣は区切りG-2で無くした）', () => {
+    const legacy = new Set(['ironArmor']);
     for (const i of ITEMS.all.filter((x) => x.slot === 'armor' && x.rarity !== 'common' && !legacy.has(x.id))) expect(i.ability ?? i.explore, i.id).toBeDefined();
   });
 

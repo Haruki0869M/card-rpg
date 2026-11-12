@@ -115,7 +115,7 @@ describe('装備', () => {
     g = run(g, { type: 'EQUIP', playerId: P, heroId: 'h0', itemUid: 'x1' });
     expect(heroStats(g.heroes[0]).str).toBe(before + 4);
     expect(g.heroes[0].stash.some((s) => s.itemId === 'copperSword')).toBe(true);
-    expect(battleDeck(g.heroes[0]).filter((c) => c.fromWeapon).map((c) => c.cardId)).toEqual(['wSteelCombo', 'wSteelCombo']);
+    expect(battleDeck(g.heroes[0]).filter((c) => c.fromWeapon).map((c) => c.cardId)).toEqual(['cmAllOut', 'cmAllOut']);
     g = run(g, { type: 'EQUIP', playerId: P, heroId: 'h0', itemUid: 'x3' });
     expect(heroFocusMax(g.heroes[0])).toBe(BALANCE.focusMax + 1);
     expect(statChance(g.heroes[0], 'luk')).toBe(Math.min(95, 40 + 5));

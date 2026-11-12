@@ -97,16 +97,7 @@ describe('区切りB: 数', () => {
 });
 
 describe('区切りB: 剣（完全成功をつなぐ）', () => {
-  it('鋼の剣《見切り》: 物理カードの完全成功で応援1。1ターンに1回', () => {
-    let s = battle(['warrior'], ['steelSword']);
-    const r = use(s, 'strike', { focus: 'max' });
-    expect(st(r.state.allies[0], 'inspired')).toBe(1);
-    expect(hasAbility(r.events, '見切り')).toBe(true);
-    s = use(r.state, 'strike', { focus: 'max' }).state; // 応援は使って消え、2回目は付かない
-    expect(st(s.allies[0], 'inspired')).toBe(0);
-    s = use(nextTurn(s), 'strike', { focus: 'max' }).state;
-    expect(st(s.allies[0], 'inspired')).toBe(1);
-  });
+  // 鋼の剣は区切りG-2で《立て直し》に変えた（lineupStageG2.test.ts）
   it('熾火の剣《魔法剣》: 魔法カードの後、次の物理カード1枚だけ成功率+10%', () => {
     let s = battle(['warrior'], ['smolderSword']);
     const bonus = (x: BattleState) => cardChanceBonus(x.allies[0], strike(), x.enemies[0], x);
@@ -143,7 +134,8 @@ describe('区切りB: 剣（完全成功をつなぐ）', () => {
     expect(st(solo.allies[0], 'inspired')).toBe(2);
   });
   it('協力プレイ: P2 のキャラの武器の能力も、P2 の操作で働く', () => {
-    const s = battle(['mage', 'warrior'], [undefined, 'steelSword'], { players: ['P1', 'P2'] });
+    // 区切りG-2: 鋼の剣の力を変えたので、完全成功で自分に応援1が付くミスリルソードで確かめる
+    const s = battle(['mage', 'warrior'], [undefined, 'mithrilSword'], { players: ['P1', 'P2'] });
     const r = use(s, 'strike', { ally: 1, focus: 'max' });
     expect(st(r.state.allies[1], 'inspired')).toBe(1);
     expect(st(r.state.allies[0], 'inspired')).toBe(0);
@@ -151,8 +143,9 @@ describe('区切りB: 剣（完全成功をつなぐ）', () => {
 });
 
 describe('区切りB: 刀（一太刀）', () => {
-  it('鍛鉄の刀《初太刀》・天下無双: そのターン最初の物理カードだけ ×1.2 / ×1.3', () => {
-    for (const [id, m] of [['forgedKatana', 1.2], ['peerlessKatana', 1.3]] as const) {
+  // 鍛鉄の刀《初太刀》は区切りG-2で「成功率+15%」に変えた（lineupStageG2.test.ts）
+  it('天下無双: そのターン最初の物理カードだけ ×1.3', () => {
+    for (const [id, m] of [['peerlessKatana', 1.3]] as const) {
       let s = battle(['warrior'], [id]), bare = battle(['warrior'], [undefined]);
       expect(ratio(s, bare), id).toBeCloseTo(m);
       s = use(s, 'guard').state; bare = use(bare, 'guard').state; // 物理でないカードは数えない
@@ -203,25 +196,7 @@ describe('区切りB: 槍（守って返す）', () => {
     s = use(s, 'strike', { focus: 'max' }).state;
     expect(s.allies[0].block).toBe(3);
   });
-  it('均衡の槍《返しの穂先》: 敵の番にHPが減らなければ、次のターン最初の物理カード ×1.25。1ターン目と、HPが減った後は無し', () => {
-    const s = battle(['warrior'], ['balancedSpear']), bare = battle(['warrior'], [undefined]);
-    expect(ratio(s, bare)).toBeCloseTo(1);
-    const s2 = nextTurn(s), bare2 = nextTurn(bare);
-    expect(ratio(s2, bare2)).toBeCloseTo(1.25);
-    expect(ratio(use(s2, 'strike').state, use(bare2, 'strike').state)).toBeCloseTo(1);
-    const hit = nextTurn(battle(['warrior'], ['balancedSpear'], { enemies: ['stageBHitter'] }));
-    expect(hit.allies[0].hp).toBeLessThan(500);
-    expect(ratio(hit, nextTurn(battle(['warrior'], [undefined], { enemies: ['stageBHitter'] })))).toBeCloseTo(1);
-  });
-  it('均衡の槍: ブロックで防ぎきれば「HPが減らなかった」に入る', () => {
-    const s = battle(['warrior'], ['balancedSpear'], { enemies: ['stageBHitter'] }), bare = battle(['warrior'], [undefined], { enemies: ['stageBHitter'] });
-    const a = applyCommand(s, { type: 'END_TURN', playerId: 'P1' }).state, b = applyCommand(bare, { type: 'END_TURN', playerId: 'P1' }).state;
-    a.allies[0].block = 99; b.allies[0].block = 99;
-    const step = (x: BattleState) => { let y = x; for (let i = 0; y.phase === 'enemy' && i < 20; i++) y = applyCommand(y, { type: 'ENEMY_STEP' }).state; return y; };
-    const a2 = step(a), b2 = step(b);
-    expect(a2.allies[0].hp).toBe(500);
-    expect(ratio(a2, b2)).toBeCloseTo(1.25);
-  });
+  // 均衡の槍《返しの穂先》は区切りG-2で「次のターンの始めにフォーカス+1」に変えた（lineupStageG2.test.ts）
   it('大物狩りの銛《大物狩り》: ボス・中ボスとの戦闘だけ、物理カードの成功率+10%', () => {
     const bonus = (opt: Opt) => { const s = battle(['warrior'], ['harpoon'], opt); return cardChanceBonus(s.allies[0], strike(), s.enemies[0], s); };
     expect(bonus({})).toBe(0);

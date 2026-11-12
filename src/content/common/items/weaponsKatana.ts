@@ -5,9 +5,9 @@ export const weaponsKatana: ItemDef[] = [
   // レア
   {
     id: "forgedKatana", name: "鍛鉄の刀", slot: "weapon", weaponType: "katana", rarity: "rare", icon: "katana",
-    description: "毎ターン、最初に使う物理カードのダメージ×1.2（2枚目からは無し）。", stats: {"per":5}, tags: ["physical","heavy"],
+    description: "毎ターン、最初に使う物理カードの成功率+15%（2枚目からは無し）。", stats: {"per":5}, tags: ["physical","heavy"],
     cards: [{"cardId":"lnGiWeakpoint","count":2}],
-    ability: {"name":"初太刀","description":"毎ターン、最初に使う物理カードのダメージ×1.2（2枚目からは無し）。","effect":{"modifier":"damageDealt","multiplier":1.2,"if":[{"kind":"cardCategory","category":"physical"},{"kind":"playedCategoryCount","category":"physical","max":0}]}},
+    ability: {"name":"初太刀","description":"毎ターン、最初に使う物理カードの成功率+15%（2枚目からは無し）。","effect":{"modifier":"cardChance","bonus":15,"if":[{"kind":"cardCategory","category":"physical"},{"kind":"playedCategoryCount","category":"physical","max":0}]}},
   },
   {
     id: "guardKatana", name: "受け流しの刀", slot: "weapon", weaponType: "katana", rarity: "rare", icon: "katana",
