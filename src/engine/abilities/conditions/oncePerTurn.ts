@@ -13,7 +13,13 @@ export const condition: ConditionHandler<'oncePerTurn'> = {
     const counters = ((c.self as { counters?: Record<string, number> }).counters ??= {});
     const k = `once:${cond.key}`;
     const turn = c.state?.turn ?? 0;
-    if (counters[k] === turn) return false;
+    if (counters[k] === turn) {
+      // 天剣: このターンだけ、もう1回（extraOnce の印を1つ使う）
+      const x = `onceExtra:${cond.key}`;
+      if (counters[x] !== turn) return false;
+      delete counters[x];
+      return true;
+    }
     counters[k] = turn;
     return true;
   },

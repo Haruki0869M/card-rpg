@@ -220,19 +220,34 @@ describe('区切りD-2: 軸① ブロック変換・反撃', () => {
     expect(r.state.allies[0].block).toBe(4);
     expect(r.state.enemies[0].block).toBe(0);
   });
-  it('鉄壁の進軍: 敵全員に、ブロックの70%（最大24）。ブロックは減らない（完全成功でブロック5）', () => {
+  it('鉄壁の進軍: 敵全員に、ブロックの70%（最大24）。ブロックは減らない（元の文どおり。完全成功のブロック5は外した）', () => {
     const s = battle(['guardian'], ['stageDIdler', 'stageDIdler']);
     s.allies[0].block = 30;
     const r = use(s, 'axIronMarch', { focus: 'max' });
     expect(lostHp(s, r.state, 0)).toBeGreaterThan(0);
     expect(lostHp(s, r.state, 1)).toBeGreaterThan(0);
-    expect(r.state.allies[0].block).toBe(35);
+    expect(r.state.allies[0].block).toBe(30);
   });
-  it('茨の誓い: 味方全員にブロック。殴られたら攻撃者に4（1人1ターン1回）', () => {
+  it('茨の誓い: 味方全員にブロック。殴られたら攻撃者に3/4/5（味方みんなで1ターン4回まで）', () => {
     const s = battle(['paladin', 'warrior'], ['stageDHitter']);
     const r = use(s, 'axThornVow', { focus: 'max' });
     expect(r.state.allies.every((a) => a.abilities?.some((x) => x.name === '茨の誓い'))).toBe(true);
     expect(r.state.allies.every((a) => a.block === 7)).toBe(true);
+    // 殴る敵4体: 反撃は 5ダメージ。味方みんなで1ターン4回まで（もう2回使った事にしておくと、あと2回だけ）
+    const four = battle(['paladin', 'warrior'], ['stageDHitter', 'stageDHitter', 'stageDHitter', 'stageDHitter']);
+    const all4 = use(four, 'axThornVow', { focus: 'max' }).state;
+    for (const a of all4.allies) a.block = 99;
+    const after4 = nextTurn(all4).state;
+    expect(all4.enemies.map((e, i) => e.hp - after4.enemies[i].hp)).toEqual([5, 5, 5, 5]);
+    const v = use(battle(['paladin', 'warrior'], ['stageDHitter', 'stageDHitter', 'stageDHitter', 'stageDHitter']), 'axThornVow', { focus: 'max' }).state;
+    for (const a of v.allies) a.block = 99;
+    v.teamCounters = { 'retaliate:thornVow:turn': v.turn, 'retaliate:thornVow:n': 2 };
+    const after = nextTurn(v).state;
+    const hits = v.enemies.map((e, i) => e.hp - after.enemies[i].hp).filter((n) => n > 0);
+    expect(hits).toEqual([5, 5]);
+    // 成功0なら3ダメージ
+    const low = use(battle(['paladin'], ['stageDHitter']), 'axThornVow', { focus: 0 });
+    if (low.state.allies[0].block === 3) { low.state.allies[0].block = 99; const n = nextTurn(low.state).state; expect(low.state.enemies[0].hp - n.enemies[0].hp).toBe(3); }
   });
   it('不動の拳: 受けた攻撃の50%を、次のターンの最初の物理カードに（最大+12）', () => {
     const s = battle(['monk'], ['stageDHitter20']);
@@ -396,6 +411,7 @@ describe('区切りD-3: 軸④ 状態異常の起爆', () => {
     s.enemies[0].statuses.poison = 1;
     const r = use(s, 'axCollapse', { focus: 'max' });
     expect(r.state.enemies[0].statuses.poison).toBe(0);
+    expect(r.state.enemies[0].statuses.weak).toBe(0); // 元の文どおり: 完全成功の「弱体1」は外した
     expect(lostHp(s, r.state)).toBeGreaterThan(a);
   });
 });
@@ -440,15 +456,16 @@ describe('区切りD-3: 軸⑤ オーバーヒール・聖光', () => {
     const r2 = applyCommand(st2, { type: 'PLAY_CARD', playerId: 'P1', characterId: a.id, cardInstanceId: 'mend1', targetId: st2.allies[1].id, focusUsed: 0 });
     expect(r2.error).toBeUndefined();
     expect(lostHp(st2, r2.state)).toBeGreaterThan(0);
+    expect(r.state.allies[0].statuses.holyLight ?? 0).toBe(0); // 元の文どおり: 完全成功の「聖光+1」は外した
   });
   it('光の蓄え: このターン、聖属性の攻撃をしても聖光が消えない', () => {
     const s = battle(['paladin']);
     s.allies[0].statuses.holyLight = 3;
     const r = use(s, 'axLightHoard', { focus: 'max' });
-    expect(r.state.allies[0].statuses.holyLight).toBe(5); // 3 ＋ 完全成功1 ＋ 能力《蓄光》1
+    expect(r.state.allies[0].statuses.holyLight).toBe(4); // 3 ＋ 成功1の+1（元の文どおり。能力《蓄光》の+1は外した）
     const ctx = makeCtx(r.state, createRng(1), [], r.state.allies[0], { target: r.state.enemies[0] });
     applyEffect(ctx, { kind: 'damage', amount: 3, element: 'holy' });
-    expect(r.state.allies[0].statuses.holyLight).toBe(5); // 3 ＋ 完全成功1 ＋ 能力《蓄光》1
+    expect(r.state.allies[0].statuses.holyLight).toBe(4);
   });
 });
 
@@ -595,6 +612,17 @@ describe('区切りD-4: 決め技', () => {
     const s = battle(['swordmaster'], ['stageDBig']);
     const r = use(s, 'fxRagnarok', { focus: 0 });
     expect(r.state.enemies[0].broken).toBe(true);
+  });
+  it('ラグナロク・ブレード: この戦闘で使った属性の状態異常を、全部1ずつ付ける（元の文の「全部宿す」）', () => {
+    const none = use(battle(['magicKnight']), 'fxRagnarok', { focus: 0 }).state.enemies[0].statuses;
+    expect([none.burn ?? 0, none.freeze ?? 0]).toEqual([0, 0]);
+    let s = use(battle(['magicKnight']), 'bladeFire', { focus: 0 }).state;
+    s = use(s, 'iceLance', { focus: 0 }).state;
+    const before = { ...s.enemies[0].statuses };
+    const st = use(s, 'fxRagnarok', { focus: 0 }).state.enemies[0].statuses;
+    expect((st.burn ?? 0) - (before.burn ?? 0)).toBeGreaterThanOrEqual(1);
+    expect(st.freeze ?? 0).toBeGreaterThanOrEqual(1); // 凍結は重ならない（上限1）
+    expect(st.paralysis ?? 0).toBe(0);
   });
   it('百鬼夜行: 屍兵を3体まで呼ぶ', () => {
     const s = battle(['necromancer']);

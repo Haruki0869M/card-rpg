@@ -170,7 +170,8 @@ export function completeSlotsOf(state: BattleState | undefined, u: Unit, card: C
   const notices: AbilityNotice[] = [];
   let active = false;
   const counters = (u as { counters?: Record<string, number> }).counters ?? {};
-  for (const ab of abilitiesOf(u)) {
+  // カード自身の能力も見る（奥義・月下断）
+  for (const ab of [...abilitiesOf(u), ...(cardTraitAbilities(card) ?? []).map((a) => ({ ...a, source: { kind: 'card' as const, label: card.name } }))]) {
     const e = ab.effect;
     if (!('modifier' in e) || e.modifier !== 'completeSlots') continue;
     if (e.turnKey && counters[`once:${e.turnKey}`] === (state?.turn ?? 0)) continue;
@@ -194,7 +195,8 @@ export function cardCostOf(state: BattleState | undefined, u: Unit, card: CardDe
   const keys: string[] = [], active: AbilityNotice[] = [];
   if (isEnemy(u)) return { cost, keys, active };
   const counters = (u as { counters?: Record<string, number> }).counters ?? {};
-  for (const ab of abilitiesOf(u)) {
+  // カード自身の能力も見る（竜牙: 1ターン目はコスト1）
+  for (const ab of [...abilitiesOf(u), ...(cardTraitAbilities(card) ?? []).map((a) => ({ ...a, source: { kind: 'card' as const, label: card.name } }))]) {
     const e = ab.effect;
     if (!('modifier' in e) || e.modifier !== 'cardCost') continue;
     if (e.turnKey && counters[`once:${e.turnKey}`] === (state?.turn ?? 0)) continue;
@@ -431,7 +433,7 @@ export function describeAbility(ab: AbilityDef, side: 'ally' | 'enemy' = 'ally')
     }
     if (e.modifier === 'comboScale') return `このカードの連携の上乗せ×${e.multiplier}（連携は合わせて+${Math.round(BALANCE.comboBonusMax * 100)}%まで）`;
     if (e.modifier === 'endure') return 'HPが1より下がらない';
-    if (e.modifier === 'counterCap') return `《後の先》の1回の反撃の上限+${e.add}`;
+    if (e.modifier === 'counterCap') return [e.add ? `《後の先》の1回の反撃の上限+${e.add}` : '', e.times ? `《後の先》の反撃の回数の上限+${e.times}` : ''].filter(Boolean).join('・');
     if (e.modifier === 'mirrorCounter') return '《後の先》の反撃が2倍・上限なし';
     if (e.modifier === 'alwaysWeak') return '弱点の属性でなくても、弱点を突いた扱い（ダメージ×1.5・BREAK のきっかけ）';
     if (e.modifier === 'weaknessElement') return '属性は、狙った敵の弱点の属性に変わる（弱点が無い敵には無属性）';

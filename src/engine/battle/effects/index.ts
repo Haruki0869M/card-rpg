@@ -381,6 +381,8 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
     // 区切りF: 敵の攻撃をブロックで防いだ（一部でも）。dealt = 防いだ量（拳聖《後の先》）
     if (r.blocked > 0 && isEnemy(source) && !isEnemy(v) && !v.dead) fireAbilities(state, rng, events, v, 'guarded', { attacker: source, dealt: r.blocked, depth: ctx.depth + 1 });
     if (v.dead && isEnemy(source) !== isEnemy(v) && !source.dead) fireAbilities(state, rng, events, source, 'kill', { target: v, condCard: ctx.card, depth: ctx.depth + 1 });
+    // 不具合の直し（2026-11-12）: カード自身の能力の「敵を倒した時」（天下割り《覇道》・全軍突撃・神罰など）が、今まで一度も働いていなかった。使っているカードの能力も、ここで動かす
+    if (v.dead && isEnemy(v) && !isEnemy(source) && !source.dead && ctx.cardAbilities?.length && ctx.depth < 3) fireAbilities(state, rng, events, source, 'kill', { target: v, card: ctx.card, list: ctx.cardAbilities, depth: ctx.depth + 1 });
     if (v.dead && isEnemy(v) && !isEnemy(source)) for (const a of state.allies) if (!a.dead) fireAbilities(state, rng, events, a, 'allyKill', { target: v, depth: ctx.depth + 1 });
   }
   return r.hpLoss;

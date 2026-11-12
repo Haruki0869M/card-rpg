@@ -5,6 +5,9 @@ import type { CardDef, Lineage } from '../../types';
 
 /** 消した札 → 残した札。古い保存データの読み替えに使う（置き換えずに消した5枚も、同じ組の残した札にする） */
 export const MERGED_CARDS: Record<string, string> = {
+  // 区切りFの「ブロックを得るだけ」の2枚は無くした（同じ役の「備え」に読み替える）
+  bwBigShield: 'cmPrepare',
+  ptBuddyGuard: 'cmPrepare',
   machineShot: 'lnGiQuick',
   lnBuStack: 'lnGiQuick',
   quickThrust: 'lnGiQuick',
@@ -95,7 +98,7 @@ export const MERGED_CARDS: Record<string, string> = {
 /** 残した札に足す物: 消した札が置かれていた武器種・系統・共通と、どこに置いても合う名前 */
 export const MERGED_PLACEMENT: Record<string, { name?: string; weaponTypes?: string[]; lineages?: Lineage[]; common?: true }> = {
   lnGiQuick: { weaponTypes: ['scythe', 'sword', 'spear', 'hammer', 'axe', 'katana'], lineages: ['bu'] },
-  lnBuFlurry: { weaponTypes: ['bow', 'dagger', 'spear', 'sword', 'katana', 'fist', 'gun'], lineages: ['gi'] },
+  lnBuFlurry: { name: '二連撃', weaponTypes: ['bow', 'dagger', 'spear', 'sword', 'katana', 'fist', 'gun'], lineages: ['gi'] },
   lnGiFeint: { weaponTypes: ['fist'], lineages: ['bu'] },
   wtSpearPierce: { name: '鎧通し', weaponTypes: ['hammer', 'katana'], lineages: ['gi'] },
   cmPrepare: { weaponTypes: ['hammer', 'spear', 'axe'], lineages: ['bu', 'sei', 'gi', 'ma'] },
@@ -120,7 +123,7 @@ export const MERGED_PLACEMENT: Record<string, { name?: string; weaponTypes?: str
   hundredKicks: { weaponTypes: ['fist'] },
   guardBreak: { weaponTypes: ['whip'] },
   bladeFire: { name: '炎の術', weaponTypes: ['tome'] },
-  sageMeditation: { weaponTypes: ['bow'] },
+  sageMeditation: { name: '静かな集中', weaponTypes: ['bow'] },
   hawkFocus: { name: '気合の集中' },
   wtHammerSkull: { name: '痺れ打ち', weaponTypes: ['whip'] },
   wtAxeWhirl: { name: '一掃', weaponTypes: ['bow'] },

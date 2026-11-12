@@ -1,6 +1,6 @@
 // K1 スキルカード: 武器種カード・系統カード・異端カードの候補と決まり
 import { describe, expect, it } from 'vitest';
-import { CARDS, cardLineages, cardWeaponTypes } from '../../data/cards';
+import { CARDS, EPIC_WITHOUT_TRAIT, cardLineages, cardWeaponTypes } from '../../data/cards';
 import { CLASSES, getClass } from '../../data/classes';
 import { createGame, heroCardPool } from '../index';
 import { jobWeapons } from '../game/hero';
@@ -41,7 +41,7 @@ describe('K1 武器種・系統・異端のカード', () => {
       if (c.heresy) expect(c.weaponType ?? c.lineage ?? c.common, `${c.id}: 異端に武器種・系統・共通は付けない`).toBeUndefined();
       if (c.weaponType || c.lineage || c.heresy || c.common) {
         // エピック以上は特殊能力が必須
-        if (['epic', 'legend'].includes(c.rarity ?? 'common')) expect(c.trait, c.id).toBeDefined();
+        if (['epic', 'legend'].includes(c.rarity ?? 'common') && !EPIC_WITHOUT_TRAIT.includes(c.id)) expect(c.trait, c.id).toBeDefined();
         expect(c.tiers[0].minSuccesses, c.id).toBe(0);
       }
     }

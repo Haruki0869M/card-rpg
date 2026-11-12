@@ -6,7 +6,6 @@ const b = (amount: number, to: 'self' | 'allies' = 'self'): Effect => ({ kind: '
 const h = (amount: number, to: 'self' | 'allies' | 'lowestAlly' | 'target' | 'allyTarget' = 'lowestAlly'): Effect => ({ kind: 'heal', amount, to });
 const s = (status: string, amount: number, to: 'target' | 'self' | 'foes' | 'allies' = 'target'): Effect => ({ kind: 'applyStatus', status, amount, to });
 const f = (amount: number): Effect => ({ kind: 'gainFocus', amount });
-const m = (amount: number): Effect => ({ kind: 'gainMana', amount });
 const draw = (amount: number): Effect => ({ kind: 'draw', amount });
 const summon = (id: string, name: string, icon: string, damage: number, turns: number, element?: string): Effect => ({ kind: 'summon', id, name, icon, damage, turns, element });
 const pierce: AbilityDef = { name: '貫通', effect: { modifier: 'ignoreBlock' } };
@@ -17,7 +16,7 @@ function c(id: string, name: string, category: CardCategory, cost: number, targe
 export const TOP_JOB_CARDS: CardDef[] = [
   // 剣聖: 斬撃・備え・完全成功。
   c('saintSlash', '天衣の一太刀', 'physical', 1, 'enemy', [[d(3)], [d(6)], [d(9), b(3)]], { stat: 'dex' }),
-  c('heavenBlade', '天剣', 'physical', 2, 'enemy', [[d(6)], [d(12)], [d(18)]], { rarity: 'epic', trait: pierce }),
+  c('heavenBlade', '天剣', 'physical', 2, 'enemy', [[d(6)], [d(12)], [d(18)]], { rarity: 'epic', trait: { name: '天剣', effect: { when: 'perfect', do: [{ kind: 'extraOnce', key: 'repeatPhysical', label: '《二の太刀》' }] } } }), // 憲章5: 《二の太刀》を1ターンに2回出すための札
   c('swordSanctuary', '剣の結界', 'skill', 1, 'self', [[b(4)], [b(7)], [b(10), f(1)]], { stat: 'per' }),
   c('calmBlade', '静の構え', 'skill', 0, 'self', [[b(2)], [b(3), draw(1)]], { stat: 'per' }),
   c('saintFinale', '無双天舞', 'physical', 3, 'enemy', [[d(8)], [d(16)], [d(24)], [d(34)]], { rarity: 'epic', trait: sharpenTrait('saintFinale'), tags: ['heavy'] }),
@@ -25,7 +24,7 @@ export const TOP_JOB_CARDS: CardDef[] = [
   c('kingCleaver', '覇王断', 'physical', 2, 'enemy', [[d(6)], [d(12)], [d(19), s('vulnerable', 1)]]),
   c('domination', '制圧の斧', 'physical', 2, 'allEnemies', [[d(3)], [d(6)], [d(10), s('weak', 1, 'foes')]], { rarity: 'epic', trait: pierce }),
   c('conquerorRoar', '覇王の号令', 'skill', 1, 'self', [[b(3, 'allies')], [b(4, 'allies')], [b(5, 'allies'), f(1)]]),
-  c('worldBreaker', '天下割り', 'physical', 3, 'allEnemies', [[d(5)], [d(9)], [d(14)], [d(20)]], { rarity: 'epic', trait: { name: '覇道', effect: { when: 'kill', do: [m(1)] } } }),
+  c('worldBreaker', '天下割り', 'physical', 3, 'allEnemies', [[d(5)], [d(9)], [d(14)], [d(20)]], { rarity: 'epic', trait: { name: '覇道', effect: { when: 'kill', do: [{ kind: 'triggerAbility', name: '覇気' }] } } }), // 憲章5: このカードで倒すと《覇気》がもう1段上がる（合わせて2段）
   // 拳王: 多段・反撃の備え・手数。
   c('hundredFists', '百拳連打', 'physical', 2, 'enemy', [[d(2, undefined, 3)], [d(3, undefined, 4)], [d(4, undefined, 5)]], { tags: ['combo'] }),
   c('kingCounter', '拳王の受け', 'physical', 1, 'enemy', [[b(3)], [d(4), b(4)], [d(6), b(6)]]),
@@ -53,7 +52,7 @@ export const TOP_JOB_CARDS: CardDef[] = [
   c('holyOath', '王の誓約', 'skill', 0, 'self', [[b(2)], [b(3), s('holyLight', 1, 'self')]], { stat: 'vit' }),
   c('royalJudgment', '光の王裁', 'physical', 3, 'allEnemies', [[d(5, 'holy')], [d(9, 'holy')], [d(14, 'holy')], [d(19, 'holy')]], { rarity: 'epic', trait: pierce, stat: 'vit' }),
   // 竜騎士: 跳躍は転職時に加わる決め技。
-  c('dragonDive', '竜牙突き', 'physical', 2, 'enemy', [[d(6)], [d(12)], [d(19)]], { rarity: 'epic', trait: pierce }),
+  c('dragonDive', '竜牙突き', 'physical', 2, 'enemy', [[d(6)], [d(12)], [d(19)]], { rarity: 'epic', trait: { name: '竜の息', effect: { when: 'perfect', do: [{ kind: 'triggerAbility', name: '竜のブレス' }] } } }), // 憲章5: 《竜のブレス》を自分の番の中で撃つ札
   c('dragonScale', '竜鱗の守り', 'skill', 1, 'self', [[b(4)], [b(7)], [b(10), s('regen', 1, 'self')]], { stat: 'vit' }),
   c('dragonSweep', '飛竜旋風', 'physical', 2, 'allEnemies', [[d(4)], [d(7)], [d(10), s('weak', 1, 'foes')]], { rarity: 'epic', trait: sharpenTrait('dragonSweep') }),
   c('jump', '跳躍', 'physical', 2, 'enemy', [[{ kind: 'jump', amount: 24 }], [{ kind: 'jump', amount: 32 }], [{ kind: 'jump', amount: 40 }]], { rarity: 'legend', exhaust: true, trait: { name: '空からの一撃', description: '1戦闘1回。次の敵フェーズの攻撃を避け、次のターンに着地して攻撃する', effect: { modifier: 'exhaust' } } }),
@@ -64,7 +63,7 @@ export const TOP_JOB_CARDS: CardDef[] = [
   c('papalPrayer', '慈愛の祈り', 'magic', 1, 'ally', [[h(3, 'target')], [h(6, 'target')], [h(9, 'target'), { kind: 'cleanse', to: 'target' }]], { stat: 'per' }),
   c('miracle', '奇跡', 'magic', 0, 'self', [[{ kind: 'fullRestore' }], [{ kind: 'fullRestore' }]], { rarity: 'legend', exhaust: true, trait: { name: 'ただ一度の奇跡', description: '1戦闘1回。成功数にかかわらず味方全員を全回復する', effect: { modifier: 'exhaust' } }, stat: 'per' }),
   // 弓聖: フォーカスを使った単体攻撃が必中。
-  c('skyPiercer', '天を貫く矢', 'physical', 3, 'enemy', [[d(8)], [d(16)], [d(24)], [d(34)]], { rarity: 'epic', trait: pierce, stat: 'per' }),
+  c('skyPiercer', '天を貫く矢', 'physical', 3, 'enemy', [[d(8)], [d(16)], [d(24)], [d(34)]], { rarity: 'epic', trait: { name: '還る矢', effect: { when: 'perfect', if: [{ kind: 'usedFocus' }], do: [{ kind: 'gainFocus', amount: 1 }] } }, stat: 'per' }), // 憲章5: 《必中》の元手（フォーカス）を返す札
   c('hawkFocus', '鷹の集中', 'skill', 0, 'self', [[f(1)], [f(1), b(2)]], { stat: 'per' }),
   c('heavenRain', '天穹の矢雨', 'physical', 3, 'allEnemies', [[d(5)], [d(9)], [d(14)], [d(19)]], { rarity: 'epic', trait: sharpenTrait('heavenRain'), stat: 'dex' }),
   // ビーストマスター: 群れと支え合う。

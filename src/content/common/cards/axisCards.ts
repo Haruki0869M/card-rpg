@@ -24,11 +24,11 @@ function c(id: string, name: string, category: CardCategory, cost: number, baseC
 /** 自分の今のブロックの pct% のダメージ（最大 max） */
 const slam = (pct: number, max: number, gain?: number, to?: 'target'): Effect => ({ kind: 'blockDamage', pct, max, ...(gain ? { gain } : {}), ...(to ? { to } : {}) });
 /** この敵の番が終わるまで、攻撃を受けるたび（防いだ時も）攻撃者に n ダメージ */
-const spikes = (name: string, n: number, perTurn?: number, to?: 'allies'): Effect => ({
+const spikes = (name: string, n: number, perTurn?: number, to?: 'allies', team?: string): Effect => ({
   kind: 'grantAbility', turns: 0, ...(to ? { to } : {}),
   abilities: [
-    { name, effect: { when: 'hurt', do: [{ kind: 'retaliate', amount: n, ...(perTurn ? { perTurn } : {}) }] } },
-    { name, effect: { when: 'blocked', do: [{ kind: 'retaliate', amount: n, ...(perTurn ? { perTurn } : {}) }] } },
+    { name, effect: { when: 'hurt', do: [{ kind: 'retaliate', amount: n, ...(perTurn ? { perTurn } : {}), ...(team ? { team } : {}) }] } },
+    { name, effect: { when: 'blocked', do: [{ kind: 'retaliate', amount: n, ...(perTurn ? { perTurn } : {}), ...(team ? { team } : {}) }] } },
   ],
 });
 /** 不落の城塞: このターンの終わりにブロックが消えず、次のターンへ持ち越す（上限は BALANCE.keepBlockFortify） */
@@ -60,8 +60,8 @@ export const AXIS_CARDS: CardDef[] = [
   c('axParry', 'パリィ・カウンター', 'physical', 1, 80, 'enemy', [[b(6)], [b(10)]], { rarity: 'epic', tags: ['block'], weaponTypes: ['katana', 'sword'], trait: t('後の先', { when: 'afterCard', do: [{ kind: 'intentDamage', max: 25 }] }) }),
   c('axReturnStroke', '返しの一手', 'physical', 1, 75, 'enemy', [[d(3), b(3)], [d(5), b(4)], [d(8), b(5)]], { rarity: 'rare', weaponTypes: ['spear', 'sword'], trait: t('返し', { modifier: 'damageDealt', multiplier: 1.5, if: [{ kind: 'counterAtLeast', key: 'unhurtTurn', n: 1, label: '前の敵の番にHPが減らなかった時' }] }) }),
   c('axBlockBreaker', 'ブロック砕き', 'physical', 1, 70, 'enemy', [[{ kind: 'breakBlock', amount: 4, stealPct: 50 }, d(4)], [{ kind: 'breakBlock', amount: 6, stealPct: 50 }, d(7)], [{ kind: 'breakBlock', amount: 8, stealPct: 50 }, d(10)]], { rarity: 'rare', weaponTypes: ['axe'] }),
-  c('axIronMarch', '鉄壁の進軍', 'physical', 2, 70, 'allEnemies', [[slam(30, 24, undefined, 'target')], [slam(50, 24, undefined, 'target')], [slam(70, 24, undefined, 'target')]], { rarity: 'epic', stat: 'vit', tags: ['block', 'aoe'], trait: t('鉄壁', { when: 'perfect', do: [b(5)] }) }),
-  c('axThornVow', '茨の誓い', 'skill', 1, 75, 'self', [[ba(3)], [ba(5)], [ba(7)]], { rarity: 'epic', tags: ['block'], lineages: ['sei'], trait: t('茨の誓い', { when: 'afterCard', do: [spikes('茨の誓い', 4, 1, 'allies')] }) }),
+  c('axIronMarch', '鉄壁の進軍', 'physical', 2, 70, 'allEnemies', [[slam(30, 24, undefined, 'target')], [slam(50, 24, undefined, 'target')], [slam(70, 24, undefined, 'target')]], { rarity: 'epic', stat: 'vit', tags: ['block', 'aoe'] }),
+  c('axThornVow', '茨の誓い', 'skill', 1, 75, 'self', [[ba(3), spikes('茨の誓い', 3, 4, 'allies', 'thornVow')], [ba(5), spikes('茨の誓い', 4, 4, 'allies', 'thornVow')], [ba(7), spikes('茨の誓い', 5, 4, 'allies', 'thornVow')]], { rarity: 'epic', tags: ['block'], lineages: ['sei'] }),
   c('axSteadfastFist', '不動の拳', 'skill', 1, 80, 'self', [[b(4), ...STEADFAST], [b(6), ...STEADFAST], [b(8), ...STEADFAST]], { rarity: 'rare', stat: 'vit', tags: ['block'], weaponTypes: ['fist'] }),
 
   // ===== 軸② BREAK・弱点 =====
@@ -86,13 +86,13 @@ export const AXIS_CARDS: CardDef[] = [
   c('axIceShatter', '氷砕き', 'physical', 1, 75, 'enemy', [[d(5), SHATTER], [d(9), SHATTER], [d(14), SHATTER]], { rarity: 'rare', tags: ['freeze'], weaponTypes: ['hammer', 'axe', 'fist'], trait: t('氷塊粉砕', { modifier: 'damageDealt', multiplier: 2.5, if: [{ kind: 'targetHasStatus', status: 'freeze' }] }) }),
   c('axCurseReturn', '呪詛返しの契り', 'magic', 1, 75, 'allEnemies', [[{ kind: 'cleanseBurst', per: 6, element: 'dark' }], [{ kind: 'cleanseBurst', per: 9, element: 'dark' }], [{ kind: 'cleanseBurst', per: 12, element: 'dark' }]], { rarity: 'epic', tags: ['curse', 'aoe'], trait: t('呪詛返し', { when: 'afterCard', do: [{ kind: 'applyStatus', status: 'curse', amount: 3, to: 'foes' }] }) }),
   c('axCurseHarvest', '呪いの刈り入れ', 'physical', 1, 75, 'enemy', [[el('dark', 4), HARVEST], [el('dark', 7), HARVEST], [el('dark', 10), HARVEST]], { rarity: 'rare', tags: ['curse'], weaponTypes: ['scythe'] }),
-  c('axCollapse', '総崩れ', 'physical', 2, 65, 'enemy', [[collapse(5)], [collapse(9)], [collapse(13)], [collapse(18)]], { rarity: 'epic', lineages: ['gi'], trait: t('総崩れ', { when: 'perfect', do: [st('weak', 1)] }) }),
+  c('axCollapse', '総崩れ', 'physical', 2, 65, 'enemy', [[collapse(5)], [collapse(9)], [collapse(13)], [collapse(18)]], { rarity: 'epic', lineages: ['gi'] }),
 
   // ===== 軸⑤ オーバーヒール・聖光 =====
   c('axOverflowBlessing', '溢れる祝福', 'magic', 1, 80, 'ally', [[{ kind: 'overflowHeal', amount: 5, per: 5 }], [{ kind: 'overflowHeal', amount: 8, per: 5 }], [{ kind: 'overflowHeal', amount: 12, per: 5 }]], { rarity: 'rare', tags: ['heal'] }),
   c('axSeraphim', '聖光解放・セラフィム', 'magic', 2, 70, 'allEnemies', [[{ kind: 'seraphim', amount: 5, per: 35, heal: 0 }], [{ kind: 'seraphim', amount: 9, per: 35, heal: 0 }], [{ kind: 'seraphim', amount: 14, per: 35, heal: 0 }]], { rarity: 'epic', tags: ['aoe'], trait: t('聖光爆発', { when: 'afterCard', do: [{ kind: 'heal', amount: 3, to: 'allies' }] }) }),
-  c('axReversalSeal', '反転の呪印', 'magic', 1, 75, 'enemy', [[{ kind: 'reversal', pct: 100, max: 45 }], [{ kind: 'reversal', pct: 130, max: 45 }], [{ kind: 'reversal', pct: 160, max: 45 }]], { rarity: 'epic', tags: ['heal'], trait: t('反転', { when: 'perfect', do: [{ kind: 'holyGain', amount: 1 }] }) }),
-  c('axLightHoard', '光の蓄え', 'skill', 1, 80, 'self', [[{ kind: 'holdLight' }], [{ kind: 'holdLight' }, { kind: 'holyGain', amount: 1 }]], { rarity: 'epic', trait: t('蓄光', { when: 'afterCard', do: [{ kind: 'holyGain', amount: 1 }] }) }),
+  c('axReversalSeal', '反転の呪印', 'magic', 1, 75, 'enemy', [[{ kind: 'reversal', pct: 100, max: 45 }], [{ kind: 'reversal', pct: 130, max: 45 }], [{ kind: 'reversal', pct: 160, max: 45 }]], { rarity: 'epic', tags: ['heal'] }),
+  c('axLightHoard', '光の蓄え', 'skill', 1, 80, 'self', [[{ kind: 'holdLight' }], [{ kind: 'holdLight' }, { kind: 'holyGain', amount: 1 }]], { rarity: 'epic' }),
 
   // ===== 軸⑥ 0コスト回転・お供号令 =====
   c('axQuickDraw', 'クイックドロー', 'physical', 0, 80, 'enemy', [[d(2)], [d(4), draw(1)]], { rarity: 'rare', weaponTypes: ['gun', 'dagger', 'fist'], trait: t('早撃ち', { when: 'afterCard', if: [{ kind: 'playedThisTurn', atLeast: 3 }, { kind: 'oncePerTurn', key: 'axQuickDraw' }], do: [mana(1)] }) }),

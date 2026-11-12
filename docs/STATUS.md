@@ -9,6 +9,19 @@
 
 
 
+## 憲章5の続き: 区切りFの5枚・専用カード3枚・区切りDの残り・必殺技6枚（2026-11-12・まとめ役 Claude）
+
+オーナーの返事「1 A 2 A 3A 4A 5A 6A」を受けて。くわしくは docs/tasks/charter5-card-merge-plan.md の §9。
+
+- **区切りF**: 見切り（counterCap の times。《後の先》の回数+1）・盾ごと突進（taunt を足す）・竜脈の鱗盾（blockByFoeKinds の per 2・最大8）。大盾構え・相棒の守りは無くした（MERGED_CARDS で「備え」に読み替え）。カードは 437 → 435枚。
+- **転職の専用カード3枚**: jobs.ts の signatureCards が、jobOnlyCard（そのジョブにしか無い札）を先に並べる。データの signature の項目は、並びの元として残している。
+- **名前**: 連続突き → 二連撃、叡智の瞑想 → 静かな集中（merged.ts の MERGED_PLACEMENT）。
+- **区切りDの残り5枚を元の文に**: 茨の誓い（retaliate の team で、味方みんなで1ターン4回）・鉄壁の進軍・総崩れ・反転の呪印・光の蓄え。能力の帯の無いエピックの例外は data/cards の EPIC_WITHOUT_TRAIT（spec §13.1 に書いた）。
+- **ラグナロク・ブレード**: 効果 usedElementStatuses（counters の elTurn:<属性> を見る）。
+- **必殺技6枚**: 天剣（extraOnce ＋ oncePerTurn の印）・竜牙突きと天下割り（triggerAbility）・奥義月下断（completeSlots ＋ 条件 chargeAtLeast）・天を貫く矢・竜牙（cardCost。カード自身の能力でコストと全枠成功を変えられるように、cardCostOf・completeSlotsOf がカードの能力も見る）。
+- **不具合の直し**: カードの能力の「敵を倒した時」（kill）が一度も働いていなかった（effects/index.ts の dealDamage が、使っているカードの能力を動かしていなかった）。
+- 公開・push はしていない。
+
 ## 憲章5: 数字だけ違うカードをまとめた・区切りDの札を元の文に戻した（2026-11-12・まとめ役 Claude）
 
 オーナーの返事「1 A 2A 3B 4A 5F」を受けて。くわしい表と、表と違う所は docs/tasks/charter5-card-merge-plan.md の §7。

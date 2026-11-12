@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../data/balance';
-import { CARDS, getCard } from '../../data/cards';
+import { CARDS, EPIC_WITHOUT_TRAIT, getCard } from '../../data/cards';
 import { ITEMS } from '../../data/items';
 import { applyCommand, cardRewardOdds, chestOdds, createBattle, createGame, createRng, rollCardOffers, rollGrade, tierDamageAgainst, toPartyMember } from '../index';
 import { END, giveHand, play, setup } from './helpers';
@@ -67,7 +67,9 @@ describe('カード報酬のレア度（spec §13）', () => {
 describe('エピック以上の特殊能力（spec §12.7・§13.1）', () => {
   it('エピック以上の装備・カードは必ず特殊能力を持つ', () => {
     for (const i of ITEMS.all) if (i.slot !== 'consumable' && (i.rarity === 'epic' || i.rarity === 'legend')) expect(i.ability, i.id).toBeDefined();
-    for (const c of CARDS.all) if (c.rarity === 'epic' || c.rarity === 'legend') expect(c.trait, c.id).toBeDefined();
+    // 例外: 区切りDの5枚（オーナーの決定 2026-11-12。元の文に能力が無い）
+    for (const c of CARDS.all) if ((c.rarity === 'epic' || c.rarity === 'legend') && !EPIC_WITHOUT_TRAIT.includes(c.id)) expect(c.trait, c.id).toBeDefined();
+    for (const id of EPIC_WITHOUT_TRAIT) expect(CARDS.get(id).trait, id).toBeUndefined();
   });
   it('装備の能力は戦闘に引き継がれる（ターン開始時のブロック）', () => {
     const g = createGame({ seed: 1, scenarioId: 'corruptionKing', difficulty: 'normal', party: [{ classId: 'warrior', gender: 'male', name: 'a', playerId: 'P1' }] });

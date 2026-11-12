@@ -17,7 +17,7 @@ export const bulwark: ClassDef = {
   exploreAbility: { id: 'bulwarkExplore', name: '重装の歩み', description: '障害物を壊す判定+15%', effect: { kind: 'checkBonus', check: 'obstacle', bonus: 15 } },
   requires: { feat: 'blockTurns25', count: 3, text: '1ターンのうちにブロックを25以上にする（3回）' },
   names: { male: ['ガルド', 'ボルグ', 'ハンス', 'ロック'], female: ['ブリュン', 'イルゼ', 'マルタ', 'ゲルダ'] },
-  cardPool: ['bwBigShield', 'bwShieldCharge', 'bwIronOath', 'axShieldSlam', 'axFortress', 'axIronMarch', 'axReturnStroke'],
-  signature: ['bwBigShield', 'bwShieldCharge', 'bwIronOath'],
+  cardPool: ['bwShieldCharge', 'bwIronOath', 'axShieldSlam', 'axFortress', 'axIronMarch', 'axReturnStroke'],
+  signature: ['bwShieldCharge', 'bwIronOath', 'axShieldSlam'],
   jobCards: ['fxFortressBreaker'],
 };

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { signatureCards } from '../game/jobs';
 import { BALANCE } from '../../data/balance';
 import { getCard } from '../../data/cards';
 import { CLASSES } from '../../data/classes';
@@ -59,8 +60,8 @@ describe('後半5職のデータ・転職', () => {
     expect(jobOptions(h, g).find(o => o.job.id === id)?.ready).toBe(true);
     const before = h.deck.length;
     const changed = applyGameCommand(g, { type: 'CHANGE_JOB', playerId: 'P1', heroId: h.id, jobId: id }); expect(changed.error).toBeUndefined(); g = changed.state;
-    expect(g.heroes[0].jobPick).toEqual(j.signature);
-    const picked = applyGameCommand(g, { type: 'PICK_JOB_CARD', playerId: 'P1', heroId: h.id, cardId: j.signature![0] }); expect(picked.error).toBeUndefined();
+    expect(g.heroes[0].jobPick).toEqual(signatureCards(j)); // そのジョブにしか無い札を先に（オーナーの決定 2026-11-12）
+    const picked = applyGameCommand(g, { type: 'PICK_JOB_CARD', playerId: 'P1', heroId: h.id, cardId: signatureCards(j)[0] }); expect(picked.error).toBeUndefined();
     expect(picked.state.heroes[0].deck.length).toBe(before + 1 + (j.jobCards?.length ?? 0));
     expect(picked.state.heroes[0].jobPick).toBeUndefined();
   });

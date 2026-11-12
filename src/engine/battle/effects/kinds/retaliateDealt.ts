@@ -24,7 +24,9 @@ export const effect: EffectHandler<'retaliateDealt'> = {
     if (!mirror) {
       const k = e.key ?? 'gonosen';
       if (cs[`${k}Turn`] !== ctx.state.turn) { cs[`${k}Turn`] = ctx.state.turn; cs[`${k}Count`] = 0; }
-      if ((cs[`${k}Count`] ?? 0) >= e.perTurn) return false;
+      // 見切り: 回数の上限を足す
+      const times = e.perTurn + abilitiesOf(me).reduce((n, a) => n + ('modifier' in a.effect && a.effect.modifier === 'counterCap' ? a.effect.times ?? 0 : 0), 0);
+      if ((cs[`${k}Count`] ?? 0) >= times) return false;
       cs[`${k}Count`] = (cs[`${k}Count`] ?? 0) + 1;
     }
     // 受けの型: 1回の上限を足す
