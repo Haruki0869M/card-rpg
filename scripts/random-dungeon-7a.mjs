@@ -112,9 +112,11 @@ for (const [width, height] of SIZES) {
     if (k === 0) await page.locator('[data-altar-mode="transmute"]').click();
     await page.screenshot({ path: `${OUT}/${tag}-altar-${k + 1}.png` });
     await check(page, tag, `祭壇 ${k + 1}人目`);
-    // カード（aria-label にカードの名前がある）を1枚選ぶ
+    // カード（aria-label にカードの名前がある）を1枚押す → 下に開く説明の窓のボタンで決める（回2）
     await task.locator('button[aria-label][aria-pressed]').first().click();
-    await page.locator('[data-card-task-go]').click();
+    await page.waitForTimeout(250);
+    if (k === 0) await page.screenshot({ path: `${OUT}/${tag}-altar-detail.png` });
+    await page.locator('[data-card-pick-action]').click();
     await page.waitForTimeout(400);
   }
   const ga = await game(page);

@@ -159,6 +159,8 @@ interface StoreState {
   impactFx: Record<string, ImpactFx>;
   fieldShake: { id: number } | null;
   guardFx: Record<string, { id: number }>;
+  /** 回2: 敵が倒れた演出を始める合図（とどめのコマで出す。見た目だけ。状態・乱数・同期は変えない） */
+  deathFx: Record<string, { id: number }>;
   retargets: Record<string, number>;
   flash: { cardUid: string; text: string; id: number } | null;
   hint: { text: string; id: number } | null;
@@ -424,7 +426,7 @@ export const useBattle = create<StoreState>((set, get) => {
     presentationTimer = null; frames = []; pendingNotices = [];
     for (const timer of uiTimers) clearTimeout(timer);
     uiTimers.clear();
-    set({ presentationBusy: false, phaseBanner: null, cutins: [], petPulses: {}, popups: [], unitFx: {}, rollFx: null, synergyFx: null, callout: null, impactFx: {}, fieldShake: null, guardFx: {} });
+    set({ presentationBusy: false, phaseBanner: null, cutins: [], petPulses: {}, popups: [], unitFx: {}, rollFx: null, synergyFx: null, callout: null, impactFx: {}, fieldShake: null, guardFx: {}, deathFx: {} });
     if (enemyWaiting) { enemyWaiting = false; setTimeout(scheduleEnemy, 0); }
   };
   /** 見ている戦闘の手番が変わっていたら、帯を出す手番を返す（出したことにする） */
@@ -492,6 +494,7 @@ export const useBattle = create<StoreState>((set, get) => {
     if (frame.callout) set({ callout: { ...frame.callout, id: fxId++ } });
     if (frame.impacts?.length) set(s => ({ impactFx: { ...s.impactFx, ...Object.fromEntries(frame.impacts!.map(({ unitId, ...rest }) => [unitId, { ...rest, id: fxId++ }])) } }));
     if (frame.guards?.length) set(s => ({ guardFx: { ...s.guardFx, ...Object.fromEntries(frame.guards!.map(id => [id, { id: fxId++ }])) } }));
+    if (frame.deaths?.length) set(s => ({ deathFx: { ...s.deathFx, ...Object.fromEntries(frame.deaths!.map(id => [id, { id: fxId++ }])) } }));
     if (frame.shake) set({ fieldShake: { id: fxId++ } });
     for (const p of frame.popups ?? []) addPopup(p);
     showNotices(frame.notices ?? []);
@@ -549,6 +552,7 @@ export const useBattle = create<StoreState>((set, get) => {
     impactFx: {},
     fieldShake: null,
     guardFx: {},
+    deathFx: {},
     retargets: {},
     flash: null,
     hint: null,
@@ -696,6 +700,7 @@ export const useBattle = create<StoreState>((set, get) => {
     impactFx: {},
     fieldShake: null,
     guardFx: {},
+    deathFx: {},
     retargets: {},
     flash: null,
     hint: null,

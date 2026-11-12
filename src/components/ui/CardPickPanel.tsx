@@ -24,9 +24,11 @@ export function CardPickPanel({ card, chance, who, action, disabled, note, onAct
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const actionRef = useRef<HTMLDivElement>(null);
   // 開いたら窓が見える所まで送る。窓の外（カード以外）を押したら閉じる
+  // 回2: 窓が見える欄より高い時も、決めるボタンが欄の外に出ないように、ボタン（窓の下の端）が見える所まで送る
   useEffect(() => {
-    ref.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    (actionRef.current ?? ref.current)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [card.id]);
   useEffect(() => {
     const down = (e: PointerEvent) => {
@@ -79,10 +81,12 @@ export function CardPickPanel({ card, chance, who, action, disabled, note, onAct
         )}
         {card.exhaust && <div className="text-zinc-400">使うと、この戦闘の間は山札から除く</div>}
       </div>
-      <button disabled={disabled} onClick={onAction} className="btn btn-gold font-display mt-2 flex h-12 w-full items-center justify-center gap-1 rounded-xl text-[17px] disabled:opacity-40" data-card-pick-action>
-        {action}
-      </button>
-      {note && <div className="mt-1 text-center text-[12px] text-zinc-400">{note}</div>}
+      <div ref={actionRef}>
+        <button disabled={disabled} onClick={onAction} className="btn btn-gold font-display mt-2 flex h-12 w-full items-center justify-center gap-1 rounded-xl text-[17px] disabled:opacity-40" data-card-pick-action>
+          {action}
+        </button>
+        {note && <div className="mt-1 text-center text-[12px] text-zinc-400">{note}</div>}
+      </div>
     </motion.div>
   );
 }

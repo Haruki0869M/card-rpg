@@ -3,7 +3,8 @@
 import { ItemInfoArea } from './ItemDetail';
 import { motion } from 'framer-motion';
 import { Coins, Heart, X } from 'lucide-react';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { CardPickPanel } from './ui/CardPickPanel';
 import { cardOf, getCard } from '../data/cards';
 import { getItem } from '../data/items';
 import { getPet } from '../data/pets';
@@ -154,6 +155,9 @@ function CardTask({ hero, send }: { hero: Hero; send: (c: GameCommand) => void }
   const cards = hero.deck.filter((c) => (!upgrading || !c.upgraded) && (task !== 'altar' || altar !== 'transmute' || !full || altarTransmutePool(full, hero, c.cardId).length > 0));
   const title = task === 'altar' ? '晶石の祭壇' : task === 'upgrade' ? 'カードの強化' : task === 'remove' ? 'カードを外す' : 'カードを捧げる';
   const verb = task === 'altar' ? (altar === 'upgrade' ? '強化する' : '変異させる') : task === 'upgrade' ? '強化する' : task === 'remove' ? '外す' : '捧げる';
+  const closeSel = useCallback(() => setSel(null), []);
+  const pickedInst = cards.find((c) => c.uid === sel);
+  const picked = pickedInst ? (upgrading ? getCard(pickedInst.cardId, true) : cardOf(pickedInst)) : undefined;
   return (
     <Frame title={title} hero={hero}>
       <div className="mt-1 text-center text-[13px] text-zinc-300">{TASK_TEXT[task]}</div>
@@ -169,22 +173,33 @@ function CardTask({ hero, send }: { hero: Hero; send: (c: GameCommand) => void }
           <div className="mt-1 text-center text-[12px] leading-4 text-sky-100/80">{ALTAR_TEXT[altar]}</div>
         </>
       )}
+      {/* 回2: カードを押すと、下に説明の窓が開く（強化の時は＋の後の説明）。決めるのは窓のボタンだけ */}
       <div className="mt-2 grid min-h-0 flex-1 grid-cols-3 content-start gap-1.5 overflow-y-auto pb-2">
-        {cards.map((c) => {
+        {cards.map((c, i) => {
           const card = upgrading && sel === c.uid ? getCard(c.cardId, true) : cardOf(c);
           return (
-            <button key={c.uid} onClick={() => setSel(c.uid)} className="btn" aria-label={card.name} aria-pressed={sel === c.uid}>
+            <button key={c.uid} onClick={() => setSel((x) => (x === c.uid ? null : c.uid))} className="btn" aria-label={card.name} aria-pressed={sel === c.uid} data-pick-card={i}>
               <CardBody card={card} chance={finalChance(card, aff)} width={104} height={150} selected={sel === c.uid} compact />
             </button>
           );
         })}
+        {!picked && <div className="col-span-3 text-center text-[12px] text-zinc-400">カードを押すと、くわしい説明が出ます</div>}
+        {picked && (
+          <div className="col-span-3">
+            <CardPickPanel
+              card={picked}
+              chance={finalChance(picked, aff)}
+              who={`${hero.name}の成功率`}
+              action={verb}
+              onAction={() => send({ type: 'CARD_TASK', playerId: hero.playerId, heroId: hero.id, cardUid: pickedInst!.uid, ...(task === 'altar' ? { altar } : {}) })}
+              onClose={closeSel}
+            />
+          </div>
+        )}
       </div>
-      <div className="grid grid-cols-[1fr_2fr] gap-2 pt-2">
-        <button onClick={() => send({ type: 'CARD_TASK', playerId: hero.playerId, heroId: hero.id })} className="btn btn-dark h-12 rounded-xl text-[15px] font-bold">
+      <div className="pt-2">
+        <button onClick={() => send({ type: 'CARD_TASK', playerId: hero.playerId, heroId: hero.id })} className="btn btn-dark h-12 w-full rounded-xl text-[15px] font-bold">
           やめる
-        </button>
-        <button disabled={!sel} onClick={() => sel && send({ type: 'CARD_TASK', playerId: hero.playerId, heroId: hero.id, cardUid: sel, ...(task === 'altar' ? { altar } : {}) })} className="btn btn-gold font-display h-12 rounded-xl text-[18px] disabled:opacity-40" data-card-task-go>
-          {verb}
         </button>
       </div>
     </Frame>
@@ -196,6 +211,9 @@ function Peddler({ hero, send }: { hero: Hero; send: (c: GameCommand) => void })
   const aff = affinityFromStats(heroStats(hero));
   // 闇商人（段階7a・無法者の隠れ処）: 行商人と同じ画面。名前と、専用の装備の案内だけが違う
   const black = shop.kind === 'blackMarket';
+  const [cardSel, setCardSel] = useState<number | null>(null);
+  const closeCardSel = useCallback(() => setCardSel(null), []);
+  const selCard = cardSel !== null ? shop.cards[cardSel] : undefined;
   return (
     <Frame title={black ? '闇商人' : 'さすらいの行商人'} hero={hero}>
       <div className="mt-1 flex items-center justify-center gap-1 text-[14px] font-bold text-amber-200">
@@ -224,19 +242,43 @@ function Peddler({ hero, send }: { hero: Hero; send: (c: GameCommand) => void })
           );
         })}
         {shop.cards.length > 0 && <div className="mt-1 text-[13px] font-bold text-zinc-300">他の系統のカード</div>}
+        {/* 回2: カード（またはその値段のボタン）を押すと、下に説明の窓が開く。買うのは窓の「〇Gで買う」だけ（町のカード売り場と同じ） */}
         <div className="flex gap-2">
           {shop.cards.map((c, i) => {
             const card = getCard(c.cardId);
+            const on = cardSel === i;
             return (
               <div key={c.cardId} className={`flex flex-col items-center gap-1 ${c.sold ? 'opacity-40' : ''}`}>
-                <CardBody card={card} chance={finalChance(card, aff)} width={110} height={160} />
-                <button disabled={c.sold || hero.gold < c.price} onClick={() => send({ type: 'PEDDLER_BUY', playerId: hero.playerId, heroId: hero.id, kind: 'card', index: i })} className="btn btn-gold h-11 w-full rounded-lg text-[14px] font-bold disabled:opacity-40">
+                <button onClick={() => setCardSel((x) => (x === i ? null : i))} className="btn" aria-label={card.name} aria-pressed={on} data-pick-card={i}>
+                  <CardBody card={card} chance={finalChance(card, aff)} width={110} height={160} selected={on} />
+                </button>
+                <button disabled={c.sold} onClick={() => setCardSel(i)} className="btn btn-gold h-11 w-full rounded-lg text-[14px] font-bold disabled:opacity-40" data-pick-card={i}>
                   {c.sold ? '済' : `${c.price}G`}
                 </button>
               </div>
             );
           })}
         </div>
+        {selCard && cardSel !== null && (
+          <CardPickPanel
+            card={getCard(selCard.cardId)}
+            chance={finalChance(getCard(selCard.cardId), aff)}
+            who={`${hero.name}の成功率`}
+            action={
+              <>
+                <Coins size={18} />
+                {selCard.price}Gで買う
+              </>
+            }
+            disabled={selCard.sold || hero.gold < selCard.price}
+            note={selCard.sold ? '売り切れです' : hero.gold < selCard.price ? 'お金が足りません' : undefined}
+            onAction={() => {
+              send({ type: 'PEDDLER_BUY', playerId: hero.playerId, heroId: hero.id, kind: 'card', index: cardSel });
+              setCardSel(null);
+            }}
+            onClose={closeCardSel}
+          />
+        )}
       </div>
       <button onClick={() => send({ type: 'PEDDLER_BUY', playerId: hero.playerId, heroId: hero.id })} className="btn btn-dark mt-2 flex h-12 items-center justify-center gap-1.5 rounded-xl text-[15px] font-bold">
         <X size={18} /> {black ? '闇商人と別れる' : '行商人と別れる'}

@@ -236,22 +236,34 @@ function PartyRow({ game }: { game: GameState }) {
           </button>
         );
       })}
-      <button
-        onClick={() => openSheet('party', self.id)}
-        aria-label={`${self.name}のステータスを見る`}
-        className="btn ml-auto flex h-11 min-w-0 shrink items-center gap-1 rounded-lg border border-amber-200/40 bg-[#2a2040]/90 px-2 text-amber-100 shadow"
-        data-status-button
-      >
-        <HeroFace hero={self} size={22} />
-        <span className="flex min-w-0 flex-col items-start leading-[15px]">
-          <span className="text-[13px] font-bold whitespace-nowrap">ステータス</span>
-          <span className="max-w-[88px] truncate text-[12px] text-zinc-300">
-            {owners ? `${isOnlinePlay() && isLocalPlayer(self.playerId) ? '自分' : self.playerId}・` : ''}
-            {self.name}
-          </span>
-        </span>
-      </button>
+      <StatusButton game={game} self={self} className="ml-auto" />
     </div>
+  );
+}
+
+/**
+ * 「ステータス」のボタン（自分のキャラのステータス・装備の付け替え・仲間への受け渡しの窓を開く）。
+ * 世界マップの下の列と、町・神殿・祭壇の画面の上（回2）で同じ物を使う。窓はこの端末だけで開く（ほかの人の操作は止めない）
+ */
+export function StatusButton({ game, self, className = '' }: { game: GameState; self: Hero; className?: string }) {
+  const openSheet = useBattle((s) => s.openSheet);
+  const owners = showOwners(game);
+  return (
+    <button
+      onClick={() => openSheet('party', self.id)}
+      aria-label={`${self.name}のステータスを見る`}
+      className={`btn flex h-11 min-w-0 shrink items-center gap-1 rounded-lg border border-amber-200/40 bg-[#2a2040]/90 px-2 text-amber-100 shadow ${className}`}
+      data-status-button
+    >
+      <HeroFace hero={self} size={22} />
+      <span className="flex min-w-0 flex-col items-start leading-[15px]">
+        <span className="text-[13px] font-bold whitespace-nowrap">ステータス</span>
+        <span className="max-w-[88px] truncate text-[12px] text-zinc-300">
+          {owners ? `${isOnlinePlay() && isLocalPlayer(self.playerId) ? '自分' : self.playerId}・` : ''}
+          {self.name}
+        </span>
+      </span>
+    </button>
   );
 }
 

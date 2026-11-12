@@ -2,7 +2,7 @@
 import { Crest } from './game';
 import { motion } from 'framer-motion';
 
-export function ConfirmDialog({ title, text, ok, onOk, onCancel, danger = true }: { title: string; text: string; ok: string; onOk: () => void; onCancel: () => void; danger?: boolean }) {
+export function ConfirmDialog({ title, text, detail, ok, onOk, onCancel, danger = true }: { title: string; text: string; /** 何をするのかの1行（例: 取り除くカードの効果。回2） */ detail?: string; ok: string; onOk: () => void; onCancel: () => void; danger?: boolean }) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -17,6 +17,7 @@ export function ConfirmDialog({ title, text, ok, onOk, onCancel, danger = true }
         <Crest />
         <div className="font-display text-[18px]">{title}</div>
         <div className="mt-1 text-[13px] leading-5 text-zinc-300">{text}</div>
+        {detail && <div className="mt-1 rounded-lg bg-black/35 px-2 py-1 text-[14px] leading-5 font-bold text-amber-200" data-confirm-detail>{detail}</div>}
         <div className="mt-4 flex gap-2">
           <button onClick={onCancel} className="btn btn-dark h-12 flex-1 rounded-lg font-bold">
             やめる

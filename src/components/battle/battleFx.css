@@ -166,6 +166,45 @@
 }
 
 
+/* ----- 回2: 敵が倒れた演出（白く光る → 赤黒く光って砕けて散る → 消える）。破片は決まった向きに飛ぶ（乱数は使わない） ----- */
+.death-burst { position: absolute; pointer-events: none; }
+@keyframes death-ghost {
+  0% { opacity: 1; transform: translate(0, 0) scale(1); }
+  12% { opacity: 1; transform: translate(0, 0) scale(1.04); }
+  22% { opacity: 1; transform: translate(-3px, 0) scale(1.05); }
+  30% { opacity: 1; transform: translate(3px, 0) scale(1.05); }
+  38% { opacity: 0.85; transform: translate(-2px, 0) scale(1.03); }
+  70% { opacity: 0.25; transform: translate(0, 4px) scale(0.95); }
+  100% { opacity: 0; transform: translate(0, 8px) scale(0.9); }
+}
+@keyframes death-ghost-calm { 0%, 30% { opacity: 1; } 100% { opacity: 0; } }
+.death-ghost { position: absolute; inset: 0; transform-origin: 50% 100%; animation: death-ghost var(--d, 0.45s) linear var(--lead, 0s) both; }
+.death-calm .death-ghost { animation-name: death-ghost-calm; }
+@keyframes death-white { 0% { opacity: 0; } 8% { opacity: 1; } 24% { opacity: 0.9; } 42% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes death-white-calm { 0% { opacity: 0; } 15% { opacity: 1; } 45% { opacity: 0.8; } 100% { opacity: 0; } }
+.death-white {
+  position: absolute; inset: -6%; border-radius: 45%;
+  background: radial-gradient(ellipse 50% 50% at 50% 55%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.55) 55%, rgba(255, 255, 255, 0) 78%);
+  animation: death-white var(--d, 0.45s) linear var(--lead, 0s) both;
+}
+.death-calm .death-white { animation-name: death-white-calm; }
+@keyframes death-red { 0%, 18% { opacity: 0; transform: scale(0.9); } 34% { opacity: 0.95; transform: scale(1.05); } 70% { opacity: 0.45; transform: scale(1.12); } 100% { opacity: 0; transform: scale(1.18); } }
+.death-red {
+  position: absolute; inset: -4%; border-radius: 45%;
+  background: radial-gradient(ellipse 50% 50% at 50% 55%, rgba(150, 12, 28, 0.9), rgba(60, 0, 10, 0.75) 50%, rgba(20, 0, 4, 0) 78%);
+  animation: death-red var(--d, 0.45s) linear var(--lead, 0s) both;
+}
+@keyframes death-shard {
+  0%, 28% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--a)) translateY(-4px) rotate(0deg) scale(1); }
+  34% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--a)) translateY(calc(var(--reach, 40px) * -1)) rotate(var(--spin, 180deg)) scale(0.6); }
+}
+.death-shard {
+  position: absolute; left: 50%; top: 55%;
+  background: linear-gradient(135deg, #ffd6c8 0%, #ff4a3a 30%, #9a0c1e 62%, #2a0006 100%);
+  animation: death-shard var(--d, 0.45s) cubic-bezier(0.2, 0.7, 0.3, 1) var(--lead, 0s) both;
+}
+
 /* ----- 段階C: スロット（回る枠・リーチの強い光・フォーカスの確定枠・完全成功の弾ける輪） ----- */
 .slot-reel {
   position: relative; display: block; width: 36px; height: 36px; overflow: hidden; border-radius: 8px;
@@ -205,5 +244,7 @@
   .idle-live, .foot-shadow, .element-aura, .target-ring-spin, .spotlight-beam, .callout-sheen, .fx-spark, .fx-mote, .fx-rise { animation: none; }
   .fx-spark, .fx-mote, .fx-rise { display: none; }
   .slot-reel-strip, .slot-reel-reach, .slot-perfect-burst, .enemy-order-now, .slot-focus-locked { animation: none; }
+  .death-shard, .death-red { display: none; }
+  .death-ghost { animation-name: death-ghost-calm; }
 }
 [data-calm] .idle-live, [data-calm] .foot-shadow, [data-calm] .element-aura, [data-calm] .target-ring-spin, [data-calm] .enemy-order-now, [data-calm] .slot-focus-locked { animation: none; }

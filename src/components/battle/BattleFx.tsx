@@ -3,8 +3,8 @@
 // 高速モードは時間を半分、動きを減らす（OS の設定・ゲームの「簡易」）では火花と揺れを止める（斬撃の線・魔法陣・白い層は出す。段階4）。
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Swords } from 'lucide-react';
-import { memo, useEffect, useState, type CSSProperties } from 'react';
-import { ItemImage } from '../../art';
+import { memo, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { EnemyArt, ItemImage } from '../../art';
 import { TIMING } from '../../data/balance';
 import { getCard } from '../../data/cards';
 import { getElement } from '../../data/elements';
@@ -270,6 +270,102 @@ export function ImpactField({ rects }: { rects: UnitRect[] }) {
       {rects.map((r) => (
         <ImpactLayer key={`i${r.id}`} rect={r} />
       ))}
+    </div>
+  );
+}
+
+// ---------- 敵が倒れた演出（回2） ----------
+
+/** 破片の飛ぶ向き（度）と大きさ（px）。決まった形（乱数は使わない） */
+const SHARDS = [
+  { a: 12, r: 1, s: 14 }, { a: 48, r: 0.8, s: 10 }, { a: 84, r: 1.1, s: 16 }, { a: 118, r: 0.85, s: 11 },
+  { a: 152, r: 1, s: 13 }, { a: 190, r: 0.75, s: 10 }, { a: 226, r: 1.05, s: 15 }, { a: 262, r: 0.9, s: 12 },
+  { a: 298, r: 1, s: 14 }, { a: 334, r: 0.8, s: 10 },
+];
+const SHARDS_BOSS = [...SHARDS, { a: 30, r: 1.25, s: 12 }, { a: 136, r: 1.3, s: 12 }, { a: 208, r: 1.25, s: 13 }, { a: 316, r: 1.3, s: 12 }];
+/** 破片の形（三角・四角の欠け） */
+const SHARD_SHAPES = ['polygon(50% 0, 100% 100%, 0 80%)', 'polygon(0 0, 100% 30%, 60% 100%)', 'polygon(20% 0, 100% 50%, 30% 100%, 0 40%)'];
+
+type DeathItem = { key: number; rect: UnitRect; defId: string; phase?: number; boss: boolean; dur: number; lead: number; calm: boolean };
+
+/**
+ * 敵が倒れた演出: 白く光る → 赤黒く光って砕けて散る（破片・少し揺れる）→ 消える。
+ * とどめのコマ（store の deathFx）で始める（命中の演出の後に見える）。絵の写しをこの層に描くので、
+ * 「仲間を呼ぶ」で倒れた敵の枠が外れても、演出は最後まで続く。
+ * 動きを減らす設定（OS・ゲームの「簡易」）では、白く光って消えるだけ（破片と揺れは出さない）
+ */
+export function DeathField({ rects, enemies, bossLike }: { rects: UnitRect[]; enemies: { uid: string; defId: string; phase?: number }[]; bossLike: (uid: string) => boolean }) {
+  const deathFx = useBattle((s) => s.deathFx);
+  const { k, calm } = useFxPace();
+  const [list, setList] = useState<DeathItem[]>([]);
+  // 出し始める前からあった合図（戦場を出し直した時など）は、もう一度は出さない
+  const seen = useRef<Set<number>>(null as unknown as Set<number>);
+  if (!seen.current) seen.current = new Set(Object.values(useBattle.getState().deathFx).map((x) => x.id));
+  const latest = useRef({ rects, enemies, bossLike, k, calm });
+  latest.current = { rects, enemies, bossLike, k, calm };
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+  useEffect(() => {
+    const add: DeathItem[] = [];
+    const now = latest.current;
+    for (const [uid, fx] of Object.entries(deathFx)) {
+      if (seen.current.has(fx.id)) continue;
+      seen.current.add(fx.id);
+      const rect = now.rects.find((r) => r.id === uid);
+      const e = now.enemies.find((x) => x.uid === uid);
+      if (!rect || !e) continue;
+      const boss = now.bossLike(uid);
+      const dur = (boss ? TIMING.enemyDeathBoss : TIMING.enemyDeath) * now.k;
+      const lead = TIMING.enemyDeathLead * now.k;
+      add.push({ key: fx.id, rect, defId: e.defId, phase: e.phase, boss, dur, lead, calm: now.calm });
+      timers.current.push(setTimeout(() => setList((l) => l.filter((x) => x.key !== fx.id)), (lead + dur + 0.05) * 1000));
+    }
+    if (add.length) setList((l) => [...l, ...add]);
+  }, [deathFx]);
+  if (!list.length) return null;
+  return (
+    <div className="pointer-events-none absolute inset-0 z-[34]" data-death-field>
+      {list.map((d) => (
+        <DeathBurst key={d.key} d={d} />
+      ))}
+    </div>
+  );
+}
+
+function DeathBurst({ d }: { d: DeathItem }) {
+  const { rect, dur, lead, calm, boss } = d;
+  const shards = boss ? SHARDS_BOSS : SHARDS;
+  const reach = Math.max(36, rect.w * (boss ? 0.75 : 0.6));
+  const grow = boss ? 1.4 : 1;
+  return (
+    <div
+      className={`death-burst ${calm ? 'death-calm' : ''}`}
+      style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, ['--d' as string]: `${dur}s`, ['--lead' as string]: `${lead}s` } as CSSProperties}
+      data-death={d.key}
+      data-death-boss={boss || undefined}
+      data-death-calm={calm || undefined}
+    >
+      {/* 絵の写し（揺れて、少しふくらんでから消える） */}
+      <div className="death-ghost">
+        <EnemyArt defId={d.defId} phase={d.phase} className="h-full w-full" />
+      </div>
+      <span className="death-white" />
+      {!calm && <span className="death-red" />}
+      {!calm &&
+        shards.map((s, i) => (
+          <span
+            key={i}
+            className="death-shard"
+            style={{
+              ['--a' as string]: `${s.a}deg`,
+              ['--reach' as string]: `${Math.round(reach * s.r)}px`,
+              ['--spin' as string]: `${(i % 2 ? 1 : -1) * (120 + i * 25)}deg`,
+              width: Math.round(s.s * grow),
+              height: Math.round(s.s * grow),
+              clipPath: SHARD_SHAPES[i % SHARD_SHAPES.length],
+            } as CSSProperties}
+          />
+        ))}
     </div>
   );
 }

@@ -70,7 +70,7 @@ function CardLink({ cardId, count, heroId, sign }: { cardId: string; count: numb
         e.stopPropagation();
         useDetail.getState().open({ type: 'card', cardId, allyId: heroId });
       }}
-      className="btn mr-1 mb-1 inline-flex min-h-10 items-center rounded-lg border border-sky-300/50 bg-sky-950/50 px-2 text-[13px] font-bold text-sky-100"
+      className="btn mr-1 mb-1 inline-flex min-h-11 items-center rounded-lg border border-sky-300/50 bg-sky-950/50 px-2 text-[13px] font-bold text-sky-100"
       data-detail-card={cardId}
     >
       {sign}「{card.name}」×{count}
