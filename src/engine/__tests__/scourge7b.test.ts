@@ -61,7 +61,7 @@ describe('段階7b: 災厄の中ボスのデータ', () => {
     expect(SCOURGES.all.map((d) => d.id)).toEqual(IDS);
     expect(SCOURGES.all.map((d) => Object.keys(d.curse)[0])).toEqual(['shopPrice', 'corruptionPerTurn', 'campHeal', 'nightLevel', 'battleBurn']);
     expect(SCOURGES.get('infernoDemon').curse.battleBurn).toBe(1);
-    expect(SCOURGES.get('infernoDemon').reward).toEqual({});
+    expect(SCOURGES.get('infernoDemon').reward).toEqual({ elixir: 1 });
     expect(SCOURGES.get('greedKing').curse.shopPrice).toBe(25);
     expect(SCOURGES.get('miasmaNecro').curse.corruptionPerTurn).toBe(0.5);
     expect(SCOURGES.get('nightmareBeast').curse.campHeal).toBe(0.5);
@@ -344,7 +344,7 @@ describe('段階7b: 戦い・倒した報酬・逃げても残る', () => {
     expect([story.title, ...story.lines]).toContain('💀 盗賊王を倒した！');
   });
 
-  it('死霊術師は侵食度 −8%（浄化3＋報酬5）・冥獄鎌。魔獣と魔女は秘薬も1つ', () => {
+  it('死霊術師は侵食度 −8%（浄化3＋報酬5）・冥獄鎌。魔獣・魔女・魔人は秘薬も1つ', () => {
     const beat = (id: string) => {
       let g = withScourge(newGame(), id);
       g.world!.corruption = 40;
@@ -357,7 +357,7 @@ describe('段階7b: 戦い・倒した報酬・逃げても残る', () => {
     const n = beat('miasmaNecro');
     expect(n.drop).toBeCloseTo(8);
     expect(n.g.reward!.loot.map((l) => (l.kind === 'item' ? l.item.itemId : ''))).toContain('soulReaperScythe');
-    for (const id of ['nightmareBeast', 'stormWitch']) {
+    for (const id of ['nightmareBeast', 'stormWitch', 'infernoDemon']) {
       const r = beat(id);
       expect(r.drop).toBeCloseTo(3);
       const got = r.g.reward!.loot.map((l) => (l.kind === 'item' ? l.item.itemId : ''));

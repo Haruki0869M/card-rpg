@@ -77,8 +77,8 @@ export const scourges: ScourgeDef[] = [
     curse: { battleBurn: 1 },
     curseShort: '戦闘で火傷1',
     curseText: '戦闘の開始時、味方全員に「火傷」1が付く',
-    // 報酬は一覧の表のとおり専用の装備だけ（ほかの4種類のお金・侵食度・秘薬は計画 §3 の表の物で、業火の魔人の行は計画に無い）。浄化 −3% は共通
-    reward: {},
+    // 報酬は専用の装備と秘薬1つ（悪夢の魔獣・氷嵐の魔女と同じ形。オーナーの決定）。浄化 −3% は共通
+    reward: { elixir: 1 },
     gear: 'infernoCore',
     appearText: '大地の底から業火が噴き出し、熱気がどこまでも広がっていく。',
     clearText: '熱気が引き、戦いの初めに火傷を負わなくなった。',
