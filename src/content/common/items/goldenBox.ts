@@ -110,4 +110,12 @@ export const goldenBoxItems: ItemDef[] = [
     stats: { vit: 4 }, tags: ['block', 'counter'],
     ability: { name: '鏡の反射', effect: { when: 'blocked', do: [{ kind: 'dealtDamage', bossCap: 30, blocked: true, to: 'attacker' }] } },
   },
+  {
+    id: 'echoRing', name: '残響の指輪', slot: 'accessory', rarity: 'epic', icon: 'ring', source: RD,
+    // カードの種類は問わない。大魔導士《詠唱短縮》（魔法だけ・1ターン1回）・一閃《鞘走り》（そのカードの完全成功のたび）とは別々に数える
+    // 能力値は【提案】（一覧に数字が無い。ほかのエピックの装飾品と同じ幅）
+    description: 'カードが完全成功したら、マナ+1。1ターンに1回。',
+    stats: { int: 4 }, tags: ['mana'],
+    ability: { name: '残響', effect: { when: 'perfect', if: [{ kind: 'oncePerTurn', key: 'echoRing' }], do: [{ kind: 'gainMana', amount: 1 }] } },
+  },
 ];
