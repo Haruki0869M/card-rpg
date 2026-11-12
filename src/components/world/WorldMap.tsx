@@ -15,7 +15,8 @@ import type { GameState, TimeOfDay, WorldState } from '../../types';
 import { BASE_DEPTH, corruptionStage, GROUND_K, hash01, hexVerts, LEVEL_STEP, MAX_LEVEL, pts, roadLinks, terrainLevel, tileLevel, TOP_SCALE } from './diorama';
 import { PlaceMini, type MiniKind } from './MapMiniatures';
 import { FogSilhouettes, LandscapeLayer } from './landscape/LandscapeLayer';
-import { riverLinks } from './landscape/scatter';
+import { riverLinks, scatter } from './landscape/scatter';
+import { DepthFront, FRONT_FADE, FRONT_OPACITY, type FrontSpot, type FrontTint } from './DepthFront';
 import { FogSea } from './FogSea';
 import { HeroFace } from '../ui/game';
 import { petSpot, PetToken } from '../ui/PetToken';
@@ -162,9 +163,50 @@ const WaterLayer = memo(function WaterLayer({ tiles, geom, levels }: { tiles: Wo
   );
 });
 
+/** 施設1つ分の絵（立体のミニチュア・描いた絵・仮の印）。施設の層と、駒の手前に重ねる層（奥行き）の両方で使う */
+function featureArt(t: WorldState['tiles'][number], i: number, geom: MapGeom, finaleTiles: ReadonlySet<number>, fallenTowns: string[]) {
+  const { R, center } = geom;
+  const w = { fallenTowns };
+    if (!t.f || !t.seen) return null;
+    const { x, y } = center(i);
+    const f = t.f;
+    const finale = finaleTiles.has(i);
+    const fallen = f.kind === 'town' && w.fallenTowns.includes(f.id);
+    const used = f.used && f.kind !== 'town' && f.kind !== 'dungeon';
+    // 見晴らしの塔（段階6）: 仮のミニチュア。上の面から少し浮かせる
+    if (f.kind === 'tower') return <TowerMini key={`f${i}`} x={x} y={y - R * FACILITY_LIFT} R={R} used={f.used} />;
+    const mini: MiniKind | undefined = finale ? 'finale' : f.kind === 'event' || f.kind === 'temple' || f.kind === 'altar' ? f.kind : undefined;
+    if (mini) {
+      return (
+        <g key={`f${i}`} opacity={used ? 0.45 : 1} data-feature={`${f.kind}:${f.id}`} data-used={used || undefined}>
+          <PlaceMini kind={mini} x={x} y={y - R * FACILITY_LIFT} R={R} />
+        </g>
+      );
+    }
+    const img = placeImage(f);
+    if (img) {
+      // 描いた絵の場所: マスより少し大きく、影をつけて上の面から飛び出させる
+      const big = R * (f.kind === 'town' ? 1.75 : f.kind === 'chest' ? 1.25 : 1.55);
+      return (
+        <g key={`f${i}`} opacity={used ? 0.4 : 1} data-feature={`${f.kind}:${f.id}`} data-used={used || undefined}>
+          <ellipse cx={x} cy={y - R * FACILITY_LIFT + big * 0.33} rx={big * 0.42} ry={big * 0.13} fill="rgba(0,0,0,.55)" />
+          <image href={img} x={x - big / 2} y={y - R * FACILITY_LIFT - big * 0.62} width={big} height={big} filter="url(#place-shadow)" style={fallen ? { filter: 'grayscale(1) brightness(.6)' } : undefined} />
+        </g>
+      );
+    }
+    const Icon = FEATURE_ICON[f.kind] ?? CircleHelp;
+    const sz = R * 0.95;
+    const color = fallen ? '#7a6a7a' : FEATURE_COLOR[f.kind];
+    return (
+      <g key={`f${i}`} opacity={used ? 0.35 : 1} data-feature={`${f.kind}:${f.id}`} data-used={used || undefined}>
+        <circle cx={x} cy={y} r={sz * 0.62} fill="rgba(0,0,0,.55)" />
+        <Icon x={x - sz / 2} y={y - sz / 2} width={sz} height={sz} color={color ?? '#ffd76a'} strokeWidth={2.2} />
+      </g>
+    );
+}
+
 /** 施設の層（立体のミニチュア・描いた絵）。歩いている間は変わらないので、施設の状態が変わった時だけ描き直す */
 const FeatureLayer = memo(function FeatureLayer({ tiles, geom, finaleTiles, fallenTowns }: { tiles: WorldState['tiles']; geom: MapGeom; finaleTiles: ReadonlySet<number>; fallenTowns: string[] }) {
-  const { R, center } = geom;
   const w = { tiles, fallenTowns };
   return (
     <svg width={geom.W} height={geom.H} className="absolute inset-0 block" data-feature-layer>
@@ -174,47 +216,23 @@ const FeatureLayer = memo(function FeatureLayer({ tiles, geom, finaleTiles, fall
         </filter>
       </defs>
       {/* 上の行から順に描く（手前の場所の絵が奥の絵を隠す） */}
-      {w.tiles.map((t, i) => {
-        if (!t.f || !t.seen) return null;
-        const { x, y } = center(i);
-        const f = t.f;
-        const finale = finaleTiles.has(i);
-        const fallen = f.kind === 'town' && w.fallenTowns.includes(f.id);
-        const used = f.used && f.kind !== 'town' && f.kind !== 'dungeon';
-        // 見晴らしの塔（段階6）: 仮のミニチュア。上の面から少し浮かせる
-        if (f.kind === 'tower') return <TowerMini key={`f${i}`} x={x} y={y - R * FACILITY_LIFT} R={R} used={f.used} />;
-        const mini: MiniKind | undefined = finale ? 'finale' : f.kind === 'event' || f.kind === 'temple' || f.kind === 'altar' ? f.kind : undefined;
-        if (mini) {
-          return (
-            <g key={`f${i}`} opacity={used ? 0.45 : 1} data-feature={`${f.kind}:${f.id}`} data-used={used || undefined}>
-              <PlaceMini kind={mini} x={x} y={y - R * FACILITY_LIFT} R={R} />
-            </g>
-          );
-        }
-        const img = placeImage(f);
-        if (img) {
-          // 描いた絵の場所: マスより少し大きく、影をつけて上の面から飛び出させる
-          const big = R * (f.kind === 'town' ? 1.75 : f.kind === 'chest' ? 1.25 : 1.55);
-          return (
-            <g key={`f${i}`} opacity={used ? 0.4 : 1} data-feature={`${f.kind}:${f.id}`} data-used={used || undefined}>
-              <ellipse cx={x} cy={y - R * FACILITY_LIFT + big * 0.33} rx={big * 0.42} ry={big * 0.13} fill="rgba(0,0,0,.55)" />
-              <image href={img} x={x - big / 2} y={y - R * FACILITY_LIFT - big * 0.62} width={big} height={big} filter="url(#place-shadow)" style={fallen ? { filter: 'grayscale(1) brightness(.6)' } : undefined} />
-            </g>
-          );
-        }
-        const Icon = FEATURE_ICON[f.kind] ?? CircleHelp;
-        const sz = R * 0.95;
-        const color = fallen ? '#7a6a7a' : FEATURE_COLOR[f.kind];
-        return (
-          <g key={`f${i}`} opacity={used ? 0.35 : 1} data-feature={`${f.kind}:${f.id}`} data-used={used || undefined}>
-            <circle cx={x} cy={y} r={sz * 0.62} fill="rgba(0,0,0,.55)" />
-            <Icon x={x - sz / 2} y={y - sz / 2} width={sz} height={sz} color={color ?? '#ffd76a'} strokeWidth={2.2} />
-          </g>
-        );
-      })}
+      {w.tiles.map((t, i) => featureArt(t, i, geom, finaleTiles, w.fallenTowns))}
     </svg>
   );
 });
+
+// ---- 奥行き（2.5D）の重なりの順 ----
+// 奥（上の行）の物ほど下に、手前（下の行）の物ほど上に重ねる。1行につき DEPTH_STEP ずつ上げる。
+// 行の中の順: 敵の駒 → 倒れた仲間 → キャラの駒（同じマスの中は左奥から右手前）→ 動いている駒 → その行の駒より手前にある木・施設
+const DEPTH_STEP = 10;
+const depthZ = (row: number, layer: number) => 2 + row * DEPTH_STEP + layer;
+const DEPTH_FRONT = 8;
+/** 時間帯の色を、手前に重ねた木・施設にも掛ける（下の景色に掛かっている色と、ほぼ同じ） */
+const FRONT_TINT: Partial<Record<TimeOfDay, NonNullable<FrontTint>>> = {
+  morning: { color: 'rgb(255,218,160)', alpha: 0.16 },
+  evening: { color: 'rgb(238,115,60)', alpha: 0.32 },
+  night: { color: 'rgb(6,14,58)', alpha: 0.58 },
+};
 
 /** 霧が晴れたマスの数（地形の層を描き直すかどうかの目安） */
 const seenKey = (w: WorldState) => w.tiles.reduce((n, t) => n + (t.seen ? 1 : 0), 0);
@@ -544,13 +562,38 @@ export function WorldMap({
     return byTile;
   }, [shownPos]);
 
+  // ---- 奥行き: 駒より手前にある木・峰・施設を、駒の上にもう一度描く ----
+  const dims = { width: w.width, height: w.height };
+  const sceneItems = useMemo(
+    () => scatter({ w: { width: w.width, height: w.height, tiles }, geom, levels, links, rivers, stage, blocked: (i) => !!tiles[i].f || finaleTiles.has(i) }),
+    // 地形・見えている範囲・大きさが変わった時だけ
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tiles, geom, levels, links, rivers, stage, finaleTiles, w.width, w.height],
+  );
+  const frontSpots = useMemo(() => {
+    const set = new Set<number>();
+    for (const t of heroSpots.keys()) set.add(t);
+    for (const wd of w.wanderers) if (w.tiles[wd.tile]?.seen) set.add(wd.tile);
+    for (const t of Object.values(w.downed ?? {})) set.add(t);
+    // 歩いている間は、通るマスも
+    for (const t of anim?.path ?? []) set.add(t);
+    return [...set].sort((a, b) => a - b).map((tile): FrontSpot & { tile: number } => {
+      const { x, y } = center(tile);
+      const front = w.tiles[tile]?.f && w.tiles[tile].seen ? FACILITY_FRONT * R * GROUND_K : 0;
+      return { key: `t${tile}`, tile, x: x - R * 1.45, y: y - R * 2.1, w: R * 2.9, h: R * 3.1, footY: y + front + R * 0.2, z: depthZ(rowOf(dims, tile), DEPTH_FRONT) };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [heroSpots, w.wanderers, w.downed, anim?.path, center, R, w.tiles]);
+  const frontTint = FRONT_TINT[time];
+
   return (
     <div ref={wrapRef} className="relative min-h-0 flex-1" style={{ touchAction: 'pan-x pan-y' }}>
     <div ref={box} className="absolute inset-0 overflow-auto overscroll-contain bg-[#0b0910]" style={{ touchAction: 'pan-x pan-y' }} data-world-map>
       {/* 地図の外（上下の余白）も雲の海（FogSea が余白まで広げる）。下地は雲の色 */}
       <div style={{ paddingTop: padY, paddingBottom: padBottom, width: W, background: time === 'night' ? '#20233c' : '#53587a' }} data-map-pad>
       {/* 歩いている間は、雲と水の動きを止める（スマホで駒の動きをなめらかにするため） */}
-      <div className="relative" style={{ width: W, height: H }} onClick={(e) => { if (!anim) tap(e); }} data-walking={anim ? '' : undefined}>
+      {/* isolate: 奥行きの重なりの順（大きな zIndex）を、地図の中だけに閉じ込める（下の操作の欄の上に出ないように） */}
+      <div className="relative isolate" style={{ width: W, height: H }} onClick={(e) => { if (!anim) tap(e); }} data-walking={anim ? '' : undefined}>
         <LandscapeLayer w={w} tiles={tiles} geom={geom} levels={levels} links={links} rivers={rivers} under={under} roadTerrain={roadTerrain} noProp={finaleTiles} stage={stage} frozen={pinchZoom !== null} walking={!!anim} />
         <WaterLayer tiles={tiles} geom={geom} levels={levels} />
         <FogSea tiles={tiles} geom={geom} levels={levels} padTop={padY} padBottom={padBottom} miasma={miasma} fresh={freshRef.current} time={time} />
@@ -646,7 +689,7 @@ export function WorldMap({
               className="pointer-events-none absolute"
               data-wanderer={wd.id}
               data-rare={wd.rare ? 'true' : undefined}
-              style={{ left: x - s / 2, top: y - s * 0.72, width: s, height: s, zIndex: 1 }}
+              style={{ left: x - s / 2, top: y - s * 0.72, width: s, height: s, zIndex: depthZ(rowOf(dims, wd.tile), 0) }}
             >
               <EnemyBase color={base} s={s} glow={wd.raidTown ? '#ff3a3a' : wd.rare ? '#ffd24a' : undefined} />
               <span className="enemy-breathe absolute block" style={{ left: s * 0.08, top: -s * 0.02, width: s * 0.84, height: s * 0.84, animationDelay: `${-(hash01(Number(wd.id.replace(/\D/g, '')) || 0, 7) * 3).toFixed(2)}s` }}>
@@ -666,13 +709,41 @@ export function WorldMap({
           const { x, y } = center(tile);
           const s = R * 0.95;
           return (
-            <div key={`down-${id}`} data-downed={id} className="pointer-events-none absolute" style={{ left: x - s / 2 + R * 0.35, top: y - s / 2 + R * 0.3, width: s, height: s, zIndex: 1 }}>
+            <div key={`down-${id}`} data-downed={id} className="pointer-events-none absolute" style={{ left: x - s / 2 + R * 0.35, top: y - s / 2 + R * 0.3, width: s, height: s, zIndex: depthZ(rowOf(dims, tile), 1) }}>
               <HeroFace hero={h} size={s} dim />
               <span className="absolute -right-1 -bottom-1 rounded-full bg-red-900 px-1 text-[12px] leading-4 font-black text-red-100">倒</span>
             </div>
           );
         })}
-        {anim?.arrived && <span data-arrival-marker className="pointer-events-none absolute z-10 rounded-full border-2 border-amber-200 bg-amber-950 px-2 text-[22px] font-black text-amber-100" style={{ left: center(anim.path[anim.i]).x - 13, top: Math.max(4, center(anim.path[anim.i]).y - R * 2.3) }}>！</span>}
+        {anim?.arrived && <span data-arrival-marker className="pointer-events-none absolute rounded-full border-2 border-amber-200 bg-amber-950 px-2 text-[22px] font-black text-amber-100" style={{ left: center(anim.path[anim.i]).x - 13, top: Math.max(4, center(anim.path[anim.i]).y - R * 2.3), zIndex: depthZ(w.height + 1, 0) }}>！</span>}
+        {/* 奥行き: 駒より手前にある木・峰・岩（景色と同じ絵を、駒の上にもう一度描く）。ピンチで大きさを変えている間は出さない */}
+        {pinchZoom === null && <DepthFront spots={frontSpots} items={sceneItems} tint={frontTint} />}
+        {/* 奥行き: 駒より手前にある施設（町・祠・神殿など）。駒のまわりだけ切り取って、駒の上に重ねる */}
+        {pinchZoom === null &&
+          frontSpots.map((sp) => {
+            const arts = w.tiles.flatMap((t, i) => {
+              if (i === sp.tile || !t.f || !t.seen) return [];
+              const c = center(i);
+              // 駒の足元より手前（下）にあって、絵がこの四角に掛かる施設だけ
+              if (c.y <= sp.footY || c.y - R * 2 > sp.y + sp.h || Math.abs(c.x - (sp.x + sp.w / 2)) > sp.w / 2 + R * 1.1) return [];
+              const art = featureArt(t, i, geom, finaleTiles, w.fallenTowns);
+              return art ? [art] : [];
+            });
+            if (!arts.length) return null;
+            return (
+              <svg key={`ff${sp.key}`} className="pointer-events-none absolute block" data-depth-front-place={sp.key} width={sp.w} height={sp.h} viewBox={`${sp.x} ${sp.y} ${sp.w} ${sp.h}`} style={{ left: sp.x, top: sp.y, zIndex: sp.z, opacity: FRONT_OPACITY, ...FRONT_FADE }}>
+                {frontTint && (
+                  <defs>
+                    <filter id={`front-tint-${sp.key}`} x="0" y="0" width="100%" height="100%" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse">
+                      <feFlood floodColor={frontTint.color} floodOpacity={frontTint.alpha} result="tint" />
+                      <feComposite in="tint" in2="SourceGraphic" operator="atop" />
+                    </filter>
+                  </defs>
+                )}
+                <g filter={frontTint ? `url(#front-tint-${sp.key})` : undefined}>{arts}</g>
+              </svg>
+            );
+          })}
         {/* 足あと（移動の演出中） */}
         {anim &&
           anim.path.slice(0, anim.i).map((t, k) => {
@@ -711,7 +782,8 @@ export function WorldMap({
                   top: y - s * 0.62 + (spot.dy + front) * R * GROUND_K,
                   width: s,
                   height: s,
-                  zIndex: 2 + spot.z + (moving ? 10 : 0),
+                  // 奥行き: 手前の行の駒ほど上。同じ行の中は、並びの順（動いている駒は、その行のいちばん手前）
+                  zIndex: depthZ(rowOf(dims, tile), moving ? 7 : 2 + Math.min(4, spot.z)),
                   opacity: w.acted.includes(id) && !active ? 0.75 : 1,
                   // 地図の大きさが決まった直後・変わった直後は動かさずに置く（仮の大きさからすべって見えないように）
                   transition: geomSettling ? 'none' : moving ? `left ${stepMs * 0.8}ms ease-out, top ${stepMs * 0.8}ms ease-out` : 'left .35s ease-out, top .35s ease-out',
