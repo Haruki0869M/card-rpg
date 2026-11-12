@@ -23,6 +23,7 @@ import { objectiveHandler, type QuestSignal } from './objectives';
 import { timeOfDay } from './time';
 import { ensureShop } from './town';
 import { dungeonGateError } from './questGate';
+import { passByNotice, queueStory } from './guide';
 import { moveWanderers, spawnWanderer } from './wanderers';
 import { terrainDiceBonus } from './lanes';
 import { scourgeCurse } from './scourgeCurse';
@@ -405,6 +406,9 @@ function visitRegion(game: GameState, w: WorldState, tile: number) {
   w.visitedRegions.push(r);
   const reg = getScenario(game.scenarioId).map!.regions[r];
   if (reg.intro) w.story = { title: reg.name, lines: [reg.intro] };
+  // 回1: 次の目的の鍵のダンジョンを通り過ぎて、新しい地域に初めて入った時の知らせ（地域の紹介の後に、別の窓で1回だけ）
+  const notice = passByNotice(game, w, r, tile);
+  if (notice) queueStory(w, notice);
 }
 
 export function waitTurn(game: GameState, cmd: Cmd<'WORLD_WAIT'>, rng: Rng): string | undefined {
@@ -749,7 +753,7 @@ export function interact(game: GameState, cmd: Cmd<'WORLD_INTERACT'>, rng: Rng):
       const def = DUNGEONS.get(f.id);
       // ランダムダンジョンは1か所1回（段階7a・オーナーの決定 6-A）。負けて出された時は f.used にならないので、また入れる
       if (def.random && f.used) return 'このダンジョンは踏破済みです（黄金箱はもう開けた）';
-      const gate = dungeonGateError(game, def);
+      const gate = dungeonGateError(game, def, tile);
       if (gate) return gate;
       // 先に入った仲間の組がいれば、新しいダンジョンは作らずに合流する（組が通路にいる時だけ。断る時は何も変えない）
       const join = dungeonJoin(game, tile);
@@ -877,7 +881,9 @@ export function worldInviteAnswer(game: GameState, cmd: Cmd<'WORLD_INVITE_ANSWER
 export function storyContinue(game: GameState): string | undefined {
   const w = game.world;
   if (!w?.story) return '物語はありません';
-  w.story = undefined;
+  // 次の窓が並んでいれば、それを出す（回1: 災厄の知らせ・通り過ぎた時の知らせは、別の窓）
+  w.story = w.storyQueue?.shift();
+  if (!w.storyQueue?.length) delete w.storyQueue;
   return undefined;
 }
 

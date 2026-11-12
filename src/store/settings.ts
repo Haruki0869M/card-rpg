@@ -14,6 +14,8 @@ export interface Settings {
   firstGuide?: boolean;
   /** 世界マップの拡大（1〜2.5倍。この端末だけ。冒険の保存データには入れない） */
   worldZoom: number;
+  /** 見取り図のボタンの最初の案内を出したか（回1。この端末だけ。true なら2回目からは出さない） */
+  overviewHintSeen?: boolean;
 }
 
 export const DEFAULT_SFX_VOLUME = 5;
@@ -36,5 +38,6 @@ export function normalizeSettings(raw: unknown): Settings {
     // 広い地図（段階6a）では1倍より小さくできるので、設定には ZOOM_FLOOR まで残す（地図ごとの下限は地図の画面で掛ける）
     worldZoom: clampZoom(s.worldZoom, ZOOM_FLOOR),
     ...(typeof s.firstGuide === 'boolean' ? { firstGuide: s.firstGuide } : {}),
+    ...(s.overviewHintSeen === true ? { overviewHintSeen: true } : {}),
   };
 }

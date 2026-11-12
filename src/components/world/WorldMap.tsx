@@ -1,12 +1,12 @@
 // ===== 世界マップの地図（六角形のマス。spec §8.1）=====
 // 地形・霧・施設・移動できる範囲は SVG、キャラと敵は上に重ねた画像。タップしたマスを親に知らせる。
-import { Binoculars, Castle, CircleHelp, DoorOpen, Flag, Gift, House, Landmark, LocateFixed, Map as MapIcon, Minus, Plus, Sparkles, TriangleAlert, type LucideIcon } from 'lucide-react';
+import { ArrowRight, Binoculars, Castle, CircleHelp, DoorOpen, Flag, Gift, House, Landmark, LocateFixed, Map as MapIcon, Minus, Plus, Sparkles, TriangleAlert, X, type LucideIcon } from 'lucide-react';
 import { useReducedMotion } from 'framer-motion';
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { artImage, EnemyArt } from '../../art';
 import { DUNGEONS } from '../../data/dungeons';
 import { getTerrain, QUESTS, TERRAINS, TOWNS } from '../../data/world';
-import { colOf, dungeonTheme, objectiveHandler, partySenses, rowOf, timeOfDay } from '../../engine';
+import { colOf, dungeonTheme, objectiveHandler, partySenses, rowOf, signposts, timeOfDay } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
 import { speedFactor, useBattle } from '../../store/battleStore';
 import { TIMING } from '../../data/balance';
@@ -21,9 +21,9 @@ import { FogSea } from './FogSea';
 import { HeroFace } from '../ui/game';
 import { petSpot, PetToken } from '../ui/PetToken';
 import { HeroPiece } from './HeroPiece';
-import { SpawnMarks, TowerMini } from './ExploreMarks';
+import { SignpostMini, SpawnMarks, TowerMini, TowerTop } from './ExploreMarks';
 import { orderOnTile, pieceSpots, PLAYER_COLORS } from './pieceLayout';
-import { cameraTop, mapPadBottom, mapPadY, revealLeft, revealTop, visibleH } from './mapCamera';
+import { cameraTop, edgeArrow, mapPadBottom, mapPadY, revealLeft, revealTop, visibleH } from './mapCamera';
 import { anchorScroll, baseRadius, clampZoom, COMPACT_ZOOM, minZoomFor, stepZoom, ZOOM_MAX, ZOOM_MIN } from './mapZoom';
 import { Overview } from './Overview';
 
@@ -268,8 +268,19 @@ export function WorldMap({
   onTapTile,
   movement,
   bottomInset = 0,
+  goalTile,
+  focusRequest,
+  overviewHint,
+  onOverviewHintClose,
 }: {
   game: GameState;
+  /** 次の目的地のマス（回1。霧の上に印・画面の外なら端に矢印） */
+  goalTile?: number;
+  /** このマスへ地図を動かす（「次の目的」の行・扉が開かない時の「場所を見る」。seq が変わるたびに動かす） */
+  focusRequest?: { tile: number; seq: number };
+  /** 見取り図のボタンの最初の案内（回1。この端末で1回だけ） */
+  overviewHint?: boolean;
+  onOverviewHintClose?: () => void;
   movement?: { heroes: string[]; i: number; path: number[]; arrived: boolean };
   /** 移動できるマス（マス → 必要な移動力） */
   reach?: Map<number, number>;
@@ -323,6 +334,9 @@ export function WorldMap({
   // 見た目だけの川（丘・山のふもとから湖・海・地図の端へ。移動には関係しない）
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const rivers = useMemo(() => riverLinks({ ...w, tiles }, levels), [terrainKey, levels, w.width, w.height]);
+  // 分かれ道の立て札（回1。地図の道のデータだけから決まるので、地形が変わった時だけ求め直す）
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const posts = useMemo(() => signposts(game, { width: w.width, height: w.height, tiles }), [terrainKey, game.scenarioId, w.width, w.height]);
   // 街道のマスの下に敷く地形（その地域で一番多い、高さ1の地形。無ければ平原）
   const under = useMemo(
     () => (scenario.map?.regions ?? []).map((r) => Object.entries(r.terrain).filter(([id]) => id !== roadTerrain && terrainLevel(id) === 1 && TERRAINS.tryGet(id)).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'plains'),
@@ -362,8 +376,8 @@ export function WorldMap({
   const padBottom = mapPadBottom(size.height);
   const inset = Math.round(bottomInset);
   const reduced = useReducedMotion();
-  // 拡大のボタンを縦に並べる高さ（「戻る」のボタン＋見取り図・拡大の4つ＋すき間 ≒ 260px）が、見えている地図に無い時は横に並べる
-  const compactZoom = size.height > 0 && visibleH(size.height, inset) < 275;
+  // 拡大のボタンを縦に並べる高さ（「戻る」のボタン＋見取り図（字つきで少し高い）・拡大の4つ＋すき間 ≒ 258px）が、見えている地図に無い時は横に並べる
+  const compactZoom = size.height > 0 && visibleH(size.height, inset) < 279;
   // 拡大を変える直前のスクロールと、残したい枠の中の点（ピンチの指の間・ボタンなら枠の真ん中）
   const zoomAnchor = useRef<{ left: number; top: number; ax: number; ay: number; padY: number; R: number } | null>(null);
   const lastCam = useRef<{ here?: number; turn: string; w: number; h: number; inset: number } | null>(null);
@@ -509,6 +523,38 @@ export function WorldMap({
     if (top !== undefined || left !== undefined) moveCam(el, left ?? el.scrollLeft, top ?? el.scrollTop, reduced ? 0 : 300);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
+
+  // 回1: 「次の目的」の行などから、そのマスへ地図を動かす（霧の中でも）
+  const focusTo = (tile: number) => {
+    const el = box.current;
+    if (!el) return;
+    const { x, y } = center(tile);
+    moveCam(el, x - el.clientWidth / 2, cameraTop(y, el.clientHeight, inset), reduced ? 0 : 350);
+  };
+  useEffect(() => {
+    if (focusRequest) focusTo(focusRequest.tile);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusRequest?.seq]);
+  // 回1: 地図の端の矢印のために、今のスクロールの位置を覚える（1フレームに1回だけ）
+  const [scroll, setScroll] = useState({ left: 0, top: 0 });
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        setScroll({ left: el.scrollLeft, top: el.scrollTop });
+      });
+    };
+    onScroll();
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      el.removeEventListener('scroll', onScroll);
+    };
+  }, [box]);
 
   // 依頼の目的地
   const questTargets = useMemo(() => {
@@ -692,6 +738,56 @@ export function WorldMap({
           })}
           {/* 時間で消える出現スポット（段階6） */}
           <SpawnMarks w={w} R={R} center={center} />
+          {/* 回1: 霧の上に見える塔の先（まだ見えていないマスの塔だけ。まわりは霧のまま） */}
+          {w.tiles.map((t, i) => {
+            if (t.seen || t.f?.kind !== 'tower') return null;
+            const { x, y } = geom.ground(i);
+            const fy = y - LEVEL_STEP * R;
+            return compact ? (
+              <g key={`tt${i}`} data-tower-top={i} opacity={0.85}>
+                <circle cx={x} cy={fy} r={R * 0.5} fill="rgba(0,0,0,.55)" />
+                <Binoculars x={x - R * 0.4} y={fy - R * 0.4} width={R * 0.8} height={R * 0.8} color={FEATURE_COLOR.tower} strokeWidth={2.2} />
+              </g>
+            ) : (
+              <TowerTop key={`tt${i}`} id={String(i)} x={x} y={fy} R={R} />
+            );
+          })}
+          {/* 回1: 分かれ道の立て札（そのマスが見えている時だけ）。駒と重ならないように、マスの右か左の端に立てる */}
+          {posts.map((p) => {
+            if (!w.tiles[p.tile]?.seen) return null;
+            const { x, y } = center(p.tile);
+            const east = !p.dir.includes('西');
+            return (
+              <g key={`sp${p.tile}`} data-signpost={p.dungeonId} data-tile={p.tile}>
+                {compact ? (
+                  <g>
+                    <circle cx={x + R * 0.45} cy={y - R * 0.2} r={R * 0.32} fill="#d8b070" stroke="#3a2412" strokeWidth={1.2} />
+                    <ArrowRight x={x + R * 0.45 - R * 0.24} y={y - R * 0.2 - R * 0.24} width={R * 0.48} height={R * 0.48} color="#3a2412" strokeWidth={3} transform={east ? undefined : `rotate(180 ${x + R * 0.45} ${y - R * 0.2})`} />
+                  </g>
+                ) : (
+                  <SignpostMini x={x + (east ? R * 0.52 : -R * 0.52)} y={y + R * 0.1} R={R} east={east} />
+                )}
+              </g>
+            );
+          })}
+          {/* 回1: 次の目的地の印（霧の中でも出す）。光る輪と、霧の中ならダンジョンの印 */}
+          {goalTile !== undefined && goalTile >= 0 && w.tiles[goalTile] && (() => {
+            const seen = w.tiles[goalTile].seen;
+            const { x, y } = seen ? center(goalTile) : { x: geom.ground(goalTile).x, y: geom.ground(goalTile).y - LEVEL_STEP * R };
+            const sz = R * 0.95;
+            const Icon = finaleTiles.has(goalTile) ? Castle : DoorOpen;
+            return (
+              <g data-goal-mark={goalTile} data-goal-seen={seen ? '' : undefined}>
+                <circle cx={x} cy={y} r={R * 0.95} fill="none" stroke="#ffe066" strokeWidth={Math.max(2, R * 0.09)} className="glow-pulse" />
+                {!seen && (
+                  <>
+                    <circle cx={x} cy={y} r={sz * 0.62} fill="rgba(0,0,0,.6)" stroke="#ffe066" strokeWidth={1.4} />
+                    <Icon x={x - sz / 2} y={y - sz / 2} width={sz} height={sz} color={finaleTiles.has(goalTile) ? FEATURE_COLOR.finale : FEATURE_COLOR.dungeon} strokeWidth={2.2} />
+                  </>
+                )}
+              </g>
+            );
+          })()}
           {/* 襲撃されている町 */}
           {w.raids.map((r) => {
             const i = w.tiles.findIndex((t) => t.f?.kind === 'town' && t.f.id === r.townId);
@@ -877,6 +973,31 @@ export function WorldMap({
           <LocateFixed size={20} className="text-amber-200" />
         </button>
       )}
+      {/* 回1: 次の目的地が画面の外にある時、地図の端にその方角の矢印（押すと、そこへ地図を動かす）。
+          右の列のボタン・左上の地域の名前・上の拡大の列と重ならない範囲に置く */}
+      {goalTile !== undefined && goalTile >= 0 && !anim && !overview && size.width > 0 && (() => {
+        const c = center(goalTile);
+        const px = c.x - scroll.left;
+        const py = c.y + padY - scroll.top;
+        const vh = visibleH(size.height, inset);
+        // 目的地のマスが少しでも見えていれば矢印は出さない（マスの半分くらいの余裕）
+        const seenBox = { minX: -R * 0.5, maxX: size.width + R * 0.5, minY: -R * 0.5, maxY: vh + R * 0.5 };
+        if (!edgeArrow(px, py, seenBox)) return null;
+        const a = edgeArrow(px, py, { minX: 26, maxX: size.width - 76, minY: compactZoom ? 74 : 46, maxY: vh - 26 });
+        if (!a) return null;
+        return (
+          <button
+            onClick={() => focusTo(goalTile)}
+            aria-label="次の目的地の方へ地図を動かす"
+            className="btn absolute z-10 flex h-11 w-11 items-center justify-center rounded-full border-2 border-amber-200 bg-[#2a1c06]/90 shadow-[0_0_10px_rgba(255,224,102,.6)]"
+            style={{ left: a.x - 22, top: a.y - 22 }}
+            data-goal-arrow
+            data-goal-deg={Math.round(a.deg)}
+          >
+            <ArrowRight size={24} className="text-amber-200" style={{ transform: `rotate(${a.deg}deg)` }} />
+          </button>
+        );
+      })()}
       {/* 拡大・縮小（右手の親指で届くように、「戻る」のボタンの上に縦に並べる）。標準 = 1倍 */}
       {/* 見えている地図が低い時（小さい画面）は、縦に並べると上にはみ出すので、地図の右上に横に並べる */}
       <div
@@ -890,10 +1011,32 @@ export function WorldMap({
         data-zoom-compact={compact ? '' : undefined}
         data-zoom-layout={compactZoom ? 'row' : 'column'}
       >
-        {/* 見取り図（段階6a）: 大陸全体を1画面に。印を押すと、その場所へ地図を動かす */}
-        <button onClick={() => setOverview(true)} aria-label="見取り図（大陸全体）を開く" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-full" data-overview-open>
-          <MapIcon size={20} className="text-amber-200" />
-        </button>
+        {/* 見取り図（段階6a）: 大陸全体を1画面に。印を押すと、その場所へ地図を動かす。回1: 絵の下に「見取り図」の字 */}
+        <div className="relative">
+          <button
+            onClick={() => {
+              setOverview(true);
+              onOverviewHintClose?.();
+            }}
+            aria-label="見取り図（大陸全体）を開く"
+            className="btn btn-dark flex h-12 w-14 flex-col items-center justify-center rounded-xl leading-none"
+            data-overview-open
+          >
+            <MapIcon size={18} className="text-amber-200" />
+            <span className="mt-0.5 text-[12px] font-bold whitespace-nowrap text-amber-100">見取り図</span>
+          </button>
+          {/* 最初の案内（この端末で1回だけ。閉じられる） */}
+          {overviewHint && (
+            <div className={`absolute flex w-[150px] items-start ${compactZoom ? 'top-full right-0 mt-2' : 'top-1/2 right-full mr-2 -translate-y-1/2'}`} data-hint-layout={compactZoom ? 'below' : 'left'}>
+            <div className="flex w-full items-start gap-1 rounded-lg border border-amber-200/70 bg-[#1a1408]/95 py-1 pr-0.5 pl-2 text-[12px] leading-4 text-amber-50 shadow-lg" role="note" data-overview-hint>
+              <span className="min-w-0 flex-1">大陸の全体は「見取り図」で見られます</span>
+              <button onClick={onOverviewHintClose} aria-label="案内を閉じる" className="btn -my-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full" data-overview-hint-close>
+                <X size={14} />
+              </button>
+            </div>
+            </div>
+          )}
+        </div>
         <button onClick={() => applyZoom(stepZoom(zoom, 1, minZoom), true)} disabled={zoom >= ZOOM_MAX} aria-label="地図を拡大" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-full disabled:opacity-40" data-zoom-in>
           <Plus size={20} className="text-amber-200" />
         </button>

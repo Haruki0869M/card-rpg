@@ -3,7 +3,7 @@ import { spawnAt, spawnTurnsLeft, SPAWN_NAME } from '../../engine/game/world/exp
 // ===== 世界マップの画面（spec §8・§20.3）=====
 // 上: 侵食度・命の灯火・ゴールド・時間帯 / 中: 地図 / 下: 手番のキャラの操作（移動力の判定・移動・入る・野営・待機）
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Coins, Dices, Flame, Hourglass, Menu, Moon, ScrollText, Star, Sun, Sunrise, Sunset, Tent, Users } from 'lucide-react';
+import { Coins, Compass, Dices, Flame, Hourglass, Menu, Moon, ScrollText, Star, Sun, Sunrise, Sunset, Tent, Users, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { BALANCE } from '../../data/balance';
 import { DUNGEONS } from '../../data/dungeons';
@@ -35,6 +35,13 @@ import {
   dungeonJoin,
   randomDungeonView,
   scourgesWith,
+  guideGoal,
+  goalLineText,
+  dungeonGateError,
+  dungeonTile,
+  signposts,
+  signpostText,
+  type GuideGoal,
 } from '../../engine';
 import { isLocalPlayer, isOnlinePlay } from '../../store/battleConfig';
 import { useBattle, type WorldMovePresentation } from '../../store/battleStore';
@@ -160,6 +167,25 @@ function MoveProposal({ game }: { game: GameState }) {
         );
       })}
     </div>
+  );
+}
+
+/**
+ * 「次の目的」の行（回1）: 上の帯（と災厄の札）のすぐ下に、いつも1行。押すと、その場所へ地図を動かす（霧の中でも）。
+ * 方角は、自分のキャラ（手番のキャラが自分のならそれ、ちがえば自分の最初のキャラ）の場所から
+ */
+function GoalLine({ game, goal, from, onFocus }: { game: GameState; goal: GuideGoal; from: number | undefined; onFocus: () => void }) {
+  const text = goalLineText(game, goal, from);
+  return (
+    <button
+      onClick={onFocus}
+      className="btn z-10 mx-2 mt-1 flex min-h-9 shrink-0 items-center gap-1 rounded-lg border border-amber-200/50 bg-[#2a1c06]/85 px-2 text-left text-[13px] leading-4 font-bold text-amber-100"
+      aria-label={`${text}。押すと地図がその場所へ動きます`}
+      data-goal-line={goal.dungeonId}
+    >
+      <Compass size={15} className="shrink-0 text-amber-300" />
+      <span className="min-w-0 flex-1 truncate">{text}</span>
+    </button>
   );
 }
 
@@ -289,10 +315,15 @@ function HandoffOverlay({ hero, onStart }: { hero: Hero; onStart: () => void }) 
 }
 
 /** 地図のマスの説明（タップしたマス） */
-function tileInfo(game: GameState, i: number): string {
+function tileInfo(game: GameState, i: number, goal?: GuideGoal): string {
   const w = game.world!;
   const t = w.tiles[i];
-  if (!t.seen) return 'まだ霧に包まれている';
+  if (!t.seen) {
+    // 回1: 霧の上に見えている物（塔の先・次の目的地の印）は、何かが分かる
+    if (t.f?.kind === 'tower') return '見晴らしの塔: 登ると、まわりが見える';
+    if (goal && goal.tile === i) return `まだ霧に包まれている（次の目的: ${goal.name}）`;
+    return 'まだ霧に包まれている';
+  }
   const terr = getTerrain(t.t);
   const parts = [terr.sea ? `${terr.name}（${w.ship ? `船で移動力${terr.shipCost ?? 1}` : '船が必要です'}）` : `${terr.name}（移動力${terr.moveCost || '×'}）`];
   const f = t.f;
@@ -310,6 +341,8 @@ function tileInfo(game: GameState, i: number): string {
   if (sp) parts.push(`${SPAWN_NAME[sp.kind]}（あと${spawnTurnsLeft(w, sp)}ターン）`);
   const wd = w.wanderers.find((x) => x.tile === i);
   if (wd) parts.push(`敵: ${wd.enemies.map((e) => `${getEnemy(e.defId).name} Lv${e.level ?? 1}`).join('・')}${wd.raidTown ? '（町を襲撃中）' : ''}`);
+  // 回1: 分かれ道の立て札
+  for (const p of signposts(game, w)) if (p.tile === i) parts.push(`立て札「${signpostText(p)}」`);
   return parts.join(' / ');
 }
 
@@ -351,6 +384,14 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
   const here = hero ? w.pos[hero.id] : undefined;
   const [selected, setSelected] = useState<number | undefined>();
   const [info, setInfo] = useState<string | undefined>();
+  // 回1: 地図をそのマスへ動かす頼み（「次の目的」の行・扉が開かない時の「場所を見る」）と、扉が開かない時の知らせ
+  const [focus, setFocus] = useState<{ tile: number; seq: number } | undefined>();
+  const focusOn = (tile: number) => setFocus((f) => ({ tile, seq: (f?.seq ?? 0) + 1 }));
+  const [gateNote, setGateNote] = useState<{ text: string; tile?: number } | undefined>();
+  // 回1: 見取り図のボタンの最初の案内（この端末で1回だけ。出した時に覚えて、閉じるか手番が変わるまで出す）
+  const hintSeen = useBattle((s) => s.settings.overviewHintSeen);
+  const setSettings = useBattle((s) => s.setSettings);
+  const [hintOn, setHintOn] = useState(false);
   const [withMe, setWithMe] = useState<Record<string, boolean>>({});
   // 手番の受け渡し: 担当プレイヤーが変わったら画面を隠す
   const players = new Set(livingHeroes(game).map((h) => h.playerId));
@@ -371,7 +412,11 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
   useEffect(() => {
     setSelected(undefined);
     setInfo(undefined);
+    setGateNote(undefined);
   }, [w.turn, w.move]);
+  useEffect(() => {
+    setHintOn(false);
+  }, [w.turn]);
 
   // 移動のサイコロ: この画面を開いた後に新しく振った時だけ、真ん中で転がす（オンラインの仲間の画面でも）
   const moveDiceKey = w.moveDice ? `move:${game.seed}:${w.moveDice.seq}` : undefined;
@@ -396,7 +441,18 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
   }, [w, here]);
   const path = useMemo(() => (selected !== undefined && here !== undefined && w.move ? pathTo(reachable(w, here, w.move), selected) : undefined), [selected, here, w]);
 
+  // 回1: 冒険の最初の自分の番に、見取り図の案内を1回だけ（物語・受け渡しの窓が閉じてから）
+  const hintReady = !hintSeen && !!hero && here !== undefined && !turnExp && isLocalPlayer(hero.playerId) && !w.story && !needHandoff && !movement;
+  useEffect(() => {
+    if (!hintReady) return;
+    setHintOn(true);
+    setSettings({ overviewHintSeen: true });
+  }, [hintReady, setSettings]);
+
   if (!hero || here === undefined) return null;
+  // 回1: 次の目的（方角は自分のキャラの場所から）
+  const selfHero = isLocalPlayer(hero.playerId) ? hero : (game.heroes.find((h) => isLocalPlayer(h.playerId) && !h.retired && w.pos[h.id] !== undefined) ?? hero);
+  const goal = guideGoal(game);
   const companions = heroesAt(game, here).filter((h) => h.id !== hero.id);
   // 同行: 自分（同じ担当）のキャラはタップで選ぶ。他の人のキャラは誘って、承知してもらった時だけ
   const ownMate = (h: { playerId: PlayerId }) => h.playerId === hero.playerId;
@@ -432,11 +488,11 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
         dispatchGame({ type: 'WORLD_MOVE', playerId: pid, heroId: hero.id, to: i, companions: chosenCompanions });
       } else {
         setSelected(i);
-        setInfo(tileInfo(game, i));
+        setInfo(tileInfo(game, i, goal));
       }
     } else {
       setSelected(undefined);
-      setInfo(tileInfo(game, i));
+      setInfo(tileInfo(game, i, goal));
     }
   };
 
@@ -444,6 +500,7 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
   return (
     <Screen>
       <WorldTopBar game={game} />
+      {goal && <GoalLine game={game} goal={goal} from={w.pos[selfHero.id] ?? here} onFocus={() => focusOn(goal.tile)} />}
       <PartyRow game={game} />
       {/* 地図。タップしたマスの説明は、地図の上に重ねたパネルのすぐ上に出す（行が増えて地図が狭くならないように。フェーズ2-D） */}
       <div className="relative flex min-h-0 flex-1 flex-col" data-world-area>
@@ -455,6 +512,10 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
           movement={playback}
           onTapTile={playback ? () => {} : tapTile}
           bottomInset={panelSize.height}
+          goalTile={goal?.tile}
+          focusRequest={focus}
+          overviewHint={hintOn}
+          onOverviewHintClose={() => setHintOn(false)}
         />
         {info && !playback && (
           <div className="pointer-events-none absolute inset-x-0 z-10 bg-black/75 py-1 pr-14 pl-3 text-[12px] leading-4 text-zinc-100" style={{ bottom: panelSize.height }} data-tile-info>
@@ -464,6 +525,20 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
       {/* 地図の下の端に重ねる操作パネル（高さが変わっても地図は動かない） */}
       <div ref={panelBox} className="absolute inset-x-0 bottom-0 z-20" data-world-panel>
       {w.moveProposal && (isOnlinePlay() || autoAgreeFailed) && <MoveProposal game={game} />}
+      {/* 回1: 扉が開かない時の知らせ（鍵のダンジョンの方角と地域。「場所を見る」で、そこへ地図を動かす） */}
+      {gateNote && !playback && (
+        <div className="panel panel-gold-edge relative z-20 mx-2 mb-1 flex items-center gap-2 rounded-xl p-2 text-[13px] leading-5" role="alert" data-gate-note>
+          <span className="min-w-0 flex-1">{gateNote.text}</span>
+          {gateNote.tile !== undefined && (
+            <button onClick={() => focusOn(gateNote.tile!)} className="btn btn-gold h-11 shrink-0 rounded-lg px-2 text-[13px] font-bold" data-gate-look>
+              場所を見る
+            </button>
+          )}
+          <button onClick={() => setGateNote(undefined)} aria-label="閉じる" className="btn btn-dark flex h-11 w-11 shrink-0 items-center justify-center rounded-full">
+            <X size={18} />
+          </button>
+        </div>
+      )}
 
       {/* 手番の表示と操作パネル。移動の演出中は、パネルを見えなくして小さな「移動中…」の帯だけを見せ、地図を広く見せる（フェーズ2-D） */}
       {movement && playback && (
@@ -584,7 +659,21 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
         {/* その場の施設に入る（省略せずに全文で、広いボタン） */}
         {label && (
             <button
-              onClick={() => dispatchGame({ type: 'WORLD_INTERACT', playerId: pid, heroId: hero.id, party: [hero.id, ...chosenCompanions] })}
+              onClick={() => {
+                // 回1: 鍵が足りなくて扉が開かない時は、地図の上に知らせを出す（「場所を見る」で、鍵のダンジョンへ地図を動かす）。
+                // エンジンも同じ理由で断るので、送らずに知らせだけ出す
+                const f = w.tiles[here].f;
+                const def = f?.kind === 'dungeon' ? DUNGEONS.get(f.id) : undefined;
+                const gate = def && !def.random ? dungeonGateError(game, def, here) : undefined;
+                if (gate) {
+                  const missing = def!.requiresKeys?.find((k) => !w.keys.includes(k));
+                  const keyDungeon = missing && !def!.finale ? DUNGEONS.forScenario(game.scenarioId).find((d) => d.rewardKey === missing) : undefined;
+                  const keyTile = keyDungeon ? dungeonTile(w, keyDungeon.id) : -1;
+                  setGateNote({ text: gate, tile: keyTile >= 0 ? keyTile : undefined });
+                  return;
+                }
+                dispatchGame({ type: 'WORLD_INTERACT', playerId: pid, heroId: hero.id, party: [hero.id, ...chosenCompanions] });
+              }}
               className="btn btn-dark font-display mt-1.5 flex min-h-12 w-full items-center justify-center gap-1.5 rounded-xl px-2 text-[16px] leading-5 text-amber-100 shadow-[0_0_12px_rgba(255,200,90,.35)]"
               data-interact
             >

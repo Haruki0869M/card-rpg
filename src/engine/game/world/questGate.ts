@@ -4,6 +4,7 @@ import { DUNGEONS } from '../../../data/dungeons';
 import { getScenario } from '../../../data/scenarios';
 import { QUESTS } from '../../../data/world';
 import type { DungeonDef, GameState } from '../../../types';
+import { dungeonTile, whereText } from './guide';
 
 /** 報告まで済ませた町の依頼の数（船を借りる依頼は、海を渡るのに必ず受けるので数えない） */
 export function finishedQuestCount(game: GameState): number {
@@ -15,8 +16,8 @@ export function questsShort(game: GameState, def: DungeonDef): number {
   return Math.max(0, (def.requiresQuests ?? 0) - finishedQuestCount(game));
 }
 
-/** 扉が開かない理由（開く時は undefined）。鍵が先、依頼が後 */
-export function dungeonGateError(game: GameState, def: DungeonDef): string | undefined {
+/** 扉が開かない理由（開く時は undefined）。鍵が先、依頼が後。from = キャラのいるマス（鍵のダンジョンの方角を足す。回1） */
+export function dungeonGateError(game: GameState, def: DungeonDef, from?: number): string | undefined {
   const w = game.world!;
   const missing = (def.requiresKeys ?? []).filter((k) => !w.keys.includes(k));
   if (missing.length) {
@@ -24,8 +25,15 @@ export function dungeonGateError(game: GameState, def: DungeonDef): string | und
     const keyNames = missing.map((k) => names[k] ?? k).join('・');
     // 最後のダンジョン以外は、どこで鍵が手に入るかも伝える（§4 C）
     if (!def.finale) {
-      const from = missing.map((k) => DUNGEONS.forScenario(game.scenarioId).find((d) => d.rewardKey === k)?.name).filter(Boolean);
-      if (from.length) return `扉が開かない…。${keyNames}が要る。先に「${from.join('」「')}」を制覇しよう`;
+      // 回1: 鍵のダンジョンの方角と地域も足す（「静寂の地下墓地」（南東・嘆きの沼の東））
+      const places = missing.flatMap((k) => {
+        const d = DUNGEONS.forScenario(game.scenarioId).find((x) => x.rewardKey === k);
+        if (!d) return [];
+        const at = dungeonTile(w, d.id);
+        const where = at >= 0 ? whereText(game, w, from, at) : '';
+        return [`「${d.name}」${where ? `（${where}）` : ''}`];
+      });
+      if (places.length) return `扉が開かない…。${keyNames}が要る。先に${places.join('・')}を制覇しよう`;
     }
     return `扉が開かない…（必要: ${keyNames}）`;
   }

@@ -39,3 +39,20 @@ export function revealLeft(hereX: number, selX: number, scrollLeft: number, view
   if (selX >= scrollLeft + margin && selX <= scrollLeft + viewW - margin) return undefined;
   return (hereX + selX) / 2 - viewW / 2;
 }
+
+/**
+ * 地図の端の矢印（回1）: 目的地（枠の中の座標 px, py）が見えている所（box）の外にある時、
+ * 見えている所の真ん中から目的地へ向かう線が box の端と交わる所と、向き（度。右 = 0、下 = 90）を返す。見えていれば undefined
+ */
+export function edgeArrow(px: number, py: number, box: { minX: number; maxX: number; minY: number; maxY: number }): { x: number; y: number; deg: number } | undefined {
+  if (box.maxX <= box.minX || box.maxY <= box.minY) return undefined;
+  if (px >= box.minX && px <= box.maxX && py >= box.minY && py <= box.maxY) return undefined;
+  const cx = (box.minX + box.maxX) / 2;
+  const cy = (box.minY + box.maxY) / 2;
+  const dx = px - cx;
+  const dy = py - cy;
+  const tx = dx ? (dx > 0 ? box.maxX - cx : box.minX - cx) / dx : Infinity;
+  const ty = dy ? (dy > 0 ? box.maxY - cy : box.minY - cy) / dy : Infinity;
+  const t = Math.min(tx, ty);
+  return { x: cx + dx * t, y: cy + dy * t, deg: (Math.atan2(dy, dx) * 180) / Math.PI };
+}

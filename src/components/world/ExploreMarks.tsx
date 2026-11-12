@@ -30,6 +30,54 @@ export function TowerMini({ x, y, R, used }: { x: number; y: number; R: number; 
   );
 }
 
+/**
+ * 霧の上に見える塔の先（回1）: まだ見えていないマスの塔は、見張り台と旗だけを霧の上に出す（まわりは霧のまま）。
+ * x, y = 霧の面の中心。clipPath で、胴の下の方を切る
+ */
+export function TowerTop({ x, y, R, id }: { x: number; y: number; R: number; id: string }) {
+  const cut = y - R * 0.55;
+  return (
+    <g data-tower-top={id} pointerEvents="none" opacity={0.92}>
+      <defs>
+        <clipPath id={`tower-top-${id}`}>
+          <rect x={x - R} y={y - R * 3} width={R * 2} height={cut - (y - R * 3)} />
+        </clipPath>
+        <linearGradient id={`tower-top-fade-${id}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#fff" stopOpacity={0} />
+          <stop offset="1" stopColor="#d8dcef" stopOpacity={0.85} />
+        </linearGradient>
+      </defs>
+      <g clipPath={`url(#tower-top-${id})`}>
+        <TowerMini x={x} y={y} R={R} />
+      </g>
+      {/* 霧から突き出している所を、白くぼかす */}
+      <rect x={x - R * 0.4} y={cut - R * 0.28} width={R * 0.8} height={R * 0.3} fill={`url(#tower-top-fade-${id})`} />
+    </g>
+  );
+}
+
+/**
+ * 分かれ道の立て札（回1）: 木の柱と、ダンジョンの方へ向いた矢印の板。east = 右向き（東の方）、false なら左向き。
+ * x, y = 立てる所（マスの上の面）
+ */
+export function SignpostMini({ x, y, R, east }: { x: number; y: number; R: number; east: boolean }) {
+  const s = R / 100;
+  const flip = east ? 1 : -1;
+  return (
+    <g transform={`translate(${x.toFixed(1)},${y.toFixed(1)}) scale(${(s * flip).toFixed(4)},${s.toFixed(4)})`} data-signpost-mini pointerEvents="none">
+      <ellipse cx="0" cy="6" rx="18" ry="6" fill="rgba(0,0,0,.45)" />
+      {/* 柱 */}
+      <rect x="-5" y="-78" width="10" height="84" rx="2" fill="#8a5a32" stroke="#3a2412" strokeWidth="3" />
+      {/* 矢印の板 */}
+      <path d="M-30 -74 H22 L38 -60 L22 -46 H-30 Z" fill="#d8b070" stroke="#3a2412" strokeWidth="3.5" strokeLinejoin="round" />
+      <path d="M-22 -60 H18" stroke="#6a4a22" strokeWidth="4" strokeLinecap="round" />
+      <path d="M8 -67 L19 -60 L8 -53" fill="none" stroke="#6a4a22" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+      {/* 小さな板（下） */}
+      <rect x="-20" y="-38" width="40" height="12" rx="2" fill="#c49a5e" stroke="#3a2412" strokeWidth="3" />
+    </g>
+  );
+}
+
 /** 流れ星の落下地点（光る星と、焦げたくぼみ） */
 function StarMini({ x, y, R }: { x: number; y: number; R: number }) {
   const s = R * 0.42;

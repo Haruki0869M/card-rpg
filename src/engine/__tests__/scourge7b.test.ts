@@ -131,7 +131,7 @@ describe('段階7b: 出る時期と場所（シナリオ1の広い地図だけ�
     expect(scourgesDue(g.world!)).toBe(1);
     g = endTurn(g);
     expect(aliveScourges(g.world)).toHaveLength(1);
-    expect(g.world!.story?.title).toMatch(/^💀 .+が現れた！$/);
+    expect(g.world!.story?.title).toMatch(/^💀 .+が、.+に現れた！$/);
     g.world!.corruption = 56;
     g = endTurn(g);
     expect(aliveScourges(g.world)).toHaveLength(2);

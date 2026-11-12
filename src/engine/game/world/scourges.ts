@@ -18,6 +18,7 @@ import { hexDistance, neighbors } from './hex';
 import { isWideMap, laneOfTile } from './lanes';
 import { corruptionLevelBonus } from './wanderers';
 import { aliveScourges } from './scourgeCurse';
+import { placeName, queueStory } from './guide';
 
 export { aliveScourges, scourgeCurse, scourgePrice, scourgesWith, type ScourgeCurse } from './scourgeCurse';
 
@@ -109,11 +110,12 @@ export function spawnScourge(game: GameState, w: WorldState, rng: Rng): Wanderer
   const seen = w.tiles[tile].seen;
   const lines = [
     def.appearText,
-    `生きている間: ${def.curseText}。`,
-    '倒すと元に戻り、専用の装備を必ず落とす。',
-    seen ? (watched ? '塔の見張りが場所を知らせてくれた（地図の💀）。' : '場所は地図の💀の所。') : '場所は霧の中。見晴らしの塔に登ると見える。',
+    `${def.curseText}。`,
+    '倒すと元に戻り、専用の装備を落とす。',
+    seen ? (watched ? '塔の見張りが場所を知らせてくれた（地図の💀）。' : '場所は地図の💀の所。') : 'くわしい場所は、見晴らしの塔に登ると分かる。',
   ];
-  pushStory(w, `💀 ${def.name}が現れた！`, lines);
+  // 回1: 制覇の物語などの後ろに足さず、その窓を閉じた後に別の窓で出す。地域（「嘆きの沼の東」）までは最初から分かる
+  queueStory(w, { title: `💀 ${def.name}が、${placeName(game, w, tile)}に現れた！`, lines });
   addLog(game, `💀 ${def.name}が現れた！（${def.curseText}）`);
   return wd;
 }

@@ -37,6 +37,8 @@ export * from './game/world/objectives';
 export { spawnAt, spawnTurnsLeft, SPAWN_NAME, SPAWN_EVENT } from './game/world/explore';
 export { createWorld, regionOfRow } from './game/world/generate';
 export { isWideMap, laneOfTile, nextGoalDungeon, terrainDiceBonus } from './game/world/lanes';
+export { direction8, dungeonTile, goalLineText, guideGoal, passByNotice, placeName, scourgePlaceText, signposts, signpostText, whereText, type GuideGoal, type Signpost } from './game/world/guide';
+export { dungeonGateError } from './game/world/questGate';
 export { sceneHeroes, activeHeroes } from './game/heroes';
 export { altarTransmutePool } from './game/tasks';
 export { isRandomDungeonTile, randomDungeonView } from './game/world/randomDungeons';

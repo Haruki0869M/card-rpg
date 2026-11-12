@@ -4,7 +4,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useState } from 'react';
-import { scourgeList } from '../../engine';
+import { placeName, scourgeList, scourgePlaceText } from '../../engine';
 import type { GameState } from '../../types';
 
 export function ScourgeStrip({ game }: { game: GameState }) {
@@ -12,6 +12,12 @@ export function ScourgeStrip({ game }: { game: GameState }) {
   const list = scourgeList(game);
   if (!list.length) return null;
   const one = list.length === 1;
+  const w = game.world!;
+  // 回1（決定 4A）: 場所は、地域（「嘆きの沼の東」）までは最初から分かる。正確なマスは、塔に登るか近づくまで出さない
+  const hidden = list.filter((s) => !s.seen);
+  const placeLine = hidden.length
+    ? `場所: ${hidden.map((s) => (one ? '' : `${s.short}は`) + placeName(game, w, s.tile)).join('・')}（くわしい場所は、塔に登ると分かる）`
+    : '場所: 地図の💀の所';
   return (
     <>
       <button
@@ -20,6 +26,7 @@ export function ScourgeStrip({ game }: { game: GameState }) {
         aria-label="災厄の中ボスの説明"
         data-scourge-strip={list.length}
       >
+        <span className="flex min-w-0 flex-1 flex-col">
         {one ? (
           <span className="min-w-0 truncate">💀{list[0].short}：{list[0].curseShort}</span>
         ) : (
@@ -36,6 +43,8 @@ export function ScourgeStrip({ game }: { game: GameState }) {
             </span>
           </>
         )}
+        <span className="min-w-0 truncate text-[12px] font-normal text-fuchsia-200" data-scourge-place>{placeLine}</span>
+        </span>
         <span className="ml-auto shrink-0 text-[12px] font-normal text-fuchsia-300">説明</span>
       </button>
       <AnimatePresence>
@@ -61,7 +70,7 @@ export function ScourgeStrip({ game }: { game: GameState }) {
                     <div className="font-bold text-fuchsia-100">💀 {s.name}</div>
                     <div className="text-zinc-200">悪さ: {s.curseText}</div>
                     <div className="text-amber-100">倒すと: {s.rewardText}</div>
-                    <div className={s.seen ? 'text-emerald-200' : 'text-zinc-400'}>{s.seen ? '場所: 地図の💀の所' : '場所: 霧の中（見晴らしの塔に登ると見える）'}</div>
+                    <div className={s.seen ? 'text-emerald-200' : 'text-zinc-300'} data-scourge-row-place>{scourgePlaceText(game, w, s.tile, s.seen)}</div>
                   </div>
                 ))}
               </div>
