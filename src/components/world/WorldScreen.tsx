@@ -3,7 +3,7 @@ import { spawnAt, spawnTurnsLeft, SPAWN_NAME } from '../../engine/game/world/exp
 // ===== 世界マップの画面（spec §8・§20.3）=====
 // 上: 侵食度・命の灯火・ゴールド・時間帯 / 中: 地図 / 下: 手番のキャラの操作（移動力の判定・移動・入る・野営・待機）
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Coins, Compass, Dices, Flame, Hourglass, Menu, Moon, ScrollText, Star, Sun, Sunrise, Sunset, Tent, Users, X } from 'lucide-react';
+import { Coins, Compass, Dices, Flame, Hourglass, Menu, Moon, ScrollText, Star, Sun, Sunrise, Sunset, Tent, Users } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { BALANCE } from '../../data/balance';
 import { DUNGEONS } from '../../data/dungeons';
@@ -61,7 +61,7 @@ import { useElementSize } from '../../hooks/useElementSize';
 const TIME_ICON: Record<TimeOfDay, typeof Sun> = { morning: Sunrise, noon: Sun, evening: Sunset, night: Moon };
 
 /** 上部のバー: 侵食度・命の灯火・ゴールド・時間帯・メニュー */
-export function WorldTopBar({ game, goldHeroId }: { game: GameState; /** 所持金を出すキャラ（町・神殿・祠では切り替えたキャラ。無ければ世界マップの手番のキャラ） */ goldHeroId?: string }) {
+export function WorldTopBar({ game, goldHeroId, goalLine }: { game: GameState; /** 所持金を出すキャラ（町・神殿・祠では切り替えたキャラ。無ければ世界マップの手番のキャラ） */ goldHeroId?: string; /** 「次の目的」の行（回1。世界マップだけ。上の帯のすぐ下、💀の札の上に出す） */ goalLine?: React.ReactNode }) {
   const openSheet = useBattle((s) => s.openSheet);
   const w = game.world!;
   const time = timeOfDay(w.worldTurn);
@@ -119,6 +119,7 @@ export function WorldTopBar({ game, goldHeroId }: { game: GameState; /** 所持�
         <Menu size={22} />
       </button>
     </div>
+    {goalLine}
     {/* 災厄の中ボスの札（段階7b）。いる時だけ */}
     <ScourgeStrip game={game} />
     </>
@@ -171,7 +172,7 @@ function MoveProposal({ game }: { game: GameState }) {
 }
 
 /**
- * 「次の目的」の行（回1）: 上の帯（と災厄の札）のすぐ下に、いつも1行。押すと、その場所へ地図を動かす（霧の中でも）。
+ * 「次の目的」の行（回1）: 上の帯のすぐ下に、いつも1行（災厄の💀の札がある時は、その上）。押すと、その場所へ地図を動かす（霧の中でも）。
  * 方角は、自分のキャラ（手番のキャラが自分のならそれ、ちがえば自分の最初のキャラ）の場所から
  */
 function GoalLine({ game, goal, from, onFocus }: { game: GameState; goal: GuideGoal; from: number | undefined; onFocus: () => void }) {
@@ -179,7 +180,8 @@ function GoalLine({ game, goal, from, onFocus }: { game: GameState; goal: GuideG
   return (
     <button
       onClick={onFocus}
-      className="btn z-10 mx-2 mt-1 flex min-h-9 shrink-0 items-center gap-1 rounded-lg border border-amber-200/50 bg-[#2a1c06]/85 px-2 text-left text-[13px] leading-4 font-bold text-amber-100"
+      // 高さ700px未満の画面（360×640 など）では出さない: 1行（44px）を足すと、操作パネルに隠れていない地図がほとんど無くなるため（回1の報告に案を書いた）
+      className="btn z-10 mx-2 mt-1 hidden min-h-11 shrink-0 items-center gap-1 rounded-lg border border-amber-200/50 bg-[#2a1c06]/85 px-2 text-left text-[13px] leading-4 font-bold text-amber-100 [@media(min-height:700px)]:flex"
       aria-label={`${text}。押すと地図がその場所へ動きます`}
       data-goal-line={goal.dungeonId}
     >
@@ -499,8 +501,7 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
   const scenario = getScenario(game.scenarioId);
   return (
     <Screen>
-      <WorldTopBar game={game} />
-      {goal && <GoalLine game={game} goal={goal} from={w.pos[selfHero.id] ?? here} onFocus={() => focusOn(goal.tile)} />}
+      <WorldTopBar game={game} goalLine={goal && <GoalLine game={game} goal={goal} from={w.pos[selfHero.id] ?? here} onFocus={() => focusOn(goal.tile)} />} />
       <PartyRow game={game} />
       {/* 地図。タップしたマスの説明は、地図の上に重ねたパネルのすぐ上に出す（行が増えて地図が狭くならないように。フェーズ2-D） */}
       <div className="relative flex min-h-0 flex-1 flex-col" data-world-area>
@@ -522,24 +523,26 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
             {info}
           </div>
         )}
+        {/* 回1: 扉が開かない時の知らせ（鍵のダンジョンの方角と地域。「場所を見る」で、そこへ地図を動かす）。
+            操作パネルの高さを変えないように、地図の下の端（パネルのすぐ上）に重ねる。右の「戻る」のボタンは避ける */}
+        {gateNote && !playback && (
+          <div className="panel panel-gold-edge absolute left-2 right-[60px] z-30 flex items-center gap-1.5 rounded-xl p-1.5 text-[13px] leading-[18px]" style={{ bottom: panelSize.height + 6 }} role="alert" data-gate-note>
+            <span className="min-w-0 flex-1">{gateNote.text}</span>
+            <span className="flex shrink-0 flex-col gap-1">
+              {gateNote.tile !== undefined && (
+                <button onClick={() => focusOn(gateNote.tile!)} className="btn btn-gold h-11 rounded-lg px-2 text-[13px] font-bold" data-gate-look>
+                  場所を見る
+                </button>
+              )}
+              <button onClick={() => setGateNote(undefined)} className="btn btn-dark h-11 rounded-lg px-2 text-[13px] font-bold" data-gate-close>
+                閉じる
+              </button>
+            </span>
+          </div>
+        )}
       {/* 地図の下の端に重ねる操作パネル（高さが変わっても地図は動かない） */}
       <div ref={panelBox} className="absolute inset-x-0 bottom-0 z-20" data-world-panel>
       {w.moveProposal && (isOnlinePlay() || autoAgreeFailed) && <MoveProposal game={game} />}
-      {/* 回1: 扉が開かない時の知らせ（鍵のダンジョンの方角と地域。「場所を見る」で、そこへ地図を動かす） */}
-      {gateNote && !playback && (
-        <div className="panel panel-gold-edge relative z-20 mx-2 mb-1 flex items-center gap-2 rounded-xl p-2 text-[13px] leading-5" role="alert" data-gate-note>
-          <span className="min-w-0 flex-1">{gateNote.text}</span>
-          {gateNote.tile !== undefined && (
-            <button onClick={() => focusOn(gateNote.tile!)} className="btn btn-gold h-11 shrink-0 rounded-lg px-2 text-[13px] font-bold" data-gate-look>
-              場所を見る
-            </button>
-          )}
-          <button onClick={() => setGateNote(undefined)} aria-label="閉じる" className="btn btn-dark flex h-11 w-11 shrink-0 items-center justify-center rounded-full">
-            <X size={18} />
-          </button>
-        </div>
-      )}
-
       {/* 手番の表示と操作パネル。移動の演出中は、パネルを見えなくして小さな「移動中…」の帯だけを見せ、地図を広く見せる（フェーズ2-D） */}
       {movement && playback && (
         <div className="absolute inset-x-0 bottom-0 z-40">

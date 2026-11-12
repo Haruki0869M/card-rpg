@@ -765,7 +765,7 @@ export function WorldMap({
                     <ArrowRight x={x + R * 0.45 - R * 0.24} y={y - R * 0.2 - R * 0.24} width={R * 0.48} height={R * 0.48} color="#3a2412" strokeWidth={3} transform={east ? undefined : `rotate(180 ${x + R * 0.45} ${y - R * 0.2})`} />
                   </g>
                 ) : (
-                  <SignpostMini x={x + (east ? R * 0.52 : -R * 0.52)} y={y + R * 0.1} R={R} east={east} />
+                  <SignpostMini x={x + (east ? R * 0.62 : -R * 0.62)} y={y + R * 0.05} R={R} east={east} />
                 )}
               </g>
             );
@@ -974,8 +974,8 @@ export function WorldMap({
         </button>
       )}
       {/* 回1: 次の目的地が画面の外にある時、地図の端にその方角の矢印（押すと、そこへ地図を動かす）。
-          右の列のボタン・左上の地域の名前・上の拡大の列と重ならない範囲に置く */}
-      {goalTile !== undefined && goalTile >= 0 && !anim && !overview && size.width > 0 && (() => {
+          右の列のボタン・左上の地域の名前・上の拡大の列と重ならない範囲に置く。見取り図の最初の案内が出ている間は出さない（重なるため） */}
+      {goalTile !== undefined && goalTile >= 0 && !anim && !overview && !overviewHint && size.width > 0 && (() => {
         const c = center(goalTile);
         const px = c.x - scroll.left;
         const py = c.y + padY - scroll.top;
@@ -983,7 +983,8 @@ export function WorldMap({
         // 目的地のマスが少しでも見えていれば矢印は出さない（マスの半分くらいの余裕）
         const seenBox = { minX: -R * 0.5, maxX: size.width + R * 0.5, minY: -R * 0.5, maxY: vh + R * 0.5 };
         if (!edgeArrow(px, py, seenBox)) return null;
-        const a = edgeArrow(px, py, { minX: 26, maxX: size.width - 76, minY: compactZoom ? 74 : 46, maxY: vh - 26 });
+        // 置ける範囲: 左上の地域の名前（上 8〜32px）・右の列のボタン（幅 56px＋余白）・上に横に並べた拡大のボタン（上 8〜56px）を避ける
+        const a = edgeArrow(px, py, { minX: 30, maxX: size.width - 90, minY: compactZoom ? 82 : 60, maxY: vh - 26 });
         if (!a) return null;
         return (
           <button
@@ -1030,7 +1031,7 @@ export function WorldMap({
             <div className={`absolute flex w-[150px] items-start ${compactZoom ? 'top-full right-0 mt-2' : 'top-1/2 right-full mr-2 -translate-y-1/2'}`} data-hint-layout={compactZoom ? 'below' : 'left'}>
             <div className="flex w-full items-start gap-1 rounded-lg border border-amber-200/70 bg-[#1a1408]/95 py-1 pr-0.5 pl-2 text-[12px] leading-4 text-amber-50 shadow-lg" role="note" data-overview-hint>
               <span className="min-w-0 flex-1">大陸の全体は「見取り図」で見られます</span>
-              <button onClick={onOverviewHintClose} aria-label="案内を閉じる" className="btn -my-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full" data-overview-hint-close>
+              <button onClick={onOverviewHintClose} aria-label="案内を閉じる" className="btn -my-2 -mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full" data-overview-hint-close>
                 <X size={14} />
               </button>
             </div>

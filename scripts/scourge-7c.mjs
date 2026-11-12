@@ -76,7 +76,7 @@ for (const [width, height] of SIZES) {
   await page.getByRole('button', { name: '待機' }).click();
   await page.waitForTimeout(1200);
   const body = await page.locator('body').innerText();
-  if (!body.includes('💀 業火の魔人が現れた！')) problems.push(`${tag}: 業火の魔人が現れた知らせが出ない`);
+  if (!/💀 業火の魔人が、.+に現れた！/.test(body)) problems.push(`${tag}: 業火の魔人が現れた知らせが出ない`);
   if (!body.includes('戦闘の開始時、味方全員に「火傷」1が付く')) problems.push(`${tag}: 知らせに悪さの文が無い`);
   await page.screenshot({ path: `${OUT}/${tag}-1-announce.png` });
   await check(page, tag, '知らせ');

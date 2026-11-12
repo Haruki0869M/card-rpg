@@ -7,12 +7,12 @@ import { spawnTurnsLeft } from '../../engine/game/world/explore';
 type Center = (i: number) => { x: number; y: number };
 
 /** 見晴らしの塔（石の塔と小さな旗）。登った後は薄くする */
-export function TowerMini({ x, y, R, used }: { x: number; y: number; R: number; used?: boolean }) {
+export function TowerMini({ x, y, R, used, fogTop }: { x: number; y: number; R: number; used?: boolean; /** 霧の上の塔の先として描く（施設の印は付けない） */ fogTop?: boolean }) {
   const h = R * 1.35;
   const bw = R * 0.42;
   const top = y - h * 0.62;
   return (
-    <g data-feature="tower:watchtower" data-used={used || undefined} opacity={used ? 0.45 : 1} pointerEvents="none">
+    <g data-feature={fogTop ? undefined : 'tower:watchtower'} data-used={used || undefined} opacity={used ? 0.45 : 1} pointerEvents="none">
       <ellipse cx={x} cy={y + R * 0.38} rx={R * 0.5} ry={R * 0.15} fill="rgba(0,0,0,.5)" />
       {/* 塔の胴（下が少し広い） */}
       <path d={`M${x - bw * 0.62} ${y + R * 0.36} L${x - bw * 0.48} ${top + R * 0.2} L${x + bw * 0.48} ${top + R * 0.2} L${x + bw * 0.62} ${y + R * 0.36} Z`} fill="#b9ab92" stroke="#3a3128" strokeWidth={1.4} />
@@ -35,23 +35,35 @@ export function TowerMini({ x, y, R, used }: { x: number; y: number; R: number; 
  * x, y = 霧の面の中心。clipPath で、胴の下の方を切る
  */
 export function TowerTop({ x, y, R, id }: { x: number; y: number; R: number; id: string }) {
-  const cut = y - R * 0.55;
+  // 霧の上でも目に入るように、塔を少し大きく（1.3倍）描き、胴の上の方まで出す
+  const k = 1.3;
+  const cut = y - R * 0.3;
   return (
-    <g data-tower-top={id} pointerEvents="none" opacity={0.92}>
+    <g data-tower-top={id} pointerEvents="none">
       <defs>
         <clipPath id={`tower-top-${id}`}>
-          <rect x={x - R} y={y - R * 3} width={R * 2} height={cut - (y - R * 3)} />
+          <rect x={x - R * 2} y={y - R * 4} width={R * 4} height={cut - (y - R * 4)} />
         </clipPath>
         <linearGradient id={`tower-top-fade-${id}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#fff" stopOpacity={0} />
-          <stop offset="1" stopColor="#d8dcef" stopOpacity={0.85} />
+          <stop offset="0" stopColor="#e8ebf8" stopOpacity={0} />
+          <stop offset="1" stopColor="#e8ebf8" stopOpacity={0.9} />
         </linearGradient>
+        <radialGradient id={`tower-top-halo-${id}`}>
+          <stop offset="0" stopColor="#fff6d0" stopOpacity={0.55} />
+          <stop offset="1" stopColor="#fff6d0" stopOpacity={0} />
+        </radialGradient>
       </defs>
+      {/* 霧の中の目印になる、うすい光 */}
+      <ellipse cx={x} cy={y - R * 0.95} rx={R * 0.85} ry={R * 0.95} fill={`url(#tower-top-halo-${id})`} />
       <g clipPath={`url(#tower-top-${id})`}>
-        <TowerMini x={x} y={y} R={R} />
+        <g transform={`translate(${x} ${y}) scale(${k}) translate(${-x} ${-y})`}>
+          <TowerMini x={x} y={y} R={R} fogTop />
+        </g>
       </g>
+      {/* 塔の立っているマス（霧の面）の印（見えない。確認スクリプトがマスの場所を知るため） */}
+      <circle cx={x} cy={y} r={1} fill="none" data-tower-foot />
       {/* 霧から突き出している所を、白くぼかす */}
-      <rect x={x - R * 0.4} y={cut - R * 0.28} width={R * 0.8} height={R * 0.3} fill={`url(#tower-top-fade-${id})`} />
+      <rect x={x - R * 0.55} y={cut - R * 0.3} width={R * 1.1} height={R * 0.32} fill={`url(#tower-top-fade-${id})`} />
     </g>
   );
 }
@@ -61,7 +73,8 @@ export function TowerTop({ x, y, R, id }: { x: number; y: number; R: number; id:
  * x, y = 立てる所（マスの上の面）
  */
 export function SignpostMini({ x, y, R, east }: { x: number; y: number; R: number; east: boolean }) {
-  const s = R / 100;
+  // 小さい画面でも目に入るように、マスの半径の約1.1倍の高さ
+  const s = (R * 1.3) / 100;
   const flip = east ? 1 : -1;
   return (
     <g transform={`translate(${x.toFixed(1)},${y.toFixed(1)}) scale(${(s * flip).toFixed(4)},${s.toFixed(4)})`} data-signpost-mini pointerEvents="none">

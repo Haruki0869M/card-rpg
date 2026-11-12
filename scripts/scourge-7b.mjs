@@ -77,7 +77,7 @@ for (const [width, height] of SIZES) {
   await page.getByRole('button', { name: '待機' }).click();
   await page.waitForTimeout(1200);
   const body = await page.locator('body').innerText();
-  if (!/💀 .+が現れた！/.test(body)) problems.push(`${tag}: 災厄が現れた知らせが出ない`);
+  if (!/💀 .+が、.+に現れた！/.test(body)) problems.push(`${tag}: 災厄が現れた知らせが出ない`);
   await page.screenshot({ path: `${OUT}/${tag}-1-announce.png` });
   await check(page, tag, '知らせ');
   const g1 = await game(page);
