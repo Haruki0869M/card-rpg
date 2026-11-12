@@ -14,6 +14,7 @@ import { colOf, hexDistance, idxOf, neighborInDir, neighbors, rowOf } from '../g
 import { isWideMap, laneOfCol, nextGoalDungeon, terrainDiceBonus } from '../game/world/lanes';
 import { startTileOf } from '../game/world/start';
 import { HERB_EVENT } from '../game/world/generate';
+import { direction8, goalLineText, guideGoal, signposts } from '../game/world/guide';
 
 afterEach(() => setLocalPlayers(null));
 const CK = 'corruptionKing';
@@ -334,6 +335,18 @@ describe('段階6a: 古い保存（v26・前の8列×35行の地図の途中）'
     const r = applyGameCommand(g, { type: 'WORLD_ROLL_MOVE', playerId: h.playerId, heroId: h.id });
     expect(r.error).toBeUndefined();
     expect(r.state.world!.moveDice!.bonus.some((b) => b.label === '街道')).toBe(false);
+  });
+
+  it('回1: 前の地図の途中でも、次の目的の文が出る（地域の名前だけ）。立て札は無い。保存に何も足さない', () => {
+    const raw = oldSave(6);
+    const g = migrateGame(JSON.parse(raw))!;
+    const w = g.world!;
+    const goal = guideGoal(g)!;
+    expect(goal.dungeonId).toBe('emeraldTemple');
+    const from = w.pos[g.heroes[0].id];
+    expect(goalLineText(g, goal, from)).toBe(`次の目的: ${DUNGEONS.get('emeraldTemple').name}（${direction8(w, from, goal.tile)}・${def().regions[w.tiles[goal.tile].r].name}）`);
+    expect(signposts(g, w)).toEqual([]);
+    expect(w.storyQueue).toBeUndefined();
   });
 
   it('前の地図の途中から、自動プレイで最後まで止まらずに遊べる（2人・4人）', () => {
