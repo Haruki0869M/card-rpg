@@ -14,7 +14,7 @@ describe('職業の戦闘の特殊能力', () => {
     expect(damageMultiplierFor(w, strike).multiplier).toBe(1);
     const [c] = giveHand(s, 'a0', ['strike']);
     const { state, events } = applyCommand(s, play('a0', c.uid, 'e0', 1));
-    expect(state.enemies[0].hp).toBe(52 - 9); // 7 × 1.3 = 9.1
+    expect(state.enemies[0].hp).toBe(57 - 9); // 敵HP 52×1.1=57。7 × 1.3 = 9.1
     expect(events.some((e) => e.type === 'ability' && e.name === '剣の心得')).toBe(true);
   });
 
