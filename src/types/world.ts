@@ -21,6 +21,11 @@ export interface TerrainDef {
   /** 海（K4 段3）。moveCost は 0 のまま（陸の処理では今までどおり通れない）。船があるパーティだけが shipCost（既定1）で進める */
   sea?: boolean;
   shipCost?: number;
+  /**
+   * 移動のサイコロのボーナス（段階6a。街道 = +1）。この地形に立って移動のサイコロを振ると足される。
+   * 広い地図（ScenarioMapDef.lanes があり、保存の地図がその大きさの時）だけで使う。前の幅の地図では足さない
+   */
+  moveDiceBonus?: number;
 }
 
 /** 寒さ・暑さ。ratio（最大HPの割合）を省略すると BALANCE.climateDamageRatio */
@@ -59,6 +64,43 @@ export interface RegionDef {
   shrines?: number;
   /** ランダムダンジョン（このダンジョンIDを置く） */
   randomDungeons?: string[];
+  /** 薬草の群生地（段階6a）の数。ScenarioMapDef.prefer.herb の帯に置く */
+  herbs?: number;
+}
+
+/** 帯（段階6a）: 列の範囲に名前と地形の出やすさの倍率を付ける。地域の割合に掛け合わせる（書いていない地形は1倍） */
+export interface LaneDef {
+  id: string;
+  name: string;
+  cols: [number, number];
+  terrain: Record<string, number>;
+}
+
+/**
+ * 仕切り（段階6a）: 帯の間に置く、通れない地形の列。六角のマスは奇数の行が半マス右にずれているので、
+ * 偶数の行は even 列・奇数の行は odd 列に置くと、すき間の無い1本の壁になる（even = odd + 1 で、ほぼまっすぐ）。
+ * rows の中から gaps 個の行を Rng で選んで切れ目（峠・橋）にする（その地域の一番多い陸の地形）。道のマスは壁にしない
+ */
+export interface BarrierDef {
+  even: number;
+  odd: number;
+  rows: [number, number];
+  terrain: string;
+  gaps: number;
+}
+
+/**
+ * 寄り道の地形（段階6a）。at = 中のマス（宝箱か祠を必ず置く）。
+ * basin（盆地）: まわりの6マスを wall の地形で囲み、open の向きの1マスだけを入口にする。
+ * peninsula（半島）: at と、open の向きの隣（首）のまわりを wall の地形（湖）にする。首の先が岸。
+ * 向きは 0=右・1=右上・2=左上・3=左・4=左下・5=右下（hex.ts の neighbors と同じ順）
+ */
+export interface PocketDef {
+  kind: 'basin' | 'peninsula';
+  at: [col: number, row: number];
+  open: number;
+  wall: string;
+  content: 'chest' | 'shrine';
 }
 
 /** マップに固定で置くもの */
@@ -112,6 +154,15 @@ export interface ScenarioMapDef {
   /** 施設（町・ダンジョンなど）のまわり何マスを、海でなく陸にするか（K4。小さすぎる島で詰まらないように。省略は0） */
   landAround?: number;
   corruptionStages: CorruptionStage[];
+  // ---- 広い地図（段階6a。overhaul-plan-v2 §2）。無いシナリオは今までどおり ----
+  /** 帯（西・中央・東など）。あると「広い地図」: 街道ボーナス・帯に合わせた置き方を使う */
+  lanes?: LaneDef[];
+  /** 街道の骨格（通る点の並び。町と最後のダンジョンを結ぶ）。ほかの施設は、一番近い道から脇道でつなぐ */
+  highway?: [col: number, row: number][];
+  barriers?: BarrierDef[];
+  pockets?: PocketDef[];
+  /** 置く物を多く置く帯（帯の id）。tower は塔1つずつの帯（下から順） */
+  prefer?: { shrine?: string; herb?: string; randomDungeon?: string; altar?: string; tower?: string[] };
 }
 
 export interface ScenarioStory {

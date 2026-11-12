@@ -7,6 +7,21 @@ import type { GameState, Wanderer, WorldState } from '../../../types';
 import type { Rng } from '../../rng';
 import { hexDistance, neighbors } from './hex';
 import { timeOfDay } from './time';
+import { isWideMap } from './lanes';
+import { startTileOf } from './start';
+
+/** 陸を歩いて行けるマス（地形は冒険の間変わらないので、同じマスの並びには作り置きを使う） */
+const reachMemo = new WeakMap<object, { from: number; key: string; set: Set<number> }>();
+function landReach(w: WorldState, from: number): Set<number> {
+  const key = w.tiles.length + ':' + w.tiles.reduce((h, t) => (h * 31 + t.t.length + t.t.charCodeAt(0)) | 0, 0);
+  const m = reachMemo.get(w.tiles);
+  if (m && m.from === from && m.key === key) return m.set;
+  const seen = new Set([from]);
+  const q = [from];
+  for (let k = 0; k < q.length; k++) for (const n of neighbors(w, q[k])) if (!seen.has(n) && TERRAINS.get(w.tiles[n].t).moveCost > 0) { seen.add(n); q.push(n); }
+  reachMemo.set(w.tiles, { from, key, set: seen });
+  return seen;
+}
 
 /** 侵食度の段階による敵のレベルの加算 */
 export function corruptionLevelBonus(game: GameState, w: WorldState): number {
@@ -57,8 +72,13 @@ export function spawnWanderer(game: GameState, w: WorldState, rng: Rng, region: 
   if (tile === undefined) {
     const heroes = Object.values(w.pos);
     const cands: number[] = [];
+    // 広い地図（段階6a）: 仕切りや溶岩に閉じ込められた、歩いて行けないマスには置かない
+    const reach = isWideMap(game, w) ? landReach(w, startTileOf(game, w)) : undefined;
+    // 敵・キャラ・出現スポットのいるマス（blocked と同じ判定を、マスごとに数え直さないように先にまとめる）
+    const busy = new Set<number>([...w.wanderers.map((x) => x.tile), ...heroes, ...(w.spawns ?? []).map((x) => x.tile)]);
     for (let i = 0; i < w.tiles.length; i++) {
-      if (w.tiles[i].r !== region || blocked(w, i)) continue;
+      if (w.tiles[i].r !== region || busy.has(i) || w.tiles[i].f || TERRAINS.get(w.tiles[i].t).moveCost <= 0) continue;
+      if (reach && !reach.has(i)) continue;
       if (heroes.some((h) => hexDistance(w, h, i) <= 2)) continue;
       cands.push(i);
     }

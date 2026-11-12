@@ -367,6 +367,8 @@ export interface EventDef {
   needsPet?: boolean;
   /** 隠しボスの名所（K3 C。where: 'map' と使う）: この地域（地域の id）の空いたマスに必ず1つだけ置く。ふつうのマップのイベントの候補には入れない */
   hiddenIn?: string;
+  /** 地図のデータが置き場所を決めるイベント（段階6a の薬草の群生地。where: 'map' と使う）。ふつうのマップのイベントの候補には入れない */
+  placed?: boolean;
   title: string;
   text: string;
   icon: string;

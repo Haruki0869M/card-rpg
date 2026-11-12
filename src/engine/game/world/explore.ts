@@ -4,12 +4,13 @@
 import { BALANCE } from '../../../data/balance';
 import { getScenario } from '../../../data/scenarios';
 import { TERRAINS } from '../../../data/world';
-import type { GameState, SpawnKind, TimedSpawn, WorldState } from '../../../types';
+import type { GameState, ScenarioMapDef, SpawnKind, TimedSpawn, WorldState } from '../../../types';
 import type { Rng } from '../../rng';
 import { addLog } from '../common';
 import { mapHeroes } from '../heroes';
-import { hexDistance, neighbors, rowOf } from './hex';
+import { colOf, hexDistance, neighbors, rowOf } from './hex';
 import { startTileOf } from './start';
+import { isWideMap, laneOfCol } from './lanes';
 
 export const SPAWN_KINDS: SpawnKind[] = ['star', 'peddler', 'thief'];
 /** 出現スポットで始まるイベント（src/content/common/randomEvents/spawnEvents.ts。where: 'spawn'） */
@@ -47,10 +48,13 @@ export function addWatchtowers(game: GameState, w: WorldState): number {
   const map = getScenario(game.scenarioId).map;
   if (!map) return 0;
   const existing = w.tiles.flatMap((t, i) => (t.f?.kind === 'tower' ? [i] : []));
-  const want = w.height >= BALANCE.watchtowerTallMap ? 3 : 2;
+  // 広い地図（段階6a）: 塔の数と帯は地図のデータ（prefer.tower。下から順）
+  const lanes = isWideMap(game, w) ? map.prefer?.tower : undefined;
+  const want = lanes?.length ?? (w.height >= BALANCE.watchtowerTallMap ? 3 : 2);
   if (existing.length >= want) return 0;
   const start = startTileOf(game, w); // 道を長くする前の古い地図でも、スタートの町のマスを使う
   const reach = walkableFrom(w, [start]);
+  if (lanes) return addLaneTowers(game, w, map, lanes, existing, start, reach);
   // 道から歩いて何マスか
   const roadDist = new Map<number, number>();
   const q = [...reach].filter((i) => w.tiles[i].t === map.roadTerrain);
@@ -81,6 +85,42 @@ export function addWatchtowers(game: GameState, w: WorldState): number {
   }
   return added;
 }
+
+/**
+ * 広い地図の塔（段階6a。西2・東2）: 決めた帯の中で、目安の行に近く、道から歩いて TOWER_ROAD_STEPS マスくらいの空きマス。
+ * 帯の中には道が少ないので、道からの距離に上限は付けない（歩いて行けるマスだけ）。乱数は引かない
+ */
+function addLaneTowers(game: GameState, w: WorldState, map: ScenarioMapDef, lanes: string[], existing: number[], start: number, reach: Set<number>): number {
+  const roadDist = new Map<number, number>();
+  const q = [...reach].filter((i) => w.tiles[i].t === map.roadTerrain);
+  for (const i of q) roadDist.set(i, 0);
+  for (let k = 0; k < q.length; k++) {
+    const d = roadDist.get(q[k])!;
+    for (const n of neighbors(w, q[k])) if (reach.has(n) && !roadDist.has(n)) { roadDist.set(n, d + 1); q.push(n); }
+  }
+  const occupied = new Set<number | undefined>([
+    ...Object.values(w.pos), ...Object.values(w.downed ?? {}), ...w.wanderers.map((e) => e.tile), ...(w.spawns ?? []).map((s) => s.tile),
+    game.event?.tile, game.chest?.tile, game.shrine?.tile, game.encounter?.tile, game.sanctuary?.tile,
+  ]);
+  const placed = [...existing];
+  let added = 0;
+  lanes.forEach((lane, k) => {
+    if (k < existing.length) return;
+    const targetRow = (w.height - 1) * (1 - (k + 1) / (lanes.length + 1));
+    const cands = [...roadDist.keys()].filter(
+      (i) => laneOfCol(map, colOf(w, i))?.id === lane && roadDist.get(i)! >= 1 && land(w, i) && !w.tiles[i].f && !occupied.has(i) && hexDistance(w, i, start) >= 4 && placed.every((p) => hexDistance(w, p, i) >= 5),
+    );
+    cands.sort((a, b) => Math.abs(rowOf(w, a) - targetRow) - Math.abs(rowOf(w, b) - targetRow) || Math.abs(roadDist.get(a)! - TOWER_ROAD_STEPS) - Math.abs(roadDist.get(b)! - TOWER_ROAD_STEPS) || a - b);
+    const tile = cands[0];
+    if (tile === undefined) return;
+    w.tiles[tile].f = { kind: 'tower', id: WATCHTOWER_ID };
+    placed.push(tile);
+    added++;
+  });
+  return added;
+}
+/** 【提案】広い地図の塔の、道から歩いて何マスくらいの所に置くか */
+const TOWER_ROAD_STEPS = 3;
 
 /** 塔に登る: まわりの霧が晴れ、少し遠くの宝箱・神殿・祭壇・レアの敵も見える。手番は使わない。1つの塔は1回だけ */
 export function climbWatchtower(game: GameState, w: WorldState, tile: number) {

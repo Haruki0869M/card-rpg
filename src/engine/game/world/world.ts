@@ -24,6 +24,7 @@ import { timeOfDay } from './time';
 import { ensureShop } from './town';
 import { dungeonGateError } from './questGate';
 import { moveWanderers, spawnWanderer } from './wanderers';
+import { terrainDiceBonus } from './lanes';
 
 type Cmd<T extends GameCommand['type']> = Extract<GameCommand, { type: T }>;
 
@@ -214,13 +215,13 @@ export function questSignal(game: GameState, s: QuestSignal) {
 
 // ---------- コマンド ----------
 
-/** 移動のサイコロ（1d6 ＋ 素早さ・探索の能力・お供のボーナス。オーナーの案） */
+/** 移動のサイコロ（1d6 ＋ 素早さ・探索の能力・お供のボーナス。オーナーの案）。広い地図では、街道の上で振ると +1（段階6a。足し算だけで、乱数は増えない） */
 export function rollMove(game: GameState, cmd: Cmd<'WORLD_ROLL_MOVE'>, rng: Rng): string | undefined {
   const t = turnCheck(game, cmd.playerId, cmd.heroId);
   if (typeof t === 'string') return t;
   const { w, h } = t;
   if (w.move !== null) return 'もう移動力を決めました';
-  const d = newDice(game, BALANCE.moveDiceSides, worldDiceBonus(h), rng);
+  const d = newDice(game, BALANCE.moveDiceSides, [...worldDiceBonus(h), ...terrainDiceBonus(game, w, w.pos[h.id])], rng);
   w.moveDice = d;
   w.move = d.total;
   w.prevTile = w.pos[h.id];

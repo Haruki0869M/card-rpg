@@ -178,7 +178,7 @@ describe('宝箱', () => {
     }
     expect(counts.legend).toBeGreaterThan(0);
     expect(counts.epic).toBeGreaterThan(0);
-  });
+  }, 20000); // 冒険を400回作る（段階6a でシナリオ1の地図が2.25倍になり、1回あたり約2ms→5ms。全部のテストを並べて動かすと5秒を超えるため）
   it('鍵開けに失敗すると罠（全員5ダメージ）。成功すれば開けられる', () => {
     let failed = false;
     let opened = false;

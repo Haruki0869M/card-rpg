@@ -2,7 +2,7 @@
 import type { TerrainDef } from '../../../types';
 
 export const terrains: TerrainDef[] = [
-  { id: 'road', order: 1, name: '街道', moveCost: 1, color: '#b49a6a', decor: 'road', background: 'plains' },
+  { id: 'road', order: 1, name: '街道', moveCost: 1, moveDiceBonus: 1, color: '#b49a6a', decor: 'road', background: 'plains' },
   { id: 'plains', order: 2, name: '平原', moveCost: 1, color: '#6f9a4a', decor: 'grass', background: 'plains' },
   { id: 'forest', order: 3, name: '森', moveCost: 2, color: '#2f6a3a', decor: 'trees', background: 'forest' },
   { id: 'swamp', order: 4, name: '沼', moveCost: 2, color: '#4a5a3e', decor: 'reeds', background: 'swamp' },
@@ -12,4 +12,6 @@ export const terrains: TerrainDef[] = [
   { id: 'lava', order: 8, name: '溶岩', moveCost: 0, color: '#c24a1a', decor: 'lava', background: 'volcano' },
   { id: 'water', order: 9, name: '湖', moveCost: 0, color: '#2a5a8a', decor: 'waves', background: 'plains' },
   { id: 'blight', order: 10, name: '瘴気の地', moveCost: 2, color: '#3a2448', decor: 'cracks', background: 'castle' },
+  // 段階6a: 広い地図の仕切り・盆地の壁。山と同じ峰の絵（少し高く・暗く）で、通れない。峠（切れ目）を通るか、回り道をする
+  { id: 'crag', order: 18, name: '険しい山', moveCost: 0, color: '#4e4650', decor: 'peaks', background: 'volcano' },
 ];

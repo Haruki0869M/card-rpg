@@ -33,6 +33,14 @@ export function neighbors(w: Pick<WorldState, 'width' | 'height'>, i: number): n
   return out;
 }
 
+/** 向き d（0=右・1=右上・2=左上・3=左・4=左下・5=右下）の隣のマス（地図の外は undefined） */
+export function neighborInDir(w: Pick<WorldState, 'width' | 'height'>, i: number, d: number): number | undefined {
+  const c = colOf(w, i);
+  const r = rowOf(w, i);
+  const [dc, dr] = (r % 2 ? ODD : EVEN)[((d % 6) + 6) % 6];
+  return inside(w, c + dc, r + dr) ? idxOf(w, c + dc, r + dr) : undefined;
+}
+
 /** 2マスの距離（ヘックスの歩数） */
 export function hexDistance(w: Pick<WorldState, 'width'>, a: number, b: number): number {
   const toCube = (i: number) => {
