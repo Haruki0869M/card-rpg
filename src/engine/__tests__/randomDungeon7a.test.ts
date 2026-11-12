@@ -154,6 +154,8 @@ describe('段階7a: 世界マップのランダムダンジョン', () => {
     expect(after.log.some((l) => l.text.includes(`${BALANCE.corruptionOnRandomDungeonClear}%下がった`))).toBe(true);
     expect(after.world!.corruption).toBeLessThan(30);
     // もう入れない（踏破済み）。もう1つのランダムダンジョンには入れる
+    // （侵食度が15%を越えているので、段階7b の災厄の中ボスの知らせが出ていることがある。読んで閉じる）
+    after.world!.story = undefined;
     after.world!.pos.h0 = tile;
     after.world!.turn = 'h0';
     expect(err(after, { type: 'WORLD_INTERACT', playerId: 'P1', heroId: 'h0', party: ['h0'] })).toContain('踏破済み');

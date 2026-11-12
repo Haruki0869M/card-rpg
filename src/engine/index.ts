@@ -40,6 +40,7 @@ export { isWideMap, laneOfTile, nextGoalDungeon, terrainDiceBonus } from './game
 export { sceneHeroes, activeHeroes } from './game/heroes';
 export { altarTransmutePool } from './game/tasks';
 export { isRandomDungeonTile, randomDungeonView } from './game/world/randomDungeons';
+export { aliveScourges, scourgeCurse, scourgeList, scourgePrice, scourgeRewardText, scourgesWith, scourgeAt, ELIXIR_ID } from './game/world/scourges';
 export * from './hash';
 export * from './game/scenes';
 export * from './game/votes';

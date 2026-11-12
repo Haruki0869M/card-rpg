@@ -42,7 +42,7 @@ export function ensureShop(game: GameState, rng: Rng): ShopStock {
   const types = new Set(game.heroes.filter((h) => !h.retired).flatMap((h) => jobWeapons(h.classId)));
   // ランダムダンジョンの専用の装備（段階7a）は町の店に出さない
   const equip = ITEMS.all.filter((i) => i.slot !== 'consumable' && !i.source && (!i.scenario || i.scenario === game.scenarioId) &&(i.slot !== 'weapon' || types.has(i.weaponType!)));
-  const cons = ITEMS.all.filter((i) => i.slot === 'consumable' && !i.noShop && !(town.shop.fixed ?? []).includes(i.id));
+  const cons = ITEMS.all.filter((i) => i.slot === 'consumable' && !i.noShop && !i.source && !(town.shop.fixed ?? []).includes(i.id));
   const pickByRarity = (pool: typeof ITEMS.all) => {
     for (let tries = 0; tries < 10; tries++) {
       const r = pickWeighted(lowWeights, rng);
@@ -95,7 +95,7 @@ export function townBuy(game: GameState, cmd: Cmd<'TOWN_BUY'>, rng: Rng): string
   const v = facilityHero(game, cmd.playerId, cmd.heroId)!;
   // カードは、町に入ったキャラの職業のものだけ買える
   if (!('item' in entry) && getClass(findHero(game, entry.heroId)?.classId ?? '').id !== v.classId) return `${v.name}の職業のカードではありません`;
-  const price = shopPriceFor(v, entry.price);
+  const price = shopPriceFor(v, entry.price, game);
   if (v.gold < price) return 'ゴールドが足りません';
   v.gold -= price;
   entry.sold = true;

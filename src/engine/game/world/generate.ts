@@ -16,6 +16,7 @@ import { addSanctuaries } from './sanctuaries';
 import { addWatchtowers } from './explore';
 import { laneOfCol } from './lanes';
 import { assignDungeonThemes } from './randomDungeons';
+import { initScourges } from './scourges';
 
 const pick = <T,>(list: readonly T[], rng: Rng) => list[rng.int(list.length)];
 
@@ -316,6 +317,8 @@ export function createWorld(game: GameState, rng: Rng): WorldState {
   w.nextSpawnId = 1;
   // ランダムダンジョンのテーマ（段階7a）。最後に引くので、ほかの物の置き方は変わらない
   assignDungeonThemes(w, rng);
+  // 災厄の中ボス（段階7b）: 広い地図だけ。まだ1体も出ていない（乱数は引かない）
+  initScourges(game, w);
   return w;
 }
 

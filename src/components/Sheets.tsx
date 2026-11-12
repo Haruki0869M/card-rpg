@@ -586,6 +586,19 @@ function PouchSheet() {
           <button onClick={() => { const error = usePouch(chosen!, owner!.id, owner?.id); if (!error) setChosen(null); }} className="btn btn-gold mt-1 h-12 w-full rounded-lg text-[14px] font-bold">ここで野営する</button>
         </div>
       )}
+      {chosenDef && fieldKind(chosenDef) === 'elixir' && stoneHero && !inBattle && (
+        <div className="mt-2 rounded-xl border border-amber-400/40 bg-black/40 p-2" data-elixir-stats>
+          <div className="text-[13px] text-zinc-300">{game.heroes.find((h) => h.id === stoneHero)?.name}のどの能力値を上げる？（この冒険の間 +{(chosenDef.use?.find((e) => e.kind === 'fieldOnly') as { amount?: number } | undefined)?.amount ?? 5}）</div>
+          <div className="mt-1 grid grid-cols-4 gap-1">
+            {STAT_IDS.map((st) => (
+              <button key={st} onClick={() => { const error = usePouch(chosen!, stoneHero, owner?.id, undefined, st); if (!error) { setChosen(null); setStoneHero(null); } }} className="btn btn-dark flex h-11 flex-col items-center justify-center rounded-lg text-[12px] leading-4 font-bold" data-elixir-stat={st}>
+                {STAT_LABEL[st]}
+                <span className="tabular-nums text-zinc-400">{heroStats(game.heroes.find((h) => h.id === stoneHero)!)[st]}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {chosenDef && fieldKind(chosenDef) === 'whetstone' && stoneHero && !inBattle && (
         <div className="mt-2 rounded-xl border border-amber-400/40 bg-black/40 p-2">
           <div className="text-[13px] text-zinc-300">強化するカードを選んでください（この冒険の間だけ。成功率+10%・効果の数値が上がる）</div>
@@ -625,7 +638,7 @@ function PouchSheet() {
           </div>
         </div>
       )}
-      {chosenDef && !(inBattle && itemTargetsEnemy(chosenDef.use)) && fieldKind(chosenDef) !== 'tent' && !(fieldKind(chosenDef) === 'whetstone' && stoneHero) && (
+      {chosenDef && !(inBattle && itemTargetsEnemy(chosenDef.use)) && fieldKind(chosenDef) !== 'tent' && !((fieldKind(chosenDef) === 'whetstone' || fieldKind(chosenDef) === 'elixir') && stoneHero) && (
         <div className="mt-2 rounded-xl border border-amber-400/40 bg-black/40 p-2">
           <div className="text-[13px] text-zinc-300">
             「{chosenDef.name}」を誰に使う？{chosenDef.use?.some((e) => e.kind === 'escape') && '（使うと戦闘から逃げる）'}
@@ -637,7 +650,7 @@ function PouchSheet() {
                 disabled={chosenDef.use?.some((e) => e.kind === 'phoenix') ? false : chosenDef.use?.some((e) => e.kind === 'revive') ? !dead : dead}
                 onClick={() => {
                   // 砥石は、先にだれのカードかを選ぶ
-                  if (fieldKind(chosenDef) === 'whetstone') { setStoneHero(h.id); return; }
+                  if (fieldKind(chosenDef) === 'whetstone' || fieldKind(chosenDef) === 'elixir') { setStoneHero(h.id); return; }
                   const error = usePouch(chosen!, h.id, owner?.id);
                   if (!error) setChosen(null);
                 }}

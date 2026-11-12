@@ -73,7 +73,8 @@ describe('見晴らしの塔', () => {
     expect(w2.turn).toBe('h1');
     w2.tiles.forEach((x, i) => {
       if (hexDistance(w2, t, i) <= BALANCE.watchtowerRadius) expect(x.seen).toBe(true);
-      else if (hexDistance(w2, t, i) > BALANCE.watchtowerSpotRadius) expect(x.seen).toBe(false);
+      // 段階7b: 広い地図では、ランダムダンジョン（と災厄の中ボス）の場所は地図全体で見える
+      else if (hexDistance(w2, t, i) > BALANCE.watchtowerSpotRadius && !(x.f?.kind === 'dungeon' && x.f.theme)) expect(x.seen).toBe(false);
     });
     if (far >= 0) expect(w2.tiles[far].seen).toBe(true);
     expect(w2.tiles[t].f!.used).toBe(true);

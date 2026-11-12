@@ -78,7 +78,8 @@ export interface ItemDef {
   /**
    * 出どころ（段階7a）。randomDungeon = ランダムダンジョンの黄金箱と闇商人だけで手に入る専用の装備（町の店・ふつうの宝箱・戦闘のドロップ・行商人には出ない）
    */
-  source?: 'randomDungeon';
+  /** scourge = 災厄の中ボスが必ず落とす専用の装備と秘薬（段階7b。ほかのどこにも出ない） */
+  source?: 'randomDungeon' | 'scourge';
   /** 仲間がいる時だけ出る（1人で遊ぶ冒険では出さない。共鳴する絆の指輪） */
   teamOnly?: boolean;
   /** 道具袋に持てる数を増やす（錬金術師のベルト） */
@@ -618,7 +619,7 @@ export type GameCommand =
   | { type: 'ENTER_DUNGEON'; playerId: PlayerId; dungeonId: string }
   | { type: 'ENTER_ROOM'; playerId: PlayerId; roomId: string }
   | { type: 'BATTLE'; command: Command }
-  | { type: 'USE_POUCH_ITEM'; playerId: PlayerId; itemUid: string; userId: string; targetId: string; /** カード鍛錬の砥石: 強化するカード */ cardUid?: string }
+  | { type: 'USE_POUCH_ITEM'; playerId: PlayerId; itemUid: string; userId: string; targetId: string; /** カード鍛錬の砥石: 強化するカード */ cardUid?: string; /** 秘薬（段階7b）: 上げる能力値 */ stat?: StatId }
   | { type: 'FINISH_BATTLE'; playerId: PlayerId }
   | { type: 'CHOOSE_GROWTH'; playerId: PlayerId; optionIndex: number; cardUid?: string }
   | { type: 'PICK_CARD'; playerId: PlayerId; offerIndex: number | null; /** 選ばない時: どのキャラの分か（省くと、その人のキャラ全員の分） */ heroId?: string }

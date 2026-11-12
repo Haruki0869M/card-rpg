@@ -9,6 +9,7 @@ import { hexDistance, neighbors } from './hex';
 import { timeOfDay } from './time';
 import { isWideMap } from './lanes';
 import { startTileOf } from './start';
+import { scourgeCurse } from './scourgeCurse';
 
 /** 陸を歩いて行けるマス（地形は冒険の間変わらないので、同じマスの並びには作り置きを使う） */
 const reachMemo = new WeakMap<object, { from: number; key: string; set: Set<number> }>();
@@ -32,7 +33,8 @@ export function corruptionLevelBonus(game: GameState, w: WorldState): number {
 /** 敵のレベル: 地域の基準 + 難易度 + 侵食度の段階 + 夜 */
 export function wandererLevel(game: GameState, w: WorldState, region: number): number {
   const def = getScenario(game.scenarioId).map!;
-  const night = timeOfDay(w.worldTurn) === 'night' ? BALANCE.nightEnemyLevel : 0;
+  // 夜は魔物が強い。氷嵐の魔女（災厄の中ボス・段階7b）が生きている間は、さらに強い
+  const night = timeOfDay(w.worldTurn) === 'night' ? BALANCE.nightEnemyLevel + scourgeCurse({ world: w }).nightLevel : 0;
   return Math.max(1, def.regions[region].enemyLevel + getDifficulty(game.difficulty).enemyLevel + corruptionLevelBonus(game, w) + night);
 }
 
@@ -102,7 +104,8 @@ export function spawnWanderer(game: GameState, w: WorldState, rng: Rng, region: 
 export function moveWanderers(w: WorldState, rng: Rng) {
   if (w.worldTurn % BALANCE.wandererMoveEvery !== 0) return;
   for (const wd of w.wanderers) {
-    if (wd.raidTown || rng.next() < 0.5) continue;
+    // 襲撃の敵と災厄の中ボス（巣にいる。段階7b）は動かない
+    if (wd.raidTown || wd.scourge || rng.next() < 0.5) continue;
     const atSea = !!TERRAINS.get(w.tiles[wd.tile].t).sea;
     const opts = neighbors(w, wd.tile).filter((n) => !blocked(w, n, atSea) && w.tiles[n].r === w.tiles[wd.tile].r);
     if (opts.length) wd.tile = opts[rng.int(opts.length)];

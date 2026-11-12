@@ -34,6 +34,7 @@ import {
   corruptionShown,
   dungeonJoin,
   randomDungeonView,
+  scourgesWith,
 } from '../../engine';
 import { isLocalPlayer, isOnlinePlay } from '../../store/battleConfig';
 import { useBattle, type WorldMovePresentation } from '../../store/battleStore';
@@ -45,6 +46,7 @@ import { PlayerTag, showOwners } from '../Sheets';
 import { DiceOverlay, DiceResult, bonusText } from '../ui/DiceRoll';
 import { Bar, HeroFace, Screen } from '../ui/game';
 import { WorldMap } from './WorldMap';
+import { ScourgeStrip } from './ScourgeBadge';
 import { arrivalView, moveButtonText, MoveStatus, useMovePlayback } from './WorldMoveScene';
 import { canChangeNow } from '../JobSheet';
 import { useElementSize } from '../../hooks/useElementSize';
@@ -61,6 +63,7 @@ export function WorldTopBar({ game, goldHeroId }: { game: GameState; /** 所持�
   const next = nextCorruptionStage(game);
   const cName = corruptionName(game.scenarioId);
   return (
+    <>
     <div className="panel z-10 flex shrink-0 items-center gap-1.5 px-2 py-1" data-cutin-anchor>
       <button
         // 押すと遊び方の「侵食度」（一番上に今の値と次の段階）を開く。以前のトーストの代わり
@@ -109,6 +112,9 @@ export function WorldTopBar({ game, goldHeroId }: { game: GameState; /** 所持�
         <Menu size={22} />
       </button>
     </div>
+    {/* 災厄の中ボスの札（段階7b）。いる時だけ */}
+    <ScourgeStrip game={game} />
+    </>
   );
 }
 
@@ -411,6 +417,8 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
   const md = w.moveDice;
   const canReroll = mine && !!md && !md.rerolled && w.move === md.total && w.pos[hero.id] === w.prevTile && hero.focus >= 1;
   const ambush = campAmbushChance(game, hero.id);
+  // 悪夢の魔獣（災厄の中ボス・段階7b）が生きている間は、野営のHPの回復が半分
+  const nightmare = scourgesWith(game, 'campHeal')[0];
   const climate = climateAt(game, here);
   const onTown = w.tiles[here].f?.kind === 'town';
   const canCamp = !onTown && (w.move === null || w.move >= BALANCE.moveBase);
@@ -641,6 +649,7 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
               className="btn btn-dark flex h-11 items-center justify-center gap-0.5 rounded-lg text-[12px] font-bold"
             >
               <Tent size={15} /> 野営{ambush ? `${ambush}%` : ''}
+              {nightmare && <span className="ml-0.5 text-[12px] text-fuchsia-300" data-camp-scourge>💀回復半分</span>}
             </button>
             <button onClick={() => dispatchGame({ type: 'WORLD_WAIT', playerId: pid, heroId: hero.id })} className="btn btn-dark h-11 rounded-lg text-[12px] font-bold">
               {w.move === null ? '待機' : '手番を終える'}

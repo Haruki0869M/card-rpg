@@ -40,7 +40,7 @@ export function makeCtx(
   rng: Rng,
   events: BattleEvent[],
   source: Unit,
-  opts: { target?: Unit; allyTarget?: Unit; attacker?: Unit; card?: CardDef; cardAbilities?: AbilityDef[]; dealt?: number; depth?: number; perfect?: boolean; tierEffects?: Effect[]; via?: 'pet' | 'summon'; weakTarget?: Unit; helped?: Unit[] } = {},
+  opts: { target?: Unit; allyTarget?: Unit; attacker?: Unit; card?: CardDef; cardAbilities?: AbilityDef[]; dealt?: number; depth?: number; perfect?: boolean; tierEffects?: Effect[]; via?: 'pet' | 'summon'; weakTarget?: Unit; helped?: Unit[]; statusId?: string } = {},
 ): EffectCtx {
   return {
     state,
@@ -58,6 +58,7 @@ export function makeCtx(
     weakTarget: opts.weakTarget,
     helped: opts.helped,
     dealt: opts.dealt ?? 0,
+    ...(opts.statusId ? { statusId: opts.statusId } : {}),
     parts: [],
     hitIds: [],
     fired: [],
@@ -371,6 +372,8 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
       ctx.parts.push(`${getStatus(el.status).name}${n}`);
       // きっかけ: 相手に状態異常を与えた
       if (ctx.depth < 3 && isEnemy(source) !== isEnemy(v) && !source.dead) fireAbilities(state, rng, events, source, 'inflict', { target: v, statusId: el.status, dealt: n, depth: ctx.depth + 1 });
+      // 段階7b: 味方に悪い状態異常が付いた（悪夢の毛皮）
+      if (ctx.depth < 3 && !isEnemy(v) && getStatus(el.status).harmful) fireAbilities(state, rng, events, v, 'statusTaken', { statusId: el.status, dealt: n, attacker: source, depth: ctx.depth + 1 });
     }
   }
   // 転職の条件の記録: 味方が敵を倒した（属性・呪い・自分のHPが少ない時）

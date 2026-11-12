@@ -229,6 +229,15 @@ export const BALANCE = {
    * - blackMarketGoods: 闇商人が専用の装備のほかに並べる、レア以上の品の数【提案】
    */
   randomDungeon: { exclusiveChance: 60, blackMarketPriceMul: 1.5, blackMarketGoods: 2 },
+  /**
+   * 災厄の中ボス（段階7b・overhaul-plan-v2 §3。数字は計画の【提案】のまま。段階8で測って決める）。広い地図（帯のある地図）だけに出る。
+   * - max: 1冒険に出る数 / firstCorruption: 1体目は「1つ目の鍵を取った時」か、その前に侵食度がこれを越えた時 / milestones: 2体目・3体目の侵食度
+   * - levelBonus: その地域の敵のレベル+N（夜の加算は入れない） / minions: 取り巻きの数（4人の冒険は minions4p）
+   * - heroDistance: 世界マップにいる一番近いキャラから何マス / roadDistance: 街道（道の地形）から何マス以上離れたマス
+   * - towerReveal: 登った見晴らしの塔からこのマス以内に出た災厄は、自動で場所が見える
+   * - purify: 倒した時に侵食度が下がる量（寄り道の浄化。オーナーの決定 3-A の始めの数字） / elixirStat: 秘薬で上がる能力値
+   */
+  scourge: { max: 3, firstCorruption: 15, milestones: [35, 55] as readonly number[], levelBonus: 2, minions: 2, minions4p: 3, heroDistance: [5, 9] as readonly [number, number], roadDistance: 3, towerReveal: 12, purify: 3, elixirStat: 5 },
   /** 野営の回復（HPは最大HPの割合）と、夜に野営した時の夜襲の確率（%） */
   campHpRatio: 0.2,
   campFocus: 1,

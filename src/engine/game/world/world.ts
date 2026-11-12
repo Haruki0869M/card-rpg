@@ -8,7 +8,7 @@ import { EVENTS } from '../../../data/events';
 import { corruptionName, getScenario } from '../../../data/scenarios';
 import { getDifficulty } from '../../../data/rules';
 import { QUESTS, SANCTUARIES, TERRAINS, TOWNS } from '../../../data/world';
-import type { EncounterState, Expedition, GameCommand, GameState, Hero, QuestState, WorldState } from '../../../types';
+import type { EncounterState, Expedition, GameCommand, GameState, Hero, QuestState, Wanderer, WorldState } from '../../../types';
 import type { Rng } from '../../rng';
 import { addPetLove, petExplore } from '../pets';
 import { addLog, campFocusOf, ownedBy, restMultiplierOf, rollWithFocus, splitGold, statChance, successes } from '../common';
@@ -25,6 +25,8 @@ import { ensureShop } from './town';
 import { dungeonGateError } from './questGate';
 import { moveWanderers, spawnWanderer } from './wanderers';
 import { terrainDiceBonus } from './lanes';
+import { scourgeCurse } from './scourgeCurse';
+import { tickScourges } from './scourges';
 
 type Cmd<T extends GameCommand['type']> = Extract<GameCommand, { type: T }>;
 
@@ -130,7 +132,9 @@ function endWorldTurn(game: GameState, rng: Rng) {
   // 「全員が中」にすると、パーティが分かれた時（外で待つ仲間がいる時）だけ長いダンジョンの間ずっと+1%になり、侵食度が持たない
   const inside = livingHeroes(game).some((x) => expeditionOf(game, x.id));
   const perTurn = inside ? BALANCE.corruptionPerDungeonTurn : BALANCE.corruptionPerTurn;
-  w.corruption = Math.min(100, w.corruption + perTurn * (getDifficulty(game.difficulty).corruptionPerTurn ?? 1));
+  // 瘴気を紡ぐ死霊術師（災厄の中ボス・段階7b）: 世界マップの番だけ、さらに上がる（ダンジョンの中の番には掛けない。オーナーの決定 2-A）
+  const curse = inside ? 0 : scourgeCurse(game).corruptionPerTurn;
+  w.corruption = Math.min(100, w.corruption + perTurn * (getDifficulty(game.difficulty).corruptionPerTurn ?? 1) + curse);
   onCorruptionChange(game, rng, before);
   // 夜は魔物が増える
   const def = getScenario(game.scenarioId).map!;
@@ -149,6 +153,8 @@ function endWorldTurn(game: GameState, rng: Rng) {
     addLog(game, `${TOWNS.get(raid.townId).name}が魔物に陥落した…（${corruptionName(game.scenarioId)}+${BALANCE.corruptionOnTownFall}%）`);
     onCorruptionChange(game, rng, b2);
   }
+  // 災厄の中ボス（段階7b）: 越えた節目の分だけ出る（1ターンに1体）
+  if (game.mode !== 'gameover') tickScourges(game, w, rng);
   revealAround(game, w);
   const first = livingHeroes(game)[0];
   if (first) setTurn(game, first.id);
@@ -438,13 +444,15 @@ export function camp(game: GameState, cmd: Cmd<'WORLD_CAMP'>, rng: Rng, opts: { 
   if (w.move !== null && w.move < (BALANCE.moveBase as number)) return '移動した後は野営できません';
   const chance = opts.tent ? 0 : campAmbushChance(game, h.id);
   const climateMul = climateAt(game, tile) ? BALANCE.climateCampHealMul : 1;
+  // 悪夢の魔獣（災厄の中ボス・段階7b）が生きている間は、HPの回復が半分（フォーカスとテントは変わらない）
+  const nightmare = scourgeCurse(game).campHeal;
   if (opts.tent) {
     h.hp = Math.min(heroMaxHp(h), h.hp + Math.ceil(heroMaxHp(h) * 0.5));
     h.focus = Math.min(heroFocusMax(h), h.focus + Math.ceil(heroFocusMax(h) * 0.5));
-  } else h.hp = Math.min(heroMaxHp(h), h.hp + Math.ceil(heroMaxHp(h) * BALANCE.campHpRatio * climateMul * (restMultiplierOf(h) + (petExplore(h).campHeal ?? 0) + equippedItems(h).reduce((n, i) => n + (i.explore?.campHeal ?? 0), 0))));
+  } else h.hp = Math.min(heroMaxHp(h), h.hp + Math.ceil(heroMaxHp(h) * BALANCE.campHpRatio * climateMul * nightmare * (restMultiplierOf(h) + (petExplore(h).campHeal ?? 0) + equippedItems(h).reduce((n, i) => n + (i.explore?.campHeal ?? 0), 0))));
   if (!opts.tent) h.focus = Math.min(heroFocusMax(h), h.focus + BALANCE.campFocus + campFocusOf(h));
   (w.sheltered ??= []).push(h.id);
-  addLog(game, opts.tent ? `${h.name}はテントを張って、ぐっすり休んだ` : `${h.name}は野営して体を休めた${climateMul < 1 ? '（厳しい土地で、回復は半分）' : ''}`);
+  addLog(game, opts.tent ? `${h.name}はテントを張って、ぐっすり休んだ` : `${h.name}は野営して体を休めた${climateMul < 1 ? '（厳しい土地で、回復は半分）' : ''}${nightmare < 1 ? '（悪夢にうなされ、回復は半分）' : ''}`);
   if (chance > 0 && rng.next() * 100 < chance) {
     const wd = spawnWanderer(game, w, rng, w.tiles[tile].r, tile);
     if (wd) {
@@ -540,21 +548,22 @@ function beginEncounterBattle(game: GameState, e: EncounterState, participants: 
   const wd = w.wanderers.find((x) => x.id === e.wandererId);
   if (!wd) return '敵がいません';
   game.party = participants;
-  game.battleInfo = { roomType: wd.raidTown ? 'elite' : 'battle', wandererId: wd.id, tile: e.tile };
+  // 災厄の中ボス（段階7b）は中ボスと同じ扱いの戦闘（ふつうの装備のドロップは無い。専用の装備は勝った時に必ず渡す）
+  game.battleInfo = { roomType: wd.scourge ? 'scourge' : wd.raidTown ? 'elite' : 'battle', wandererId: wd.id, tile: e.tile };
   game.encounter = undefined;
   startBattleWith(game, wd.enemies, game.battleInfo.roomType, rng, { surprise, background: undefined });
   if (surprise) addLog(game, '奇襲成功！ 敵は最初のターンに動けない');
   return undefined;
 }
 
-/** 遭遇の戦闘に勝った時（敵を消す・襲撃を防ぐ・依頼） */
-export function onWandererDefeated(game: GameState, rng: Rng) {
+/** 遭遇の戦闘に勝った時（敵を消す・襲撃を防ぐ・依頼）。倒した敵の組を返す（災厄の中ボスの報酬は、呼んだ側で渡す） */
+export function onWandererDefeated(game: GameState, rng: Rng): Wanderer | undefined {
   const w = game.world;
   const info = game.battleInfo;
-  if (!w || !info?.wandererId) return;
+  if (!w || !info?.wandererId) return undefined;
   const wd = w.wanderers.find((x) => x.id === info.wandererId);
   w.wanderers = w.wanderers.filter((x) => x.id !== info.wandererId);
-  if (!wd) return;
+  if (!wd) return undefined;
   questSignal(game, { kind: 'defeatWanderer', region: w.tiles[wd.tile].r });
   if (wd.raidTown) {
     w.raids = w.raids.filter((r) => r.townId !== wd.raidTown);
@@ -564,6 +573,7 @@ export function onWandererDefeated(game: GameState, rng: Rng) {
     addLog(game, `${TOWNS.get(wd.raidTown).name}を魔物から守った！（${BALANCE.raidRewardGold}Gを山分け）`);
   }
   void rng;
+  return wd;
 }
 
 /** 場面（遭遇の戦闘・宝箱・イベント・祠・ダンジョン）が終わって世界マップに戻る */

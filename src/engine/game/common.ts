@@ -9,6 +9,7 @@ import { finalChanceOf } from './checks';
 import { rarityIndex } from './dungeon';
 import { findHero, livingHeroes, sceneHeroes } from './heroes';
 import { equippedItems, heroStats, pouchLimitOf } from './hero';
+import { scourgePrice } from './world/scourgeCurse';
 import { petExplore } from './pets';
 import { exploreEffects } from './exploreAbilities';
 
@@ -156,8 +157,12 @@ export function campFocusOf(hero: Hero): number {
   return e.kind === 'campFocus' ? e.amount : 0;
 }
 
-/** 探索の特殊能力: 町の買い物の値段（怪盗の変装など。値引きは切り捨て） */
-export function shopPriceFor(hero: Hero | undefined, price: number): number {
+/**
+ * 町の買い物の値段: 災厄の中ボスの悪さ（強欲の盗賊王 +25%。段階7b）を掛けてから、探索の特殊能力の値引き（怪盗の変装など。切り捨て）。
+ * game を渡さない時は、災厄の悪さを掛けない
+ */
+export function shopPriceFor(hero: Hero | undefined, base: number, game?: Pick<GameState, 'world'>): number {
+  const price = scourgePrice(game, base);
   const discount = hero ? Math.max(0, ...exploreEffects(hero).map(e => e.kind === 'shopDiscount' ? e.percent : 0)) : 0;
   return discount ? Math.max(1, Math.floor(price * (100 - discount) / 100)) : price;
 }
