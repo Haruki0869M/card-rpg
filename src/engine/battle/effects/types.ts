@@ -24,6 +24,8 @@ export interface EffectCtx {
   tierEffects?: Effect[];
   /** カードではない攻撃の出どころ（pet = お供の能力 / summon = 砲台・罠・召喚。追い込み） */
   via?: 'pet' | 'summon';
+  /** 分身の追撃（召喚の攻撃。かばう敵に逸らされない） */
+  echo?: boolean;
   /** 今のカードが弱点を突いた敵（効果の対象 weakHit） */
   weakTarget?: Unit;
   /** 今のカードで支援が成立した味方（効果の対象 helped） */

@@ -16,7 +16,7 @@ import { useBattle } from '../store/battleStore';
 import type { Affinity, BattleState, EnemyActionDef, EnemyState, GameState, StatId } from '../types';
 import { CATEGORY_LABEL, intentView, longEffect, tierTitle } from './format';
 import { RARITY_STYLE } from './ui/game';
-import { CATEGORY_STYLE, ElementTag, statusStyle } from './ui/icons';
+import { CATEGORY_STYLE, ElementTag, MARK_STATUSES, statusStyle } from './ui/icons';
 import { BALANCE } from '../data/balance';
 
 function signed(n: number) {
@@ -100,6 +100,8 @@ function Content({ d, battle, game }: { d: Detail; battle: BattleState; game: Ga
             {iv ? (
               <div className="mt-1 text-[13px]">
                 <div className="font-bold text-red-300">次の行動：「{iv.name}」</div>
+                {/* 敵の特殊な行動: 何が起きるか・どうすれば止まるか */}
+                {iv.hint && <div className="my-0.5 rounded bg-amber-400/15 px-1.5 py-0.5 font-bold text-amber-200" data-intent-hint>{iv.hint}</div>}
                 {iv.details.map((t, i) => (
                   <div key={i}>・{t}</div>
                 ))}
@@ -108,6 +110,7 @@ function Content({ d, battle, game }: { d: Detail; battle: BattleState; game: Ga
               <div className="mt-1 text-[13px] text-zinc-400">{e.dead ? '撃破済み' : '行動済み'}</div>
             )}
             {e.tauntedBy && <div className="text-[13px] text-amber-300">{findAlly(battle, e.tauntedBy)?.name}に挑発されている</div>}
+            {e.guarding && !e.dead && <div className="text-[13px] text-sky-300">仲間をかばっている（ほかの敵への単体攻撃を代わりに受ける。全体攻撃は通る）</div>}
             {(def.weak?.length || def.resist?.length) && (
               <div className="mt-1 flex flex-wrap gap-x-2 text-[12px]">
                 {def.weak?.length ? (
@@ -207,12 +210,12 @@ function Content({ d, battle, game }: { d: Detail; battle: BattleState; game: Ga
           <Title>
             <span className="inline-flex items-center gap-1" style={{ color: st.color }}>
               <st.Icon size={18} /> {st.name}
-              {d.status !== 'taunt' && ` ${d.amount}`}
+              {!MARK_STATUSES.has(d.status) && ` ${d.amount}`}
             </span>
           </Title>
           <div className="text-[13px]">{st.text}</div>
           {by && <div className="text-[13px] text-amber-300">挑発した味方：{by.name}</div>}
-          {d.status !== 'taunt' && (
+          {!MARK_STATUSES.has(d.status) && (
             <div className="mt-1 text-[12px] text-zinc-400">
               {getStatus(d.status).decay === 0 ? `蓄積量${d.amount}。自然には減りません。` : `残り${Math.ceil(d.amount / (getStatus(d.status).decay ?? 1))}ターン相当（現在値${d.amount}）。${d.side === 'enemy' ? '敵' : '味方'}フェーズ終了時に${getStatus(d.status).decay ?? 1}減少。`}追加の消費条件は上の効果説明を確認してください。
             </div>
@@ -228,7 +231,7 @@ function actionText(e: EnemyState, a: EnemyActionDef): string {
   const parts = a.effects.map((eff) => {
     if (eff.kind === 'damage') {
       const hits = eff.hits ?? 1;
-      return `${targetOf(eff) === 'target' ? '' : '全体に'}${enemyHitDamage(e, eff.amount, undefined)}ダメージ${hits > 1 ? `×${hits}` : ''}`;
+      return `${targetOf(eff) === 'target' ? '' : '全体に'}${enemyHitDamage(e, eff.amount, undefined)}ダメージ${hits > 1 ? `×${hits}` : ''}${eff.lowHpMul ? `（HPが半分以下の相手に×${eff.lowHpMul}）` : ''}`;
     }
     return describeEffect(eff, 'enemy');
   });

@@ -9,6 +9,15 @@
 
 
 
+## 敵の特殊な行動 1回目（シナリオ1・7種類）を作った（2026-11-12・作ったのは Opus 5.5 の作業役、設計と見直しは Fable）
+
+オーナーの OK（7種類ともシナリオ1で試す）。設計と結果は docs/tasks/enemy-behaviors-plan.md の §7・§8。
+
+- 沼の大ガマ＝浄化／葦陰の狩人＝手数読み／玄武岩の虫＝盾砕き／炭火の猟犬＝手負い狙い／魔王軍の騎士＝かばう／砦の小悪魔＝仲間を呼ぶ／呪紋の魔犬＝癒し封じの呪い。敵は増やしていない（今ある行動を1つずつ置き換えた）。
+- 部品: 効果 shieldBreak・purify・punishPlays・guardAllies、damage.lowHpMul、summonEnemy の call / orElse、状態異常 healSeal（癒し封じ）、EnemyActionDef.hint（予告の文）、EnemyState.guarding。ダメージの無い大技は BREAK されると起きない（breakStopsAction）。
+- 保存の版は v26 のまま。
+- 次: オーナーがシナリオ1を遊んで確かめる → 2回目（残り6本への割り当ての表を先に出す）。
+
 ## 敵のHP +10%（2〜4人）（2026-11-12・作ったのは Opus 5.5 の作業役）
 
 - オーナーの決定: カードが強くなった分、敵を強くして難しさを戻す（カードは弱くしない）。balance.ts の enemyHpByPartySize を [0, 0.6, 1.1, 1.49, 2.42] に（1人は変えない）。

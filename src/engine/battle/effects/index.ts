@@ -238,6 +238,16 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   // 区切りD: エレメンタル・チェイン — 属性が無ければ、狙った敵の弱点の属性になる（耐性の無い最初の物）
   if (!element && isEnemy(victim) && cardModifier(ctx.cardAbilities, 'weaknessElement').length) element = getEnemy(victim.defId).weak?.find((w) => !getEnemy(victim.defId).resist?.includes(w));
   let v = victim;
+  // かばう（魔王軍の騎士）: ほかの敵を狙った「敵1体が対象のカード」のダメージは、かばっている敵が受ける（2体いれば並びの前）。
+  // 全体攻撃・お供と召喚の攻撃（via・分身）・道具・能力は、そのまま通る
+  if (!isEnemy(source) && isEnemy(v) && ctx.card?.target === 'enemy' && v === ctx.target && !ctx.via && !ctx.echo) {
+    const guard = state.enemies.find((e) => !e.dead && e.guarding && e !== v);
+    if (guard) {
+      abilityTriggered(state, guard.uid, 'かばう', events);
+      addLog(state, `${nameOf(guard)}が${nameOf(v)}をかばった`);
+      v = guard;
+    }
+  }
   let mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities, ctx.perfect, element, ctx.via);
   // 属性を強める状態異常（聖光など）: この一撃で使い切る
   const boost = element ? elementBoost(source, element, state.turn) : 1;

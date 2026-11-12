@@ -29,7 +29,7 @@ import { affinityOf } from '../stats';
 import { calcDamage } from './damage';
 import { discardHand, drawCards } from './deck';
 import { applyEffect, checkEffect, comboMultiplier, dealDamage, elementMultiplier, makeCtx, targetOf } from './effects';
-import { decideAllIntents } from './intents';
+import { breakStopsAction, decideAllIntents } from './intents';
 import { finalChance, selectTier } from './probability';
 import { helpedAllies, recordSupport, selfSnapshot, supportSnapshot } from './support';
 import { afterAttackCard, attackElement, consumeAttackCharge, cardElements, cardHpCost, chargedMultiplier, tierHpCost } from './cardState';
@@ -580,6 +580,8 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   for (const summon of ally.summons ?? []) {
     if (!summon.echoPct) continue;
     const echo = makeCtx(state, rng, events, ally, { card, target });
+    // 分身の追撃は召喚の攻撃なので、かばう敵に逸らされない
+    echo.echo = true;
     for (const eff of tier.effects) if (eff.kind === 'damage') applyEffect(echo, { ...eff, amount: Math.floor(eff.amount * summon.echoPct / 100) });
     if (echo.dealt > 0) abilityTriggered(state, ally.id, summon.name, events, { kind: 'summon', id: summon.id, label: summon.name });
   }
@@ -766,8 +768,11 @@ function endTurn(state: BattleState, playerId: string, rng: Rng, events: BattleE
   tickDamageOverTime(state, 'ally', rng, events);
   for (const a of state.allies) decayStatuses(a.statuses);
   if (checkEnd(state, events)) return undefined;
-  // 敵のブロックは敵フェーズ開始時に0へ
-  for (const e of state.enemies) e.block = 0;
+  // 敵のブロックは敵フェーズ開始時に0へ。かばう（魔王軍の騎士）も、敵の番の始めに終わる
+  for (const e of state.enemies) {
+    e.block = 0;
+    delete e.guarding;
+  }
   state.phase = 'enemy';
   state.enemyCursor = 0;
   addLog(state, `--- 敵フェーズ ---`);
@@ -855,6 +860,15 @@ function executeIntent(state: BattleState, enemy: EnemyState, rng: Rng, events: 
     }
   }
   if (enemy.dead) { enemy.intent = undefined; return; }
+  // BREAK された大技のうち、ダメージの無い行動（浄化・仲間を呼ぶ・かばう・癒し封じなど）は起きない
+  // （ダメージのある大技は、今までどおり威力が半分になる）
+  if (enemy.broken && breakStopsAction(action)) {
+    events.push({ type: 'enemyAct', enemyUid: enemy.uid, actionName: `BREAK で「${action.name}」が止まった`, targetIds: [] });
+    addLog(state, `${enemyName(enemy)}は体勢が崩れて「${action.name}」ができなかった`);
+    enemy.intent = undefined;
+    delete enemy.nextActionMultiplier;
+    return;
+  }
   // 演出用のイベントは先に積み、対象の一覧は効果を使った後に埋まる
   events.push({ type: 'enemyAct', enemyUid: enemy.uid, actionName: action.name, targetIds: ctx.hitIds });
   const actionMultiplier = enemy.nextActionMultiplier ?? 1;

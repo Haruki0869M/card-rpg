@@ -161,9 +161,11 @@ describe('BREAK（大技の予告を崩す。オーナーの決定 3-A）', () =
     }
     // 隠しボス（名所のイベントの戦闘にだけ出る。HPが大きい）も大技を持つ
     // 亜種（絵と行動を元の敵から引き継ぐ）は、元の敵が強敵なら大技も引き継ぐ
-    for (const e of ENEMIES.all) if (big(e.id) && !strong.has(e.id) && !(e.variantOf && strong.has(e.variantOf))) expect(e.maxHp, `${e.id} は強敵の組にも隠しボスにも当てはまらない`).toBeGreaterThanOrEqual(250);
-    // 大技は、ダメージのある行動だけ
-    for (const e of ENEMIES.all) for (const a of [e.actions, ...(e.phases ?? []).map((p) => p.actions)].flat()) if (a.big) expect(a.effects.some((x) => x.kind === 'damage'), `${e.id}.${a.id}`).toBe(true);
+    // 敵の特殊な行動（予告の文 hint 付き。docs/tasks/enemy-behaviors-plan.md §7）は、ふつうの敵にも付く大技なので、この2つの決まりの外
+    const special = (id: string) => [getEnemy(id).actions, ...(getEnemy(id).phases ?? []).map((p) => p.actions)].flat().some((a) => a.big && !a.hint);
+    for (const e of ENEMIES.all) if (special(e.id) && !strong.has(e.id) && !(e.variantOf && strong.has(e.variantOf))) expect(e.maxHp, `${e.id} は強敵の組にも隠しボスにも当てはまらない`).toBeGreaterThanOrEqual(250);
+    // 大技は、ダメージのある行動だけ（敵の特殊な行動は除く。ダメージの無い物は BREAK すると起きない）
+    for (const e of ENEMIES.all) for (const a of [e.actions, ...(e.phases ?? []).map((p) => p.actions)].flat()) if (a.big && !a.hint) expect(a.effects.some((x) => x.kind === 'damage'), `${e.id}.${a.id}`).toBe(true);
   });
 });
 

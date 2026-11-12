@@ -16,7 +16,9 @@ export const darkKnight: EnemyDef = {
   maxConsecutive: 2,
   actions: [
     { id: 'slash', name: '闇の剣', effects: [{ kind: 'damage', element: 'dark', amount: 15 }] },
-    { id: 'guard', name: '鉄壁', effects: [{ kind: 'block', amount: 14 }, { kind: 'damage', amount: 6 }] },
+    // 敵の特殊な行動 1回目（docs/tasks/enemy-behaviors-plan.md §7）: 守る行動「鉄壁」をかばうに置き換えた。ID は古い保存のために残す
+    // 自分以外の敵がいない時は、かばう相手がいないので「闇の剣」に変える（予告もその攻撃になる）
+    { id: 'guard', name: 'かばう', big: true, fallbackIfAloneId: 'slash', hint: '次の味方の番の間、ほかの敵への単体攻撃を代わりに受ける。全体攻撃は通る', effects: [{ kind: 'guardAllies' }] },
     { id: 'cleave', name: 'なぎ払い', effects: [{ kind: 'damage', amount: 9, to: 'foes' }] },
   ],
 };

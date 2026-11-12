@@ -18,7 +18,8 @@ export const reedStalker: EnemyDef = {
   actions: [
     {"id": "slash", "name": "葦の鎌", "effects": [{"kind": "damage", "amount": 8}]},
     {"id": "pair", "name": "二枚の刃", "effects": [{"kind": "damage", "amount": 4, "hits": 2}]},
-    {"id": "cover", "name": "葦にまぎれる", "effects": [{"kind": "block", "amount": 7}]},
+    // 敵の特殊な行動 1回目（docs/tasks/enemy-behaviors-plan.md §7）: 「葦にまぎれる」（守る）を手数読みに置き換えた。ID は古い保存のために残す
+    {"id": "cover", "name": "手数読み", big: true, hint: "このターンにカードを4枚以上使った味方に、枚数×2のダメージ", "effects": [{"kind": "punishPlays", "amount": 2, "min": 4}]},
   ],
 };
 

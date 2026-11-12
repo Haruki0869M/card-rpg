@@ -70,6 +70,7 @@ function killEnemy(state: BattleState, enemy: EnemyState, events: BattleEvent[])
   enemy.intent = undefined;
   enemy.tauntedBy = undefined;
   enemy.block = 0;
+  delete enemy.guarding;
   addLog(state, `${enemyName(enemy)}を倒した`);
   events.push({ type: 'death', unitId: enemy.uid });
 }

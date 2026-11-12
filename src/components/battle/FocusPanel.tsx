@@ -51,7 +51,7 @@ function counterHints(battle: BattleState, ally: AllyState, card: CardDef, targe
     const from = preds.findIndex((p) => p.some((t) => t.id === e.uid && t.breaks));
     if (from < 0) continue;
     const who = foes.length > 1 ? `${unitName(battle, e.uid)}：` : '';
-    const power = bp.from !== undefined && bp.to !== undefined ? `（${bp.name} ${bp.from}→${bp.to}）` : `（${bp.name}の威力が半分）`;
+    const power = bp.stops ? `（${bp.name}を止める）` : bp.from !== undefined && bp.to !== undefined ? `（${bp.name} ${bp.from}→${bp.to}）` : `（${bp.name}の威力が半分）`;
     out.push({ kind: 'break', color: '#fcd34d', text: `⚡${who}${from === 0 ? 'この攻撃' : `${label(from)}${from < preds.length - 1 ? '以上' : ''}`}で BREAK！${power}` });
   }
   // 完全成功の段の、最初の属性つきの攻撃

@@ -1,7 +1,7 @@
 import { useDetail, usePress } from '../../hooks/usePress';
 import type { Statuses } from '../../types';
 import { activeStatuses } from '../../engine';
-import { statusStyle } from './icons';
+import { MARK_STATUSES, statusStyle } from './icons';
 
 function Chip({
   status,
@@ -10,7 +10,7 @@ function Chip({
   by,
   onTap,
 }: {
-  /** 状態異常のID、または 'taunt'（挑発） */
+  /** 状態異常のID、または 'taunt'（挑発）・'guard'（かばう） */
   status: string;
   amount: number;
   side: 'ally' | 'enemy';
@@ -28,7 +28,7 @@ function Chip({
       style={{ background: st.bg, borderColor: st.color, color: st.color }}
     >
       <st.Icon size={11} strokeWidth={2.8} />
-      {status !== 'taunt' && amount}
+      {!MARK_STATUSES.has(status) && amount}
     </span>
   );
 }
@@ -38,20 +38,24 @@ export function StatusChips({
   side,
   onTap,
   tauntedBy,
+  guarding,
 }: {
   s: Statuses;
   side: 'ally' | 'enemy';
   onTap?: () => void;
   tauntedBy?: string;
+  /** かばう（敵の特殊な行動） */
+  guarding?: boolean;
 }) {
   const list = activeStatuses(s);
-  if (!list.length && !tauntedBy) return null;
+  if (!list.length && !tauntedBy && !guarding) return null;
   return (
     <div className="flex max-h-10 flex-wrap justify-center gap-0.5 overflow-y-auto">
       {list.map(({ def, amount }) => (
         <Chip key={def.id} status={def.id} amount={amount} side={side} onTap={onTap} />
       ))}
       {tauntedBy && <Chip status="taunt" amount={1} side={side} by={tauntedBy} onTap={onTap} />}
+      {guarding && <Chip status="guard" amount={1} side={side} onTap={onTap} />}
     </div>
   );
 }
