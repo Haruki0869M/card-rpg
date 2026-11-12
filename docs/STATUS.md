@@ -9,6 +9,16 @@
 
 
 
+## 本番へ再公開（17回目・2026-11-13・まとめ役 Claude）
+
+- オーナーの OK（「3 A」= 今から公開の準備をする）を受けて、main `3c78a0c` を `npm run deploy:firebase` で公開した。本番の `index-Dr0Tatmu.js` が出ている事・タイトルが出て読み込みの失敗が無い事を確かめた。
+- 中身（16回目からの差）: ランダムダンジョン（全5行・テーマ3つ・黄金箱の専用の装備14個・闇商人・晶石の祭壇）・災厄の中ボス5種（悪さ・討伐で専用の装備と報酬。シナリオ1だけ）。
+- オーナーの決定（同日）: イージスの鏡盾は一覧のまま（ふつうの戦闘は上限なし。遊んだ手ごたえで後から決める）／業火の魔人の報酬に秘薬を足す。
+- 公開の前に main のビルドで確かめた物: 型チェック・全部のテスト（1645）・確認スクリプト19本（adventure 2人と4人・check-layout・stepb-battle・stepb-world・world-overview・world-zoom・weak-guide・break-combo・battle-feedback・card-pick・jobchange・ops-save-resume 60/60・final-special-jobs・interaction-safety・detail-popup・random-dungeon-7a・scourge-7b・scourge-7c・dungeon-view）。
+- 16回目の保存（つづきから）は、そのまま読める（v26 のまま）。災厄は、広い地図（シナリオ1の新しい冒険）にだけ出る。
+- 確かめていない物: 実機の Android、オンラインの2人（本番のデータベースには書かない決まり）、人が遊んだ時の災厄・鏡盾の強さ。
+- 入っていない物: 「工夫する bot」で測る道具（作業ツリーで作っている途中。ゲームの中身は変えない道具）。
+
 ## 業火の魔人（災厄の5種類目）・イージスの鏡盾・残響の指輪を作った（2026-11-13・作ったのは Opus 5.5 の作業役・**公開していない**）
 
 - 記録: docs/tasks/overhaul-stage7b.md の「追加で作った物」。災厄は5種類（1冒険に3体まで）・黄金箱の専用の装備は14個。
