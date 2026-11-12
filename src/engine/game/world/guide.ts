@@ -5,9 +5,11 @@ import { DUNGEONS } from '../../../data/dungeons';
 import { getScenario } from '../../../data/scenarios';
 import { TERRAINS } from '../../../data/world';
 import type { GameState, WorldState } from '../../../types';
-import { colOf, linePath, neighbors, rowOf } from './hex';
+import { colOf, hexDistance, linePath, neighbors, pathTo, reachable, rowOf } from './hex';
 import { isWideMap, laneOfCol, nextGoalDungeon } from './lanes';
 import { questsShort } from './questGate';
+import { isRandomDungeonTile } from './randomDungeons';
+import { dungeonTheme } from '../dungeon';
 
 type StoryPage = NonNullable<WorldState['story']>;
 
@@ -78,6 +80,50 @@ export function goalLineText(game: GameState, goal: GuideGoal, from: number | un
   if (goal.questsShort > 0) return `次の目的: 町の依頼をあと${goal.questsShort}つ果たす（「${goal.name}」の扉が開く）`;
   const where = from === goal.tile ? 'ここ' : whereText(game, game.world!, from, goal.tile);
   return `次の目的: ${goal.name}（${where}）`;
+}
+
+/**
+ * 「次の目的」の短い形（回1の追加。高さ700px未満の画面で、操作のパネルの行に出す）: 「次: 沈黙の地下墓所（東）」。
+ * 方角だけ（地域は付けない）。同じマスなら「ここ」
+ */
+export function goalShortText(game: GameState, goal: GuideGoal, from: number | undefined): string {
+  if (goal.questsShort > 0) return `次: 町の依頼をあと${goal.questsShort}つ`;
+  const dir = from === undefined ? '' : from === goal.tile ? 'ここ' : direction8(game.world!, from, goal.tile);
+  return dir ? `次: ${goal.name}（${dir}）` : `次: ${goal.name}`;
+}
+
+/**
+ * 施設へ向かう道（回1の追加。移動力が足りない施設を押した時）。読むだけで、ゲームの状態は変えない・乱数も引かない。
+ * 移動できるマスの計算（reachable）を、移動力の上限なしで使う（霧の中には入らない・敵のいるマスの先へは進めない、の決まりも同じ）。
+ * total = その施設までに要る移動力（地形のコストの合計）、stop = その道のうち、この番の移動力 move で行ける一番先のマス
+ * （1マスも進めなければ undefined）。道が無ければ undefined
+ */
+export function routeToward(w: WorldState, from: number, target: number, move: number): { total: number; stop?: number } | undefined {
+  const all = reachable(w, from, Infinity);
+  const end = all.get(target);
+  if (!end || target === from) return undefined;
+  let stop: number | undefined;
+  for (const p of pathTo(all, target)) if (all.get(p)!.cost <= move) stop = p;
+  return { total: end.cost, stop };
+}
+
+/**
+ * 町のうわさ（回1の追加）: その町からいちばん近い、まだ踏破していないランダムダンジョン1つ。
+ * 「うわさ: 嘆きの沼の東に、古代の晶洞があるらしい」。無ければ undefined。乱数は使わない（同じ近さなら、マスの番号の小さい方）
+ */
+export function rumorText(game: Pick<GameState, 'scenarioId'>, w: WorldState, fromTile: number): string | undefined {
+  let best = -1;
+  let bd = Infinity;
+  w.tiles.forEach((t, i) => {
+    if (!isRandomDungeonTile(t.f) || t.f.used) return;
+    const d = hexDistance(w, fromTile, i);
+    if (d < bd) (bd = d), (best = i);
+  });
+  if (best < 0) return undefined;
+  const f = w.tiles[best].f!;
+  const name = dungeonTheme(f.theme)?.name ?? DUNGEONS.get(f.id).name;
+  const place = placeName(game, w, best);
+  return place ? `うわさ: ${place}に、${name}があるらしい` : `うわさ: どこかに、${name}があるらしい`;
 }
 
 /**

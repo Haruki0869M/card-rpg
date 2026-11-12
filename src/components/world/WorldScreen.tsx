@@ -37,6 +37,8 @@ import {
   scourgesWith,
   guideGoal,
   goalLineText,
+  goalShortText,
+  routeToward,
   dungeonGateError,
   dungeonTile,
   signposts,
@@ -483,6 +485,31 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
   const pid = hero.playerId;
 
   const tapTile = (i: number) => {
+    // 回1の追加: 移動力が足りない施設を押した時（自分の番だけ）。届かない施設へ向かう道のうち、この番で行ける一番先のマスを選ぶ（動かすのは、今までどおり確かめてから）
+    const place = w.tiles[i]?.seen && !!w.tiles[i].f && i !== here;
+    if (mine && place && !reach?.has(i)) {
+      if (w.move === null) {
+        setSelected(undefined);
+        setInfo(`${tileInfo(game, i, goal)} / サイコロを振ると、進める`);
+        return;
+      }
+      if (w.move > 0) {
+        const route = routeToward(w, here, i, w.move);
+        if (!route) {
+          setSelected(undefined);
+          setInfo(`ここへは、回り道が要る（${tileInfo(game, i, goal)}）`);
+          return;
+        }
+        if (route.stop === undefined) {
+          setSelected(undefined);
+          setInfo(`あと${route.total}マス。この番は、この道を進めない（${tileInfo(game, i, goal)}）`);
+          return;
+        }
+        setSelected(route.stop);
+        setInfo(`あと${route.total}マス。この番は、ここまで進める（${tileInfo(game, i, goal)}）`);
+        return;
+      }
+    }
     if (mine && reach?.has(i) && i !== here) {
       if (selected === i) {
         // 選んだマスと説明は、移動の演出が終わるまで残す（パネルの高さが変わると地図の大きさが変わるため）。
@@ -596,7 +623,23 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
                 {hero.focus}/{heroFocusMax(hero)}
               </span>
             </div>
-            <div className="text-[12px] text-zinc-400">{getTerrain(w.tiles[here].t).name}・{scenario.map!.regions[w.tiles[here].r].name}</div>
+            {/* 高さ700px以上の画面（と、次の目的が無い時）は、今までどおり地形と地域 */}
+            <div className={`text-[12px] text-zinc-400 ${goal ? '[@media(max-height:699.98px)]:hidden' : ''}`}>{getTerrain(w.tiles[here].t).name}・{scenario.map!.regions[w.tiles[here].r].name}</div>
+            {/* 回1の追加: 高さ700px未満の画面は、この行に「次: 沈黙の地下墓所（東）」（押すと、そこへ地図が動く）。
+                入りきらない時は、右の地形と地域から先に切る（それでも入らなければ、次の目的も …で切る） */}
+            {goal && (
+              <button
+                onClick={() => focusOn(goal.tile)}
+                // 押せる所は44pxの高さ（上の名前の行に重ねる。下のボタンには重ねない）。行の高さは変えない
+                className="btn relative -mt-7 hidden min-h-11 w-full min-w-0 items-end gap-1 text-left text-[12px] leading-4 [@media(max-height:699.98px)]:flex"
+                aria-label={`${goalLineText(game, goal, w.pos[selfHero.id] ?? here)}。押すと地図がその場所へ動きます`}
+                data-goal-short={goal.dungeonId}
+              >
+                <Compass size={13} className="shrink-0 text-amber-300" />
+                <span className="max-w-full shrink-0 truncate font-bold text-amber-200 underline decoration-amber-300/50 underline-offset-2" data-goal-short-text>{goalShortText(game, goal, w.pos[selfHero.id] ?? here)}</span>
+                <span className="min-w-0 flex-1 truncate text-zinc-400">・{getTerrain(w.tiles[here].t).name}・{scenario.map!.regions[w.tiles[here].r].name}</span>
+              </button>
+            )}
           </div>
           {w.move !== null && (
             <div className="flex shrink-0 flex-col items-center rounded-lg bg-black/40 px-2 py-0.5">
