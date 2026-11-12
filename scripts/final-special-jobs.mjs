@@ -32,7 +32,7 @@ const { jobLevel, jobRequires } = await loadJobData();
 const config = [
   ['shrineMaiden', '巫女', 'bishop', 'prayers', 'woodScepter', '癒やしの祝詞', 'divinePossession'],
   ['astrologer', '占星術師', 'bishop', 'perfects:luk', 'apprenticeTome', '魔力の矢', 'cmArcaneArrow'],
-  ['machinist', '機工士', 'archer', 'checks:mechanism', 'antiqueGun', '精密射撃', 'placeTrap'],
+  ['machinist', '機工士', 'archer', 'checks:mechanism', 'antiqueGun', '仕掛け罠', 'placeTrap'],
   ['bard', '吟遊詩人', 'phantomThief', 'support:others', 'travelerLute', '勇気の歌', 'bardCourage'],
   ['gambler', '賭博師', 'phantomThief', 'checks:luk', 'rustyDagger', '勝負の一撃', 'gambleStrike'],
 ];
