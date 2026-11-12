@@ -127,13 +127,15 @@ describe('区切りF: 戦闘の力', () => {
     s = use(s, 'ptBuddyGuard').state;
     expect(pecks(s)).toBe(2);
   });
-  it('調教師「なでなで」（計画どおり HP回復）: HPが減っている時は、お供が動く。満タンの時は動かない（オーナーに相談中）', () => {
+  it('調教師「なでなで」: HPを回復してお供が動く。満タンの時はブロック2で、やはりお供が動く（オーナーの決定）', () => {
     const hurt = trainer();
     hurt.allies[0].hp = 400;
     const r = use(hurt, 'ptPat');
     expect(r.state.allies[0].hp).toBe(403);
     expect(pecks(r.state)).toBe(1);
-    expect(pecks(use(trainer(), 'ptPat').state)).toBe(0);
+    const full = use(trainer(), 'ptPat').state;
+    expect(full.allies[0].block).toBe(2);
+    expect(pecks(full)).toBe(1);
   });
   it('拳聖「受けの型」（計画どおり）: この敵の番の《後の先》の1回の上限+6（12 → 18）', () => {
     const s = battle(['fistSaint'], ['stageFHitter']);

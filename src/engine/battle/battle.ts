@@ -699,16 +699,24 @@ function summonsAttack(state: BattleState, ally: AllyState, rng: Rng, events: Ba
   ally.summons = ally.summons.filter((s) => s.turns > 0);
 }
 
+/** 敵1体に使う道具か（狙う敵を選ぶ。閃光の破砕玉・氷結の魔石） */
+export const itemTargetsEnemy = (effects: readonly { kind: string }[] | undefined) => !!effects?.some((e) => e.kind === 'flashBreak' || e.kind === 'iceGem');
+
 /** 消費アイテム（効果の部品を使う。所持の管理は冒険側） */
 function useItem(state: BattleState, cmd: Extract<Command, { type: 'USE_ITEM' }>, rng: Rng, events: BattleEvent[]): string | undefined {
   if (state.phase !== 'ally') return '味方フェーズではありません';
   const user = findAlly(state, cmd.characterId);
   if (!user || user.dead) return '使うキャラが戦闘不能です';
   if (user.playerId !== cmd.playerId) return '担当していないキャラです';
-  const target = findAlly(state, cmd.targetId);
+  // 敵に使う道具（閃光の破砕玉・氷結の魔石）は、狙う敵を選ぶ
+  const foeItem = itemTargetsEnemy(cmd.effects);
+  const foe = foeItem ? state.enemies.find((e) => e.uid === cmd.targetId && !e.dead) : undefined;
+  if (foeItem && !foe) return '狙う敵を選び直してください';
+  const ally = foeItem ? undefined : findAlly(state, cmd.targetId);
   // 不死鳥の羽根は、倒れた味方にも生きている味方にも使える（区切りE）
   const anyState = cmd.effects.some(e => e.kind === 'phoenix');
-  if (!target || (!anyState && (cmd.effects.some(e => e.kind === 'revive') ? !target.dead : target.dead))) return '道具の対象を選び直してください';
+  if (!foeItem && (!ally || (!anyState && (cmd.effects.some(e => e.kind === 'revive') ? !ally.dead : ally.dead)))) return '道具の対象を選び直してください';
+  const target = foe ?? ally;
   const ctx = makeCtx(state, rng, events, user, { target });
   for (const e of cmd.effects) {
     const why = checkEffect(ctx, e);
