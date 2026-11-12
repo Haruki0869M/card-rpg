@@ -7,7 +7,7 @@ export const frozenGear: ItemDef[] = [
   {
     id: "blizzardBow", name: "吹雪の弓", slot: "weapon", weaponType: "bow", rarity: "rare", icon: "bow", scenario: "frozenKingdom",
     description: "敵全体を狙うカードが完全成功した時、ランダムな敵1体に「凍結」1（ボスには代わりに「弱体」1）。1ターンに1回。", stats: {"dex":5,"per":3}, tags: ["physical","ice","freeze","aoe"],
-    cards: [{"cardId":"wtBowShower","count":2}],
+    cards: [{"cardId":"wtAxeWhirl","count":2}],
     ability: {"name":"吹雪","description":"敵全体を狙うカードが完全成功した時、ランダムな敵1体に「凍結」1（ボスには代わりに「弱体」1）。1ターンに1回。","effect":{"when":"perfect","if":[{"kind":"cardAoe"},{"kind":"oncePerTurn","key":"blizzardBow"}],"do":[{"kind":"applyStatus","status":"freeze","amount":1,"bossStatus":"weak","to":"randomFoe"}]}},
   },
   {

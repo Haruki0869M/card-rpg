@@ -19,13 +19,13 @@ export const weaponsFist: ItemDef[] = [
   {
     id: "galeWraps", name: "疾走の手甲", slot: "weapon", weaponType: "fist", rarity: "epic", icon: "fist",
     description: "同じターンの4枚目からの物理カードの基本ダメージ+4（1回の攻撃ごと。力などの倍率もかかる）。", stats: {"agi":8}, tags: ["physical","combo","multi"],
-    cards: [{"cardId":"wtFistThousand","count":2}],
+    cards: [{"cardId":"hundredKicks","count":2}],
     ability: {"name":"疾走","description":"同じターンの4枚目からの物理カードの基本ダメージ+4（1回の攻撃ごと。力などの倍率もかかる）。","effect":{"modifier":"damageDealt","multiplier":1,"add":4,"if":[{"kind":"cardCategory","category":"physical"},{"kind":"playedThisTurn","atLeast":3}]}},
   },
   {
     id: "stillwaterWraps", name: "静水の手甲", slot: "weapon", weaponType: "fist", rarity: "legend", icon: "fist",
     description: "フォーカスを使ったカードが完全成功したら、フォーカスが1戻る。1ターンに1回。", stats: {"vit":10,"agi":2}, tags: ["physical","focus"],
-    cards: [{"cardId":"wtFistKiBlast","count":2}],
+    cards: [{"cardId":"lnBuGodStrike","count":2}],
     ability: {"name":"気の巡り","description":"フォーカスを使ったカードが完全成功したら、フォーカスが1戻る。1ターンに1回。","effect":{"when":"perfect","if":[{"kind":"usedFocus"},{"kind":"oncePerTurn","key":"stillwaterWraps"}],"do":[{"kind":"gainFocus","amount":1}]}},
   },
   // レジェンド

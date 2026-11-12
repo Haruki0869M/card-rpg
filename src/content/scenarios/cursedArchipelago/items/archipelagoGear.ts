@@ -13,13 +13,13 @@ export const archipelagoGear: ItemDef[] = [
   {
     id: "harpoon", name: "大物狩りの銛", slot: "weapon", weaponType: "spear", rarity: "rare", icon: "spear", scenario: "cursedArchipelago",
     description: "ボス・中ボスとの戦闘の間、物理カードの成功率+10%。", stats: {"str":6,"dex":2}, tags: ["physical"],
-    cards: [{"cardId":"wtSpearDouble","count":2}],
+    cards: [{"cardId":"lnBuFlurry","count":2}],
     ability: {"name":"大物狩り","description":"ボス・中ボスとの戦闘の間、物理カードの成功率+10%。","effect":{"modifier":"cardChance","bonus":10,"if":[{"kind":"cardCategory","category":"physical"},{"kind":"bossBattle"}]}},
   },
   {
     id: 'lighthouseScepter', name: '灯台守の錫杖', slot: 'weapon', weaponType: 'scepter', rarity: 'legend', icon: 'scepter', scenario: 'cursedArchipelago',
     description: '回復のカードが完全成功すると、ランダムな敵1体に「脆弱」1を与える。1ターンに1回。灯が霧の中の敵を照らす。', stats: { int: 8, vit: 4 }, tags: ['holy', 'heal', 'vulnerable'],
-    cards: [{ cardId: 'wtScepterJudgment', count: 2 }],
+    cards: [{ cardId: 'lnSeiDivinePunish', count: 2 }],
     ability: { name: '霧払いの灯', description: '回復のカードが完全成功した時（1ターンに1回）：ランダムな敵1体に「脆弱」1', effect: { when: 'perfect', if: [{ kind: 'cardHasHeal' }, { kind: 'oncePerTurn', key: 'lighthouseScepter' }], do: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'randomFoe' }] } },
   },
   // ----- 鎧 -----

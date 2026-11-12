@@ -1,4 +1,4 @@
-// 詠唱の栞（区切りD）: 1枚引く。引いたカードが category なら、このターンの次の category のカードのコスト delta（1枚・1ターンに1回）
+// 詠唱の栞（区切りD）: 1枚引く。引いたカードが category なら、そのカードのコストを、このターンだけ delta（1ターンに1回。元の文どおり）
 import { getCard } from '../../../../data/cards';
 import { drawCards } from '../../deck';
 import { isEnemy } from '../../units';
@@ -27,13 +27,9 @@ export const effect: EffectHandler<'drawDiscount'> = {
     const cs = (u.counters ??= {});
     if (drawn.category !== e.category || cs.drawDiscountTurn === ctx.state.turn) return true;
     cs.drawDiscountTurn = ctx.state.turn;
-    const key = `drawDiscount${ctx.state.turn}`;
-    u.abilities = [
-      ...(u.abilities ?? []).filter((a) => a.name !== '詠唱の栞'),
-      { name: '詠唱の栞', source: { kind: 'card', label: '詠唱の栞' }, untilTurn: ctx.state.turn, effect: { modifier: 'cardCost', delta: e.delta, turnKey: key, if: [{ kind: 'cardCategory', category: e.category }] } },
-    ];
-    ctx.parts.push(`次の${CAT[e.category]}カードのコスト${e.delta}`);
+    u.cheapCard = { uid: u.hand[u.hand.length - 1].uid, turn: ctx.state.turn, delta: e.delta };
+    ctx.parts.push(`引いた「${drawn.name}」のコスト${e.delta}`);
     return true;
   },
-  describe: (e) => `1枚引く。引いたカードが${CAT[e.category]}なら、このターンの次の${CAT[e.category]}カード1枚のコスト${e.delta}（1ターンに1回）`,
+  describe: (e) => `1枚引く。引いたカードが${CAT[e.category]}なら、このターンだけ、そのカードのコスト${e.delta}（1ターンに1回）`,
 };

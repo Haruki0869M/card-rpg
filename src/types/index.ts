@@ -510,6 +510,8 @@ export interface CardInstance {
 }
 
 export interface AllyState {
+  /** 詠唱の栞: 引いたそのカード（uid）のコストを、このターン（turn）だけ delta する */
+  cheapCard?: { uid: string; turn: number; delta: number };
   slotPreviewUsed?: number;
   /** 次の攻撃カードへ蓄えた倍率。戦闘を越えて持ち越さない。 */
   attackCharge?: { multiplier: number; category: CardCategory };
@@ -673,6 +675,8 @@ export interface BattleState {
   /** 区切りE: この戦闘で得るお金の倍率（黄金の招き猫）・閃光の破砕玉をボスに使った */
   goldMul?: number;
   flashBreakUsed?: boolean;
+  /** 味方みんなで数える「1ターンに何回まで」（輪唱など）。perTurn の条件の team が使う */
+  teamCounters?: Record<string, number>;
   /** ボスの部屋の戦闘 */
   boss?: boolean;
   /** 中ボスの部屋の戦闘（大物狩り） */

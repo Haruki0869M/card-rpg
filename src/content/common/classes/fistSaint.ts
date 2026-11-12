@@ -12,7 +12,7 @@ export const fistSaint: ClassDef = {
   exploreAbility: { id: 'fistSaintExplore', name: '受け流し', description: '罠やイベントで受けるダメージが半分', effect: { kind: 'eventDamageHalf' } },
   requires: { feat: 'blockedTotal', count: 60, text: 'ブロックで敵の攻撃を合わせて60防ぐ' },
   names: { male: ['ゲンジ', 'テツ', 'ロウ', 'シン'], female: ['カスミ', 'リン', 'ユエ', 'シズク'] },
-  cardPool: ['fsSeeThrough', 'fsGuardForm', 'fsCounterStrike', 'axSteadfastFist', 'axParry', 'axSpikeArmor', 'axShieldSlam', 'axFortress'],
+  cardPool: ['fsSeeThrough', 'fsGuardForm', 'fsCounterStrike', 'axSteadfastFist', 'axParry', 'axSpikeArmor', 'axShieldSlam'],
   signature: ['fsSeeThrough', 'fsGuardForm', 'fsCounterStrike'],
   jobCards: ['fxMirrorHeart'],
 };

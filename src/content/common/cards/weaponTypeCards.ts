@@ -4,7 +4,6 @@
 import type { CardDef, CardTarget, Effect, Rarity, StatId, AbilityDef, CardCategory } from '../../../types';
 
 const d = (amount: number): Effect => ({ kind: 'damage', amount });
-const b = (amount: number): Effect => ({ kind: 'block', amount });
 const st = (status: string, amount: number): Effect => ({ kind: 'applyStatus', status, amount });
 const focus = (amount: number): Effect => ({ kind: 'gainFocus', amount });
 
@@ -18,9 +17,6 @@ const W = (weaponType: string) => ({ weaponType });
 
 export const WEAPON_TYPE_CARDS: CardDef[] = [
   // ===== 剣（正統派。バランスと一撃） =====
-  { ...c('wtSwordLunge', '踏み込み斬り', 'physical', 1, 80, 'enemy', [[d(3)], [d(6)], [d(8)]], W('sword')), weaponTypes: ['spear'], name: '踏み込み' }, // 区切りD: 踏み込み斬り＝突き をまとめた
-  { ...c('wtSwordGuard', '剣の構え', 'skill', 1, 80, 'self', [[b(4)], [b(6), focus(1)], [b(8), focus(1)]], W('sword')), weaponTypes: ['katana'], name: '構え直し' }, // 区切りD: 剣の構え＝納刀の構え をまとめた
-  { ...c('wtSwordNotch', '刃こぼし', 'physical', 1, 75, 'enemy', [[d(3)], [d(5), st('vulnerable', 1)], [d(7), st('vulnerable', 2)]], { ...W('sword'), rarity: 'rare' }), weaponTypes: ['katana'] }, // 区切りD: 刃こぼし＝月影 をまとめた
   c('wtSwordAura', '剣気解放', 'physical', 2, 60, 'enemy', [[d(5)], [d(9)], [d(14)]], { ...W('sword'), rarity: 'epic', trait: { name: '剣気', effect: { when: 'perfect', do: [focus(1)] } } }),
   c('wtSwordHelmSplit', '兜割り', 'physical', 3, 55, 'enemy', [[d(6)], [d(12)], [d(18)], [d(27), st('vulnerable', 2)]], { ...W('sword'), rarity: 'epic', stat: 'str', tags: ['heavy'], trait: { name: '止めの一太刀', effect: { modifier: 'damageDealt', multiplier: 1.5, if: [{ kind: 'targetHpAtMost', pct: 30 }] } } }),
 ];

@@ -22,15 +22,12 @@ function c(id: string, name: string, category: CardCategory, cost: number, targe
 export const FINAL_SPECIAL_CARDS: CardDef[] = [
   c('maidenHeal', '癒やしの祝詞', 'magic', 1, 'ally', [[h(3, 'target')], [h(6, 'target')], [h(9, 'target')]], { stat: 'per' }),
   c('maidenPurify', '清めの鈴', 'magic', 1, 'self', [[{ kind: 'reduceStatus', amount: 1, statuses: ['weak', 'vulnerable'], to: 'allies' }], [{ kind: 'cleanse', to: 'allies' }], [{ kind: 'cleanse', to: 'allies' }, h(2, 'allies')]], { stat: 'per', rarity: 'epic', trait: sharpenTrait('maidenPurify') }),
-  c('maidenWard', '守りの御札', 'skill', 1, 'self', [[b(2, 'allies')], [b(3, 'allies')], [b(5, 'allies')]], { stat: 'per' }), // 区切りD: 守りの御札＝守りの旋律 をまとめた
   c('maidenLight', '破魔の光', 'magic', 2, 'enemy', [[d(6, 'holy')], [d(11, 'holy')], [d(17, 'holy')]], { rarity: 'epic', trait: pierce, stat: 'per' }),
   c('divinePossession', '神降ろし', 'magic', v.possessionCost, 'self', [[{ kind: 'payHp', amount: v.possessionHp }, { kind: 'applyStatus', status: 'possession', amount: v.possessionTurns, to: 'allies' }], [{ kind: 'payHp', amount: v.possessionHp }, { kind: 'applyStatus', status: 'possession', amount: v.possessionTurns, to: 'allies' }]], { stat: 'per', rarity: 'legend', exhaust: true, trait: { name: '神との契り', effect: { modifier: 'exhaust' } } }),
 
-  c('starRay', '星の光条', 'magic', 1, 'enemy', [[d(3)], [d(6)], [d(9)]], { stat: 'int' }), // 区切りD: 星の光条＝時の矢 をまとめた
   c('starGift', '星明かりの恵み', 'magic', 2, 'self', [[h(3, 'allies')], [h(5, 'allies')], [h(7, 'allies')]], { rarity: 'epic', trait: sharpenTrait('starGift') }),
   c('starFall', '星降る夜', 'magic', 3, 'allEnemies', [[d(5)], [d(9)], [d(14)], [d(19)]], { rarity: 'epic', trait: pierce }), // 区切りD: 星降る夜＝時空崩壊 をまとめた
 
-  c('machineShot', '精密射撃', 'physical', 1, 'enemy', [[d(3)], [d(6)], [d(9)]], { stat: 'dex' }), // 区切りD: 精密射撃＝抜刀一閃＝魔力斬り をまとめた
   c('placeTurret', '砲台設置', 'skill', 1, 'enemy', [[turret()], [turret()], [turret(), b(3)]], { stat: 'int', tags: ['summon'] }),
   c('placeTrap', '仕掛け罠', 'skill', 1, 'enemy', [[trap()], [trap()], [trap(), b(3)]], { stat: 'dex', tags: ['summon'] }),
   c('machineVolley', '二連射', 'physical', 2, 'enemy', [[{ kind: 'damage', amount: 3, hits: 2 }, TURRET], [{ kind: 'damage', amount: 6, hits: 2 }, TURRET], [{ kind: 'damage', amount: 9, hits: 2 }, TURRET]], { stat: 'dex', rarity: 'epic', trait: sharpenTrait('machineVolley') }), // 区切りD: 燕返しと同じ中身だったので、砲台も1回撃つ

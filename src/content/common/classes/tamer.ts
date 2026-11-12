@@ -28,8 +28,8 @@ export const tamer: ClassDef = {
   lineage: 'gi',
   tags: ['scout'],
   from: ['hunter'],
-  signature: ['packHunt', 'beastRoar', 'callFalcon'],
+  signature: ['packHunt', 'warHowl', 'callFalcon'],
   startingEquipment: { weapon: 'leatherWhip', armor: 'travelerClothes' },
-  cardPool: ['packHunt', 'beastRoar', 'callFalcon', 'whipCrack', 'feedBeast', 'stampede', 'axPetCharge', 'axPackHunt'],
+  cardPool: ['packHunt', 'warHowl', 'callFalcon', 'lnGiFeint', 'feedBeast', 'stampede', 'axPetCharge', 'axPackHunt'],
   growthWeights: { per: 3, dex: 2, agi: 2 },
 };

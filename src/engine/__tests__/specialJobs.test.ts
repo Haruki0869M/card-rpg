@@ -86,7 +86,7 @@ describe('侍の居合', () => {
     s = nextTurn(s); expect(s.allies[0].attackCharge?.multiplier).toBe(4);
   });
   it('防御カードを使ったターンは蓄積せず、すでに蓄えた倍率は維持する', () => {
-    let s = use(battle('samurai'), 'samuraiPoise'); s = nextTurn(s); expect(s.allies[0].attackCharge).toBeUndefined();
+    let s = use(battle('samurai'), 'cmGrit'); s = nextTurn(s); expect(s.allies[0].attackCharge).toBeUndefined();
     s = nextTurn(s); expect(s.allies[0].attackCharge?.multiplier).toBe(2);
     s = use(s, 'samuraiFocus'); s = nextTurn(s); expect(s.allies[0].attackCharge?.multiplier).toBe(2);
   });
@@ -98,20 +98,20 @@ describe('侍の居合', () => {
     const perfect = s.log.at(-1)!.text.includes('完全成功');
     expect(s.allies[0].attackCharge?.multiplier).toBe(perfect ? 2 : undefined);
     delete s.allies[0].attackCharge;
-    const hp2 = s.enemies[0].hp; s = use(s, 'machineShot'); expect(hp2 - s.enemies[0].hp).toBe(9);
+    const hp2 = s.enemies[0].hp; s = use(s, 'lnGiQuick'); expect(hp2 - s.enemies[0].hp).toBe(8); // 憲章5: 「精密射撃」（9）を「手早い攻撃」（8）にまとめた
   });
   it('予測と実ダメージが一致し、魔法攻撃では消費しない', () => {
     let s = nextTurn(battle('samurai')); s = use(s, 'bladeFire'); expect(s.allies[0].attackCharge?.multiplier).toBe(2);
-    const card = getCard('machineShot'), predicted = tierDamageAgainst(s.allies[0], card, s.enemies[0]).at(-1)!;
+    const card = getCard('lnGiQuick'), predicted = tierDamageAgainst(s.allies[0], card, s.enemies[0]).at(-1)!;
     const hp = s.enemies[0].hp; s = use(s, card.id); expect(hp - s.enemies[0].hp).toBe(predicted);
   });
 });
 
 describe('魔剣士の魔法剣', () => {
-  it.each([['bladeFire', 'fire', 13], ['bladeIce', 'ice', 4]])('%sの属性を次の物理攻撃に宿し弱点・耐性を反映する', (id, element, damage) => {
+  it.each([['bladeFire', 'fire', 12], ['iceLance', 'ice', 4]])('%sの属性を次の物理攻撃に宿し弱点・耐性を反映する', (id, element, damage) => {
     let s = use(battle('magicKnight'), id); expect(s.allies[0].imbuedElement).toBe(element);
-    const predicted = tierDamageAgainst(s.allies[0], getCard('machineShot'), s.enemies[0]).at(-1)!;
-    const hp = s.enemies[0].hp; s = use(s, 'machineShot');
+    const predicted = tierDamageAgainst(s.allies[0], getCard('lnGiQuick'), s.enemies[0]).at(-1)!;
+    const hp = s.enemies[0].hp; s = use(s, 'lnGiQuick');
     expect(hp - s.enemies[0].hp).toBe(damage); expect(predicted).toBe(damage); expect(s.allies[0].imbuedElement).toBeUndefined();
   });
   it('防御と次ターンを挟んでも保持し、多段物理カード全体へ属性を乗せる', () => {
@@ -121,13 +121,13 @@ describe('魔剣士の魔法剣', () => {
   });
   it('元からある属性は上書きせず、無属性部分にだけ記憶した属性を使う', () => {
     const s = battle('magicKnight'), a = s.allies[0], e = s.enemies[0]; a.imbuedElement = 'fire';
-    const ctx = makeCtx(s, createRng(1), [], a, { card: getCard('machineShot'), target: e });
+    const ctx = makeCtx(s, createRng(1), [], a, { card: getCard('lnGiQuick'), target: e });
     const hp = e.hp; applyEffect(ctx, { kind: 'damage', amount: 10, element: 'ice' }); expect(hp - e.hp).toBe(5);
     applyEffect(ctx, { kind: 'damage', amount: 10 }); expect(hp - e.hp).toBe(20);
   });
   it('複数属性の魔法は最後の属性を記憶し、属性のない魔法では記憶を変えない', () => {
     let s = use(battle('magicKnight'), 'elementRevelation'); expect(s.allies[0].imbuedElement).toBe('thunder');
-    s = use(s, 'starRay'); expect(s.allies[0].imbuedElement).toBe('thunder');
+    s = use(s, 'cmArcaneArrow'); expect(s.allies[0].imbuedElement).toBe('thunder');
   });
 });
 
@@ -211,7 +211,7 @@ describe('祭壇の半減と保存再開', () => {
     const g = fresh(), h = g.heroes[0]; h.classId = id;
     const s = createBattle({ seed: 6, party: [toPartyMember(h)], encounter: { id: 'special', name: '検証', enemies: [{ defId: 'specialJobDummy' }] } });
     s.allies[0].attackCharge = { multiplier: 4, category: 'physical' }; s.allies[0].imbuedElement = 'fire';
-    s.enemies[0].skipNextAction = true; giveHand(s, h.id, ['machineShot']); s.allies[0].mana = 20;
+    s.enemies[0].skipNextAction = true; giveHand(s, h.id, ['lnGiQuick']); s.allies[0].mana = 20;
     g.mode = 'battle'; g.battle = s; g.party = [h.id];
     const resumed = migrateGame(JSON.parse(JSON.stringify(g)))!; const copy = structuredClone(g);
     const cmd = { type: 'BATTLE' as const, command: play(h.id, 't0', s.enemies[0].uid, 0) };

@@ -1,9 +1,12 @@
 import { upgradeEffect } from '../../engine/battle/effects';
 import type { CardDef, CardInstance } from '../../types';
 import { contentRegistry, type ContentModules } from '../content';
+import { applyMergedPlacement } from './merged';
 
 /** カードの登録表。src/content の cards フォルダ にカードのファイルを置くだけで登場する */
 export const CARDS = contentRegistry<CardDef>('card', import.meta.glob('/src/content/**/cards/*.ts', { eager: true }) as ContentModules);
+// 憲章5: まとめた札の置き場所と名前を足す（merged.ts）
+applyMergedPlacement((id) => CARDS.get(id));
 
 /** 強化のルール: 成功率+10%（上限95%）。効果の値の上げ方は効果の部品ごと（ダメージ・ブロック・回復は25%増し・最低+1） */
 const upgradedCache = new Map<string, CardDef>();

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../data/balance';
 import { CARDS, getCard } from '../../data/cards';
-import { CLASSES } from '../../data/classes';
 import { ITEMS } from '../../data/items';
 import { applyCommand, cardRewardOdds, chestOdds, createBattle, createGame, createRng, rollCardOffers, rollGrade, tierDamageAgainst, toPartyMember } from '../index';
 import { END, giveHand, play, setup } from './helpers';
@@ -62,9 +61,7 @@ describe('カード報酬のレア度（spec §13）', () => {
     expect(epic / total).toBeGreaterThan(0.02);
     expect(epic / total).toBeLessThan(0.07);
   });
-  it('どの職業にもエピックのカードが2枚以上ある', () => {
-    for (const c of CLASSES.all) expect(c.cardPool.filter((id) => CARDS.get(id).rarity === 'epic').length).toBeGreaterThanOrEqual(2);
-  });
+  // 「どの職業にもエピックのカードが2枚以上」の決まりは、やめた（オーナーの決定 2026-11-12。憲章4: 数の目標を捨てる）
 });
 
 describe('エピック以上の特殊能力（spec §12.7・§13.1）', () => {

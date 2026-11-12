@@ -44,7 +44,7 @@ export { enemyName, findAlly, findEnemy, unitName } from './units';
 // v21（2026-11-12）: 区切りD-1 同じ中身のカードをまとめた。古い保存は読まない
 // v22（2026-11-12）: 区切りD-2〜D-4 軸のカード・決め技・武器のカードの付け替え。古い保存は読まない
 // v23（2026-11-12）: 区切りE 消耗品 50→24。古い保存は読まない
-export const STATE_VERSION = 23;
+export const STATE_VERSION = 24;
 export { slotPreviewLimitOf } from './preview';
 
 // ---------- 生成 ----------
@@ -196,12 +196,12 @@ function consumeChanceBonus(st: Statuses) {
 }
 
 /** カードが使えない理由（使えるなら null） */
-export function unusableReason(state: BattleState, ally: AllyState, card: CardDef): string | null {
+export function unusableReason(state: BattleState, ally: AllyState, card: CardDef, uid?: string): string | null {
   if (state.slotPreview) return '星読みの結果を確定してください';
   if (state.phase !== 'ally') return '味方フェーズではありません';
   if (ally.dead) return '戦闘不能です';
   if (ally.exhaustedCards?.includes(card.id)) return 'この戦闘ではもう使いました';
-  if (ally.mana < cardCostOf(state, ally, card).cost) return 'マナが足りません';
+  if (ally.mana < cardCostOf(state, ally, card, uid).cost) return 'マナが足りません';
   if (ally.hp <= cardHpCost(card, ally.hp)) return 'HPを払うと戦闘不能になります';
   if (needsCardTarget(card) && !cardTargets(state, ally, card).length) return '対象がいません';
   if ((card.target === 'enemy' || card.target === 'allEnemies') && !state.enemies.some((e) => !e.dead)) return '対象がいません';
@@ -210,7 +210,7 @@ export function unusableReason(state: BattleState, ally: AllyState, card: CardDe
 
 export function usableCardCount(state: BattleState, ally: AllyState): number {
   let n = 0;
-  for (const c of ally.hand) if (unusableReason(state, ally, cardOf(c)) === null) n++;
+  for (const c of ally.hand) if (unusableReason(state, ally, cardOf(c), c.uid) === null) n++;
   return n;
 }
 
@@ -250,6 +250,8 @@ const SLOT_ICON: Record<SlotResult, string> = { focus: '🌟', hit: '⭕', miss:
 function startAllyPhase(state: BattleState, rng: Rng, events: BattleEvent[]) {
   state.turn += 1;
   state.phase = 'ally';
+  // 区切りD: 血の代価の数え（このターンに失ったHP）は、自分たちの番の始めから数え直す（元の文どおり）
+  for (const a of state.allies) if (a.counters?.hpLostTurn) a.counters.hpLostTurn = 0;
   // 連携攻撃の記録と、狙いの表示は、ターンごとに消す
   state.aims = {};
   for (const e of state.enemies) {
@@ -434,7 +436,7 @@ function reserveCard(state: BattleState, cmd: Extract<Command, { type: 'PREVIEW_
   if ((ally.slotPreviewUsed ?? 0) >= slotPreviewLimitOf(ally)) return 'この戦闘では星読みを使えません';
   const inst = ally.hand.find(c => c.uid === cmd.cardInstanceId);
   if (!inst) return '手札にありません';
-  const card = cardOf(inst), reason = unusableReason(state, ally, card);
+  const card = cardOf(inst), reason = unusableReason(state, ally, card, inst.uid);
   if (reason) return reason;
   if (!Number.isInteger(cmd.focusUsed) || cmd.focusUsed < 0 || cmd.focusUsed > Math.min(card.slots, ally.focus)) return 'フォーカスの数が不正です';
   if (needsCardTarget(card) && !selectedCardTarget(state, ally, card, cmd.targetId)) return '対象を選んでください';
@@ -459,7 +461,7 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   if (idx < 0) return '手札にありません';
   const inst = ally.hand[idx];
   const card = reserved?.card ?? cardOf(inst);
-  const reason = unusableReason(state, ally, card);
+  const reason = unusableReason(state, ally, card, inst.uid);
   if (reason) return reason;
   const focusUsed = cmd.focusUsed;
   if (!Number.isInteger(focusUsed) || focusUsed < 0 || focusUsed > Math.min(card.slots, ally.focus)) return 'フォーカスの数が不正です';
@@ -471,7 +473,7 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   if (card.secondaryTarget && !allyTarget) return '回復・支援する味方を選び直してください';
 
   // 支払い
-  const paid = cardCostOf(state, ally, card);
+  const paid = cardCostOf(state, ally, card, inst.uid);
   ally.mana -= paid.cost;
   // 陣割りなど: 今のカードに払ったマナを覚えておく
   (ally.counters ??= {}).lastCost = paid.cost;
@@ -751,8 +753,6 @@ function endTurn(state: BattleState, playerId: string, rng: Rng, events: BattleE
   if (checkEnd(state, events)) return undefined;
   // 敵のブロックは敵フェーズ開始時に0へ
   for (const e of state.enemies) e.block = 0;
-  // 区切りD: 血の代価の数え（失ったHP）は、敵の番の始めから数え直す
-  for (const a of state.allies) if (a.counters?.hpLostTurn) a.counters.hpLostTurn = 0;
   state.phase = 'enemy';
   state.enemyCursor = 0;
   addLog(state, `--- 敵フェーズ ---`);

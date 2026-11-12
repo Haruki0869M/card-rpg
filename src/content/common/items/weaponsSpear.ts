@@ -6,7 +6,7 @@ export const weaponsSpear: ItemDef[] = [
   {
     id: "temperedSpear", name: "鍛鋼の槍", slot: "weapon", weaponType: "spear", rarity: "rare", icon: "spear",
     description: "物理カードでダメージを与えた後、ブロック3。1ターンに1回。", stats: {"str":5}, tags: ["physical","block"],
-    cards: [{"cardId":"wtSpearHook","count":2}],
+    cards: [{"cardId":"lnGiWeakpoint","count":2}],
     ability: {"name":"槍構え","description":"物理カードでダメージを与えた後、ブロック3。1ターンに1回。","effect":{"when":"afterCard","if":[{"kind":"cardCategory","category":"physical"},{"kind":"dealtDamage"},{"kind":"oncePerTurn","key":"temperedSpear"}],"do":[{"kind":"block","amount":3,"to":"self"}]}},
   },
   {

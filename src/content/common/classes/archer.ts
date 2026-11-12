@@ -26,8 +26,8 @@ export const archer: ClassDef = {
   lineage: 'gi',
   tags: ['scout'],
   from: ['hunter'],
-  signature: ['aimedShot', 'arrowRain', 'piercingArrow'],
+  signature: ['cmAllOut', 'arrowRain', 'piercingArrow'],
   startingEquipment: { weapon: 'hunterBow', armor: 'travelerClothes' },
-  cardPool: ['aimedShot', 'arrowRain', 'piercingArrow', 'quickShot', 'focusAim', 'stormOfArrows', 'axWeakSight', 'axVitalShot'],
+  cardPool: ['cmAllOut', 'arrowRain', 'piercingArrow', 'quickShot', 'cmBreather', 'stormOfArrows', 'axWeakSight', 'axVitalShot'],
   growthWeights: { per: 3, dex: 3, agi: 1 },
 };

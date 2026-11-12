@@ -842,7 +842,7 @@ export const useBattle = create<StoreState>((set, get) => {
         return;
       }
       const card = cardOf(inst);
-      const reason = unusableReason(battle, ally, card);
+      const reason = unusableReason(battle, ally, card, inst.uid);
       if (reason) {
         set({ flash: { cardUid, text: reason, id: fxId++ } });
         return;

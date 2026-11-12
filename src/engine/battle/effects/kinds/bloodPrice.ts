@@ -1,4 +1,4 @@
-// 血の代価（区切りD）: 前の敵の番からこれまでに自分が失ったHP（払った分も、殴られた分も）と同じ値を、次の攻撃カードの最初の1回に足す（最大 max）
+// 血の代価（区切りD）: このターンに自分が失ったHP（払った分も、殴られた分も）と同じ値を、次の攻撃カードの最初の1回に足す（最大 max）
 // blockPct = その値の何%をブロックにもするか
 import { BALANCE } from '../../../../data/balance';
 import { isEnemy, unitIdOf } from '../../units';
@@ -27,5 +27,5 @@ export const effect: EffectHandler<'bloodPrice'> = {
     ctx.parts.push(n > 0 ? `血の代価+${n}` : '失ったHPが無い');
     return n > 0;
   },
-  describe: (e) => `前の敵の番からこれまでに自分が失ったHP（払った分も、殴られた分も）と同じ値を、次の攻撃カードのダメージに足す（最大+${e.max}）${e.blockPct ? `。その${e.blockPct === 50 ? '半分' : `${e.blockPct}%`}のブロックも得る` : ''}`,
+  describe: (e) => `このターンに自分が失ったHP（カードで払った分も、殴られた分も）と同じ値を、次の攻撃カードのダメージに足す（最大+${e.max}）${e.blockPct ? `。その${e.blockPct === 50 ? '半分' : `${e.blockPct}%`}のブロックも得る` : ''}`,
 };

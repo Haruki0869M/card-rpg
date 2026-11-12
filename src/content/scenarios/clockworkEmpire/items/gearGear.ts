@@ -7,7 +7,7 @@ export const gearGearItems: ItemDef[] = [
   {
     id: 'sageScepter', name: '賢者の錫杖', slot: 'weapon', weaponType: 'scepter', rarity: 'legend', icon: 'scepter', scenario: 'clockworkEmpire',
     description: '毎ターン、コスト3以上のカード1枚のコストが1下がる。時を刻む杖。', stats: { int: 8, vit: 4 }, tags: ['holy', 'highCost'],
-    cards: [{ cardId: 'wtScepterJudgment', count: 2 }],
+    cards: [{ cardId: 'lnSeiDivinePunish', count: 2 }],
     ability: { name: '時の短縮', description: '1ターンに1枚、コスト3以上のカードのコスト-1', effect: { modifier: 'cardCost', delta: -1, turnKey: 'sageScepter', if: [{ kind: 'cardCost', min: 3 }] } },
   },
   // ----- 鎧 -----

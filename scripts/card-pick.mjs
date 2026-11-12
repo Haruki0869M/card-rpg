@@ -38,7 +38,7 @@ for (const width of [360, 390, 480]) {
   const h = g.heroes[0];
   e.mode = 'reward';
   delete e.battle;
-  e.reward = { gold: 12, exp: [], levelUps: [], cardOffers: ['mightyBlow', 'ironWall', 'warCry'].map((cardId) => ({ cardId, heroId: h.id })), cardDone: [], cardOdds: [70, 25, 5], cardPicked: false, loot: [] };
+  e.reward = { gold: 12, exp: [], levelUps: [], cardOffers: ['lanceCharge', 'cmPrepare', 'warCry'].map((cardId) => ({ cardId, heroId: h.id })), cardDone: [], cardOdds: [70, 25, 5], cardPicked: false, loot: [] };
   const deckBefore = h.deck.length;
   await load(page, d);
   if (!(await page.getByText(/の山札に1枚加える/).count())) { ng(`${width}px: 報酬の画面が出ない`); await shot('fail'); await page.close(); continue; }
@@ -51,7 +51,7 @@ for (const width of [360, 390, 480]) {
   }
   let s = await save(page);
   if ((s.game.expeditions?.find((x) => x.reward) ?? s.game).reward?.cardDone?.length) ng(`${width}px: カードを1回押しただけで選ばれた`);
-  if (!(await page.locator('[data-card-pick-panel="mightyBlow"]').count())) ng(`${width}px: 押しても説明の窓が出ない`);
+  if (!(await page.locator('[data-card-pick-panel="lanceCharge"]').count())) ng(`${width}px: 押しても説明の窓が出ない`);
   else {
     const sum = await page.locator('[data-card-summary]').innerText();
     if (!sum.trim()) ng(`${width}px: ひとことの説明が空`);
@@ -62,7 +62,7 @@ for (const width of [360, 390, 480]) {
   // 別のカードを押すと切り替わる
   await page.locator('[data-pick-card="1"]').click();
   await page.waitForTimeout(250);
-  if (!(await page.locator('[data-card-pick-panel="ironWall"]').count())) ng(`${width}px: 別のカードに切り替わらない`);
+  if (!(await page.locator('[data-card-pick-panel="cmPrepare"]').count())) ng(`${width}px: 別のカードに切り替わらない`);
   // 窓の外（題の文字）を押すと閉じる
   await page.getByText(/の山札に1枚加える/).click();
   await page.waitForTimeout(250);

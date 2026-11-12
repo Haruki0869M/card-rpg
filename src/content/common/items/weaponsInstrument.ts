@@ -7,13 +7,13 @@ export const weaponsInstrument: ItemDef[] = [
   {
     id: "resonantLute", name: "響きのリュート", slot: "weapon", weaponType: "instrument", rarity: "rare", icon: "instrument",
     description: "味方への支援が成立した時、その味方に「応援」1。1ターンに1回。（1人の時は、自分への支援でも成立）", stats: {"luk":5}, tags: ["support"],
-    cards: [{"cardId":"wtInstStrum","count":1},{"cardId":"wtInstHymn","count":1}],
+    cards: [{"cardId":"cmArcaneArrow","count":1},{"cardId":"wtInstHymn","count":1}],
     ability: {"name":"伴奏","description":"味方への支援が成立した時、その味方に「応援」1。1ターンに1回。（1人の時は、自分への支援でも成立）","effect":{"when":"afterCard","if":[{"kind":"supported"},{"kind":"oncePerTurn","key":"resonantLute"}],"do":[{"kind":"applyStatus","status":"inspired","amount":1,"to":"helped"}]}},
   },
   {
     id: "steadfastLute", name: "堅心のリュート", slot: "weapon", weaponType: "instrument", rarity: "rare", icon: "instrument",
     description: "そのターンに攻撃カードを使わなかったら、ターン終了時に味方全員にブロック3。", stats: {"luk":2,"vit":2}, tags: ["support","block"],
-    cards: [{"cardId":"wtInstStrum","count":1},{"cardId":"wtInstHymn","count":1}],
+    cards: [{"cardId":"cmArcaneArrow","count":1},{"cardId":"wtInstHymn","count":1}],
     ability: {"name":"間奏","description":"そのターンに攻撃カードを使わなかったら、ターン終了時に味方全員にブロック3。","effect":{"when":"turnEnd","if":[{"kind":"noAttackThisTurn"}],"do":[{"kind":"block","amount":3,"to":"allies"}]}},
   },
   // エピック

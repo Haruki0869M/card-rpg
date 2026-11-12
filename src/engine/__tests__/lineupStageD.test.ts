@@ -1,6 +1,7 @@
 // ラインナップの作り直し 区切りD（docs/tasks/lineup-stageD-plan.md）
 // D-1: 1枚を複数の場所に置く・同じ中身のカード36組をまとめる・例外の2組・HPを払うカードの整理・保存 v21
 import { describe, expect, it } from 'vitest';
+import { cardCostOf } from '../abilities';
 import { CARDS, cardLineages, cardWeaponTypes, getCard } from '../../data/cards';
 import { CLASSES } from '../../data/classes';
 import { ITEMS } from '../../data/items';
@@ -76,23 +77,21 @@ describe('区切りD-1: 同じ中身のカードをまとめる', () => {
   it('まとめたカードは、元の全部の場所に置かれる', () => {
     const cm = getCard('cmProbe');
     expect(cm.common).toBe(true);
-    expect(cardWeaponTypes(cm)).toEqual(['dagger']);
+    expect(cardWeaponTypes(cm)).toEqual(['dagger', 'gun']); // 憲章5: 銃の「早撃ち」もここにまとめた
     expect(cardLineages(cm)).toEqual(['gi']);
     expect(CLASSES.get('brawler').cardPool).toContain('cmProbe');
-    const iron = getCard('lnBuIronBreath');
-    expect(cardLineages(iron).sort()).toEqual(['bu', 'sei']);
-    expect(cardWeaponTypes(iron).sort()).toEqual(['hammer', 'spear']);
-    // 名前を変えた2枚
-    expect(getCard('wtSwordLunge').name).toBe('踏み込み');
-    expect(getCard('wtSwordGuard').name).toBe('構え直し');
-    expect(cardWeaponTypes(getCard('wtSwordGuard'))).toEqual(['sword', 'katana']);
+    // 憲章5（2026-11-12）: 「鉄壁の呼吸」「踏み込み」「構え直し」は、数字だけ違う札として「備え」「手早い攻撃」「不屈の闘志」にまとめた
+    const iron = getCard('cmPrepare');
+    expect(cardLineages(iron).sort()).toEqual(['bu', 'gi', 'ma', 'sei']);
+    expect(cardWeaponTypes(iron).sort()).toEqual(['axe', 'hammer', 'spear']);
+    expect(cardWeaponTypes(getCard('cmGrit')).sort()).toEqual(['fist', 'katana', 'sword']);
   });
-  it('槍を持てるジョブの候補に、剣の「踏み込み」が入る（武器種を複数持つカード）', () => {
+  it('槍を持てるジョブの候補に、「手早い攻撃」が入る（武器種を複数持つカード）', () => {
     const g = game(['lancer']);
     const h = g.heroes[0];
-    expect(heroCardPool(h)).toContain('wtSwordLunge');
+    expect(heroCardPool(h)).toContain('lnGiQuick');
     h.equipment.weapon = { uid: 'w', itemId: 'ironSpear' };
-    expect(heroJobCardPool(h)).toContain('wtSwordLunge');
+    expect(heroJobCardPool(h)).toContain('lnGiQuick');
   });
   it('判定の能力値は、まとめた組で多い方（小手調べ = 器用・堅実な構え = 知力）', () => {
     expect(getCard('cmProbe').stat).toBe('dex');
@@ -683,5 +682,60 @@ describe('区切りD-5: 《研ぎ澄まし》25枚を、ジョブに合う力へ
     const s = battle(['darkKnight']);
     const r = use(s, 'bloodDrain', { focus: 'max' });
     expect(r.state.allies[0].abilities?.some((a) => a.name === '血の契り')).toBe(true);
+  });
+});
+
+// ===================== 元の文どおりに戻した札（オーナーの決定 2026-11-12） =====================
+describe('区切りD: 元の文どおりに戻した札', () => {
+  it('輪唱: 連携が起きるたびに回復。味方みんなで1ターン4回まで', () => {
+    const s = battle(['bard', 'warrior']);
+    let st = use(s, 'axRoundSong', { focus: 'max' }).state;
+    st.allies[1].hp = 400;
+    for (let i = 0; i < 6; i++) {
+      st.enemies[0].hitBy = [st.allies[0].id];
+      st = use(st, 'strike', { ally: 1, focus: 'max' }).state;
+    }
+    // 4回復 × 4回まで（1人2回の決まりは、もう無い）
+    expect(st.allies[1].hp).toBe(416);
+  });
+  it('挟撃の陣: 殴るたびにブロック（×N回のカードは、当てた回数ぶん）', () => {
+    const s = battle(['warrior']);
+    const r = use(s, 'axPincer', { focus: 'max' });
+    const hits = getCard('lnBuFlurry').tiers[2].effects.reduce((n, e) => n + (e.kind === 'damage' ? (e as { hits?: number }).hits ?? 1 : 0), 0);
+    expect(hits).toBeGreaterThan(1);
+    const r2 = use(r.state, 'lnBuFlurry', { focus: 'max' });
+    expect(r2.state.allies[0].block).toBe(4 * hits);
+  });
+  it('血の代価: 数えるのは「このターンに」失ったHP。自分たちの番の始めに0に戻る', () => {
+    const s = battle(['darkKnight'], ['stageDHitter20']);
+    const n = nextTurn(s);
+    // 前の敵の番に殴られた分は、入らない
+    expect(n.state.allies[0].counters?.hpLostTurn ?? 0).toBe(0);
+    const r = use(n.state, 'axBloodPrice', { focus: 'max' });
+    expect(r.state.allies[0].counters?.bloodAdd ?? 0).toBe(0);
+  });
+  it('詠唱の栞: 引いたカードが魔法なら、そのカードだけ、このターンだけコスト-1', () => {
+    const s = battle(['mage']);
+    const a = s.allies[0];
+    a.drawPile = [{ uid: 'drawnMagic', cardId: 'magicArrow' }];
+    a.hand = [{ uid: 'otherMagic', cardId: 'magicArrow' }];
+    const st = use(s, 'axChantMark', { focus: 'max' }).state;
+    const me = st.allies[0];
+    expect(me.hand.map((c) => c.uid)).toContain('drawnMagic');
+    expect(cardCostOf(st, me, getCard('magicArrow'), 'drawnMagic').cost).toBe(getCard('magicArrow').cost - 1);
+    // 手札の、ほかの魔法カードは安くならない
+    expect(cardCostOf(st, me, getCard('magicArrow'), 'otherMagic').cost).toBe(getCard('magicArrow').cost);
+    // 払うマナも1少ない
+    me.mana = 10;
+    const r = applyCommand(st, { type: 'PLAY_CARD', playerId: me.playerId, characterId: me.id, cardInstanceId: 'drawnMagic', targetId: st.enemies[0].uid, focusUsed: 0 });
+    expect(r.error).toBeUndefined();
+    expect(r.state.allies[0].mana).toBe(10 - (getCard('magicArrow').cost - 1));
+  });
+  it('詠唱の栞: 引いたカードが魔法でなければ、安くならない', () => {
+    const s = battle(['mage']);
+    s.allies[0].drawPile = [{ uid: 'drawnGuard', cardId: 'guard' }];
+    const st = use(s, 'axChantMark', { focus: 'max' }).state;
+    expect(st.allies[0].cheapCard).toBeUndefined();
+    expect(cardCostOf(st, st.allies[0], getCard('guard'), 'drawnGuard').cost).toBe(getCard('guard').cost);
   });
 });

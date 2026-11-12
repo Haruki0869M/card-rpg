@@ -249,10 +249,10 @@ describe('戦闘 → 報酬 → 成長', () => {
 describe('新しい戦闘の要素', () => {
   it('全体攻撃・全員ブロック・全員回復', () => {
     const s = createBattle({ seed: 1, party: party('warrior', 'guardian'), encounter: { id: 't', name: 't', enemies: [{ defId: 'goblinScout' }, { defId: 'goblinScout' }] } });
-    s.allies[0].hand = [{ uid: 'z1', cardId: 'sweep' }];
+    s.allies[0].hand = [{ uid: 'z1', cardId: 'lnBuSwipe' }];
     let r = applyCommand(s, { type: 'PLAY_CARD', playerId: 'P1', characterId: 'a0', cardInstanceId: 'z1', focusUsed: 2 });
     expect(r.error).toBeUndefined();
-    expect(r.state.enemies.every((e) => e.hp === e.maxHp - 10)).toBe(true); // 8 × 剣の心得（完全成功で1.3倍）
+    expect(r.state.enemies.map((e) => e.maxHp - e.hp)).toEqual([6, 6]); // 5 × 剣の心得（完全成功で1.3倍）。憲章5: 「旋風撃」（8）を「払い斬り」（5）にまとめた
     const s2 = r.state;
     s2.allies[1].hand = [{ uid: 'z2', cardId: 'guardFormation' }, { uid: 'z3', cardId: 'holyLight' }];
     s2.allies[0].hp = 30;

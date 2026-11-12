@@ -42,7 +42,6 @@ export interface EffectCtx {
   multi?: { total: number; landed: number };
   /** 区切りD: このカードで連携が起きた・挟撃の陣のブロックをもらった・カードの成功の数 */
   comboLanded?: boolean;
-  pincerPaid?: boolean;
   successes?: number;
   /** 働いた常時型の能力の名前（重複なし。演出用） */
   fired: AbilityNotice[];

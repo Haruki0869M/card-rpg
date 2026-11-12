@@ -25,8 +25,8 @@ export const shadow: ClassDef = {
   tier: 'mid',
   lineage: 'gi',
   from: ['thief'],
-  signature: ['vitalStab', 'caltrops', 'shadowKill'],
+  signature: ['cmTackle', 'caltrops', 'shadowKill'],
   startingEquipment: { weapon: 'rustyDagger', armor: 'travelerClothes' },
-  cardPool: ['vitalStab', 'caltrops', 'shadowKill', 'smokeVeil', 'poisonNeedle', 'assassinate', 'axVenomBurst', 'axCollapse'],
+  cardPool: ['cmTackle', 'caltrops', 'shadowKill', 'smokeVeil', 'poisonNeedle', 'assassinate', 'axVenomBurst', 'axCollapse'],
   growthWeights: { agi: 3, dex: 3, per: 1 },
 };

@@ -10,6 +10,6 @@ export const dragoon: ClassDef = {
   battleAbility: { name: '竜のブレス', effect: { when: 'turnEnd', do: [{ kind: 'damage', amount: 4, to: 'foes' }] } },
   exploreAbility: { id: 'dragoonExplore', name: '竜の翼', description: '移動のサイコロ+1', effect: { kind: 'moveSlots', slots: 1 } },
   requires: { feat: 'kills:big', count: 2, text: '大きな敵を2体倒す' },
-  cardPool: ["dragonDive","dragonScale","dragonSweep","dragonSpirit","jump"], signature: ["dragonDive","dragonScale","dragonSweep"],
+  cardPool: ["dragonDive","dragonScale","dragonSweep","hawkFocus","jump"], signature: ["dragonDive","dragonScale","dragonSweep"],
   jobCards: ['jump'],
 };

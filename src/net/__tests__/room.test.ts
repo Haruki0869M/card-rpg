@@ -112,7 +112,7 @@ describe('特殊職の通信と再接続', () => {
     const { rooms } = await specialBattle(['bard', 'warrior', 'mage', 'hunter']);
     for (const r of rooms) {
       r.game!.battle!.allies[0].hand = [{ uid: 'song', cardId: 'bardCourage' }];
-      r.game!.battle!.allies[1].hand = [{ uid: 'attack', cardId: 'starRay' }];
+      r.game!.battle!.allies[1].hand = [{ uid: 'attack', cardId: 'cmArcaneArrow' }];
     }
     await rooms[0].send({ type: 'BATTLE', command: { type: 'PLAY_CARD', playerId: 'P1', characterId: 'h0', cardInstanceId: 'song', focusUsed: 0 } }); await settle();
     expect(allSame(rooms)).toBe(true); expect(rooms[3].game!.battle!.allies.map(a => a.statuses.songInspired)).toEqual([1, 1, 1, 1]);
@@ -122,7 +122,7 @@ describe('特殊職の通信と再接続', () => {
   });
   it('P2の星読みを全端末が共有し、結果確認中の再接続でも予約・乱数が一致する', async () => {
     const { hub, host, rooms } = await specialBattle(['warrior', 'astrologer']);
-    for (const r of rooms) r.game!.battle!.allies[1].hand = [{ uid: 'star', cardId: 'starRay' }];
+    for (const r of rooms) r.game!.battle!.allies[1].hand = [{ uid: 'star', cardId: 'cmArcaneArrow' }];
     await rooms[1].send({ type: 'BATTLE', command: { type: 'PREVIEW_CARD', playerId: 'P2', characterId: 'h1', cardInstanceId: 'star', targetId: host.game!.battle!.enemies[0].uid, focusUsed: 0 } }); await settle();
     expect(allSame(rooms)).toBe(true); const preview = structuredClone(host.game!.battle!.slotPreview), rng = host.game!.battle!.rngState, seq = host.seq;
     await rooms[0].send({ type: 'BATTLE', command: { type: 'CONFIRM_PREVIEW', playerId: 'P1', characterId: 'h1' } }); await settle();

@@ -13,7 +13,7 @@ export const starGear: ItemDef[] = [
   {
     id: 'starScepter', name: '星環の錫杖', slot: 'weapon', weaponType: 'scepter', rarity: 'legend', icon: 'scepter', scenario: 'starCastle',
     description: '1回の戦闘で2回、次に使うカードのスロットを先に見て、1回だけ振り直せる。星を読み続けた女王の環。', stats: { int: 8, vit: 4 }, tags: ['holy', 'focus'],
-    cards: [{ cardId: 'wtScepterJudgment', count: 2 }],
+    cards: [{ cardId: 'lnSeiDivinePunish', count: 2 }],
     ability: { name: '星の導き手', effect: { modifier: 'slotPreview', uses: 2 } },
   },
   // ----- 鎧 -----

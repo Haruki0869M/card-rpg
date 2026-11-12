@@ -34,23 +34,17 @@ function c(
 export const MID_JOB_CARDS: CardDef[] = [
   // ===== 剣豪（剣・刀。完全成功と見切りの追撃） =====
   c('swordDance', '剣舞', 'physical', 1, 75, 'enemy', [[d(3)], [d(3), d(3)], [d(4), d(4), d(4)]], { rarity: 'rare', stat: 'dex', tags: ['combo'] }),
-  c('mindsEye', '心眼', 'skill', 1, 80, 'self', [[b(4)], [b(6), focus(1)], [b(8), focus(2)]], { rarity: 'rare', stat: 'per' }),
   c('flashCut', '一閃', 'physical', 2, 60, 'enemy', [[d(7)], [d(14)], [d(22)]], { rarity: 'epic', stat: 'per', trait: { name: '鞘走り', effect: { when: 'perfect', do: [mana(1)] } } }),
-  c('parryStrike', '受け流し', 'physical', 1, 75, 'enemy', [[b(3)], [d(4), b(4)], [d(6), b(6)]]),
-  c('doubleSlash', '二段斬り', 'physical', 1, 70, 'enemy', [[d(3)], [dh(4, 2)], [dh(6, 2)]]),
   c('masterStroke', '奥義・星断ち', 'physical', 3, 55, 'enemy', [[d(10)], [d(18)], [d(26)], [d(36), st('vulnerable', 2)]], { rarity: 'epic', trait: { name: '奥義', effect: { modifier: 'ignoreBlock' } }, stat: 'str' }),
 
   // ===== 狂戦士（斧。HPを削って火力） =====
   c('recklessSwing', '捨て身の一撃', 'physical', 1, 70, 'enemy', [[d(6), me('vulnerable', 1)], [d(11), me('vulnerable', 1)], [d(16)]], { rarity: 'rare', stat: 'str', tags: ['heavy'] }),
   c('bloodRage', '血の怒り', 'skill', 0, 85, 'self', [[mana(1), me('vulnerable', 1)], [mana(1), draw(1)]], { rarity: 'rare', stat: 'vit' }),
   c('ragingStorm', '大暴れ', 'physical', 2, 60, 'allEnemies', [[d(4)], [d(7)], [d(10), all('weak', 1)]], { rarity: 'epic', stat: 'str', trait: { name: '狂乱', effect: { when: 'kill', do: [mana(1)] } } }),
-  c('cleaveThrough', '薙ぎ払い', 'physical', 1, 70, 'allEnemies', [[d(2)], [d(4)], [d(6)]]),
   c('warHowl', '狂戦の咆哮', 'skill', 1, 80, 'self', [[b(5)], [b(7), all('weak', 1)], [b(9), all('weak', 1)]]),
   c('bloodFeast', '血の饗宴', 'physical', 2, 65, 'enemy', [[d(6), drain(30)], [d(10), drain(40)], [d(15), drain(50)]], { rarity: 'epic', trait: { name: '血に飢えて', effect: { when: 'kill', do: [heal(5)] } }, stat: 'str' }),
 
   // ===== 闘士（拳。手数と弱体） =====
-  c('comboRush', '連環撃', 'physical', 1, 75, 'enemy', [[d(2)], [dh(2, 2)], [dh(3, 3)]], { rarity: 'rare', stat: 'agi', tags: ['combo'] }),
-  c('chiBurst', '発勁', 'physical', 1, 70, 'enemy', [[d(4)], [d(7), st('weak', 1)], [d(10), st('weak', 2)]], { rarity: 'rare', stat: 'vit' }),
   c('hundredKicks', '百烈脚', 'physical', 2, 60, 'enemy', [[dh(2, 3)], [dh(3, 4)], [dh(3, 6)]], { rarity: 'epic', stat: 'agi', trait: { name: '闘魂', effect: { when: 'perfect', do: [draw(1)] } } }),
   c('guardBreak', '崩し', 'physical', 1, 75, 'enemy', [[d(3)], [d(4), st('vulnerable', 1)], [d(6), st('vulnerable', 1), st('weak', 1)]]),
   c('fistOfFury', '怒涛の拳', 'physical', 2, 60, 'enemy', [[d(6)], [d(10), mana(1)], [d(15), mana(1), focus(1)]], { rarity: 'epic', trait: { name: '破竹', effect: { when: 'kill', do: [draw(1)] } }, stat: 'str' }),
@@ -90,7 +84,6 @@ export const MID_JOB_CARDS: CardDef[] = [
   c('lanceCharge', '突進突き', 'physical', 2, 65, 'enemy', [[d(6)], [d(12)], [d(18), st('vulnerable', 1)]], { rarity: 'rare', stat: 'str', tags: ['heavy'] }), // 区切りD: 突進突き＝昇竜脚 をまとめた
   c('spearWall', '槍衾', 'skill', 1, 80, 'self', [[b(5)], [b(8)], [b(10), all('weak', 1)]], { rarity: 'rare', stat: 'vit' }),
   c('skewer', '串刺し', 'physical', 2, 60, 'allEnemies', [[d(4)], [d(6)], [d(9), all('vulnerable', 1)]], { rarity: 'epic', trait: { name: '貫通', effect: { modifier: 'ignoreBlock' } } }),
-  c('quickThrust', '素早い突き', 'physical', 1, 80, 'enemy', [[d(3)], [d(5)], [d(7)]], { stat: 'agi' }),
   c('sweepLegs', '足払い', 'physical', 1, 75, 'enemy', [[d(2), st('weak', 1)], [d(4), st('weak', 1)], [d(5), st('weak', 2)]]),
   c('dragonFang', '竜牙', 'physical', 3, 55, 'enemy', [[d(10)], [d(18)], [d(26)], [d(34), st('vulnerable', 2)]], { rarity: 'epic', trait: { name: '竜殺し', effect: { modifier: 'damageDealt', multiplier: 1.3, if: [{ kind: 'targetHpAtMost', pct: 50 }] } }, stat: 'str' }),
 
@@ -103,23 +96,18 @@ export const MID_JOB_CARDS: CardDef[] = [
   c('resurgence', '再起の祈り', 'magic', 3, 60, 'self', [[heal(6, 'allies')], [heal(9, 'allies')], [heal(12, 'allies')], [heal(16, 'allies'), { kind: 'cleanse', to: 'allies' }]], { rarity: 'epic', trait: { name: '奇跡の兆し', effect: { when: 'perfect', do: [focus(1)] } }, stat: 'per' }),
 
   // ===== 弓術士（弓。1体を狙い撃つ） =====
-  c('aimedShot', '狙撃', 'physical', 2, 65, 'enemy', [[d(6)], [d(12)], [d(19)]], { rarity: 'rare', stat: 'per', tags: ['heavy'] }),
   c('arrowRain', '矢の雨', 'physical', 2, 65, 'allEnemies', [[d(3)], [d(5)], [d(7), all('vulnerable', 1)]], { rarity: 'rare', stat: 'dex' }),
   c('piercingArrow', '貫き矢', 'physical', 2, 60, 'enemy', [[d(7)], [d(13)], [d(20), st('vulnerable', 2)]], { rarity: 'epic', stat: 'per', trait: { name: '貫通', effect: { modifier: 'ignoreBlock' } } }),
   c('quickShot', '速射', 'physical', 1, 80, 'enemy', [[d(3)], [d(5)], [d(5), draw(1)]], { stat: 'dex' }),
-  c('focusAim', '集中', 'skill', 0, 85, 'self', [[focus(1)], [focus(1), b(3)]], { stat: 'per' }),
   c('stormOfArrows', '千本矢', 'physical', 3, 55, 'enemy', [[dh(2, 3)], [dh(3, 4)], [dh(3, 6)], [dh(4, 7)]], { rarity: 'epic', trait: { name: '鷹の目', effect: { when: 'perfect', do: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'foes' }] } }, stat: 'dex' }),
 
   // ===== 獣使い（鞭。相棒の獣と連携） =====
   c('packHunt', '狩りの合図', 'physical', 1, 75, 'enemy', [[d(3)], [d(4), summon('companionBeast', '相棒の獣', '🐾', 4, 99)], [d(6), summon('companionBeast', '相棒の獣', '🐾', 6, 99)]], { rarity: 'rare', stat: 'dex', tags: ['summon'] }),
-  c('beastRoar', '獣の咆哮', 'skill', 1, 80, 'self', [[b(4)], [b(5), all('weak', 1)], [b(7), all('weak', 1)]], { rarity: 'rare', stat: 'per', tags: ['summon'] }),
   c('callFalcon', '鷹呼び', 'skill', 2, 65, 'self', [[summon('falcon', '鷹', '🦅', 4, 2)], [summon('falcon', '鷹', '🦅', 6, 3)], [summon('falcon', '鷹', '🦅', 7, 3), focus(1)]], { rarity: 'epic', trait: { name: '空からの目', effect: { when: 'perfect', do: [draw(1)] } }, stat: 'per', tags: ['summon'] }),
-  c('whipCrack', '鞭鳴らし', 'physical', 1, 80, 'enemy', [[d(3)], [d(4), st('weak', 1)], [d(6), st('weak', 1)]], { stat: 'dex' }),
   c('feedBeast', '餌付け', 'skill', 0, 85, 'self', [[heal(2)], [heal(3), draw(1)]], { stat: 'per' }),
   c('stampede', '獣の群れ', 'physical', 3, 55, 'allEnemies', [[d(4)], [d(7)], [d(10)], [d(14), all('vulnerable', 1)]], { rarity: 'epic', trait: { name: '群れの力', effect: { modifier: 'damageDealt', multiplier: 1, scale: { by: 'targetStatuses', per: 0.15 } } }, stat: 'per' }),
 
   // ===== 隠密（短剣。状態異常を重ねて急所を突く） =====
-  c('vitalStab', '急所刺し', 'physical', 1, 75, 'enemy', [[d(3)], [d(6)], [d(9), st('vulnerable', 1)]], { rarity: 'rare', stat: 'dex' }),
   c('caltrops', '撒き菱', 'skill', 1, 80, 'self', [[all('weak', 1)], [all('weak', 1), all('poison', 1)], [all('weak', 1), all('poison', 2)]], { rarity: 'rare', stat: 'dex' }),
   c('shadowKill', '影縫い', 'physical', 2, 60, 'enemy', [[d(5), st('paralysis', 1)], [d(9), st('paralysis', 1)], [d(14), st('paralysis', 1), st('vulnerable', 1)]], { rarity: 'epic', stat: 'agi', trait: { name: '闇討ち', effect: { modifier: 'damageDealt', multiplier: 1, scale: { by: 'targetStatuses', per: 0.2 } } } }),
   c('smokeVeil', '煙幕', 'skill', 1, 80, 'self', [[b(4)], [b(6), draw(1)], [b(8), draw(1)]], { stat: 'agi' }), // 区切りD: 煙幕＝煙玉 をまとめた

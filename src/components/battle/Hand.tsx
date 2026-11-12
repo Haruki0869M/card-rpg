@@ -187,8 +187,8 @@ export function Hand() {
               pos={positions[i]}
               selected={selection?.cardUid === c.uid}
               focus={selection?.cardUid === c.uid ? selection.focus : 0}
-              reason={unusableReason(battle, ally, cardOf(c))}
-              cost={cardCostOf(battle, ally, cardOf(c)).cost}
+              reason={unusableReason(battle, ally, cardOf(c), c.uid)}
+              cost={cardCostOf(battle, ally, cardOf(c), c.uid).cost}
               containerW={W}
               tall={tall}
             />

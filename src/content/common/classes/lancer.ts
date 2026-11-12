@@ -28,6 +28,6 @@ export const lancer: ClassDef = {
   from: ['guardian'],
   signature: ['lanceCharge', 'spearWall', 'skewer'],
   startingEquipment: { weapon: 'ironSpear', armor: 'leatherArmor' },
-  cardPool: ['lanceCharge', 'spearWall', 'skewer', 'quickThrust', 'sweepLegs', 'dragonFang', 'axIronMarch'],
+  cardPool: ['lanceCharge', 'spearWall', 'skewer', 'lnGiQuick', 'sweepLegs', 'dragonFang', 'axIronMarch'],
   growthWeights: { str: 3, vit: 3 },
 };

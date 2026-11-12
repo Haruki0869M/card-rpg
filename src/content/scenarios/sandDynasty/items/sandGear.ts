@@ -13,7 +13,7 @@ export const sandGear: ItemDef[] = [
   {
     id: "scorpionSting", name: "蠍の針", slot: "weapon", weaponType: "dagger", rarity: "rare", icon: "dagger", scenario: "sandDynasty",
     description: "まだ毒が付いていない敵に毒を付ける時、毒+2。", stats: {"dex":4,"agi":3}, tags: ["physical","poison"],
-    cards: [{"cardId":"wtDaggerVenom","count":2}],
+    cards: [{"cardId":"lnGiNeedle","count":2}],
     ability: {"name":"蠍毒","description":"まだ毒が付いていない敵に毒を付ける時、毒+2。","effect":{"modifier":"statusBonus","statuses":["poison"],"amount":2,"if":[{"kind":"targetNoStatus","status":"poison"}]}},
   },
   {

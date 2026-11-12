@@ -239,7 +239,7 @@ function battleStep(g: GameState, log: BotLog): GameState {
   if (b.phase === 'ally') {
     for (const a of b.allies) {
       if (isDone(b, a)) continue;
-      const c = a.hand.find((x) => !unusableReason(b, a, cardOf(x)));
+      const c = a.hand.find((x) => !unusableReason(b, a, cardOf(x), x.uid));
       if (!c) continue;
       const card = cardOf(c);
       const target = b.enemies.find((e) => !e.dead)?.uid;

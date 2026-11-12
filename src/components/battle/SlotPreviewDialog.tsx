@@ -29,7 +29,7 @@ export function SlotPreviewDialog() {
       </div>
       <p className="text-[13px] leading-5 text-zinc-300">{p.rerolled ? '振り直し済みです。この結果でカードを使います。' : 'この結果を使うか、1回だけ振り直せます。フォーカス枠は確定成功のままです。'}</p>
       {predictCard(battle, ally.id, inst.uid, p.targetId, p.focusUsed, tierIndex(card, results.filter(r => r !== 'miss').length), p.allyTargetId).map(x => <p key={x.id} className="mt-1 text-[13px] text-sky-100">予測：{unitName(battle, x.id)} {x.text}（追加抽選の効果は目安）</p>)}
-      <p className="mt-2 text-[12px] leading-5 text-zinc-400">確定時にマナ{cardCostOf(battle, ally, card).cost}・フォーカス{p.focusUsed}を消費します。結果確認中はこの戦闘が待機します。</p>
+      <p className="mt-2 text-[12px] leading-5 text-zinc-400">確定時にマナ{cardCostOf(battle, ally, card, inst.uid).cost}・フォーカス{p.focusUsed}を消費します。結果確認中はこの戦闘が待機します。</p>
       <div className="mt-3 flex flex-col gap-2">
         <button disabled={!mine || p.rerolled} onClick={() => dispatch({ type: 'REROLL_PREVIEW', playerId: LOCAL_PLAYER, characterId: ally.id })} className="btn btn-dark min-h-12 rounded-xl px-2 text-[15px] font-bold">振り直す（残り{p.rerolled ? 0 : 1}回）</button>
         <button disabled={!mine} onClick={() => dispatch({ type: 'CONFIRM_PREVIEW', playerId: LOCAL_PLAYER, characterId: ally.id })} className="btn btn-gold min-h-12 rounded-xl px-2 text-[15px] font-bold">この結果で使う</button>

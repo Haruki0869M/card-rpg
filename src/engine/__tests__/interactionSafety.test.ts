@@ -104,7 +104,7 @@ describe('単体支援の対象と星読み', () => {
     const r = applyCommand(s, cmd); expect(r.state.allies[2].hp).toBe(r.state.allies[2].maxHp);
   });
   it.each([
-    ['samurai', 'machineShot'], ['magicKnight', 'machineShot'], ['darkKnight', 'bloodBlade'], ['warrior', 'strike'],
+    ['samurai', 'lnGiQuick'], ['magicKnight', 'lnGiQuick'], ['darkKnight', 'bloodBlade'], ['warrior', 'strike'],
   ])('%sの倍率・属性・ブロックを含む予測を実際の攻撃と照合する', (job, id) => {
     const s = battle(); s.allies[0].classId = job;
     s.allies[0].attackCharge = { category: 'physical', multiplier: 4 };

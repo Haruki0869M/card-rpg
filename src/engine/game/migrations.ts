@@ -2,6 +2,7 @@
 // 保存データの形を変えた時は、GAME_VERSION（= battle の STATE_VERSION）を1つ上げ、ここに「前の版 → 次の版」の直し方を1つ足す。
 // 直し方が無い古い版は読み込まない（タイトルで「つづきから」が出ないだけで、新しく始められる）。
 import { CARDS } from '../../data/cards';
+import { MERGED_CARDS } from '../../data/cards/merged';
 import { CLASSES } from '../../data/classes';
 import { DUNGEONS } from '../../data/dungeons';
 import { ENEMIES } from '../../data/enemies';
@@ -16,7 +17,28 @@ type Loose = Record<string, any>; // eslint-disable-line @typescript-eslint/no-e
 
 // v17 までの保存データは読まない（2026-11-11 オーナーの決定: 装備の作り直しで、古い保存は捨てて良い。置き換えの表は作らない）。
 // それより前の「直し方」（v3〜v16）は、もう通らないので消した。次に形を変える時は、ここに 18(g) { ... } から足す。
-const MIGRATIONS: Record<number, (g: Loose) => void> = {};
+const MIGRATIONS: Record<number, (g: Loose) => void> = {
+  // v23 → v24（2026-11-12・憲章5）: 数字だけ違うカードをまとめた。消した札を、残した札に読み替える
+  23(g) { renameCards(g); },
+};
+
+/** 保存データの中のカードのID（cardId の項目と、名前に card が入る並び）を、まとめた先に読み替える。敵の行動のID（同じ文字の物がある）には触らない */
+function renameCards(v: unknown, key = ''): void {
+  if (Array.isArray(v)) {
+    const cardList = /card|jobPick|exhausted/i.test(key);
+    v.forEach((x, i) => {
+      if (typeof x === 'string') { if (cardList && MERGED_CARDS[x]) v[i] = MERGED_CARDS[x]; }
+      else renameCards(x, key);
+    });
+    return;
+  }
+  if (!v || typeof v !== 'object') return;
+  const o = v as Loose;
+  for (const k of Object.keys(o)) {
+    if (k === 'cardId' && typeof o[k] === 'string') { if (MERGED_CARDS[o[k]]) o[k] = MERGED_CARDS[o[k]]; }
+    else renameCards(o[k], k);
+  }
+}
 
 /**
  * 版を上げずに直す物:
