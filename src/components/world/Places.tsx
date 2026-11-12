@@ -39,6 +39,7 @@ import {
   scourgeAt,
   scourgeRewardText,
   scourgesWith,
+  rumorText,
 } from '../../engine';
 import { isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
@@ -243,6 +244,8 @@ export function TownScreen() {
   const def = TOWNS.get(t.townId);
   const w = game.world!;
   const stock = w.shops[def.id];
+  const townTile = w.tiles.findIndex((x) => x.f?.kind === 'town' && x.f.id === def.id);
+  const rumor = townTile >= 0 ? rumorText(game, w, townTile) : undefined;
   // 町に入ったキャラ（お金・持ち物はこのキャラのもの。操作できるのはこのキャラの担当だけ）
   const [visitorId, setVisitorId] = useState<string>();
   const visitors = game.heroes.filter(h => facilityMembers(game).includes(h.id));
@@ -290,7 +293,8 @@ export function TownScreen() {
     <Screen bg="town" bgOpacity={0.28}>
       <WorldTopBar game={game} goldHeroId={v.id} />
       <FacilityRoster game={game} selected={v.id} onSelect={setVisitorId} />
-      <Heading sub={def.description}>{def.name}</Heading>
+      {/* 回1の追加: 町の説明の下に、ランダムダンジョンのうわさ（いちばん近い未踏破の1つ。無ければ出さない） */}
+      <Heading sub={<>{def.description}{rumor && <span className="block text-amber-200/90" data-town-rumor>{rumor}</span>}</>}>{def.name}</Heading>
       <div className="mx-3 mt-1 flex shrink-0 items-center gap-2 rounded-lg bg-black/40 px-2 py-1 text-[13px]">
         <HeroFace hero={v} size={28} />
         <span className="min-w-0 flex-1 truncate">

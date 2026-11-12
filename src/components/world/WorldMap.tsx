@@ -5,8 +5,8 @@ import { useReducedMotion } from 'framer-motion';
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { artImage, EnemyArt } from '../../art';
 import { DUNGEONS } from '../../data/dungeons';
-import { getTerrain, QUESTS, TERRAINS, TOWNS } from '../../data/world';
-import { colOf, dungeonTheme, objectiveHandler, partySenses, rowOf, signposts, timeOfDay } from '../../engine';
+import { getTerrain, QUESTS, SANCTUARIES, SHRINES, TERRAINS, TOWNS } from '../../data/world';
+import { colOf, dungeonTheme, objectiveHandler, partySenses, randomDungeonView, rowOf, signposts, timeOfDay } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
 import { speedFactor, useBattle } from '../../store/battleStore';
 import { TIMING } from '../../data/balance';
@@ -26,6 +26,7 @@ import { orderOnTile, pieceSpots, PLAYER_COLORS } from './pieceLayout';
 import { cameraTop, edgeArrow, mapPadBottom, mapPadY, revealLeft, revealTop, visibleH } from './mapCamera';
 import { anchorScroll, baseRadius, clampZoom, COMPACT_ZOOM, minZoomFor, stepZoom, ZOOM_MAX, ZOOM_MIN } from './mapZoom';
 import { Overview } from './Overview';
+import { artBox, FACILITY_LIFT, pickPlace, placeLabels, signpostBox, type ArtShape, type Box, type PlaceLabel } from './placeTap';
 
 const SQRT3 = Math.sqrt(3);
 
@@ -45,8 +46,7 @@ function placeImage(f: NonNullable<WorldState['tiles'][number]['f']>): string | 
 }
 
 /** 夜・夕方の明かり（場所の種類 → 色と大きさ（R に対する半径）） */
-/** 施設のあるマス: 建物を少し奥（上）へ、駒を少し手前（下）へずらす（R を1とする。駒は奥行きの縮みも掛ける） */
-const FACILITY_LIFT = 0.22;
+/** 施設のあるマス: 建物を少し奥（上）へ（FACILITY_LIFT。placeTap.ts）、駒を少し手前（下）へずらす（R を1とする。駒は奥行きの縮みも掛ける） */
 const FACILITY_FRONT = 0.85;
 
 const GLOW: Record<string, { color: string; r: number }> = {
@@ -167,6 +167,12 @@ const WaterLayer = memo(function WaterLayer({ tiles, geom, levels }: { tiles: Wo
 
 /** 施設1つ分の絵（立体のミニチュア・描いた絵・仮の印）。施設の層と、駒の手前に重ねる層（奥行き）の両方で使う */
 function featureArt(t: WorldState['tiles'][number], i: number, geom: MapGeom, finaleTiles: ReadonlySet<number>, fallenTowns: string[], compact = false) {
+  const art = featureArtInner(t, i, geom, finaleTiles, fallenTowns, compact);
+  // 回1の追加: どのマスの絵かの印（画面の確認で、絵の上の端・真ん中・足元を押すため）
+  return art ? <g key={`f${i}`} data-place-tile={i}>{art}</g> : null;
+}
+
+function featureArtInner(t: WorldState['tiles'][number], i: number, geom: MapGeom, finaleTiles: ReadonlySet<number>, fallenTowns: string[], compact = false) {
   const { R, center } = geom;
   const w = { fallenTowns };
     if (!t.f || !t.seen) return null;
@@ -228,6 +234,41 @@ function featureMark(kind: string, i: number, x: number, y: number, R: number, u
     );
 }
 
+/** 回1の追加: 施設の絵の形（featureArt と同じ分け方。押した所が絵の中かを調べる） */
+function featureShape(t: WorldState['tiles'][number], i: number, finaleTiles: ReadonlySet<number>, compact: boolean): ArtShape | undefined {
+  const f = t.f;
+  if (!f || !t.seen) return undefined;
+  if (compact) return { type: 'mark' };
+  if (f.kind === 'tower') return { type: 'tower' };
+  if (finaleTiles.has(i)) return { type: 'image', big: 1.9 };
+  if (f.kind === 'event' || f.kind === 'temple' || f.kind === 'altar') return { type: 'image', big: 1.5 };
+  if (placeImage(f)) return { type: 'image', big: f.kind === 'town' ? 1.75 : f.kind === 'chest' ? 1.25 : 1.55 };
+  return { type: 'mark' };
+}
+
+/** 回1の追加: 施設の絵が占める四角（無ければ undefined） */
+function featureBox(t: WorldState['tiles'][number], i: number, geom: MapGeom, finaleTiles: ReadonlySet<number>, compact: boolean): Box | undefined {
+  const shape = featureShape(t, i, finaleTiles, compact);
+  if (!shape) return undefined;
+  const { x, y } = geom.center(i);
+  return artBox(shape, x, y, geom.R, t.f?.kind === 'dungeon' && !!dungeonTheme(t.f.theme)?.mark);
+}
+
+/**
+ * 回1の追加: 施設の足元のマス（六角の台と縁）。「このマスに建っている」と分かるように、施設の絵より下に描く。
+ * 縮小した時は縁だけ
+ */
+function FacilityBase({ tile, x, y, R, compact, used }: { tile: number; x: number; y: number; R: number; compact: boolean; used?: boolean }) {
+  const r = R * TOP_SCALE;
+  return (
+    <g data-facility-base={tile} opacity={used ? 0.5 : 1} pointerEvents="none">
+      {/* 外の細い影の線（明るい地形の上でも縁が見えるように） */}
+      <polygon points={hexPoints(x, y, r - 1)} fill="none" stroke="rgba(40,26,10,.6)" strokeWidth={Math.max(1.2, R * 0.05)} />
+      <polygon points={hexPoints(x, y, r - 1 - Math.max(1.5, R * 0.05))} fill={compact ? 'none' : 'rgba(255,246,222,.26)'} stroke="rgba(255,244,214,.92)" strokeWidth={Math.max(1.5, R * 0.065)} />
+    </g>
+  );
+}
+
 /** 施設の層（立体のミニチュア・描いた絵）。歩いている間は変わらないので、施設の状態が変わった時だけ描き直す */
 const FeatureLayer = memo(function FeatureLayer({ tiles, geom, finaleTiles, fallenTowns, compact }: { tiles: WorldState['tiles']; geom: MapGeom; finaleTiles: ReadonlySet<number>; fallenTowns: string[]; compact: boolean }) {
   const w = { tiles, fallenTowns };
@@ -238,6 +279,12 @@ const FeatureLayer = memo(function FeatureLayer({ tiles, geom, finaleTiles, fall
           <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#000" floodOpacity=".85" />
         </filter>
       </defs>
+      {/* 回1の追加: 施設の足元のマス（全部の絵より下） */}
+      {w.tiles.map((t, i) => {
+        if (!t.f || !t.seen) return null;
+        const { x, y } = geom.center(i);
+        return <FacilityBase key={`b${i}`} tile={i} x={x} y={y} R={geom.R} compact={compact} used={t.f.used && t.f.kind !== 'town'} />;
+      })}
       {/* 上の行から順に描く（手前の場所の絵が奥の絵を隠す） */}
       {w.tiles.map((t, i) => featureArt(t, i, geom, finaleTiles, w.fallenTowns, compact))}
     </svg>
@@ -568,12 +615,65 @@ export function WorldMap({
     return ids;
   }, [w.quests]);
 
+  // 回1の追加: 施設の絵と立て札が占める四角（押した所が中なら、そのマスを押した事にする。手前の行が先）
+  const placeSpots = useMemo(() => {
+    const out: { tile: number; box: Box }[] = [];
+    w.tiles.forEach((t, i) => {
+      const b = featureBox(t, i, geom, finaleTiles, compact);
+      if (b) out.push({ tile: i, box: b });
+    });
+    for (const p of posts) {
+      if (!w.tiles[p.tile]?.seen) continue;
+      const { x, y } = geom.center(p.tile);
+      out.push({ tile: p.tile, box: signpostBox(x, y, geom.R, !p.dir.includes('西'), compact) });
+    }
+    return out;
+  }, [w.tiles, geom, finaleTiles, compact, posts]);
+
+  // 回1の追加: 入れる施設（届く時に光を強くして「入れる」と出す）。陥落した町・踏破済み・祈り済み・登った塔は除く
+  const enterable = (i: number) => {
+    const t = w.tiles[i];
+    const f = t?.f;
+    if (!f || !t.seen) return false;
+    if (f.kind === 'town') return !w.fallenTowns.includes(f.id);
+    if (f.kind === 'dungeon' || f.kind === 'shrine' || f.kind === 'tower') return !f.used;
+    return f.kind === 'temple' || f.kind === 'altar';
+  };
+
+  // 回1の追加: 施設の名前の札（町・ダンジョン・塔・神殿・祭壇・祠。宝箱やイベントの印には出さない）
+  const labelFont = Math.min(14, Math.max(12, Math.round(R * 0.4)));
+  const labels = useMemo(() => {
+    const out: PlaceLabel[] = [];
+    w.tiles.forEach((t, i) => {
+      const f = t.f;
+      if (!f || !t.seen) return;
+      let text: string | undefined;
+      if (f.kind === 'town') text = TOWNS.tryGet(f.id)?.name;
+      else if (f.kind === 'dungeon') {
+        const rd = randomDungeonView(w, i);
+        text = rd ? (rd.theme?.name ?? rd.name) : DUNGEONS.tryGet(f.id)?.name;
+      } else if (f.kind === 'tower') text = '見晴らしの塔';
+      else if (f.kind === 'temple' || f.kind === 'altar') text = SANCTUARIES.tryGet(f.id)?.name;
+      else if (f.kind === 'shrine') text = SHRINES.tryGet(f.id)?.name;
+      if (!text) return;
+      const { x, y } = geom.center(i);
+      out.push({ tile: i, text, rank: i === goalTile ? 0 : f.kind === 'town' ? 1 : f.kind === 'dungeon' ? 2 : 3, x, y: y + geom.R * 0.62 });
+    });
+    return placeLabels(out, labelFont, compact);
+  }, [w, geom, goalTile, labelFont, compact]);
+
   // タップ: 押した所に見えている「上の面」を優先する（手前の行から調べる。高いマスが奥のマスに重なって見える所でも、見えている方を選ぶ）。
   // どの上の面でもない所（崖の側面など）は、今までどおり一番近いマスの中心
   const tap = (e: React.MouseEvent) => {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const px = e.clientX - rect.left;
     const py = e.clientY - rect.top;
+    // 回1の追加: 施設の絵（立て札も）の上なら、その施設のマス
+    const hit = pickPlace(placeSpots, px, py);
+    if (hit !== undefined) {
+      onTapTile(hit);
+      return;
+    }
     const half = (SQRT3 / 2) * R * TOP_SCALE;
     for (let i = w.tiles.length - 1; i >= 0; i--) {
       const c = center(i);
@@ -702,9 +802,18 @@ export function WorldMap({
             [...reach].map(([i, cost]) => {
               if (i === here) return null;
               const { x, y } = center(i);
+              // 回1の追加: 入れる施設のマスは、光を強くする
+              const enter = enterable(i);
               return (
-                <g key={`r${i}`} data-reach={i} data-cost={cost}>
-                  <polygon points={hexPoints(x, y, R * TOP_SCALE - 2)} fill="rgba(255,240,180,.2)" stroke="rgba(255,214,110,.85)" strokeWidth={1.8} />
+                <g key={`r${i}`} data-reach={i} data-cost={cost} data-reach-enter={enter ? '' : undefined}>
+                  {enter ? (
+                    <>
+                      <polygon points={hexPoints(x, y, R * TOP_SCALE - 1)} fill="rgba(255,236,150,.4)" stroke="#ffe066" strokeWidth={Math.max(3, R * 0.12)} className="glow-pulse" />
+                      <polygon points={hexPoints(x, y, R * TOP_SCALE - 2)} fill="none" stroke="#fff6c8" strokeWidth={1.5} />
+                    </>
+                  ) : (
+                    <polygon points={hexPoints(x, y, R * TOP_SCALE - 2)} fill="rgba(255,240,180,.2)" stroke="rgba(255,214,110,.85)" strokeWidth={1.8} />
+                  )}
                   {/* 数字の下敷き（木・テント・建物と重なっても読めるように）。縮小した時は数字を出さない（マスより大きくなるため） */}
                   {!compact && <circle cx={x} cy={y + R * 0.62 * GROUND_K - Math.max(12, R * 0.42) * 0.36} r={Math.max(12, R * 0.42) * 0.72} fill="rgba(28,18,8,.78)" stroke="rgba(255,214,110,.9)" strokeWidth={1.2} />}
                   {!compact && <text x={x} y={y + R * 0.62 * GROUND_K} textAnchor="middle" fontSize={Math.max(12, R * 0.42)} fontWeight={800} fill="#fff3c4" stroke="#000" strokeWidth={2.5} paintOrder="stroke">
@@ -723,7 +832,7 @@ export function WorldMap({
               strokeLinecap="round"
             />
           )}
-          {selected !== undefined && <polygon points={hexPoints(center(selected).x, center(selected).y, R * TOP_SCALE - 1)} fill="none" stroke="#fff" strokeWidth={3} />}
+          {selected !== undefined && <polygon data-selected={selected} points={hexPoints(center(selected).x, center(selected).y, R * TOP_SCALE - 1)} fill="none" stroke="#fff" strokeWidth={3} />}
           {/* 霊感のキャラがいれば、祠とイベントは雲の中でも光って見える */}
           {senses &&
             w.tiles.map((t, i) => {
@@ -802,6 +911,43 @@ export function WorldMap({
               </g>
             );
           })}
+        </svg>
+        {/* 回1の追加: 施設の名前の札と、届く時の「入れる」（夜でも読めるように、時間帯の色より上） */}
+        <svg width={W} height={H} className="pointer-events-none absolute inset-0 block" data-place-labels>
+          {labels.map((l) => {
+            const t = w.tiles[l.tile];
+            const dim = (t.f?.used && t.f.kind !== 'town') || (t.f?.kind === 'town' && w.fallenTowns.includes(t.f.id));
+            const wd = [...l.text].length * labelFont + 8;
+            return (
+              <g key={`pl${l.tile}`} data-place-label={l.tile} data-label-rank={l.rank} opacity={dim ? 0.6 : 1}>
+                <rect x={l.x - wd / 2} y={l.y} width={wd} height={labelFont + 4} rx={4} fill="rgba(16,10,4,.62)" stroke={l.rank === 0 ? 'rgba(255,224,102,.9)' : 'rgba(255,236,190,.35)'} strokeWidth={1} />
+                <text x={l.x} y={l.y + labelFont} textAnchor="middle" fontSize={labelFont} fontWeight={700} fill={l.rank === 0 ? '#ffe9a0' : '#fff3dc'} stroke="#140c04" strokeWidth={3} paintOrder="stroke">
+                  {l.text}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+        {/* 届く施設の絵の上に、小さく「入れる」（縮小した時は字を出さない。光るマスの強さで分かる）。
+            となりのマスの駒に隠れないように、駒より上に重ねる（行き先を選ぶ間だけ出る小さな札） */}
+        <svg width={W} height={H} className="pointer-events-none absolute inset-0 block" style={{ zIndex: depthZ(w.height + 1, 0) }} data-enter-marks>
+          {!compact &&
+            reach &&
+            [...reach.keys()].map((i) => {
+              if (i === here || !enterable(i)) return null;
+              const b = featureBox(w.tiles[i], i, geom, finaleTiles, compact);
+              if (!b) return null;
+              const { x } = center(i);
+              const cw = 3 * 12 + 10;
+              return (
+                <g key={`en${i}`} data-enter-mark={i}>
+                  <rect x={x - cw / 2} y={b.y0 + 1} width={cw} height={17} rx={8.5} fill="#ffd76a" stroke="#3a2406" strokeWidth={1.5} />
+                  <text x={x} y={b.y0 + 14} textAnchor="middle" fontSize={12} fontWeight={800} fill="#2a1804">
+                    入れる
+                  </text>
+                </g>
+              );
+            })}
         </svg>
         {/* 徘徊する敵: 赤い台座に乗った魔物の駒（レアは金の台座と★・災厄の中ボスは紫の台座と💀で少し大きい）。ゆっくり呼吸するように動く */}
         {w.wanderers.map((wd) => {
