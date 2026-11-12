@@ -424,6 +424,7 @@ export function describeAbility(ab: AbilityDef, side: 'ally' | 'enemy' = 'ally')
     }
     if (e.modifier === 'comboScale') return `このカードの連携の上乗せ×${e.multiplier}（連携は合わせて+${Math.round(BALANCE.comboBonusMax * 100)}%まで）`;
     if (e.modifier === 'endure') return 'HPが1より下がらない';
+    if (e.modifier === 'counterCap') return `《後の先》の1回の反撃の上限+${e.add}`;
     if (e.modifier === 'mirrorCounter') return '《後の先》の反撃が2倍・上限なし';
     if (e.modifier === 'alwaysWeak') return '弱点の属性でなくても、弱点を突いた扱い（ダメージ×1.5・BREAK のきっかけ）';
     if (e.modifier === 'weaknessElement') return '属性は、狙った敵の弱点の属性に変わる（弱点が無い敵には無属性）';

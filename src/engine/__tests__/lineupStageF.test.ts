@@ -106,15 +106,46 @@ describe('区切りF: 戦闘の力', () => {
   it('竜脈術師《竜脈》: 違う種類の状態異常が3つ付いた敵は BREAK', () => {
     const s = battle(['dragonVein'], ['stageFBig']);
     s.enemies[0].statuses.burn = 1;
+    s.enemies[0].statuses.weak = 1;
+    // 地脈の楔は、まだ付いていない種類を1つ付ける（弱体は付いているので、脆弱）→ 3種類で BREAK
     const r = use(s, 'dvLeyWedge');
+    expect(r.state.enemies[0].statuses.vulnerable).toBeGreaterThan(0);
     expect(r.state.enemies[0].broken).toBe(true);
   });
-  it('調教師《相棒の覚醒》: カードでブロックを得たら、お供が動く（1ターン2回まで）', () => {
+  // お供の能力は「ターン終了時」にしておく（カードを使っただけでは動かない。《相棒の覚醒》で動いた事だけを数える）
+  const trainer = () => {
     const s = battle(['petTrainer']);
     givePet(s.allies[0]);
-    s.allies[0].abilities = [...(s.allies[0].abilities ?? []), { name: 'つつく', pet: true, effect: { when: 'afterCard', do: [{ kind: 'damage', amount: 2, to: 'randomFoe' }] } }];
-    const r = use(s, 'ptPat');
-    expect(r.state.allies[0].counters?.petActsTurn).toBeGreaterThanOrEqual(1);
+    s.allies[0].abilities = [...(s.allies[0].abilities ?? []), { name: 'つつく', pet: true, effect: { when: 'turnEnd', do: [{ kind: 'damage', amount: 2, to: 'randomFoe' }] } }];
+    return s;
+  };
+  const pecks = (s: BattleState) => s.log.filter((l) => l.text.includes('「つつく」')).length;
+  it('調教師《相棒の覚醒》: カードでブロックを得たら、お供が動く（1ターン2回まで）', () => {
+    let s = use(trainer(), 'ptBuddyGuard').state;
+    expect(pecks(s)).toBe(1);
+    s = use(s, 'ptBuddyGuard').state;
+    s = use(s, 'ptBuddyGuard').state;
+    expect(pecks(s)).toBe(2);
+  });
+  it('調教師「なでなで」（計画どおり HP回復）: HPが減っている時は、お供が動く。満タンの時は動かない（オーナーに相談中）', () => {
+    const hurt = trainer();
+    hurt.allies[0].hp = 400;
+    const r = use(hurt, 'ptPat');
+    expect(r.state.allies[0].hp).toBe(403);
+    expect(pecks(r.state)).toBe(1);
+    expect(pecks(use(trainer(), 'ptPat').state)).toBe(0);
+  });
+  it('拳聖「受けの型」（計画どおり）: この敵の番の《後の先》の1回の上限+6（12 → 18）', () => {
+    const s = battle(['fistSaint'], ['stageFHitter']);
+    const r = use(s, 'fsGuardForm');
+    r.state.allies[0].block = 30;
+    expect(lost(r.state, nextTurn(r.state))).toBe(18);
+  });
+  it('重装衛士の専用カード（計画どおり）: 大盾構え = ブロック14／盾ごと突進 = ブロック+4／鉄の誓い = 全員8・自分はさらに+4', () => {
+    expect(use(battle(['bulwark']), 'bwBigShield').state.allies[0].block).toBe(14);
+    expect(use(battle(['bulwark']), 'bwShieldCharge').state.allies[0].block).toBe(4);
+    const r = use(battle(['bulwark', 'warrior']), 'bwIronOath');
+    expect(r.state.allies.map((a) => a.block)).toEqual([12, 8]);
   });
   it('調教師《懐き上手》: 懐き度の上がり方が2倍', () => {
     const g = game(['petTrainer']);
