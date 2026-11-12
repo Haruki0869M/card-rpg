@@ -53,9 +53,11 @@ interface Props {
   frozen: boolean;
   /** 駒が歩いている間（画面のスレッドで描く時だけ使う。霧が晴れて描き直した区切りは、止まるまで Canvas のまま見せる。画像にするのが重いため） */
   walking: boolean;
+  /** 立つ物（木・峰・岩など）を描かない（小さく縮小した時。段階6a。地面の色・崖・道・川は描く） */
+  bare?: boolean;
 }
 
-export const LandscapeLayer = memo(function LandscapeLayer({ w, tiles, geom, levels, links, rivers, under, roadTerrain, noProp, stage, frozen, walking }: Props) {
+export const LandscapeLayer = memo(function LandscapeLayer({ w, tiles, geom, levels, links, rivers, under, roadTerrain, noProp, stage, frozen, walking, bare = false }: Props) {
   // 描く時の地図の大きさ（ピンチの最中は、前の大きさのまま）
   const [drawGeom, setDrawGeom] = useState(geom);
   if (!frozen && drawGeom !== geom) setDrawGeom(geom);
@@ -65,10 +67,10 @@ export const LandscapeLayer = memo(function LandscapeLayer({ w, tiles, geom, lev
   // 立つ物の置き場所（画面のスレッドで描く時だけ作る。同じ材料なら作り置きを使う）
   const itemsMemo = useRef<{ deps: unknown[]; items: SceneItem[] } | null>(null);
   const getItems = () => {
-    const deps = [w.width, w.height, tiles, g, levels, links, rivers, stage, noProp];
+    const deps = [w.width, w.height, tiles, g, levels, links, rivers, stage, noProp, bare];
     const m = itemsMemo.current;
     if (m && m.deps.every((d, i) => d === deps[i])) return m.items;
-    const items = scatter({ w: { ...w, tiles }, geom: g, levels, links, rivers, stage, blocked: (i) => !!tiles[i].f || noProp.has(i) });
+    const items = bare ? [] : scatter({ w: { ...w, tiles }, geom: g, levels, links, rivers, stage, blocked: (i) => !!tiles[i].f || noProp.has(i) });
     itemsMemo.current = { deps, items };
     return items;
   };
@@ -160,7 +162,7 @@ export const LandscapeLayer = memo(function LandscapeLayer({ w, tiles, geom, lev
   );
   /** 地図の、描き直しの間は変わらない部分を送る（変わった時だけ） */
   const sendStatic = () => {
-    const deps = [gen.current, w.width, w.height, g, levels, links, rivers, under, roadTerrain, noProp, stage, terrains, dpr, top];
+    const deps = [gen.current, w.width, w.height, g, levels, links, rivers, under, roadTerrain, noProp, stage, terrains, dpr, top, bare];
     if (sentStatic.current && sentStatic.current.length === deps.length && sentStatic.current.every((d, i) => d === deps[i])) return;
     sentStatic.current = deps;
     const centers = new Float64Array(tiles.length * 2);
@@ -197,6 +199,7 @@ export const LandscapeLayer = memo(function LandscapeLayer({ w, tiles, geom, lev
       dpr,
       top,
       chunk: CHUNK,
+      bare,
     });
   };
   const sendSeen = () => post({ type: 'seen', seen: Uint8Array.from(tiles, (t) => (t.seen ? 1 : 0)) });
@@ -455,7 +458,7 @@ export const FogSilhouettes = memo(function FogSilhouettes({
     const out: { d: string; a: number }[] = [];
     tiles.forEach((t, i) => {
       const d = dist.get(i);
-      if (t.seen || d === undefined || d === 0 || (t.t !== 'mountain' && t.t !== 'lava')) return;
+      if (t.seen || d === undefined || d === 0 || (t.t !== 'mountain' && t.t !== 'crag' && t.t !== 'lava')) return;
       const gr = geom.ground(i);
       const y = gr.y - levels[i] * LEVEL_STEP * R + R * 0.42 * GROUND_K;
       out.push({ d: silhouettePath('peak', gr.x, y, R * (1.5 + (i % 3) * 0.12), (i * 0.37) % 1), a: [0, 0.55, 0.42, 0.3, 0.18][d] });

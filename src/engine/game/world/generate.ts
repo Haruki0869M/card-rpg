@@ -45,7 +45,7 @@ function shapeWideMap(game: GameState, def: ScenarioMapDef, w: WorldState, rng: 
   const open = (i: number | undefined) => {
     if (i !== undefined && !keep(i) && blocked(i)) tiles[i].t = mainLand(def, tiles[i].r);
   };
-  // 仕切り: 偶数の行は even 列、奇数の行は odd 列。端の行を除いた中から、3行以上離して切れ目を選ぶ
+  // 仕切り: 偶数の行は even 列、奇数の行は odd 列。切れ目は Rng で選ぶ
   for (const b of def.barriers ?? []) {
     const rows: number[] = [];
     for (let r = b.rows[0]; r <= b.rows[1]; r++) rows.push(r);

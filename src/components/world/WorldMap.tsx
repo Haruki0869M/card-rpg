@@ -1,6 +1,6 @@
 // ===== 世界マップの地図（六角形のマス。spec §8.1）=====
 // 地形・霧・施設・移動できる範囲は SVG、キャラと敵は上に重ねた画像。タップしたマスを親に知らせる。
-import { CircleHelp, DoorOpen, Flag, Gift, House, Landmark, LocateFixed, Minus, Plus, Sparkles, TriangleAlert, type LucideIcon } from 'lucide-react';
+import { Binoculars, Castle, CircleHelp, DoorOpen, Flag, Gift, House, Landmark, LocateFixed, Map as MapIcon, Minus, Plus, Sparkles, TriangleAlert, type LucideIcon } from 'lucide-react';
 import { useReducedMotion } from 'framer-motion';
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { artImage, EnemyArt } from '../../art';
@@ -24,12 +24,13 @@ import { HeroPiece } from './HeroPiece';
 import { SpawnMarks, TowerMini } from './ExploreMarks';
 import { orderOnTile, pieceSpots, PLAYER_COLORS } from './pieceLayout';
 import { cameraTop, mapPadBottom, mapPadY, revealLeft, revealTop, visibleH } from './mapCamera';
-import { anchorScroll, clampZoom, stepZoom, ZOOM_MAX, ZOOM_MIN } from './mapZoom';
+import { anchorScroll, baseRadius, clampZoom, COMPACT_ZOOM, minZoomFor, stepZoom, ZOOM_MAX, ZOOM_MIN } from './mapZoom';
+import { Overview } from './Overview';
 
 const SQRT3 = Math.sqrt(3);
 
-const FEATURE_ICON: Record<string, LucideIcon> = { town: House, dungeon: DoorOpen, shrine: Sparkles, event: CircleHelp, chest: Gift, landmark: Landmark, temple: Landmark, altar: Sparkles };
-const FEATURE_COLOR: Record<string, string> = { town: '#ffe9a8', dungeon: '#ff9a7a', shrine: '#9affd0', event: '#9ad8ff', chest: '#ffd76a', landmark: '#d8c8ff', temple: '#ffe9a8', altar: '#c8a0ff' };
+const FEATURE_ICON: Record<string, LucideIcon> = { town: House, dungeon: DoorOpen, shrine: Sparkles, event: CircleHelp, chest: Gift, landmark: Landmark, temple: Landmark, altar: Sparkles, tower: Binoculars, finale: Castle };
+const FEATURE_COLOR: Record<string, string> = { town: '#ffe9a8', dungeon: '#ff9a7a', shrine: '#9affd0', event: '#9ad8ff', chest: '#ffd76a', landmark: '#d8c8ff', temple: '#ffe9a8', altar: '#c8a0ff', tower: '#e8e0c8', finale: '#ff6a5a' };
 
 /** 地図の場所の絵（無ければ undefined → アイコンで描く） */
 function placeImage(f: NonNullable<WorldState['tiles'][number]['f']>): string | undefined {
@@ -105,7 +106,8 @@ export interface MapGeom {
  */
 export function useMapGeom(w: Pick<WorldState, 'width' | 'height'>, containerW: number, zoom = 1, levels?: readonly number[]): MapGeom {
   return useMemo(() => {
-    const R = Math.max(18, Math.min(34, (containerW || 360) / (SQRT3 * (w.width + 0.5)))) * zoom;
+    // 1倍のマスの大きさは、横8列の地図が収まる大きさ（広い地図でも同じ。段階6a）
+    const R = baseRadius(containerW, w.width) * zoom;
     const hexW = SQRT3 * R;
     const rowH = 1.5 * R; // 地面をつぶす前の行の間隔（つぶした後は rowH * GROUND_K）
     // 一番上の行の高い山も切れないように、上に「一番高い段」の分の余白を足す。下は六角柱の土台の分
@@ -164,7 +166,7 @@ const WaterLayer = memo(function WaterLayer({ tiles, geom, levels }: { tiles: Wo
 });
 
 /** 施設1つ分の絵（立体のミニチュア・描いた絵・仮の印）。施設の層と、駒の手前に重ねる層（奥行き）の両方で使う */
-function featureArt(t: WorldState['tiles'][number], i: number, geom: MapGeom, finaleTiles: ReadonlySet<number>, fallenTowns: string[]) {
+function featureArt(t: WorldState['tiles'][number], i: number, geom: MapGeom, finaleTiles: ReadonlySet<number>, fallenTowns: string[], compact = false) {
   const { R, center } = geom;
   const w = { fallenTowns };
     if (!t.f || !t.seen) return null;
@@ -173,6 +175,8 @@ function featureArt(t: WorldState['tiles'][number], i: number, geom: MapGeom, fi
     const finale = finaleTiles.has(i);
     const fallen = f.kind === 'town' && w.fallenTowns.includes(f.id);
     const used = f.used && f.kind !== 'town' && f.kind !== 'dungeon';
+    // 縮小した時（段階6a。COMPACT_ZOOM より小さい）: 絵を描かず、印（丸とアイコン）だけ
+    if (compact) return featureMark(f.kind === 'dungeon' && finale ? 'finale' : f.kind, i, x, y, R, used, fallen, f);
     // 見晴らしの塔（段階6）: 仮のミニチュア。上の面から少し浮かせる
     if (f.kind === 'tower') return <TowerMini key={`f${i}`} x={x} y={y - R * FACILITY_LIFT} R={R} used={f.used} />;
     const mini: MiniKind | undefined = finale ? 'finale' : f.kind === 'event' || f.kind === 'temple' || f.kind === 'altar' ? f.kind : undefined;
@@ -194,9 +198,14 @@ function featureArt(t: WorldState['tiles'][number], i: number, geom: MapGeom, fi
         </g>
       );
     }
-    const Icon = FEATURE_ICON[f.kind] ?? CircleHelp;
+    return featureMark(f.kind, i, x, y, R, used, fallen, f);
+}
+
+/** 施設の印（丸とアイコン）。絵の無い施設と、縮小した時のすべての施設 */
+function featureMark(kind: string, i: number, x: number, y: number, R: number, used: boolean | undefined, fallen: boolean, f: NonNullable<WorldState['tiles'][number]['f']>) {
+    const Icon = FEATURE_ICON[kind] ?? CircleHelp;
     const sz = R * 0.95;
-    const color = fallen ? '#7a6a7a' : FEATURE_COLOR[f.kind];
+    const color = fallen ? '#7a6a7a' : FEATURE_COLOR[kind];
     return (
       <g key={`f${i}`} opacity={used ? 0.35 : 1} data-feature={`${f.kind}:${f.id}`} data-used={used || undefined}>
         <circle cx={x} cy={y} r={sz * 0.62} fill="rgba(0,0,0,.55)" />
@@ -206,7 +215,7 @@ function featureArt(t: WorldState['tiles'][number], i: number, geom: MapGeom, fi
 }
 
 /** 施設の層（立体のミニチュア・描いた絵）。歩いている間は変わらないので、施設の状態が変わった時だけ描き直す */
-const FeatureLayer = memo(function FeatureLayer({ tiles, geom, finaleTiles, fallenTowns }: { tiles: WorldState['tiles']; geom: MapGeom; finaleTiles: ReadonlySet<number>; fallenTowns: string[] }) {
+const FeatureLayer = memo(function FeatureLayer({ tiles, geom, finaleTiles, fallenTowns, compact }: { tiles: WorldState['tiles']; geom: MapGeom; finaleTiles: ReadonlySet<number>; fallenTowns: string[]; compact: boolean }) {
   const w = { tiles, fallenTowns };
   return (
     <svg width={geom.W} height={geom.H} className="absolute inset-0 block" data-feature-layer>
@@ -216,7 +225,7 @@ const FeatureLayer = memo(function FeatureLayer({ tiles, geom, finaleTiles, fall
         </filter>
       </defs>
       {/* 上の行から順に描く（手前の場所の絵が奥の絵を隠す） */}
-      {w.tiles.map((t, i) => featureArt(t, i, geom, finaleTiles, w.fallenTowns))}
+      {w.tiles.map((t, i) => featureArt(t, i, geom, finaleTiles, w.fallenTowns, compact))}
     </svg>
   );
 });
@@ -265,7 +274,12 @@ export function WorldMap({
   const savedZoom = useBattle(st => st.settings.worldZoom);
   const setSettings = useBattle(st => st.setSettings);
   const [pinchZoom, setPinchZoom] = useState<number | null>(null);
-  const zoom = clampZoom(pinchZoom ?? savedZoom);
+  // 縮小の下限: 広い地図（段階6a）は横の全部の列が収まるまで。8列の地図は1倍
+  const minZoom = minZoomFor(size.width, w.width);
+  const zoom = clampZoom(pinchZoom ?? savedZoom, minZoom);
+  // 小さく縮小した時は、小さい文字と飾りを消し、施設は印だけにする
+  const compact = zoom < COMPACT_ZOOM;
+  const [overview, setOverview] = useState(false);
   // 霧が晴れた時だけ地形の層を作り直す（それ以外は前の層を使い回す）
   const tilesRef = useRef(w.tiles);
   const key = seenKey(w) + ':' + w.tiles.length;
@@ -334,8 +348,8 @@ export function WorldMap({
   const padBottom = mapPadBottom(size.height);
   const inset = Math.round(bottomInset);
   const reduced = useReducedMotion();
-  // 拡大のボタンを縦に並べる高さ（「戻る」のボタン＋3つ＋すき間 ≒ 210px）が、見えている地図に無い時は横に並べる
-  const compactZoom = size.height > 0 && visibleH(size.height, inset) < 225;
+  // 拡大のボタンを縦に並べる高さ（「戻る」のボタン＋見取り図・拡大の4つ＋すき間 ≒ 260px）が、見えている地図に無い時は横に並べる
+  const compactZoom = size.height > 0 && visibleH(size.height, inset) < 275;
   // 拡大を変える直前のスクロールと、残したい枠の中の点（ピンチの指の間・ボタンなら枠の真ん中）
   const zoomAnchor = useRef<{ left: number; top: number; ax: number; ay: number; padY: number; R: number } | null>(null);
   const lastCam = useRef<{ here?: number; turn: string; w: number; h: number; inset: number } | null>(null);
@@ -406,7 +420,7 @@ export function WorldMap({
   /** 拡大を変える（ax, ay = 残したい点。枠の中の座標。省略すると枠の真ん中）。save = この端末の設定に保存する */
   const applyZoom = (next: number, save: boolean, ax?: number, ay?: number) => {
     const el = box.current;
-    const z = clampZoom(next);
+    const z = clampZoom(next, minZoom);
     if (el && z !== zoom) {
       zoomAnchor.current = { left: el.scrollLeft, top: el.scrollTop, ax: ax ?? el.clientWidth / 2, ay: ay ?? visibleH(el.clientHeight, inset) / 2, padY, R };
     }
@@ -419,6 +433,8 @@ export function WorldMap({
   applyZoomRef.current = applyZoom;
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
+  const minZoomRef = useRef(minZoom);
+  minZoomRef.current = minZoom;
 
   // 2本指のピンチで拡大・縮小（1本指はいつものスクロールとタップ）。
   // 指が拡大のボタンの上から始まっても効くように、ボタンも含む外側の枠で受ける
@@ -448,7 +464,7 @@ export function WorldMap({
       if (!start || e.touches.length !== 2) return;
       e.preventDefault();
       const t = two(e);
-      const z = clampZoom(start.zoom * (t.dist / start.dist));
+      const z = clampZoom(start.zoom * (t.dist / start.dist), minZoomRef.current);
       if (Math.abs(z - last) < 0.02) return;
       last = z;
       applyZoomRef.current(z, false, t.ax, t.ay);
@@ -594,13 +610,13 @@ export function WorldMap({
       {/* 歩いている間は、雲と水の動きを止める（スマホで駒の動きをなめらかにするため） */}
       {/* isolate: 奥行きの重なりの順（大きな zIndex）を、地図の中だけに閉じ込める（下の操作の欄の上に出ないように） */}
       <div className="relative isolate" style={{ width: W, height: H }} onClick={(e) => { if (!anim) tap(e); }} data-walking={anim ? '' : undefined}>
-        <LandscapeLayer w={w} tiles={tiles} geom={geom} levels={levels} links={links} rivers={rivers} under={under} roadTerrain={roadTerrain} noProp={finaleTiles} stage={stage} frozen={pinchZoom !== null} walking={!!anim} />
-        <WaterLayer tiles={tiles} geom={geom} levels={levels} />
+        <LandscapeLayer w={w} tiles={tiles} geom={geom} levels={levels} links={links} rivers={rivers} under={under} roadTerrain={roadTerrain} noProp={finaleTiles} stage={stage} frozen={pinchZoom !== null} walking={!!anim} bare={compact} />
+        {!compact && <WaterLayer tiles={tiles} geom={geom} levels={levels} />}
         <FogSea tiles={tiles} geom={geom} levels={levels} padTop={padY} padBottom={padBottom} miasma={miasma} fresh={freshRef.current} time={time} />
         {/* 霧の向こうの山のシルエットと、地平線の最後の城 */}
         <FogSilhouettes w={w} tiles={tiles} geom={geom} levels={levels} finale={finaleTiles.values().next().value} padTop={padY} night={time === 'night'} />
         {/* 施設（立体のミニチュア・描いた絵）。時間帯の色の下に置く（夜は暗くなり、町などの明かりだけが光る） */}
-        <FeatureLayer tiles={w.tiles} geom={geom} finaleTiles={finaleTiles} fallenTowns={w.fallenTowns} />
+        <FeatureLayer tiles={w.tiles} geom={geom} finaleTiles={finaleTiles} fallenTowns={w.fallenTowns} compact={compact} />
         {/* 時間帯の光（朝 = 斜めの光、夕方 = オレンジ、夜 = 青い月明かり）。地図といっしょに動く1枚の色なので、描き直しは起きない */}
         {light.wash && <div className="pointer-events-none absolute" style={{ left: 0, top: -padY, width: W, height: padY + H + padBottom, background: light.wash }} data-time-light={time} />}
         {/* 夜と夕方の明かり（町・祠・神殿・祭壇・野営のたき火） */}
@@ -629,11 +645,11 @@ export function WorldMap({
               return (
                 <g key={`r${i}`} data-reach={i} data-cost={cost}>
                   <polygon points={hexPoints(x, y, R * TOP_SCALE - 2)} fill="rgba(255,240,180,.2)" stroke="rgba(255,214,110,.85)" strokeWidth={1.8} />
-                  {/* 数字の下敷き（木・テント・建物と重なっても読めるように） */}
-                  <circle cx={x} cy={y + R * 0.62 * GROUND_K - Math.max(12, R * 0.42) * 0.36} r={Math.max(12, R * 0.42) * 0.72} fill="rgba(28,18,8,.78)" stroke="rgba(255,214,110,.9)" strokeWidth={1.2} />
-                  <text x={x} y={y + R * 0.62 * GROUND_K} textAnchor="middle" fontSize={Math.max(12, R * 0.42)} fontWeight={800} fill="#fff3c4" stroke="#000" strokeWidth={2.5} paintOrder="stroke">
+                  {/* 数字の下敷き（木・テント・建物と重なっても読めるように）。縮小した時は数字を出さない（マスより大きくなるため） */}
+                  {!compact && <circle cx={x} cy={y + R * 0.62 * GROUND_K - Math.max(12, R * 0.42) * 0.36} r={Math.max(12, R * 0.42) * 0.72} fill="rgba(28,18,8,.78)" stroke="rgba(255,214,110,.9)" strokeWidth={1.2} />}
+                  {!compact && <text x={x} y={y + R * 0.62 * GROUND_K} textAnchor="middle" fontSize={Math.max(12, R * 0.42)} fontWeight={800} fill="#fff3c4" stroke="#000" strokeWidth={2.5} paintOrder="stroke">
                     {cost}
-                  </text>
+                  </text>}
                 </g>
               );
             })}
@@ -670,9 +686,9 @@ export function WorldMap({
             return (
               <g key={`raid${r.townId}`}>
                 <TriangleAlert x={x - R * 0.9} y={y - R * 1.1} width={R * 0.7} height={R * 0.7} color="#ff4a4a" fill="#3a0808" />
-                <text x={x + R * 0.1} y={y - R * 0.55} fontSize={Math.max(12, R * 0.45)} fontWeight={900} fill="#ff8a8a" stroke="#000" strokeWidth={3} paintOrder="stroke">
+                {!compact && <text x={x + R * 0.1} y={y - R * 0.55} fontSize={Math.max(12, R * 0.45)} fontWeight={900} fill="#ff8a8a" stroke="#000" strokeWidth={3} paintOrder="stroke">
                   残{Math.max(0, r.deadline - w.worldTurn + 1)}
-                </text>
+                </text>}
               </g>
             );
           })}
@@ -695,10 +711,13 @@ export function WorldMap({
               <span className="enemy-breathe absolute block" style={{ left: s * 0.08, top: -s * 0.02, width: s * 0.84, height: s * 0.84, animationDelay: `${-(hash01(Number(wd.id.replace(/\D/g, '')) || 0, 7) * 3).toFixed(2)}s` }}>
                 <EnemyArt defId={wd.enemies[0].defId} className="h-full w-full" />
               </span>
-              {wd.rare && <span className="absolute -left-1 top-0 z-10 text-[14px] leading-4 font-black text-amber-300">★</span>}
-              <span className="absolute -right-1 bottom-[10%] rounded-full border border-red-300 bg-red-950/90 px-1 text-[12px] leading-4 font-black text-red-200">
-                {wd.enemies.length > 1 ? `×${wd.enemies.length}` : `Lv${wd.enemies[0].level ?? 1}`}
-              </span>
+              {/* 小さい文字は、縮小した時は出さない（台座の色でレア・襲撃は分かる） */}
+              {wd.rare && !compact && <span className="absolute -left-1 top-0 z-10 text-[14px] leading-4 font-black text-amber-300">★</span>}
+              {!compact && (
+                <span className="absolute -right-1 bottom-[10%] rounded-full border border-red-300 bg-red-950/90 px-1 text-[12px] leading-4 font-black text-red-200">
+                  {wd.enemies.length > 1 ? `×${wd.enemies.length}` : `Lv${wd.enemies[0].level ?? 1}`}
+                </span>
+              )}
             </div>
           );
         })}
@@ -717,10 +736,10 @@ export function WorldMap({
         })}
         {anim?.arrived && <span data-arrival-marker className="pointer-events-none absolute rounded-full border-2 border-amber-200 bg-amber-950 px-2 text-[22px] font-black text-amber-100" style={{ left: center(anim.path[anim.i]).x - 13, top: Math.max(4, center(anim.path[anim.i]).y - R * 2.3), zIndex: depthZ(w.height + 1, 0) }}>！</span>}
         {/* 奥行き: 駒より手前にある木・峰・岩（景色と同じ絵を、駒の上にもう一度描く）。ピンチで大きさを変えている間は出さない */}
-        {pinchZoom === null && <DepthFront spots={frontSpots} items={sceneItems} tint={frontTint} />}
+        {pinchZoom === null && !compact && <DepthFront spots={frontSpots} items={sceneItems} tint={frontTint} />}
         {/* 奥行き: 駒より手前にある施設（町・祠・神殿など）。駒のまわりだけ切り取って、駒の上に重ねる。
             建物は透かさない（木は葉のすき間から見えても自然だが、建物が透けると、駒が建物にめり込んで見える） */}
-        {pinchZoom === null &&
+        {pinchZoom === null && !compact &&
           frontSpots.map((sp) => {
             const arts = w.tiles.flatMap((t, i) => {
               if (i === sp.tile || !t.f || !t.seen) return [];
@@ -847,18 +866,38 @@ export function WorldMap({
         aria-label="地図の拡大"
         data-zoom-controls
         data-zoom={zoom}
+        data-zoom-min={minZoom}
+        data-zoom-compact={compact ? '' : undefined}
         data-zoom-layout={compactZoom ? 'row' : 'column'}
       >
-        <button onClick={() => applyZoom(stepZoom(zoom, 1), true)} disabled={zoom >= ZOOM_MAX} aria-label="地図を拡大" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-full disabled:opacity-40" data-zoom-in>
+        {/* 見取り図（段階6a）: 大陸全体を1画面に。印を押すと、その場所へ地図を動かす */}
+        <button onClick={() => setOverview(true)} aria-label="見取り図（大陸全体）を開く" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-full" data-overview-open>
+          <MapIcon size={20} className="text-amber-200" />
+        </button>
+        <button onClick={() => applyZoom(stepZoom(zoom, 1, minZoom), true)} disabled={zoom >= ZOOM_MAX} aria-label="地図を拡大" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-full disabled:opacity-40" data-zoom-in>
           <Plus size={20} className="text-amber-200" />
         </button>
         <button onClick={() => applyZoom(1, true)} disabled={zoom === ZOOM_MIN} aria-label="地図を標準の大きさに戻す" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-full text-[12px] font-bold text-amber-100 disabled:opacity-40" data-zoom-reset>
           標準
         </button>
-        <button onClick={() => applyZoom(stepZoom(zoom, -1), true)} disabled={zoom <= ZOOM_MIN} aria-label="地図を縮小" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-full disabled:opacity-40" data-zoom-out>
+        <button onClick={() => applyZoom(stepZoom(zoom, -1, minZoom), true)} disabled={zoom <= minZoom} aria-label="地図を縮小" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-full disabled:opacity-40" data-zoom-out>
           <Minus size={20} className="text-amber-200" />
         </button>
       </div>
+      {/* 見取り図（段階6a）。印を押すと閉じて、その場所へ地図を動かす */}
+      {overview && (
+        <Overview
+          game={game}
+          onClose={() => setOverview(false)}
+          onPick={(tile) => {
+            setOverview(false);
+            const el = box.current;
+            if (!el) return;
+            const { x, y } = center(tile);
+            moveCam(el, x - el.clientWidth / 2, cameraTop(y, el.clientHeight, inset), reduced ? 0 : 350);
+          }}
+        />
+      )}
       {/* 侵食度の色（25%・50%・75% で一段ずつ暗く紫に。地図の上に重ねる。タップは通す） */}
       {stage > 0 && (
         <div

@@ -25,6 +25,8 @@ const LEVEL: Record<string, number> = {
   sea: 0,
   hills: 2,
   mountain: 2,
+  // 段階6a の険しい山（通れない仕切り・盆地の壁）
+  crag: 2,
   lava: 2,
 };
 export function terrainLevel(terrainId: string): number {
