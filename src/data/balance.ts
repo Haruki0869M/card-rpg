@@ -29,6 +29,11 @@ export const BALANCE = {
    * 2026-11-12: カードが強くなった分、2〜4人の敵のHPを+10%（オーナーの決定。docs/tasks/difficulty-restore-plan.md）
    */
   enemyHpByPartySize: [0, 0.6, 1.1, 1.49, 2.42] as readonly number[],
+  /**
+   * 地域ごとの敵のHPの倍率（キー = 地図の地域の id。書いていない地域は 1 = 変えない）。世界マップの戦闘と、その地域にあるダンジョンの戦闘に掛かる。
+   * 2026-11-13 回4: 測るための入れ物（既定は空 = 今と同じ）。数値を入れるかはオーナーが測定の表を見て決める
+   */
+  enemyHpByRegion: {} as Readonly<Record<string, number>>,
   /** 戦闘に参加した味方の人数ごとの敵の攻撃倍率（4人の時だけ少し強くする。2人・3人は変えない） */
   enemyAttackByPartySize: [1, 1, 1, 1.4, 1.8] as readonly number[],
   /** 敵のレベルが baseLevel より1上がるごとの増加率 */
@@ -198,6 +203,12 @@ export const BALANCE = {
    * 崩すと、その予告の威力が breakPower 倍・弱体 breakWeak・ブロック0。1つの予告に1回
    */
   breakDamagePct: 20,
+  /**
+   * 敵の格ごとの「合計ダメージで BREAK」の線（%）。書いていない格は breakDamagePct。Infinity = 合計ダメージでは崩れない（弱点・完全成功だけ）。
+   * 格: boss = ボスの部屋 / midboss = 中ボスの部屋と災厄 / elite = 強敵の部屋（封魔の宝箱・町を襲う敵を含む）/ normal = それ以外。
+   * 2026-11-13 回4: 測るための入れ物（既定は空 = 今と同じ）
+   */
+  breakDamagePctByRank: {} as Readonly<Partial<Record<'boss' | 'midboss' | 'elite' | 'normal', number>>>,
   breakPower: 0.5,
   breakWeak: 1,
   /** 先読みができる感知の成功率（%）。フクロウのお供・霊感の探索能力でもできる（扉の先の中身と、次の次の行の色が分かる） */

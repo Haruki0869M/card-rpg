@@ -194,6 +194,12 @@ export function canBreak(enemy: Unit | undefined): boolean {
   return !!getEnemyAction(enemy.defId, enemy.intent.actionId).big;
 }
 
+/** 「合計ダメージで BREAK」の線（%）。敵の格（ボス・中ボスと災厄・強敵・ふつう）ごとに BALANCE.breakDamagePctByRank で変えられる。書いていなければ breakDamagePct */
+export function breakDamagePctOf(state: Pick<BattleState, 'boss' | 'midboss' | 'elite'>): number {
+  const rank = state.boss ? 'boss' : state.midboss ? 'midboss' : state.elite ? 'elite' : 'normal';
+  return BALANCE.breakDamagePctByRank[rank] ?? BALANCE.breakDamagePct;
+}
+
 /** 大技の予告を崩す: 威力が半分・弱体1・ブロック0（オーナーの決定 3-A）。乱数は使わない */
 export function breakEnemy(ctx: EffectCtx, enemy: EnemyState, why: 'weak' | 'perfect' | 'damage') {
   enemy.broken = true;
@@ -353,7 +359,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
     // 区切りD: 魔力の楔 — 成功1でも、完全成功と同じに崩せる
     const earlyBreak = cardModifier(ctx.cardAbilities, 'breakOnSuccess').some((e) => (ctx.successes ?? 0) >= e.min);
     if (dmg > 0 && canBreak(v)) {
-      const why = weakHit ? 'weak' : (ctx.perfect || earlyBreak) && ctx.card ? 'perfect' : v.turnDamage * 100 >= v.maxHp * BALANCE.breakDamagePct ? 'damage' : undefined;
+      const why = weakHit ? 'weak' : (ctx.perfect || earlyBreak) && ctx.card ? 'perfect' : v.turnDamage * 100 >= v.maxHp * breakDamagePctOf(state) ? 'damage' : undefined;
       if (why) {
         breakEnemy(ctx, v, why);
         // 段階7a: きっかけ「自分の攻撃で敵を BREAK させた」（処刑人の黒外套）

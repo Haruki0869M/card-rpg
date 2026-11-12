@@ -24,29 +24,32 @@ async function cast() {
   const go = page.locator('button:has-text("発動")');
   await go.click(); await page.waitForTimeout(500);
 }
+// 職・名前・転職の元の職・条件の記録と数（各職の requires 以上）・初期武器・戦闘で試すカード
+// 専用カードは、転職の画面の1枚目（data-pick-card="0"）を選ぶ（専用カードの顔ぶれが変わっても直さなくてよい）。
+// 侍の「抜刀一閃」（samuraiDrawCut）はカードの整理で無くなったので、居合を使う物理の攻撃は「燕返し」で試す
 const config = [
-  ['samurai', '侍', 'swordmaster', 'kills:weapon:katana', 10, 'plainKatana', '抜刀一閃', 'samuraiDrawCut'],
-  ['magicKnight', '魔剣士', 'swordmaster', 'kills:element', 10, 'copperSword', '炎刃の術', 'bladeFire'],
-  ['timeMage', '時魔道士', 'archmage', 'mana', 50, 'apprenticeTome', '時の矢', 'timeStop'],
-  ['necromancer', '死霊術師', 'hexer', 'kills:cursed', 5, 'rustyScythe', '冥府の矢', 'graveBolt'],
-  ['darkKnight', '暗黒騎士', 'paladin', 'kills:lowHp', 5, 'copperSword', '血刃', 'bloodBlade'],
+  ['samurai', '侍', 'swordmaster', 'kills:weapon:katana', 10, 'plainKatana', 'samuraiSwallow'],
+  ['magicKnight', '魔剣士', 'swordmaster', 'kills:element', 10, 'copperSword', 'bladeFire'],
+  ['timeMage', '時魔道士', 'archmage', 'mana', 70, 'apprenticeTome', 'timeStop'],
+  ['necromancer', '死霊術師', 'hexer', 'kills:cursed', 5, 'rustyScythe', 'graveBolt'],
+  ['darkKnight', '暗黒騎士', 'paladin', 'kills:lowHp', 5, 'copperSword', 'bloodBlade'],
 ];
 try {
   await startBattle(page, 1, ['forestWolf']);
   const battleBase = await read();
   for (const width of [360, 390, 480]) {
     await page.setViewportSize({ width, height: 780 });
-    for (const [id, name, from, feat, count, weapon, signature, cardId] of config) {
+    for (const [id, name, from, feat, count, weapon, cardId] of config) {
       const d = structuredClone(battleBase), g = d.game, h = g.heroes[0], w = g.world;
       g.expeditions = []; g.mode = 'world'; g.party = undefined; g.battle = undefined; g.dungeon = undefined; g.sanctuary = undefined;
-      h.classId = from; h.level = 3; h.feats = { [feat]: count }; delete h.equipment.weapon;
+      h.classId = from; h.level = 5; /* 特殊職への転職は Lv5（BALANCE.jobChange.special） */ h.feats = { [feat]: count }; delete h.equipment.weapon;
       w.story = undefined; w.turn = h.id; w.pos[h.id] = w.tiles.findIndex(t => t.f?.id === 'pilgrimTemple');
       await resume(d);
       await page.getByText('巡礼の神殿に入る', { exact: true }).click();
       await page.getByRole('button', { name: '転職先を見る', exact: true }).click();
       await page.getByRole('button', { name: `${name}に転職する`, exact: true }).click();
       await page.getByRole('dialog').getByText('転職する', { exact: true }).click();
-      await page.getByRole('button', { name: signature, exact: true }).click();
+      await page.locator('[data-pick-card="0"]').click();
       await page.waitForTimeout(250);
       const pickIssues = await layoutIssues(page); check(!pickIssues.length, `${width}px ${name}の転職画面: ${pickIssues}`);
       await page.screenshot({ path: `screenshots/special-jobs/${id}-pick-${width}.png` });
@@ -74,7 +77,8 @@ try {
       }
       await cast();
       const after = await read(), result = after.game.expeditions[0].battle;
-      if (id === 'samurai') check(!result.allies[0].attackCharge, '居合を消費しない');
+      // 4倍の居合は使い切る。侍の《残心》は攻撃の後に新しく小さく蓄えるので（区切りD-5）、「無くなる」ではなく「4倍が残っていない」で見る
+      if (id === 'samurai') check((result.allies[0].attackCharge?.multiplier ?? 1) < 4, `居合を消費しない: ${JSON.stringify(result.allies[0].attackCharge)}`);
       if (id === 'magicKnight') check(await page.locator('[data-imbued-element]').count() === 1, '魔法剣の属性が見えない');
       if (id === 'timeMage') check(result.enemies[0].skipNextAction && await page.getByText('休み', { exact: true }).count() > 0, '時間停止の表示がない');
       if (id === 'necromancer') check(result.allies[0].summons?.length === 1, '屍兵が増えない');

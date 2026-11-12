@@ -618,17 +618,30 @@ function partyAttackMul(game: GameState, n: number): number {
   return BALANCE.enemyAttackByPartySize[n] ?? 1;
 }
 
+/**
+ * 地域ごとの敵のHPの倍率（BALANCE.enemyHpByRegion。書いていない地域・地図の無い時は 1）。
+ * 地域は、戦闘の場所のマス（徘徊する敵・イベント）か、場面の先頭のキャラがいるマス（ダンジョンの中なら、ダンジョンの入口のマス）で決める
+ */
+function regionHpMul(game: GameState, heroId: string | undefined): number {
+  const w = game.world;
+  const tile = game.battleInfo?.tile ?? (heroId !== undefined ? w?.pos[heroId] : undefined);
+  if (!w || tile === undefined || !w.tiles[tile]) return 1;
+  const id = getScenario(game.scenarioId).map?.regions[w.tiles[tile].r]?.id;
+  return (id !== undefined ? BALANCE.enemyHpByRegion[id] : undefined) ?? 1;
+}
+
 /** 戦闘を始める（今の場面の参加者で）。surprise = 奇襲成功（敵は1ターン目に動けない） */
 export function startBattleWith(game: GameState, enemies: EncounterSpec['enemies'], roomType: string, rng: Rng, opts: { surprise?: boolean; background?: string } = {}) {
   // 区切りD: 戦闘に1人だけの時は、武器のカードが1人用に変わる物がある（湧泉のリュート）
   const inScene = sceneHeroes(game);
   const party = inScene.map((h) => toPartyMember(h, inScene.length === 1));
   const diff = getDifficulty(game.difficulty);
+  const regionMul = regionHpMul(game, inScene[0]?.id);
   game.battle = createBattle({
     seed: rng.int(1_000_000_000),
     party,
-    encounter: { id: game.battleInfo?.wandererId ?? game.dungeon?.currentRoomId ?? 'battle', name: getRoomType(roomType).name, enemies, ...(getRoomType(roomType).battle?.boss ? { boss: true } : {}), ...(getRoomType(roomType).battle?.pool === 'midboss' ? { midboss: true } : {}) },
-    enemyHpMul: diff.enemyHp,
+    encounter: { id: game.battleInfo?.wandererId ?? game.dungeon?.currentRoomId ?? 'battle', name: getRoomType(roomType).name, enemies, ...(getRoomType(roomType).battle?.boss ? { boss: true } : {}), ...(getRoomType(roomType).battle?.pool === 'midboss' ? { midboss: true } : {}), ...(getRoomType(roomType).battle?.pool === 'elite' ? { elite: true } : {}) },
+    enemyHpMul: regionMul === 1 ? diff.enemyHp : (diff.enemyHp ?? 1) * regionMul,
     enemyAttackMul: (diff.enemyAttack ?? 1) * partyAttackMul(game, party.length),
     surprise: opts.surprise,
     readyCheck: game.online,

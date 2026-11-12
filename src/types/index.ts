@@ -468,6 +468,8 @@ export interface EncounterSpec {
   boss?: boolean;
   /** 中ボスの部屋の戦闘 */
   midboss?: boolean;
+  /** 強敵の部屋の戦闘（BREAK の線を格ごとに分ける時に見る。BALANCE.breakDamagePctByRank） */
+  elite?: boolean;
 }
 
 // ---------- 戦闘の状態 ----------
@@ -711,6 +713,8 @@ export interface BattleState {
   boss?: boolean;
   /** 中ボスの部屋の戦闘（大物狩り） */
   midboss?: boolean;
+  /** 強敵の部屋の戦闘（BALANCE.breakDamagePctByRank が見る） */
+  elite?: boolean;
 }
 
 /** 呼び出したお供（turns = 残りのターン数。0になったら帰る） */
