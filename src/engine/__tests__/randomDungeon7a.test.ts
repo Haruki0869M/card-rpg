@@ -1,5 +1,5 @@
 // ===== 段階7a: ランダムダンジョンの強化（overhaul-plan-v2 §4） =====
-// 全5行・テーマ3つ・1か所1回・最奥の黄金箱と専用の装備・闇商人・晶石の祭壇・専用の装備12個の力・古い保存
+// 全5行・テーマ3つ・1か所1回・最奥の黄金箱と専用の装備・闇商人・晶石の祭壇・専用の装備14個の力（鏡盾・指輪は段階7c）・古い保存
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../data/balance';
 import { CARDS, getCard } from '../../data/cards';
@@ -17,7 +17,7 @@ import { altarTransmutePool, doCardTask, peddlerBuy } from '../game/tasks';
 import { ensureTileTheme } from '../game/world/randomDungeons';
 import { roomBehavior } from '../game/rooms';
 
-const RD_IDS = ['thunderChaseKatana', 'gatlingGun', 'gospelScepter', 'madKingMail', 'executionerCloak', 'twinSoulBell', 'endlessHourglass', 'cheatersDice', 'overchargeCore', 'resonanceRing', 'alchemistBelt', 'stormEarring'];
+const RD_IDS = ['thunderChaseKatana', 'gatlingGun', 'gospelScepter', 'madKingMail', 'executionerCloak', 'twinSoulBell', 'endlessHourglass', 'cheatersDice', 'overchargeCore', 'resonanceRing', 'alchemistBelt', 'stormEarring', 'aegisMirror', 'echoRing'];
 const THEMES = ['crystalGrotto', 'sealedLabyrinth', 'outlawDen'];
 const eventIds = EVENTS.forScenario('corruptionKing').filter((e) => e.where !== 'map' && e.where !== 'spawn').map((e) => e.id);
 
@@ -213,19 +213,23 @@ describe('段階7a: 世界マップのランダムダンジョン', () => {
 // ---------- 黄金箱と専用の装備の出どころ ----------
 
 describe('段階7a: 黄金箱と専用の装備', () => {
-  it('専用の装備は12個（武器3・鎧2・装飾品7）。全部 source: randomDungeon・説明文がある・付くカードがある', () => {
+  it('専用の装備は14個（武器3・鎧2・装飾品9）。全部 source: randomDungeon・説明文がある・付くカードがある', () => {
     const rd = ITEMS.all.filter((i) => i.source === 'randomDungeon');
     expect(rd.map((i) => i.id).sort()).toEqual([...RD_IDS].sort());
     expect(rd.filter((i) => i.slot === 'weapon')).toHaveLength(3);
     expect(rd.filter((i) => i.slot === 'armor')).toHaveLength(2);
-    expect(rd.filter((i) => i.slot === 'accessory')).toHaveLength(7);
+    expect(rd.filter((i) => i.slot === 'accessory')).toHaveLength(9);
     for (const i of rd) {
       expect(i.rarity === 'epic' || i.rarity === 'legend', i.id).toBe(true);
       expect(describeAbility(i.ability!), i.id).toBeTruthy();
       for (const c of i.cards ?? []) expect(CARDS.has(c.cardId), c.cardId).toBe(true);
     }
-    // 一覧の14個のうち、重なりで作らなかった2個は無い
-    expect(ITEMS.all.some((i) => i.name === 'イージスの鏡盾' || i.name === '残響の指輪')).toBe(false);
+    // 段階7c: 一覧の14個が全部そろった（イージスの鏡盾・残響の指輪はエピックの装飾品）
+    for (const name of ['イージスの鏡盾', '残響の指輪']) {
+      const it7c = rd.find((i) => i.name === name)!;
+      expect(it7c.slot, name).toBe('accessory');
+      expect(it7c.rarity, name).toBe('epic');
+    }
   });
 
   it('ふつうのくじ引き（宝箱・ドロップ）・町の店・行商人には出ない', () => {
@@ -604,5 +608,98 @@ describe('段階7a: 専用の装備の力（1つずつ）', () => {
     expect(r2.state.allies[0].mana).toBe(m - 1);
     const plain = use(battle(['mage'], [undefined], { enemies: ['rd7Idler'], accessory: ['stormEarring'] }), 'rd7Fire');
     expect(plain.state.allies[0].mana).toBe(m - 1);
+  });
+});
+
+// ---------- 段階7c: イージスの鏡盾・残響の指輪 ----------
+
+ENEMIES.register({ ...dummy, id: 'rd7Smasher', name: '確認用の強く殴る置物', maxHp: 100000, actions: [{ id: 'smash', name: '強打', effects: [{ kind: 'damage', amount: 25 }] }] });
+ENEMIES.register({ ...dummy, id: 'rd7Crusher', name: '確認用のとても強く殴る置物', maxHp: 100000, actions: [{ id: 'crush', name: '豪打', effects: [{ kind: 'damage', amount: 45 }] }] });
+/** 敵の番を1回まわして、起きた出来事を全部集める */
+function enemyRound(s: BattleState) {
+  let r = applyCommand(s, { type: 'END_TURN', playerId: 'P1' });
+  const events = [...r.events];
+  for (let i = 0; r.state.phase === 'enemy' && i < 20; i++) {
+    r = applyCommand(r.state, { type: 'ENEMY_STEP' });
+    events.push(...r.events);
+  }
+  return { state: r.state, events };
+}
+
+describe('段階7c: 黄金箱の装備（一覧の残り2個）', () => {
+  /** 敵の攻撃1回を、ブロック block で受けた時。taken = 減ったHP・back = 攻撃してきた敵が受けたダメージの合計 */
+  const guard = (classId: string, enemy: string, block: number, o: { mirror?: boolean; boss?: boolean; mirrorHeart?: boolean } = {}) => {
+    let s = battle([classId], [undefined], { enemies: [enemy], accessory: o.mirror ? ['aegisMirror'] : undefined, boss: o.boss });
+    if (o.mirrorHeart) s = use(s, 'fxMirrorHeart', { focus: 1 }).state;
+    s.allies[0].block = block;
+    const r = enemyRound(s);
+    return { taken: 500 - r.state.allies[0].hp, back: dmgTo(r.events, 'e0'), mirror: r.events.filter((e) => e.type === 'ability' && e.name === '鏡の反射').length };
+  };
+
+  it('イージスの鏡盾: ブロックで完全に防いだら、防いだ量をその敵にはね返す（ボス・中ボスへは1回30まで）。一部しか防げない時は無し', () => {
+    // 攻撃の量（ブロック無しで受けた量）
+    expect(guard('warrior', 'rd7Hitter', 0).taken).toBe(7);
+    expect(guard('warrior', 'rd7Smasher', 0).taken).toBe(25);
+    expect(guard('warrior', 'rd7Crusher', 0).taken).toBe(45);
+    // 完全に防いだ: 防いだ量と同じ
+    expect(guard('warrior', 'rd7Hitter', 100, { mirror: true })).toEqual({ taken: 0, back: 7, mirror: 1 });
+    expect(guard('warrior', 'rd7Crusher', 100, { mirror: true }).back).toBe(45);
+    // ボス戦では1回30まで
+    expect(guard('warrior', 'rd7Crusher', 100, { mirror: true, boss: true }).back).toBe(30);
+    // 一部しか防げない（HPが減った）時は、はね返さない
+    expect(guard('warrior', 'rd7Hitter', 3, { mirror: true })).toEqual({ taken: 4, back: 0, mirror: 0 });
+    // 鏡盾が無ければ何も起きない
+    expect(guard('warrior', 'rd7Hitter', 100).back).toBe(0);
+  });
+
+  it('拳聖＋イージスの鏡盾: 《後の先》（1回12まで）と鏡盾（防いだ量）の両方が出る。1回の攻撃への反撃の合計', () => {
+    // 7の攻撃: 後の先7 ＋ 鏡盾7 = 14
+    expect(guard('fistSaint', 'rd7Hitter', 100).back).toBe(7);
+    expect(guard('fistSaint', 'rd7Hitter', 100, { mirror: true }).back).toBe(14);
+    // 25の攻撃: 後の先12 ＋ 鏡盾25 = 37
+    expect(guard('fistSaint', 'rd7Smasher', 100).back).toBe(12);
+    expect(guard('fistSaint', 'rd7Smasher', 100, { mirror: true }).back).toBe(37);
+    // 45の攻撃: 後の先12 ＋ 鏡盾45 = 57。ボス戦は 後の先12 ＋ 鏡盾30 = 42
+    expect(guard('fistSaint', 'rd7Crusher', 100, { mirror: true }).back).toBe(57);
+    expect(guard('fistSaint', 'rd7Crusher', 100, { mirror: true, boss: true }).back).toBe(42);
+    // 明鏡止水（後の先が2倍・上限なし）の後: 25の攻撃に 後の先50 ＋ 鏡盾25 = 75。ボス戦の45の攻撃に 後の先90 ＋ 鏡盾30 = 120
+    expect(guard('fistSaint', 'rd7Smasher', 100, { mirror: true, mirrorHeart: true }).back).toBe(75);
+    expect(guard('fistSaint', 'rd7Crusher', 100, { mirror: true, mirrorHeart: true, boss: true }).back).toBe(120);
+  });
+
+  it('残響の指輪: カードが完全成功したらマナ+1（種類は問わない・1ターンに1回）', () => {
+    const s = battle(['warrior'], [undefined], { accessory: ['echoRing'] });
+    const m = s.allies[0].mana;
+    const a = use(s, 'rd7Hit', { focus: 1 });
+    expect(a.state.allies[0].mana).toBe(m);
+    const b = use(a.state, 'rd7Hit', { focus: 1 });
+    expect(b.state.allies[0].mana).toBe(m - 1);
+    // 技のカードでも
+    const t = use(battle(['warrior'], [undefined], { accessory: ['echoRing'] }), 'rd7Block', { focus: 1 });
+    expect(t.state.allies[0].mana).toBe(m);
+    // 指輪が無ければ戻らない
+    expect(use(battle(['warrior'], [undefined]), 'rd7Hit', { focus: 1 }).state.allies[0].mana).toBe(m - 1);
+  });
+
+  it('残響の指輪＋大魔導士《詠唱短縮》＋一閃《鞘走り》: 別々に数える（1ターンに 指輪1・詠唱短縮1・一閃は完全成功のたび）', () => {
+    const slots = getCard('flashCut').slots;
+    // 大魔導士＋指輪: 魔法の完全成功で +2（指輪1・詠唱短縮1）。2枚目の魔法は +0
+    let s = battle(['archmage'], [undefined], { accessory: ['echoRing'] });
+    const m = s.allies[0].mana;
+    s = use(s, 'rd7Fire', { focus: 1 }).state;
+    expect(s.allies[0].mana).toBe(m - 1 + 2);
+    s = use(s, 'rd7Fire', { focus: 1 }).state;
+    expect(s.allies[0].mana).toBe(m - 1 + 2 - 1);
+    // 大魔導士＋指輪で一閃（コスト2・物理）を完全成功: 指輪1・鞘走り1（詠唱短縮は魔法だけ）
+    let t = battle(['archmage'], [undefined], { accessory: ['echoRing'] });
+    t.allies[0].focus = 9;
+    t = use(t, 'flashCut', { focus: slots }).state;
+    expect(t.allies[0].mana).toBe(m - 2 + 2);
+    // 続けて魔法を完全成功: 詠唱短縮だけ +1（指輪はこのターン使った）
+    t = use(t, 'rd7Fire', { focus: 1 }).state;
+    expect(t.allies[0].mana).toBe(m - 1 + 1);
+    // 2枚目の一閃: 鞘走りだけ +1
+    t = use(t, 'flashCut', { focus: slots }).state;
+    expect(t.allies[0].mana).toBe(m - 2 + 1);
   });
 });

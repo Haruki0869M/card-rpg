@@ -3,7 +3,8 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../data/balance';
 import { CARDS, getCard } from '../../data/cards';
-import { ENEMIES, getEnemy } from '../../data/enemies';
+import { ENEMIES, getEnemy, getEnemyAction } from '../../data/enemies';
+import { breakStopsAction } from '../battle/intents';
 import { getItem, ITEMS } from '../../data/items';
 import { getScenario } from '../../data/scenarios';
 import { SCOURGES } from '../../data/world';
@@ -18,8 +19,8 @@ import { wandererLevel } from '../game/world/wanderers';
 import { climbWatchtower } from '../game/world/explore';
 import { RARITIES } from '../game/dungeon';
 
-const IDS = ['greedKing', 'miasmaNecro', 'nightmareBeast', 'stormWitch'];
-const GEAR = ['greedCrown', 'soulReaperScythe', 'nightmarePelt', 'permafrostGown'];
+const IDS = ['greedKing', 'miasmaNecro', 'nightmareBeast', 'stormWitch', 'infernoDemon'];
+const GEAR = ['greedCrown', 'soulReaperScythe', 'nightmarePelt', 'permafrostGown', 'infernoCore'];
 
 function run(g: GameState, cmd: GameCommand): GameState {
   const r = applyGameCommand(g, cmd);
@@ -56,9 +57,11 @@ function withScourge(g: GameState, id: string): GameState {
 // ---------- データ ----------
 
 describe('段階7b: 災厄の中ボスのデータ', () => {
-  it('4種類（計画 §3-2 の表のとおり）。悪さはそれぞれ別の種類・本体の敵と専用の装備がある', () => {
+  it('5種類（計画 §3-2 の4種類＋段階7c の業火の魔人）。悪さはそれぞれ別の種類・本体の敵と専用の装備がある', () => {
     expect(SCOURGES.all.map((d) => d.id)).toEqual(IDS);
-    expect(SCOURGES.all.map((d) => Object.keys(d.curse)[0])).toEqual(['shopPrice', 'corruptionPerTurn', 'campHeal', 'nightLevel']);
+    expect(SCOURGES.all.map((d) => Object.keys(d.curse)[0])).toEqual(['shopPrice', 'corruptionPerTurn', 'campHeal', 'nightLevel', 'battleBurn']);
+    expect(SCOURGES.get('infernoDemon').curse.battleBurn).toBe(1);
+    expect(SCOURGES.get('infernoDemon').reward).toEqual({});
     expect(SCOURGES.get('greedKing').curse.shopPrice).toBe(25);
     expect(SCOURGES.get('miasmaNecro').curse.corruptionPerTurn).toBe(0.5);
     expect(SCOURGES.get('nightmareBeast').curse.campHeal).toBe(0.5);
@@ -76,7 +79,7 @@ describe('段階7b: 災厄の中ボスのデータ', () => {
     }
   });
 
-  it('本体の戦い方は4体とも別々。特殊な行動（大技の予告）は2種類まで・全部に予告の文がある・味方の番を止める行動は無い', () => {
+  it('本体の戦い方は5体とも別々。特殊な行動（大技の予告）は2種類まで・全部に予告の文がある・味方の番を止める行動は無い', () => {
     const shapes = new Set<string>();
     for (const d of SCOURGES.all) {
       const e = getEnemy(d.boss);
@@ -89,7 +92,7 @@ describe('段階7b: 災厄の中ボスのデータ', () => {
       expect(e.variantOf && ENEMIES.has(e.variantOf), d.id).toBe(true);
       shapes.add(big.map((a) => a.effects.map((x) => x.kind).join('+')).sort().join('|'));
     }
-    expect(shapes.size).toBe(4);
+    expect(shapes.size).toBe(5);
   });
 
   it('専用の装備と秘薬は、宝箱・ドロップ・町の店・行商人・黄金箱・闇商人には出ない', () => {
@@ -212,7 +215,7 @@ describe('段階7b: 出る時期と場所（シナリオ1の広い地図だけ�
 
 // ---------- 悪さ ----------
 
-describe('段階7b: 生きている間の悪さ（4つ）', () => {
+describe('段階7b: 生きている間の悪さ（5つ）', () => {
   it('強欲の盗賊王: 町の店の値段 +25%（売る値段・値引きの順は今までどおり）。倒すと元に戻る', () => {
     const g = withScourge(newGame(), 'greedKing');
     const h = g.heroes[0];
@@ -260,6 +263,25 @@ describe('段階7b: 生きている間の悪さ（4つ）', () => {
     expect(wandererLevel(s, s.world!, 0)).toBe(plain + 1);
     s.world!.worldTurn = 1;
     expect(wandererLevel(s, s.world!, 0)).toBe(day);
+  });
+
+  it('業火の魔人（段階7c）: 戦闘の開始時、味方全員に火傷1（1ターン目の間は見えていて、味方の番の終わりに燃える）。倒すと元に戻る', () => {
+    const start = (g: GameState, players = ['h0']) => {
+      g = fightScourge(g, players);
+      return run(g, { type: 'ENCOUNTER_CHOOSE', playerId: 'P1', choice: 'fight', heroId: 'h0', focusUsed: 0, participants: players });
+    };
+    // 業火の魔人の戦闘（災厄そのものとの戦闘でも付く）
+    let g = start(withScourge(newGame('corruptionKing', 5, ['P1', 'P1']), 'infernoDemon'), ['h0', 'h1']);
+    expect(g.mode).toBe('battle');
+    expect(g.battle!.allies.map((a) => a.statuses.burn)).toEqual([1, 1]);
+    expect(g.battle!.log.some((l) => l.text.includes('魔人のせいで、全員に火傷1'))).toBe(true);
+    expect(scourgeCurse(g).battleBurn).toBe(1);
+    // ほかの災厄では付かない
+    const other = start(withScourge(newGame(), 'greedKing'));
+    expect(other.battle!.allies[0].statuses.burn ?? 0).toBe(0);
+    // 倒すと消える
+    g = win(g);
+    expect(scourgeCurse(g).battleBurn).toBe(0);
   });
 });
 
@@ -538,6 +560,58 @@ describe('段階7b: 専用の装備の力', () => {
     expect(s.enemies[0].statuses.burn).toBe(4);
     const p = enemyTurn(battle({ armor: 'nightmarePelt', enemies: ['sc7Poisoner'] }));
     expect(p.enemies[0].statuses.poison ?? 0).toBeGreaterThanOrEqual(1);
+  });
+
+  it('紅蓮魔人の炉心核（段階7c）: 毎ターンの始めに マナ+1・1枚引く・自分と敵全員に火傷1。カードを使っても増えない。自分の火傷で倒れる事はある', () => {
+    const bare = enemyTurn(battle());
+    const core = enemyTurn(battle({ accessory: 'infernoCore' }));
+    expect(core.allies[0].mana).toBe(bare.allies[0].mana + 1);
+    expect(core.allies[0].hand.length).toBe(bare.allies[0].hand.length + 1);
+    // 1ターン目に付いた火傷1は味方の番の終わりに燃え（4）、2ターン目の始めに新しく1付く。敵の火傷は敵の番の始めに燃える
+    expect(core.allies[0].statuses.burn).toBe(1);
+    expect(core.allies[0].hp).toBe(bare.allies[0].hp - 4);
+    expect(core.enemies.map((e) => e.statuses.burn)).toEqual([1, 1]);
+    expect(core.enemies[0].hp).toBe(bare.enemies[0].hp - 4);
+    // カードを何枚使っても、マナ・手札は増えない（毎ターンの始めだけ）
+    let s = core;
+    const mana = s.allies[0].mana;
+    for (let k = 0; k < 3; k++) s = use(s, 'sc7Hit').state;
+    expect(s.allies[0].mana).toBe(mana - 3);
+    // 悪夢の毛皮と組むと、自分に付く火傷が敵全員にもうつる
+    const both = battle({ accessory: 'infernoCore', armor: 'nightmarePelt' });
+    expect(both.enemies[0].statuses.burn).toBe(2);
+    // 自分の火傷で倒れる（今の火傷の決まりのまま。4ダメージでHPが0になれば戦闘不能）
+    const low = battle({ accessory: 'infernoCore', enemies: ['sc7Idler'] });
+    low.allies[0].hp = 3;
+    const end = enemyTurn(low);
+    expect(end.allies[0].dead).toBe(true);
+    expect(end.phase).toBe('defeat');
+  });
+
+  it('業火の魔人（段階7c）: 噴火で火傷を重ね、業火の炸裂で起爆（1つにつき4・1人24まで）。炸裂は BREAK で止まる', () => {
+    expect(getEnemy('scourgeInfernoDemon').actions.filter((a) => a.big).map((a) => a.id)).toEqual(['eruption', 'inferno']);
+    expect(breakStopsAction(getEnemyAction('scourgeInfernoDemon', 'inferno'))).toBe(true);
+    const blast = (burn: number) => {
+      const s = battle({ enemies: ['scourgeInfernoDemon'] });
+      s.allies[0].statuses.burn = burn;
+      s.enemies[0].intent = { actionId: 'inferno', targetId: s.allies[0].id };
+      const t = enemyTurn(s);
+      expect(t.allies[0].statuses.burn ?? 0).toBe(0);
+      return 500 - t.allies[0].hp;
+    };
+    // 味方の番の終わりに火傷が1回燃えて（4）1減り、残りを起爆する: 3 → 4＋2×4=12 / 7 → 4＋24 / 10 → 4＋24（1人24まで）
+    expect(blast(3)).toBe(12);
+    expect(blast(7)).toBe(28);
+    expect(blast(10)).toBe(28);
+    // BREAK された炸裂は起きない
+    const s = battle({ enemies: ['scourgeInfernoDemon'] });
+    s.allies[0].statuses.burn = 6;
+    s.enemies[0].intent = { actionId: 'inferno', targetId: s.allies[0].id };
+    s.enemies[0].broken = true;
+    const t = enemyTurn(s);
+    // 火傷が1回燃えた分（4）だけ。火傷は残る
+    expect(500 - t.allies[0].hp).toBe(4);
+    expect(t.allies[0].statuses.burn).toBe(5);
   });
 });
 

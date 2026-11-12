@@ -8,7 +8,8 @@ import type { EffectHandler } from '../types';
 declare module '../../../../types' {
   interface EffectParams {
     /** cap = どの戦闘でも1回この値まで（段階7b: 強欲王の黄金冠） */
-    dealtDamage: { element?: string; bossCap?: number; cap?: number };
+    /** blocked = 「防いだ量」と書く（段階7c: イージスの鏡盾。きっかけ blocked の dealt = 防いだ量） */
+    dealtDamage: { element?: string; bossCap?: number; cap?: number; blocked?: boolean };
   }
 }
 
@@ -28,5 +29,5 @@ export const effect: EffectHandler<'dealtDamage'> = {
     }
     return any;
   },
-  describe: (e, who) => `${who}${e.cap !== undefined ? '得た量' : 'あふれた量'}と同じ${e.element ? `${getElement(e.element).name}属性の` : ''}ダメージ${e.cap !== undefined ? `（1回${e.cap}まで）` : ''}${e.bossCap !== undefined ? `（ボス・中ボスへは1回${e.bossCap}まで）` : ''}`,
+  describe: (e, who) => `${who}${e.blocked ? '防いだ量' : e.cap !== undefined ? '得た量' : 'あふれた量'}と同じ${e.element ? `${getElement(e.element).name}属性の` : ''}ダメージ${e.cap !== undefined ? `（1回${e.cap}まで）` : ''}${e.bossCap !== undefined ? `（ボス・中ボスへは1回${e.bossCap}まで）` : ''}`,
 };

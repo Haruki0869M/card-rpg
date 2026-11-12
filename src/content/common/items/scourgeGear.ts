@@ -1,7 +1,7 @@
 // 災厄の中ボスの専用の装備（段階7b・overhaul-plan-v2 §3-2。中身は、その後でオーナーが OK した docs/tasks/lineup-final-gear.md の「新しい（災厄）」）。
 // 出どころは、その災厄を倒した時だけ（必ず落とす。source: 'scourge'。町の店・宝箱・ドロップ・行商人・闇商人には出ない）。
 // 冒険をまたいで持ち越さない（今の装備と同じ）。能力の数字は一覧のまま。一覧に数字の無い所は【提案】。
-// 一覧の5個のうち「紅蓮魔人の炉心核」は、5種類目の災厄（業火の魔人）の物で、計画 §3 の4種類に無いので作っていない（報告に理由と案）
+// 一覧の5個のうち「紅蓮魔人の炉心核」は、5種類目の災厄（業火の魔人）の物。段階7c で足した（オーナーの決定 2026-11-13）
 import type { ItemDef } from '../../../types';
 
 const SC = 'scourge' as const;
@@ -55,6 +55,18 @@ export const scourgeItems: ItemDef[] = [
       name: '悪夢返し',
       description: '自分に悪い状態異常が付くたび、同じ物を同じ数だけ敵全員にも付ける（凍結は、ボス・中ボスには弱体）。1ターンに2回まで。',
       effect: { when: 'statusTaken', if: [{ kind: 'perTurn', key: 'nightmarePelt', max: 2 }], do: [{ kind: 'mirrorStatus' }] },
+    },
+  },
+  {
+    // 段階7c: 5種類目「業火の魔人」の装備。能力値（力+8・知力+8）は docs/tasks/lineup-phase3-gear.md §2-1 の表のまま。
+    // マナ+1・1枚引くは自分の番の始めに1回だけ（カードや能力では増えない）。自分の火傷で倒れる事はある（今の火傷の決まりのまま）
+    id: 'infernoCore', name: '紅蓮魔人の炉心核', slot: 'accessory', rarity: 'legend', icon: 'amulet', source: SC,
+    description: '毎ターンの始めに、マナ+1・カードを1枚引く。代わりに、自分と敵全員に「火傷」1。',
+    stats: { str: 8, int: 8 }, tags: ['mana', 'draw', 'burn'],
+    ability: {
+      name: '暴走炉心',
+      description: '毎ターンの始めに、マナ+1・カードを1枚引く。代わりに、自分と敵全員に「火傷」1。',
+      effect: { when: 'turnStart', do: [{ kind: 'gainMana', amount: 1 }, { kind: 'draw', amount: 1 }, { kind: 'applyStatus', status: 'burn', amount: 1, to: 'self' }, { kind: 'applyStatus', status: 'burn', amount: 1, to: 'foes' }] },
     },
   },
   // ---- 秘薬（オーナーの決定 1-A: その冒険の中だけ。選んだキャラの能力値を1つ +5）----

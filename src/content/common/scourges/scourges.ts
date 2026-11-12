@@ -1,7 +1,7 @@
-// 災厄の中ボス4種類（段階7b・overhaul-plan-v2 §3-2 の表のとおり。悪さ・報酬の数字は計画の【提案】のまま）。
+// 災厄の中ボス5種類（段階7b・overhaul-plan-v2 §3-2 の表のとおり。悪さ・報酬の数字は計画の【提案】のまま）。
 // 専用の装備は、計画の表の後でオーナーが OK した一覧（docs/tasks/lineup-final-gear.md の「新しい（災厄）」）の物。
 // 計画の表の装備（盗賊王の金貨袋・瘴気喰らいの〇〇・ブロックを持ち越す悪夢の毛皮・氷嵐の耳飾り）は、一覧で置き換えられている
-// （耳飾りは段階7a で黄金箱へ移した）。業火の魔人（一覧で足された5種類目）は計画 §3 に無いので作っていない（報告に理由と案）
+// （耳飾りは段階7a で黄金箱へ移した）。5種類目の業火の魔人は段階7c で足した（オーナーの決定 2026-11-13）。1冒険に出るのは3体まで（5種類から）
 import type { ScourgeDef } from '../../../types';
 
 export const scourges: ScourgeDef[] = [
@@ -65,5 +65,22 @@ export const scourges: ScourgeDef[] = [
     gear: 'permafrostGown',
     appearText: '夜の吹雪が魔物を荒ぶらせている。',
     clearText: '吹雪がやみ、夜の魔物が元の強さに戻った。',
+  },
+  {
+    // 段階7c: 5種類目（オーナーの決定 2026-11-13）。悪さは docs/tasks/lineup-phase3-gear.md §2-1 の表（「災厄5種類…は案のまま」）の文のまま
+    id: 'infernoDemon',
+    order: 5,
+    name: '業火の魔人',
+    short: '魔人',
+    boss: 'scourgeInfernoDemon',
+    minions: ['fireSalamander', 'ashBat', 'fireSalamander'],
+    curse: { battleBurn: 1 },
+    curseShort: '戦闘で火傷1',
+    curseText: '戦闘の開始時、味方全員に「火傷」1が付く',
+    // 報酬は一覧の表のとおり専用の装備だけ（ほかの4種類のお金・侵食度・秘薬は計画 §3 の表の物で、業火の魔人の行は計画に無い）。浄化 −3% は共通
+    reward: {},
+    gear: 'infernoCore',
+    appearText: '大地の底から業火が噴き出し、熱気がどこまでも広がっていく。',
+    clearText: '熱気が引き、戦いの初めに火傷を負わなくなった。',
   },
 ];

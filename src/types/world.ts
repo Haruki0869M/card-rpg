@@ -275,8 +275,9 @@ export interface ScourgeDef {
   /** 災厄の本体の敵ID / 取り巻きの敵ID（前から順に、2人まで=2体・4人=3体） */
   boss: string;
   minions: string[];
-  /** 生きている間の悪さ。shopPrice = 町の店の値段 +N% / corruptionPerTurn = 世界マップの番の侵食度 +N% / campHeal = 野営のHPの回復の倍率 / nightLevel = 夜の敵のレベル +N */
-  curse: { shopPrice?: number; corruptionPerTurn?: number; campHeal?: number; nightLevel?: number };
+  /** 生きている間の悪さ。shopPrice = 町の店の値段 +N% / corruptionPerTurn = 世界マップの番の侵食度 +N% / campHeal = 野営のHPの回復の倍率 / nightLevel = 夜の敵のレベル +N /
+   *  battleBurn = 戦闘の開始時、味方全員に「火傷」N（段階7c: 業火の魔人） */
+  curse: { shopPrice?: number; corruptionPerTurn?: number; campHeal?: number; nightLevel?: number; battleBurn?: number };
   /** 札に出す悪さの短い文（店+25%）と、知らせ・説明の文 */
   curseShort: string;
   curseText: string;
