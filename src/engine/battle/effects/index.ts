@@ -394,7 +394,8 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   if (ctx.depth < 3) {
     if (r.hpLoss > 0 && !v.dead) fireAbilities(state, rng, events, v, 'hurt', { attacker: source, depth: ctx.depth + 1 });
     // きっかけ: 相手の攻撃を、ブロックで完全に防いだ
-    if (r.hpLoss === 0 && r.blocked > 0 && !v.dead && isEnemy(source) !== isEnemy(v)) fireAbilities(state, rng, events, v, 'blocked', { attacker: source, depth: ctx.depth + 1 });
+    // dealt = 防いだ量（段階7c: イージスの鏡盾。ほかの blocked の能力は dealt を使わない）
+    if (r.hpLoss === 0 && r.blocked > 0 && !v.dead && isEnemy(source) !== isEnemy(v)) fireAbilities(state, rng, events, v, 'blocked', { attacker: source, dealt: r.blocked, depth: ctx.depth + 1 });
     // 区切りF: 敵の攻撃をブロックで防いだ（一部でも）。dealt = 防いだ量（拳聖《後の先》）
     if (r.blocked > 0 && isEnemy(source) && !isEnemy(v) && !v.dead) fireAbilities(state, rng, events, v, 'guarded', { attacker: source, dealt: r.blocked, depth: ctx.depth + 1 });
     if (v.dead && isEnemy(source) !== isEnemy(v) && !source.dead) fireAbilities(state, rng, events, source, 'kill', { target: v, condCard: ctx.card, depth: ctx.depth + 1 });

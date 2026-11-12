@@ -1,7 +1,8 @@
 // ランダムダンジョンの専用の装備（段階7a・overhaul-plan-v2 §4-3 と、それを1つにまとめた docs/tasks/lineup-final-gear.md の「新しい（黄金箱）」）。
 // 出どころは、ランダムダンジョンの最奥の黄金箱（60%で1つ余分に）と、無法者の隠れ処の闇商人だけ（source: 'randomDungeon'。町の店・ふつうの宝箱・ドロップ・行商人には出ない）。
 // 冒険をまたいで持ち越さない（今の装備と同じ）。能力の数字は一覧のまま。能力値（stats）は、同じ武器種・同じ格の今の武器と同じ。無い物は【提案】。
-// 一覧の14個のうち、今のデータと役割が重なる2個（イージスの鏡盾 = 拳聖《後の先》／残響の指輪 = 大魔導士《詠唱短縮》）は作っていない（報告に理由と案）
+// 一覧の14個を全部作った。イージスの鏡盾・残響の指輪は、今あるジョブの力（拳聖《後の先》・大魔導士《詠唱短縮》）と似ているが、
+// オーナーの決定（2026-11-13）で一覧のとおりに足した（段階7c。ジョブの力とは別々に働く）
 import type { ItemDef } from '../../../types';
 
 const RD = 'randomDungeon' as const;
@@ -97,5 +98,16 @@ export const goldenBoxItems: ItemDef[] = [
     // 能力値は【提案】
     stats: { int: 4 }, tags: ['weak', 'mana', 'magic'],
     ability: { name: '氷嵐の巡り', effect: { when: 'afterCard', if: [{ kind: 'weakHit' }, { kind: 'cardCost', min: 1 }, { kind: 'oncePerTurn', key: 'stormEarring' }], do: [{ kind: 'refundCost' }] } },
+  },
+  // ---- 段階7c で足した2個（オーナーの決定 2026-11-13: 一覧のとおりに作る） ----
+  {
+    id: 'aegisMirror', name: 'イージスの鏡盾', slot: 'accessory', rarity: 'epic', icon: 'charm', source: RD,
+    // 「ブロックで0に抑えた」= 敵の攻撃を、ブロックで完全に防いだ時（きっかけ blocked）。はね返す量 = 防いだその攻撃のダメージ。
+    // ボス・中ボスとの戦闘では1回30まで（福音の大錫杖の「ボスへは30まで」と同じ扱い）。回数の上限は無い（一覧に無いので足さない）。
+    // 拳聖《後の先》（きっかけ guarded）とは別々に数える（docs/tasks/lineup-phase4-jobs.md の重ねがけの決まり）。反撃で反撃は起きない（深さで止まる）
+    // 能力値は【提案】（一覧に数字が無い。ほかのエピックの装飾品と同じ幅）
+    description: '敵の攻撃をブロックで完全に防いだら（HPが減らなかったら）、防いだダメージと同じダメージをその敵にはね返す（ボス・中ボスへは1回30まで）。',
+    stats: { vit: 4 }, tags: ['block', 'counter'],
+    ability: { name: '鏡の反射', effect: { when: 'blocked', do: [{ kind: 'dealtDamage', bossCap: 30, blocked: true, to: 'attacker' }] } },
   },
 ];
