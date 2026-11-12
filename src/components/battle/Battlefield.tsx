@@ -2,7 +2,7 @@
 // 背景の上に、敵（上段）と味方（下段）が向かい合う。動きの演出はラッパー要素の transform だけで行う。
 
 import { motion, useAnimate, useReducedMotion } from 'framer-motion';
-import { memo, useEffect, useMemo, type ReactNode } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type React from 'react';
 import { BattleBackground, CharacterArt, EnemyArt, preloadEnemyPhases } from '../../art';
 import { getPet } from '../../data/pets';
@@ -16,11 +16,12 @@ import { useElementSize } from '../../hooks/useElementSize';
 import { useDetail, usePress } from '../../hooks/usePress';
 import { speedFactor, useBattle, type UnitFx } from '../../store/battleStore';
 import type { AllyState, BattleState, EnemyState } from '../../types';
-import { intentView, type IntentPart } from '../format';
+import { breakPreview, intentView, type IntentPart } from '../format';
 import { HpBar } from '../ui/HpBar';
 import { EffectChip, ELEMENT_ICONS, Shield, Skull, statusStyle, Swords } from '../ui/icons';
 import { Flame } from 'lucide-react';
 import { getElement } from '../../data/elements';
+import { SCOURGES } from '../../data/world';
 import { StatusChips } from '../ui/StatusChips';
 import { UnitPopups } from './Popups';
 import { SlotOverlay } from './SlotOverlay';
@@ -28,7 +29,7 @@ import { isAllyCard } from '../../engine/battle/targets';
 import { isOnlinePlay } from '../../store/battleConfig';
 import { seatModeOf } from '../../store/seats';
 import './battleFx.css';
-import { CalloutBand, GuardLayer, ImpactField, type UnitRect } from './BattleFx';
+import { CalloutBand, DeathField, GuardLayer, ImpactField, type UnitRect } from './BattleFx';
 
 /** 個体ごとの呼吸の周期と始まりをずらす（IDの文字から決める。乱数は使わない） */
 export function breathStyle(id: string, base: number, spread: number, sway: number): React.CSSProperties {
@@ -216,7 +217,10 @@ const EnemyUnit = memo(function EnemyUnit({
   slotW,
   spriteH,
   boxH,
+  narrow,
 }: {
+  /** 敵が3体以上で枠が狭い（BREAK の印を短い形にする） */
+  narrow: boolean;
   enemy: EnemyState;
   left: number;
   top: number;
@@ -257,6 +261,23 @@ const EnemyUnit = memo(function EnemyUnit({
   }, [battle, enemy]);
   const breath = useMemo(() => breathStyle(enemy.uid + enemy.defId, 2.5, 0.9, 0.6), [enemy.uid, enemy.defId]);
   const footW = Math.min(slotW - 4, h * 0.9);
+  // 回2: 倒れた演出。とどめのコマ（deathFx）が来たら、絵は戦場の演出の層（DeathField）の写しに任せて、すぐ隠す。
+  // 合図が来るまでは絵を残す（命中 → 倒れる、の順に見えるように）。合図が来ないまま時間が過ぎたら、今までどおり薄くして消す
+  const death = useBattle((s) => s.deathFx[enemy.uid]);
+  const fast = useBattle((s) => s.settings.fastMode);
+  const [gone, setGone] = useState(!!enemy.dead);
+  const staleDeath = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (!enemy.dead) {
+      setGone(false);
+      return;
+    }
+    staleDeath.current = useBattle.getState().deathFx[enemy.uid]?.id;
+    const t = setTimeout(() => setGone(true), (TIMING.enemyDeathFallback * 1000) / speedFactor({ fastMode: fast }));
+    return () => clearTimeout(t);
+  }, [enemy.dead]);
+  const ghost = !!enemy.dead && !!death && death.id !== staleDeath.current;
+  const hidden = ghost || (!!enemy.dead && gone);
 
   return (
     <div
@@ -291,8 +312,9 @@ const EnemyUnit = memo(function EnemyUnit({
         {lit && <TargetRing width={footW * 1.12} />}
         <motion.div
           className="absolute bottom-0"
-          animate={enemy.dead ? { opacity: 0, scale: 0.85, y: 10 } : { opacity: dimmed ? 0.6 : 1, scale: 1, y: 0 }}
-          transition={{ duration: enemy.dead ? 0.45 : 0.15 }}
+          animate={ghost ? { opacity: 0, scale: 1, y: 0 } : hidden ? { opacity: 0, scale: 0.85, y: 10 } : { opacity: dimmed ? 0.6 : 1, scale: 1, y: 0 }}
+          transition={ghost ? { duration: 0, delay: 0.03 } : { duration: hidden ? 0.45 : 0.15 }}
+          data-enemy-gone={hidden ? (ghost ? 'burst' : 'fade') : undefined}
           style={{ width: h * 0.85, height: h }}
           data-enemy-sprite={enemy.uid}
           data-spot={lit ? 'lit' : dimmed ? 'dim' : undefined}
@@ -332,6 +354,7 @@ const EnemyUnit = memo(function EnemyUnit({
           <ElementMarks defId={enemy.defId} />
           {/* 次の行動の予告（HPのすぐ下。誰を狙っているかの顔つき） */}
           <IntentBubble enemy={enemy} onTap={onTap} />
+          <BreakHint enemy={enemy} narrow={narrow} maxW={narrow ? slotW - 4 : slotW - 8} />
           <AimMarks battle={battle} enemyUid={enemy.uid} />
           <StatusChips s={enemy.statuses} side="enemy" onTap={onTap} tauntedBy={enemy.tauntedBy} guarding={enemy.guarding} />
         </div>
@@ -339,6 +362,33 @@ const EnemyUnit = memo(function EnemyUnit({
     </div>
   );
 });
+
+/**
+ * 回2: 大技の予告の枠のすぐ下に、カードを選ぶ前からいつも出す BREAK の印。
+ * 止め方の文は今の決まり（予告の説明の「弱点の属性で攻撃・完全成功で攻撃」）と同じ。弱点の属性はその敵のデータの弱点の印（▲と同じ絵）。
+ * 出す条件は「大技の予告・まだ BREAK していない・その行動をする」（breakPreview と同じ）。敵が3体以上の時は短い形
+ */
+function BreakHint({ enemy, narrow, maxW }: { enemy: EnemyState; narrow: boolean; maxW: number }) {
+  const show = useBattle((s) => !enemy.dead && !!breakPreview(s.battle, enemy));
+  if (!show) return null;
+  const weak = getEnemy(enemy.defId).weak ?? [];
+  const icons = weak.map((id) => {
+    const el = getElement(id);
+    const Icon = ELEMENT_ICONS[el.icon] ?? Swords;
+    return <Icon key={id} size={12} strokeWidth={2.8} className="inline align-[-2px]" style={{ color: el.color }} aria-label={el.name} />;
+  });
+  // 短い形は1行に収める（かっこは半角の幅。折り返すと味方の立ち絵の頭に重なりやすい）
+  const els = weak.length ? (narrow ? <>({icons})</> : <>（{icons}）</>) : null;
+  return (
+    <span
+      className={`w-max rounded bg-black/80 text-center text-[12px] leading-4 font-black text-amber-200 ring-1 ring-amber-400/80 ${narrow ? 'px-px tracking-[-0.03em] whitespace-nowrap' : 'px-1 [overflow-wrap:anywhere] [word-break:keep-all]'}`}
+      style={{ maxWidth: Math.max(60, maxW) }}
+      data-break-hint={narrow ? 'short' : 'long'}
+    >
+      ⚡{narrow ? <>BREAK可{els}</> : weak.length ? <>弱点{els}か完全成功で BREAK</> : <>完全成功で BREAK</>}
+    </span>
+  );
+}
 
 /** 狙う敵の足元で回るターゲットリング（横に寝かせた輪。中の目盛りがゆっくり回る） */
 function TargetRing({ width }: { width: number }) {
@@ -518,9 +568,12 @@ export function Battlefield() {
   const enemyTop = 4;
   // 名前 + HP + 行動の予告（狙いの名前の行を含む）+ 先読みの行 + 状態異常
   const foresee = enemies.some((e) => !e.dead && e.queuedActionId);
+  // 回2: 大技の予告の下の BREAK の印の行（敵が1体は1行・3体以上は短い形で1行。2体は長い形が2行に折り返すことがある）
+  const breakRow = useBattle((s) => fieldEnemies(s.battle.enemies).some((e) => !e.dead && !!breakPreview(s.battle, e)));
+  const breakRowH = breakRow ? (enemies.length === 2 ? 34 : 18) : 0;
   // 属性の印の行（16）・各行の間（0.5×5）・3体以上の時に互い違いにずらす分（10）も数える
   // 予告の枠は「→名前」の行（16）＋数字の行（20）＋枠の余白（6）の2行ぶん
-  const enemyInfoH = 14 + 14 + 16 + 42 + 16 + (foresee ? 18 : 0) + 18 + 10 + (nE >= 3 ? 10 : 0);
+  const enemyInfoH = 14 + 14 + 16 + 42 + 16 + (foresee ? 18 : 0) + breakRowH + 18 + 10 + (nE >= 3 ? 10 : 0);
   // 敵の列の下端と味方の頭の間に少し余白を残す（予告の枠が立ち絵の頭に重ならないように）
   const enemySpriteH = Math.max(40, Math.min(H * 0.56 - enemyInfoH, enemySlotW * 1.15));
   // 大きな敵（size > 1）は、絵の箱より上へはみ出して描かれ、戦場の上の端（上の帯）で体が切れていた。
@@ -543,6 +596,14 @@ export function Battlefield() {
   const enemyY = (i: number) => enemyTop + (nE >= 3 && i % 2 === 1 ? 10 : 0);
   const allyX = (i: number) => (allyAreaW / nA) * (i + 0.5) + (nA <= 2 ? W * 0.02 : 0);
   const allyBottom = (i: number) => 6 + (nA >= 3 && i % 2 === 1 ? 8 : 0);
+  // 回2: 倒れた演出を少し長く・大きくする敵（災厄の本体・ボスと中ボスの部屋のいちばん大きい敵）
+  const bossRoom = useBattle((s) => !!s.battle.boss || !!s.battle.midboss);
+  const bossLike = (uid: string) => {
+    const e = allEnemies.find((x) => x.uid === uid);
+    if (!e) return false;
+    if (SCOURGES.all.some((d) => d.boss === e.defId)) return true;
+    return bossRoom && (getEnemy(e.defId).size ?? 1) >= Math.max(...allEnemies.map((x) => getEnemy(x.defId).size ?? 1));
+  };
   const impactRects: UnitRect[] = [
     ...enemies.map((e, i) => {
       const h = enemyUnitH * (getEnemy(e.defId).size ?? 1);
@@ -570,6 +631,7 @@ export function Battlefield() {
               slotW={enemySlotW}
               spriteH={enemyUnitH}
               boxH={enemySpriteH}
+              narrow={nE >= 3}
             />
           ))}
           {allies.map((a, i) => (
@@ -583,6 +645,8 @@ export function Battlefield() {
               active={a.id === activeId && phase === 'ally'}
             />
           ))}
+          {/* 回2: 倒れた演出（命中の層の下。命中の演出が上に重なって、命中 → 倒れる、の順に見える） */}
+          <DeathField rects={impactRects} enemies={allEnemies} bossLike={bossLike} />
           <ImpactField rects={impactRects} />
         </>
       )}
