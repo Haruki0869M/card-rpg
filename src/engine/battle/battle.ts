@@ -299,6 +299,8 @@ function startAllyPhase(state: BattleState, rng: Rng, events: BattleEvent[]) {
     const carry = Math.min(carryManaOf(a), Math.max(0, a.mana));
     a.mana = BALANCE.manaPerTurn + carry;
     if (carry > 0) addLog(state, `${a.name}は残ったマナを${carry}持ち越した`);
+    // きっかけ: ターン開始時のうち、凍結・遅延の罰を受ける前（雪解けの指輪。点検 2026-11-13 F5）
+    fireAbilities(state, rng, events, a, 'turnStartBefore');
     // 凍結など: マナが減る（効いたら1減る）
     const pen = takeManaPenalty(a.statuses);
     if (pen.amount) {
