@@ -1,5 +1,6 @@
 // ===== 徘徊する敵（spec §8.4・§8.5）: マップ上に姿が見えている敵 =====
 import { BALANCE } from '../../../data/balance';
+import { DUNGEONS } from '../../../data/dungeons';
 import { getDifficulty } from '../../../data/rules';
 import { getScenario } from '../../../data/scenarios';
 import { TERRAINS } from '../../../data/world';
@@ -38,11 +39,31 @@ export function wandererLevel(game: GameState, w: WorldState, region: number): n
   return Math.max(1, def.regions[region].enemyLevel + getDifficulty(game.difficulty).enemyLevel + corruptionLevelBonus(game, w) + night);
 }
 
-/** 敵やキャラ・施設のあるマス、または敵が入れない地形。海の敵（sea）は海のマスにだけ入る */
+/** 入口のとなりのマスに敵を置かない施設: 町・鍵のダンジョン・最後のダンジョン（ランダムダンジョン・塔・祠などは今のまま） */
+const guardsEntrance = (f: WorldState['tiles'][number]['f']) => f?.kind === 'town' || (f?.kind === 'dungeon' && !DUNGEONS.tryGet(f.id)?.random);
+
+/**
+ * 回3 E: 町・鍵のダンジョン・最後のダンジョンの、となりのマス。
+ * 徘徊する敵は、ここに湧かない・動いて入らない（合流や入口へ向かう時に、入口の手前で戦闘にならないように。オーナーの実機の指摘）。
+ * もうここにいる敵（古い保存）は、そのまま。地形は冒険の間変わらないので、同じマスの並びには作り置きを使う
+ */
+const guardMemo = new WeakMap<object, Set<number>>();
+export function entranceGuardTiles(w: WorldState): Set<number> {
+  const memo = guardMemo.get(w.tiles);
+  if (memo) return memo;
+  const out = new Set<number>();
+  w.tiles.forEach((t, i) => {
+    if (guardsEntrance(t.f)) for (const n of neighbors(w, i)) if (!w.tiles[n].f) out.add(n);
+  });
+  guardMemo.set(w.tiles, out);
+  return out;
+}
+
+/** 敵やキャラ・施設のあるマス、入口のとなりのマス（回3 E）、または敵が入れない地形。海の敵（sea）は海のマスにだけ入る */
 const blocked = (w: WorldState, i: number, sea = false) => {
   const t = TERRAINS.get(w.tiles[i].t);
   const wrongTerrain = sea ? !t.sea : t.moveCost <= 0;
-  return !!w.tiles[i].f || wrongTerrain || w.wanderers.some((x) => x.tile === i) || Object.values(w.pos).includes(i) || !!w.spawns?.some((x) => x.tile === i);
+  return !!w.tiles[i].f || wrongTerrain || entranceGuardTiles(w).has(i) || w.wanderers.some((x) => x.tile === i) || Object.values(w.pos).includes(i) || !!w.spawns?.some((x) => x.tile === i);
 };
 
 /** 地域の海のマスに、海の敵（幽霊船など）を1組置く（K4 段3）。置けたら返す */
@@ -78,8 +99,9 @@ export function spawnWanderer(game: GameState, w: WorldState, rng: Rng, region: 
     const reach = isWideMap(game, w) ? landReach(w, startTileOf(game, w)) : undefined;
     // 敵・キャラ・出現スポットのいるマス（blocked と同じ判定を、マスごとに数え直さないように先にまとめる）
     const busy = new Set<number>([...w.wanderers.map((x) => x.tile), ...heroes, ...(w.spawns ?? []).map((x) => x.tile)]);
+    const guard = entranceGuardTiles(w);
     for (let i = 0; i < w.tiles.length; i++) {
-      if (w.tiles[i].r !== region || busy.has(i) || w.tiles[i].f || TERRAINS.get(w.tiles[i].t).moveCost <= 0) continue;
+      if (w.tiles[i].r !== region || busy.has(i) || w.tiles[i].f || guard.has(i) || TERRAINS.get(w.tiles[i].t).moveCost <= 0) continue;
       if (reach && !reach.has(i)) continue;
       if (heroes.some((h) => hexDistance(w, h, i) <= 2)) continue;
       cands.push(i);

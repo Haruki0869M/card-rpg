@@ -17,6 +17,8 @@ import { CardPickPanel } from '../ui/CardPickPanel';
 import { Bar, Crest, HeroFace, RARITY_STYLE, Screen } from '../ui/game';
 import { LootList } from './RoomScreens';
 import { ClaimPanel } from '../ui/ClaimPanel';
+import { WaitNotes } from './OnlineScreens';
+import { rewardWaits } from './waitNotes';
 
 /** 成長ボーナスのアイコン（成長の種類の icon のキー → アイコン） */
 const GROWTH_ICONS: Record<string, typeof TrendingUp> = { trendingUp: TrendingUp, heart: Heart, star: Star, arrowUp: ArrowUpCircle };
@@ -188,11 +190,18 @@ export function RewardScreen() {
   const [upgradeFor, setUpgradeFor] = useState<number | null>(null);
   const lu = r.levelUps[0];
   const luHero = lu ? findHero(game, lu.heroId) : undefined;
+  // 回3 A: レベルアップの成長は先頭から順に選ぶ（エンジンの決まり）。ただし、ほかの人のキャラの番の間も、
+  // この端末の人は自分のカード報酬・取り合いの返事を先に進められる（エンジンはカードと取り合いを、成長の順と別に受け付ける）。
+  // 1台で全員を動かす時は、今までどおり成長が先
+  const luMine = !!luHero && isLocalPlayer(luHero.playerId);
   // カード報酬（M3-C4）: 生き残ったキャラごとに、担当の人が同時に選ぶ。この端末のキャラから順に
   const pending = cardOfferHeroes(r).filter((id) => !r.cardDone?.includes(id));
   const minePending = pending.filter((id) => isLocalPlayer(findHero(game, id)?.playerId ?? LOCAL_PLAYER));
   const cardHero = minePending[0];
-  const othersPicking = pending.filter((id) => !minePending.includes(id)).map((id) => findHero(game, id)!);
+  // この端末のキャラで、まだ「欲しい／余れば／いらない」を選んでいない取り合い
+  const myClaimOpen = !!r.claim && !r.claim.rolls && r.claim.heroes.some((id) => !r.claim!.choices[id] && isLocalPlayer(findHero(game, id)?.playerId ?? LOCAL_PLAYER));
+  // ほかの人が今していること（だれが・何を選んでいるか）
+  const waits = rewardWaits(game, isLocalPlayer);
 
   return (
     <Screen>
@@ -240,19 +249,12 @@ export function RewardScreen() {
         </div>
 
         {/* カード報酬（裏向きで並び、1枚ずつめくれる。spec §13） */}
-        {!lu && cardHero && <RewardCards key={cardHero} heroId={cardHero} />}
-        {!lu && othersPicking.length > 0 && (
-          <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5 text-[13px] text-zinc-300">
-            {othersPicking.map((h) => (
-              <span key={h.id} className="flex items-center gap-1 rounded-full bg-black/40 px-2 py-0.5">
-                <HeroFace hero={h} size={20} /> {h.name}
-              </span>
-            ))}
-            がカードを選んでいます
-          </div>
-        )}
+        {/* 自分の取り合いの返事がまだなら、カードより上に出す（1回押すだけで、相手を待たせない） */}
+        {!luMine && r.claim && myClaimOpen && <ClaimPanel claim={r.claim} />}
+        {!luMine && cardHero && <RewardCards key={cardHero} heroId={cardHero} />}
+        {!luMine && (cardHero || myClaimOpen) && <WaitNotes notes={waits} className="mt-2" />}
 
-        {!lu && r.claim && <ClaimPanel claim={r.claim} />}
+        {!luMine && r.claim && !myClaimOpen && <ClaimPanel claim={r.claim} />}
 
         {/* ドロップ */}
         {r.loot.length > 0 && (
@@ -269,14 +271,16 @@ export function RewardScreen() {
       </div>
 
       <div className="shrink-0 px-3 pt-1 pb-3">
-        {lu ? null : cardHero ? (
+        {luMine ? null : cardHero ? (
           <button onClick={() => dispatchGame({ type: 'PICK_CARD', playerId: LOCAL_PLAYER, offerIndex: null, heroId: cardHero })} className="btn btn-dark h-12 w-full rounded-xl text-[15px] font-bold">
             {findHero(game, cardHero)?.name}はカードを選ばない
           </button>
-        ) : r.claim && !r.claim.rolls ? (
-          <div className="flex h-12 items-center justify-center rounded-xl bg-black/40 text-[14px] text-zinc-300">戦利品の取り合いが終わるのを待っています</div>
-        ) : pending.length ? (
-          <div className="flex h-12 items-center justify-center rounded-xl bg-black/40 text-[14px] text-zinc-300">ほかの人がカードを選び終えるのを待っています</div>
+        ) : myClaimOpen ? (
+          <div className="flex min-h-12 items-center justify-center rounded-xl bg-black/40 px-2 text-center text-[14px] text-zinc-300">上の「戦利品を取り合う」で、欲しいか選んでください</div>
+        ) : waits.length ? (
+          <WaitNotes notes={waits} />
+        ) : lu || pending.length || (r.claim && !r.claim.rolls) ? (
+          <div className="flex h-12 items-center justify-center rounded-xl bg-black/40 text-[14px] text-zinc-300">ほかの人が選び終えるのを待っています</div>
         ) : (
           <>
             <VoteStatus className="mb-2" />
@@ -290,7 +294,7 @@ export function RewardScreen() {
 
       {/* レベルアップの成長ボーナス */}
       <AnimatePresence>
-        {lu && luHero && (
+        {luMine && lu && luHero && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-40 flex flex-col justify-center bg-black/75 px-3">
             <motion.div initial={{ scale: 0.85 }} animate={{ scale: 1 }} className="panel panel-gold-edge panel-ornate rounded-2xl p-3 pt-4">
               <Crest />

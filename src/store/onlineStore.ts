@@ -33,11 +33,15 @@ interface OnlineState {
   offlineSince: Partial<Record<PlayerId, number>>;
   /** 待合室で作っているキャラの枠 */
   editingSlot: number | null;
+  /** 回3 C: ホストが切れて、ほかの人が引き継いだ知らせ（しばらく出す） */
+  hostNote: { id: number; oldName: string; newName: string; mine: boolean } | null;
 
   available: () => boolean;
   setPlayerName: (n: string) => void;
   createRoom: (opts: { scenarioId: string; difficulty: string; partySize: number }) => Promise<boolean>;
   joinRoom: (code: string) => Promise<boolean>;
+  /** 「前の部屋に戻る」を出さなくする（部屋がもう無い時） */
+  forgetLastRoom: () => void;
   leaveRoom: () => Promise<void>;
   claimSlot: (index: number, hero: Omit<Slot, 'ownerUid'>) => Promise<void>;
   releaseSlot: (index: number) => Promise<void>;
@@ -103,10 +107,18 @@ export const useOnline = create<OnlineState>((set, get) => {
         case 'rejected':
           useBattle.getState().showToast(e.text);
           break;
+        case 'host': {
+          // 回3 C: ホストが代わった。前のホストが切れた（止まった）時は、残った人に知らせる
+          const old = room.prevHostUid ? room.members[room.prevHostUid] : undefined;
+          const now = room.members[e.hostUid];
+          if (old && now && !room.alive(old)) set({ hostNote: { id: stampId++, oldName: old.name, newName: now.name, mine: e.hostUid === room.uid } });
+          if (room.isHost) useBattle.getState().onBecameHost();
+          break;
+        }
         case 'members': {
-          // 切断に気づいた時刻を覚える（60秒たったら、ホストが代わりに操作できる）
+          // 切断に気づいた時刻を覚える（60秒たったら、ホストが代わりに操作できる）。止まっている人（スマホが眠った）も切断と同じに数える
           const off: Partial<Record<PlayerId, number>> = {};
-          for (const m of Object.values(room.members)) if (!m.online) off[m.seat] = get().offlineSince[m.seat] ?? Date.now();
+          for (const m of Object.values(room.members)) if (!room.alive(m)) off[m.seat] = get().offlineSince[m.seat] ?? Date.now();
           set({ offlineSince: off });
           // 戻ってきた人の分の「代わりに操作」は自動でやめる
           if (room.isHost) for (const p of Object.keys(room.meta?.proxy ?? {}) as PlayerId[]) if (room.seatOnline(p)) void room.setProxy(p, false).catch(() => {});
@@ -152,6 +164,7 @@ export const useOnline = create<OnlineState>((set, get) => {
     playerName: last.name,
     offlineSince: {},
     editingSlot: null,
+    hostNote: null,
 
     available: onlineAvailable,
     setPlayerName: (n) => {
@@ -168,9 +181,13 @@ export const useOnline = create<OnlineState>((set, get) => {
         const b = await backend();
         attach(await Room.join(b, normalizeCode(code), get().playerName || 'プレイヤー'));
       }),
+    forgetLastRoom: () => {
+      set({ lastCode: null });
+      saveLast(null, get().playerName);
+    },
     leaveRoom: async () => {
       const r = get().room;
-      set({ room: null, offlineSince: {}, editingSlot: null });
+      set({ room: null, offlineSince: {}, editingSlot: null, hostNote: null });
       setStoreRoom(null);
       setLocalPlayers(null);
       useBattle.getState().exitOnline();

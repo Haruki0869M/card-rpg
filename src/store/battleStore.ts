@@ -203,6 +203,8 @@ interface StoreState {
   loadRemote: (game: GameState) => void;
   /** オンライン協力をやめた: この端末の1人用の冒険（保存）に戻す */
   exitOnline: () => void;
+  /** オンライン協力: この端末がホストを引き継いだ（敵の行動を進める役も引き継ぐ。回3 C） */
+  onBecameHost: () => void;
   /** 戻る操作などで一番上のものを閉じる。閉じたら true */
   closeTop: () => boolean;
 }
@@ -763,6 +765,12 @@ export const useBattle = create<StoreState>((set, get) => {
       const scene = pickScene(local?.game ?? null, WORLD_SCENE, true);
       const game = viewIn(local?.game ?? null, scene);
       set({ worldMoves: [], full: local?.game ?? null, scene, game, activeId: local?.activeId ?? '', screen: 'title', confirmAbandon: false, sheet: null, battle: game?.battle ?? EMPTY_BATTLE, selection: null });
+    },
+
+    onBecameHost: () => {
+      // 前のホストが送るはずだった敵の行動は、もう来ない。止まっている敵の番があれば、ここから進める
+      enemyInFlight = false;
+      scheduleEnemy();
     },
 
     abandonGame: () => {

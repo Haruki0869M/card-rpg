@@ -2,7 +2,8 @@
 // 格はエンジンが1回だけ抽選済み。ここは結果を「段階的に見せる」だけ（ガセ演出なし: 光・リーチ・予告は本当の格のときだけ出る）
 import { VoteChips, VoteStatus } from '../ui/Votes';
 import { chestLeaveGate } from './worldTurnGate';
-import { OthersTurnNote } from './OnlineScreens';
+import { OthersTurnNote, WaitNotes } from './OnlineScreens';
+import { chestClaimWaits } from './waitNotes';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Check, ChevronsRight, Lock, Sparkles, Star, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -610,6 +611,7 @@ export function ChestScreen() {
           <div className="-mt-3 max-h-[46vh] overflow-y-auto overscroll-contain" data-claim-area>
             <ClaimPanel claim={chest.claims![claimIdx]} index={claimIdx} title={`中身を取り合う（${claimIdx + 1}/${chest.claims!.length}）`} />
             <div className="mt-1 text-center text-[12px] text-zinc-400">残り{claimsLeft}つ。全部決まると先へ進めます</div>
+            <WaitNotes notes={chestClaimWaits(game, isLocalPlayer)} className="mt-1" />
           </div>
         ) : claimsLeft === 0 && !leaveGate.canLeave ? (
           // 世界マップの宝箱: 手番のキャラの担当の人が「先へ進む」を押す。ほかの人にはだれを待っているかを出す

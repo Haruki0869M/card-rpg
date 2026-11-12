@@ -50,7 +50,17 @@ export interface Member {
   seat: PlayerId;
   joinedAt: number;
   online: boolean;
+  /** 最後に「動いている」と書いた時刻（回3 C。古い端末は書かないので ? 付き） */
+  beat?: number;
 }
+
+/** 「動いている」を書く間隔 */
+export const BEAT_MS = 10_000;
+/**
+ * これより長く「動いている」が書かれていない人は、接続が残っていても止まっている（スマホが眠った・ページが凍った）とみなす（回3 C）。
+ * ホストなら、残っている中で一番早く入った人が引き継ぐ。
+ */
+export const STALE_MS = 35_000;
 
 export interface Slot {
   classId: string;
@@ -107,6 +117,8 @@ export const normalizeCode = (s: string) =>
     .slice(0, 4);
 
 export class RoomError extends Error {}
+/** 合言葉の部屋が無い（消えた）時の文。タイトルの「前の部屋に戻る」で見分ける */
+export const ROOM_MISSING = 'その合言葉の部屋はありません';
 
 export class Room {
   meta: RoomMeta | null = null;
@@ -132,6 +144,9 @@ export class Room {
   private pendingCheck: Snapshot | null = null;
   private resyncing: Promise<void> | null = null;
   private closed = false;
+  private beatTimer: ReturnType<typeof setInterval> | null = null;
+  /** 直前のホスト（引き継ぎの知らせに使う。回3 C） */
+  prevHostUid: string | null = null;
 
   private constructor(
     readonly backend: Backend,
@@ -154,9 +169,13 @@ export class Room {
     if (this.isHost) for (const p of SEATS) if (this.meta?.proxy?.[p] && !out.includes(p)) out.push(p);
     return out;
   }
-  /** 席の人が接続中か（誰もいない席は false） */
+  /** その人が今動いているか: 接続中で、「動いている」の書き込みが古すぎない（書かない古い端末は、接続中なら動いているとみなす） */
+  alive(m: Member | undefined): boolean {
+    return !!m && m.online && (m.beat === undefined || this.backend.now() - m.beat < STALE_MS);
+  }
+  /** 席の人が接続中（動いている）か（誰もいない席は false） */
   seatOnline(p: PlayerId): boolean {
-    return Object.values(this.members).some((m) => m.seat === p && m.online);
+    return Object.values(this.members).some((m) => m.seat === p && this.alive(m));
   }
   seatName(p: PlayerId): string | undefined {
     return Object.values(this.members).find((m) => m.seat === p)?.name;
@@ -214,7 +233,7 @@ export class Room {
     const code = normalizeCode(rawCode);
     if (code.length !== 4) throw new RoomError('合言葉は4文字です');
     const meta = await backend.get<RoomMeta>(roomPath(code, 'meta'));
-    if (!meta) throw new RoomError('その合言葉の部屋はありません');
+    if (!meta) throw new RoomError(ROOM_MISSING);
     if (meta.version !== GAME_VERSION || meta.content !== contentVersion()) throw new RoomError('ゲームの版が部屋と違います。ページを読み込み直してください');
     const me = await backend.get<Member>(roomPath(code, 'members', backend.uid));
     if (!me) {
@@ -263,7 +282,7 @@ export class Room {
         this.emit({ type: 'meta' });
         // 人数が変わったら枠も作り直す（増やした時は枠のデータが変わらず、枠の知らせが来ないため）
         if (sizeChanged) this.rebuildSlots();
-        if (m.hostUid !== oldHost) this.onHostChanged();
+        if (m.hostUid !== oldHost) this.onHostChanged(oldHost);
         if (m.status === 'playing' && (!wasPlaying || !this.game)) void this.resync('start');
       }),
       b.onValue<Record<string, Member>>(p('members'), (m) => {
@@ -294,6 +313,39 @@ export class Room {
     );
     if (this.meta?.status === 'playing') await this.resync('join');
     if (this.isHost) this.startHosting();
+    this.startBeat();
+  }
+
+  /**
+   * 回3 C: 「動いている」を一定の間隔で書き、ほかの人が止まっていないかを見る。
+   * ページが凍る（スマホが眠る）と、接続は残ったまま何も処理しなくなるので、接続の印だけでは気づけない。
+   * ホストが止まっていたら、checkHost で引き継ぐ。だれかの「動いている」が変わったら、画面を書き直す
+   */
+  private startBeat() {
+    if (this.beatTimer || this.closed) return;
+    let lastBeat = 0;
+    let lastAlive = '';
+    const tick = () => {
+      if (this.closed || !this.connected) return;
+      const now = this.backend.now();
+      if (now - lastBeat >= BEAT_MS) {
+        lastBeat = now;
+        void this.backend.set(roomPath(this.code, 'members', this.uid, 'beat'), now).catch(() => {});
+      }
+      const alive = Object.keys(this.members)
+        .sort()
+        .map((k) => (this.alive(this.members[k]) ? 1 : 0))
+        .join('');
+      if (alive !== lastAlive) {
+        const first = lastAlive === '';
+        lastAlive = alive;
+        if (!first) this.emit({ type: 'members' });
+      }
+      this.checkHost();
+    };
+    tick();
+    this.beatTimer = setInterval(tick, BEAT_MS / 2);
+    (this.beatTimer as { unref?: () => void }).unref?.();
   }
 
   /** 部屋を出る（データは残るので、同じ合言葉でまた入れる） */
@@ -309,6 +361,8 @@ export class Room {
 
   dispose() {
     this.closed = true;
+    if (this.beatTimer) clearInterval(this.beatTimer);
+    this.beatTimer = null;
     for (const u of this.subs) u();
     this.subs = [];
     this.logSub?.();
@@ -558,14 +612,15 @@ export class Room {
     await this.backend.update(u);
   }
 
-  /** ホストが切断していたら、残っている中で一番早く入った人が引き継ぐ */
+  /** ホストが切断していたら（止まっていたら）、残っている中で一番早く入った人が引き継ぐ */
   private checkHost() {
     const m = this.meta;
     if (!m || this.closed || !this.connected) return;
     const host = this.members[m.hostUid];
-    if (host?.online) return;
+    if (this.alive(host)) return;
+    // 自分は今動いているので、自分の「動いている」が古く見えても候補に入れる（書き込みが届く前）
     const next = Object.entries(this.members)
-      .filter(([, x]) => x.online)
+      .filter(([uid, x]) => (uid === this.uid ? x.online : this.alive(x)))
       .sort((a, b) => a[1].joinedAt - b[1].joinedAt)[0];
     if (next?.[0] !== this.uid) return;
     const old = m.hostUid;
@@ -580,7 +635,8 @@ export class Room {
     this.emit({ type: 'slots' });
   }
 
-  private onHostChanged() {
+  private onHostChanged(oldHost?: string) {
+    this.prevHostUid = oldHost ?? null;
     this.emit({ type: 'host', hostUid: this.meta!.hostUid });
     if (this.isHost) {
       // 引き継いだ: 自分が代わりに操作するのは、切断中の席だけ

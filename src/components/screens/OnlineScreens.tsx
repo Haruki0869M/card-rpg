@@ -17,6 +17,7 @@ import { useBattle } from '../../store/battleStore';
 import { PROXY_WAIT_SEC, useOnline } from '../../store/onlineStore';
 import type { GameState, PlayerId } from '../../types';
 import { HeroFace, Screen } from '../ui/game';
+import { chestClaimWaits, facilityWaits, rewardWaits } from './waitNotes';
 
 /** 定型のスタンプ（spec §7.1） */
 export const STAMPS = ['いいね！', '待って！', 'ここ行こう', 'ありがとう', 'まかせて', 'ごめん！'];
@@ -278,8 +279,14 @@ export function awaitedSeats(game: GameState): PlayerId[] {
     return h ? [h.playerId] : [];
   }
   if (game.mode === 'battle' && game.battle?.phase === 'ally') return waitingPlayers(game.battle);
-  if (game.mode === 'reward' && game.reward?.levelUps.length) {
-    const h = game.heroes.find((x) => x.id === game.reward!.levelUps[0].heroId);
+  // 回3 A・C: 報酬（成長・カード・取り合い）・宝箱の取り合い・施設も、まだ選んでいない人を待っている
+  const all = () => false;
+  const seats = (notes: { playerId: PlayerId }[]) => [...new Set(notes.map((n) => n.playerId))];
+  if (game.mode === 'reward') return seats(rewardWaits(game, all));
+  if (game.mode === 'chest' && game.chest?.claims?.some((c) => !c.rolls)) return seats(chestClaimWaits(game, all));
+  if (game.mode === 'town' || game.mode === 'shrine' || game.mode === 'sanctuary') return seats(facilityWaits(game, all));
+  if (game.mode === 'encounter' && game.encounter) {
+    const h = game.heroes.find((x) => x.id === game.encounter!.heroId);
     return h ? [h.playerId] : [];
   }
   return [];
@@ -311,12 +318,12 @@ export function OnlinePanel() {
             {mem.name}
             {room.meta!.hostUid === Object.entries(room.members).find(([, x]) => x === mem)?.[0] && <Crown size={13} className="ml-1 inline text-amber-300" />}
           </span>
-          {!mem.online && room.isHost && mem.seat !== room.seat && (
+          {!room.alive(mem) && room.isHost && mem.seat !== room.seat && (
             <button onClick={() => setProxy(mem.seat, !room.meta!.proxy?.[mem.seat])} className="btn btn-dark h-11 rounded-lg px-2 text-[12px] font-bold">
               {room.meta!.proxy?.[mem.seat] ? '代わりの操作をやめる' : '代わりに操作する'}
             </button>
           )}
-          {mem.online ? <Wifi size={14} className="text-emerald-300" /> : <WifiOff size={14} className="text-zinc-500" />}
+          {room.alive(mem) ? <Wifi size={14} className="text-emerald-300" /> : <WifiOff size={14} className="text-zinc-500" />}
         </div>
       ))}
       <div className="grid grid-cols-3 gap-1">
@@ -348,6 +355,15 @@ export function OnlineOverlay() {
   const screen = useBattle((s) => s.screen);
   const [shownStamp, setShownStamp] = useState<number | null>(null);
   const [, setNow] = useState(0);
+  const hostNote = useOnline((s) => s.hostNote);
+  const [shownHost, setShownHost] = useState<number | null>(null);
+  // 回3 C: ホストの引き継ぎの知らせは12秒出す
+  useEffect(() => {
+    if (!hostNote) return;
+    setShownHost(hostNote.id);
+    const t = setTimeout(() => setShownHost(null), 12000);
+    return () => clearTimeout(t);
+  }, [hostNote]);
   useEffect(() => {
     if (!stamp) return;
     setShownStamp(stamp.id);
@@ -370,6 +386,14 @@ export function OnlineOverlay() {
       {!room.connected && (
         <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-red-950/90 px-3 py-1.5 text-[13px] text-red-100">
           <WifiOff size={16} /> 通信が切れました。つながり直しています…
+        </div>
+      )}
+      {hostNote && shownHost === hostNote.id && (
+        <div className="pointer-events-auto flex w-full max-w-[400px] items-start gap-1.5 rounded-xl border border-amber-300/40 bg-black/90 px-3 py-2 text-[13px] text-amber-50" role="status" data-host-note>
+          <Crown size={16} className="mt-0.5 shrink-0 text-amber-300" />
+          <span>
+            ホスト（{hostNote.oldName}さん）との接続が切れました。{hostNote.mine ? 'あなたがホストを引き継ぎました。このまま続けられます' : `${hostNote.newName}さんが引き継ぎました。このまま続けられます`}
+          </span>
         </div>
       )}
       {offlineAwaited.map((p) => {
@@ -441,6 +465,25 @@ export function OthersTurnNote({ seat, name, what }: { seat: PlayerId; name: str
         {name}が{what}
       </span>
      
+    </div>
+  );
+}
+
+/** 回3 A: 待っている相手と、相手が今していること（1行ずつ。「P2 ナツさんが、リナの山札に加えるカードを選んでいます」） */
+export function WaitNotes({ notes, className = '' }: { notes: { playerId: PlayerId; what: string }[]; className?: string }) {
+  useOnline((s) => s.tick);
+  if (!notes.length) return null;
+  const room = useOnline.getState().room;
+  return (
+    <div className={`flex flex-col gap-1 rounded-xl bg-black/50 px-2 py-1.5 ${className}`} role="status" data-wait-notes>
+      {notes.map((n, i) => (
+        <div key={i} className="flex items-start gap-1.5 text-[13px] leading-5 text-zinc-100">
+          <SeatChip p={n.playerId} small />
+          <span className="min-w-0">
+            {room?.seatName(n.playerId) ?? n.playerId}さんが、{n.what}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
