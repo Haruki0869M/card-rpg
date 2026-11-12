@@ -153,21 +153,24 @@ describe('3つ目の鍵のダンジョンの関門（町の依頼）', () => {
 });
 
 describe('引き締めた地図（高さ35。抜本的な見直し §2-6）', () => {
-  it.each(SCENARIOS.all.map((s) => [s.id] as const))('%s: 鍵のダンジョンまでの行の差が 11・9・10、高さ35', (sid) => {
+  // 段階6a（overhaul-plan-v2 §2-1）: 広い地図（帯のある地図）は 15列×42行・スタート [7,40]。行の差は同じ比率で約1.2倍（13・11・12）
+  it.each(SCENARIOS.all.map((s) => [s.id] as const))('%s: 鍵のダンジョンまでの行の差が 11・9・10、高さ35（広い地図は 13・11・12、高さ42）', (sid) => {
     const map = SCENARIOS.get(sid).map!;
-    expect(map.height).toBe(35);
-    expect(map.start).toEqual([3, 33]);
+    const wide = !!map.lanes?.length;
+    expect(map.height).toBe(wide ? 42 : 35);
+    expect(map.start).toEqual(wide ? [7, 40] : [3, 33]);
     const keyed = DUNGEONS.forScenario(sid).filter((d) => d.rewardKey && !d.random).sort((a, b) => a.baseLevel - b.baseLevel);
     const row = (id: string) => map.features.find((f) => f.id === id)!.at[1];
-    expect(map.start[1] - row(keyed[0].id)).toBe(11);
-    expect(row(keyed[0].id) - row(keyed[1].id)).toBe(9);
-    expect(row(keyed[1].id) - row(keyed[2].id)).toBe(10);
+    const gaps = wide ? [13, 11, 12] : [11, 9, 10];
+    expect(map.start[1] - row(keyed[0].id)).toBe(gaps[0]);
+    expect(row(keyed[0].id) - row(keyed[1].id)).toBe(gaps[1]);
+    expect(row(keyed[1].id) - row(keyed[2].id)).toBe(gaps[2]);
     expect(row(DUNGEONS.forScenario(sid).find((d) => d.finale)!.id)).toBe(0);
     // 地域は隙間なく、上から下までつながっている
     const regions = [...map.regions].sort((a, b) => a.rows[0] - b.rows[0]);
     expect(regions[0].rows[0]).toBe(0);
     for (let i = 1; i < regions.length; i++) expect(regions[i].rows[0]).toBe(regions[i - 1].rows[1] + 1);
-    expect(regions[regions.length - 1].rows[1]).toBe(34);
+    expect(regions[regions.length - 1].rows[1]).toBe(map.height - 1);
     // 町・ダンジョン・名所は地図の中で、同じマスに重ならない
     const at = map.features.map((f) => f.at.join());
     expect(new Set(at).size).toBe(at.length);

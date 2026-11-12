@@ -36,6 +36,7 @@ export * from './game/world/town';
 export * from './game/world/objectives';
 export { spawnAt, spawnTurnsLeft, SPAWN_NAME, SPAWN_EVENT } from './game/world/explore';
 export { createWorld, regionOfRow } from './game/world/generate';
+export { isWideMap, laneOfTile, nextGoalDungeon, terrainDiceBonus } from './game/world/lanes';
 export { sceneHeroes, activeHeroes } from './game/heroes';
 export * from './hash';
 export * from './game/scenes';

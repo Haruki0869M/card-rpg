@@ -77,7 +77,8 @@ const SPOTS: [number, number][] = [
 ];
 
 const isForest = (t: string) => t === 'forest';
-const isPeakTerrain = (t: string) => t === 'mountain';
+/** 峰の絵を立てる地形（段階6a の険しい山は、山より高い峰で描く。通れないことが見て分かるように） */
+const isPeakTerrain = (t: string) => t === 'mountain' || t === 'crag';
 
 export interface ScatterInput {
   w: Pick<WorldState, 'width' | 'height' | 'tiles'>;
@@ -138,7 +139,8 @@ export function scatter({ w, geom, levels, links, rivers, blocked, stage }: Scat
         const j = neighborAt(w, i, k);
         return j !== undefined && isPeakTerrain(T(j));
       }).length;
-      out.push({ k: 'peak', x: c.x + (h(11) - 0.5) * R * 0.2, y: c.y + R * 0.42 * GROUND_K, h: R * (1.35 + nb * 0.14 + h(12) * 0.3), v: h(13), tile: i });
+      const tall = t === 'crag' ? 0.45 : 0;
+      out.push({ k: 'peak', x: c.x + (h(11) - 0.5) * R * 0.2, y: c.y + R * 0.42 * GROUND_K, h: R * (1.35 + tall + nb * 0.14 + h(12) * 0.3), v: h(13), tile: i });
       continue;
     }
     if (t === 'lava') {

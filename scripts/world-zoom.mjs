@@ -1,5 +1,5 @@
 // 世界マップの拡大の確認（360/390/480）:
-// 1) 始めは1倍。＋・−・標準のボタンで、1〜2.5倍の範囲で変わる。標準で1倍に戻る
+// 1) 始めは1倍。＋・−・標準のボタンで、下限〜2.5倍の範囲で変わる。標準で1倍に戻る（下限は8列の地図なら1倍、広い地図（段階6a）は横の全部の列が収まる倍率）
 // 2) 2本指のピンチ（CDP のタッチ）で変わる。範囲の外には出ない。指を離すとこの端末の設定に保存される
 // 3) 町に入って出ても、読み込み直しても、拡大がそのまま。駒が枠の中に見える
 // 4) 最大の拡大で移動しても拡大がそのまま。歩いている駒がずっと枠の中に見える
@@ -22,6 +22,7 @@ for (const [width, height] of sizes) {
   const ng = (m) => problems.push(`${width}px: ${m}`);
   const shot = (n) => page.screenshot({ path: `scripts/screenshots/world-zoom-${width}-${n}.png` });
   const zoom = async () => Number(await page.locator('[data-zoom-controls]').getAttribute('data-zoom'));
+  const zoomMin = async () => Number(await page.locator('[data-zoom-controls]').getAttribute('data-zoom-min'));
   const savedZoom = () => page.evaluate(() => JSON.parse(localStorage.getItem('card-rpg/settings') || '{}').worldZoom);
   // 手番の駒が地図の枠の中に見えているか（上下左右の位置の割合）
   const heroView = () =>
@@ -59,7 +60,7 @@ for (const [width, height] of sizes) {
 
   // 1) ボタン
   if ((await zoom()) !== 1) ng(`始めが1倍でない（${await zoom()}）`);
-  if (!(await page.locator('[data-zoom-out]').isDisabled())) ng('1倍で「−」が押せる');
+  if ((await zoomMin()) >= 1 && !(await page.locator('[data-zoom-out]').isDisabled())) ng('下限の1倍で「−」が押せる');
   const base = await hexW();
   if (SAMPLE) await page.screenshot({ path: 'screenshots/world-zoom/sample-min.png', scale: 'css' });
   else await shot('1-min');
@@ -127,8 +128,10 @@ for (const [width, height] of sizes) {
   if (Math.abs(z1 - 2.5) > 0.03) ng(`ピンチで広げても大きくならない（${z1}）`);
   await pinch(60, 300); // 範囲の外 → 2.5 で止まる
   if ((await zoom()) > 2.5) ng(`ピンチで最大を超える（${await zoom()}）`);
-  await pinch(300, 30); // 範囲の外 → 1 で止まる
-  if ((await zoom()) !== 1) ng(`ピンチで縮めても1倍で止まらない（${await zoom()}）`);
+  await pinch(300, 30); // 範囲の外 → 下限で止まる
+  if ((await zoom()) !== (await zoomMin())) ng(`ピンチで縮めても下限で止まらない（${await zoom()} / 下限 ${await zoomMin()}）`);
+  await page.locator('[data-zoom-reset]').click();
+  await page.waitForTimeout(150);
   await pinch(100, 150); // 1.5
   const z2 = await zoom();
   if (Math.abs(z2 - 1.5) > 0.03) ng(`ピンチで1.5倍にならない（${z2}）`);

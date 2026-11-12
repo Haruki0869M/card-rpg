@@ -29,6 +29,7 @@ import {
   timeOfDay,
   turnsUntilNightChange,
   worldDiceBonus,
+  terrainDiceBonus,
   diceAverage,
   corruptionShown,
   dungeonJoin,
@@ -393,7 +394,9 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
   };
   const label = interactLabel(game, here);
   const chance = statChance(hero, 'agi', 'move');
-  const diceBonus = worldDiceBonus(hero);
+  // 広い地図では、街道の上で振ると +1（段階6a。エンジンの rollMove と同じ足し方）
+  const roadBonus = terrainDiceBonus(game, w, here);
+  const diceBonus = [...worldDiceBonus(hero), ...roadBonus];
   const bonusSum = diceBonus.reduce((n, b) => n + b.value, 0);
   const avg = diceAverage(BALANCE.moveDiceSides, diceBonus);
   // フォーカスで振り直せるか（目を見た後・まだ動く前・1回だけ）
@@ -591,6 +594,7 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
               data-roll-move
             >
               <Dices size={20} /> サイコロを振る
+              {roadBonus.length > 0 && <span className="ml-1 rounded-full bg-black/25 px-2 text-[13px] leading-6" data-road-bonus>{roadBonus.map((b) => `${b.label}ボーナス +${b.value}`).join('・')}</span>}
             </button>
           ) : selected !== undefined ? (
             <button onClick={() => tapTile(selected)} className="btn btn-gold font-display h-12 rounded-xl text-[17px] leading-5">

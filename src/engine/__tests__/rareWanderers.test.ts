@@ -45,7 +45,7 @@ describe('K3 レアの徘徊する敵', () => {
     const pct = (rare * 100) / N;
     expect(pct).toBeGreaterThan(BALANCE.rareWandererChance / 3);
     expect(pct).toBeLessThan(BALANCE.rareWandererChance * 2.5);
-  });
+  }, 20000); // 冒険を600回作る（段階6a でシナリオ1の地図が2.25倍になり、1回あたり約2ms→5ms。全部のテストを並べて動かすと5秒を超えるため）
 
   it('同じ種なら、同じ結果になる（オンラインで全員が同じ）', () => {
     regionOf().rareEncounters = [['goldenThief'], ['guardDog']];

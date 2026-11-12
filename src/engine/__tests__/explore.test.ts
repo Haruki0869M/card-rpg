@@ -33,15 +33,17 @@ function passTurn(g: GameState): GameState {
 }
 
 describe('見晴らしの塔', () => {
-  it('どのシナリオ・種でも2〜3か所、歩いて行ける陸の空きマスに置かれ、道から3マス以内', () => {
+  it('どのシナリオ・種でも2〜3か所、歩いて行ける陸の空きマスに置かれ、道から3マス以内（広い地図は prefer.tower の数・帯の中で、道からの距離の上限なし。段階6a）', () => {
     for (const sc of ['corruptionKing', 'cursedArchipelago', 'frozenKingdom', 'sandDynasty', 'starCastle', 'clockworkEmpire', 'dreamLabyrinth'])
       for (let seed = 1; seed <= 6; seed++) {
         const g = fresh(seed, sc), w = g.world!, map = getScenario(sc).map!;
         const ts = towers(g);
-        expect(ts.length, `${sc}:${seed}`).toBe(w.height >= BALANCE.watchtowerTallMap ? 3 : 2);
+        const wide = map.prefer?.tower;
+        expect(ts.length, `${sc}:${seed}`).toBe(wide ? wide.length : w.height >= BALANCE.watchtowerTallMap ? 3 : 2);
         for (const i of ts) {
           expect(TERRAINS.get(w.tiles[i].t).moveCost).toBeGreaterThan(0);
           expect(w.tiles[i].t).not.toBe(map.roadTerrain);
+          if (wide) continue;
           const near = new Set([i]);
           for (let s = 0; s < 3; s++) for (const x of [...near]) for (const n of neighbors(w, x)) if (TERRAINS.get(w.tiles[n].t).moveCost > 0) near.add(n);
           expect([...near].some((x) => w.tiles[x].t === map.roadTerrain)).toBe(true);

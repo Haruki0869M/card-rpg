@@ -11,7 +11,9 @@ import { getItem } from '../data/items';
 import { QUESTS, TOWNS } from '../data/world';
 import { canReportQuest } from './game/world/town';
 import { questsShort } from './game/world/questGate';
-import type { GameCommand, GameState, PlayerId } from '../types';
+import type { GameCommand, GameState, PlayerId, WorldState } from '../types';
+import { moveCostOf, neighbors } from './game/world/hex';
+import { isWideMap } from './game/world/lanes';
 import {
   applyGameCommand,
   canEquip,
@@ -188,6 +190,27 @@ function worldTarget(g: GameState, at: number, straight = false): { tile: number
   return { tile: tileOf(g, 'dungeon', goal)!, why: 'dungeon' };
 }
 
+/** 各マスから to まで歩いてかかる移動力（霧・敵は見ない。地形の移動力だけ。通れないマスは入らない） */
+function walkCostTo(w: WorldState, to: number): Map<number, number> {
+  const dist = new Map<number, number>([[to, 0]]);
+  const open = [to];
+  while (open.length) {
+    let k = 0;
+    for (let j = 1; j < open.length; j++) if (dist.get(open[j])! < dist.get(open[k])!) k = j;
+    const cur = open.splice(k, 1)[0];
+    const step = dist.get(cur)! + Math.max(1, moveCostOf(w, cur));
+    for (const n of neighbors(w, cur)) {
+      if (moveCostOf(w, n) <= 0) continue;
+      const old = dist.get(n);
+      if (old === undefined || step < old) {
+        dist.set(n, step);
+        if (!open.includes(n)) open.push(n);
+      }
+    }
+  }
+  return dist;
+}
+
 function worldStep(g: GameState, log: BotLog, memo: BotMemo): GameState {
   const w = g.world!;
   if (w.story) return send(g, { type: 'STORY_CONTINUE', playerId: pid(g) }, log);
@@ -222,7 +245,10 @@ function worldStep(g: GameState, log: BotLog, memo: BotMemo): GameState {
   if (w.move > 0) {
     const reach = reachable(w, at, w.move);
     let best = at;
-    for (const [i] of reach) if (hexDistance(w, i, target.tile) < hexDistance(w, best, target.tile)) best = i;
+    // 広い地図（段階6a）: 仕切りの壁で行き止まりにならないように、歩いてかかる移動力で近い所を選ぶ。前の地図は今までどおり（まっすぐの距離）
+    const far = isWideMap(g, w) ? walkCostTo(w, target.tile) : undefined;
+    const dist = (i: number) => (far ? (far.get(i) ?? Infinity) : hexDistance(w, i, target.tile));
+    for (const [i] of reach) if (dist(i) < dist(best)) best = i;
     if (best !== at) {
       const companions = livingHeroes(g)
         .filter((x) => x.id !== h.id && w.pos[x.id] === at && !g.expeditions?.some((e) => e.heroes.includes(x.id)))
