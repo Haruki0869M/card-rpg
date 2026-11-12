@@ -27,7 +27,9 @@ export const effect: EffectHandler<'retaliateDealt'> = {
       if ((cs[`${k}Count`] ?? 0) >= e.perTurn) return false;
       cs[`${k}Count`] = (cs[`${k}Count`] ?? 0) + 1;
     }
-    const amount = mirror ? ctx.dealt * 2 : Math.min(e.max, ctx.dealt);
+    // 受けの型: 1回の上限を足す
+    const cap = e.max + abilitiesOf(me).reduce((n, a) => n + ('modifier' in a.effect && a.effect.modifier === 'counterCap' ? a.effect.add : 0), 0);
+    const amount = mirror ? ctx.dealt * 2 : Math.min(cap, ctx.dealt);
     const loss = dealDamage(ctx, foe, amount);
     ctx.parts.push(`${nameOf(foe)}に後の先${loss}`);
     return true;
