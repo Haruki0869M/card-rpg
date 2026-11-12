@@ -52,7 +52,7 @@ import { CardFace } from '../ui/CardFace';
 import { CardPickPanel } from '../ui/CardPickPanel';
 import { CheckPanel, RollStrip } from '../ui/CheckPanel';
 import { Heading, HeroFace, ItemIcon, itemSummary, RARITY_STYLE, Screen } from '../ui/game';
-import { WorldTopBar } from './WorldScreen';
+import { StatusButton, WorldTopBar } from './WorldScreen';
 import { ItemPickPanel } from '../ui/ItemPickPanel';
 import { cardSummary } from '../format';
 import { BuyNotice, boughtNotice, type Bought } from './BuyNotice';
@@ -264,6 +264,8 @@ export function TownScreen() {
   const closeRemoveSel = useCallback(() => setRemoveSel(null), []);
   const removeCard = v.deck.find((c) => c.uid === removeSel);
   const removing = confirmRemove ? v.deck.find((c) => c.uid === confirmRemove) : undefined;
+  // ステータスのボタンで開くキャラ: 選んでいるキャラが自分のならそれ、ちがえば町にいる自分のキャラ
+  const statusHero = isLocalPlayer(v.playerId) ? v : visitors.find((h) => isLocalPlayer(h.playerId)) ?? game.heroes.find((h) => isLocalPlayer(h.playerId)) ?? v;
   const myCards = stock?.cards.map((c, i) => ({ c, i })).filter(({ c }) => getClass(game.heroes.find((x) => x.id === c.heroId)?.classId ?? '').id === v.classId) ?? [];
   // 買った時の手応え（フェーズ2-A）: 装備品は「すぐ装備」の窓、道具・カードは短いお知らせ
   const [bought, setBought] = useState<Bought | null>(null);
@@ -302,7 +304,13 @@ export function TownScreen() {
   return (
     <Screen bg="town" bgOpacity={0.28}>
       <WorldTopBar game={game} goldHeroId={v.id} />
-      <FacilityRoster game={game} selected={v.id} onSelect={setVisitorId} />
+      {/* 回2: 世界マップと同じ「ステータス」（装備の付け替え・受け渡し）。閉じると同じタブに戻る */}
+      <div className="flex shrink-0 items-center gap-1.5 pr-2">
+        <div className="min-w-0 flex-1">
+          <FacilityRoster game={game} selected={v.id} onSelect={setVisitorId} />
+        </div>
+        <StatusButton game={game} self={statusHero} />
+      </div>
       {/* 回1の追加: 町の説明の下に、ランダムダンジョンのうわさ（いちばん近い未踏破の1つ。無ければ出さない） */}
       <Heading sub={<>{def.description}{rumor && <span className="block text-amber-200/90" data-town-rumor>{rumor}</span>}</>}>{def.name}</Heading>
       <div className="mx-3 mt-1 flex shrink-0 items-center gap-2 rounded-lg bg-black/40 px-2 py-1 text-[13px]">
@@ -653,11 +661,19 @@ export function SanctuaryScreen() {
   const openSheet = useBattle(s => s.openSheet);
   const visit = game.sanctuary!;
   const def = SANCTUARIES.get(visit.sanctuaryId);
+  const members = facilityMembers(game);
+  const statusHero = game.heroes.find((h) => members.includes(h.id) && isLocalPlayer(h.playerId)) ?? game.heroes.find((h) => isLocalPlayer(h.playerId));
   return (
     <Screen>
       <WorldTopBar game={game} />
       <div data-sanctuary={def.kind} className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
-        <FacilityRoster game={game} />
+        {/* 回2: 世界マップと同じ「ステータス」（装備の付け替え・受け渡し） */}
+        <div className="flex items-center gap-1.5">
+          <div className="min-w-0 flex-1">
+            <FacilityRoster game={game} />
+          </div>
+          {statusHero && <StatusButton game={game} self={statusHero} />}
+        </div>
         <h1 className="font-display text-[24px] text-amber-100">{def.name}</h1>
         <p className="panel mt-3 rounded-xl p-3 text-[15px] leading-6">{def.text}</p>
         <p className="mt-3 text-[14px] leading-6">{def.kind === 'temple' ? `中位Lv${BALANCE.jobChange.special}と条件を満たすと特殊職、中位Lv${BALANCE.jobChange.mid}と条件を満たすと最上位職へ進めます。` : `中位Lv${BALANCE.jobChange.special}と条件を満たすと、この祭壇に対応する特殊職へ進めます。`}</p>
