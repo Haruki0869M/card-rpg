@@ -328,6 +328,8 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   if (r.hp <= 0 && v.hp > 0 && enduresOf(v)) { r.hpLoss -= 1 - r.hp; r.hp = 1; }
   v.hp = r.hp;
   if (r.hpLoss > 0) noteHpLoss(v, r.hpLoss);
+  // 区切りF: 転職の条件の記録 — 敵の攻撃をブロックで防いだ量（拳聖）
+  if (r.blocked > 0 && isEnemy(source) && !isEnemy(v)) { const f = (v.feats ??= {}); f.blockedTotal = (f.blockedTotal ?? 0) + r.blocked; const cs = (v.counters ??= {}); cs.blockedPhase = (cs.blockedPhase ?? 0) + r.blocked; }
   events.push({ type: 'damage', unitId: unitIdOf(v), amount: r.hpLoss, rawAmount: dmg, blocked: r.blocked, sourceId: unitIdOf(source) });
   if (isEnemy(v)) state.stats.totalDamage += r.hpLoss;
   ctx.dealt += r.hpLoss;
@@ -355,7 +357,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
       events.push({ type: 'status', unitId: unitIdOf(v), status: el.status, amount: n });
       ctx.parts.push(`${getStatus(el.status).name}${n}`);
       // きっかけ: 相手に状態異常を与えた
-      if (ctx.depth < 3 && isEnemy(source) !== isEnemy(v) && !source.dead) fireAbilities(state, rng, events, source, 'inflict', { target: v, statusId: el.status, depth: ctx.depth + 1 });
+      if (ctx.depth < 3 && isEnemy(source) !== isEnemy(v) && !source.dead) fireAbilities(state, rng, events, source, 'inflict', { target: v, statusId: el.status, dealt: n, depth: ctx.depth + 1 });
     }
   }
   // 転職の条件の記録: 味方が敵を倒した（属性・呪い・自分のHPが少ない時）
@@ -369,12 +371,16 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
     if (Object.entries(v.statuses).some(([id, n]) => n > 0 && getStatus(id).harmful)) add('kills:status');
     if (source.hp <= source.maxHp * 0.3) add('kills:lowHp');
     if (getEnemy(v.defId).size !== undefined && getEnemy(v.defId).size! >= 1.3) add('kills:big');
+    // 区切りF: 違う種類の悪い状態異常が2つ以上付いた敵を倒した（竜脈術師）
+    if (Object.entries(v.statuses).filter(([id, n]) => n > 0 && getStatus(id).harmful).length >= 2) add('kills:multiStatus');
   }
   // きっかけ: ダメージを受けた / 倒した
   if (ctx.depth < 3) {
     if (r.hpLoss > 0 && !v.dead) fireAbilities(state, rng, events, v, 'hurt', { attacker: source, depth: ctx.depth + 1 });
     // きっかけ: 相手の攻撃を、ブロックで完全に防いだ
     if (r.hpLoss === 0 && r.blocked > 0 && !v.dead && isEnemy(source) !== isEnemy(v)) fireAbilities(state, rng, events, v, 'blocked', { attacker: source, depth: ctx.depth + 1 });
+    // 区切りF: 敵の攻撃をブロックで防いだ（一部でも）。dealt = 防いだ量（拳聖《後の先》）
+    if (r.blocked > 0 && isEnemy(source) && !isEnemy(v) && !v.dead) fireAbilities(state, rng, events, v, 'guarded', { attacker: source, dealt: r.blocked, depth: ctx.depth + 1 });
     if (v.dead && isEnemy(source) !== isEnemy(v) && !source.dead) fireAbilities(state, rng, events, source, 'kill', { target: v, condCard: ctx.card, depth: ctx.depth + 1 });
     if (v.dead && isEnemy(v) && !isEnemy(source)) for (const a of state.allies) if (!a.dead) fireAbilities(state, rng, events, a, 'allyKill', { target: v, depth: ctx.depth + 1 });
   }

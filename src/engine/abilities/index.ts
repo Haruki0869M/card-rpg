@@ -41,7 +41,9 @@ export function testConditions(conds: AbilityCondition[] | undefined, c: CondCtx
 export function abilitiesOf(u: Unit): AbilityDef[] {
   if (isEnemy(u)) return (getEnemy(u.defId).abilities ?? []).map(a => ({ ...a, source: { kind: 'enemy', id: u.defId, label: getEnemy(u.defId).name } }));
   const def = getClass(u.classId), own: AbilityDef = { ...def.battleAbility, source: { kind: 'job', id: def.id, label: def.name } };
-  return [own, ...(u.abilities ?? []).map(a => a.source ? a : { ...a, source: a.pet && u.pet ? { kind: 'pet' as const, id: u.pet.petId, label: u.pet.name } : { kind: 'other' as const } })];
+  // 区切りF: ジョブの力にも also（2つ目の力。重装衛士《不落》）
+  const jobAlso: AbilityDef[] = (def.battleAbility.also ?? []).map((effect) => ({ name: def.battleAbility.name, effect, source: own.source }));
+  return [own, ...jobAlso, ...(u.abilities ?? []).map(a => a.source ? a : { ...a, source: a.pet && u.pet ? { kind: 'pet' as const, id: u.pet.petId, label: u.pet.name } : { kind: 'other' as const } })];
 }
 
 const isTriggered = (e: AbilityEffect): e is Extract<AbilityEffect, { when: AbilityTrigger }> => 'when' in e;
@@ -84,7 +86,7 @@ export function damageModifiers(state: BattleState | undefined, source: Unit, ca
     if (!testConditions(e.if, c)) continue;
     if (e.modifier === 'damageDealt') {
       const m = e.multiplier * scaleOf(e.scale, source, victim);
-      const add = (e.add ?? 0) + (e.addFromCounter ? ((source as { counters?: Record<string, number> }).counters?.[e.addFromCounter] ?? 0) : 0);
+      const add = (e.add ?? 0) + (e.addFromCounter ? ((source as { counters?: Record<string, number> }).counters?.[e.addFromCounter] ?? 0) : 0) + (e.addFromBlock ? Math.min(e.addFromBlock.max, Math.floor((source.block * e.addFromBlock.pct) / 100)) : 0);
       if (m === 1 && !add) continue;
       out.multiplier *= m;
       if (e.once) out.addOnce += add;
@@ -227,7 +229,7 @@ export function statusBonusOf(u: Unit, status: string, card?: CardDef, target?: 
 export function keepBlockOf(u: Unit): number {
   let n = 0;
   let fortify = false;
-  for (const ab of abilitiesOf(u)) if ('modifier' in ab.effect && ab.effect.modifier === 'keepBlock') { n = Math.max(n, ab.effect.max); if (ab.effect.fortify) fortify = true; }
+  for (const ab of abilitiesOf(u)) if ('modifier' in ab.effect && ab.effect.modifier === 'keepBlock') { n = Math.max(n, ab.effect.pct !== undefined ? Math.min(ab.effect.max, Math.floor((u.block * ab.effect.pct) / 100)) : ab.effect.max); if (ab.effect.fortify) fortify = true; }
   // 何を重ねても、残せるのは25まで（不落の城塞を使ったターンだけ50。区切りD）
   return Math.min(n, fortify ? BALANCE.keepBlockFortify : BALANCE.keepBlockCap);
 }
@@ -398,6 +400,8 @@ const TRIGGER_TEXT: Record<AbilityTrigger, string> = {
   cheerPerfect: '自分が応援を付けた味方のカードが完全成功した時',
   detonate: '状態異常を起爆して消した時',
   combo: 'このカードで連携が起きた時',
+  guarded: '敵の攻撃をブロックで防いだ時',
+  selfBoost: 'カードで自分が回復かブロックを得た時',
 };
 
 const condText = (conds?: AbilityCondition[]) => (conds ?? []).map((c) => conditionHandler(c.kind).describe(c as never));
@@ -420,6 +424,7 @@ export function describeAbility(ab: AbilityDef, side: 'ally' | 'enemy' = 'ally')
     }
     if (e.modifier === 'comboScale') return `このカードの連携の上乗せ×${e.multiplier}（連携は合わせて+${Math.round(BALANCE.comboBonusMax * 100)}%まで）`;
     if (e.modifier === 'endure') return 'HPが1より下がらない';
+    if (e.modifier === 'mirrorCounter') return '《後の先》の反撃が2倍・上限なし';
     if (e.modifier === 'alwaysWeak') return '弱点の属性でなくても、弱点を突いた扱い（ダメージ×1.5・BREAK のきっかけ）';
     if (e.modifier === 'weaknessElement') return '属性は、狙った敵の弱点の属性に変わる（弱点が無い敵には無属性）';
     if (e.modifier === 'breakOnSuccess') return `大技を予告している敵は、成功${e.min}以上でも BREAK できる`;
@@ -437,6 +442,7 @@ export function describeAbility(ab: AbilityDef, side: 'ally' | 'enemy' = 'ally')
     if (e.modifier === 'weaknessDamage') return `${head}弱点属性のダメージ×${Math.round(e.multiplier * 100) / 100}（弱点の倍率は合わせて×${BALANCE.elementWeakMax}まで）`;
     if (e.modifier === 'statusBonus') return `${head}自分が付ける${e.statuses.map((x) => `「${getStatus(x).name}」`).join('')}+${e.amount}`;
     if (e.modifier === 'damageDealt' && e.addFromCounter) return `${head}最初の1回の攻撃のダメージ+（ためた量）`;
+    if (e.modifier === 'damageDealt' && e.addFromBlock) return `${head}${e.once ? '最初の1回の攻撃の' : ''}ダメージ+今のブロックの${e.addFromBlock.pct}%（最大+${e.addFromBlock.max}）`;
     if (e.modifier === 'damageDealt') return `${head}${e.add ? `${e.once ? '最初の1回の攻撃の' : '1回の攻撃ごとに'}ダメージ+${e.add}${e.multiplier !== 1 || e.scale ? '、' : ''}` : ''}${e.multiplier !== 1 ? `与えるダメージ×${e.multiplier}${e.scale ? '、さらに' : ''}` : ''}${e.scale ? scaleText(e.scale) : ''}`;
     return `${head}ダメージが敵のブロックを無視する`;
   }

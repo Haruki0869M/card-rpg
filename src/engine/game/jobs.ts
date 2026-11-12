@@ -1,4 +1,5 @@
 import { facilityMembers, facilityVisit } from './world/facilities';
+import { petLoveLevel } from './pets';
 // ===== 転職（spec §6.4） =====
 // 段は 基本 → 中位 → 最上位。中位からは、条件を満たすと特殊ジョブ（脇道）にも転職できる。
 // 転職するとLv1に戻る。成長ボーナス・山札・装備は引き継ぎ、前のジョブの戦闘の特殊能力を1つ持ち越す。
@@ -28,7 +29,9 @@ export function addFeat(hero: Pick<Hero, 'feats'>, key: string, n = 1) {
 }
 
 /** 記録の値 */
-export const featOf = (hero: Pick<Hero, 'feats'>, key: string) => hero.feats?.[key] ?? 0;
+/** 転職の条件の記録の数。petBond = お供の懐き度が♡3以上の時の、お供の行動の合計（調教師。お供がいなければ0。区切りF） */
+export const featOf = (hero: Pick<Hero, 'feats'> & { pet?: Hero['pet'] }, key: string) =>
+  key === 'petBond' ? (hero.pet && petLoveLevel(hero.pet.love) >= 3 ? hero.pet.acts : 0) : (hero.feats?.[key] ?? 0);
 
 /**
  * キャラが今いる所（転職できるかの判定用）。

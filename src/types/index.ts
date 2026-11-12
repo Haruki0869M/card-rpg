@@ -113,7 +113,7 @@ export interface CardDef {
  * summonHit 自分の砲台・罠・召喚が敵のHPにダメージを与えた後 / overheal 自分の回復が味方のHPからあふれた時（満タンの味方を回復した時も） /
  * cheerPerfect 自分が「応援」を付けた味方のカードが完全成功した時（1人パーティなら自分でも） / detonate 状態異常を起爆して消した時
  */
-export type AbilityTrigger = 'battleStart' | 'turnStart' | 'turnEnd' | 'afterCard' | 'perfect' | 'kill' | 'hurt' | 'allyKill' | 'allyDown' | 'blocked' | 'inflict' | 'foeTick' | 'petAct' | 'summonHit' | 'overheal' | 'cheerPerfect' | 'detonate' | 'combo';
+export type AbilityTrigger = 'battleStart' | 'turnStart' | 'turnEnd' | 'afterCard' | 'perfect' | 'kill' | 'hurt' | 'allyKill' | 'allyDown' | 'blocked' | 'inflict' | 'foeTick' | 'petAct' | 'summonHit' | 'overheal' | 'cheerPerfect' | 'detonate' | 'combo' | 'guarded' | 'selfBoost';
 
 /** 発動の条件の種類ごとの数値。条件のファイル（src/engine/abilities/conditions/）が declare module で種類を足す */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -127,7 +127,7 @@ export type AbilityCondition = { [K in keyof ConditionParams]: { kind: K } & Con
  */
 export type AbilityEffect =
   | { when: AbilityTrigger; if?: AbilityCondition[]; do: Effect[] }
-  | { modifier: 'damageDealt'; multiplier: number; /** 1回の攻撃ごとに足すダメージ（倍率を掛ける前） */ add?: number; /** add を、そのカード・効果の最初の1回の攻撃にだけ足す（弾込め） */ once?: boolean; if?: AbilityCondition[]; scale?: DamageScale; /** 自分の数え（counters）の値を add に足す（不動の拳。区切りD） */ addFromCounter?: string }
+  | { modifier: 'damageDealt'; multiplier: number; /** 1回の攻撃ごとに足すダメージ（倍率を掛ける前） */ add?: number; /** add を、そのカード・効果の最初の1回の攻撃にだけ足す（弾込め） */ once?: boolean; if?: AbilityCondition[]; scale?: DamageScale; /** 自分の数え（counters）の値を add に足す（不動の拳。区切りD） */ addFromCounter?: string; /** 今のブロックの pct% を add に足す（最大 blockMax。重装衛士《不落》。区切りF） */ addFromBlock?: { pct: number; max: number } }
   /** このカードの連携の上乗せの倍率（ファイナル・ユニゾン。区切りD） */
   | { modifier: 'comboScale'; multiplier: number }
   /** 属性の無い攻撃が、狙った敵の弱点の属性になる（エレメンタル・チェイン。区切りD） */
@@ -136,6 +136,8 @@ export type AbilityEffect =
   | { modifier: 'endure' }
   /** 弱点の属性でなくても、弱点を突いた扱い（×1.5・BREAK。ラグナロク・ブレード。区切りD） */
   | { modifier: 'alwaysWeak' }
+  /** 明鏡止水: 《後の先》の反撃が2倍・上限なし（区切りF） */
+  | { modifier: 'mirrorCounter' }
   /** BREAK の「合計ダメージ」の数えを multiplier 倍にする（鎧通しの一撃。区切りD） */
   | { modifier: 'breakCount'; multiplier: number; if?: AbilityCondition[] }
   /** 成功が min 以上なら、完全成功でなくても BREAK のきっかけになる（魔力の楔。区切りD） */
@@ -150,7 +152,7 @@ export type AbilityEffect =
   /** カードのコストを変える（set = その値にする / delta = 足す。0より下にはならない）。turnKey があると1ターンに1枚だけ（使った時に数える） */
   | { modifier: 'cardCost'; delta?: number; set?: number; turnKey?: string; if?: AbilityCondition[] }
   /** ターンの始めに、前のターンのブロックが max まで残る（不動の錨） */
-  | { modifier: 'keepBlock'; max: number; /** 不落の城塞: 持ち越しの上限を BALANCE.keepBlockFortify まで上げる（区切りD） */ fortify?: boolean }
+  | { modifier: 'keepBlock'; max: number; /** 不落の城塞: 持ち越しの上限を BALANCE.keepBlockFortify まで上げる（区切りD） */ fortify?: boolean; /** 重装衛士《不落》: 今のブロックの pct% だけ残す（max まで。区切りF） */ pct?: number }
   /** 自分の砲台・罠・召喚が2回ずつ発動する（永久機関） */
   | { modifier: 'summonTwice' }
   /** HPを回復した時、その pct 倍のブロックも得る（福音。0.5 = 50%） */
@@ -220,7 +222,9 @@ export type ExploreAbility =
   /** 野営でフォーカスも回復する（闘士など） */
   | { kind: 'campFocus'; amount: number }
   /** 町の買い物の値引き（%。怪盗など） */
-  | { kind: 'shopDiscount'; percent: number };
+  | { kind: 'shopDiscount'; percent: number }
+  /** 罠・イベントで受けるダメージが半分（拳聖《受け流し》。区切りF） */
+  | { kind: 'eventDamageHalf' };
 
 export interface ExploreAbilityDef {
   id: string;
@@ -614,6 +618,8 @@ export interface EnemyState {
   exposed?: boolean;
   /** 区切りE: このターンだけの弱点（紅蓮の油壺） */
   tempWeak?: string;
+  /** 区切りF: 竜脈術師の《竜脈》で BREAK した（敵1体につき1戦闘1回） */
+  veinBroken?: boolean;
   pincer?: number;
   pincerFocus?: string[];
   /** このターンの予告は、もう体勢を崩された（BREAK は1つの予告に1回。ターンの初めに消す） */

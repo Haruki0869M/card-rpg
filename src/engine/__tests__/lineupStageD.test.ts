@@ -530,9 +530,9 @@ describe('区切りD-3: 背水', () => {
 
 // ===================== 区切りD-4: 決め技・武器のカードの付け替え =====================
 describe('区切りD-4: 決め技', () => {
-  it('最上位・特殊の23職すべてが、決め技（レジェンド・1戦闘1回）を1枚ずつ持つ', () => {
+  it('最上位・特殊の全部（区切りFの後は27職）が、決め技（レジェンド・1戦闘1回）を1枚ずつ持つ', () => {
     const jobs = CLASSES.all.filter((j) => j.tier === 'top' || j.tier === 'special');
-    expect(jobs).toHaveLength(23);
+    expect(jobs).toHaveLength(27);
     const seen = new Set<string>();
     for (const j of jobs) {
       expect(j.jobCards ?? [], j.id).toHaveLength(1);

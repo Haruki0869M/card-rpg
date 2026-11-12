@@ -217,6 +217,8 @@ describe('転職の速さ（§5）', () => {
     const want: Record<string, number> = {
       swordSaint: 22, bowSaint: 20, holyKing: 20, bard: 12, phantomKing: 80, timeMage: 70, fistKing: 35, pope: 22, grandThief: 250, overlord: 10, beastMaster: 8,
       greatSage: 6, magicKnight: 6, hadesLord: 4, necromancer: 3, ninja: 6, dragoon: 2, darkKnight: 3, samurai: 6, gambler: 6, astrologer: 3, machinist: 3, shrineMaiden: 2,
+      // 区切りF の新ジョブ4職
+      fistSaint: 60, bulwark: 3, dragonVein: 4, petTrainer: 15,
     };
     const withReq = CLASSES.all.filter((c) => c.requires);
     expect(withReq.map((c) => c.id).sort()).toEqual(Object.keys(want).sort());
