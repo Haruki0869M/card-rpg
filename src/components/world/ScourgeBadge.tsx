@@ -16,7 +16,7 @@ export function ScourgeStrip({ game }: { game: GameState }) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="btn z-10 mx-2 mt-1 flex min-h-8 shrink-0 items-center gap-1 rounded-lg border border-fuchsia-400/60 bg-fuchsia-950/80 px-2 text-left text-[12px] leading-4 font-bold text-fuchsia-100"
+        className="btn z-10 mx-2 mt-1 flex min-h-11 shrink-0 items-center gap-1 rounded-lg border border-fuchsia-400/60 bg-fuchsia-950/80 px-2 text-left text-[12px] leading-4 font-bold text-fuchsia-100"
         aria-label="災厄の中ボスの説明"
         data-scourge-strip={list.length}
       >
