@@ -1031,7 +1031,7 @@ export function WorldMap({
             <div className={`absolute flex w-[150px] items-start ${compactZoom ? 'top-full right-0 mt-2' : 'top-1/2 right-full mr-2 -translate-y-1/2'}`} data-hint-layout={compactZoom ? 'below' : 'left'}>
             <div className="flex w-full items-start gap-1 rounded-lg border border-amber-200/70 bg-[#1a1408]/95 py-1 pr-0.5 pl-2 text-[12px] leading-4 text-amber-50 shadow-lg" role="note" data-overview-hint>
               <span className="min-w-0 flex-1">大陸の全体は「見取り図」で見られます</span>
-              <button onClick={onOverviewHintClose} aria-label="案内を閉じる" className="btn -my-2 -mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full" data-overview-hint-close>
+              <button onClick={onOverviewHintClose} aria-label="見取り図の案内を消す" className="btn -my-2 -mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full" data-overview-hint-close>
                 <X size={14} />
               </button>
             </div>
