@@ -232,6 +232,17 @@ function attackScore(b: BattleState, a: AllyState, card: CardDef, e: EnemyState)
 }
 
 /**
+ * 賢い bot（botSmart.ts）の「仲間どうしの連携」が、点を足し引きするための口。
+ * 渡さない時（工夫する bot）は、今までと全く同じ動き。
+ */
+export interface BattleAdjust {
+  /** 攻撃カードを敵 e に使う時の点とフォーカスを直す */
+  attack(a: AllyState, card: CardDef, e: EnemyState, s: { score: number; focus: number }): { score: number; focus: number };
+  /** 攻撃でないカードの点を直す（kind = ブロックだけ / 回復 / ほか）。targetId = 回復の相手 */
+  other(a: AllyState, card: CardDef, kind: 'block' | 'heal' | 'other', score: number, targetId?: string): number;
+}
+
+/**
  * 工夫する bot の、味方の番の1手（無ければ undefined = 番を終える）。
  * - 弱点のカードを先に・耐性の敵は避ける（弱点の案内と同じ判断）
  * - 大技の予告の敵を、弱点か完全成功（フォーカス）で崩す
@@ -239,7 +250,7 @@ function attackScore(b: BattleState, a: AllyState, card: CardDef, e: EnemyState)
  * - 手数読みの予告: 1人の枚数を止める。盾砕きで狙われている味方は、ブロックだけのカードを使わない
  * - 仲間を呼ぶ・浄化の予告の敵を先に。かばう敵がいる時の単体攻撃は、かばう敵に向ける（どのみち吸われる）
  */
-export function cleverBattleCommand(b: BattleState): Command | undefined {
+export function cleverBattleCommand(b: BattleState, adjust?: BattleAdjust): Command | undefined {
   const warn = readWarnings(b);
   const foes = b.enemies.filter((e) => !e.dead);
   const guard = foes.find((e) => e.guarding);
@@ -262,7 +273,8 @@ export function cleverBattleCommand(b: BattleState): Command | undefined {
           const cands = guard ? [guard] : foes;
           let pick: { score: number; focus: number; e: EnemyState } | undefined;
           for (const e of cands) {
-            const s = attackScore(b, a, card, e);
+            const s0 = attackScore(b, a, card, e);
+            const s = adjust ? adjust.attack(a, card, e, s0) : s0;
             if (!pick || s.score > pick.score) pick = { ...s, e };
           }
           if (!pick) continue;
@@ -271,7 +283,7 @@ export function cleverBattleCommand(b: BattleState): Command | undefined {
           targetId = pick.e.uid;
         } else {
           // 全体攻撃: 敵の中で一番点の高い相手で数える。かばう敵がいる時は、全体攻撃が通るので少し上げる
-          score = Math.max(...foes.map((e) => attackScore(b, a, card, e).score)) + (guard ? 15 : 0) + 5 * (foes.length - 1);
+          score = Math.max(...foes.map((e) => (adjust ? adjust.attack(a, card, e, attackScore(b, a, card, e)) : attackScore(b, a, card, e)).score)) + (guard ? 15 : 0) + 5 * (foes.length - 1);
         }
       } else if (card.target === 'enemy') {
         // ダメージの無い、敵1体へのカード（弱体など）: かばう敵がいればその敵、いなければ大技の予告の敵 → 左の敵
@@ -288,9 +300,11 @@ export function cleverBattleCommand(b: BattleState): Command | undefined {
           score += ratio < 0.5 ? 40 : ratio < 0.8 ? 10 : -10;
           if (warn.healSeal && ratio < 1) score += 25;
         }
+        if (adjust) score = adjust.other(a, card, healCard(card) ? 'heal' : 'other', score, targetId);
       } else if (blockOnly(card)) {
         if (warn.shieldBreak.has(a.id)) continue;
         score = 10;
+        if (adjust) score = adjust.other(a, card, 'block', score);
       } else score = 12;
       if (card.secondaryTarget) {
         const t2 = lowest(cardTargets(b, a, secondaryCard(card)));

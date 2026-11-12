@@ -12,6 +12,10 @@
 //     b = ボス・中ボス・災厄は合計ダメージでは BREAK しない（弱点か完全成功だけ）
 //     c = a ＋ 沼より後の地域（世界マップの並びで、沼の地域より魔王城の側）の敵のHP +15%（SIM_LATE_HP=1.3 などで倍率を変えられる）
 //   SIM_PARTYSET（phys = 2人を 剣士＋狩人 / magic = 2人を 魔法使い＋僧侶。省略 = 上のパーティ）
+// 賢い bot（3段目。botSmart.ts）で足した環境変数:
+//   SIM_BOTS（流す bot をカンマで。straight,clever,smart。既定は3本とも）
+//   SIM_SMART_OFF（賢い bot から外す工夫。shop,cards,items,team,time をカンマで）
+//   SIM_PARTYSET に ws = 2人を 剣士＋僧侶 / mx = 2人を 魔法使い＋召喚士（回復を持たない魔法の基本職）を足した
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -34,6 +38,7 @@ vi.mock('../index', async (orig) => {
 import { createGame, aliveScourges, isRandomDungeonTile } from '../index';
 import { playToEnd } from '../bot';
 import type { CleverPart } from '../botClever';
+import type { SmartPart } from '../botSmart';
 import { DUNGEONS } from '../../data/dungeons';
 import { getDifficulty } from '../../data/rules';
 import { BALANCE } from '../../data/balance';
@@ -47,6 +52,8 @@ const PARTYSET = process.env.SIM_PARTYSET ?? '';
 const PARTIES: Record<string, string[]> =
   PARTYSET === 'phys' ? { '2人': ['warrior', 'hunter'] }
   : PARTYSET === 'magic' ? { '2人': ['mage', 'priest'] }
+  : PARTYSET === 'ws' ? { '2人': ['warrior', 'priest'] }
+  : PARTYSET === 'mx' ? { '2人': ['mage', 'summoner'] }
   : {
     '2人': ['warrior', 'mage'],
     '3人': ['warrior', 'mage', 'hunter'],
@@ -74,6 +81,9 @@ const VARIANT_TEXT: Record<string, string> = {
 };
 /** 計画書 §5-3 の目標（ふつう・提案）。工夫する bot のクリア率の目標は人数で変わる（3人は書いていないので 2人と4人の間で見る） */
 const OFF = (process.env.SIM_CLEVER_OFF ?? '').split(',').filter(Boolean) as CleverPart[];
+const SMART_OFF = (process.env.SIM_SMART_OFF ?? '').split(',').filter(Boolean) as SmartPart[];
+type BotKind = 'straight' | 'clever' | 'smart';
+const BOTS = (process.env.SIM_BOTS ?? 'straight,clever,smart').split(',').filter(Boolean) as BotKind[];
 const TARGET: Record<string, string> = { '2人': '35〜50%', '3人': '（目標なし。2人と4人の間）', '4人': '30〜45%' };
 
 const WHERE = ['鍵1の前', '鍵1の中', '鍵2の前', '鍵2の中', '鍵3の前', '鍵3の中', '最後の前', '最後の中'] as const;
@@ -105,18 +115,28 @@ interface Run {
   endMode: string;
   /** 地域（とダンジョン）ごとの、始まった戦闘の数（どこに HP の倍率が掛かったかの確かめ） */
   where2: Record<string, number>;
+  /** 賢い bot の工夫が使われた数: 買った（町・行商人）・売った・付け替えた・使った消耗品（戦闘の中・外）・削ったカード（町・イベント）・取らなかったカード報酬・断られた操作 */
+  bought: number;
+  sold: number;
+  equips: number;
+  itemsBattle: number;
+  itemsField: number;
+  removed: number;
+  skipped: number;
+  refused: number;
 }
 
 /** ボスの部屋・中ボスの部屋・災厄（災厄の戦闘は中ボスの印を持つ）の戦闘か */
 const isBig = (b: NonNullable<GameState['battle']>) => !!b.boss || !!b.midboss;
 
-function runOne(classes: string[], seed: number, bot: 'straight' | 'clever'): Run {
+function runOne(classes: string[], seed: number, bot: BotKind): Run {
   const g0 = createGame({ seed, scenarioId: SCENARIO, difficulty: DIFF as never, party: classes.map((c, i) => ({ classId: c, gender: 'male', name: c + i, playerId: 'P1' as PlayerId })) });
   const battlesOf = (g: GameState) => [g.battle, ...(g.expeditions ?? []).map((x) => x.battle)].filter((b): b is NonNullable<GameState['battle']> => !!b);
   const scenesOf = (g: GameState) => [{ battle: g.battle, battleInfo: g.battleInfo, dungeon: g.dungeon, party: g.party }, ...(g.expeditions ?? []).map((x) => ({ battle: x.battle, battleInfo: x.battleInfo, dungeon: x.dungeon, party: x.heroes }))];
   const dungeonsOf = (g: GameState) => [g.dungeon, ...(g.expeditions ?? []).map((x) => x.dungeon)].filter((d): d is NonNullable<GameState['dungeon']> => !!d);
   const r: Run = { clear: false, corr100: false, where: '', fights: 0, rounds: 0, finished: 0, breaks: 0, randomIn: 0, randomDone: 0, scourgeKills: 0, jobChanges: 0, hones: 0, errors: 0,
-    bigFinished: 0, bigRounds: 0, breakWhy: { weak: 0, perfect: 0, damage: 0 }, bigBreaks: 0, worldTurn: 0, corruption: 0, wiped: false, endMode: '', where2: {} };
+    bigFinished: 0, bigRounds: 0, breakWhy: { weak: 0, perfect: 0, damage: 0 }, bigBreaks: 0, worldTurn: 0, corruption: 0, wiped: false, endMode: '', where2: {},
+    bought: 0, sold: 0, equips: 0, itemsBattle: 0, itemsField: 0, removed: 0, skipped: 0, refused: 0 };
   const entered = new Set<string>();
   H.hook = (pre, cmd, post, events) => {
     const b0 = battlesOf(pre);
@@ -159,9 +179,22 @@ function runOne(classes: string[], seed: number, bot: 'straight' | 'clever'): Ru
     const inner = cmd.type === 'SCENE' || cmd.type === 'VOTE' ? cmd.command : cmd;
     if (inner?.type === 'CHANGE_JOB') r.jobChanges++;
     if (inner?.type === 'REST' && inner.kind === 'upgrade') r.hones++;
+    // 賢い bot の工夫（成功した操作だけ数える）
+    if (inner?.type === 'TOWN_BUY' || (inner?.type === 'PEDDLER_BUY' && inner.index !== undefined)) r.bought++;
+    if (inner?.type === 'TOWN_SELL') r.sold++;
+    if (inner?.type === 'EQUIP') r.equips++;
+    if (inner?.type === 'USE_POUCH_ITEM') {
+      if (pre.mode === 'battle' || (cmd.type === 'SCENE' && pre.expeditions?.find((x) => x.id === cmd.scene)?.mode === 'battle')) r.itemsBattle++;
+      else r.itemsField++;
+    }
+    if (inner?.type === 'TOWN_REMOVE_CARD') r.removed++;
+    if (inner?.type === 'CARD_TASK' && inner.cardUid && post.heroes.find((h) => h.id === inner.heroId)!.deck.length < pre.heroes.find((h) => h.id === inner.heroId)!.deck.length) r.removed++;
+    if (inner?.type === 'PICK_CARD' && inner.offerIndex === null) r.skipped++;
   };
-  const { game, log } = playToEnd(g0, 60000, bot === 'straight' ? { straight: true } : { clever: true, cleverOff: OFF });
+  const opts = bot === 'straight' ? { straight: true } : bot === 'clever' ? { clever: true, cleverOff: OFF } : { smart: true, cleverOff: OFF, smartOff: SMART_OFF };
+  const { game, log } = playToEnd(g0, 60000, opts);
   H.hook = undefined;
+  r.refused = log.refused ?? 0;
   r.errors = log.errors.length;
   r.clear = game.mode === 'ending';
   r.corr100 = !r.clear && (game.world?.corruption ?? 0) >= 100;
@@ -190,17 +223,17 @@ const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : NaN);
 describe.skipIf(!process.env.SIM)(`物差し2本（直行 bot と工夫する bot・${SCENARIO}・${DIFF}・${SEEDS}種）`, () => {
   it('2本の bot を同じ種で流して、表にする', () => {
     const t0 = Date.now();
-    const all: Record<string, Record<'straight' | 'clever', Run[]>> = {};
+    const all: Record<string, Partial<Record<BotKind, Run[]>>> = {};
     const write = () => {
       const L: string[] = [];
-      const name = { straight: '直行 bot', clever: '工夫する bot' } as const;
-      L.push(`# 物差し2本（計画書 第2版 §5-3）`, '');
-      L.push(`シナリオ ${SCENARIO}・難易度 ${getDifficulty(DIFF as never).name}・種 ${SEEDS}個（1001〜）・${((Date.now() - t0) / 1000).toFixed(0)}秒。同じ種・同じ人数・同じ難易度で2本の bot を流した。${OFF.length ? `**工夫する bot から外した工夫: ${OFF.join('・')}**` : ''}`, '');
-      L.push('## 1. 2本の比べ', '');
+      const name = { straight: '直行 bot', clever: '工夫する bot', smart: '賢い bot' } as const;
+      L.push(`# 物差し（計画書 第2版 §5-3。直行 bot・工夫する bot・賢い bot）`, '');
+      L.push(`シナリオ ${SCENARIO}・難易度 ${getDifficulty(DIFF as never).name}・種 ${SEEDS}個（1001〜）・${((Date.now() - t0) / 1000).toFixed(0)}秒。同じ種・同じ人数・同じ難易度で bot（${BOTS.map((k) => name[k]).join('・')}）を流した。${OFF.length ? `**工夫する bot から外した工夫: ${OFF.join('・')}**` : ''}${SMART_OFF.length ? `**賢い bot から外した工夫: ${SMART_OFF.join('・')}**` : ''}`, '');
+      L.push('## 1. bot の比べ', '');
       L.push(`| 人数 | bot | クリア率 | 負けた場所（${WHERE.join('・')}） | 侵食度100%で終わった割合（負けのうち） | クリアした冒険の戦闘の数 | 1戦あたりのラウンド | 全部の冒険の戦闘の数 |`);
       L.push('|---|---|---|---|---|---|---|---|');
       for (const [p, by] of Object.entries(all)) {
-        for (const k of ['straight', 'clever'] as const) {
+        for (const k of BOTS) {
           const rs = by[k];
           if (!rs) continue;
           const lost = rs.filter((r) => !r.clear);
@@ -212,6 +245,10 @@ describe.skipIf(!process.env.SIM)(`物差し2本（直行 bot と工夫する bo
         if (by.straight && by.clever) {
           const d = pct(by.clever.filter((r) => r.clear).length, by.clever.length) - pct(by.straight.filter((r) => r.clear).length, by.straight.length);
           L.push(`| ${p} | **差（工夫 − 直行）** | **${d >= 0 ? '+' : ''}${f(d)}ポイント** | | | | | |`);
+        }
+        if (by.clever && by.smart) {
+          const d = pct(by.smart.filter((r) => r.clear).length, by.smart.length) - pct(by.clever.filter((r) => r.clear).length, by.clever.length);
+          L.push(`| ${p} | **差（賢い − 工夫）** | **${d >= 0 ? '+' : ''}${f(d)}ポイント** | | | | | |`);
         }
       }
       L.push('', '## 2. 計画書の目標（ふつう・提案）との比べ', '');
@@ -231,11 +268,23 @@ describe.skipIf(!process.env.SIM)(`物差し2本（直行 bot と工夫する bo
       L.push('| 人数 | bot | BREAK | ランダムダンジョンに入った | ランダムダンジョンを踏破 | 災厄を倒した | 転職 | 休憩で技を磨いた | bot の操作の失敗 |');
       L.push('|---|---|---|---|---|---|---|---|---|');
       for (const [p, by] of Object.entries(all)) {
-        for (const k of ['straight', 'clever'] as const) {
+        for (const k of BOTS) {
           const rs = by[k];
           if (!rs) continue;
           const a = (key: keyof Run) => f(avg(rs.map((r) => Number(r[key]))), 2);
           L.push(`| ${p} | ${name[k]} | ${a('breaks')} | ${a('randomIn')} | ${a('randomDone')} | ${a('scourgeKills')} | ${a('jobChanges')} | ${a('hones')} | ${rs.reduce((n, r) => n + r.errors, 0)} |`);
+        }
+      }
+      // 賢い bot の工夫が使われた数
+      L.push('', '## 3b. 賢い bot の工夫が使われた数（1冒険あたりの平均。成功した操作だけ）', '');
+      L.push('| 人数 | bot | 買った（町・行商人） | 売った | 装備を付けた | 消耗品（戦闘の中） | 消耗品（戦闘の外） | 削ったカード（町・イベント） | 取らなかったカード報酬 | 断られた操作（失敗に数えない） |');
+      L.push('|---|---|---|---|---|---|---|---|---|---|');
+      for (const [p, by] of Object.entries(all)) {
+        for (const k of BOTS) {
+          const rs = by[k];
+          if (!rs) continue;
+          const a = (key: keyof Run) => f(avg(rs.map((r) => Number(r[key]))), 2);
+          L.push(`| ${p} | ${name[k]} | ${a('bought')} | ${a('sold')} | ${a('equips')} | ${a('itemsBattle')} | ${a('itemsField')} | ${a('removed')} | ${a('skipped')} | ${a('refused')} |`);
         }
       }
       // 回4: 難しさの測定で足した数（エンジンの結果は変えず、テストの側で数えた物）
@@ -243,7 +292,7 @@ describe.skipIf(!process.env.SIM)(`物差し2本（直行 bot と工夫する bo
       L.push('| 人数 | bot | クリア率 | 負け: 全滅 / 侵食度100% / ほか | 全部の冒険の戦闘の数 | 1戦の平均ラウンド | ボス・中ボス・災厄の戦闘の数（1冒険）| その平均ラウンド | 1冒険の BREAK（弱点・完全成功・合計ダメージ） | ボス・中ボス・災厄の戦闘での BREAK（1冒険） | クリアした時のワールドターン | クリアした時の侵食度 |');
       L.push('|---|---|---|---|---|---|---|---|---|---|---|---|');
       for (const [p, by] of Object.entries(all)) {
-        for (const k of ['straight', 'clever'] as const) {
+        for (const k of BOTS) {
           const rs = by[k];
           if (!rs?.length) continue;
           const cl = rs.filter((r) => r.clear);
@@ -254,10 +303,10 @@ describe.skipIf(!process.env.SIM)(`物差し2本（直行 bot と工夫する bo
           L.push(`| ${p} | ${name[k]} | **${f(pct(cl.length, rs.length))}%**（${cl.length}/${rs.length}） | ${lost.filter((r) => r.wiped).length} / ${lost.filter((r) => r.corr100).length} / ${lost.filter((r) => !r.wiped && !r.corr100).length} | ${f(a((r) => r.fights), 1)} | ${f(fin ? rs.reduce((n, r) => n + r.rounds, 0) / fin : NaN, 2)} | ${f(a((r) => r.bigFinished), 1)} | ${f(bigFin ? rs.reduce((n, r) => n + r.bigRounds, 0) / bigFin : NaN, 2)} | ${f(a((r) => r.breaks), 1)}（${f(a((r) => r.breakWhy.weak), 1)}・${f(a((r) => r.breakWhy.perfect), 1)}・${f(a((r) => r.breakWhy.damage), 1)}） | ${f(a((r) => r.bigBreaks), 1)} | ${f(a((r) => r.worldTurn, cl), 1)} | ${f(a((r) => r.corruption, cl), 1)} |`);
         }
       }
-      const others = Object.values(all).flatMap((by) => [...(by.straight ?? []), ...(by.clever ?? [])]).filter((r) => !r.clear && !r.wiped && !r.corr100).map((r) => r.endMode);
+      const others = Object.values(all).flatMap((by) => BOTS.flatMap((k) => by[k] ?? [])).filter((r) => !r.clear && !r.wiped && !r.corr100).map((r) => r.endMode);
       if (others.length) L.push('', `負けの「ほか」の終わり方（game.mode）: ${[...new Set(others)].map((m) => `${m || '(空)'} ${others.filter((x) => x === m).length}`).join('・')}`);
       const where2: Record<string, number> = {};
-      for (const by of Object.values(all)) for (const rs of Object.values(by)) for (const r of rs) for (const [key, n] of Object.entries(r.where2)) where2[key] = (where2[key] ?? 0) + n;
+      for (const by of Object.values(all)) for (const rs of Object.values(by)) for (const r of rs ?? []) for (const [key, n] of Object.entries(r.where2)) where2[key] = (where2[key] ?? 0) + n;
       L.push('', `始まった戦闘の場所（地域/ダンジョン: 数。全部の冒険の合計）。HP の倍率が掛かる地域: ${Object.keys(BALANCE.enemyHpByRegion).join('・') || 'なし'}`, '');
       L.push(Object.entries(where2).sort((x, y) => y[1] - x[1]).map(([key, n]) => `${key}: ${n}`).join('・'));
       mkdirSync(dirname(OUT), { recursive: true });
@@ -265,14 +314,15 @@ describe.skipIf(!process.env.SIM)(`物差し2本（直行 bot と工夫する bo
     };
     for (const [p, classes] of Object.entries(PARTIES)) {
       if (process.env.SIM_PARTY && process.env.SIM_PARTY !== p) continue;
-      all[p] = { straight: [], clever: [] };
-      for (const bot of ['straight', 'clever'] as const) {
-        for (let s = 1; s <= SEEDS; s++) all[p][bot].push(runOne(classes, 1000 + s, bot));
+      all[p] = {};
+      for (const bot of BOTS) {
+        const rs: Run[] = (all[p][bot] = []);
+        for (let s = 1; s <= SEEDS; s++) rs.push(runOne(classes, 1000 + s, bot));
         // 途中でも結果が残るように、1組ごとに書き出す
         write();
       }
     }
     // bot の操作がゲームに断られていない事（断られると、測った数字が bot の不具合の数字になる）
-    for (const by of Object.values(all)) for (const rs of Object.values(by)) expect(rs.reduce((n, r) => n + r.errors, 0)).toBe(0);
+    for (const by of Object.values(all)) for (const rs of Object.values(by)) expect((rs ?? []).reduce((n, r) => n + r.errors, 0)).toBe(0);
   }, 86_400_000);
 });
