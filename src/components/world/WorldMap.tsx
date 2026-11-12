@@ -180,8 +180,8 @@ function featureArt(t: WorldState['tiles'][number], i: number, geom: MapGeom, fi
     const themeMark = f.kind === 'dungeon' ? dungeonTheme(f.theme)?.mark : undefined;
     const badge = themeMark ? (
       <g key={`t${i}`} data-theme-mark={f.theme}>
-        <circle cx={x + R * 0.5} cy={y - R * 0.75} r={R * 0.36} fill="rgba(0,0,0,.72)" stroke="#c8a0ff" strokeWidth={1} />
-        <text x={x + R * 0.5} y={y - R * 0.75 + R * 0.17} textAnchor="middle" fontSize={R * 0.46}>{themeMark}</text>
+        <circle cx={x + R * 0.5} cy={y - R * 0.75} r={Math.max(9, R * 0.36)} fill="rgba(0,0,0,.72)" stroke="#c8a0ff" strokeWidth={1} />
+        <text x={x + R * 0.5} y={y - R * 0.75 + Math.max(12, R * 0.46) * 0.36} textAnchor="middle" fontSize={Math.max(12, R * 0.46)}>{themeMark}</text>
       </g>
     ) : null;
     // 縮小した時（段階6a。COMPACT_ZOOM より小さい）: 絵を描かず、印（丸とアイコン）だけ

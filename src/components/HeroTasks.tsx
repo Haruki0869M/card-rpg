@@ -211,7 +211,7 @@ function Peddler({ hero, send }: { hero: Hero; send: (c: GameCommand) => void })
                 <ItemIcon item={it} size={44} />
                 <span className="block min-w-0 flex-1 leading-4">
                   <span className="block text-[14px] font-bold" style={{ color: RARITY_STYLE[it.rarity].color }}>
-                    {it.source && <span className="mr-1 rounded bg-amber-500/80 px-1 text-[11px] text-black" data-exclusive-tag>専用</span>}
+                    {it.source && <span className="mr-1 rounded bg-amber-500/80 px-1 text-[12px] text-black" data-exclusive-tag>専用</span>}
                     {it.name}
                   </span>
                   <span className="block truncate text-[12px] text-zinc-400">{itemSummary(it)}</span>

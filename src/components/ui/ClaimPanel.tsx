@@ -23,7 +23,7 @@ export function ClaimPanel({ claim: c, index, title = '戦利品を取り合う'
         <ItemIcon item={def} size={52} />
         <span className="block min-w-0">
           <span className="block font-bold" style={{ color: RARITY_STYLE[def.rarity].color }}>
-            {def.source && <span className="mr-1 rounded bg-amber-500/80 px-1 text-[11px] text-black" data-exclusive-tag>✨専用</span>}
+            {def.source && <span className="mr-1 rounded bg-amber-500/80 px-1 text-[12px] text-black" data-exclusive-tag>✨専用</span>}
             {def.name}
           </span>
           <span className="block text-[12px] leading-4 text-zinc-300">{itemSummary(def)}</span>
