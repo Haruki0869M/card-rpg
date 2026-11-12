@@ -44,8 +44,8 @@ function inflict(s: BattleState, index: number, status: string, amount = 1) {
 }
 
 describe('区切りA: 数', () => {
-  it('鎧は29着・装飾品は52個', () => {
-    expect(ITEMS.all.filter((i) => i.slot === 'armor')).toHaveLength(29);
+  it('鎧は28着（区切りG-2で魔法の法衣を無くした）・装飾品は52個', () => {
+    expect(ITEMS.all.filter((i) => i.slot === 'armor')).toHaveLength(28);
     expect(ITEMS.all.filter((i) => i.slot === 'accessory')).toHaveLength(52);
   });
   it('外した物は無い。属性除けは6属性そろい、どのシナリオでも出る', () => {

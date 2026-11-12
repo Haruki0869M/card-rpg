@@ -10,8 +10,8 @@ import { jobOnlyCard, signatureCards } from '../game/jobs';
 import { migrateGame } from '../game/migrations';
 
 describe('憲章5: 数字だけ違うカードのまとめ', () => {
-  it('消した札は登録表に無く、読み替え先は全部ある（85枚＋区切りFの2枚）', () => {
-    expect(Object.keys(MERGED_CARDS)).toHaveLength(98);
+  it('消した札は登録表に無く、読み替え先は全部ある（85枚＋区切りFの2枚＋区切りG-1の11枚＋区切りG-2の鋼の連撃）', () => {
+    expect(Object.keys(MERGED_CARDS)).toHaveLength(99);
     for (const [gone, keep] of Object.entries(MERGED_CARDS)) {
       expect(CARDS.tryGet(gone), gone).toBeUndefined();
       expect(CARDS.tryGet(keep), `${gone} → ${keep}`).toBeDefined();
@@ -42,8 +42,8 @@ describe('憲章5: 数字だけ違うカードのまとめ', () => {
     expect(getCard('lnGiQuick').tiers.map((t) => (t.effects[0] as { amount: number }).amount)).toEqual([3, 5, 8]);
     expect(getCard('strike').tiers.map((t) => (t.effects[0] as { amount: number }).amount)).toEqual([4, 7]);
   });
-  it('まとめなかった札: 勝負の一撃（当たり外れの幅がある）・急所の一矢・職の名前の必殺技6枚・武器だけに付く札', () => {
-    for (const id of ['gambleStrike', 'vitalShot', 'heavenBlade', 'dragonDive', 'samuraiMoon', 'skyPiercer', 'worldBreaker', 'dragonFang', 'wSteelCombo']) expect(CARDS.tryGet(id), id).toBeDefined();
+  it('まとめなかった札: 勝負の一撃（当たり外れの幅がある）・急所の一矢・職の名前の必殺技6枚（鋼の連撃は区切りG-2でまとめた）', () => {
+    for (const id of ['gambleStrike', 'vitalShot', 'heavenBlade', 'dragonDive', 'samuraiMoon', 'skyPiercer', 'worldBreaker', 'dragonFang']) expect(CARDS.tryGet(id), id).toBeDefined();
     expect(CLASSES.get('gambler').cardPool).toContain('gambleStrike');
   });
   it('古い保存データ（v23）: 消した札を、残した札に読み替える。敵の行動のIDには触らない', () => {

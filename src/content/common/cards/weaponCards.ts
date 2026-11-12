@@ -9,17 +9,7 @@ const ba = (amount: number) => ({ kind: 'block', amount, to: 'allies' }) as cons
 
 export const WEAPON_CARDS: CardDef[] = [
   // ---------- 剣 ----------
-  {
-    id: 'wSteelCombo',
-    rarity: 'rare',
-    name: '鋼の連撃',
-    category: 'physical',
-    cost: 1,
-    slots: 2,
-    baseChance: 75,
-    target: 'enemy',
-    tiers: [{ minSuccesses: 0, effects: [d(4)] }, { minSuccesses: 1, effects: [d(8)] }, { minSuccesses: 2, effects: [d(13)] }],
-  },
+  // 区切りG-2（2026-11-12）: 「鋼の連撃」は「手早い攻撃」と形が同じなので無くした（data/cards/merged.ts で読み替える）
   {
     id: 'wFlameSlash',
     rarity: 'legend',

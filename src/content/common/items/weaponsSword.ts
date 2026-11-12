@@ -6,7 +6,7 @@ export const weaponsSword: ItemDef[] = [
   {
     id: "smolderSword", name: "熾火の剣", slot: "weapon", weaponType: "sword", rarity: "rare", icon: "sword",
     description: "魔法カードを使った後、次の物理カードの成功率+10%。1ターンに1回。", stats: {"str":2,"int":2}, tags: ["physical","magic"],
-    cards: [{"cardId":"wSteelCombo","count":2}],
+    cards: [{"cardId":"bladeFire","count":1},{"cardId":"lnGiQuick","count":1}],
     ability: {"name":"魔法剣","description":"魔法カードを使った後、次の物理カードの成功率+10%。1ターンに1回。","effect":{"modifier":"cardChance","bonus":10,"if":[{"kind":"cardCategory","category":"physical"},{"kind":"counterAtLeast","key":"magicBlade","n":1,"label":"魔法カードを使った後の"}]},"also":[{"when":"afterCard","if":[{"kind":"cardCategory","category":"physical"},{"kind":"counterAtLeast","key":"magicBlade","n":1}],"do":[{"kind":"counter","key":"magicBlade","set":0,"silent":true}]},{"when":"afterCard","if":[{"kind":"cardCategory","category":"magic"},{"kind":"oncePerTurn","key":"smolderSword"}],"do":[{"kind":"counter","key":"magicBlade","set":1,"text":"次の物理カードの成功率+10%"}]}]},
   },
   // エピック

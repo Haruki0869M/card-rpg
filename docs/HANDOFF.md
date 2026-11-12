@@ -78,7 +78,7 @@ scripts/           画面の自動確認（Playwright）・絵の加工（art/bu
 - **カードの候補**: `heroCardPool(hero)` = 今のジョブ＋これまでのジョブの cardPool。報酬は `rollCardOffers`（3枚のうち2枚はスマート抽選、1枚は完全ランダム）。
 - **イベント**: `EventDef`（where: dungeon / map / random）。選択肢の判定・お金・フォーカス・道具の支払い・結果（outcomes）。結果で戦闘を始める時は `event.battle` に入れて「戦闘を始める」で開始。
 - **お供**: `hero.pet`。能力は PetDef の abilities / masterAbilities（獣使い系統）。表示は `components/ui/PetToken.tsx`。
-- **保存データ**: localStorage。**今の版は v25**（2026-11-12）。**型に任意の項目（?付き）を足すだけなら引き継ぎ不要**。項目の名前を変える・必須にする・意味を変える時は `GAME_VERSION`（= battle の STATE_VERSION）を1つ上げ、`migrations.ts` に直し方を1つ足す。版に関係なく読み込む時に直すもの（例: `normalizeDice` = 古いスロットの結果を捨て、ダンジョンの残り歩数を扉の数に直す）もある。
+- **保存データ**: localStorage。**今の版は v26**（2026-11-12）。**型に任意の項目（?付き）を足すだけなら引き継ぎ不要**。項目の名前を変える・必須にする・意味を変える時は `GAME_VERSION`（= battle の STATE_VERSION）を1つ上げ、`migrations.ts` に直し方を1つ足す。版に関係なく読み込む時に直すもの（例: `normalizeDice` = 古いスロットの結果を捨て、ダンジョンの残り歩数を扉の数に直す）もある。
 - **サイコロ**: `WORLD_ROLL_MOVE`/`WORLD_REROLL_MOVE`（世界マップ）、`EXPLORE_ROLLER`（だれが振るかの投票）/`EXPLORE_ROLL`/`EXPLORE_REROLL`（ダンジョン）。扉は `ENTER_ROOM`（エンジンが扉の前まで歩く）。`DUNGEON_STEP`・`DUNGEON_TURN`・`DUNGEON_WALK` は残っているが画面からは使わない。
 
 ---

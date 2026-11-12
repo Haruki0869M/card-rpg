@@ -17,6 +17,8 @@ export const MERGED_CARDS: Record<string, string> = {
   wManaTorrent: 'iceLance',
   wLash: 'palmStrike',
   wIronHammer: 'palmStrike',
+  // 区切りG-2（2026-11-12）: 鋼の剣・熾火の剣の札を付け替えて、どこにも付かなくなった札（docs/tasks/lineup-stageG2-plan.md §3）
+  wSteelCombo: 'lnGiQuick',
   // 区切りFの「ブロックを得るだけ」の2枚は無くした（同じ役の「備え」に読み替える）
   bwBigShield: 'cmPrepare',
   ptBuddyGuard: 'cmPrepare',
