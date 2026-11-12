@@ -53,6 +53,8 @@ import { CardPickPanel } from '../ui/CardPickPanel';
 import { CheckPanel, RollStrip } from '../ui/CheckPanel';
 import { Heading, HeroFace, ItemIcon, itemSummary, RARITY_STYLE, Screen } from '../ui/game';
 import { WorldTopBar } from './WorldScreen';
+import { ItemPickPanel } from '../ui/ItemPickPanel';
+import { cardSummary } from '../format';
 import { BuyNotice, boughtNotice, type Bought } from './BuyNotice';
 
 /** 買った時のお知らせの番号（同じ物を続けて買っても出し直す） */
@@ -254,6 +256,14 @@ export function TownScreen() {
   const p = v.playerId;
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const sellable = v.stash;
+  // 回2: 売却・カード削除も、押すと説明の窓を開く（決めるのは窓のボタンだけ）
+  const [sellSel, setSellSel] = useState<string | null>(null);
+  const closeSellSel = useCallback(() => setSellSel(null), []);
+  const sellItem = sellable.find((s) => s.uid === sellSel);
+  const [removeSel, setRemoveSel] = useState<string | null>(null);
+  const closeRemoveSel = useCallback(() => setRemoveSel(null), []);
+  const removeCard = v.deck.find((c) => c.uid === removeSel);
+  const removing = confirmRemove ? v.deck.find((c) => c.uid === confirmRemove) : undefined;
   const myCards = stock?.cards.map((c, i) => ({ c, i })).filter(({ c }) => getClass(game.heroes.find((x) => x.id === c.heroId)?.classId ?? '').id === v.classId) ?? [];
   // 買った時の手応え（フェーズ2-A）: 装備品は「すぐ装備」の窓、道具・カードは短いお知らせ
   const [bought, setBought] = useState<Bought | null>(null);
@@ -505,36 +515,95 @@ export function TownScreen() {
               山札からいらないカードを1枚取り除きます（{def.removeCost}G・{BALANCE.minDeckSize}枚より少なくはできません）
             </div>
             <div className="text-[12px] text-zinc-400">{v.name}の山札（タップして選ぶ）</div>
+            {/* 回2: カードを押すと下に説明の窓が開く。取り除くのは窓のボタン → 確かめの窓 */}
             <div className="flex flex-wrap justify-center gap-1.5">
-              {v.deck.map((c) => (
-                <button
-                  key={c.uid}
-                  disabled={!mine || v.gold < def.removeCost}
-                  onClick={() => setConfirmRemove(c.uid)}
-                  className="btn"
-                  aria-label={`${cardOf(c).name}を取り除く`}
-                >
-                  <CardFace card={cardOf(c)} width={78} height={120} />
-                </button>
-              ))}
+              {v.deck.map((c) => {
+                const on = removeSel === c.uid;
+                return (
+                  <button
+                    key={c.uid}
+                    onClick={() => setRemoveSel((x) => (x === c.uid ? null : c.uid))}
+                    className="btn transition-transform duration-150"
+                    style={on ? { transform: 'scale(1.08) translateY(-3px)', zIndex: 2 } : removeSel ? { opacity: 0.75 } : undefined}
+                    aria-label={cardOf(c).name}
+                    aria-pressed={on}
+                    data-pick-card={`rm-${c.uid}`}
+                  >
+                    <CardFace card={cardOf(c)} width={78} height={120} />
+                  </button>
+                );
+              })}
             </div>
+            {!removeCard && <div className="text-center text-[12px] text-zinc-400">カードを押すと、くわしい説明が出ます</div>}
+            {removeCard && (
+              <CardPickPanel
+                card={cardOf(removeCard)}
+                chance={finalChance(cardOf(removeCard), affinityFromStats(heroStats(v)))}
+                who={`${v.name}の成功率`}
+                action={
+                  <>
+                    <Trash2 size={18} />
+                    このカードを取り除く（{def.removeCost}G）
+                  </>
+                }
+                disabled={!mine || v.gold < def.removeCost}
+                note={!mine ? `${v.name}の担当の人が取り除けます` : v.gold < def.removeCost ? 'お金が足りません' : undefined}
+                onAction={() => setConfirmRemove(removeCard.uid)}
+                onClose={closeRemoveSel}
+              />
+            )}
           </div>
         )}
         {tab === 'sell' && (
           <div className="flex flex-col gap-1">
             {sellable.length === 0 && <div className="py-4 text-center text-[13px] text-zinc-500">売れる装備がありません（装備中のものは売れません）</div>}
+            {sellable.length > 0 && !sellItem && <div className="text-[12px] text-zinc-400">装備を押すと、くわしい説明と、今の装備との違いが出ます</div>}
+            {/* 回2: 装備を押すと、その下に説明の窓（能力・特殊能力・カード・今の装備との違い）が開く。売るのは窓のボタンだけ */}
             {sellable.map((s) => {
               const it = getItem(s.itemId);
+              const on = sellSel === s.uid;
               return (
-                <div key={s.uid} className="flex items-center gap-2 rounded-lg bg-black/30 p-1.5">
-                  <ItemIcon item={it} size={40} />
-                  <span className="min-w-0 flex-1 truncate text-[14px] font-bold" style={{ color: RARITY_STYLE[it.rarity].color }}>
-                    {it.name}
-                  </span>
-                  <button disabled={!mine} onClick={() => dispatchGame({ type: 'TOWN_SELL', heroId: v.id, playerId: p, itemUid: s.uid })} className="btn btn-dark flex h-11 w-[84px] items-center justify-center gap-0.5 rounded-lg text-[13px] font-bold">
-                    <Coins size={14} />
-                    {sellPrice(s.itemId)}で売る
+                <div key={s.uid}>
+                  <button
+                    onClick={() => setSellSel((x) => (x === s.uid ? null : s.uid))}
+                    className={`btn flex min-h-11 w-full items-center gap-2 rounded-lg p-1.5 text-left ${on ? 'bg-amber-500/20 ring-2 ring-amber-300' : 'bg-black/30'}`}
+                    aria-pressed={on}
+                    aria-label={it.name}
+                    data-pick-item={s.uid}
+                    data-sell-item={s.uid}
+                  >
+                    <ItemIcon item={it} size={40} />
+                    <span className="min-w-0 flex-1 leading-4">
+                      <span className="block truncate text-[14px] font-bold" style={{ color: RARITY_STYLE[it.rarity].color }}>
+                        {it.name}
+                      </span>
+                      <span className="block truncate text-[12px] text-zinc-400">{itemSummary(it)}</span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-0.5 text-[13px] font-bold text-amber-200 tabular-nums">
+                      <Coins size={14} />
+                      {sellPrice(s.itemId)}G
+                    </span>
                   </button>
+                  {on && (
+                    <ItemPickPanel
+                      itemId={s.itemId}
+                      itemUid={s.uid}
+                      hero={v}
+                      action={
+                        <>
+                          <Coins size={18} />
+                          {sellPrice(s.itemId)}Gで売る
+                        </>
+                      }
+                      disabled={!mine}
+                      note={!mine ? `${v.name}の担当の人が売れます` : undefined}
+                      onAction={() => {
+                        dispatchGame({ type: 'TOWN_SELL', heroId: v.id, playerId: p, itemUid: s.uid });
+                        setSellSel(null);
+                      }}
+                      onClose={closeSellSel}
+                    />
+                  )}
                 </div>
               );
             })}
@@ -562,11 +631,13 @@ export function TownScreen() {
       {confirmRemove && (
         <ConfirmDialog
           title="カードを取り除きますか？"
-          text={`「${cardOf(v.deck.find((c) => c.uid === confirmRemove) ?? { cardId: v.deck[0].cardId }).name}」を${v.name}の山札から取り除きます（${def.removeCost}G）。元には戻せません。`}
+          text={`「${cardOf(removing ?? { cardId: v.deck[0].cardId }).name}」を${v.name}の山札から取り除きます（${def.removeCost}G）。元には戻せません。`}
+          detail={removing ? cardSummary(cardOf(removing)) : undefined}
           ok="取り除く"
           onOk={() => {
             dispatchGame({ type: 'TOWN_REMOVE_CARD', playerId: p, heroId: v.id, cardUid: confirmRemove });
             setConfirmRemove(null);
+            setRemoveSel(null);
           }}
           onCancel={() => setConfirmRemove(null)}
         />
