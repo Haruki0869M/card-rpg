@@ -9,7 +9,7 @@ import type { GameState, MapFeature, ScenarioMapDef, Tile, WorldState } from '..
 import type { Rng } from '../../rng';
 import { RARITIES } from '../dungeon';
 import { pickWeighted } from '../loot';
-import { colOf, hexDistance, idxOf, neighborInDir, neighbors, rowOf } from './hex';
+import { colOf, hexDistance, idxOf, linePath, neighborInDir, neighbors, rowOf } from './hex';
 import { revealAround } from './fog';
 import { spawnSeaWanderer, spawnWanderer } from './wanderers';
 import { addSanctuaries } from './sanctuaries';
@@ -116,29 +116,6 @@ function straightPath(w: Pick<WorldState, 'width' | 'height'>, a: number, b: num
   }
   const path: number[] = [];
   for (let c = b; c >= 0; c = prev.get(c) ?? -1) path.unshift(c);
-  return path;
-}
-
-/**
- * まっすぐな道（広い地図の街道・脇道。段階6a）: 1歩ずつ、目的地に近づく隣のマスのうち、a と b を結ぶ線に一番近いマスを選ぶ。
- * straightPath（幅を探す最短経路）は、隣の調べる順で右へ寄った道になるため、広い地図ではこちらを使う。乱数は使わない
- */
-function linePath(w: Pick<WorldState, 'width' | 'height'>, a: number, b: number): number[] {
-  const xy = (i: number) => ({ x: colOf(w, i) + 0.5 * (rowOf(w, i) & 1), y: rowOf(w, i) * 0.866 });
-  const A = xy(a), B = xy(b);
-  const len = Math.hypot(B.x - A.x, B.y - A.y) || 1;
-  const off = (i: number) => {
-    const p = xy(i);
-    return Math.abs((B.x - A.x) * (A.y - p.y) - (A.x - p.x) * (B.y - A.y)) / len;
-  };
-  const path = [a];
-  for (let cur = a; cur !== b && path.length <= w.width * w.height; ) {
-    const d = hexDistance(w, cur, b);
-    const next = neighbors(w, cur).filter((n) => hexDistance(w, n, b) < d).sort((p, q) => off(p) - off(q) || p - q)[0];
-    if (next === undefined) break;
-    path.push(next);
-    cur = next;
-  }
   return path;
 }
 

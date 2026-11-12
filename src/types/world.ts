@@ -349,6 +349,11 @@ export interface WorldState {
   shops: Record<string, ShopStock>;
   /** 画面に出す物語（冒頭・地域の紹介・エンディング） */
   story?: { title: string; lines: string[] };
+  /**
+   * 次に出す物語の窓（回1）: 物語の窓が出ている時に来た知らせ（災厄が現れた・通り過ぎた時）は、後ろに足さずにここに並べ、
+   * 今の窓を閉じた後に1つずつ出す。無ければ空（古い保存データは無いまま）
+   */
+  storyQueue?: { title: string; lines: string[] }[];
   /** 時間で消える出現スポット（段階6・v17）。無ければ空 / 次に出るワールドターン / 次の番号 */
   spawns?: TimedSpawn[];
   nextSpawnAt?: number;

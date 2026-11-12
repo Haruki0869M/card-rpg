@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cameraTop, mapPadBottom, mapPadY, revealTop, visibleH } from './mapCamera';
+import { cameraTop, edgeArrow, mapPadBottom, mapPadY, revealTop, visibleH } from './mapCamera';
 
 describe('世界マップのカメラ（フェーズ2-D）', () => {
   it('余白は枠の半分。地図の一番下のマスでも、駒を枠の真ん中に置ける', () => {
@@ -47,5 +47,27 @@ describe('移動中の帯とボタンの文言（フェーズ2-D）', () => {
   });
   it('移動するのボタンは、使う移動力とマスの数を両方言う', () => {
     expect(moveButtonText(3, 2)).toBe('移動する（移動力3を使う・2マス先）');
+  });
+});
+
+describe('回1: 地図の端の矢印', () => {
+  const box = { minX: 30, maxX: 300, minY: 60, maxY: 400 };
+  it('目的地が見えている所の中なら出さない', () => {
+    expect(edgeArrow(100, 200, box)).toBeUndefined();
+  });
+  it('外なら、真ん中から目的地へ向かう線が端と交わる所に、目的地の向きで出す', () => {
+    const up = edgeArrow(165, -500, box)!;
+    expect(up).toEqual({ x: 165, y: 60, deg: -90 });
+    const right = edgeArrow(900, 230, box)!;
+    expect(right.x).toBe(300);
+    expect(right.y).toBeCloseTo(230);
+    expect(right.deg).toBeCloseTo(0);
+    const downLeft = edgeArrow(-1000, 2000, box)!;
+    expect(downLeft.y === 400 || downLeft.x === 30).toBe(true);
+    expect(downLeft.x).toBeGreaterThanOrEqual(30);
+    expect(downLeft.y).toBeLessThanOrEqual(400);
+  });
+  it('置ける範囲が無い（見えている地図がとても低い）時は出さない', () => {
+    expect(edgeArrow(0, -500, { minX: 30, maxX: 300, minY: 82, maxY: 40 })).toBeUndefined();
   });
 });

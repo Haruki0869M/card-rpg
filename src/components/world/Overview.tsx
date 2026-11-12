@@ -1,6 +1,6 @@
 // ===== 見取り図（段階6a・overhaul-plan-v2 §2-4）=====
 // 大陸全体を1画面に出す（真上から見た平らな六角形。地形は色だけ、街道は線）。箱庭の絵は描かないので軽い。
-// 印: 自分たち（席の色）・町・鍵のダンジョン（制覇は✓）・次の目的地（光る）・見つけた塔・ランダムダンジョン・💀災厄の中ボス（段階7b。見えている所だけ）。霧の中は暗いまま。
+// 印: 自分たち（席の色）・町・鍵のダンジョン（制覇は✓）・次の目的地（光る）・塔（回1: 霧の中でも）・ランダムダンジョン・💀災厄の中ボス（段階7b。見えている所だけ）。霧の中は暗いまま。
 // 印（どのマスでも）を押すと、見取り図を閉じて、その場所へ地図を動かす。ゲームの状態は変えない（見るだけ）。
 import { Binoculars, Castle, Check, DoorOpen, House, X } from 'lucide-react';
 import { useMemo } from 'react';
@@ -74,8 +74,8 @@ export function Overview({ game, onPick, onClose }: { game: GameState; onPick: (
     w.tiles.forEach((t, i) => {
       const f = t.f;
       if (!f) return;
-      // 次の目的地だけは、霧の中でも印を出す（町で聞いた行き先）
-      if (!t.seen && !(f.kind === 'dungeon' && f.id === goal)) return;
+      // 次の目的地だけは、霧の中でも印を出す（町で聞いた行き先）。回1: 見晴らしの塔も、最初から印を出す
+      if (!t.seen && !(f.kind === 'dungeon' && f.id === goal) && f.kind !== 'tower') return;
       if (f.kind === 'town') out.push({ tile: i, kind: 'town', label: TOWNS.tryGet(f.id)?.name ?? f.id, fallen: w.fallenTowns.includes(f.id) });
       else if (f.kind === 'tower') out.push({ tile: i, kind: 'tower', label: '見晴らしの塔', done: f.used });
       else if (f.kind === 'dungeon') {
