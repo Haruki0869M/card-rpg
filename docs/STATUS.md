@@ -9,6 +9,13 @@
 
 
 
+## 段階7a（ランダムダンジョン 全5行・テーマ3つ・黄金箱の専用の装備12個）を作った（2026-11-12 深夜・作ったのは Opus 5.5 の作業役・**公開していない**）
+
+- 記録と装備の一覧: docs/tasks/overhaul-stage7a.md。計画は overhaul-plan-v2.md §4。
+- 部品: dungeonThemes/themes.ts・roomTypes/themeRooms.ts（闇商人・晶石の祭壇）・items/goldenBox.ts（専用の装備。source: 'randomDungeon'）・world/randomDungeons.ts。保存の版は v26 のまま。
+- 作らなかった物: イージスの鏡盾・残響の指輪（今あるジョブの力と役割が重なる。オーナーに聞く）。
+- 次: 段階7b（災厄の中ボス）。オーナーが遊んでから: 段階6b・敵の特殊な行動の2回目。オーナーに見てほしい所のまとめは docs/tasks/owner-check-list-1112.md。
+
 ## 本番へ再公開（16回目・2026-11-12 夜・まとめ役 Claude）
 
 - オーナーの OK（「今日中に公開」→ B: 弱点の案内が出来てからまとめて）を受けて、main `adb6002` を `npm run deploy:firebase` で公開した。本番の `index-TGdllShs.js` が出ている事・タイトルが出てエラーが無い事を確かめた。
