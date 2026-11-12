@@ -38,9 +38,10 @@ describe('後半5職のデータ・転職', () => {
     // 区切りF: 新ジョブ4職を足した（44 → 48・特殊 10 → 14）
     expect(CLASSES.all).toHaveLength(48); expect(CLASSES.all.filter(j => j.tier === 'special')).toHaveLength(14);
     // 区切りD: 同じ中身のカードをまとめたので、職どうしで同じカードを使う所がある（30 → 24）
-    expect(new Set(jobs.flatMap(id => CLASSES.get(id).cardPool.filter(k1))).size).toBe(24);
+    // 2026-11-12: 専用の札が足りなかった6職に1枚ずつ足した（docs/tasks/job-unique-cards-plan.md）。この5職では占星術師の「星の導き」だけ（24 → 25・占星術師は7枚）
+    expect(new Set(jobs.flatMap(id => CLASSES.get(id).cardPool.filter(k1))).size).toBe(25);
     for (const id of jobs) {
-      const j = CLASSES.get(id); expect(j.cardPool.filter(k1)).toHaveLength(6); expect(j.signature).toEqual(j.cardPool.slice(0, 3));
+      const j = CLASSES.get(id); expect(j.cardPool.filter(k1)).toHaveLength(id === 'astrologer' ? 7 : 6); expect(j.signature).toEqual(j.cardPool.slice(0, 3));
       // 「エピック2枚以上」の決まりは、やめた（オーナーの決定 2026-11-12。憲章4: 数の目標を捨てる）
     }
   });
@@ -66,7 +67,7 @@ describe('後半5職のデータ・転職', () => {
     expect(picked.state.heroes[0].jobPick).toBeUndefined();
   });
   it('銃と楽器の初期武器には対応する武器カードが2枚ずつ付く', () => {
-    for (const [weapon, type, card] of [['antiqueGun', 'gun', 'wGunShot'], ['travelerLute', 'instrument', 'wEncouragingNote']]) {
+    for (const [weapon, type, card] of [['antiqueGun', 'gun', 'strike'], ['travelerLute', 'instrument', 'wEncouragingNote']]) {
       expect(WEAPON_TYPES.has(type)).toBe(true); expect(ITEMS.get(weapon).cards).toEqual([{ cardId: card, count: 2 }]);
     }
   });

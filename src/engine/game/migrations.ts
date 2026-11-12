@@ -20,6 +20,8 @@ type Loose = Record<string, any>; // eslint-disable-line @typescript-eslint/no-e
 const MIGRATIONS: Record<number, (g: Loose) => void> = {
   // v23 → v24（2026-11-12・憲章5）: 数字だけ違うカードをまとめた。消した札を、残した札に読み替える
   23(g) { renameCards(g); },
+  // v24 → v25（2026-11-12・区切りG-1）: 武器にだけ付いていた札11枚と、区切りFの2枚をまとめた
+  24(g) { renameCards(g); },
 };
 
 /** 保存データの中のカードのID（cardId の項目と、名前に card が入る並び）を、まとめた先に読み替える。敵の行動のID（同じ文字の物がある）には触らない */

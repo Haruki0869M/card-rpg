@@ -24,5 +24,9 @@ export function consumeAttackCharge(ally: AllyState, card: CardDef, tier: CardTi
 
 export function afterAttackCard(ally: AllyState, card: CardDef, tier: CardTier) {
   if (!tier.effects.some(e => e.kind === 'damage')) return;
-  if (card.category === 'physical') delete ally.imbuedElement;
+  if (card.category !== 'physical') return;
+  // 二重付与: 宿した属性が、あと何枚に乗るか
+  if ((ally.imbueCards ?? 1) > 1) { ally.imbueCards = ally.imbueCards! - 1; return; }
+  delete ally.imbuedElement;
+  delete ally.imbueCards;
 }

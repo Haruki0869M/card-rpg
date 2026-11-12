@@ -5,6 +5,18 @@ import type { CardDef, Lineage } from '../../types';
 
 /** 消した札 → 残した札。古い保存データの読み替えに使う（置き換えずに消した5枚も、同じ組の残した札にする） */
 export const MERGED_CARDS: Record<string, string> = {
+  // 区切りG-1（2026-11-12）: 武器にだけ付いていた11枚（docs/tasks/lineup-stageG-plan.md §2）
+  wSlash: 'strike',
+  wGunShot: 'strike',
+  wAimedShot: 'strike',
+  wManaBolt: 'magicArrow',
+  wQuickStab: 'cmProbe',
+  wIaiCut: 'lnGiQuick',
+  wThrust: 'lnSeiSmite',
+  wCleave: 'cmTackle',
+  wManaTorrent: 'iceLance',
+  wLash: 'palmStrike',
+  wIronHammer: 'palmStrike',
   // 区切りFの「ブロックを得るだけ」の2枚は無くした（同じ役の「備え」に読み替える）
   bwBigShield: 'cmPrepare',
   ptBuddyGuard: 'cmPrepare',
@@ -97,6 +109,9 @@ export const MERGED_CARDS: Record<string, string> = {
 
 /** 残した札に足す物: 消した札が置かれていた武器種・系統・共通と、どこに置いても合う名前 */
 export const MERGED_PLACEMENT: Record<string, { name?: string; weaponTypes?: string[]; lineages?: Lineage[]; common?: true }> = {
+  // 区切りG-1: 槍にも聖職にも合う名前・鞭と槌にも合う名前（オーナーの OK）
+  lnSeiSmite: { name: '守りの一撃' },
+  palmStrike: { name: '打ち据え' },
   lnGiQuick: { weaponTypes: ['scythe', 'sword', 'spear', 'hammer', 'axe', 'katana'], lineages: ['bu'] },
   lnBuFlurry: { name: '二連撃', weaponTypes: ['bow', 'dagger', 'spear', 'sword', 'katana', 'fist', 'gun'], lineages: ['gi'] },
   lnGiFeint: { weaponTypes: ['fist'], lineages: ['bu'] },

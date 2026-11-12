@@ -104,10 +104,11 @@ describe('区切りC: 数', () => {
     expect(STATE_VERSION).toBeGreaterThanOrEqual(20);
     expect(GAME_VERSION).toBeGreaterThanOrEqual(20);
   });
-  it('単発射撃は 成功率85%・4/8', () => {
-    const c = getCard('wGunShot');
-    expect(c.baseChance).toBe(85);
-    expect(c.tiers.map((t) => (t.effects[0] as { amount: number }).amount)).toEqual([4, 8]);
+  it('古式銃の札は「ストライク」（区切りG-1: 単発射撃 85%・4/8 は、形が同じなのでストライクにまとめた）', () => {
+    const c = getCard('strike');
+    expect(getItem('antiqueGun').cards).toEqual([{ cardId: 'strike', count: 2 }]);
+    expect(c.baseChance).toBe(80);
+    expect(c.tiers.map((t) => (t.effects[0] as { amount: number }).amount)).toEqual([4, 7]);
   });
 });
 

@@ -27,6 +27,6 @@ export const brawler: ClassDef = {
   from: ['monk'],
   signature: ['lnBuFlurry', 'lnGiFeint', 'hundredKicks'],
   startingEquipment: { weapon: 'clothWraps', armor: 'travelerClothes' },
-  cardPool: ['lnBuFlurry', 'lnGiFeint', 'hundredKicks', 'cmProbe', 'guardBreak', 'fistOfFury', 'axFlurryGuard'],
+  cardPool: ['lnBuFlurry', 'lnGiFeint', 'hundredKicks', 'cmProbe', 'guardBreak', 'fistOfFury', 'axFlurryGuard', 'brFinishFist'],
   growthWeights: { agi: 3, str: 2, dex: 2 },
 };
