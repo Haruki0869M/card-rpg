@@ -9,6 +9,15 @@
 
 
 
+## 回4（難しさ）を測った（2026-11-13・測ったのは Opus 5.5 の作業役・**数値は変えていない**）
+
+- 結果: docs/review/2026-11-13-difficulty-r4.md と、docs/tasks/play-feedback-1113-plan.md の §9。
+- 候補 (a)(b)（合計ダメージで BREAK の線を上げる・無くす）は、数字が1つも動かなかった。「合計ダメージで BREAK」は1冒険に 0.0〜0.2回しか起きていない。BREAK のほとんどは完全成功と弱点。
+- 候補 (c)（火山・魔王城の荒野の敵のHP +15%）は、工夫する bot が 85〜93% → 70〜88%。目標（35〜50%）に遠く、回復役のいないパーティだけが大きく落ちる。
+- おすすめは「3つとも入れない」。次に測る候補 (d) ボス・中ボス・災厄は完全成功だけでは崩れない、(e) 大物だけHPを上げる、は、オーナーの OK 待ち。
+- 足した入れ物（既定は空 = 今と同じ）: BALANCE.breakDamagePctByRank・BALANCE.enemyHpByRegion・戦闘の elite の印（effects/index.ts の breakDamagePctOf、game.ts の regionHpMul）。測定の切り替えは twoBots.sim.test.ts の SIM_VARIANT・SIM_LATE_HP・SIM_PARTYSET。
+- 古い確認スクリプト3本（special-jobs.mjs・sanctuaries.mjs・explore.mjs）を直した。テスト 1688件成功/8件スキップ。
+
 ## 回3（2人プレイの不具合）を作った（2026-11-13・作ったのは Opus 5.5 の作業役・**公開していない**）
 
 - 結果: docs/tasks/play-feedback-1113-plan.md の §8。エミュレーターの2台で再現してから直した（scripts/coop-r3.mjs）。
