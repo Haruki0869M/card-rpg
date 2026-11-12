@@ -1,13 +1,13 @@
 // ===== 見取り図（段階6a・overhaul-plan-v2 §2-4）=====
 // 大陸全体を1画面に出す（真上から見た平らな六角形。地形は色だけ、街道は線）。箱庭の絵は描かないので軽い。
-// 印: 自分たち（席の色）・町・鍵のダンジョン（制覇は✓）・次の目的地（光る）・見つけた塔・ランダムダンジョン。霧の中は暗いまま。
+// 印: 自分たち（席の色）・町・鍵のダンジョン（制覇は✓）・次の目的地（光る）・見つけた塔・ランダムダンジョン・💀災厄の中ボス（段階7b。見えている所だけ）。霧の中は暗いまま。
 // 印（どのマスでも）を押すと、見取り図を閉じて、その場所へ地図を動かす。ゲームの状態は変えない（見るだけ）。
 import { Binoculars, Castle, Check, DoorOpen, House, X } from 'lucide-react';
 import { useMemo } from 'react';
 import { DUNGEONS } from '../../data/dungeons';
 import { getScenario } from '../../data/scenarios';
 import { TERRAINS, TOWNS } from '../../data/world';
-import { colOf, nextGoalDungeon, randomDungeonView, rowOf } from '../../engine';
+import { aliveScourges, colOf, nextGoalDungeon, randomDungeonView, rowOf } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
 import type { GameState, Tile } from '../../types';
 import { PLAYER_COLORS } from './pieceLayout';
@@ -18,7 +18,7 @@ const FOG = '#22202e';
 
 interface Mark {
   tile: number;
-  kind: 'town' | 'dungeon' | 'finale' | 'random' | 'tower';
+  kind: 'town' | 'dungeon' | 'finale' | 'random' | 'tower' | 'scourge';
   label: string;
   done?: boolean;
   fallen?: boolean;
@@ -87,6 +87,8 @@ export function Overview({ game, onPick, onClose }: { game: GameState; onPick: (
         else out.push({ tile: i, kind: d.finale ? 'finale' : 'dungeon', label: d.name, done: game.clearedDungeons.includes(f.id) });
       }
     });
+    // 災厄の中ボス（段階7b）: 場所が見えている物だけ（霧の中は出さない。見晴らしの塔に登ると見える）
+    for (const { wd, def } of aliveScourges(w)) if (w.tiles[wd.tile].seen) out.push({ tile: wd.tile, kind: 'scourge', label: def.name, mark: '💀' });
     return out;
   }, [w, goal, game.clearedDungeons]);
   const goalTile = goal ? w.tiles.findIndex((t) => t.f?.kind === 'dungeon' && t.f.id === goal) : -1;
@@ -96,7 +98,7 @@ export function Overview({ game, onPick, onClose }: { game: GameState; onPick: (
   for (const h of heroes) byTile.set(w.pos[h.id], [...(byTile.get(w.pos[h.id]) ?? []), h]);
 
   const icon = (m: Mark) => (m.kind === 'town' ? House : m.kind === 'finale' ? Castle : m.kind === 'tower' ? Binoculars : DoorOpen);
-  const color = (m: Mark) => (m.fallen ? '#7a6a7a' : m.kind === 'town' ? '#ffe9a8' : m.kind === 'finale' ? '#ff6a5a' : m.kind === 'tower' ? '#e8e0c8' : m.kind === 'random' ? '#c8a0ff' : '#ff9a7a');
+  const color = (m: Mark) => (m.fallen ? '#7a6a7a' : m.kind === 'scourge' ? '#e070ff' : m.kind === 'town' ? '#ffe9a8' : m.kind === 'finale' ? '#ff6a5a' : m.kind === 'tower' ? '#e8e0c8' : m.kind === 'random' ? '#c8a0ff' : '#ff9a7a');
   // 印の大きさ（小さい画面でも押せるように、マスより大きく描く。押せる所はさらに大きい）
   const M = Math.max(14, R * 1.9);
 

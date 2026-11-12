@@ -36,6 +36,9 @@ import {
   shopPriceFor,
   statChance,
   corruptionShown,
+  scourgeAt,
+  scourgeRewardText,
+  scourgesWith,
 } from '../../engine';
 import { isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
@@ -80,6 +83,9 @@ export function EncounterScreen() {
   const rollers = cands.filter((h) => participants.includes(h.id) && !others(h));
   const roller = rollers.find((h) => h.id === heroId) ?? rollers[0] ?? mover;
   const r = e.result;
+  // 災厄の中ボス（段階7b）: 何の災厄か・悪さ・倒すとどうなるか・逃げても残る
+  const scourge = scourgeAt(w, e.wandererId);
+  const many = (wd?.enemies.length ?? 0) > 3;
 
   return (
     <Screen>
@@ -87,12 +93,19 @@ export function EncounterScreen() {
       <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <BattleBackground kind={sceneBackground(game)} className="absolute inset-0 h-full w-full opacity-50" />
         <div className="relative px-3 pt-3">
-          <div className="font-display text-outline text-center text-[24px] text-red-200">{e.ambushed ? '夜襲だ！' : wd?.raidTown ? '町を襲う魔物！' : '魔物に遭遇した！'}</div>
+          <div className={`font-display text-outline text-center text-[24px] ${scourge ? 'text-fuchsia-200' : 'text-red-200'}`}>{e.ambushed ? '夜襲だ！' : scourge ? `💀 ${scourge.name}！` : wd?.raidTown ? '町を襲う魔物！' : '魔物に遭遇した！'}</div>
+          {scourge && (
+            <div className="panel mt-1 rounded-xl border border-fuchsia-400/50 p-2 text-[12px] leading-4" data-encounter-scourge={scourge.id}>
+              <div className="text-fuchsia-100">いま世界に: {scourge.curseText}</div>
+              <div className="mt-0.5 text-amber-100">倒すと: 悪さが消える。{scourgeRewardText(game, scourge)}</div>
+              <div className="mt-0.5 text-zinc-300">逃げても、災厄は巣に残る（また挑める）</div>
+            </div>
+          )}
           <div className="mt-1 flex items-end justify-center gap-1">
             {wd?.enemies.map((en, i) => (
-              <div key={i} className="flex flex-col items-center">
-                <EnemyArt defId={en.defId} className="h-[110px] w-[92px]" />
-                <span className="text-outline text-[12px] font-bold">
+              <div key={i} className="flex min-w-0 flex-col items-center">
+                <EnemyArt defId={en.defId} className={many ? 'h-[92px] w-[76px]' : 'h-[110px] w-[92px]'} />
+                <span className="text-outline max-w-[92px] truncate text-[12px] font-bold">
                   {getEnemy(en.defId).name} <span className="text-amber-300">Lv{en.level ?? 1}</span>
                 </span>
               </div>
@@ -307,6 +320,12 @@ export function TownScreen() {
       <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-6" data-town-body>
         {tab === 'shop' && stock && (
           <div className="flex flex-col gap-1">
+            {/* 災厄の中ボス（段階7b）: 強欲の盗賊王が生きている間は値段が高い（だれのせいか・倒すと戻ることを出す） */}
+            {scourgesWith(game, 'shopPrice').map((d) => (
+              <div key={d.id} className="rounded-lg border border-fuchsia-400/50 bg-fuchsia-950/40 px-2 py-1 text-[12px] leading-4 text-fuchsia-100" data-shop-scourge={d.id}>
+                💀{d.short}のせいで、値段が+{d.curse.shopPrice}%（倒すと元に戻る）
+              </div>
+            ))}
             {stock.items.map((s, i) => {
               const it = getItem(s.item.itemId);
               const left = shopLeft(stock, s.item.itemId);
@@ -339,14 +358,14 @@ export function TownScreen() {
                     </button>
                   )}
                   <button
-                    disabled={!mine || s.sold || v.gold < shopPriceFor(v, s.price)}
+                    disabled={!mine || s.sold || v.gold < shopPriceFor(v, s.price, game)}
                     onClick={() => buy('item', i)}
                     className="btn btn-gold flex h-11 w-[78px] shrink-0 items-center justify-center gap-0.5 rounded-lg text-[13px] font-bold"
                   >
                     {s.sold ? '売り切れ' : (
                       <>
                         <Coins size={14} />
-                        {shopPriceFor(v, s.price)}
+                        {shopPriceFor(v, s.price, game)}
                       </>
                     )}
                   </button>
@@ -384,7 +403,7 @@ export function TownScreen() {
                       {c.sold ? '売り切れ' : (
                         <>
                           <Coins size={14} />
-                          {shopPriceFor(v, c.price)}
+                          {shopPriceFor(v, c.price, game)}
                         </>
                       )}
                     </button>
@@ -400,11 +419,11 @@ export function TownScreen() {
                 action={
                   <>
                     <Coins size={18} />
-                    {shopPriceFor(v, selCard.price)}Gで買う
+                    {shopPriceFor(v, selCard.price, game)}Gで買う
                   </>
                 }
-                disabled={!mine || selCard.sold || v.gold < shopPriceFor(v, selCard.price)}
-                note={selCard.sold ? '売り切れです' : !mine ? `${v.name}の担当の人が買えます` : v.gold < shopPriceFor(v, selCard.price) ? 'お金が足りません' : undefined}
+                disabled={!mine || selCard.sold || v.gold < shopPriceFor(v, selCard.price, game)}
+                note={selCard.sold ? '売り切れです' : !mine ? `${v.name}の担当の人が買えます` : v.gold < shopPriceFor(v, selCard.price, game) ? 'お金が足りません' : undefined}
                 onAction={() => {
                   buy('card', cardSel);
                   setCardSel(null);

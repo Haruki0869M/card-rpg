@@ -707,27 +707,33 @@ export function WorldMap({
             );
           })}
         </svg>
-        {/* 徘徊する敵: 赤い台座に乗った魔物の駒（レアは金の台座と★）。ゆっくり呼吸するように動く */}
+        {/* 徘徊する敵: 赤い台座に乗った魔物の駒（レアは金の台座と★・災厄の中ボスは紫の台座と💀で少し大きい）。ゆっくり呼吸するように動く */}
         {w.wanderers.map((wd) => {
           if (!w.tiles[wd.tile].seen) return null;
           const { x, y } = center(wd.tile);
-          const s = R * 1.5;
-          const base = wd.rare ? '#e0a82a' : '#c0282a';
+          const s = R * (wd.scourge ? 1.8 : 1.5);
+          const base = wd.scourge ? '#8a2ad0' : wd.rare ? '#e0a82a' : '#c0282a';
           return (
             <div
               key={wd.id}
               className="pointer-events-none absolute"
               data-wanderer={wd.id}
               data-rare={wd.rare ? 'true' : undefined}
+              data-scourge={wd.scourge}
               style={{ left: x - s / 2, top: y - s * 0.72, width: s, height: s, zIndex: depthZ(rowOf(dims, wd.tile), 0) }}
             >
-              <EnemyBase color={base} s={s} glow={wd.raidTown ? '#ff3a3a' : wd.rare ? '#ffd24a' : undefined} />
+              <EnemyBase color={base} s={s} glow={wd.scourge ? '#d08aff' : wd.raidTown ? '#ff3a3a' : wd.rare ? '#ffd24a' : undefined} />
               <span className="enemy-breathe absolute block" style={{ left: s * 0.08, top: -s * 0.02, width: s * 0.84, height: s * 0.84, animationDelay: `${-(hash01(Number(wd.id.replace(/\D/g, '')) || 0, 7) * 3).toFixed(2)}s` }}>
                 <EnemyArt defId={wd.enemies[0].defId} className="h-full w-full" />
               </span>
               {/* 小さい文字は、縮小した時は出さない（台座の色でレア・襲撃は分かる） */}
               {wd.rare && !compact && <span className="absolute -left-1 top-0 z-10 text-[14px] leading-4 font-black text-amber-300">★</span>}
-              {!compact && (
+              {/* 災厄の中ボスの💀は、縮小した時も出す（どこに災厄がいるかが一目で分かるように） */}
+              {wd.scourge ? (
+                <span className="absolute -right-1 bottom-[8%] z-10 rounded-full border border-fuchsia-300 bg-fuchsia-950/90 px-0.5 text-[12px] leading-4 font-black text-fuchsia-100" data-scourge-mark>
+                  💀
+                </span>
+              ) : !compact && (
                 <span className="absolute -right-1 bottom-[10%] rounded-full border border-red-300 bg-red-950/90 px-1 text-[12px] leading-4 font-black text-red-200">
                   {wd.enemies.length > 1 ? `×${wd.enemies.length}` : `Lv${wd.enemies[0].level ?? 1}`}
                 </span>

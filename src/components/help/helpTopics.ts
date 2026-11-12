@@ -139,6 +139,7 @@ export const HELP_TOPICS: HelpTopic[] = [
       `時間が進むと上がります（ワールドターンごと+${BALANCE.corruptionPerTurn}%、だれかがダンジョンの中にいる時は+${BALANCE.corruptionPerDungeonTurn}%・ダンジョンに入る時+${BALANCE.corruptionOnDungeonEnter}%・町が陥落した時+${BALANCE.corruptionOnTownFall}%）。鍵のダンジョンを制覇すると${BALANCE.corruptionOnKeyDungeonClear}%下がります。`,
       `交代運転にも時間がかかります。同じワールドターンのうちに、仲間の番ですでに動いたキャラを、別の人の番でまた動かすと+${BALANCE.corruptionPerRelayMove}%（1回の番に1回まで）。`,
       '一定の値をこえるごとに、敵が増える・強くなるなど世界が変わります。次の変化は上のバーに出ています。',
+      `💀災厄の中ボス（広い地図のシナリオ）: 1つ目の鍵を取った時（その前に${BALANCE.scourge.firstCorruption}%を越えたらその時）・${BALANCE.scourge.milestones.join('%・')}%で、1体ずつ現れます（最大${BALANCE.scourge.max}体）。生きている間は「店の値段が高い」「侵食度が速く上がる」「野営の回復が半分」「夜の敵が強い」のどれかの悪さをします。倒すと悪さが消え、専用の装備を必ず落とし、侵食度が${BALANCE.scourge.purify}%下がります。逃げても巣に残ります。場所は見晴らしの塔に登ると見えます。`,
       '100%になるとゲームオーバーです。',
     ],
   },
