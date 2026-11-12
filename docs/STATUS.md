@@ -9,6 +9,12 @@
 
 
 
+## 回2（説明の出ない画面の統一・町で装備・倒した時の演出・BREAK の印）を作った（2026-11-13・作ったのは Opus 5.5 の作業役・**公開していない**）
+
+- 結果: docs/tasks/play-feedback-1113-plan.md の §7。部品: ui/CardPickPanel.tsx・ui/ItemPickPanel.tsx（新）・StatusButton（WorldScreen から切り出し）・BattleFx の倒れる演出。
+- 古い確認スクリプトが3本落ちている（special-jobs.mjs・sanctuaries.mjs・explore.mjs）。ゲームの問題ではなく、スクリプトが古い決まりを見ている。回3 の後に直す。
+- 次: 回3（2人プレイの不具合の再現と直し）→ 回4（難しさを測って案を出す）。18回目の公開はオーナーの OK 待ち。
+
 ## 回1（導線と寄り道の見つけ方）と、回1の追加（施設の押しやすさ）を作った（2026-11-13・作ったのは Opus 5.5 の作業役・**公開していない**）
 
 - 計画と結果: docs/tasks/play-feedback-1113-plan.md の §5・§6。
