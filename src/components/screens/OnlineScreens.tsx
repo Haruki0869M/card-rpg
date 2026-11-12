@@ -1,8 +1,7 @@
 // ===== オンライン協力の画面（部屋に参加・待合室・遊んでいる間の表示。spec §7.2） =====
 import { TopBar } from '../ui/fancy';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Copy, Crown, LogIn, Share2, Swords, Users, Wifi, WifiOff } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Copy, Crown, LogIn, Share2, Swords, Users, Wifi, WifiOff } from 'lucide-react';import { useEffect, useState } from 'react';
 import { BALANCE } from '../../data/balance';
 import { CLASSES } from '../../data/classes';
 import { DIFFICULTIES } from '../../data/rules';
@@ -318,12 +317,12 @@ export function OnlinePanel() {
             {mem.name}
             {room.meta!.hostUid === Object.entries(room.members).find(([, x]) => x === mem)?.[0] && <Crown size={13} className="ml-1 inline text-amber-300" />}
           </span>
-          {!mem.online && room.isHost && mem.seat !== room.seat && (
+          {!room.alive(mem) && room.isHost && mem.seat !== room.seat && (
             <button onClick={() => setProxy(mem.seat, !room.meta!.proxy?.[mem.seat])} className="btn btn-dark h-11 rounded-lg px-2 text-[12px] font-bold">
               {room.meta!.proxy?.[mem.seat] ? '代わりの操作をやめる' : '代わりに操作する'}
             </button>
           )}
-          {mem.online ? <Wifi size={14} className="text-emerald-300" /> : <WifiOff size={14} className="text-zinc-500" />}
+          {room.alive(mem) ? <Wifi size={14} className="text-emerald-300" /> : <WifiOff size={14} className="text-zinc-500" />}
         </div>
       ))}
       <div className="grid grid-cols-3 gap-1">
@@ -355,6 +354,15 @@ export function OnlineOverlay() {
   const screen = useBattle((s) => s.screen);
   const [shownStamp, setShownStamp] = useState<number | null>(null);
   const [, setNow] = useState(0);
+  const hostNote = useOnline((s) => s.hostNote);
+  const [shownHost, setShownHost] = useState<number | null>(null);
+  // 回3 C: ホストの引き継ぎの知らせは12秒出す
+  useEffect(() => {
+    if (!hostNote) return;
+    setShownHost(hostNote.id);
+    const t = setTimeout(() => setShownHost(null), 12000);
+    return () => clearTimeout(t);
+  }, [hostNote]);
   useEffect(() => {
     if (!stamp) return;
     setShownStamp(stamp.id);
@@ -377,6 +385,14 @@ export function OnlineOverlay() {
       {!room.connected && (
         <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-red-950/90 px-3 py-1.5 text-[13px] text-red-100">
           <WifiOff size={16} /> 通信が切れました。つながり直しています…
+        </div>
+      )}
+      {hostNote && shownHost === hostNote.id && (
+        <div className="pointer-events-auto flex w-full max-w-[400px] items-start gap-1.5 rounded-xl border border-amber-300/40 bg-black/90 px-3 py-2 text-[13px] text-amber-50" role="status" data-host-note>
+          <Crown size={16} className="mt-0.5 shrink-0 text-amber-300" />
+          <span>
+            ホスト（{hostNote.oldName}さん）との接続が切れました。{hostNote.mine ? 'あなたがホストを引き継ぎました。このまま続けられます' : `${hostNote.newName}さんが引き継ぎました。このまま続けられます`}
+          </span>
         </div>
       )}
       {offlineAwaited.map((p) => {

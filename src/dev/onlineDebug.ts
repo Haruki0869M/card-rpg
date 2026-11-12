@@ -43,6 +43,15 @@ const api = {
     return null;
   },
   resync: () => useOnline.getState().room?.resync('error'),
+  /** 画面の今の様子（確認用。回3） */
+  ui: () => {
+    const s = useBattle.getState();
+    return { screen: s.screen, scene: s.scene, sheet: s.sheet, activeId: s.activeId, mode: s.game?.mode, toast: s.toast?.text ?? null };
+  },
+  /** 確認用: 下から出る画面（道具袋など）を開く（回3） */
+  openSheet: (name: string) => useBattle.getState().openSheet(name as Parameters<ReturnType<typeof useBattle.getState>['openSheet']>[0]),
+  /** 確認用: この端末が持っている冒険の状態（1台で遊ぶ時も。回3） */
+  full: () => structuredClone(useBattle.getState().full ?? null),
   /** 部屋のピン（確認用） */
   pins: () => structuredClone(useOnline.getState().room?.pins ?? {}),
 };

@@ -273,6 +273,43 @@ describe('切断と再接続・ホストの引き継ぎ', () => {
     expect(allSame(rooms)).toBe(true);
   }, 30_000);
 
+  it('回3 C: ホストのページが止まった（接続は残ったまま）時も、「動いている」が古くなったら次の人が引き継ぎ、そのまま続けられる', async () => {
+    const { hub, rooms } = await playing(2, 2);
+    await drive(rooms, 6);
+    const [host, b] = rooms;
+    type Inside = { beatTimer: ReturnType<typeof setInterval> | null; stopHosting(): void; checkHost(): void; startBeat(): void };
+    const h = host as unknown as Inside;
+    // スマホが眠った: タイマーも処理も止まる。接続（online）は残る
+    if (h.beatTimer) clearInterval(h.beatTimer);
+    h.beatTimer = null;
+    h.stopHosting();
+    expect(hub.read(`rooms/${host.code}/members/u0/online`)).toBe(true);
+    // まだ新しいうちは引き継がない
+    (b as unknown as Inside).checkHost();
+    await settle(30);
+    expect(b.isHost).toBe(false);
+    // 時間がたって、ホストの「動いている」が古くなった
+    const t0 = Date.now();
+    hub.clock = () => Date.now() - t0 + t0 + 40_000;
+    expect(b.seatOnline('P1')).toBe(false);
+    (b as unknown as Inside).checkHost();
+    await settle(30);
+    expect(b.isHost).toBe(true);
+    await b.setProxy('P1', true);
+    await settle();
+    const before = b.seq;
+    await drive([b], 12);
+    expect(b.seq).toBeGreaterThan(before);
+    // 目を覚ました: ホストは戻らず、記録に追いつく（新しいホストは、その間も「動いている」を書き続けている）
+    await b.backend.set(`rooms/${b.code}/members/u1/beat`, hub.clock());
+    await settle();
+    h.startBeat();
+    await settle(30);
+    expect(host.isHost).toBe(false);
+    expect(allSame(rooms)).toBe(true);
+    expect(b.seatOnline('P1')).toBe(true);
+  }, 30_000);
+
   it('全員抜けても、同じ合言葉で入り直して続きから遊べる', async () => {
     const { hub, rooms } = await playing(2);
     await drive(rooms, 25);
