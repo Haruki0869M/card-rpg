@@ -9,7 +9,7 @@ import { CharacterArt } from '../art';
 import { cardOf } from '../data/cards';
 import { getClass } from '../data/classes';
 import { getItem, POUCH_LIMIT } from '../data/items';
-import { EQUIP_SLOTS, STAT_IDS, affinityFromStats, jobOptions, battleDeck, canEquip, describeAbility, expToNext, findAlly, heroFocusMax, heroMaxHp, heroStats, weaponRarity } from '../engine';
+import { EQUIP_SLOTS, STAT_IDS, affinityFromStats, jobOptions, battleDeck, canBreak, canEquip, enemyName, itemTargetsEnemy, describeAbility, expToNext, findAlly, heroFocusMax, heroMaxHp, heroStats, weaponRarity } from '../engine';
 import { LOCAL_PLAYER, isLocalPlayer, isOnlinePlay } from '../store/battleConfig';
 import { PLAYER_COLOR } from '../data/theme';
 import { useBattle } from '../store/battleStore';
@@ -599,7 +599,33 @@ function PouchSheet() {
           </div>
         </div>
       )}
-      {chosenDef && fieldKind(chosenDef) !== 'tent' && !(fieldKind(chosenDef) === 'whetstone' && stoneHero) && (
+      {chosenDef && inBattle && itemTargetsEnemy(chosenDef.use) && (
+        <div className="mt-2 rounded-xl border border-amber-400/40 bg-black/40 p-2" data-pouch-foes>
+          <div className="text-[13px] text-zinc-300">「{chosenDef.name}」をどの敵に使う？</div>
+          <div className="mt-1 grid grid-cols-2 gap-1">
+            {battle.enemies.filter((e) => !e.dead).map((e) => (
+              <button
+                key={e.uid}
+                onClick={() => {
+                  const error = usePouch(chosen!, e.uid, owner?.id);
+                  if (!error) setChosen(null);
+                }}
+                className="btn btn-dark flex h-12 items-center gap-1.5 rounded-lg px-2 text-left"
+              >
+                <span className="min-w-0 flex-1 leading-4">
+                  <span className="block truncate text-[13px] font-bold">{enemyName(e)}</span>
+                  <span className="block text-[12px] text-zinc-400 tabular-nums">
+                    HP {e.hp}/{e.maxHp}
+                    {canBreak(e) && <span className="ml-1 text-amber-300">大技の予告</span>}
+                  </span>
+                </span>
+                <ArrowRight size={16} className="ml-auto text-amber-300" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {chosenDef && !(inBattle && itemTargetsEnemy(chosenDef.use)) && fieldKind(chosenDef) !== 'tent' && !(fieldKind(chosenDef) === 'whetstone' && stoneHero) && (
         <div className="mt-2 rounded-xl border border-amber-400/40 bg-black/40 p-2">
           <div className="text-[13px] text-zinc-300">
             「{chosenDef.name}」を誰に使う？{chosenDef.use?.some((e) => e.kind === 'escape') && '（使うと戦闘から逃げる）'}

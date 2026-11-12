@@ -4,7 +4,7 @@ import { ENEMIES } from '../../data/enemies';
 import { ITEMS, getItem } from '../../data/items';
 import type { BattleState, GameState, PlayerId } from '../../types';
 import { applyCommand, applyGameCommand, createBattle, createGame, toPartyMember } from '../index';
-import { STATE_VERSION } from '../battle/battle';
+import { STATE_VERSION, itemTargetsEnemy } from '../battle/battle';
 import { addItem } from '../game/common';
 import { findHero } from '../game/heroes';
 
@@ -21,10 +21,11 @@ function battle(classes: string[], enemies = ['stageEIdler'], opt: { boss?: bool
   for (const a of s.allies) { a.mana = 3; a.focus = 2; a.hp = a.maxHp = 500; a.block = 0; a.hand = []; }
   return s;
 }
-/** 戦闘で道具を使う（target = 味方の番号） */
+/** 戦闘で道具を使う（target = 味方の番号。敵に使う道具は、敵の番号） */
 function useItem(s: BattleState, itemId: string, target = 0) {
   const def = getItem(itemId);
-  return applyCommand(s, { type: 'USE_ITEM', playerId: P, characterId: s.allies[0].id, targetId: s.allies[target].id, itemName: def.name, effects: def.use! });
+  const targetId = itemTargetsEnemy(def.use) ? s.enemies[target].uid : s.allies[target].id;
+  return applyCommand(s, { type: 'USE_ITEM', playerId: P, characterId: s.allies[0].id, targetId, itemName: def.name, effects: def.use! });
 }
 
 describe('区切りE: 数', () => {
@@ -62,6 +63,21 @@ describe('区切りE: 戦闘で使う道具', () => {
     r.state.enemies[0].broken = false;
     expect(useItem(r.state, 'flashShard').error).toBeDefined();
     expect(useItem(battle(['warrior']), 'flashShard').error).toBe('大技を予告している敵がいません');
+  });
+  it('閃光の破砕玉・氷結の魔石: 狙う敵を選べる（オーナーの決定 2026-11-12）', () => {
+    // 1体目は置物・2体目が大技の予告
+    const s = battle(['warrior'], ['stageEIdler', 'stageEBig']);
+    expect(useItem(s, 'flashShard', 0).error).toBe('その敵は、大技を予告していません');
+    const r = useItem(s, 'flashShard', 1);
+    expect(r.error).toBeUndefined();
+    expect([r.state.enemies[0].broken ?? false, r.state.enemies[1].broken]).toEqual([false, true]);
+    // 氷結の魔石は、選んだ敵だけに当たる
+    const f = useItem(battle(['warrior'], ['stageEIdler', 'stageEIdler']), 'frostGem', 1).state.enemies;
+    expect([f[0].statuses.freeze ?? 0, f[1].statuses.freeze, f[0].hp === f[0].maxHp, f[1].hp < f[1].maxHp]).toEqual([0, 1, true, true]);
+    // 倒れた敵・味方を選んだ時は使えない
+    const d = battle(['warrior'], ['stageEIdler', 'stageEIdler']);
+    const def = getItem('frostGem');
+    expect(applyCommand(d, { type: 'USE_ITEM', playerId: P, characterId: d.allies[0].id, targetId: d.allies[0].id, itemName: def.name, effects: def.use! }).error).toBe('狙う敵を選び直してください');
   });
   it('英雄の霊薬: マナ+2・フォーカス+2・2枚引く', () => {
     const s = battle(['warrior']);

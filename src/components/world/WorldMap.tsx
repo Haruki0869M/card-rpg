@@ -16,7 +16,7 @@ import { BASE_DEPTH, corruptionStage, GROUND_K, hash01, hexVerts, LEVEL_STEP, MA
 import { PlaceMini, type MiniKind } from './MapMiniatures';
 import { FogSilhouettes, LandscapeLayer } from './landscape/LandscapeLayer';
 import { riverLinks, scatter } from './landscape/scatter';
-import { DepthFront, FRONT_FADE, FRONT_OPACITY, type FrontSpot, type FrontTint } from './DepthFront';
+import { DepthFront, FRONT_FADE, type FrontSpot, type FrontTint } from './DepthFront';
 import { FogSea } from './FogSea';
 import { HeroFace } from '../ui/game';
 import { petSpot, PetToken } from '../ui/PetToken';
@@ -718,7 +718,8 @@ export function WorldMap({
         {anim?.arrived && <span data-arrival-marker className="pointer-events-none absolute rounded-full border-2 border-amber-200 bg-amber-950 px-2 text-[22px] font-black text-amber-100" style={{ left: center(anim.path[anim.i]).x - 13, top: Math.max(4, center(anim.path[anim.i]).y - R * 2.3), zIndex: depthZ(w.height + 1, 0) }}>！</span>}
         {/* 奥行き: 駒より手前にある木・峰・岩（景色と同じ絵を、駒の上にもう一度描く）。ピンチで大きさを変えている間は出さない */}
         {pinchZoom === null && <DepthFront spots={frontSpots} items={sceneItems} tint={frontTint} />}
-        {/* 奥行き: 駒より手前にある施設（町・祠・神殿など）。駒のまわりだけ切り取って、駒の上に重ねる */}
+        {/* 奥行き: 駒より手前にある施設（町・祠・神殿など）。駒のまわりだけ切り取って、駒の上に重ねる。
+            建物は透かさない（木は葉のすき間から見えても自然だが、建物が透けると、駒が建物にめり込んで見える） */}
         {pinchZoom === null &&
           frontSpots.map((sp) => {
             const arts = w.tiles.flatMap((t, i) => {
@@ -731,7 +732,7 @@ export function WorldMap({
             });
             if (!arts.length) return null;
             return (
-              <svg key={`ff${sp.key}`} className="pointer-events-none absolute block" data-depth-front-place={sp.key} width={sp.w} height={sp.h} viewBox={`${sp.x} ${sp.y} ${sp.w} ${sp.h}`} style={{ left: sp.x, top: sp.y, zIndex: sp.z, opacity: FRONT_OPACITY, ...FRONT_FADE }}>
+              <svg key={`ff${sp.key}`} className="pointer-events-none absolute block" data-depth-front-place={sp.key} width={sp.w} height={sp.h} viewBox={`${sp.x} ${sp.y} ${sp.w} ${sp.h}`} style={{ left: sp.x, top: sp.y, zIndex: sp.z, ...FRONT_FADE }}>
                 {frontTint && (
                   <defs>
                     <filter id={`front-tint-${sp.key}`} x="0" y="0" width="100%" height="100%" filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse">

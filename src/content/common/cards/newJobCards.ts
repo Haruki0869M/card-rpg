@@ -7,7 +7,6 @@ import type { AbilityDef, AbilityEffect, CardCategory, CardDef, CardTarget, Effe
 const d = (amount: number): Effect => ({ kind: 'damage', amount });
 const b = (amount: number): Effect => ({ kind: 'block', amount });
 const ba = (amount: number): Effect => ({ kind: 'block', amount, to: 'allies' });
-const heal = (amount: number): Effect => ({ kind: 'heal', amount, to: 'self' });
 const t = (name: string, effect: AbilityEffect): AbilityDef => ({ name, effect });
 
 type Opt = { rarity?: Rarity; stat?: StatId; trait?: AbilityDef; tags?: string[] };
@@ -34,7 +33,8 @@ export const NEW_JOB_CARDS: CardDef[] = [
   c('dvLeyWedge', '地脈の楔', 'magic', 1, 80, 'enemy', [[{ kind: 'freshStatus', order: ['weak', 'vulnerable', 'poison'], amount: 1, count: 1 }], [{ kind: 'freshStatus', order: ['weak', 'vulnerable', 'poison'], amount: 2, count: 1 }], [{ kind: 'freshStatus', order: ['weak', 'vulnerable', 'poison'], amount: 2, count: 1 }]], { rarity: 'rare' }),
   c('dvScaleGuard', '竜脈の鱗盾', 'skill', 1, 80, 'self', [[{ kind: 'blockByFoeKinds', base: 5, max: 4 }], [{ kind: 'blockByFoeKinds', base: 8, max: 4 }], [{ kind: 'blockByFoeKinds', base: 11, max: 4 }]], { tags: ['block'] }),
   // ===== 調教師 =====
-  c('ptPat', 'なでなで', 'skill', 0, 85, 'self', [[heal(2)], [heal(3)]], { stat: 'luk', tags: ['pet'] }),
+  // オーナーの決定（2026-11-12）: HP回復。満タンの時はブロック2（満タンでも《相棒の覚醒》でお供が動くように）
+  c('ptPat', 'なでなで', 'skill', 0, 85, 'self', [[{ kind: 'healOrBlock', amount: 2, block: 2 }], [{ kind: 'healOrBlock', amount: 3, block: 2 }]], { stat: 'luk', tags: ['pet'] }),
   c('ptBuddyGuard', '相棒の守り', 'skill', 1, 80, 'self', [[b(5)], [b(8)], [b(11)]], { rarity: 'epic', tags: ['pet', 'block'], trait: t('相棒の守り', { when: 'afterCard', if: [{ kind: 'hasPet' }], do: [{ kind: 'block', amount: 3 }] }) }),
   c('ptTogether', 'いっしょに！', 'physical', 1, 75, 'enemy', [[d(3), { kind: 'petAct' }], [d(5), { kind: 'petAct' }], [d(8), { kind: 'petAct' }]], { tags: ['pet'] }),
 ];
