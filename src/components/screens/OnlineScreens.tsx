@@ -17,6 +17,7 @@ import { useBattle } from '../../store/battleStore';
 import { PROXY_WAIT_SEC, useOnline } from '../../store/onlineStore';
 import type { GameState, PlayerId } from '../../types';
 import { HeroFace, Screen } from '../ui/game';
+import { chestClaimWaits, facilityWaits, rewardWaits } from './waitNotes';
 
 /** 定型のスタンプ（spec §7.1） */
 export const STAMPS = ['いいね！', '待って！', 'ここ行こう', 'ありがとう', 'まかせて', 'ごめん！'];
@@ -278,8 +279,14 @@ export function awaitedSeats(game: GameState): PlayerId[] {
     return h ? [h.playerId] : [];
   }
   if (game.mode === 'battle' && game.battle?.phase === 'ally') return waitingPlayers(game.battle);
-  if (game.mode === 'reward' && game.reward?.levelUps.length) {
-    const h = game.heroes.find((x) => x.id === game.reward!.levelUps[0].heroId);
+  // 回3 A・C: 報酬（成長・カード・取り合い）・宝箱の取り合い・施設も、まだ選んでいない人を待っている
+  const all = () => false;
+  const seats = (notes: { playerId: PlayerId }[]) => [...new Set(notes.map((n) => n.playerId))];
+  if (game.mode === 'reward') return seats(rewardWaits(game, all));
+  if (game.mode === 'chest' && game.chest?.claims?.some((c) => !c.rolls)) return seats(chestClaimWaits(game, all));
+  if (game.mode === 'town' || game.mode === 'shrine' || game.mode === 'sanctuary') return seats(facilityWaits(game, all));
+  if (game.mode === 'encounter' && game.encounter) {
+    const h = game.heroes.find((x) => x.id === game.encounter!.heroId);
     return h ? [h.playerId] : [];
   }
   return [];
@@ -441,6 +448,25 @@ export function OthersTurnNote({ seat, name, what }: { seat: PlayerId; name: str
         {name}が{what}
       </span>
      
+    </div>
+  );
+}
+
+/** 回3 A: 待っている相手と、相手が今していること（1行ずつ。「P2 ナツさんが、リナの山札に加えるカードを選んでいます」） */
+export function WaitNotes({ notes, className = '' }: { notes: { playerId: PlayerId; what: string }[]; className?: string }) {
+  useOnline((s) => s.tick);
+  if (!notes.length) return null;
+  const room = useOnline.getState().room;
+  return (
+    <div className={`flex flex-col gap-1 rounded-xl bg-black/50 px-2 py-1.5 ${className}`} role="status" data-wait-notes>
+      {notes.map((n, i) => (
+        <div key={i} className="flex items-start gap-1.5 text-[13px] leading-5 text-zinc-100">
+          <SeatChip p={n.playerId} small />
+          <span className="min-w-0">
+            {room?.seatName(n.playerId) ?? n.playerId}さんが、{n.what}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
