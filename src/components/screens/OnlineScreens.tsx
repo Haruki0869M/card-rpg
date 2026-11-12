@@ -1,7 +1,8 @@
 // ===== オンライン協力の画面（部屋に参加・待合室・遊んでいる間の表示。spec §7.2） =====
 import { TopBar } from '../ui/fancy';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Copy, Crown, LogIn, Share2, Swords, Users, Wifi, WifiOff } from 'lucide-react';import { useEffect, useState } from 'react';
+import { Copy, Crown, LogIn, Share2, Swords, Users, Wifi, WifiOff } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { BALANCE } from '../../data/balance';
 import { CLASSES } from '../../data/classes';
 import { DIFFICULTIES } from '../../data/rules';

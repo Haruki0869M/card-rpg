@@ -9,6 +9,17 @@
 
 
 
+## 回3（2人プレイの不具合）を作った（2026-11-13・作ったのは Opus 5.5 の作業役・**公開していない**）
+
+- 結果: docs/tasks/play-feedback-1113-plan.md の §8。エミュレーターの2台で再現してから直した（scripts/coop-r3.mjs）。
+- A 待っている側に「だれが・何を選んでいるか」（screens/waitNotes.ts）。ほかの人のレベルアップの間も、自分のカードと取り合いを先に選べる。
+- B 道具袋の相手の一覧から、ダンジョンの中の仲間を外した（再現できたのはこの1つだけ）。
+- C ホストが止まった時（スマホが眠った時）も引き継ぐ: members/{id}/beat を10秒ごとに書き、35秒より古ければ止まっているとみなす（net/room.ts の alive・BEAT_MS・STALE_MS）。引き継いだ端末が敵の番を進める（battleStore の onBecameHost）。データベースのルール・保存の版は変えていない。
+- D タイトルに「前の部屋（合言葉）に戻る」。
+- E 町・鍵のダンジョン・最後のダンジョンのとなりのマスに、徘徊する敵が湧かない・入らない（wanderers.ts の entranceGuardTiles）。乱数の流れが変わった。
+- テスト 1683件成功/8件スキップ。確かめていない事: 実機のスマホが眠った時・本番の Firebase・3〜4人。
+- 次: 回4（難しさを測って案を出す）。18回目の公開はオーナーの OK 待ち。
+
 ## 回2（説明の出ない画面の統一・町で装備・倒した時の演出・BREAK の印）を作った（2026-11-13・作ったのは Opus 5.5 の作業役・**公開していない**）
 
 - 結果: docs/tasks/play-feedback-1113-plan.md の §7。部品: ui/CardPickPanel.tsx・ui/ItemPickPanel.tsx（新）・StatusButton（WorldScreen から切り出し）・BattleFx の倒れる演出。
