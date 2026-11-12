@@ -4,7 +4,7 @@ import { fireAbilities, healToBlockOf, enduresOf } from '../abilities';
 import { getEnemy } from '../../data/enemies';
 import type { AbilitySource, AllyState, BattleEvent, BattleState, EnemyState } from '../../types';
 import type { Rng } from '../rng';
-import { retargetAfterDeath } from './intents';
+import { fallbackLoneIntents, retargetAfterDeath } from './intents';
 import { emptyStatuses, healMultiplier } from './statuses';
 import { getStatus } from '../../data/statuses';
 
@@ -65,7 +65,7 @@ function killAlly(state: BattleState, ally: AllyState, rng: Rng, events: BattleE
   retargetAfterDeath(state, ally.id, rng, events);
 }
 
-function killEnemy(state: BattleState, enemy: EnemyState, events: BattleEvent[]) {
+function killEnemy(state: BattleState, enemy: EnemyState, rng: Rng, events: BattleEvent[]) {
   enemy.dead = true;
   enemy.intent = undefined;
   enemy.tauntedBy = undefined;
@@ -73,6 +73,8 @@ function killEnemy(state: BattleState, enemy: EnemyState, events: BattleEvent[])
   delete enemy.guarding;
   addLog(state, `${enemyName(enemy)}を倒した`);
   events.push({ type: 'death', unitId: enemy.uid });
+  // かばう相手がいなくなった敵は、予告を代わりの行動（闇の剣）に変える
+  fallbackLoneIntents(state, rng, events);
 }
 
 /** ボスの段階の切り替え（HPが一定以下になったら） */
@@ -94,7 +96,7 @@ function checkEnemyPhase(state: BattleState, enemy: EnemyState, events: BattleEv
 /** HPが減った後の処理（0なら戦闘不能、敵ならボスの段階の確認） */
 export function afterHpLoss(state: BattleState, u: Unit, rng: Rng, events: BattleEvent[]) {
   if (u.hp <= 0) {
-    if (isEnemy(u)) killEnemy(state, u, events);
+    if (isEnemy(u)) killEnemy(state, u, rng, events);
     else killAlly(state, u, rng, events);
   } else if (isEnemy(u)) checkEnemyPhase(state, u, events);
 }

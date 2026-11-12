@@ -29,7 +29,7 @@ import { affinityOf } from '../stats';
 import { calcDamage } from './damage';
 import { discardHand, drawCards } from './deck';
 import { applyEffect, checkEffect, comboMultiplier, dealDamage, elementMultiplier, makeCtx, targetOf } from './effects';
-import { breakStopsAction, decideAllIntents } from './intents';
+import { breakStopsAction, decideAllIntents, fallbackLoneIntents } from './intents';
 import { finalChance, selectTier } from './probability';
 import { helpedAllies, recordSupport, selfSnapshot, supportSnapshot } from './support';
 import { afterAttackCard, attackElement, consumeAttackCharge, cardElements, cardHpCost, chargedMultiplier, tierHpCost } from './cardState';
@@ -817,6 +817,8 @@ function enemyStep(state: BattleState, rng: Rng, events: BattleEvent[]): string 
 }
 
 function executeIntent(state: BattleState, enemy: EnemyState, rng: Rng, events: BattleEvent[]) {
+  // 念のため: 行動する時にかばう相手がいなければ、代わりの行動にする（ふつうは敵が倒れた時点で変わっている。古い保存のため）
+  if (enemy.intent && !state.enemies.some((o) => !o.dead && o !== enemy)) fallbackLoneIntents(state, rng, events);
   const intent = enemy.intent;
   if (!intent) return;
   const action = getEnemyAction(enemy.defId, intent.actionId);

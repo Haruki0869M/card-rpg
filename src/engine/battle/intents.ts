@@ -89,6 +89,30 @@ export function decideIntent(enemy: EnemyState, state: BattleState, rng: Rng): v
   enemy.intent = { actionId: action.id, targetId: needsTarget(action) ? (isHuntAction(action) ? weakestAlly(state) : pickRandomAlly(state, rng)) : undefined };
 }
 
+/** ほかの敵がいる時だけ意味のある行動か（かばう）。データの効果の種類で見る */
+const needsOtherEnemies = (action: EnemyActionDef) => action.effects.some((e) => e.kind === 'guardAllies');
+
+/**
+ * 予告が「かばう」の敵で、ほかの生きている敵がいなくなった時、予告を代わりの行動（fallbackIfAloneId。魔王軍の騎士なら闇の剣）に変える。
+ * 狙う味方は予告を作る時と同じ決め方（挑発されていれば挑発した味方・手負い狙いならHPの割合が一番低い味方・ほかは乱数）。
+ * 乱数は、実際に予告が変わる時にだけ1回引く（ほかの場面の乱数の順番は変えない）
+ */
+export function fallbackLoneIntents(state: BattleState, rng: Rng, events: BattleEvent[]): void {
+  for (const e of state.enemies) {
+    if (e.dead || !e.intent) continue;
+    if (state.enemies.some((o) => !o.dead && o !== e)) continue;
+    const action = getEnemyAction(e.defId, e.intent.actionId);
+    if (!action.fallbackIfAloneId || !needsOtherEnemies(action)) continue;
+    const fb = getEnemyAction(e.defId, action.fallbackIfAloneId);
+    const taunter = e.tauntedBy && isSingleAttack(fb) ? state.allies.find((a) => a.id === e.tauntedBy && !a.dead)?.id : undefined;
+    const targetId = !needsTarget(fb) ? undefined : taunter ?? (isHuntAction(fb) ? weakestAlly(state) : pickRandomAlly(state, rng));
+    // 行動の記録（同じ行動の連続の数え）も、実際に行う行動に合わせる
+    if (e.history.at(-1) === action.id) e.history = [...e.history.slice(0, -1), fb.id];
+    e.intent = { ...e.intent, actionId: fb.id, targetId };
+    events.push({ type: 'retarget', enemyUid: e.uid });
+  }
+}
+
 export function decideAllIntents(state: BattleState, rng: Rng): void {
   for (const e of state.enemies) decideIntent(e, state, rng);
 }

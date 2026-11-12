@@ -1,6 +1,7 @@
 // 敵が戦闘から逃げる（倒したことにならない。黄金のコソ泥など）
 import { addLog, isEnemy, nameOf, unitIdOf } from '../../units';
 import type { EffectHandler } from '../types';
+import { fallbackLoneIntents } from '../../intents';
 
 declare module '../../../../types' {
   // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -21,6 +22,8 @@ export const effect: EffectHandler<'flee'> = {
     addLog(ctx.state, `${nameOf(u)}は逃げ出した！`);
     ctx.events.push({ type: 'ability', unitId: unitIdOf(u), name: '逃走' });
     ctx.parts.push('逃げ出した');
+    // かばう相手がいなくなった敵は、予告を代わりの行動に変える
+    fallbackLoneIntents(ctx.state, ctx.rng, ctx.events);
     return true;
   },
   describe: () => '戦闘から逃げ出す（倒したことにならない）',

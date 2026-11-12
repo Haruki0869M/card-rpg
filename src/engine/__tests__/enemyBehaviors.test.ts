@@ -301,6 +301,31 @@ describe('かばう（魔王軍の騎士）', () => {
     for (let i = 0; i < 40; i++) { t.enemies[0].history = []; decideIntent(t.enemies[0], t, r2); picked.add(t.enemies[0].intent!.actionId); }
     expect(picked.has('guard')).toBe(true);
   });
+  it('かばうの予告の後に、ほかの敵が全部倒れたら、その時点で闇の剣の予告に変わり、敵の番に闇の剣を行う', () => {
+    let s = battle(['darkKnight', 'ebDummy']);
+    s.enemies[1].hp = 5;
+    setIntent(s, 0, 'guard', undefined);
+    s.enemies[0].history = ['guard'];
+    s = use(s, 'ebHit', s.enemies[1].uid);
+    expect(s.enemies[1].dead).toBe(true);
+    // 倒れた時点で予告が変わる（狙う味方も決まる）
+    expect(s.enemies[0].intent).toEqual({ actionId: 'slash', targetId: s.allies[0].id });
+    expect(s.enemies[0].history.at(-1)).toBe('slash');
+    const hp = s.allies[0].hp;
+    s = nextTurn(s);
+    expect(s.enemies[0].guarding).toBeFalsy();
+    expect(s.allies[0].hp).toBeLessThan(hp);
+    expect(s.log.some((l) => l.text.includes('「闇の剣」'))).toBe(true);
+    expect(s.log.some((l) => l.text.includes('「かばう」'))).toBe(false);
+  });
+  it('古い保存などで「かばう」のまま敵の番になっても、ひとりなら闇の剣を行う', () => {
+    let s = battle(['darkKnight']);
+    setIntent(s, 0, 'guard', undefined);
+    const hp = s.allies[0].hp;
+    s = nextTurn(s);
+    expect(s.enemies[0].guarding).toBeFalsy();
+    expect(s.allies[0].hp).toBeLessThan(hp);
+  });
   it('BREAK すると、かばわない', () => {
     let s = battle(['darkKnight', 'ebDummy']);
     setIntent(s, 0, 'guard', undefined);
