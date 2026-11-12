@@ -528,7 +528,10 @@ function PouchSheet() {
   const groups = new Map<string, string[]>();
   for (const p of pouch) groups.set(p.itemId, [...(groups.get(p.itemId) ?? []), p.uid]);
   const chosenDef = chosen ? getItem(pouch.find((p) => p.uid === chosen)?.itemId ?? 'potion') : null;
-  const targets = game.heroes.filter((h) => !h.retired && (!game.party || game.party.includes(h.id)) && (!game.world || game.party || game.world.pos[h.id] === game.world.pos[owner?.id ?? ''])).map((h) => {
+  // 使える相手: 自分と、同じ場面にいる仲間（回3 B: 世界マップで、同じマスにいてもダンジョンの中の仲間は入れない。
+  // 前は入っていて、押すと「そのキャラはダンジョンの中です」と断られた。渡す相手の一覧 placeMates と同じ決まり）
+  const mates = owner ? placeMates(game, owner) : [];
+  const targets = game.heroes.filter((h) => h === owner || mates.includes(h)).map((h) => {
     const a = inBattle ? battle.allies.find((x) => x.id === h.id) : undefined;
     const hp = a ? a.hp : h.hp;
     const max = a ? a.maxHp : heroMaxHp(h);
