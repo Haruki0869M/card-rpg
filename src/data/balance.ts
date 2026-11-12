@@ -34,6 +34,21 @@ export const BALANCE = {
    * 2026-11-13 回4: 測るための入れ物（既定は空 = 今と同じ）。数値を入れるかはオーナーが測定の表を見て決める
    */
   enemyHpByRegion: {} as Readonly<Record<string, number>>,
+  /**
+   * 地域ごとの敵の攻撃の倍率（キー = 地図の地域の id。書いていない地域は 1）。地域の決め方は enemyHpByRegion と同じ。
+   * 2026-11-13 つまみの測定: 測るための入れ物（既定は空 = 今と同じ）
+   */
+  enemyAttackByRegion: {} as Readonly<Record<string, number>>,
+  /**
+   * 敵の格ごとのHPの倍率（boss = ボスの部屋 / midboss = 中ボスの部屋と災厄 / elite = 強敵の部屋 / normal = それ以外。書いていない格は 1）。
+   * 2026-11-13 つまみの測定: 測るための入れ物（既定は空 = 今と同じ）
+   */
+  enemyHpByRank: {} as Readonly<Partial<Record<'boss' | 'midboss' | 'elite' | 'normal', number>>>,
+  /**
+   * 稼いだお金（戦闘の報酬・宝箱・売値・災厄や町を守った報酬・袋が満杯で換えたお金。earnGold を通る物全部）の倍率。端数は切り捨て。
+   * 初期の所持金・仲間からの送金には掛けない。2026-11-13 つまみの測定: 測るための入れ物（既定 1 = 今と同じ）
+   */
+  goldGainMul: 1 as number,
   /** 戦闘に参加した味方の人数ごとの敵の攻撃倍率（4人の時だけ少し強くする。2人・3人は変えない） */
   enemyAttackByPartySize: [1, 1, 1, 1.4, 1.8] as readonly number[],
   /** 敵のレベルが baseLevel より1上がるごとの増加率 */
@@ -209,6 +224,21 @@ export const BALANCE = {
    * 2026-11-13 回4: 測るための入れ物（既定は空 = 今と同じ）
    */
   breakDamagePctByRank: {} as Readonly<Partial<Record<'boss' | 'midboss' | 'elite' | 'normal', number>>>,
+  /**
+   * 敵の格ごとに「完全成功だけで崩れるか」（false = 崩れない。弱点・合計ダメージの線は別）。書いていない格は true（今のまま）。
+   * カードの能力で崩す物（魔力の楔の「成功1でも崩せる」・閃光の破砕玉・崩しの効果）は、ここに関係なく今のまま崩せる。
+   * 2026-11-13 つまみの測定: 測るための入れ物（既定は空 = 今と同じ）
+   */
+  breakPerfectByRank: {} as Readonly<Partial<Record<'boss' | 'midboss' | 'elite' | 'normal', boolean>>>,
+  /**
+   * true = 憲章4の文のとおり「弱点の属性で、しかも完全成功」の時だけ崩れる（弱点を持たない敵は、完全成功だけで崩れる）。
+   * 合計ダメージの線は breakDamagePctByRank で別に決める。カードの能力で崩す物は今のまま。
+   * 2026-11-13 つまみの測定: 測るための入れ物（既定 false = 今と同じ）
+   */
+  breakNeedsWeakPerfect: false as boolean,
+  /** 崩した時に付ける状態（'weak' = 弱体・今 / 'vulnerable' = 脆弱）と、ブロックを0にするか。2026-11-13 つまみの測定（既定 = 今と同じ） */
+  breakStatus: 'weak' as 'weak' | 'vulnerable',
+  breakClearsBlock: true as boolean,
   breakPower: 0.5,
   breakWeak: 1,
   /** 先読みができる感知の成功率（%）。フクロウのお供・霊感の探索能力でもできる（扉の先の中身と、次の次の行の色が分かる） */
