@@ -28,7 +28,7 @@ import { isAllyCard } from '../../engine/battle/targets';
 import { isOnlinePlay } from '../../store/battleConfig';
 import { seatModeOf } from '../../store/seats';
 import './battleFx.css';
-import { CalloutBand, GuardLayer, ImpactLayer } from './BattleFx';
+import { CalloutBand, GuardLayer, ImpactField, type UnitRect } from './BattleFx';
 
 /** 個体ごとの呼吸の周期と始まりをずらす（IDの文字から決める。乱数は使わない） */
 export function breathStyle(id: string, base: number, spread: number, sway: number): React.CSSProperties {
@@ -55,15 +55,11 @@ function useUnitMotion(unitId: string, side: 'ally' | 'enemy') {
     const frames = calm ? { opacity: [1, 0.6, 1] } : fx.kind === 'attack'
       ? { x: [0, 12 * dir, 0], y: [0, -12 * dir, 0], scale: [1, 1.08, 1] }
       : fx.kind === 'cast' ? { y: [0, -10, 0], scale: [1, 1.06, 1] }
-      // 被弾（段階B）: 小刻みな揺れ（白いフラッシュは中の絵に重ねる）
+      // 被弾（段階B）: 小刻みな揺れ（白いフラッシュは戦場の命中の層に出す。段階4）
       : { x: [0, -6 * dir, 6 * dir, -5 * dir, 4 * dir, -2 * dir, 0] };
     const controls = animate(scope.current, frames, { duration: (calm ? 0.14 : fx.kind === 'hit' ? 0.24 : 0.28) * k, ease: 'easeOut' });
-    // 被弾の白いフラッシュ（0.06秒・明るさ2.8倍）。動きを減らす設定では出さない
-    const inner = scope.current.firstElementChild as HTMLElement | null;
-    const flash = fx.kind === 'hit' && !calm && inner
-      ? animate(inner, { filter: ['brightness(2.8)', 'brightness(2.8)', 'brightness(1)'] }, { duration: TIMING.hitFlash * 2 * k, times: [0, 0.5, 1], ease: 'linear' })
-      : undefined;
-    return () => { controls.stop(); flash?.stop(); };
+    // 被弾の白いフラッシュは、戦場の命中の層に白い半透明の層で出す（段階4。BattleFx.tsx の HitFlash）
+    return () => controls.stop();
   }, [fx?.id, fast, simple, reduced]);
   return scope;
 }
@@ -86,7 +82,7 @@ function SynergyShake({ children }: { children: ReactNode }) {
     const controls = animate(scope.current, { x: [0, -3, 3, -2, 0] }, { duration: TIMING.synergyShake / speedFactor({ fastMode: fast }), ease: 'linear' });
     return () => controls.stop();
   }, [fx?.id]);
-  // 段階B: 大ダメージ・完全成功で戦場全体（背景ごと）を0.12秒揺らす
+  // 段階B: 大ダメージ・完全成功で戦場全体（背景ごと）を揺らす（段階4で 0.12 → 0.16秒）
   useEffect(() => {
     if (!big || !scope.current) return;
     scope.current.dataset.fieldShake = String(big.id);
@@ -310,7 +306,6 @@ const EnemyUnit = memo(function EnemyUnit({
               <EnemyArt defId={enemy.defId} phase={enemy.phase} className="h-full w-full" />
             </div>
           </div>
-          <ImpactLayer unitId={enemy.uid} />
         </motion.div>
         {/* 狙う敵: 足元の光る輪・絵の発光・頭の上の矢印（予測の数字は下の操作パネルに出す。絵は隠さない） */}
         {isTarget && (
@@ -455,7 +450,6 @@ const AllySprite = memo(function AllySprite({ ally, left, bottom, h, active, fie
           </span>
         </div>
       )}
-      <ImpactLayer unitId={ally.id} />
       <GuardLayer unitId={ally.id} />
       {/* 数字は、そのキャラの頭のすぐ上に出す */}
       <UnitPopups unitId={ally.id} top="-6px" />
@@ -544,6 +538,18 @@ export function Battlefield() {
   useEffect(() => {
     ref.current?.parentElement?.style.setProperty('--ally-reach', `${Math.round(6 + allyH * 0.45)}px`);
   }, [allyH]);
+  // 段階4: 命中のエフェクトを出す位置（敵・味方の絵の箱。下の並べ方と同じ計算）
+  const enemyX = (i: number) => enemySlotW * (i + 0.5);
+  const enemyY = (i: number) => enemyTop + (nE >= 3 && i % 2 === 1 ? 10 : 0);
+  const allyX = (i: number) => (allyAreaW / nA) * (i + 0.5) + (nA <= 2 ? W * 0.02 : 0);
+  const allyBottom = (i: number) => 6 + (nA >= 3 && i % 2 === 1 ? 8 : 0);
+  const impactRects: UnitRect[] = [
+    ...enemies.map((e, i) => {
+      const h = enemyUnitH * (getEnemy(e.defId).size ?? 1);
+      return { id: e.uid, x: enemyX(i) - (h * 0.85) / 2, y: enemyY(i) + enemySpriteH - h, w: h * 0.85, h };
+    }),
+    ...allies.map((a, i) => ({ id: a.id, x: allyX(i) - allyH * 0.4, y: H - allyBottom(i) - allyH, w: allyH * 0.8, h: allyH })),
+  ];
 
   return (
     <div ref={ref} className="relative min-h-[190px] flex-1 overflow-hidden">
@@ -559,8 +565,8 @@ export function Battlefield() {
             <EnemyUnit
               key={e.uid}
               enemy={e}
-              left={enemySlotW * (i + 0.5)}
-              top={enemyTop + (nE >= 3 && i % 2 === 1 ? 10 : 0)}
+              left={enemyX(i)}
+              top={enemyY(i)}
               slotW={enemySlotW}
               spriteH={enemyUnitH}
               boxH={enemySpriteH}
@@ -571,17 +577,19 @@ export function Battlefield() {
               key={a.id}
               ally={a}
               fieldW={W}
-              left={(allyAreaW / nA) * (i + 0.5) + (nA <= 2 ? W * 0.02 : 0)}
-              bottom={6 + (nA >= 3 && i % 2 === 1 ? 8 : 0)}
+              left={allyX(i)}
+              bottom={allyBottom(i)}
               h={allyH}
               active={a.id === activeId && phase === 'ally'}
             />
           ))}
+          <ImpactField rects={impactRects} />
         </>
       )}
       </SynergyShake>
       <CalloutBand top={22} />
-      <div className="pointer-events-none absolute inset-x-0 top-[46%] z-40 flex justify-center">
+      {/* スロットの板（段階4）: 戦場の中央ではなく、下の端（手札の上）の細い帯に出す（命中の演出・敵の予告に重ならないように） */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-1 z-40 flex justify-center">
         <SlotOverlay />
       </div>
       <SeatLabel />

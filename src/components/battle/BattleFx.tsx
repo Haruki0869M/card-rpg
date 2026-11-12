@@ -1,6 +1,6 @@
 // ===== 戦闘の手ごたえの演出（段階B）: 技名の帯・命中のエフェクト・盾で弾く =====
 // 見た目だけ。状態・乱数・同期には触れない。粒の置き方は決まった形（乱数を使わない）。
-// 高速モードは時間を半分、動きを減らす（OS の設定・ゲームの「簡易」）では揺れ・広がりを抑えて、ふわっと出して消すだけ。
+// 高速モードは時間を半分、動きを減らす（OS の設定・ゲームの「簡易」）では火花と揺れを止める（斬撃の線・魔法陣・白い層は出す。段階4）。
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Swords } from 'lucide-react';
 import { memo, useEffect, useState, type CSSProperties } from 'react';
@@ -213,19 +213,66 @@ function ImpactShape({ fx, dur, calm }: { fx: ImpactFx; dur: number; calm: boole
   }
 }
 
-/** ユニットの上の命中のエフェクト（受けたユニットの絵の箱に重ねる） */
-export const ImpactLayer = memo(function ImpactLayer({ unitId }: { unitId: string }) {
-  const fx = useBattle((s) => s.impactFx[unitId]);
+/** 戦場の中での、ユニットの絵の箱の位置（px） */
+export type UnitRect = { id: string; x: number; y: number; w: number; h: number };
+
+/**
+ * 命中のエフェクト（段階4）: 敵の立ち絵の外（戦場の直下の専用の層）に、受けたユニットの絵の箱の位置で出す。
+ * 倒れる敵の絵と一緒に薄くならない・スロットの板などの重なり順に左右されないように
+ */
+const ImpactLayer = memo(function ImpactLayer({ rect }: { rect: UnitRect }) {
+  const fx = useBattle((s) => s.impactFx[rect.id]);
   const { k, calm } = useFxPace();
   const dur = TIMING.impactFx * k;
   const shown = useFlash(fx?.id, dur + 0.05);
   if (!fx || shown !== fx.id) return null;
   return (
-    <div key={fx.id} className="pointer-events-none absolute inset-0 z-[25]" style={fx.big && !calm ? { transform: 'scale(1.35)' } : undefined} data-impact={fx.style} data-impact-unit={unitId}>
+    <div
+      key={fx.id}
+      className="pointer-events-none absolute"
+      style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, ...(fx.big && !calm ? { transform: 'scale(1.35)' } : {}) }}
+      data-impact={fx.style}
+      data-impact-unit={rect.id}
+    >
       <ImpactShape fx={fx} dur={dur} calm={calm} />
     </div>
   );
 });
+
+/**
+ * 被弾の白いフラッシュ（段階4）: 絵に filter: brightness をかけるのをやめ、白い半透明の層を重ねて消す（端末の GPU との相性の問題を避ける）。
+ * 動きを減らす設定（OS・ゲームの「簡易」）の時も出す（最低限の形として残す）
+ */
+const HitFlash = memo(function HitFlash({ rect }: { rect: UnitRect }) {
+  const fx = useBattle((s) => s.unitFx[rect.id]);
+  const { k } = useFxPace();
+  const dur = TIMING.hitFlash * 2 * k;
+  const hit = fx?.kind === 'hit' ? fx.id : undefined;
+  const shown = useFlash(hit, dur + 0.05);
+  if (hit === undefined || shown !== hit) return null;
+  return (
+    <span
+      key={hit}
+      className="fx-hit-flash"
+      style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, ['--d' as string]: `${dur}s` } as CSSProperties}
+      data-hit-flash={rect.id}
+    />
+  );
+});
+
+/** 戦場の直下の、命中のエフェクトと白いフラッシュの専用の層（z-35） */
+export function ImpactField({ rects }: { rects: UnitRect[] }) {
+  return (
+    <div className="pointer-events-none absolute inset-0 z-[35]" data-impact-field>
+      {rects.map((r) => (
+        <HitFlash key={`f${r.id}`} rect={r} />
+      ))}
+      {rects.map((r) => (
+        <ImpactLayer key={`i${r.id}`} rect={r} />
+      ))}
+    </div>
+  );
+}
 
 /** 敵の攻撃を味方のブロックで防いだ: 味方の前に青い盾が出て「ブロック！」と弾く */
 export const GuardLayer = memo(function GuardLayer({ unitId }: { unitId: string }) {

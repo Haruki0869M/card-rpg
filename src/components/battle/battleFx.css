@@ -157,6 +157,13 @@
   position: absolute; bottom: 8%; width: 4px; height: 4px; border-radius: 50%;
   animation: fx-rise-up var(--d, 0.4s) ease-out both;
 }
+/* 段階4: 被弾の白いフラッシュ。絵に filter をかけず、白い半透明の層を重ねて消す（opacity だけ動かす） */
+@keyframes fx-hit-flash { 0%, 50% { opacity: 1; } 100% { opacity: 0; } }
+.fx-hit-flash {
+  position: absolute; pointer-events: none; border-radius: 45%;
+  background: radial-gradient(ellipse 50% 50% at 50% 55%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.45) 55%, rgba(255, 255, 255, 0) 78%);
+  animation: fx-hit-flash var(--d, 0.18s) linear both;
+}
 
 
 /* ----- 段階C: スロット（回る枠・リーチの強い光・フォーカスの確定枠・完全成功の弾ける輪） ----- */
@@ -173,7 +180,14 @@
   50% { box-shadow: 0 0 18px 6px rgba(255, 210, 90, 1), inset 0 0 10px rgba(255, 236, 170, 0.9); }
 }
 .slot-reel-reach { border-color: #ffe9a8; animation: slot-reach-glow 0.22s ease-in-out infinite; }
-.slot-focus-locked { box-shadow: 0 0 10px rgba(255, 200, 80, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.7); }
+.slot-focus-locked { box-shadow: 0 0 10px rgba(255, 200, 80, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.7); animation: slot-focus-pulse 0.8s ease-in-out infinite; }
+/* 段階4: フォーカス「★」の金の光が脈打つ（動きを減らす設定では止める） */
+@keyframes slot-focus-pulse {
+  0%, 100% { box-shadow: 0 0 8px 1px rgba(255, 200, 80, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.7); }
+  50% { box-shadow: 0 0 18px 6px rgba(255, 214, 100, 1), inset 0 1px 0 rgba(255, 255, 255, 0.9); }
+}
+/* 段階4: 失敗「✖」の枠は明るい赤と赤い光 */
+.slot-miss { box-shadow: 0 0 10px 2px rgba(255, 77, 109, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
 @keyframes slot-burst { from { transform: translate(-50%, -50%) scale(0.3); opacity: 1; } to { transform: translate(-50%, -50%) scale(2.2); opacity: 0; } }
 .slot-perfect-burst {
   position: absolute; left: 50%; top: 50%; width: 120px; height: 120px; border-radius: 50%; pointer-events: none;
@@ -190,6 +204,6 @@
 @media (prefers-reduced-motion: reduce) {
   .idle-live, .foot-shadow, .element-aura, .target-ring-spin, .spotlight-beam, .callout-sheen, .fx-spark, .fx-mote, .fx-rise { animation: none; }
   .fx-spark, .fx-mote, .fx-rise { display: none; }
-  .slot-reel-strip, .slot-reel-reach, .slot-perfect-burst, .enemy-order-now { animation: none; }
+  .slot-reel-strip, .slot-reel-reach, .slot-perfect-burst, .enemy-order-now, .slot-focus-locked { animation: none; }
 }
-[data-calm] .idle-live, [data-calm] .foot-shadow, [data-calm] .element-aura, [data-calm] .target-ring-spin, [data-calm] .enemy-order-now { animation: none; }
+[data-calm] .idle-live, [data-calm] .foot-shadow, [data-calm] .element-aura, [data-calm] .target-ring-spin, [data-calm] .enemy-order-now, [data-calm] .slot-focus-locked { animation: none; }

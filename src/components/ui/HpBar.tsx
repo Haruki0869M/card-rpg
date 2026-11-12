@@ -35,10 +35,10 @@ export const HpBar = memo(function HpBar({
         className="relative min-w-0 flex-1 overflow-hidden rounded-[4px] border border-black/80 bg-[#140c10]"
         style={{ height, boxShadow: block > 0 ? '0 0 0 1.5px #7ac8ff' : 'inset 0 1px 2px rgba(0,0,0,.8)' }}
       >
-        {/* 減った分の残像（白〜黄色）: 0.35秒残ってから追いかけて減る（段階B。高速モードは半分） */}
+        {/* 減った分の残像（薄い黄色の帯）: 0.45秒残ってから追いかけて減る（段階B・段階4。高速モードは半分） */}
         <div
           className="absolute inset-y-0 left-0 w-full origin-left"
-          style={{ transform: `scaleX(${ratio})`, transition: `transform ${Math.round(TIMING.hpGhostChase * 1000 * k)}ms ease-in ${Math.round(TIMING.hpGhostHold * 1000 * k)}ms`, background: 'linear-gradient(180deg,#ffffff,#fff3b0 45%,#ffd24a)' }}
+          style={{ transform: `scaleX(${ratio})`, transition: `transform ${Math.round(TIMING.hpGhostChase * 1000 * k)}ms ease-in ${Math.round(TIMING.hpGhostHold * 1000 * k)}ms`, background: 'linear-gradient(180deg,#fff9cf,#ffec8a)' }}
           data-hp-ghost
         />
         <div
