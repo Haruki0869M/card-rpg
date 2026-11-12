@@ -6,7 +6,7 @@ export const weaponsDagger: ItemDef[] = [
   {
     id: "temperedDagger", name: "鍛鋼の短剣", slot: "weapon", weaponType: "dagger", rarity: "rare", icon: "dagger",
     description: "物理の攻撃カードが完全成功した時、対象に毒2。1ターンに2回まで。", stats: {"dex":5}, tags: ["physical","poison"],
-    cards: [{"cardId":"wtDaggerVenom","count":2}],
+    cards: [{"cardId":"lnGiNeedle","count":2}],
     ability: {"name":"毒刃","description":"物理の攻撃カードが完全成功した時、対象に毒2。1ターンに2回まで。","effect":{"when":"perfect","if":[{"kind":"cardCategory","category":"physical"},{"kind":"cardHasDamage"},{"kind":"perTurn","key":"temperedDagger","max":2}],"do":[{"kind":"applyStatus","status":"poison","amount":2}]}},
   },
   {

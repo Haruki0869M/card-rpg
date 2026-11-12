@@ -25,7 +25,6 @@ export const TOP_JOB_CARDS: CardDef[] = [
   c('kingCleaver', '覇王断', 'physical', 2, 'enemy', [[d(6)], [d(12)], [d(19), s('vulnerable', 1)]]),
   c('domination', '制圧の斧', 'physical', 2, 'allEnemies', [[d(3)], [d(6)], [d(10), s('weak', 1, 'foes')]], { rarity: 'epic', trait: pierce }),
   c('conquerorRoar', '覇王の号令', 'skill', 1, 'self', [[b(3, 'allies')], [b(4, 'allies')], [b(5, 'allies'), f(1)]]),
-  c('bloodThrone', '血の玉座', 'physical', 1, 'enemy', [[d(3)], [d(5), { kind: 'healPctOfDealt', pct: 30 }], [d(8), { kind: 'healPctOfDealt', pct: 50 }]]),
   c('worldBreaker', '天下割り', 'physical', 3, 'allEnemies', [[d(5)], [d(9)], [d(14)], [d(20)]], { rarity: 'epic', trait: { name: '覇道', effect: { when: 'kill', do: [m(1)] } } }),
   // 拳王: 多段・反撃の備え・手数。
   c('hundredFists', '百拳連打', 'physical', 2, 'enemy', [[d(2, undefined, 3)], [d(3, undefined, 4)], [d(4, undefined, 5)]], { tags: ['combo'] }),
@@ -33,7 +32,6 @@ export const TOP_JOB_CARDS: CardDef[] = [
   c('fistFlurry', '閃光拳', 'physical', 1, 'enemy', [[d(3)], [d(5)], [d(7), draw(1)]], { rarity: 'epic', trait: sharpenTrait('fistFlurry'), stat: 'agi' }),
   c('earthShatter', '震天拳', 'physical', 3, 'enemy', [[d(8)], [d(16)], [d(24)], [d(32), s('weak', 2)]], { rarity: 'epic', trait: pierce }),
   // 大賢者: 3属性を選び分ける。
-  c('sageFlame', '賢者の業火', 'magic', 2, 'allEnemies', [[d(4, 'fire')], [d(7, 'fire')], [d(11, 'fire')]]),
   c('sageFrost', '絶零の理', 'magic', 2, 'enemy', [[d(6, 'ice')], [d(11, 'ice')], [d(17, 'ice'), s('weak', 1)]]),
   c('sageThunder', '万雷の理', 'magic', 3, 'enemy', [[d(8, 'thunder')], [d(15, 'thunder')], [d(23, 'thunder')], [d(32, 'thunder')]], { rarity: 'epic', trait: pierce }),
   c('sageMeditation', '叡智の瞑想', 'skill', 0, 'self', [[f(1)], [f(1), draw(1)]], { stat: 'int' }), // 区切りD: 叡智の瞑想＝幸運の仕込み をまとめた
@@ -58,7 +56,6 @@ export const TOP_JOB_CARDS: CardDef[] = [
   c('dragonDive', '竜牙突き', 'physical', 2, 'enemy', [[d(6)], [d(12)], [d(19)]], { rarity: 'epic', trait: pierce }),
   c('dragonScale', '竜鱗の守り', 'skill', 1, 'self', [[b(4)], [b(7)], [b(10), s('regen', 1, 'self')]], { stat: 'vit' }),
   c('dragonSweep', '飛竜旋風', 'physical', 2, 'allEnemies', [[d(4)], [d(7)], [d(10), s('weak', 1, 'foes')]], { rarity: 'epic', trait: sharpenTrait('dragonSweep') }),
-  c('dragonSpirit', '竜の息吹', 'skill', 0, 'self', [[f(1)], [f(1), b(3)]]),
   c('jump', '跳躍', 'physical', 2, 'enemy', [[{ kind: 'jump', amount: 24 }], [{ kind: 'jump', amount: 32 }], [{ kind: 'jump', amount: 40 }]], { rarity: 'legend', exhaust: true, trait: { name: '空からの一撃', description: '1戦闘1回。次の敵フェーズの攻撃を避け、次のターンに着地して攻撃する', effect: { modifier: 'exhaust' } } }),
   // 教皇: 回復と浄化。
   c('papalBlessing', '大いなる祝福', 'magic', 2, 'self', [[h(4, 'allies')], [h(6, 'allies')], [h(8, 'allies')]], { stat: 'per' }),
@@ -67,19 +64,13 @@ export const TOP_JOB_CARDS: CardDef[] = [
   c('papalPrayer', '慈愛の祈り', 'magic', 1, 'ally', [[h(3, 'target')], [h(6, 'target')], [h(9, 'target'), { kind: 'cleanse', to: 'target' }]], { stat: 'per' }),
   c('miracle', '奇跡', 'magic', 0, 'self', [[{ kind: 'fullRestore' }], [{ kind: 'fullRestore' }]], { rarity: 'legend', exhaust: true, trait: { name: 'ただ一度の奇跡', description: '1戦闘1回。成功数にかかわらず味方全員を全回復する', effect: { modifier: 'exhaust' } }, stat: 'per' }),
   // 弓聖: フォーカスを使った単体攻撃が必中。
-  c('saintArrow', '天弓の一矢', 'physical', 2, 'enemy', [[d(6)], [d(12)], [d(19)]], { stat: 'per' }),
-  c('hawkVolley', '鷹の連矢', 'physical', 1, 'enemy', [[d(3)], [d(3, undefined, 2)], [d(4, undefined, 2)]], { stat: 'dex' }),
   c('skyPiercer', '天を貫く矢', 'physical', 3, 'enemy', [[d(8)], [d(16)], [d(24)], [d(34)]], { rarity: 'epic', trait: pierce, stat: 'per' }),
   c('hawkFocus', '鷹の集中', 'skill', 0, 'self', [[f(1)], [f(1), b(2)]], { stat: 'per' }),
   c('heavenRain', '天穹の矢雨', 'physical', 3, 'allEnemies', [[d(5)], [d(9)], [d(14)], [d(19)]], { rarity: 'epic', trait: sharpenTrait('heavenRain'), stat: 'dex' }),
   // ビーストマスター: 群れと支え合う。
-  c('packAssault', '群れの強襲', 'physical', 2, 'enemy', [[d(6)], [d(12)], [d(18), s('vulnerable', 1)]], { stat: 'dex', tags: ['summon'] }),
-  c('packGuard', '群れの守り', 'skill', 1, 'self', [[b(3, 'allies')], [b(4, 'allies')], [b(5, 'allies')]], { stat: 'per' }),
   c('alphaCall', '白狼の王', 'skill', 2, 'self', [[summon('alphaWolf', '白狼', '🐺', 4, 2)], [summon('alphaWolf', '白狼', '🐺', 6, 2)], [summon('alphaWolf', '白狼', '🐺', 8, 3)]], { rarity: 'epic', trait: sharpenTrait('alphaCall'), stat: 'per', tags: ['summon'] }),
-  c('packCare', '群れの手当て', 'skill', 0, 'self', [[h(2, 'self')], [h(3, 'self'), draw(1)]], { stat: 'per' }), // 区切りD: 群れの手当て＝幻獣の贈り物 をまとめた
   c('wildKingdom', '獣王の進撃', 'physical', 3, 'allEnemies', [[d(5)], [d(9)], [d(14)], [d(19), s('weak', 1, 'foes')]], { rarity: 'epic', trait: cursed, stat: 'per' }),
   // 忍者: 分身の追撃を活かす手数と状態異常。
-  c('shadowShuriken', '影手裏剣', 'physical', 1, 'enemy', [[d(3)], [d(5)], [d(8)]], { stat: 'dex' }),
   c('ninjaVenom', '忍法・毒霧', 'skill', 1, 'self', [[s('poison', 1, 'foes')], [s('poison', 2, 'foes')], [s('poison', 2, 'foes'), s('weak', 1, 'foes')]], { stat: 'dex' }),
   c('shadowStep', '影渡り', 'physical', 2, 'enemy', [[d(5), b(3)], [d(10), b(4)], [d(15), b(5)]], { rarity: 'epic', trait: cursed, stat: 'agi' }),
   { ...c('ninjaBreath', '息を潜める', 'skill', 0, 'self', [[b(2)], [b(3), f(1)]], { stat: 'agi' }), stat: undefined }, // 区切りD: 息を潜める＝練気 をまとめた

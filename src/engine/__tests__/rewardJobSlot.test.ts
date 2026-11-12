@@ -50,7 +50,8 @@ describe('報酬のカードのジョブ寄りの1枚（K7）', () => {
     const pool = heroJobCardPool(h);
     for (const id of pool) {
       const c = CARDS.get(id);
-      if (c.weaponType) expect(c.weaponType).toBe('staff'); // 魔道士の最初の武器（杖）をまだ持っている
+      // 魔道士の最初の武器（杖）をまだ持っている。憲章5: ジョブの報酬に入っている札（例: 魔道士の「紙一重」は短剣・銃の札でもある）は別
+      if (c.weaponType && !['mage', 'hexer'].some((j) => CLASSES.get(j).cardPool.includes(id))) expect(c.weaponType).toBe('staff');
     }
     for (const id of CLASSES.get('mage').cardPool.filter((x) => CARDS.has(x) && !CARDS.get(x).common && !CARDS.get(x).weaponType && !CARDS.get(x).lineage)) expect(pool).toContain(id);
   });

@@ -102,7 +102,7 @@ export function afterHpLoss(state: BattleState, u: Unit, rng: Rng, events: Battl
 export function noteHpLoss(u: Unit, amount = 0) {
   if (isEnemy(u)) return;
   (u.counters ??= {}).unhurt = 0;
-  // 区切りD: 血の代価 — 前の敵の番からこれまでに失ったHP
+  // 区切りD: 血の代価 — このターンに失ったHP（自分たちの番の始めに0に戻る）
   u.counters.hpLostTurn = (u.counters.hpLostTurn ?? 0) + amount;
   for (const [id, n] of Object.entries(u.statuses)) if (n && getStatus(id).loseOnHpLoss) u.statuses[id] = 0;
 }

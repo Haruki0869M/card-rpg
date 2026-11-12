@@ -36,6 +36,6 @@ export const warrior: ClassDef = {
   tier: 'base',
   lineage: 'bu',
   startingEquipment: { weapon: 'copperSword', armor: 'leatherArmor' },
-  cardPool: ['mightyBlow', 'ironWall', 'sweep', 'battleCry', 'charge', 'heavySwing', 'shieldBash', 'warCry', 'berserkSlash', 'armorBreak'],
+  cardPool: ['lanceCharge', 'cmPrepare', 'lnBuSwipe', 'battleCry', 'strike', 'heavySwing', 'shieldBash', 'warCry', 'berserkSlash', 'armorBreak'],
   growthWeights: { str: 3, vit: 3, dex: 1, agi: 1 },
 };

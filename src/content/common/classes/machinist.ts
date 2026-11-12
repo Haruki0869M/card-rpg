@@ -11,6 +11,6 @@ export const machinist: ClassDef = {
   battleAbility: { name: '自動砲台', effect: { when: 'battleStart', do: [{ kind: 'summon', id: 'turret', name: '砲台', icon: '⚙', damage: BALANCE.specialJobs.turretDamage, turns: BALANCE.specialJobs.deviceTurns, replace: true, targeted: true }] } },
   exploreAbility: { id: 'machinistExplore', name: '機構の知恵', description: '鍵開けの判定+20%', effect: { kind: 'checkBonus', check: 'lock', bonus: 20 } },
   requires: { feat: 'checks:mechanism', count: 3, text: '罠・仕掛けの判定を3回成功' },
-  cardPool: ['machineShot', 'placeTurret', 'placeTrap', 'machineVolley', 'gambleGuard', 'machineCannon'], signature: ['machineShot', 'placeTurret', 'placeTrap'],
+  cardPool: ['lnGiQuick', 'placeTurret', 'placeTrap', 'machineVolley', 'gambleGuard', 'machineCannon'], signature: ['lnGiQuick', 'placeTurret', 'placeTrap'],
   jobCards: ['fxOmegaLaser'], // 区切りD: 決め技（転職した時に山札へ1枚）
 };

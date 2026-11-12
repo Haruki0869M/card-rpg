@@ -38,8 +38,8 @@ const STEADFAST: Effect[] = [
   { kind: 'steadfast', pct: 50, max: 12 },
   { kind: 'grantAbility', turns: 1, abilities: [{ name: '不動の拳', effect: { modifier: 'damageDealt', multiplier: 1, addFromCounter: 'fudo', once: true, if: [{ kind: 'cardCategory', category: 'physical' }, { kind: 'playedCategoryCount', category: 'physical', max: 0 }, { kind: 'counterAtLeast', key: 'fudo', n: 1, label: '不動の構えの次のターン' }] } }] },
 ];
-/** 輪唱: このターン、連携を起こした味方が回復する（1人1ターン2回まで） */
-const roundSong = (n: number): Effect => ({ kind: 'grantAbility', turns: 0, to: 'allies', abilities: [{ name: '輪唱', effect: { when: 'combo', if: [{ kind: 'perTurn', key: 'roundSong', max: 2 }], do: [heal(n)] } }] });
+/** 輪唱: このターン、連携が起きるたびに、起こした味方が回復する（味方みんなで1ターン4回まで。元の文どおり） */
+const roundSong = (n: number): Effect => ({ kind: 'grantAbility', turns: 0, to: 'allies', abilities: [{ name: '輪唱', effect: { when: 'combo', if: [{ kind: 'perTurn', key: 'roundSong', max: 4, team: true }], do: [heal(n)] } }] });
 
 /** 氷砕き: 対象が凍結なら、凍結を消して、敵全員に8の氷片のダメージ（属性は付けない。氷属性だと、また凍ってしまうため） */
 const SHATTER: Effect = { kind: 'statusBurst', status: 'freeze', consume: true, splashAll: 8 };

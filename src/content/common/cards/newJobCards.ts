@@ -1,7 +1,8 @@
 // 区切りF（2026-11-12）: 新ジョブ4職の専用カード（1職3枚）。ID は fs（拳聖）・bw（重装衛士）・dv（竜脈術師）・pt（調教師）＋名前。
 // 置き場所は各ジョブの cardPool。中身は、オーナーが OK した計画（docs/tasks/lineup-stageF-plan.md §3）のとおり。
 // 2026-11-12: 作る時に計画から勝手に変えていた5枚（受けの型・大盾構え・盾ごと突進・鉄の誓い・なでなで）を、計画どおりに戻した。
-// まだ相談中: 「相棒の守り」のエピックと能力・「竜脈の鱗盾」の名前（計画は「竜鱗の守り」。今あるカードと名前が重なる）
+// 2026-11-12: 「どのジョブもエピック2枚以上」の決まりをやめた（オーナーの決定）。「相棒の守り」は計画どおりのブロックだけに戻し、拳聖の報酬から「不落の城塞」を外した。
+// まだ相談中: 「竜脈の鱗盾」の名前（計画は「竜鱗の守り」。今あるカードと名前が重なる）・弱い札の作り直し
 import type { AbilityDef, AbilityEffect, CardCategory, CardDef, CardTarget, Effect, Rarity, StatId } from '../../../types';
 
 const d = (amount: number): Effect => ({ kind: 'damage', amount });
@@ -35,6 +36,6 @@ export const NEW_JOB_CARDS: CardDef[] = [
   // ===== 調教師 =====
   // オーナーの決定（2026-11-12）: HP回復。満タンの時はブロック2（満タンでも《相棒の覚醒》でお供が動くように）
   c('ptPat', 'なでなで', 'skill', 0, 85, 'self', [[{ kind: 'healOrBlock', amount: 2, block: 2 }], [{ kind: 'healOrBlock', amount: 3, block: 2 }]], { stat: 'luk', tags: ['pet'] }),
-  c('ptBuddyGuard', '相棒の守り', 'skill', 1, 80, 'self', [[b(5)], [b(8)], [b(11)]], { rarity: 'epic', tags: ['pet', 'block'], trait: t('相棒の守り', { when: 'afterCard', if: [{ kind: 'hasPet' }], do: [{ kind: 'block', amount: 3 }] }) }),
+  c('ptBuddyGuard', '相棒の守り', 'skill', 1, 80, 'self', [[b(5)], [b(8)], [b(11)]], { tags: ['pet', 'block'] }),
   c('ptTogether', 'いっしょに！', 'physical', 1, 75, 'enemy', [[d(3), { kind: 'petAct' }], [d(5), { kind: 'petAct' }], [d(8), { kind: 'petAct' }]], { tags: ['pet'] }),
 ];

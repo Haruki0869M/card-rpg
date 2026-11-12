@@ -27,7 +27,6 @@ export const COMMON_CARDS: CardDef[] = [
   c('cmRecover', '立て直し', 'skill', 1, 80, 'self', [[heal(3)], [heal(5)], [heal(7), b(2)]]),
   { ...c('cmBreather', '一息つく', 'skill', 0, 85, 'self', [[focus(1)], [focus(1), b(2)]]), weaponTypes: ['fist'] }, // 区切りD: 一息つく＝息吹 をまとめた
   { ...c('cmSpirit', '気合', 'skill', 0, 80, 'self', [[mana(1)], [mana(1), b(2)]]), lineages: ['bu'] }, // 区切りD: 気合＝戦士の矜持 をまとめた
-  { ...c('cmInstinct', '冒険者の勘', 'skill', 0, 85, 'self', [[draw(1)], [draw(1), mana(1)]]), lineages: ['ma'] }, // 区切りD: 冒険者の勘＝魔導の探求 をまとめた
   c('cmTackle', '体当たり', 'physical', 1, 75, 'enemy', [[d(3)], [d(5)], [d(7), st('vulnerable', 1)]]),
   c('cmFirstAid', '応急処置', 'skill', 1, 80, 'ally', [[heal(4)], [heal(6)], [heal(9)]], { tags: ['support'] }),
   c('cmCover', 'かばう構え', 'skill', 1, 80, 'ally', [[bt(4)], [bt(6)], [bt(8)]], { tags: ['support'] }),

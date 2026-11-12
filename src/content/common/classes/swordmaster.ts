@@ -25,8 +25,8 @@ export const swordmaster: ClassDef = {
   tier: 'mid',
   lineage: 'bu',
   from: ['warrior'],
-  signature: ['swordDance', 'mindsEye', 'flashCut'],
+  signature: ['swordDance', 'cmGrit', 'flashCut'],
   startingEquipment: { weapon: 'copperSword', armor: 'leatherArmor' },
-  cardPool: ['swordDance', 'mindsEye', 'flashCut', 'parryStrike', 'doubleSlash', 'masterStroke'],
+  cardPool: ['swordDance', 'cmGrit', 'flashCut', 'lnBuCounter', 'lnBuFlurry', 'masterStroke'],
   growthWeights: { str: 3, dex: 3, per: 2 },
 };

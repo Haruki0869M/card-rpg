@@ -7,22 +7,6 @@ const st = (status: string, amount: number) => ({ kind: 'applyStatus', status, a
 
 export const BASE_JOB_CARDS_2: CardDef[] = [
   // 武闘家
-  {
-    id: 'counterPalm',
-    name: '返し手',
-    category: 'physical',
-    stat: 'agi',
-    cost: 1,
-    slots: 2,
-    baseChance: 75,
-    target: 'enemy',
-    tags: ['combo'],
-    tiers: [
-      { minSuccesses: 0, effects: [b(3)] },
-      { minSuccesses: 1, effects: [d(3), b(4)] },
-      { minSuccesses: 2, effects: [d(5), b(5)] },
-    ],
-  },
   // 召喚士
   {
     id: 'summonSprite',

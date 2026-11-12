@@ -16,14 +16,11 @@ function c(id: string, name: string, category: CardCategory, cost: number, targe
 }
 const hp = BALANCE.specialJobs;
 export const SPECIAL_JOB_CARDS: CardDef[] = [
-  c('samuraiPoise', '残心', 'skill', 1, 'self', [[b(4)], [b(6), f(1)], [b(9), f(1)]], { stat: 'per' }),
   c('samuraiSwallow', '燕返し', 'physical', 2, 'enemy', [[d(3, undefined, 2)], [d(6, undefined, 2)], [d(9, undefined, 2)]], { rarity: 'epic', trait: sharpenTrait('samuraiSwallow') }),
   c('samuraiFocus', '無念無想', 'skill', 0, 'self', [[f(1)], [f(2)]], { stat: 'per' }), // 区切りD: 無念無想＝鎮めの祈り＝星の導き＝勝負の呼吸 をまとめた
-  c('samuraiBlunt', '峰打ち', 'physical', 1, 'enemy', [[d(3)], [d(5), s('weak', 1)], [d(8), s('weak', 1)]]),
   c('samuraiMoon', '奥義・月下断', 'physical', 3, 'enemy', [[d(8)], [d(15)], [d(23)], [d(31)]], { rarity: 'epic', trait: pierce }),
 
   c('bladeFire', '炎刃の術', 'magic', 1, 'enemy', [[d(3, 'fire')], [d(5, 'fire')], [d(8, 'fire')]]),
-  c('bladeIce', '氷刃の術', 'magic', 1, 'enemy', [[d(3, 'ice')], [d(5, 'ice')], [d(8, 'ice')]]),
   c('bladeThunder', '雷刃の術', 'magic', 2, 'enemy', [[d(6, 'thunder')], [d(11, 'thunder')], [d(17, 'thunder')]], { rarity: 'epic', trait: sharpenTrait('bladeThunder') }),
   c('bladeRelease', '奥義・魔剣解放', 'physical', 3, 'enemy', [[d(3, undefined, 3)], [d(5, undefined, 3)], [d(8, undefined, 3)], [d(11, undefined, 3)]], { rarity: 'epic', trait: sharpenTrait('bladeRelease') }),
 

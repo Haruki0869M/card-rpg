@@ -282,9 +282,8 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   if (isEnemy(v) && !isEnemy(source)) {
     const id = unitIdOf(source);
     if (!(v.hitBy ??= []).includes(id)) v.hitBy.push(id);
-    // 区切りD: 挟撃の陣（2 = ブロック3 / 3 = ブロック4・フォーカス+1。ブロックはカード1枚に1回、フォーカスは1人1回）
-    if ((v.pincer ?? 0) >= 2 && !ctx.pincerPaid && dmg > 0) {
-      ctx.pincerPaid = true;
+    // 区切りD: 挟撃の陣（2 = ブロック3 / 3 = ブロック4・フォーカス+1。ブロックは殴るたび（元の文どおり）、フォーカスは1人1回）
+    if ((v.pincer ?? 0) >= 2 && dmg > 0) {
       const gain = v.pincer! >= 3 ? 4 : 3;
       source.block = Math.min(BALANCE.blockMax, source.block + gain);
       events.push({ type: 'block', unitId: id, amount: gain });

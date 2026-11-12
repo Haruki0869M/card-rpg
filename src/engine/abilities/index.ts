@@ -188,7 +188,8 @@ export function completeSlotsOf(state: BattleState | undefined, u: Unit, card: C
  * カードのコスト（常時型 cardCost を全部当てた後。0より下にはならない）。
  * keys = 効いた「1ターンに1枚だけ」の能力の数えの名前（カードを使った時に markCostUsed で数える）。ここでは何も書き換えない
  */
-export function cardCostOf(state: BattleState | undefined, u: Unit, card: CardDef): { cost: number; keys: string[]; active: AbilityNotice[] } {
+/** uid = 手札のそのカード（詠唱の栞の「引いたそのカードのコスト-1」に使う） */
+export function cardCostOf(state: BattleState | undefined, u: Unit, card: CardDef, uid?: string): { cost: number; keys: string[]; active: AbilityNotice[] } {
   let cost = card.cost;
   const keys: string[] = [], active: AbilityNotice[] = [];
   if (isEnemy(u)) return { cost, keys, active };
@@ -203,6 +204,12 @@ export function cardCostOf(state: BattleState | undefined, u: Unit, card: CardDe
     cost = next;
     if (e.turnKey) keys.push(e.turnKey);
     active.push({ name: ab.name, source: ab.source });
+  }
+  // 詠唱の栞: 引いたそのカードだけ、このターンだけ
+  const cheap = (u as { cheapCard?: { uid: string; turn: number; delta: number } }).cheapCard;
+  if (uid && cheap && cheap.uid === uid && cheap.turn === (state?.turn ?? 0)) {
+    const next = Math.max(0, cost + cheap.delta);
+    if (next !== cost) { cost = next; active.push({ name: '詠唱の栞', source: { kind: 'card', label: '詠唱の栞' } }); }
   }
   return { cost, keys, active };
 }

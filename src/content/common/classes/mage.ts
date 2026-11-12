@@ -34,6 +34,6 @@ export const mage: ClassDef = {
   tier: 'base',
   lineage: 'ma',
   startingEquipment: { weapon: 'oakStaff', armor: 'travelerClothes' },
-  cardPool: ['fireball', 'iceLance', 'thunder', 'manaShield', 'deepFocus', 'gambleBolt', 'meditate', 'magicArrow', 'meteor', 'soulDrain', 'axBlazeCatalyst'],
+  cardPool: ['fireball', 'iceLance', 'thunder', 'wtDaggerDodge', 'deepFocus', 'gambleBolt', 'meditate', 'magicArrow', 'meteor', 'soulDrain', 'axBlazeCatalyst'],
   growthWeights: { int: 4, dex: 2, luk: 1, per: 1 },
 };

@@ -13,6 +13,6 @@ export const samurai: ClassDef = {
   battleAbility: { name: '居合', effect: { when: 'turnEnd', if: [{ kind: 'playedAtMost', count: 0 }], do: [{ kind: 'chargeAttack', factor: BALANCE.specialJobs.chargeFactor, max: BALANCE.specialJobs.chargeMax, category: 'physical' }] } },
   exploreAbility: { id: 'samuraiExplore', name: '心眼', description: '障害物の判定+15%', effect: { kind: 'checkBonus', check: 'obstacle', bonus: 15 } },
   requires: { feat: 'kills:weapon:katana', count: 6, text: '刀を装備して敵を6体倒す' },
-  cardPool: ['machineShot', 'samuraiPoise', 'samuraiSwallow', 'samuraiFocus', 'samuraiBlunt', 'samuraiMoon'], signature: ['machineShot', 'samuraiPoise', 'samuraiSwallow'],
+  cardPool: ['lnGiQuick', 'cmGrit', 'samuraiSwallow', 'samuraiFocus', 'lnGiFeint', 'samuraiMoon'], signature: ['lnGiQuick', 'cmGrit', 'samuraiSwallow'],
   jobCards: ['fxMumyou'], // 区切りD: 決め技（転職した時に山札へ1枚）
 };
