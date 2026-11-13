@@ -9,6 +9,15 @@
 
 
 
+## 19回目の公開（2026-11-13 22時ごろ・index-fgIJbwhB.js）
+
+- 入っている物と見どころ: docs/review/2026-11-13-deploy19-checklist.md。
+- 18回目から増えた物: 部屋の並びの直し直し（docs/review/2026-11-13-room-variety2.md）、敵3〜4体の予告、BREAK の決まり（紫の札と大物は弱点で完全成功。1つ目の鍵のボスだけ今までどおり。docs/tasks/break-read-plan.md・docs/review/2026-11-13-break-read.md）、店に属性の指輪を必ず1つ（後半の大物の弱点に合わせる）、1つ目の鍵の型の選ぶ所を戻した。
+- 案Y（大物のHP×2・後半の攻撃×1.5）はオーナーが取りやめ。難しさは「仕組みが先、小さな数字は最後」。目標は回復役入りで賢い bot が約15〜40%。今は 98〜100%。
+- 測定: 時間の伸び ×1.75 で 30〜45% になるが、負けが時間切れだけ・寄り道が損になるので単独では入れない（docs/review/2026-11-13-time-pressure.md）。
+- 次: 強敵の案（docs/tasks/elite-plan.md。オーナー OK 済み）→ ボスの段階 → 寄り道の値打ち → 時間を小さく。
+- 憲章の点検: docs/review/2026-11-13-charter-audit2.md・docs/review/charter-audit-1113c/pre-deploy19.md。
+
 ## 18回目の公開（2026-11-13 13時45分ごろ・main b431131・index-Dnm-CMq2.js）
 
 - 入っている物と見どころ: docs/review/2026-11-13-deploy18-checklist.md。
