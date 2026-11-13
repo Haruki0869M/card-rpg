@@ -376,7 +376,8 @@ export interface WorldState {
 
 export interface ShopStock {
   refreshedAt: number;
-  items: { kind: 'item'; item: ItemInstance; price: number; sold?: boolean }[];
+  /** featured = 必ず並ぶ品（BALANCE.shopFeatured。3つ目の地域の町の「属性の付与」の装飾品） */
+  items: { kind: 'item'; item: ItemInstance; price: number; sold?: boolean; featured?: true }[];
   cards: { cardId: string; heroId: string; price: number; sold?: boolean }[];
 }
 

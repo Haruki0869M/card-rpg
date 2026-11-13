@@ -9,7 +9,7 @@ import { PETS } from '../../../data/pets';
 import { getScenario } from '../../../data/scenarios';
 import { startTileOf } from './start';
 import type { GameCommand, GameState, ShopStock } from '../../../types';
-import type { Rng } from '../../rng';
+import { createRng, type Rng } from '../../rng';
 import { addItem, addLog, addLoot, earnGold, ownedBy, shopPriceFor } from '../common';
 import { rarityIndex } from '../dungeon';
 import { pickCard, withoutStarterCards } from '../cardTags';
@@ -28,6 +28,35 @@ const isEquipped = (game: GameState, uid: string) => game.heroes.some((h) => Obj
 /** 売値 */
 export const sellPrice = (itemId: string) => Math.floor((BALANCE.itemPrice[getItem(itemId).rarity] ?? 30) * BALANCE.sellRatio);
 
+/**
+ * 必ず並ぶ品の町（BALANCE.shopFeatured・docs/tasks/break-read-plan.md §3）: 進む順で region 番目の地域にある町。
+ * その地域に町が無ければ、その次（先へ進む側）の地域にある町。同じ地域に2つあれば、先に着く方（スタートに近い方）。
+ * 地図の regions は上（最後の地域）から下（始まりの地域）の順で、町の場所（at の行）で地域を決める
+ */
+export function featuredShopTownOf(scenarioId: string): string | undefined {
+  const map = getScenario(scenarioId).map;
+  if (!map) return undefined;
+  const regionOf = (row: number) => map.regions.findIndex((r) => row >= r.rows[0] && row <= r.rows[1]);
+  const target = map.regions.length - BALANCE.shopFeatured.region;
+  const towns = map.features
+    .filter((f) => f.kind === 'town')
+    .map((f) => ({ id: f.id as string, r: regionOf(f.at[1]), row: f.at[1] }))
+    .filter((t) => t.r >= 0 && t.r <= target)
+    .sort((a, b) => b.r - a.r || b.row - a.row);
+  return towns[0]?.id;
+}
+
+/**
+ * その冒険で、必ず並ぶ品（BALANCE.shopFeatured.items のうち1つ）。冒険の種から決める（冒険の乱数は使わない = ほかの抽選の順番を変えない）。
+ * 冒険の間、いつも同じ物
+ */
+export function featuredShopItemOf(game: Pick<GameState, 'seed'>): string {
+  const list = BALANCE.shopFeatured.items;
+  return list[createRng((game.seed ^ FEATURED_SALT) >>> 0).int(list.length)];
+}
+/** 必ず並ぶ品を決める乱数の種に混ぜる値（ほかの抽選と重ならないように） */
+const FEATURED_SALT = 0x5f0e7a11;
+
 /** 品揃えを作る（町に入った時。一定のワールドターンごとに入れ替わる） */
 export function ensureShop(game: GameState, rng: Rng): ShopStock {
   const w = game.world!;
@@ -39,6 +68,11 @@ export function ensureShop(game: GameState, rng: Rng): ShopStock {
   const items: ShopStock['items'] = [];
   const price = (id: string) => BALANCE.itemPrice[getItem(id).rarity] ?? 30;
   for (const id of town.shop.fixed ?? []) items.push({ kind: 'item', item: newItem(game, getItem(id)), price: price(id) });
+  // 必ず並ぶ品（3つ目の地域の町。入れ替わっても、売り切れの後でも、冒険の間は同じ品がまた並ぶ）
+  if (featuredShopTownOf(game.scenarioId) === town.id) {
+    const id = featuredShopItemOf(game);
+    items.push({ kind: 'item', item: newItem(game, getItem(id)), price: price(id), featured: true });
+  }
   const types = new Set(game.heroes.filter((h) => !h.retired).flatMap((h) => jobWeapons(h.classId)));
   // ランダムダンジョンの専用の装備（段階7a）は町の店に出さない
   const equip = ITEMS.all.filter((i) => i.slot !== 'consumable' && !i.source && (!i.scenario || i.scenario === game.scenarioId) &&(i.slot !== 'weapon' || types.has(i.weaponType!)));
