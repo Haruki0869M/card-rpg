@@ -34,6 +34,7 @@ import { finalChance, selectTier } from './probability';
 import { helpedAllies, recordSupport, selfSnapshot, supportSnapshot } from './support';
 import { afterAttackCard, attackElement, consumeAttackCharge, cardElements, cardHpCost, chargedMultiplier, tierHpCost } from './cardState';
 import { slotPreviewLimitOf } from './preview';
+import { allyHasWeakCard } from './breakRules';
 import { isStrikingSummon, summonStrikeOnce } from './summons';
 import { activeStatuses, actionFailChanceOf, applyTick, chancePenaltyOf, consumeStatus, decayStatuses, emptyStatuses, skipActionStatus, takeDrawPenalty, takeManaPenalty, tickHealOf } from './statuses';
 import { abilityTriggered, addLog, enemyName, findAlly, healUnit, loseHp, nameOf, unitIdOf } from './units';
@@ -549,6 +550,9 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   const cardAbilities = cardTraitAbilities(card);
   const ctx = makeCtx(state, rng, events, ally, { target, allyTarget, card, cardAbilities, perfect, tierEffects: tier.effects });
   ctx.successes = successes;
+  // つまみの測定2（2026-11-13・測るだけ）: BREAK の決まりの入れ物が読む物。既定の値（breakPerfectNoWeakCard = false・breakPerfectHeavy なし）では読まれない
+  ctx.focusUsed = focusUsed;
+  if (BALANCE.breakPerfectNoWeakCard) ctx.hasWeakCard = (e) => allyHasWeakCard(ally, e);
   if (target && tier.effects.some(e => e.kind === 'damage')) ally.lastTargetId = unitIdOf(target);
   for (const eff of tier.effects) applyEffect(ctx, eff);
   consumeAttackCharge(ally, card, tier);

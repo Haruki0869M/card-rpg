@@ -12,7 +12,7 @@ import { giveHand, party, play } from './helpers';
 
 type Mutable = Record<string, unknown>;
 const B = BALANCE as unknown as Mutable;
-const SAVED = Object.fromEntries(['breakPerfectByRank', 'breakNeedsWeakPerfect', 'breakStatus', 'breakClearsBlock', 'breakDamagePctByRank', 'enemyAttackByRegion', 'enemyHpByRank', 'enemyHpByRegion', 'goldGainMul'].map((k) => [k, B[k]]));
+const SAVED = Object.fromEntries(['breakPerfectByRank', 'breakNeedsWeakPerfect', 'breakNeedsWeakPerfectRanks', 'breakPerfectNoWeakCard', 'breakPerfectHeavy','breakStatus', 'breakClearsBlock', 'breakDamagePctByRank', 'enemyAttackByRegion', 'enemyHpByRank', 'enemyHpByRegion', 'goldGainMul'].map((k) => [k, B[k]]));
 afterEach(() => Object.assign(B, SAVED));
 
 /** 1体だけの戦闘（大技の予告を出させる）。flags で格を決める */
@@ -107,6 +107,62 @@ describe('BREAK の決まりのつまみ（既定 = 今のまま）', () => {
     const s = one(noWeak!.id, noWeak!.actions.find((x) => x.big)!.id, 5);
     expect(perfectAloneBreaks(s, s.enemies[0])).toBe(true);
     expect(perfectAloneBreaks(gate(5), gate(5).enemies[0])).toBe(false);
+  });
+
+  // つまみの測定2（2026-11-13）: (ア) B3 は大物だけ / (イ) 弱点を突けるカードが無い人は完全成功で崩せる / (エ) 重い一撃の完全成功で崩れる
+  it('つまみの測定2 の入れ物の既定の値（今と同じ）', () => {
+    expect(BALANCE.breakNeedsWeakPerfectRanks).toBeUndefined();
+    expect(BALANCE.breakPerfectNoWeakCard).toBe(false);
+    expect(BALANCE.breakPerfectHeavy).toBeUndefined();
+  });
+
+  it('(ア) B3 を大物だけに: ボス・中ボスは弱点で完全成功の時だけ。強敵・ふつうは今のまま（完全成功・弱点だけで崩れる）', () => {
+    B.breakNeedsWeakPerfect = true;
+    B.breakNeedsWeakPerfectRanks = ['boss', 'midboss'];
+    B.breakDamagePctByRank = { boss: Infinity, midboss: Infinity };
+    expect(perfectHit({ boss: true })).toEqual([]);
+    expect(perfectHit({ midboss: true })).toEqual([]);
+    expect(perfectHit({ elite: true })).toEqual(['perfect']);
+    expect(perfectHit({})).toEqual(['perfect']);
+    expect(weakHit(false)).toEqual(['weak']);
+    expect(wedge({ boss: true })).toEqual(['perfect']);
+  });
+
+  it('(イ) 弱点を突けるカードが手札・山札・捨て札に1枚も無い味方は、完全成功で崩せる（1枚でもあれば崩れない）', () => {
+    B.breakNeedsWeakPerfect = true;
+    B.breakPerfectNoWeakCard = true;
+    B.breakDamagePctByRank = { boss: Infinity, midboss: Infinity, elite: Infinity, normal: Infinity };
+    const hit = (pile: string[]) => {
+      const s = gate(5);
+      const [card] = giveHand(s, 'a0', ['heavySwing']);
+      const a = s.allies[0];
+      a.drawPile = pile.map((cardId, i) => ({ uid: `p${i}`, cardId }));
+      a.discard = [];
+      a.focus = 3;
+      return whys(applyCommand(s, play('a0', card.uid, 'e0', 3)).events);
+    };
+    expect(hit([])).toEqual(['perfect']);
+    expect(hit(['strike', 'guard'])).toEqual(['perfect']);
+    // 門番ガルザの弱点（雷）のカードが山札にあれば、弱点でない完全成功では崩れない
+    expect(hit(['gambleBolt'])).toEqual([]);
+    expect(weakHit(true)).toEqual(['weak']);
+  });
+
+  it('(エ) 枠3以上のカードか、フォーカス2以上を使った攻撃の完全成功なら崩れる（軽い一撃の完全成功では崩れない）', () => {
+    B.breakNeedsWeakPerfect = true;
+    B.breakPerfectHeavy = { slots: 3, focus: 2 };
+    B.breakDamagePctByRank = { boss: Infinity, midboss: Infinity, elite: Infinity, normal: Infinity };
+    const hit = (cardId: string, focus: number) => {
+      const s = gate(5);
+      const [card] = giveHand(s, 'a0', [cardId]);
+      s.allies[0].focus = focus;
+      const r = applyCommand(s, play('a0', card.uid, 'e0', focus));
+      expect(r.error).toBeUndefined();
+      return whys(r.events);
+    };
+    expect(hit('heavySwing', 3)).toEqual(['perfect']);
+    expect(hit('shieldBash', 2)).toEqual(['perfect']);
+    expect(hit('strike', 1)).toEqual([]);
   });
 
   it('B4: 崩した時に付ける状態とブロック（既定は脆弱・ブロック0。弱体にも戻せる）', () => {

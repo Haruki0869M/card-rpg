@@ -19,6 +19,8 @@
 // つまみの測定（2026-11-13）で足した環境変数:
 //   SIM_KNOBS（B1〜B4・H1〜H4・A1・A2・C1・C2・G1 をカンマで。下の KNOB_ALIAS の所に説明）・SIM_JSON（集計用の要約の書き出し先）・
 //   SIM_PARTY をカンマで複数書けるようにした（例: 2人,4人）
+// つまみの測定2（2026-11-13）で足した SIM_KNOBS: BA（ア）= B3 は大物だけ / BI（イ）= B3 ＋ 弱点を突けるカードが無い味方は完全成功で崩せる /
+//   BE（エ）= B3 ＋ 枠3以上かフォーカス2以上の完全成功でも崩れる（BE4/3 のように 枠/フォーカス を書ける）。SIM_JSON に出会った敵（foes）を足した
 // 部屋の連続の直し（2026-11-13）で SIM_JSON に足した数: クリアした冒険の戦闘の数・固定／ランダムダンジョンの中の戦闘の数・終わった時の平均レベル・転職の数
 // 敵の特殊な行動の直し（2026-11-13）で足した数: 特殊な行動（7種類）が、予告された・実際に行われた・BREAK で止められた回数（種類ごと・1冒険の平均）。
 //   テストの側で数える（エンジンの結果は変えない）。どの行動が特殊な行動かは、行動の効果の種類で見分ける（直す前と後で同じ見分け方）
@@ -108,8 +110,24 @@ const KNOB_TEXT: string[] = [];
     else if (k === 'B2') { B.breakPerfectByRank = ranksAll; KNOB_TEXT.push('B2 全部の敵で完全成功だけでは崩れない'); }
     else if (k === 'B3') {
       B.breakNeedsWeakPerfect = true;
-      B.breakDamagePctByRank = { boss: Infinity, midboss: Infinity, elite: Infinity, normal: Infinity };
       KNOB_TEXT.push('B3 弱点の属性で、しかも完全成功の時だけ崩れる（弱点の無い敵は完全成功で崩れる・合計ダメージでは崩れない）');
+    } else if (k === 'BA') {
+      // つまみの測定2（ア）: B3 を大物（ボス・中ボス・災厄）だけに当てる。強敵・ふつうの敵は今の決まりのまま
+      B.breakNeedsWeakPerfect = true;
+      B.breakNeedsWeakPerfectRanks = ['boss', 'midboss'];
+      KNOB_TEXT.push('BA（ア）B3 は大物だけ（強敵・ふつうの敵は今のまま）');
+    } else if (k === 'BI') {
+      // つまみの測定2（イ）: B3 ＋ 弱点を突けるカードを1枚も持たない味方は、完全成功で崩せる
+      B.breakNeedsWeakPerfect = true;
+      B.breakPerfectNoWeakCard = true;
+      KNOB_TEXT.push('BI（イ）B3 ＋ 弱点を突けるカードが手札・山札・捨て札に無い味方は、完全成功で崩せる');
+    } else if (k.startsWith('BE')) {
+      // つまみの測定2（エ）: B3 ＋ 重い一撃の完全成功でも崩れる（BE = 枠3以上かフォーカス2以上。BE4/3 のように 枠/フォーカス を書ける）
+      const [s, fo] = k === 'BE' ? [3, 2] : k.slice(2).split('/').map(Number);
+      if (!(s > 0) || !(fo > 0)) throw new Error(`つまみの倍率が読めない: ${raw}`);
+      B.breakNeedsWeakPerfect = true;
+      B.breakPerfectHeavy = { slots: s, focus: fo };
+      KNOB_TEXT.push(`${raw}（エ）B3 ＋ 枠${s}以上のカードか、フォーカス${fo}以上を使った攻撃の完全成功でも崩れる`);
     } else if (k === 'B4') { B.breakStatus = 'vulnerable'; B.breakClearsBlock = false; KNOB_TEXT.push('B4 崩した時の効果 = 威力半分＋脆弱1（弱体なし・ブロックは残る）'); }
     else if (k.startsWith('HL')) { B.enemyHpByRegion = Object.fromEntries(LATE3_REGIONS.map((id) => [id, num('HL')])); KNOB_TEXT.push(`${raw} ${LATE3_REGIONS.join('・')}の敵のHP ×${num('HL')}`); }
     else if (k.startsWith('HB')) { B.enemyHpByRank = { boss: num('HB'), midboss: num('HB') }; KNOB_TEXT.push(`${raw} ボス・中ボス・災厄のHP ×${num('HB')}`); }
@@ -120,6 +138,11 @@ const KNOB_TEXT: string[] = [];
       KNOB_TEXT.push(`${raw} 侵食度の伸び ×${num('C')}（ターンごと ${B.corruptionPerTurn}・ダンジョンの中 ${B.corruptionPerDungeonTurn}）`);
     } else if (k.startsWith('G')) { B.goldGainMul = num('G'); KNOB_TEXT.push(`${raw} 稼いだお金 ×${num('G')}`); }
     else throw new Error(`知らないつまみ: ${raw}`);
+  }
+  // B3 の仲間（B3・BA・BI・BE）: 決まりを当てる格では、合計ダメージでは崩れない（前の B3 と同じ。BA は大物だけ）
+  if (B.breakNeedsWeakPerfect) {
+    const ranks = (B.breakNeedsWeakPerfectRanks as string[] | undefined) ?? ['boss', 'midboss', 'elite', 'normal'];
+    B.breakDamagePctByRank = Object.fromEntries(ranks.map((r) => [r, Infinity]));
   }
 }
 const VARIANT_TEXT: Record<string, string> = {
@@ -199,6 +222,8 @@ interface Run {
   levelEnd: number;
   /** 敵の特殊な行動の直し: 種類ごとの、予告された・実際に行われた・BREAK で止められた（崩された）回数 */
   sp: SpecialCount;
+  /** つまみの測定2: 戦闘の始めにいた敵（敵の種類 → 出た戦闘の数）。シナリオ1で本当に出会う敵を洗い出す用 */
+  foes: Record<string, number>;
 }
 
 /** ボスの部屋・中ボスの部屋・災厄（災厄の戦闘は中ボスの印を持つ）の戦闘か */
@@ -212,7 +237,7 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
   const r: Run = { clear: false, corr100: false, where: '', fights: 0, rounds: 0, finished: 0, breaks: 0, randomIn: 0, randomDone: 0, scourgeKills: 0, jobChanges: 0, hones: 0, errors: 0,
     bigFinished: 0, bigRounds: 0, breakWhy: { weak: 0, perfect: 0, damage: 0 }, bigBreaks: 0, worldTurn: 0, corruption: 0, wiped: false, endMode: '', where2: {},
     bought: 0, sold: 0, equips: 0, itemsBattle: 0, itemsField: 0, removed: 0, skipped: 0, refused: 0, goldEnd: 0,
-    fixedDungeonFights: 0, randomDungeonFights: 0, levelEnd: 0, sp: emptySpecials() };
+    fixedDungeonFights: 0, randomDungeonFights: 0, levelEnd: 0, sp: emptySpecials(), foes: {} };
   const entered = new Set<string>();
   /** 予告を数えた印（戦闘の種:敵:ターン。同じ予告を2回数えない） */
   const said = new Set<string>();
@@ -238,6 +263,7 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
       const reg = tile !== undefined && w.tiles[tile] ? MAP_REGIONS[w.tiles[tile].r]?.id ?? '?' : '?';
       const key = `${reg}${sc.dungeon ? `/${sc.dungeon.dungeonId}` : ''}`;
       r.where2[key] = (r.where2[key] ?? 0) + 1;
+      for (const id of new Set(sc.battle.enemies.map((x) => x.defId))) r.foes[id] = (r.foes[id] ?? 0) + 1;
       if (sc.dungeon) {
         if (DUNGEONS.get(sc.dungeon.dungeonId).random) r.randomDungeonFights++;
         else r.fixedDungeonFights++;
@@ -430,7 +456,9 @@ describe.skipIf(!process.env.SIM)(`物差し2本（直行 bot と工夫する bo
       writeFileSync(OUT, L.join('\n') + '\n');
       // つまみの測定: 集計用の要約（SIM_JSON に書く。人数・bot ごと）
       if (process.env.SIM_JSON) {
-        const sum: Record<string, unknown> = { knobs: KNOBS, variant: VARIANT, partyset: PARTYSET, seeds: SEEDS, rows: [] as unknown[] };
+        const foes: Record<string, number> = {};
+        for (const by of Object.values(all)) for (const rs of Object.values(by)) for (const r of rs ?? []) for (const [id, n] of Object.entries(r.foes)) foes[id] = (foes[id] ?? 0) + n;
+        const sum: Record<string, unknown> = { knobs: KNOBS, variant: VARIANT, partyset: PARTYSET, seeds: SEEDS, rows: [] as unknown[], foes };
         for (const [p, by] of Object.entries(all)) {
           for (const k of BOTS) {
             const rs = by[k];

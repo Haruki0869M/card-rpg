@@ -12,7 +12,8 @@ import { elementGuide } from '../components/battle/elementGuide';
 import type { AllyState, BattleState, CardDef, Command, EnemyState, GameCommand, GameState, Hero } from '../types';
 import { cardTargets, isAllyCard, secondaryCard } from './battle/targets';
 import { unitIdOf } from './battle/units';
-import { canBreak, comboStage, perfectAloneBreaks, targetOf } from './battle/effects';
+import { canBreak, comboStage, needsWeakPerfect, perfectAloneBreaks, targetOf } from './battle/effects';
+import { allyHasWeakCard } from './battle/breakRules';
 import { isDone, tierDamageAgainst, unusableReason } from './battle/battle';
 import { aliveScourges } from './game/world/scourgeCurse';
 import { isRandomDungeonTile } from './game/world/randomDungeons';
@@ -217,11 +218,12 @@ function attackScore(b: BattleState, a: AllyState, card: CardDef, e: EnemyState)
   if (canBreak(e)) {
     // 大技の予告: 弱点で当てれば崩れる。弱点でなければ、フォーカスを全部の枠に入れて完全成功で崩す（足りれば）
     // つまみの測定（2026-11-13）: BREAK の決まりを変えた時は、画面の説明と同じ決まりで考える（既定の決まりでは、前と全く同じ点）
-    if (guide?.kind === 'weak' && !BALANCE.breakNeedsWeakPerfect) score += 60;
+    // つまみの測定2: 大物だけの決まり（ア）・弱点を突けない人（イ）・重い一撃（エ）も、エンジンと同じ関数で考える（既定の決まりでは前と同じ点）
+    if (guide?.kind === 'weak' && !needsWeakPerfect(b)) score += 60;
     else if (guide?.kind === 'weak' && card.slots <= a.focus) {
       focus = card.slots;
       score += 60;
-    } else if (guide?.kind !== 'weak' && perfectAloneBreaks(b, e) && card.slots <= a.focus) {
+    } else if (guide?.kind !== 'weak' && card.slots <= a.focus && perfectAloneBreaks(b, e, { card, focusUsed: card.slots, hasWeakCard: () => allyHasWeakCard(a, e) })) {
       focus = card.slots;
       score += 50;
     } else score += 25; // 合計ダメージ（最大HPの2割）で崩せるかもしれない
