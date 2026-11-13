@@ -143,6 +143,11 @@ export const BALANCE = {
   /** 中身の格がレア以下の時に、おまけの消費アイテムが付く確率（%） */
   chestBonusConsumable: 25,
   /**
+   * 中身の格がエピック・レジェンドの時に、装備とは別に、同じ格の消耗品が付く確率（%）。
+   * レジェンド = 神々の神酒・不死鳥の羽根・時の砂時計のどれか（お店で売らない3つの出どころ）。2026-11-13 まとめ役の指示
+   */
+  chestTopConsumable: { epic: 25, legend: 100 } as Record<string, number>,
+  /**
    * 封魔の宝箱（依頼の「金の扉 ＝ 宝物庫 または 封魔の宝箱（罠・戦闘つき高レア箱）」。数値はすべて提案）。
    * - chance: 宝箱の部屋が、ダンジョンを作る時に封魔の宝箱に変わる確率（%）。fromRow 行目（入口が0）より奥の宝箱だけ
    * - 箱の見た目: 装飾箱（legendFromRow 行目（入口が0）より奥は黄金箱）。鍵は無い（封印が鍵の代わり）
@@ -215,7 +220,7 @@ export const BALANCE = {
   /**
    * BREAK（体勢崩し。抜本的な見直し §3-2・オーナーの決定 3-A）: 敵が大技の予告を出しているターンに、
    * 弱点の属性で攻撃する／完全成功で攻撃を当てる／そのターンの合計ダメージが最大HPの breakDamagePct% 以上、のどれかで崩せる。
-   * 崩すと、その予告の威力が breakPower 倍・弱体 breakWeak・ブロック0。1つの予告に1回
+   * 崩すと、その予告の威力が breakPower 倍・breakStatus（今は脆弱）breakWeak・ブロック0。1つの予告に1回
    */
   breakDamagePct: 20,
   /**
@@ -236,8 +241,11 @@ export const BALANCE = {
    * 2026-11-13 つまみの測定: 測るための入れ物（既定 false = 今と同じ）
    */
   breakNeedsWeakPerfect: false as boolean,
-  /** 崩した時に付ける状態（'weak' = 弱体・今 / 'vulnerable' = 脆弱）と、ブロックを0にするか。2026-11-13 つまみの測定（既定 = 今と同じ） */
-  breakStatus: 'weak' as 'weak' | 'vulnerable',
+  /**
+   * 崩した時に付ける状態（'weak' = 弱体 / 'vulnerable' = 脆弱）と、ブロックを0にするか。
+   * 2026-11-13 まとめ役の指示で 'weak' → 'vulnerable'（崩した敵は、受けるダメージが増える）。量は breakWeak（名前は前のまま）
+   */
+  breakStatus: 'vulnerable' as 'weak' | 'vulnerable',
   breakClearsBlock: true as boolean,
   breakPower: 0.5,
   breakWeak: 1,
@@ -265,11 +273,12 @@ export const BALANCE = {
   corruptionOnRandomDungeonClear: 2,
   /**
    * ランダムダンジョン（段階7a・overhaul-plan-v2 §4-3）。
-   * - exclusiveChance: ボスの黄金箱から、専用の装備が1つ「余分に」出る確率（%）
+   * - exclusiveChance: ボスの黄金箱から、専用の装備が1つ「余分に」出る確率（%）。
+   *   憲章2「最奥の主を倒すと必ず黄金箱が開き、秘宝装備が手に入る」に合わせて 60 → 100（2026-11-13 オーナーの決定 A）
    * - blackMarketPriceMul: 闇商人の値段の倍率（町の店の値段 × これ）【提案】
    * - blackMarketGoods: 闇商人が専用の装備のほかに並べる、レア以上の品の数【提案】
    */
-  randomDungeon: { exclusiveChance: 60, blackMarketPriceMul: 1.5, blackMarketGoods: 2 },
+  randomDungeon: { exclusiveChance: 100, blackMarketPriceMul: 1.5, blackMarketGoods: 2 },
   /**
    * 災厄の中ボス（段階7b・overhaul-plan-v2 §3。数字は計画の【提案】のまま。段階8で測って決める）。広い地図（帯のある地図）だけに出る。
    * - max: 1冒険に出る数 / firstCorruption: 1体目は「1つ目の鍵を取った時」か、その前に侵食度がこれを越えた時 / milestones: 2体目・3体目の侵食度

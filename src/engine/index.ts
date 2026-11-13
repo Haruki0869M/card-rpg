@@ -42,7 +42,7 @@ export { dungeonGateError } from './game/world/questGate';
 export { sceneHeroes, activeHeroes } from './game/heroes';
 export { altarTransmutePool } from './game/tasks';
 export { isRandomDungeonTile, randomDungeonView } from './game/world/randomDungeons';
-export { aliveScourges, scourgeCurse, scourgeList, scourgePrice, scourgeRewardText, scourgesWith, scourgeAt, ELIXIR_ID } from './game/world/scourges';
+export { aliveScourges, scourgeCurse, scourgeList, scourgePrice, scourgeRewardText, scourgeGearText, scourgesWith, scourgeAt, ELIXIR_ID } from './game/world/scourges';
 export * from './hash';
 export * from './game/scenes';
 export * from './game/votes';

@@ -27,7 +27,7 @@ import { cardChanceBonus, cardCostOf, cardModifier, cardTraitAbilities, carryMan
 import { createRng, type Rng, shuffle } from '../rng';
 import { affinityOf } from '../stats';
 import { calcDamage } from './damage';
-import { discardHand, drawCards } from './deck';
+import { discardHand, drawCards, reshuffleBlockedText } from './deck';
 import { applyEffect, checkEffect, comboMultiplier, dealDamage, elementMultiplier, makeCtx, targetOf } from './effects';
 import { breakStopsAction, decideAllIntents, fallbackLoneIntents } from './intents';
 import { finalChance, selectTier } from './probability';
@@ -310,8 +310,9 @@ function startAllyPhase(state: BattleState, rng: Rng, events: BattleEvent[]) {
     // 遅延など: 引くカードが減る（効いたら消える）
     const slow = takeDrawPenalty(a.statuses);
     if (slow.amount) addLog(state, `${a.name}は${slow.names.join('・')}で引くカード-${slow.amount}`);
-    const { reshuffled } = drawCards(a, Math.max(0, BALANCE.drawPerTurn + a.extraDraw - slow.amount), rng);
+    const { reshuffled, blocked } = drawCards(a, Math.max(0, BALANCE.drawPerTurn + a.extraDraw - slow.amount), rng, state.turn);
     if (reshuffled) addLog(state, `${a.name}: 捨札をシャッフルして山札に戻した`);
+    if (blocked) addLog(state, reshuffleBlockedText(a.name));
   }
   for (const a of state.allies) if (!a.dead) applyTickHeal(state, a, events);
   for (const a of state.allies) {

@@ -217,7 +217,10 @@ describe('回1: 災厄が出た時の知らせ（別の窓）と場所の文', (
     const page = w.storyQueue![0];
     expect(page.title).toBe(`💀 強欲の盗賊王が、${placeName(g, w, wd.tile)}に現れた！`);
     expect(page.title).toMatch(/の(西|東)に現れた！$/);
-    expect(page.lines.slice(1)).toEqual(['すべての町の店の値段が25%高い（売る値段は変わらない）。', '倒すと元に戻り、専用の装備を落とす。', 'くわしい場所は、見晴らしの塔に登ると分かる。']);
+    // 2026-11-13: 倒すと手に入る専用の装備の名前と効果を、最後の行に出す
+    expect(page.lines.slice(1, 3)).toEqual(['すべての町の店の値段が25%高い（売る値段は変わらない）。', 'くわしい場所は、見晴らしの塔に登ると分かる。']);
+    expect(page.lines[3]).toMatch(/^倒すと元に戻り、専用の装備「強欲王の黄金冠」を落とす（《黄金の雨》.+）。$/);
+    expect(page.lines).toHaveLength(4);
     g = run(g, { type: 'STORY_CONTINUE', playerId: 'P1' });
     expect(g.world!.story?.title).toBe(page.title);
   });

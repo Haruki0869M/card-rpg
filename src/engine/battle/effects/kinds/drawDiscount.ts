@@ -1,7 +1,7 @@
 // 詠唱の栞（区切りD）: 1枚引く。引いたカードが category なら、そのカードのコストを、このターンだけ delta（1ターンに1回。元の文どおり）
 import { getCard } from '../../../../data/cards';
-import { drawCards } from '../../deck';
-import { isEnemy } from '../../units';
+import { drawCards, reshuffleBlockedText } from '../../deck';
+import { addLog, isEnemy } from '../../units';
 import type { CardCategory } from '../../../../types';
 import type { EffectHandler } from '../types';
 
@@ -20,7 +20,11 @@ export const effect: EffectHandler<'drawDiscount'> = {
     const u = ctx.source;
     if (isEnemy(u)) return false;
     const before = u.hand.length;
-    drawCards(u, 1, ctx.rng);
+    const { blocked } = drawCards(u, 1, ctx.rng, ctx.state.turn);
+    if (blocked) {
+      addLog(ctx.state, reshuffleBlockedText(u.name));
+      ctx.parts.push('切り直しは1ターンに1回');
+    }
     if (u.hand.length <= before) return false;
     const drawn = getCard(u.hand[u.hand.length - 1].cardId);
     ctx.parts.push('1枚引いた');

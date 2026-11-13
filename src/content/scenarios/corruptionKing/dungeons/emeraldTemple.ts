@@ -16,8 +16,8 @@ export const emeraldTemple: DungeonDef = {
   layout: [
     [{ type: 'battle', next: [0, 1] }],
     [
-      { type: 'battle', next: [0, 1] },
       { type: 'event', eventId: 'fallenTree', next: [0, 1] },
+      { type: 'rest', next: [0, 1] },
     ],
     [
       { type: 'elite', next: [0, 1] },

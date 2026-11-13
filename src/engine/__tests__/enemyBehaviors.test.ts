@@ -142,8 +142,8 @@ describe('手数読み（葦陰の狩人）', () => {
     expect(s.enemies[0].broken).toBe(true);
     for (let i = 0; i < 3; i++) s = use(s, 'ebZero');
     s = nextTurn(s);
-    // 4枚 × 1、BREAK の弱体（×0.75）で 3
-    expect(s.allies[0].hp).toBe(97);
+    // 4枚 × 1（BREAK で付くのは脆弱なので、敵の攻撃は減らない。2026-11-13 に弱体から変えた）
+    expect(s.allies[0].hp).toBe(96);
   });
 });
 
@@ -168,9 +168,9 @@ describe('盾砕き（玄武岩の虫）', () => {
     s.allies[0].block = 15;
     s = endTurn(s);
     s = applyCommand(s, { type: 'ENEMY_STEP' }).state;
-    // 5 × 弱体0.75 = 3 をブロックで受ける
+    // 5 をブロックで受ける（BREAK で付くのは脆弱なので、敵の攻撃は減らない。2026-11-13 に弱体から変えた）
     expect(s.allies[0].hp).toBe(100);
-    expect(s.allies[0].block).toBe(12);
+    expect(s.allies[0].block).toBe(10);
   });
 });
 
@@ -213,7 +213,7 @@ describe('手負い狙い（炭火の猟犬）', () => {
     expect(s.allies[1].hp).toBe(40);
     expect(s.allies[0].hp).toBe(90);
   });
-  it('BREAK すると半分（5×1.5、弱体で×0.75）', () => {
+  it('BREAK すると半分（5×1.5。BREAK で付くのは脆弱なので、敵の攻撃は減らない）', () => {
     let s = battle(['cinderHound'], 2);
     s.allies[0].hp = 100; s.allies[1].hp = 40;
     decide(s);
@@ -221,7 +221,7 @@ describe('手負い狙い（炭火の猟犬）', () => {
     expect(s.enemies[0].broken).toBe(true);
     s = endTurn(s);
     s = applyCommand(s, { type: 'ENEMY_STEP' }).state;
-    expect(s.allies[1].hp).toBe(35);
+    expect(s.allies[1].hp).toBe(33);
   });
 });
 

@@ -18,6 +18,7 @@ import { hexDistance, neighbors } from './hex';
 import { isWideMap, laneOfTile } from './lanes';
 import { corruptionLevelBonus } from './wanderers';
 import { aliveScourges } from './scourgeCurse';
+import { describeAbility } from '../../abilities';
 import { bumpStoryVer, placeName, queueStory } from './guide';
 
 export { aliveScourges, scourgeCurse, scourgePrice, scourgesWith, type ScourgeCurse } from './scourgeCurse';
@@ -111,8 +112,9 @@ export function spawnScourge(game: GameState, w: WorldState, rng: Rng): Wanderer
   const lines = [
     def.appearText,
     `${def.curseText}。`,
-    '倒すと元に戻り、専用の装備を落とす。',
     seen ? (watched ? '塔の見張りが場所を知らせてくれた（地図の💀）。' : '場所は地図の💀の所。') : 'くわしい場所は、見晴らしの塔に登ると分かる。',
+    // 倒すと手に入る専用の装備の効果（2026-11-13。長いので最後に置く）
+    `倒すと元に戻り、専用の装備「${getItem(def.gear).name}」を落とす（${scourgeGearText(def).replace(/。$/, '')}）。`,
   ];
   // 回1: 制覇の物語などの後ろに足さず、その窓を閉じた後に別の窓で出す。地域（「嘆きの沼の東」）までは最初から分かる
   queueStory(w, { title: `💀 ${def.name}が、${placeName(game, w, tile)}に現れた！`, lines });
@@ -187,7 +189,7 @@ export function scourgeLoot(game: GameState, reward: RewardState, survivors: Her
 }
 
 /** 画面用: 生きている災厄の一覧（名前・悪さ・場所が見えているか・倒した時の報酬の文） */
-export function scourgeList(game: GameState): { id: string; name: string; short: string; curseShort: string; curseText: string; seen: boolean; tile: number; rewardText: string; gearName: string }[] {
+export function scourgeList(game: GameState): { id: string; name: string; short: string; curseShort: string; curseText: string; seen: boolean; tile: number; rewardText: string; gearName: string; gearText: string }[] {
   const w = game.world;
   if (!w) return [];
   return aliveScourges(w).map(({ wd, def }) => ({
@@ -199,8 +201,15 @@ export function scourgeList(game: GameState): { id: string; name: string; short:
     seen: !!w.tiles[wd.tile]?.seen,
     tile: wd.tile,
     gearName: getItem(def.gear).name,
+    gearText: scourgeGearText(def),
     rewardText: scourgeRewardText(game, def),
   }));
+}
+
+/** 倒すと手に入る専用の装備の効果（1行。装備の能力の説明 = 装備の画面と同じ describeAbility。能力が無ければ装備の説明） */
+export function scourgeGearText(def: ScourgeDef): string {
+  const it = getItem(def.gear);
+  return it.ability ? `《${it.ability.name}》${describeAbility(it.ability)}` : it.description;
 }
 
 /** 倒した時の報酬の文（専用の装備・お金・侵食度・秘薬） */

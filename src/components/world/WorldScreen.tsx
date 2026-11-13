@@ -34,6 +34,7 @@ import {
   corruptionShown,
   dungeonJoin,
   randomDungeonView,
+  scourgeCurse,
   scourgesWith,
   guideGoal,
   goalLineText,
@@ -71,6 +72,7 @@ export function WorldTopBar({ game, goldHeroId, goalLine }: { game: GameState; /
   const until = turnsUntilNightChange(w.worldTurn);
   const next = nextCorruptionStage(game);
   const cName = corruptionName(game.scenarioId);
+  const curse = scourgeCurse(game);
   return (
     <>
     <div className="panel z-10 flex shrink-0 items-center gap-1.5 px-2 py-1" data-cutin-anchor>
@@ -82,8 +84,12 @@ export function WorldTopBar({ game, goldHeroId, goalLine }: { game: GameState; /
         data-help-open="corruption"
       >
         <span className="flex items-center justify-between text-[12px] leading-4">
-          <span className="font-display text-fuchsia-200">{cName}</span>
-          <b className="tabular-nums text-fuchsia-100">{corruptionShown(w.corruption)}%</b>
+          <span className="font-display whitespace-nowrap text-fuchsia-200">{cName}</span>
+          <span className="flex items-center gap-1 whitespace-nowrap">
+            {/* 災厄（瘴気を紡ぐ死霊術師）が生きている間は、世界マップの番ごとの伸びが増える（2026-11-13） */}
+            {curse.corruptionPerTurn > 0 && <span className="text-[12px] font-normal text-fuchsia-300" aria-label={`災厄のせいで、番ごとに+${curse.corruptionPerTurn}%`} data-corruption-scourge>💀+{curse.corruptionPerTurn}%</span>}
+            <b className="tabular-nums text-fuchsia-100">{corruptionShown(w.corruption)}%</b>
+          </span>
         </span>
         <Bar value={w.corruption} max={100} color="linear-gradient(90deg,#6a2a9a,#e04aff)" height={6} />
         {/* 次の段階は省略せずに全文（2行まで） */}
@@ -113,6 +119,8 @@ export function WorldTopBar({ game, goldHeroId, goalLine }: { game: GameState; /
           <Hourglass size={12} />
           {until.night ? `朝まで${until.turns}` : `夜まで${until.turns}`}
         </span>
+        {/* 災厄（氷嵐の魔女）が生きている間は、夜の魔物のレベルがさらに上がる（夜の間だけ出す。2026-11-13） */}
+        {time === 'night' && curse.nightLevel > 0 && <span className="text-fuchsia-300" data-night-scourge>💀敵Lv+{curse.nightLevel}</span>}
       </div>
       <button onClick={() => openSheet('quests')} aria-label="依頼" className="btn btn-dark flex h-11 w-11 shrink-0 items-center justify-center rounded-lg">
         <ScrollText size={20} />

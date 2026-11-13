@@ -237,7 +237,7 @@ describe('段階7a: 黄金箱と専用の装備', () => {
     for (let s = 1; s <= 400; s++) for (const r of ['rare', 'epic', 'legend'] as const) expect(rollEquipment(r, g.heroes, createRng(s), { scenario: 'corruptionKing' }).source).toBeUndefined();
   });
 
-  it('黄金箱のおまけは約60%。1人の冒険では「仲間がいる時だけ」の指輪は出ない', () => {
+  it('黄金箱のおまけは必ず出る（憲章2。2026-11-13 に 60 → 100）。1人の冒険では「仲間がいる時だけ」の指輪は出ない', () => {
     const solo = newGame('corruptionKing', 4);
     const duo = newGame('corruptionKing', 4, ['P1', 'P2']);
     for (let s = 1; s <= 300; s++) {
@@ -250,10 +250,15 @@ describe('段階7a: 黄金箱と専用の装備', () => {
       const ex = rollExclusive(duo, duo.heroes, createRng(s))!;
       if (ex.slot === 'weapon') expect(ex.weaponType).toBe('katana');
     }
-    expect(BALANCE.randomDungeon.exclusiveChance).toBe(60);
+    expect(BALANCE.randomDungeon.exclusiveChance).toBe(100);
+    // 1人でも2人でも、選べる専用の装備は必ずある（だから黄金箱の秘宝は必ず1つ出る）
+    for (let s = 1; s <= 300; s++) {
+      expect(rollExclusive(solo, solo.heroes, createRng(s))).toBeTruthy();
+      expect(rollExclusive(duo, duo.heroes, createRng(s))).toBeTruthy();
+    }
   });
 
-  it('ランダムダンジョンのボスの黄金箱を開けると、約60%で専用の装備が1つ余分に入る（ふつうの中身はそのまま）', () => {
+  it('ランダムダンジョンのボスの黄金箱を開けると、必ず専用の装備が1つ余分に入る（ふつうの中身はそのまま）', () => {
     let extra = 0;
     const N = 60;
     for (let s = 0; s < N; s++) {
@@ -279,8 +284,7 @@ describe('段階7a: 黄金箱と専用の装備', () => {
         expect(s2.heroes[0].stash.some((i) => getItem(i.itemId).source)).toBe(true);
       } else expect(items.some((i) => i.source)).toBe(false);
     }
-    expect(extra / N).toBeGreaterThan(0.4);
-    expect(extra / N).toBeLessThan(0.8);
+    expect(extra).toBe(N);
   });
 
   it('2人の時は、専用の装備も「欲しい／余れば／いらない」の取り合いに入る（だれも止まらない）', () => {

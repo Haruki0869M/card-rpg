@@ -9,7 +9,7 @@ import { addItem, addLog } from './common';
 import { rarityIndex } from './dungeon';
 import { STAT_IDS } from './hero';
 import { withoutStarterCards } from './cardTags';
-import { heroCardPool } from './jobs';
+import { finisherCards, heroCardPool } from './jobs';
 
 /**
  * 晶石の祭壇の「変異」の行き先の候補（段階7a）: そのキャラの報酬に出るカード（最初の山札の基本の札は除く）のうち、同じ格で別のカード。
@@ -63,8 +63,10 @@ export function doCardTask(game: GameState, h: Hero, cardUid: string | undefined
   } else {
     // 変異: 別の系統のジョブのレア以上のカードに変わり、ランダムな能力値+1
     const lin = getClass(h.classId).lineage;
+    // 決め技（転職でだけ入る札）には変わらない
+    const fin = finisherCards();
     const pool = [...new Set(CLASSES.all.filter((c) => c.lineage && c.lineage !== lin).flatMap((c) => c.cardPool))].filter(
-      (id) => CARDS.has(id) && rarityIndex(CARDS.get(id).rarity ?? 'common') >= 1,
+      (id) => CARDS.has(id) && !fin.has(id) && rarityIndex(CARDS.get(id).rarity ?? 'common') >= 1,
     );
     if (!pool.length) return '変異できるカードがありません';
     const to = pool[rng.int(pool.length)];

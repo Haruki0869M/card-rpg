@@ -41,8 +41,8 @@ type Layout = NonNullable<DungeonDef['layout']>;
 const windmillLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
-    { type: 'battle', next: [0, 1] },
-    { type: 'event', eventId: 'skyWindGap', next: [1, 2] },
+    { type: 'event', eventId: 'skyWindGap', next: [0, 1] },
+    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1, 2] },
   ],
   [
     { type: 'chest', chest: { rarity: 'common', locked: false }, next: [0, 1] },
@@ -51,10 +51,10 @@ const windmillLayout: Layout = [
   ],
   [
     { type: 'battle', next: [0, 1] },
-    { type: 'event', eventId: 'starDustChest', next: [0] },
+    { type: 'battle', next: [0] },
   ],
   [
-    { type: 'battle', next: [0] },
+    { type: 'event', eventId: 'starDustChest', next: [0] },
     { type: 'chest', chest: { rarity: 'rare', locked: true }, next: [0] },
   ],
   [{ type: 'rest', next: [0] }],
@@ -67,11 +67,11 @@ const observatoryLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
     { type: 'event', eventId: 'constellationMural', next: [0, 1] },
-    { type: 'battle', next: [1] },
+    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1] },
   ],
   [
     { type: 'battle', next: [0, 1] },
-    { type: 'rest', next: [1, 2] },
+    { type: 'battle', next: [1, 2] },
   ],
   [
     { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
@@ -79,7 +79,7 @@ const observatoryLayout: Layout = [
     { type: 'event', eventId: 'clockworkTrap', next: [1] },
   ],
   [
-    { type: 'battle', next: [0, 1] },
+    { type: 'event', eventId: 'skyWindGap', next: [0, 1] },
     { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
   ],
   [
@@ -95,8 +95,8 @@ const observatoryLayout: Layout = [
 const moonGardenLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
-    { type: 'battle', next: [0, 1] },
-    { type: 'event', eventId: 'moonPetalFountain', next: [1, 2] },
+    { type: 'event', eventId: 'moonPetalFountain', next: [0, 1] },
+    { type: 'rest', next: [1, 2] },
   ],
   [
     { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
@@ -104,19 +104,19 @@ const moonGardenLayout: Layout = [
     { type: 'battle', next: [1] },
   ],
   [
-    { type: 'rest', next: [0, 1] },
+    { type: 'battle', next: [0, 1] },
     { type: 'event', eventId: 'skyPeddler', next: [1] },
   ],
   [
-    { type: 'battle', next: [0, 1] },
-    { type: 'battle', next: [1] },
+    { type: 'event', eventId: 'skyWindGap', next: [0, 1] },
+    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1] },
   ],
   [
     { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
-    { type: 'elite', next: [0, 1] },
+    { type: 'battle', next: [0, 1] },
   ],
   [
-    { type: 'battle', next: [0] },
+    { type: 'event', eventId: 'starDustChest', next: [0] },
     { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
   ],
   [{ type: 'rest', next: [0] }],
@@ -181,11 +181,11 @@ export const skyCastle: DungeonDef = {
   layout: [
     [{ type: 'battle', next: [0, 1] }],
     [
-      { type: 'battle', next: [0] },
+      { type: 'event', eventId: 'skyWindGap', next: [0] },
       { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0, 1] },
     ],
     [
-      { type: 'elite', next: [0, 1] },
+      { type: 'battle', next: [0, 1] },
       { type: 'battle', next: [1] },
     ],
     [
@@ -194,20 +194,20 @@ export const skyCastle: DungeonDef = {
     ],
     [
       { type: 'battle', next: [0, 1] },
-      { type: 'elite', next: [1] },
+      { type: 'battle', next: [1] },
     ],
     [
       { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
-      { type: 'battle', next: [0] },
+      { type: 'elite', next: [0] },
     ],
     [{ type: 'midboss', next: [0] }],
     [{ type: 'rest', next: [0, 1] }],
     [
-      { type: 'battle', next: [0, 1] },
+      { type: 'elite', next: [0, 1] },
       { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
     ],
     [
-      { type: 'elite', next: [0] },
+      { type: 'battle', next: [0] },
       { type: 'battle', next: [0] },
     ],
     [{ type: 'rest', next: [0] }],

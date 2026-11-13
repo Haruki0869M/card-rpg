@@ -37,8 +37,8 @@ type Layout = NonNullable<DungeonDef['layout']>;
 const wreckCaveLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
-    { type: 'battle', next: [0, 1] },
-    { type: 'event', eventId: 'seaCaveTide', next: [1, 2] },
+    { type: 'event', eventId: 'seaCaveTide', next: [0, 1] },
+    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1, 2] },
   ],
   [
     { type: 'chest', chest: { rarity: 'common', locked: false }, next: [0, 1] },
@@ -47,10 +47,10 @@ const wreckCaveLayout: Layout = [
   ],
   [
     { type: 'battle', next: [0, 1] },
-    { type: 'event', eventId: 'sunkenChest', next: [0] },
+    { type: 'battle', next: [0] },
   ],
   [
-    { type: 'battle', next: [0] },
+    { type: 'event', eventId: 'sunkenChest', next: [0] },
     { type: 'chest', chest: { rarity: 'rare', locked: true }, next: [0] },
   ],
   [{ type: 'rest', next: [0] }],
@@ -63,11 +63,11 @@ const pirateIslandLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
     { type: 'event', eventId: 'pirateStash', next: [0, 1] },
-    { type: 'battle', next: [1] },
+    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1] },
   ],
   [
     { type: 'battle', next: [0, 1] },
-    { type: 'rest', next: [1, 2] },
+    { type: 'battle', next: [1, 2] },
   ],
   [
     { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
@@ -75,7 +75,7 @@ const pirateIslandLayout: Layout = [
     { type: 'event', eventId: 'castawayCamp', next: [1] },
   ],
   [
-    { type: 'battle', next: [0, 1] },
+    { type: 'event', eventId: 'seaCaveTide', next: [0, 1] },
     { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
   ],
   [
@@ -91,8 +91,8 @@ const pirateIslandLayout: Layout = [
 const sunkenTempleLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
-    { type: 'battle', next: [0, 1] },
-    { type: 'event', eventId: 'ghostSong', next: [1, 2] },
+    { type: 'event', eventId: 'ghostSong', next: [0, 1] },
+    { type: 'rest', next: [1, 2] },
   ],
   [
     { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
@@ -100,19 +100,19 @@ const sunkenTempleLayout: Layout = [
     { type: 'battle', next: [1] },
   ],
   [
-    { type: 'rest', next: [0, 1] },
+    { type: 'battle', next: [0, 1] },
     { type: 'event', eventId: 'seaTrader', next: [1] },
   ],
   [
-    { type: 'battle', next: [0, 1] },
-    { type: 'battle', next: [1] },
+    { type: 'event', eventId: 'seaCaveTide', next: [0, 1] },
+    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1] },
   ],
   [
     { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
-    { type: 'elite', next: [0, 1] },
+    { type: 'battle', next: [0, 1] },
   ],
   [
-    { type: 'battle', next: [0] },
+    { type: 'event', eventId: 'sunkenChest', next: [0] },
     { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
   ],
   [{ type: 'rest', next: [0] }],
@@ -177,11 +177,11 @@ export const ghostFlagship: DungeonDef = {
   layout: [
     [{ type: 'battle', next: [0, 1] }],
     [
-      { type: 'battle', next: [0] },
+      { type: 'event', eventId: 'seaCaveTide', next: [0] },
       { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0, 1] },
     ],
     [
-      { type: 'elite', next: [0, 1] },
+      { type: 'battle', next: [0, 1] },
       { type: 'battle', next: [1] },
     ],
     [
@@ -190,20 +190,20 @@ export const ghostFlagship: DungeonDef = {
     ],
     [
       { type: 'battle', next: [0, 1] },
-      { type: 'elite', next: [1] },
+      { type: 'battle', next: [1] },
     ],
     [
       { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
-      { type: 'battle', next: [0] },
+      { type: 'elite', next: [0] },
     ],
     [{ type: 'midboss', next: [0] }],
     [{ type: 'rest', next: [0, 1] }],
     [
-      { type: 'battle', next: [0, 1] },
+      { type: 'elite', next: [0, 1] },
       { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
     ],
     [
-      { type: 'elite', next: [0] },
+      { type: 'battle', next: [0] },
       { type: 'battle', next: [0] },
     ],
     [{ type: 'rest', next: [0] }],

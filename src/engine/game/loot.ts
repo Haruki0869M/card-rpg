@@ -99,7 +99,8 @@ export function newItem(game: GameState, def: ItemDef) {
 }
 
 /**
- * 宝箱の中身（spec §10.4）: 格に合う装備か消費アイテム（エピック以上は必ず装備）+ ゴールド + ときどき消費アイテム。
+ * 宝箱の中身（spec §10.4）: 格に合う装備か消費アイテム（エピック以上は必ず装備）+ ゴールド + ときどき消費アイテム
+ * ＋ エピック・レジェンドの時は同じ格の消耗品（レジェンドは必ず・エピックは chestTopConsumable の確率）。
  * 大宝箱は必ず装備・ゴールド2倍・消費アイテム付き。
  */
 export function rollChestContents(game: GameState, grade: Rarity, big: boolean, rng: Rng): Loot[] {
@@ -111,6 +112,10 @@ export function rollChestContents(game: GameState, grade: Rarity, big: boolean, 
   out.push({ kind: 'gold', amount: Math.round(g * (0.8 + rng.next() * 0.4)) * (big ? 2 : 1) });
   if (big || (rarityIndex(grade) <= 1 && rng.next() * 100 < BALANCE.chestBonusConsumable))
     out.push({ kind: 'item', item: newItem(game, rollConsumable(big ? 'rare' : 'common', rng)) });
+  // 中身がエピック・レジェンド: 装備とは別に、同じ格の消耗品（レジェンドは必ず。お店で売らない神酒・不死鳥の羽根・砂時計の出どころ）。
+  // どの宝箱（ダンジョンの宝箱・黄金箱・封魔の宝箱・世界マップの宝箱・隠し宝箱）も、ここを通る
+  const top = BALANCE.chestTopConsumable[grade] ?? 0;
+  if (top > 0 && (top >= 100 || rng.next() * 100 < top)) out.push({ kind: 'item', item: newItem(game, rollConsumable(grade, rng)) });
   return out;
 }
 

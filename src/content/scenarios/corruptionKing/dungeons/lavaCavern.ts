@@ -18,8 +18,8 @@ export const lavaCavern: DungeonDef = {
   layout: [
     [{ type: 'battle', next: [0, 1] }],
     [
-      { type: 'battle', next: [0, 1] },
-      { type: 'event', eventId: 'wanderingMerchant', next: [1, 2] },
+      { type: 'event', eventId: 'wanderingMerchant', next: [0, 1] },
+      { type: 'rest', next: [1, 2] },
     ],
     [
       { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
@@ -27,19 +27,19 @@ export const lavaCavern: DungeonDef = {
       { type: 'battle', next: [1] },
     ],
     [
-      { type: 'rest', next: [0, 1] },
+      { type: 'battle', next: [0, 1] },
       { type: 'event', eventId: 'ancientStele', next: [1] },
     ],
     [
-      { type: 'battle', next: [0, 1] },
-      { type: 'battle', next: [1] },
+      { type: 'event', eventId: 'fallenTree', next: [0, 1] },
+      { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1] },
     ],
     [
       { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
-      { type: 'elite', next: [0, 1] },
+      { type: 'battle', next: [0, 1] },
     ],
     [
-      { type: 'battle', next: [0, 1] },
+      { type: 'elite', next: [0, 1] },
       { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0, 1] },
     ],
     [

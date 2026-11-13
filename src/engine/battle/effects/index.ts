@@ -224,13 +224,13 @@ function breakReason(state: BattleState, enemy: EnemyState, weakHit: boolean, pe
   return weakHit ? 'weak' : early || (perfect && perfectAloneBreaks(state, enemy)) ? 'perfect' : byDamage ? 'damage' : undefined;
 }
 
-/** 大技の予告を崩す: 威力が半分・弱体1・ブロック0（オーナーの決定 3-A）。乱数は使わない */
+/** 大技の予告を崩す: 威力が半分・脆弱1（balance の breakStatus。2026-11-13 に弱体から変えた）・ブロック0（オーナーの決定 3-A）。乱数は使わない */
 export function breakEnemy(ctx: EffectCtx, enemy: EnemyState, why: 'weak' | 'perfect' | 'damage') {
   enemy.broken = true;
   enemy.nextActionMultiplier = (enemy.nextActionMultiplier ?? 1) * BALANCE.breakPower;
   if (BALANCE.breakClearsBlock) enemy.block = 0;
   ctx.events.push({ type: 'break', enemyUid: enemy.uid, why });
-  // つまみの測定（2026-11-13）: 付ける状態を「脆弱」に変えられる（既定は弱体 = 今のまま）
+  // 付ける状態は balance の breakStatus（2026-11-13 から脆弱）
   const st = BALANCE.breakStatus;
   addStatus(enemy.statuses, st, BALANCE.breakWeak);
   ctx.events.push({ type: 'status', unitId: enemy.uid, status: st, amount: BALANCE.breakWeak });

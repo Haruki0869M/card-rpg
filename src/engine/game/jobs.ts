@@ -136,7 +136,8 @@ export function jobOnlyCard(job: ClassDef, id: string): boolean {
  * 転職で必ず入る札（jobCards = 決め技）は候補に出さない（点検 2026-11-13 F4: 時魔道士の「時間停止」が2枚取れた）。
  */
 export function signatureCards(job: ClassDef): string[] {
-  const given = new Set(job.jobCards ?? []);
+  // 自分の決め技も、ほかの職の決め技も出さない（決め技は、その職の転職でだけ入る）
+  const given = new Set([...(job.jobCards ?? []), ...finisherCards()]);
   const order = [...new Set([...(job.signature ?? []), ...job.cardPool])].filter((id) => CARDS.has(id) && !given.has(id));
   const own = order.filter((id) => jobOnlyCard(job, id));
   return [...own, ...order.filter((id) => !own.includes(id))].slice(0, 3);
@@ -222,7 +223,15 @@ export function heroJobCardPool(hero: Hero, solo = false): string[] {
   });
 }
 
-/** solo = 1人プレイ（キャラが1人）。連携のカード（teamOnly）は入れない */
+/**
+ * 決め技（どれかのジョブの jobCards の札）の一覧。決め技は、その職に転職した時に1枚だけ入る札なので、
+ * 報酬・イベントのカード・変異・行商人・町の店の候補には出さない（2026-11-13。点検 F4 の続き）
+ */
+export function finisherCards(): Set<string> {
+  return new Set(CLASSES.all.flatMap((j) => j.jobCards ?? []));
+}
+
+/** solo = 1人プレイ（キャラが1人）。連携のカード（teamOnly）と決め技は入れない */
 export function heroCardPool(hero: Hero, solo = false): string[] {
   const ids = new Set<string>();
   for (const cls of [hero.classId, ...(hero.jobs ?? [])]) for (const id of getClass(cls).cardPool) if (CARDS.has(id)) ids.add(id);
@@ -232,5 +241,6 @@ export function heroCardPool(hero: Hero, solo = false): string[] {
     if (c.heresy || (solo && c.teamOnly)) continue;
     if (c.common || cardWeaponTypes(c).some((w) => weapons.has(w)) || (!!lineage && cardLineages(c).includes(lineage))) ids.add(c.id);
   }
-  return solo ? [...ids].filter((id) => !CARDS.get(id).teamOnly) : [...ids];
+  const fin = finisherCards();
+  return [...ids].filter((id) => !fin.has(id) && !(solo && CARDS.get(id).teamOnly));
 }
