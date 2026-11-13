@@ -158,6 +158,16 @@ describe('固定ダンジョン28か所の形', () => {
     }
   });
 
+  // 2026-11-13 強敵の計画（docs/tasks/elite-plan.md 柱3）: どのダンジョンにも、強敵を1回も通らない道がある（挑むか避けるかを選べる。憲章3）。
+  // 【保留・オーナーの判断待ち】 下の7か所は、今の決まりのままでは作れない（docs/review/2026-11-13-elite.md §3）:
+  // 休憩の前の「奥の行」が2行しかなく（2つ目の鍵の型 = 休憩→物語の部屋→ボス・翠の神殿 = 休憩→ボス）、その2行は「どの道でも戦う部屋」で、
+  // 同じ type が続かないので、どの道も「戦闘→強敵」か「強敵→戦闘」になる。直すには、決まりか、休憩・物語の部屋の位置を変える必要がある
+  const ELITE_FORCED_PENDING = ['emeraldTemple', 'sunkenCathedral', 'pirateIsland', 'shadowLibrary', 'observatory', 'steamPlant', 'echoSandTomb'];
+  it.each(fixed().map((d) => [d.id, d] as const))('%s: 強敵を1回も通らない道がある（保留の7か所を除く）', (id, d) => {
+    const free = allPaths(d.layout!).some((p) => !p.includes('elite'));
+    expect(free, id).toBe(!ELITE_FORCED_PENDING.includes(id));
+  });
+
   // 2026-11-13（点検19の問題 A1）: 1つ目の鍵の型は、シナリオ2〜7の6か所。選ぶ所は 6 以上（直す前 bf628d5 と同じ数）。
   // 宝箱の格（コモン・鍵付きのレア）は残す。シナリオ1の翠の神殿は、この型ではない（ふつうの戦闘は 3回以上のまま）
   it('1つ目の鍵の型: シナリオ2〜7の6か所・選ぶ所 6 以上・宝箱の格は残す', () => {
