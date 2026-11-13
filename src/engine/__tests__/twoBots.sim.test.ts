@@ -37,11 +37,14 @@
 //   CX<倍率> = C と同じ2つ ＋ ダンジョンに入る時・町が陥落した時・交代運転 も ×倍率（災厄の呪いの +0.5 は掛けない）。
 //   RC<値> = ランダムダンジョンを制覇した時に下がる侵食度を、この値（%）にする。
 //   SIM_JSON に、寄り道（ランダムダンジョンに入った・踏破・災厄を倒した・登った塔）・休んだ回数（休憩部屋・野営・宿）・買った数・技を磨いた数を足した
+// ボスの段階（2026-11-14・docs/tasks/boss-phase-plan.md §4）で足した数（テストの側だけ。エンジンの結果は変えない）:
+//   主のボス（ボスの部屋の戦闘で、段階を持つ敵がいる戦闘）の始まった数・終わった数・ラウンド・段階ごとのボスの行動の数・2段目／3段目まで行った数・
+//   開幕の一手の予告とその BREAK・終わった時に倒れていた味方・ボス戦での全滅・ボス戦に入った時のHPの割合（SIM_JSON の boss にボスごとの数も書く）
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { BattleEvent, EnemyActionDef, GameCommand, GameState, PlayerId } from '../../types';
-import { getEnemyAction } from '../../data/enemies';
+import { getEnemy, getEnemyAction } from '../../data/enemies';
 import { getItem } from '../../data/items';
 
 type Hook = (pre: GameState, cmd: GameCommand, post: GameState, events: BattleEvent[]) => void;
@@ -328,7 +331,29 @@ interface Run {
   frenzyBroke: number;
   eliteGear: number;
   eliteEpic: number;
+  /** ボスの段階（2026-11-14）: 主のボスの戦闘の数え（下の BossCount） */
+  boss: BossCount;
 }
+
+/**
+ * ボスの段階（2026-11-14）: 主のボス（ボスの部屋の戦闘で、段階を持つ敵がいる）の戦闘の数え。
+ * acts[k] = 段階 k（0 = 最初）でボスが行動した（予告を実行した・休んだ・止められた）回数の合計 / reached[k] = 段階 k まで行った戦闘の数 /
+ * maxPhases[n] = 段階を n 個持つボスの戦闘の数 / opening = 開幕の一手の予告の数（予告の印 intent.opening）・openingBroke = その予告を BREAK した数 /
+ * entryHp = 戦闘に入った時の、味方のHPの割合の合計
+ */
+interface BossTally { finished: number; rounds: number; wiped: number; acts: number[]; reached: number[] }
+interface BossCount {
+  started: number; finished: number; rounds: number; won: number; wiped: number; downed: number;
+  acts: number[]; reached: number[]; maxPhases: number[];
+  opening: number; openingBroke: number; entryHp: number;
+  byBoss: Record<string, BossTally>;
+}
+const emptyBoss = (): BossCount => ({ started: 0, finished: 0, rounds: 0, won: 0, wiped: 0, downed: 0, acts: [0, 0, 0], reached: [0, 0, 0], maxPhases: [0, 0, 0], opening: 0, openingBroke: 0, entryHp: 0, byBoss: {} });
+const emptyTally = (): BossTally => ({ finished: 0, rounds: 0, wiped: 0, acts: [0, 0, 0], reached: [0, 0, 0] });
+/** その戦闘の、段階を持つボス（主のボス）。無ければ undefined */
+const phasedBossOf = (b: NonNullable<GameState['battle']>) => (b.boss && !b.midboss ? b.enemies.find((x) => !x.summoned && !!getEnemy(x.defId).phases?.length) : undefined);
+/** 予告の開幕の一手の印（ボスの段階の直しの前のコードには無いので、形を緩く読む） */
+const openingOf = (intent: unknown) => (intent as { opening?: number } | undefined)?.opening;
 
 /** 「属性の付与」の装飾品か */
 const isConverter = (itemId: string) => { const e = getItem(itemId).ability?.effect; return !!e && 'modifier' in e && e.modifier === 'convertElement'; };
@@ -348,7 +373,10 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
     bought: 0, sold: 0, equips: 0, itemsBattle: 0, itemsField: 0, removed: 0, skipped: 0, refused: 0, goldEnd: 0,
     fixedDungeonFights: 0, randomDungeonFights: 0, levelEnd: 0, sp: emptySpecials(), foes: {}, breakKind: { purple: 0, big: 0, red: 0 }, convBought: 0, convWorn: 0,
     restRoom: 0, camp: 0, inn: 0, towers: 0,
-    eliteOffered: 0, eliteChosen: 0, eliteOnly: 0, eliteFights: 0, eliteFinished: 0, eliteRounds: 0, eliteDowned: 0, eliteLost: 0, frenzy: 0, frenzyBroke: 0, eliteGear: 0, eliteEpic: 0 };
+    eliteOffered: 0, eliteChosen: 0, eliteOnly: 0, eliteFights: 0, eliteFinished: 0, eliteRounds: 0, eliteDowned: 0, eliteLost: 0, frenzy: 0, frenzyBroke: 0, eliteGear: 0, eliteEpic: 0, boss: emptyBoss() };
+  /** ボスの段階: 戦闘の種 → その戦闘で行った一番深い段階・開幕の一手を数えた印 */
+  const bossSeen = new Map<number, number>();
+  const openingSaid = new Set<string>();
   const frenzySaid = new Set<string>();
   const entered = new Set<string>();
   /** 予告を数えた印（戦闘の種:敵:ターン。同じ予告を2回数えない） */
@@ -453,6 +481,48 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
           r.eliteOffered++;
           if (chosen && elite(chosen.type)) r.eliteChosen++;
         } else if (doors.length && doors.every((d) => elite(d.type))) r.eliteOnly++;
+      }
+    }
+    // ボスの段階（2026-11-14）: 主のボスの戦闘の数え（テストの側だけ）
+    {
+      const bc = r.boss;
+      const had0 = new Set(b0.map((b) => b.seed));
+      for (const b of b1) {
+        const boss = phasedBossOf(b);
+        if (!boss) continue;
+        if (!had0.has(b.seed)) {
+          bc.started++;
+          bc.entryHp += b.allies.reduce((n, a) => n + Math.max(0, a.hp), 0) / Math.max(1, b.allies.reduce((n, a) => n + a.maxHp, 0));
+        }
+        bossSeen.set(b.seed, Math.max(bossSeen.get(b.seed) ?? 0, boss.phase));
+        // 開幕の一手の予告（1つの予告を1回だけ数える）
+        if (!boss.dead && openingOf(boss.intent)) {
+          const key = `${b.seed}:${boss.uid}:${b.turn}:${boss.intent!.actionId}`;
+          if (!openingSaid.has(key)) { openingSaid.add(key); bc.opening++; }
+        }
+      }
+      // 段階ごとのボスの行動: 前の状態のボスが予告を持っていて、このコマンドで、そのボスの行動（enemyAct）が出た
+      for (const b of b0) {
+        const boss = phasedBossOf(b);
+        if (!boss) continue;
+        const by = (bc.byBoss[boss.defId] ??= emptyTally());
+        for (const e of events) {
+          if (e.type === 'enemyAct' && e.enemyUid === boss.uid && boss.intent) { bc.acts[Math.min(2, boss.phase)]++; by.acts[Math.min(2, boss.phase)]++; }
+          if (e.type === 'break' && e.enemyUid === boss.uid && !boss.broken && openingOf(boss.intent)) bc.openingBroke++;
+        }
+        if (left.has(b.seed)) continue;
+        const maxPhase = Math.min(2, Math.max(bossSeen.get(b.seed) ?? 0, boss.phase));
+        bc.finished++;
+        bc.rounds += b.turn;
+        bc.downed += b.allies.filter((a) => a.dead).length;
+        if (b.phase === 'victory') bc.won++;
+        if (b.phase === 'defeat') bc.wiped++;
+        for (let k = 0; k <= maxPhase; k++) { bc.reached[k]++; by.reached[k]++; }
+        bc.maxPhases[Math.min(2, getEnemy(boss.defId).phases?.length ?? 0)]++;
+        by.finished++;
+        by.rounds += b.turn;
+        if (b.phase === 'defeat') by.wiped++;
+        bossSeen.delete(b.seed);
       }
     }
     const d0 = dungeonsOf(pre).length;
@@ -624,6 +694,20 @@ describe.skipIf(!process.env.SIM)(`物差し2本（直行 bot と工夫する bo
           L.push(`| ${p} | ${name[k]} | ${s((r) => r.eliteOffered)} → ${s((r) => r.eliteChosen)}（${f(pct(s((r) => r.eliteChosen), s((r) => r.eliteOffered)))}%） | ${s((r) => r.eliteOnly)} | ${s((r) => r.eliteFights)} / ${fin} | ${f(fin ? s((r) => r.eliteRounds) / fin : NaN, 2)} | ${s((r) => r.eliteDowned)}（${f(fin ? s((r) => r.eliteDowned) / fin : NaN, 2)}） | ${s((r) => r.eliteLost)} | ${s((r) => r.frenzy)} / ${s((r) => r.frenzyBroke)} | ${s((r) => r.eliteEpic)} / ${s((r) => r.eliteGear)} |`);
         }
       }
+      // ボスの段階（2026-11-14）: 主のボスの戦闘（全部の冒険の合計）
+      L.push('', '## 7. 主のボス（ボスの部屋の戦闘で、段階を持つ敵。全部の冒険の合計）', '');
+      L.push('| 人数 | bot | ボス戦（始まった / 終わった） | 勝った / 全滅 | 1戦のラウンド | 段階ごとのボスの行動（1戦あたり。1段目 / 2段目 / 3段目） | 2段目まで / 3段目まで行った割合（3段目は段階2つのボスのうち） | 開幕の一手（予告 / BREAK） | 終わった時に倒れていた味方（1戦あたり） | 入った時のHPの割合 |');
+      L.push('|---|---|---|---|---|---|---|---|---|---|');
+      for (const [p, by] of Object.entries(all)) {
+        for (const k of BOTS) {
+          const rs = by[k];
+          if (!rs?.length) continue;
+          const s = (fn: (c: BossCount) => number) => rs.reduce((n, r) => n + fn(r.boss), 0);
+          const fin = s((c) => c.finished);
+          const per = (x: number) => f(fin ? x / fin : NaN, 2);
+          L.push(`| ${p} | ${name[k]} | ${s((c) => c.started)} / ${fin} | ${s((c) => c.won)} / ${s((c) => c.wiped)} | ${per(s((c) => c.rounds))} | ${per(s((c) => c.acts[0]))} / ${per(s((c) => c.acts[1]))} / ${per(s((c) => c.acts[2]))} | ${f(pct(s((c) => c.reached[1]), fin))}% / ${f(pct(s((c) => c.reached[2]), s((c) => c.maxPhases[2])))}% | ${s((c) => c.opening)} / ${s((c) => c.openingBroke)} | ${per(s((c) => c.downed))} | ${f(pct(s((c) => c.entryHp), s((c) => c.started)))}% |`);
+        }
+      }
       const others = Object.values(all).flatMap((by) => BOTS.flatMap((k) => by[k] ?? [])).filter((r) => !r.clear && !r.wiped && !r.corr100).map((r) => r.endMode);
       if (others.length) L.push('', `負けの「ほか」の終わり方（game.mode）: ${[...new Set(others)].map((m) => `${m || '(空)'} ${others.filter((x) => x === m).length}`).join('・')}`);
       const where2: Record<string, number> = {};
@@ -669,6 +753,21 @@ describe.skipIf(!process.env.SIM)(`物差し2本（直行 bot と工夫する bo
               elite: (() => {
                 const s = (fn: (r: Run) => number) => rs.reduce((n, r) => n + fn(r), 0);
                 return { offered: s((r) => r.eliteOffered), chosen: s((r) => r.eliteChosen), only: s((r) => r.eliteOnly), fights: s((r) => r.eliteFights), finished: s((r) => r.eliteFinished), rounds: s((r) => r.eliteRounds), downed: s((r) => r.eliteDowned), lost: s((r) => r.eliteLost), frenzy: s((r) => r.frenzy), frenzyBroke: s((r) => r.frenzyBroke), gear: s((r) => r.eliteGear), epic: s((r) => r.eliteEpic) };
+              })(),
+              // ボスの段階（2026-11-14）: 主のボスの数え（全部の冒険の合計・ボスごと）
+              boss: (() => {
+                const t = emptyBoss();
+                for (const r of rs) {
+                  const c = r.boss;
+                  for (const key of ['started', 'finished', 'rounds', 'won', 'wiped', 'downed', 'opening', 'openingBroke', 'entryHp'] as const) t[key] += c[key];
+                  for (let i = 0; i < 3; i++) { t.acts[i] += c.acts[i]; t.reached[i] += c.reached[i]; t.maxPhases[i] += c.maxPhases[i]; }
+                  for (const [id, x] of Object.entries(c.byBoss)) {
+                    const y = (t.byBoss[id] ??= emptyTally());
+                    y.finished += x.finished; y.rounds += x.rounds; y.wiped += x.wiped;
+                    for (let i = 0; i < 3; i++) { y.acts[i] += x.acts[i]; y.reached[i] += x.reached[i]; }
+                  }
+                }
+                return t;
               })(),
               specials: Object.fromEntries((Object.keys(SPECIALS) as SpecialKind[]).map((s) => [s, { said: a((r) => r.sp[s].said), done: a((r) => r.sp[s].done), broke: a((r) => r.sp[s].broke) }])),
             });

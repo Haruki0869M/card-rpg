@@ -2,7 +2,7 @@
 // 絵は元の敵のものを使い回す（makeVariant の variantOf）。元の敵より少し強く（HP+10%・攻撃+1）、
 // 攻撃の属性か開幕の特性を必ず1つ変える（亜種の決まり）。亜種2割の決まりは、このシナリオの再来だけ例外（オーナー承認済み）
 import { makeVariant } from '../../../../data/enemyVariant';
-import type { AbilityDef, EnemyActionDef, EnemyDef } from '../../../../types';
+import type { AbilityDef, EnemyActionDef, EnemyDef, EnemyPhaseDef } from '../../../../types';
 
 export interface EchoOptions {
   id: string;
@@ -20,6 +20,11 @@ export interface EchoOptions {
   actions?: EnemyActionDef[];
   /** 戦闘の1ターン目に必ず予告する行動（元の敵の firstActionId は引き継がない。表に載っている夢の再来だけ書く） */
   firstActionId?: string;
+  /**
+   * ボスの段階（2026-11-14）: 元のボスの段階の代わりに、この段階を土台にする（ダメージ+1・属性の変更は同じにかける）。
+   * 夢の鍵のボス3体は、元のボスに無い決まりを持つ（docs/tasks/boss-phase-plan.md のオーナーの返事 4-A）
+   */
+  phases?: EnemyPhaseDef[];
 }
 
 /** 攻撃のダメージを+1し、element があれば属性を変える（ブロック・状態異常はそのまま） */
@@ -40,7 +45,7 @@ export function dreamEcho(base: EnemyDef, o: EchoOptions): EnemyDef {
     gold: Math.round(base.gold * 1.1),
     actions: (o.actions ?? base.actions).map((a) => strengthen(a, o.element)),
     firstActionId: o.firstActionId,
-    phases: base.phases?.map((p) => ({ ...p, actions: p.actions.map((a) => strengthen(a, o.element)) })),
+    phases: (o.phases ?? base.phases)?.map((p) => ({ ...p, actions: p.actions.map((a) => strengthen(a, o.element)) })),
     abilities: o.abilities ? [...(base.abilities ?? []), ...o.abilities] : base.abilities,
   });
 }

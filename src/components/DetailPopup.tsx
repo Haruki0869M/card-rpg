@@ -9,6 +9,8 @@ import { getClass } from '../data/classes';
 import { getEnemy } from '../data/enemies';
 import { affinityFromStats, affinityOf, chanceFor, describeEffect, describeAbility, enemyHitDamage, enemyName, finalChance, findAlly, findEnemy, heroStats, incomingDamage, statsOf, targetOf, tierDistribution, toPercents } from '../engine';
 import { getEnemyAction } from '../data/enemies';
+import { enemyResist, enemyWeak, phaseDefOf, phaseMarks } from '../engine/battle/phases';
+import { currentActionSet } from '../engine/battle/intents';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ItemDetailContent } from './ItemDetail';
 import { type Detail, useDetail } from '../hooks/usePress';
@@ -85,8 +87,13 @@ function Content({ d, battle, game }: { d: Detail; battle: BattleState; game: Ga
     case 'intent': {
       const e = inBattle ? findEnemy(battle, d.uid) : undefined;
       if (!e) return null;
-      const def = getEnemy(e.defId);
       const iv = intentView(battle, e);
+      // ボスの段階（2026-11-14）: 今の弱点・耐性（段階と予告で変わる）・今の段階の決まり・まだ越えていない境目
+      const weak = enemyWeak(e);
+      const resist = enemyResist(e);
+      const ph = phaseDefOf(e);
+      const marks = e.dead ? [] : phaseMarks(e);
+      const set = currentActionSet(e);
       return (
         <div className="flex gap-2">
           <EnemyArt defId={e.defId} className="h-[78px] w-[66px] shrink-0" />
@@ -103,6 +110,7 @@ function Content({ d, battle, game }: { d: Detail; battle: BattleState; game: Ga
                 {/* 敵の特殊な行動: 何が起きるか・どうすれば止まるか */}
                 {/* 強敵の本気: なぜ強いか・どう受けるか */}
                 {iv.frenzy && !iv.broken && <div className="my-0.5 rounded bg-orange-500/20 px-1.5 py-0.5 font-bold text-orange-200" data-intent-frenzy-hint>{iv.frenzy.icon}{iv.frenzy.label}: {iv.frenzy.long}</div>}
+                {iv.opening && <div className="my-0.5 rounded bg-indigo-500/25 px-1.5 py-0.5 font-bold text-indigo-100" data-intent-opening-hint>🌀{iv.opening.label}: {iv.opening.long}</div>}
                 {iv.hint && <div className="my-0.5 rounded bg-amber-400/15 px-1.5 py-0.5 font-bold text-amber-200" data-intent-hint>{iv.hint}</div>}
                 {iv.details.map((t, i) => (
                   <div key={i}>・{t}</div>
@@ -113,22 +121,29 @@ function Content({ d, battle, game }: { d: Detail; battle: BattleState; game: Ga
             )}
             {e.tauntedBy && <div className="text-[13px] text-amber-300">{findAlly(battle, e.tauntedBy)?.name}に挑発されている</div>}
             {e.guarding && !e.dead && <div className="text-[13px] text-sky-300">仲間をかばっている（ほかの敵への単体攻撃を代わりに受ける。全体攻撃は通る）</div>}
-            {(def.weak?.length || def.resist?.length) && (
+            {/* ボスの段階: 今の段階の決まりと、この先の境目（HPバーの線） */}
+            {ph?.rule && <div className="mt-1 text-[12px] text-indigo-200" data-phase-rule>🌀今の段階「{ph.name}」: {ph.rule}</div>}
+            {marks.map((m) => (
+              <div key={m.phase} className="text-[12px] text-sky-200" data-phase-ahead={m.phase}>
+                ▼HP{Math.round(m.at * 100)}%を切ると「{m.name}」になる。{m.opening ? `最初に「${m.opening}」をしてくる` : ''}{m.rule ? `（${m.rule}）` : ''}
+              </div>
+            ))}
+            {(weak.length > 0 || resist.length > 0) && (
               <div className="mt-1 flex flex-wrap gap-x-2 text-[12px]">
-                {def.weak?.length ? (
+                {weak.length ? (
                   <span>
                     弱点（×{BALANCE.elementWeakMul}）：
-                    {def.weak.map((x) => (
+                    {weak.map((x) => (
                       <span key={x} className="mr-1">
                         <ElementTag id={x} />
                       </span>
                     ))}
                   </span>
                 ) : null}
-                {def.resist?.length ? (
+                {resist.length ? (
                   <span className="text-zinc-300">
                     耐性（×{BALANCE.elementResistMul}・状態異常なし）：
-                    {def.resist.map((x) => (
+                    {resist.map((x) => (
                       <span key={x} className="mr-1">
                         <ElementTag id={x} />
                       </span>
@@ -139,9 +154,9 @@ function Content({ d, battle, game }: { d: Detail; battle: BattleState; game: Ga
             )}
             <EnemyStats e={e} />
             <div className="mt-1 text-[12px] text-zinc-500">
-              {def.pattern === 'sequence'
-                ? `行動順：${def.actions.map((a) => a.name).join(' → ')} → 最初に戻る`
-                : `ランダム行動：${def.actions.map((a) => a.name).join(' / ')}`}
+              {set.pattern === 'sequence'
+                ? `行動順：${set.actions.map((a) => a.name).join(' → ')} → 最初に戻る`
+                : `ランダム行動：${set.actions.map((a) => a.name).join(' / ')}`}
             </div>
           </div>
         </div>

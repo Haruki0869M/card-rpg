@@ -3,7 +3,7 @@
 // 文の元は全部データ: 倍率 = BALANCE.elementWeakMul、属性ごとの状態異常 = 属性のデータ、一言 = 状態異常のデータの guideNote。
 import { BALANCE } from '../../data/balance';
 import { getElement } from '../../data/elements';
-import { getEnemy } from '../../data/enemies';
+import { enemyWeak, isResistTo, isWeakTo } from '../../engine/battle/phases';
 import { getStatus } from '../../data/statuses';
 import { cardModifier, cardTraitAbilities, convertedElement } from '../../engine/abilities';
 import { attackElement } from '../../engine/battle/cardState';
@@ -29,10 +29,7 @@ export function hitElement(ally: AllyState, card: CardDef, enemy: EnemyState): s
     for (const eff of card.tiers[i].effects) {
       if (eff.kind !== 'damage') continue;
       let element = convertedElement(ally, card, attackElement(ally, card, eff.element));
-      if (!element && cardModifier(abilities, 'weaknessElement').length) {
-        const def = getEnemy(enemy.defId);
-        element = def.weak?.find((w) => !def.resist?.includes(w));
-      }
+      if (!element && cardModifier(abilities, 'weaknessElement').length) element = enemyWeak(enemy)[0];
       return element;
     }
   }
@@ -53,11 +50,10 @@ const hasDamage = (card: CardDef) => card.tiers.some((t) => t.effects.some((e) =
 export function elementGuide(battle: BattleState, ally: AllyState | undefined, card: CardDef | undefined, enemy: EnemyState, perfectStatuses?: string[]): ElementGuide | undefined {
   if (!ally || !card || !hasDamage(card) || enemy.dead) return undefined;
   if (card.target === 'enemy' && battle.enemies.some((e) => !e.dead && e.guarding && e !== enemy)) return undefined;
-  const def = getEnemy(enemy.defId);
   const element = hitElement(ally, card, enemy);
-  if (element && def.resist?.includes(element)) return { kind: 'resist', element, chip: '▼耐性' };
+  if (element && isResistTo(enemy, element)) return { kind: 'resist', element, chip: '▼耐性' };
   const alwaysWeak = cardModifier(cardTraitAbilities(card), 'alwaysWeak').length > 0;
-  const weak = (!!element && (!!def.weak?.includes(element) || enemy.tempWeak === element)) || !!enemy.exposed || alwaysWeak;
+  const weak = (!!element && isWeakTo(enemy, element)) || !!enemy.exposed || alwaysWeak;
   if (!weak) return undefined;
   const mul = `弱点×${BALANCE.elementWeakMul}`;
   const top = card.tiers[card.tiers.length - 1];

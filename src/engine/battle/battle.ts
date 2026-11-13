@@ -18,6 +18,7 @@ import type {
   CardInstance,
   Command,
   CommandResult,
+  EnemyActionDef,
   EnemyState,
   PlayerId,
   SlotResult,
@@ -869,6 +870,11 @@ function enemyStep(state: BattleState, rng: Rng, events: BattleEvent[]): string 
   return undefined;
 }
 
+/** 溜め（chargeTo）の行動が行われなかった時（BREAK・凍結・痺れ・時間停止・倒れた）: 溜めた次の行動も消す（次は元の順番から。2026-11-14） */
+function dropCharge(enemy: EnemyState, action: EnemyActionDef) {
+  if (action.chargeTo && enemy.queuedActionId === action.chargeTo) enemy.queuedActionId = undefined;
+}
+
 function executeIntent(state: BattleState, enemy: EnemyState, rng: Rng, events: BattleEvent[]) {
   // 空振りを無くす: 行動する時に、かばう相手がいない・仲間を呼べない（予告の後に満員・回数切れ）なら、代わりのふつうの攻撃にする
   // （かばうは、ふつうは敵が倒れた時点で変わっている。古い保存のためにも、ここで見る）
@@ -876,13 +882,19 @@ function executeIntent(state: BattleState, enemy: EnemyState, rng: Rng, events: 
   const intent = enemy.intent;
   if (!intent) return;
   const action = getEnemyAction(enemy.defId, intent.actionId);
+  const done = executeAction(state, enemy, action, rng, events);
+  if (!done) dropCharge(enemy, action);
+}
+
+/** 予告の行動を行う。行えなかった（休んだ・失敗した・BREAK で止まった・行う前に倒れた）時は false */
+function executeAction(state: BattleState, enemy: EnemyState, action: EnemyActionDef, rng: Rng, events: BattleEvent[]): boolean {
   if (enemy.skipNextAction) {
     delete enemy.skipNextAction;
     delete enemy.nextActionMultiplier;
     enemy.intent = undefined;
     events.push({ type: 'enemyAct', enemyUid: enemy.uid, actionName: '時間停止で休み', targetIds: [] });
     addLog(state, `${enemyName(enemy)}は時間停止で休んだ`);
-    return;
+    return false;
   }
   // 凍結: 次の行動を休む（効いたら1減る） / 痺れ: 確率で行動に失敗する
   const frozen = skipActionStatus(enemy.statuses);
@@ -894,7 +906,7 @@ function executeIntent(state: BattleState, enemy: EnemyState, rng: Rng, events: 
     addLog(state, `${enemyName(enemy)}は${why}で動けない！（「${action.name}」は失敗）`);
     enemy.intent = undefined;
     delete enemy.nextActionMultiplier;
-    return;
+    return false;
   }
   const ctx = makeCtx(state, rng, events, enemy);
   for (const owner of state.allies.filter(a => !a.dead)) {
@@ -915,7 +927,7 @@ function executeIntent(state: BattleState, enemy: EnemyState, rng: Rng, events: 
       if (trap.dealt > 0 && !owner.dead) fireAbilities(state, rng, events, owner, 'summonHit', { target: enemy, depth: 1 });
     }
   }
-  if (enemy.dead) { enemy.intent = undefined; return; }
+  if (enemy.dead) { enemy.intent = undefined; return false; }
   // BREAK された大技のうち、ダメージの無い行動（浄化・仲間を呼ぶ・かばう・癒し封じなど）は起きない
   // （ダメージのある大技は、今までどおり威力が半分になる）
   if (enemy.broken && breakStopsAction(action)) {
@@ -923,7 +935,7 @@ function executeIntent(state: BattleState, enemy: EnemyState, rng: Rng, events: 
     addLog(state, `${enemyName(enemy)}は体勢が崩れて「${action.name}」ができなかった`);
     enemy.intent = undefined;
     delete enemy.nextActionMultiplier;
-    return;
+    return false;
   }
   // 演出用のイベントは先に積み、対象の一覧は効果を使った後に埋まる
   events.push({ type: 'enemyAct', enemyUid: enemy.uid, actionName: action.name, targetIds: ctx.hitIds });
@@ -937,6 +949,7 @@ function executeIntent(state: BattleState, enemy: EnemyState, rng: Rng, events: 
   for (const n of ctx.fired) abilityTriggered(state, enemy.uid, n.name, events, n.source);
   addLog(state, `${enemyName(enemy)}「${action.name}」${ctx.parts.join(' / ')}`);
   enemy.intent = undefined;
+  return true;
 }
 
 /** ユニットのID（味方は id、敵は uid） */
