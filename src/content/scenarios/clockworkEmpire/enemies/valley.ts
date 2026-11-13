@@ -15,9 +15,12 @@ export const steamSprite: EnemyDef = {
   weak: ['ice'],
   resist: ['fire'],
   pattern: 'sequence',
+  // 敵の特殊な行動・第2弾（docs/tasks/enemy-behaviors-round2-plan.md §3・fix-plan §4）: 癒し封じを1ターン目に予告する（2ターン目からは蒸気の噴射・熱い湯気・癒し封じの順）
+  firstActionId: 'mist',
   actions: [
     { id: 'scald', name: '熱い湯気', effects: [{ kind: 'damage', amount: 5 }, { kind: 'applyStatus', status: 'burn', amount: 1 }] },
-    { id: 'mist', name: '白い霧', effects: [{ kind: 'block', amount: 7 }] },
+    // 「白い霧」を癒し封じに置き換えた。ID は古い保存のために残す。3つ目の地域なのでブロック8（BREAK されると行動ごと止まる）
+    { id: 'mist', name: 'まとわりつく熱気', big: true, behavior: 'healSeal', hint: '味方全員の回復が、2ターン半分になる。BREAK するか、先に回復を使う', effects: [{ kind: 'applyStatus', status: 'healSeal', amount: 2, to: 'foes' }, { kind: 'block', amount: 8 }] },
     { id: 'jet', name: '蒸気の噴射', effects: [{ kind: 'damage', amount: 10, element: 'fire' }] },
   ],
 };
@@ -56,7 +59,9 @@ export const wrenchGolem: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'swing', name: 'スパナの一撃', effects: [{ kind: 'damage', amount: 11 }] },
-    { id: 'tighten', name: 'ネジを締め直す', effects: [{ kind: 'block', amount: 8 }] },
+    // 敵の特殊な行動・第2弾（round2 §3・fix-plan §4）: 「ネジを締め直す」を仲間を呼ぶ（壊れた人形）に置き換えた。ID は古い保存のために残す。
+    // 呼べる時は優先・2ターン続けては呼ばない・1戦闘に2回まで。呼べない時は「スパナの一撃」。3つ目の地域なのでブロック8
+    { id: 'tighten', name: '人形を組み直す', big: true, behavior: 'call', cutIn: { when: 'canSummon', rest: 1, noRepeat: true }, hint: '仲間を1体呼ぶ。その前に倒すか、BREAK する', effects: [{ kind: 'summonEnemy', enemy: 'brokenAutomaton', uses: 2, call: true, orElse: 'swing' }, { kind: 'block', amount: 8 }] },
     { id: 'bash', name: '振り下ろし', effects: [{ kind: 'damage', amount: 7 }, { kind: 'applyStatus', status: 'weak', amount: 1 }] },
   ],
 };
@@ -93,8 +98,11 @@ export const steamTurretLord: EnemyDef = {
   weak: ['ice', 'thunder'],
   resist: ['fire', 'poison'],
   pattern: 'sequence',
+  // 敵の特殊な行動・第2弾（round2 §3・fix-plan §4）: 手数読みを1ターン目に予告する（もとから順番の1番目）
+  firstActionId: 'aim',
   actions: [
-    { id: 'aim', name: '照準を合わせる', effects: [{ kind: 'block', amount: 10 }] },
+    // 「照準を合わせる」を手数読みに置き換えた。ID は古い保存のために残す。3つ目の地域なのでブロック8（BREAK されると付かない）
+    { id: 'aim', name: '動きに照準を合わせる', big: true, behavior: 'punish', hint: 'このターンにカードを4枚以上使った味方に、枚数×2のダメージ', effects: [{ kind: 'punishPlays', amount: 2, min: 4 }, { kind: 'block', amount: 8 }] },
     { id: 'barrage', name: '蒸気の一斉砲撃', big: true, effects: [{ kind: 'damage', amount: 7, to: 'foes' }] },
     { id: 'cannon', name: '大砲の直撃', big: true, effects: [{ kind: 'damage', amount: 13 }] },
     { id: 'scald', name: '熱い蒸気幕', effects: [{ kind: 'applyStatus', status: 'burn', amount: 1, to: 'foes' }, { kind: 'block', amount: 5 }] },

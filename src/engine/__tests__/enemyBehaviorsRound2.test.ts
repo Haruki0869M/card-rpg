@@ -76,6 +76,21 @@ const ROUND2: Row[] = [
   { sc: 'starCastle', id: 'thornFairy', act: 'tangle', name: 'いたずら仲間を呼ぶ', kind: 'call', region: 4, summon: 'windSprite', orElse: 'prick' },
   { sc: 'starCastle', id: 'holyMoonWolf', act: 'bite', name: '弱った獲物への牙', kind: 'hunt', region: 5, amount: 14, element: 'holy' },
   { sc: 'starCastle', id: 'skyKnight', act: 'guard', name: '天の盾', kind: 'guard', region: 5, alone: 'lance' },
+  // シナリオ6「機械仕掛けの帝国」
+  { sc: 'clockworkEmpire', id: 'pressGolem', act: 'vent', name: '蒸気を抜く', kind: 'purify', region: 3 },
+  { sc: 'clockworkEmpire', id: 'wrenchGolem', act: 'tighten', name: '人形を組み直す', kind: 'call', region: 3, summon: 'brokenAutomaton', orElse: 'swing' },
+  { sc: 'clockworkEmpire', id: 'steamSprite', act: 'mist', name: 'まとわりつく熱気', kind: 'healSeal', region: 3 },
+  { sc: 'clockworkEmpire', id: 'steamTurretLord', act: 'aim', name: '動きに照準を合わせる', kind: 'punish', region: 3 },
+  { sc: 'clockworkEmpire', id: 'pistonFist', act: 'piston', name: '杭打ち', kind: 'shatter', region: 4, amount: 12 },
+  { sc: 'clockworkEmpire', id: 'ironClockworkDog', act: 'bite', name: '喉笛に食らいつく', kind: 'hunt', region: 4, amount: 10 },
+  { sc: 'clockworkEmpire', id: 'venomBoilerCrab', act: 'shell', name: '鉄の甲羅でかばう', kind: 'guard', region: 4, alone: 'double' },
+  // シナリオ7「夢幻の大迷宮」（盾砕きは置かない。手数読みは夢の機械兵・影の子は下の別のテスト）
+  { sc: 'dreamLabyrinth', id: 'pillowGolem', act: 'fluff', name: 'ひと眠り', kind: 'purify', region: 3 },
+  { sc: 'dreamLabyrinth', id: 'echoWrenchGolem', act: 'tighten', name: '夢の人形を組み直す', kind: 'call', region: 4, summon: 'echoConveyorBot', orElse: 'swing' },
+  { sc: 'dreamLabyrinth', id: 'echoConveyorBot', act: 'reset', name: '動きを点検する', kind: 'punish', region: 4 },
+  { sc: 'dreamLabyrinth', id: 'echoShark', act: 'tear', name: '血の匂いを追う', kind: 'hunt', region: 5, amount: 9, element: 'poison' },
+  { sc: 'dreamLabyrinth', id: 'dreamWeaver', act: 'weave', name: '覚めない眠りの糸', kind: 'healSeal', region: 5 },
+  { sc: 'dreamLabyrinth', id: 'echoColossusStatue', act: 'shove', name: '巨兵が立ちはだかる', kind: 'guard', region: 6, alone: 'fist' },
 ];
 
 /** シナリオ1で付けた敵（第1弾・直し）と、災厄の中ボス（behavior だけ付けた）。亜種の確かめから外す */
@@ -219,6 +234,40 @@ describe('第2弾: 元の状態異常を弱めて残した4体（効果を並べ
     if (r.kind === 'healSeal') for (const a of s.allies) expect(a.statuses.healSeal ?? 0).toBeGreaterThan(0);
     if (r.kind === 'purify') expect(s.enemies[0].statuses.poison ?? 0).toBe(0);
     if (NO_DAMAGE.includes(r.kind)) expect(s.enemies[0].block).toBe(blockFor(r));
+  });
+});
+
+describe('第2弾: 夢幻の大迷宮の変更（fix-plan §7 の4）', () => {
+  it('41体（7本目は盾砕きなしの6体）', () => {
+    expect(ROUND2).toHaveLength(41);
+    expect(ROUND2.filter((r) => r.sc === 'dreamLabyrinth').map((r) => r.kind).sort()).toEqual(['call', 'guard', 'healSeal', 'hunt', 'punish', 'purify']);
+  });
+  it('影の子: 手数読みは付けない。「かくれんぼ」は ブロック12＋狙った1人のフォーカスを1奪う（4ダメージは外した）。ふつうの行動', () => {
+    const def = getEnemy('shadowChild');
+    const a = def.actions.find((x) => x.id === 'hideSeek')!;
+    expect(a.name).toBe('かくれんぼ');
+    expect(a.effects).toEqual([{ kind: 'block', amount: 12 }, { kind: 'drainFocus', amount: 1 }]);
+    expect(a.big).toBeUndefined();
+    expect(a.behavior).toBeUndefined();
+    expect(def.actions.some((x) => x.behavior)).toBe(false);
+    expect(def.firstActionId).toBeUndefined();
+    // 記憶喰いの単体の「記憶を食べる」と同じ形（狙いの書き方が同じ）
+    const eater = getEnemy('memoryEater').actions.find((x) => x.id === 'devour')!.effects.find((e) => e.kind === 'drainFocus')!;
+    expect('to' in eater).toBe(false);
+    // 戦闘の中で: 狙った味方のフォーカスが1減り、自分にブロック12
+    let s = battle(['shadowChild', 'r2Dummy']);
+    const t = s.allies[0];
+    t.focus = 3;
+    s.enemies[0].intent = { actionId: 'hideSeek', targetId: t.id };
+    s = nextTurn(s);
+    expect(s.enemies[0].block).toBe(12);
+  });
+  it('元の敵（ベルトコンベアの機械兵・スパナのゴーレム・石像の巨兵）は、夢の再来の変更を持たない', () => {
+    expect(getEnemy('conveyorBot').actions.some((a) => a.behavior)).toBe(false);
+    expect(getEnemy('colossusStatue').actions.some((a) => a.behavior)).toBe(false);
+    // スパナのゴーレムは、自分の表の行（壊れた人形を呼ぶ）。夢の再来は夢の機械兵を呼ぶ
+    expect(getEnemy('wrenchGolem').actions.find((a) => a.id === 'tighten')!.effects[0]).toMatchObject({ enemy: 'brokenAutomaton' });
+    expect(getEnemy('echoWrenchGolem').actions.find((a) => a.id === 'tighten')!.effects[0]).toMatchObject({ enemy: 'echoConveyorBot' });
   });
 });
 

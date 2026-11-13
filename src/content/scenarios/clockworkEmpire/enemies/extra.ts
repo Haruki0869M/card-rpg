@@ -37,7 +37,9 @@ export const pressGolem: EnemyDef = {
   actions: [
     { id: 'raise', name: 'プレスを上げる', effects: [{ kind: 'block', amount: 8 }] },
     { id: 'press', name: '重いプレス', effects: [{ kind: 'damage', amount: 15 }] },
-    { id: 'vent', name: '蒸気を抜く', effects: [{ kind: 'block', amount: 5 }, { kind: 'damage', amount: 4 }] },
+    // 敵の特殊な行動・第2弾（docs/tasks/enemy-behaviors-round2-plan.md §3・fix-plan §4）: 「蒸気を抜く」（ブロック5＋4ダメージ）を浄化にした（名前と ID はそのまま）。
+    // 自分に悪い状態異常がある時は割り込む（割り込んだら次の2ターンは割り込まない）。順番の最後にも残す。3つ目の地域なので1種類につき6回復
+    { id: 'vent', name: '蒸気を抜く', big: true, behavior: 'purify', cutIn: { when: 'afflicted', rest: 2 }, hint: '状態異常を全部消して回復する。その前に起爆するか、BREAK する', effects: [{ kind: 'purify', amount: 6 }] },
   ],
 };
 
@@ -49,8 +51,11 @@ export const ironClockworkDog: EnemyDef = makeVariant(clockworkDog, {
   baseLevel: 7,
   exp: 13,
   gold: 9,
+  // 敵の特殊な行動・第2弾（round2 §3・fix-plan §4）: 亜種のこの敵だけ「鋼の連続噛みつき」（5×2）を手負い狙いに置き換えた（10ダメージ・1回。
+  // HPが半分以下なら×1.5）。ID は古い保存のために残す。1ターン目に予告する（もとから順番の1番目）。元のゼンマイの犬は変えていない
+  firstActionId: 'bite',
   actions: [
-    { id: 'bite', name: '鋼の連続噛みつき', effects: [{ kind: 'damage', amount: 5, hits: 2 }] },
+    { id: 'bite', name: '喉笛に食らいつく', big: true, behavior: 'hunt', hint: 'HPの割合がいちばん低い味方を狙う。HPが半分以下だと×1.5', effects: [{ kind: 'damage', amount: 10, lowHpMul: 1.5 }] },
     { id: 'bite2', name: '鋼の激しい噛みつき', effects: [{ kind: 'damage', amount: 4, hits: 3 }] },
     { id: 'rewind', name: '鋼板を締める', effects: [{ kind: 'block', amount: 8 }] },
   ],

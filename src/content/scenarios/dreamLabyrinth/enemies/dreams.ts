@@ -52,8 +52,11 @@ export const pillowGolem: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'smother', name: '圧しかかり', effects: [{ kind: 'damage', amount: 9 }] },
-    { id: 'fluff', name: '羽毛の盾', effects: [{ kind: 'block', amount: 12 }] },
     { id: 'drowse', name: '眠気のあくび', effects: [{ kind: 'applyStatus', status: 'delay', amount: 1 }, { kind: 'damage', amount: 4 }] },
+    // 敵の特殊な行動・第2弾（docs/tasks/enemy-behaviors-round2-plan.md §3・fix-plan §4）: 「羽毛の盾」を浄化に置き換えた。ID は古い保存のために残す。
+    // 自分に悪い状態異常がある時は割り込む（割り込んだら次の2ターンは割り込まない）。順番の最後にも残す（2番目から最後へ移した）。
+    // 3つ目の地域なので1種類につき6回復
+    { id: 'fluff', name: 'ひと眠り', big: true, behavior: 'purify', cutIn: { when: 'afflicted', rest: 2 }, hint: '状態異常を全部消して回復する。その前に起爆するか、BREAK する', effects: [{ kind: 'purify', amount: 6 }] },
   ],
 };
 
@@ -90,7 +93,9 @@ export const shadowChild: EnemyDef = {
   actions: [
     { id: 'whisper', name: 'ささやき', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }] },
     { id: 'hand', name: '影の手', effects: [{ kind: 'damage', amount: 10, element: 'dark' }] },
-    { id: 'hideSeek', name: 'かくれんぼ', effects: [{ kind: 'block', amount: 10 }, { kind: 'damage', amount: 4 }] },
+    // 敵の特殊な行動・第2弾（fix-plan §2 の 2-2・§7 の4）: 手数読みは付けず、「かくれんぼ」を ブロック12＋狙った1人のフォーカスを1奪う にした
+    // （記憶喰いの「記憶を食べる」と同じ単体の形。今の4ダメージは外した）。特殊な行動の札は付けない、ふつうの行動
+    { id: 'hideSeek', name: 'かくれんぼ', effects: [{ kind: 'block', amount: 12 }, { kind: 'drainFocus', amount: 1 }] },
   ],
 };
 
@@ -144,8 +149,11 @@ export const dreamWeaver: EnemyDef = {
   gold: 20,
   weak: ['holy'],
   pattern: 'sequence',
+  // 敵の特殊な行動・第2弾（round2 §3・fix-plan §4）: 癒し封じを1ターン目に予告する（もとから順番の1番目）
+  firstActionId: 'weave',
   actions: [
-    { id: 'weave', name: '眠気の糸', effects: [{ kind: 'applyStatus', status: 'weak', amount: 1, to: 'foes' }, { kind: 'block', amount: 6 }] },
+    // 「眠気の糸」（弱体1・全体＋ブロック6）を癒し封じに置き換えた。ID は古い保存のために残す。5つ目の地域なのでブロック10（BREAK されると行動ごと止まる）
+    { id: 'weave', name: '覚めない眠りの糸', big: true, behavior: 'healSeal', hint: '味方全員の回復が、2ターン半分になる。BREAK するか、先に回復を使う', effects: [{ kind: 'applyStatus', status: 'healSeal', amount: 2, to: 'foes' }, { kind: 'block', amount: 10 }] },
     { id: 'thread', name: '呪いの糸', big: true, effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }, { kind: 'damage', amount: 8 }] },
     { id: 'net', name: '夢の網', big: true, effects: [{ kind: 'damage', amount: 6, to: 'foes' }] },
   ],
