@@ -43,7 +43,7 @@ const intend = (s: BattleState, actionId: string) => {
 const breaks = (events: { type: string }[]) => events.filter((e) => e.type === 'break') as { type: 'break'; why: string }[];
 
 describe('BREAK（大技の予告を崩す。オーナーの決定 3-A）', () => {
-  it('完全成功で攻撃を当てると崩れる: 威力が半分・弱体1・ブロック0。1つの予告に1回だけ', () => {
+  it('完全成功で攻撃を当てると崩れる: 威力が半分・脆弱1・ブロック0。1つの予告に1回だけ', () => {
     const s = intend(gateBattle(), 'crush');
     s.enemies[0].block = 30;
     const before = intentHitsOn(s.enemies[0], s.allies[0])[0];
@@ -56,11 +56,16 @@ describe('BREAK（大技の予告を崩す。オーナーの決定 3-A）', () =
     const e = r.state.enemies[0];
     expect(e.broken).toBe(true);
     expect(e.nextActionMultiplier).toBe(BALANCE.breakPower);
-    expect(e.statuses.weak).toBe(BALANCE.breakWeak);
+    // BREAK で付く状態は脆弱（2026-11-13 に弱体から変えた）
+    expect(BALANCE.breakStatus).toBe('vulnerable');
+    // 重い一撃も脆弱を付けるので、BREAK の分は出来事（status）で確かめる
+    expect(r.events.some((x) => x.type === 'status' && x.unitId === e.uid && x.status === 'vulnerable' && x.amount === BALANCE.breakWeak)).toBe(true);
+    expect(e.statuses.vulnerable).toBeGreaterThanOrEqual(BALANCE.breakWeak);
+    expect(e.statuses.weak ?? 0).toBe(0);
     expect(e.block).toBe(0);
-    // 予告の数字: 半分（切り捨て）に、弱体の ×0.75
+    // 予告の数字: 半分（切り捨て）。脆弱は敵の攻撃を減らさない
     const after = intentHitsOn(e, r.state.allies[0])[0];
-    expect(after).toBeLessThanOrEqual(Math.ceil(before * 0.5 * 0.75));
+    expect(after).toBeLessThanOrEqual(Math.ceil(before * 0.5));
     expect(after).toBeGreaterThan(0);
     expect(canBreak(e)).toBe(false);
     // フォーカスで全部の枠を決めたので、乱数の流れは「乱数を使わないカード」と同じだけ（BREAK は乱数を引かない）

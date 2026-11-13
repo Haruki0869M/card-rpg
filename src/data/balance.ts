@@ -220,7 +220,7 @@ export const BALANCE = {
   /**
    * BREAK（体勢崩し。抜本的な見直し §3-2・オーナーの決定 3-A）: 敵が大技の予告を出しているターンに、
    * 弱点の属性で攻撃する／完全成功で攻撃を当てる／そのターンの合計ダメージが最大HPの breakDamagePct% 以上、のどれかで崩せる。
-   * 崩すと、その予告の威力が breakPower 倍・弱体 breakWeak・ブロック0。1つの予告に1回
+   * 崩すと、その予告の威力が breakPower 倍・breakStatus（今は脆弱）breakWeak・ブロック0。1つの予告に1回
    */
   breakDamagePct: 20,
   /**
@@ -241,8 +241,11 @@ export const BALANCE = {
    * 2026-11-13 つまみの測定: 測るための入れ物（既定 false = 今と同じ）
    */
   breakNeedsWeakPerfect: false as boolean,
-  /** 崩した時に付ける状態（'weak' = 弱体・今 / 'vulnerable' = 脆弱）と、ブロックを0にするか。2026-11-13 つまみの測定（既定 = 今と同じ） */
-  breakStatus: 'weak' as 'weak' | 'vulnerable',
+  /**
+   * 崩した時に付ける状態（'weak' = 弱体 / 'vulnerable' = 脆弱）と、ブロックを0にするか。
+   * 2026-11-13 まとめ役の指示で 'weak' → 'vulnerable'（崩した敵は、受けるダメージが増える）。量は breakWeak（名前は前のまま）
+   */
+  breakStatus: 'vulnerable' as 'weak' | 'vulnerable',
   breakClearsBlock: true as boolean,
   breakPower: 0.5,
   breakWeak: 1,

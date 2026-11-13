@@ -107,16 +107,20 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
   // ダメージの無い大技（浄化・仲間を呼ぶ・かばう・癒し封じ）は、BREAK すると起きない（battle.ts の executeIntent）
   const stops = breakStopsAction(action);
   if (enemy.broken) details.unshift(stops ? '体勢が崩れている（BREAK）: この行動は起きない' : '体勢が崩れている（BREAK）: この行動の威力は半分');
-  else if (action.big) details.unshift(`大技！ 弱点の属性で攻撃・完全成功で攻撃・このターンに最大HPの${BALANCE.breakDamagePct}%のダメージ、のどれかで体勢を崩せる（BREAK: ${stops ? 'この行動は起きない' : '威力が半分'}・弱体${BALANCE.breakWeak}・ブロック0）`);
+  else if (action.big) details.unshift(`大技！ 弱点の属性で攻撃・完全成功で攻撃・このターンに最大HPの${BALANCE.breakDamagePct}%のダメージ、のどれかで体勢を崩せる（BREAK: ${stops ? 'この行動は起きない' : '威力が半分'}・${breakStatusText()}・ブロック0）`);
   return { parts, name: action.name, details, big: !!action.big, broken: !!enemy.broken, ...(action.hint ? { hint: action.hint } : {}) };
 }
+
+/** BREAK で敵に付く状態の文（例: 「脆弱1」。balance.ts の breakStatus・breakWeak から作る） */
+export const breakStatusText = () => `${getStatus(BALANCE.breakStatus).name}${BALANCE.breakWeak}`;
 
 /** 体勢を崩した時の、その予告の最初の攻撃の値（今の値 → 崩した後の値。大技でない・もう崩した・攻撃でない時は undefined） */
 /** stops = ダメージの無い大技（BREAK すると、その行動が起きない） */
 export function breakPreview(state: BattleState, enemy: EnemyState): { name: string; from?: number; to?: number; stops?: boolean } | undefined {
   const now = intentView(state, enemy);
   if (!now?.big || now.broken || enemy.skipNextAction) return undefined;
-  const after = intentView(state, { ...enemy, broken: true, nextActionMultiplier: (enemy.nextActionMultiplier ?? 1) * BALANCE.breakPower, statuses: { ...enemy.statuses, weak: (enemy.statuses.weak ?? 0) + BALANCE.breakWeak } });
+  const st = BALANCE.breakStatus;
+  const after = intentView(state, { ...enemy, broken: true, nextActionMultiplier: (enemy.nextActionMultiplier ?? 1) * BALANCE.breakPower, statuses: { ...enemy.statuses, [st]: (enemy.statuses[st] ?? 0) + BALANCE.breakWeak } });
   const dmg = (v: IntentView | null) => { const p = v?.parts.find((x) => x.kind === 'attack' || x.kind === 'attackAll'); return p && (p.kind === 'attack' || p.kind === 'attackAll') ? p.damage * p.hits : undefined; };
   const stops = breakStopsAction(getEnemyAction(enemy.defId, enemy.intent!.actionId));
   return { name: now.name, from: dmg(now), to: dmg(after), ...(stops ? { stops } : {}) };

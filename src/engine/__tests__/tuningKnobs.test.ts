@@ -61,7 +61,8 @@ describe('BREAK の決まりのつまみ（既定 = 今のまま）', () => {
   it('既定の値', () => {
     expect(BALANCE.breakPerfectByRank).toEqual({});
     expect(BALANCE.breakNeedsWeakPerfect).toBe(false);
-    expect(BALANCE.breakStatus).toBe('weak');
+    // 2026-11-13: BREAK で付く状態は脆弱（まとめ役の指示）
+    expect(BALANCE.breakStatus).toBe('vulnerable');
     expect(BALANCE.breakClearsBlock).toBe(true);
     expect(BALANCE.enemyAttackByRegion).toEqual({});
     expect(BALANCE.enemyHpByRank).toEqual({});
@@ -108,7 +109,7 @@ describe('BREAK の決まりのつまみ（既定 = 今のまま）', () => {
     expect(perfectAloneBreaks(gate(5), gate(5).enemies[0])).toBe(false);
   });
 
-  it('B4: 崩した時に脆弱を付け、弱体は付けず、ブロックは残す（既定は弱体・ブロック0）', () => {
+  it('B4: 崩した時に付ける状態とブロック（既定は脆弱・ブロック0。弱体にも戻せる）', () => {
     const run = () => {
       const s = gate(1);
       s.enemies[0].block = 7;
@@ -117,11 +118,11 @@ describe('BREAK の決まりのつまみ（既定 = 今のまま）', () => {
       return s.enemies[0];
     };
     const d = run();
-    expect([d.statuses.weak, d.statuses.vulnerable ?? 0, d.block, d.nextActionMultiplier]).toEqual([1, 0, 0, 0.5]);
-    B.breakStatus = 'vulnerable';
+    expect([d.statuses.weak ?? 0, d.statuses.vulnerable, d.block, d.nextActionMultiplier]).toEqual([0, 1, 0, 0.5]);
+    B.breakStatus = 'weak';
     B.breakClearsBlock = false;
     const v = run();
-    expect([v.statuses.weak ?? 0, v.statuses.vulnerable, v.block, v.nextActionMultiplier]).toEqual([0, 1, 7, 0.5]);
+    expect([v.statuses.weak, v.statuses.vulnerable ?? 0, v.block, v.nextActionMultiplier]).toEqual([1, 0, 7, 0.5]);
   });
 });
 
