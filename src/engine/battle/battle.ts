@@ -144,6 +144,7 @@ export function createBattle(setup: BattleSetup): BattleState {
     ...(encounter.boss ? { boss: true } : {}),
     ...(encounter.midboss ? { midboss: true } : {}),
     ...(encounter.elite ? { elite: true } : {}),
+    ...(encounter.firstKeyBoss ? { firstKeyBoss: true } : {}),
     ...(setup.readyCheck ? { readyCheck: true, ready: [] } : {}),
   };
   addLog(state, `戦闘開始（${party.length}人 / ${encounter.name}）`);

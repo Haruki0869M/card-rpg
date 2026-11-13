@@ -207,10 +207,15 @@ export const behaviorNeedsWeakPerfect = (enemy: Unit | undefined) => BALANCE.bre
  * 「合計ダメージで BREAK」の線（%）。敵の格（ボス・中ボスと災厄・強敵・ふつう）ごとに BALANCE.breakDamagePctByRank で変えられる。書いていなければ breakDamagePct。
  * 敵が紫の札（特殊な行動）を予告している時は BALANCE.breakDamagePctBehavior（書いてあれば）。enemy を渡さない時は格だけで見る
  */
-export function breakDamagePctOf(state: Pick<BattleState, 'boss' | 'midboss' | 'elite'>, enemy?: Unit): number {
+export function breakDamagePctOf(state: BreakRankState, enemy?: Unit): number {
   if (BALANCE.breakDamagePctBehavior !== undefined && intentIsBehavior(enemy)) return BALANCE.breakDamagePctBehavior;
+  // 2026-11-13（pre-deploy19 の問題 A2・オーナーの OK）: 1つ目の鍵のダンジョンのボスは、今までどおり（格ごとの線を使わない）
+  if (state.firstKeyBoss) return BALANCE.breakDamagePct;
   return BALANCE.breakDamagePctByRank[battleRankOf(state)] ?? BALANCE.breakDamagePct;
 }
+
+/** BREAK の決まりが見る、戦闘の格の情報（firstKeyBoss = 各シナリオの、鍵の順番で1つ目のダンジョンのボスの戦闘） */
+export type BreakRankState = Pick<BattleState, 'boss' | 'midboss' | 'elite' | 'firstKeyBoss'>;
 
 /** 戦闘の敵の格（ボス・中ボスと災厄・強敵・ふつう） */
 export const battleRankOf = (state: Pick<BattleState, 'boss' | 'midboss' | 'elite'>) => (state.boss ? 'boss' : state.midboss ? 'midboss' : state.elite ? 'elite' : 'normal');
@@ -219,11 +224,13 @@ export const battleRankOf = (state: Pick<BattleState, 'boss' | 'midboss' | 'elit
  * この敵の予告に「弱点の属性で、しかも完全成功」の決まりを当てるか（2026-11-13 docs/tasks/break-read-plan.md §2）:
  * - 紫の札（特殊な行動）の予告 → どの戦闘でも（BALANCE.breakBehaviorNeedsWeakPerfect）
  * - ボス・中ボス・災厄の戦闘 → BALANCE.breakNeedsWeakPerfect・breakNeedsWeakPerfectRanks
+ *   ただし、各シナリオの鍵の順番で1つ目のダンジョンのボスの戦闘（firstKeyBoss）は当てない（今までどおり。紫の札は上のとおり当てる）
  * enemy を渡さない時は、戦闘の格だけで見る（ヘルプの文など）
  */
-export function needsWeakPerfect(state: Pick<BattleState, 'boss' | 'midboss' | 'elite'>, enemy?: Unit): boolean {
+export function needsWeakPerfect(state: BreakRankState, enemy?: Unit): boolean {
   if (behaviorNeedsWeakPerfect(enemy)) return true;
   if (!BALANCE.breakNeedsWeakPerfect) return false;
+  if (state.firstKeyBoss) return false;
   const ranks = BALANCE.breakNeedsWeakPerfectRanks;
   return !ranks || ranks.includes(battleRankOf(state));
 }
@@ -235,7 +242,7 @@ export function needsWeakPerfect(state: Pick<BattleState, 'boss' | 'midboss' | '
 export interface PerfectTry { card?: CardDef; focusUsed?: number; hasWeakCard?: () => boolean }
 
 /** 完全成功だけで、この敵を崩せるか（BALANCE.breakPerfectByRank・breakNeedsWeakPerfect。既定では、いつも true） */
-export function perfectAloneBreaks(state: Pick<BattleState, 'boss' | 'midboss' | 'elite'>, enemy: Unit, t: PerfectTry = {}): boolean {
+export function perfectAloneBreaks(state: BreakRankState, enemy: Unit, t: PerfectTry = {}): boolean {
   if ((BALANCE.breakPerfectByRank[battleRankOf(state)] ?? true) === false) return false;
   if (needsWeakPerfect(state, enemy)) {
     // 「弱点で、しかも完全成功」の決まりでも、弱点を持たない敵は完全成功だけで崩れる（崩す手が無くならないように）

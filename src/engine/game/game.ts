@@ -6,7 +6,7 @@ import { detachFollower } from './world/group';
 import { BALANCE } from '../../data/balance';
 import { CARDS, getCard } from '../../data/cards';
 import { getClass } from '../../data/classes';
-import { DUNGEONS } from '../../data/dungeons';
+import { DUNGEONS, isFirstKeyDungeon } from '../../data/dungeons';
 import { corruptionName, getScenario } from '../../data/scenarios';
 import { getEnemy } from '../../data/enemies';
 import { EVENTS } from '../../data/events';
@@ -642,10 +642,13 @@ export function startBattleWith(game: GameState, enemies: EncounterSpec['enemies
   // 地域ごと・格ごとの倍率（測るための入れ物。既定は全部 1 で、前と全く同じ値を渡す）
   const hpMul = regionMulOf(game, inScene[0]?.id, BALANCE.enemyHpByRegion) * (BALANCE.enemyHpByRank[rank] ?? 1);
   const atkMul = regionMulOf(game, inScene[0]?.id, BALANCE.enemyAttackByRegion);
+  // 2026-11-13（pre-deploy19 の問題 A2）: 鍵の順番で1つ目のダンジョンのボスの部屋は、大技の BREAK が今までどおり（effects の needsWeakPerfect）
+  const dungeonDef = game.dungeon ? DUNGEONS.tryGet(game.dungeon.dungeonId) : undefined;
+  const firstKeyBoss = !!rb?.boss && !!dungeonDef && isFirstKeyDungeon(dungeonDef);
   game.battle = createBattle({
     seed: rng.int(1_000_000_000),
     party,
-    encounter: { id: game.battleInfo?.wandererId ?? game.dungeon?.currentRoomId ?? 'battle', name: getRoomType(roomType).name, enemies, ...(getRoomType(roomType).battle?.boss ? { boss: true } : {}), ...(getRoomType(roomType).battle?.pool === 'midboss' ? { midboss: true } : {}), ...(getRoomType(roomType).battle?.pool === 'elite' ? { elite: true } : {}) },
+    encounter: { id: game.battleInfo?.wandererId ?? game.dungeon?.currentRoomId ?? 'battle', name: getRoomType(roomType).name, enemies, ...(getRoomType(roomType).battle?.boss ? { boss: true } : {}), ...(getRoomType(roomType).battle?.pool === 'midboss' ? { midboss: true } : {}), ...(getRoomType(roomType).battle?.pool === 'elite' ? { elite: true } : {}), ...(firstKeyBoss ? { firstKeyBoss: true } : {}) },
     enemyHpMul: hpMul === 1 ? diff.enemyHp : (diff.enemyHp ?? 1) * hpMul,
     enemyAttackMul: (diff.enemyAttack ?? 1) * partyAttackMul(game, party.length) * atkMul,
     surprise: opts.surprise,

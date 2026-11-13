@@ -493,6 +493,8 @@ export interface EncounterSpec {
   midboss?: boolean;
   /** 強敵の部屋の戦闘（BREAK の線を格ごとに分ける時に見る。BALANCE.breakDamagePctByRank） */
   elite?: boolean;
+  /** 各シナリオの、鍵の順番で1つ目のダンジョンのボスの戦闘（大技の BREAK は今までどおり。effects の needsWeakPerfect） */
+  firstKeyBoss?: boolean;
 }
 
 // ---------- 戦闘の状態 ----------
@@ -740,6 +742,8 @@ export interface BattleState {
   midboss?: boolean;
   /** 強敵の部屋の戦闘（BALANCE.breakDamagePctByRank が見る） */
   elite?: boolean;
+  /** 各シナリオの、鍵の順番で1つ目のダンジョンのボスの戦闘（2026-11-13: 大技の BREAK は今までどおり。紫の札は除く） */
+  firstKeyBoss?: boolean;
 }
 
 /** 呼び出したお供（turns = 残りのターン数。0になったら帰る） */

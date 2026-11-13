@@ -8,9 +8,9 @@
 import { cardModifier, cardTraitAbilities, convertedElement } from '../abilities';
 import { cardOf } from '../../data/cards';
 import { getEnemy } from '../../data/enemies';
-import type { AllyState, BattleState, CardDef, EnemyState } from '../../types';
+import type { AllyState, CardDef, EnemyState } from '../../types';
 import { attackElement } from './cardState';
-import { behaviorNeedsWeakPerfect, breakDamagePctOf, needsWeakPerfect, perfectAloneBreaks } from './effects';
+import { behaviorNeedsWeakPerfect, breakDamagePctOf, needsWeakPerfect, perfectAloneBreaks, type BreakRankState } from './effects';
 
 /**
  * 2026-11-13（docs/tasks/break-read-plan.md）: その敵の大技（紫の札を含む）の予告を「どうすれば崩せるか」の決まり（画面の説明が読む。エンジンの決まりの関数から作るので、ずれない）。
@@ -26,7 +26,7 @@ export interface BreakRule {
   /** 2026-11-13: 決まりが厳しくなった理由（behavior = 紫の札（特殊な行動）の予告 / rank = ボス・中ボス・災厄の戦闘）。厳しくない時は無い */
   strictBy?: 'behavior' | 'rank';
 }
-export function breakRuleOf(state: Pick<BattleState, 'boss' | 'midboss' | 'elite'>, enemy: EnemyState): BreakRule {
+export function breakRuleOf(state: BreakRankState, enemy: EnemyState): BreakRule {
   const def = getEnemy(enemy.defId);
   const weak = [...new Set([...(def.weak ?? []), ...(enemy.tempWeak ? [enemy.tempWeak] : [])])];
   // 2026-11-13（docs/tasks/break-read-plan.md §2）: 紫の札（特殊な行動）の予告も「弱点で完全成功」。エンジンと同じ関数に敵を渡して読む
