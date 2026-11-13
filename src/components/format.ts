@@ -48,7 +48,7 @@ export interface IntentView {
   /** 予告の説明（敵の特殊な行動。何が起きるか・どうすれば止まるか） */
   hint?: string;
   /** 敵の特殊な行動の札（⚠️手数読み など）と、いつも出す1行の案内（src/data/enemyBehaviors.ts） */
-  behavior?: { id: EnemyBehaviorId; icon: string; label: string; brief: string };
+  behavior?: { id: EnemyBehaviorId; icon: string; label: string; short: string; brief: string };
 }
 
 /** インテントの表示（敵のレベル・弱体・味方の脆弱を反映した実際の値） */

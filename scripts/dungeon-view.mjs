@@ -73,13 +73,19 @@ async function run(width, height, reduced = false, three = false) {
       (g.expeditions?.[0] ?? g).dungeon.dungeonId = look;
     }, LOOK);
   }
-  // 扉3つの確認: 2行目に強敵の部屋を1つ足して、最初の部屋の先を3つの扉にする（翠の神殿は2つまでなので、保存の上で足す）
+  // 扉3つの確認: 2行目の3つ目の部屋を強敵の部屋にする（2026-11-13 の並びの直しで、翠の神殿の2行目は3部屋・最初の部屋の先は扉3つになった。
+  // 強敵の扉の見た目を確かめるため、3つ目〔休憩〕を保存の上で強敵に替える）
   if (three) {
     await edit((g) => {
       const d = g.expeditions[0].dungeon;
       const elite = d.rooms.find((r) => r.type === 'elite');
-      d.rooms.push({ ...d.rooms.find((r) => r.id === 'r1c1'), id: 'r1c2', col: 2, type: 'elite', enemies: elite.enemies, eventId: undefined, chest: undefined });
-      d.rooms.find((r) => r.id === 'r0c0').next.push('r1c2');
+      Object.assign(d.rooms.find((r) => r.id === 'r1c2'), { type: 'elite', enemies: elite.enemies, eventId: undefined, chest: undefined });
+    });
+  } else {
+    // 扉2つの確認: 最初の部屋の先を、保存の上で2行目の左と右の2つにする（前の翠の神殿と同じ、左右の扉2つの形）
+    await edit((g) => {
+      const d = g.expeditions[0].dungeon;
+      d.rooms.find((r) => r.id === 'r0c0').next = ['r1c0', 'r1c2'];
     });
   }
   // 絵の扉（左から右）とボタン（左から右）が、同じ数・同じ並び・同じ種類か

@@ -8,6 +8,8 @@ export interface EnemyBehaviorDef {
   icon: string;
   /** 札の名前 */
   label: string;
+  /** 敵が3体以上で予告の枠が狭い時の、札の短い名前（3文字まで。2026-11-13） */
+  short: string;
   /** いつも出す1行の案内の既定（行動の効果から作る） */
   brief: (action: EnemyActionDef) => string;
 }
@@ -16,24 +18,25 @@ export const ENEMY_BEHAVIORS: Record<EnemyBehaviorId, EnemyBehaviorDef> = {
   punish: {
     icon: '⚠️',
     label: '手数読み',
+    short: '手数',
     brief: (a) => {
       const e = a.effects.find((x) => x.kind === 'punishPlays');
       return `${e && e.kind === 'punishPlays' ? e.min : 4}枚以上使うと反撃`;
     },
   },
-  guard: { icon: '🛡️', label: 'かばう', brief: () => '単体攻撃を代わりに受ける' },
-  healSeal: { icon: '🚫', label: '癒し封じ', brief: () => '回復が2ターン半分' },
-  call: { icon: '📢', label: '増援', brief: () => '仲間を1体呼ぶ' },
-  hunt: { icon: '🎯', label: '手負い狙い', brief: () => 'HPの低い味方を狙う' },
-  shatter: { icon: '🔨', label: '盾砕き', brief: () => 'ブロックを全部壊す' },
-  purify: { icon: '✨', label: '浄化', brief: () => '状態異常を消して回復' },
+  guard: { icon: '🛡️', label: 'かばう', short: 'かばう', brief: () => '単体攻撃を代わりに受ける' },
+  healSeal: { icon: '🚫', label: '癒し封じ', short: '癒封じ', brief: () => '回復が2ターン半分' },
+  call: { icon: '📢', label: '増援', short: '増援', brief: () => '仲間を1体呼ぶ' },
+  hunt: { icon: '🎯', label: '手負い狙い', short: '手負い', brief: () => 'HPの低い味方を狙う' },
+  shatter: { icon: '🔨', label: '盾砕き', short: '盾砕き', brief: () => 'ブロックを全部壊す' },
+  purify: { icon: '✨', label: '浄化', short: '浄化', brief: () => '状態異常を消して回復' },
 };
 
 /** 行動の札と1行の案内（特殊な行動でなければ undefined） */
-export function behaviorBadge(action: EnemyActionDef): { id: EnemyBehaviorId; icon: string; label: string; brief: string } | undefined {
+export function behaviorBadge(action: EnemyActionDef): { id: EnemyBehaviorId; icon: string; label: string; short: string; brief: string } | undefined {
   if (!action.behavior) return undefined;
   const def = ENEMY_BEHAVIORS[action.behavior];
-  return { id: action.behavior, icon: def.icon, label: def.label, brief: action.brief ?? def.brief(action) };
+  return { id: action.behavior, icon: def.icon, label: def.label, short: def.short, brief: action.brief ?? def.brief(action) };
 }
 
 /**
