@@ -202,11 +202,33 @@ export function breakDamagePctOf(state: Pick<BattleState, 'boss' | 'midboss' | '
 /** 戦闘の敵の格（ボス・中ボスと災厄・強敵・ふつう） */
 export const battleRankOf = (state: Pick<BattleState, 'boss' | 'midboss' | 'elite'>) => (state.boss ? 'boss' : state.midboss ? 'midboss' : state.elite ? 'elite' : 'normal');
 
+/** この戦闘の敵に「弱点の属性で、しかも完全成功」の決まりを当てるか（BALANCE.breakNeedsWeakPerfect・breakNeedsWeakPerfectRanks。既定では false） */
+export function needsWeakPerfect(state: Pick<BattleState, 'boss' | 'midboss' | 'elite'>): boolean {
+  if (!BALANCE.breakNeedsWeakPerfect) return false;
+  const ranks = BALANCE.breakNeedsWeakPerfectRanks;
+  return !ranks || ranks.includes(battleRankOf(state));
+}
+
+/**
+ * 完全成功の一撃の中身（つまみの測定2で足した決まりが読む。既定の値では読まない）。
+ * card = 使ったカード / focusUsed = 使ったフォーカス / hasWeakCard = その味方が、その敵の弱点を突けるカードを持っているか（breakRules.ts）
+ */
+export interface PerfectTry { card?: CardDef; focusUsed?: number; hasWeakCard?: () => boolean }
+
 /** 完全成功だけで、この敵を崩せるか（BALANCE.breakPerfectByRank・breakNeedsWeakPerfect。既定では、いつも true） */
-export function perfectAloneBreaks(state: Pick<BattleState, 'boss' | 'midboss' | 'elite'>, enemy: Unit): boolean {
+export function perfectAloneBreaks(state: Pick<BattleState, 'boss' | 'midboss' | 'elite'>, enemy: Unit, t: PerfectTry = {}): boolean {
   if ((BALANCE.breakPerfectByRank[battleRankOf(state)] ?? true) === false) return false;
-  // 「弱点で、しかも完全成功」の決まりでも、弱点を持たない敵は完全成功だけで崩れる（崩す手が無くならないように）
-  if (BALANCE.breakNeedsWeakPerfect) return isEnemy(enemy) && !getEnemy(enemy.defId).weak?.length && !enemy.tempWeak;
+  if (needsWeakPerfect(state)) {
+    // 「弱点で、しかも完全成功」の決まりでも、弱点を持たない敵は完全成功だけで崩れる（崩す手が無くならないように）
+    if (!isEnemy(enemy)) return false;
+    if (!getEnemy(enemy.defId).weak?.length && !enemy.tempWeak) return true;
+    // つまみの測定2（イ）: 弱点を突けるカードを1枚も持たない味方は、完全成功で崩せる
+    if (BALANCE.breakPerfectNoWeakCard && t.hasWeakCard && !t.hasWeakCard()) return true;
+    // つまみの測定2（エ）: 重い一撃（枠が多いカード・フォーカスを多く使った）の完全成功は崩せる
+    const h = BALANCE.breakPerfectHeavy;
+    if (h && t.card && (t.card.slots >= h.slots || (t.focusUsed ?? 0) >= h.focus)) return true;
+    return false;
+  }
   return true;
 }
 
@@ -214,14 +236,14 @@ export function perfectAloneBreaks(state: Pick<BattleState, 'boss' | 'midboss' |
  * BREAK のきっかけ（無ければ undefined）。perfect = カードの完全成功、early = カードの能力で「成功1でも崩せる」（魔力の楔）。
  * 既定（BALANCE の今の値）では「弱点 → 完全成功 → 合計ダメージ」の順で、前と全く同じ
  */
-function breakReason(state: BattleState, enemy: EnemyState, weakHit: boolean, perfect: boolean, early: boolean): 'weak' | 'perfect' | 'damage' | undefined {
+function breakReason(state: BattleState, enemy: EnemyState, weakHit: boolean, perfect: boolean, early: boolean, t: PerfectTry = {}): 'weak' | 'perfect' | 'damage' | undefined {
   const byDamage = (enemy.turnDamage ?? 0) * 100 >= enemy.maxHp * breakDamagePctOf(state);
-  if (BALANCE.breakNeedsWeakPerfect) {
+  if (needsWeakPerfect(state)) {
     if (weakHit && perfect) return 'weak';
-    if (early || (perfect && perfectAloneBreaks(state, enemy))) return 'perfect';
+    if (early || (perfect && perfectAloneBreaks(state, enemy, t))) return 'perfect';
     return byDamage ? 'damage' : undefined;
   }
-  return weakHit ? 'weak' : early || (perfect && perfectAloneBreaks(state, enemy)) ? 'perfect' : byDamage ? 'damage' : undefined;
+  return weakHit ? 'weak' : early || (perfect && perfectAloneBreaks(state, enemy, t)) ? 'perfect' : byDamage ? 'damage' : undefined;
 }
 
 /** 大技の予告を崩す: 威力が半分・脆弱1（balance の breakStatus。2026-11-13 に弱体から変えた）・ブロック0（オーナーの決定 3-A）。乱数は使わない */
@@ -385,7 +407,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
     // 区切りD: 魔力の楔 — 成功1でも、完全成功と同じに崩せる
     const earlyBreak = cardModifier(ctx.cardAbilities, 'breakOnSuccess').some((e) => (ctx.successes ?? 0) >= e.min);
     if (dmg > 0 && canBreak(v)) {
-      const why = breakReason(state, v, weakHit, !!ctx.perfect && !!ctx.card, earlyBreak && !!ctx.card);
+      const why = breakReason(state, v, weakHit, !!ctx.perfect && !!ctx.card, earlyBreak && !!ctx.card, { card: ctx.card, focusUsed: ctx.focusUsed, hasWeakCard: ctx.hasWeakCard && (() => ctx.hasWeakCard!(v)) });
       if (why) {
         breakEnemy(ctx, v, why);
         // 段階7a: きっかけ「自分の攻撃で敵を BREAK させた」（処刑人の黒外套）

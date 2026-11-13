@@ -242,6 +242,23 @@ export const BALANCE = {
    */
   breakNeedsWeakPerfect: false as boolean,
   /**
+   * breakNeedsWeakPerfect を当てる格（書いていない = 全部の格）。例: ['boss', 'midboss'] = 大物だけ「弱点で、しかも完全成功」。
+   * ほかの格は今の決まりのまま（弱点・完全成功・合計ダメージのどれかで崩れる）。
+   * 2026-11-13 つまみの測定2（ア）: 測るための入れ物（既定は undefined = 今と同じ。breakNeedsWeakPerfect が false の間は読まない）
+   */
+  breakNeedsWeakPerfectRanks: undefined as readonly ('boss' | 'midboss' | 'elite' | 'normal')[] | undefined,
+  /**
+   * true = 「弱点で、しかも完全成功」の決まりの時でも、その味方の手札・山札・捨て札に、その敵の弱点を突けるカードが1枚も無ければ、
+   * その味方の完全成功で崩せる（判定は src/engine/battle/breakRules.ts）。
+   * 2026-11-13 つまみの測定2（イ）: 測るための入れ物（既定 false = 今と同じ）
+   */
+  breakPerfectNoWeakCard: false as boolean,
+  /**
+   * 「弱点で、しかも完全成功」の決まりの時でも、重い一撃の完全成功なら崩せる: カードの枠が slots 以上か、使ったフォーカスが focus 以上。
+   * 2026-11-13 つまみの測定2（エ）: 測るための入れ物（既定 undefined = 今と同じ）
+   */
+  breakPerfectHeavy: undefined as { slots: number; focus: number } | undefined,
+  /**
    * 崩した時に付ける状態（'weak' = 弱体 / 'vulnerable' = 脆弱）と、ブロックを0にするか。
    * 2026-11-13 まとめ役の指示で 'weak' → 'vulnerable'（崩した敵は、受けるダメージが増える）。量は breakWeak（名前は前のまま）
    */

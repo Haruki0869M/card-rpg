@@ -1,5 +1,5 @@
 // ===== 効果の部品の決まりごと =====
-import type { AbilityDef, AbilityNotice, BattleEvent, BattleState, CardDef, Effect, EffectKind, EffectTarget, EffectParams } from '../../../types';
+import type { AbilityDef, AbilityNotice, BattleEvent, BattleState, CardDef, Effect, EffectKind, EffectTarget, EffectParams, EnemyState } from '../../../types';
 import type { Rng } from '../../rng';
 import type { Unit } from '../units';
 
@@ -47,6 +47,12 @@ export interface EffectCtx {
   /** 区切りD: このカードで連携が起きた・挟撃の陣のブロックをもらった・カードの成功の数 */
   comboLanded?: boolean;
   successes?: number;
+  /**
+   * つまみの測定2（2026-11-13・測るだけ）: カードを使った時の、使ったフォーカス・その味方が敵の弱点を突けるカードを持っているか。
+   * BREAK の決まり（BALANCE.breakPerfectHeavy・breakPerfectNoWeakCard）だけが読む。既定の値では読まない
+   */
+  focusUsed?: number;
+  hasWeakCard?: (enemy: EnemyState) => boolean;
   /** 働いた常時型の能力の名前（重複なし。演出用） */
   fired: AbilityNotice[];
   /** 能力の連鎖の深さ（無限に続かないように） */
