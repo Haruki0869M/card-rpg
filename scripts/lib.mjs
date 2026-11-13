@@ -133,6 +133,64 @@ export async function waitForBattlePresentation(page) {
   await page.locator('[data-battle-presenting]').waitFor({ state: 'detached', timeout: 15000 });
 }
 
+/** 敵の特殊な行動の札の、敵が3体以上の時の短い形（src/data/enemyBehaviors.ts の short。2026-11-13） */
+export const BEHAVIOR_SHORT = { '⚠️手数読み': '⚠️手数', '🛡️かばう': '🛡️かばう', '🚫癒し封じ': '🚫癒封じ', '📢増援': '📢増援', '🎯手負い狙い': '🎯手負い', '🔨盾砕き': '🔨盾砕き', '✨浄化': '✨浄化' };
+
+/**
+ * 敵が3体以上の時の、敵の列の下の案内の1行（data-behavior-brief-bar）を確かめる（2026-11-13）。問題の文の配列を返す。
+ * - 1つだけ出る・画面の外に出ない・文が枠からはみ出さない・12px より小さい字でない・操作パネルに重ならない
+ * - どの敵の名前・HP・予告の枠・BREAK の印にも重ならない
+ * - 味方の顔: 高さ700px以上の画面で 8px を超えて重なれば問題。低い画面は前からの並び（味方が最小の大きさで敵の高さまで来る）なのでメモ
+ * - 左の敵の札が金の縁（data-brief-on）。2体目の敵の予告の枠を押すと、金の縁と文がその敵に替わる（押すのはこの端末の見た目だけ）
+ */
+export async function briefBarIssues(page, count) {
+  const out = [];
+  const notes = [];
+  const bars = page.locator('[data-behavior-brief-bar]');
+  if ((await bars.count()) !== 1) return { out: [`案内の1行の数が ${await bars.count()}`], notes };
+  const look = () => page.evaluate(() => {
+    const out = [];
+    const notes = [];
+    const bar = document.querySelector('[data-behavior-brief-bar]');
+    const r = bar.getBoundingClientRect();
+    const hit = (a, b) => a.left < b.right - 3 && b.left < a.right - 3 && a.top < b.bottom - 3 && b.top < a.bottom - 3;
+    if (r.left < 0 || r.right > innerWidth) out.push(`案内の1行が画面の外（${r.left.toFixed(0)}〜${r.right.toFixed(0)}）`);
+    if (bar.scrollWidth > bar.clientWidth + 1) out.push('案内の1行の文が枠からはみ出す');
+    if (parseFloat(getComputedStyle(bar).fontSize) < 12) out.push('案内の1行の字が 12px より小さい');
+    const panel = document.querySelector('.glass-panel')?.getBoundingClientRect();
+    if (panel && r.bottom > panel.top + 1) out.push('案内の1行が操作パネルに重なる');
+    [...document.querySelectorAll('[data-enemy]:not([data-dead])')].forEach((u, j) => {
+      const info = u.querySelector('[data-enemy-info]');
+      const parts = { 名前: info?.children[0], HP: info?.children[1], 予告: u.querySelector('[data-intent]'), 'BREAK の印': u.querySelector('[data-break-hint]') };
+      for (const [k, el] of Object.entries(parts)) if (el && hit(r, el.getBoundingClientRect())) out.push(`案内の1行が敵${j}の${k}に重なる`);
+      for (const el of u.querySelectorAll('[data-status]')) if (hit(r, el.getBoundingClientRect())) out.push(`案内の1行が敵${j}の状態異常の印に重なる`);
+    });
+    [...document.querySelectorAll('[data-ally-sprite]')].forEach((el, k) => {
+      const a = el.getBoundingClientRect();
+      const f = { left: a.left + a.width * 0.25, right: a.right - a.width * 0.25, top: a.top, bottom: a.top + a.height * 0.3 };
+      const depth = Math.min(r.bottom, f.bottom) - Math.max(r.top, f.top);
+      if (hit(r, f) && depth > 8 && innerHeight >= 700) out.push(`案内の1行が味方${k}の顔に ${depth.toFixed(0)}px 重なる`);
+      else if (hit(r, f)) notes.push(`案内の1行と味方${k}の絵の箱の上の端が ${depth.toFixed(0)}px 触れる`);
+    });
+    const on = [...document.querySelectorAll('[data-enemy]:not([data-dead])')].findIndex((u) => u.querySelector('[data-brief-on]'));
+    return { out, notes, on, text: bar.textContent };
+  });
+  const first = await look();
+  out.push(...first.out);
+  notes.push(...first.notes);
+  if (first.on !== 0) out.push(`金の縁の札が左の敵でない（${first.on}）`);
+  // 2体目の敵の予告の枠を押すと、案内がその敵に替わる
+  if (count >= 2) {
+    await page.locator('[data-enemy]:not([data-dead])').nth(1).locator('[data-intent]').click();
+    await page.waitForTimeout(150);
+    const second = await look();
+    out.push(...second.out);
+    if (second.on !== 1) out.push(`2体目の札を押しても、金の縁が替わらない（${second.on}）`);
+    if (second.text === first.text) out.push('2体目の札を押しても、案内の文が替わらない');
+  }
+  return { out, notes, text: first.text };
+}
+
 /** 「ターン終了」の確認の窓（まだ行動できる仲間がいる時だけ出る）が出たら「ターンを終了する」を押す */
 export async function confirmEndTurn(page) {
   const yes = page.getByRole('button', { name: 'ターンを終了する' });

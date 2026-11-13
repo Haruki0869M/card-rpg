@@ -30,7 +30,9 @@
 //   B3 は全部の格に、BI・BE は BA と一緒でなければ全部の格に当てる（前の測定と同じ意味）
 // 敵の特殊な行動の直し（2026-11-13）で足した数: 特殊な行動（7種類）が、予告された・実際に行われた・BREAK で止められた回数（種類ごと・1冒険の平均）。
 //   テストの側で数える（エンジンの結果は変えない）。どの行動が特殊な行動かは、行動の効果の種類で見分ける（直す前と後で同じ見分け方）
-import { mkdirSync, writeFileSync } from 'node:fs';
+// 部屋の並びの直し・2回目（2026-11-13）で足した環境変数: SIM_PARTYSET=heal4（4人を 剣士＋魔法使い＋狩人＋僧侶）・
+//   SIM_LAYOUTS（手作りのダンジョンの並びを、JSON の物に差し替える。直す前の並びで測る用）
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { BattleEvent, EnemyActionDef, GameCommand, GameState, PlayerId } from '../../types';
@@ -73,6 +75,8 @@ const PARTIES: Record<string, string[]> =
   // 回復役入りの測定（2026-11-13 オーナーの決定「難しさは必ず回復役を入れて測る」）で足した2人の組
   : PARTYSET === 'hp' ? { '2人': ['hunter', 'priest'] }
   : PARTYSET === 'gp' ? { '2人': ['guardian', 'priest'] }
+  // 部屋の並びの直し・2回目（2026-11-13）: 回復役入りの4人
+  : PARTYSET === 'heal4' ? { '4人': ['warrior', 'mage', 'hunter', 'priest'] }
   // 前の標準のパーティ（回復役なし。参考として比べる用）
   : PARTYSET === 'old' ? {
     '2人': ['warrior', 'mage'],
@@ -86,6 +90,12 @@ const PARTIES: Record<string, string[]> =
     '4人': ['warrior', 'mage', 'hunter', 'priest'],
   };
 
+// ---- 部屋の並びの直し・2回目（2026-11-13）: SIM_LAYOUTS = 並びの JSON の場所（{ ダンジョンのID: layout }。scripts/room-layout-stats.mjs の
+//   loadLayouts で作る）。このテストの中だけで手作りのダンジョンの並びを差し替える（直す前と後を、同じコードで比べる用）----
+if (process.env.SIM_LAYOUTS) {
+  const layouts = JSON.parse(readFileSync(process.env.SIM_LAYOUTS, 'utf8')) as Record<string, unknown>;
+  for (const [id, layout] of Object.entries(layouts)) (DUNGEONS.get(id) as { layout?: unknown }).layout = layout;
+}
 // ---- 回4: 測る候補の差し替え（このテストの中だけ。本番のコードは環境変数を読まない）----
 const VARIANT = process.env.SIM_VARIANT ?? '';
 const MAP_REGIONS = getScenario(SCENARIO).map?.regions ?? [];
