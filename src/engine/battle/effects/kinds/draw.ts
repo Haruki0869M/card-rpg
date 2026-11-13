@@ -1,6 +1,6 @@
 // カードを引く（味方のみ）
 import { resolveTargets, targetOf } from '..';
-import { drawCards } from '../../deck';
+import { drawCards, reshuffleBlockedText } from '../../deck';
 import { addLog, isEnemy } from '../../units';
 import type { EffectHandler } from '../types';
 
@@ -17,8 +17,12 @@ export const effect: EffectHandler<'draw'> = {
     let total = 0;
     for (const t of resolveTargets(ctx, targetOf(e))) {
       if (isEnemy(t)) continue;
-      const { drawn, reshuffled } = drawCards(t, e.amount, ctx.rng);
+      const { drawn, reshuffled, blocked } = drawCards(t, e.amount, ctx.rng, ctx.state.turn);
       if (reshuffled) addLog(ctx.state, `${t.name}: 捨札をシャッフルして山札に戻した`);
+      if (blocked) {
+        addLog(ctx.state, reshuffleBlockedText(t.name));
+        ctx.parts.push('切り直しは1ターンに1回');
+      }
       total += drawn;
     }
     ctx.parts.push(`${total}枚ドロー`);

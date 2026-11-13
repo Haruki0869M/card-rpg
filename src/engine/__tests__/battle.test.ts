@@ -119,7 +119,7 @@ describe('山札', () => {
   });
   it('山札が尽きたら捨札をシャッフルして引く', () => {
     const a = mkAlly(2, 6);
-    expect(drawCards(a, 5, createRng(3))).toEqual({ drawn: 5, reshuffled: true });
+    expect(drawCards(a, 5, createRng(3))).toEqual({ drawn: 5, reshuffled: true, blocked: false });
     expect(a.hand.slice(0, 2).map((c) => c.uid)).toEqual(['d0', 'd1']);
     expect(a.drawPile).toHaveLength(3);
     expect(a.discard).toHaveLength(0);
@@ -129,7 +129,7 @@ describe('山札', () => {
     expect(drawCards(a, 5, createRng(1)).drawn).toBe(2);
   });
   it('山札も捨札も空なら引けない', () => {
-    expect(drawCards(mkAlly(0, 0), 5, createRng(1))).toEqual({ drawn: 0, reshuffled: false });
+    expect(drawCards(mkAlly(0, 0), 5, createRng(1))).toEqual({ drawn: 0, reshuffled: false, blocked: false });
   });
 });
 
