@@ -1,6 +1,7 @@
 // シナリオ4のダンジョン。敵の組み合わせは砂塵の王朝の専用の敵（enemies/）。
 // 制覇すると聖印が手に入り、3つそろうと最終ダンジョンに入れる。ボスの手前に「物語の部屋」（event）を置く
 import type { DungeonDef } from '../../../../types';
+import { finaleLayout, keyLayout1, keyLayout2, keyLayout3 } from '../../../common/dungeonLayouts';
 
 /** 蠍の墓所: 廃墟の敵と王家の衛兵ミイラ */
 const TOMB_POOLS: DungeonDef['pools'] = {
@@ -41,92 +42,15 @@ const CAVE_POOLS: DungeonDef['pools'] = {
 
 type Layout = NonNullable<DungeonDef['layout']>;
 
+// 部屋の並びは4つの型（src/content/common/dungeonLayouts.ts）を、このダンジョンのイベントで埋めた物
 /** 蠍の墓所（入門。砂の崩落と墓の罠） */
-const scorpionTombLayout: Layout = [
-  [{ type: 'battle', next: [0, 1] }],
-  [
-    { type: 'event', eventId: 'sandCollapse', next: [0, 1] },
-    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1, 2] },
-  ],
-  [
-    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [0, 1] },
-    { type: 'elite', next: [0, 1] },
-    { type: 'rest', next: [0] },
-  ],
-  [
-    { type: 'battle', next: [0, 1] },
-    { type: 'battle', next: [0] },
-  ],
-  [
-    { type: 'event', eventId: 'tombTrap', next: [0] },
-    { type: 'chest', chest: { rarity: 'rare', locked: true }, next: [0] },
-  ],
-  [{ type: 'rest', next: [0] }],
-  [{ type: 'event', eventId: 'scorpionNest', next: [0] }],
-  [{ type: 'boss', next: [] }],
-];
+const scorpionTombLayout: Layout = keyLayout1({ first: 'sandCollapse', second: 'tombTrap', story: 'scorpionNest' });
 
-/** 影の書庫（壁画と泉。強敵が2回） */
-const shadowLibraryLayout: Layout = [
-  [{ type: 'battle', next: [0, 1] }],
-  [
-    { type: 'event', eventId: 'hieroglyphWall', next: [0, 1] },
-    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1] },
-  ],
-  [
-    { type: 'battle', next: [0, 1] },
-    { type: 'battle', next: [1, 2] },
-  ],
-  [
-    { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
-    { type: 'elite', next: [0, 1] },
-    { type: 'event', eventId: 'undergroundSpring', next: [1] },
-  ],
-  [
-    { type: 'event', eventId: 'sandCollapse', next: [0, 1] },
-    { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
-  ],
-  [
-    { type: 'battle', next: [0] },
-    { type: 'elite', next: [0] },
-  ],
-  [{ type: 'rest', next: [0] }],
-  [{ type: 'event', eventId: 'scribeDesk', next: [0] }],
-  [{ type: 'boss', next: [] }],
-];
+/** 影の書庫（壁画と泉） */
+const shadowLibraryLayout: Layout = keyLayout2({ first: 'hieroglyphWall', second: 'undergroundSpring', story: 'scribeDesk' });
 
-/** 石像の神殿（分かれ道が多く、幽霊の隊商がいる） */
-const statueTempleLayout: Layout = [
-  [{ type: 'battle', next: [0, 1] }],
-  [
-    { type: 'event', eventId: 'rubbleChest', next: [0, 1] },
-    { type: 'rest', next: [1, 2] },
-  ],
-  [
-    { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
-    { type: 'elite', next: [0, 1] },
-    { type: 'battle', next: [1] },
-  ],
-  [
-    { type: 'battle', next: [0, 1] },
-    { type: 'event', eventId: 'ghostCaravan', next: [1] },
-  ],
-  [
-    { type: 'event', eventId: 'sandCollapse', next: [0, 1] },
-    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1] },
-  ],
-  [
-    { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
-    { type: 'battle', next: [0, 1] },
-  ],
-  [
-    { type: 'event', eventId: 'tombTrap', next: [0] },
-    { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
-  ],
-  [{ type: 'rest', next: [0] }],
-  [{ type: 'event', eventId: 'guardianGate', next: [0] }],
-  [{ type: 'boss', next: [] }],
-];
+/** 石像の神殿（幽霊の隊商がいる） */
+const statueTempleLayout: Layout = keyLayout3({ first: 'rubbleChest', second: 'ghostCaravan', story: 'guardianGate' });
 
 export const scorpionTomb: DungeonDef = {
   id: 'scorpionTomb',
@@ -182,42 +106,7 @@ export const sandPalace: DungeonDef = {
   bossChest: 'legend',
   requiresKeys: ['sealScarab', 'sealEye', 'sealBeast'],
   finale: true,
-  layout: [
-    [{ type: 'battle', next: [0, 1] }],
-    [
-      { type: 'event', eventId: 'sandCollapse', next: [0] },
-      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0, 1] },
-    ],
-    [
-      { type: 'battle', next: [0, 1] },
-      { type: 'battle', next: [1] },
-    ],
-    [
-      { type: 'rest', next: [0, 1] },
-      { type: 'event', eventId: 'ghostCaravan', next: [1] },
-    ],
-    [
-      { type: 'battle', next: [0, 1] },
-      { type: 'battle', next: [1] },
-    ],
-    [
-      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
-      { type: 'elite', next: [0] },
-    ],
-    [{ type: 'midboss', next: [0] }],
-    [{ type: 'rest', next: [0, 1] }],
-    [
-      { type: 'elite', next: [0, 1] },
-      { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
-    ],
-    [
-      { type: 'battle', next: [0] },
-      { type: 'battle', next: [0] },
-    ],
-    [{ type: 'rest', next: [0] }],
-    [{ type: 'event', eventId: 'pharaohThrone', next: [0] }],
-    [{ type: 'boss', next: [] }],
-  ],
+  layout: finaleLayout({ first: 'ghostCaravan', story: 'pharaohThrone' }),
 };
 
 // ランダムダンジョン: 砂の洞窟（部屋の並びを自動生成）

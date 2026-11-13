@@ -303,7 +303,8 @@ describe('一人称の通路の見え方（段階B）', () => {
   });
 
   it('通路で東を向くと、壁にある扉が横に見える。まだ見ていない所は暗い', () => {
-    const d = standIn(temple(), 'r0c0');
+    // 2行目の部屋が2つ（左右の端）のダンジョンで見る（翠の神殿は 2026-11-13 の並びの直しで、2行目が3部屋になった）
+    const d = standIn(buildDungeon('silentCatacomb', createRng(1), 0, eventIds), 'r0c0');
     const c = dungeonGrid(d).roomCell.get('r0c0')!;
     d.pos = { x: c.x, y: c.y + 1, facing: 1 };
     d.seen = [];

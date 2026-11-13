@@ -15,24 +15,25 @@ export const silentCatacomb: DungeonDef = {
   // 1つ目のダンジョンの鍵が要る（play-feedback-plan §4 C: 町や依頼を飛ばして、まっすぐ奥へ行けないように）
   requiresKeys: ['emerald'],
   clearStory: ['屍術師モルデアは、静かに崩れ落ちた。', '亡者たちが、ようやく眠りについた。', '封印の鍵（蒼）を手に入れた！'],
+  // 並びの決まり（docs/review/2026-11-13-room-variety2.md）: 5〜6行目（敵が1体増える行）は2つとも戦う部屋（ふつうの戦闘と強敵を交差させる）
   layout: [
     [{ type: 'battle', next: [0, 1] }],
     [
       { type: 'event', eventId: 'trappedHall', next: [0, 1] },
-      { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1] },
+      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0, 1] },
     ],
     [
-      { type: 'battle', next: [0, 1] },
+      { type: 'rest', next: [0] },
       { type: 'battle', next: [1, 2] },
     ],
     [
-      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
-      { type: 'elite', next: [0, 1] },
-      { type: 'event', eventId: 'mysticSpring', next: [1] },
+      { type: 'battle', next: [0] },
+      { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0, 1] },
+      { type: 'event', eventId: 'mysticSpring', next: [0, 1] },
     ],
     [
-      { type: 'event', eventId: 'fallenTree', next: [0, 1] },
-      { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
+      { type: 'elite', next: [0] },
+      { type: 'battle', next: [1] },
     ],
     [
       { type: 'battle', next: [0, 1] },

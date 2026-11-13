@@ -1,6 +1,7 @@
 // シナリオ6のダンジョン。敵の組み合わせはダンジョンごと（雷だけが弱点の敵ばかりにならないよう、火・氷が弱点の敵を混ぜる）。
 // 制覇すると動力核が壊れて鍵になり、3つそろうと最終ダンジョンに入れる。ボスの手前に「物語の部屋」（event）を置く
 import type { DungeonDef } from '../../../../types';
+import { finaleLayout, keyLayout1, keyLayout2, keyLayout3 } from '../../../common/dungeonLayouts';
 
 const FACTORY_POOLS: DungeonDef['pools'] = {
   battle: [['smokeStackCrow', 'brokenAutomaton'], ['conveyorBot', 'oilSlime'], ['riveter', 'sparkTurret'], ['voltGearBug', 'brokenAutomaton'], ['gearBug', 'conveyorBot', 'oilSlime']],
@@ -37,92 +38,15 @@ const SCRAP_POOLS: DungeonDef['pools'] = {
 
 type Layout = NonNullable<DungeonDef['layout']>;
 
+// 部屋の並びは4つの型（src/content/common/dungeonLayouts.ts）を、このダンジョンのイベントで埋めた物
 /** 歯車の工場（入門。ベルトコンベアとプレス機） */
-const factoryLayout: Layout = [
-  [{ type: 'battle', next: [0, 1] }],
-  [
-    { type: 'event', eventId: 'gearConveyor', next: [0, 1] },
-    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1, 2] },
-  ],
-  [
-    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [0, 1] },
-    { type: 'elite', next: [0, 1] },
-    { type: 'rest', next: [0] },
-  ],
-  [
-    { type: 'battle', next: [0, 1] },
-    { type: 'battle', next: [0] },
-  ],
-  [
-    { type: 'event', eventId: 'pressTrap', next: [0] },
-    { type: 'chest', chest: { rarity: 'rare', locked: true }, next: [0] },
-  ],
-  [{ type: 'rest', next: [0] }],
-  [{ type: 'event', eventId: 'foremanOffice', next: [0] }],
-  [{ type: 'boss', next: [] }],
-];
+const factoryLayout: Layout = keyLayout1({ first: 'gearConveyor', second: 'pressTrap', story: 'foremanOffice' });
 
-/** 蒸気の発電所（蒸気のバルブと冷却水。強敵が2回） */
-const plantLayout: Layout = [
-  [{ type: 'battle', next: [0, 1] }],
-  [
-    { type: 'event', eventId: 'steamValve', next: [0, 1] },
-    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1] },
-  ],
-  [
-    { type: 'battle', next: [0, 1] },
-    { type: 'battle', next: [1, 2] },
-  ],
-  [
-    { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
-    { type: 'elite', next: [0, 1] },
-    { type: 'event', eventId: 'coolantTank', next: [1] },
-  ],
-  [
-    { type: 'event', eventId: 'gearConveyor', next: [0, 1] },
-    { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
-  ],
-  [
-    { type: 'battle', next: [0] },
-    { type: 'elite', next: [0] },
-  ],
-  [{ type: 'rest', next: [0] }],
-  [{ type: 'event', eventId: 'boilerRoom', next: [0] }],
-  [{ type: 'boss', next: [] }],
-];
+/** 蒸気の発電所（蒸気のバルブと冷却水） */
+const plantLayout: Layout = keyLayout2({ first: 'steamValve', second: 'coolantTank', story: 'boilerRoom' });
 
-/** 時計塔（スクラップと行商ロボット。分かれ道が多い） */
-const towerLayout: Layout = [
-  [{ type: 'battle', next: [0, 1] }],
-  [
-    { type: 'event', eventId: 'scrapChest', next: [0, 1] },
-    { type: 'rest', next: [1, 2] },
-  ],
-  [
-    { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
-    { type: 'elite', next: [0, 1] },
-    { type: 'battle', next: [1] },
-  ],
-  [
-    { type: 'battle', next: [0, 1] },
-    { type: 'event', eventId: 'peddlerBot', next: [1] },
-  ],
-  [
-    { type: 'event', eventId: 'gearConveyor', next: [0, 1] },
-    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1] },
-  ],
-  [
-    { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
-    { type: 'battle', next: [0, 1] },
-  ],
-  [
-    { type: 'event', eventId: 'pressTrap', next: [0] },
-    { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
-  ],
-  [{ type: 'rest', next: [0] }],
-  [{ type: 'event', eventId: 'sageStudy', next: [0] }],
-  [{ type: 'boss', next: [] }],
-];
+/** 時計塔（スクラップと行商ロボット） */
+const towerLayout: Layout = keyLayout3({ first: 'scrapChest', second: 'peddlerBot', story: 'sageStudy' });
 
 export const gearFactory: DungeonDef = {
   id: 'gearFactory',
@@ -178,42 +102,7 @@ export const machineHeart: DungeonDef = {
   bossChest: 'legend',
   requiresKeys: ['coreGear', 'coreSteam', 'coreTime'],
   finale: true,
-  layout: [
-    [{ type: 'battle', next: [0, 1] }],
-    [
-      { type: 'event', eventId: 'gearConveyor', next: [0] },
-      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0, 1] },
-    ],
-    [
-      { type: 'battle', next: [0, 1] },
-      { type: 'battle', next: [1] },
-    ],
-    [
-      { type: 'rest', next: [0, 1] },
-      { type: 'event', eventId: 'peddlerBot', next: [1] },
-    ],
-    [
-      { type: 'battle', next: [0, 1] },
-      { type: 'battle', next: [1] },
-    ],
-    [
-      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
-      { type: 'elite', next: [0] },
-    ],
-    [{ type: 'midboss', next: [0] }],
-    [{ type: 'rest', next: [0, 1] }],
-    [
-      { type: 'elite', next: [0, 1] },
-      { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
-    ],
-    [
-      { type: 'battle', next: [0] },
-      { type: 'battle', next: [0] },
-    ],
-    [{ type: 'rest', next: [0] }],
-    [{ type: 'event', eventId: 'machineHeartRoom', next: [0] }],
-    [{ type: 'boss', next: [] }],
-  ],
+  layout: finaleLayout({ first: 'peddlerBot', story: 'machineHeartRoom' }),
 };
 
 // ランダムダンジョン: 廃品の洞窟（部屋の並びを自動生成）

@@ -1,6 +1,7 @@
 // シナリオ7のダンジョン。敵はこのシナリオの敵（enemies/。夢の再来と新しい夢の敵）。弱点が同じ敵だけの組にしない。
 // 制覇すると夢の欠片が手に入り、3つそろうと最終ダンジョンに入れる。ボスは過去のボスの再来。手前に「物語の部屋」（event）を置く
 import type { DungeonDef } from '../../../../types';
+import { finaleLayout, keyLayout1, keyLayout2, keyLayout3 } from '../../../common/dungeonLayouts';
 
 /** 氷の記憶の洞: 森と氷の記憶の敵。ボスは夢の白の女王 */
 const ICE_POOLS: DungeonDef['pools'] = {
@@ -34,92 +35,15 @@ const LAIR_POOLS: DungeonDef['pools'] = {
 
 type Layout = NonNullable<DungeonDef['layout']>;
 
+// 部屋の並びは4つの型（src/content/common/dungeonLayouts.ts）を、このダンジョンのイベントで埋めた物
 /** 氷の記憶の洞（入門。終わらない階段と記憶の宝箱） */
-const iceLayout: Layout = [
-  [{ type: 'battle', next: [0, 1] }],
-  [
-    { type: 'event', eventId: 'dreamStairs', next: [0, 1] },
-    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1, 2] },
-  ],
-  [
-    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [0, 1] },
-    { type: 'elite', next: [0, 1] },
-    { type: 'rest', next: [0] },
-  ],
-  [
-    { type: 'battle', next: [0, 1] },
-    { type: 'battle', next: [0] },
-  ],
-  [
-    { type: 'event', eventId: 'echoChest', next: [0] },
-    { type: 'chest', chest: { rarity: 'rare', locked: true }, next: [0] },
-  ],
-  [{ type: 'rest', next: [0] }],
-  [{ type: 'event', eventId: 'iceEchoHall', next: [0] }],
-  [{ type: 'boss', next: [] }],
-];
+const iceLayout: Layout = keyLayout1({ first: 'dreamStairs', second: 'echoChest', story: 'iceEchoHall' });
 
-/** 砂の幻影の墓（壁画と泉。強敵が2回） */
-const sandLayout: Layout = [
-  [{ type: 'battle', next: [0, 1] }],
-  [
-    { type: 'event', eventId: 'fadedMural', next: [0, 1] },
-    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1] },
-  ],
-  [
-    { type: 'battle', next: [0, 1] },
-    { type: 'battle', next: [1, 2] },
-  ],
-  [
-    { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
-    { type: 'elite', next: [0, 1] },
-    { type: 'event', eventId: 'lullabySpring', next: [1] },
-  ],
-  [
-    { type: 'event', eventId: 'dreamStairs', next: [0, 1] },
-    { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
-  ],
-  [
-    { type: 'battle', next: [0] },
-    { type: 'elite', next: [0] },
-  ],
-  [{ type: 'rest', next: [0] }],
-  [{ type: 'event', eventId: 'sandEchoHall', next: [0] }],
-  [{ type: 'boss', next: [] }],
-];
+/** 砂の幻影の墓（壁画と泉） */
+const sandLayout: Layout = keyLayout2({ first: 'fadedMural', second: 'lullabySpring', story: 'sandEchoHall' });
 
-/** 幽霊船の悪夢（悪夢の罠と夢の行商人。分かれ道が多い） */
-const ghostLayout: Layout = [
-  [{ type: 'battle', next: [0, 1] }],
-  [
-    { type: 'event', eventId: 'nightmareTrap', next: [0, 1] },
-    { type: 'rest', next: [1, 2] },
-  ],
-  [
-    { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
-    { type: 'elite', next: [0, 1] },
-    { type: 'battle', next: [1] },
-  ],
-  [
-    { type: 'battle', next: [0, 1] },
-    { type: 'event', eventId: 'dreamPeddler', next: [1] },
-  ],
-  [
-    { type: 'event', eventId: 'dreamStairs', next: [0, 1] },
-    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1] },
-  ],
-  [
-    { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
-    { type: 'battle', next: [0, 1] },
-  ],
-  [
-    { type: 'event', eventId: 'echoChest', next: [0] },
-    { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
-  ],
-  [{ type: 'rest', next: [0] }],
-  [{ type: 'event', eventId: 'ghostEchoHall', next: [0] }],
-  [{ type: 'boss', next: [] }],
-];
+/** 幽霊船の悪夢（悪夢の罠と夢の行商人） */
+const ghostLayout: Layout = keyLayout3({ first: 'nightmareTrap', second: 'dreamPeddler', story: 'ghostEchoHall' });
 
 export const echoIceVault: DungeonDef = {
   id: 'echoIceVault',
@@ -175,42 +99,7 @@ export const dreamEaterLair: DungeonDef = {
   bossChest: 'legend',
   requiresKeys: ['shardMemory', 'shardFear', 'shardHope'],
   finale: true,
-  layout: [
-    [{ type: 'battle', next: [0, 1] }],
-    [
-      { type: 'event', eventId: 'dreamStairs', next: [0] },
-      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0, 1] },
-    ],
-    [
-      { type: 'battle', next: [0, 1] },
-      { type: 'battle', next: [1] },
-    ],
-    [
-      { type: 'rest', next: [0, 1] },
-      { type: 'event', eventId: 'dreamPeddler', next: [1] },
-    ],
-    [
-      { type: 'battle', next: [0, 1] },
-      { type: 'battle', next: [1] },
-    ],
-    [
-      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
-      { type: 'elite', next: [0] },
-    ],
-    [{ type: 'midboss', next: [0] }],
-    [{ type: 'rest', next: [0, 1] }],
-    [
-      { type: 'elite', next: [0, 1] },
-      { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
-    ],
-    [
-      { type: 'battle', next: [0] },
-      { type: 'battle', next: [0] },
-    ],
-    [{ type: 'rest', next: [0] }],
-    [{ type: 'event', eventId: 'dreamEaterNest', next: [0] }],
-    [{ type: 'boss', next: [] }],
-  ],
+  layout: finaleLayout({ first: 'dreamPeddler', story: 'dreamEaterNest' }),
 };
 
 // ランダムダンジョン: 夢の洞窟（部屋の並びを自動生成）
