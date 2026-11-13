@@ -45,9 +45,9 @@ export const BALANCE = {
    * 2026-11-13 つまみの測定: 測るための入れ物（既定は空 = 今と同じ）。
    * 2026-11-13 案Y で大物 ×2 を入れたが、オーナーが案Y を取りやめたので空に戻した。
    * 2026-11-13 強敵の計画（docs/tasks/elite-plan.md 柱2）: elite は「強敵の本体」（強敵の組から来た敵。奥で足されるふつうの戦闘の敵・町を襲う敵には掛からない）だけに掛ける。
-   * 値は ×1.2・×1.3・×1.5 を測って決めた（docs/review/2026-11-13-elite.md）
+   * 値は ×1.2・×1.3・×1.5 を測って決めた（docs/review/2026-11-13-elite.md。×1.5 だけで、強敵の戦闘の長さ・倒れる味方・強敵に負ける事がはっきり増えた）
    */
-  enemyHpByRank: { elite: 1.3 } as Readonly<Partial<Record<'boss' | 'midboss' | 'elite' | 'normal', number>>>,
+  enemyHpByRank: { elite: 1.5 } as Readonly<Partial<Record<'boss' | 'midboss' | 'elite' | 'normal', number>>>,
   /**
    * 強敵の本気（docs/tasks/elite-plan.md 柱1）: 強敵の本体のHPが最大の hpBelow を切ると、次の予告がその敵のいちばん強い攻撃になり、威力が ×power。1戦闘に1回
    */
