@@ -16,9 +16,12 @@ export const barnacleBeast: EnemyDef = {
   resist: ['poison'],
   pattern: 'sequence',
   actions: [
-    { id: 'crust', name: 'フジツボの殻', effects: [{ kind: 'block', amount: 12 }] },
     { id: 'slam', name: '岩の体当たり', effects: [{ kind: 'damage', amount: 16 }] },
     { id: 'spores', name: '殻を飛ばす', effects: [{ kind: 'damage', amount: 6, to: 'foes' }] },
+    // 敵の特殊な行動・第2弾（round2 §3・fix-plan §4）: 「フジツボの殻」を浄化に置き換えた。ID は古い保存のために残す。
+    // 自分に悪い状態異常がある時は割り込む（割り込んだら次の2ターンは割り込まない）。順番の最後にも残す（1番目から最後へ移した）。
+    // 5つ目の地域なので1種類につき8回復
+    { id: 'crust', name: '古い殻を落とす', big: true, behavior: 'purify', cutIn: { when: 'afflicted', rest: 2 }, hint: '状態異常を全部消して回復する。その前に起爆するか、BREAK する', effects: [{ kind: 'purify', amount: 8 }] },
   ],
 };
 
@@ -33,6 +36,8 @@ export const venomShark: EnemyDef = makeVariant(shark, {
   gold: 11,
   weak: ['thunder'],
   resist: ['poison'],
+  // 敵の特殊な行動・第2弾: 元の人喰い鮫の「1ターン目の手負い狙い」が伝わらないように、1ターン目の行動は無し（今までどおり、順番の1番目から）
+  firstActionId: undefined,
   actions: [
     { id: 'circle', name: '毒の渦を泳ぐ', effects: [{ kind: 'block', amount: 8 }] },
     { id: 'chomp', name: '毒牙の大顎', effects: [{ kind: 'damage', amount: 16, element: 'poison' }] },

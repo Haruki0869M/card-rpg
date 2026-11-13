@@ -17,12 +17,34 @@ import { conveyorBot } from '../../clockworkEmpire/enemies/factory';
 import { wrenchGolem } from '../../clockworkEmpire/enemies/valley';
 import { dreamEcho } from './echo';
 
+// 敵の特殊な行動・第2弾（docs/tasks/enemy-behaviors-round2-plan.md §3）: 元の敵の行動を置き換えたので、表に無い夢の再来は、
+// 置き換える前の行動を土台にする（元の敵の変更が、勝手に伝わらないように）
+/** 氷の剣士の置き換える前の行動（「氷刃の突き」を盾砕きに置き換えた） */
+const ICE_SWORDSMAN_ORIGINAL: EnemyDef['actions'] = [
+  { id: 'combo', name: '二の太刀', effects: [{ kind: 'damage', amount: 5, hits: 2 }] },
+  { id: 'stance', name: '霜刃の構え', effects: [{ kind: 'block', amount: 9 }] },
+  { id: 'thrust', name: '氷刃の突き', effects: [{ kind: 'damage', amount: 12 }] },
+];
+/** 氷の騎士の置き換える前の行動（「氷鎧の構え」をかばうに置き換えた） */
+const ICE_KNIGHT_ORIGINAL: EnemyDef['actions'] = [
+  { id: 'slash', name: '氷剣の一撃', effects: [{ kind: 'damage', amount: 14 }] },
+  { id: 'guard', name: '氷鎧の構え', effects: [{ kind: 'block', amount: 16 }] },
+  { id: 'crush', name: '砕氷斬', big: true, effects: [{ kind: 'damage', amount: 18 }] },
+  { id: 'sweep', name: '横薙ぎ', big: true, effects: [{ kind: 'damage', amount: 7, to: 'foes' }] },
+];
+/** 人喰い鮫の置き換える前の行動（「食いちぎる」を手負い狙いに置き換えた） */
+const SHARK_ORIGINAL: EnemyDef['actions'] = [
+  { id: 'circle', name: '獲物のまわりを泳ぐ', effects: [{ kind: 'block', amount: 6 }] },
+  { id: 'chomp', name: '大顎の一撃', effects: [{ kind: 'damage', amount: 20 }] },
+  { id: 'tear', name: '食いちぎる', effects: [{ kind: 'damage', amount: 8 }, { kind: 'applyStatus', status: 'vulnerable', amount: 1 }] },
+];
+
 // ----- 通常12体 -----
 export const echoForestWolf: EnemyDef = dreamEcho(forestWolf, { id: 'echoForestWolf', name: '夢の森の狼', aura: 'shadow', element: 'dark' });
 export const echoBogGhoul: EnemyDef = dreamEcho(bogGhoul, { id: 'echoBogGhoul', name: '夢の沼の亡者', aura: 'holy', element: 'holy' });
 export const echoFrostWolf: EnemyDef = dreamEcho(frostWolf, { id: 'echoFrostWolf', name: '夢の雪狼', aura: 'shadow', element: 'dark' });
-export const echoIceSwordsman: EnemyDef = dreamEcho(iceSwordsman, { id: 'echoIceSwordsman', name: '夢の氷の剣士', aura: 'storm', element: 'thunder' });
-export const echoShark: EnemyDef = dreamEcho(shark, { id: 'echoShark', name: '夢の鮫', aura: 'venom', element: 'poison' });
+export const echoIceSwordsman: EnemyDef = dreamEcho(iceSwordsman, { id: 'echoIceSwordsman', name: '夢の氷の剣士', aura: 'storm', element: 'thunder', actions: ICE_SWORDSMAN_ORIGINAL });
+export const echoShark: EnemyDef = dreamEcho(shark, { id: 'echoShark', name: '夢の鮫', aura: 'venom', element: 'poison', actions: SHARK_ORIGINAL });
 export const echoDrownedSailor: EnemyDef = dreamEcho(drownedSailor, { id: 'echoDrownedSailor', name: '夢の溺れた水夫', aura: 'frost', element: 'ice' });
 export const echoMummy: EnemyDef = dreamEcho(mummy, { id: 'echoMummy', name: '夢のミイラ', aura: 'ember', element: 'fire' });
 export const echoSandScorpion: EnemyDef = dreamEcho(sandScorpion, { id: 'echoSandScorpion', name: '夢の砂蠍', aura: 'storm', element: 'thunder' });
@@ -45,7 +67,7 @@ export const echoWrenchGolem: EnemyDef = dreamEcho(wrenchGolem, {
 });
 
 // ----- エリート3体 -----
-export const echoIceKnight: EnemyDef = dreamEcho(iceKnight, { id: 'echoIceKnight', name: '夢の氷の騎士', aura: 'shadow', element: 'dark' });
+export const echoIceKnight: EnemyDef = dreamEcho(iceKnight, { id: 'echoIceKnight', name: '夢の氷の騎士', aura: 'shadow', element: 'dark', actions: ICE_KNIGHT_ORIGINAL });
 export const echoSeaWitch: EnemyDef = dreamEcho(seaWitch, { id: 'echoSeaWitch', name: '夢の海の魔女', aura: 'ember', element: 'fire' });
 export const echoColossusStatue: EnemyDef = dreamEcho(colossusStatue, { id: 'echoColossusStatue', name: '夢の石像の巨兵', aura: 'holy', element: 'holy' });
 

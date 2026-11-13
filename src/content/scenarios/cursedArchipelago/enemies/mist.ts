@@ -55,7 +55,9 @@ export const pirateGunner: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'barrage', name: '甲板の砲撃', effects: [{ kind: 'damage', amount: 5, to: 'foes' }] },
-    { id: 'reload', name: '弾込め', effects: [{ kind: 'block', amount: 6 }] },
+    // 敵の特殊な行動・第2弾（docs/tasks/enemy-behaviors-round2-plan.md §3・fix-plan §4）: 「弾込め」を仲間を呼ぶ（海賊の下っ端）に置き換えた。ID は古い保存のために残す。
+    // 呼べる時は優先・2ターン続けては呼ばない・1戦闘に2回まで。呼べない時は「至近の一発」。3つ目の地域なのでブロック8
+    { id: 'reload', name: '呼び子を吹く', big: true, behavior: 'call', cutIn: { when: 'canSummon', rest: 1, noRepeat: true }, hint: '仲間を1体呼ぶ。その前に倒すか、BREAK する', effects: [{ kind: 'summonEnemy', enemy: 'pirateGrunt', uses: 2, call: true, orElse: 'point' }, { kind: 'block', amount: 8 }] },
     { id: 'point', name: '至近の一発', effects: [{ kind: 'damage', amount: 12 }] },
   ],
 };
@@ -71,10 +73,14 @@ export const siren: EnemyDef = {
   gold: 6,
   weak: ['thunder'],
   pattern: 'sequence',
+  // 敵の特殊な行動・第2弾（round2 §3・fix-plan §4）: 癒し封じを1ターン目に予告する（2ターン目からは惑わしの歌・濡れた爪・癒し封じの順）
+  firstActionId: 'lament',
   actions: [
     { id: 'song', name: '惑わしの歌', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'foes' }] },
     { id: 'claw', name: '濡れた爪', effects: [{ kind: 'damage', amount: 9 }] },
-    { id: 'lament', name: '呪いの調べ', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }, { kind: 'damage', amount: 5 }] },
+    // 「呪いの調べ」（呪い2＋5ダメージ）を癒し封じに置き換えた。ID は古い保存のために残す。
+    // 元の呪いは弱めて残す（狙った1人に呪い1。fix-plan §2 の 2-4）。3つ目の地域なのでブロック8（BREAK されると行動ごと止まる）
+    { id: 'lament', name: '癒しを拒む歌', big: true, behavior: 'healSeal', hint: '味方全員の回復が、2ターン半分になる。BREAK するか、先に回復を使う', effects: [{ kind: 'applyStatus', status: 'healSeal', amount: 2, to: 'foes' }, { kind: 'applyStatus', status: 'curse', amount: 1 }, { kind: 'block', amount: 8 }] },
   ],
 };
 

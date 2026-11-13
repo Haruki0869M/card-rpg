@@ -13,6 +13,13 @@ export interface EchoOptions {
   element?: string;
   /** 開幕の特性などを足す（元の特性は残す） */
   abilities?: AbilityDef[];
+  /**
+   * 元の敵の行動の代わりに、この行動を土台にする（ダメージ+1・属性の変更は同じにかける）。
+   * 敵の特殊な行動・第2弾: 元の敵の行動を置き換えた時に、表に無い夢の再来へ伝わらないよう、置き換える前の行動をここに書く
+   */
+  actions?: EnemyActionDef[];
+  /** 戦闘の1ターン目に必ず予告する行動（元の敵の firstActionId は引き継がない。表に載っている夢の再来だけ書く） */
+  firstActionId?: string;
 }
 
 /** 攻撃のダメージを+1し、element があれば属性を変える（ブロック・状態異常はそのまま） */
@@ -31,7 +38,8 @@ export function dreamEcho(base: EnemyDef, o: EchoOptions): EnemyDef {
     maxHp: Math.round(base.maxHp * 1.1),
     exp: Math.round(base.exp * 1.1),
     gold: Math.round(base.gold * 1.1),
-    actions: base.actions.map((a) => strengthen(a, o.element)),
+    actions: (o.actions ?? base.actions).map((a) => strengthen(a, o.element)),
+    firstActionId: o.firstActionId,
     phases: base.phases?.map((p) => ({ ...p, actions: p.actions.map((a) => strengthen(a, o.element)) })),
     abilities: o.abilities ? [...(base.abilities ?? []), ...o.abilities] : base.abilities,
   });
