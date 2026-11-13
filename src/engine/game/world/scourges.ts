@@ -18,7 +18,7 @@ import { hexDistance, neighbors } from './hex';
 import { isWideMap, laneOfTile } from './lanes';
 import { corruptionLevelBonus } from './wanderers';
 import { aliveScourges } from './scourgeCurse';
-import { placeName, queueStory } from './guide';
+import { bumpStoryVer, placeName, queueStory } from './guide';
 
 export { aliveScourges, scourgeCurse, scourgePrice, scourgesWith, type ScourgeCurse } from './scourgeCurse';
 
@@ -122,8 +122,11 @@ export function spawnScourge(game: GameState, w: WorldState, rng: Rng): Wanderer
 
 /** 物語の窓に出す（もう出ている時は、後ろに足す） */
 function pushStory(w: WorldState, title: string, lines: string[]) {
-  if (w.story) w.story = { title: w.story.title, lines: [...w.story.lines, '', title, ...lines] };
-  else w.story = { title, lines };
+  if (w.story) {
+    w.story = { title: w.story.title, lines: [...w.story.lines, '', title, ...lines] };
+    // 点検 F6: 出ている窓の中身が増えた。増える前の窓への「つづける」で、まだ読んでいない分を閉じない
+    bumpStoryVer(w);
+  } else w.story = { title, lines };
 }
 
 /** 見晴らしの塔に登った時: 地図全体の災厄の場所を見せる（見えた数） */

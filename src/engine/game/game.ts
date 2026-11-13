@@ -88,6 +88,7 @@ import {
 } from './hero';
 import { needsVote, tally, VOTED_COMMANDS, voteCtx, voters } from './votes';
 import { encounterJoin, worldInvite, worldInviteAnswer } from './world/world';
+import { bumpStoryVer } from './world/guide';
 import { EXPEDITION_MODES, findExpedition, mount, restoreSceneFields, saveSceneFields, unmount } from './scenes';
 import { addFeat, announceJobs, changeJob, pickJobCard } from './jobs';
 import { addPetActs, addPetLove, adoptPet, patPet } from './pets';
@@ -495,7 +496,7 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
         error = encounterContinue(game, cmd, rng);
         break;
       case 'STORY_CONTINUE':
-        error = storyContinue(game);
+        error = storyContinue(game, cmd.storyVer);
         break;
       case 'TOWN_BUY':
         error = townBuy(game, cmd, rng);
@@ -1169,12 +1170,17 @@ function onDungeonCleared(game: GameState, dungeonId: string, rng: Rng) {
   questSignal(game, { kind: 'clearDungeon', dungeonId });
   if (def.clearStory?.length && !def.finale) {
     // 回1: 世界マップに別の知らせ（災厄が現れた など）が出ていたら、消さずに制覇の物語の後へ回す
-    if (w.story) w.storyQueue = [w.story, ...(w.storyQueue ?? [])];
+    if (w.story) {
+      w.storyQueue = [w.story, ...(w.storyQueue ?? [])];
+      // 点検 F6: 出ていた窓が後ろへ回った。前の窓への「つづける」で、制覇の物語を閉じない
+      bumpStoryVer(w);
+    }
     w.story = { title: def.name, lines: [...def.clearStory, ...nextGoalLines(game)] };
   }
   if (def.finale) {
     const story = getScenario(game.scenarioId).story;
     delete w.storyQueue;
+    if (w.story) bumpStoryVer(w);
     w.story = { title: 'エンディング', lines: story?.ending ?? ['魔王は封じられた。'] };
     game.mode = 'ending';
   }

@@ -166,6 +166,13 @@ interface StoreState {
   hint: { text: string; id: number } | null;
   /** 画面下に出す短いお知らせ（エラーなど） */
   toast: { text: string; id: number } | null;
+  /**
+   * 点検 2026-11-13 F6（オンライン）: ほかの人の「つづける」で閉じた物語の窓のうち、この端末でまだ押していない物。
+   * この端末だけの表示で、押すまで出しておく（ゲームの状態・進行は変えない）
+   */
+  heldStories: { title: string; lines: string[] }[];
+  /** 物語の窓の「つづける」（この端末だけの窓が残っていれば、それを閉じる。無ければ今の窓を閉じる操作を送る） */
+  continueStory: (playerId: PlayerId) => void;
 
   setScreen: (s: Screen) => void;
   /** 見る場面を切り替える */
@@ -307,6 +314,8 @@ export const setStoreRoom = (r: Room | null) => {
 };
 /** ホストが送った「敵の行動」がまだ戻ってきていない */
 let enemyInFlight = false;
+/** この端末で「つづける」を押した物語の窓の版（点検 F6。押していない窓が、ほかの人の操作で閉じた時だけ、この端末に残す） */
+let storyPressed: number | null = null;
 
 /** この端末の担当で、まだ行動できる（使えるカードが残っている）仲間がいるか。オンラインで準備完了した席は数えない */
 export function canStillAct(battle: BattleState): boolean {
@@ -625,6 +634,11 @@ export const useBattle = create<StoreState>((set, get) => {
       if (mine) vibrate(get().settings, VIBRATION.turn);
       playSound(mine ? 'sfx_turn_cutin' : 'sfx_turn_notice');
     }
+    // 点検 F6: オンラインで、ほかの人の「つづける」で物語の窓が閉じた。この端末でまだ押していなければ、押すまで出しておく
+    const bw = before?.world;
+    if (room && bw?.story && unwrapCommand(wire).command.type === 'STORY_CONTINUE' && (full.world?.storyVer ?? 0) !== (bw.storyVer ?? 0) && storyPressed !== (bw.storyVer ?? 0)) {
+      patch.heldStories = [...get().heldStories, bw.story];
+    }
     const lm = full.world?.lastMove;
     if (before && scene === WORLD_SCENE && cmdScene === WORLD_SCENE && lm && lm.seq !== before.world?.lastMove?.seq && lm.path.length > 1) {
       patch.worldMoves = [...get().worldMoves, { id: fxId++, game: full, before }];
@@ -684,6 +698,15 @@ export const useBattle = create<StoreState>((set, get) => {
     settings: loadSettings(),
     worldMoves: [],
     presentationBusy: false, phaseBanner: null, cutins: [], petPulses: {}, turnCutin: null, doorOpen: null,
+    heldStories: [],
+    continueStory: (playerId) => {
+      const held = get().heldStories;
+      if (held.length) return set({ heldStories: held.slice(1) });
+      const w = get().full?.world;
+      if (!w?.story) return;
+      storyPressed = w.storyVer ?? 0;
+      get().dispatchGame({ type: 'STORY_CONTINUE', playerId, storyVer: w.storyVer ?? 0 });
+    },
     finishWorldMove: id => {
       set(s => ({ worldMoves: s.worldMoves[0]?.id === id ? s.worldMoves.slice(1) : s.worldMoves }));
       if (!get().worldMoves.length) { pumpNotices(); scheduleEnemy(); }
@@ -738,7 +761,8 @@ export const useBattle = create<StoreState>((set, get) => {
         difficulty: d.difficulty,
         party: d.party.map((m) => ({ ...m, playerId: m.playerId ?? LOCAL_PLAYER })),
       });
-      set({ worldMoves: [], full: game, scene: WORLD_SCENE, game, screen: 'game', battle: EMPTY_BATTLE, sheet: null, selection: null });
+      storyPressed = null;
+      set({ worldMoves: [], full: game, scene: WORLD_SCENE, game, screen: 'game', battle: EMPTY_BATTLE, sheet: null, selection: null, heldStories: [] });
       scheduleSave(get);
     },
 
@@ -764,7 +788,8 @@ export const useBattle = create<StoreState>((set, get) => {
       const local = loadSave();
       const scene = pickScene(local?.game ?? null, WORLD_SCENE, true);
       const game = viewIn(local?.game ?? null, scene);
-      set({ worldMoves: [], full: local?.game ?? null, scene, game, activeId: local?.activeId ?? '', screen: 'title', confirmAbandon: false, sheet: null, battle: game?.battle ?? EMPTY_BATTLE, selection: null });
+      storyPressed = null;
+      set({ worldMoves: [], full: local?.game ?? null, scene, game, activeId: local?.activeId ?? '', screen: 'title', confirmAbandon: false, sheet: null, battle: game?.battle ?? EMPTY_BATTLE, selection: null, heldStories: [] });
     },
 
     onBecameHost: () => {
@@ -777,7 +802,8 @@ export const useBattle = create<StoreState>((set, get) => {
       clearPresentation();
       if (enemyTimer) clearTimeout(enemyTimer);
       enemyTimer = null;
-      set({ worldMoves: [], activeId: '', draft: defaultDraft(), full: null, scene: WORLD_SCENE, game: null, screen: 'title', confirmAbandon: false, sheet: null, battle: EMPTY_BATTLE, selection: null });
+      storyPressed = null;
+      set({ worldMoves: [], activeId: '', draft: defaultDraft(), full: null, scene: WORLD_SCENE, game: null, screen: 'title', confirmAbandon: false, sheet: null, battle: EMPTY_BATTLE, selection: null, heldStories: [] });
       if (saveTimer) clearTimeout(saveTimer);
       saveTimer = null;
       enemyInFlight = false;

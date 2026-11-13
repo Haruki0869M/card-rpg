@@ -673,7 +673,8 @@ export type GameCommand =
   | { type: 'ENCOUNTER_CHOOSE'; playerId: PlayerId; choice: 'fight' | 'ambush' | 'flee'; heroId: string; focusUsed: number; participants: string[] }
   /** 遭遇の判定の結果を見た後に進む */
   | { type: 'ENCOUNTER_CONTINUE'; playerId: PlayerId; participants: string[] }
-  | { type: 'STORY_CONTINUE'; playerId: PlayerId }
+  /** storyVer = 押した時に見ていた物語の窓の版（WorldState.storyVer）。違えば何もしない。無い（古い形）時は今出ている窓を閉じる（点検 F6） */
+  | { type: 'STORY_CONTINUE'; playerId: PlayerId; storyVer?: number }
   // ---------- 町・祠 ----------
   | { type: 'TOWN_BUY'; playerId: PlayerId; heroId?: string; kind: 'item' | 'card'; index: number }
   | { type: 'TOWN_INN'; playerId: PlayerId; heroId?: string }
