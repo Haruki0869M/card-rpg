@@ -6,7 +6,7 @@
 // 並びの決まり（tests: src/engine/__tests__/dungeonShape.test.ts）:
 // - どの道でも、続けて同じ種類の部屋に入らない・同じ行の部屋は全部ちがう種類
 // - どの道でも、戦う部屋（ふつうの戦闘・強敵・中ボス・ボス）でない部屋が3つ以上続かない
-// - どの道でも、ふつうの戦闘は鍵で3回以上・最後で4回以上
+// - どの道でも、ふつうの戦闘は鍵で3回以上・最後で4回以上（1つ目の鍵の型 keyLayout1 だけ 2回以上。2026-11-13 オーナーの OK）
 // - 強敵の部屋は、同じ行に強敵でない部屋がある
 import type { DungeonDef } from '../../types';
 
@@ -21,22 +21,30 @@ export interface LayoutEvents {
 
 /**
  * 1つ目の鍵のダンジョン（8行）。
- * ボスの前が「休憩 → 物語の部屋」なので、5行目は必ず戦う部屋になる。どの道でもふつうの戦闘を3回にするため、
- * 3行目と5行目はふつうの戦闘1つだけ（2行目・4行目で選ぶ）。5行目より後に戦う部屋を2つ置く場所は無い（報告に書いた）
+ * 2026-11-13（点検19の問題 A1・オーナーの OK）: この型だけ「どの道でも、ふつうの戦闘は2回以上」に緩め、選ぶ所を 6 に戻した
+ * （直す前 bf628d5 と同じ数。1回目の直しでは 2 だった）。
+ * ボスの前が「休憩 → 物語の部屋」なので、5行目は全部が戦う部屋（戦闘か強敵）。3行目も全部が戦う部屋（戦闘か強敵）。
+ * 強敵の後の4行目は「イベントか戦闘」、イベントの後はふつうの戦闘だけ（強敵が2回続く道で、ふつうの戦闘が1回にならないように）
  */
 export const keyLayout1 = (e: LayoutEvents): Layout => [
   [{ type: 'battle', next: [0, 1] }],
   [
-    { type: 'event', eventId: e.first, next: [0] },
-    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [0] },
+    { type: 'event', eventId: e.first, next: [0, 1] },
+    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [0, 1] },
   ],
-  [{ type: 'battle', next: [0, 1, 2] }],
   [
-    { type: 'elite', next: [0] },
-    { type: 'chest', chest: { rarity: 'rare', locked: true }, next: [0] },
-    { type: 'event', eventId: e.second!, next: [0] },
+    { type: 'battle', next: [0, 1] },
+    { type: 'elite', next: [1, 2] },
   ],
-  [{ type: 'battle', next: [0] }],
+  [
+    { type: 'chest', chest: { rarity: 'rare', locked: true }, next: [0, 1] },
+    { type: 'event', eventId: e.second!, next: [0] },
+    { type: 'battle', next: [1] },
+  ],
+  [
+    { type: 'battle', next: [0] },
+    { type: 'elite', next: [0] },
+  ],
   [{ type: 'rest', next: [0] }],
   [{ type: 'event', eventId: e.story, next: [0] }],
   [{ type: 'boss', next: [] }],

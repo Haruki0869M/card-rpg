@@ -158,7 +158,8 @@ export function violations(d, base) {
   if (s.maxRun[1] >= 3) v.push(`戦わない部屋が ${s.maxRun[1]} 続く`);
   const deepWant = d.finale ? 3 : 2;
   if (s.deep[0] < deepWant) v.push(`5行目〜休憩の前の戦う部屋 最小 ${s.deep[0]}（${deepWant}以上）`);
-  const bWant = d.finale ? 4 : 3;
+  // 2026-11-13（点検19の問題 A1・オーナーの OK）: 1つ目の鍵の型（シナリオ2〜7の8行の鍵のダンジョン）だけ 2回以上
+  const bWant = d.finale ? 4 : d.stage === 0 && d.scenario !== 'corruptionKing' ? 2 : 3;
   if (s.battle[0] < bWant) v.push(`battle 最小 ${s.battle[0]}（${bWant}以上）`);
   if (!s.eliteAvoidable) v.push('避けられない elite の行');
   if (!s.eliteOrOther) v.push('elite を選べる所が無い');
