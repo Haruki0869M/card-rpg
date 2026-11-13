@@ -127,7 +127,9 @@ export const frostGiant: EnemyDef = {
   ],
   abilities: [{"name": "霜の厚皮", "effect": {"when": "battleStart", "do": [{"kind": "block", "amount": 8}]}}],
   phases: [
-    { belowHpPct: 50, name: "怒れる霜の巨人", pattern: 'sequence', actions: [
+    // ボスの段階（2026-11-14）: 盾砕き（順番にも入る）。答え: 守りに頼らない・火・毒の弱点で押し切る
+    { belowHpPct: 50, name: "怒れる霜の巨人", pattern: 'sequence', openingActionId: 'smashGuard', rule: '当たるとブロックを全部壊す一撃（火・毒で BREAK すると威力が半分。守りに頼らず受ける）', actions: [
+      { id: 'smashGuard', name: '盾ごと砕く大槌', big: true, behavior: 'shatter', hint: '当たるとブロックを全部壊す。BREAK するか、ブロックに頼らずに受ける', effects: [{ kind: 'shieldBreak' }, { kind: 'damage', amount: 18 }] },
       {"id": "rage", "name": "怒りの大槌", big: true, "effects": [{"kind": "damage", "amount": 28}]},
       {"id": "guard", "name": "怒りの構え", "effects": [{"kind": "block", "amount": 24}]},
       {"id": "quake", "name": "鉱山を揺らす", big: true, "effects": [{"kind": "damage", "amount": 12, "to": "foes"}]},

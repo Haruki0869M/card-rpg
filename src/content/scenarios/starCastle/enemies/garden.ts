@@ -109,7 +109,11 @@ export const moonMaiden: EnemyDef = {
       belowHpPct: 50,
       name: '満月の力に目覚めた乙女',
       pattern: 'sequence',
+      // ボスの段階（2026-11-14）: 再生＋浄化（今の満月の再生は残す）。答え: 一気に削る・闇で BREAK
+      openingActionId: 'moonRite',
+      rule: '状態異常を払って回復し、満月の再生も続く（闇で BREAK すると止まる。一気に削る）',
       actions: [
+        { id: 'moonRite', name: '月の禊', big: true, behavior: 'purify', cutIn: { when: 'afflicted', rest: 2 }, hint: '状態異常を全部消して回復する（1種類につき6）。その前に起爆するか、闇の弱点で BREAK する。満月の再生も残るので、一気に削る', effects: [{ kind: 'purify', amount: 6 }, { kind: 'applyStatus', status: 'regen', amount: 3, to: 'self' }] },
         { id: 'fullMoon', name: '満月の力', effects: [{ kind: 'block', amount: 12, to: 'allies' }, { kind: 'applyStatus', status: 'regen', amount: 4, to: 'self' }] },
         { id: 'lunar', name: '満月の光', big: true, effects: [{ kind: 'damage', amount: 14, element: 'holy', to: 'foes' }] },
         { id: 'briar', name: '茨の檻', big: true, effects: [{ kind: 'damage', amount: 29 }] },

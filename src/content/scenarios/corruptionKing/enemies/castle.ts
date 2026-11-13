@@ -67,7 +67,11 @@ export const valgrim: EnemyDef = {
       belowHpPct: 66,
       name: '真の姿のヴァルグリム',
       pattern: 'sequence',
+      // ボスの段階（2026-11-14）: 魔王軍の騎士を呼ぶ（騎士は1ターン目にかばう。1回だけ）。答え: 聖で BREAK・騎士を先に倒す・全体攻撃
+      openingActionId: 'callKnight',
+      rule: '魔王軍の騎士を呼び、かばわせる（聖で BREAK すると止まる。騎士を先に倒すか、全体攻撃で）',
       actions: [
+        { id: 'callKnight', name: '魔王軍招集', big: true, scripted: true, behavior: 'call', hint: '魔王軍の騎士を1体呼ぶ（騎士は最初の番にヴァルグリムをかばう）。聖の弱点で BREAK すると止まる。騎士を先に倒すか、全体攻撃で両方を削る', effects: [{ kind: 'summonEnemy', enemy: 'darkKnight', uses: 1, orElse: 'devour' }, { kind: 'block', amount: 12 }] },
         { id: 'corruptWave', name: '侵食の波動', big: true, effects: [{ kind: 'damage', element: 'dark', amount: 13, to: 'foes' }, { kind: 'applyStatus', status: 'poison', amount: 2, to: 'foes' }] },
         { id: 'devour', name: '喰らう', big: true, effects: [{ kind: 'damage', element: 'dark', amount: 28 }, { kind: 'heal', amount: 15, to: 'self' }] },
         { id: 'despair', name: '絶望', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 2, to: 'foes' }, { kind: 'block', amount: 20 }] },
@@ -77,7 +81,11 @@ export const valgrim: EnemyDef = {
       belowHpPct: 33,
       name: '最後の抵抗',
       pattern: 'sequence',
+      // ボスの段階（2026-11-14）: 手数読み＋消滅の一撃の溜め（1回だけ。消滅の一撃は順番にも残る）。答え: 手数を絞る・消滅の一撃を聖で BREAK・守り
+      openingActionId: 'doomWatch',
+      rule: 'カードを使いすぎた味方に反撃し、次の予告で「消滅の一撃」（手数を絞り、消滅の一撃は聖で BREAK）',
       actions: [
+        { id: 'doomWatch', name: '終焉の眼', big: true, scripted: true, behavior: 'punish', chargeTo: 'annihilate', hint: 'このターンにカードを4枚以上使った味方に、枚数×3のダメージ。次の予告は「消滅の一撃」になる。手数を絞って受け、消滅の一撃は聖の弱点で BREAK する', effects: [{ kind: 'punishPlays', amount: 3, min: 4 }] },
         { id: 'apocalypse', name: '終焉', big: true, effects: [{ kind: 'damage', element: 'dark', amount: 18, to: 'foes' }] },
         { id: 'shadowBarrier', name: '影の障壁', big: true, effects: [{ kind: 'block', amount: 30 }, { kind: 'damage', amount: 12, to: 'foes' }] },
         { id: 'annihilate', name: '消滅の一撃', big: true, effects: [{ kind: 'damage', element: 'dark', amount: 34 }] },

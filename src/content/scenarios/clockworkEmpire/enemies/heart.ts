@@ -61,13 +61,17 @@ export const greatMachine: EnemyDef = {
   ],
   abilities: [{ name: '帝国の鋼鉄', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 8 }] } }],
   phases: [
-    { belowHpPct: 60, name: '人を繋ぐ大機械', pattern: 'sequence', actions: [
+    // ボスの段階（2026-11-14）: 麻痺（今の「繋ぐ」）＋呼ぶ（機械の猟犬。順番でもう1回）。答え: 雷で BREAK・先に倒す
+    { belowHpPct: 60, name: '人を繋ぐ大機械', pattern: 'sequence', openingActionId: 'callParts', rule: '機械の猟犬を呼ぶ（2回まで。雷で BREAK すると止まる。先に倒すか、全体攻撃で）', actions: [
+      { id: 'callParts', name: '機械の猟犬を放つ', big: true, behavior: 'call', hint: 'ゼンマイの犬を1体呼ぶ（2回まで。倒しても報酬なし）。雷の弱点で BREAK すると止まる。先に倒すか、全体攻撃で', effects: [{ kind: 'summonEnemy', enemy: 'clockworkDog', uses: 2, orElse: 'press' }, { kind: 'block', amount: 10 }] },
       { id: 'link', name: '繋ぐ', big: true, effects: [{ kind: 'applyStatus', status: 'paralysis', amount: 1, to: 'foes' }, { kind: 'damage', amount: 8, element: 'thunder', to: 'foes' }] },
       { id: 'press', name: '帝国の圧延', big: true, effects: [{ kind: 'damage', amount: 26 }] },
       { id: 'reroute', name: '動力を回す', effects: [{ kind: 'block', amount: 24 }, { kind: 'heal', amount: 10, to: 'self' }] },
       { id: 'steam', name: '白い蒸気の奔流', big: true, effects: [{ kind: 'damage', amount: 7, to: 'foes' }, { kind: 'applyStatus', status: 'burn', amount: 1, to: 'foes' }] },
     ] },
-    { belowHpPct: 30, name: '全力稼働の大機械', pattern: 'sequence', actions: [
+    // ボスの段階（2026-11-14）: 盾砕き（順番にも入る）。答え: 守りに頼らない・雷で BREAK
+    { belowHpPct: 30, name: '全力稼働の大機械', pattern: 'sequence', openingActionId: 'crushPlates', rule: '当たるとブロックを全部壊す一撃（守りに頼らず受ける。雷で BREAK すると威力が半分）', actions: [
+      { id: 'crushPlates', name: '装甲ごと押し潰す', big: true, behavior: 'shatter', hint: '当たるとブロックを全部壊す。BREAK するか、ブロックに頼らずに受ける', effects: [{ kind: 'shieldBreak' }, { kind: 'damage', amount: 20 }] },
       { id: 'fullPower', name: '全力稼働', big: true, effects: [{ kind: 'damage', amount: 16, element: 'thunder', to: 'foes' }] },
       { id: 'crush', name: '鋼の歯車で砕く', big: true, effects: [{ kind: 'damage', amount: 32 }] },
       { id: 'overheat', name: '炉の暴走', big: true, effects: [{ kind: 'block', amount: 26 }, { kind: 'damage', amount: 8, element: 'fire', to: 'foes' }] },

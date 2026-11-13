@@ -240,10 +240,10 @@ function IntentBubble({ enemy, onTap, narrow }: { enemy: EnemyState; onTap: () =
               🌀{narrow ? view.opening.short : view.opening.label}
             </span>
           )}
-          {/* 数え読み（2026-11-14）: 予告の枠の右上に残りの数（0 = この予告が数え読みの行動） */}
+          {/* 数え読み（2026-11-14）: 予告の枠の右上に残りの数（0 = この予告が数え読みの行動）。敵が3体以上で狭い時は、枠の内側の角（画面の端の敵がはみ出さない） */}
           {view.countdown && (
             <span
-              className={`absolute -top-2 -right-2 z-[1] flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-0.5 text-[12px] leading-none font-black tabular-nums ring-1 ${view.countdown.fire ? 'bg-red-600 text-white ring-yellow-200' : 'bg-indigo-950 text-sky-100 ring-sky-300'}`}
+              className={`absolute -top-2 ${narrow ? 'right-0' : '-right-2'} z-[1] flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-0.5 text-[12px] leading-none font-black tabular-nums ring-1 ${view.countdown.fire ? 'bg-red-600 text-white ring-yellow-200' : 'bg-indigo-950 text-sky-100 ring-sky-300'}`}
               data-countdown={view.countdown.left}
               title={`あと${view.countdown.left}回の予告で「${view.countdown.actionName}」`}
             >

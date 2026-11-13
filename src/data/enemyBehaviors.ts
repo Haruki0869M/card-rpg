@@ -64,7 +64,8 @@ export function behaviorFromEffects(action: EnemyActionDef): EnemyBehaviorId | u
     if (e.kind === 'punishPlays') return 'punish';
     if (e.kind === 'guardAllies') return 'guard';
     if (e.kind === 'purify') return 'purify';
-    if (e.kind === 'summonEnemy' && e.call) return 'call';
+    // 2026-11-14: ボスの取り巻きを呼ぶ（増援の決まり。call の無い summonEnemy）も、紫の札の「増援」にそろえる
+    if (e.kind === 'summonEnemy') return 'call';
     if (e.kind === 'shieldBreak') return 'shatter';
     if (e.kind === 'applyStatus' && e.status === 'healSeal') return 'healSeal';
     if (e.kind === 'damage' && e.lowHpMul) return 'hunt';

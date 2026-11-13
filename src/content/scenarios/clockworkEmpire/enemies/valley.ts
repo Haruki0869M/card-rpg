@@ -129,7 +129,10 @@ export const runawayBoiler: EnemyDef = {
   ],
   abilities: [{ name: '鋼の釜', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 6 }] } }],
   phases: [
-    { belowHpPct: 50, name: '爆発寸前のボイラー', pattern: 'sequence', actions: [
+    // ボスの段階（2026-11-14）: 数え読み（3回で大爆発。くり返す）。答え: 氷で BREAK して数を戻す・その前に倒す
+    { belowHpPct: 50, name: '爆発寸前のボイラー', pattern: 'sequence', openingActionId: 'pressureUp', rule: '数え読み: 3回の予告の後に「大爆発」（数えている間に BREAK すると、圧が抜けて1つ戻る）', actions: [
+      { id: 'pressureUp', name: '圧力計が振り切れる', scripted: true, countdown: { actionId: 'blast', turns: 3 }, hint: '3回の予告の後に「大爆発」（味方全員に火20・火傷2）。数えている間に BREAK すると、圧が抜けて数が1つ戻る。数えが0になる前に倒すか、守りを固める', effects: [{ kind: 'block', amount: 14 }] },
+      { id: 'blast', name: '大爆発', big: true, scripted: true, effects: [{ kind: 'damage', amount: 20, element: 'fire', to: 'foes' }, { kind: 'applyStatus', status: 'burn', amount: 2, to: 'foes' }] },
       { id: 'burst', name: '爆発寸前の熱波', big: true, effects: [{ kind: 'damage', amount: 11, element: 'fire', to: 'foes' }] },
       { id: 'rivets', name: '飛び散る鋲', big: true, effects: [{ kind: 'damage', amount: 5, hits: 3 }] },
       { id: 'hiss', name: '悲鳴のような汽笛', effects: [{ kind: 'block', amount: 20 }, { kind: 'applyStatus', status: 'burn', amount: 2, to: 'foes' }] },

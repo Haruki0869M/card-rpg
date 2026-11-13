@@ -105,7 +105,9 @@ export const clockworkSage: EnemyDef = {
   ],
   abilities: [{ name: '真鍮の外装', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 8 }] } }],
   phases: [
-    { belowHpPct: 50, name: '針の早まった賢者', pattern: 'sequence', actions: [
+    // ボスの段階（2026-11-14）: 巻き戻し（逆回し。1回だけ）。答え: 雷で BREAK・呪い
+    { belowHpPct: 50, name: '針の早まった賢者', pattern: 'sequence', openingActionId: 'reverse', rule: '1回だけ時を巻き戻し、HPを最大の半分まで戻す（雷で BREAK すると止まる。呪いで戻る量が減る）', actions: [
+      { id: 'reverse', name: '時を巻き戻す', big: true, scripted: true, hint: 'HPを最大の50%まで戻す（1回だけ）。雷の弱点で BREAK すると止まる。呪い・癒し封じで戻る量が減る', effects: [{ kind: 'healToPct', pct: 50 }, { kind: 'block', amount: 10 }] },
       { id: 'accel', name: '加速', big: true, effects: [{ kind: 'damage', amount: 7, hits: 3 }] },
       { id: 'toll', name: '終わりの鐘', big: true, effects: [{ kind: 'damage', amount: 12, element: 'thunder', to: 'foes' }] },
       { id: 'rewind2', name: '最後の逆回し', effects: [{ kind: 'heal', amount: 10, to: 'self' }, { kind: 'block', amount: 20 }] },

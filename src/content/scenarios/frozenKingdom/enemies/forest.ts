@@ -120,7 +120,9 @@ export const crystalLord: EnemyDef = {
   ],
   abilities: [{"name": "氷晶の外殻", "effect": {"when": "battleStart", "do": [{"kind": "block", "amount": 6}]}}],
   phases: [
-    { belowHpPct: 50, name: "増殖する氷晶", pattern: 'sequence', actions: [
+    // ボスの段階（2026-11-14）: 呼ぶ。開幕の一手で氷柱の虫を呼ぶ（順番でもう1回）。答え: 火・雷で BREAK・先に倒す
+    { belowHpPct: 50, name: "増殖する氷晶", pattern: 'sequence', openingActionId: 'shardCall', rule: '氷柱の虫を呼ぶ（2回まで。火・雷で BREAK すると止まる。先に倒すか、全体攻撃で）', actions: [
+      { id: 'shardCall', name: '氷晶から虫を孵す', big: true, behavior: 'call', hint: '氷柱の虫を1体呼ぶ（2回まで。倒しても報酬なし）。火・雷の弱点で BREAK すると止まる。呼ばれた虫は先に倒すか、全体攻撃で', effects: [{ kind: 'summonEnemy', enemy: 'icicleBug', uses: 2, orElse: 'lance' }, { kind: 'block', amount: 8 }] },
       {"id": "bloom", "name": "増え続ける氷晶", "effects": [{"kind": "block", "amount": 22}]},
       {"id": "storm", "name": "氷柱の嵐", big: true, "effects": [{"kind": "damage", "amount": 10, "element": "ice", "to": "foes"}]},
       {"id": "lance", "name": "裂ける氷晶", big: true, "effects": [{"kind": "damage", "amount": 20}]},

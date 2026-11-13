@@ -170,10 +170,14 @@ export const tideHighPriest: EnemyDef = {
       belowHpPct: 50,
       name: '大潮を呼ぶ神官',
       pattern: 'sequence',
+      // ボスの段階（2026-11-14）: 弱点が入れ替わる（満ち潮＝雷・引き潮＝闇。予告と一緒に変わる）。答え: 合う属性の札をその時に
+      openingActionId: 'tideTurn',
+      rule: '潮で弱点が入れ替わる（満ち潮の予告の間は雷・引き潮の予告の間は闇。予告に出る）',
       actions: [
-        { id: 'springTide', name: '大潮', big: true, effects: [{ kind: 'damage', amount: 15, to: 'foes' }] },
-        { id: 'undertow', name: '引き潮の呪い', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2, to: 'foes' }, { kind: 'block', amount: 16 }] },
-        { id: 'drown', name: '溺れる祈り', big: true, effects: [{ kind: 'damage', amount: 30 }] },
+        { id: 'tideTurn', name: '潮目を変える', scripted: true, weakWhile: ['dark'], hint: 'この予告の間は引き潮: 弱点は闇だけ。次の予告で満ち潮になると、弱点は雷だけ', effects: [{ kind: 'block', amount: 14 }, { kind: 'applyStatus', status: 'curse', amount: 1, to: 'foes' }] },
+        { id: 'springTide', name: '大潮', big: true, weakWhile: ['thunder'], effects: [{ kind: 'damage', amount: 15, to: 'foes' }] },
+        { id: 'undertow', name: '引き潮の呪い', weakWhile: ['dark'], effects: [{ kind: 'applyStatus', status: 'curse', amount: 2, to: 'foes' }, { kind: 'block', amount: 16 }] },
+        { id: 'drown', name: '溺れる祈り', big: true, weakWhile: ['thunder'], effects: [{ kind: 'damage', amount: 30 }] },
       ],
     },
   ],

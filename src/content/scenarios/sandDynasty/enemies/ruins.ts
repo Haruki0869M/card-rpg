@@ -78,7 +78,9 @@ export const sandScorpionKing: EnemyDef = {
   ],
   abilities: [{ name: '王の甲殻', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 6 }] } }],
   phases: [
-    { belowHpPct: 50, name: '毒を撒く蠍王', pattern: 'sequence', actions: [
+    // ボスの段階（2026-11-14）: 甲殻が割れて弱点が増える（助かる段階）。答え: 増えた弱点（雷）で押す
+    { belowHpPct: 50, name: '毒を撒く蠍王', pattern: 'sequence', openingActionId: 'shellCrack', rule: '甲殻が割れて、雷も弱点になる（助かる段階。増えた弱点で押す）', addWeak: ['thunder'], actions: [
+      { id: 'shellCrack', name: '割れた甲殻で暴れる', big: true, scripted: true, effects: [{ kind: 'damage', amount: 6, hits: 2 }] },
       { id: 'miasma', name: '墓所に満ちる毒', big: true, effects: [{ kind: 'applyStatus', status: 'poison', amount: 3, to: 'foes' }, { kind: 'damage', amount: 4, to: 'foes' }] },
       { id: 'crush', name: 'はさみで締め潰す', big: true, effects: [{ kind: 'damage', amount: 18 }] },
       { id: 'armor', name: '割れた甲殻', effects: [{ kind: 'block', amount: 18 }] },

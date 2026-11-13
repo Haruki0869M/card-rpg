@@ -149,7 +149,9 @@ export const shadowVizier: EnemyDef = {
   ],
   abilities: [{ name: '宰相の影', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 8 }] } }],
   phases: [
-    { belowHpPct: 50, name: '影を分ける宰相', pattern: 'sequence', actions: [
+    // ボスの段階（2026-11-14）: 呼ぶ（かばう人形）。答え: 聖で BREAK・全体攻撃・人形を先に
+    { belowHpPct: 50, name: '影を分ける宰相', pattern: 'sequence', openingActionId: 'callDecoy', rule: '身代わりの土人形を呼び、かばわせる（聖で BREAK すると止まる。全体攻撃か、人形を先に）', actions: [
+      { id: 'callDecoy', name: '身代わりを呼ぶ', big: true, behavior: 'call', hint: '土人形を1体呼ぶ（2回まで。人形は最初の番に宰相をかばう。倒しても報酬なし）。聖の弱点で BREAK すると止まる。全体攻撃で両方を削るか、人形を先に倒す', effects: [{ kind: 'summonEnemy', enemy: 'clayGolem', uses: 2, orElse: 'judgment' }, { kind: 'block', amount: 10 }] },
       { id: 'split', name: '影の分身', effects: [{ kind: 'block', amount: 26 }] },
       { id: 'shadows', name: '分身たちの刃', big: true, effects: [{ kind: 'damage', amount: 10, element: 'dark', to: 'foes' }] },
       { id: 'judgment', name: '宰相の裁き', big: true, effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1 }, { kind: 'damage', amount: 22, element: 'dark' }] },

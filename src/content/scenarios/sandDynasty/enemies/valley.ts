@@ -145,7 +145,9 @@ export const stoneGuardianBeast: EnemyDef = {
   ],
   abilities: [{ name: '砂岩の体', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 8 }] } }],
   phases: [
-    { belowHpPct: 50, name: '咆哮する守護獣', pattern: 'sequence', actions: [
+    // ボスの段階（2026-11-14）: 溜め（跳びかかり。順番でもくり返す）。答え: 溜めを雷で BREAK・守り
+    { belowHpPct: 50, name: '咆哮する守護獣', pattern: 'sequence', openingActionId: 'crouch', rule: '身を沈め、次の予告で跳びかかる（溜めを雷で BREAK すると、跳びかかりも消える）', actions: [
+      { id: 'crouch', name: '身を沈める', big: true, chargeTo: 'pounce', hint: '次の予告が「砕ける跳びかかり」（単体28）になる。雷の弱点で BREAK すると溜めが止まり、跳びかかりも消える。止められなければ狙われた味方を守る', effects: [{ kind: 'block', amount: 14 }] },
       { id: 'roar', name: '石の咆哮', big: true, effects: [{ kind: 'damage', amount: 12, to: 'foes' }] },
       { id: 'pounce', name: '砕ける跳びかかり', big: true, effects: [{ kind: 'damage', amount: 28 }] },
       { id: 'guard', name: 'ひび割れた守り', effects: [{ kind: 'block', amount: 24 }] },

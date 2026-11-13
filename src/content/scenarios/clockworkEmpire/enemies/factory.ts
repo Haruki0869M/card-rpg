@@ -120,7 +120,9 @@ export const foremanGolem: EnemyDef = {
   ],
   abilities: [{ name: '分厚い装甲', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 6 }] } }],
   phases: [
-    { belowHpPct: 50, name: '暴走する工場長', pattern: 'sequence', actions: [
+    // ボスの段階（2026-11-14）: 呼ぶ（作業の機械兵。順番でもう1回）。答え: 雷で BREAK・先に倒す
+    { belowHpPct: 50, name: '暴走する工場長', pattern: 'sequence', openingActionId: 'callWorker', rule: '作業の機械兵を呼ぶ（2回まで。雷で BREAK すると止まる。先に倒すか、全体攻撃で）', actions: [
+      { id: 'callWorker', name: '作業の機械兵を呼ぶ', big: true, behavior: 'call', hint: 'ベルトコンベアの機械兵を1体呼ぶ（2回まで。倒しても報酬なし）。雷の弱点で BREAK すると止まる。先に倒すか、全体攻撃で', effects: [{ kind: 'summonEnemy', enemy: 'conveyorBot', uses: 2, orElse: 'overdrive' }, { kind: 'block', amount: 8 }] },
       { id: 'overdrive', name: '暴走の連打', big: true, effects: [{ kind: 'damage', amount: 5, hits: 3 }] },
       { id: 'quota', name: 'ノルマの嵐', big: true, effects: [{ kind: 'damage', amount: 8, to: 'foes' }] },
       { id: 'vent', name: '過熱の排気', effects: [{ kind: 'block', amount: 14 }, { kind: 'applyStatus', status: 'burn', amount: 1, to: 'foes' }] },

@@ -121,7 +121,12 @@ export const windKeeper: EnemyDef = {
       belowHpPct: 50,
       name: '竜巻をまとう番人',
       pattern: 'sequence',
+      // ボスの段階（2026-11-14）: 溜め（竜巻。順番でもくり返す）。答え: 溜めを闇で BREAK・守り
+      openingActionId: 'gather',
+      rule: '風を集め、次の予告で全体に大竜巻（溜めを闇で BREAK すると、竜巻も消える）',
       actions: [
+        { id: 'gather', name: '風を集める', big: true, chargeTo: 'twister', hint: '次の予告が「大竜巻」（味方全員に14）になる。闇の弱点で BREAK すると溜めが止まり、大竜巻も消える', effects: [{ kind: 'block', amount: 12 }] },
+        { id: 'twister', name: '大竜巻', big: true, scripted: true, effects: [{ kind: 'damage', amount: 14, to: 'foes' }] },
         { id: 'tornado', name: '竜巻', effects: [{ kind: 'block', amount: 16 }, { kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'foes' }] },
         { id: 'storm', name: '暴風の矛', big: true, effects: [{ kind: 'damage', amount: 22 }] },
         { id: 'gale', name: '吹き荒れる風', big: true, effects: [{ kind: 'damage', amount: 11, to: 'foes' }] },
