@@ -9,6 +9,13 @@
 
 
 
+## 20回目の公開（2026-11-14・index-BDSi2CoM.js）
+
+- 入っている物と見どころ: docs/review/2026-11-14-deploy20-checklist.md。
+- 19回目から増えた物: 強敵の本気・本体のHP ×1.5・深さでエピック率・全28ダンジョンに強敵を避ける道（docs/review/2026-11-13-elite.md）。
+- 憲章の戦闘の数を「全32〜40戦」に（オーナーが決めた）。
+- 次: ボスの段階（docs/tasks/boss-phase-plan.md。オーナーの返事は全部 A。作っている途中）→ 寄り道の値打ち → 時間を小さく。
+
 ## 19回目の公開（2026-11-13 22時ごろ・index-fgIJbwhB.js）
 
 - 入っている物と見どころ: docs/review/2026-11-13-deploy19-checklist.md。
