@@ -43,9 +43,20 @@ export const BALANCE = {
   /**
    * 敵の格ごとのHPの倍率（boss = ボスの部屋 / midboss = 中ボスの部屋と災厄 / elite = 強敵の部屋 / normal = それ以外。書いていない格は 1）。
    * 2026-11-13 つまみの測定: 測るための入れ物（既定は空 = 今と同じ）。
-   * 2026-11-13 案Y で大物 ×2 を入れたが、オーナーが案Y を取りやめたので空に戻した
+   * 2026-11-13 案Y で大物 ×2 を入れたが、オーナーが案Y を取りやめたので空に戻した。
+   * 2026-11-13 強敵の計画（docs/tasks/elite-plan.md 柱2）: elite は「強敵の本体」（強敵の組から来た敵。奥で足されるふつうの戦闘の敵・町を襲う敵には掛からない）だけに掛ける。
+   * 値は ×1.2・×1.3・×1.5 を測って決めた（docs/review/2026-11-13-elite.md）
    */
-  enemyHpByRank: {} as Readonly<Partial<Record<'boss' | 'midboss' | 'elite' | 'normal', number>>>,
+  enemyHpByRank: { elite: 1.3 } as Readonly<Partial<Record<'boss' | 'midboss' | 'elite' | 'normal', number>>>,
+  /**
+   * 強敵の本気（docs/tasks/elite-plan.md 柱1）: 強敵の本体のHPが最大の hpBelow を切ると、次の予告がその敵のいちばん強い攻撃になり、威力が ×power。1戦闘に1回
+   */
+  eliteFrenzy: { hpBelow: 0.5, power: 1.5 },
+  /**
+   * 強敵の部屋の装備のエピック率（%。深層ボーナスの段 = 入口 / 浅層 / 中層 / 深層。docs/tasks/elite-plan.md 柱4）。
+   * ランダムダンジョンのテーマの倍率（封魔の地下迷宮のエピック ×2）は、今までどおりこの値に掛ける
+   */
+  eliteEpicChanceByDepth: [10, 10, 20, 35] as readonly number[],
   /**
    * 稼いだお金（戦闘の報酬・宝箱・売値・災厄や町を守った報酬・袋が満杯で換えたお金。earnGold を通る物全部）の倍率。端数は切り捨て。
    * 初期の所持金・仲間からの送金には掛けない。2026-11-13 つまみの測定: 測るための入れ物（既定 1 = 今と同じ）

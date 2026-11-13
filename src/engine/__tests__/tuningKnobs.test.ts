@@ -79,7 +79,8 @@ describe('BREAK の決まりのつまみ（既定 = 紫の札と大物は弱点�
     expect(BALANCE.breakStatus).toBe('vulnerable');
     expect(BALANCE.breakClearsBlock).toBe(true);
     // 案Y の取りやめ: 大物のHP・後半の攻撃の倍率は入れない
-    expect(BALANCE.enemyHpByRank).toEqual({});
+    // 2026-11-13 強敵の計画 柱2: 強敵の本体だけのHPの倍率（elite）だけを入れる（ボス・中ボス・ふつうは入れない）
+    expect(Object.keys(BALANCE.enemyHpByRank)).toEqual(['elite']);
     expect(BALANCE.enemyAttackByRegion).toEqual({});
     expect(BALANCE.goldGainMul).toBe(1);
   });

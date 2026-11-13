@@ -107,7 +107,9 @@ export function createBattle(setup: BattleSetup): BattleState {
     const def = getEnemy(spec.defId);
     const level = spec.level ?? def.baseLevel;
     const f = enemyLevelFactors(def, level);
-    const hp = Math.max(1, Math.floor(def.maxHp * f.hp * partyMul * (setup.enemyHpMul ?? 1) + 1e-9));
+    // 強敵の本体（強敵の戦闘で、強敵の組から来た敵）だけ、HPに eliteBodyHpMul を掛ける（2026-11-13 強敵の計画 柱2）
+    const body = !!encounter.elite && !encounter.boss && !encounter.midboss && !!spec.eliteBody;
+    const hp = Math.max(1, Math.floor(def.maxHp * f.hp * partyMul * (setup.enemyHpMul ?? 1) * (body ? (setup.eliteBodyHpMul ?? 1) : 1) + 1e-9));
     const n = seen.get(spec.defId) ?? 0;
     seen.set(spec.defId, n + 1);
     return {
@@ -124,6 +126,7 @@ export function createBattle(setup: BattleSetup): BattleState {
       history: [],
       dead: false,
       phase: 0,
+      ...(body ? { eliteBody: true } : {}),
     };
   });
 

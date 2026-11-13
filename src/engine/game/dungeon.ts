@@ -62,12 +62,14 @@ function rollEnemies(def: DungeonDef, type: RoomType, row: number, levelBonus: n
   const battlePool = large ? def.pools.battle.filter((g) => g.length === Math.max(...def.pools.battle.map((x) => x.length))) : undefined;
   let ids = b.pool === 'boss' ? def.pools.boss : b.pool === 'midboss' ? (def.pools.midboss ?? def.pools.elite[0]) : pick(battlePool ?? def.pools[b.pool], rng);
   if (large && ids.length < LARGE_GROUP_MIN && ids.length < BALANCE.maxEnemies) ids = [...ids, pick(pick(def.pools.battle, rng), rng)];
+  // 強敵の本体 = 強敵の組（pools.elite）から来た敵（強敵の部屋・封魔の宝箱の番人）。下で足すふつうの戦闘の敵は本体ではない（2026-11-13 強敵の本気）
+  const bodies = b.pool === 'elite' ? ids.length : 0;
   const step = depthStep(row);
   // 奥（深さの段が extraEnemyFromStep 以上。今は5行目以降）の戦闘・強敵の部屋は、そのダンジョンの戦闘の敵が1体増える（最大4体。ボス・中ボスは決まった組のまま）
   if ((b.pool === 'battle' || b.pool === 'elite') && step >= BALANCE.depthBonus.extraEnemyFromStep && ids.length < BALANCE.maxEnemies) ids = [...ids, pick(pick(def.pools.battle, rng), rng)];
   // 深さ: 段ごとに+1（今は2行ごと。鍵10行のボスの行で+4、最後13行のボスの行で+6）
   const lv = dungeonEnemyLevel(def) + step + levelBonus + b.levelBonus;
-  return ids.map((defId) => ({ defId, level: Math.max(1, lv) }));
+  return ids.map((defId, i) => ({ defId, level: Math.max(1, lv), ...(i < bodies ? { eliteBody: true } : {}) }));
 }
 
 /** ダンジョンの宝箱の見た目（木箱が中心。奥の行ほど良い箱が出やすい） */

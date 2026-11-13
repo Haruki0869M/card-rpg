@@ -7,6 +7,8 @@ import { calcDamage } from './damage';
 import { targetOf } from './effects';
 import { activeStatuses, skipActionStatus, tickDamageOf } from './statuses';
 import { canSummonEnemy } from './effects/kinds/summonEnemy';
+import { BALANCE } from '../../data/balance';
+import { addLog, enemyName } from './units';
 
 export function livingAllies(state: BattleState): AllyState[] {
   return state.allies.filter((a) => !a.dead);
@@ -148,10 +150,50 @@ export function decideIntent(enemy: EnemyState, state: BattleState, rng: Rng): v
   // 先読みで次の行動が決まっていれば、それを使う（段階が変わって使えない行動なら選び直す）
   const queued = enemy.queuedActionId && currentActionSet(enemy).actions.find((a) => a.id === enemy.queuedActionId);
   enemy.queuedActionId = undefined;
-  const action = queued || chooseAction(enemy, state, rng);
+  // 強敵の本気: 先読みで見せた行動があれば、そちらを先に守る（本気は、その次の予告になる）
+  const frenzy = !queued && frenzyReady(enemy, state) ? strongestAttack(enemy, state) : undefined;
+  const action = queued || frenzy || chooseAction(enemy, state, rng);
   enemy.history = [...enemy.history, action.id].slice(-5);
   // 手負い狙いは、HPの割合がいちばん低い味方を狙う（挑発で変えられる）
   enemy.intent = { actionId: action.id, targetId: needsTarget(action) ? (isHuntAction(action) ? weakestAlly(state) : pickRandomAlly(state, rng)) : undefined };
+  if (frenzy) {
+    enemy.intent.frenzy = true;
+    enemy.frenzyUsed = true;
+    enemy.nextActionMultiplier = (enemy.nextActionMultiplier ?? 1) * BALANCE.eliteFrenzy.power;
+    addLog(state, `🔥${enemyName(enemy)}は本気になった！ 次は「${action.name}」（威力×${BALANCE.eliteFrenzy.power}）`);
+  }
+}
+
+/**
+ * 強敵の本気（2026-11-13 docs/tasks/elite-plan.md 柱1）が、この予告で出るか。
+ * 強敵の戦闘（ボス・中ボスでない）の本体（eliteBody）で、まだ本気になっていなくて、HPが最大の BALANCE.eliteFrenzy.hpBelow を切っている時。
+ * 予告を決める時（戦闘の始め・敵の番の終わり）にだけ見る = 味方の番に半分を切っても、今の予告は書き換えず、次の敵の番の予告から本気になる
+ * （予告と違う行動をしない）。乱数は使わない
+ */
+export function frenzyReady(enemy: EnemyState, state: Pick<BattleState, 'elite' | 'boss' | 'midboss'>): boolean {
+  return !!state.elite && !state.boss && !state.midboss && !!enemy.eliteBody && !enemy.frenzyUsed && !enemy.dead && enemy.hp < enemy.maxHp * BALANCE.eliteFrenzy.hpBelow;
+}
+
+/**
+ * その敵の今の行動の一覧で、いちばん強い攻撃（本気の予告に使う。乱数は使わない）。
+ * 強さ = ダメージの効果の amount × 回数 の合計（味方全員への攻撃は、今生きている味方の人数を掛ける）。手数読み・ブロック・状態異常は数えない。
+ * 同じ強さなら大技（BREAK できる）を先に、それでも同じならデータの順で先の物。今は意味の無い行動（かばう相手がいない・呼べない）は選ばない。
+ * ダメージの行動が1つも無い敵は undefined（本気にならない）
+ */
+export function strongestAttack(enemy: EnemyState, state: BattleState): EnemyActionDef | undefined {
+  const n = Math.max(1, livingAllies(state).length);
+  let best: EnemyActionDef | undefined;
+  let bestScore = 0;
+  for (const a of currentActionSet(enemy).actions) {
+    if (actionIsUseless(enemy, state, a)) continue;
+    const score = a.effects.reduce((s, e) => (e.kind === 'damage' ? s + e.amount * (e.hits ?? 1) * (targetOf(e) === 'foes' ? n : 1) : s), 0);
+    if (score <= 0) continue;
+    if (score > bestScore || (score === bestScore && !!a.big && !best?.big)) {
+      best = a;
+      bestScore = score;
+    }
+  }
+  return best;
 }
 
 /** ほかの敵がいる時だけ意味のある行動か（かばう）。データの効果の種類で見る */

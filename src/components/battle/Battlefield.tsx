@@ -17,7 +17,7 @@ import { useElementSize } from '../../hooks/useElementSize';
 import { useDetail, usePress } from '../../hooks/usePress';
 import { speedFactor, useBattle, type UnitFx } from '../../store/battleStore';
 import type { AllyState, BattleState, EnemyState } from '../../types';
-import { breakPreview, intentView, type IntentPart } from '../format';
+import { breakPreview, intentBrief, intentView, type IntentPart } from '../format';
 import { breakRuleOf } from '../../engine/battle/breakRules';
 import { HpBar } from '../ui/HpBar';
 import { EffectChip, ELEMENT_ICONS, Shield, Skull, statusStyle, Swords } from '../ui/icons';
@@ -184,10 +184,8 @@ const useBriefFocus = create<{ uid?: string; set: (uid: string) => void }>((set)
  * どれも、特殊な行動を予告していて、まだ崩していない敵だけ
  */
 export function briefEnemy(battle: BattleState, enemies: EnemyState[], targetId?: string, focusUid?: string): { enemy: EnemyState; count: number } | undefined {
-  const list = enemies.filter((e) => {
-    const v = e.dead ? null : intentView(battle, e);
-    return !!v && !v.broken && !!v.behavior;
-  });
+  // 強敵の本気（🔥本気）の予告も、特殊な行動と同じく案内の1行に出す（2026-11-13）
+  const list = enemies.filter((e) => !!intentBrief(e.dead ? null : intentView(battle, e)));
   const enemy = list.find((e) => e.uid === targetId) ?? list.find((e) => e.uid === focusUid) ?? list[0];
   return enemy && { enemy, count: list.length };
 }
@@ -218,9 +216,12 @@ function IntentBubble({ enemy, onTap, narrow }: { enemy: EnemyState; onTap: () =
           data-intent-big={view.big || undefined}
           data-intent-broken={view.broken || undefined}
           data-intent-behavior={(!view.broken && view.behavior?.id) || undefined}
+          data-intent-frenzy={(!view.broken && !!view.frenzy) || undefined}
           style={
             view.broken
               ? { borderColor: 'rgba(251,191,36,.9)' }
+              : view.frenzy
+                ? { borderColor: 'rgba(253,186,116,.95)', boxShadow: '0 0 9px rgba(249,115,22,.9), 0 2px 0 rgba(0,0,0,.6)' }
               : view.behavior
                 ? { borderColor: 'rgba(216,180,254,.95)', boxShadow: '0 0 8px rgba(192,132,252,.8), 0 2px 0 rgba(0,0,0,.6)' }
                 : view.big
@@ -231,6 +232,17 @@ function IntentBubble({ enemy, onTap, narrow }: { enemy: EnemyState; onTap: () =
           {/* 大技の予告（体勢を崩せる）。崩した後は「BREAK」の札に変わる。敵の特殊な行動は、赤い「大技」ではなく紫の札（⚠️手数読み など） */}
           {view.broken ? (
             <span className="order-first rounded bg-amber-400 px-1 text-[12px] leading-4 font-black whitespace-nowrap text-amber-950" data-break-mark>⚡BREAK</span>
+          ) : view.frenzy ? (
+            // 強敵の本気（2026-11-13）: 紫の札・赤い大技の札と見分けられる橙の札。BREAK できるかは、下の BREAK の印で分かる
+            <span
+              className={`order-first rounded bg-gradient-to-b from-orange-400 to-orange-700 text-[12px] leading-4 font-black whitespace-nowrap text-white ring-1 ring-yellow-200/90 ${narrow ? 'px-0.5' : 'px-1'} ${briefOn ? 'ring-2 ring-amber-300' : ''}`}
+              data-frenzy-mark
+              data-frenzy-short={narrow || undefined}
+              data-brief-on={briefOn || undefined}
+            >
+              {view.frenzy.icon}
+              {narrow ? view.frenzy.short : view.frenzy.label}
+            </span>
           ) : view.behavior ? (
             <span
               className={`order-first rounded bg-gradient-to-b from-fuchsia-500 to-purple-700 text-[12px] leading-4 font-black whitespace-nowrap text-white ${narrow ? 'px-0.5' : 'px-1'} ${briefOn ? 'ring-2 ring-amber-300' : 'ring-1 ring-amber-300/90'}`}
@@ -419,16 +431,16 @@ const EnemyUnit = memo(function EnemyUnit({
  * 長押ししなくても見える。敵が3体以上で枠が狭い時は出さない（札だけ。文は長押しの説明で読める）。崩した後は出さない
  */
 function BehaviorBrief({ enemy, maxW }: { enemy: EnemyState; maxW: number }) {
-  const brief = useBattle((s) => {
-    const v = enemy.dead ? null : intentView(s.battle, enemy);
-    return v && !v.broken ? v.behavior?.brief : undefined;
-  });
+  // 強敵の本気の時は橙（「威力×1.5」。特殊な行動もある時は1つにまとめる）
+  const brief = useBattle((s) => intentBrief(enemy.dead ? null : intentView(s.battle, enemy))?.text);
+  const frenzy = !enemy.dead && !!enemy.intent?.frenzy && !enemy.broken;
   if (!brief) return null;
   return (
     <span
-      className="w-max rounded bg-purple-950/90 px-1 text-center text-[12px] leading-4 font-bold text-fuchsia-100 ring-1 ring-fuchsia-300/70 [overflow-wrap:anywhere] [word-break:keep-all]"
+      className={`w-max rounded px-1 text-center text-[12px] leading-4 font-bold ring-1 [overflow-wrap:anywhere] [word-break:keep-all] ${frenzy ? 'bg-orange-950/90 text-orange-100 ring-orange-300/80' : 'bg-purple-950/90 text-fuchsia-100 ring-fuchsia-300/70'}`}
       style={{ maxWidth: Math.max(60, maxW) }}
       data-behavior-brief
+      data-brief-kind={frenzy ? 'frenzy' : 'behavior'}
     >
       {brief}
     </span>
@@ -445,20 +457,25 @@ const BRIEF_BAR_H = 20;
  */
 function BehaviorBriefBar({ top, maxW }: { top: number; maxW: number }) {
   const focusUid = useBriefFocus((s) => s.uid);
-  const text = useBattle((s) => {
+  // 文字列で返す（先頭の1文字 = 本気なら 'F'。zustand の選び方は、同じ値なら描き直さない）
+  const key = useBattle((s) => {
     const list = fieldEnemies(s.battle.enemies);
     const b = briefEnemy(s.battle, list, s.selection?.targetId, focusUid);
     if (!b) return undefined;
     const v = intentView(s.battle, b.enemy)!;
+    const br = intentBrief(v)!;
     const order = list.filter((e) => briefEnemy(s.battle, [e])).findIndex((e) => e.uid === b.enemy.uid) + 1;
-    return `${v.behavior!.icon}${shortName(enemyName(b.enemy))}：${v.behavior!.brief}${b.count > 1 ? `（${order}/${b.count}）` : ''}`;
+    return `${v.frenzy ? 'F' : 'B'}${br.icon}${shortName(enemyName(b.enemy))}：${br.text}${b.count > 1 ? `（${order}/${b.count}）` : ''}`;
   });
-  if (!text) return null;
+  if (!key) return null;
+  const info = { frenzy: key.startsWith('F') };
+  const text = key.slice(1);
   return (
     <div
-      className="pointer-events-none absolute left-1/2 z-[7] -translate-x-1/2 rounded bg-purple-950/90 px-1.5 text-center text-[12px] leading-4 font-bold whitespace-nowrap text-fuchsia-100 ring-1 ring-fuchsia-300/70"
+      className={`pointer-events-none absolute left-1/2 z-[7] -translate-x-1/2 rounded px-1.5 text-center text-[12px] leading-4 font-bold whitespace-nowrap ring-1 ${info.frenzy ? 'bg-orange-950/90 text-orange-100 ring-orange-300/80' : 'bg-purple-950/90 text-fuchsia-100 ring-fuchsia-300/70'}`}
       style={{ top, maxWidth: maxW }}
       data-behavior-brief-bar
+      data-brief-kind={info.frenzy ? 'frenzy' : 'behavior'}
     >
       {text}
     </div>
