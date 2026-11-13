@@ -196,20 +196,46 @@ export function canBreak(enemy: Unit | undefined): boolean {
 
 /** 「合計ダメージで BREAK」の線（%）。敵の格（ボス・中ボスと災厄・強敵・ふつう）ごとに BALANCE.breakDamagePctByRank で変えられる。書いていなければ breakDamagePct */
 export function breakDamagePctOf(state: Pick<BattleState, 'boss' | 'midboss' | 'elite'>): number {
-  const rank = state.boss ? 'boss' : state.midboss ? 'midboss' : state.elite ? 'elite' : 'normal';
-  return BALANCE.breakDamagePctByRank[rank] ?? BALANCE.breakDamagePct;
+  return BALANCE.breakDamagePctByRank[battleRankOf(state)] ?? BALANCE.breakDamagePct;
+}
+
+/** 戦闘の敵の格（ボス・中ボスと災厄・強敵・ふつう） */
+export const battleRankOf = (state: Pick<BattleState, 'boss' | 'midboss' | 'elite'>) => (state.boss ? 'boss' : state.midboss ? 'midboss' : state.elite ? 'elite' : 'normal');
+
+/** 完全成功だけで、この敵を崩せるか（BALANCE.breakPerfectByRank・breakNeedsWeakPerfect。既定では、いつも true） */
+export function perfectAloneBreaks(state: Pick<BattleState, 'boss' | 'midboss' | 'elite'>, enemy: Unit): boolean {
+  if ((BALANCE.breakPerfectByRank[battleRankOf(state)] ?? true) === false) return false;
+  // 「弱点で、しかも完全成功」の決まりでも、弱点を持たない敵は完全成功だけで崩れる（崩す手が無くならないように）
+  if (BALANCE.breakNeedsWeakPerfect) return isEnemy(enemy) && !getEnemy(enemy.defId).weak?.length && !enemy.tempWeak;
+  return true;
+}
+
+/**
+ * BREAK のきっかけ（無ければ undefined）。perfect = カードの完全成功、early = カードの能力で「成功1でも崩せる」（魔力の楔）。
+ * 既定（BALANCE の今の値）では「弱点 → 完全成功 → 合計ダメージ」の順で、前と全く同じ
+ */
+function breakReason(state: BattleState, enemy: EnemyState, weakHit: boolean, perfect: boolean, early: boolean): 'weak' | 'perfect' | 'damage' | undefined {
+  const byDamage = (enemy.turnDamage ?? 0) * 100 >= enemy.maxHp * breakDamagePctOf(state);
+  if (BALANCE.breakNeedsWeakPerfect) {
+    if (weakHit && perfect) return 'weak';
+    if (early || (perfect && perfectAloneBreaks(state, enemy))) return 'perfect';
+    return byDamage ? 'damage' : undefined;
+  }
+  return weakHit ? 'weak' : early || (perfect && perfectAloneBreaks(state, enemy)) ? 'perfect' : byDamage ? 'damage' : undefined;
 }
 
 /** 大技の予告を崩す: 威力が半分・弱体1・ブロック0（オーナーの決定 3-A）。乱数は使わない */
 export function breakEnemy(ctx: EffectCtx, enemy: EnemyState, why: 'weak' | 'perfect' | 'damage') {
   enemy.broken = true;
   enemy.nextActionMultiplier = (enemy.nextActionMultiplier ?? 1) * BALANCE.breakPower;
-  enemy.block = 0;
+  if (BALANCE.breakClearsBlock) enemy.block = 0;
   ctx.events.push({ type: 'break', enemyUid: enemy.uid, why });
-  addStatus(enemy.statuses, 'weak', BALANCE.breakWeak);
-  ctx.events.push({ type: 'status', unitId: enemy.uid, status: 'weak', amount: BALANCE.breakWeak });
+  // つまみの測定（2026-11-13）: 付ける状態を「脆弱」に変えられる（既定は弱体 = 今のまま）
+  const st = BALANCE.breakStatus;
+  addStatus(enemy.statuses, st, BALANCE.breakWeak);
+  ctx.events.push({ type: 'status', unitId: enemy.uid, status: st, amount: BALANCE.breakWeak });
   ctx.parts.push('BREAK！');
-  addLog(ctx.state, `⚡BREAK！ ${nameOf(enemy)}の体勢が崩れた（次の行動の威力が半分・弱体${BALANCE.breakWeak}・ブロック0）`);
+  addLog(ctx.state, `⚡BREAK！ ${nameOf(enemy)}の体勢が崩れた（次の行動の威力が半分・${getStatus(st).name}${BALANCE.breakWeak}${BALANCE.breakClearsBlock ? '・ブロック0' : ''}）`);
 }
 
 /** 属性を強める状態異常（聖光など）の倍率。使った分は消す */
@@ -359,7 +385,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
     // 区切りD: 魔力の楔 — 成功1でも、完全成功と同じに崩せる
     const earlyBreak = cardModifier(ctx.cardAbilities, 'breakOnSuccess').some((e) => (ctx.successes ?? 0) >= e.min);
     if (dmg > 0 && canBreak(v)) {
-      const why = weakHit ? 'weak' : (ctx.perfect || earlyBreak) && ctx.card ? 'perfect' : v.turnDamage * 100 >= v.maxHp * breakDamagePctOf(state) ? 'damage' : undefined;
+      const why = breakReason(state, v, weakHit, !!ctx.perfect && !!ctx.card, earlyBreak && !!ctx.card);
       if (why) {
         breakEnemy(ctx, v, why);
         // 段階7a: きっかけ「自分の攻撃で敵を BREAK させた」（処刑人の黒外套）

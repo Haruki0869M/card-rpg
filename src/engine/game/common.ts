@@ -15,6 +15,8 @@ import { exploreEffects } from './exploreAbilities';
 
 /** 報酬・売却で稼いだお金。初期所持金や仲間からの送金は含めない。 */
 export function earnGold(hero: Hero, amount: number) {
+  // 稼いだお金の倍率（測るための入れ物。既定 1 = 今のまま）
+  if (BALANCE.goldGainMul !== 1 && amount > 0) amount = Math.floor(amount * BALANCE.goldGainMul);
   hero.gold += amount;
   if (amount > 0) {
     const f = (hero.feats ??= {});

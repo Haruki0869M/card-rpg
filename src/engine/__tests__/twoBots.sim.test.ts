@@ -16,6 +16,9 @@
 //   SIM_BOTS（流す bot をカンマで。straight,clever,smart。既定は3本とも）
 //   SIM_SMART_OFF（賢い bot から外す工夫。shop,cards,items,team,time をカンマで）
 //   SIM_PARTYSET に ws = 2人を 剣士＋僧侶 / mx = 2人を 魔法使い＋召喚士（回復を持たない魔法の基本職）を足した
+// つまみの測定（2026-11-13）で足した環境変数:
+//   SIM_KNOBS（B1〜B4・H1〜H4・A1・A2・C1・C2・G1 をカンマで。下の KNOB_ALIAS の所に説明）・SIM_JSON（集計用の要約の書き出し先）・
+//   SIM_PARTY をカンマで複数書けるようにした（例: 2人,4人）
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -73,8 +76,50 @@ const LATE_REGIONS = MAP_REGIONS.slice(0, Math.max(0, MAP_REGIONS.findIndex((r) 
   if (VARIANT === 'b') B.breakDamagePctByRank = { boss: Infinity, midboss: Infinity };
   if (VARIANT === 'c') B.enemyHpByRegion = Object.fromEntries(LATE_REGIONS.map((id) => [id, LATE_HP]));
 }
+// ---- つまみの測定（2026-11-13）: SIM_KNOBS にカンマで並べる（例: SIM_KNOBS=B1,H3）。このテストの中だけで BALANCE の値を差し替える ----
+//   B1 = ボス・中ボス・災厄は完全成功だけでは崩れない / B2 = 全部の敵で完全成功だけでは崩れない /
+//   B3 = 弱点の属性で、しかも完全成功の時だけ崩れる（弱点の無い敵は完全成功だけで崩れる。合計ダメージでは崩れない） /
+//   B4 = 崩した時の効果を「威力半分＋脆弱1」（弱体は付けない・ブロックは0にしない）
+//   H1・H2 = 3つ目の地域より後（シナリオ1なら 沼・火山・魔王城の荒野）の敵のHP ×1.25・×1.5（HL1.75 のように倍率も書ける）
+//   H3・H4 = ボス・中ボス・災厄だけ HP ×1.5・×2（HB2.5 のように書ける）
+//   A1・A2 = 3つ目の地域より後の敵の攻撃 ×1.25・×1.5（AL1.75 のように書ける）
+//   C1・C2 = 侵食度の伸び（ワールドターンごと・ダンジョンの中のターンごと）×1.25・×1.5（C1.75 のように書ける）
+//   G1 = 稼いだお金 ×0.5（G0.3 のように書ける）
+const KNOB_ALIAS: Record<string, string> = { H1: 'HL1.25', H2: 'HL1.5', H3: 'HB1.5', H4: 'HB2', A1: 'AL1.25', A2: 'AL1.5', C1: 'C1.25', C2: 'C1.5', G1: 'G0.5' };
+const KNOBS = (process.env.SIM_KNOBS ?? '').split(',').map((k) => k.trim()).filter(Boolean);
+/** 3つ目の地域より後: 地図の regions は上（最後の地域）から下（始まりの地域）の順なので、下の2つ（始まりの地域と2つ目）を除いた物 */
+const LATE3_REGIONS = MAP_REGIONS.slice(0, Math.max(0, MAP_REGIONS.length - 2)).map((r) => r.id);
+const KNOB_TEXT: string[] = [];
+{
+  const B = BALANCE as unknown as Record<string, unknown>;
+  const ranksAll = { boss: false, midboss: false, elite: false, normal: false };
+  for (const raw of KNOBS) {
+    const k = KNOB_ALIAS[raw] ?? raw;
+    const num = (p: string) => {
+      const x = Number(k.slice(p.length));
+      if (!Number.isFinite(x) || x <= 0) throw new Error(`つまみの倍率が読めない: ${raw}`);
+      return x;
+    };
+    if (k === 'B1') { B.breakPerfectByRank = { boss: false, midboss: false }; KNOB_TEXT.push('B1 ボス・中ボス・災厄は完全成功だけでは崩れない'); }
+    else if (k === 'B2') { B.breakPerfectByRank = ranksAll; KNOB_TEXT.push('B2 全部の敵で完全成功だけでは崩れない'); }
+    else if (k === 'B3') {
+      B.breakNeedsWeakPerfect = true;
+      B.breakDamagePctByRank = { boss: Infinity, midboss: Infinity, elite: Infinity, normal: Infinity };
+      KNOB_TEXT.push('B3 弱点の属性で、しかも完全成功の時だけ崩れる（弱点の無い敵は完全成功で崩れる・合計ダメージでは崩れない）');
+    } else if (k === 'B4') { B.breakStatus = 'vulnerable'; B.breakClearsBlock = false; KNOB_TEXT.push('B4 崩した時の効果 = 威力半分＋脆弱1（弱体なし・ブロックは残る）'); }
+    else if (k.startsWith('HL')) { B.enemyHpByRegion = Object.fromEntries(LATE3_REGIONS.map((id) => [id, num('HL')])); KNOB_TEXT.push(`${raw} ${LATE3_REGIONS.join('・')}の敵のHP ×${num('HL')}`); }
+    else if (k.startsWith('HB')) { B.enemyHpByRank = { boss: num('HB'), midboss: num('HB') }; KNOB_TEXT.push(`${raw} ボス・中ボス・災厄のHP ×${num('HB')}`); }
+    else if (k.startsWith('AL')) { B.enemyAttackByRegion = Object.fromEntries(LATE3_REGIONS.map((id) => [id, num('AL')])); KNOB_TEXT.push(`${raw} ${LATE3_REGIONS.join('・')}の敵の攻撃 ×${num('AL')}`); }
+    else if (k.startsWith('C')) {
+      B.corruptionPerTurn = (B.corruptionPerTurn as number) * num('C');
+      B.corruptionPerDungeonTurn = (B.corruptionPerDungeonTurn as number) * num('C');
+      KNOB_TEXT.push(`${raw} 侵食度の伸び ×${num('C')}（ターンごと ${B.corruptionPerTurn}・ダンジョンの中 ${B.corruptionPerDungeonTurn}）`);
+    } else if (k.startsWith('G')) { B.goldGainMul = num('G'); KNOB_TEXT.push(`${raw} 稼いだお金 ×${num('G')}`); }
+    else throw new Error(`知らないつまみ: ${raw}`);
+  }
+}
 const VARIANT_TEXT: Record<string, string> = {
-  '': '今のまま',
+  '': KNOB_TEXT.length ? `つまみ ${KNOB_TEXT.join(' / ')}` : '今のまま',
   a: '(a) 合計ダメージで BREAK の線: ボス・中ボス・災厄 30%・強敵 25%・ふつう 20%',
   b: '(b) ボス・中ボス・災厄は合計ダメージでは BREAK しない',
   c: `(c) (a) ＋ 沼より後の地域（${LATE_REGIONS.join('・')}）の敵のHP +${Math.round((LATE_HP - 1) * 100)}%`,
@@ -124,6 +169,8 @@ interface Run {
   removed: number;
   skipped: number;
   refused: number;
+  /** つまみの測定: 終わった時の1人あたりの所持金 */
+  goldEnd: number;
 }
 
 /** ボスの部屋・中ボスの部屋・災厄（災厄の戦闘は中ボスの印を持つ）の戦闘か */
@@ -136,7 +183,7 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
   const dungeonsOf = (g: GameState) => [g.dungeon, ...(g.expeditions ?? []).map((x) => x.dungeon)].filter((d): d is NonNullable<GameState['dungeon']> => !!d);
   const r: Run = { clear: false, corr100: false, where: '', fights: 0, rounds: 0, finished: 0, breaks: 0, randomIn: 0, randomDone: 0, scourgeKills: 0, jobChanges: 0, hones: 0, errors: 0,
     bigFinished: 0, bigRounds: 0, breakWhy: { weak: 0, perfect: 0, damage: 0 }, bigBreaks: 0, worldTurn: 0, corruption: 0, wiped: false, endMode: '', where2: {},
-    bought: 0, sold: 0, equips: 0, itemsBattle: 0, itemsField: 0, removed: 0, skipped: 0, refused: 0 };
+    bought: 0, sold: 0, equips: 0, itemsBattle: 0, itemsField: 0, removed: 0, skipped: 0, refused: 0, goldEnd: 0 };
   const entered = new Set<string>();
   H.hook = (pre, cmd, post, events) => {
     const b0 = battlesOf(pre);
@@ -202,6 +249,7 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
   r.endMode = game.mode;
   r.worldTurn = game.world?.worldTurn ?? 0;
   r.corruption = game.world?.corruption ?? 0;
+  r.goldEnd = game.heroes.reduce((n, h) => n + h.gold, 0) / Math.max(1, game.heroes.length);
   const w = game.world;
   if (w) {
     r.randomDone = w.tiles.filter((t) => isRandomDungeonTile(t.f) && t.f!.used).length;
@@ -311,9 +359,37 @@ describe.skipIf(!process.env.SIM)(`物差し2本（直行 bot と工夫する bo
       L.push(Object.entries(where2).sort((x, y) => y[1] - x[1]).map(([key, n]) => `${key}: ${n}`).join('・'));
       mkdirSync(dirname(OUT), { recursive: true });
       writeFileSync(OUT, L.join('\n') + '\n');
+      // つまみの測定: 集計用の要約（SIM_JSON に書く。人数・bot ごと）
+      if (process.env.SIM_JSON) {
+        const sum: Record<string, unknown> = { knobs: KNOBS, variant: VARIANT, partyset: PARTYSET, seeds: SEEDS, rows: [] as unknown[] };
+        for (const [p, by] of Object.entries(all)) {
+          for (const k of BOTS) {
+            const rs = by[k];
+            if (!rs?.length) continue;
+            const cl = rs.filter((r) => r.clear);
+            const fin = rs.reduce((n, r) => n + r.finished, 0);
+            const bigFin = rs.reduce((n, r) => n + r.bigFinished, 0);
+            const a = (fn: (r: Run) => number, xs = rs) => avg(xs.map(fn));
+            (sum.rows as unknown[]).push({
+              party: p, bot: k, n: rs.length, clear: cl.length,
+              wiped: rs.filter((r) => r.wiped).length, corr100: rs.filter((r) => r.corr100).length, other: rs.filter((r) => !r.clear && !r.wiped && !r.corr100).length,
+              where: Object.fromEntries(WHERE.map((w) => [w, rs.filter((r) => r.where === w).length])),
+              wipedWhere: Object.fromEntries(WHERE.map((w) => [w, rs.filter((r) => r.wiped && r.where === w).length])),
+              fights: a((r) => r.fights), rounds: fin ? rs.reduce((n, r) => n + r.rounds, 0) / fin : null,
+              bigFights: a((r) => r.bigFinished), bigRounds: bigFin ? rs.reduce((n, r) => n + r.bigRounds, 0) / bigFin : null,
+              breaks: a((r) => r.breaks), weak: a((r) => r.breakWhy.weak), perfect: a((r) => r.breakWhy.perfect), damage: a((r) => r.breakWhy.damage), bigBreaks: a((r) => r.bigBreaks),
+              clearCorr: cl.length ? a((r) => r.corruption, cl) : null, clearTurn: cl.length ? a((r) => r.worldTurn, cl) : null,
+              goldEnd: a((r) => r.goldEnd), goldEndClear: cl.length ? a((r) => r.goldEnd, cl) : null, errors: rs.reduce((n, r) => n + r.errors, 0),
+            });
+          }
+        }
+        mkdirSync(dirname(process.env.SIM_JSON), { recursive: true });
+        writeFileSync(process.env.SIM_JSON, JSON.stringify(sum, null, 1));
+      }
     };
     for (const [p, classes] of Object.entries(PARTIES)) {
-      if (process.env.SIM_PARTY && process.env.SIM_PARTY !== p) continue;
+      // SIM_PARTY はカンマで複数書ける（例: 2人,4人）
+      if (process.env.SIM_PARTY && !process.env.SIM_PARTY.split(',').includes(p)) continue;
       all[p] = {};
       for (const bot of BOTS) {
         const rs: Run[] = (all[p][bot] = []);
