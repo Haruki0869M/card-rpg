@@ -7,6 +7,17 @@ import { createServer } from 'vite';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
+/** ランダムダンジョンの黄金箱の専用の装備の id の一覧（src/content/common/items/goldenBox.ts。数が増えてもスクリプトを直さなくてよい） */
+export async function loadGoldenBoxIds() {
+  const server = await createServer({ root: ROOT, logLevel: 'silent', appType: 'custom', server: { middlewareMode: true, hmr: false, ws: false }, optimizeDeps: { noDiscovery: true } });
+  try {
+    const { goldenBoxItems } = await server.ssrLoadModule('/src/content/common/items/goldenBox.ts');
+    return goldenBoxItems.map((i) => i.id);
+  } finally {
+    await server.close();
+  }
+}
+
 /** 転職のデータを読む。jobLevel(id) = そのジョブへ転職できるレベル、jobRequires(id) = 条件（{ feat, count, text }。無ければ undefined） */
 export async function loadJobData() {
   const server = await createServer({ root: ROOT, logLevel: 'silent', appType: 'custom', server: { middlewareMode: true, hmr: false, ws: false }, optimizeDeps: { noDiscovery: true } });

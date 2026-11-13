@@ -15,7 +15,8 @@ import { attackElement } from '../../engine/battle/cardState';
 import { convertedElement } from '../../engine/abilities';
 import { resistsElement } from '../../engine/battle/effects';
 import type { AllyState, BattleState, CardDef } from '../../types';
-import { breakPreview } from '../format';
+import { breakPreview, elementNames } from '../format';
+import { breakRuleOf } from '../../engine/battle/breakRules';
 import { rollChanceFor, findAlly, tierDistribution, toPercents, slotPreviewLimitOf } from '../../engine';
 import { useBattle } from '../../store/battleStore';
 import { CATEGORY_STYLE, EffectChip, ELEMENT_ICONS } from '../ui/icons';
@@ -51,8 +52,16 @@ function counterHints(battle: BattleState, ally: AllyState, card: CardDef, targe
     const bp = breakPreview(battle, e);
     if (!bp) continue;
     const from = preds.findIndex((p) => p.some((t) => t.id === e.uid && t.breaks));
-    if (from < 0) continue;
     const who = foes.length > 1 ? `${unitName(battle, e.uid)}：` : '';
+    if (from < 0) {
+      // 2026-11-13: ボス・中ボス・災厄の大技と紫の札（特殊な行動）で、このカードが弱点を突かない時は「完全成功だけでは崩れない」と、崩せる属性を出す。
+      // 決まりは breakRules.ts の breakRuleOf（エンジンと同じ関数）。BREAK の予測（engine の breaks）が出ない時だけなので、嘘の「BREAK!」は出ない
+      const rule = breakRuleOf(battle, e);
+      const guarded = card.target === 'enemy' && battle.enemies.some((x) => !x.dead && x.guarding && x !== e);
+      if (rule.weakAndPerfect && !guarded && elementGuide(battle, ally, card, e)?.kind !== 'weak')
+        out.push({ kind: 'break', color: '#fcd34d', text: `⚡${who}完全成功だけでは崩れない（弱点の${elementNames(rule.weak)}で完全成功なら BREAK）` });
+      continue;
+    }
     const power = bp.stops ? `（${bp.name}を止める）` : bp.from !== undefined && bp.to !== undefined ? `（${bp.name} ${bp.from}→${bp.to}）` : `（${bp.name}の威力が半分）`;
     out.push({ kind: 'break', color: '#fcd34d', text: `⚡${who}${from === 0 ? 'この攻撃' : `${label(from)}${from < preds.length - 1 ? '以上' : ''}`}で BREAK！${power}` });
   }
@@ -195,7 +204,7 @@ export function FocusPanel() {
       {hints.length > 0 && (
         <div className="mt-1 flex flex-wrap items-center justify-center gap-0.5" data-counter-hints>
           {hints.map((h, i) => (
-            <div key={i} className={`max-w-full rounded-md bg-black/55 px-2 text-center text-[14px] leading-5 font-black ${h.kind === 'weak' ? '[overflow-wrap:anywhere] [word-break:keep-all]' : ''}`} style={{ color: h.color, boxShadow: `0 0 0 1px ${h.color}` }} data-counter-hint={h.kind}>{h.icon && ELEMENT_ICONS[h.icon] ? (() => { const I = ELEMENT_ICONS[h.icon!]; return <I size={14} strokeWidth={2.8} className="mr-0.5 inline align-[-2px]" />; })() : null}{h.text}</div>
+            <div key={i} className={`max-w-full rounded-md bg-black/55 px-2 text-center text-[14px] leading-5 font-black ${h.kind !== 'status' ? '[overflow-wrap:anywhere] [word-break:keep-all]' : ''}`} style={{ color: h.color, boxShadow: `0 0 0 1px ${h.color}` }} data-counter-hint={h.kind}>{h.icon && ELEMENT_ICONS[h.icon] ? (() => { const I = ELEMENT_ICONS[h.icon!]; return <I size={14} strokeWidth={2.8} className="mr-0.5 inline align-[-2px]" />; })() : null}{h.text}</div>
           ))}
         </div>
       )}

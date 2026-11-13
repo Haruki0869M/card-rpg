@@ -355,7 +355,12 @@ async function deathFrames(label, { boss = false, simple = false }) {
   await page.waitForFunction(() => window.r2.death > 0, null, { timeout: 8000 }).catch(() => ng('倒れた演出が出ない'));
   const r = await page.evaluate(() => window.r2);
   if (!r.death) return page.close();
-  if (r.impact && r.impact > r.death + 1) ng('倒れた演出が、命中の演出より先に出た');
+  // 命中と倒れた演出は、同じ描き直しか隣のコマで画面に入る。測る時の揺れ（MutationObserver の知らせの順・数 ms）は通す:
+  // 1コマ（17ms）までの遅れは「同時」とみなす。倒れた演出は始めるまでに短い間（--lead・0.08秒）があるので、見た目は命中が先のまま。
+  // 17ms を超えて命中が遅れたら、本当に順番が逆なので NG（前は +1ms で NG にしていて、-7ms の揺れで落ちることがあった）
+  const JITTER_MS = 17;
+  if (!r.impact) ng('命中の演出が出ない');
+  else if (r.impact > r.death + JITTER_MS) ng(`倒れた演出が、命中の演出より先に出た（${(r.impact - r.death).toFixed(0)}ms）`);
   if (boss !== r.boss) ng(`ボスの形が ${r.boss}`);
   if (simple !== r.calm) ng(`簡易の形が ${r.calm}`);
   if (simple && r.shards) ng('簡易なのに破片が出た');

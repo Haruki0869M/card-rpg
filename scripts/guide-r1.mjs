@@ -436,7 +436,9 @@ for (const [width, height] of SIZES) {
   {
     const body = await page.locator('body').innerText();
     if (!/💀 強欲の盗賊王が、.+の(西|東)に現れた！/.test(body)) problems.push(`${tag}: 災厄の知らせ（題に地域）が出ない`);
-    for (const s of ['すべての町の店の値段が25%高い', '倒すと元に戻り、専用の装備を落とす。']) if (!body.includes(s)) problems.push(`${tag}: 災厄の知らせに「${s}」が無い`);
+    if (!body.includes('すべての町の店の値段が25%高い')) problems.push(`${tag}: 災厄の知らせに「すべての町の店の値段が25%高い」が無い`);
+    // 2026-11-13 から、落とす専用の装備の名前と効果も書く（scourges.ts。エンジンのテスト guide-r1.test.ts と同じ形）
+    if (!/倒すと元に戻り、専用の装備「強欲王の黄金冠」を落とす（.+）。/.test(body)) problems.push(`${tag}: 災厄の知らせに「倒すと元に戻り、専用の装備「強欲王の黄金冠」を落とす（効果）。」が無い`);
     await page.screenshot({ path: `${OUT}/${tag}-12-scourge-alone.png` });
   }
   // 制覇の物語と重なった時: 物語の窓が出ている時に来た知らせは、閉じた後の別の窓（エンジンの並び。状態はエンジンが作った物を使う）

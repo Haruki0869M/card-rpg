@@ -47,6 +47,7 @@ import {
   smartEquipCommand,
   smartFieldItemCommand,
   smartGrowthCommand,
+  smartNoteBattle,
   smartPeddlerCommand,
   smartPickCardCommand,
   smartRemoveCardCommand,
@@ -333,6 +334,8 @@ function worldStep(g: GameState, log: BotLog, memo: BotMemo): GameState {
 
 function battleStep(g: GameState, log: BotLog, memo: BotMemo): GameState {
   const b = g.battle!;
+  // 賢い bot（weak）: 戦闘の画面で見えた敵の弱点を覚える（ボスの弱点に合わせる装飾品を選ぶため。ゲームは変えない）
+  if (memo.smart) smartNoteBattle(g, memo.smart, b);
   // 賢い bot: 消耗品（倒れそう・ボス・大技の予告）
   if (b.phase === 'ally' && smartUses(memo.smart, 'items')) {
     const ng = sendSmart(g, log, memo, smartBattleItemCommand(g, memo.smart!, b));

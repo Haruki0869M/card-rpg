@@ -16,6 +16,7 @@ import { cardOf, getCard } from '../data/cards';
 import { getClass } from '../data/classes';
 import { DUNGEONS } from '../data/dungeons';
 import { getItem } from '../data/items';
+import { getEnemy } from '../data/enemies';
 import { TOWNS } from '../data/world';
 import { BALANCE } from '../data/balance';
 import { elementGuide } from '../components/battle/elementGuide';
@@ -32,8 +33,11 @@ import { findHero, livingHeroes } from './game/heroes';
 import { corruptionShown } from './game/world/corruptionShown';
 import { hexDistance } from './game/world/hex';
 
-export type SmartPart = 'shop' | 'cards' | 'items' | 'team' | 'time';
-export const SMART_PARTS: SmartPart[] = ['shop', 'cards', 'items', 'team', 'time'];
+//   weak  = ボスの弱点に合わせる（2026-11-13 docs/tasks/break-read-plan.md §4。測るため）: 属性の攻撃をほとんど持たないキャラ（物理）は、
+//           「属性の付与」の装飾品が次の目的のダンジョンのボスの弱点に合う時だけ買って付ける（合わない属性は買わない・付けない）。
+//           ボスの弱点は、もう戦った事がある時だけ分かる。分からない時は、今いる地域で戦った敵によく見る弱点
+export type SmartPart = 'shop' | 'cards' | 'items' | 'team' | 'time' | 'weak';
+export const SMART_PARTS: SmartPart[] = ['shop', 'cards', 'items', 'team', 'time', 'weak'];
 
 /** 賢い bot の覚え（BotMemo に入れる） */
 export interface SmartMemo {
@@ -45,9 +49,15 @@ export interface SmartMemo {
   removed: Set<string>;
   /** 最後に町に入ったワールドターン（買い物の寄り道を続けてしない） */
   lastShop?: number;
+  /** weak: 戦った事がある敵の弱点（敵の種類 → 弱点の属性。戦闘の画面で見えた物だけ） */
+  seenWeak: Map<string, string[]>;
+  /** weak: 地域ごとに、戦った敵の弱点の属性を数えた物（地域の番号 → 属性 → 回数。1戦闘で1体1回） */
+  regionWeak: Map<number, Map<string, number>>;
+  /** weak: もう数えた戦闘（戦闘の種） */
+  noted: Set<number>;
 }
 
-export const newSmartMemo = (off: SmartPart[] = []): SmartMemo => ({ off: new Set(off), refused: new Set(), removed: new Set() });
+export const newSmartMemo = (off: SmartPart[] = []): SmartMemo => ({ off: new Set(off), refused: new Set(), removed: new Set(), seenWeak: new Map(), regionWeak: new Map(), noted: new Set() });
 
 /** その工夫を使うか */
 export const smartUses = (sm: SmartMemo | undefined, part: SmartPart) => !!sm && !sm.off.has(part);
@@ -175,6 +185,93 @@ export function equipGain(h: Hero, def: ItemDef): number {
   return itemScore(h, def, main, tags) - equippedScore(h, def.slot, main, tags);
 }
 
+// ---------- 1b. ボスの弱点に合わせる（weak） ----------
+
+/**
+ * 作戦の数字（bot の提案。ゲームの中身ではない）:
+ * physicalShare = 山札のダメージの札のうち「属性の無い物理の札」がこの割合以上なら、物理のキャラとみなす /
+ * bonus = 弱点に合う「属性の付与」の装飾品に足す点（ほかの装飾品より先に選ぶ大きさ）
+ */
+const WEAK_MATCH = { physicalShare: 0.5, bonus: 20 };
+
+/** 「属性の付与」の装飾品なら、その属性（属性の無い物理攻撃が、その属性になる） */
+const converterOf = (def: ItemDef | undefined): string | undefined => {
+  const e = def?.ability?.effect;
+  return e && 'modifier' in e && e.modifier === 'convertElement' ? e.into : undefined;
+};
+
+/** 属性の攻撃をほとんど持たないキャラ（物理）か（山札だけを見る。装備は入れない: 行ったり来たりしないように） */
+export function isPhysicalHero(h: Hero): boolean {
+  let dmg = 0;
+  let plain = 0;
+  for (const c of h.deck) {
+    const d = cardOf(c);
+    if (!hasDamage(d)) continue;
+    dmg++;
+    if (d.category === 'physical' && !d.tiers.some((t) => t.effects.some((e) => e.kind === 'damage' && e.element))) plain++;
+  }
+  return dmg > 0 && plain / dmg >= WEAK_MATCH.physicalShare;
+}
+
+/** 今いる地域の番号（パーティの先頭のキャラの居場所。分からなければ undefined） */
+function regionNow(g: GameState): number | undefined {
+  const w = g.world;
+  const h = livingHeroes(g).find((x) => !g.party || g.party.includes(x.id));
+  const at = h ? w?.pos[h.id] : undefined;
+  return at === undefined ? undefined : w!.tiles[at]?.r;
+}
+
+/** 戦闘の画面で見えた敵の弱点を覚える（1つの戦闘で1回だけ数える）。ゲームは変えない */
+export function smartNoteBattle(g: GameState, sm: SmartMemo, b: BattleState) {
+  if (!smartUses(sm, 'weak') || sm.noted.has(b.seed)) return;
+  sm.noted.add(b.seed);
+  const r = regionNow(g);
+  const counts = r === undefined ? undefined : sm.regionWeak.get(r) ?? sm.regionWeak.set(r, new Map()).get(r)!;
+  for (const e of b.enemies) {
+    const weak = getEnemy(e.defId).weak ?? [];
+    sm.seenWeak.set(e.defId, weak);
+    if (counts) for (const el of weak) counts.set(el, (counts.get(el) ?? 0) + 1);
+  }
+}
+
+/** 次の目的のダンジョン（普通の bot の goalDungeon と同じ順: 鍵のダンジョンを敵のレベルが低い順 → 最後のダンジョン） */
+function nextGoal(g: GameState): string | undefined {
+  const list = DUNGEONS.forScenario(g.scenarioId).filter((d) => !d.random && (d.rewardKey || d.finale));
+  const order = [...list.filter((d) => !d.finale).sort((a, b) => a.baseLevel - b.baseLevel), ...list.filter((d) => d.finale)];
+  return order.find((d) => !g.clearedDungeons.includes(d.id))?.id;
+}
+
+/**
+ * 合わせたい弱点の属性: 次の目的のダンジョンのボスと、もう戦った事があれば、その弱点。
+ * 無ければ、今いる地域で戦った敵によく見る弱点（一番多く見た属性。同じ数なら全部）。何も分からなければ空
+ */
+export function targetWeakOf(g: GameState, sm: SmartMemo): string[] {
+  const goal = nextGoal(g);
+  const bosses = goal ? DUNGEONS.get(goal).pools.boss : [];
+  const known = [...new Set(bosses.flatMap((id) => sm.seenWeak.get(id) ?? []))];
+  if (bosses.some((id) => sm.seenWeak.has(id))) return known;
+  const r = regionNow(g);
+  const counts = r === undefined ? undefined : sm.regionWeak.get(r);
+  if (!counts?.size) return [];
+  const top = Math.max(...counts.values());
+  return [...counts.entries()].filter(([, n]) => n === top).map(([el]) => el).sort();
+}
+
+/**
+ * 賢い bot の装備の点の上がり方（equipGain に「弱点に合わせる」を足した物。weak を外した時は equipGain と同じ）:
+ * 物理のキャラは、弱点に合う「属性の付与」の装飾品に bonus を足し、合わない「属性の付与」は買わない・付けない（-Infinity）
+ */
+export function smartGain(g: GameState, sm: SmartMemo, h: Hero, def: ItemDef): number {
+  const base = equipGain(h, def);
+  if (!smartUses(sm, 'weak') || def.slot !== 'accessory' || !isPhysicalHero(h)) return base;
+  const want = targetWeakOf(g, sm);
+  const into = converterOf(def);
+  if (into && !want.includes(into)) return -Infinity;
+  const cur = h.equipment.accessory ? getItem(h.equipment.accessory.itemId) : undefined;
+  const val = (el: string | undefined) => (el && want.includes(el) ? WEAK_MATCH.bonus : 0);
+  return base + val(into) - val(converterOf(cur));
+}
+
 /** カードの点: 格・主に使う能力値と合うか・山札の印との重なり・最初の山札の基本の札か */
 export function cardValue(h: Hero, def: CardDef, main = mainStat(h), tags = deckTags(h), upgraded = false): number {
   let v = rarityIndex(def.rarity ?? 'common') * CARD_W.rarity;
@@ -203,9 +300,11 @@ export function smartEquipCommand(g: GameState, sm: SmartMemo): SmartPick | unde
     for (const inst of owner.stash) {
       const def = getItem(inst.itemId);
       if (def.slot === 'consumable') continue;
-      if (equipGain(owner, def) > SHOP_MIN_GAIN) cmds.push({ type: 'EQUIP', playerId: owner.playerId, heroId: owner.id, itemUid: inst.uid });
-      const to = scene.filter((h) => h !== owner && near(h.id, owner.id) && equipGain(h, def) > SHOP_MIN_GAIN).sort((a, b) => equipGain(b, def) - equipGain(a, def))[0];
-      if (to && equipGain(to, def) > Math.max(SHOP_MIN_GAIN, equipGain(owner, def))) cmds.unshift({ type: 'GIVE', playerId: owner.playerId, fromHeroId: owner.id, toHeroId: to.id, itemUid: inst.uid });
+      // 2026-11-13: 点の上がり方は smartGain（weak を外した時は equipGain と同じ）
+      const gain = (h: Hero) => smartGain(g, sm, h, def);
+      if (gain(owner) > SHOP_MIN_GAIN) cmds.push({ type: 'EQUIP', playerId: owner.playerId, heroId: owner.id, itemUid: inst.uid });
+      const to = scene.filter((h) => h !== owner && near(h.id, owner.id) && gain(h) > SHOP_MIN_GAIN).sort((a, b) => gain(b) - gain(a))[0];
+      if (to && gain(to) > Math.max(SHOP_MIN_GAIN, gain(owner))) cmds.unshift({ type: 'GIVE', playerId: owner.playerId, fromHeroId: owner.id, toHeroId: to.id, itemUid: inst.uid });
     }
   }
   return firstOk(sm, g, cmds);
@@ -234,7 +333,7 @@ export function smartTownShopCommand(g: GameState, sm: SmartMemo): SmartPick | u
   for (const inst of v.stash) {
     const def = getItem(inst.itemId);
     if (def.slot === 'consumable') continue;
-    if (party.every((h) => !(equipGain(h, def) > 0))) cmds.push({ type: 'TOWN_SELL', playerId: v.playerId, heroId: v.id, itemUid: inst.uid });
+    if (party.every((h) => !(smartGain(g, sm, h, def) > 0))) cmds.push({ type: 'TOWN_SELL', playerId: v.playerId, heroId: v.id, itemUid: inst.uid });
   }
   const stock = w.shops[t.townId];
   if (stock) {
@@ -243,8 +342,8 @@ export function smartTownShopCommand(g: GameState, sm: SmartMemo): SmartPick | u
     // 装備: 点の上がり方が一番大きい物
     const eq = stock.items
       .map((e, index) => ({ e, index, def: getItem(e.item.itemId) }))
-      .filter(({ e, def }) => !e.sold && def.slot !== 'consumable' && price(e.price) <= budget && equipGain(v, def) > SHOP_MIN_GAIN)
-      .sort((a, b) => equipGain(v, b.def) - equipGain(v, a.def) || a.index - b.index);
+      .filter(({ e, def }) => !e.sold && def.slot !== 'consumable' && price(e.price) <= budget && smartGain(g, sm, v, def) > SHOP_MIN_GAIN)
+      .sort((a, b) => smartGain(g, sm, v, b.def) - smartGain(g, sm, v, a.def) || a.index - b.index);
     for (const x of eq) cmds.push({ type: 'TOWN_BUY', playerId: v.playerId, heroId: v.id, kind: 'item', index: x.index });
     // 消耗品: 袋に空きがあれば。回復の道具は SHOP_HEAL_STOCK 個まで、ほかは袋に1つ空きを残す
     const room = pouchLimitOf(v) - v.pouch.length;
@@ -270,8 +369,8 @@ export function smartPeddlerCommand(g: GameState, sm: SmartMemo, heroes: Hero[])
     const cmds: GameCommand[] = [];
     const best = shop.items
       .map((e, index) => ({ e, index, def: getItem(e.item.itemId) }))
-      .filter(({ e, def }) => !e.sold && e.price <= h.gold - SHOP_PEDDLER_RESERVE && equipGain(h, def) > SHOP_MIN_GAIN)
-      .sort((a, b) => equipGain(h, b.def) - equipGain(h, a.def) || a.index - b.index);
+      .filter(({ e, def }) => !e.sold && e.price <= h.gold - SHOP_PEDDLER_RESERVE && smartGain(g, sm, h, def) > SHOP_MIN_GAIN)
+      .sort((a, b) => smartGain(g, sm, h, b.def) - smartGain(g, sm, h, a.def) || a.index - b.index);
     for (const x of best) cmds.push({ type: 'PEDDLER_BUY', playerId: h.playerId, heroId: h.id, kind: 'item', index: x.index });
     cmds.push({ type: 'PEDDLER_BUY', playerId: h.playerId, heroId: h.id });
     const p = firstOk(sm, g, cmds);

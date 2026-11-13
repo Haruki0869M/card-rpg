@@ -36,12 +36,14 @@ export const BALANCE = {
   enemyHpByRegion: {} as Readonly<Record<string, number>>,
   /**
    * 地域ごとの敵の攻撃の倍率（キー = 地図の地域の id。書いていない地域は 1）。地域の決め方は enemyHpByRegion と同じ。
-   * 2026-11-13 つまみの測定: 測るための入れ物（既定は空 = 今と同じ）
+   * 2026-11-13 つまみの測定: 測るための入れ物（既定は空 = 今と同じ）。
+   * 2026-11-13 案Y で後半の地域 ×1.5 を入れたが、オーナーが案Y を取りやめた（数字の帳尻合わせになるため。docs/tasks/break-read-plan.md）ので空に戻した
    */
   enemyAttackByRegion: {} as Readonly<Record<string, number>>,
   /**
    * 敵の格ごとのHPの倍率（boss = ボスの部屋 / midboss = 中ボスの部屋と災厄 / elite = 強敵の部屋 / normal = それ以外。書いていない格は 1）。
-   * 2026-11-13 つまみの測定: 測るための入れ物（既定は空 = 今と同じ）
+   * 2026-11-13 つまみの測定: 測るための入れ物（既定は空 = 今と同じ）。
+   * 2026-11-13 案Y で大物 ×2 を入れたが、オーナーが案Y を取りやめたので空に戻した
    */
   enemyHpByRank: {} as Readonly<Partial<Record<'boss' | 'midboss' | 'elite' | 'normal', number>>>,
   /**
@@ -220,15 +222,21 @@ export const BALANCE = {
   /**
    * BREAK（体勢崩し。抜本的な見直し §3-2・オーナーの決定 3-A）: 敵が大技の予告を出しているターンに、
    * 弱点の属性で攻撃する／完全成功で攻撃を当てる／そのターンの合計ダメージが最大HPの breakDamagePct% 以上、のどれかで崩せる。
-   * 崩すと、その予告の威力が breakPower 倍・breakStatus（今は脆弱）breakWeak・ブロック0。1つの予告に1回
+   * 崩すと、その予告の威力が breakPower 倍・breakStatus（今は脆弱）breakWeak・ブロック0。1つの予告に1回。
+   * 2026-11-13 BREAK を読み合いにする（オーナーの決定。docs/tasks/break-read-plan.md §2）:
+   * - ボス・中ボス・災厄の大技 → 「弱点の属性で、しかも完全成功」の時だけ崩れる（下の breakNeedsWeakPerfect・breakNeedsWeakPerfectRanks・breakDamagePctByRank）
+   * - 特殊な行動（紫の札。行動に behavior が付いている物）→ どの戦闘でも同じ（下の breakBehaviorNeedsWeakPerfect・breakDamagePctBehavior）
+   * - 強敵・ふつうの敵の赤い大技 → 今までどおり上の3つのどれか
+   * - 弱点を持たない敵は、どれでも完全成功で崩れる。合計ダメージでは崩れない
    */
   breakDamagePct: 20,
   /**
    * 敵の格ごとの「合計ダメージで BREAK」の線（%）。書いていない格は breakDamagePct。Infinity = 合計ダメージでは崩れない（弱点・完全成功だけ）。
    * 格: boss = ボスの部屋 / midboss = 中ボスの部屋と災厄 / elite = 強敵の部屋（封魔の宝箱・町を襲う敵を含む）/ normal = それ以外。
-   * 2026-11-13 回4: 測るための入れ物（既定は空 = 今と同じ）
+   * 2026-11-13 回4: 測るための入れ物。
+   * 2026-11-13 オーナーの決定（案Y の BA）: ボス・中ボス・災厄は合計ダメージでは崩れない（強敵・ふつうの敵は breakDamagePct のまま）
    */
-  breakDamagePctByRank: {} as Readonly<Partial<Record<'boss' | 'midboss' | 'elite' | 'normal', number>>>,
+  breakDamagePctByRank: { boss: Infinity, midboss: Infinity } as Readonly<Partial<Record<'boss' | 'midboss' | 'elite' | 'normal', number>>>,
   /**
    * 敵の格ごとに「完全成功だけで崩れるか」（false = 崩れない。弱点・合計ダメージの線は別）。書いていない格は true（今のまま）。
    * カードの能力で崩す物（魔力の楔の「成功1でも崩せる」・閃光の破砕玉・崩しの効果）は、ここに関係なく今のまま崩せる。
@@ -238,15 +246,28 @@ export const BALANCE = {
   /**
    * true = 憲章4の文のとおり「弱点の属性で、しかも完全成功」の時だけ崩れる（弱点を持たない敵は、完全成功だけで崩れる）。
    * 合計ダメージの線は breakDamagePctByRank で別に決める。カードの能力で崩す物は今のまま。
-   * 2026-11-13 つまみの測定: 測るための入れ物（既定 false = 今と同じ）
+   * 2026-11-13 つまみの測定: 測るための入れ物。
+   * 2026-11-13 オーナーの決定（案Y の BA）: true（当てる格は breakNeedsWeakPerfectRanks = ボス・中ボス・災厄だけ）
    */
-  breakNeedsWeakPerfect: false as boolean,
+  breakNeedsWeakPerfect: true as boolean,
   /**
    * breakNeedsWeakPerfect を当てる格（書いていない = 全部の格）。例: ['boss', 'midboss'] = 大物だけ「弱点で、しかも完全成功」。
    * ほかの格は今の決まりのまま（弱点・完全成功・合計ダメージのどれかで崩れる）。
-   * 2026-11-13 つまみの測定2（ア）: 測るための入れ物（既定は undefined = 今と同じ。breakNeedsWeakPerfect が false の間は読まない）
+   * 2026-11-13 つまみの測定2（ア）: 測るための入れ物。
+   * 2026-11-13 オーナーの決定（案Y の BA）: ['boss', 'midboss']（ボス・中ボスの部屋と災厄。災厄の戦闘は中ボスの印を持つ）
    */
-  breakNeedsWeakPerfectRanks: undefined as readonly ('boss' | 'midboss' | 'elite' | 'normal')[] | undefined,
+  breakNeedsWeakPerfectRanks: ['boss', 'midboss'] as readonly ('boss' | 'midboss' | 'elite' | 'normal')[] | undefined,
+  /**
+   * true = 特殊な行動（紫の札。行動のデータに behavior が付いている物）の予告は、どの戦闘でも「弱点の属性で、しかも完全成功」の時だけ崩れる
+   * （弱点を持たない敵は完全成功で崩れる）。カードの能力で崩す物（魔力の楔・閃光の破砕玉・崩しの効果）は今のまま。
+   * 2026-11-13 オーナーの決定（docs/tasks/break-read-plan.md §2・§7 の 1 = A）
+   */
+  breakBehaviorNeedsWeakPerfect: true as boolean,
+  /**
+   * 特殊な行動（紫の札）の予告の「合計ダメージで BREAK」の線（%）。undefined = 格ごとの線（breakDamagePctByRank）のまま。Infinity = 合計ダメージでは崩れない。
+   * 2026-11-13 オーナーの決定（docs/tasks/break-read-plan.md §2）: Infinity
+   */
+  breakDamagePctBehavior: Infinity as number | undefined,
   /**
    * true = 「弱点で、しかも完全成功」の決まりの時でも、その味方の手札・山札・捨て札に、その敵の弱点を突けるカードが1枚も無ければ、
    * その味方の完全成功で崩せる（判定は src/engine/battle/breakRules.ts）。
@@ -349,6 +370,15 @@ export const BALANCE = {
   maxBlessings: 3,
   /** ショップ: 品揃えが入れ替わる間隔（ワールドターン）、格ごとの値段、売値の割合 */
   shopRefreshTurns: 8,
+  /**
+   * 必ず並ぶ品（2026-11-13 オーナーの決定・docs/tasks/break-read-plan.md §3）: 進む順で region 番目の地域の町
+   * （その地域に町が無ければ、その次にある町）の店に、items のうち1つを必ず並べる。どれかは冒険の種で決まる（冒険の間、同じ物）。
+   * 値段は、その品の格の itemPrice（今はエピック）。items = 「属性の付与」の装飾品（属性の無い物理攻撃が、その属性になる）
+   */
+  shopFeatured: {
+    region: 3,
+    items: ['emberRing', 'stormRing', 'crystalNecklace', 'meteorRing', 'nightmareRing'] as readonly string[],
+  },
   itemPrice: { common: 30, rare: 70, epic: 160, legend: 400 } as Record<string, number>,
   cardPrice: { common: 40, rare: 75, epic: 140, legend: 300 } as Record<string, number>,
   sellRatio: 0.5,

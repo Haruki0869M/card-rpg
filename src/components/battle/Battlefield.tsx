@@ -18,6 +18,7 @@ import { useDetail, usePress } from '../../hooks/usePress';
 import { speedFactor, useBattle, type UnitFx } from '../../store/battleStore';
 import type { AllyState, BattleState, EnemyState } from '../../types';
 import { breakPreview, intentView, type IntentPart } from '../format';
+import { breakRuleOf } from '../../engine/battle/breakRules';
 import { HpBar } from '../ui/HpBar';
 import { EffectChip, ELEMENT_ICONS, Shield, Skull, statusStyle, Swords } from '../ui/icons';
 import { Flame } from 'lucide-react';
@@ -471,8 +472,12 @@ function BehaviorBriefBar({ top, maxW }: { top: number; maxW: number }) {
  */
 function BreakHint({ enemy, narrow, maxW }: { enemy: EnemyState; narrow: boolean; maxW: number }) {
   const show = useBattle((s) => !enemy.dead && !!breakPreview(s.battle, enemy));
+  // 案Y（2026-11-13）: ボス・中ボス・災厄で弱点を持つ敵は「弱点（属性）で完全成功 → BREAK」。決まりは breakRules.ts の breakRuleOf から読む
+  const strict = useBattle((s) => breakRuleOf(s.battle, enemy).weakAndPerfect);
+  const ruleWeak = useBattle((s) => breakRuleOf(s.battle, enemy).weak.join(','));
   if (!show) return null;
-  const weak = getEnemy(enemy.defId).weak ?? [];
+  // 弱点の印: 「弱点で完全成功」の時は一時的な弱点（油壺）も入れる（その時だけ崩せる属性を全部見せる）
+  const weak = strict ? ruleWeak.split(',').filter(Boolean) : getEnemy(enemy.defId).weak ?? [];
   const icons = weak.map((id) => {
     const el = getElement(id);
     const Icon = ELEMENT_ICONS[el.icon] ?? Swords;
@@ -485,8 +490,11 @@ function BreakHint({ enemy, narrow, maxW }: { enemy: EnemyState; narrow: boolean
       className={`w-max rounded bg-black/80 text-center text-[12px] leading-4 font-black text-amber-200 ring-1 ring-amber-400/80 ${narrow ? 'px-px tracking-[-0.03em] whitespace-nowrap' : 'px-1 [overflow-wrap:anywhere] [word-break:keep-all]'}`}
       style={{ maxWidth: Math.max(60, maxW) }}
       data-break-hint={narrow ? 'short' : 'long'}
+      data-break-rule={strict ? 'weak-perfect' : 'any'}
     >
-      ⚡{narrow ? <>BREAK可{els}</> : weak.length ? <>弱点{els}か完全成功で BREAK</> : <>完全成功で BREAK</>}
+      ⚡{strict
+        ? (narrow ? <>{els}+完全</> : <>弱点{els}で完全成功 → BREAK</>)
+        : narrow ? <>BREAK可{els}</> : weak.length ? <>弱点{els}か完全成功で BREAK</> : <>完全成功で BREAK</>}
     </span>
   );
 }

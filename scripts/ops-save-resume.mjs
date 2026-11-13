@@ -176,9 +176,13 @@ for (const width of WIDTHS) {
       const d = await read();
       const b = d.game.expeditions?.find((x) => x.battle)?.battle ?? d.game.battle;
       if (b) {
-        for (const e of b.enemies) { if (e.hp > 0) e.hp = 1; e.block = 0; }
+        for (const e of b.enemies) { if (e.hp > 0) e.hp = 1; e.block = 0; delete e.guarding; }
+        // 前は手札の1枚目（守りや回復のカードのことがある）を使っていて、敵を倒しきれずに「報酬の画面まで進めなかった」になることがあった（390px）。
+        // 味方の手札を「攻撃」2枚にして、マナも足す（保存の書き換えはこの場面の準備だけ。確かめるのは報酬の画面の保存と再開）
+        b.phase = 'ally';
+        for (const a of b.allies) if (!a.dead) { a.hand = [{ uid: 'ops-k1', cardId: 'strike' }, { uid: 'ops-k2', cardId: 'strike' }]; a.mana = Math.max(a.mana, 3); }
         await resume(d);
-        for (let i = 0; i < 6 && !(await page.locator('button:has-text("報酬を受け取る")').count()); i++) {
+        for (let i = 0; i < 8 && !(await page.locator('button:has-text("報酬を受け取る")').count()); i++) {
           if (await page.locator('[data-card-index][data-usable]').count()) await playFirstCard().catch(() => {});
           else await endTurn().catch(() => {});
           await page.waitForTimeout(400);
@@ -189,7 +193,11 @@ for (const width of WIDTHS) {
         await page.locator('button:has-text("報酬を受け取る")').click();
         await page.waitForTimeout(800);
         await scene('reward');
-      } else note('reward', '報酬の画面まで進めなかった（スクリプトの都合）', false);
+      } else {
+        const label = await page.locator('[data-result-button]').innerText().catch(() => '（結果の画面なし）');
+        await page.screenshot({ path: `${OUT}/${width}-reward-fail.png` }).catch(() => {});
+        note('reward', '報酬の画面まで進めなかった（スクリプトの都合）', false, `結果のボタン: ${label}`);
+      }
     }
     note('全体', 'ページのエラーが無い', errors.length === 0, errors.slice(0, 3).join(' / '));
   } catch (e) {

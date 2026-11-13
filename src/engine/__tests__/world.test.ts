@@ -393,10 +393,18 @@ describe('ダンジョンも世界マップの手番の順番で動く（M3-D）
 describe('自動プレイ（シナリオ1をエンディングまで）', () => {
   it('4人・やさしい: どの場面でもエラーが出ず、最後まで（エンディングか、負け）進む。何回かに1回はエンディングに着く', () => {
     let cleared = 0;
+    // 案Y（2026-11-13・大物のHP×2・後半の攻撃×1.5・大物は弱点で完全成功の時だけ BREAK）を入れた時、いつもの bot（予告を読まない）は
+    // やさしいでも 8種とも負けで終わった（測った）。案Y は取りやめたが、紫の札と大物は今も「弱点で完全成功」なので、
+    // エンディングに着く事は、引き続き工夫する bot（BREAK を狙う）で確かめる（テストの前提だけ直した）
     for (let seed = 1; seed <= 8; seed++) {
       const { game, log } = playToEnd(newWorld(seed, ['warrior', 'mage', 'guardian', 'hunter'], 'easy'));
       expect(log.errors, `seed ${seed}`).toEqual([]);
       expect(['ending', 'gameover'], `seed ${seed}`).toContain(game.mode);
+    }
+    for (let seed = 1; seed <= 3 && !cleared; seed++) {
+      const { game, log } = playToEnd(newWorld(seed, ['warrior', 'mage', 'guardian', 'hunter'], 'easy'), 60000, { clever: true });
+      expect(log.errors, `clever seed ${seed}`).toEqual([]);
+      expect(['ending', 'gameover'], `clever seed ${seed}`).toContain(game.mode);
       if (game.mode === 'ending') {
         cleared++;
         expect(game.world!.keys.sort()).toEqual(['azure', 'crimson', 'emerald']);

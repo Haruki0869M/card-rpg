@@ -7,12 +7,20 @@ import { applyCommand, createBattle, createGame, createRng, startBattleWith } fr
 import { breakDamagePctOf } from '../battle/effects';
 import { giveHand, party, play } from './helpers';
 
-type Mutable = { breakDamagePctByRank: Record<string, number>; enemyHpByRegion: Record<string, number> };
+type Mutable = { breakDamagePctByRank: Record<string, number>; enemyHpByRegion: Record<string, number>; breakNeedsWeakPerfect: boolean; breakNeedsWeakPerfectRanks?: string[] };
 const B = BALANCE as unknown as Mutable;
-afterEach(() => {
+const SAVED = { breakDamagePctByRank: B.breakDamagePctByRank, enemyHpByRegion: B.enemyHpByRegion, breakNeedsWeakPerfect: B.breakNeedsWeakPerfect, breakNeedsWeakPerfectRanks: B.breakNeedsWeakPerfectRanks };
+afterEach(() => Object.assign(B, SAVED));
+/**
+ * 2026-11-13 から既定は、大物（と紫の札）は「弱点で、しかも完全成功」・合計ダメージでは崩れない（breakRead.test.ts）。
+ * ここの「線を格ごとに変える入れ物」の確かめは、前の既定（どの格も 20%・完全成功で崩れる）に戻してから流す（テストの前提だけ直した）。
+ * ここで使う門番ガルザの「大斧の一撃」は赤い札（紫の札の決まりは当たらない）
+ */
+const oldRules = () => {
   B.breakDamagePctByRank = {};
-  B.enemyHpByRegion = {};
-});
+  B.breakNeedsWeakPerfect = false;
+  B.breakNeedsWeakPerfectRanks = undefined;
+};
 
 /** 門番ガルザ1体（大技 = 大斧の一撃）。格は flags で決める */
 function gate(seed: number, flags: { boss?: boolean; midboss?: boolean; elite?: boolean } = {}): BattleState {
@@ -44,8 +52,17 @@ function hit25(flags: Parameters<typeof gate>[1]): string[] {
 }
 
 describe('敵の格ごとの BREAK の線（回4・測るための切り替え）', () => {
-  it('既定（空）では、どの格も breakDamagePct（20%）のまま', () => {
-    expect(BALANCE.breakDamagePctByRank).toEqual({});
+  it('既定では、ボス・中ボスは合計ダメージでは崩れない（∞）。強敵・ふつうは breakDamagePct（20%）のまま', () => {
+    expect(breakDamagePctOf({ boss: true })).toBe(Infinity);
+    expect(breakDamagePctOf({ midboss: true })).toBe(Infinity);
+    expect(breakDamagePctOf({ elite: true })).toBe(BALANCE.breakDamagePct);
+    expect(breakDamagePctOf({})).toBe(BALANCE.breakDamagePct);
+    expect(hit25({ boss: true })).toEqual([]);
+    expect(hit25({ elite: true })).toEqual(['damage']);
+  });
+
+  it('入れ物が空（前の既定）なら、どの格も breakDamagePct（20%）のまま', () => {
+    oldRules();
     for (const f of [{}, { boss: true }, { midboss: true }, { elite: true }]) expect(breakDamagePctOf(f)).toBe(BALANCE.breakDamagePct);
     // 25% の一撃は、どの格でも崩れる（今と同じ）
     expect(hit25({})).toEqual(['damage']);
@@ -53,6 +70,7 @@ describe('敵の格ごとの BREAK の線（回4・測るための切り替え�
   });
 
   it('ボスだけ線を 30% にすると、25% の一撃でボスは崩れず、ふつうの敵は崩れる', () => {
+    oldRules();
     B.breakDamagePctByRank = { boss: 30, midboss: 30, elite: 25 };
     expect(breakDamagePctOf({ boss: true })).toBe(30);
     expect(breakDamagePctOf({ midboss: true })).toBe(30);
@@ -64,7 +82,8 @@ describe('敵の格ごとの BREAK の線（回4・測るための切り替え�
     expect(hit25({})).toEqual(['damage']);
   });
 
-  it('Infinity にすると、合計ダメージでは崩れない（完全成功では崩れる）', () => {
+  it('Infinity にすると、合計ダメージでは崩れない（前の既定の決まりなら、完全成功では崩れる）', () => {
+    oldRules();
     B.breakDamagePctByRank = { boss: Infinity };
     expect(hit25({ boss: true })).toEqual([]);
     const s = gate(5, { boss: true });

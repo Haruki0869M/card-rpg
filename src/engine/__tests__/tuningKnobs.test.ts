@@ -12,7 +12,7 @@ import { giveHand, party, play } from './helpers';
 
 type Mutable = Record<string, unknown>;
 const B = BALANCE as unknown as Mutable;
-const SAVED = Object.fromEntries(['breakPerfectByRank', 'breakNeedsWeakPerfect', 'breakNeedsWeakPerfectRanks', 'breakPerfectNoWeakCard', 'breakPerfectHeavy','breakStatus', 'breakClearsBlock', 'breakDamagePctByRank', 'enemyAttackByRegion', 'enemyHpByRank', 'enemyHpByRegion', 'goldGainMul'].map((k) => [k, B[k]]));
+const SAVED = Object.fromEntries(['breakPerfectByRank', 'breakNeedsWeakPerfect', 'breakNeedsWeakPerfectRanks', 'breakPerfectNoWeakCard', 'breakPerfectHeavy','breakStatus', 'breakClearsBlock', 'breakDamagePctByRank', 'breakBehaviorNeedsWeakPerfect', 'breakDamagePctBehavior', 'enemyAttackByRegion', 'enemyHpByRank', 'enemyHpByRegion', 'goldGainMul'].map((k) => [k, B[k]]));
 afterEach(() => Object.assign(B, SAVED));
 
 /** 1体だけの戦闘（大技の予告を出させる）。flags で格を決める */
@@ -57,19 +57,35 @@ function wedge(flags: Parameters<typeof one>[3] = {}) {
   return whys(r.events);
 }
 
-describe('BREAK の決まりのつまみ（既定 = 今のまま）', () => {
+/**
+ * 2026-11-13 から既定が「紫の札と大物は弱点で、しかも完全成功」（docs/tasks/break-read-plan.md）なので、「前の既定」（18回目の公開の形）の
+ * 決まりを確かめるテストは、BREAK の決まりを前の既定に戻してから流す（ゲームの決まりは変えていない。テストの前提だけ直した）
+ */
+const oldBreakRules = () => {
+  B.breakNeedsWeakPerfect = false;
+  B.breakNeedsWeakPerfectRanks = undefined;
+  B.breakDamagePctByRank = {};
+  B.breakBehaviorNeedsWeakPerfect = false;
+  B.breakDamagePctBehavior = undefined;
+};
+
+describe('BREAK の決まりのつまみ（既定 = 紫の札と大物は弱点で完全成功。つまみの効き目は、前の既定に戻してから確かめる）', () => {
   it('既定の値', () => {
     expect(BALANCE.breakPerfectByRank).toEqual({});
-    expect(BALANCE.breakNeedsWeakPerfect).toBe(false);
+    // 2026-11-13: 紫の札と大物だけ「弱点で、しかも完全成功」（breakRead.test.ts でくわしく確かめる）
+    expect(BALANCE.breakNeedsWeakPerfect).toBe(true);
+    expect(BALANCE.breakBehaviorNeedsWeakPerfect).toBe(true);
     // 2026-11-13: BREAK で付く状態は脆弱（まとめ役の指示）
     expect(BALANCE.breakStatus).toBe('vulnerable');
     expect(BALANCE.breakClearsBlock).toBe(true);
-    expect(BALANCE.enemyAttackByRegion).toEqual({});
+    // 案Y の取りやめ: 大物のHP・後半の攻撃の倍率は入れない
     expect(BALANCE.enemyHpByRank).toEqual({});
+    expect(BALANCE.enemyAttackByRegion).toEqual({});
     expect(BALANCE.goldGainMul).toBe(1);
   });
 
-  it('既定では、完全成功・弱点（完全成功でなくても）・魔力の楔で、どの格でも崩れる', () => {
+  it('前の既定では、完全成功・弱点（完全成功でなくても）・魔力の楔で、どの格でも崩れる', () => {
+    oldBreakRules();
     for (const f of [{}, { boss: true }, { midboss: true }, { elite: true }]) {
       expect(perfectHit(f)).toEqual(['perfect']);
       expect(wedge(f)).toEqual(['perfect']);
@@ -79,6 +95,7 @@ describe('BREAK の決まりのつまみ（既定 = 今のまま）', () => {
   });
 
   it('B1: ボス・中ボスは完全成功だけでは崩れない（強敵・ふつうは崩れる）。魔力の楔は崩せる', () => {
+    oldBreakRules();
     B.breakPerfectByRank = { boss: false, midboss: false };
     expect(perfectHit({ boss: true })).toEqual([]);
     expect(perfectHit({ midboss: true })).toEqual([]);
@@ -88,6 +105,7 @@ describe('BREAK の決まりのつまみ（既定 = 今のまま）', () => {
   });
 
   it('B2: 全部の敵で完全成功だけでは崩れない。弱点・魔力の楔は崩せる', () => {
+    oldBreakRules();
     B.breakPerfectByRank = { boss: false, midboss: false, elite: false, normal: false };
     expect(perfectHit({})).toEqual([]);
     expect(weakHit(false)).toEqual(['weak']);
@@ -95,6 +113,7 @@ describe('BREAK の決まりのつまみ（既定 = 今のまま）', () => {
   });
 
   it('B3: 弱点で、しかも完全成功の時だけ崩れる。弱点の無い敵は完全成功で崩れる。魔力の楔は崩せる', () => {
+    oldBreakRules();
     B.breakNeedsWeakPerfect = true;
     B.breakDamagePctByRank = { boss: Infinity, midboss: Infinity, elite: Infinity, normal: Infinity };
     expect(perfectHit({})).toEqual([]);
@@ -110,13 +129,14 @@ describe('BREAK の決まりのつまみ（既定 = 今のまま）', () => {
   });
 
   // つまみの測定2（2026-11-13）: (ア) B3 は大物だけ / (イ) 弱点を突けるカードが無い人は完全成功で崩せる / (エ) 重い一撃の完全成功で崩れる
-  it('つまみの測定2 の入れ物の既定の値（今と同じ）', () => {
-    expect(BALANCE.breakNeedsWeakPerfectRanks).toBeUndefined();
+  it('つまみの測定2 の入れ物の既定の値（(ア) は大物だけ（2026-11-13 の決定）。(イ)(エ) は使わない）', () => {
+    expect(BALANCE.breakNeedsWeakPerfectRanks).toEqual(['boss', 'midboss']);
     expect(BALANCE.breakPerfectNoWeakCard).toBe(false);
     expect(BALANCE.breakPerfectHeavy).toBeUndefined();
   });
 
   it('(ア) B3 を大物だけに: ボス・中ボスは弱点で完全成功の時だけ。強敵・ふつうは今のまま（完全成功・弱点だけで崩れる）', () => {
+    oldBreakRules();
     B.breakNeedsWeakPerfect = true;
     B.breakNeedsWeakPerfectRanks = ['boss', 'midboss'];
     B.breakDamagePctByRank = { boss: Infinity, midboss: Infinity };
@@ -129,6 +149,7 @@ describe('BREAK の決まりのつまみ（既定 = 今のまま）', () => {
   });
 
   it('(イ) 弱点を突けるカードが手札・山札・捨て札に1枚も無い味方は、完全成功で崩せる（1枚でもあれば崩れない）', () => {
+    oldBreakRules();
     B.breakNeedsWeakPerfect = true;
     B.breakPerfectNoWeakCard = true;
     B.breakDamagePctByRank = { boss: Infinity, midboss: Infinity, elite: Infinity, normal: Infinity };
@@ -149,6 +170,7 @@ describe('BREAK の決まりのつまみ（既定 = 今のまま）', () => {
   });
 
   it('(エ) 枠3以上のカードか、フォーカス2以上を使った攻撃の完全成功なら崩れる（軽い一撃の完全成功では崩れない）', () => {
+    oldBreakRules();
     B.breakNeedsWeakPerfect = true;
     B.breakPerfectHeavy = { slots: 3, focus: 2 };
     B.breakDamagePctByRank = { boss: Infinity, midboss: Infinity, elite: Infinity, normal: Infinity };
@@ -197,6 +219,8 @@ describe('敵の強さ・お金のつまみ（既定 = 今のまま）', () => {
     expect(start().attackMul).toBeCloseTo(base * 2);
   });
   it('格ごとのHPの倍率: ボスの部屋だけに入れると、ボスの部屋の戦闘だけHPが増える', () => {
+    // 倍率なしの値を元にする（案Y の取りやめで既定も空。念のため空にしてから測る）
+    B.enemyHpByRank = {};
     const base = start('battle').maxHp;
     const bossBase = start('boss').maxHp;
     B.enemyHpByRank = { boss: 2 };
