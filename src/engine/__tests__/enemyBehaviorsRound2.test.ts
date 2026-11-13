@@ -294,6 +294,29 @@ describe('第2弾: 亜種に伝わっていない事', () => {
       expect(b.firstActionId, base).toBeUndefined();
     }
   });
+  it('表に無い夢の再来（夢の氷の剣士・夢の氷の騎士・夢の月ウサギ）: 置き換えなかった行動は元の敵と同じ（ダメージ+1・属性だけ違う）。置き換えた行動は元の名前のまま', () => {
+    const cases: [string, string, string, string][] = [
+      ['echoIceSwordsman', 'iceSwordsman', 'thrust', '氷刃の突き'],
+      ['echoIceKnight', 'iceKnight', 'guard', '氷鎧の構え'],
+      ['echoMoonRabbit', 'moonRabbit', 'hex', '月影の呪い'],
+    ];
+    for (const [echoId, baseId, replaced, oldName] of cases) {
+      const echo = getEnemy(echoId);
+      const base = getEnemy(baseId);
+      expect(echo.actions.map((a) => a.id).sort(), echoId).toEqual(base.actions.map((a) => a.id).sort());
+      for (const a of echo.actions) {
+        if (a.id === replaced) {
+          expect(a.name, echoId).toBe(oldName);
+          continue;
+        }
+        const b = base.actions.find((x) => x.id === a.id)!;
+        expect(a.name).toBe(b.name);
+        expect(a.effects.map((e) => (e.kind === 'damage' ? { ...e, amount: e.amount - 1, element: undefined } : e)), `${echoId}.${a.id}`).toEqual(
+          b.effects.map((e) => (e.kind === 'damage' ? { ...e, element: undefined } : e)),
+        );
+      }
+    }
+  });
   it('表の元の敵の亜種（表に無い物）は、元の行動のまま（同じIDの行動に札が付いていない）', () => {
     for (const r of ROUND2) {
       for (const v of ENEMIES.all.filter((d) => d.variantOf === r.id && !listed.has(d.id))) {
