@@ -83,7 +83,9 @@ export const venomJackalWarrior: EnemyDef = makeVariant(jackalWarrior, {
   weak: ['thunder'], resist: ['fire', 'poison'],
   actions: [
     { id: 'thrust', name: '毒槍の連突き', effects: [{ kind: 'damage', amount: 4, hits: 3 }, { kind: 'applyStatus', status: 'poison', amount: 2 }] },
-    { id: 'guard', name: '槍の構え', effects: [{ kind: 'block', amount: 10 }] },
+    // 敵の特殊な行動・第2弾（round2 §3・fix-plan §4）: 亜種のこの敵だけ「槍の構え」を仲間を呼ぶ（ジャッカルの戦士）に置き換えた。ID は古い保存のために残す。
+    // 呼べる時は優先・2ターン続けては呼ばない・1戦闘に2回まで。呼べない時は「毒槍の踏み込み」。5つ目の地域なのでブロック10。元のジャッカルの戦士は変えていない
+    { id: 'guard', name: '遠吠えで群れを呼ぶ', big: true, behavior: 'call', cutIn: { when: 'canSummon', rest: 1, noRepeat: true }, hint: '仲間を1体呼ぶ。その前に倒すか、BREAK する', effects: [{ kind: 'summonEnemy', enemy: 'jackalWarrior', uses: 2, call: true, orElse: 'lunge' }, { kind: 'block', amount: 10 }] },
     { id: 'lunge', name: '毒槍の踏み込み', effects: [{ kind: 'damage', amount: 13, element: 'poison' }] },
   ],
 });

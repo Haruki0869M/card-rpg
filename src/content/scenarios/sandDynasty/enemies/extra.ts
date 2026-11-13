@@ -34,9 +34,12 @@ export const obeliskSentinel: EnemyDef = {
   weak: ['thunder'],
   resist: ['poison', 'fire'],
   pattern: 'sequence',
+  // 敵の特殊な行動・第2弾（docs/tasks/enemy-behaviors-round2-plan.md §3・fix-plan §4）: 盾砕きを1ターン目に予告する（2ターン目からは刻まれた呪文・石碑の守り・盾砕きの順）
+  firstActionId: 'slam',
   actions: [
     { id: 'wall', name: '石碑の守り', effects: [{ kind: 'block', amount: 12 }] },
-    { id: 'slam', name: '石柱の打撃', effects: [{ kind: 'damage', amount: 12 }] },
+    // 「石柱の打撃」を盾砕きに置き換えた（ブロックを0にしてから、同じ12のダメージ）。ID は古い保存のために残す
+    { id: 'slam', name: '石柱で叩き割る', big: true, behavior: 'shatter', hint: '当たるとブロックを全部壊す。BREAK するか、ブロックに頼らずに受ける', effects: [{ kind: 'shieldBreak' }, { kind: 'damage', amount: 12 }] },
     { id: 'glyph', name: '刻まれた呪文', effects: [{ kind: 'damage', amount: 5, to: 'foes' }] },
   ],
   abilities: [{ name: '硬い石肌', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 6 }] } }],

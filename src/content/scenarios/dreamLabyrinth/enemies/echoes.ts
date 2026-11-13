@@ -32,6 +32,12 @@ const ICE_KNIGHT_ORIGINAL: EnemyDef['actions'] = [
   { id: 'crush', name: '砕氷斬', big: true, effects: [{ kind: 'damage', amount: 18 }] },
   { id: 'sweep', name: '横薙ぎ', big: true, effects: [{ kind: 'damage', amount: 7, to: 'foes' }] },
 ];
+/** 月のウサギの置き換える前の行動（「月影の呪い」を浄化に置き換え、順番の最後へ移した） */
+const MOON_RABBIT_ORIGINAL: EnemyDef['actions'] = [
+  { id: 'mallet', name: '月の杵', effects: [{ kind: 'damage', amount: 10 }] },
+  { id: 'hex', name: '月影の呪い', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }, { kind: 'block', amount: 4 }] },
+  { id: 'hop', name: '跳ねる杵つき', effects: [{ kind: 'damage', amount: 5, hits: 2 }] },
+];
 /** 人喰い鮫の置き換える前の行動（「食いちぎる」を手負い狙いに置き換えた） */
 const SHARK_ORIGINAL: EnemyDef['actions'] = [
   { id: 'circle', name: '獲物のまわりを泳ぐ', effects: [{ kind: 'block', amount: 6 }] },
@@ -53,6 +59,7 @@ export const echoMoonRabbit: EnemyDef = dreamEcho(moonRabbit, {
   id: 'echoMoonRabbit',
   name: '夢の月ウサギ',
   aura: 'iron',
+  actions: MOON_RABBIT_ORIGINAL,
   abilities: [{ name: '夢の毛皮', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 6 }] } }],
 });
 export const echoConveyorBot: EnemyDef = dreamEcho(conveyorBot, { id: 'echoConveyorBot', name: '夢の機械兵', aura: 'frost', element: 'ice' });

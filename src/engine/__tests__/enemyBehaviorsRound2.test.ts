@@ -60,6 +60,22 @@ const ROUND2: Row[] = [
   { sc: 'cursedArchipelago', id: 'conchKnight', act: 'shell', name: '殻でかばう', kind: 'guard', region: 4, alone: 'lance' },
   { sc: 'cursedArchipelago', id: 'lanternAngler', act: 'gulp', name: '丸呑み', kind: 'shatter', region: 5, amount: 12 },
   { sc: 'cursedArchipelago', id: 'barnacleBeast', act: 'crust', name: '古い殻を落とす', kind: 'purify', region: 5 },
+  // シナリオ4「砂塵の王朝」
+  { sc: 'sandDynasty', id: 'vulture', act: 'peck', name: '弱った所をつつく', kind: 'hunt', region: 3, amount: 9 },
+  { sc: 'sandDynasty', id: 'sandSprite', act: 'veil', name: '渇きの砂', kind: 'healSeal', region: 3 },
+  { sc: 'sandDynasty', id: 'scribeShade', act: 'scroll', name: '行いを書き記す', kind: 'punish', region: 3 },
+  { sc: 'sandDynasty', id: 'clayGolem', act: 'harden', name: '身代わりの土人形', kind: 'guard', region: 4, alone: 'fist' },
+  { sc: 'sandDynasty', id: 'obeliskSentinel', act: 'slam', name: '石柱で叩き割る', kind: 'shatter', region: 4, amount: 12 },
+  { sc: 'sandDynasty', id: 'cursedMummy', act: 'wrap', name: '包帯を巻き直す', kind: 'purify', region: 4 },
+  { sc: 'sandDynasty', id: 'venomJackalWarrior', act: 'guard', name: '遠吠えで群れを呼ぶ', kind: 'call', region: 5, summon: 'jackalWarrior', orElse: 'lunge' },
+  // シナリオ5「星降る天空城」
+  { sc: 'starCastle', id: 'cometFox', act: 'tail', name: '彗星の衝突', kind: 'shatter', region: 3, amount: 11, element: 'holy' },
+  { sc: 'starCastle', id: 'moonRabbit', act: 'hex', name: '月の薬を搗く', kind: 'purify', region: 3, extra: ['curse', 1] },
+  { sc: 'starCastle', id: 'hourglassGolem', act: 'turn', name: '砂時計で数える', kind: 'punish', region: 4 },
+  { sc: 'starCastle', id: 'harpGuardian', act: 'song', name: '癒しを鎮める調べ', kind: 'healSeal', region: 4, extra: ['vulnerable', 1] },
+  { sc: 'starCastle', id: 'thornFairy', act: 'tangle', name: 'いたずら仲間を呼ぶ', kind: 'call', region: 4, summon: 'windSprite', orElse: 'prick' },
+  { sc: 'starCastle', id: 'holyMoonWolf', act: 'bite', name: '弱った獲物への牙', kind: 'hunt', region: 5, amount: 14, element: 'holy' },
+  { sc: 'starCastle', id: 'skyKnight', act: 'guard', name: '天の盾', kind: 'guard', region: 5, alone: 'lance' },
 ];
 
 /** シナリオ1で付けた敵（第1弾・直し）と、災厄の中ボス（behavior だけ付けた）。亜種の確かめから外す */
@@ -134,7 +150,7 @@ describe('第2弾: 表のとおりの割り当て（行動の名前・札・予�
         expect(a.effects.slice(1)).toEqual([{ kind: 'damage', amount: r.amount, ...(r.element ? { element: r.element } : {}) }]);
         break;
       case 'purify':
-        expect(a.effects).toEqual([{ kind: 'purify', amount: r.region >= 4 ? 8 : 6 }]);
+        expect(a.effects.filter((e) => e.kind !== 'applyStatus')).toEqual([{ kind: 'purify', amount: r.region >= 4 ? 8 : 6 }]);
         expect(a.cutIn).toEqual({ when: 'afflicted', rest: 2 });
         // 順番の最後にも残す
         expect(def.actions.at(-1)!.id).toBe(r.act);
@@ -184,6 +200,25 @@ describe('第2弾: 1ターン目の予告・割り込み・優先', () => {
     s.turn = 2;
     decideIntent(e, s, { next: () => 0, int: () => 0 } as never);
     expect(s.enemies[0].intent?.actionId).toBe(r.act);
+  });
+});
+
+describe('第2弾: 元の状態異常を弱めて残した4体（効果を並べた時に、全部が働く）', () => {
+  it.each(ROUND2.filter((r) => r.extra).map((r) => [r.id, r.name, r] as const))('%s「%s」', (_id, _n, r) => {
+    let s = battle([r.id, 'r2Dummy'], 7, 2);
+    for (const a of s.allies) { a.hp = a.maxHp = 100; a.block = 0; }
+    const e = s.enemies[0];
+    e.hp = e.maxHp = 1000;
+    if (r.kind === 'purify') e.statuses = { ...e.statuses, poison: 2 };
+    e.intent = { actionId: r.act, targetId: s.allies[1].id };
+    s = nextTurn(s);
+    const [st, n] = r.extra!;
+    // 狙った1人にだけ付く
+    expect(s.allies[1].statuses[st] ?? 0).toBeGreaterThanOrEqual(n);
+    expect(s.allies[0].statuses[st] ?? 0).toBe(0);
+    if (r.kind === 'healSeal') for (const a of s.allies) expect(a.statuses.healSeal ?? 0).toBeGreaterThan(0);
+    if (r.kind === 'purify') expect(s.enemies[0].statuses.poison ?? 0).toBe(0);
+    if (NO_DAMAGE.includes(r.kind)) expect(s.enemies[0].block).toBe(blockFor(r));
   });
 });
 
