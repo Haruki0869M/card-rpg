@@ -5,9 +5,9 @@ import { BALANCE } from '../../data/balance';
 import { DUNGEONS } from '../../data/dungeons';
 import { ENEMIES } from '../../data/enemies';
 import { EVENTS } from '../../data/events';
-import { getRoomType } from '../../data/rules';
+import { DUNGEON_THEMES, getRoomType } from '../../data/rules';
 import { SCENARIOS } from '../../data/scenarios';
-import { DEPTH_TIER_NAME, depthStep, depthTier, dungeonRows, isLegacyLayout } from '../game/dungeon';
+import { DEPTH_TIER_NAME, depthStep, depthTier, dungeonRows, isLegacyLayout, roomKind } from '../game/dungeon';
 import { cardRewardOdds } from '../game/loot';
 import type { DungeonDef, GameCommand, GameState, PlayerId } from '../../types';
 import { applyGameCommand, buildDungeon, createGame, createRng } from '../index';
@@ -92,6 +92,9 @@ describe('固定ダンジョン28か所の形', () => {
     }
   });
 
+  // 憲章3「同じ種類の部屋の連続は禁止」に合わせる直し（docs/tasks/room-variety-plan.md）は、手作りの28か所では、
+  // 計画の決まり（同じ行を全部同じ種類にしない・道ごとの戦闘の数）を同時に守れない所があり、オーナーの決定待ち（docs/review/2026-11-13-room-variety.md）。
+  // それまでは、今までの決まりを確かめる
   it.each(fixed().map((d) => [d.id, d] as const))('%s: どの道でも 休憩→休憩なし・イベント→イベントなし・通常の戦闘は最大2連続', (_id, d) => {
     const paths = allPaths(d.layout!);
     expect(paths.length).toBeGreaterThan(1);
@@ -101,24 +104,42 @@ describe('固定ダンジョン28か所の形', () => {
   });
 });
 
+/** 同じ種類（扉の予兆と同じ分け方）の部屋が続いている所（無ければ undefined。憲章3。2026-11-13） */
+function sameKindOf(path: string[]): string | undefined {
+  for (let i = 1; i < path.length; i++) if (roomKind(path[i]) === roomKind(path[i - 1])) return `${path[i - 1]}→${path[i]}（${i}行目）`;
+  return undefined;
+}
+
 describe('ランダムダンジョンの偏り防止', () => {
-  it('種を変えても、どの道でも決まりを守る。行の数は 4＋ボス（段階7a で全5行。テーマなしでも・3つのテーマでも）', () => {
+  it('種を変えても、どの道でも同じ種類の部屋が続かない（扉の予兆と同じ分け方。2026-11-13 に全部の種類へ広げた）。行の数は 4＋ボス', () => {
     const randoms = DUNGEONS.all.filter((d) => d.random);
     expect(randoms).toHaveLength(7);
-    const eventIds = EVENTS.forScenario('corruptionKing')
-      .filter((e) => e.where !== 'map' && e.where !== 'spawn')
-      .map((e) => e.id);
-    for (const d of randoms) for (const theme of [undefined, 'crystalGrotto', 'sealedLabyrinth', 'outlawDen']) {
-      for (let seed = 1; seed <= 60; seed++) {
-        const run = buildDungeon(d.id, createRng(seed), 0, eventIds, theme);
-        expect(dungeonRows(run)).toBe(5);
-        const layout: Layout = [];
-        for (const room of run.rooms) (layout[room.row] ??= [])[room.col] = { type: room.type, next: room.next.map((id) => Number(id.split('c')[1])) };
-        for (const p of allPaths(layout)) expect(biasOf(p), `${d.id} seed${seed}: ${p.join('→')}`).toBeUndefined();
-        expect(isLegacyLayout(run)).toBe(false);
+    let layouts = 0;
+    for (const d of randoms) {
+      const eventIds = EVENTS.forScenario(DUNGEONS.scenarioOf(d.id)!)
+        .filter((e) => e.where !== 'map' && e.where !== 'spawn')
+        .map((e) => e.id);
+      for (const theme of [undefined, 'crystalGrotto', 'sealedLabyrinth', 'outlawDen']) {
+        for (let seed = 1; seed <= 100; seed++) {
+          const run = buildDungeon(d.id, createRng(seed * 7919 + 13), 0, eventIds, theme);
+          layouts++;
+          expect(dungeonRows(run)).toBe(5);
+          expect(isLegacyLayout(run)).toBe(false);
+          expect(run.rooms[0].type).toBe('battle');
+          // どの辺も、同じ type ではない・同じ種類（予兆）でもない
+          const by = new Map(run.rooms.map((r) => [r.id, r]));
+          for (const room of run.rooms) for (const n of room.next) expect(roomKind(by.get(n)!.type), `${d.id} ${theme} seed${seed}: ${room.id}→${n}`).not.toBe(roomKind(room.type));
+          const layout: Layout = [];
+          for (const room of run.rooms) (layout[room.row] ??= [])[room.col] = { type: room.type, next: room.next.map((id) => Number(id.split('c')[1])) };
+          for (const p of allPaths(layout)) expect(sameKindOf(p), `${d.id} seed${seed}: ${p.join('→')}`).toBeUndefined();
+          // テーマの部屋は最後の行（ボスの前）に1つ
+          if (theme) expect(layout[3].map((r) => r.type)).toEqual([getRoomType(DUNGEON_THEMES.get(theme).fixedRoom).id]);
+        }
       }
     }
+    expect(layouts).toBe(2800);
   });
+
 });
 
 describe('深さ（2行ごとに +1。段階3で 3行ごと → 2行ごと）', () => {

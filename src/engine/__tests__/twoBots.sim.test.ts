@@ -19,6 +19,7 @@
 // つまみの測定（2026-11-13）で足した環境変数:
 //   SIM_KNOBS（B1〜B4・H1〜H4・A1・A2・C1・C2・G1 をカンマで。下の KNOB_ALIAS の所に説明）・SIM_JSON（集計用の要約の書き出し先）・
 //   SIM_PARTY をカンマで複数書けるようにした（例: 2人,4人）
+// 部屋の連続の直し（2026-11-13）で SIM_JSON に足した数: クリアした冒険の戦闘の数・固定／ランダムダンジョンの中の戦闘の数・終わった時の平均レベル・転職の数
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -171,6 +172,10 @@ interface Run {
   refused: number;
   /** つまみの測定: 終わった時の1人あたりの所持金 */
   goldEnd: number;
+  /** 部屋の連続の直し（2026-11-13）: 固定のダンジョンの中・ランダムダンジョンの中で始まった戦闘の数・終わった時のパーティの平均レベル */
+  fixedDungeonFights: number;
+  randomDungeonFights: number;
+  levelEnd: number;
 }
 
 /** ボスの部屋・中ボスの部屋・災厄（災厄の戦闘は中ボスの印を持つ）の戦闘か */
@@ -183,7 +188,8 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
   const dungeonsOf = (g: GameState) => [g.dungeon, ...(g.expeditions ?? []).map((x) => x.dungeon)].filter((d): d is NonNullable<GameState['dungeon']> => !!d);
   const r: Run = { clear: false, corr100: false, where: '', fights: 0, rounds: 0, finished: 0, breaks: 0, randomIn: 0, randomDone: 0, scourgeKills: 0, jobChanges: 0, hones: 0, errors: 0,
     bigFinished: 0, bigRounds: 0, breakWhy: { weak: 0, perfect: 0, damage: 0 }, bigBreaks: 0, worldTurn: 0, corruption: 0, wiped: false, endMode: '', where2: {},
-    bought: 0, sold: 0, equips: 0, itemsBattle: 0, itemsField: 0, removed: 0, skipped: 0, refused: 0, goldEnd: 0 };
+    bought: 0, sold: 0, equips: 0, itemsBattle: 0, itemsField: 0, removed: 0, skipped: 0, refused: 0, goldEnd: 0,
+    fixedDungeonFights: 0, randomDungeonFights: 0, levelEnd: 0 };
   const entered = new Set<string>();
   H.hook = (pre, cmd, post, events) => {
     const b0 = battlesOf(pre);
@@ -207,6 +213,10 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
       const reg = tile !== undefined && w.tiles[tile] ? MAP_REGIONS[w.tiles[tile].r]?.id ?? '?' : '?';
       const key = `${reg}${sc.dungeon ? `/${sc.dungeon.dungeonId}` : ''}`;
       r.where2[key] = (r.where2[key] ?? 0) + 1;
+      if (sc.dungeon) {
+        if (DUNGEONS.get(sc.dungeon.dungeonId).random) r.randomDungeonFights++;
+        else r.fixedDungeonFights++;
+      }
     }
     // 回4: BREAK の理由ごと。どの戦闘の BREAK かは、BREAK した敵の uid を持つ戦闘（前か後の状態）で見る。
     // 戦闘が2つ同時にあって、どちらにも同じ uid の敵がいる時は、ボスの印のある方を数えない（少なめに数える）
@@ -250,6 +260,7 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
   r.worldTurn = game.world?.worldTurn ?? 0;
   r.corruption = game.world?.corruption ?? 0;
   r.goldEnd = game.heroes.reduce((n, h) => n + h.gold, 0) / Math.max(1, game.heroes.length);
+  r.levelEnd = game.heroes.reduce((n, h) => n + h.level, 0) / Math.max(1, game.heroes.length);
   const w = game.world;
   if (w) {
     r.randomDone = w.tiles.filter((t) => isRandomDungeonTile(t.f) && t.f!.used).length;
@@ -380,6 +391,9 @@ describe.skipIf(!process.env.SIM)(`物差し2本（直行 bot と工夫する bo
               breaks: a((r) => r.breaks), weak: a((r) => r.breakWhy.weak), perfect: a((r) => r.breakWhy.perfect), damage: a((r) => r.breakWhy.damage), bigBreaks: a((r) => r.bigBreaks),
               clearCorr: cl.length ? a((r) => r.corruption, cl) : null, clearTurn: cl.length ? a((r) => r.worldTurn, cl) : null,
               goldEnd: a((r) => r.goldEnd), goldEndClear: cl.length ? a((r) => r.goldEnd, cl) : null, errors: rs.reduce((n, r) => n + r.errors, 0),
+              fightsClear: cl.length ? a((r) => r.fights, cl) : null, fixedDungeonFights: a((r) => r.fixedDungeonFights), randomDungeonFights: a((r) => r.randomDungeonFights),
+              fixedDungeonFightsClear: cl.length ? a((r) => r.fixedDungeonFights, cl) : null,
+              levelEndClear: cl.length ? a((r) => r.levelEnd, cl) : null, levelEnd: a((r) => r.levelEnd), jobChanges: a((r) => r.jobChanges),
             });
           }
         }

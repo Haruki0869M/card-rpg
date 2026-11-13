@@ -7,6 +7,7 @@ import { DUNGEONS } from '../../data/dungeons';
 import type { ChestSpec, DungeonDef, DungeonRun, DungeonThemeDef, Rarity, Room, RoomType } from '../../types';
 import type { Rng } from '../rng';
 import { initDungeonPos } from './dungeonMap';
+import { omenOfType } from './dungeonOmen';
 
 export const RARITIES: Rarity[] = ['common', 'rare', 'epic', 'legend'];
 export const rarityIndex = (r: Rarity) => RARITIES.indexOf(r);
@@ -79,6 +80,12 @@ function rollChest(row: number, rng: Rng): ChestSpec {
   return { rarity: RARITIES[i], locked: rng.next() < 0.4 };
 }
 
+/**
+ * 部屋の「種類」（連続の決まりで使う分け方。扉の予兆と同じ: 戦闘・強敵・宝（宝箱と封魔の宝箱）・休憩・未知（イベント・祭壇・闇商人））。
+ * 予兆の無いボス・中ボスは、部屋の type のまま（どの種類とも違う）
+ */
+export const roomKind = (type: RoomType): string => omenOfType(type) ?? type;
+
 /** 途中の行の部屋の種類（部屋の種類のデータの layoutWeight の割合。x は 0〜1 の乱数） */
 function pickRoomType(x: number, banned: ReadonlySet<RoomType>): RoomType {
   const list = ROOM_TYPES.all.filter((t) => (t.layoutWeight ?? 0) > 0 && !banned.has(t.id));
@@ -91,10 +98,10 @@ function pickRoomType(x: number, banned: ReadonlySet<RoomType>): RoomType {
   return list[list.length - 1].id;
 }
 
-/** テーマの割合で部屋の種類を選ぶ（x は 0〜1 の乱数。偏り防止で出せない種類は除く。全部除かれたら宝箱） */
+/** テーマの割合で部屋の種類を選ぶ（x は 0〜1 の乱数。偏り防止で出せない種類は除く。全部除かれたら、ふつうの割合で出せる種類から選ぶ） */
 function pickThemeRoomType(x: number, weights: DungeonThemeDef['weights'], banned: ReadonlySet<RoomType>): RoomType {
   const list = Object.entries(weights).filter(([id, w]) => (w ?? 0) > 0 && !banned.has(id)) as [RoomType, number][];
-  if (!list.length) return 'chest';
+  if (!list.length) return pickRoomType(x, banned);
   const total = list.reduce((n, [, w]) => n + w, 0);
   let acc = 0;
   for (const [id, w] of list) {
@@ -117,22 +124,21 @@ function generateLayout(def: DungeonDef, rng: Rng, eventIds: string[], theme?: D
   for (let r = 0; r < rows; r++) {
     const w = widths[r];
     const nextW = r + 1 < rows ? widths[r + 1] : 1;
-    // 偏り防止（どの道でも: 休憩→休憩なし・イベント→イベントなし・通常の戦闘は最大2連続）。
-    // つながりに関係なく「前の行にその種類が1つでもあれば、この行には出さない」と決める（厳しめだが、どの道でも必ず守れる）
-    const prev = layout[r - 1]?.map((p) => p.type) ?? [];
-    const prev2 = layout[r - 2]?.map((p) => p.type) ?? [];
-    const banned = new Set<RoomType>();
-    if (prev.includes('rest')) banned.add('rest');
-    if (prev.includes('event')) banned.add('event');
-    if (prev.includes('battle') && prev2.includes('battle')) banned.add('battle');
-    if (theme && r === rows - 2) banned.add(theme.fixedRoom);
+    // 偏り防止（憲章3「同じ種類の部屋の連続出現は禁止」。2026-11-13 に全部の種類へ広げた）: どの道でも、続けて同じ種類の部屋に入らない。
+    // 種類は扉の予兆と同じ分け方（roomKind）。つながりに関係なく「前の行にその種類が1つでもあれば、この行には出さない」と決める
+    // （厳しめだが、どの道でも必ず守れる）。前の行は多くて3部屋なので、5つの種類のうち2つ以上は必ず残る（止まらない）
+    const prevKinds = new Set((layout[r - 1] ?? []).map((p) => roomKind(p.type)));
+    // テーマの部屋（最後の行）の手前の行には、テーマの部屋と同じ種類を出さない
+    if (theme && r === rows - 2) prevKinds.add(roomKind(theme.fixedRoom));
+    const banned = new Set<RoomType>(ROOM_TYPES.all.filter((t) => prevKinds.has(roomKind(t.id))).map((t) => t.id));
     const row = Array.from({ length: w }, (_, c) => {
       // 部屋の種類: 1行目は戦闘。最後の行の手前は休憩が出やすい
       let type: RoomType;
       const x = rng.next();
       if (r === 0) type = 'battle';
       else if (theme) type = r === rows - 1 ? theme.fixedRoom : pickThemeRoomType(x, theme.weights, banned);
-      else if (r === rows - 1) type = x < 0.6 && !banned.has('rest') ? 'rest' : 'chest';
+      // テーマなしの最後の行: 休憩か宝箱（どちらも前の行にあれば、ふつうの割合で出せる種類から）
+      else if (r === rows - 1) type = !banned.has('rest') && (x < 0.6 || banned.has('chest')) ? 'rest' : !banned.has('chest') ? 'chest' : pickRoomType(x, banned);
       else type = pickRoomType(x, banned);
       // 次の行への接続（位置が近い部屋へ。必ず1つ以上）
       const center = nextW === 1 ? 0 : Math.round((c / Math.max(1, w - 1)) * (nextW - 1));
