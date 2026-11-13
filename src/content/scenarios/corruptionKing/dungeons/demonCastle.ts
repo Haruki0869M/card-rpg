@@ -15,11 +15,11 @@ export const demonCastle: DungeonDef = {
   layout: [
     [{ type: 'battle', next: [0, 1] }],
     [
-      { type: 'battle', next: [0] },
+      { type: 'event', eventId: 'fallenTree', next: [0] },
       { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0, 1] },
     ],
     [
-      { type: 'elite', next: [0, 1] },
+      { type: 'battle', next: [0, 1] },
       { type: 'battle', next: [1] },
     ],
     [
@@ -28,20 +28,20 @@ export const demonCastle: DungeonDef = {
     ],
     [
       { type: 'battle', next: [0, 1] },
-      { type: 'elite', next: [1] },
+      { type: 'battle', next: [1] },
     ],
     [
       { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
-      { type: 'battle', next: [0] },
+      { type: 'elite', next: [0] },
     ],
     [{ type: 'midboss', next: [0] }],
     [{ type: 'rest', next: [0, 1] }],
     [
-      { type: 'battle', next: [0, 1] },
+      { type: 'elite', next: [0, 1] },
       { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
     ],
     [
-      { type: 'elite', next: [0, 1] },
+      { type: 'battle', next: [0, 1] },
       { type: 'battle', next: [0, 1] },
     ],
     [

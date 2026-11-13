@@ -120,47 +120,57 @@ function generateLayout(def: DungeonDef, rng: Rng, eventIds: string[], theme?: D
   const rows = def.rows ?? 6;
   const widths = Array.from({ length: rows }, (_, i) => (i === 0 ? 1 + rng.int(2) : 1 + rng.int(3)));
   if (theme) widths[rows - 1] = 1;
-  const layout: NonNullable<DungeonDef['layout']> = [];
-  for (let r = 0; r < rows; r++) {
-    const w = widths[r];
+  // 1. 道のつながりを先に決める（位置が近い部屋へ。必ず1つ以上）。部屋の種類は、つながりが全部決まってから決める
+  const nexts: number[][][] = widths.map((w, r) => {
     const nextW = r + 1 < rows ? widths[r + 1] : 1;
-    // 偏り防止（憲章3「同じ種類の部屋の連続出現は禁止」。2026-11-13 に全部の種類へ広げた）: どの道でも、続けて同じ種類の部屋に入らない。
-    // 種類は扉の予兆と同じ分け方（roomKind）。つながりに関係なく「前の行にその種類が1つでもあれば、この行には出さない」と決める
-    // （厳しめだが、どの道でも必ず守れる）。前の行は多くて3部屋なので、5つの種類のうち2つ以上は必ず残る（止まらない）
-    const prevKinds = new Set((layout[r - 1] ?? []).map((p) => roomKind(p.type)));
-    // テーマの部屋（最後の行）の手前の行には、テーマの部屋と同じ種類を出さない
-    if (theme && r === rows - 2) prevKinds.add(roomKind(theme.fixedRoom));
-    const banned = new Set<RoomType>(ROOM_TYPES.all.filter((t) => prevKinds.has(roomKind(t.id))).map((t) => t.id));
-    const row = Array.from({ length: w }, (_, c) => {
+    return Array.from({ length: w }, (_, c) => {
+      const center = nextW === 1 ? 0 : Math.round((c / Math.max(1, w - 1)) * (nextW - 1));
+      const next = new Set<number>([center]);
+      if (nextW > 1 && rng.next() < 0.5) next.add(Math.min(nextW - 1, Math.max(0, center + (rng.next() < 0.5 ? -1 : 1))));
+      return [...next].sort();
+    });
+  });
+  // 次の行のどの部屋にも入れない部屋が無いよう、つながっていない部屋へ前の行からつなぐ
+  for (let r = 1; r < rows; r++) {
+    for (let c = 0; c < widths[r]; c++) {
+      if (!nexts[r - 1].some((n) => n.includes(c))) {
+        const from = Math.min(widths[r - 1] - 1, Math.round((c / Math.max(1, widths[r] - 1)) * (widths[r - 1] - 1)));
+        nexts[r - 1][from] = [...new Set([...nexts[r - 1][from], c])].sort();
+      }
+    }
+  }
+  // 2. 部屋の種類。偏り防止（憲章3「同じ種類の部屋の連続出現は禁止」。2026-11-13）:
+  //   (a) どの道でも、続けて同じ種類の部屋に入らない（その部屋へつながる前の行の部屋の種類は出さない）。種類は扉の予兆と同じ分け方（roomKind）
+  //   (b) 同じ行の部屋は、なるべく全部ちがう種類にする。出せる種類が足りない時は、部屋の数は減らさず、(b) を「type が違う」→「決まりなし」の順にゆるめる（(a) は必ず守る）
+  const layout: NonNullable<DungeonDef['layout']> = [];
+  const baseTypes = ROOM_TYPES.all.filter((t) => (t.layoutWeight ?? 0) > 0);
+  const kindBan = (kinds: ReadonlySet<string>) => new Set<RoomType>(ROOM_TYPES.all.filter((t) => kinds.has(roomKind(t.id))).map((t) => t.id));
+  for (let r = 0; r < rows; r++) {
+    const row: NonNullable<DungeonDef['layout']>[number] = [];
+    for (let c = 0; c < widths[r]; c++) {
+      const parentKinds = new Set((layout[r - 1] ?? []).filter((_, pc) => nexts[r - 1][pc].includes(c)).map((p) => roomKind(p.type)));
+      // テーマの部屋（最後の行）の手前の行には、テーマの部屋と同じ種類を出さない
+      if (theme && r === rows - 2) parentKinds.add(roomKind(theme.fixedRoom));
+      const mustBan = kindBan(parentKinds);
+      const rowKinds = new Set(row.map((p) => roomKind(p.type)));
+      const tries = [kindBan(new Set([...parentKinds, ...rowKinds])), new Set<RoomType>([...mustBan, ...row.map((p) => p.type)]), mustBan];
+      const banned = tries.find((b) => baseTypes.some((t) => !b.has(t.id)))!;
       // 部屋の種類: 1行目は戦闘。最後の行の手前は休憩が出やすい
       let type: RoomType;
       const x = rng.next();
       if (r === 0) type = 'battle';
       else if (theme) type = r === rows - 1 ? theme.fixedRoom : pickThemeRoomType(x, theme.weights, banned);
-      // テーマなしの最後の行: 休憩か宝箱（どちらも前の行にあれば、ふつうの割合で出せる種類から）
+      // テーマなしの最後の行: 休憩か宝箱（どちらも出せなければ、ふつうの割合で出せる種類から）
       else if (r === rows - 1) type = !banned.has('rest') && (x < 0.6 || banned.has('chest')) ? 'rest' : !banned.has('chest') ? 'chest' : pickRoomType(x, banned);
       else type = pickRoomType(x, banned);
-      // 次の行への接続（位置が近い部屋へ。必ず1つ以上）
-      const center = nextW === 1 ? 0 : Math.round((c / Math.max(1, w - 1)) * (nextW - 1));
-      const next = new Set<number>([center]);
-      if (nextW > 1 && rng.next() < 0.5) next.add(Math.min(nextW - 1, Math.max(0, center + (rng.next() < 0.5 ? -1 : 1))));
-      return {
+      row.push({
         type,
-        next: [...next].sort(),
+        next: nexts[r][c],
         chest: getRoomType(type).behavior === 'chest' ? rollChest(r, rng) : undefined,
         eventId: getRoomType(type).behavior === 'event' ? pick(eventIds, rng) : undefined,
-      };
-    });
+      });
+    }
     layout.push(row);
-  }
-  // 次の行のどの部屋にも入れない部屋が無いよう、つながっていない部屋へ前の行からつなぐ
-  for (let r = 1; r < rows; r++) {
-    layout[r].forEach((_, c) => {
-      if (!layout[r - 1].some((p) => p.next.includes(c))) {
-        const from = Math.min(layout[r - 1].length - 1, Math.round((c / Math.max(1, layout[r].length - 1)) * (layout[r - 1].length - 1)));
-        layout[r - 1][from].next = [...new Set([...layout[r - 1][from].next, c])].sort();
-      }
-    });
   }
   layout.push([{ type: 'boss', next: [] }]);
   return layout;

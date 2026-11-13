@@ -41,8 +41,8 @@ type Layout = NonNullable<DungeonDef['layout']>;
 const factoryLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
-    { type: 'battle', next: [0, 1] },
-    { type: 'event', eventId: 'gearConveyor', next: [1, 2] },
+    { type: 'event', eventId: 'gearConveyor', next: [0, 1] },
+    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1, 2] },
   ],
   [
     { type: 'chest', chest: { rarity: 'common', locked: false }, next: [0, 1] },
@@ -51,10 +51,10 @@ const factoryLayout: Layout = [
   ],
   [
     { type: 'battle', next: [0, 1] },
-    { type: 'event', eventId: 'pressTrap', next: [0] },
+    { type: 'battle', next: [0] },
   ],
   [
-    { type: 'battle', next: [0] },
+    { type: 'event', eventId: 'pressTrap', next: [0] },
     { type: 'chest', chest: { rarity: 'rare', locked: true }, next: [0] },
   ],
   [{ type: 'rest', next: [0] }],
@@ -67,11 +67,11 @@ const plantLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
     { type: 'event', eventId: 'steamValve', next: [0, 1] },
-    { type: 'battle', next: [1] },
+    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1] },
   ],
   [
     { type: 'battle', next: [0, 1] },
-    { type: 'rest', next: [1, 2] },
+    { type: 'battle', next: [1, 2] },
   ],
   [
     { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
@@ -79,7 +79,7 @@ const plantLayout: Layout = [
     { type: 'event', eventId: 'coolantTank', next: [1] },
   ],
   [
-    { type: 'battle', next: [0, 1] },
+    { type: 'event', eventId: 'gearConveyor', next: [0, 1] },
     { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
   ],
   [
@@ -95,8 +95,8 @@ const plantLayout: Layout = [
 const towerLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
-    { type: 'battle', next: [0, 1] },
-    { type: 'event', eventId: 'scrapChest', next: [1, 2] },
+    { type: 'event', eventId: 'scrapChest', next: [0, 1] },
+    { type: 'rest', next: [1, 2] },
   ],
   [
     { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
@@ -104,19 +104,19 @@ const towerLayout: Layout = [
     { type: 'battle', next: [1] },
   ],
   [
-    { type: 'rest', next: [0, 1] },
+    { type: 'battle', next: [0, 1] },
     { type: 'event', eventId: 'peddlerBot', next: [1] },
   ],
   [
-    { type: 'battle', next: [0, 1] },
-    { type: 'battle', next: [1] },
+    { type: 'event', eventId: 'gearConveyor', next: [0, 1] },
+    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1] },
   ],
   [
     { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
-    { type: 'elite', next: [0, 1] },
+    { type: 'battle', next: [0, 1] },
   ],
   [
-    { type: 'battle', next: [0] },
+    { type: 'event', eventId: 'pressTrap', next: [0] },
     { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
   ],
   [{ type: 'rest', next: [0] }],
@@ -181,11 +181,11 @@ export const machineHeart: DungeonDef = {
   layout: [
     [{ type: 'battle', next: [0, 1] }],
     [
-      { type: 'battle', next: [0] },
+      { type: 'event', eventId: 'gearConveyor', next: [0] },
       { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0, 1] },
     ],
     [
-      { type: 'elite', next: [0, 1] },
+      { type: 'battle', next: [0, 1] },
       { type: 'battle', next: [1] },
     ],
     [
@@ -194,20 +194,20 @@ export const machineHeart: DungeonDef = {
     ],
     [
       { type: 'battle', next: [0, 1] },
-      { type: 'elite', next: [1] },
+      { type: 'battle', next: [1] },
     ],
     [
       { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
-      { type: 'battle', next: [0] },
+      { type: 'elite', next: [0] },
     ],
     [{ type: 'midboss', next: [0] }],
     [{ type: 'rest', next: [0, 1] }],
     [
-      { type: 'battle', next: [0, 1] },
+      { type: 'elite', next: [0, 1] },
       { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
     ],
     [
-      { type: 'elite', next: [0] },
+      { type: 'battle', next: [0] },
       { type: 'battle', next: [0] },
     ],
     [{ type: 'rest', next: [0] }],

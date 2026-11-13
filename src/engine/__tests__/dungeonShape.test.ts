@@ -92,15 +92,37 @@ describe('固定ダンジョン28か所の形', () => {
     }
   });
 
-  // 憲章3「同じ種類の部屋の連続は禁止」に合わせる直し（docs/tasks/room-variety-plan.md）は、手作りの28か所では、
-  // 計画の決まり（同じ行を全部同じ種類にしない・道ごとの戦闘の数）を同時に守れない所があり、オーナーの決定待ち（docs/review/2026-11-13-room-variety.md）。
-  // それまでは、今までの決まりを確かめる
-  it.each(fixed().map((d) => [d.id, d] as const))('%s: どの道でも 休憩→休憩なし・イベント→イベントなし・通常の戦闘は最大2連続', (_id, d) => {
-    const paths = allPaths(d.layout!);
+  // 憲章3「同じ種類の部屋の連続は禁止」（docs/tasks/room-variety-plan.md・docs/review/2026-11-13-room-variety.md。2026-11-13）:
+  // どの道でも、続けて同じ type の部屋に入らない（ふつうの戦闘→強敵・強敵→ボスは別の type）。
+  // どの道でも、ふつうの戦闘は鍵のダンジョンで2回以上・最後のダンジョンで4回以上
+  it.each(fixed().map((d) => [d.id, d] as const))('%s: どの辺も同じ type でない・どの道でも通常の戦闘が下限以上', (_id, d) => {
+    const L = d.layout!;
+    L.forEach((row, r) => row.forEach((room, c) => room.next.forEach((n) => expect(L[r + 1][n].type, `${r}:${c}→${r + 1}:${n}`).not.toBe(room.type))));
+    const paths = allPaths(L);
     expect(paths.length).toBeGreaterThan(1);
     for (const p of paths) expect(biasOf(p), p.join('→')).toBeUndefined();
+    const floor = d.finale ? 4 : 2;
+    for (const p of paths) expect(p.filter((t) => t === 'battle').length, p.join('→')).toBeGreaterThanOrEqual(floor);
     // どの道でも、ボスを入れて戦闘が3回以上ある（宝箱と休憩だけでは奥へ行けない）
     for (const p of paths) expect(p.filter((t) => getRoomType(t).battle).length, p.join('→')).toBeGreaterThanOrEqual(3);
+  });
+
+  // 同じ行の部屋は、全部ちがう type。道のつながりを変えずに「連続なし」と「戦闘の下限」を守るため、
+  // ここに書いた行だけは、ふつうの戦闘が2つ並ぶ（守れなかった所。docs/review/2026-11-13-room-variety.md）
+  const ROW_DUP_ALLOWED: Record<string, number[]> = {
+    emeraldTemple: [4], silentCatacomb: [2], lavaCavern: [], demonCastle: [2, 4, 9],
+    crystalCave: [3], sunkenCathedral: [2], giantMine: [], iceCastle: [2, 4, 9],
+    wreckCave: [3], pirateIsland: [2], sunkenTemple: [], ghostFlagship: [2, 4, 9],
+    scorpionTomb: [3], shadowLibrary: [2], statueTemple: [], sandPalace: [2, 4, 9],
+    windmillTower: [3], observatory: [2], moonlitGarden: [], skyCastle: [2, 4, 9],
+    gearFactory: [3], steamPlant: [2], clockTower: [], machineHeart: [2, 4, 9],
+    echoIceVault: [3], echoSandTomb: [2], echoGhostShip: [], dreamEaterLair: [2, 4, 9],
+  };
+  it.each(fixed().map((d) => [d.id, d] as const))('%s: 同じ行の部屋は全部ちがう type（決まった例外の行だけ、ふつうの戦闘が並ぶ）', (id, d) => {
+    expect(ROW_DUP_ALLOWED[id], id).toBeDefined();
+    const dupRows = d.layout!.flatMap((row, r) => (r > 0 && row.length > 1 && new Set(row.map((x) => x.type)).size < row.length ? [r] : []));
+    expect(dupRows).toEqual(ROW_DUP_ALLOWED[id]);
+    for (const r of dupRows) expect(d.layout![r].every((x) => x.type === 'battle'), `${r}`).toBe(true);
   });
 });
 
@@ -115,6 +137,8 @@ describe('ランダムダンジョンの偏り防止', () => {
     const randoms = DUNGEONS.all.filter((d) => d.random);
     expect(randoms).toHaveLength(7);
     let layouts = 0;
+    let rowDups = 0;
+    let multiRows = 0;
     for (const d of randoms) {
       const eventIds = EVENTS.forScenario(DUNGEONS.scenarioOf(d.id)!)
         .filter((e) => e.where !== 'map' && e.where !== 'spawn')
@@ -132,12 +156,20 @@ describe('ランダムダンジョンの偏り防止', () => {
           const layout: Layout = [];
           for (const room of run.rooms) (layout[room.row] ??= [])[room.col] = { type: room.type, next: room.next.map((id) => Number(id.split('c')[1])) };
           for (const p of allPaths(layout)) expect(sameKindOf(p), `${d.id} seed${seed}: ${p.join('→')}`).toBeUndefined();
+          // 同じ行の部屋は、なるべく全部ちがう type（1行目の戦闘は除く。出せる種類が足りない時だけ重なる）
+          layout.forEach((row, r) => {
+            if (r > 0 && row.length > 1 && new Set(row.map((x) => x.type)).size < row.length) rowDups++;
+            if (r > 0 && row.length > 1) multiRows++;
+          });
           // テーマの部屋は最後の行（ボスの前）に1つ
           if (theme) expect(layout[3].map((r) => r.type)).toEqual([getRoomType(DUNGEON_THEMES.get(theme).fixedRoom).id]);
         }
       }
     }
     expect(layouts).toBe(2800);
+    // 2026-11-13 の測定: 部屋が2つ以上の行 3955 のうち、重なりは 49（前は 2191）。2% を超えたら作り方を見直す
+    expect(multiRows).toBeGreaterThan(3000);
+    expect(rowDups / multiRows).toBeLessThan(0.02);
   });
 
 });

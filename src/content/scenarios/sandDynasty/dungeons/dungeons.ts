@@ -45,8 +45,8 @@ type Layout = NonNullable<DungeonDef['layout']>;
 const scorpionTombLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
-    { type: 'battle', next: [0, 1] },
-    { type: 'event', eventId: 'sandCollapse', next: [1, 2] },
+    { type: 'event', eventId: 'sandCollapse', next: [0, 1] },
+    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1, 2] },
   ],
   [
     { type: 'chest', chest: { rarity: 'common', locked: false }, next: [0, 1] },
@@ -55,10 +55,10 @@ const scorpionTombLayout: Layout = [
   ],
   [
     { type: 'battle', next: [0, 1] },
-    { type: 'event', eventId: 'tombTrap', next: [0] },
+    { type: 'battle', next: [0] },
   ],
   [
-    { type: 'battle', next: [0] },
+    { type: 'event', eventId: 'tombTrap', next: [0] },
     { type: 'chest', chest: { rarity: 'rare', locked: true }, next: [0] },
   ],
   [{ type: 'rest', next: [0] }],
@@ -71,11 +71,11 @@ const shadowLibraryLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
     { type: 'event', eventId: 'hieroglyphWall', next: [0, 1] },
-    { type: 'battle', next: [1] },
+    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1] },
   ],
   [
     { type: 'battle', next: [0, 1] },
-    { type: 'rest', next: [1, 2] },
+    { type: 'battle', next: [1, 2] },
   ],
   [
     { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
@@ -83,7 +83,7 @@ const shadowLibraryLayout: Layout = [
     { type: 'event', eventId: 'undergroundSpring', next: [1] },
   ],
   [
-    { type: 'battle', next: [0, 1] },
+    { type: 'event', eventId: 'sandCollapse', next: [0, 1] },
     { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
   ],
   [
@@ -99,8 +99,8 @@ const shadowLibraryLayout: Layout = [
 const statueTempleLayout: Layout = [
   [{ type: 'battle', next: [0, 1] }],
   [
-    { type: 'battle', next: [0, 1] },
-    { type: 'event', eventId: 'rubbleChest', next: [1, 2] },
+    { type: 'event', eventId: 'rubbleChest', next: [0, 1] },
+    { type: 'rest', next: [1, 2] },
   ],
   [
     { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
@@ -108,19 +108,19 @@ const statueTempleLayout: Layout = [
     { type: 'battle', next: [1] },
   ],
   [
-    { type: 'rest', next: [0, 1] },
+    { type: 'battle', next: [0, 1] },
     { type: 'event', eventId: 'ghostCaravan', next: [1] },
   ],
   [
-    { type: 'battle', next: [0, 1] },
-    { type: 'battle', next: [1] },
+    { type: 'event', eventId: 'sandCollapse', next: [0, 1] },
+    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1] },
   ],
   [
     { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
-    { type: 'elite', next: [0, 1] },
+    { type: 'battle', next: [0, 1] },
   ],
   [
-    { type: 'battle', next: [0] },
+    { type: 'event', eventId: 'tombTrap', next: [0] },
     { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
   ],
   [{ type: 'rest', next: [0] }],
@@ -185,11 +185,11 @@ export const sandPalace: DungeonDef = {
   layout: [
     [{ type: 'battle', next: [0, 1] }],
     [
-      { type: 'battle', next: [0] },
+      { type: 'event', eventId: 'sandCollapse', next: [0] },
       { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0, 1] },
     ],
     [
-      { type: 'elite', next: [0, 1] },
+      { type: 'battle', next: [0, 1] },
       { type: 'battle', next: [1] },
     ],
     [
@@ -198,20 +198,20 @@ export const sandPalace: DungeonDef = {
     ],
     [
       { type: 'battle', next: [0, 1] },
-      { type: 'elite', next: [1] },
+      { type: 'battle', next: [1] },
     ],
     [
       { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
-      { type: 'battle', next: [0] },
+      { type: 'elite', next: [0] },
     ],
     [{ type: 'midboss', next: [0] }],
     [{ type: 'rest', next: [0, 1] }],
     [
-      { type: 'battle', next: [0, 1] },
+      { type: 'elite', next: [0, 1] },
       { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
     ],
     [
-      { type: 'elite', next: [0] },
+      { type: 'battle', next: [0] },
       { type: 'battle', next: [0] },
     ],
     [{ type: 'rest', next: [0] }],

@@ -17,8 +17,8 @@ export const crystalCave: DungeonDef = {
   layout: [
     [{ type: 'battle', next: [0, 1] }],
     [
-      { type: 'battle', next: [0, 1] },
-      { type: 'event', eventId: 'frostBridge', next: [1, 2] },
+      { type: 'event', eventId: 'frostBridge', next: [0, 1] },
+      { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1, 2] },
     ],
     [
       { type: 'chest', chest: { rarity: 'common', locked: false }, next: [0, 1] },
@@ -27,10 +27,10 @@ export const crystalCave: DungeonDef = {
     ],
     [
       { type: 'battle', next: [0, 1] },
-      { type: 'event', eventId: 'buriedChest', next: [0] },
+      { type: 'battle', next: [0] },
     ],
     [
-      { type: 'battle', next: [0] },
+      { type: 'event', eventId: 'buriedChest', next: [0] },
       { type: 'chest', chest: { rarity: 'rare', locked: true }, next: [0] },
     ],
     [{ type: 'rest', next: [0] }],
@@ -56,11 +56,11 @@ export const sunkenCathedral: DungeonDef = {
     [{ type: 'battle', next: [0, 1] }],
     [
       { type: 'event', eventId: 'iceSilhouette', next: [0, 1] },
-      { type: 'battle', next: [1] },
+      { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1] },
     ],
     [
       { type: 'battle', next: [0, 1] },
-      { type: 'rest', next: [1, 2] },
+      { type: 'battle', next: [1, 2] },
     ],
     [
       { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
@@ -68,7 +68,7 @@ export const sunkenCathedral: DungeonDef = {
       { type: 'event', eventId: 'frozenCamp', next: [1] },
     ],
     [
-      { type: 'battle', next: [0, 1] },
+      { type: 'event', eventId: 'frostBridge', next: [0, 1] },
       { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
     ],
     [
@@ -98,8 +98,8 @@ export const giantMine: DungeonDef = {
   layout: [
     [{ type: 'battle', next: [0, 1] }],
     [
-      { type: 'battle', next: [0, 1] },
-      { type: 'event', eventId: 'buriedChest', next: [1, 2] },
+      { type: 'event', eventId: 'buriedChest', next: [0, 1] },
+      { type: 'rest', next: [1, 2] },
     ],
     [
       { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
@@ -107,19 +107,19 @@ export const giantMine: DungeonDef = {
       { type: 'battle', next: [1] },
     ],
     [
-      { type: 'rest', next: [0, 1] },
+      { type: 'battle', next: [0, 1] },
       { type: 'event', eventId: 'furTrader', next: [1] },
     ],
     [
-      { type: 'battle', next: [0, 1] },
-      { type: 'battle', next: [1] },
+      { type: 'event', eventId: 'frostBridge', next: [0, 1] },
+      { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1] },
     ],
     [
       { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
-      { type: 'elite', next: [0, 1] },
+      { type: 'battle', next: [0, 1] },
     ],
     [
-      { type: 'battle', next: [0] },
+      { type: 'event', eventId: 'frozenMural', next: [0] },
       { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
     ],
     [{ type: 'rest', next: [0] }],
@@ -142,11 +142,11 @@ export const iceCastle: DungeonDef = {
   layout: [
     [{ type: 'battle', next: [0, 1] }],
     [
-      { type: 'battle', next: [0] },
+      { type: 'event', eventId: 'frostBridge', next: [0] },
       { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0, 1] },
     ],
     [
-      { type: 'elite', next: [0, 1] },
+      { type: 'battle', next: [0, 1] },
       { type: 'battle', next: [1] },
     ],
     [
@@ -155,20 +155,20 @@ export const iceCastle: DungeonDef = {
     ],
     [
       { type: 'battle', next: [0, 1] },
-      { type: 'elite', next: [1] },
+      { type: 'battle', next: [1] },
     ],
     [
       { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
-      { type: 'battle', next: [0] },
+      { type: 'elite', next: [0] },
     ],
     [{ type: 'midboss', next: [0] }],
     [{ type: 'rest', next: [0, 1] }],
     [
-      { type: 'battle', next: [0, 1] },
+      { type: 'elite', next: [0, 1] },
       { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
     ],
     [
-      { type: 'elite', next: [0] },
+      { type: 'battle', next: [0] },
       { type: 'battle', next: [0] },
     ],
     [{ type: 'rest', next: [0] }],
