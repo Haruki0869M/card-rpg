@@ -99,8 +99,10 @@ describe('3つ目の地域の町の店に、必ず1つ並ぶ', () => {
   it('同じ種なら同じ品。種が違えば、候補が全部出る。冒険の間（入れ替え・売り切れの後）も同じ品', () => {
     for (const sc of SCENARIOS.all) {
       const picks = new Set<string>();
+      // 本物の冒険（createGame）でも、種とシナリオだけで決まる（重いので3種だけ）
+      for (let seed = 1; seed <= 3; seed++) expect(featuredShopItemOf(game(sc.id, seed)), sc.id).toBe(featuredShopItemOf({ seed, scenarioId: sc.id }));
       for (let seed = 1; seed <= 200; seed++) {
-        const a = featuredShopItemOf(game(sc.id, seed));
+        const a = featuredShopItemOf({ seed, scenarioId: sc.id });
         expect(featuredShopItemOf({ seed, scenarioId: sc.id })).toBe(a);
         picks.add(a);
       }
