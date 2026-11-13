@@ -16,12 +16,14 @@ const waves = () => [...dungeons().flatMap(d => [...d.pools.battle,...d.pools.el
 const legacy: Record<string, { battle: string[][]; elite: string[][]; boss: string[] }> = {
   emeraldTemple: { battle: [['forestWolf','forestWolf'],['toxicShroom','forestWolf'],['goblinScout','toxicShroom','goblinScout'],['chaosShaman','forestWolf'],['toxicShroom','toxicShroom','forestWolf']], elite: [['treeWarden'],['goblinBrute','chaosShaman']], boss:['treantKing'] },
   silentCatacomb: { battle: [['bogGhoul','bogGhoul'],['mireSlime','bogGhoul'],['mireSlime','mireSlime','bogGhoul'],['bogGhoul','bogGhoul','mireSlime']], elite:[['bogWraith','bogGhoul'],['bogWraith']], boss:['mordea'] },
-  lavaCavern: { battle:[['fireSalamander','ashBat'],['ashBat','ashBat','fireSalamander'],['fireSalamander','fireSalamander']], elite:[['magmaGolem'],['magmaGolem','ashBat']], boss:['ignavarl'] },
+  // 敵の特殊な行動の直し（docs/tasks/enemy-behaviors-fix-plan.md §3・2026-11-13）: 火山の2組を、特殊な行動の敵の入った組に入れ替えた（オーナーが OK）
+  lavaCavern: { battle:[['fireSalamander','cinderHound'],['basaltCrawler','ashBat','fireSalamander'],['fireSalamander','fireSalamander']], elite:[['magmaGolem'],['magmaGolem','ashBat']], boss:['ignavarl'] },
   demonCastle: { battle:[['darkKnight','ashBat'],['darkKnight','darkKnight'],['bogWraith','darkKnight']], elite:[['gatekeeper']], boss:['valgrim'] },
 };
 const legacyMap: Record<string,string[][]> = {
  castleRegion:[['darkKnight'],['darkKnight','ashBat'],['bogWraith','darkKnight']],
- volcano:[['fireSalamander','ashBat'],['magmaGolem'],['ashBat','ashBat','fireSalamander']],
+ // 敵の特殊な行動の直し（同上）: 「火トカゲ＋灰コウモリ」→「火トカゲ＋炭火の猟犬」、「灰コウモリ×2＋火トカゲ」→「玄武岩の虫＋灰コウモリ＋火トカゲ」
+ volcano:[['fireSalamander','cinderHound'],['magmaGolem'],['basaltCrawler','ashBat','fireSalamander']],
  swamp:[['bogGhoul','bogGhoul'],['mireSlime','bogGhoul'],['bogWraith','mireSlime']],
  forest:[['forestWolf','forestWolf'],['toxicShroom','forestWolf'],['goblinScout','toxicShroom']],
  plains:[['goblinScout'],['goblinScout','goblinScout'],['chaosShaman','goblinScout']],

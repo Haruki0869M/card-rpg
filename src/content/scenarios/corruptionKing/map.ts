@@ -28,7 +28,8 @@ export const corruptionKingMap: ScenarioMapDef = {
       // 丘は東の帯の地形（段階6a で足した。帯の倍率で東に多く出る）
       terrain: { ash: 4, mountain: 2, lava: 1, hills: 1 },
       enemyLevel: 7,
-      encounters: [['fireSalamander', 'ashBat'], ['magmaGolem'], ['ashBat', 'ashBat', 'fireSalamander'], ["cinderHound", "ironAshBat"], ["basaltCrawler", "ashBat"]],
+      // 敵の特殊な行動の直し（docs/tasks/enemy-behaviors-fix-plan.md §3）: 特殊な行動の敵がいる組を 2 → 4（5組のうち）に。敵の数は変えない
+      encounters: [['fireSalamander', 'cinderHound'], ['magmaGolem'], ['basaltCrawler', 'ashBat', 'fireSalamander'], ["cinderHound", "ironAshBat"], ["basaltCrawler", "ashBat"]],
       wanderers: 7,
       // 宝箱は東の盆地の1つを含めて5つ
       chests: 4,

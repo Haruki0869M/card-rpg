@@ -29,7 +29,7 @@ import { affinityOf } from '../stats';
 import { calcDamage } from './damage';
 import { discardHand, drawCards, reshuffleBlockedText } from './deck';
 import { applyEffect, checkEffect, comboMultiplier, dealDamage, elementMultiplier, makeCtx, targetOf } from './effects';
-import { breakStopsAction, decideAllIntents, fallbackLoneIntents } from './intents';
+import { blockSkippedOnBreak, breakStopsAction, decideAllIntents, fallbackUselessIntent } from './intents';
 import { finalChance, selectTier } from './probability';
 import { helpedAllies, recordSupport, selfSnapshot, supportSnapshot } from './support';
 import { afterAttackCard, attackElement, consumeAttackCharge, cardElements, cardHpCost, chargedMultiplier, tierHpCost } from './cardState';
@@ -862,8 +862,9 @@ function enemyStep(state: BattleState, rng: Rng, events: BattleEvent[]): string 
 }
 
 function executeIntent(state: BattleState, enemy: EnemyState, rng: Rng, events: BattleEvent[]) {
-  // 念のため: 行動する時にかばう相手がいなければ、代わりの行動にする（ふつうは敵が倒れた時点で変わっている。古い保存のため）
-  if (enemy.intent && !state.enemies.some((o) => !o.dead && o !== enemy)) fallbackLoneIntents(state, rng, events);
+  // 空振りを無くす: 行動する時に、かばう相手がいない・仲間を呼べない（予告の後に満員・回数切れ）なら、代わりのふつうの攻撃にする
+  // （かばうは、ふつうは敵が倒れた時点で変わっている。古い保存のためにも、ここで見る）
+  fallbackUselessIntent(state, enemy, rng, events);
   const intent = enemy.intent;
   if (!intent) return;
   const action = getEnemyAction(enemy.defId, intent.actionId);
@@ -920,7 +921,11 @@ function executeIntent(state: BattleState, enemy: EnemyState, rng: Rng, events: 
   events.push({ type: 'enemyAct', enemyUid: enemy.uid, actionName: action.name, targetIds: ctx.hitIds });
   const actionMultiplier = enemy.nextActionMultiplier ?? 1;
   delete enemy.nextActionMultiplier;
-  for (const eff of action.effects) applyEffect(ctx, 'amount' in eff && eff.amount !== undefined ? { ...eff, amount: Math.floor(eff.amount * actionMultiplier) } : eff);
+  for (const eff of action.effects) {
+    // 特殊な行動に足したブロックは、BREAK されていると付かない（崩れた体勢で守りは固められない。ブロックは BREAK で0のまま）
+    if (enemy.broken && blockSkippedOnBreak(action, eff)) continue;
+    applyEffect(ctx, 'amount' in eff && eff.amount !== undefined ? { ...eff, amount: Math.floor(eff.amount * actionMultiplier) } : eff);
+  }
   for (const n of ctx.fired) abilityTriggered(state, enemy.uid, n.name, events, n.source);
   addLog(state, `${enemyName(enemy)}「${action.name}」${ctx.parts.join(' / ')}`);
   enemy.intent = undefined;

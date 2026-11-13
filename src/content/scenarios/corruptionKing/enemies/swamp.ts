@@ -44,7 +44,8 @@ export const mireSlime: EnemyDef = {
     { id: 'tackle', name: '体当たり', effects: [{ kind: 'damage', element: 'poison', amount: 5, hits: 2 }] },
     // 敵の特殊な行動 1回目（docs/tasks/enemy-behaviors-plan.md §7）: 守る行動「泥の膜」を浄化（脱皮）に置き換えた。ID は古い保存のために残す
     // 1ターン目は状態異常がまだ付いていない事が多く空振りになるので、順番の最後に回した
-    { id: 'harden', name: '浄化の脱皮', big: true, hint: '状態異常を全部消して回復する。その前に起爆するか、BREAK する', effects: [{ kind: 'purify', amount: 6 }] },
+    // 直し（docs/tasks/enemy-behaviors-fix-plan.md §3）: 自分に悪い状態異常がある時は、順番を飛ばして割り込む（割り込んだら次の2ターンは割り込まない）。順番の3番目にも残す
+    { id: 'harden', name: '浄化の脱皮', big: true, behavior: 'purify', cutIn: { when: 'afflicted', rest: 2 }, hint: '状態異常を全部消して回復する。その前に起爆するか、BREAK する', effects: [{ kind: 'purify', amount: 6 }] },
   ],
 };
 

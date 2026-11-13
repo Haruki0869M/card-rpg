@@ -14,11 +14,14 @@ export const darkKnight: EnemyDef = {
   gold: 18,
   pattern: 'random',
   maxConsecutive: 2,
+  // 敵の特殊な行動の直し（docs/tasks/enemy-behaviors-fix-plan.md §3）: ほかの敵がいる時は、1ターン目に必ず「かばう」（1体だけの時は闇の剣に変わる）
+  firstActionId: 'guard',
   actions: [
     { id: 'slash', name: '闇の剣', effects: [{ kind: 'damage', element: 'dark', amount: 15 }] },
     // 敵の特殊な行動 1回目（docs/tasks/enemy-behaviors-plan.md §7）: 守る行動「鉄壁」をかばうに置き換えた。ID は古い保存のために残す
     // 自分以外の敵がいない時は、かばう相手がいないので「闇の剣」に変える（予告もその攻撃になる）
-    { id: 'guard', name: 'かばう', big: true, fallbackIfAloneId: 'slash', hint: '次の味方の番の間、ほかの敵への単体攻撃を代わりに受ける。全体攻撃は通る', effects: [{ kind: 'guardAllies' }] },
+    // 直し（§3）: ブロック10を足した（BREAK されると、行動ごと止まり、ブロックも付かない）
+    { id: 'guard', name: 'かばう', big: true, behavior: 'guard', fallbackIfAloneId: 'slash', hint: '次の味方の番の間、ほかの敵への単体攻撃を代わりに受ける。全体攻撃は通る', effects: [{ kind: 'guardAllies' }, { kind: 'block', amount: 10 }] },
     { id: 'cleave', name: 'なぎ払い', effects: [{ kind: 'damage', amount: 9, to: 'foes' }] },
   ],
 };

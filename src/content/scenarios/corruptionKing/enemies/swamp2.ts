@@ -15,11 +15,14 @@ export const reedStalker: EnemyDef = {
   weak: ["fire", "thunder"],
   resist: ["poison"],
   pattern: "sequence",
+  // 敵の特殊な行動の直し（docs/tasks/enemy-behaviors-fix-plan.md §3）: 手数読みを1ターン目に予告する（2ターン目からは葦の鎌・二枚の刃・手数読みの順）
+  firstActionId: "cover",
   actions: [
     {"id": "slash", "name": "葦の鎌", "effects": [{"kind": "damage", "amount": 8}]},
     {"id": "pair", "name": "二枚の刃", "effects": [{"kind": "damage", "amount": 4, "hits": 2}]},
     // 敵の特殊な行動 1回目（docs/tasks/enemy-behaviors-plan.md §7）: 「葦にまぎれる」（守る）を手数読みに置き換えた。ID は古い保存のために残す
-    {"id": "cover", "name": "手数読み", big: true, hint: "このターンにカードを4枚以上使った味方に、枚数×2のダメージ", "effects": [{"kind": "punishPlays", "amount": 2, "min": 4}]},
+    // 直し（§3）: ブロック8を足した（BREAK されると付かない）
+    {"id": "cover", "name": "手数読み", big: true, behavior: "punish", hint: "このターンにカードを4枚以上使った味方に、枚数×2のダメージ", "effects": [{"kind": "punishPlays", "amount": 2, "min": 4}, {"kind": "block", "amount": 8}]},
   ],
 };
 

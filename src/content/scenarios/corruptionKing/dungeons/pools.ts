@@ -33,9 +33,11 @@ export const SWAMP_POOLS: DungeonDef['pools'] = {
 
 // 灼熱の火山
 export const VOLCANO_POOLS: DungeonDef['pools'] = {
+  // 敵の特殊な行動の直し（docs/tasks/enemy-behaviors-fix-plan.md §3）: 世界マップの組と同じ考えで、特殊な行動の敵がいる組を 2 → 4（5組のうち）に。
+  // 「火トカゲ＋灰コウモリ」→「火トカゲ＋炭火の猟犬」、「灰コウモリ×2＋火トカゲ」→「玄武岩の虫＋灰コウモリ＋火トカゲ」（敵の数は変えない）
   battle: [
-    ['fireSalamander', 'ashBat'],
-    ['ashBat', 'ashBat', 'fireSalamander'],
+    ['fireSalamander', 'cinderHound'],
+    ['basaltCrawler', 'ashBat', 'fireSalamander'],
     ['fireSalamander', 'fireSalamander'],
     ["cinderHound", "ironAshBat"],
     ["basaltCrawler", "ashBat"],

@@ -20,10 +20,13 @@
 //   SIM_KNOBS（B1〜B4・H1〜H4・A1・A2・C1・C2・G1 をカンマで。下の KNOB_ALIAS の所に説明）・SIM_JSON（集計用の要約の書き出し先）・
 //   SIM_PARTY をカンマで複数書けるようにした（例: 2人,4人）
 // 部屋の連続の直し（2026-11-13）で SIM_JSON に足した数: クリアした冒険の戦闘の数・固定／ランダムダンジョンの中の戦闘の数・終わった時の平均レベル・転職の数
+// 敵の特殊な行動の直し（2026-11-13）で足した数: 特殊な行動（7種類）が、予告された・実際に行われた・BREAK で止められた回数（種類ごと・1冒険の平均）。
+//   テストの側で数える（エンジンの結果は変えない）。どの行動が特殊な行動かは、行動の効果の種類で見分ける（直す前と後で同じ見分け方）
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import type { BattleEvent, GameCommand, GameState, PlayerId } from '../../types';
+import type { BattleEvent, EnemyActionDef, GameCommand, GameState, PlayerId } from '../../types';
+import { getEnemyAction } from '../../data/enemies';
 
 type Hook = (pre: GameState, cmd: GameCommand, post: GameState, events: BattleEvent[]) => void;
 const H: { hook?: Hook } = {};
@@ -132,6 +135,24 @@ type BotKind = 'straight' | 'clever' | 'smart';
 const BOTS = (process.env.SIM_BOTS ?? 'straight,clever,smart').split(',').filter(Boolean) as BotKind[];
 const TARGET: Record<string, string> = { '2人': '35〜50%', '3人': '（目標なし。2人と4人の間）', '4人': '30〜45%' };
 
+/** 敵の特殊な行動（7種類）。効果の種類で見分ける */
+const SPECIALS = { punish: '手数読み', guard: 'かばう', healSeal: '癒し封じ', call: '増援', hunt: '手負い狙い', shatter: '盾砕き', purify: '浄化' } as const;
+type SpecialKind = keyof typeof SPECIALS;
+function specialOf(a: EnemyActionDef): SpecialKind | undefined {
+  for (const e of a.effects) {
+    if (e.kind === 'punishPlays') return 'punish';
+    if (e.kind === 'guardAllies') return 'guard';
+    if (e.kind === 'purify') return 'purify';
+    if (e.kind === 'summonEnemy' && e.call) return 'call';
+    if (e.kind === 'shieldBreak') return 'shatter';
+    if (e.kind === 'applyStatus' && e.status === 'healSeal') return 'healSeal';
+    if (e.kind === 'damage' && e.lowHpMul) return 'hunt';
+  }
+  return undefined;
+}
+type SpecialCount = Record<SpecialKind, { said: number; done: number; broke: number }>;
+const emptySpecials = (): SpecialCount => Object.fromEntries(Object.keys(SPECIALS).map((k) => [k, { said: 0, done: 0, broke: 0 }])) as SpecialCount;
+
 const WHERE = ['鍵1の前', '鍵1の中', '鍵2の前', '鍵2の中', '鍵3の前', '鍵3の中', '最後の前', '最後の中'] as const;
 
 interface Run {
@@ -176,6 +197,8 @@ interface Run {
   fixedDungeonFights: number;
   randomDungeonFights: number;
   levelEnd: number;
+  /** 敵の特殊な行動の直し: 種類ごとの、予告された・実際に行われた・BREAK で止められた（崩された）回数 */
+  sp: SpecialCount;
 }
 
 /** ボスの部屋・中ボスの部屋・災厄（災厄の戦闘は中ボスの印を持つ）の戦闘か */
@@ -189,8 +212,10 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
   const r: Run = { clear: false, corr100: false, where: '', fights: 0, rounds: 0, finished: 0, breaks: 0, randomIn: 0, randomDone: 0, scourgeKills: 0, jobChanges: 0, hones: 0, errors: 0,
     bigFinished: 0, bigRounds: 0, breakWhy: { weak: 0, perfect: 0, damage: 0 }, bigBreaks: 0, worldTurn: 0, corruption: 0, wiped: false, endMode: '', where2: {},
     bought: 0, sold: 0, equips: 0, itemsBattle: 0, itemsField: 0, removed: 0, skipped: 0, refused: 0, goldEnd: 0,
-    fixedDungeonFights: 0, randomDungeonFights: 0, levelEnd: 0 };
+    fixedDungeonFights: 0, randomDungeonFights: 0, levelEnd: 0, sp: emptySpecials() };
   const entered = new Set<string>();
+  /** 予告を数えた印（戦闘の種:敵:ターン。同じ予告を2回数えない） */
+  const said = new Set<string>();
   H.hook = (pre, cmd, post, events) => {
     const b0 = battlesOf(pre);
     const b1 = battlesOf(post);
@@ -228,6 +253,25 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
       if (hit.length && hit.every((b) => isBig(b))) r.bigBreaks++;
     }
     r.breaks += events.filter((e) => e.type === 'break').length;
+    // 特殊な行動: 予告（後の状態に出ている予告）・実行（前の状態の予告と同じ名前で行動した）・BREAK（前の状態で特殊な行動を予告していた敵が崩された）
+    for (const b of b1) for (const en of b.enemies) {
+      if (en.dead || !en.intent) continue;
+      const k = specialOf(getEnemyAction(en.defId, en.intent.actionId));
+      const key = `${b.seed}:${en.uid}:${b.turn}`;
+      if (!k || said.has(key)) continue;
+      said.add(key);
+      r.sp[k].said++;
+    }
+    const preEnemies = b0.flatMap((b) => b.enemies.map((x) => ({ x, b })));
+    for (const e of events) {
+      if (e.type !== 'enemyAct' && e.type !== 'break') continue;
+      const hit = preEnemies.find(({ x }) => x.uid === e.enemyUid && !!x.intent && (e.type === 'break' ? !x.broken : getEnemyAction(x.defId, x.intent.actionId).name === e.actionName));
+      const k = hit?.x.intent && specialOf(getEnemyAction(hit.x.defId, hit.x.intent.actionId));
+      if (!k || !hit) continue;
+      // 増援: 呼べずに代わりの攻撃をした時（直す前は、同じ名前のまま代わりの攻撃をしていた）は、行ったに数えない
+      if (k === 'call' && e.type === 'enemyAct' && (b1.find((b) => b.seed === hit.b.seed)?.enemies.length ?? 0) <= hit.b.enemies.length) continue;
+      r.sp[k][e.type === 'break' ? 'broke' : 'done']++;
+    }
     const d0 = dungeonsOf(pre).length;
     for (const d of dungeonsOf(post).slice(d0)) {
       entered.add(d.dungeonId);
@@ -362,6 +406,20 @@ describe.skipIf(!process.env.SIM)(`物差し2本（直行 bot と工夫する bo
           L.push(`| ${p} | ${name[k]} | **${f(pct(cl.length, rs.length))}%**（${cl.length}/${rs.length}） | ${lost.filter((r) => r.wiped).length} / ${lost.filter((r) => r.corr100).length} / ${lost.filter((r) => !r.wiped && !r.corr100).length} | ${f(a((r) => r.fights), 1)} | ${f(fin ? rs.reduce((n, r) => n + r.rounds, 0) / fin : NaN, 2)} | ${f(a((r) => r.bigFinished), 1)} | ${f(bigFin ? rs.reduce((n, r) => n + r.bigRounds, 0) / bigFin : NaN, 2)} | ${f(a((r) => r.breaks), 1)}（${f(a((r) => r.breakWhy.weak), 1)}・${f(a((r) => r.breakWhy.perfect), 1)}・${f(a((r) => r.breakWhy.damage), 1)}） | ${f(a((r) => r.bigBreaks), 1)} | ${f(a((r) => r.worldTurn, cl), 1)} | ${f(a((r) => r.corruption, cl), 1)} |`);
         }
       }
+      // 敵の特殊な行動の直し: 特殊な行動の回数（1冒険の平均。予告 / 実行 / BREAK で止めた）
+      L.push('', '## 5. 敵の特殊な行動の回数（1冒険の平均。予告された / 実際に行われた / 予告の後に BREAK された）', '');
+      L.push(`| 人数 | bot | ${Object.values(SPECIALS).join(' | ')} | 合計 |`);
+      L.push(`|---|---|${Object.keys(SPECIALS).map(() => '---|').join('')}---|`);
+      for (const [p, by] of Object.entries(all)) {
+        for (const k of BOTS) {
+          const rs = by[k];
+          if (!rs?.length) continue;
+          const cell = (fn: (c: SpecialCount[SpecialKind]) => number, kinds: SpecialKind[]) => avg(rs.map((r) => kinds.reduce((n, s) => n + fn(r.sp[s]), 0)));
+          const tri = (kinds: SpecialKind[]) => `${f(cell((c) => c.said, kinds), 2)} / ${f(cell((c) => c.done, kinds), 2)} / ${f(cell((c) => c.broke, kinds), 2)}`;
+          const kinds = Object.keys(SPECIALS) as SpecialKind[];
+          L.push(`| ${p} | ${name[k]} | ${kinds.map((s) => tri([s])).join(' | ')} | ${tri(kinds)} |`);
+        }
+      }
       const others = Object.values(all).flatMap((by) => BOTS.flatMap((k) => by[k] ?? [])).filter((r) => !r.clear && !r.wiped && !r.corr100).map((r) => r.endMode);
       if (others.length) L.push('', `負けの「ほか」の終わり方（game.mode）: ${[...new Set(others)].map((m) => `${m || '(空)'} ${others.filter((x) => x === m).length}`).join('・')}`);
       const where2: Record<string, number> = {};
@@ -394,6 +452,7 @@ describe.skipIf(!process.env.SIM)(`物差し2本（直行 bot と工夫する bo
               fightsClear: cl.length ? a((r) => r.fights, cl) : null, fixedDungeonFights: a((r) => r.fixedDungeonFights), randomDungeonFights: a((r) => r.randomDungeonFights),
               fixedDungeonFightsClear: cl.length ? a((r) => r.fixedDungeonFights, cl) : null,
               levelEndClear: cl.length ? a((r) => r.levelEnd, cl) : null, levelEnd: a((r) => r.levelEnd), jobChanges: a((r) => r.jobChanges),
+              specials: Object.fromEntries((Object.keys(SPECIALS) as SpecialKind[]).map((s) => [s, { said: a((r) => r.sp[s].said), done: a((r) => r.sp[s].done), broke: a((r) => r.sp[s].broke) }])),
             });
           }
         }

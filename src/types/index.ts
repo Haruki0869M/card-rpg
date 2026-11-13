@@ -415,7 +415,25 @@ export interface EnemyActionDef {
   big?: boolean;
   /** 予告の説明（何が起きるか・どうすれば止まるか。予告をタップした説明に出す。敵の特殊な行動 1回目） */
   hint?: string;
+  /**
+   * 敵の特殊な行動の種類（予告の枠の目立つ札と、いつも出す1行の案内を決める。src/data/enemyBehaviors.ts）。
+   * 特殊な行動の効果（手数読み・かばう・癒し封じ・仲間を呼ぶ・手負い狙い・盾砕き・浄化）を持つ行動には必ず付ける（テストで確かめる）
+   */
+  behavior?: EnemyBehaviorId;
+  /** いつも出す1行の案内（省略は種類ごとの既定の文） */
+  brief?: string;
+  /**
+   * 割り込み・優先（敵の特殊な行動の直し）: 条件が合う時は、決め方（順番・ランダム）を飛ばして、この行動を予告する。
+   * 割り込んだ時、順番の位置は進めない（次のターンは元の順番の続きから）。順番の中にも、ふつうに残る。
+   * - when: 'afflicted' = 自分に悪い状態異常が付いている（浄化） / 'canSummon' = この行動で仲間を呼べる（生きている敵が上限より少ない・回数が残っている）
+   * - rest: 1回割り込んだら、次の rest ターンは割り込まない（省略は2）
+   * - noRepeat: 2ターン続けては、この行動をしない（続く時は代わりの行動。仲間を呼ぶ）
+   */
+  cutIn?: { when: 'afflicted' | 'canSummon'; rest?: number; noRepeat?: boolean };
 }
+
+/** 敵の特殊な行動の種類（手数読み・かばう・癒し封じ・仲間を呼ぶ・手負い狙い・盾砕き・浄化） */
+export type EnemyBehaviorId = 'punish' | 'guard' | 'healSeal' | 'call' | 'hunt' | 'shatter' | 'purify';
 
 export interface EnemyDef {
   id: string;
@@ -428,6 +446,10 @@ export interface EnemyDef {
   /** 行動の決め方（src/engine/battle/ai/ のID。sequence = 順番 / random = ランダム） */
   pattern: string;
   actions: EnemyActionDef[];
+  /**
+   * 戦闘の1ターン目に必ず予告する行動（最初の段階だけ）。順番の敵は、2ターン目からその行動の次から続ける。
+   * 単独の時の代わり（fallbackIfAloneId）・呼べない時の代わり（orElse）は、ほかの行動と同じに働く
+   */
   firstActionId?: string;
   /** レベルが1上がるごとのHP・攻撃の増加率（省略は balance.ts の共通値） */
   hpPerLevel?: number;
@@ -661,6 +683,8 @@ export interface EnemyState {
   broken?: boolean;
   /** かばう（魔王軍の騎士）: ほかの敵を狙った単体攻撃のカードのダメージを代わりに受ける。敵の番の始め・倒れた時に消える */
   guarding?: boolean;
+  /** 最後に割り込み・優先（EnemyActionDef.cutIn）で予告を決めた時の戦闘のターン（任意。古い保存には無い = 割り込める） */
+  cutInTurn?: number;
 }
 
 export type Phase = 'ally' | 'enemy' | 'victory' | 'defeat' | 'escaped';

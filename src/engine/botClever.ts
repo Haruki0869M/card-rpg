@@ -173,7 +173,7 @@ const blockOnly = (card: CardDef) => card.target === 'self' && card.tiers.every(
 const healCard = (card: CardDef) => isAllyCard(card) && card.tiers.some((t) => t.effects.some((e) => e.kind === 'heal'));
 
 /** 予告から読める、このターンの注意（画面の予告の欄に出ている事だけ） */
-interface Warnings {
+export interface Warnings {
   /** 手数読み: 1人がこのターンに使ってよいカードの枚数（無ければ Infinity） */
   playLimit: number;
   /** 盾砕きで狙われている味方（ブロックに頼らない） */
@@ -182,7 +182,8 @@ interface Warnings {
   healSeal: boolean;
 }
 
-function readWarnings(b: BattleState): Warnings {
+/** テストでも使う（敵の特殊な行動の直しで、新しい形の行動でも働くかを確かめる） */
+export function readWarnings(b: BattleState): Warnings {
   const w: Warnings = { playLimit: Infinity, shieldBreak: new Set(), healSeal: false };
   for (const e of b.enemies) {
     if (e.dead || !e.intent) continue;

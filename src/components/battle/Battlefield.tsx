@@ -187,11 +187,28 @@ function IntentBubble({ enemy, onTap }: { enemy: EnemyState; onTap: () => void }
           data-intent={enemy.uid}
           data-intent-big={view.big || undefined}
           data-intent-broken={view.broken || undefined}
-          style={view.broken ? { borderColor: 'rgba(251,191,36,.9)' } : view.big ? { borderColor: 'rgba(255,90,90,.95)', boxShadow: '0 0 8px rgba(255,80,80,.7), 0 2px 0 rgba(0,0,0,.6)' } : undefined}
+          data-intent-behavior={(!view.broken && view.behavior?.id) || undefined}
+          style={
+            view.broken
+              ? { borderColor: 'rgba(251,191,36,.9)' }
+              : view.behavior
+                ? { borderColor: 'rgba(216,180,254,.95)', boxShadow: '0 0 8px rgba(192,132,252,.8), 0 2px 0 rgba(0,0,0,.6)' }
+                : view.big
+                  ? { borderColor: 'rgba(255,90,90,.95)', boxShadow: '0 0 8px rgba(255,80,80,.7), 0 2px 0 rgba(0,0,0,.6)' }
+                  : undefined
+          }
         >
-          {/* 大技の予告（体勢を崩せる）。崩した後は「BREAK」の札に変わる */}
+          {/* 大技の予告（体勢を崩せる）。崩した後は「BREAK」の札に変わる。敵の特殊な行動は、赤い「大技」ではなく紫の札（⚠️手数読み など） */}
           {view.broken ? (
             <span className="order-first rounded bg-amber-400 px-1 text-[12px] leading-4 font-black whitespace-nowrap text-amber-950" data-break-mark>⚡BREAK</span>
+          ) : view.behavior ? (
+            <span
+              className="order-first rounded bg-gradient-to-b from-fuchsia-500 to-purple-700 px-1 text-[12px] leading-4 font-black whitespace-nowrap text-white ring-1 ring-amber-300/90"
+              data-behavior-mark={view.behavior.id}
+            >
+              {view.behavior.icon}
+              {view.behavior.label}
+            </span>
           ) : view.big ? (
             <span className="order-first flex items-center rounded bg-red-600 px-1 text-[12px] leading-4 font-black whitespace-nowrap text-white" data-big-mark><Flame size={12} strokeWidth={2.8} />大技</span>
           ) : null}
@@ -354,6 +371,7 @@ const EnemyUnit = memo(function EnemyUnit({
           <ElementMarks defId={enemy.defId} />
           {/* 次の行動の予告（HPのすぐ下。誰を狙っているかの顔つき） */}
           <IntentBubble enemy={enemy} onTap={onTap} />
+          {!narrow && <BehaviorBrief enemy={enemy} maxW={slotW - 8} />}
           <BreakHint enemy={enemy} narrow={narrow} maxW={narrow ? slotW - 4 : slotW - 8} />
           <AimMarks battle={battle} enemyUid={enemy.uid} />
           <StatusChips s={enemy.statuses} side="enemy" onTap={onTap} tauntedBy={enemy.tauntedBy} guarding={enemy.guarding} />
@@ -362,6 +380,27 @@ const EnemyUnit = memo(function EnemyUnit({
     </div>
   );
 });
+
+/**
+ * 敵の特殊な行動の直し: 特殊な行動の予告の札の下に、いつも出す短い1行の案内（例:「4枚以上使うと反撃」）。
+ * 長押ししなくても見える。敵が3体以上で枠が狭い時は出さない（札だけ。文は長押しの説明で読める）。崩した後は出さない
+ */
+function BehaviorBrief({ enemy, maxW }: { enemy: EnemyState; maxW: number }) {
+  const brief = useBattle((s) => {
+    const v = enemy.dead ? null : intentView(s.battle, enemy);
+    return v && !v.broken ? v.behavior?.brief : undefined;
+  });
+  if (!brief) return null;
+  return (
+    <span
+      className="w-max rounded bg-purple-950/90 px-1 text-center text-[12px] leading-4 font-bold text-fuchsia-100 ring-1 ring-fuchsia-300/70 [overflow-wrap:anywhere] [word-break:keep-all]"
+      style={{ maxWidth: Math.max(60, maxW) }}
+      data-behavior-brief
+    >
+      {brief}
+    </span>
+  );
+}
 
 /**
  * 回2: 大技の予告の枠のすぐ下に、カードを選ぶ前からいつも出す BREAK の印。
