@@ -36,14 +36,32 @@ export const BALANCE = {
   enemyHpByRegion: {} as Readonly<Record<string, number>>,
   /**
    * 地域ごとの敵の攻撃の倍率（キー = 地図の地域の id。書いていない地域は 1）。地域の決め方は enemyHpByRegion と同じ。
-   * 2026-11-13 つまみの測定: 測るための入れ物（既定は空 = 今と同じ）
+   * 2026-11-13 つまみの測定: 測るための入れ物。
+   * 2026-11-13 オーナーの決定（案Y の A2）: 7本のシナリオとも、進む順で3つ目の地域より後（3つ目を含む）の敵の攻撃 ×1.5。
+   * 地域の id は各シナリオの map.ts の regions（上 = 最後の地域・下 = 始まりの地域）の、下の2つを除いた物（docs/review/2026-11-13-plan-y.md）
    */
-  enemyAttackByRegion: {} as Readonly<Record<string, number>>,
+  enemyAttackByRegion: {
+    // シナリオ1 侵食の魔王: 嘆きの沼・灼熱の火山・魔王城の荒野
+    swamp: 1.5, volcano: 1.5, castleRegion: 1.5,
+    // 凍てつく王国: 凍てついた湖・吹雪の山脈・氷の城の荒野
+    frozenLake: 1.5, blizzardRange: 1.5, iceCastleWaste: 1.5,
+    // 砂塵の王朝: 砂丘の海・王家の谷・砂塵の王宮前
+    duneSea: 1.5, royalValley: 1.5, palaceWaste: 1.5,
+    // 機械仕掛けの帝国: 蒸気の谷・動力炉・大機械の心臓部
+    steamValley: 1.5, powerPlant: 1.5, heartCore: 1.5,
+    // 呪われた群島: 霧の海域・呪われた島々・沈没船の海
+    mistSea: 1.5, cursedIsles: 1.5, wreckSea: 1.5,
+    // 星降る天空城: 星見の丘・月の庭園・天空城の前庭
+    starHill: 1.5, moonGarden: 1.5, skyCastleGate: 1.5,
+    // 夢幻の大迷宮（地域が6つ）: 氷の記憶・砂と機械の記憶・空と海の記憶・夢の最奥
+    iceMemory: 1.5, sandMachineMemory: 1.5, skySeaMemory: 1.5, dreamCore: 1.5,
+  } as Readonly<Record<string, number>>,
   /**
    * 敵の格ごとのHPの倍率（boss = ボスの部屋 / midboss = 中ボスの部屋と災厄 / elite = 強敵の部屋 / normal = それ以外。書いていない格は 1）。
-   * 2026-11-13 つまみの測定: 測るための入れ物（既定は空 = 今と同じ）
+   * 2026-11-13 つまみの測定: 測るための入れ物。
+   * 2026-11-13 オーナーの決定（案Y の H4）: ボス・中ボス・災厄の HP ×2
    */
-  enemyHpByRank: {} as Readonly<Partial<Record<'boss' | 'midboss' | 'elite' | 'normal', number>>>,
+  enemyHpByRank: { boss: 2, midboss: 2 } as Readonly<Partial<Record<'boss' | 'midboss' | 'elite' | 'normal', number>>>,
   /**
    * 稼いだお金（戦闘の報酬・宝箱・売値・災厄や町を守った報酬・袋が満杯で換えたお金。earnGold を通る物全部）の倍率。端数は切り捨て。
    * 初期の所持金・仲間からの送金には掛けない。2026-11-13 つまみの測定: 測るための入れ物（既定 1 = 今と同じ）
@@ -220,15 +238,18 @@ export const BALANCE = {
   /**
    * BREAK（体勢崩し。抜本的な見直し §3-2・オーナーの決定 3-A）: 敵が大技の予告を出しているターンに、
    * 弱点の属性で攻撃する／完全成功で攻撃を当てる／そのターンの合計ダメージが最大HPの breakDamagePct% 以上、のどれかで崩せる。
-   * 崩すと、その予告の威力が breakPower 倍・breakStatus（今は脆弱）breakWeak・ブロック0。1つの予告に1回
+   * 崩すと、その予告の威力が breakPower 倍・breakStatus（今は脆弱）breakWeak・ブロック0。1つの予告に1回。
+   * 2026-11-13 案Y（オーナーの決定）: ボス・中ボス・災厄は「弱点の属性で、しかも完全成功」の時だけ崩れる（弱点を持たない大物は完全成功で崩れる。
+   * 合計ダメージでは崩れない）。下の breakDamagePctByRank・breakNeedsWeakPerfect・breakNeedsWeakPerfectRanks。強敵・ふつうの敵は上の3つのどれか
    */
   breakDamagePct: 20,
   /**
    * 敵の格ごとの「合計ダメージで BREAK」の線（%）。書いていない格は breakDamagePct。Infinity = 合計ダメージでは崩れない（弱点・完全成功だけ）。
    * 格: boss = ボスの部屋 / midboss = 中ボスの部屋と災厄 / elite = 強敵の部屋（封魔の宝箱・町を襲う敵を含む）/ normal = それ以外。
-   * 2026-11-13 回4: 測るための入れ物（既定は空 = 今と同じ）
+   * 2026-11-13 回4: 測るための入れ物。
+   * 2026-11-13 オーナーの決定（案Y の BA）: ボス・中ボス・災厄は合計ダメージでは崩れない（強敵・ふつうの敵は breakDamagePct のまま）
    */
-  breakDamagePctByRank: {} as Readonly<Partial<Record<'boss' | 'midboss' | 'elite' | 'normal', number>>>,
+  breakDamagePctByRank: { boss: Infinity, midboss: Infinity } as Readonly<Partial<Record<'boss' | 'midboss' | 'elite' | 'normal', number>>>,
   /**
    * 敵の格ごとに「完全成功だけで崩れるか」（false = 崩れない。弱点・合計ダメージの線は別）。書いていない格は true（今のまま）。
    * カードの能力で崩す物（魔力の楔の「成功1でも崩せる」・閃光の破砕玉・崩しの効果）は、ここに関係なく今のまま崩せる。
@@ -238,15 +259,17 @@ export const BALANCE = {
   /**
    * true = 憲章4の文のとおり「弱点の属性で、しかも完全成功」の時だけ崩れる（弱点を持たない敵は、完全成功だけで崩れる）。
    * 合計ダメージの線は breakDamagePctByRank で別に決める。カードの能力で崩す物は今のまま。
-   * 2026-11-13 つまみの測定: 測るための入れ物（既定 false = 今と同じ）
+   * 2026-11-13 つまみの測定: 測るための入れ物。
+   * 2026-11-13 オーナーの決定（案Y の BA）: true（当てる格は breakNeedsWeakPerfectRanks = ボス・中ボス・災厄だけ）
    */
-  breakNeedsWeakPerfect: false as boolean,
+  breakNeedsWeakPerfect: true as boolean,
   /**
    * breakNeedsWeakPerfect を当てる格（書いていない = 全部の格）。例: ['boss', 'midboss'] = 大物だけ「弱点で、しかも完全成功」。
    * ほかの格は今の決まりのまま（弱点・完全成功・合計ダメージのどれかで崩れる）。
-   * 2026-11-13 つまみの測定2（ア）: 測るための入れ物（既定は undefined = 今と同じ。breakNeedsWeakPerfect が false の間は読まない）
+   * 2026-11-13 つまみの測定2（ア）: 測るための入れ物。
+   * 2026-11-13 オーナーの決定（案Y の BA）: ['boss', 'midboss']（ボス・中ボスの部屋と災厄。災厄の戦闘は中ボスの印を持つ）
    */
-  breakNeedsWeakPerfectRanks: undefined as readonly ('boss' | 'midboss' | 'elite' | 'normal')[] | undefined,
+  breakNeedsWeakPerfectRanks: ['boss', 'midboss'] as readonly ('boss' | 'midboss' | 'elite' | 'normal')[] | undefined,
   /**
    * true = 「弱点で、しかも完全成功」の決まりの時でも、その味方の手札・山札・捨て札に、その敵の弱点を突けるカードが1枚も無ければ、
    * その味方の完全成功で崩せる（判定は src/engine/battle/breakRules.ts）。

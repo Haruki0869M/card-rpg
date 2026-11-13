@@ -8,8 +8,34 @@
 import { cardModifier, cardTraitAbilities, convertedElement } from '../abilities';
 import { cardOf } from '../../data/cards';
 import { getEnemy } from '../../data/enemies';
-import type { AllyState, CardDef, EnemyState } from '../../types';
+import type { AllyState, BattleState, CardDef, EnemyState } from '../../types';
 import { attackElement } from './cardState';
+import { breakDamagePctOf, needsWeakPerfect, perfectAloneBreaks } from './effects';
+
+/**
+ * 案Y（2026-11-13）: その敵の大技の予告を「どうすれば崩せるか」の決まり（画面の説明が読む。エンジンの決まりの関数から作るので、ずれない）。
+ * - weak = その敵の弱点の属性（一時的な弱点＝油壺も含む）
+ * - weakAndPerfect = 弱点の属性で、しかも完全成功の時だけ崩れる（ボス・中ボス・災厄で弱点を持つ敵）
+ * - perfectAlone = 完全成功だけで崩れる（弱点を持たない大物・強敵・ふつうの敵）
+ * - weakAlone = 弱点の属性なら、完全成功でなくても崩れる（強敵・ふつうの敵）
+ * - damagePct = 合計ダメージで崩れる線（%。合計ダメージでは崩れない時は undefined）
+ * カードの能力で崩す物（魔力の楔・閃光の破砕玉・崩しの効果）は、どの決まりでも崩せる（ここには入れない）
+ */
+export interface BreakRule { weak: string[]; weakAndPerfect: boolean; perfectAlone: boolean; weakAlone: boolean; damagePct?: number }
+export function breakRuleOf(state: Pick<BattleState, 'boss' | 'midboss' | 'elite'>, enemy: EnemyState): BreakRule {
+  const def = getEnemy(enemy.defId);
+  const weak = [...new Set([...(def.weak ?? []), ...(enemy.tempWeak ? [enemy.tempWeak] : [])])];
+  const strict = needsWeakPerfect(state);
+  const perfectAlone = perfectAloneBreaks(state, enemy);
+  const pct = breakDamagePctOf(state);
+  return {
+    weak,
+    weakAndPerfect: strict && weak.length > 0 && !perfectAlone,
+    perfectAlone,
+    weakAlone: !strict && weak.length > 0,
+    ...(Number.isFinite(pct) ? { damagePct: pct } : {}),
+  };
+}
 
 /** そのカードが、その敵の弱点を突ける攻撃か（ダメージの効果のどれか1つでも） */
 export function cardHitsWeakness(ally: AllyState, card: CardDef, enemy: EnemyState): boolean {

@@ -7,6 +7,7 @@ import { getEnemyAction } from '../data/enemies';
 import { breakStopsAction, describeEffect, enemyHitDamage, findAlly, lowHpMulOn, targetOf } from '../engine';
 import { behaviorBadge } from '../data/enemyBehaviors';
 import { blockSkippedOnBreak } from '../engine';
+import { breakRuleOf } from '../engine/battle/breakRules';
 import type { BattleState, CardDef, CardEffect, EnemyBehaviorId, EnemyState, StatusId } from '../types';
 
 export { CATEGORY_LABEL };
@@ -113,9 +114,30 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
   // ダメージの無い大技（浄化・仲間を呼ぶ・かばう・癒し封じ）は、BREAK すると起きない（battle.ts の executeIntent）
   const stops = breakStopsAction(action);
   if (enemy.broken) details.unshift(stops ? '体勢が崩れている（BREAK）: この行動は起きない' : '体勢が崩れている（BREAK）: この行動の威力は半分');
-  else if (action.big) details.unshift(`大技！ 弱点の属性で攻撃・完全成功で攻撃・このターンに最大HPの${BALANCE.breakDamagePct}%のダメージ、のどれかで体勢を崩せる（BREAK: ${stops ? 'この行動は起きない' : '威力が半分'}・${breakStatusText()}・ブロック0）`);
+  else if (action.big) details.unshift(`大技！ ${breakHowText(state, enemy)}（BREAK: ${stops ? 'この行動は起きない' : '威力が半分'}・${breakStatusText()}・ブロック0）`);
   const badge = behaviorBadge(action);
   return { parts, name: action.name, details, big: !!action.big, broken: !!enemy.broken, ...(action.hint ? { hint: action.hint } : {}), ...(badge ? { behavior: badge } : {}) };
+}
+
+/** 属性の名前を「・」でつなぐ（例: 「雷・聖」） */
+export const elementNames = (ids: readonly string[]) => ids.map((id) => getElement(id).name).join('・');
+
+/**
+ * 案Y（2026-11-13）: その敵の大技を崩す方法の文（予告の長押しの説明）。決まりは breakRules.ts の breakRuleOf から読む（決まりと文がずれないように）。
+ * 例（ボス・中ボス・災厄）: 「ボス・中ボス・災厄の大技は、弱点の属性（雷・聖）で、しかも完全成功で攻撃した時だけ体勢を崩せる（完全成功だけ・大きなダメージでは崩れない）」
+ * 例（強敵・ふつう）: 「弱点の属性（火）で攻撃・完全成功で攻撃・このターンに最大HPの20%のダメージ、のどれかで体勢を崩せる」
+ */
+export function breakHowText(state: Pick<BattleState, 'boss' | 'midboss' | 'elite'>, enemy: EnemyState): string {
+  const r = breakRuleOf(state, enemy);
+  if (r.weakAndPerfect) return `ボス・中ボス・災厄の大技は、弱点の属性（${elementNames(r.weak)}）で、しかも完全成功で攻撃した時だけ体勢を崩せる（完全成功だけ${r.damagePct === undefined ? '・大きなダメージ' : ''}では崩れない）`;
+  const ways = [
+    ...(r.weakAlone ? [`弱点の属性（${elementNames(r.weak)}）で攻撃`] : []),
+    ...(r.perfectAlone ? ['完全成功で攻撃'] : []),
+    ...(r.damagePct !== undefined ? [`このターンに最大HPの${r.damagePct}%のダメージ`] : []),
+  ];
+  if (!ways.length) return 'カードや道具の「崩す」力でだけ体勢を崩せる';
+  const how = ways.length > 1 ? `${ways.join('・')}、のどれかで体勢を崩せる` : `${ways[0]}${ways[0].endsWith('攻撃') ? 'した時' : 'を与えた時'}に体勢を崩せる`;
+  return r.damagePct === undefined ? `${how}（大きなダメージでは崩れない）` : how;
 }
 
 /** BREAK で敵に付く状態の文（例: 「脆弱1」。balance.ts の breakStatus・breakWeak から作る） */

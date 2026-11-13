@@ -3,9 +3,20 @@
 import { BALANCE } from '../../data/balance';
 import { getStatus } from '../../data/statuses';
 import { OMEN_INFO } from '../../engine/game/dungeonOmen';
+import { breakDamagePctOf, needsWeakPerfect } from '../../engine/battle/effects';
 
 /** BREAK で敵に付く状態（例: 「脆弱1」） */
 const breakStatusText = () => `${getStatus(BALANCE.breakStatus).name}${BALANCE.breakWeak}`;
+/**
+ * 案Y（2026-11-13）: ボス・中ボス・災厄の BREAK の決まりの文。決まりの関数（effects の needsWeakPerfect・breakDamagePctOf）から作る（決まりと文がずれないように）。
+ * 大物に別の決まりが無ければ空
+ */
+function bigBreakText(): string {
+  const big = { boss: true };
+  if (!needsWeakPerfect(big)) return '';
+  const dmg = Number.isFinite(breakDamagePctOf(big));
+  return `ただし、ボス・中ボス・災厄の大技は、弱点の属性で、しかも完全成功で攻撃した時だけ崩せます（完全成功だけ${dmg ? '' : '・大きなダメージ'}では崩れません。弱点を持たない相手は、完全成功で崩せます）。予告の下の「⚡弱点（属性）で完全成功 → BREAK」が目印です。`;
+}
 
 export type HelpTopicId =
   | 'flow'
@@ -108,7 +119,7 @@ export const HELP_TOPICS: HelpTopic[] = [
       `連携: 同じターンに別の仲間が攻撃した敵を攻撃すると、ダメージが増えます。2人目は「連携」＋${pct(BALANCE.comboBonus[1])}、3人目は「大連携」＋${pct(BALANCE.comboBonus[2])}、4人目は「極連携」＋${pct(BALANCE.comboBonus[3])}。攻める順番を相談しましょう。`,
       '完全成功に連携やジョブの能力が重なると、ダメージの数字が大きく金色に光ります（3つ重なると光の輪も）。見た目だけで、ダメージは同じです。',
       '敵の頭の上には、次の行動（攻撃・防御など）が出ています。守るか攻めるかの目安にしましょう。',
-      `赤い「大技」の印が付いた予告は、体勢を崩せます（BREAK）。そのターンのうちに、弱点の属性で攻撃する・完全成功で攻撃を当てる・最大HPの${BALANCE.breakDamagePct}%以上のダメージを与える、のどれかで、その行動の威力が半分・${breakStatusText()}・ブロック0になります。`,
+      `赤い「大技」の印が付いた予告は、体勢を崩せます（BREAK）。そのターンのうちに、弱点の属性で攻撃する・完全成功で攻撃を当てる・最大HPの${BALANCE.breakDamagePct}%以上のダメージを与える、のどれかで、その行動の威力が半分・${breakStatusText()}・ブロック0になります。${bigBreakText()}`,
       '紫の札（⚠️手数読み・🛡️かばう・🚫癒し封じ・📢増援・🎯手負い狙い・🔨盾砕き・✨浄化）は、敵の特殊な行動です。札の下の1行が、何が起きるかの目安です（予告を長押しすると、止め方も読めます）。これも大技なので、BREAK すると止まるか、威力が半分になります。',
       '属性の攻撃は、完全成功なら必ず状態異常が付きます（氷＝凍結で行動を止める、雷＝痺れで30%失敗、火＝火傷）。カードを選ぶと、予測の所に出ます。',
       'マナを使い切ったら、右下の『ターン終了』。全員が終えると敵の番です（オンラインでは『準備完了』）。',
@@ -222,7 +233,7 @@ export const GLOSSARY: { term: string; text: string; topic?: HelpTopicId }[] = [
   { term: '完全成功', text: '全部の枠が成功すること。一番強い効果が出ます。', topic: 'battle' },
   { term: '★フォーカス', text: '枠を必ず成功させる力。戦闘をまたいで持ち越します。', topic: 'focus' },
   { term: '連携', text: `同じターンに別の仲間が攻撃した敵へのダメージが増える（2人目＋${pct(BALANCE.comboBonus[1])}・3人目＋${pct(BALANCE.comboBonus[2])}・4人目＋${pct(BALANCE.comboBonus[3])}）。`, topic: 'battle' },
-  { term: 'BREAK（体勢崩し）', text: `「大技」の予告を出した敵に、弱点の属性・完全成功・大きなダメージを当てると、その行動の威力が半分・${breakStatusText()}・ブロック0。`, topic: 'battle' },
+  { term: 'BREAK（体勢崩し）', text: `「大技」の予告を出した敵に、弱点の属性・完全成功・大きなダメージを当てると、その行動の威力が半分・${breakStatusText()}・ブロック0。${needsWeakPerfect({ boss: true }) ? 'ボス・中ボス・災厄は、弱点の属性で完全成功した時だけ。' : ''}`, topic: 'battle' },
   { term: 'ブロック', text: '受けるダメージを先に引き受ける守り。', topic: 'battle' },
   { term: '行動予告', text: '敵の頭の上に出る、次の行動の印。', topic: 'battle' },
   { term: '状態異常', text: '毒・脆弱などの効果。アイコンをタップすると説明が出ます。', topic: 'battle' },

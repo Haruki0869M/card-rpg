@@ -5,7 +5,7 @@
 // 環境変数（どれも省略できる）: SIM_SEEDS（種の数。1001 から。既定40）・SIM_DIFF（既定 normal）・SIM_PARTY（2人 / 3人 / 4人。既定は全部）・
 //   SIM_SCENARIO（既定 corruptionKing）・SIM_OUT（既定 screenshots/balance-two-bots.md）・
 //   SIM_CLEVER_OFF（工夫する bot から外す工夫。battle,job,detour,hone をカンマで。どの工夫が効いているかを確かめる用）
-// パーティは balance.sim と同じ（1人のプレイヤーが全員を動かす。剣士・魔法使い ＋ 狩人 ＋ 守護者）
+// パーティは1人のプレイヤーが全員を動かす。2026-11-13 から標準は回復役（僧侶）入り（下の PARTIES。前の 剣士・魔法使い ＋ 狩人 ＋ 守護者 は SIM_PARTYSET=old）
 // 回4（難しさの測定）で足した環境変数:
 //   SIM_VARIANT（a / b / c。このテストの中だけで BALANCE の値を差し替える。省略 = 今のまま）
 //     a = 合計ダメージで BREAK の線: ボス・中ボス・災厄 30% / 強敵 25% / ふつう 20%
@@ -22,6 +22,11 @@
 // つまみの測定2（2026-11-13）で足した SIM_KNOBS: BA（ア）= B3 は大物だけ / BI（イ）= B3 ＋ 弱点を突けるカードが無い味方は完全成功で崩せる /
 //   BE（エ）= B3 ＋ 枠3以上かフォーカス2以上の完全成功でも崩れる（BE4/3 のように 枠/フォーカス を書ける）。SIM_JSON に出会った敵（foes）を足した
 // 部屋の連続の直し（2026-11-13）で SIM_JSON に足した数: クリアした冒険の戦闘の数・固定／ランダムダンジョンの中の戦闘の数・終わった時の平均レベル・転職の数
+// 回復役を入れて測る（2026-11-13 オーナーの決定）: 標準のパーティを 2人 = 剣士＋僧侶 / 3人 = 剣士＋魔道士＋僧侶 / 4人 = 剣士＋魔道士＋狩人＋僧侶 にした。
+//   前の並び（回復役なし）は SIM_PARTYSET=old。2人の組の比べに hp = 狩人＋僧侶 / gp = 守護者＋僧侶 を足した
+// 案Y を既定に入れた（2026-11-13）: 何も書かない「今のまま」= 新しい既定（前の SIM_KNOBS=BA,H4,A2 と同じ）。
+//   SIM_KNOBS に Y0 を書くと、案Y を入れる前の既定に戻す（例: SIM_KNOBS=Y0 = 前の「今のまま」、SIM_KNOBS=Y0,BA,H4,A2 = 新しい既定と同じ）。
+//   B3 は全部の格に、BI・BE は BA と一緒でなければ全部の格に当てる（前の測定と同じ意味）
 // 敵の特殊な行動の直し（2026-11-13）で足した数: 特殊な行動（7種類）が、予告された・実際に行われた・BREAK で止められた回数（種類ごと・1冒険の平均）。
 //   テストの側で数える（エンジンの結果は変えない）。どの行動が特殊な行動かは、行動の効果の種類で見分ける（直す前と後で同じ見分け方）
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -63,10 +68,20 @@ const PARTIES: Record<string, string[]> =
   : PARTYSET === 'magic' ? { '2人': ['mage', 'priest'] }
   : PARTYSET === 'ws' ? { '2人': ['warrior', 'priest'] }
   : PARTYSET === 'mx' ? { '2人': ['mage', 'summoner'] }
-  : {
+  // 回復役入りの測定（2026-11-13 オーナーの決定「難しさは必ず回復役を入れて測る」）で足した2人の組
+  : PARTYSET === 'hp' ? { '2人': ['hunter', 'priest'] }
+  : PARTYSET === 'gp' ? { '2人': ['guardian', 'priest'] }
+  // 前の標準のパーティ（回復役なし。参考として比べる用）
+  : PARTYSET === 'old' ? {
     '2人': ['warrior', 'mage'],
     '3人': ['warrior', 'mage', 'hunter'],
     '4人': ['warrior', 'mage', 'guardian', 'hunter'],
+  }
+  // 標準のパーティ（2026-11-13 から回復役 = 僧侶入り。【提案】の並び）
+  : {
+    '2人': ['warrior', 'priest'],
+    '3人': ['warrior', 'mage', 'priest'],
+    '4人': ['warrior', 'mage', 'hunter', 'priest'],
   };
 
 // ---- 回4: 測る候補の差し替え（このテストの中だけ。本番のコードは環境変数を読まない）----
@@ -99,7 +114,18 @@ const KNOB_TEXT: string[] = [];
 {
   const B = BALANCE as unknown as Record<string, unknown>;
   const ranksAll = { boss: false, midboss: false, elite: false, normal: false };
+  // 案Y を既定に入れた（2026-11-13）: Y0 = 案Y を入れる前の既定に戻す（並びのどこに書いても、ほかのつまみより先に当てる）。
+  //   Y0 を書かない時の「今のまま」は、新しい既定（= 前の測定の SIM_KNOBS=BA,H4,A2 と同じ）
+  if (KNOBS.includes('Y0')) {
+    B.breakNeedsWeakPerfect = false;
+    B.breakNeedsWeakPerfectRanks = undefined;
+    B.breakDamagePctByRank = {};
+    B.enemyHpByRank = {};
+    B.enemyAttackByRegion = {};
+    KNOB_TEXT.push('Y0 案Y を入れる前の既定（大物も弱点・完全成功・合計ダメージのどれかで崩れる・大物のHP ×1・後半の攻撃 ×1）');
+  }
   for (const raw of KNOBS) {
+    if (raw === 'Y0') continue;
     const k = KNOB_ALIAS[raw] ?? raw;
     const num = (p: string) => {
       const x = Number(k.slice(p.length));
@@ -110,6 +136,8 @@ const KNOB_TEXT: string[] = [];
     else if (k === 'B2') { B.breakPerfectByRank = ranksAll; KNOB_TEXT.push('B2 全部の敵で完全成功だけでは崩れない'); }
     else if (k === 'B3') {
       B.breakNeedsWeakPerfect = true;
+      // 新しい既定は大物だけ（BA と同じ）なので、B3 は全部の格に広げる
+      B.breakNeedsWeakPerfectRanks = undefined;
       KNOB_TEXT.push('B3 弱点の属性で、しかも完全成功の時だけ崩れる（弱点の無い敵は完全成功で崩れる・合計ダメージでは崩れない）');
     } else if (k === 'BA') {
       // つまみの測定2（ア）: B3 を大物（ボス・中ボス・災厄）だけに当てる。強敵・ふつうの敵は今の決まりのまま
@@ -119,6 +147,8 @@ const KNOB_TEXT: string[] = [];
     } else if (k === 'BI') {
       // つまみの測定2（イ）: B3 ＋ 弱点を突けるカードを1枚も持たない味方は、完全成功で崩せる
       B.breakNeedsWeakPerfect = true;
+      // 前の測定と同じ意味にする: BA と一緒でなければ全部の格（新しい既定は大物だけなので戻す）
+      if (!KNOBS.includes('BA')) B.breakNeedsWeakPerfectRanks = undefined;
       B.breakPerfectNoWeakCard = true;
       KNOB_TEXT.push('BI（イ）B3 ＋ 弱点を突けるカードが手札・山札・捨て札に無い味方は、完全成功で崩せる');
     } else if (k.startsWith('BE')) {
@@ -126,6 +156,7 @@ const KNOB_TEXT: string[] = [];
       const [s, fo] = k === 'BE' ? [3, 2] : k.slice(2).split('/').map(Number);
       if (!(s > 0) || !(fo > 0)) throw new Error(`つまみの倍率が読めない: ${raw}`);
       B.breakNeedsWeakPerfect = true;
+      if (!KNOBS.includes('BA')) B.breakNeedsWeakPerfectRanks = undefined;
       B.breakPerfectHeavy = { slots: s, focus: fo };
       KNOB_TEXT.push(`${raw}（エ）B3 ＋ 枠${s}以上のカードか、フォーカス${fo}以上を使った攻撃の完全成功でも崩れる`);
     } else if (k === 'B4') { B.breakStatus = 'vulnerable'; B.breakClearsBlock = false; KNOB_TEXT.push('B4 崩した時の効果 = 威力半分＋脆弱1（弱体なし・ブロックは残る）'); }
@@ -140,7 +171,8 @@ const KNOB_TEXT: string[] = [];
     else throw new Error(`知らないつまみ: ${raw}`);
   }
   // B3 の仲間（B3・BA・BI・BE）: 決まりを当てる格では、合計ダメージでは崩れない（前の B3 と同じ。BA は大物だけ）
-  if (B.breakNeedsWeakPerfect) {
+  // （つまみを書かない時は、既定の値のまま = 大物の線は ∞。SIM_VARIANT の a/b/c は、その既定の上に重ねる）
+  if (B.breakNeedsWeakPerfect && KNOBS.length) {
     const ranks = (B.breakNeedsWeakPerfectRanks as string[] | undefined) ?? ['boss', 'midboss', 'elite', 'normal'];
     B.breakDamagePctByRank = Object.fromEntries(ranks.map((r) => [r, Infinity]));
   }
