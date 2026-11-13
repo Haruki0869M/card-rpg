@@ -32,6 +32,11 @@
 //   テストの側で数える（エンジンの結果は変えない）。どの行動が特殊な行動かは、行動の効果の種類で見分ける（直す前と後で同じ見分け方）
 // 部屋の並びの直し・2回目（2026-11-13）で足した環境変数: SIM_PARTYSET=heal4（4人を 剣士＋魔法使い＋狩人＋僧侶）・
 //   SIM_LAYOUTS（手作りのダンジョンの並びを、JSON の物に差し替える。直す前の並びで測る用）
+// 時間の厳しさの測定（2026-11-13・docs/review/2026-11-13-time-pressure.md）で足した SIM_KNOBS:
+//   CW<倍率> = 世界マップのターン（だれもダンジョンの中にいない番）の侵食度だけ ×倍率 / CD<倍率> = ダンジョンの中の番の侵食度だけ ×倍率 /
+//   CX<倍率> = C と同じ2つ ＋ ダンジョンに入る時・町が陥落した時・交代運転 も ×倍率（災厄の呪いの +0.5 は掛けない）。
+//   RC<値> = ランダムダンジョンを制覇した時に下がる侵食度を、この値（%）にする。
+//   SIM_JSON に、寄り道（ランダムダンジョンに入った・踏破・災厄を倒した・登った塔）・休んだ回数（休憩部屋・野営・宿）・買った数・技を磨いた数を足した
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -179,7 +184,20 @@ const KNOB_TEXT: string[] = [];
     else if (k.startsWith('HL')) { B.enemyHpByRegion = Object.fromEntries(LATE3_REGIONS.map((id) => [id, num('HL')])); KNOB_TEXT.push(`${raw} ${LATE3_REGIONS.join('・')}の敵のHP ×${num('HL')}`); }
     else if (k.startsWith('HB')) { B.enemyHpByRank = { boss: num('HB'), midboss: num('HB') }; KNOB_TEXT.push(`${raw} ボス・中ボス・災厄のHP ×${num('HB')}`); }
     else if (k.startsWith('AL')) { B.enemyAttackByRegion = Object.fromEntries(LATE3_REGIONS.map((id) => [id, num('AL')])); KNOB_TEXT.push(`${raw} ${LATE3_REGIONS.join('・')}の敵の攻撃 ×${num('AL')}`); }
-    else if (k.startsWith('C')) {
+    else if (k.startsWith('CW')) {
+      B.corruptionPerTurn = (B.corruptionPerTurn as number) * num('CW');
+      KNOB_TEXT.push(`${raw} 世界マップのターンの侵食度だけ ×${num('CW')}（${B.corruptionPerTurn}・ダンジョンの中は ${B.corruptionPerDungeonTurn} のまま）`);
+    } else if (k.startsWith('CD')) {
+      B.corruptionPerDungeonTurn = (B.corruptionPerDungeonTurn as number) * num('CD');
+      KNOB_TEXT.push(`${raw} ダンジョンの中のターンの侵食度だけ ×${num('CD')}（${B.corruptionPerDungeonTurn}・世界マップは ${B.corruptionPerTurn} のまま）`);
+    } else if (k.startsWith('CX')) {
+      for (const key of ['corruptionPerTurn', 'corruptionPerDungeonTurn', 'corruptionOnDungeonEnter', 'corruptionOnTownFall', 'corruptionPerRelayMove']) B[key] = (B[key] as number) * num('CX');
+      KNOB_TEXT.push(`${raw} 侵食度の上がる所を全部 ×${num('CX')}（ターン ${B.corruptionPerTurn}・ダンジョンの中 ${B.corruptionPerDungeonTurn}・入る時 ${B.corruptionOnDungeonEnter}・陥落 ${B.corruptionOnTownFall}・交代運転 ${B.corruptionPerRelayMove}）`);
+    } else if (k.startsWith('RC')) {
+      // 時間の厳しさの測定: ランダムダンジョンを制覇した時に下がる侵食度を、この値にする（寄り道の得になるかを見る用）
+      B.corruptionOnRandomDungeonClear = num('RC');
+      KNOB_TEXT.push(`${raw} ランダムダンジョンを制覇した時に下がる侵食度 ${num('RC')}%`);
+    } else if (k.startsWith('C')) {
       B.corruptionPerTurn = (B.corruptionPerTurn as number) * num('C');
       B.corruptionPerDungeonTurn = (B.corruptionPerDungeonTurn as number) * num('C');
       KNOB_TEXT.push(`${raw} 侵食度の伸び ×${num('C')}（ターンごと ${B.corruptionPerTurn}・ダンジョンの中 ${B.corruptionPerDungeonTurn}）`);
@@ -280,6 +298,11 @@ interface Run {
   /** 買った「属性の付与」の装飾品の数（買う操作の前と後で、全員の持ち物と装備の数を比べた）・終わった時に付けていた人数 */
   convBought: number;
   convWorn: number;
+  /** 時間の厳しさの測定: 休憩部屋で休んだ（技を磨くも含む）・野営・宿に泊まった（1人1回）・登った塔の数 */
+  restRoom: number;
+  camp: number;
+  inn: number;
+  towers: number;
 }
 
 /** 「属性の付与」の装飾品か */
@@ -298,7 +321,8 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
   const r: Run = { clear: false, corr100: false, where: '', fights: 0, rounds: 0, finished: 0, breaks: 0, randomIn: 0, randomDone: 0, scourgeKills: 0, jobChanges: 0, hones: 0, errors: 0,
     bigFinished: 0, bigRounds: 0, breakWhy: { weak: 0, perfect: 0, damage: 0 }, bigBreaks: 0, worldTurn: 0, corruption: 0, wiped: false, endMode: '', where2: {},
     bought: 0, sold: 0, equips: 0, itemsBattle: 0, itemsField: 0, removed: 0, skipped: 0, refused: 0, goldEnd: 0,
-    fixedDungeonFights: 0, randomDungeonFights: 0, levelEnd: 0, sp: emptySpecials(), foes: {}, breakKind: { purple: 0, big: 0, red: 0 }, convBought: 0, convWorn: 0 };
+    fixedDungeonFights: 0, randomDungeonFights: 0, levelEnd: 0, sp: emptySpecials(), foes: {}, breakKind: { purple: 0, big: 0, red: 0 }, convBought: 0, convWorn: 0,
+    restRoom: 0, camp: 0, inn: 0, towers: 0 };
   const entered = new Set<string>();
   /** 予告を数えた印（戦闘の種:敵:ターン。同じ予告を2回数えない） */
   const said = new Set<string>();
@@ -370,6 +394,9 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
     const inner = cmd.type === 'SCENE' || cmd.type === 'VOTE' ? cmd.command : cmd;
     if (inner?.type === 'CHANGE_JOB') r.jobChanges++;
     if (inner?.type === 'REST' && inner.kind === 'upgrade') r.hones++;
+    if (inner?.type === 'REST') r.restRoom++;
+    if (inner?.type === 'WORLD_CAMP') r.camp++;
+    if (inner?.type === 'TOWN_INN') r.inn++;
     // 賢い bot の工夫（成功した操作だけ数える）
     if (inner?.type === 'TOWN_BUY' || (inner?.type === 'PEDDLER_BUY' && inner.index !== undefined)) {
       r.bought++;
@@ -403,6 +430,7 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
   if (w) {
     r.randomDone = w.tiles.filter((t) => isRandomDungeonTile(t.f) && t.f!.used).length;
     r.scourgeKills = (w.scourgesMet?.length ?? 0) - aliveScourges(w).length;
+    r.towers = w.tiles.filter((t) => t.f?.kind === 'tower' && t.f.used).length;
   }
   // どこで終わったか（volume.sim と同じ数え方）: 次に目指していたダンジョン（鍵の順・最後）に、1回でも入っていれば「中」
   const keyed = DUNGEONS.forScenario(SCENARIO).filter((d) => d.rewardKey && !d.random).sort((a, b) => a.baseLevel - b.baseLevel);
@@ -551,6 +579,9 @@ describe.skipIf(!process.env.SIM)(`物差し2本（直行 bot と工夫する bo
               breakPurple: a((r) => r.breakKind.purple), breakBig: a((r) => r.breakKind.big), breakRed: a((r) => r.breakKind.red),
               convBought: a((r) => r.convBought), convWorn: a((r) => r.convWorn),
               bigFightsClear: cl.length ? a((r) => r.bigFinished, cl) : null,
+              randomIn: a((r) => r.randomIn), randomDone: a((r) => r.randomDone), scourgeKills: a((r) => r.scourgeKills), towers: a((r) => r.towers),
+              restRoom: a((r) => r.restRoom), camp: a((r) => r.camp), inn: a((r) => r.inn), bought: a((r) => r.bought), hones: a((r) => r.hones),
+              randomInClear: cl.length ? a((r) => r.randomIn, cl) : null, scourgeKillsClear: cl.length ? a((r) => r.scourgeKills, cl) : null,
               wipedRow: rs.filter((r) => r.wiped).map((r) => r.where), corrRow: rs.filter((r) => r.corr100).map((r) => r.where),
               specials: Object.fromEntries((Object.keys(SPECIALS) as SpecialKind[]).map((s) => [s, { said: a((r) => r.sp[s].said), done: a((r) => r.sp[s].done), broke: a((r) => r.sp[s].broke) }])),
             });
