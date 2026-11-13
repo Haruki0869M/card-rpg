@@ -449,6 +449,7 @@ const TRIGGER_TEXT: Record<AbilityTrigger, string> = {
   itemUse: '戦闘中に自分が消耗品を使った時',
   goldGain: '戦闘中に自分がお金を得た時',
   statusTaken: '自分に悪い状態異常が付いた時',
+  turnStartBefore: 'ターン開始時',
 };
 
 const condText = (conds?: AbilityCondition[]) => (conds ?? []).map((c) => conditionHandler(c.kind).describe(c as never));

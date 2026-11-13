@@ -23,7 +23,7 @@ import { objectiveHandler, type QuestSignal } from './objectives';
 import { timeOfDay } from './time';
 import { ensureShop } from './town';
 import { dungeonGateError } from './questGate';
-import { passByNotice, queueStory } from './guide';
+import { bumpStoryVer, passByNotice, queueStory } from './guide';
 import { moveWanderers, spawnWanderer } from './wanderers';
 import { terrainDiceBonus } from './lanes';
 import { scourgeCurse } from './scourgeCurse';
@@ -878,12 +878,15 @@ export function worldInviteAnswer(game: GameState, cmd: Cmd<'WORLD_INVITE_ANSWER
   return undefined;
 }
 
-export function storyContinue(game: GameState): string | undefined {
+export function storyContinue(game: GameState, ver?: number): string | undefined {
   const w = game.world;
   if (!w?.story) return '物語はありません';
+  // 点検 F6: もう閉じた窓（または中身が変わる前の窓）への「つづける」は、何もしない（次の窓を閉じない）
+  if (ver !== undefined && ver !== (w.storyVer ?? 0)) return undefined;
   // 次の窓が並んでいれば、それを出す（回1: 災厄の知らせ・通り過ぎた時の知らせは、別の窓）
   w.story = w.storyQueue?.shift();
   if (!w.storyQueue?.length) delete w.storyQueue;
+  bumpStoryVer(w);
   return undefined;
 }
 

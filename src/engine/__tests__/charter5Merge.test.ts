@@ -75,7 +75,8 @@ describe('転職の時に選ぶ専用カード3枚（オーナーの決定 2026-
     for (const j of CLASSES.all.filter((c) => c.tier !== 'base')) {
       const sig = signatureCards(j);
       expect(sig.length, j.id).toBe(3);
-      const own = j.cardPool.filter((id) => jobOnlyCard(j, id));
+      // 転職で必ず入る札（jobCards = 決め技）は、選ぶ候補に出さない（点検 2026-11-13 F4）ので数えない
+      const own = j.cardPool.filter((id) => jobOnlyCard(j, id) && !(j.jobCards ?? []).includes(id));
       // そのジョブにしか無い札が3枚以上あれば、3枚ともそれ
       if (own.length >= 3) for (const id of sig) expect(jobOnlyCard(j, id), `${j.id}: ${id}`).toBe(true);
       // 足りなければ、ある分は全部入っている

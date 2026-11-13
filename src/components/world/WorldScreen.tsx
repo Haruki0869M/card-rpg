@@ -395,7 +395,11 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
   // 移動中は、パネルを外さずに見えなくして、その上に小さな「移動中…」の帯を重ねる（パネルの高さが変わらないので、カメラも合わせ直さない）
   const [panelBox, panelSize] = useElementSize<HTMLDivElement>();
   const dispatchGame = useBattle((s) => s.dispatchGame);
+  const continueStory = useBattle((s) => s.continueStory);
+  const heldStories = useBattle((s) => s.heldStories);
   const w = game.world!;
+  // 出す物語の窓: この端末でまだ押していない（ほかの人が閉じた）窓を先に、無ければ今の窓（点検 F6）
+  const storyPage = heldStories[0] ?? w.story;
   const hero = game.heroes.find((h) => h.id === w.turn);
   const here = hero ? w.pos[hero.id] : undefined;
   const [selected, setSelected] = useState<number | undefined>();
@@ -458,7 +462,7 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
   const path = useMemo(() => (selected !== undefined && here !== undefined && w.move ? pathTo(reachable(w, here, w.move), selected) : undefined), [selected, here, w]);
 
   // 回1: 冒険の最初の自分の番に、見取り図の案内を1回だけ（物語・受け渡しの窓が閉じてから）
-  const hintReady = !hintSeen && !!hero && here !== undefined && !turnExp && isLocalPlayer(hero.playerId) && !w.story && !needHandoff && !movement;
+  const hintReady = !hintSeen && !!hero && here !== undefined && !turnExp && isLocalPlayer(hero.playerId) && !storyPage && !needHandoff && !movement;
   useEffect(() => {
     if (!hintReady) return;
     setHintOn(true);
@@ -812,8 +816,9 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
       {/* 移動の演出中は、上の情報欄・仲間の列・地図のタップも受け付けない（以前の移動画面と同じ） */}
       {movement && <div className="absolute inset-0 z-30" aria-hidden data-move-blocker />}
       <AnimatePresence>
-        {w.story && <StoryOverlay key="story" title={w.story.title} lines={w.story.lines} onNext={() => dispatchGame({ type: 'STORY_CONTINUE', playerId: pid })} />}
-        {!w.story && needHandoff && (
+        {/* 点検 F6: ほかの人の「つづける」で閉じた窓は、この端末で押すまで先に出す（heldStories。オンラインだけ） */}
+        {storyPage && <StoryOverlay key="story" title={storyPage.title} lines={storyPage.lines} onNext={() => continueStory(pid)} />}
+        {!storyPage && needHandoff && (
           <HandoffOverlay
             key="handoff"
             hero={hero}

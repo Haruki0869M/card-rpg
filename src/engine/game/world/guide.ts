@@ -145,6 +145,11 @@ export function passByNotice(game: GameState, w: WorldState, newRegion: number, 
   };
 }
 
+/** 出ている物語の窓が変わった印（閉じた・中身が入れ替わった）。古い窓への「つづける」を見分ける（点検 2026-11-13 F6） */
+export function bumpStoryVer(w: WorldState) {
+  w.storyVer = (w.storyVer ?? 0) + 1;
+}
+
 /** 物語の窓に出す。もう出ている時は、その窓を閉じた後に別の窓で出す（後ろに足さない） */
 export function queueStory(w: WorldState, page: StoryPage) {
   if (w.story) (w.storyQueue ??= []).push(page);
