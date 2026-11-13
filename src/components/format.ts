@@ -51,7 +51,7 @@ export interface IntentView {
   /** 敵の特殊な行動の札（⚠️手数読み など）と、いつも出す1行の案内（src/data/enemyBehaviors.ts） */
   behavior?: { id: EnemyBehaviorId; icon: string; label: string; short: string; brief: string };
   /** 強敵の本気の予告（🔥本気の札。src/data/enemyBehaviors.ts の FRENZY_BADGE） */
-  frenzy?: typeof FRENZY_BADGE;
+  frenzy?: { icon: string; label: string; short: string; brief: string; long: string };
 }
 
 /** 予告の札の下・敵が3体以上の時の案内の1行に出す文（本気・特殊な行動）。両方の時は1つにまとめる。崩した後は出さない */
