@@ -43,6 +43,8 @@ export const FRENZY_BADGE = {
   short: '本気',
   brief: `威力×${BALANCE.eliteFrenzy.power}`,
   long: `HPが半分を切って本気になった。次の攻撃は${BALANCE.eliteFrenzy.power}倍。BREAK するか、守りを固めるか、その前に倒すか`,
+  /** 本気の行動が大技でない時（BREAK できない）の長押しの説明 */
+  longNoBreak: `HPが半分を切って本気になった。次の攻撃は${BALANCE.eliteFrenzy.power}倍。守りを固めるか、その前に倒すか`,
 } as const;
 
 /** 行動の札と1行の案内（特殊な行動でなければ undefined） */

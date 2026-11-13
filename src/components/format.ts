@@ -126,7 +126,8 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
   else if (action.big) details.unshift(`大技！ ${breakHowText(state, enemy)}（BREAK: ${stops ? 'この行動は起きない' : '威力が半分'}・${breakStatusText()}・ブロック0）`);
   const badge = behaviorBadge(action);
   // 強敵の本気: 長押しの説明（DetailPopup）で、なぜ強いか・どう受けるかを出す
-  const frenzy = enemy.intent.frenzy ? FRENZY_BADGE : undefined;
+  // 大技でない行動は BREAK できないので、説明から「BREAK するか」を外す（pre-deploy20 の点検 1）
+  const frenzy = enemy.intent.frenzy ? { ...FRENZY_BADGE, long: action.big ? FRENZY_BADGE.long : FRENZY_BADGE.longNoBreak } : undefined;
   return { parts, name: action.name, details, big: !!action.big, broken: !!enemy.broken, ...(action.hint ? { hint: action.hint } : {}), ...(badge ? { behavior: badge } : {}), ...(frenzy ? { frenzy } : {}) };
 }
 
