@@ -184,8 +184,10 @@ const doorsA = A.locator('[data-door-choice]');
 const doorsB = B.locator('[data-door-choice]');
 check((await doorsA.count()) >= 1, `P1 に扉のボタンが出る（${(await doorsA.allInnerTexts()).map((t) => t.split('\n').slice(0, 2).join('・')).join(' / ')}）`);
 check((await doorsB.count()) >= 1, 'P2 にも扉のボタンが出る');
-await sameDoors(A, 'P1 扉2つ', 2);
-await sameDoors(B, 'P2 扉2つ', 2);
+// 扉の数は並び次第（2026-11-13 の並びの直しで、翠の神殿の最初の部屋の先は扉3つになった）。絵の扉とボタンが同じ数・同じ並びかを見る
+const nDoors = await doorsA.count();
+await sameDoors(A, `P1 扉${nDoors}つ`, nDoors);
+await sameDoors(B, `P2 扉${nDoors}つ`, nDoors);
 await shot(A, '4-doors-P1');
 await shot(B, '4-doors-P2');
 await layout(A, '扉のボタン（P1）');
@@ -205,7 +207,7 @@ const f1 = (await A.evaluate(() => window.__online.game())).heroes.find((h) => h
 check(f1 === f0 - 1, `P2 のキャラのフォーカスが1減る（${f0} → ${f1}）`);
 await wait(600);
 check((await A.locator('[data-door-detail]').count()) >= 1 && (await B.locator('[data-door-detail]').count()) >= 1, '警戒の後、2台とも扉の中身（敵の名前など）が見える');
-check((await A.locator('[data-door-beyond]').count()) === 2, '「その先」の扉の色も見える（P1）');
+check((await A.locator('[data-door-beyond]').count()) === nDoors, `「その先」の扉の色も見える（P1・扉${nDoors}つ分）`);
 check((await A.locator('[data-scout-open]').count()) === 0, '同じ通路では、もう警戒できない');
 await shot(A, '4c-scouted-P1');
 await layout(A, '警戒の後（P1）');
