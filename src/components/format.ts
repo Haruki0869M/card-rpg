@@ -123,13 +123,15 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
 export const elementNames = (ids: readonly string[]) => ids.map((id) => getElement(id).name).join('・');
 
 /**
- * 案Y（2026-11-13）: その敵の大技を崩す方法の文（予告の長押しの説明）。決まりは breakRules.ts の breakRuleOf から読む（決まりと文がずれないように）。
+ * 2026-11-13（docs/tasks/break-read-plan.md）: その敵の大技（紫の札を含む）を崩す方法の文（予告の長押しの説明）。決まりは breakRules.ts の breakRuleOf から読む（決まりと文がずれないように）。
  * 例（ボス・中ボス・災厄）: 「ボス・中ボス・災厄の大技は、弱点の属性（雷・聖）で、しかも完全成功で攻撃した時だけ体勢を崩せる（完全成功だけ・大きなダメージでは崩れない）」
  * 例（強敵・ふつう）: 「弱点の属性（火）で攻撃・完全成功で攻撃・このターンに最大HPの20%のダメージ、のどれかで体勢を崩せる」
  */
 export function breakHowText(state: Pick<BattleState, 'boss' | 'midboss' | 'elite'>, enemy: EnemyState): string {
   const r = breakRuleOf(state, enemy);
-  if (r.weakAndPerfect) return `ボス・中ボス・災厄の大技は、弱点の属性（${elementNames(r.weak)}）で、しかも完全成功で攻撃した時だけ体勢を崩せる（完全成功だけ${r.damagePct === undefined ? '・大きなダメージ' : ''}では崩れない）`;
+  // 2026-11-13（docs/tasks/break-read-plan.md §2）: 紫の札（特殊な行動）も同じ決まり。どちらの理由かで、文の頭を変える
+  const who = r.strictBy === 'behavior' ? '特殊な行動（紫の札）' : 'ボス・中ボス・災厄の大技';
+  if (r.weakAndPerfect) return `${who}は、弱点の属性（${elementNames(r.weak)}）で、しかも完全成功で攻撃した時だけ体勢を崩せる（完全成功だけ${r.damagePct === undefined ? '・大きなダメージ' : ''}では崩れない）`;
   const ways = [
     ...(r.weakAlone ? [`弱点の属性（${elementNames(r.weak)}）で攻撃`] : []),
     ...(r.perfectAlone ? ['完全成功で攻撃'] : []),

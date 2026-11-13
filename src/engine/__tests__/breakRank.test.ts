@@ -12,8 +12,9 @@ const B = BALANCE as unknown as Mutable;
 const SAVED = { breakDamagePctByRank: B.breakDamagePctByRank, enemyHpByRegion: B.enemyHpByRegion, breakNeedsWeakPerfect: B.breakNeedsWeakPerfect, breakNeedsWeakPerfectRanks: B.breakNeedsWeakPerfectRanks };
 afterEach(() => Object.assign(B, SAVED));
 /**
- * 案Y を既定に入れた（2026-11-13）: 大物は「弱点で、しかも完全成功」・合計ダメージでは崩れない（planY.test.ts）。
- * ここの「線を格ごとに変える入れ物」の確かめは、前の既定（どの格も 20%・完全成功で崩れる）に戻してから流す（テストの前提だけ直した）
+ * 2026-11-13 から既定は、大物（と紫の札）は「弱点で、しかも完全成功」・合計ダメージでは崩れない（breakRead.test.ts）。
+ * ここの「線を格ごとに変える入れ物」の確かめは、前の既定（どの格も 20%・完全成功で崩れる）に戻してから流す（テストの前提だけ直した）。
+ * ここで使う門番ガルザの「大斧の一撃」は赤い札（紫の札の決まりは当たらない）
  */
 const oldRules = () => {
   B.breakDamagePctByRank = {};
@@ -51,7 +52,7 @@ function hit25(flags: Parameters<typeof gate>[1]): string[] {
 }
 
 describe('敵の格ごとの BREAK の線（回4・測るための切り替え）', () => {
-  it('既定（案Y）では、ボス・中ボスは合計ダメージでは崩れない（∞）。強敵・ふつうは breakDamagePct（20%）のまま', () => {
+  it('既定では、ボス・中ボスは合計ダメージでは崩れない（∞）。強敵・ふつうは breakDamagePct（20%）のまま', () => {
     expect(breakDamagePctOf({ boss: true })).toBe(Infinity);
     expect(breakDamagePctOf({ midboss: true })).toBe(Infinity);
     expect(breakDamagePctOf({ elite: true })).toBe(BALANCE.breakDamagePct);

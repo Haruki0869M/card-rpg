@@ -44,7 +44,16 @@ function use(s: BattleState, cardId: string, targetId?: string, focus = 0, who =
   expect(r.error, cardId).toBeUndefined();
   return r.state;
 }
-const endTurn = (s: BattleState) => applyCommand(s, { type: 'END_TURN', playerId: P }).state;
+/**
+ * 1体目の敵の特殊な行動（紫の札）を BREAK する。2026-11-13 から紫の札は「弱点の属性で、しかも完全成功」の時だけ崩れる
+ * （docs/tasks/break-read-plan.md §2）ので、弱点看破の印（弱点を突いた扱い）を付けてから、完全成功の一撃を当てる。
+ * BREAK の後に何が起きるかを確かめるテストの前提だけ直した（ゲームの決まりは変えていない）
+ */
+function breakHit(s: BattleState): BattleState {
+  s.enemies[0].exposed = true;
+  return use(s, 'ebHit', s.enemies[0].uid, 1);
+}
+const endTurn =(s: BattleState) => applyCommand(s, { type: 'END_TURN', playerId: P }).state;
 function nextTurn(s: BattleState): BattleState {
   let st = endTurn(s);
   for (let i = 0; st.phase === 'enemy' && i < 30; i++) st = applyCommand(st, { type: 'ENEMY_STEP' }).state;
@@ -111,7 +120,7 @@ describe('浄化（沼の大ガマ）', () => {
     let s = battle(['mireSlime']);
     s.enemies[0].statuses.poison = 5;
     setIntent(s, 0, 'harden', undefined);
-    s = use(s, 'ebHit', s.enemies[0].uid, 1);
+    s = breakHit(s);
     expect(s.enemies[0].broken).toBe(true);
     const hp = s.enemies[0].hp;
     s = nextTurn(s);
@@ -145,7 +154,7 @@ describe('手数読み（葦陰の狩人）', () => {
   it('BREAK すると、今の大技の決まりどおり半分（枚数×1）になる', () => {
     let s = battle(['reedStalker']);
     setIntent(s, 0, 'cover', undefined);
-    s = use(s, 'ebHit', s.enemies[0].uid, 1);
+    s = breakHit(s);
     expect(s.enemies[0].broken).toBe(true);
     for (let i = 0; i < 3; i++) s = use(s, 'ebZero');
     s = nextTurn(s);
@@ -171,7 +180,7 @@ describe('盾砕き（玄武岩の虫）', () => {
   it('BREAK するとブロックは壊れず、ダメージは半分', () => {
     let s = battle(['basaltCrawler']);
     setIntent(s, 0, 'horn');
-    s = use(s, 'ebHit', s.enemies[0].uid, 1);
+    s = breakHit(s);
     s.allies[0].block = 15;
     s = endTurn(s);
     s = applyCommand(s, { type: 'ENEMY_STEP' }).state;
@@ -224,7 +233,7 @@ describe('手負い狙い（炭火の猟犬）', () => {
     let s = battle(['cinderHound'], 2);
     s.allies[0].hp = 100; s.allies[1].hp = 40;
     decide(s);
-    s = use(s, 'ebHit', s.enemies[0].uid, 1);
+    s = breakHit(s);
     expect(s.enemies[0].broken).toBe(true);
     s = endTurn(s);
     s = applyCommand(s, { type: 'ENEMY_STEP' }).state;
@@ -340,7 +349,7 @@ describe('かばう（魔王軍の騎士）', () => {
   it('BREAK すると、かばわない', () => {
     let s = battle(['darkKnight', 'ebDummy']);
     setIntent(s, 0, 'guard', undefined);
-    s = use(s, 'ebHit', s.enemies[0].uid, 1);
+    s = breakHit(s);
     expect(s.enemies[0].broken).toBe(true);
     s = nextTurn(s);
     expect(s.enemies[0].guarding).toBeFalsy();
@@ -402,7 +411,7 @@ describe('仲間を呼ぶ（砦の小悪魔）', () => {
   it('BREAK すると呼ばない', () => {
     let s = battle(['siegeImp'], 1, false);
     setIntent(s, 0, 'guard', undefined);
-    s = use(s, 'ebHit', s.enemies[0].uid, 1);
+    s = breakHit(s);
     expect(s.enemies[0].broken).toBe(true);
     const hp = s.allies[0].hp;
     s = nextTurn(s);
@@ -457,7 +466,7 @@ describe('癒し封じの呪い（呪紋の魔犬）', () => {
   it('BREAK すると起きない', () => {
     let s = battle(['cursedHound']);
     setIntent(s, 0, 'brace', undefined);
-    s = use(s, 'ebHit', s.enemies[0].uid, 1);
+    s = breakHit(s);
     s = nextTurn(s);
     expect(s.allies[0].statuses.healSeal ?? 0).toBe(0);
   });
@@ -619,7 +628,7 @@ describe('直し: 特殊な行動のブロックと BREAK', () => {
     let s = battle([enemyId, 'ebDummy'], 1, enemyId !== 'siegeImp');
     setIntent(s, 0, actionId, undefined);
     s.enemies[0].block = 5;
-    s = use(s, 'ebHit', s.enemies[0].uid, 1);
+    s = breakHit(s);
     expect(s.enemies[0].broken).toBe(true);
     expect(s.enemies[0].block).toBe(0);
     s = nextTurn(s);
@@ -628,7 +637,7 @@ describe('直し: 特殊な行動のブロックと BREAK', () => {
   it('BREAK された手数読みは、今の決まりどおり半分（枚数×1）で起き、ブロックは付かない', () => {
     let s = battle(['reedStalker']);
     setIntent(s, 0, 'cover', undefined);
-    s = use(s, 'ebHit', s.enemies[0].uid, 1);
+    s = breakHit(s);
     for (let i = 0; i < 3; i++) s = use(s, 'ebZero');
     s = nextTurn(s);
     expect(s.allies[0].hp).toBe(96);
@@ -637,7 +646,7 @@ describe('直し: 特殊な行動のブロックと BREAK', () => {
   it('BREAK された他の特殊な行動（かばう・呼ぶ・癒し封じ）は、行動ごと起きない', () => {
     let s = battle(['darkKnight', 'ebDummy']);
     setIntent(s, 0, 'guard', undefined);
-    s = use(s, 'ebHit', s.enemies[0].uid, 1);
+    s = breakHit(s);
     s = nextTurn(s);
     expect(s.enemies[0].guarding).toBeFalsy();
   });

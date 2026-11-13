@@ -10,30 +10,36 @@ import { cardOf } from '../../data/cards';
 import { getEnemy } from '../../data/enemies';
 import type { AllyState, BattleState, CardDef, EnemyState } from '../../types';
 import { attackElement } from './cardState';
-import { breakDamagePctOf, needsWeakPerfect, perfectAloneBreaks } from './effects';
+import { behaviorNeedsWeakPerfect, breakDamagePctOf, needsWeakPerfect, perfectAloneBreaks } from './effects';
 
 /**
- * 案Y（2026-11-13）: その敵の大技の予告を「どうすれば崩せるか」の決まり（画面の説明が読む。エンジンの決まりの関数から作るので、ずれない）。
+ * 2026-11-13（docs/tasks/break-read-plan.md）: その敵の大技（紫の札を含む）の予告を「どうすれば崩せるか」の決まり（画面の説明が読む。エンジンの決まりの関数から作るので、ずれない）。
  * - weak = その敵の弱点の属性（一時的な弱点＝油壺も含む）
- * - weakAndPerfect = 弱点の属性で、しかも完全成功の時だけ崩れる（ボス・中ボス・災厄で弱点を持つ敵）
+ * - weakAndPerfect = 弱点の属性で、しかも完全成功の時だけ崩れる（ボス・中ボス・災厄で弱点を持つ敵と、紫の札を予告している弱点を持つ敵）
  * - perfectAlone = 完全成功だけで崩れる（弱点を持たない大物・強敵・ふつうの敵）
  * - weakAlone = 弱点の属性なら、完全成功でなくても崩れる（強敵・ふつうの敵）
  * - damagePct = 合計ダメージで崩れる線（%。合計ダメージでは崩れない時は undefined）
  * カードの能力で崩す物（魔力の楔・閃光の破砕玉・崩しの効果）は、どの決まりでも崩せる（ここには入れない）
  */
-export interface BreakRule { weak: string[]; weakAndPerfect: boolean; perfectAlone: boolean; weakAlone: boolean; damagePct?: number }
+export interface BreakRule {
+  weak: string[]; weakAndPerfect: boolean; perfectAlone: boolean; weakAlone: boolean; damagePct?: number;
+  /** 2026-11-13: 決まりが厳しくなった理由（behavior = 紫の札（特殊な行動）の予告 / rank = ボス・中ボス・災厄の戦闘）。厳しくない時は無い */
+  strictBy?: 'behavior' | 'rank';
+}
 export function breakRuleOf(state: Pick<BattleState, 'boss' | 'midboss' | 'elite'>, enemy: EnemyState): BreakRule {
   const def = getEnemy(enemy.defId);
   const weak = [...new Set([...(def.weak ?? []), ...(enemy.tempWeak ? [enemy.tempWeak] : [])])];
-  const strict = needsWeakPerfect(state);
+  // 2026-11-13（docs/tasks/break-read-plan.md §2）: 紫の札（特殊な行動）の予告も「弱点で完全成功」。エンジンと同じ関数に敵を渡して読む
+  const strict = needsWeakPerfect(state, enemy);
   const perfectAlone = perfectAloneBreaks(state, enemy);
-  const pct = breakDamagePctOf(state);
+  const pct = breakDamagePctOf(state, enemy);
   return {
     weak,
     weakAndPerfect: strict && weak.length > 0 && !perfectAlone,
     perfectAlone,
     weakAlone: !strict && weak.length > 0,
     ...(Number.isFinite(pct) ? { damagePct: pct } : {}),
+    ...(strict ? { strictBy: behaviorNeedsWeakPerfect(enemy) ? 'behavior' as const : 'rank' as const } : {}),
   };
 }
 

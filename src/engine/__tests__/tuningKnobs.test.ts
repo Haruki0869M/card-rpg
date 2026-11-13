@@ -12,7 +12,7 @@ import { giveHand, party, play } from './helpers';
 
 type Mutable = Record<string, unknown>;
 const B = BALANCE as unknown as Mutable;
-const SAVED = Object.fromEntries(['breakPerfectByRank', 'breakNeedsWeakPerfect', 'breakNeedsWeakPerfectRanks', 'breakPerfectNoWeakCard', 'breakPerfectHeavy','breakStatus', 'breakClearsBlock', 'breakDamagePctByRank', 'enemyAttackByRegion', 'enemyHpByRank', 'enemyHpByRegion', 'goldGainMul'].map((k) => [k, B[k]]));
+const SAVED = Object.fromEntries(['breakPerfectByRank', 'breakNeedsWeakPerfect', 'breakNeedsWeakPerfectRanks', 'breakPerfectNoWeakCard', 'breakPerfectHeavy','breakStatus', 'breakClearsBlock', 'breakDamagePctByRank', 'breakBehaviorNeedsWeakPerfect', 'breakDamagePctBehavior', 'enemyAttackByRegion', 'enemyHpByRank', 'enemyHpByRegion', 'goldGainMul'].map((k) => [k, B[k]]));
 afterEach(() => Object.assign(B, SAVED));
 
 /** 1体だけの戦闘（大技の予告を出させる）。flags で格を決める */
@@ -58,25 +58,29 @@ function wedge(flags: Parameters<typeof one>[3] = {}) {
 }
 
 /**
- * 案Y を既定に入れた（2026-11-13）ので、「前の既定」（案Y を入れる前）の決まりを確かめるテストは、BREAK の決まりを前の既定に戻してから流す
- * （ゲームの決まりは変えていない。テストの前提だけ直した）
+ * 2026-11-13 から既定が「紫の札と大物は弱点で、しかも完全成功」（docs/tasks/break-read-plan.md）なので、「前の既定」（18回目の公開の形）の
+ * 決まりを確かめるテストは、BREAK の決まりを前の既定に戻してから流す（ゲームの決まりは変えていない。テストの前提だけ直した）
  */
 const oldBreakRules = () => {
   B.breakNeedsWeakPerfect = false;
   B.breakNeedsWeakPerfectRanks = undefined;
   B.breakDamagePctByRank = {};
+  B.breakBehaviorNeedsWeakPerfect = false;
+  B.breakDamagePctBehavior = undefined;
 };
 
-describe('BREAK の決まりのつまみ（既定 = 案Y。つまみの効き目は、前の既定に戻してから確かめる）', () => {
+describe('BREAK の決まりのつまみ（既定 = 紫の札と大物は弱点で完全成功。つまみの効き目は、前の既定に戻してから確かめる）', () => {
   it('既定の値', () => {
     expect(BALANCE.breakPerfectByRank).toEqual({});
-    // 2026-11-13 案Y: 大物だけ「弱点で、しかも完全成功」（planY.test.ts でくわしく確かめる）
+    // 2026-11-13: 紫の札と大物だけ「弱点で、しかも完全成功」（breakRead.test.ts でくわしく確かめる）
     expect(BALANCE.breakNeedsWeakPerfect).toBe(true);
+    expect(BALANCE.breakBehaviorNeedsWeakPerfect).toBe(true);
     // 2026-11-13: BREAK で付く状態は脆弱（まとめ役の指示）
     expect(BALANCE.breakStatus).toBe('vulnerable');
     expect(BALANCE.breakClearsBlock).toBe(true);
-    expect(BALANCE.enemyHpByRank).toEqual({ boss: 2, midboss: 2 });
-    expect(BALANCE.enemyAttackByRegion.swamp).toBe(1.5);
+    // 案Y の取りやめ: 大物のHP・後半の攻撃の倍率は入れない
+    expect(BALANCE.enemyHpByRank).toEqual({});
+    expect(BALANCE.enemyAttackByRegion).toEqual({});
     expect(BALANCE.goldGainMul).toBe(1);
   });
 
@@ -125,7 +129,7 @@ describe('BREAK の決まりのつまみ（既定 = 案Y。つまみの効き目
   });
 
   // つまみの測定2（2026-11-13）: (ア) B3 は大物だけ / (イ) 弱点を突けるカードが無い人は完全成功で崩せる / (エ) 重い一撃の完全成功で崩れる
-  it('つまみの測定2 の入れ物の既定の値（(ア) は案Y で大物だけ。(イ)(エ) は使わない）', () => {
+  it('つまみの測定2 の入れ物の既定の値（(ア) は大物だけ（2026-11-13 の決定）。(イ)(エ) は使わない）', () => {
     expect(BALANCE.breakNeedsWeakPerfectRanks).toEqual(['boss', 'midboss']);
     expect(BALANCE.breakPerfectNoWeakCard).toBe(false);
     expect(BALANCE.breakPerfectHeavy).toBeUndefined();
@@ -200,7 +204,7 @@ describe('BREAK の決まりのつまみ（既定 = 案Y。つまみの効き目
   });
 });
 
-describe('敵の強さ・お金のつまみ（既定の値の中身は planY.test.ts）', () => {
+describe('敵の強さ・お金のつまみ（既定 = 今のまま）', () => {
   const start = (roomType = 'battle') => {
     const g = createGame({ seed: 7, scenarioId: 'corruptionKing', difficulty: 'normal', party: [{ classId: 'warrior', gender: 'male', name: 'a', playerId: 'P1' as PlayerId }] });
     g.party = g.heroes.map((h) => h.id);
@@ -215,7 +219,7 @@ describe('敵の強さ・お金のつまみ（既定の値の中身は planY.tes
     expect(start().attackMul).toBeCloseTo(base * 2);
   });
   it('格ごとのHPの倍率: ボスの部屋だけに入れると、ボスの部屋の戦闘だけHPが増える', () => {
-    // 案Y で既定がボス・中ボス ×2 になったので、倍率なしの値を元にする（テストの前提だけ直した）
+    // 倍率なしの値を元にする（案Y の取りやめで既定も空。念のため空にしてから測る）
     B.enemyHpByRank = {};
     const base = start('battle').maxHp;
     const bossBase = start('boss').maxHp;

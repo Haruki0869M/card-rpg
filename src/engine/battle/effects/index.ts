@@ -194,16 +194,35 @@ export function canBreak(enemy: Unit | undefined): boolean {
   return !!getEnemyAction(enemy.defId, enemy.intent.actionId).big;
 }
 
-/** 「合計ダメージで BREAK」の線（%）。敵の格（ボス・中ボスと災厄・強敵・ふつう）ごとに BALANCE.breakDamagePctByRank で変えられる。書いていなければ breakDamagePct */
-export function breakDamagePctOf(state: Pick<BattleState, 'boss' | 'midboss' | 'elite'>): number {
+/** その敵が今予告している行動が、特殊な行動（紫の札。行動のデータに behavior が付いている物）か */
+export function intentIsBehavior(enemy: Unit | undefined): boolean {
+  if (!enemy || !isEnemy(enemy) || !enemy.intent) return false;
+  return !!getEnemyAction(enemy.defId, enemy.intent.actionId).behavior;
+}
+
+/** 紫の札（特殊な行動）の予告に「弱点の属性で、しかも完全成功」の決まりを当てるか（BALANCE.breakBehaviorNeedsWeakPerfect） */
+export const behaviorNeedsWeakPerfect = (enemy: Unit | undefined) => BALANCE.breakBehaviorNeedsWeakPerfect && intentIsBehavior(enemy);
+
+/**
+ * 「合計ダメージで BREAK」の線（%）。敵の格（ボス・中ボスと災厄・強敵・ふつう）ごとに BALANCE.breakDamagePctByRank で変えられる。書いていなければ breakDamagePct。
+ * 敵が紫の札（特殊な行動）を予告している時は BALANCE.breakDamagePctBehavior（書いてあれば）。enemy を渡さない時は格だけで見る
+ */
+export function breakDamagePctOf(state: Pick<BattleState, 'boss' | 'midboss' | 'elite'>, enemy?: Unit): number {
+  if (BALANCE.breakDamagePctBehavior !== undefined && intentIsBehavior(enemy)) return BALANCE.breakDamagePctBehavior;
   return BALANCE.breakDamagePctByRank[battleRankOf(state)] ?? BALANCE.breakDamagePct;
 }
 
 /** 戦闘の敵の格（ボス・中ボスと災厄・強敵・ふつう） */
 export const battleRankOf = (state: Pick<BattleState, 'boss' | 'midboss' | 'elite'>) => (state.boss ? 'boss' : state.midboss ? 'midboss' : state.elite ? 'elite' : 'normal');
 
-/** この戦闘の敵に「弱点の属性で、しかも完全成功」の決まりを当てるか（BALANCE.breakNeedsWeakPerfect・breakNeedsWeakPerfectRanks。既定では false） */
-export function needsWeakPerfect(state: Pick<BattleState, 'boss' | 'midboss' | 'elite'>): boolean {
+/**
+ * この敵の予告に「弱点の属性で、しかも完全成功」の決まりを当てるか（2026-11-13 docs/tasks/break-read-plan.md §2）:
+ * - 紫の札（特殊な行動）の予告 → どの戦闘でも（BALANCE.breakBehaviorNeedsWeakPerfect）
+ * - ボス・中ボス・災厄の戦闘 → BALANCE.breakNeedsWeakPerfect・breakNeedsWeakPerfectRanks
+ * enemy を渡さない時は、戦闘の格だけで見る（ヘルプの文など）
+ */
+export function needsWeakPerfect(state: Pick<BattleState, 'boss' | 'midboss' | 'elite'>, enemy?: Unit): boolean {
+  if (behaviorNeedsWeakPerfect(enemy)) return true;
   if (!BALANCE.breakNeedsWeakPerfect) return false;
   const ranks = BALANCE.breakNeedsWeakPerfectRanks;
   return !ranks || ranks.includes(battleRankOf(state));
@@ -218,7 +237,7 @@ export interface PerfectTry { card?: CardDef; focusUsed?: number; hasWeakCard?: 
 /** 完全成功だけで、この敵を崩せるか（BALANCE.breakPerfectByRank・breakNeedsWeakPerfect。既定では、いつも true） */
 export function perfectAloneBreaks(state: Pick<BattleState, 'boss' | 'midboss' | 'elite'>, enemy: Unit, t: PerfectTry = {}): boolean {
   if ((BALANCE.breakPerfectByRank[battleRankOf(state)] ?? true) === false) return false;
-  if (needsWeakPerfect(state)) {
+  if (needsWeakPerfect(state, enemy)) {
     // 「弱点で、しかも完全成功」の決まりでも、弱点を持たない敵は完全成功だけで崩れる（崩す手が無くならないように）
     if (!isEnemy(enemy)) return false;
     if (!getEnemy(enemy.defId).weak?.length && !enemy.tempWeak) return true;
@@ -237,8 +256,8 @@ export function perfectAloneBreaks(state: Pick<BattleState, 'boss' | 'midboss' |
  * 既定（BALANCE の今の値）では「弱点 → 完全成功 → 合計ダメージ」の順で、前と全く同じ
  */
 function breakReason(state: BattleState, enemy: EnemyState, weakHit: boolean, perfect: boolean, early: boolean, t: PerfectTry = {}): 'weak' | 'perfect' | 'damage' | undefined {
-  const byDamage = (enemy.turnDamage ?? 0) * 100 >= enemy.maxHp * breakDamagePctOf(state);
-  if (needsWeakPerfect(state)) {
+  const byDamage = (enemy.turnDamage ?? 0) * 100 >= enemy.maxHp * breakDamagePctOf(state, enemy);
+  if (needsWeakPerfect(state, enemy)) {
     if (weakHit && perfect) return 'weak';
     if (early || (perfect && perfectAloneBreaks(state, enemy, t))) return 'perfect';
     return byDamage ? 'damage' : undefined;

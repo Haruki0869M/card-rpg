@@ -54,7 +54,7 @@ function counterHints(battle: BattleState, ally: AllyState, card: CardDef, targe
     const from = preds.findIndex((p) => p.some((t) => t.id === e.uid && t.breaks));
     const who = foes.length > 1 ? `${unitName(battle, e.uid)}：` : '';
     if (from < 0) {
-      // 案Y（2026-11-13）: ボス・中ボス・災厄で、このカードが弱点を突かない時は「完全成功だけでは崩れない」と、崩せる属性を出す。
+      // 2026-11-13: ボス・中ボス・災厄の大技と紫の札（特殊な行動）で、このカードが弱点を突かない時は「完全成功だけでは崩れない」と、崩せる属性を出す。
       // 決まりは breakRules.ts の breakRuleOf（エンジンと同じ関数）。BREAK の予測（engine の breaks）が出ない時だけなので、嘘の「BREAK!」は出ない
       const rule = breakRuleOf(battle, e);
       const guarded = card.target === 'enemy' && battle.enemies.some((x) => !x.dead && x.guarding && x !== e);

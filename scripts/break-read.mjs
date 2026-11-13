@@ -1,24 +1,32 @@
-// 案Y（2026-11-13）の画面の確認: ボス・中ボス・災厄の戦闘の BREAK の印と、カードを選んだ時の予測欄。
-// - 予告の下の印: 大物は「⚡弱点（属性）で完全成功 → BREAK」（敵3体以上は短い形「⚡弱点（属性）+完全」）。ふつうの敵は前のまま
+// BREAK を読み合いにする（2026-11-13・docs/tasks/break-read-plan.md §2）の画面の確認: BREAK の印と、カードを選んだ時の予測欄。
+// （前の名前は scripts/plan-y.mjs。案Y の取りやめで、紫の札（特殊な行動）の形を足した）
+// - 予告の下の印: 大物と紫の札は「⚡弱点（属性）で完全成功 → BREAK」（敵3体以上は短い形「⚡（属性）+完全」）。ふつうの敵の赤い札は前のまま
 // - 予測欄: 弱点を突かないカード（氷の槍）→「完全成功だけでは崩れない（弱点の火で完全成功なら BREAK）」。嘘の「BREAK!」が出ない
 //           弱点を突くカード（火球）→「完全で BREAK！」（完全成功の時だけ）
+// - 形: boss = 樹木の番人（弱点 火）のボス戦の赤い大技 / normal = 同じ敵のふつうの戦闘 / purple = 葦の狩人（弱点 火・雷）のふつうの戦闘で紫の札「手数読み」
 // - 360×640・390×844、敵1体と4体。重なり・はみ出し・画面の外を見る
-// 使い方: URL=http://127.0.0.1:<番号>/card-rpg/ node scripts/plan-y.mjs
+// 使い方: URL=http://127.0.0.1:<番号>/card-rpg/ node scripts/break-read.mjs
 import { mkdir } from 'node:fs/promises';
 import { chromium, layoutIssues, startBattle } from './lib.mjs';
 
-const dir = 'screenshots/plan-y';
+const dir = 'screenshots/break-read';
 await mkdir(dir, { recursive: true });
 const browser = await chromium.launch();
 const problems = [];
 const notes = new Set();
+const MODE = {
+  boss: { name: 'ボス', boss: true, strict: true, defId: 'treeWarden', actionId: 'rootBind' },
+  normal: { name: 'ふつう', boss: false, strict: false, defId: 'treeWarden', actionId: 'rootBind' },
+  purple: { name: '紫の札', boss: false, strict: true, defId: 'reedStalker', actionId: 'cover' },
+};
 
-async function run(width, height, enemies, boss) {
+async function run(width, height, enemies, mode) {
+  const { boss, strict, defId, actionId } = MODE[mode];
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
   page.setDefaultTimeout(10000);
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  const tag = `${width}x${height}・敵${enemies.length}体・${boss ? 'ボス' : 'ふつう'}`;
+  const tag = `${width}x${height}・敵${enemies.length}体・${MODE[mode].name}`;
   const ng = (t) => problems.push(`${tag}: ${t}`);
   const shot = async (name) => {
     const issues = await layoutIssues(page);
@@ -29,13 +37,13 @@ async function run(width, height, enemies, boss) {
     if (old.length) notes.add(`${tag}: 前からの短い形がはみ出す（${old.join('・')}）`);
     const fresh = spill.filter((t) => !t.includes('BREAK可'));
     if (fresh.length) ng(`${name}: 文が枠からはみ出す（${fresh.join('・')}）`);
-    await page.screenshot({ path: `${dir}/${width}x${height}-${enemies.length}-${boss ? 'boss' : 'normal'}-${name}.png` });
+    await page.screenshot({ path: `${dir}/${width}x${height}-${enemies.length}-${mode}-${name}.png` });
   };
   await startBattle(page, 2, enemies, true);
   await page.getByText('ターン終了').waitFor();
   await page.waitForTimeout(400);
-  // 保存の上で形を作る: 樹木の番人（弱点 = 火）が大技を予告。ボスの印を付ける。1人目の手札は火球（火）と氷の槍（氷）
-  await page.evaluate((boss) => {
+  // 保存の上で形を作る: 樹木の番人（弱点 = 火）が大技を予告（purple は葦の狩人が紫の札）。ボスの印を付ける。1人目の手札は火球（火）と氷の槍（氷）
+  await page.evaluate(({ boss, defId, actionId }) => {
     const k = 'card-rpg/adventure';
     const d = JSON.parse(localStorage.getItem(k));
     const b = d.game.expeditions[0].battle;
@@ -46,7 +54,7 @@ async function run(width, height, enemies, boss) {
       e.block = 0;
       delete e.guarding;
       delete e.broken;
-      if (e.defId === 'treeWarden') e.intent = { actionId: 'rootBind', targetId: b.allies[0].id };
+      if (e.defId === defId) e.intent = { actionId, targetId: b.allies[0].id };
     }
     b.phase = 'ally';
     b.allies.forEach((a, i) => {
@@ -57,7 +65,7 @@ async function run(width, height, enemies, boss) {
       a.hand = i === 0 ? [{ uid: 'py-fire', cardId: 'fireball' }, { uid: 'py-ice', cardId: 'iceLance' }] : [];
     });
     localStorage.setItem(k, JSON.stringify(d));
-  }, boss);
+  }, { boss, defId, actionId });
   await page.reload();
   await page.getByText('つづきから', { exact: true }).click();
   await page.getByText('ターン終了').waitFor();
@@ -68,7 +76,7 @@ async function run(width, height, enemies, boss) {
   const text = (await hint.innerText().catch(() => '')).replace(/\s+/g, ' ');
   const rule = await hint.getAttribute('data-break-rule').catch(() => null);
   const narrow = enemies.length >= 3;
-  if (boss) {
+  if (strict) {
     if (rule !== 'weak-perfect') ng(`印の決まりが weak-perfect でない（${rule}）`);
     if (narrow ? !/^⚡\(.*\)\+完全$/.test(text) : !text.includes('で完全成功 → BREAK')) ng(`印の文: ${text}`);
   } else {
@@ -99,7 +107,7 @@ async function run(width, height, enemies, boss) {
 
   const ids = await page.locator('[data-ally]').evaluateAll((es) => es.map((e) => e.getAttribute('data-ally')));
   const uids = await page.evaluate(() => JSON.parse(localStorage.getItem('card-rpg/adventure')).game.expeditions[0].battle.enemies.map((e) => ({ uid: e.uid, defId: e.defId })));
-  const warden = uids.find((e) => e.defId === 'treeWarden').uid;
+  const warden = uids.find((e) => e.defId === defId).uid;
   const pick = async (cardIndex) => {
     await page.locator(`[data-ally="${ids[0]}"]`).click();
     const box = await page.locator('[data-card-index][data-usable]').nth(cardIndex).boundingBox();
@@ -115,7 +123,7 @@ async function run(width, height, enemies, boss) {
   await pick(1);
   let lines = await breakLines();
   let c = await chip();
-  if (boss) {
+  if (strict) {
     if (!lines.some((l) => l.includes('完全成功だけでは崩れない') && l.includes('火'))) ng(`氷の槍: 「完全成功だけでは崩れない」が無い（${lines.join(' / ')}）`);
     if (lines.some((l) => l.includes('BREAK！'))) ng(`氷の槍: 崩れないのに「BREAK！」が出る（${lines.join(' / ')}）`);
     if (c.includes('BREAK')) ng(`氷の槍: 札に BREAK が出る（${c.replace(/\s+/g, ' ')}）`);
@@ -130,7 +138,7 @@ async function run(width, height, enemies, boss) {
   lines = await breakLines();
   c = await chip();
   if (!lines.some((l) => l.includes('BREAK！'))) ng(`火球: BREAK の行が無い（${lines.join(' / ')}）`);
-  if (boss && !lines.some((l) => l.includes('完全で BREAK！'))) ng(`火球: ボスで「完全で BREAK！」でない（${lines.join(' / ')}）`);
+  if (strict && !lines.some((l) => l.includes('完全で BREAK！'))) ng(`火球: ${MODE[mode].name}で「完全で BREAK！」でない（${lines.join(' / ')}）`);
   if (lines.some((l) => l.includes('崩れない'))) ng(`火球: 崩せるのに「崩れない」が出る（${lines.join(' / ')}）`);
   await shot('fire');
   console.log(`  火球: ${lines.join(' / ')}・札: ${c.replace(/\s+/g, ' ')}`);
@@ -139,9 +147,10 @@ async function run(width, height, enemies, boss) {
 }
 
 for (const [w, h] of [[360, 640], [390, 844]]) {
-  for (const boss of [true, false]) {
-    await run(w, h, ['treeWarden'], boss);
-    await run(w, h, ['treeWarden', 'wildBoar', 'emberBoar', 'darkKnight'], boss);
+  for (const mode of Object.keys(MODE)) {
+    const main = MODE[mode].defId;
+    await run(w, h, [main], mode);
+    await run(w, h, [main, 'wildBoar', 'emberBoar', 'darkKnight'], mode);
   }
 }
 await browser.close();
@@ -150,4 +159,4 @@ if (problems.length) {
   console.log('NG:\n' + problems.join('\n'));
   process.exit(1);
 }
-console.log('OK: 案Y の BREAK の印と予測欄（ボス・ふつう、敵1体と4体、360×640・390×844）');
+console.log('OK: BREAK の印と予測欄（ボス・ふつう・紫の札、敵1体と4体、360×640・390×844）');

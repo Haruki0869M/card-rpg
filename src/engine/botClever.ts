@@ -219,7 +219,8 @@ function attackScore(b: BattleState, a: AllyState, card: CardDef, e: EnemyState)
     // 大技の予告: 弱点で当てれば崩れる。弱点でなければ、フォーカスを全部の枠に入れて完全成功で崩す（足りれば）
     // つまみの測定（2026-11-13）: BREAK の決まりを変えた時は、画面の説明と同じ決まりで考える（既定の決まりでは、前と全く同じ点）
     // つまみの測定2: 大物だけの決まり（ア）・弱点を突けない人（イ）・重い一撃（エ）も、エンジンと同じ関数で考える（既定の決まりでは前と同じ点）
-    if (guide?.kind === 'weak' && !needsWeakPerfect(b)) score += 60;
+    // 2026-11-13: 紫の札（特殊な行動）の決まりも、エンジンと同じ関数（敵を渡す）で考える
+    if (guide?.kind === 'weak' && !needsWeakPerfect(b, e)) score += 60;
     else if (guide?.kind === 'weak' && card.slots <= a.focus) {
       focus = card.slots;
       score += 60;

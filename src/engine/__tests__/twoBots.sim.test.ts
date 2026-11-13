@@ -14,7 +14,7 @@
 //   SIM_PARTYSET（phys = 2人を 剣士＋狩人 / magic = 2人を 魔法使い＋僧侶。省略 = 上のパーティ）
 // 賢い bot（3段目。botSmart.ts）で足した環境変数:
 //   SIM_BOTS（流す bot をカンマで。straight,clever,smart。既定は3本とも）
-//   SIM_SMART_OFF（賢い bot から外す工夫。shop,cards,items,team,time をカンマで）
+//   SIM_SMART_OFF（賢い bot から外す工夫。shop,cards,items,team,time,weak をカンマで。weak = ボスの弱点に合わせる装飾品。2026-11-13）
 //   SIM_PARTYSET に ws = 2人を 剣士＋僧侶 / mx = 2人を 魔法使い＋召喚士（回復を持たない魔法の基本職）を足した
 // つまみの測定（2026-11-13）で足した環境変数:
 //   SIM_KNOBS（B1〜B4・H1〜H4・A1・A2・C1・C2・G1 をカンマで。下の KNOB_ALIAS の所に説明）・SIM_JSON（集計用の要約の書き出し先）・
@@ -24,8 +24,9 @@
 // 部屋の連続の直し（2026-11-13）で SIM_JSON に足した数: クリアした冒険の戦闘の数・固定／ランダムダンジョンの中の戦闘の数・終わった時の平均レベル・転職の数
 // 回復役を入れて測る（2026-11-13 オーナーの決定）: 標準のパーティを 2人 = 剣士＋僧侶 / 3人 = 剣士＋魔道士＋僧侶 / 4人 = 剣士＋魔道士＋狩人＋僧侶 にした。
 //   前の並び（回復役なし）は SIM_PARTYSET=old。2人の組の比べに hp = 狩人＋僧侶 / gp = 守護者＋僧侶 を足した
-// 案Y を既定に入れた（2026-11-13）: 何も書かない「今のまま」= 新しい既定（前の SIM_KNOBS=BA,H4,A2 と同じ）。
-//   SIM_KNOBS に Y0 を書くと、案Y を入れる前の既定に戻す（例: SIM_KNOBS=Y0 = 前の「今のまま」、SIM_KNOBS=Y0,BA,H4,A2 = 新しい既定と同じ）。
+// 案Y を既定に入れた（2026-11-13）→ 同じ日に取りやめ、BREAK を読み合いにする形（docs/tasks/break-read-plan.md）にした:
+//   何も書かない「今のまま」= 新しい既定（紫の札と大物は弱点で完全成功・大物のHP と後半の攻撃は ×1）。
+//   SIM_KNOBS に Y0 を書くと、18回目の公開の形（どれでも、弱点・完全成功・合計ダメージのどれかで崩れる）に戻す。
 //   B3 は全部の格に、BI・BE は BA と一緒でなければ全部の格に当てる（前の測定と同じ意味）
 // 敵の特殊な行動の直し（2026-11-13）で足した数: 特殊な行動（7種類）が、予告された・実際に行われた・BREAK で止められた回数（種類ごと・1冒険の平均）。
 //   テストの側で数える（エンジンの結果は変えない）。どの行動が特殊な行動かは、行動の効果の種類で見分ける（直す前と後で同じ見分け方）
@@ -34,6 +35,7 @@ import { dirname } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { BattleEvent, EnemyActionDef, GameCommand, GameState, PlayerId } from '../../types';
 import { getEnemyAction } from '../../data/enemies';
+import { getItem } from '../../data/items';
 
 type Hook = (pre: GameState, cmd: GameCommand, post: GameState, events: BattleEvent[]) => void;
 const H: { hook?: Hook } = {};
@@ -116,13 +118,17 @@ const KNOB_TEXT: string[] = [];
   const ranksAll = { boss: false, midboss: false, elite: false, normal: false };
   // 案Y を既定に入れた（2026-11-13）: Y0 = 案Y を入れる前の既定に戻す（並びのどこに書いても、ほかのつまみより先に当てる）。
   //   Y0 を書かない時の「今のまま」は、新しい既定（= 前の測定の SIM_KNOBS=BA,H4,A2 と同じ）
+  //   2026-11-13（案Y の取りやめ・docs/tasks/break-read-plan.md）: Y0 = 18回目の公開の形（紫の札も大物も、弱点・完全成功・合計ダメージのどれかで崩れる）。
+  //   新しい既定は「紫の札と大物は弱点で完全成功」だけで、大物のHP・後半の攻撃は元のまま（×1）なので、Y0 で戻すのは BREAK の決まりだけ
   if (KNOBS.includes('Y0')) {
     B.breakNeedsWeakPerfect = false;
     B.breakNeedsWeakPerfectRanks = undefined;
     B.breakDamagePctByRank = {};
+    B.breakBehaviorNeedsWeakPerfect = false;
+    B.breakDamagePctBehavior = undefined;
     B.enemyHpByRank = {};
     B.enemyAttackByRegion = {};
-    KNOB_TEXT.push('Y0 案Y を入れる前の既定（大物も弱点・完全成功・合計ダメージのどれかで崩れる・大物のHP ×1・後半の攻撃 ×1）');
+    KNOB_TEXT.push('Y0 18回目の公開の形（紫の札も大物も、弱点・完全成功・合計ダメージのどれかで崩れる）');
   }
   for (const raw of KNOBS) {
     if (raw === 'Y0') continue;
@@ -256,7 +262,20 @@ interface Run {
   sp: SpecialCount;
   /** つまみの測定2: 戦闘の始めにいた敵（敵の種類 → 出た戦闘の数）。シナリオ1で本当に出会う敵を洗い出す用 */
   foes: Record<string, number>;
+  /**
+   * BREAK を読み合いにする（2026-11-13）: BREAK した予告の種類ごとの数（purple = 紫の札（behavior 付きの行動）/ big = ボス・中ボス・災厄の戦闘の赤い大技 /
+   * red = それ以外の赤い大技）。前の状態で、その敵が予告していた行動で見分ける
+   */
+  breakKind: Record<'purple' | 'big' | 'red', number>;
+  /** 買った「属性の付与」の装飾品の数（買う操作の前と後で、全員の持ち物と装備の数を比べた）・終わった時に付けていた人数 */
+  convBought: number;
+  convWorn: number;
 }
+
+/** 「属性の付与」の装飾品か */
+const isConverter = (itemId: string) => { const e = getItem(itemId).ability?.effect; return !!e && 'modifier' in e && e.modifier === 'convertElement'; };
+/** 全員の持ち物と装備にある「属性の付与」の装飾品の数 */
+const convCount = (g: GameState) => g.heroes.reduce((n, h) => n + h.stash.filter((i) => isConverter(i.itemId)).length + Object.values(h.equipment).filter((i) => i && isConverter(i.itemId)).length, 0);
 
 /** ボスの部屋・中ボスの部屋・災厄（災厄の戦闘は中ボスの印を持つ）の戦闘か */
 const isBig = (b: NonNullable<GameState['battle']>) => !!b.boss || !!b.midboss;
@@ -269,7 +288,7 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
   const r: Run = { clear: false, corr100: false, where: '', fights: 0, rounds: 0, finished: 0, breaks: 0, randomIn: 0, randomDone: 0, scourgeKills: 0, jobChanges: 0, hones: 0, errors: 0,
     bigFinished: 0, bigRounds: 0, breakWhy: { weak: 0, perfect: 0, damage: 0 }, bigBreaks: 0, worldTurn: 0, corruption: 0, wiped: false, endMode: '', where2: {},
     bought: 0, sold: 0, equips: 0, itemsBattle: 0, itemsField: 0, removed: 0, skipped: 0, refused: 0, goldEnd: 0,
-    fixedDungeonFights: 0, randomDungeonFights: 0, levelEnd: 0, sp: emptySpecials(), foes: {} };
+    fixedDungeonFights: 0, randomDungeonFights: 0, levelEnd: 0, sp: emptySpecials(), foes: {}, breakKind: { purple: 0, big: 0, red: 0 }, convBought: 0, convWorn: 0 };
   const entered = new Set<string>();
   /** 予告を数えた印（戦闘の種:敵:ターン。同じ予告を2回数えない） */
   const said = new Set<string>();
@@ -309,6 +328,9 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
       r.breakWhy[e.why]++;
       const hit = cands.filter((b) => b.enemies.some((x) => x.uid === e.enemyUid));
       if (hit.length && hit.every((b) => isBig(b))) r.bigBreaks++;
+      // 予告の種類（前の状態の、その敵の予告で見る）
+      const foe = b0.flatMap((b) => b.enemies.map((x) => ({ x, b }))).find(({ x }) => x.uid === e.enemyUid && !!x.intent);
+      if (foe) r.breakKind[getEnemyAction(foe.x.defId, foe.x.intent!.actionId).behavior ? 'purple' : isBig(foe.b) ? 'big' : 'red']++;
     }
     r.breaks += events.filter((e) => e.type === 'break').length;
     // 特殊な行動: 予告（後の状態に出ている予告）・実行（前の状態の予告と同じ名前で行動した）・BREAK（前の状態で特殊な行動を予告していた敵が崩された）
@@ -339,7 +361,10 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
     if (inner?.type === 'CHANGE_JOB') r.jobChanges++;
     if (inner?.type === 'REST' && inner.kind === 'upgrade') r.hones++;
     // 賢い bot の工夫（成功した操作だけ数える）
-    if (inner?.type === 'TOWN_BUY' || (inner?.type === 'PEDDLER_BUY' && inner.index !== undefined)) r.bought++;
+    if (inner?.type === 'TOWN_BUY' || (inner?.type === 'PEDDLER_BUY' && inner.index !== undefined)) {
+      r.bought++;
+      r.convBought += Math.max(0, convCount(post) - convCount(pre));
+    }
     if (inner?.type === 'TOWN_SELL') r.sold++;
     if (inner?.type === 'EQUIP') r.equips++;
     if (inner?.type === 'USE_POUCH_ITEM') {
@@ -363,6 +388,7 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
   r.corruption = game.world?.corruption ?? 0;
   r.goldEnd = game.heroes.reduce((n, h) => n + h.gold, 0) / Math.max(1, game.heroes.length);
   r.levelEnd = game.heroes.reduce((n, h) => n + h.level, 0) / Math.max(1, game.heroes.length);
+  r.convWorn = game.heroes.filter((h) => h.equipment.accessory && isConverter(h.equipment.accessory.itemId)).length;
   const w = game.world;
   if (w) {
     r.randomDone = w.tiles.filter((t) => isRandomDungeonTile(t.f) && t.f!.used).length;
@@ -512,6 +538,10 @@ describe.skipIf(!process.env.SIM)(`物差し2本（直行 bot と工夫する bo
               fightsClear: cl.length ? a((r) => r.fights, cl) : null, fixedDungeonFights: a((r) => r.fixedDungeonFights), randomDungeonFights: a((r) => r.randomDungeonFights),
               fixedDungeonFightsClear: cl.length ? a((r) => r.fixedDungeonFights, cl) : null,
               levelEndClear: cl.length ? a((r) => r.levelEnd, cl) : null, levelEnd: a((r) => r.levelEnd), jobChanges: a((r) => r.jobChanges),
+              breakPurple: a((r) => r.breakKind.purple), breakBig: a((r) => r.breakKind.big), breakRed: a((r) => r.breakKind.red),
+              convBought: a((r) => r.convBought), convWorn: a((r) => r.convWorn),
+              bigFightsClear: cl.length ? a((r) => r.bigFinished, cl) : null,
+              wipedRow: rs.filter((r) => r.wiped).map((r) => r.where), corrRow: rs.filter((r) => r.corr100).map((r) => r.where),
               specials: Object.fromEntries((Object.keys(SPECIALS) as SpecialKind[]).map((s) => [s, { said: a((r) => r.sp[s].said), done: a((r) => r.sp[s].done), broke: a((r) => r.sp[s].broke) }])),
             });
           }
