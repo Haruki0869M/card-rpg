@@ -1,5 +1,6 @@
 // 区切りE（2026-11-12）: Gemini の案の消耗品15個。docs/tasks/lineup-stageE-plan.md（オーナーの OK）。数値は Gemini の文のとおり、【提案】の所は計画に書いた物
-// レジェンドの3個はお店で売らない（noShop）。区切りG（黄金の宝箱・災厄の中ボス）ができるまでは、レジェンドの宝箱からだけ出る
+// レジェンドの3個はお店で売らない（noShop）。出どころ: 宝箱の中身の格がレジェンドの時、装備とは別に、この3個のどれか1つが必ず付く
+// （どの宝箱でも。エピックの時は 25% でエピックの消耗品が1つ付く。balance.ts の chestTopConsumable・loot.ts の rollChestContents。点検 2026-11-13 F2）
 import type { ItemDef } from '../../../types';
 
 export const consumables3: ItemDef[] = [
