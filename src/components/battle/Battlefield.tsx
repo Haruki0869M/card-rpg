@@ -2,7 +2,8 @@
 // 背景の上に、敵（上段）と味方（下段）が向かい合う。動きの演出はラッパー要素の transform だけで行う。
 
 import { motion, useAnimate, useReducedMotion } from 'framer-motion';
-import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { create } from 'zustand';
 import type React from 'react';
 import { BattleBackground, CharacterArt, EnemyArt, preloadEnemyPhases } from '../../art';
 import { getPet } from '../../data/pets';
@@ -123,7 +124,8 @@ function IntentTargetName({ id }: { id?: string }) {
   // 敵が3体以上で枠が狭い時も、短い名前で出す（「→P1」だと、2人とも P1 の時に誰か分からない）
   return a ? <span className="order-first w-full truncate text-center text-[12px] leading-4" data-intent-name>→{shortName(a.name)}</span> : null;
 }
-function IntentPartView({ p }: { p: IntentPart }) {
+/** narrow = 敵が3体以上で枠が狭い（状態異常の予告も、狙いの名前を1行目に折り返す。2026-11-13） */
+function IntentPartView({ p, narrow }: { p: IntentPart; narrow: boolean }) {
   switch (p.kind) {
     case 'attack': {
       const el = p.element ? getElement(p.element) : undefined;
@@ -158,7 +160,7 @@ function IntentPartView({ p }: { p: IntentPart }) {
     case 'debuff': {
       const st = statusStyle(p.status);
       return (
-        <span className="flex items-center gap-0.5" style={{ color: st.color }}>
+        <span className={`flex items-center gap-0.5 ${narrow ? 'max-w-full flex-wrap justify-center' : ''}`} style={{ color: st.color }}>
           <st.Icon size={14} strokeWidth={2.6} />
           {p.all ? <span className="text-[12px]">味方全員</span> : <><TargetFace allyId={p.targetId} /><IntentTargetName id={p.targetId} /></>}
           <span className="tabular-nums">{p.amount}</span>
@@ -170,20 +172,47 @@ function IntentPartView({ p }: { p: IntentPart }) {
   }
 }
 
-function IntentBubble({ enemy, onTap }: { enemy: EnemyState; onTap: () => void }) {
+/**
+ * 敵が3体以上の時に、敵の列の下の1行に案内を出す敵（この端末だけの見た目の状態。戦闘の結果・相方の画面は変わらない）。
+ * 予告の枠を押すと、その敵の案内に切り替わる
+ */
+const useBriefFocus = create<{ uid?: string; set: (uid: string) => void }>((set) => ({ set: (uid) => set({ uid }) }));
+
+/**
+ * 敵が3体以上の時の、案内の1行に出す敵【提案】: 狙っている敵（カードを選んで狙いを決めた敵）→ 最後に予告の枠を押した敵 → 左から1体目。
+ * どれも、特殊な行動を予告していて、まだ崩していない敵だけ
+ */
+export function briefEnemy(battle: BattleState, enemies: EnemyState[], targetId?: string, focusUid?: string): { enemy: EnemyState; count: number } | undefined {
+  const list = enemies.filter((e) => {
+    const v = e.dead ? null : intentView(battle, e);
+    return !!v && !v.broken && !!v.behavior;
+  });
+  const enemy = list.find((e) => e.uid === targetId) ?? list.find((e) => e.uid === focusUid) ?? list[0];
+  return enemy && { enemy, count: list.length };
+}
+
+function IntentBubble({ enemy, onTap, narrow }: { enemy: EnemyState; onTap: () => void; narrow: boolean }) {
   const battle = useBattle((s) => s.battle);
   const retargetKey = useBattle((s) => s.retargets[enemy.uid] ?? 0);
-  const press = usePress(onTap, { type: 'intent', uid: enemy.uid });
+  const setFocus = useBriefFocus((s) => s.set);
+  const press = usePress(() => {
+    setFocus(enemy.uid);
+    onTap();
+  }, { type: 'intent', uid: enemy.uid });
+  // 敵が3体以上の時、下の案内の1行に出ている敵の札は、金の縁で目立たせる
+  const focusUid = useBriefFocus((s) => s.uid);
+  const briefOn = useBattle((s) => narrow && briefEnemy(s.battle, fieldEnemies(s.battle.enemies), s.selection?.targetId, focusUid)?.enemy.uid === enemy.uid);
   const view = intentView(battle, enemy);
   return (
-    <div {...press} className="flex min-h-[24px] items-center justify-center">
+    // 敵が3体以上の時は、枠を敵の欄の幅に収める（中身は折り返す。画面の外・隣の敵の枠に出ないように。2026-11-13）
+    <div {...press} className={`flex min-h-[24px] items-center justify-center ${narrow ? 'w-full min-w-0' : ''}`}>
       {view && (
         <motion.div
           key={retargetKey}
           initial={retargetKey ? { scale: 1.45 } : false}
           animate={{ scale: 1 }}
           transition={{ type: 'spring', stiffness: 500, damping: 18 }}
-          className="relative flex max-w-full flex-wrap items-center justify-center gap-1 rounded-lg border border-red-300/50 bg-[#1c0a10]/90 px-1.5 py-0.5 text-[14px] leading-5 font-black shadow-[0_2px_0_rgba(0,0,0,.6)]"
+          className={`relative flex max-w-full flex-wrap items-center justify-center rounded-lg border border-red-300/50 bg-[#1c0a10]/90 py-0.5 text-[14px] leading-5 font-black shadow-[0_2px_0_rgba(0,0,0,.6)] ${narrow ? 'gap-x-0.5 px-1' : 'gap-1 px-1.5'}`}
           data-intent={enemy.uid}
           data-intent-big={view.big || undefined}
           data-intent-broken={view.broken || undefined}
@@ -203,17 +232,20 @@ function IntentBubble({ enemy, onTap }: { enemy: EnemyState; onTap: () => void }
             <span className="order-first rounded bg-amber-400 px-1 text-[12px] leading-4 font-black whitespace-nowrap text-amber-950" data-break-mark>⚡BREAK</span>
           ) : view.behavior ? (
             <span
-              className="order-first rounded bg-gradient-to-b from-fuchsia-500 to-purple-700 px-1 text-[12px] leading-4 font-black whitespace-nowrap text-white ring-1 ring-amber-300/90"
+              className={`order-first rounded bg-gradient-to-b from-fuchsia-500 to-purple-700 text-[12px] leading-4 font-black whitespace-nowrap text-white ${narrow ? 'px-0.5' : 'px-1'} ${briefOn ? 'ring-2 ring-amber-300' : 'ring-1 ring-amber-300/90'}`}
               data-behavior-mark={view.behavior.id}
+              data-behavior-short={narrow || undefined}
+              data-brief-on={briefOn || undefined}
             >
               {view.behavior.icon}
-              {view.behavior.label}
+              {/* 敵が3体以上で枠が狭い時は短い名前（例「⚠️手数」）。何をされるかは、敵の列の下の1行に出す */}
+              {narrow ? view.behavior.short : view.behavior.label}
             </span>
           ) : view.big ? (
             <span className="order-first flex items-center rounded bg-red-600 px-1 text-[12px] leading-4 font-black whitespace-nowrap text-white" data-big-mark><Flame size={12} strokeWidth={2.8} />大技</span>
           ) : null}
           {view.parts.map((p, i) => (
-            <IntentPartView key={i} p={p} />
+            <IntentPartView key={i} p={p} narrow={narrow} />
           ))}
           {/* お供の先読み: 次のターンの行動の名前（枠の中の最後の行。下の味方や狙いの名前に重ねない） */}
           {enemy.queuedActionId && (
@@ -370,7 +402,7 @@ const EnemyUnit = memo(function EnemyUnit({
           <HpBar hp={enemy.hp} max={enemy.maxHp} block={enemy.block} tone="enemy" height={12} />
           <ElementMarks defId={enemy.defId} />
           {/* 次の行動の予告（HPのすぐ下。誰を狙っているかの顔つき） */}
-          <IntentBubble enemy={enemy} onTap={onTap} />
+          <IntentBubble enemy={enemy} onTap={onTap} narrow={narrow} />
           {!narrow && <BehaviorBrief enemy={enemy} maxW={slotW - 8} />}
           <BreakHint enemy={enemy} narrow={narrow} maxW={narrow ? slotW - 4 : slotW - 8} />
           <AimMarks battle={battle} enemyUid={enemy.uid} />
@@ -399,6 +431,36 @@ function BehaviorBrief({ enemy, maxW }: { enemy: EnemyState; maxW: number }) {
     >
       {brief}
     </span>
+  );
+}
+
+/** 敵が3体以上の時の、特殊な行動の案内の1行の高さ（敵の列の下に、この分の場所を取る） */
+const BRIEF_BAR_H = 20;
+
+/**
+ * 敵が3体以上の時の、特殊な行動の案内の1行（2026-11-13【提案】）。予告の枠が狭くて案内を敵ごとに出せないので、
+ * 敵の列の下・味方の立ち絵の上に1つだけ出す。出す敵は briefEnemy（狙っている敵 → 最後に押した札の敵 → 左から1体目）。
+ * 特殊な行動の敵が2体以上いる時は「1/2」のように数を出し、その敵の札を金の縁で目立たせる。押せない（下の操作を邪魔しない）
+ */
+function BehaviorBriefBar({ top, maxW }: { top: number; maxW: number }) {
+  const focusUid = useBriefFocus((s) => s.uid);
+  const text = useBattle((s) => {
+    const list = fieldEnemies(s.battle.enemies);
+    const b = briefEnemy(s.battle, list, s.selection?.targetId, focusUid);
+    if (!b) return undefined;
+    const v = intentView(s.battle, b.enemy)!;
+    const order = list.filter((e) => briefEnemy(s.battle, [e])).findIndex((e) => e.uid === b.enemy.uid) + 1;
+    return `${v.behavior!.icon}${shortName(enemyName(b.enemy))}：${v.behavior!.brief}${b.count > 1 ? `（${order}/${b.count}）` : ''}`;
+  });
+  if (!text) return null;
+  return (
+    <div
+      className="pointer-events-none absolute left-1/2 z-[7] -translate-x-1/2 rounded bg-purple-950/90 px-1.5 text-center text-[12px] leading-4 font-bold whitespace-nowrap text-fuchsia-100 ring-1 ring-fuchsia-300/70"
+      style={{ top, maxWidth: maxW }}
+      data-behavior-brief-bar
+    >
+      {text}
+    </div>
   );
 }
 
@@ -612,7 +674,9 @@ export function Battlefield() {
   const breakRowH = breakRow ? (enemies.length === 2 ? 34 : 18) : 0;
   // 属性の印の行（16）・各行の間（0.5×5）・3体以上の時に互い違いにずらす分（10）も数える
   // 予告の枠は「→名前」の行（16）＋数字の行（20）＋枠の余白（6）の2行ぶん
-  const enemyInfoH = 14 + 14 + 16 + 42 + 16 + (foresee ? 18 : 0) + breakRowH + 18 + 10 + (nE >= 3 ? 10 : 0);
+  // 敵が3体以上で、特殊な行動を予告している敵がいる時は、敵の列の下に案内の1行（BehaviorBriefBar）の場所も取る
+  const briefBar = useBattle((s) => nE >= 3 && !!briefEnemy(s.battle, fieldEnemies(s.battle.enemies)));
+  const enemyInfoH = 14 + 14 + 16 + 42 + 16 + (foresee ? 18 : 0) + breakRowH + 18 + 10 + (nE >= 3 ? 10 : 0) + (briefBar ? BRIEF_BAR_H : 0);
   // 敵の列の下端と味方の頭の間に少し余白を残す（予告の枠が立ち絵の頭に重ならないように）
   const enemySpriteH = Math.max(40, Math.min(H * 0.56 - enemyInfoH, enemySlotW * 1.15));
   // 大きな敵（size > 1）は、絵の箱より上へはみ出して描かれ、戦場の上の端（上の帯）で体が切れていた。
@@ -625,6 +689,15 @@ export function Battlefield() {
   // 味方の立ち絵は、敵の列（予告まで）の下に収まる高さにする。画面が低い時でも元の6割より小さくしない
   const allyFull = Math.min(H * 0.42, (allyAreaW / nA) * 1.25);
   const enemyBottom = enemyTop + enemySpriteH + enemyInfoH;
+  // 案内の1行は、敵の欄（名前〜状態異常）の一番下のすぐ下に置く。欄の高さは予告の中身で変わるので、描いた後に測る
+  const [infoBottom, setInfoBottom] = useState(0);
+  useLayoutEffect(() => {
+    const root = ref.current;
+    if (!briefBar || !root) return;
+    const top = root.getBoundingClientRect().top;
+    const b = Math.max(0, ...[...root.querySelectorAll('[data-enemy-info]')].map((el) => el.getBoundingClientRect().bottom - top));
+    if (Math.abs(b - infoBottom) > 0.5) setInfoBottom(b);
+  });
   const allyH = Math.max(48, allyFull * 0.6, Math.min(allyFull, H - 6 - enemyBottom));
   // 段階A: 操作パネルが戦場に重なってよい高さ（味方の下半身まで＝立ち絵の下45%）。パネルの最大の高さに使う
   useEffect(() => {
@@ -673,6 +746,7 @@ export function Battlefield() {
               narrow={nE >= 3}
             />
           ))}
+          {briefBar && <BehaviorBriefBar top={Math.max(enemyBottom - BRIEF_BAR_H + 2, infoBottom + 2)} maxW={W - 16} />}
           {allies.map((a, i) => (
             <AllySprite
               key={a.id}

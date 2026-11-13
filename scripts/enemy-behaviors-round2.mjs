@@ -1,14 +1,15 @@
 // 敵の特殊な行動・第2弾（残り6本・2026-11-13）の画面の確認（360×640 と 390×844）。手本は scripts/enemy-behaviors-fix.mjs。
 // 6本のシナリオから、札の種類ごとに2体ずつと、効果を複数持つ4体（竪琴の守り人・セイレーン・月のウサギ・小ダコ）を、
 // 敵1体・2体・3体・4体で撮る。確かめる事:
-// - 札が予告の枠に出る（文字は種類ごと）。1行の案内は敵が2体までの時だけ出る（3体以上は札だけ）
+// - 札が予告の枠に出る（文字は種類ごと。敵が3体以上は短い形）。1行の案内は、敵が2体までは敵ごと、
+//   3体以上は敵の列の下に1つだけ（左の敵の物。2体目の札を押すと替わる。2026-11-13 の直し）
 // - 札・案内が、ほかの敵の名前・HP・予告・BREAK の印、味方の立ち絵の顔、操作パネル、画面の外に重ならない。文が枠からはみ出さない
 // - 札・案内・BREAK の印の字が 12px より小さくない
 // - 効果を複数持つ4体の予告の枠（癒し封じ＋呪い＋ブロック など）が、画面の外・ほかの敵に重ならない
 // - BREAK した後は、札と案内が消えて「⚡BREAK」の札に替わる
 // 使い方: URL=http://127.0.0.1:<番号>/card-rpg/ node scripts/enemy-behaviors-round2.mjs
 import { mkdir } from 'node:fs/promises';
-import { chromium, layoutIssues, startBattle } from './lib.mjs';
+import { BEHAVIOR_SHORT, briefBarIssues, chromium, layoutIssues, startBattle } from './lib.mjs';
 
 const dir = 'screenshots/enemy-behaviors-round2';
 await mkdir(dir, { recursive: true });
@@ -84,10 +85,13 @@ async function check(w, h, count) {
     const ng = (t) => problems.push(`特殊な行動の札 ${tag}: ${t}`);
     await setup(page, kinds, false);
     const marks = await page.locator('[data-behavior-mark]').allInnerTexts();
-    const want = kinds.map((k) => k.mark);
+    // 敵が3体以上の時は、札は短い形（例「⚠️手数」）
+    const want = kinds.map((k) => (count >= 3 ? BEHAVIOR_SHORT[k.mark] : k.mark));
     if (JSON.stringify(marks.map((t) => t.replace(/\s/g, ''))) !== JSON.stringify(want)) ng(`札の文字 ${JSON.stringify(marks)}（ほしい ${JSON.stringify(want)}）`);
+    // 1行の案内: 敵が2体までは敵ごと。3体以上は、敵の列の下に1つだけ（下の briefBarIssues）
     const briefs = await page.locator('[data-behavior-brief]').allInnerTexts();
     if (briefs.length !== (count >= 3 ? 0 : count)) ng(`1行の案内の数が ${briefs.length}`);
+    if (count < 3 && (await page.locator('[data-behavior-brief-bar]').count())) ng('敵が2体までなのに、敵の列の下の案内が出ている');
     const result = await page.evaluate(() => {
       const out = [];
       const notes = [];
@@ -145,11 +149,19 @@ async function check(w, h, count) {
     if (result.notes.length) console.log(`  （メモ ${tag}: ${result.notes.join(' / ')}）`);
     const issues = await layoutIssues(page);
     if (issues.length) ng(issues.join(' / '));
-    console.log(`特殊な行動の札 ${tag}: ${marks.join('・')}${briefs.length ? ` ／ 案内: ${briefs.join('・')}` : ''}`);
     await page.screenshot({ path: `${dir}/${tag}.png` });
+    let bar = '';
+    if (count >= 3) {
+      const b = await briefBarIssues(page, count);
+      if (b.out.length) ng(b.out.join(' / '));
+      if (b.notes.length) console.log(`  （メモ ${tag}: ${b.notes.join(' / ')}）`);
+      bar = ` ／ 列の下の案内: ${b.text}`;
+      await page.screenshot({ path: `${dir}/${tag}-2体目を押した.png` });
+    }
+    console.log(`特殊な行動の札 ${tag}: ${marks.join('・')}${briefs.length ? ` ／ 案内: ${briefs.join('・')}` : ''}${bar}`);
     // BREAK した後: 札と案内は消え、⚡BREAK の札に替わる
     await setup(page, kinds, true);
-    const after = { mark: await page.locator('[data-behavior-mark]').count(), brief: await page.locator('[data-behavior-brief]').count(), brk: await page.locator('[data-break-mark]').count() };
+    const after = { mark: await page.locator('[data-behavior-mark]').count(), brief: await page.locator('[data-behavior-brief]').count() + (await page.locator('[data-behavior-brief-bar]').count()), brk: await page.locator('[data-break-mark]').count() };
     if (after.mark || after.brief || after.brk !== count) ng(`BREAK の後: 札${after.mark}・案内${after.brief}・⚡BREAK ${after.brk}`);
     if (start === 0) await page.screenshot({ path: `${dir}/${tag}-broken.png` });
   }
