@@ -40,10 +40,21 @@ const shapeOf = (L: Layout) => JSON.stringify(L.map((row) => row.map((x) => [x.t
  * 2026-11-13（点検19の問題 A1・オーナーの OK）: この型だけ「ふつうの戦闘は2回以上」・選ぶ所 6 以上
  */
 const isKeyLayout1 = (d: DungeonDef) => !!d.layout && shapeOf(d.layout) === shapeOf(keyLayout1({ first: 'a', second: 'b', story: 'c' }));
+/**
+ * ボスの前が「休憩 → イベント → ボス」の8行の鍵のダンジョンか（1つ目の鍵の型と、2026-11-13 の案イで同じ形にした翠の神殿）。
+ * 休憩の後に戦う部屋が無いので、ふつうの戦闘の下限は1つ目の鍵の型と同じ 2回（2026-11-13 点検19の問題 A1 でオーナーが OK した扱い）
+ */
+const isShortKeyShape = (d: DungeonDef) => {
+  const L = d.layout!;
+  return !d.finale && L.length === 8 && restRowOf(L) === L.length - 3 && L[L.length - 2][0].type === 'event';
+};
 /** 戦う部屋（ふつうの戦闘・強敵・中ボス・ボス） */
 const isCombat = (type: string) => !!getRoomType(type).battle;
-/** ボスの前の休憩の行（最後の3行のうち、休憩1つだけの行） */
-const restRowOf = (L: Layout) => [L.length - 2, L.length - 3].find((r) => L[r].length === 1 && L[r][0].type === 'rest')!;
+/**
+ * ボスの前の休憩の行（ボスの前の3行のうち、ボスに近い順で最初の「休憩1つだけの行」）。
+ * 2026-11-13（強敵の計画 柱3・案イ）: 2つ目の鍵の型は「休憩 → ふつうの戦闘 → 物語の部屋 → ボス」なので、ボスの4行前まで見る
+ */
+const restRowOf = (L: Layout) => [L.length - 2, L.length - 3, L.length - 4].find((r) => L[r].length === 1 && L[r][0].type === 'rest')!;
 /** 入口からボスまでの全部の道（行の番号つき） */
 function allRowPaths(L: Layout): { r: number; type: string }[][] {
   const out: { r: number; type: string }[][] = [];
@@ -80,11 +91,14 @@ describe('固定ダンジョン28か所の形', () => {
     const L = d.layout!;
     expect(L[0].every((r) => r.type === 'battle')).toBe(true);
     expect(L[L.length - 1].map((r) => r.type)).toEqual(['boss']);
-    // ボスの前は「休憩」か「休憩→物語の部屋」
-    expect(
-      L.slice(-3, -1).some((row) => row.length === 1 && row[0].type === 'rest'),
-      '休憩',
-    ).toBe(true);
+    // ボスの前は「休憩」か「休憩→物語の部屋」か「休憩→ふつうの戦闘→物語の部屋」（2026-11-13 案イ）。
+    // 休憩の後の行は部屋が1つで、宝箱・休憩は置かない。イベント（物語の部屋）はボスの直前だけ
+    const rest = restRowOf(L);
+    expect(rest, '休憩').toBeGreaterThanOrEqual(L.length - 4);
+    for (let r = rest + 1; r < L.length - 1; r++) {
+      expect(L[r], `${r}行`).toHaveLength(1);
+      expect(L[r][0].type, `${r}行`).toBe(r === L.length - 2 ? 'event' : 'battle');
+    }
     for (let r = 0; r + 1 < L.length; r++) {
       for (const room of L[r]) {
         expect(room.next.length, `${r}`).toBeGreaterThan(0);
@@ -121,7 +135,9 @@ describe('固定ダンジョン28か所の形', () => {
   // 戦闘の濃さ（憲章1・3）: どの道でも、戦う部屋でない部屋が3つ以上続かない。ふつうの戦闘は鍵で3回以上・最後で4回以上。
   // 5行目（敵が1体増える行）からボスの前の休憩の手前までに、戦う部屋が鍵で2回以上・最後で3回以上（中ボスを含む）。
   // ただし、その間の行の数がそれより少ない時は、行の数まで（1つ目の鍵の8行のダンジョンは、ボスの前が「休憩→物語の部屋」なので、
-  // 5行目より後で休憩の前は1行しかない。docs/review/2026-11-13-room-variety2.md に書いた）
+  // 5行目より後で休憩の前は1行しかない。docs/review/2026-11-13-room-variety2.md に書いた）。
+  // 2026-11-13（強敵の計画 柱3・案イ）: 休憩を1行前に出した翠の神殿・2つ目の鍵の型も、同じ数え方で1行（= 1回以上）。
+  // ふつうの戦闘の下限は、ボスの前が「休憩 → イベント → ボス」の8行の鍵（1つ目の鍵の型と翠の神殿）だけ 2回以上
   it.each(fixed().map((d) => [d.id, d] as const))('%s: どの道でも、戦わない部屋は2つまで・ふつうの戦闘が下限以上・奥の戦う部屋が下限以上', (_id, d) => {
     const L = d.layout!;
     const rest = restRowOf(L);
@@ -136,7 +152,7 @@ describe('固定ダンジョン28か所の形', () => {
         run = isCombat(x.type) ? 0 : run + 1;
         expect(run, label).toBeLessThan(3);
       }
-      expect(p.filter((x) => x.type === 'battle').length, label).toBeGreaterThanOrEqual(d.finale ? 4 : isKeyLayout1(d) ? 2 : 3);
+      expect(p.filter((x) => x.type === 'battle').length, label).toBeGreaterThanOrEqual(d.finale ? 4 : isShortKeyShape(d) ? 2 : 3);
       expect(p.filter((x) => x.r >= from && x.r < rest && isCombat(x.type)).length, label).toBeGreaterThanOrEqual(deepWant);
     }
   });
@@ -159,17 +175,14 @@ describe('固定ダンジョン28か所の形', () => {
   });
 
   // 2026-11-13 強敵の計画（docs/tasks/elite-plan.md 柱3）: どのダンジョンにも、強敵を1回も通らない道がある（挑むか避けるかを選べる。憲章3）。
-  // 【保留・オーナーの判断待ち】 下の7か所は、今の決まりのままでは作れない（docs/review/2026-11-13-elite.md §3）:
-  // 休憩の前の「奥の行」が2行しかなく（2つ目の鍵の型 = 休憩→物語の部屋→ボス・翠の神殿 = 休憩→ボス）、その2行は「どの道でも戦う部屋」で、
-  // 同じ type が続かないので、どの道も「戦闘→強敵」か「強敵→戦闘」になる。直すには、決まりか、休憩・物語の部屋の位置を変える必要がある
-  const ELITE_FORCED_PENDING = ['emeraldTemple', 'sunkenCathedral', 'pirateIsland', 'shadowLibrary', 'observatory', 'steamPlant', 'echoSandTomb'];
-  it.each(fixed().map((d) => [d.id, d] as const))('%s: 強敵を1回も通らない道がある（保留の7か所を除く）', (id, d) => {
-    const free = allPaths(d.layout!).some((p) => !p.includes('elite'));
-    expect(free, id).toBe(!ELITE_FORCED_PENDING.includes(id));
+  // 前は7か所（翠の神殿・2つ目の鍵の型の6か所）を外していた。オーナーが選んだ案イ（休憩を1行前に出す）で直したので、例外は無い
+  // （docs/review/2026-11-13-elite.md §3・§10）
+  it.each(fixed().map((d) => [d.id, d] as const))('%s: 強敵を1回も通らない道がある', (id, d) => {
+    expect(allPaths(d.layout!).some((p) => !p.includes('elite')), id).toBe(true);
   });
 
   // 2026-11-13（点検19の問題 A1）: 1つ目の鍵の型は、シナリオ2〜7の6か所。選ぶ所は 6 以上（直す前 bf628d5 と同じ数）。
-  // 宝箱の格（コモン・鍵付きのレア）は残す。シナリオ1の翠の神殿は、この型ではない（ふつうの戦闘は 3回以上のまま）
+  // 宝箱の格（コモン・鍵付きのレア）は残す。シナリオ1の翠の神殿は、この型ではない（2026-11-13 の案イで、ボスの前の形とふつうの戦闘の下限だけ同じになった）
   it('1つ目の鍵の型: シナリオ2〜7の6か所・選ぶ所 6 以上・宝箱の格は残す', () => {
     const k1 = fixed().filter(isKeyLayout1);
     expect(k1.map((d) => DUNGEONS.scenarioOf(d.id)).sort()).toEqual(SCENARIOS.all.map((s) => s.id).filter((s) => s !== 'corruptionKing').sort());
