@@ -1,5 +1,5 @@
 // ===== 災厄の中ボスの札（段階7b・overhaul-plan-v2 §3-1）=====
-// 上の帯（侵食度など）のすぐ下に「💀盗賊王：店+25%」。2体以上の時、狭い画面（400px 未満）は「💀×2：店+25%・野営 半分」にまとめる。
+// 上の帯（侵食度など）のすぐ下に「💀盗賊王：店+25%」・場所・倒すと手に入る専用の装備の効果（1行。2026-11-13）。2体以上の時、狭い画面（400px 未満）は「💀×2：店+25%・野営 半分」にまとめる。
 // 押すと、悪さの中身・倒した時の報酬・場所が分かっているかを出す（見るだけ。だれでも開ける。ゲームの状態は変えない）
 import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
@@ -44,6 +44,10 @@ export function ScourgeStrip({ game }: { game: GameState }) {
           </>
         )}
         <span className="min-w-0 truncate text-[12px] font-normal text-fuchsia-200" data-scourge-place>{placeLine}</span>
+        {/* 倒すと手に入る専用の装備の効果（1行。はみ出す分は「…」。全文は押した時の説明に出す） */}
+        <span className="min-w-0 truncate text-[12px] font-normal text-amber-100" data-scourge-gear>
+          倒すと: {list.map((s) => `「${s.gearName}」${s.gearText}`).join('／')}
+        </span>
         </span>
         <span className="ml-auto shrink-0 text-[12px] font-normal text-fuchsia-300">説明</span>
       </button>
@@ -70,6 +74,7 @@ export function ScourgeStrip({ game }: { game: GameState }) {
                     <div className="font-bold text-fuchsia-100">💀 {s.name}</div>
                     <div className="text-zinc-200">悪さ: {s.curseText}</div>
                     <div className="text-amber-100">倒すと: {s.rewardText}</div>
+                    <div className="text-[12px] leading-4 text-amber-200/90" data-scourge-row-gear>装備の効果: {s.gearText}</div>
                     <div className={s.seen ? 'text-emerald-200' : 'text-zinc-300'} data-scourge-row-place>{scourgePlaceText(game, w, s.tile, s.seen)}</div>
                   </div>
                 ))}
