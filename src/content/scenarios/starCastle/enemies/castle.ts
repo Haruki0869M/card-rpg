@@ -16,9 +16,12 @@ export const skyKnight: EnemyDef = {
   weak: ['dark'],
   resist: ['holy'],
   pattern: 'sequence',
+  // 敵の特殊な行動・第2弾（docs/tasks/enemy-behaviors-round2-plan.md §3・fix-plan §4）: ほかの敵がいる時は、1ターン目に必ず「天の盾」（1体だけの時は槍の突撃）
+  firstActionId: 'guard',
   actions: [
     { id: 'lance', name: '槍の突撃', effects: [{ kind: 'damage', amount: 16 }] },
-    { id: 'guard', name: '天の構え', effects: [{ kind: 'block', amount: 10 }, { kind: 'damage', amount: 5 }] },
+    // 「天の構え」（ブロック10＋5ダメージ）をかばうに置き換えた。ID は古い保存のために残す。5つ目の地域なのでブロック10（BREAK されると行動ごと止まる）
+    { id: 'guard', name: '天の盾', big: true, behavior: 'guard', fallbackIfAloneId: 'lance', hint: '次の味方の番の間、ほかの敵への単体攻撃を代わりに受ける。全体攻撃は通る', effects: [{ kind: 'guardAllies' }, { kind: 'block', amount: 10 }] },
     { id: 'sweep', name: '槍の薙ぎ払い', effects: [{ kind: 'damage', amount: 7, to: 'foes' }] },
   ],
 };

@@ -15,10 +15,13 @@ export const iceFisher: EnemyDef = {
   weak: ['fire'],
   resist: ['ice'],
   pattern: 'sequence',
+  // 敵の特殊な行動・第2弾（docs/tasks/enemy-behaviors-round2-plan.md §3・fix-plan §4）: 手数読みを1ターン目に予告する（2ターン目からは釣り針の一撃・糸を巻く・手数読みの順）
+  firstActionId: 'hole',
   actions: [
     { id: 'hook', name: '釣り針の一撃', effects: [{ kind: 'damage', amount: 9 }] },
     { id: 'reel', name: '糸を巻く', effects: [{ kind: 'damage', amount: 4 }, { kind: 'applyStatus', status: 'weak', amount: 1 }] },
-    { id: 'hole', name: '氷の穴にこもる', effects: [{ kind: 'block', amount: 7 }] },
+    // 「氷の穴にこもる」を手数読みに置き換えた。ID は古い保存のために残す。3つ目の地域なのでブロック8（BREAK されると付かない）
+    { id: 'hole', name: '糸を張って待つ', big: true, behavior: 'punish', hint: 'このターンにカードを4枚以上使った味方に、枚数×2のダメージ', effects: [{ kind: 'punishPlays', amount: 2, min: 4 }, { kind: 'block', amount: 8 }] },
   ],
 };
 

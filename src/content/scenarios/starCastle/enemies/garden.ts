@@ -37,7 +37,9 @@ export const thornFairy: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'needle', name: '茨の針', effects: [{ kind: 'damage', amount: 7 }, { kind: 'applyStatus', status: 'poison', amount: 2 }] },
-    { id: 'tangle', name: 'からまる茨', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1 }, { kind: 'block', amount: 5 }] },
+    // 敵の特殊な行動・第2弾（docs/tasks/enemy-behaviors-round2-plan.md §3・fix-plan §4）: 「からまる茨」を仲間を呼ぶ（風の精）に置き換えた。ID は古い保存のために残す。
+    // 呼べる時は優先・2ターン続けては呼ばない・1戦闘に2回まで。呼べない時は「いたずらの棘」。4つ目の地域なのでブロック10
+    { id: 'tangle', name: 'いたずら仲間を呼ぶ', big: true, behavior: 'call', cutIn: { when: 'canSummon', rest: 1, noRepeat: true }, hint: '仲間を1体呼ぶ。その前に倒すか、BREAK する', effects: [{ kind: 'summonEnemy', enemy: 'windSprite', uses: 2, call: true, orElse: 'prick' }, { kind: 'block', amount: 10 }] },
     { id: 'prick', name: 'いたずらの棘', effects: [{ kind: 'damage', amount: 5, hits: 2 }] },
   ],
 };
@@ -144,9 +146,12 @@ export const hourglassGolem: EnemyDef = {
   weak: ['thunder'],
   resist: ['poison'],
   pattern: 'sequence',
+  // 敵の特殊な行動・第2弾（round2 §3・fix-plan §4）: 手数読みを1ターン目に予告する（2ターン目からは止まる砂・石の拳・手数読みの順）
+  firstActionId: 'turn',
   actions: [
     { id: 'sand', name: '止まる砂', effects: [{ kind: 'damage', amount: 6 }, { kind: 'applyStatus', status: 'delay', amount: 1 }] },
     { id: 'fist', name: '石の拳', effects: [{ kind: 'damage', amount: 12 }] },
-    { id: 'turn', name: '砂時計を返す', effects: [{ kind: 'block', amount: 12 }] },
+    // 「砂時計を返す」を手数読みに置き換えた。ID は古い保存のために残す。4つ目の地域なのでブロック10（BREAK されると付かない）
+    { id: 'turn', name: '砂時計で数える', big: true, behavior: 'punish', hint: 'このターンにカードを4枚以上使った味方に、枚数×2のダメージ', effects: [{ kind: 'punishPlays', amount: 2, min: 4 }, { kind: 'block', amount: 10 }] },
   ],
 };

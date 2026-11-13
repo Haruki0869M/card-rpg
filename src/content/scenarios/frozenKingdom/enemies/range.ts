@@ -34,9 +34,12 @@ export const blizzardSnake: EnemyDef = {
   weak: ["fire"],
   resist: ["ice", "poison"],
   pattern: "sequence",
+  // 敵の特殊な行動・第2弾（round2 §3・fix-plan §4）: 癒し封じを1ターン目に予告する（2ターン目からは吹雪の締めつけ・毒の牙・癒し封じの順）
+  firstActionId: "coil",
   actions: [
     {"id": "bite", "name": "毒の牙", "effects": [{"kind": "damage", "amount": 8}, {"kind": "applyStatus", "status": "poison", "amount": 2}]},
-    {"id": "coil", "name": "雪を巻く", "effects": [{"kind": "block", "amount": 7}]},
+    // 「雪を巻く」を癒し封じに置き換えた。ID は古い保存のために残す。4つ目の地域なのでブロック10（BREAK されると行動ごと止まる）
+    {"id": "coil", "name": "凍傷の牙", big: true, behavior: "healSeal", hint: "味方全員の回復が、2ターン半分になる。BREAK するか、先に回復を使う", "effects": [{"kind": "applyStatus", "status": "healSeal", "amount": 2, "to": "foes"}, {"kind": "block", "amount": 10}]},
     {"id": "chill", "name": "吹雪の締めつけ", "effects": [{"kind": "applyStatus", "status": "freeze", "amount": 1}]},
   ],
 };
@@ -53,10 +56,13 @@ export const iceSwordsman: EnemyDef = {
   weak: ["thunder", "holy"],
   resist: ["ice"],
   pattern: "sequence",
+  // 敵の特殊な行動・第2弾（round2 §3・fix-plan §4）: 盾砕きを1ターン目に予告する（2ターン目からは二の太刀・霜刃の構え・盾砕きの順）
+  firstActionId: "thrust",
   actions: [
     {"id": "combo", "name": "二の太刀", "effects": [{"kind": "damage", "amount": 5, "hits": 2}]},
     {"id": "stance", "name": "霜刃の構え", "effects": [{"kind": "block", "amount": 9}]},
-    {"id": "thrust", "name": "氷刃の突き", "effects": [{"kind": "damage", "amount": 12}]},
+    // 「氷刃の突き」を盾砕きに置き換えた（ブロックを0にしてから、同じ12のダメージ）。ID は古い保存のために残す
+    {"id": "thrust", "name": "鎧通しの突き", big: true, behavior: "shatter", hint: "当たるとブロックを全部壊す。BREAK するか、ブロックに頼らずに受ける", "effects": [{"kind": "shieldBreak"}, {"kind": "damage", "amount": 12}]},
   ],
 };
 
@@ -131,4 +137,6 @@ export const frostGiant: EnemyDef = {
 
 export const venomIceSlime: EnemyDef = makeVariant(iceSlime, {"id": "venomIceSlime", "name": "毒氷のスライム", "aura": "venom", "maxHp": 36, "baseLevel": 7, "exp": 13, "gold": 9, "weak": ["fire"], "resist": ["ice"], "actions": [{"id": "ram", "name": "毒氷の体当たり", "effects": [{"kind": "damage", "amount": 9}]}, {"id": "shell", "name": "毒氷の膜", "effects": [{"kind": "block", "amount": 8}]}, {"id": "spit", "name": "毒のしぶき", "effects": [{"kind": "applyStatus", "status": "poison", "amount": 2}]}], "abilities": [{"name": "毒の飛沫", "effect": {"when": "battleStart", "do": [{"kind": "applyStatus", "status": "poison", "amount": 1, "to": "foes"}]}}]});
 
-export const stormIceArcher: EnemyDef = makeVariant(iceArcher, {"id": "stormIceArcher", "name": "雷氷の弓兵", "aura": "storm", "maxHp": 34, "baseLevel": 7, "exp": 13, "gold": 9, "weak": ["fire"], "resist": ["ice", "thunder"], "actions": [{"id": "arrow", "name": "雷氷の矢", "effects": [{"kind": "damage", "amount": 11, "element": "thunder"}]}, {"id": "volley", "name": "散る雷矢", "effects": [{"kind": "damage", "amount": 5, "element": "thunder", "to": "foes"}]}, {"id": "brace", "name": "雷矢の構え", "effects": [{"kind": "block", "amount": 7}]}]});
+// 敵の特殊な行動・第2弾（round2 §3・fix-plan §4）: 亜種のこの敵だけ「雷氷の矢」を手負い狙いに置き換えた（同じ雷11・HPが半分以下なら×1.5）。
+// ID は古い保存のために残す。1ターン目に予告する（もとから順番の1番目）。元の極寒の弓兵は変えていない
+export const stormIceArcher: EnemyDef = makeVariant(iceArcher, {"id": "stormIceArcher", "name": "雷氷の弓兵", "aura": "storm", "maxHp": 34, "baseLevel": 7, "exp": 13, "gold": 9, "weak": ["fire"], "resist": ["ice", "thunder"], firstActionId: "arrow", "actions": [{"id": "arrow", "name": "弱った者を射抜く", big: true, behavior: "hunt", hint: "HPの割合がいちばん低い味方を狙う。HPが半分以下だと×1.5", "effects": [{"kind": "damage", "amount": 11, "element": "thunder", "lowHpMul": 1.5}]}, {"id": "volley", "name": "散る雷矢", "effects": [{"kind": "damage", "amount": 5, "element": "thunder", "to": "foes"}]}, {"id": "brace", "name": "雷矢の構え", "effects": [{"kind": "block", "amount": 7}]}]});
