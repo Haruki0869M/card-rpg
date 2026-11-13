@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../../data/balance';
 import { DUNGEONS } from '../../data/dungeons';
 import { dungeonRows, isLegacyLayout } from '../game/dungeon';
+import { moveIntoRoom } from '../game/dungeonMap';
 import type { DungeonRun, GameCommand, GameState, PlayerId, Room } from '../../types';
 import { applyGameCommand, createGame, migrateGame, reachableRooms, retreatLoss, validateGame, viewOf, GAME_VERSION } from '../index';
 
@@ -126,5 +127,66 @@ describe('古い形のダンジョンからの撤退（損をしない）', () =
     const before = g.world!.corruption;
     g = run(g, { type: 'WORLD_INTERACT', playerId: P, heroId: 'h0', party: ['h0'] });
     expect(g.world!.corruption).toBe(before + BALANCE.corruptionOnDungeonEnter);
+  });
+});
+
+// 2026-11-13（強敵の計画 柱3・案イ）: 翠の神殿と2つ目の鍵の型の並びを変えた（休憩を1行前に出した）。行の数は同じなので「古い形」には当たらない。
+// 入った時の部屋は保存に入っているので、並びを変える前に入っていた途中の保存は、前の並びのまま最後まで進める
+const EMERALD_BEFORE_PLAN_I: NonNullable<ReturnType<typeof DUNGEONS.get>['layout']> = [
+  [{ type: 'battle', next: [0, 1, 2] }],
+  [
+    { type: 'event', eventId: 'fallenTree', next: [0, 1] },
+    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [0, 1] },
+    { type: 'rest', next: [0, 1] },
+  ],
+  [
+    { type: 'battle', next: [1, 2] },
+    { type: 'elite', next: [0] },
+  ],
+  [
+    { type: 'battle', next: [0] },
+    { type: 'chest', chest: { rarity: 'rare', locked: true }, next: [0, 1] },
+    { type: 'event', eventId: 'ancientStele', next: [0, 1] },
+  ],
+  [
+    { type: 'elite', next: [0] },
+    { type: 'battle', next: [1] },
+  ],
+  [
+    { type: 'battle', next: [0] },
+    { type: 'elite', next: [0] },
+  ],
+  [{ type: 'rest', next: [0] }],
+  [{ type: 'boss', next: [] }],
+];
+
+describe('並びを変える前（案イの前）に入っていた途中の保存', () => {
+  it('読み込める・古い形には当たらない・前の並びのまま、6行目の後の休憩（7行目）に進める', () => {
+    const def = DUNGEONS.get('emeraldTemple') as { layout?: unknown };
+    const now = def.layout;
+    def.layout = EMERALD_BEFORE_PLAN_I;
+    let made: ReturnType<typeof inTemple>;
+    try {
+      made = inTemple();
+    } finally {
+      def.layout = now;
+    }
+    const { g, x } = made;
+    const d0 = g.expeditions![0].dungeon!;
+    expect(d0.rooms.filter((r) => r.row === 6).map((r) => r.type)).toEqual(['rest']);
+    // 6行目の強敵まで済ませた所で保存した形にする
+    for (const r of d0.rooms) if (r.row <= 5) r.cleared = true;
+    d0.currentRoomId = 'r5c1';
+    moveIntoRoom(d0, 'r5c1');
+    const m = migrateGame(JSON.parse(JSON.stringify(g)))!;
+    expect(m).not.toBeNull();
+    expect(validateGame(m)).toBe(true);
+    const d = m.expeditions!.find((e) => e.id === x)!.dungeon!;
+    expect(isLegacyLayout(d)).toBe(false);
+    expect(dungeonRows(d)).toBe(8);
+    const next = reachableRooms(d);
+    expect(next.map((r) => [r.row, r.type])).toEqual([[6, 'rest']]);
+    const after = run(m, inScene(x, { type: 'ENTER_ROOM', playerId: P, roomId: next[0].id }));
+    expect(viewOf(after, x).mode).toBe('rest');
   });
 });

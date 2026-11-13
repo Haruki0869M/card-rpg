@@ -78,9 +78,9 @@ export function allPaths(L) {
   return out;
 }
 
-/** ボスの前の休憩の行（最後の3行のうち、休憩1つだけの行） */
+/** ボスの前の休憩の行（ボスの前の3行のうち、ボスに近い順で最初の「休憩1つだけの行」。2026-11-13 案イで、ボスの4行前まで見る） */
 export const restRowOf = (L) => {
-  for (let r = L.length - 2; r >= L.length - 3; r--) if (L[r].length === 1 && L[r][0].type === 'rest') return r;
+  for (let r = L.length - 2; r >= L.length - 4; r--) if (L[r].length === 1 && L[r][0].type === 'rest') return r;
   return -1;
 };
 
@@ -142,8 +142,11 @@ export function violations(d, base) {
   if (!(L[0].length === 1 && L[0][0].type === 'battle')) v.push('1行目が battle 1つでない');
   if (L[L.length - 1].length !== 1 || L[L.length - 1][0].type !== 'boss') v.push('最後がボスでない');
   if (d.finale && !(L[6].length === 1 && L[6][0].type === 'midboss' && L[7].length === 1 && L[7][0].type === 'rest')) v.push('中ボス・休憩の行');
-  if (base && restRowOf(base.layout) !== s.rest) v.push(`ボスの前の休憩の行が違う ${restRowOf(base.layout)}→${s.rest}`);
-  if (base) for (let r = s.rest; r < L.length; r++) if (JSON.stringify(L[r].map((x) => [x.type, x.eventId])) !== JSON.stringify(base.layout[r].map((x) => [x.type, x.eventId]))) v.push(`最後の行 ${r} が直す前と違う`);
+  // 2026-11-13（強敵の計画 柱3・オーナーが選んだ案イ）: 休憩を1行前に出すのは良い。その時は、前の休憩の行より後（物語の部屋・ボス）だけ比べる
+  const baseRest = base ? restRowOf(base.layout) : -1;
+  const moved = base && s.rest === baseRest - 1;
+  if (base && baseRest !== s.rest && !moved) v.push(`ボスの前の休憩の行が違う ${baseRest}→${s.rest}`);
+  if (base) for (let r = moved ? baseRest + 1 : s.rest; r < L.length; r++) if (JSON.stringify(L[r].map((x) => [x.type, x.eventId])) !== JSON.stringify(base.layout[r].map((x) => [x.type, x.eventId]))) v.push(`最後の行 ${r} が直す前と違う`);
   L.forEach((row, r) => {
     if (row.length < 1 || row.length > 3) v.push(`${r}行: 部屋の数 ${row.length}`);
     row.forEach((room, c) => {
@@ -156,10 +159,13 @@ export function violations(d, base) {
   if (s.sameEdges) v.push(`同じ type が続く辺 ${s.sameEdges}`);
   if (s.rowDups.length) v.push(`同じ行に同じ type: ${s.rowDups.join(',')}`);
   if (s.maxRun[1] >= 3) v.push(`戦わない部屋が ${s.maxRun[1]} 続く`);
-  const deepWant = d.finale ? 3 : 2;
+  // 休憩の前の奥の行が少ない時は、行の数まで（dungeonShape.test.ts と同じ数え方）
+  const deepWant = Math.min(d.finale ? 3 : 2, s.rest - 4);
   if (s.deep[0] < deepWant) v.push(`5行目〜休憩の前の戦う部屋 最小 ${s.deep[0]}（${deepWant}以上）`);
   // 2026-11-13（点検19の問題 A1・オーナーの OK）: 1つ目の鍵の型（シナリオ2〜7の8行の鍵のダンジョン）だけ 2回以上
-  const bWant = d.finale ? 4 : d.stage === 0 && d.scenario !== 'corruptionKing' ? 2 : 3;
+  // 2026-11-13（案イ）: ボスの前が「休憩 → イベント → ボス」の8行の鍵（1つ目の鍵の型と翠の神殿）は 2回以上
+  const shortKey = !d.finale && L.length === 8 && s.rest === L.length - 3 && L[L.length - 2][0].type === 'event';
+  const bWant = d.finale ? 4 : shortKey ? 2 : 3;
   if (s.battle[0] < bWant) v.push(`battle 最小 ${s.battle[0]}（${bWant}以上）`);
   if (!s.eliteAvoidable) v.push('避けられない elite の行');
   if (!s.eliteOrOther) v.push('elite を選べる所が無い');
@@ -181,14 +187,16 @@ function summary(rev) {
   let choices = 0;
   let same = 0;
   let eo = 0;
+  let free = 0;
   for (const d of ds) {
     const s = stats(d);
+    if (s.elite[0] === 0) free++;
     for (const t of TYPES) total[t] += s.counts[t] ?? 0;
     choices += s.choices;
     same += s.sameChoices;
     eo += s.eliteOrOther;
   }
-  return { ds, total, choices, same, eo };
+  return { ds, total, choices, same, eo, free };
 }
 
 const NAME = { battle: '戦', elite: '強', chest: '宝', event: 'イ', rest: '休', boss: 'ボス', midboss: '中ボス' };
@@ -232,9 +240,9 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '
   const revs = process.argv.slice(2).length ? process.argv.slice(2) : ['WORK'];
   const base = new Map(loadLayouts(BASE).map((d) => [d.id, d]));
   for (const rev of revs) {
-    const { ds, total, choices, same, eo } = summary(rev);
+    const { ds, total, choices, same, eo, free } = summary(rev);
     console.log(`\n===== ${rev} =====`);
-    console.log(`合計 ${TYPES.map((t) => `${t} ${total[t]}`).join(' / ')} / 選ぶ所 ${choices}（どちらも同じ type ${same}・elite か別の物 ${eo}）`);
+    console.log(`合計 ${TYPES.map((t) => `${t} ${total[t]}`).join(' / ')} / 選ぶ所 ${choices}（どちらも同じ type ${same}・elite か別の物 ${eo}） / 強敵を1回も通らない道があるダンジョン ${free}/${ds.length}`);
     let bad = 0;
     for (const d of ds) {
       const s = stats(d);
