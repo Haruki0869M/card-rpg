@@ -5,7 +5,7 @@ import type { EnemyAiHandler } from './ai/types';
 import { damageModifiers } from '../abilities';
 import { calcDamage } from './damage';
 import { targetOf } from './effects';
-import { skipActionStatus, tickDamageOf } from './statuses';
+import { activeStatuses, skipActionStatus, tickDamageOf } from './statuses';
 import { canSummonEnemy } from './effects/kinds/summonEnemy';
 
 export function livingAllies(state: BattleState): AllyState[] {
@@ -20,6 +20,14 @@ export function isSingleAttack(action: EnemyActionDef): boolean {
 /** BREAK されると起きない大技か（ダメージの無い行動: 浄化・仲間を呼ぶ・かばう・癒し封じなど。ダメージのある大技は威力が半分） */
 export function breakStopsAction(action: EnemyActionDef): boolean {
   return !!action.big && !action.effects.some((e) => e.kind === 'damage' || e.kind === 'punishPlays');
+}
+
+/**
+ * BREAK された時に付かないブロックか: 特殊な行動（behavior の付いた行動）に足した、自分へのブロック。
+ * ダメージの無い特殊な行動は、BREAK で行動ごと止まる（breakStopsAction）。手数読みのように、BREAK でも威力が半分で起きる行動も、ブロックは付かない
+ */
+export function blockSkippedOnBreak(action: EnemyActionDef, eff: EnemyActionDef['effects'][number]): boolean {
+  return !!action.behavior && eff.kind === 'block' && targetOf(eff) === 'self';
 }
 
 /** 対象（味方1人）を選ぶ効果を含む行動か */
@@ -59,16 +67,73 @@ for (const [path, mod] of Object.entries(import.meta.glob('./ai/*.ts', { eager: 
 }
 export const hasEnemyAi = (id: string) => AIS.has(id);
 
+/** 仲間を呼ぶ効果（無ければ undefined） */
+const callEffectOf = (action: EnemyActionDef) => {
+  const c = action.effects.find((e) => e.kind === 'summonEnemy');
+  return c && c.kind === 'summonEnemy' ? c : undefined;
+};
+
+/**
+ * 特殊な行動が意味を持たない時に代わりに行う行動のID（単独の時の代わり fallbackIfAloneId・呼べない時の代わり orElse）。
+ * 敵の特殊な行動の直し（e）: かばう・仲間を呼ぶを持つ敵は、必ずどちらかを持つ（テストで確かめる）
+ */
+export function fallbackIdOf(action: EnemyActionDef): string | undefined {
+  return action.fallbackIfAloneId ?? callEffectOf(action)?.orElse;
+}
+
+/**
+ * 今この行動をしても意味が無いか（かばう: ほかの生きている敵がいない／仲間を呼ぶ: 満員・回数切れ）。
+ * 意味が無ければ、代わりの行動（fallbackIdOf）を行う。乱数は使わない
+ */
+export function actionIsUseless(enemy: EnemyState, state: BattleState, action: EnemyActionDef): boolean {
+  if (needsOtherEnemies(action) && !state.enemies.some((o) => !o.dead && o !== enemy)) return true;
+  const call = callEffectOf(action);
+  return !!call && !canSummonEnemy(state, enemy, call);
+}
+
+/**
+ * 割り込み・優先（EnemyActionDef.cutIn）が、今このターンに働くか。乱数は使わない。
+ * - 1回割り込んだら、次の rest ターン（省略は2）は割り込まない（cutInTurn と今のターンの差で見る）
+ * - noRepeat: 前のターンにこの行動をしていたら割り込まない
+ */
+function cutInReady(enemy: EnemyState, state: BattleState, a: EnemyActionDef): boolean {
+  const c = a.cutIn;
+  if (!c) return false;
+  if (enemy.cutInTurn !== undefined && state.turn - enemy.cutInTurn <= (c.rest ?? 2)) return false;
+  if (c.noRepeat && enemy.history.at(-1) === a.id) return false;
+  if (c.when === 'afflicted') return activeStatuses(enemy.statuses).some(({ def }) => def.harmful);
+  const call = callEffectOf(a);
+  return !!call && canSummonEnemy(state, enemy, call);
+}
+
 /** 次の行動を選ぶ（選び方は敵のデータの pattern。ai/ のファイルで増やせる） */
 export function chooseAction(enemy: EnemyState, state: BattleState, rng: Rng): EnemyActionDef {
   const set = currentActionSet(enemy);
+  const last = enemy.history.at(-1);
   const alone = !state.enemies.some((e) => !e.dead && e.uid !== enemy.uid);
   const resolve = (a: EnemyActionDef) => {
-    const r = alone && a.fallbackIfAloneId ? getEnemyAction(enemy.defId, a.fallbackIfAloneId) : a;
+    let r = alone && a.fallbackIfAloneId ? getEnemyAction(enemy.defId, a.fallbackIfAloneId) : a;
     // 仲間を呼ぶ: 満員・回数切れで呼べないと分かっている時は、予告の時点で代わりの行動（ふつうの攻撃）にする
-    const call = r.effects.find((e) => e.kind === 'summonEnemy' && e.orElse);
-    return call && call.kind === 'summonEnemy' && !canSummonEnemy(state, enemy, call) ? getEnemyAction(enemy.defId, call.orElse!) : r;
+    const call = callEffectOf(r);
+    if (call?.orElse && !canSummonEnemy(state, enemy, call)) r = getEnemyAction(enemy.defId, call.orElse);
+    // 2ターン続けてはしない行動（仲間を呼ぶ）: 前のターンにしていたら、代わりの行動
+    if (r.cutIn?.noRepeat && last === r.id && fallbackIdOf(r)) r = getEnemyAction(enemy.defId, fallbackIdOf(r)!);
+    return r;
   };
+  // (a) 戦闘の1ターン目に必ず予告する行動（最初の段階・まだ何も予告していない時）。順番の敵は、その行動の次から続ける
+  if (enemy.history.length === 0 && enemy.phase === 0 && set.firstActionId) {
+    const i = set.actions.findIndex((a) => a.id === set.firstActionId);
+    if (i >= 0) {
+      enemy.seqIndex = (i + 1) % set.actions.length;
+      return resolve(set.actions[i]);
+    }
+  }
+  // (b)(c) 割り込み（浄化）・優先（仲間を呼ぶ）: 決め方を飛ばして予告する。順番の位置は進めない
+  const cut = set.actions.find((a) => cutInReady(enemy, state, a));
+  if (cut) {
+    enemy.cutInTurn = state.turn;
+    return resolve(cut);
+  }
   const handler = AIS.get(set.pattern);
   if (!handler) throw new Error(`Unknown enemy ai: ${set.pattern}`);
   return handler.choose(enemy, state, rng, set, resolve);
@@ -103,14 +168,32 @@ export function fallbackLoneIntents(state: BattleState, rng: Rng, events: Battle
     if (state.enemies.some((o) => !o.dead && o !== e)) continue;
     const action = getEnemyAction(e.defId, e.intent.actionId);
     if (!action.fallbackIfAloneId || !needsOtherEnemies(action)) continue;
-    const fb = getEnemyAction(e.defId, action.fallbackIfAloneId);
-    const taunter = e.tauntedBy && isSingleAttack(fb) ? state.allies.find((a) => a.id === e.tauntedBy && !a.dead)?.id : undefined;
-    const targetId = !needsTarget(fb) ? undefined : taunter ?? (isHuntAction(fb) ? weakestAlly(state) : pickRandomAlly(state, rng));
-    // 行動の記録（同じ行動の連続の数え）も、実際に行う行動に合わせる
-    if (e.history.at(-1) === action.id) e.history = [...e.history.slice(0, -1), fb.id];
-    e.intent = { ...e.intent, actionId: fb.id, targetId };
-    events.push({ type: 'retarget', enemyUid: e.uid });
+    switchIntent(state, e, action, action.fallbackIfAloneId, rng, events);
   }
+}
+
+/** 予告を代わりの行動に変える（狙う味方も決め直す。乱数は、狙いを決める時だけ1回引く） */
+function switchIntent(state: BattleState, e: EnemyState, action: EnemyActionDef, fallbackId: string, rng: Rng, events: BattleEvent[]): void {
+  const fb = getEnemyAction(e.defId, fallbackId);
+  const taunter = e.tauntedBy && isSingleAttack(fb) ? state.allies.find((a) => a.id === e.tauntedBy && !a.dead)?.id : undefined;
+  const targetId = !needsTarget(fb) ? undefined : taunter ?? (isHuntAction(fb) ? weakestAlly(state) : pickRandomAlly(state, rng));
+  // 行動の記録（同じ行動の連続の数え）も、実際に行う行動に合わせる
+  if (e.history.at(-1) === action.id) e.history = [...e.history.slice(0, -1), fb.id];
+  e.intent = { ...e.intent!, actionId: fb.id, targetId };
+  events.push({ type: 'retarget', enemyUid: e.uid });
+}
+
+/**
+ * 敵の特殊な行動の直し（e）: 敵の番に、予告の行動が意味を持たなくなっていたら（かばう: ほかの敵が全部倒れた／
+ * 仲間を呼ぶ: 予告の後に満員になった・回数切れ）、代わりのふつうの攻撃（fallbackIdOf）にする。
+ * 浄化は、状態異常が消えていても何も起きないだけなので変えない。代わりの行動が無い時も変えない
+ */
+export function fallbackUselessIntent(state: BattleState, e: EnemyState, rng: Rng, events: BattleEvent[]): void {
+  if (e.dead || !e.intent) return;
+  const action = getEnemyAction(e.defId, e.intent.actionId);
+  const fb = fallbackIdOf(action);
+  if (!fb || !actionIsUseless(e, state, action)) return;
+  switchIntent(state, e, action, fb, rng, events);
 }
 
 export function decideAllIntents(state: BattleState, rng: Rng): void {

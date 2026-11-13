@@ -5,7 +5,9 @@ import { activeStatuses, actionFailChanceOf, skipActionStatus } from '../engine'
 import { getElement } from '../data/elements';
 import { getEnemyAction } from '../data/enemies';
 import { breakStopsAction, describeEffect, enemyHitDamage, findAlly, lowHpMulOn, targetOf } from '../engine';
-import type { BattleState, CardDef, CardEffect, EnemyState, StatusId } from '../types';
+import { behaviorBadge } from '../data/enemyBehaviors';
+import { blockSkippedOnBreak } from '../engine';
+import type { BattleState, CardDef, CardEffect, EnemyBehaviorId, EnemyState, StatusId } from '../types';
 
 export { CATEGORY_LABEL };
 /** 状態異常の名前 */
@@ -45,6 +47,8 @@ export interface IntentView {
   broken?: boolean;
   /** 予告の説明（敵の特殊な行動。何が起きるか・どうすれば止まるか） */
   hint?: string;
+  /** 敵の特殊な行動の札（⚠️手数読み など）と、いつも出す1行の案内（src/data/enemyBehaviors.ts） */
+  behavior?: { id: EnemyBehaviorId; icon: string; label: string; brief: string };
 }
 
 /** インテントの表示（敵のレベル・弱体・味方の脆弱を反映した実際の値） */
@@ -59,6 +63,8 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
   // 強奪・BREAK で次の行動の数値が変わっている時は、その値で出す（実際の行動と同じ計算）
   const mul = enemy.nextActionMultiplier ?? 1;
   for (const raw of action.effects) {
+    // 特殊な行動に足したブロックは、BREAK されると付かない（battle.ts の executeIntent と同じ）
+    if (enemy.broken && blockSkippedOnBreak(action, raw)) continue;
     const eff = mul !== 1 && 'amount' in raw && raw.amount !== undefined ? { ...raw, amount: Math.floor(raw.amount * mul) } : raw;
     const to = targetOf(eff);
     if (eff.kind === 'damage') {
@@ -108,7 +114,8 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
   const stops = breakStopsAction(action);
   if (enemy.broken) details.unshift(stops ? '体勢が崩れている（BREAK）: この行動は起きない' : '体勢が崩れている（BREAK）: この行動の威力は半分');
   else if (action.big) details.unshift(`大技！ 弱点の属性で攻撃・完全成功で攻撃・このターンに最大HPの${BALANCE.breakDamagePct}%のダメージ、のどれかで体勢を崩せる（BREAK: ${stops ? 'この行動は起きない' : '威力が半分'}・${breakStatusText()}・ブロック0）`);
-  return { parts, name: action.name, details, big: !!action.big, broken: !!enemy.broken, ...(action.hint ? { hint: action.hint } : {}) };
+  const badge = behaviorBadge(action);
+  return { parts, name: action.name, details, big: !!action.big, broken: !!enemy.broken, ...(action.hint ? { hint: action.hint } : {}), ...(badge ? { behavior: badge } : {}) };
 }
 
 /** BREAK で敵に付く状態の文（例: 「脆弱1」。balance.ts の breakStatus・breakWeak から作る） */

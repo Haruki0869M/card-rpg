@@ -17,7 +17,7 @@ export const cinderHound: EnemyDef = {
   pattern: "sequence",
   actions: [
     // 敵の特殊な行動 1回目（docs/tasks/enemy-behaviors-plan.md §7）: 攻撃「炭火の牙」を手負い狙いに置き換えた（同じ10の炎のダメージ）。ID は古い保存のために残す
-    {"id": "bite", "name": "手負い狙い", big: true, hint: "HPの割合がいちばん低い味方を狙う。HPが半分以下だと×1.5", "effects": [{"kind": "damage", "amount": 10, "element": "fire", "lowHpMul": 1.5}]},
+    {"id": "bite", "name": "手負い狙い", big: true, behavior: "hunt", hint: "HPの割合がいちばん低い味方を狙う。HPが半分以下だと×1.5", "effects": [{"kind": "damage", "amount": 10, "element": "fire", "lowHpMul": 1.5}]},
     {"id": "brace", "name": "炭の毛皮", "effects": [{"kind": "block", "amount": 6}]},
     {"id": "pounce", "name": "飛びかかり", "effects": [{"kind": "damage", "amount": 4, "hits": 2}]},
   ],
@@ -37,7 +37,7 @@ export const basaltCrawler: EnemyDef = {
   pattern: "sequence",
   actions: [
     // 敵の特殊な行動 1回目（docs/tasks/enemy-behaviors-plan.md §7）: 攻撃「岩角の一撃」を盾砕きに置き換えた（ブロックを0にしてから、同じ10のダメージ）。ID は古い保存のために残す
-    {"id": "horn", "name": "盾砕き", big: true, hint: "当たるとブロックを全部壊す。BREAK するか、ブロックに頼らずに受ける", "effects": [{"kind": "shieldBreak"}, {"kind": "damage", "amount": 10}]},
+    {"id": "horn", "name": "盾砕き", big: true, behavior: "shatter", hint: "当たるとブロックを全部壊す。BREAK するか、ブロックに頼らずに受ける", "effects": [{"kind": "shieldBreak"}, {"kind": "damage", "amount": 10}]},
     {"id": "shell", "name": "玄武岩の殻", "effects": [{"kind": "block", "amount": 10}]},
     {"id": "sweep", "name": "岩脚の薙ぎ払い", "effects": [{"kind": "damage", "amount": 5, "to": "foes"}]},
   ],

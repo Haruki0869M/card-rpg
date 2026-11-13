@@ -20,7 +20,7 @@ export const scourgeGreedKing: EnemyDef = {
   weak: ['holy'],
   pattern: 'sequence',
   actions: [
-    { id: 'call', name: '手下を呼ぶ', big: true, hint: '手下を1体呼ぶ。その前に倒すか、BREAK する', effects: [{ kind: 'summonEnemy', enemy: 'banditThug', uses: 2, call: true, orElse: 'cleave' }] },
+    { id: 'call', name: '手下を呼ぶ', big: true, behavior: 'call', brief: '手下を1体呼ぶ', hint: '手下を1体呼ぶ。その前に倒すか、BREAK する', effects: [{ kind: 'summonEnemy', enemy: 'banditThug', uses: 2, call: true, orElse: 'cleave' }] },
     { id: 'cleave', name: '黄金の大斧', effects: [{ kind: 'damage', amount: 16 }] },
     { id: 'storm', name: '金貨の嵐', big: true, hint: '味方全員に小さなダメージを3回。ブロックで受けるか、BREAK する', effects: [{ kind: 'damage', amount: 4, hits: 3, to: 'foes' }] },
     { id: 'taunt', name: 'あざ笑う', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1 }, { kind: 'damage', amount: 7 }] },
@@ -46,8 +46,8 @@ export const scourgeMiasmaNecro: EnemyDef = {
   actions: [
     { id: 'miasma', name: '瘴気の霧', effects: [{ kind: 'applyStatus', status: 'poison', amount: 3, to: 'foes' }] },
     { id: 'bolt', name: '呪いの魔弾', effects: [{ kind: 'damage', amount: 14, element: 'dark' }] },
-    { id: 'shed', name: '屍の脱皮', big: true, hint: '状態異常を全部消して回復する。その前に起爆するか、BREAK する', effects: [{ kind: 'purify', amount: 8 }] },
-    { id: 'seal', name: '癒し封じの瘴気', big: true, hint: '味方全員の回復が、2ターン半分になる。BREAK するか、先に回復を使う', effects: [{ kind: 'applyStatus', status: 'healSeal', amount: 2, to: 'foes' }] },
+    { id: 'shed', name: '屍の脱皮', big: true, behavior: 'purify', hint: '状態異常を全部消して回復する。その前に起爆するか、BREAK する', effects: [{ kind: 'purify', amount: 8 }] },
+    { id: 'seal', name: '癒し封じの瘴気', big: true, behavior: 'healSeal', hint: '味方全員の回復が、2ターン半分になる。BREAK するか、先に回復を使う', effects: [{ kind: 'applyStatus', status: 'healSeal', amount: 2, to: 'foes' }] },
   ],
 };
 
@@ -68,9 +68,9 @@ export const scourgeNightmareBeast: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'howl', name: '悪夢の咆哮', effects: [{ kind: 'applyStatus', status: 'weak', amount: 1, to: 'foes' }, { kind: 'damage', amount: 5, to: 'foes' }] },
-    { id: 'hunt', name: '手負い狙い', big: true, hint: 'HPの割合がいちばん低い味方を狙う。HPが半分以下だと×1.5', effects: [{ kind: 'damage', amount: 15, element: 'dark', lowHpMul: 1.5 }] },
+    { id: 'hunt', name: '手負い狙い', big: true, behavior: 'hunt', hint: 'HPの割合がいちばん低い味方を狙う。HPが半分以下だと×1.5', effects: [{ kind: 'damage', amount: 15, element: 'dark', lowHpMul: 1.5 }] },
     { id: 'claws', name: '影の連撃', effects: [{ kind: 'damage', amount: 6, hits: 3 }] },
-    { id: 'watch', name: '眠りを見張る', big: true, hint: 'このターンにカードを4枚以上使った味方に、枚数×2のダメージ', effects: [{ kind: 'punishPlays', amount: 2, min: 4 }] },
+    { id: 'watch', name: '眠りを見張る', big: true, behavior: 'punish', hint: 'このターンにカードを4枚以上使った味方に、枚数×2のダメージ', effects: [{ kind: 'punishPlays', amount: 2, min: 4 }] },
   ],
 };
 
@@ -91,7 +91,7 @@ export const scourgeStormWitch: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'frost', name: '凍てつく息', effects: [{ kind: 'damage', amount: 6, element: 'ice' }, { kind: 'applyStatus', status: 'weak', amount: 1 }] },
-    { id: 'lance', name: '氷槍・盾砕き', big: true, hint: '当たるとブロックを全部壊す。BREAK するか、ブロックに頼らずに受ける', effects: [{ kind: 'shieldBreak' }, { kind: 'damage', amount: 14, element: 'ice' }] },
+    { id: 'lance', name: '氷槍・盾砕き', big: true, behavior: 'shatter', hint: '当たるとブロックを全部壊す。BREAK するか、ブロックに頼らずに受ける', effects: [{ kind: 'shieldBreak' }, { kind: 'damage', amount: 14, element: 'ice' }] },
     { id: 'mirror', name: '氷の鏡', effects: [{ kind: 'block', amount: 14 }, { kind: 'block', amount: 8, to: 'otherAllies' }] },
     { id: 'blizzard', name: '吹雪', big: true, hint: '味方全員に氷のダメージ。ブロックで受けるか、BREAK する', effects: [{ kind: 'damage', amount: 8, element: 'ice', to: 'foes' }] },
   ],
