@@ -184,12 +184,12 @@ FACES = {
     ('swordmaster', 'female'): (0.70, 0.124, 0.15), ('swordSaint', 'female'): (0.607, 0.13, 0.15),
     ('samurai', 'female'): (0.497, 0.131, 0.15), ('magicKnight', 'female'): (0.603, 0.131, 0.15),
     ('overlord', 'female'): (0.579, 0.146, 0.15), ('berserker', 'female'): (0.617, 0.131, 0.15),
+    ('pope', 'male'): (0.55, 0.152, 0.15), ('pope', 'female'): (0.474, 0.154, 0.15),
 }
 # 帽子・冠・鎌などで自動の位置がずれる職は、目で確認して決めた値（J4）
 FACES.update({
     ('hadesLord', 'female'): (0.543, 0.158, 0.157), ('hadesLord', 'male'): (0.443, 0.136, 0.156),
     ('necromancer', 'female'): (0.421, 0.153, 0.156), ('necromancer', 'male'): (0.571, 0.139, 0.155),
-    ('pope', 'female'): (0.50, 0.172, 0.156), ('pope', 'male'): (0.553, 0.178, 0.156),
     ('lancer', 'female'): (0.559, 0.168, 0.156), ('hexer', 'female'): (0.535, 0.192, 0.156),
     # 区切りF（槍の先が頭より上にあるため）
     ('bulwark', 'male'): (0.466, 0.158, 0.156), ('bulwark', 'female'): (0.485, 0.118, 0.156),
