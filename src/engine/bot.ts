@@ -44,6 +44,7 @@ import {
   hurtLine,
   newSmartMemo,
   smartBattleItemCommand,
+  smartEliteDoor,
   smartEquipCommand,
   smartFieldItemCommand,
   smartGrowthCommand,
@@ -516,7 +517,9 @@ export function botStep(g: GameState, log: BotLog, memo: BotMemo, inScene = fals
       const hurt = livingHeroes(g).some((h) => h.hp < heroMaxHp(h) * 0.5);
       // 普通の bot は、扉の予兆の色だけを見て選ぶ（人と同じ情報。部屋の中身は読まない）: 傷ついていれば緑（休憩）、そうでなければ金（宝）、無ければ左端。
       // 直行 bot は予兆を見ない: いつも左端の扉（抜本的な見直し §3-1）
-      const pick = memo.straight ? rooms[0] : (rooms.find((r) => omenOfType(r.type) === (hurt ? 'rest' : 'treasure')) ?? rooms[0]);
+      const byOmen = (rs: typeof rooms) => rs.find((r) => omenOfType(r.type) === (hurt ? 'rest' : 'treasure')) ?? rs[0];
+      // 賢い bot（2026-11-13 強敵の計画 §3）: 元気で回復の道具があれば強敵の扉、そうでなければ強敵を避ける（SIM_SMART_OFF=elite で外すと前と同じ）
+      const pick = memo.straight ? rooms[0] : (smartEliteDoor(g, memo.smart, rooms, (r) => omenOfType(r.type) === 'elite', byOmen) ?? byOmen(rooms));
       if (!pick) return g;
       return send(g, { type: 'ENTER_ROOM', playerId: pid(g), roomId: pick.id }, log);
     }

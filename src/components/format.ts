@@ -5,7 +5,7 @@ import { activeStatuses, actionFailChanceOf, skipActionStatus } from '../engine'
 import { getElement } from '../data/elements';
 import { getEnemyAction } from '../data/enemies';
 import { breakStopsAction, describeEffect, enemyHitDamage, findAlly, lowHpMulOn, targetOf } from '../engine';
-import { behaviorBadge } from '../data/enemyBehaviors';
+import { behaviorBadge, FRENZY_BADGE } from '../data/enemyBehaviors';
 import { blockSkippedOnBreak } from '../engine';
 import { breakRuleOf } from '../engine/battle/breakRules';
 import type { BattleState, CardDef, CardEffect, EnemyBehaviorId, EnemyState, StatusId } from '../types';
@@ -50,6 +50,15 @@ export interface IntentView {
   hint?: string;
   /** 敵の特殊な行動の札（⚠️手数読み など）と、いつも出す1行の案内（src/data/enemyBehaviors.ts） */
   behavior?: { id: EnemyBehaviorId; icon: string; label: string; short: string; brief: string };
+  /** 強敵の本気の予告（🔥本気の札。src/data/enemyBehaviors.ts の FRENZY_BADGE） */
+  frenzy?: typeof FRENZY_BADGE;
+}
+
+/** 予告の札の下・敵が3体以上の時の案内の1行に出す文（本気・特殊な行動）。両方の時は1つにまとめる。崩した後は出さない */
+export function intentBrief(v: IntentView | null): { icon: string; text: string } | undefined {
+  if (!v || v.broken) return undefined;
+  if (v.frenzy) return { icon: v.frenzy.icon, text: v.behavior ? `${v.behavior.brief}・${v.frenzy.brief}` : v.frenzy.brief };
+  return v.behavior ? { icon: v.behavior.icon, text: v.behavior.brief } : undefined;
 }
 
 /** インテントの表示（敵のレベル・弱体・味方の脆弱を反映した実際の値） */
@@ -116,7 +125,9 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
   if (enemy.broken) details.unshift(stops ? '体勢が崩れている（BREAK）: この行動は起きない' : '体勢が崩れている（BREAK）: この行動の威力は半分');
   else if (action.big) details.unshift(`大技！ ${breakHowText(state, enemy)}（BREAK: ${stops ? 'この行動は起きない' : '威力が半分'}・${breakStatusText()}・ブロック0）`);
   const badge = behaviorBadge(action);
-  return { parts, name: action.name, details, big: !!action.big, broken: !!enemy.broken, ...(action.hint ? { hint: action.hint } : {}), ...(badge ? { behavior: badge } : {}) };
+  // 強敵の本気: 長押しの説明（DetailPopup）で、なぜ強いか・どう受けるかを出す
+  const frenzy = enemy.intent.frenzy ? FRENZY_BADGE : undefined;
+  return { parts, name: action.name, details, big: !!action.big, broken: !!enemy.broken, ...(action.hint ? { hint: action.hint } : {}), ...(badge ? { behavior: badge } : {}), ...(frenzy ? { frenzy } : {}) };
 }
 
 /** 属性の名前を「・」でつなぐ（例: 「雷・聖」） */

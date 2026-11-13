@@ -102,7 +102,9 @@ describe('BREAK の決まり（既定の値）', () => {
     expect(BALANCE.breakBehaviorNeedsWeakPerfect).toBe(true);
     expect(BALANCE.breakDamagePctBehavior).toBe(Infinity);
     // 案Y の取りやめ: 大物のHP ×2・後半の地域の攻撃 ×1.5 は入れない（入れ物は空）
-    expect(BALANCE.enemyHpByRank).toEqual({});
+    // （2026-11-13 強敵の計画 柱2 で、強敵の本体だけのHPの倍率 elite を入れた。大物には入れない）
+    expect(BALANCE.enemyHpByRank.boss).toBeUndefined();
+    expect(BALANCE.enemyHpByRank.midboss).toBeUndefined();
     expect(BALANCE.enemyAttackByRegion).toEqual({});
     // 測るだけのつまみは、今も使っていない
     expect(BALANCE.breakPerfectNoWeakCard).toBe(false);

@@ -486,7 +486,8 @@ export interface EnemyPhaseDef {
 export interface EncounterSpec {
   id: string;
   name: string;
-  enemies: { defId: string; level?: number }[];
+  /** eliteBody = 強敵の組（pools.elite）から来た「本体」（2026-11-13 強敵の本気。奥で足されるふつうの戦闘の敵には付けない） */
+  enemies: { defId: string; level?: number; eliteBody?: boolean }[];
   /** ボスの部屋の戦闘（ボスには効き方が変わる効果が見る） */
   boss?: boolean;
   /** 中ボスの部屋の戦闘 */
@@ -638,6 +639,8 @@ export interface AllyState {
 export interface Intent {
   actionId: string;
   targetId?: string;
+  /** 強敵の本気の予告（いちばん強い攻撃・威力 ×BALANCE.eliteFrenzy.power。2026-11-13） */
+  frenzy?: boolean;
 }
 
 export interface EnemyState {
@@ -687,6 +690,10 @@ export interface EnemyState {
   guarding?: boolean;
   /** 最後に割り込み・優先（EnemyActionDef.cutIn）で予告を決めた時の戦闘のターン（任意。古い保存には無い = 割り込める） */
   cutInTurn?: number;
+  /** 強敵の戦闘の「本体」（強敵の組から来た敵。2026-11-13 強敵の本気） */
+  eliteBody?: boolean;
+  /** この戦闘で、もう本気になった（1戦闘に1回） */
+  frenzyUsed?: boolean;
 }
 
 export type Phase = 'ally' | 'enemy' | 'victory' | 'defeat' | 'escaped';
@@ -773,6 +780,8 @@ export interface BattleSetup {
   /** 敵のHP・攻撃の倍率（難易度など。省略は1） */
   enemyHpMul?: number;
   enemyAttackMul?: number;
+  /** 強敵の本体（eliteBody の敵）だけに掛かるHPの倍率（BALANCE.enemyHpByRank.elite。省略は1） */
+  eliteBodyHpMul?: number;
   /** 奇襲成功（敵は1ターン目に行動しない） */
   surprise?: boolean;
   /** オンライン協力: 全員の準備完了を待つ */

@@ -36,8 +36,10 @@ import { hexDistance } from './game/world/hex';
 //   weak  = ボスの弱点に合わせる（2026-11-13 docs/tasks/break-read-plan.md §4。測るため）: 属性の攻撃をほとんど持たないキャラ（物理）は、
 //           「属性の付与」の装飾品が次の目的のダンジョンのボスの弱点に合う時だけ買って付ける（合わない属性は買わない・付けない）。
 //           ボスの弱点は、もう戦った事がある時だけ分かる。分からない時は、今いる地域で戦った敵によく見る弱点
-export type SmartPart = 'shop' | 'cards' | 'items' | 'team' | 'time' | 'weak';
-export const SMART_PARTS: SmartPart[] = ['shop', 'cards', 'items', 'team', 'time', 'weak'];
+//   elite = 強敵の扉を選ぶか避けるか（2026-11-13 docs/tasks/elite-plan.md §3。測るため）: パーティ全員のHPが ELITE_DOOR_HP 以上で、
+//           回復の道具が袋に残っていれば、強敵の扉を選ぶ。そうでなければ強敵を避ける（ほかの扉を、今までの決め方で選ぶ。強敵しか無い時は強敵）
+export type SmartPart = 'shop' | 'cards' | 'items' | 'team' | 'time' | 'weak' | 'elite';
+export const SMART_PARTS: SmartPart[] = ['shop', 'cards', 'items', 'team', 'time', 'weak', 'elite'];
 
 /** 賢い bot の覚え（BotMemo に入れる） */
 export interface SmartMemo {
@@ -638,3 +640,26 @@ export function timeLate(g: GameState): boolean {
 
 /** 世界マップで町へ戻るHPの割合（時間が足りない時は低くする） */
 export const hurtLine = (g: GameState, sm: SmartMemo | undefined) => (smartUses(sm, 'time') && timeLate(g) ? TIME_HURT_LATE : 0.5);
+
+// ---------- 7. 強敵の扉（2026-11-13 docs/tasks/elite-plan.md §3。測るため） ----------
+
+/** 強敵の扉を選ぶ: パーティ（場面にいる生きている仲間）全員のHPが、最大HPのこの割合以上の時だけ（bot の作戦の提案） */
+const ELITE_DOOR_HP = 0.7;
+
+/**
+ * 賢い bot の扉の選び方（強敵を選ぶか避けるか）。強敵の扉が無い時・elite の工夫を外した時は undefined（今までの決め方のまま）。
+ * 見るのは扉の予兆（強敵の色）・仲間のHP・袋の道具だけ。乱数は使わない。
+ * - 全員のHPが ELITE_DOOR_HP 以上で、だれかの袋に回復の道具（単体・全体どちらも）があれば、強敵の扉（左から1つ目）
+ * - そうでなければ、強敵でない扉の中から pickOthers（今までの決め方: 傷ついていれば休憩・ほかは宝・無ければ左端）。強敵の扉しか無ければ強敵
+ */
+export function smartEliteDoor<R extends { type: string }>(g: GameState, sm: SmartMemo | undefined, rooms: R[], isElite: (r: R) => boolean, pickOthers: (rs: R[]) => R | undefined): R | undefined {
+  if (!smartUses(sm, 'elite')) return undefined;
+  const elites = rooms.filter(isElite);
+  if (!elites.length) return undefined;
+  const party = livingHeroes(g).filter((h) => !g.party || g.party.includes(h.id));
+  const healthy = party.length > 0 && party.every((h) => h.hp >= heroMaxHp(h) * ELITE_DOOR_HP);
+  const heal = party.some((h) => h.pouch.some((p) => !!getItem(p.itemId).use?.some((e) => e.kind === 'heal')));
+  if (healthy && heal) return elites[0];
+  const others = rooms.filter((r) => !isElite(r));
+  return others.length ? pickOthers(others) : elites[0];
+}

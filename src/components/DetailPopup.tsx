@@ -101,6 +101,8 @@ function Content({ d, battle, game }: { d: Detail; battle: BattleState; game: Ga
               <div className="mt-1 text-[13px]">
                 <div className="font-bold text-red-300">次の行動：「{iv.name}」</div>
                 {/* 敵の特殊な行動: 何が起きるか・どうすれば止まるか */}
+                {/* 強敵の本気: なぜ強いか・どう受けるか */}
+                {iv.frenzy && !iv.broken && <div className="my-0.5 rounded bg-orange-500/20 px-1.5 py-0.5 font-bold text-orange-200" data-intent-frenzy-hint>{iv.frenzy.icon}{iv.frenzy.label}: {iv.frenzy.long}</div>}
                 {iv.hint && <div className="my-0.5 rounded bg-amber-400/15 px-1.5 py-0.5 font-bold text-amber-200" data-intent-hint>{iv.hint}</div>}
                 {iv.details.map((t, i) => (
                   <div key={i}>・{t}</div>

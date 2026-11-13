@@ -178,7 +178,8 @@ export interface RoomTypeDef {
     /** 逃げられない戦闘（中ボス。逃げて素通りできないように） */
     noEscape?: boolean;
     /** 勝った時に装備を落とす（epicChance% でエピック、それ以外はレア） */
-    equipmentDrop?: { epicChance: number };
+    /** byDepth = エピック率を深層ボーナスの段で変える（BALANCE.eliteEpicChanceByDepth。ダンジョンの外の戦闘は入口の段。2026-11-13 強敵の計画 柱4） */
+    equipmentDrop?: { epicChance: number; byDepth?: boolean };
     /** 勝った時に chance% でコモンの消費アイテムを落とす */
     consumableDrop?: { chance: number };
   };
@@ -239,7 +240,7 @@ export interface Room {
   type: RoomType;
   next: string[];
   /** 戦闘の敵（生成済み） */
-  enemies?: { defId: string; level: number }[];
+  enemies?: { defId: string; level: number; eliteBody?: boolean }[];
   chest?: ChestSpec;
   eventId?: string;
   cleared: boolean;

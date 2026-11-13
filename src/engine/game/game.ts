@@ -640,7 +640,9 @@ export function startBattleWith(game: GameState, enemies: EncounterSpec['enemies
   const rb = getRoomType(roomType).battle;
   const rank = rb?.boss ? 'boss' : rb?.pool === 'midboss' ? 'midboss' : rb?.pool === 'elite' ? 'elite' : 'normal';
   // 地域ごと・格ごとの倍率（測るための入れ物。既定は全部 1 で、前と全く同じ値を渡す）
-  const hpMul = regionMulOf(game, inScene[0]?.id, BALANCE.enemyHpByRegion) * (BALANCE.enemyHpByRank[rank] ?? 1);
+  // 強敵（elite）の倍率は、組の全員ではなく強敵の本体（eliteBody の敵）だけに掛ける（2026-11-13 強敵の計画 柱2。下の eliteBodyHpMul）
+  const hpMul = regionMulOf(game, inScene[0]?.id, BALANCE.enemyHpByRegion) * (rank === 'elite' ? 1 : (BALANCE.enemyHpByRank[rank] ?? 1));
+  const eliteBodyHpMul = rank === 'elite' ? (BALANCE.enemyHpByRank.elite ?? 1) : 1;
   const atkMul = regionMulOf(game, inScene[0]?.id, BALANCE.enemyAttackByRegion);
   // 2026-11-13（pre-deploy19 の問題 A2）: 鍵の順番で1つ目のダンジョンのボスの部屋は、大技の BREAK が今までどおり（effects の needsWeakPerfect）
   const dungeonDef = game.dungeon ? DUNGEONS.tryGet(game.dungeon.dungeonId) : undefined;
@@ -650,6 +652,7 @@ export function startBattleWith(game: GameState, enemies: EncounterSpec['enemies
     party,
     encounter: { id: game.battleInfo?.wandererId ?? game.dungeon?.currentRoomId ?? 'battle', name: getRoomType(roomType).name, enemies, ...(getRoomType(roomType).battle?.boss ? { boss: true } : {}), ...(getRoomType(roomType).battle?.pool === 'midboss' ? { midboss: true } : {}), ...(getRoomType(roomType).battle?.pool === 'elite' ? { elite: true } : {}), ...(firstKeyBoss ? { firstKeyBoss: true } : {}) },
     enemyHpMul: hpMul === 1 ? diff.enemyHp : (diff.enemyHp ?? 1) * hpMul,
+    ...(eliteBodyHpMul !== 1 ? { eliteBodyHpMul } : {}),
     enemyAttackMul: (diff.enemyAttack ?? 1) * partyAttackMul(game, party.length) * atkMul,
     surprise: opts.surprise,
     readyCheck: game.online,
@@ -707,6 +710,16 @@ function syncHeroesFromBattle(game: GameState, revive: boolean) {
     h.hp = a.dead ? (revive ? 1 : 0) : a.hp;
     h.focus = a.focus;
   }
+}
+
+/**
+ * 部屋の種類が落とす装備のエピック率（%。テーマの倍率を掛ける前）。byDepth の部屋（強敵）は深層ボーナスの段で変わる（BALANCE.eliteEpicChanceByDepth。
+ * 段が表より深ければ表の最後）。tier = 深層ボーナスの段（ダンジョンの外・古い形のダンジョンは 0）
+ */
+export function equipmentEpicChance(drop: { epicChance: number; byDepth?: boolean }, tier: number): number {
+  if (!drop.byDepth) return drop.epicChance;
+  const t = BALANCE.eliteEpicChanceByDepth;
+  return t[Math.min(Math.max(0, tier), t.length - 1)] ?? drop.epicChance;
 }
 
 function finishBattle(game: GameState, playerId: string, rng: Rng): string | undefined {
@@ -812,7 +825,7 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
   // ドロップ（部屋の種類の設定どおり）。ボスの大宝箱は報酬の後に開ける
   const drop = rt.battle;
   if (drop?.equipmentDrop) {
-    const item = newItem(game, rollEquipment(rng.next() * 100 < drop.equipmentDrop.epicChance * tr.epicMul ? 'epic' : 'rare', game.heroes, rng, { scenario: game.scenarioId }));
+    const item = newItem(game, rollEquipment(rng.next() * 100 < equipmentEpicChance(drop.equipmentDrop, tier) * tr.epicMul ? 'epic' : 'rare', game.heroes, rng, { scenario: game.scenarioId }));
     const to = leastLoaded(survivorHeroes);
     // 2人以上のプレイヤーが生き残ったら、みんなで取り合う（欲しい / 余れば / いらない → 運の判定）
     if (new Set(survivorHeroes.map((h) => h.playerId)).size > 1) reward.claim = { item, heroes: survivorHeroes.map((h) => h.id), choices: {} };
