@@ -11,6 +11,7 @@ import { DEPTH_TIER_NAME, depthStep, depthTier, dungeonRows, isLegacyLayout, roo
 import { cardRewardOdds } from '../game/loot';
 import type { DungeonDef, GameCommand, GameState, PlayerId } from '../../types';
 import { applyGameCommand, buildDungeon, createGame, createRng } from '../index';
+import { keyLayout1 } from '../../content/common/dungeonLayouts';
 
 const P: PlayerId = 'P1';
 type Layout = NonNullable<DungeonDef['layout']>;
@@ -32,6 +33,13 @@ function allPaths(layout: Layout): string[][] {
   layout[0].forEach((_, c) => walk(0, c, []));
   return out;
 }
+/** 部屋の並びの形（type とつながり。イベント・宝箱の中身は見ない） */
+const shapeOf = (L: Layout) => JSON.stringify(L.map((row) => row.map((x) => [x.type, x.next])));
+/**
+ * 1つ目の鍵の型（keyLayout1）で作ったダンジョンか（シナリオ2〜7の6か所）。
+ * 2026-11-13（点検19の問題 A1・オーナーの OK）: この型だけ「ふつうの戦闘は2回以上」・選ぶ所 6 以上
+ */
+const isKeyLayout1 = (d: DungeonDef) => !!d.layout && shapeOf(d.layout) === shapeOf(keyLayout1({ first: 'a', second: 'b', story: 'c' }));
 /** 戦う部屋（ふつうの戦闘・強敵・中ボス・ボス） */
 const isCombat = (type: string) => !!getRoomType(type).battle;
 /** ボスの前の休憩の行（最後の3行のうち、休憩1つだけの行） */
@@ -128,7 +136,7 @@ describe('固定ダンジョン28か所の形', () => {
         run = isCombat(x.type) ? 0 : run + 1;
         expect(run, label).toBeLessThan(3);
       }
-      expect(p.filter((x) => x.type === 'battle').length, label).toBeGreaterThanOrEqual(d.finale ? 4 : 3);
+      expect(p.filter((x) => x.type === 'battle').length, label).toBeGreaterThanOrEqual(d.finale ? 4 : isKeyLayout1(d) ? 2 : 3);
       expect(p.filter((x) => x.r >= from && x.r < rest && isCombat(x.type)).length, label).toBeGreaterThanOrEqual(deepWant);
     }
   });
@@ -147,6 +155,19 @@ describe('固定ダンジョン28か所の形', () => {
     for (let r = 0; r < restRowOf(L); r++) {
       single = L[r].length === 1 ? single + 1 : 0;
       expect(single, `${r}行`).toBeLessThan(3);
+    }
+  });
+
+  // 2026-11-13（点検19の問題 A1）: 1つ目の鍵の型は、シナリオ2〜7の6か所。選ぶ所は 6 以上（直す前 bf628d5 と同じ数）。
+  // 宝箱の格（コモン・鍵付きのレア）は残す。シナリオ1の翠の神殿は、この型ではない（ふつうの戦闘は 3回以上のまま）
+  it('1つ目の鍵の型: シナリオ2〜7の6か所・選ぶ所 6 以上・宝箱の格は残す', () => {
+    const k1 = fixed().filter(isKeyLayout1);
+    expect(k1.map((d) => DUNGEONS.scenarioOf(d.id)).sort()).toEqual(SCENARIOS.all.map((s) => s.id).filter((s) => s !== 'corruptionKing').sort());
+    for (const d of k1) {
+      expect(keyed(DUNGEONS.scenarioOf(d.id)!)[0].id).toBe(d.id);
+      expect(d.layout!.flat().filter((x) => x.next.length >= 2).length, d.id).toBeGreaterThanOrEqual(6);
+      const chests = d.layout!.flat().filter((x) => x.type === 'chest').map((x) => `${x.chest!.rarity}${x.chest!.locked ? '鍵' : ''}`);
+      expect(chests.sort(), d.id).toEqual(['common', 'rare鍵']);
     }
   });
 

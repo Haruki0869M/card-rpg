@@ -28,7 +28,9 @@ function strictNoDamage(): boolean {
 function strictBreakText(): string {
   const who = strictBreakWho();
   if (!who) return '';
-  return `ただし、${who}は、弱点の属性で、しかも完全成功で攻撃した時だけ崩せます（完全成功だけ${strictNoDamage() ? '・大きなダメージ' : ''}では崩れません。弱点を持たない相手は、完全成功で崩せます）。予告の下の「⚡弱点（属性）で完全成功 → BREAK」が目印です。まとめると、赤い札 = 今までどおり／${who.replace('ボス・中ボス・災厄の大技', '大物')} = 弱点の属性で完全成功。`;
+  // 2026-11-13: 鍵の順番で1つ目のダンジョンのボスは、今までどおり（effects の needsWeakPerfect の firstKeyBoss。決まりから読む）
+  const firstKey = needsWeakPerfect({ boss: true }) && !needsWeakPerfect({ boss: true, firstKeyBoss: true }) ? 'なお、1つ目の鍵のダンジョンのボスの大技は、今までどおり崩せます（紫の札は除く）。' : '';
+  return `ただし、${who}は、弱点の属性で、しかも完全成功で攻撃した時だけ崩せます（完全成功だけ${strictNoDamage() ? '・大きなダメージ' : ''}では崩れません。弱点を持たない相手は、完全成功で崩せます）。${firstKey}予告の下の「⚡弱点（属性）で完全成功 → BREAK」が目印です。まとめると、赤い札 = 今までどおり／${who.replace('ボス・中ボス・災厄の大技', '大物')} = 弱点の属性で完全成功。`;
 }
 
 export type HelpTopicId =
