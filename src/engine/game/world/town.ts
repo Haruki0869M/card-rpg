@@ -4,6 +4,8 @@ import { BALANCE } from '../../../data/balance';
 import { CARDS } from '../../../data/cards';
 import { getClass } from '../../../data/classes';
 import { getItem, ITEMS } from '../../../data/items';
+import { DUNGEONS, isFirstKeyDungeon } from '../../../data/dungeons';
+import { getEnemy } from '../../../data/enemies';
 import { QUESTS, SHRINES, TOWNS } from '../../../data/world';
 import { PETS } from '../../../data/pets';
 import { getScenario } from '../../../data/scenarios';
@@ -47,12 +49,50 @@ export function featuredShopTownOf(scenarioId: string): string | undefined {
 }
 
 /**
- * その冒険で、必ず並ぶ品（BALANCE.shopFeatured.items のうち1つ）。冒険の種から決める（冒険の乱数は使わない = ほかの抽選の順番を変えない）。
+ * そのシナリオの「後半の大物」（2026-11-13・点検19の 3-2）: 2つ目・3つ目の鍵のダンジョンのボスと、最後のダンジョンの中ボスとボス。
+ * データから作る（鍵をくれて入るのに鍵が要るダンジョンの pools.boss と、最後のダンジョンの pools.midboss・pools.boss。ランダムダンジョンは入れない）
+ */
+export function lateBigEnemiesOf(scenarioId: string): string[] {
+  const out: string[] = [];
+  for (const d of DUNGEONS.forScenario(scenarioId)) {
+    if (d.random) continue;
+    if (d.finale) out.push(...(d.pools.midboss ?? []), ...d.pools.boss);
+    else if (d.rewardKey && !isFirstKeyDungeon(d)) out.push(...d.pools.boss);
+  }
+  return out;
+}
+
+/** 「属性の付与」の装飾品が、属性の無い物理攻撃を変える属性（無ければ undefined） */
+const convertIntoOf = (itemId: string) => (getItem(itemId).ability?.effect as { modifier?: string; into?: string } | undefined)?.into;
+
+/**
+ * 必ず並ぶ品の候補と重み（2026-11-13 オーナーの OK）: BALANCE.shopFeatured.items のうち、後半の大物（lateBigEnemiesOf）の弱点の属性に合う物。
+ * 重み = その属性が弱点の大物の数。合う物が1つも無いシナリオは、5つ全部（重み1ずつ。前と同じ）。
+ * 5つに無い属性（毒など）が弱点の大物は数えない
+ */
+export function featuredShopCandidatesOf(scenarioId: string): { itemId: string; weight: number }[] {
+  const bigs = lateBigEnemiesOf(scenarioId).map((id) => getEnemy(id));
+  const list = BALANCE.shopFeatured.items.map((itemId) => {
+    const el = convertIntoOf(itemId);
+    return { itemId, weight: el ? bigs.filter((e) => e.weak?.includes(el)).length : 0 };
+  });
+  const hit = list.filter((x) => x.weight > 0);
+  return hit.length ? hit : list.map((x) => ({ itemId: x.itemId, weight: 1 }));
+}
+
+/**
+ * その冒険で、必ず並ぶ品（featuredShopCandidatesOf のうち1つ）。冒険の種から決める（冒険の乱数は使わない = ほかの抽選の順番を変えない）。
  * 冒険の間、いつも同じ物
  */
-export function featuredShopItemOf(game: Pick<GameState, 'seed'>): string {
-  const list = BALANCE.shopFeatured.items;
-  return list[createRng((game.seed ^ FEATURED_SALT) >>> 0).int(list.length)];
+export function featuredShopItemOf(game: Pick<GameState, 'seed' | 'scenarioId'>): string {
+  const list = featuredShopCandidatesOf(game.scenarioId);
+  const total = list.reduce((a, x) => a + x.weight, 0);
+  let x = createRng((game.seed ^ FEATURED_SALT) >>> 0).int(total);
+  for (const c of list) {
+    if (x < c.weight) return c.itemId;
+    x -= c.weight;
+  }
+  return list[list.length - 1].itemId;
 }
 /** 必ず並ぶ品を決める乱数の種に混ぜる値（ほかの抽選と重ならないように） */
 const FEATURED_SALT = 0x5f0e7a11;

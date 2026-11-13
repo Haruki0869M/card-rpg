@@ -374,6 +374,7 @@ export const BALANCE = {
    * 必ず並ぶ品（2026-11-13 オーナーの決定・docs/tasks/break-read-plan.md §3）: 進む順で region 番目の地域の町
    * （その地域に町が無ければ、その次にある町）の店に、items のうち1つを必ず並べる。どれかは冒険の種で決まる（冒険の間、同じ物）。
    * 値段は、その品の格の itemPrice（今はエピック）。items = 「属性の付与」の装飾品（属性の無い物理攻撃が、その属性になる）
+   * 2026-11-13（点検19の 3-2）: 選ぶのは、そのシナリオの後半の大物の弱点に合う物だけ（重み = 弱点の大物の数。town.ts の featuredShopCandidatesOf）
    */
   shopFeatured: {
     region: 3,
