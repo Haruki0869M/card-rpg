@@ -9,6 +9,14 @@
 
 
 
+## 18回目の公開（2026-11-13 13時45分ごろ・main b431131・index-Dnm-CMq2.js）
+
+- 入っている物と見どころ: docs/review/2026-11-13-deploy18-checklist.md。
+- 17回目から増えた物: 回1〜回3（案内・施設の押しやすさ・説明の画面・2人プレイの直し）、憲章の点検の不具合 F1・F4・F5・F6、部屋の連続を無くす（docs/review/2026-11-13-room-variety.md）、黄金箱の秘宝100%、山札の切り直しは1ターンに1回、レジェンドとエピックの消耗品の出どころ、決め技は jobCards からだけ、BREAK の効果は脆弱、災厄の手がかり、敵の特殊な行動の直し（シナリオ1 docs/review/2026-11-13-enemy-behaviors-fix.md・残り6本の41体 docs/review/2026-11-13-enemy-behaviors-round2.md）。
+- 入っていない物: 難しさの調整（オーナーの目標は「賢い bot が約15%」。今は 95〜100%。docs/review/2026-11-13-tuning-sweep.md の案A は物理だけのパーティが 0% になるので、物理でも崩せる形を追加で測る）。
+- 公開の前の確認: テスト 1985件成功/8件スキップ。確認スクリプト24本のうち4本が落ちたが、どれもスクリプトの側の理由（古い文・古い一覧・測る時の揺れ）。直す宿題: guide-r1.mjs・random-dungeon-7a.mjs・ops-save-resume.mjs・ui-r2.mjs の揺れ。
+- 作業ツリー: 直しは C:/dev/card-rpg/.claude/worktrees/audit-fixes（claude/audit-fixes）、測定は lineup-phase1a（claude/lineup-phase1a）。
+
 ## 賢い bot（3段目）と、憲章の点検（2026-11-13）
 
 - オーナーの決定（11/13）: bot をもっと賢くし、その上で難しさを調整して「賢い bot が約15%しかクリアできない」ようにする（前の目標 35〜50% を置き換える。測る条件はシナリオ1・ふつう・2〜4人＝まとめ役の解釈）。
