@@ -9,6 +9,10 @@
 // 使い方: npx vite build && npx vite preview --port 4173 を起こしてから node scripts/random-dungeon-7a.mjs（URL で変更可）
 import { mkdirSync } from 'node:fs';
 import { chromium, layoutIssues, URL, depart } from './lib.mjs';
+import { loadGoldenBoxIds } from './gameData.mjs';
+
+/** 専用の装備の id（前は12個を直に書いていて、14個に増えた時に古くなった。今はゲームのデータ goldenBox.ts から読む） */
+const GOLDEN_BOX_IDS = await loadGoldenBoxIds();
 
 const OUT = process.env.RD7A_OUTPUT ?? 'screenshots/random-dungeon-7a';
 const KEY = 'card-rpg/adventure';
@@ -138,7 +142,7 @@ for (const [width, height] of SIZES) {
   await page.waitForTimeout(300);
   const gb = await game(page);
   if (gb.heroes[0].gold >= goldBefore) problems.push(`${tag}: 闇商人で買えなかった`);
-  if (!gb.heroes[0].stash.some((i) => ['thunderChaseKatana', 'gatlingGun', 'gospelScepter', 'madKingMail', 'executionerCloak', 'twinSoulBell', 'endlessHourglass', 'cheatersDice', 'overchargeCore', 'resonanceRing', 'alchemistBelt', 'stormEarring'].includes(i.itemId))) problems.push(`${tag}: 専用の装備が持ち物に入らない`);
+  if (!gb.heroes[0].stash.some((i) => GOLDEN_BOX_IDS.includes(i.itemId))) problems.push(`${tag}: 専用の装備が持ち物に入らない`);
   // 2人とも「別れる」で閉じる（だれも止まらない）
   for (let k = 0; k < 2; k++) {
     const close = page.getByText('闇商人と別れる');
