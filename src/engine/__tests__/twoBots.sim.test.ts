@@ -58,7 +58,7 @@ vi.mock('../index', async (orig) => {
   };
 });
 
-import { createGame, aliveScourges, isRandomDungeonTile } from '../index';
+import { createGame, aliveScourges, isRandomDungeonTile, omenOfType, reachableRooms } from '../index';
 import { playToEnd } from '../bot';
 import type { CleverPart } from '../botClever';
 import type { SmartPart } from '../botSmart';
@@ -202,6 +202,14 @@ const KNOB_TEXT: string[] = [];
       B.corruptionPerDungeonTurn = (B.corruptionPerDungeonTurn as number) * num('C');
       KNOB_TEXT.push(`${raw} 侵食度の伸び ×${num('C')}（ターンごと ${B.corruptionPerTurn}・ダンジョンの中 ${B.corruptionPerDungeonTurn}）`);
     } else if (k.startsWith('G')) { B.goldGainMul = num('G'); KNOB_TEXT.push(`${raw} 稼いだお金 ×${num('G')}`); }
+    // 強敵の計画（2026-11-13）: EH<倍率> = 強敵の本体のHP（enemyHpByRank.elite）/ EF0 = 強敵の本気を出さない / EE0 = 強敵の装備のエピック率を深さで変えない（10%） /
+    //   MAIN = EH1・EF0・EE0 をまとめて（7a20e43 と同じ戦闘・ご褒美。扉の選び方は SIM_SMART_OFF=elite、並びは SIM_LAYOUTS で前に戻す）
+    else if (k === 'MAIN' || k === 'EF0' || k === 'EE0' || k.startsWith('EH')) {
+      if (k === 'MAIN' || k.startsWith('EH')) B.enemyHpByRank = { ...(B.enemyHpByRank as object), elite: k === 'MAIN' ? 1 : num('EH') };
+      if (k === 'MAIN' || k === 'EF0') B.eliteFrenzy = { ...(B.eliteFrenzy as object), hpBelow: 0 };
+      if (k === 'MAIN' || k === 'EE0') B.eliteEpicChanceByDepth = [10, 10, 10, 10];
+      KNOB_TEXT.push(k === 'MAIN' ? 'MAIN 強敵の本体のHP ×1・本気なし・エピック率10%（7a20e43 と同じ）' : k === 'EF0' ? 'EF0 本気なし' : k === 'EE0' ? 'EE0 エピック率10%' : `${raw} 強敵の本体のHP ×${num('EH')}`);
+    }
     else throw new Error(`知らないつまみ: ${raw}`);
   }
   // B3 の仲間（B3・BA・BI・BE）: 決まりを当てる格では、合計ダメージでは崩れない（前の B3 と同じ。BA は大物だけ）
@@ -303,6 +311,23 @@ interface Run {
   camp: number;
   inn: number;
   towers: number;
+  /**
+   * 強敵の計画（2026-11-13）: 扉を選んだ回数のうち、強敵と別の物を選べた回数・そこで強敵を選んだ回数・強敵の扉しか無かった回数 /
+   * 強敵の戦闘（強敵の本体がいる戦闘 = 強敵の部屋と封魔の宝箱の番人）の始まった数・終わった数・ラウンドの合計・終わった時に倒れていた味方の数・負けた数 /
+   * 本気の予告の数・そのうち BREAK した数 / 強敵の部屋で手に入れた装備の数・そのうちエピック
+   */
+  eliteOffered: number;
+  eliteChosen: number;
+  eliteOnly: number;
+  eliteFights: number;
+  eliteFinished: number;
+  eliteRounds: number;
+  eliteDowned: number;
+  eliteLost: number;
+  frenzy: number;
+  frenzyBroke: number;
+  eliteGear: number;
+  eliteEpic: number;
 }
 
 /** 「属性の付与」の装飾品か */
@@ -322,7 +347,9 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
     bigFinished: 0, bigRounds: 0, breakWhy: { weak: 0, perfect: 0, damage: 0 }, bigBreaks: 0, worldTurn: 0, corruption: 0, wiped: false, endMode: '', where2: {},
     bought: 0, sold: 0, equips: 0, itemsBattle: 0, itemsField: 0, removed: 0, skipped: 0, refused: 0, goldEnd: 0,
     fixedDungeonFights: 0, randomDungeonFights: 0, levelEnd: 0, sp: emptySpecials(), foes: {}, breakKind: { purple: 0, big: 0, red: 0 }, convBought: 0, convWorn: 0,
-    restRoom: 0, camp: 0, inn: 0, towers: 0 };
+    restRoom: 0, camp: 0, inn: 0, towers: 0,
+    eliteOffered: 0, eliteChosen: 0, eliteOnly: 0, eliteFights: 0, eliteFinished: 0, eliteRounds: 0, eliteDowned: 0, eliteLost: 0, frenzy: 0, frenzyBroke: 0, eliteGear: 0, eliteEpic: 0 };
+  const frenzySaid = new Set<string>();
   const entered = new Set<string>();
   /** 予告を数えた印（戦闘の種:敵:ターン。同じ予告を2回数えない） */
   const said = new Set<string>();
@@ -385,6 +412,48 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
       // 増援: 呼べずに代わりの攻撃をした時（直す前は、同じ名前のまま代わりの攻撃をしていた）は、行ったに数えない
       if (k === 'call' && e.type === 'enemyAct' && (b1.find((b) => b.seed === hit.b.seed)?.enemies.length ?? 0) <= hit.b.enemies.length) continue;
       r.sp[k][e.type === 'break' ? 'broke' : 'done']++;
+    }
+    // 強敵の計画（2026-11-13）: 強敵の戦闘（強敵の本体がいる戦闘）・本気・強敵の扉・強敵の装備（テストの側で数える。エンジンの結果は変えない）
+    const isEliteFight = (b: NonNullable<GameState['battle']>) => !!b.elite && !b.boss && !b.midboss && b.enemies.some((x) => x.eliteBody);
+    {
+      const had0 = new Set(b0.map((b) => b.seed));
+      for (const b of b1) if (!had0.has(b.seed) && isEliteFight(b)) r.eliteFights++;
+      for (const b of b0) {
+        if (left.has(b.seed) || !isEliteFight(b)) continue;
+        r.eliteFinished++;
+        r.eliteRounds += b.turn;
+        r.eliteDowned += b.allies.filter((a) => a.dead).length;
+        if (b.phase === 'defeat') r.eliteLost++;
+        // 勝った時の装備（強敵の部屋だけ。封魔の宝箱の番人は装備を落とさない）: 後の状態の、その場面の報酬
+        if (b.phase !== 'victory') continue;
+        const ex = pre.expeditions?.find((x) => x.battle?.seed === b.seed);
+        const reward = ex ? post.expeditions?.find((x) => x.id === ex.id)?.reward : pre.battle?.seed === b.seed ? post.reward : undefined;
+        const items = [...(reward?.loot ?? []).flatMap((l) => (l.kind === 'item' ? [l.item] : [])), ...(reward?.claim ? [reward.claim.item] : [])].filter((i) => getItem(i.itemId).slot !== 'consumable');
+        r.eliteGear += items.length;
+        r.eliteEpic += items.filter((i) => getItem(i.itemId).rarity === 'epic').length;
+      }
+      for (const b of b1) for (const en of b.enemies) {
+        if (en.dead || !en.intent?.frenzy) continue;
+        const key = `${b.seed}:${en.uid}`;
+        if (frenzySaid.has(key)) continue;
+        frenzySaid.add(key);
+        r.frenzy++;
+      }
+      for (const e of events) {
+        if (e.type !== 'break') continue;
+        if (preEnemies.some(({ x }) => x.uid === e.enemyUid && !x.broken && !!x.intent?.frenzy)) r.frenzyBroke++;
+      }
+      const innerCmd = cmd.type === 'SCENE' || cmd.type === 'VOTE' ? cmd.command : cmd;
+      if (innerCmd?.type === 'ENTER_ROOM') {
+        const run = cmd.type === 'SCENE' ? pre.expeditions?.find((x) => x.id === cmd.scene)?.dungeon : pre.dungeon;
+        const doors = run ? reachableRooms(run) : [];
+        const elite = (t: string) => omenOfType(t) === 'elite';
+        const chosen = doors.find((d) => d.id === innerCmd.roomId);
+        if (doors.some((d) => elite(d.type)) && doors.some((d) => !elite(d.type))) {
+          r.eliteOffered++;
+          if (chosen && elite(chosen.type)) r.eliteChosen++;
+        } else if (doors.length && doors.every((d) => elite(d.type))) r.eliteOnly++;
+      }
     }
     const d0 = dungeonsOf(pre).length;
     for (const d of dungeonsOf(post).slice(d0)) {
@@ -542,6 +611,19 @@ describe.skipIf(!process.env.SIM)(`物差し2本（直行 bot と工夫する bo
           L.push(`| ${p} | ${name[k]} | ${kinds.map((s) => tri([s])).join(' | ')} | ${tri(kinds)} |`);
         }
       }
+      // 強敵の計画（2026-11-13）: 強敵の数（全部の冒険の合計。強敵の戦闘 = 強敵の本体がいる戦闘 = 強敵の部屋と封魔の宝箱の番人）
+      L.push('', '## 6. 強敵（全部の冒険の合計）', '');
+      L.push('| 人数 | bot | 強敵か別の物かを選べた扉 → 強敵を選んだ | 強敵しか無い扉 | 強敵の戦闘（始まった / 終わった） | 1戦のラウンド | 終わった時に倒れていた味方（1戦あたり） | 強敵に負けた | 本気（予告 / BREAK） | 強敵の部屋の装備（エピック / 全部） |');
+      L.push('|---|---|---|---|---|---|---|---|---|---|');
+      for (const [p, by] of Object.entries(all)) {
+        for (const k of BOTS) {
+          const rs = by[k];
+          if (!rs?.length) continue;
+          const s = (fn: (r: Run) => number) => rs.reduce((n, r) => n + fn(r), 0);
+          const fin = s((r) => r.eliteFinished);
+          L.push(`| ${p} | ${name[k]} | ${s((r) => r.eliteOffered)} → ${s((r) => r.eliteChosen)}（${f(pct(s((r) => r.eliteChosen), s((r) => r.eliteOffered)))}%） | ${s((r) => r.eliteOnly)} | ${s((r) => r.eliteFights)} / ${fin} | ${f(fin ? s((r) => r.eliteRounds) / fin : NaN, 2)} | ${s((r) => r.eliteDowned)}（${f(fin ? s((r) => r.eliteDowned) / fin : NaN, 2)}） | ${s((r) => r.eliteLost)} | ${s((r) => r.frenzy)} / ${s((r) => r.frenzyBroke)} | ${s((r) => r.eliteEpic)} / ${s((r) => r.eliteGear)} |`);
+        }
+      }
       const others = Object.values(all).flatMap((by) => BOTS.flatMap((k) => by[k] ?? [])).filter((r) => !r.clear && !r.wiped && !r.corr100).map((r) => r.endMode);
       if (others.length) L.push('', `負けの「ほか」の終わり方（game.mode）: ${[...new Set(others)].map((m) => `${m || '(空)'} ${others.filter((x) => x === m).length}`).join('・')}`);
       const where2: Record<string, number> = {};
@@ -583,6 +665,11 @@ describe.skipIf(!process.env.SIM)(`物差し2本（直行 bot と工夫する bo
               restRoom: a((r) => r.restRoom), camp: a((r) => r.camp), inn: a((r) => r.inn), bought: a((r) => r.bought), hones: a((r) => r.hones),
               randomInClear: cl.length ? a((r) => r.randomIn, cl) : null, scourgeKillsClear: cl.length ? a((r) => r.scourgeKills, cl) : null,
               wipedRow: rs.filter((r) => r.wiped).map((r) => r.where), corrRow: rs.filter((r) => r.corr100).map((r) => r.where),
+              // 強敵の計画（2026-11-13）: 合計（全部の冒険の和）
+              elite: (() => {
+                const s = (fn: (r: Run) => number) => rs.reduce((n, r) => n + fn(r), 0);
+                return { offered: s((r) => r.eliteOffered), chosen: s((r) => r.eliteChosen), only: s((r) => r.eliteOnly), fights: s((r) => r.eliteFights), finished: s((r) => r.eliteFinished), rounds: s((r) => r.eliteRounds), downed: s((r) => r.eliteDowned), lost: s((r) => r.eliteLost), frenzy: s((r) => r.frenzy), frenzyBroke: s((r) => r.frenzyBroke), gear: s((r) => r.eliteGear), epic: s((r) => r.eliteEpic) };
+              })(),
               specials: Object.fromEntries((Object.keys(SPECIALS) as SpecialKind[]).map((s) => [s, { said: a((r) => r.sp[s].said), done: a((r) => r.sp[s].done), broke: a((r) => r.sp[s].broke) }])),
             });
           }

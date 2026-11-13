@@ -11,6 +11,8 @@ import { getRoomType, ROOM_TYPES } from '../../data/rules';
 import type { BattleState, EncounterSpec, PlayerId } from '../../types';
 import { applyCommand, buildDungeon, createBattle, createGame, createRng, equipmentEpicChance, frenzyReady, intentHitsOn, startBattleWith, startRoomBattle, strongestAttack } from '../index';
 import { intentView } from '../../components/format';
+import { newSmartMemo, smartEliteDoor } from '../botSmart';
+import { heroMaxHp } from '../game/hero';
 import { giveHand, makeImmortal, nextTurn, party, play } from './helpers';
 
 /** 門番ガルザ（本体）＋魔王軍の騎士（足された敵の役）。flags で戦闘の格を決める */
@@ -228,5 +230,23 @@ describe('柱4 強敵の装備のエピック率（深さで上がる）', () =>
   it('中ボスの部屋は今までどおり（深さで変わらない）', () => {
     const drop = getRoomType('midboss').battle!.equipmentDrop!;
     expect([0, 1, 2, 3].map((t) => equipmentEpicChance(drop, t))).toEqual([30, 30, 30, 30]);
+  });
+});
+
+describe('賢い bot の強敵の扉（測定のため。ゲームは変えない）', () => {
+  const rooms = [{ id: 'a', type: 'elite' }, { id: 'b', type: 'battle' }, { id: 'c', type: 'chest' }];
+  const isElite = (r: { type: string }) => r.type === 'elite';
+  const others = (rs: typeof rooms) => rs.find((r) => r.type === 'chest') ?? rs[0];
+  it('全員のHPが7割以上で回復の道具があれば強敵、そうでなければ避ける（強敵しか無ければ強敵）。elite を外すと undefined（前と同じ）', () => {
+    const g = gameOf();
+    for (const h of g.heroes) { h.hp = heroMaxHp(h); h.pouch = []; }
+    expect(smartEliteDoor(g, newSmartMemo(), rooms, isElite, others)?.id).toBe('c');
+    g.heroes[0].pouch = [{ uid: 'pot', itemId: 'potion' }];
+    expect(smartEliteDoor(g, newSmartMemo(), rooms, isElite, others)?.id).toBe('a');
+    g.heroes[1].hp = Math.floor(heroMaxHp(g.heroes[1]) * 0.69);
+    expect(smartEliteDoor(g, newSmartMemo(), rooms, isElite, others)?.id).toBe('c');
+    expect(smartEliteDoor(g, newSmartMemo(), [rooms[0]], isElite, others)?.id).toBe('a');
+    expect(smartEliteDoor(g, newSmartMemo(['elite']), rooms, isElite, others)).toBeUndefined();
+    expect(smartEliteDoor(g, newSmartMemo(), rooms.slice(1), isElite, others)).toBeUndefined();
   });
 });
