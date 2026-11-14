@@ -7,10 +7,11 @@ import { create } from 'zustand';
 import { normalizeSettings, type Settings } from './settings';
 import { playSound, setAudioVolumes } from '../audio/player';
 import { petCry } from '../audio/cues';
-import { battleFrames, explorationNotices, explorationSounds, type CalloutDraft, type ImpactDraft, type PopupDraft, type PopupTone, type SynergyTier, type NoticeDraft, type PresentationFrame } from './presentation';
+import { battleFrames, explorationNotices, explorationSounds, receiveNotice, type CalloutDraft, type ImpactDraft, type PopupDraft, type PopupTone, type SynergyTier, type NoticeDraft, type PresentationFrame } from './presentation';
 export type { Settings } from './settings';
 import { TIMING, VIBRATION } from '../data/balance';
 import { cardOf } from '../data/cards';
+import { getItem } from '../data/items';
 import { CLASSES } from '../data/classes';
 import { contentVersion } from '../data/contentVersion';
 import { ENCOUNTERS } from '../data/enemies';
@@ -19,6 +20,7 @@ import {
   applyGameCommand,
   createBattle,
   createGame,
+  enemyName,
   findAlly,
   GAME_VERSION,
   migrateGame,
@@ -145,6 +147,11 @@ interface StoreState {
   sheet: Sheet;
   /** パーティの窓で最初に見せるキャラ */
   sheetHeroId: string | null;
+  /**
+   * つながり直し（状態の取り直し）の回数（実機の不具合② 点検 F6）。
+   * シートは開いたまま残し、シートの中の選択（選んでいた道具・渡す相手・開いていた行）は、この数が変わった時に消す
+   */
+  sheetEpoch: number;
   /** 冒険の放棄・リセットの確認 */
   confirmAbandon: boolean;
   /** 「ターン終了」の確認（この端末の担当で、まだ行動できる仲間がいる時だけ出す） */
@@ -195,7 +202,8 @@ interface StoreState {
   /** 道具を使う（userId = 袋の持ち主。戦闘中は操作中のキャラ） */
   /** cardUid = カード鍛錬の砥石で強化するカード（区切りE） */
   /** stat = 災厄討ちの秘薬で上げる能力値（段階7b） */
-  usePouch: (itemUid: string, targetHeroId: string, userId?: string, cardUid?: string, stat?: StatId) => string | undefined;
+  /** keepSheet = 使った後もシートを閉じない（パーティ・装備のシートの持ち物の行から使う時。実機の不具合⑥） */
+  usePouch: (itemUid: string, targetHeroId: string, userId?: string, cardUid?: string, stat?: StatId, keepSheet?: boolean) => string | undefined;
   setSettings: (s: Partial<Settings>) => void;
   /** heroId: パーティの窓で最初に見せるキャラ（世界マップの顔を押した時など） */
   openSheet: (s: Sheet, heroId?: string) => void;
@@ -646,6 +654,11 @@ export const useBattle = create<StoreState>((set, get) => {
     }
     set(patch);
     // 見ている場面の出来事だけ演出する
+    // 実機の不具合⑥: 仲間が渡した物がこの端末のキャラに届いた（受け取った側の知らせ。見ている場面に関係なく出す）
+    if (before) {
+      const got = receiveNotice(before, full, wire, isLocalPlayer);
+      if (got) get().showToast(got);
+    }
     if (cmdScene === scene) {
       if (startedBattle) playSound('sfx_battle_start');
       const quiet = remoteActor(wire);
@@ -715,6 +728,7 @@ export const useBattle = create<StoreState>((set, get) => {
     selection: null,
     sheet: null,
     sheetHeroId: null,
+    sheetEpoch: 0,
     confirmAbandon: false,
     confirmEndTurn: false,
     rollFx: null,
@@ -860,7 +874,11 @@ export const useBattle = create<StoreState>((set, get) => {
       const exp = full.expeditions?.find((x) => mine.length && mine.every((h) => x.heroes.includes(h.id)));
       const scene = pickScene(full, exp?.id ?? get().scene, true);
       const game = viewOf(full, scene);
-      set({ worldMoves: [], turnCutin: null, doorOpen: null, full, scene, game, screen: 'game', sheet: null, battle: game.battle ?? EMPTY_BATTLE, ...(game.battle ? resetBattleUi(game.battle) : { selection: null }) });
+      // 実機の不具合②（点検 F6）: つながり直しても、開いていたシートは閉じない（前は黙って閉じて「装備の欄が消えた」に見えた）。
+      // シートの中の選択は sheetEpoch が変わった時に消す（取り直しで道具やキャラが変わっていても、古い物を指したまま描かない）。
+      // 冒険の画面に初めて入る時（待合室から）は、シートを開いていないので今までどおり
+      const keep = get().screen === 'game' ? get().sheet : null;
+      set({ worldMoves: [], turnCutin: null, doorOpen: null, full, scene, game, screen: 'game', sheet: keep, sheetEpoch: get().sheetEpoch + 1, battle: game.battle ?? EMPTY_BATTLE, ...(game.battle ? resetBattleUi(game.battle) : { selection: null }) });
       scheduleEnemy();
     },
 
@@ -998,12 +1016,20 @@ export const useBattle = create<StoreState>((set, get) => {
       get().dispatch({ type: 'END_TURN', playerId: LOCAL_PLAYER });
     },
 
-    usePouch: (itemUid, targetHeroId, userId, cardUid, stat) => {
+    usePouch: (itemUid, targetHeroId, userId, cardUid, stat, keepSheet) => {
       const { game, activeId } = get();
       if (!game) return;
       const user = game.mode === 'battle' ? activeId : (userId ?? game.heroes.find((h) => h.pouch.some((p) => p.uid === itemUid))?.id ?? targetHeroId);
+      const owner = game.heroes.find((h) => h.id === user);
+      const item = owner?.pouch.find((p) => p.uid === itemUid);
       const err = get().dispatchGame({ type: 'USE_POUCH_ITEM', playerId: LOCAL_PLAYER, itemUid, userId: user, targetId: targetHeroId, ...(cardUid ? { cardUid } : {}), ...(stat ? { stat } : {}) });
-      if (!err) { set({ sheet: null }); get().showToast('道具を使いました'); }
+      if (!err) {
+        if (!keepSheet) set({ sheet: null });
+        // 実機の不具合⑥: だれに何を使ったかを出す（「ルーシアに回復薬を使いました」）
+        const target = game.heroes.find((h) => h.id === targetHeroId)?.name ?? (() => { const e = game.battle?.enemies.find((x) => x.uid === targetHeroId); return e ? enemyName(e) : undefined; })();
+        const name = item ? getItem(item.itemId).name : '道具';
+        get().showToast(target ? `${target}に${name}を使いました` : `${name}を使いました`);
+      }
       return err;
     },
 

@@ -32,6 +32,8 @@ import { TurnLock } from './components/ui/TurnLock';
 import { TurnCutin } from './components/ui/TurnCutin';
 import { findAlly } from './engine';
 import { useBackButton } from './hooks/useBackButton';
+import { useAppHeight } from './hooks/useAppHeight';
+import { LAYER } from './components/ui/layers';
 import { HelpScreen } from './components/help/HelpScreen';
 import { useHelp } from './store/help';
 import { useLore } from './store/lore';
@@ -200,7 +202,8 @@ function Toast() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0 }}
-          className="pointer-events-none absolute inset-x-4 bottom-24 z-[80] rounded-xl border border-amber-300/50 bg-black/90 px-3 py-2 text-center text-[14px] text-amber-50"
+          style={{ zIndex: LAYER.toast }}
+          className="pointer-events-none absolute inset-x-4 bottom-24 rounded-xl border border-amber-300/50 bg-black/90 px-3 py-2 text-center text-[14px] text-amber-50"
         >
           {toast.text}
         </motion.div>
@@ -237,6 +240,8 @@ export default function App() {
     return closeTop();
   });
   useKeyboard();
+  // 実機の不具合②: 見えている高さ（visualViewport）を --app-h に入れる（LINE 内ブラウザで下が切れないように）
+  useAppHeight();
 
   // 招待のリンク（?room=合言葉）で開いたら「部屋に参加」へ
   useEffect(() => {
@@ -260,7 +265,7 @@ export default function App() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="flex h-dvh w-full justify-center bg-[#050407]">
+      <div className="flex w-full justify-center bg-[#050407]" style={{ height: 'var(--app-h, 100dvh)' }} data-app-root>
         <div className="relative flex h-full w-full max-w-[480px] flex-col overflow-hidden">
           {!moving && screen === 'game' && <SceneTabs />}
           <div className="relative flex min-h-0 w-full flex-1 justify-center">
@@ -278,7 +283,7 @@ export default function App() {
           </>}
           {/* 伝承の書（Step C ②）: 冒険の途中にメニューから開く。読むだけ。閉じると開いたメニューに戻る */}
           {loreOpen && screen === 'game' && (
-            <div className="absolute inset-0 z-[70]">
+            <div className="absolute inset-0" style={{ zIndex: LAYER.cardPick }}>
               <Lorebook inAdventure onClose={() => useLore.getState().close()} />
             </div>
           )}

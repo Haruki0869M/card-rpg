@@ -2,6 +2,7 @@ import { TIMING, BALANCE } from '../data/balance';
 import { EVENTS } from '../data/events';
 import { getStatus } from '../data/statuses';
 import { getCard } from '../data/cards';
+import { getItem } from '../data/items';
 import { petExplore } from '../engine/game/pets';
 import { unwrapCommand, viewOf } from '../engine/game/scenes';
 import { timeOfDay } from '../engine/game/world/time';
@@ -333,4 +334,23 @@ export function explorationSounds(before: GameState, after: GameState, wire: Gam
   if (ribbon) out.push('sfx_pet_ribbon');
   else if (heart) out.push('sfx_pet_heart');
   return [...new Set(out)];
+}
+
+/**
+ * 物を受け取った側の知らせ（実機の不具合⑥ 2026-11-14）。
+ * 仲間が渡した物（GIVE）が、この端末のキャラに届いた時だけ文を返す。渡した人がこの端末の席なら出さない
+ * （渡した側には、画面が「回復薬をルーシアに渡しました」を出すため。1台で全員を動かす時も同じ）
+ */
+export function receiveNotice(before: GameState, after: GameState, wire: GameCommand, isLocal: (p: GameState['heroes'][number]['playerId']) => boolean): string | null {
+  const cmd = unwrapCommand(wire).command;
+  if (cmd.type !== 'GIVE' || isLocal(cmd.playerId)) return null;
+  const to = after.heroes.find((h) => h.id === cmd.toHeroId);
+  const from = after.heroes.find((h) => h.id === cmd.fromHeroId);
+  const toBefore = before.heroes.find((h) => h.id === cmd.toHeroId);
+  if (!to || !from || !toBefore || !isLocal(to.playerId)) return null;
+  if (cmd.gold !== undefined) return to.gold > toBefore.gold ? `${from.name}から${cmd.gold}Gを受け取りました` : null;
+  const got = [...to.stash, ...to.pouch].find((x) => x.uid === cmd.itemUid);
+  const had = [...toBefore.stash, ...toBefore.pouch].some((x) => x.uid === cmd.itemUid);
+  if (!got || had) return null;
+  return `${from.name}から${getItem(got.itemId).name}を受け取りました`;
 }

@@ -1,5 +1,6 @@
 // ===== オンライン協力の画面（部屋に参加・待合室・遊んでいる間の表示。spec §7.2） =====
 import { TopBar } from '../ui/fancy';
+import { LAYER } from '../ui/layers';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Copy, Crown, LogIn, Share2, Swords, Users, Wifi, WifiOff } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -396,7 +397,7 @@ export function OnlineOverlay() {
     .filter((x) => x.target && x.by && isLocalPlayer(x.target.playerId));
   const offlineAwaited = awaitedSeats(game).filter((p) => !room.seatOnline(p) && !room.meta?.proxy?.[p] && livingHeroes(game).some((h) => h.playerId === p));
   return (
-    <div data-online-overlay className="pointer-events-none absolute inset-x-0 top-0 z-[70] flex flex-col items-center gap-1 px-3 pt-14">
+    <div data-online-overlay style={{ zIndex: LAYER.online }} className="pointer-events-none absolute inset-x-0 top-0 flex flex-col items-center gap-1 px-3 pt-14">
       {!room.connected && (
         <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-red-950/90 px-3 py-1.5 text-[13px] text-red-100">
           <WifiOff size={16} /> 通信が切れました。つながり直しています…
