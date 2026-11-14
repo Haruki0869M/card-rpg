@@ -10,6 +10,8 @@ import { canSummonEnemy } from './effects/kinds/summonEnemy';
 import { BALANCE } from '../../data/balance';
 import { addLog, enemyName } from './units';
 import { pendingOpening } from './phases';
+import { punishHits } from './effects/kinds/punishPlays';
+import { huntApplies } from './effects/kinds/damage';
 
 export function livingAllies(state: BattleState): AllyState[] {
   return state.allies.filter((a) => !a.dead);
@@ -53,6 +55,28 @@ export function weakestAlly(state: BattleState): string | undefined {
 
 /** 手負い狙いの行動か（HPが半分以下の相手に倍率がかかる単体攻撃を含む） */
 const isHuntAction = (action: EnemyActionDef) => action.effects.some((e) => e.kind === 'damage' && !!e.lowHpMul && targetOf(e) === 'target');
+
+/**
+ * 手負い狙いの予告の狙い（2026-11-14 特殊な行動のばらし。damage の huntBy）。乱数は使わない。同じ時は並びの前
+ * - 省略 = HPの割合がいちばん低い / hp = HPの量がいちばん少ない / lastHit = 前のターンに自分を攻撃した味方（最後の人。いなければ割合）/
+ *   afflicted = 悪い状態異常の付いた味方のうち割合がいちばん低い（いなければ割合）
+ */
+export function huntTarget(state: BattleState, enemy: EnemyState, action: EnemyActionDef): string | undefined {
+  const eff = action.effects.find((e) => e.kind === 'damage' && !!e.lowHpMul && targetOf(e) === 'target');
+  const by = eff && eff.kind === 'damage' ? eff.huntBy : undefined;
+  const alive = livingAllies(state);
+  if (!alive.length) return undefined;
+  if (by === 'hp') return alive.reduce((a, b) => (b.hp < a.hp ? b : a)).id;
+  if (by === 'lastHit') {
+    const last = [...(enemy.hitBy ?? [])].reverse().find((id) => alive.some((a) => a.id === id));
+    if (last) return last;
+  }
+  if (by === 'afflicted') {
+    const sick = alive.filter((a) => activeStatuses(a.statuses).some(({ def }) => def.harmful));
+    if (sick.length) return sick.reduce((a, b) => (b.hp * a.maxHp < a.hp * b.maxHp ? b : a)).id;
+  }
+  return weakestAlly(state);
+}
 
 /** 今の段階の行動の全部（決め方では選ばない scripted の行動も含む。開幕の一手・溜め・数え読みの行動を探す時に使う） */
 export function currentPhaseActions(enemy: EnemyState): EnemyActionDef[] {
@@ -112,9 +136,28 @@ function cutInReady(enemy: EnemyState, state: BattleState, a: EnemyActionDef): b
   if (!c) return false;
   if (enemy.cutInTurn !== undefined && state.turn - enemy.cutInTurn <= (c.rest ?? 2)) return false;
   if (c.noRepeat && enemy.history.at(-1) === a.id) return false;
-  if (c.when === 'afflicted') return activeStatuses(enemy.statuses).some(({ def }) => def.harmful);
+  // 呼ぶ行動は、どの条件でも「呼べる時」だけ
   const call = callEffectOf(a);
-  return !!call && canSummonEnemy(state, enemy, call);
+  if (call && !canSummonEnemy(state, enemy, call)) return false;
+  switch (c.when) {
+    case 'afflicted': {
+      // 浄化の only（呪詛のミイラ: 毒と火傷だけ）があれば、その状態異常だけ見る
+      const pur = a.effects.find((e) => e.kind === 'purify');
+      const only = pur && pur.kind === 'purify' ? pur.only : undefined;
+      return activeStatuses(enemy.statuses).some(({ def }) => def.harmful && (!only || only.includes(def.id)));
+    }
+    case 'canSummon':
+      return !!call;
+    case 'alone':
+      return !state.enemies.some((e) => !e.dead && e !== enemy);
+    case 'hurt':
+      return enemy.hp * 2 <= enemy.maxHp;
+    case 'allyDown':
+      return state.enemies.some((e) => e.dead && e !== enemy);
+    case 'foeLow':
+      return livingAllies(state).some((x) => x.hp * 2 <= x.maxHp);
+  }
+  return false;
 }
 
 /**
@@ -145,7 +188,8 @@ export function chooseAction(enemy: EnemyState, state: BattleState, rng: Rng): E
     }
   }
   // (b)(c) 割り込み（浄化）・優先（仲間を呼ぶ）: 決め方を飛ばして予告する。順番の位置は進めない
-  const cut = set.actions.find((a) => cutInReady(enemy, state, a));
+  // 決め方では選ばない行動（scripted）も、最初の段階では割り込みの条件が合えば出す（1体になった時だけ呼ぶ、など。2026-11-14）
+  const cut = (enemy.phase === 0 ? currentPhaseActions(enemy) : set.actions).find((a) => cutInReady(enemy, state, a));
   if (cut) {
     enemy.cutInTurn = state.turn;
     return resolve(cut);
@@ -197,7 +241,7 @@ export function decideIntent(enemy: EnemyState, state: BattleState, rng: Rng): v
   if (opening) afterOpening(enemy, openingDef!);
   enemy.history = [...enemy.history, action.id].slice(-5);
   // 手負い狙いは、HPの割合がいちばん低い味方を狙う（挑発で変えられる）
-  enemy.intent = { actionId: action.id, targetId: needsTarget(action) ? (isHuntAction(action) ? weakestAlly(state) : pickRandomAlly(state, rng)) : undefined };
+  enemy.intent = { actionId: action.id, targetId: needsTarget(action) ? (isHuntAction(action) ? huntTarget(state, enemy, action) : pickRandomAlly(state, rng)) : undefined };
   if (opening) enemy.intent.opening = enemy.phase;
   // 数え読みの行動を出した（先読みで見せた時も）: 数えを最初に戻す
   if (cd && action.id === cd.actionId && cd.left <= 0) {
@@ -326,7 +370,8 @@ export function enemyHitDamage(enemy: EnemyState, base: number, target: AllyStat
 export const lowHpMulOn = (lowHpMul: number | undefined, target: AllyState | undefined) => (lowHpMul && target && target.hp * 2 <= target.maxHp ? lowHpMul : 1);
 
 /** 敵の行動が ally に与える予定ダメージ（1回あたりの値の配列。ブロック考慮前） */
-export function intentHitsOn(enemy: EnemyState, ally: AllyState): number[] {
+/** allies = 味方全員（手数読みの「いちばん多い1人」「みんなの合計」を数える。省略は ally だけで数える） */
+export function intentHitsOn(enemy: EnemyState, ally: AllyState, allies?: AllyState[]): number[] {
   if (enemy.dead || !enemy.intent || ally.dead) return [];
   if (enemy.skipNextAction) return [];
   // 凍結で次の行動を休む敵は攻撃しない
@@ -335,14 +380,19 @@ export function intentHitsOn(enemy: EnemyState, ally: AllyState): number[] {
   const hits: number[] = [];
   for (const eff of action.effects) {
     // 手数読み: このターンに min 枚以上使った味方に（枚数×amount）。使った枚数で予定が変わる
+    // 2026-11-14: 数える札・当たる人は敵ごと（punishHits）
     if (eff.kind === 'punishPlays') {
-      if ((ally.played ?? 0) >= eff.min) hits.push(enemyHitDamage(enemy, (ally.played ?? 0) * Math.floor(eff.amount * (enemy.nextActionMultiplier ?? 1)), ally));
+      const h = punishHits(allies ?? [ally], eff).find((x) => x.ally === ally);
+      if (h && eff.amount > 0) hits.push(enemyHitDamage(enemy, h.mul * Math.floor(eff.amount * (enemy.nextActionMultiplier ?? 1)), ally));
       continue;
     }
     if (eff.kind !== 'damage') continue;
     const to = targetOf(eff);
     if (to === 'target' ? enemy.intent.targetId !== ally.id : to !== 'foes') continue;
-    const dmg = enemyHitDamage(enemy, Math.floor(eff.amount * (enemy.nextActionMultiplier ?? 1)), ally, lowHpMulOn(eff.lowHpMul, ally));
+    // 手負いだけに噛みつく（夢の鮫）: HPが半分より多い味方には当たらない
+    if (eff.lowOnly && ally.hp * 2 > ally.maxHp) continue;
+    const low = eff.huntWhen ? (eff.lowHpMul && huntApplies(eff, ally) ? eff.lowHpMul : 1) : lowHpMulOn(eff.lowHpMul, ally);
+    const dmg = enemyHitDamage(enemy, Math.floor(eff.amount * (enemy.nextActionMultiplier ?? 1)), ally, low);
     for (let i = 0; i < (eff.hits ?? 1); i++) hits.push(dmg);
   }
   return hits;
@@ -358,7 +408,7 @@ export function incomingDamage(state: BattleState, ally: AllyState): number {
   if (ally.dead) return 0;
   let total = 0;
   let shields = ally.summons?.filter(s => s.intercept).length ?? 0;
-  for (const e of state.enemies) for (const h of intentHitsOn(e, ally)) {
+  for (const e of state.enemies) for (const h of intentHitsOn(e, ally, state.allies)) {
     if (ally.airborne || (h > 0 && shields-- > 0)) continue;
     total += h;
   }

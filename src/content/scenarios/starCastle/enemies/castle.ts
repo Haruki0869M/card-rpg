@@ -21,7 +21,7 @@ export const skyKnight: EnemyDef = {
   actions: [
     { id: 'lance', name: '槍の突撃', effects: [{ kind: 'damage', amount: 16 }] },
     // 「天の構え」（ブロック10＋5ダメージ）をかばうに置き換えた。ID は古い保存のために残す。5つ目の地域なのでブロック10（BREAK されると行動ごと止まる）
-    { id: 'guard', name: '天の盾', big: true, behavior: 'guard', fallbackIfAloneId: 'lance', hint: '次の味方の番の間、ほかの敵への単体攻撃を代わりに受ける。全体攻撃は通る', effects: [{ kind: 'guardAllies' }, { kind: 'block', amount: 10 }] },
+    { id: 'guard', name: '天の盾', big: true, behavior: 'guard', fallbackIfAloneId: 'lance', brief: '受けた攻撃に光を返す', hint: '次の味方の番の間、ほかの敵への単体攻撃を代わりに受け、攻撃した味方に聖5を返す。全体攻撃・お供は返されない', effects: [{ kind: 'guardAllies', retaliate: 5, element: 'holy' }, { kind: 'block', amount: 8 }] },
     { id: 'sweep', name: '槍の薙ぎ払い', effects: [{ kind: 'damage', amount: 7, to: 'foes' }] },
   ],
   // 最後の中ボス（2026-11-14 寄り道の値打ち 柱5）: 中ボスの部屋の戦闘だけの段階。HP50%か、相方が倒れると入る。数字は【提案】

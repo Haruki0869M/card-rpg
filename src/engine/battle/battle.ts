@@ -290,6 +290,7 @@ function startAllyPhase(state: BattleState, rng: Rng, events: BattleEvent[]) {
   for (const a of state.allies) {
     a.played = 0;
     a.playedZero = 0;
+    a.playedAttack = 0;
     a.playedBy = {};
   }
   for (const a of state.allies) {
@@ -566,6 +567,8 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
     add('mana', paid.cost);
     if (perfect) add('perfects');
     if (successes > 0) add(`success:${card.category}`);
+    // 2026-11-14（竜騎士の条件・案A）: 戦闘の1ターン目に成功した物理カード（槍騎士の《突撃》の「最初の一撃」）。記録が無い古い保存は0から数える
+    if (successes > 0 && card.category === 'physical' && state.turn === 1) add('success:physical:turn1');
     if (successes > 0 && card.tiers.some(t => t.effects.some(e => e.kind === 'heal'))) add('success:heal');
     if ((card.target === 'self' || isAllyCard(card)) && card.tiers.some((t) => t.effects.some((e) => e.kind === 'block' || e.kind === 'heal' || e.kind === 'applyStatus'))) add('support');
   }
@@ -673,6 +676,8 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   if (perfect) { const cs = (ally.counters ??= {}); if (cs.perfectTurn !== state.turn) { cs.perfectTurn = state.turn; cs.perfectCount = 0; } cs.perfectCount = (cs.perfectCount ?? 0) + 1; }
   // 区切りD: コスト0のカードの枚数（流れる連撃）
   if (card.cost === 0) ally.playedZero = (ally.playedZero ?? 0) + 1;
+  // 2026-11-14: 攻撃の札（敵を狙う札）の枚数（手数読みの「攻撃の札だけ数える」。数えない札は数えない）
+  if (!uncounted && (card.target === 'enemy' || card.target === 'allEnemies')) ally.playedAttack = (ally.playedAttack ?? 0) + 1;
   // 区切りD: この戦闘で使った物理カードの枚数（無想阿修羅拳）
   if (card.category === 'physical') (ally.counters ??= {}).physBattle = (ally.counters.physBattle ?? 0) + 1;
   afterAttackCard(ally, card, tier);
@@ -850,6 +855,7 @@ function endTurn(state: BattleState, playerId: string, rng: Rng, events: BattleE
   for (const e of state.enemies) {
     e.block = 0;
     delete e.guarding;
+    delete e.guardStyle;
   }
   state.phase = 'enemy';
   state.enemyCursor = 0;
@@ -953,6 +959,16 @@ function executeAction(state: BattleState, enemy: EnemyState, action: EnemyActio
     }
   }
   if (enemy.dead) { enemy.intent = undefined; return false; }
+  // 残り香（2026-11-14 開幕の一手）: BREAK された時は、元の効果の代わりに軽い効果だけを行う（倍率は掛けない）。溜めは消える
+  if (enemy.broken && action.breakResidue?.length) {
+    events.push({ type: 'enemyAct', enemyUid: enemy.uid, actionName: `「${action.name}」（BREAK で弱まった）`, targetIds: ctx.hitIds });
+    delete enemy.nextActionMultiplier;
+    for (const eff of action.breakResidue) applyEffect(ctx, eff);
+    for (const n of ctx.fired) abilityTriggered(state, enemy.uid, n.name, events, n.source);
+    addLog(state, `${enemyName(enemy)}は体勢が崩れて「${action.name}」が弱まった ${ctx.parts.join(' / ')}`);
+    enemy.intent = undefined;
+    return false;
+  }
   // BREAK された大技のうち、ダメージの無い行動（浄化・仲間を呼ぶ・かばう・癒し封じなど）は起きない
   // （ダメージのある大技は、今までどおり威力が半分になる）
   if (enemy.broken && breakStopsAction(action)) {

@@ -38,7 +38,7 @@ export const lanternAngler: EnemyDef = {
   actions: [
     { id: 'lure', name: '妖しい灯り', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1 }] },
     // 「大口の丸呑み」を盾砕きに置き換えた（ブロックを0にしてから、同じ12のダメージ）。ID は古い保存のために残す
-    { id: 'gulp', name: '丸呑み', big: true, behavior: 'shatter', hint: '当たるとブロックを全部壊す。BREAK するか、ブロックに頼らずに受ける', effects: [{ kind: 'shieldBreak' }, { kind: 'damage', amount: 12 }] },
+    { id: 'gulp', name: '丸呑み', big: true, behavior: 'shatter', brief: '壊した盾を飲み込む', hint: 'ブロックを全部壊して自分のブロックにしてから、12。ブロックを張りすぎないか、BREAK する', effects: [{ kind: 'shieldBreak', absorb: true }, { kind: 'damage', amount: 12 }] },
     { id: 'fangs', name: '並んだ牙', effects: [{ kind: 'damage', amount: 5, hits: 2 }] },
   ],
 };

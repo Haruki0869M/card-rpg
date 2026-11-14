@@ -8,6 +8,9 @@ import { breakStopsAction, describeEffect, enemyHitDamage, findAlly, lowHpMulOn,
 import { behaviorBadge, FRENZY_BADGE } from '../data/enemyBehaviors';
 import { blockSkippedOnBreak } from '../engine';
 import { breakRuleOf } from '../engine/battle/breakRules';
+import { countName, punishHits } from '../engine/battle/effects/kinds/punishPlays';
+import { huntApplies, huntWhenText } from '../engine/battle/effects/kinds/damage';
+import { getEnemy } from '../data/enemies';
 import type { BattleState, CardDef, CardEffect, EnemyBehaviorId, EnemyState, StatusId } from '../types';
 
 export { CATEGORY_LABEL };
@@ -68,7 +71,11 @@ export function intentBrief(v: IntentView | null): { icon: string; text: string 
 /** インテントの表示（敵のレベル・弱体・味方の脆弱を反映した実際の値） */
 export function intentView(state: BattleState, enemy: EnemyState): IntentView | null {
   if (!enemy.intent || enemy.dead) return null;
-  if (enemy.skipNextAction) return { parts: [{ kind: 'other', effect: { kind: 'skipIntent' } }], name: '時間停止で休み', details: ['次の行動は休み。その後は通常の行動順へ戻る'] };
+  if (enemy.skipNextAction) {
+    // 2026-11-14（宿題8-3）: 本気の予告を時間停止で休む時は、本気が空振りになると分かる文にする（文だけ）
+    const f = enemy.intent.frenzy ? skipFrenzy('時間停止') : undefined;
+    return { parts: [{ kind: 'other', effect: { kind: 'skipIntent' } }], name: '時間停止で休み', details: ['次の行動は休み。その後は通常の行動順へ戻る', ...(f ? [f.long] : [])], ...(f ? { frenzy: f } : {}) };
+  }
   const action = getEnemyAction(enemy.defId, enemy.intent.actionId);
   const target = enemy.intent.targetId ? findAlly(state, enemy.intent.targetId) : undefined;
   const targetName = target ? target.name : '（対象なし）';
@@ -76,23 +83,27 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
   const details: string[] = [];
   // 強奪・BREAK で次の行動の数値が変わっている時は、その値で出す（実際の行動と同じ計算）
   const mul = enemy.nextActionMultiplier ?? 1;
-  for (const raw of action.effects) {
+  // 残り香（2026-11-14 開幕の一手）: 崩した後は、元の効果の代わりに残る軽い効果を見せる（倍率は掛からない）
+  const residue = enemy.broken && action.breakResidue?.length ? action.breakResidue : undefined;
+  for (const raw of residue ?? action.effects) {
     // 特殊な行動に足したブロックは、BREAK されると付かない（battle.ts の executeIntent と同じ）
     if (enemy.broken && blockSkippedOnBreak(action, raw)) continue;
-    const eff = mul !== 1 && 'amount' in raw && raw.amount !== undefined ? { ...raw, amount: Math.floor(raw.amount * mul) } : raw;
+    const eff = !residue && mul !== 1 && 'amount' in raw && raw.amount !== undefined ? { ...raw, amount: Math.floor(raw.amount * mul) } : raw;
     const to = targetOf(eff);
     if (eff.kind === 'damage') {
       const hits = eff.hits ?? 1;
       if (to === 'target') {
         // 手負い狙い: 狙った相手のHPが今、半分以下なら倍率込みの値
-        const low = lowHpMulOn(eff.lowHpMul, target);
+        // 手負い狙い（2026-11-14: 倍率の掛かる時が敵ごとにちがう。huntWhen）
+        const low = eff.huntWhen ? (eff.lowHpMul && target && huntApplies(eff, target) ? eff.lowHpMul : 1) : lowHpMulOn(eff.lowHpMul, target);
         const dmg = enemyHitDamage(enemy, eff.amount, target, low);
         parts.push({ kind: 'attack', damage: dmg, hits, targetId: target?.id, element: eff.element });
-        details.push(`${targetName}に${dmg}の${elementText(eff.element)}ダメージ${hits > 1 ? `×${hits}回` : ''}${elementStatusText(eff.element)}${eff.lowHpMul ? (low !== 1 ? `（HPが半分以下なので×${eff.lowHpMul} 反映済み）` : `（当たる時にHPが半分以下なら×${eff.lowHpMul}）`) : ''}`);
+        const when = huntWhenText(eff);
+        details.push(`${targetName}に${dmg}の${elementText(eff.element)}ダメージ${hits > 1 ? `×${hits}回` : ''}${elementStatusText(eff.element)}${eff.lowHpMul ? (low !== 1 ? `（${when}ので×${eff.lowHpMul} 反映済み）` : `（当たる時に${when.replace(/の$/, '')}なら×${eff.lowHpMul}）`) : ''}${eff.pierce && !enemy.broken ? '（ブロックを無視する）' : ''}`);
       } else {
         const dmg = enemyHitDamage(enemy, eff.amount, undefined);
         parts.push({ kind: 'attackAll', damage: dmg, hits, element: eff.element });
-        details.push(`味方全員に${dmg}の${elementText(eff.element)}ダメージ${hits > 1 ? `×${hits}回` : ''}${elementStatusText(eff.element)}（状態異常で増減あり）`);
+        details.push(`${eff.lowOnly ? 'HPが半分以下の味方全員' : '味方全員'}に${dmg}の${elementText(eff.element)}ダメージ${hits > 1 ? `×${hits}回` : ''}${elementStatusText(eff.element)}（状態異常で増減あり${eff.lowOnly ? '。だれも半分以下でなければ空振り' : ''}）`);
       }
     } else if (eff.kind === 'block' && (to === 'self' || to === 'otherAllies' || to === 'allies')) {
       parts.push({ kind: 'block', amount: eff.amount, others: to !== 'self' });
@@ -100,14 +111,26 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
     } else if (eff.kind === 'applyStatus' && (to === 'target' || to === 'foes')) {
       const all = to === 'foes';
       parts.push({ kind: 'debuff', status: eff.status, amount: eff.amount, targetId: all ? undefined : target?.id, all });
-      details.push(`${all ? '味方全員' : targetName}に「${STATUS_LABEL(eff.status)}」${eff.amount}`);
+      // 2026-11-14: 付ける相手の条件（ブロックの無い相手だけ・もう〇〇の付いた相手だけ）
+      const who = eff.onlyIf ? `${all ? '味方' : targetName}のうち${eff.onlyIf.noBlock ? 'ブロックの無い相手' : `「${STATUS_LABEL(eff.onlyIf.has!)}」の付いた相手`}` : all ? '味方全員' : targetName;
+      details.push(`${who}に「${STATUS_LABEL(eff.status)}」${eff.amount}`);
     } else {
       parts.push({ kind: 'other', effect: eff });
       details.push(describeEffect(eff, 'enemy').replace('対象に', `${targetName}に`).replace('対象の', `${targetName}の`));
       // 手数読み: 今このターンに使った枚数（予定のダメージが変わる）
+      // 2026-11-14: 数える札（攻撃の札・コスト0 など）と、当たる人（いちばん多い1人・みんなの合計）は敵ごと
       if (eff.kind === 'punishPlays') {
         const live = state.allies.filter((a) => !a.dead);
-        details.push(`今使った枚数: ${live.map((a) => `${a.name} ${a.played ?? 0}枚${(a.played ?? 0) >= eff.min ? `（${enemyHitDamage(enemy, (a.played ?? 0) * eff.amount, a)}ダメージ）` : ''}`).join('・')}`);
+        const hits = punishHits(live, eff);
+        const counted = (a: (typeof live)[number]) => (eff.count === 'attack' ? a.playedAttack ?? 0 : eff.count === 'skill' ? Math.max(0, (a.played ?? 0) - (a.playedAttack ?? 0)) : eff.count === 'zero' ? a.playedZero ?? 0 : a.played ?? 0);
+        const hitText = (a: (typeof live)[number]) => {
+          const h = hits.find((x) => x.ally === a);
+          if (!h) return '';
+          const bits = [...(eff.amount > 0 ? [`${enemyHitDamage(enemy, h.mul * eff.amount, a)}ダメージ`] : []), ...(eff.status ? [`${STATUS_LABEL(eff.status.status)}${eff.status.per ? h.mul * eff.status.amount : eff.status.amount}`] : [])];
+          return `（${bits.join('・')}）`;
+        };
+        const total = live.reduce((s, a) => s + counted(a), 0);
+        details.push(`今使った${countName(eff.count)}: ${live.map((a) => `${a.name} ${counted(a)}枚${hitText(a)}`).join('・')}${eff.scope === 'team' ? `（みんなで${total}枚）` : ''}`);
       }
     }
   }
@@ -126,12 +149,20 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
   if (mul !== 1) details.push(`（次の行動の威力 ×${mul} 反映済み）`);
   // ダメージの無い大技（浄化・仲間を呼ぶ・かばう・癒し封じ）は、BREAK すると起きない（battle.ts の executeIntent）
   const stops = breakStopsAction(action);
-  if (enemy.broken) details.unshift(stops ? '体勢が崩れている（BREAK）: この行動は起きない' : '体勢が崩れている（BREAK）: この行動の威力は半分');
-  else if (action.big) details.unshift(`大技！ ${breakHowText(state, enemy)}（BREAK: ${stops ? 'この行動は起きない' : '威力が半分'}・${breakStatusText()}・ブロック0）`);
+  const res = breakResidueText(action);
+  const back = breakBacklashText(action);
+  const onBreak = res ? `弱まって「${res}」だけ起きる` : stops ? 'この行動は起きない' : '威力が半分';
+  if (enemy.broken) details.unshift(res ? `体勢が崩れている（BREAK）: 弱まって「${res}」だけ起きる` : stops ? '体勢が崩れている（BREAK）: この行動は起きない' : '体勢が崩れている（BREAK）: この行動の威力は半分');
+  else if (action.big) details.unshift(`大技！ ${breakHowText(state, enemy)}（BREAK: ${onBreak}・${breakStatusText()}・ブロック0${back ? `。ただし崩した人に「${back}」` : ''}）`);
   const badge = behaviorBadge(action);
   // 強敵の本気: 長押しの説明（DetailPopup）で、なぜ強いか・どう受けるかを出す
   // 大技でない行動は BREAK できないので、説明から「BREAK するか」を外す（pre-deploy20 の点検 1）
-  const frenzy = enemy.intent.frenzy ? { ...FRENZY_BADGE, long: action.big ? FRENZY_BADGE.long : FRENZY_BADGE.longNoBreak } : undefined;
+  // 2026-11-14（宿題8-3）: 凍結で休むと決まっている時は、本気が空振りになると分かる文にする（文だけ。強さは変えない）
+  const frenzy = enemy.intent.frenzy
+    ? frozen
+      ? skipFrenzy(frozen.name)
+      : { icon: FRENZY_BADGE.icon, label: FRENZY_BADGE.label, short: FRENZY_BADGE.short, brief: FRENZY_BADGE.brief, long: action.big ? FRENZY_BADGE.long : FRENZY_BADGE.longNoBreak }
+    : undefined;
   // ボスの段階（2026-11-14）: 開幕の一手の札（🌀第2段階）と、数え読みの残り
   const opening = openingBadge(enemy);
   const cd = enemy.countdown;
@@ -140,6 +171,19 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
   // 弱点が予告と一緒に変わる行動（満ち潮・引き潮）
   if (action.weakWhile?.length) details.push(`この予告の間の弱点: ${elementNames(action.weakWhile)}`);
   return { parts, name: action.name, details, big: !!action.big, broken: !!enemy.broken, ...(action.hint ? { hint: action.hint } : {}), ...(badge ? { behavior: badge } : {}), ...(frenzy ? { frenzy } : {}), ...(opening ? { opening } : {}), ...(countdown ? { countdown } : {}) };
+}
+
+/** 本気の予告を、凍結・時間停止で休む時の札（本気は空振り。文だけ） */
+const skipFrenzy = (why: string) => ({ icon: FRENZY_BADGE.icon, label: FRENZY_BADGE.label, short: FRENZY_BADGE.short, brief: FRENZY_BADGE.briefSkip(why), long: FRENZY_BADGE.longSkip(why) });
+
+/** 残り香（BREAK で崩した時に、代わりに起きる軽い効果）の短い文。無ければ undefined */
+export function breakResidueText(action: { breakResidue?: CardEffect[] }): string | undefined {
+  return action.breakResidue?.length ? action.breakResidue.map((e) => describeEffect(e, 'enemy')).join('・') : undefined;
+}
+
+/** 代償（この予告を崩した味方に付く効果）の短い文。無ければ undefined */
+export function breakBacklashText(action: { breakBacklash?: CardEffect[] }): string | undefined {
+  return action.breakBacklash?.length ? action.breakBacklash.map((e) => describeEffect(e, 'enemy').replace(/^攻撃してきた相手に/, '').replace(/^相手に/, '')).join('・') : undefined;
 }
 
 /** 開幕の一手の札（予告の印 intent.opening がある時だけ）。段階の名前と新しい決まりを長押しの説明にする */
@@ -158,11 +202,16 @@ export const elementNames = (ids: readonly string[]) => ids.map((id) => getEleme
  * 例（ボス・中ボス・災厄）: 「ボス・中ボス・災厄の大技は、弱点の属性（雷・聖）で、しかも完全成功で攻撃した時だけ体勢を崩せる（完全成功だけ・大きなダメージでは崩れない）」
  * 例（強敵・ふつう）: 「弱点の属性（火）で攻撃・完全成功で攻撃・このターンに最大HPの20%のダメージ、のどれかで体勢を崩せる」
  */
-export function breakHowText(state: Pick<BattleState, 'boss' | 'midboss' | 'elite' | 'firstKeyBoss'>, enemy: EnemyState): string {
+export function breakHowText(state: Pick<BattleState, 'boss' | 'midboss' | 'elite' | 'firstKeyBoss'> & Partial<Pick<BattleState, 'enemies'>>, enemy: EnemyState): string {
   const r = breakRuleOf(state, enemy);
   // 2026-11-13（docs/tasks/break-read-plan.md §2）: 紫の札（特殊な行動）も同じ決まり。どちらの理由かで、文の頭を変える
+  // 2026-11-14（宿題8-7）: ボスの部屋の手下（段階を持たない敵・呼ばれた敵）には、手下の文を出す（決まりは同じ）
+  // 手下 = 呼ばれた敵か、同じ戦闘に段階を持つ敵（主のボス）がいる時の、段階を持たない敵
+  const hasPhases = (e: EnemyState) => !!getEnemy(e.defId).phases?.length;
+  const minion = !!state.boss && (!!enemy.summoned || (!hasPhases(enemy) && (state.enemies ?? []).some(hasPhases)));
   const who = r.strictBy === 'behavior' ? '特殊な行動（紫の札）' : 'ボス・中ボス・災厄の大技';
-  if (r.weakAndPerfect) return `${who}は、弱点の属性（${elementNames(r.weak)}）で、しかも完全成功で攻撃した時だけ体勢を崩せる（完全成功だけ${r.damagePct === undefined ? '・大きなダメージ' : ''}では崩れない）`;
+  const head = r.strictBy !== 'behavior' && minion ? 'ボスの部屋の手下の大技も、ボスと同じに' : `${who}は、`;
+  if (r.weakAndPerfect) return `${head}弱点の属性（${elementNames(r.weak)}）で、しかも完全成功で攻撃した時だけ体勢を崩せる（完全成功だけ${r.damagePct === undefined ? '・大きなダメージ' : ''}では崩れない）`;
   const ways = [
     ...(r.weakAlone ? [`弱点の属性（${elementNames(r.weak)}）で攻撃`] : []),
     ...(r.perfectAlone ? ['完全成功で攻撃'] : []),

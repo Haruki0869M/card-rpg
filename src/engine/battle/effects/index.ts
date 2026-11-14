@@ -295,6 +295,13 @@ export function breakEnemy(ctx: EffectCtx, enemy: EnemyState, why: 'weak' | 'per
   addStatus(enemy.statuses, st, BALANCE.breakWeak);
   ctx.events.push({ type: 'status', unitId: enemy.uid, status: st, amount: BALANCE.breakWeak });
   ctx.parts.push('BREAK！');
+  // 代償（2026-11-14 開幕の一手）: この予告を崩した味方に、その場で小さな効果（敵からの効果）
+  const act = enemy.intent ? getEnemyAction(enemy.defId, enemy.intent.actionId) : undefined;
+  if (act?.breakBacklash?.length && !isEnemy(ctx.source) && !ctx.source.dead && ctx.depth < 3) {
+    const back = makeCtx(ctx.state, ctx.rng, ctx.events, enemy, { attacker: ctx.source, depth: ctx.depth + 1 });
+    for (const eff of act.breakBacklash) applyEffect(back, eff);
+    if (back.parts.length) addLog(ctx.state, `${nameOf(enemy)}を崩した反動: ${back.parts.join(' / ')}`);
+  }
   // 数え読み（ボスの段階・2026-11-14）: 数えている間に崩すと、1つ戻る（最初の数まで。数え読みの行動そのものの予告では戻らない）
   const cd = enemy.countdown;
   if (cd && !enemy.intent?.countdownFire && cd.left < cd.turns) cd.left += 1;
@@ -319,6 +326,38 @@ function elementBoost(source: Unit, element: string, turn: number): number {
 /** その属性に耐性があるか（状態異常が効かない） */
 export const resistsElement = (victim: Unit, element: string) => isEnemy(victim) && isResistTo(victim, element);
 
+// ---------- かばう形（2026-11-14 特殊な行動のばらし） ----------
+
+/** かばっている敵 guard が、ほかの敵 victim への一撃を代わりに受けるか（かばう形 guardStyle の決まり。乱数は使わない） */
+export function guardCovers(state: BattleState, guard: EnemyState, victim: EnemyState): boolean {
+  const st = guard.guardStyle;
+  if (!st) return true;
+  // 崩れるまで（土人形）: 自分のブロックが0なら、もうかばわない
+  if (st.untilBlockGone && guard.block <= 0) return false;
+  // 傷ついた仲間だけ（氷の騎士）: HPの割合がいちばん低い、ほかの生きている敵（同じなら並びの前）だけ
+  if (st.cover === 'weakest') {
+    const others = state.enemies.filter((e) => !e.dead && e !== guard);
+    const low = others.reduce<EnemyState | undefined>((a, b) => (!a || b.hp * a.maxHp < a.hp * b.maxHp ? b : a), undefined);
+    return low === victim;
+  }
+  return true;
+}
+
+/** かばって受けた後の反撃・状態異常（攻撃した味方へ。敵からの効果として扱う） */
+function guardRetort(ctx: EffectCtx, guard: EnemyState, attacker: Unit) {
+  const st = guard.guardStyle;
+  if (!st || guard.dead) return;
+  if (st.retaliate) {
+    const back = dealDamage(makeCtx(ctx.state, ctx.rng, ctx.events, guard, { depth: ctx.depth + 1 }), attacker, st.retaliate, st.element);
+    addLog(ctx.state, `${nameOf(guard)}がかばった一撃を返した（${nameOf(attacker)}に${back}）`);
+  }
+  if (st.status && !attacker.dead) {
+    addStatus(attacker.statuses, st.status.status, st.status.amount);
+    ctx.events.push({ type: 'status', unitId: unitIdOf(attacker), status: st.status.status, amount: st.status.amount });
+    addLog(ctx.state, `${nameOf(guard)}にかばわれた一撃で、${nameOf(attacker)}に「${getStatus(st.status.status).name}」${st.status.amount}`);
+  }
+}
+
 // ---------- ダメージ（ダメージの効果・特殊能力から使う） ----------
 
 /**
@@ -336,15 +375,23 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   let v = victim;
   // かばう（魔王軍の騎士）: ほかの敵を狙った「敵1体が対象のカード」のダメージは、かばっている敵が受ける（2体いれば並びの前）。
   // 全体攻撃・お供と召喚の攻撃（via・分身）・道具・能力は、そのまま通る
+  // 2026-11-14: かばう形（guardStyle）で、かばう相手・いつまで・受けた時の反撃が敵ごとに変わる
+  let guardedBy: EnemyState | undefined;
   if (!isEnemy(source) && isEnemy(v) && ctx.card?.target === 'enemy' && v === ctx.target && !ctx.via && !ctx.echo) {
-    const guard = state.enemies.find((e) => !e.dead && e.guarding && e !== v);
+    const victimEnemy = v;
+    const guard = state.enemies.find((e) => !e.dead && e.guarding && e !== victimEnemy && guardCovers(state, e, victimEnemy));
     if (guard) {
       abilityTriggered(state, guard.uid, 'かばう', events);
       addLog(state, `${nameOf(guard)}が${nameOf(v)}をかばった`);
       v = guard;
+      guardedBy = guard;
+      // 殻で受ける（貝の騎士）: 代わりに受けるダメージは半分
+      if (guard.guardStyle?.half) extraMultiplier *= 0.5;
     }
   }
   let mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities, ctx.perfect, element, ctx.via);
+  // 鎧通し（氷の剣士。2026-11-14）: この一撃はブロックを無視する（ブロックは壊れずに残る）
+  if (ctx.pierce) mods = { ...mods, ignoreBlock: true };
   // 属性を強める状態異常（聖光など）: この一撃で使い切る
   const boost = element ? elementBoost(source, element, state.turn) : 1;
   base = Math.round(base * boost);
@@ -365,6 +412,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
         addLog(state, `${nameOf(other)}の「${cov.name}」！ ${nameOf(v)}をかばった`);
         v = other;
         mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities, ctx.perfect, element, ctx.via);
+        if (ctx.pierce) mods = { ...mods, ignoreBlock: true };
         dmg = calcDamage(base + mods.add + (ctx.addOnceUsed ? 0 : mods.addOnce), source.statuses, v.statuses, extraMultiplier * mods.multiplier * elementMultiplier(v, element) * exposedMul(v) * comboMultiplier(source, v, comboScale));
         break;
       }
@@ -440,6 +488,8 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   ctx.dealt += r.hpLoss;
   if (isEnemy(source) !== isEnemy(v) && !ctx.hitIds.includes(unitIdOf(v))) ctx.hitIds.push(unitIdOf(v));
   afterHpLoss(state, v, rng, events);
+  // かばった敵の反撃（空の騎士の光・毒液の蟹の毒。2026-11-14）: 代わりに受けた一撃ごとに、攻撃した味方へ
+  if (guardedBy && !source.dead && ctx.depth < 3) guardRetort(ctx, guardedBy, source);
   // BREAK: 大技の予告を出している敵に、弱点の属性で攻撃／完全成功で攻撃／このターンの合計ダメージが最大HPの2割以上
   if (isEnemy(v) && !isEnemy(source)) {
     // 区切りD: 鎧通しの一撃 — BREAK の数えを2倍に

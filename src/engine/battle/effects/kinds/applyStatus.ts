@@ -9,7 +9,9 @@ import type { Unit } from '../../units';
 
 declare module '../../../../types' {
   interface EffectParams {
-    applyStatus: { status: string; amount: number; /** ボスの部屋の戦闘では、代わりにこの状態異常を付ける */ bossStatus?: string; /** bossStatus を中ボス（災厄の中ボスも）の戦闘でも使う（段階7b: 永久凍土の女皇衣） */ bossLike?: boolean };
+    applyStatus: { status: string; amount: number; /** ボスの部屋の戦闘では、代わりにこの状態異常を付ける */ bossStatus?: string; /** bossStatus を中ボス（災厄の中ボスも）の戦闘でも使う（段階7b: 永久凍土の女皇衣） */ bossLike?: boolean;
+      /** 2026-11-14（敵の特殊な行動のばらし）: 付ける相手の条件。noBlock = ブロックの無い相手だけ（砂の精）/ has = この状態異常がもう付いている相手だけ（夢織り） */
+      onlyIf?: { noBlock?: boolean; has?: string } };
   }
 }
 
@@ -17,7 +19,10 @@ export const effect: EffectHandler<'applyStatus'> = {
   kind: 'applyStatus',
   defaultTo: 'target',
   apply(ctx, e) {
-    const ts = resolveTargets(ctx, targetOf(e));
+    const all = resolveTargets(ctx, targetOf(e));
+    const cond = e.onlyIf;
+    const ts = cond ? all.filter((t) => (!cond.noBlock || t.block <= 0) && (!cond.has || (t.statuses[cond.has] ?? 0) > 0)) : all;
+    if (cond && !ts.length && all.length) ctx.parts.push(`${cond.noBlock ? 'ブロックの無い' : `「${getStatus(cond.has!).name}」の付いた`}味方はいない`);
     if (e.bossStatus && (ctx.state.boss || (e.bossLike && ctx.state.midboss))) e = { ...e, status: e.bossStatus };
     // 相手に付ける時は、自分の能力（呪詛など）で量が増える
     // （対象ごとに数える。「すでに毒なら+2」のように、相手の状態で変わる物があるため）
@@ -53,6 +58,6 @@ export const effect: EffectHandler<'applyStatus'> = {
     }
     return ts.length > 0;
   },
-  describe: (e, who) => `${who}「${getStatus(e.status).name}」${e.amount}${e.bossStatus ? `（${e.bossLike ? "ボス・中ボス" : "ボス"}には代わりに「${getStatus(e.bossStatus).name}」${e.amount}）` : ''}`,
+  describe: (e, who) => `${e.onlyIf ? `${who.replace(/に$/, '')}のうち${e.onlyIf.noBlock ? 'ブロックの無い相手' : `「${getStatus(e.onlyIf.has!).name}」の付いた相手`}に` : who}「${getStatus(e.status).name}」${e.amount}${e.bossStatus ? `（${e.bossLike ? "ボス・中ボス" : "ボス"}には代わりに「${getStatus(e.bossStatus).name}」${e.amount}）` : ''}`,
   short: (e) => `${e.amount}`,
 };

@@ -39,7 +39,7 @@ export const obeliskSentinel: EnemyDef = {
   actions: [
     { id: 'wall', name: '石碑の守り', effects: [{ kind: 'block', amount: 12 }] },
     // 「石柱の打撃」を盾砕きに置き換えた（ブロックを0にしてから、同じ12のダメージ）。ID は古い保存のために残す
-    { id: 'slam', name: '石柱で叩き割る', big: true, behavior: 'shatter', hint: '当たるとブロックを全部壊す。BREAK するか、ブロックに頼らずに受ける', effects: [{ kind: 'shieldBreak' }, { kind: 'damage', amount: 12 }] },
+    { id: 'slam', name: '石柱で叩き割る', big: true, behavior: 'shatter', brief: '全員の盾を割る', hint: '味方全員のブロックを壊し、全員に6。守りを当てにせず、先に倒すか BREAK する', effects: [{ kind: 'shieldBreak', to: 'foes' }, { kind: 'damage', amount: 6, to: 'foes' }] },
     { id: 'glyph', name: '刻まれた呪文', effects: [{ kind: 'damage', amount: 5, to: 'foes' }] },
   ],
   abilities: [{ name: '硬い石肌', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 6 }] } }],

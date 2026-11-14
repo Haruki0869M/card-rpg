@@ -53,6 +53,15 @@ const SCENES = {
     { defId: 'gearBug', phase: 0, intent: 'gnaw', target: true, hpPct: 100 },
     { defId: 'runawayBoiler', phase: 1, intent: 'blast', countdown: { actionId: 'blast', turns: 3, left: 0 }, fire: true, hpPct: 40 },
   ],
+  // 2026-11-14（開幕の一手の残り香・代償・手下の文）: 長押しに「BREAK: 弱まって…」「崩した人に…」、手下には手下の BREAK の文
+  residue: [
+    { defId: 'treantKing', phase: 1, intent: 'rootDown', opening: 1, hpPct: 45, longHas: 'BREAK: 弱まって' },
+    { defId: 'gatekeeper', phase: 0, intent: 'crush', target: true, hpPct: 100, longHas: 'ボスの部屋の手下の大技も' },
+  ],
+  backlash: [
+    { defId: 'ignavarl', phase: 1, intent: 'deepBreath', opening: 1, queued: 'flameBreath', hpPct: 45, longHas: '崩した人に' },
+    { defId: 'shadowVizier', phase: 1, intent: 'callDecoy', opening: 1, hpPct: 45, longHas: '崩した人に' },
+  ],
 };
 
 async function setup(page, list) {
@@ -138,7 +147,7 @@ async function check(w, h, scene) {
   // HPバーの境目の線（敵ごと: まだ越えていない段階の数）
   for (let i = 0; i < list.length; i++) {
     const n = await page.locator(`[data-enemy="e${i}"] [data-phase-mark]`).count();
-    const wantN = { valgrim: 2, runawayBoiler: 1, ignavarl: 1, greatMachine: 2 }[list[i].defId] ?? 0;
+    const wantN = { valgrim: 2, runawayBoiler: 1, ignavarl: 1, greatMachine: 2, treantKing: 1, shadowVizier: 1 }[list[i].defId] ?? 0;
     if (n !== Math.max(0, wantN - list[i].phase)) ng(`敵${i}の境目の線 ${n}本（ほしい ${Math.max(0, wantN - list[i].phase)}本）`);
   }
   // 数え読み
@@ -163,6 +172,20 @@ async function check(w, h, scene) {
   const small = (await layoutIssues(page)).filter((x) => x.startsWith('small text'));
   if (small.length) ng(`長押しの説明に小さな字: ${small.join(' / ')}`);
   await page.screenshot({ path: `${dir}/${tag}-長押し.png` });
+  // 長押しの文（残り香・代償・手下の BREAK の文）: 敵ごとに押して確かめる
+  for (let i = 0; i < list.length; i++) {
+    if (!list[i].longHas) continue;
+    const close = page.getByText('詳細を閉じる');
+    if (await close.count()) await close.first().click();
+    await page.waitForTimeout(200);
+    await page.locator(`[data-enemy="e${i}"] [data-intent]`).click({ delay: 600 });
+    await page.waitForTimeout(250);
+    const text = await page.evaluate(() => document.body.innerText);
+    if (!text.includes(list[i].longHas)) ng(`敵${i}の長押しに「${list[i].longHas}」が無い`);
+    const sm = (await layoutIssues(page)).filter((x) => x.startsWith('small text'));
+    if (sm.length) ng(`敵${i}の長押しに小さな字: ${sm.join(' / ')}`);
+    await page.screenshot({ path: `${dir}/${tag}-長押し-敵${i}.png` });
+  }
   console.log(`ボスの段階 ${tag}: 札 ${marks.join('・') || '-'} ／ 数え ${counts.join('・') || '-'} ／ 次 ${next.join('・') || '-'} ／ 長押し ${openHint[0] ?? ahead[0] ?? '-'}`);
   if (errors.length) problems.push(`${tag}: ページのエラー ${errors.join(' / ')}`);
   await page.close();
@@ -215,8 +238,10 @@ async function phaseChange(w, h) {
 }
 
 for (const [w, h] of SIZES) {
-  for (const s of Object.keys(SCENES)) await check(w, h, s);
-  await phaseChange(w, h);
+  // SCENES=residue,backlash のように、一部の場面だけを流せる（省略 = 全部と段階が変わる知らせ）
+  const only = process.env.SCENES?.split(',');
+  for (const s of Object.keys(SCENES)) if (!only || only.includes(s)) await check(w, h, s);
+  if (!only) await phaseChange(w, h);
 }
 
 await browser.close();

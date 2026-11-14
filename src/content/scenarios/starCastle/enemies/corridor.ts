@@ -125,7 +125,7 @@ export const windKeeper: EnemyDef = {
       openingActionId: 'gather',
       rule: '風を集め、次の予告で全体に大竜巻（溜めを闇で BREAK すると、竜巻も消える）',
       actions: [
-        { id: 'gather', name: '風を集める', big: true, chargeTo: 'twister', hint: '次の予告が「大竜巻」（味方全員に14）になる。闇の弱点で BREAK すると溜めが止まり、大竜巻も消える', effects: [{ kind: 'block', amount: 12 }] },
+        { id: 'gather', name: '風を集める', big: true, chargeTo: 'twister', hint: '次の予告が「大竜巻」（味方全員に14）になる。闇の弱点で BREAK すると溜めが止まり、大竜巻も消える。崩した人は風にあおられて遅延1（次に引く札-1）', breakBacklash: [{ kind: 'applyStatus', status: 'delay', amount: 1, to: 'attacker' }], effects: [{ kind: 'block', amount: 12 }] },
         { id: 'twister', name: '大竜巻', big: true, scripted: true, effects: [{ kind: 'damage', amount: 14, to: 'foes' }] },
         { id: 'tornado', name: '竜巻', effects: [{ kind: 'block', amount: 16 }, { kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'foes' }] },
         { id: 'storm', name: '暴風の矛', big: true, effects: [{ kind: 'damage', amount: 22 }] },

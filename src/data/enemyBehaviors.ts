@@ -43,6 +43,9 @@ export const FRENZY_BADGE = {
   short: '本気',
   brief: `威力×${BALANCE.eliteFrenzy.power}`,
   long: `HPが半分を切って本気になった。次の攻撃は${BALANCE.eliteFrenzy.power}倍。BREAK するか、守りを固めるか、その前に倒すか`,
+  /** 本気の予告の行動を、凍結・時間停止で休むと決まっている時（本気は1戦闘に1回なので、空振りになる。2026-11-14 宿題8-3。文だけ） */
+  briefSkip: (why: string) => `${why}で空振り`,
+  longSkip: (why: string) => `HPが半分を切って本気になったが、${why}で次の行動を休むので、この本気は空振りになる（本気は1戦闘に1回。次からはふつうの攻撃）`,
   /** 本気の行動が大技でない時（BREAK できない）の長押しの説明 */
   longNoBreak: `HPが半分を切って本気になった。次の攻撃は${BALANCE.eliteFrenzy.power}倍。守りを固めるか、その前に倒すか`,
 } as const;
@@ -67,8 +70,10 @@ export function behaviorFromEffects(action: EnemyActionDef): EnemyBehaviorId | u
     // 2026-11-14: ボスの取り巻きを呼ぶ（増援の決まり。call の無い summonEnemy）も、紫の札の「増援」にそろえる
     if (e.kind === 'summonEnemy') return 'call';
     if (e.kind === 'shieldBreak') return 'shatter';
+    // 2026-11-14: 鎧通し（ブロックを無視する攻撃。氷の剣士）も盾砕き
+    if (e.kind === 'damage' && e.pierce) return 'shatter';
     if (e.kind === 'applyStatus' && e.status === 'healSeal') return 'healSeal';
-    if (e.kind === 'damage' && e.lowHpMul) return 'hunt';
+    if (e.kind === 'damage' && (e.lowHpMul || e.lowOnly)) return 'hunt';
   }
   return undefined;
 }

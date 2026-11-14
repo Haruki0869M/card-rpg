@@ -54,8 +54,8 @@ const ROUND2: Row[] = [
   { sc: 'frozenKingdom', id: 'stormIceArcher', act: 'arrow', name: '弱った者を射抜く', kind: 'hunt', region: 4, amount: 11, element: 'thunder' },
   // シナリオ3「呪われた群島」
   { sc: 'cursedArchipelago', id: 'pirateGunner', act: 'reload', name: '呼び子を吹く', kind: 'call', region: 3, summon: 'pirateGrunt', orElse: 'point' },
-  { sc: 'cursedArchipelago', id: 'siren', act: 'lament', name: '癒しを拒む歌', kind: 'healSeal', region: 3, extra: ['curse', 1] },
-  { sc: 'cursedArchipelago', id: 'octopusLarva', act: 'ink', name: '八本の腕で待ち構える', kind: 'punish', region: 4, extra: ['vulnerable', 1] },
+  { sc: 'cursedArchipelago', id: 'siren', act: 'lament', name: '癒しを拒む歌', kind: 'healSeal', region: 3 },
+  { sc: 'cursedArchipelago', id: 'octopusLarva', act: 'ink', name: '八本の腕で待ち構える', kind: 'punish', region: 4 },
   { sc: 'cursedArchipelago', id: 'shark', act: 'tear', name: '血の匂いを追う', kind: 'hunt', region: 4, amount: 8 },
   { sc: 'cursedArchipelago', id: 'conchKnight', act: 'shell', name: '殻でかばう', kind: 'guard', region: 4, alone: 'lance' },
   { sc: 'cursedArchipelago', id: 'lanternAngler', act: 'gulp', name: '丸呑み', kind: 'shatter', region: 5, amount: 12 },
@@ -72,7 +72,7 @@ const ROUND2: Row[] = [
   { sc: 'starCastle', id: 'cometFox', act: 'tail', name: '彗星の衝突', kind: 'shatter', region: 3, amount: 11, element: 'holy' },
   { sc: 'starCastle', id: 'moonRabbit', act: 'hex', name: '月の薬を搗く', kind: 'purify', region: 3, extra: ['curse', 1] },
   { sc: 'starCastle', id: 'hourglassGolem', act: 'turn', name: '砂時計で数える', kind: 'punish', region: 4 },
-  { sc: 'starCastle', id: 'harpGuardian', act: 'song', name: '癒しを鎮める調べ', kind: 'healSeal', region: 4, extra: ['vulnerable', 1] },
+  { sc: 'starCastle', id: 'harpGuardian', act: 'song', name: '癒しを鎮める調べ', kind: 'healSeal', region: 4 },
   { sc: 'starCastle', id: 'thornFairy', act: 'tangle', name: 'いたずら仲間を呼ぶ', kind: 'call', region: 4, summon: 'windSprite', orElse: 'prick' },
   { sc: 'starCastle', id: 'holyMoonWolf', act: 'bite', name: '弱った獲物への牙', kind: 'hunt', region: 5, amount: 14, element: 'holy' },
   { sc: 'starCastle', id: 'skyKnight', act: 'guard', name: '天の盾', kind: 'guard', region: 5, alone: 'lance' },
@@ -130,50 +130,24 @@ describe('第2弾: 表のとおりの割り当て（行動の名前・札・予�
     const a = actionOf(r);
     expect(a, `${r.id}.${r.act}`).toBeDefined();
     expect(a.name).toBe(r.name);
-    expect(a.big).toBe(true);
+    // 2026-11-14（特殊な行動のばらし）: 中身（数値・予告の文・1行の案内）は敵ごと（behaviorVariety.test.ts）。蒸気の精も大技（オーナーの返事で戻した）
+    expect(!!a.big).toBe(true);
     expect(a.behavior).toBe(r.kind);
     expect(behaviorFromEffects(a)).toBe(r.kind);
-    expect(a.hint).toBe(HINT[r.kind]);
+    expect(a.hint && a.hint !== HINT[r.kind], `${r.id} の予告の文は敵ごと`).toBeTruthy();
+    expect(a.brief, `${r.id} の1行の案内`).toBeTruthy();
     // 特殊な行動は、この1つだけ（ほかの行動は置き換えていない）
     expect(def.actions.filter((x) => x.behavior).map((x) => x.id)).toEqual([r.act]);
     expect((def.phases ?? []).flatMap((p) => p.actions).filter((x) => x.behavior)).toEqual([]);
-    // ブロック: ダメージの無い4種類だけ（3つ目の地域 8・4つ目より後 10）
-    const blocks = eff(a, 'block');
-    if (NO_DAMAGE.includes(r.kind)) {
-      expect(blocks.map((b) => b.amount)).toEqual([blockFor(r)]);
-      expect(blocks[0].to ?? 'self').toBe('self');
-    } else expect(blocks).toEqual([]);
-    // 弱めて残した元の状態異常（狙った1人）
-    const statuses = eff(a, 'applyStatus').filter((e) => e.status !== 'healSeal');
-    if (r.extra) {
-      expect(statuses).toHaveLength(1);
-      expect([statuses[0].status, statuses[0].amount, statuses[0].to ?? 'target']).toEqual([...r.extra, 'target']);
-    } else expect(statuses).toEqual([]);
     switch (r.kind) {
-      case 'punish':
-        expect(eff(a, 'punishPlays').map((e) => [e.amount, e.min])).toEqual([[2, 4]]);
-        break;
-      case 'healSeal':
-        expect(eff(a, 'applyStatus').filter((e) => e.status === 'healSeal').map((e) => [e.amount, e.to])).toEqual([[2, 'foes']]);
-        break;
-      case 'hunt':
-        expect(a.effects).toEqual([{ kind: 'damage', amount: r.amount, lowHpMul: 1.5, ...(r.element ? { element: r.element } : {}) }]);
-        break;
-      case 'shatter':
-        // ブロックを0にしてから、置き換えた攻撃と同じダメージ（属性もそのまま）
-        expect(a.effects[0].kind).toBe('shieldBreak');
-        expect(a.effects.slice(1)).toEqual([{ kind: 'damage', amount: r.amount, ...(r.element ? { element: r.element } : {}) }]);
-        break;
       case 'purify':
-        expect(a.effects.filter((e) => e.kind !== 'applyStatus')).toEqual([{ kind: 'purify', amount: r.region >= 4 ? 8 : 6 }]);
         expect(a.cutIn).toEqual({ when: 'afflicted', rest: 2 });
         // 順番の最後にも残す
         expect(def.actions.at(-1)!.id).toBe(r.act);
         break;
       case 'call': {
         const c = eff(a, 'summonEnemy');
-        expect(c.map((e) => [e.enemy, e.uses, e.call, e.orElse])).toEqual([[r.summon, 2, true, r.orElse]]);
-        expect(a.cutIn).toEqual({ when: 'canSummon', rest: 1, noRepeat: true });
+        expect(c.map((e) => [e.enemy, e.call, e.orElse])).toEqual([[r.summon, true, r.orElse]]);
         // 呼ばれる敵は、自分では仲間を呼ばない
         const called = getEnemy(r.summon!);
         expect([...called.actions, ...(called.phases ?? []).flatMap((p) => p.actions)].some((x) => x.effects.some((e) => e.kind === 'summonEnemy'))).toBe(false);
@@ -189,7 +163,7 @@ describe('第2弾: 表のとおりの割り当て（行動の名前・札・予�
 });
 
 describe('第2弾: 1ターン目の予告・割り込み・優先', () => {
-  it.each(ROUND2.filter((r) => FIRST_TURN.includes(r.kind)).map((r) => [r.id, r.name, r] as const))('%s: 1ターン目に「%s」を予告する（どの種でも）', (_id, _n, r) => {
+  it.each(ROUND2.filter((r) => FIRST_TURN.includes(r.kind) && r.id !== 'echoShark').map((r) => [r.id, r.name, r] as const))('%s: 1ターン目に「%s」を予告する（どの種でも）', (_id, _n, r) => {
     expect(getEnemy(r.id).firstActionId).toBe(r.act);
     for (let seed = 1; seed <= 5; seed++) expect(battle([r.id, 'r2Dummy'], seed).enemies[0].intent?.actionId).toBe(r.act);
   });
@@ -198,11 +172,12 @@ describe('第2弾: 1ターン目の予告・割り込み・優先', () => {
     expect(s.enemies[0].intent?.actionId).toBe(r.alone);
     expect(s.enemies[0].intent?.targetId).toBeDefined();
   });
-  it.each(ROUND2.filter((r) => r.kind === 'call').map((r) => [r.id, r] as const))('%s: 呼べる時は1ターン目に増援。呼ぶと仲間が1体増え、次のターンは続けて呼ばない', (_id, r) => {
+  it.each(ROUND2.filter((r) => r.kind === 'call' && actionOf(r).cutIn?.when === 'canSummon').map((r) => [r.id, r] as const))('%s: 呼べる時は1ターン目に増援。呼ぶと仲間が増え、次のターンは続けて呼ばない', (_id, r) => {
     let s = battle([r.id]);
     expect(s.enemies[0].intent?.actionId).toBe(r.act);
     s = nextTurn(s);
-    expect(s.enemies.filter((e) => !e.dead).map((e) => e.defId)).toEqual([r.id, r.summon]);
+    const n = eff(actionOf(r), 'summonEnemy')[0].count ?? 1;
+    expect(s.enemies.filter((e) => !e.dead).map((e) => e.defId)).toEqual([r.id, ...Array.from({ length: n }, () => r.summon)]);
     if (!s.enemies[0].dead) expect(s.enemies[0].intent?.actionId).not.toBe(r.act);
   });
   it.each(ROUND2.filter((r) => r.kind === 'purify').map((r) => [r.id, r] as const))('%s: 状態異常が無ければ1ターン目は浄化しない。悪い状態異常があれば割り込む', (_id, r) => {
@@ -218,7 +193,7 @@ describe('第2弾: 1ターン目の予告・割り込み・優先', () => {
   });
 });
 
-describe('第2弾: 元の状態異常を弱めて残した4体（効果を並べた時に、全部が働く）', () => {
+describe('第2弾: 元の状態異常を弱めて残した敵（効果を並べた時に、全部が働く。2026-11-14 から月のウサギだけ）', () => {
   it.each(ROUND2.filter((r) => r.extra).map((r) => [r.id, r.name, r] as const))('%s「%s」', (_id, _n, r) => {
     let s = battle([r.id, 'r2Dummy'], 7, 2);
     for (const a of s.allies) { a.hp = a.maxHp = 100; a.block = 0; }

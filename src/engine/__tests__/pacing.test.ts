@@ -220,7 +220,7 @@ describe('転職の速さ（§5）', () => {
     const want: Record<string, number> = {
       // 2026-11-14 宿題6A: 2つ目の鍵の中でそろうように減らした（聖王・教皇・大怪盗・覇王・ビーストマスター・大賢者・冥王・死霊術師・忍者・拳聖。docs/review/2026-11-14-growth-fix.md）
       swordSaint: 22, bowSaint: 20, holyKing: 6, bard: 12, phantomKing: 80, timeMage: 70, fistKing: 35, pope: 9, grandThief: 150, overlord: 7, beastMaster: 4,
-      greatSage: 3, magicKnight: 6, hadesLord: 2, necromancer: 2, ninja: 4, dragoon: 2, darkKnight: 3, samurai: 6, gambler: 6, astrologer: 3, machinist: 3, shrineMaiden: 2,
+      greatSage: 3, magicKnight: 6, hadesLord: 2, necromancer: 2, ninja: 4, dragoon: 10, darkKnight: 3, samurai: 6, gambler: 6, astrologer: 3, machinist: 3, shrineMaiden: 2,
       // 区切りF の新ジョブ4職
       fistSaint: 50, bulwark: 3, dragonVein: 4, petTrainer: 15,
     };

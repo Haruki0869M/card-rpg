@@ -20,7 +20,7 @@ export const vulture: EnemyDef = {
     { id: 'talons', name: '二度の鉤爪', effects: [{ kind: 'damage', amount: 5, hits: 2 }] },
     { id: 'circle', name: '空を旋回する', effects: [{ kind: 'block', amount: 6 }] },
     // 「弱った所をつつく」を、名前のとおりの手負い狙いにした（同じ9ダメージ・HPが半分以下なら×1.5）。名前と ID はそのまま
-    { id: 'peck', name: '弱った所をつつく', big: true, behavior: 'hunt', hint: 'HPの割合がいちばん低い味方を狙う。HPが半分以下だと×1.5', effects: [{ kind: 'damage', amount: 9, lowHpMul: 1.5 }] },
+    { id: 'peck', name: '弱った所をつつく', big: true, behavior: 'hunt', cutIn: { when: 'foeLow', rest: 1, noRepeat: true }, brief: '弱った者がいると降りる', hint: 'HPの割合がいちばん低い味方を狙う（半分以下なら×1.5）。味方のだれかがHP半分を切ると、順番を飛ばして降りてくる', effects: [{ kind: 'damage', amount: 9, lowHpMul: 1.5 }] },
   ],
 };
 
@@ -61,7 +61,7 @@ export const sandSprite: EnemyDef = {
     { id: 'grit', name: '目つぶしの砂', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1 }, { kind: 'damage', amount: 4 }] },
     { id: 'whirl', name: '砂粒の渦', effects: [{ kind: 'damage', amount: 8 }] },
     // 「砂の帳」を癒し封じに置き換えた。ID は古い保存のために残す。3つ目の地域なのでブロック8（BREAK されると行動ごと止まる）
-    { id: 'veil', name: '渇きの砂', big: true, behavior: 'healSeal', hint: '味方全員の回復が、2ターン半分になる。BREAK するか、先に回復を使う', effects: [{ kind: 'applyStatus', status: 'healSeal', amount: 2, to: 'foes' }, { kind: 'block', amount: 8 }] },
+    { id: 'veil', name: '渇きの砂', big: true, behavior: 'healSeal', brief: '守りの無い者の回復を封じる', hint: 'ブロックの無い味方だけ、回復が2ターン半分になる。ブロックを張っておけば防げる', effects: [{ kind: 'applyStatus', status: 'healSeal', amount: 2, to: 'foes', onlyIf: { noBlock: true } }, { kind: 'block', amount: 8 }] },
   ],
 };
 
@@ -124,7 +124,7 @@ export const scribeShade: EnemyDef = {
     { id: 'ink', name: '墨の刃', big: true, effects: [{ kind: 'damage', amount: 11 }] },
     { id: 'curse', name: '呪いの文字', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }] },
     // 「巻物の帳」を手数読みに置き換えた。ID は古い保存のために残す。3つ目の地域なのでブロック8（BREAK されると付かない）
-    { id: 'scroll', name: '行いを書き記す', big: true, behavior: 'punish', hint: 'このターンにカードを4枚以上使った味方に、枚数×2のダメージ', effects: [{ kind: 'punishPlays', amount: 2, min: 4 }, { kind: 'block', amount: 8 }] },
+    { id: 'scroll', name: '行いを書き記す', big: true, behavior: 'punish', brief: '守りの札2枚で呪い', hint: '攻撃でない札（守り・補助）を2枚以上使った味方に、枚数ぶんの呪い（回復が半分）。攻撃の札で押せば何もしない', effects: [{ kind: 'punishPlays', amount: 0, min: 2, count: 'skill', status: { status: 'curse', amount: 1, per: true } }, { kind: 'block', amount: 8 }] },
   ],
   abilities: [{ name: '影の文字', effect: { when: 'battleStart', do: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'randomFoe' }] } }],
 };
@@ -151,7 +151,7 @@ export const shadowVizier: EnemyDef = {
   phases: [
     // ボスの段階（2026-11-14）: 呼ぶ（かばう人形）。答え: 聖で BREAK・全体攻撃・人形を先に
     { belowHpPct: 50, name: '影を分ける宰相', pattern: 'sequence', openingActionId: 'callDecoy', rule: '身代わりの土人形を呼び、かばわせる（聖で BREAK すると止まる。全体攻撃か、人形を先に）', actions: [
-      { id: 'callDecoy', name: '身代わりを呼ぶ', big: true, behavior: 'call', hint: '土人形を1体呼ぶ（2回まで。人形は最初の番に宰相をかばう。倒しても報酬なし）。聖の弱点で BREAK すると止まる。全体攻撃で両方を削るか、人形を先に倒す', effects: [{ kind: 'summonEnemy', enemy: 'clayGolem', uses: 2, orElse: 'judgment' }, { kind: 'block', amount: 10 }] },
+      { id: 'callDecoy', name: '身代わりを呼ぶ', big: true, behavior: 'call', hint: '土人形を1体呼ぶ（2回まで。人形は最初の番に宰相をかばう。倒しても報酬なし）。聖の弱点で BREAK すると止まる。全体攻撃で両方を削るか、人形を先に倒す。崩した人は影の呪い1を受ける', breakBacklash: [{ kind: 'applyStatus', status: 'curse', amount: 1, to: 'attacker' }], effects: [{ kind: 'summonEnemy', enemy: 'clayGolem', uses: 2, orElse: 'judgment' }, { kind: 'block', amount: 10 }] },
       { id: 'split', name: '影の分身', effects: [{ kind: 'block', amount: 26 }] },
       { id: 'shadows', name: '分身たちの刃', big: true, effects: [{ kind: 'damage', amount: 10, element: 'dark', to: 'foes' }] },
       { id: 'judgment', name: '宰相の裁き', big: true, effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1 }, { kind: 'damage', amount: 22, element: 'dark' }] },

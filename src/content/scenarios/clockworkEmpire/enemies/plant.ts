@@ -19,7 +19,7 @@ export const pistonFist: EnemyDef = {
   firstActionId: 'piston',
   actions: [
     // 「ピストンの突き」を盾砕きに置き換えた（ブロックを0にしてから、同じ12のダメージ）。ID は古い保存のために残す
-    { id: 'piston', name: '杭打ち', big: true, behavior: 'shatter', hint: '当たるとブロックを全部壊す。BREAK するか、ブロックに頼らずに受ける', effects: [{ kind: 'shieldBreak' }, { kind: 'damage', amount: 12 }] },
+    { id: 'piston', name: '杭打ち', big: true, behavior: 'shatter', brief: '盾を割ると弱らせる', hint: 'ブロックを全部壊して12。壊したブロックがあれば、その人に弱体1。ブロックせずに受けるか、BREAK する', effects: [{ kind: 'shieldBreak', afterStatus: { status: 'weak', amount: 1 } }, { kind: 'damage', amount: 12 }] },
     { id: 'shock', name: '床を打つ衝撃', effects: [{ kind: 'damage', amount: 6, to: 'foes' }] },
     { id: 'retract', name: '腕を引き戻す', effects: [{ kind: 'block', amount: 10 }] },
   ],
@@ -107,7 +107,7 @@ export const clockworkSage: EnemyDef = {
   phases: [
     // ボスの段階（2026-11-14）: 巻き戻し（逆回し。1回だけ）。答え: 雷で BREAK・呪い
     { belowHpPct: 50, name: '針の早まった賢者', pattern: 'sequence', openingActionId: 'reverse', rule: '1回だけ時を巻き戻し、HPを最大の半分まで戻す（雷で BREAK すると止まる。呪いで戻る量が減る）', actions: [
-      { id: 'reverse', name: '時を巻き戻す', big: true, scripted: true, hint: 'HPを最大の50%まで戻す（1回だけ）。雷の弱点で BREAK すると止まる。呪い・癒し封じで戻る量が減る', effects: [{ kind: 'healToPct', pct: 50 }, { kind: 'block', amount: 10 }] },
+      { id: 'reverse', name: '時を巻き戻す', big: true, scripted: true, hint: 'HPを最大の50%まで戻す（1回だけ）。雷の弱点で BREAK すると止まる。呪い・癒し封じで戻る量が減る。BREAK しても、少しだけ時が戻ってHP15', breakResidue: [{ kind: 'heal', amount: 15, to: 'self' }], effects: [{ kind: 'healToPct', pct: 50 }, { kind: 'block', amount: 10 }] },
       { id: 'accel', name: '加速', big: true, effects: [{ kind: 'damage', amount: 7, hits: 3 }] },
       { id: 'toll', name: '終わりの鐘', big: true, effects: [{ kind: 'damage', amount: 12, element: 'thunder', to: 'foes' }] },
       { id: 'rewind2', name: '最後の逆回し', effects: [{ kind: 'heal', amount: 10, to: 'self' }, { kind: 'block', amount: 20 }] },
@@ -129,7 +129,7 @@ export const venomBoilerCrab: EnemyDef = makeVariant(boilerCrab, {
   // ほかの敵がいる時は、1ターン目に必ず「鉄の甲羅でかばう」（1体だけの時は両のはさみ）。4つ目の地域なのでブロック10（BREAK されると行動ごと止まる）
   firstActionId: 'shell',
   actions: [
-    { id: 'shell', name: '鉄の甲羅でかばう', big: true, behavior: 'guard', fallbackIfAloneId: 'double', hint: '次の味方の番の間、ほかの敵への単体攻撃を代わりに受ける。全体攻撃は通る', effects: [{ kind: 'guardAllies' }, { kind: 'block', amount: 10 }] },
+    { id: 'shell', name: '鉄の甲羅でかばう', big: true, behavior: 'guard', fallbackIfAloneId: 'double', brief: '受けた攻撃に毒を返す', hint: '次の味方の番の間、ほかの敵への単体攻撃を代わりに受け、攻撃した味方に毒2。全体攻撃・お供は通る', effects: [{ kind: 'guardAllies', status: { status: 'poison', amount: 2 } }, { kind: 'block', amount: 10 }] },
     { id: 'pinch', name: '毒液のはさみ', effects: [{ kind: 'damage', amount: 8, element: 'poison' }, { kind: 'applyStatus', status: 'poison', amount: 2 }] },
     { id: 'double', name: '両のはさみ', effects: [{ kind: 'damage', amount: 6, hits: 2 }] },
   ],

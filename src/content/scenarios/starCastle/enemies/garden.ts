@@ -39,7 +39,7 @@ export const thornFairy: EnemyDef = {
     { id: 'needle', name: '茨の針', effects: [{ kind: 'damage', amount: 7 }, { kind: 'applyStatus', status: 'poison', amount: 2 }] },
     // 敵の特殊な行動・第2弾（docs/tasks/enemy-behaviors-round2-plan.md §3・fix-plan §4）: 「からまる茨」を仲間を呼ぶ（風の精）に置き換えた。ID は古い保存のために残す。
     // 呼べる時は優先・2ターン続けては呼ばない・1戦闘に2回まで。呼べない時は「いたずらの棘」。4つ目の地域なのでブロック10
-    { id: 'tangle', name: 'いたずら仲間を呼ぶ', big: true, behavior: 'call', cutIn: { when: 'canSummon', rest: 1, noRepeat: true }, hint: '仲間を1体呼ぶ。その前に倒すか、BREAK する', effects: [{ kind: 'summonEnemy', enemy: 'windSprite', uses: 2, call: true, orElse: 'prick' }, { kind: 'block', amount: 10 }] },
+    { id: 'tangle', name: 'いたずら仲間を呼ぶ', big: true, scripted: true, behavior: 'call', cutIn: { when: 'afflicted', rest: 1, noRepeat: true }, brief: '状態異常で仲間を呼ぶ', hint: '自分に状態異常が付くと、泣いて風の精を呼ぶ（2回まで。BREAK の脆弱も数える）。状態異常を使わずに倒せば呼ばれない', effects: [{ kind: 'summonEnemy', enemy: 'windSprite', uses: 2, call: true, orElse: 'prick' }, { kind: 'block', amount: 10 }] },
     { id: 'prick', name: 'いたずらの棘', effects: [{ kind: 'damage', amount: 5, hits: 2 }] },
   ],
 };
@@ -113,7 +113,7 @@ export const moonMaiden: EnemyDef = {
       openingActionId: 'moonRite',
       rule: '状態異常を払って回復し、満月の再生も続く（闇で BREAK すると止まる。一気に削る）',
       actions: [
-        { id: 'moonRite', name: '月の禊', big: true, behavior: 'purify', cutIn: { when: 'afflicted', rest: 2 }, hint: '状態異常を全部消して回復する（1種類につき6）。その前に起爆するか、闇の弱点で BREAK する。満月の再生も残るので、一気に削る', effects: [{ kind: 'purify', amount: 6 }, { kind: 'applyStatus', status: 'regen', amount: 3, to: 'self' }] },
+        { id: 'moonRite', name: '月の禊', big: true, behavior: 'purify', cutIn: { when: 'afflicted', rest: 2 }, hint: '状態異常を全部消して回復する（1種類につき6）。その前に起爆するか、闇の弱点で BREAK する。満月の再生も残るので、一気に削る。BREAK すると浄化は止まるが、満月の再生3は残る', breakResidue: [{ kind: 'applyStatus', status: 'regen', amount: 3, to: 'self' }], effects: [{ kind: 'purify', amount: 6 }, { kind: 'applyStatus', status: 'regen', amount: 3, to: 'self' }] },
         { id: 'fullMoon', name: '満月の力', effects: [{ kind: 'block', amount: 12, to: 'allies' }, { kind: 'applyStatus', status: 'regen', amount: 4, to: 'self' }] },
         { id: 'lunar', name: '満月の光', big: true, effects: [{ kind: 'damage', amount: 14, element: 'holy', to: 'foes' }] },
         { id: 'briar', name: '茨の檻', big: true, effects: [{ kind: 'damage', amount: 29 }] },
@@ -156,6 +156,6 @@ export const hourglassGolem: EnemyDef = {
     { id: 'sand', name: '止まる砂', effects: [{ kind: 'damage', amount: 6 }, { kind: 'applyStatus', status: 'delay', amount: 1 }] },
     { id: 'fist', name: '石の拳', effects: [{ kind: 'damage', amount: 12 }] },
     // 「砂時計を返す」を手数読みに置き換えた。ID は古い保存のために残す。4つ目の地域なのでブロック10（BREAK されると付かない）
-    { id: 'turn', name: '砂時計で数える', big: true, behavior: 'punish', hint: 'このターンにカードを4枚以上使った味方に、枚数×2のダメージ', effects: [{ kind: 'punishPlays', amount: 2, min: 4 }, { kind: 'block', amount: 10 }] },
+    { id: 'turn', name: '砂時計で数える', big: true, behavior: 'punish', brief: '3枚目から重くなる', hint: 'カードを3枚以上使った味方に、3枚目から1枚ごとに3（3枚=3・4枚=6・5枚=9）と遅延1（次に引く札-1）。2枚までなら何もしない', effects: [{ kind: 'punishPlays', amount: 3, min: 3, ramp: true, status: { status: 'delay', amount: 1 } }, { kind: 'block', amount: 10 }] },
   ],
 };

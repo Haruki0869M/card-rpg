@@ -429,7 +429,14 @@ export interface EnemyActionDef {
    * - rest: 1回割り込んだら、次の rest ターンは割り込まない（省略は2）
    * - noRepeat: 2ターン続けては、この行動をしない（続く時は代わりの行動。仲間を呼ぶ）
    */
-  cutIn?: { when: 'afflicted' | 'canSummon'; rest?: number; noRepeat?: boolean };
+  cutIn?: { when: CutInWhen; rest?: number; noRepeat?: boolean };
+  /**
+   * 残り香（2026-11-14 開幕の一手）: BREAK で崩された時、元の効果の代わりに、この効果だけを行う（倍率は掛けない。小さい数字で書く）。
+   * BREAK の決まり（脆弱・ブロック0）はそのまま
+   */
+  breakResidue?: EnemyEffect[];
+  /** 代償（2026-11-14 開幕の一手）: この予告を BREAK した味方に、その場で付く効果（敵からの効果。元の行動は今までどおり止まる・半分） */
+  breakBacklash?: EnemyEffect[];
   /**
    * 溜め（2026-11-14 ボスの段階）: この行動を予告した時、次の予告をこの行動（同じ段階の行動のID）に決める（予告の下に「次: 〇〇」）。
    * 溜めの行動が BREAK・凍結などで行われなかった時は、溜めた行動も消える（次は元の順番から）
@@ -444,6 +451,28 @@ export interface EnemyActionDef {
   scripted?: boolean;
   /** この行動を予告している間だけの弱点（敵のデータ・段階の弱点の代わり。満ち潮・引き潮のように、予告と一緒に変わる。2026-11-14） */
   weakWhile?: string[];
+}
+
+/**
+ * 割り込み・優先の条件（2026-11-14 特殊な行動のばらしで増やした）:
+ * afflicted = 自分に悪い状態異常（浄化の only があれば、その状態異常だけ見る） / canSummon = 呼べる /
+ * alone = ほかの生きている敵がいない / hurt = 自分のHPが最大の半分以下 / allyDown = 倒れた仲間がいる / foeLow = HPが半分以下の味方がいる。
+ * 呼ぶ行動は、どの条件でも「呼べる時」だけ
+ */
+export type CutInWhen = 'afflicted' | 'canSummon' | 'alone' | 'hurt' | 'allyDown' | 'foeLow';
+
+/**
+ * かばう時の形（guardAllies の効果の中身。2026-11-14）: cover = だれをかばうか（weakest = HPの割合がいちばん低い仲間だけ）／
+ * untilBlockGone = 自分のブロックが0の時はかばわない／half = 代わりに受けるダメージは半分／
+ * retaliate = 代わりに受けるたび、攻撃した味方にこの量のダメージ（属性 element）／status = 代わりに受けるたび、攻撃した味方に付ける状態異常
+ */
+export interface GuardStyle {
+  cover?: 'weakest';
+  untilBlockGone?: boolean;
+  half?: boolean;
+  retaliate?: number;
+  element?: string;
+  status?: { status: string; amount: number };
 }
 
 /** 敵の特殊な行動の種類（手数読み・かばう・癒し封じ・仲間を呼ぶ・手負い狙い・盾砕き・浄化） */
@@ -635,6 +664,8 @@ export interface AllyState {
   extraHits?: number;
   /** 区切りD: このターンに使ったコスト0のカードの枚数（流れる連撃） */
   playedZero?: number;
+  /** このターンに使った「攻撃の札」（敵を狙う札）の枚数（手数読みの数え方。2026-11-14。任意） */
+  playedAttack?: number;
   /** 呼び出したお供（幻獣・獣など。ターン終了時に攻撃する。足元のトークンで表示） */
   summons?: SummonState[];
   /** このターンに使ったカードの枚数（種類ごと。子狼など） */
@@ -726,6 +757,10 @@ export interface EnemyState {
   broken?: boolean;
   /** かばう（魔王軍の騎士）: ほかの敵を狙った単体攻撃のカードのダメージを代わりに受ける。敵の番の始め・倒れた時に消える */
   guarding?: boolean;
+  /** かばう時の形（敵ごとにちがう。2026-11-14 特殊な行動のばらし。無い = 基本の形。かばうと一緒に消える） */
+  guardStyle?: GuardStyle;
+  /** 歌の癒し封じ（セイレーン）: この敵が倒れると、味方全員の癒し封じが消える（2026-11-14。任意） */
+  sealBound?: boolean;
   /** 最後に割り込み・優先（EnemyActionDef.cutIn）で予告を決めた時の戦闘のターン（任意。古い保存には無い = 割り込める） */
   cutInTurn?: number;
   /** 強敵の戦闘の「本体」（強敵の組から来た敵。2026-11-13 強敵の本気） */
