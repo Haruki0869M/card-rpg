@@ -55,10 +55,8 @@ for f in sorted(glob.glob(os.path.join(SRC, 'piece', '*.png'))):
                 out |= m
         alpha = soften(np.where(out, 0, 255).astype(np.uint8))
     if kind is None:
+        # 前に rembg で切り抜いた物が置き場にあれば、それを使い続ける（元の絵を入れかえた時は、置き場の絵を手で消す）
         print(f'{name:18s} 背景が分からない → rembg に任せる')
-        p = os.path.join(OUT, f'{name}.png')
-        if os.path.exists(p):
-            os.remove(p)
         continue
     Image.fromarray(np.dstack([rgba[..., :3], alpha]), 'RGBA').save(os.path.join(OUT, f'{name}.png'))
     print(f'{name:18s} {kind:12s} 残した割合 {(alpha > 128).mean():.3f}')
