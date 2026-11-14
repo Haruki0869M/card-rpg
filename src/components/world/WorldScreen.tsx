@@ -373,7 +373,7 @@ function tileInfo(game: GameState, i: number, goal?: GuideGoal): string {
   for (const p of signposts(game, w)) if (p.tile === i) parts.push(`立て札「${signpostText(p)}」`);
   // 3つの道（2026-11-14）: 広い地図の帯の性質（行く前に違いが分かるように）
   const lane = laneDefOfTile(game, w, i);
-  if (lane?.hint) parts.push(`${lane.mark ?? ''}${lane.name}: ${lane.hint}`);
+  if (lane?.hint) parts.push(`${lane.mark ?? ''}${lane.name}: ${lane.hint}${lane.ambush && lane.ambush !== 1 ? `（夜の野営の夜襲×${lane.ambush}）` : ''}`);
   return parts.join(' / ');
 }
 

@@ -118,9 +118,9 @@ export function Overview({ game, onPick, onClose }: { game: GameState; onPick: (
       {lanes.length > 0 && (
         <div className="mx-3 mb-1.5 grid shrink-0 gap-1" style={{ gridTemplateColumns: `repeat(${lanes.length}, minmax(0, 1fr))` }} data-overview-lanes>
           {lanes.map((l) => (
-            <div key={l.id} className="rounded border border-amber-200/25 bg-black/50 px-1.5 py-0.5 leading-[14px]" data-overview-lane={l.id}>
-              <div className="truncate text-[12px] font-bold text-amber-100">{l.mark}{l.name}</div>
-              <div className="text-[11px] text-zinc-300">{l.hint}</div>
+            <div key={l.id} className="rounded border border-amber-200/25 bg-black/50 px-1.5 py-0.5 text-[12px] leading-[15px]" title={l.hint} data-overview-lane={l.id}>
+              <div className="truncate font-bold text-amber-100">{l.mark}{l.name}</div>
+              <div className="truncate text-zinc-300">{l.tag ?? l.hint}</div>
             </div>
           ))}
         </div>
@@ -166,7 +166,7 @@ export function Overview({ game, onPick, onClose }: { game: GameState; onPick: (
                   <circle cx={p.x} cy={p.y} r={M * 0.75} fill="transparent" />
                   <circle cx={p.x} cy={p.y} r={M * 0.5} fill="rgba(0,0,0,.7)" stroke={color(m)} strokeWidth={1.2} />
                   {m.mark ? (
-                    <text x={p.x} y={p.y + M * 0.22} textAnchor="middle" fontSize={M * 0.62} data-overview-theme={m.mark}>{m.mark}</text>
+                    <text x={p.x} y={p.y + M * 0.22} textAnchor="middle" fontSize={Math.max(12, M * 0.62)} data-overview-theme={m.mark}>{m.mark}</text>
                   ) : (
                     <Icon x={p.x - M * 0.33} y={p.y - M * 0.33} width={M * 0.66} height={M * 0.66} color={color(m)} strokeWidth={2.4} />
                   )}
