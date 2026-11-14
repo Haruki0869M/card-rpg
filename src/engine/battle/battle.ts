@@ -567,6 +567,8 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
     add('mana', paid.cost);
     if (perfect) add('perfects');
     if (successes > 0) add(`success:${card.category}`);
+    // 2026-11-14（竜騎士の条件・案A）: 戦闘の1ターン目に成功した物理カード（槍騎士の《突撃》の「最初の一撃」）。記録が無い古い保存は0から数える
+    if (successes > 0 && card.category === 'physical' && state.turn === 1) add('success:physical:turn1');
     if (successes > 0 && card.tiers.some(t => t.effects.some(e => e.kind === 'heal'))) add('success:heal');
     if ((card.target === 'self' || isAllyCard(card)) && card.tiers.some((t) => t.effects.some((e) => e.kind === 'block' || e.kind === 'heal' || e.kind === 'applyStatus'))) add('support');
   }

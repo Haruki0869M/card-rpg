@@ -346,6 +346,20 @@ describe('最上位の戦闘能力', () => {
     let s = topBattle(['dragoon']); const hp = s.enemies[0].hp;
     s = applyCommand(s, { type: 'END_TURN', playerId: P }).state; expect(hp - s.enemies[0].hp).toBe(4);
   });
+  // 2026-11-14 竜騎士の条件（案A）: 戦闘の1ターン目に成功した物理カードだけ数える（docs/review/2026-11-14-dragoon-condition.md）
+  it('竜騎士の条件の記録: 1ターン目の物理カードの成功だけ数える（魔法・2ターン目は数えない）', () => {
+    let s = topBattle(['lancer']);
+    const f = () => s.allies[0].feats?.['success:physical:turn1'] ?? 0;
+    s = topPlay(s, 'palmStrike'); expect(f()).toBe(1);
+    expect(s.allies[0].feats?.['success:physical']).toBe(1);
+    s = topPlay(s, 'phantomClaw'); expect(f()).toBe(1);
+    s = applyCommand(s, { type: 'END_TURN', playerId: P }).state;
+    for (let i = 0; s.phase === 'enemy' && i < 30; i++) s = applyCommand(s, { type: 'ENEMY_STEP' }).state;
+    expect(s.turn).toBe(2);
+    s = topPlay(s, 'palmStrike'); expect(f()).toBe(1);
+    expect(s.allies[0].feats?.['success:physical']).toBe(2);
+    expect(CLASSES.get('dragoon').requires?.feat).toBe('success:physical:turn1');
+  });
   it('教皇: ターン開始に味方全員を2回復', () => {
     const spec = setup(7, ['pope', 'warrior']);
     spec.party.forEach(a => { a.hp = 10; }); const s = createBattle(spec);
