@@ -143,7 +143,7 @@ export function ensureShop(game: GameState, rng: Rng): ShopStock {
     let g = pickWeighted(odds, rng);
     let cand: string[] = [];
     for (; g >= 0 && !cand.length; g--) cand = pool.filter((id) => rarityIndex(CARDS.get(id).rarity ?? 'common') === g);
-    const cardId = cand.length ? pickCard(cand, h, rng, true, BALANCE.smartDraw.shopStrength) : pool[0];
+    const cardId = cand.length ? pickCard(cand, h, rng, true, BALANCE.smartDraw.shopStrength, heroes) : pool[0];
     cards.push({ cardId, heroId: h.id, price: BALANCE.cardPrice[CARDS.get(cardId).rarity ?? 'common'] ?? 40 });
   }
   const stock = { refreshedAt: w.worldTurn, items, cards };

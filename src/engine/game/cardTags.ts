@@ -6,7 +6,7 @@ import { CARDS, cardLineages, cardWeaponTypes } from '../../data/cards';
 import { CLASSES, getClass } from '../../data/classes';
 import type { CardDef, Effect, Hero } from '../../types';
 import type { Rng } from '../rng';
-import { equippedItems } from './hero';
+import { battleDeck, equippedItems } from './hero';
 
 const cache = new Map<string, string[]>();
 
@@ -96,11 +96,28 @@ export function poolWeight(card: CardDef, hero: Hero): number {
   return wts.length ? W.subWeapon : 1;
 }
 
-/** 候補から1枚選ぶ。smart = 好みで重み付けする */
-export function pickCard(cands: string[], hero: Hero, rng: Rng, smart: boolean, strength = 1): string {
+/** 味方を回復できるカード（回復の印があり、味方を選ぶ・味方全員に効く物） */
+export const healsOthers = (card: CardDef): boolean => {
+  const t = cardTags(card);
+  return t.includes('heal') && (card.target === 'ally' || card.target === 'otherAlly' || card.target === 'fallenAlly' || t.includes('support'));
+};
+
+/** 宿題7（2026-11-14）: パーティに回復役がいるか = だれかの戦闘の山札（自分の山札＋武器のカード）に、味方を回復できるカードがある */
+export function partyHasHealer(party: readonly Hero[]): boolean {
+  return party.some((h) => !h.retired && battleDeck(h).some((c) => CARDS.has(c.cardId) && healsOthers(CARDS.get(c.cardId))));
+}
+
+/** 宿題7: 回復役のいないパーティでは、共通の回復のカード（立て直し・応急処置・起死回生など）が出やすい（スマート抽選の時だけ） */
+export function healerlessWeight(card: CardDef, healerless: boolean): number {
+  return healerless && card.common && cardTags(card).includes('heal') ? BALANCE.smartDraw.healerlessHeal : 1;
+}
+
+/** 候補から1枚選ぶ。smart = 好みで重み付けする。party = 一緒に冒険している仲間（回復役がいない時の寄せに使う。宿題7） */
+export function pickCard(cands: string[], hero: Hero, rng: Rng, smart: boolean, strength = 1, party?: readonly Hero[]): string {
   if (cands.length < 2) return cands[rng.int(cands.length)];
   const profile = smart ? heroTagProfile(hero) : undefined;
-  const w = cands.map((id) => poolWeight(CARDS.get(id), hero) * (profile ? synergyWeight(CARDS.get(id), profile, strength) : 1));
+  const healerless = smart && !!party && !partyHasHealer(party);
+  const w = cands.map((id) => poolWeight(CARDS.get(id), hero) * (profile ? synergyWeight(CARDS.get(id), profile, strength) * healerlessWeight(CARDS.get(id), healerless) : 1));
   const total = w.reduce((a, b) => a + b, 0);
   let x = rng.next() * total;
   for (let i = 0; i < cands.length; i++) {
