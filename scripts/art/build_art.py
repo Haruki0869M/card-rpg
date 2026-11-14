@@ -199,7 +199,7 @@ FACES.update({
 })
 # 穴埋め（fill_holes）をしない元画像。重装衛士は、細い槍を戻すため切り抜きを直している（.cut の絵を
 # scripts/art/fix_thin_cut.py で作り直し済み）。槍と足の間の背景が穴として埋まるので、穴埋めをしない
-NO_FILL_HOLES = {'bulwark-female', 'bulwark-male', 'lancer-male', 'lancer-female', 'archer-male', 'archer-female', 'tamer-male', 'tamer-female', 'archmage-male', 'archmage-female', 'hexer-male', 'hexer-female', 'brawler-male', 'brawler-female', 'phantomThief-male', 'phantomThief-female'}
+NO_FILL_HOLES = {'bulwark-female', 'bulwark-male', 'lancer-male', 'lancer-female', 'archer-male', 'archer-female', 'tamer-male', 'tamer-female', 'archmage-male', 'archmage-female', 'hexer-male', 'hexer-female', 'brawler-male', 'brawler-female', 'phantomThief-male', 'phantomThief-female', 'phantomTamer-male', 'phantomTamer-female', 'shadow-female'}
 # 表に無い職は、この値（x=0.5 は頭の位置を自動で探す）
 FACE_DEFAULT = (0.5, 0.085, 0.17)
 
