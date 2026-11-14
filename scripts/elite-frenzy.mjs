@@ -31,6 +31,13 @@ const SETS = {
     { enemy: 'treeWarden', action: 'barkGuard', target: false },
     { enemy: 'treeWarden', action: 'branchSweep', target: false },
   ],
+  // 2026-11-14（宿題8-3）: 凍結で休む本気（1行の案内「凍結で空振り」）＋ふつうの本気
+  C: [
+    { enemy: 'gatekeeper', action: 'crush', target: true, frenzy: true, frozen: true },
+    { enemy: 'gatekeeper', action: 'whirl', target: false, frenzy: true },
+    { enemy: 'treeWarden', action: 'barkGuard', target: false },
+    { enemy: 'treeWarden', action: 'branchSweep', target: false },
+  ],
 };
 
 const save = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('card-rpg/adventure')));
@@ -58,6 +65,7 @@ async function setup(page, kinds, broken) {
     if (broken) e.broken = true;
     else delete e.broken;
     delete e.guarding;
+    if (k.frozen) e.statuses = { ...e.statuses, freeze: 1 };
     return e;
   });
   b.phase = 'ally';
@@ -88,7 +96,8 @@ async function check(w, h, count, setName) {
   if (colors.frenzy && (colors.frenzy === colors.purple || colors.frenzy === colors.red)) ng('札の色が紫か赤の札と同じ');
   const briefs = await page.locator('[data-behavior-brief][data-brief-kind="frenzy"]').allInnerTexts();
   if (count < 3 && briefs.length !== nF) ng(`本気の案内の数が ${briefs.length}（ほしい ${nF}）`);
-  if (count < 3 && briefs.some((t) => !t.includes('威力×1.5'))) ng(`本気の案内の文 ${JSON.stringify(briefs)}`);
+  const wantBriefs = kinds.filter((k) => k.frenzy).map((k) => (k.frozen ? '凍結で空振り' : '威力×1.5'));
+  if (count < 3 && briefs.some((t, i) => !t.includes(wantBriefs[i]))) ng(`本気の案内の文 ${JSON.stringify(briefs)}（ほしい ${JSON.stringify(wantBriefs)}）`);
   if (count >= 3 && (await page.locator('[data-behavior-brief]').count())) ng('敵が3体以上なのに、敵ごとの案内が出ている');
   // 大技の本気（門番ガルザの大斧の一撃）は、BREAK の印も出る
   if (setName === 'A' && !(await page.locator('[data-enemy="e0"] [data-break-hint]').count())) ng('大技の本気に BREAK の印が無い');
@@ -171,7 +180,7 @@ async function check(w, h, count, setName) {
   await page.close();
 }
 
-for (const [w, h] of SIZES) for (const count of [1, 2, 3, 4]) for (const s of ['A', 'B']) await check(w, h, count, s);
+for (const [w, h] of SIZES) for (const count of [1, 2, 3, 4]) for (const s of ['A', 'B', 'C']) await check(w, h, count, s);
 
 await browser.close();
 if (problems.length) {

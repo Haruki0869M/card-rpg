@@ -525,6 +525,7 @@ function BreakHint({ enemy, narrow, maxW }: { enemy: EnemyState; narrow: boolean
     return <Icon key={id} size={12} strokeWidth={2.8} className="inline align-[-2px]" style={{ color: el.color }} aria-label={el.name} />;
   });
   // 短い形は1行に収める（かっこは半角の幅。折り返すと味方の立ち絵の頭に重なりやすい）
+  // 2026-11-14（宿題8-8）: 赤い札の短い形「⚡BREAK可」は、かっこを付けない（敵4体・360px で弱点2つの時に、欄を約7px はみ出していた）
   const els = weak.length ? (narrow ? <>({icons})</> : <>（{icons}）</>) : null;
   return (
     <span
@@ -535,7 +536,7 @@ function BreakHint({ enemy, narrow, maxW }: { enemy: EnemyState; narrow: boolean
     >
       ⚡{strict
         ? (narrow ? <>{els}+完全</> : <>弱点{els}で完全成功 → BREAK</>)
-        : narrow ? <>BREAK可{els}</> : weak.length ? <>弱点{els}か完全成功で BREAK</> : <>完全成功で BREAK</>}
+        : narrow ? <>BREAK可{icons}</> : weak.length ? <>弱点{els}か完全成功で BREAK</> : <>完全成功で BREAK</>}
     </span>
   );
 }

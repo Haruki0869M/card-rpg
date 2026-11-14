@@ -4,6 +4,7 @@ import { BALANCE } from '../../data/balance';
 import { DUNGEONS } from '../../data/dungeons';
 import { ENEMIES, getEnemy } from '../../data/enemies';
 import { getRoomType } from '../../data/rules';
+import { getItem } from '../../data/items';
 import type { BattleState, GameCommand, GameState, PlayerId } from '../../types';
 import {
   applyCommand,
@@ -339,6 +340,9 @@ describe('封魔の宝箱（金の扉。罠・戦闘つきの高レア箱）', (
     v = viewOf(g, x);
     expect(v.chest!.contents?.length).toBeGreaterThan(0);
     expect(v.chest!.lastRoll?.kind).toBe('luck');
+    // 2026-11-14（宿題8-4・オーナーの返事 5A）: 封魔の宝箱は、エピック以上の消耗品が必ず1つ入る
+    const tops = v.chest!.contents!.filter((l) => l.kind === 'item' && getItem(l.item.itemId).slot === 'consumable' && ['epic', 'legend'].includes(getItem(l.item.itemId).rarity));
+    expect(tops.length).toBeGreaterThanOrEqual(1);
     g = run(g, inScene(x, { type: 'LEAVE_CHEST', playerId: 'P1' }));
     expect(viewOf(g, x).dungeon!.rooms.find((r) => r.id === roomId)!.cleared).toBe(true);
   });

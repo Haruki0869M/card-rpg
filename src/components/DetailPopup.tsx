@@ -1,4 +1,5 @@
 import { getPet } from '../data/pets';
+import { guardStyleText } from '../engine/battle/effects/kinds/guardAllies';
 import { getStatus } from '../data/statuses';
 import { getElement } from '../data/elements';
 import { STAT_LABEL } from '../data/terms';
@@ -121,7 +122,8 @@ function Content({ d, battle, game }: { d: Detail; battle: BattleState; game: Ga
               <div className="mt-1 text-[13px] text-zinc-400">{e.dead ? '撃破済み' : '行動済み'}</div>
             )}
             {e.tauntedBy && <div className="text-[13px] text-amber-300">{findAlly(battle, e.tauntedBy)?.name}に挑発されている</div>}
-            {e.guarding && !e.dead && <div className="text-[13px] text-sky-300">仲間をかばっている（ほかの敵への単体攻撃を代わりに受ける。全体攻撃は通る）</div>}
+            {/* 2026-11-14: かばう形は敵ごと（傷ついた仲間だけ・崩れるまで・半分・返す） */}
+            {e.guarding && !e.dead && <div className="text-[13px] text-sky-300">仲間をかばっている: {guardStyleText(e.guardStyle ?? {})}</div>}
             {/* ボスの段階: 今の段階の決まりと、この先の境目（HPバーの線） */}
             {ph?.rule && <div className="mt-1 text-[12px] text-indigo-200" data-phase-rule>🌀今の段階「{ph.name}」: {ph.rule}</div>}
             {marks.map((m) => (
