@@ -109,16 +109,22 @@ for (const [width, height] of SIZES) {
 
   // ---- ③ 晶石の祭壇（2人・1台） ----
   await enterThemed(page, tag, 'crystalGrotto', 'crystalAltar');
-  for (let k = 0; k < 2; k++) {
+  // 2026-11-14（寄り道の値打ち 5-A）: 古代の晶洞の祭壇は1人2回（2人で4回）
+  for (let k = 0; k < 4; k++) {
     const task = page.locator('[data-hero-task]');
-    if (!(await task.count())) { problems.push(`${tag}: 晶石の祭壇の画面が${k + 1}人目に出ない`); break; }
+    if (!(await task.count())) { problems.push(`${tag}: 晶石の祭壇の画面が${k + 1}回目に出ない`); break; }
     if (!(await page.locator('[data-altar-modes]').count())) problems.push(`${tag}: 祭壇に「強化／変異」の切り替えが無い`);
     if (k === 0) await page.locator('[data-altar-mode="transmute"]').click();
     await page.screenshot({ path: `${OUT}/${tag}-altar-${k + 1}.png` });
-    await check(page, tag, `祭壇 ${k + 1}人目`);
+    await check(page, tag, `祭壇 ${k + 1}回目`);
     // カード（aria-label にカードの名前がある）を1枚押す → 下に開く説明の窓のボタンで決める（回2）
     await task.locator('button[aria-label][aria-pressed]').first().click();
     await page.waitForTimeout(250);
+    // 同じキャラの2回目は、前に選んだカードが選ばれたままのことがある（押すと閉じる）。窓が無ければもう一度押す
+    if (!(await page.locator('[data-card-pick-action]').count())) {
+      await task.locator('button[aria-label][aria-pressed]').first().click();
+      await page.waitForTimeout(250);
+    }
     if (k === 0) await page.screenshot({ path: `${OUT}/${tag}-altar-detail.png` });
     await page.locator('[data-card-pick-action]').click();
     await page.waitForTimeout(400);

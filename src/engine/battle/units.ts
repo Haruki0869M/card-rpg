@@ -75,10 +75,12 @@ function killEnemy(state: BattleState, enemy: EnemyState, rng: Rng, events: Batt
   events.push({ type: 'death', unitId: enemy.uid });
   // かばう相手がいなくなった敵は、予告を代わりの行動（闇の剣）に変える
   fallbackLoneIntents(state, rng, events);
-  // 最後の中ボス（2026-11-14 寄り道の値打ち 柱5）: 相方（呼ばれていない、ほかの敵）が全部倒れたら、残った方が「相方が倒れると入る段階」に入る
+  // 最後の中ボス（2026-11-14 寄り道の値打ち 柱5）: 相方（同じ段階の出どころ phaseSet を持つ、ほかの敵 = 中ボスの組の相手）が全部倒れたら、
+  // 残った方が「相方が倒れると入る段階」に入る。呼ばれた敵・仲間を呼ぶで来た敵は相方に数えない
   if (enemy.summoned) return;
+  const partnerOf = (o: EnemyState, x: EnemyState) => x !== o && !x.summoned && x.phaseSet === o.phaseSet;
   for (const o of state.enemies) {
-    if (o.dead || o.summoned || state.enemies.some((x) => x !== o && !x.dead && !x.summoned)) continue;
+    if (o.dead || o.summoned || state.enemies.some((x) => partnerOf(o, x) && !x.dead)) continue;
     const phases = phasesOf(o);
     const i = phases?.findIndex((p, k) => !!p.onPartnerDown && o.phase < k + 1) ?? -1;
     if (i >= 0) enterPhase(state, o, i, events, '相方が倒れ、');

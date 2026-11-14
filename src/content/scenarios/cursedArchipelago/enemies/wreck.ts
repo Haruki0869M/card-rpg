@@ -73,10 +73,9 @@ export const krakenTentacle: EnemyDef = {
       openingActionId: 'ktDeepCall',
       rule: '仲間を呼ぶ（2回まで。弱点で BREAK すると止まる。先に倒すか、全体攻撃で）',
       actions: [
-        { id: 'ktDeepCall', name: '深海から呼ぶ', big: true, scripted: true, behavior: 'call', brief: '幽霊水夫を1体呼ぶ', hint: '幽霊水夫を1体呼ぶ。雷の弱点で BREAK すると止まる。先に倒すか、全体攻撃で', effects: [{ kind: 'summonEnemy', enemy: 'ghostDeckhand', uses: 2, call: true, orElse: 'ktSqueeze' }] },
+        { id: 'ktDeepCall', name: '深海から呼ぶ', big: true, behavior: 'call', brief: '幽霊水夫を1体呼ぶ', hint: '幽霊水夫を1体呼ぶ。雷の弱点で BREAK すると止まる。先に倒すか、全体攻撃で', effects: [{ kind: 'summonEnemy', enemy: 'ghostDeckhand', uses: 2, call: true, orElse: 'ktSqueeze' }] },
         { id: 'ktSqueeze', name: '締め上げる', effects: [{ kind: 'damage', amount: 18 }] },
         { id: 'ktLash', name: '触腕の薙ぎ', effects: [{ kind: 'damage', amount: 9, to: 'foes' }] },
-        { id: 'ktCallAgain', name: 'もう一度呼ぶ', big: true, behavior: 'call', brief: '幽霊水夫を1体呼ぶ', hint: '幽霊水夫を1体呼ぶ。雷の弱点で BREAK すると止まる。先に倒すか、全体攻撃で', effects: [{ kind: 'summonEnemy', enemy: 'ghostDeckhand', uses: 2, call: true, orElse: 'ktSqueeze' }] },
       ],
     },
   ],

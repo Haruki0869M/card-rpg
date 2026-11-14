@@ -69,10 +69,9 @@ export const colossusStatue: EnemyDef = {
       openingActionId: 'csStoneEye',
       rule: '手数読み: このターンにカードを何枚も使った味方に、枚数に応じたダメージ（使う枚数を絞る。弱点で BREAK すると威力が半分）',
       actions: [
-        { id: 'csStoneEye', name: '石の眼が見張る', big: true, scripted: true, behavior: 'punish', hint: 'このターンにカードを4枚以上使った味方に、枚数×3のダメージ', effects: [{ kind: 'punishPlays', amount: 3, min: 4 }] },
+        { id: 'csStoneEye', name: '石の眼が見張る', big: true, behavior: 'punish', hint: 'このターンにカードを4枚以上使った味方に、枚数×3のダメージ', effects: [{ kind: 'punishPlays', amount: 3, min: 4 }] },
         { id: 'csCrush', name: '巨兵の踏みつけ', effects: [{ kind: 'damage', amount: 17 }] },
         { id: 'csQuake', name: '大地鳴らし', big: true, hint: '味方全員にダメージ。ブロックで受けるか、雷の弱点で BREAK する', effects: [{ kind: 'damage', amount: 8, to: 'foes' }] },
-        { id: 'csWatch', name: '石の眼が光る', behavior: 'punish', hint: 'このターンにカードを4枚以上使った味方に、枚数×3のダメージ', effects: [{ kind: 'punishPlays', amount: 3, min: 4 }] },
       ],
     },
   ],

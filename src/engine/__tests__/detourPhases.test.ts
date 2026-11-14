@@ -122,6 +122,15 @@ describe('柱5 最後の中ボスの戦闘', () => {
     }
   });
 
+  it('仲間を呼ぶで来た敵（幽霊水夫）は相方に数えない: 呼ばれた水夫が生きていても、組の相手が倒れれば段階に入る', () => {
+    const s = midFight('cursedArchipelago', 5);
+    const [kraken, ghost] = s.enemies;
+    // 仲間を呼ぶで来た水夫（phaseSet なし・summoned なし）
+    s.enemies.push({ ...structuredClone(ghost), uid: 'e2', phaseSet: undefined, phase: 0 });
+    loseHp(s, ghost, ghost.hp, createRng(1), []);
+    expect(kraken.phase).toBe(1);
+  });
+
   it.each(MID_IDS)('%s: 段階で何ターンか戦っても落ちない。JSON をはさんでも同じ', (id) => {
     const sc = Object.keys(MIDS).find((x) => MIDS[x].includes(id))!;
     const runIt = (copy: boolean) => {
