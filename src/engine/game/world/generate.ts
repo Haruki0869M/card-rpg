@@ -227,17 +227,20 @@ export function createWorld(game: GameState, rng: Rng): WorldState {
   const free = (row0: number, row1: number) =>
     [...ok].filter((i) => !tiles[i].f && !reserved.has(i) && !TERRAINS.get(tiles[i].t).sea && rowOf(w, i) >= row0 && rowOf(w, i) <= row1 && hexDistance(w, i, start) >= 2);
   const inLane = (lane: string | undefined) => (i: number) => laneOfCol(def, colOf(w, i))?.id === lane;
+  // 祠を置かない帯（シナリオ2の西「凍った湖の近道」= 回復の場所が無い）。無い地図（シナリオ1）は今までどおり
+  const noShrine = def.lanes?.some((l) => l.noShrine) ? (i: number) => !!laneOfCol(def, colOf(w, i))?.noShrine : undefined;
   const scenarioEvents = EVENTS.forScenario(game.scenarioId);
   const mapEvents = scenarioEvents.filter((e) => e.where === 'map' && !e.hiddenIn && !e.placed);
   const shrineIds = SHRINES.forScenario(game.scenarioId).map((s) => s.id);
   def.regions.forEach((reg, ri) => {
     /**
      * lane: その帯に置く（広い地図だけ）。only = 帯に空きが無い時だけほかへ / 無ければ確率 PREFER_CHANCE でその帯、外れたら地域のどこでも。
+     * avoid: 候補から除くマス（祠を置かない帯。ほかに空きが無ければ除かない。乱数の引く回数は変わらない）。
      * 帯を見ない時は、今までと同じ乱数の引き方
      */
     // 地域の空きマス（置くたびに作り直さず、置いたマスを抜く。並びは作り直した時と同じなので、選ばれるマスも同じ）
     let pool: number[] | undefined;
-    const place = (n: number, make: (tile: number) => MapFeature, lane?: string, only = false) => {
+    const place = (n: number, make: (tile: number) => MapFeature, lane?: string, only = false, avoid?: (tile: number) => boolean) => {
       for (let k = 0; k < n; k++) {
         pool ??= free(reg.rows[0], reg.rows[1]);
         let cands = pool;
@@ -245,6 +248,10 @@ export function createWorld(game: GameState, rng: Rng): WorldState {
         if (wide && lane) {
           const there = cands.filter(inLane(lane));
           if (there.length && (only || rng.next() < PREFER_CHANCE)) cands = there;
+        }
+        if (wide && avoid) {
+          const rest = cands.filter((i) => !avoid(i));
+          if (rest.length) cands = rest;
         }
         const tile = pick(cands, rng);
         pool.splice(pool.indexOf(tile), 1);
@@ -263,7 +270,7 @@ export function createWorld(game: GameState, rng: Rng): WorldState {
     // 薬草の群生地（段階6a）: 決めた帯に置く
     const herb = herbEventOf(def);
     if (reg.herbs && EVENTS.tryGet(herb)) place(reg.herbs, () => ({ kind: 'event', id: herb }), def.prefer?.herb, true);
-    if (shrineIds.length) place(reg.shrines ?? 0, () => ({ kind: 'shrine', id: pick(shrineIds, rng) }), def.prefer?.shrine);
+    if (shrineIds.length) place(reg.shrines ?? 0, () => ({ kind: 'shrine', id: pick(shrineIds, rng) }), def.prefer?.shrine, false, noShrine);
     // ランダムダンジョン: prefer が配列なら、1つ目は1つ目の帯・2つ目は2つ目の帯（段階7a: 西と東に1つずつ）
     const rdLane = def.prefer?.randomDungeon;
     (reg.randomDungeons ?? []).forEach((d, k) => place(1, () => ({ kind: 'dungeon', id: d }), Array.isArray(rdLane) ? rdLane[k] : rdLane, true));

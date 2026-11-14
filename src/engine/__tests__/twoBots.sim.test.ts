@@ -71,6 +71,7 @@ import { DUNGEONS } from '../../data/dungeons';
 import { getDifficulty } from '../../data/rules';
 import { BALANCE } from '../../data/balance';
 import { getScenario } from '../../data/scenarios';
+import { herbEventOf } from '../game/world/generate';
 
 const SCENARIO = process.env.SIM_SCENARIO ?? 'corruptionKing';
 const SEEDS = Number(process.env.SIM_SEEDS ?? 40);
@@ -109,6 +110,7 @@ if (process.env.SIM_LAYOUTS) {
 // ---- 回4: 測る候補の差し替え（このテストの中だけ。本番のコードは環境変数を読まない）----
 const VARIANT = process.env.SIM_VARIANT ?? '';
 const MAP_REGIONS = getScenario(SCENARIO).map?.regions ?? [];
+const HERB_ID = herbEventOf(getScenario(SCENARIO).map);
 /** 沼より後の地域: 地図の regions は上（魔王城）から下（はじまりの平原）の順なので、沼より前に書いてある地域 */
 /** (c) の HP の倍率（SIM_LATE_HP で変えられる。既定 1.15 = +15%） */
 const LATE_HP = Number(process.env.SIM_LATE_HP ?? 1.15);
@@ -426,7 +428,8 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
         const c = (r.lanes[ln] ??= emptyLane());
         if (t.f.kind === 'chest') c.chests++;
         else if (t.f.kind === 'shrine') c.shrines++;
-        else if (t.f.kind === 'event' && t.f.id === 'herbField') c.herbs++;
+        // 回復のマス（シナリオ1 = 薬草の群生地・シナリオ2 = 温泉。地図の herbEvent）
+        else if (t.f.kind === 'event' && t.f.id === HERB_ID) c.herbs++;
       });
     }
     const b0 = battlesOf(pre);

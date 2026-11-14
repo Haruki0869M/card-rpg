@@ -219,8 +219,9 @@ describe('段階6a: シナリオ1の広い地図の形', () => {
     expect(JSON.stringify(fresh(7).world!.tiles)).toBe(JSON.stringify(fresh(7).world!.tiles));
   });
 
-  it('ほかの6本は前の地図のまま（帯が無い・幅も変わらない）', () => {
-    for (const s of SCENARIOS.all.filter((x) => x.id !== CK && x.map)) {
+  // シナリオ2は、作り直しの区切り2で広い地図になった（scenario2Map.test.ts）
+  it('ほかの5本は前の地図のまま（帯が無い・幅も変わらない）', () => {
+    for (const s of SCENARIOS.all.filter((x) => x.id !== CK && x.id !== 'frozenKingdom' && x.map)) {
       const g = fresh(1, s.id);
       expect(s.map!.lanes, s.id).toBeUndefined();
       expect(g.world!.width, s.id).toBe(s.map!.width);

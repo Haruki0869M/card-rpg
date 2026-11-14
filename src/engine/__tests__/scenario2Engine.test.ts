@@ -84,10 +84,13 @@ const BEFORE: Record<number, { kinds: string[]; state: string }> = {
   24: { kinds: ['infernoDemon@599', 'stormWitch@538', 'greedKing@536'], state: 'd193f14e:4fe36bb7' },
   25: { kinds: ['stormWitch@468', 'greedKing@496', 'nightmareBeast@599'], state: 'd432a9ad:1b66d5aa' },
 };
-/** 作り直しの前のコードで取った、7本の新しい冒険（種1〜3・2人）の状態の指紋。地図の生成と乱数の順番が変わっていない事 */
+/**
+ * 作り直しの前のコードで取った、7本の新しい冒険（種1〜3・2人）の状態の指紋。地図の生成と乱数の順番が変わっていない事。
+ * シナリオ2だけは、区切り2で地図を 15×42 に作り直したので、区切り2の地図で取り直した（前の 8×35 は 8695f871・b725699b・b35b9ce7）
+ */
 const BEFORE_MAPS: Record<string, string[]> = {
   corruptionKing: ['26c62f2f', 'e61644da', 'b4f77cef'],
-  frozenKingdom: ['8695f871', 'b725699b', 'b35b9ce7'],
+  frozenKingdom: ['18abebb9', '5a847cfb', 'd7dec7f1'],
   cursedArchipelago: ['c475394c', 'f650664b', 'a54306f8'],
   sandDynasty: ['bb9a8be6', '93b10c4a', 'd723aecd'],
   starCastle: ['3636fe91', 'd44fae16', 'f00ba5cb'],
@@ -159,29 +162,26 @@ describe('区切り1: 帯の寒さ・暑さの倍率（LaneDef.climate）', () =
     expect(g.heroes[1].hp).toBe(hp2);
   });
 
-  it('帯の無い地図（今のシナリオ2の 8×35）は今までどおり: 地形の寒さが優先・無ければ地域の寒さ', () => {
+  // 「帯の無い地図（前のシナリオ2の 8×35）は今までどおり」は、区切り2でシナリオ2の地図が広い地図になったので、
+  // 古い保存のテスト（scenario2OldSave.test.ts の「寒さは前の決まりのまま」）で確かめる
+  it('シナリオ2（区切り2から広い地図）: 帯の倍率は西 ×2・中央 ×0.5・東は省略（×1）', () => {
     const g = newGame(FK, 5);
-    const w = g.world!;
-    expect(isWideMap(g, w)).toBe(false);
-    const regions = getScenario(FK).map!.regions;
-    for (let i = 0; i < w.tiles.length; i++) {
-      const t = w.tiles[i];
-      if (t.f?.kind === 'town') continue;
-      expect(climateAt(g, i), `tile ${i}`).toEqual(TERRAINS.get(t.t).climate ?? regions[t.r].climate);
-    }
+    expect(isWideMap(g, g.world!)).toBe(true);
+    expect(getScenario(FK).map!.lanes!.map((l) => l.climate)).toEqual([2, 0.5, undefined]);
   });
 });
 
 // ---------- 湖の氷 ----------
 
 describe('区切り1: 新しい地形「湖の氷」（lakeIce）', () => {
-  it('移動力1・寒い・海でない。氷原（移動力2）・街道（寒さ無し）と違う', () => {
+  it('移動力1・寒い・海でない・移動 +2（区切り2。オーナーの決定 §8-1 の3）。氷原（移動力2）・街道（寒さ無しで +1）と違う', () => {
     const t = TERRAINS.get('lakeIce');
     expect(t.name).toBe('湖の氷');
     expect(t.moveCost).toBe(1);
     expect(t.climate?.kind).toBe('cold');
     expect(t.sea).toBeFalsy();
-    expect(t.moveDiceBonus).toBeUndefined();
+    expect(t.moveDiceBonus).toBe(2);
+    expect(TERRAINS.get('road').moveDiceBonus).toBe(1);
     expect(TERRAINS.get('ice').moveCost).toBe(2);
     expect(TERRAINS.get('road').climate).toBeUndefined();
     // 地形の並び（order）がほかと重ならない
@@ -189,8 +189,11 @@ describe('区切り1: 新しい地形「湖の氷」（lakeIce）', () => {
     expect(new Set(orders).size).toBe(orders.length);
   });
 
-  it('今の地図のどれにもまだ使われていない（次の区切りのシナリオ2の地図で使う）', () => {
-    for (const s of SCENARIOS.all) for (const r of s.map?.regions ?? []) expect(r.terrain.lakeIce, `${s.id}/${r.id}`).toBeUndefined();
+  it('使うのはシナリオ2の地図だけ（区切り2から）', () => {
+    for (const s of SCENARIOS.all) {
+      if (s.id === FK) expect(s.map!.regions.some((r) => r.terrain.lakeIce), s.id).toBe(true);
+      else for (const r of s.map?.regions ?? []) expect(r.terrain.lakeIce, `${s.id}/${r.id}`).toBeUndefined();
+    }
   });
 });
 
@@ -241,7 +244,8 @@ describe('区切り1: 災厄の置き場（街道の帯でない帯）', () => {
     expect([...scourgeLanes({ lanes, highway: [[12, 40], [11, 0]] })].sort()).toEqual(['lake', 'road']);
     expect([...scourgeLanes({ lanes })].sort()).toEqual(['lake', 'ridge', 'road']);
     expect(scourgeLanes({ highway: [[1, 1]] }).size).toBe(0);
-    expect(scourgeLanes(getScenario(FK).map).size).toBe(0);
+    // シナリオ2（区切り2から広い地図）: 街道は中央の「薪の街道」なので、西と東
+    expect([...scourgeLanes(getScenario(FK).map)].sort()).toEqual(['east', 'west']);
   });
 });
 
@@ -267,13 +271,11 @@ describe('区切り1: シナリオに出る災厄の一覧（ScenarioMapDef.scou
     for (const s of SCENARIOS.all) for (const id of s.map?.scourges ?? []) expect(SCOURGES.has(id), `${s.id}: ${id}`).toBe(true);
   });
 
-  it('今のシナリオ2（8×35・帯が無い）には、魔女の指定があっても災厄は出ない', () => {
-    let g = newGame(FK, 5);
-    expect(g.world!.scourgeCount).toBeUndefined();
-    g.world!.keys = ['x'];
-    g.world!.corruption = 60;
-    g = endTurn(g);
-    g = endTurn(g);
+  // 「8×35 のシナリオ2には災厄は出ない」は、区切り2で地図が広い地図になったので、古い保存のテスト（scenario2OldSave.test.ts）で確かめる。
+  // 新しい地図で魔女だけが出る事は scenario2Map.test.ts
+  it('シナリオ2（区切り2から広い地図）: 新しい冒険は災厄の数え始め（まだ0体）', () => {
+    const g = newGame(FK, 5);
+    expect(g.world!.scourgeCount).toBe(0);
     expect(aliveScourges(g.world)).toHaveLength(0);
   });
 });

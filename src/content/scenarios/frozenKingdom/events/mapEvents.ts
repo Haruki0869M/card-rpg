@@ -31,4 +31,23 @@ export const mapEvents: EventDef[] = [
       { label: '薪を足して、火を絶やさないようにする', success: [{ kind: 'gainFocus', amount: 2, all: true }], successText: '火を見つめていると、心が落ち着いた。（全員のフォーカス+2）' },
     ],
   },
+  // 温泉（シナリオ2の作り直し §2-1・§8-2）: 地図の herbEvent で、東「巨人の尾根」に置く回復のマス（placed なので、ふつうのイベントのくじには入らない）。
+  // 役割: 「HPの回復」と「次の朝まで寒さを受けない」を1か所で（野営 = 番を使ってそのターンだけ／焚き火の旅人 = 回復かフォーカス）。
+  // 回復の量は、新しい数字を作らず、薬草の群生地で摘める回復薬（HP+20）と同じ【提案】
+  {
+    id: 'hotSpring',
+    where: 'map',
+    placed: true,
+    title: '尾根の温泉',
+    icon: 'droplet',
+    text: '岩の間から湯気が立ちのぼっている。雪の中に、温かい湯が湧いていた。',
+    options: [
+      {
+        label: '湯につかる（全員のHP+20・次の朝まで寒さを受けない）',
+        success: [{ kind: 'heal', amount: 20, all: true }, { kind: 'warmth', all: true }],
+        successText: '体の芯まで温まった。次の朝まで、寒さはこたえないだろう。',
+      },
+      { label: '先を急ぐ', success: [{ kind: 'nothing' }], successText: '湯気を背に、先へ進んだ。' },
+    ],
+  },
 ];

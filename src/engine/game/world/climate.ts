@@ -3,7 +3,7 @@ import { BALANCE } from '../../../data/balance';
 import { getScenario } from '../../../data/scenarios';
 import { TERRAINS } from '../../../data/world';
 import { timeOfDay } from './time';
-import type { ClimateDef, GameState } from '../../../types';
+import type { ClimateDef, GameState, WorldState } from '../../../types';
 import { addLog } from '../common';
 import { heroMaxHp } from '../hero';
 import { mapHeroes } from '../heroes';
@@ -27,7 +27,24 @@ export function climateAt(game: GameState, tile: number): ClimateDef | undefined
   return { kind: now.kind, ratio: (now.ratio ?? BALANCE.climateDamageRatio) * mul };
 }
 
-/** ワールドターンの終わり: 寒さ・暑さのマスにいるキャラのHPを減らす（HPは1で止まる。今ターン野営したキャラは受けない） */
+/**
+ * 温泉で温まっているキャラか（シナリオ2の作り直し §8-2）: 今のワールドターンが効き目の最後のターン以下なら、寒さを受けない（暑さは受ける）。
+ * 画面の印にも使う（乱数は引かない）
+ */
+export function isWarm(w: Pick<WorldState, 'warm' | 'worldTurn'> | undefined, heroId: string): boolean {
+  const until = w?.warm?.[heroId];
+  return until !== undefined && w!.worldTurn <= until;
+}
+
+/** 温泉の効き目が残っている間の、画面に出す短い文（温まっていなければ undefined） */
+export function warmthNote(game: GameState, heroId: string): string | undefined {
+  const w = game.world;
+  if (!w || !isWarm(w, heroId)) return undefined;
+  const left = w.warm![heroId] - w.worldTurn + 1;
+  return `♨ 温泉で温まっている（次の朝まで寒さを受けない・あと${left}ターン）`;
+}
+
+/** ワールドターンの終わり: 寒さ・暑さのマスにいるキャラのHPを減らす（HPは1で止まる。今ターン野営したキャラ・温泉で温まったキャラ（寒さだけ）は受けない） */
 export function applyClimate(game: GameState) {
   const w = game.world;
   if (!w) return;
@@ -38,10 +55,16 @@ export function applyClimate(game: GameState) {
     if (tile === undefined || sheltered.includes(h.id)) continue;
     const c = climateAt(game, tile);
     if (!c) continue;
+    if (c.kind === 'cold' && isWarm(w, h.id)) continue;
     const dmg = Math.max(1, Math.ceil(heroMaxHp(h) * (c.ratio ?? BALANCE.climateDamageRatio)));
     const lost = Math.min(dmg, Math.max(0, h.hp - 1));
     if (lost <= 0) continue;
     h.hp -= lost;
     addLog(game, `${h.name}は${c.kind === 'cold' ? '寒さ' : '暑さ'}で体力を奪われた（-${lost}）`);
+  }
+  // 温泉の効き目: このターンで終わる印を消す（全部消えたら欄ごと消す。乱数は引かない）
+  if (w.warm) {
+    for (const [id, until] of Object.entries(w.warm)) if (until <= w.worldTurn) delete w.warm[id];
+    if (!Object.keys(w.warm).length) w.warm = undefined;
   }
 }
