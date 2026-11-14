@@ -34,6 +34,7 @@ import {
   corruptionShown,
   dungeonJoin,
   randomDungeonView,
+  dungeonDetourLines,
   scourgeCurse,
   scourgesWith,
   guideGoal,
@@ -356,6 +357,8 @@ function tileInfo(game: GameState, i: number, goal?: GuideGoal): string {
   const rd = randomDungeonView(w, i);
   if (rd) parts.push(rd.done ? `${rd.theme?.mark ?? ''}${rd.name}（踏破済み）` : `${rd.theme?.mark ?? ''}${rd.name}：全5行・最奥に黄金箱。${rd.theme?.description ?? ''}`);
   else if (f?.kind === 'dungeon') parts.push(DUNGEONS.get(f.id).name);
+  // 寄り道の値打ち（2026-11-14）: 行く前に分かる手がかり（ランダムダンジョンのご褒美・掛かっている加護・見破り）
+  parts.push(...dungeonDetourLines(game, i));
   if (f?.kind === 'temple' || f?.kind === 'altar') parts.push(SANCTUARIES.get(f.id).name);
   if (f?.kind === 'shrine') parts.push(SHRINES.get(f.id).name + (f.used ? '（祈り済み）' : ''));
   if (f?.kind === 'event' || f?.kind === 'landmark') parts.push((EVENTS.tryGet(f.id)?.title ?? '何かがある') + (f.used ? '（調べた）' : ''));

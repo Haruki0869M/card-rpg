@@ -169,10 +169,15 @@ export function townBuy(game: GameState, cmd: Cmd<'TOWN_BUY'>, rng: Rng): string
   const v = facilityHero(game, cmd.playerId, cmd.heroId)!;
   // カードは、町に入ったキャラの職業のものだけ買える
   if (!('item' in entry) && getClass(findHero(game, entry.heroId)?.classId ?? '').id !== v.classId) return `${v.name}の職業のカードではありません`;
-  const price = shopPriceFor(v, entry.price, game);
+  // 盗賊王の無料券（2026-11-14）: 装備・消耗品だけ。券を1枚使って、お金を払わない
+  const free = !!cmd.free;
+  if (free && !('item' in entry)) return '無料券はカードには使えません';
+  if (free && !(game.world?.freeShop ?? 0)) return '無料券がありません';
+  const price = free ? 0 : shopPriceFor(v, entry.price, game);
   if (v.gold < price) return 'ゴールドが足りません';
   v.gold -= price;
   entry.sold = true;
+  if (free) game.world!.freeShop! -= 1;
   if ('item' in entry) addLog(game, `${v.name}が${addItem(game, v, entry.item, false)}を買った（${price}G）`);
   else {
     const h = v;

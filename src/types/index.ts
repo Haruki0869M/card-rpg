@@ -476,6 +476,11 @@ export interface EnemyDef {
   gold: number;
   /** ボスの段階（HPが belowHpPct% 以下になると行動が変わる） */
   phases?: EnemyPhaseDef[];
+  /**
+   * 最後のダンジョンの中ボスの部屋の戦闘でだけ使う段階（2026-11-14 寄り道の値打ち 柱5）。ふつうの戦闘（地図の遭遇・ほかの部屋）では使わない
+   * （同じ敵が、ふつうの敵としても出るため）。戦闘を始める時、中ボスの戦闘なら EnemyState.phaseSet = 'midboss' にして、こちらを読む
+   */
+  midbossPhases?: EnemyPhaseDef[];
   /** 敵の特殊能力（味方と同じ書き方） */
   abilities?: AbilityDef[];
   /** 弱点の属性（ダメージ×1.5）・耐性のある属性（ダメージ×0.5・状態異常が効かない） */
@@ -508,6 +513,8 @@ export interface EnemyPhaseDef {
   weak?: string[];
   /** この段階の耐性（元の耐性の代わり） */
   resist?: string[];
+  /** 相方（同じ戦闘の、呼ばれていないほかの敵）が全部倒れた時にも、この段階に入る（HPの境目とは別の入り方。2026-11-14 最後の中ボス） */
+  onPartnerDown?: boolean;
 }
 
 export interface EncounterSpec {
@@ -729,6 +736,8 @@ export interface EnemyState {
   phaseOpened?: number;
   /** ボスの段階: 数え読み（left = あと何回の予告で actionId を出すか。任意。古い保存には無い。2026-11-14） */
   countdown?: { actionId: string; turns: number; left: number };
+  /** 段階のデータの出どころ（'midboss' = 敵のデータの midbossPhases を読む。省略は phases。2026-11-14） */
+  phaseSet?: 'midboss';
 }
 
 export type Phase = 'ally' | 'enemy' | 'victory' | 'defeat' | 'escaped';
@@ -786,6 +795,13 @@ export interface BattleState {
   elite?: boolean;
   /** 各シナリオの、鍵の順番で1つ目のダンジョンのボスの戦闘（2026-11-13: 大技の BREAK は今までどおり。紫の札は除く） */
   firstKeyBoss?: boolean;
+  /**
+   * 災厄の加護（2026-11-14 寄り道の値打ち 柱1）: この戦闘に掛かっている加護。ids = 加護を掛けている災厄のID / uid = 大物（加護の決まりが掛かる敵）/
+   * regen = 大物が敵の番の始めに回復する最大HPの% / ward = 最初の BREAK を1回防ぐ（wardUsed = もう防いだ）/ phaseBurn = 大物が段階を越えるたびの火傷
+   */
+  boon?: { ids: string[]; uid: string; regen?: number; ward?: boolean; wardUsed?: boolean; phaseBurn?: number };
+  /** 見破ったボスの戦闘（2026-11-14 寄り道の値打ち 柱2）: 見破った大物（この uid の敵）の大技と開幕の一手は、完全成功だけで崩れる */
+  insight?: string;
 }
 
 /** 呼び出したお供（turns = 残りのターン数。0になったら帰る） */

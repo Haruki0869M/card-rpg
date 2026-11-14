@@ -215,7 +215,7 @@ export function breakDamagePctOf(state: BreakRankState, enemy?: Unit): number {
 }
 
 /** BREAK の決まりが見る、戦闘の格の情報（firstKeyBoss = 各シナリオの、鍵の順番で1つ目のダンジョンのボスの戦闘） */
-export type BreakRankState = Pick<BattleState, 'boss' | 'midboss' | 'elite' | 'firstKeyBoss'>;
+export type BreakRankState = Pick<BattleState, 'boss' | 'midboss' | 'elite' | 'firstKeyBoss'> & Partial<Pick<BattleState, 'insight'>>;
 
 /** 戦闘の敵の格（ボス・中ボスと災厄・強敵・ふつう） */
 export const battleRankOf = (state: Pick<BattleState, 'boss' | 'midboss' | 'elite'>) => (state.boss ? 'boss' : state.midboss ? 'midboss' : state.elite ? 'elite' : 'normal');
@@ -228,6 +228,8 @@ export const battleRankOf = (state: Pick<BattleState, 'boss' | 'midboss' | 'elit
  * enemy を渡さない時は、戦闘の格だけで見る（ヘルプの文など）
  */
 export function needsWeakPerfect(state: BreakRankState, enemy?: Unit): boolean {
+  // 見破り（2026-11-14 寄り道の値打ち 柱2）: 見破ったボスの戦闘では、そのボス（大物）の大技と開幕の一手（紫の札も）は、完全成功だけで崩れる
+  if (state.insight && enemy && isEnemy(enemy) && enemy.uid === state.insight) return false;
   if (behaviorNeedsWeakPerfect(enemy)) return true;
   if (!BALANCE.breakNeedsWeakPerfect) return false;
   if (state.firstKeyBoss) return false;
@@ -274,6 +276,16 @@ function breakReason(state: BattleState, enemy: EnemyState, weakHit: boolean, pe
 
 /** 大技の予告を崩す: 威力が半分・脆弱1（balance の breakStatus。2026-11-13 に弱体から変えた）・ブロック0（オーナーの決定 3-A）。乱数は使わない */
 export function breakEnemy(ctx: EffectCtx, enemy: EnemyState, why: 'weak' | 'perfect' | 'damage') {
+  // 災厄の加護「凍てつく守り」（2026-11-14）: 大物への最初の BREAK が1回だけ効かない（この予告はもう崩せない = broken。次の予告からまた崩せる）
+  const bo = ctx.state.boon;
+  if (bo?.ward && !bo.wardUsed && bo.uid === enemy.uid) {
+    bo.wardUsed = true;
+    enemy.broken = true;
+    ctx.events.push({ type: 'ability', unitId: enemy.uid, name: '凍てつく守り' });
+    ctx.parts.push('凍てつく守りが BREAK を防いだ');
+    addLog(ctx.state, `💀凍てつく守り（氷嵐の魔女の加護）: ${nameOf(enemy)}への BREAK を1回防いだ（次の予告からは崩せる）`);
+    return;
+  }
   enemy.broken = true;
   enemy.nextActionMultiplier = (enemy.nextActionMultiplier ?? 1) * BALANCE.breakPower;
   if (BALANCE.breakClearsBlock) enemy.block = 0;

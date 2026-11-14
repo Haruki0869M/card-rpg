@@ -5,6 +5,7 @@ import { isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
 import { useOnline } from '../../store/onlineStore';
 import { EVENTS } from '../../data/events';
+import { getItem } from '../../data/items';
 import type { GameCommand, GameState, PlayerId } from '../../types';
 
 const name = (p: PlayerId) => useOnline.getState().room?.seatName(p) ?? p;
@@ -35,6 +36,13 @@ function voteLabel(game: GameState, cmd: GameCommand): string {
       return '先へ進む';
     case 'CHEST_OPENER':
       return `${game.heroes.find((h) => h.id === cmd.heroId)?.name ?? ''}に任せる`;
+    // 寄り道の値打ち（2026-11-14）: 秘宝の3択・抜け道
+    case 'PICK_RELIC': {
+      const r = game.chest?.relics?.[cmd.optionIndex];
+      return r ? `「${getItem(r.itemId).name}」` : '秘宝';
+    }
+    case 'RETURN_TO_HUB':
+      return cmd.kind === 'shortcut' ? '抜け道を通る' : '入口へ戻る';
     default:
       return '続ける';
   }

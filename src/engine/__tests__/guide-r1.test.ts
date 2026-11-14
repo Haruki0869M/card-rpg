@@ -210,6 +210,8 @@ describe('回1: 災厄が出た時の知らせ（別の窓）と場所の文', (
     const w = g.world!;
     w.story = { title: '翠の神殿', lines: ['神殿の封印が解けた。'] };
     w.scourgesMet = ['miasmaNecro', 'nightmareBeast', 'stormWitch', 'infernoDemon'];
+    // 2026-11-14（寄り道の値打ち）: 盗賊王は、黄金冠を使えるキャラ（お金を得るカードを持つジョブにたどり着ける）がいる時だけ出る
+    g.heroes[0].classId = 'thief';
     const wd = spawnScourge(g, w, createRng(3))!;
     expect(wd.scourge).toBe('greedKing');
     expect(w.story).toEqual({ title: '翠の神殿', lines: ['神殿の封印が解けた。'] });
@@ -220,7 +222,9 @@ describe('回1: 災厄が出た時の知らせ（別の窓）と場所の文', (
     // 2026-11-13: 倒すと手に入る専用の装備の名前と効果を、最後の行に出す
     expect(page.lines.slice(1, 3)).toEqual(['すべての町の店の値段が25%高い（売る値段は変わらない）。', 'くわしい場所は、見晴らしの塔に登ると分かる。']);
     expect(page.lines[3]).toMatch(/^倒すと元に戻り、専用の装備「強欲王の黄金冠」を落とす（《黄金の雨》.+）。$/);
-    expect(page.lines).toHaveLength(4);
+    // 2026-11-14（寄り道の値打ち）: 最後に加護の行
+    expect(page.lines[4]).toMatch(/^💀加護: ボス・中ボスとの戦闘に「用心棒」/);
+    expect(page.lines).toHaveLength(5);
     g = run(g, { type: 'STORY_CONTINUE', playerId: 'P1' });
     expect(g.world!.story?.title).toBe(page.title);
   });

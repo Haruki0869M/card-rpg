@@ -281,6 +281,10 @@ export function TownScreen() {
   const notify = useCallback((text: string) => showToast(text), [showToast]);
   useShopNotices(game, stock, myBuys, notify);
   const [lastOne, setLastOne] = useState<number | null>(null);
+  // 盗賊王の無料券（2026-11-14 寄り道の値打ち）: 券がある時だけ「無料券で買う」に切り替えられる（装備・消耗品だけ）
+  const freeLeft = game.world?.freeShop ?? 0;
+  const [useFree, setUseFree] = useState(false);
+  const free = useFree && freeLeft > 0;
   const buy = (kind: 'item' | 'card', index: number, confirmed = false) => {
     const entry = kind === 'item' ? stock?.items[index] : stock?.cards[index];
     if (!entry) return;
@@ -289,7 +293,7 @@ export function TownScreen() {
       return;
     }
     if ('item' in entry) myBuys.add(entry.item.uid);
-    const err = dispatchGame({ type: 'TOWN_BUY', heroId: v.id, playerId: p, kind, index });
+    const err = dispatchGame({ type: 'TOWN_BUY', heroId: v.id, playerId: p, kind, index, ...(free && kind === 'item' ? { free: true } : {}) });
     if (err) return;
     const id = ++buySeq;
     if ('item' in entry) {
@@ -348,6 +352,17 @@ export function TownScreen() {
                 💀{d.short}のせいで、値段が+{d.curse.shopPrice}%（倒すと元に戻る）
               </div>
             ))}
+            {freeLeft > 0 && (
+              <button
+                onClick={() => setUseFree(!useFree)}
+                aria-pressed={free}
+                className={`btn flex min-h-11 items-center gap-1 rounded-lg border px-2 text-left text-[12px] leading-4 ${free ? 'border-amber-300 bg-amber-500/25 text-amber-50' : 'border-amber-400/50 bg-black/40 text-amber-100'}`}
+                data-free-shop={freeLeft}
+              >
+                <span className="min-w-0 flex-1">🎟無料券×{freeLeft}（盗賊王から）: 装備・消耗品を1つ無料でもらえる</span>
+                <span className="shrink-0 font-bold">{free ? '使う: ON' : '使う: OFF'}</span>
+              </button>
+            )}
             {stock.items.map((s, i) => {
               const it = getItem(s.item.itemId);
               const left = shopLeft(stock, s.item.itemId);
@@ -380,11 +395,11 @@ export function TownScreen() {
                     </button>
                   )}
                   <button
-                    disabled={!mine || s.sold || v.gold < shopPriceFor(v, s.price, game)}
+                    disabled={!mine || s.sold || (!free && v.gold < shopPriceFor(v, s.price, game))}
                     onClick={() => buy('item', i)}
                     className="btn btn-gold flex h-11 w-[78px] shrink-0 items-center justify-center gap-0.5 rounded-lg text-[13px] font-bold"
                   >
-                    {s.sold ? '売り切れ' : (
+                    {s.sold ? '売り切れ' : free ? '無料券' : (
                       <>
                         <Coins size={14} />
                         {shopPriceFor(v, s.price, game)}

@@ -24,6 +24,7 @@ import { CHEST_NAME, fmtPct, OddsBar } from '../ui/ChestOdds';
 import { HeroFace, RARITY_STYLE, Screen } from '../ui/game';
 import { CHEST_VIDEO_SECONDS, ChestVideo, chestVideoUrl } from './ChestVideo';
 import { LootList } from './RoomScreens';
+import { RelicPicker } from './RelicPicker';
 
 /** 光の色（白 → 青 → 紫 → 金）。本当の格の色で止まる */
 const LIGHT = ['#ffffff', '#5ab0ff', '#c58bff', '#ffcf4a'];
@@ -606,6 +607,9 @@ export function ChestScreen() {
               </button>
             </div>
           </>
+        ) : opened && chest.relics?.length && chest.relicPicked === undefined ? (
+          // 寄り道の値打ち（2026-11-14）: 黄金箱の秘宝を3つから1つ選ぶ（選ぶまで先へ進めない）
+          <RelicPicker game={game} chest={chest} />
         ) : claimIdx >= 0 ? (
           // 中身の取り合い（ステップ2）: 1つずつ。決まった物は上の一覧に「→ 名前」で出る
           <div className="-mt-3 max-h-[46vh] overflow-y-auto overscroll-contain" data-claim-area>

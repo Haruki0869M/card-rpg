@@ -2,12 +2,19 @@
 // 選ぶのは本人（CARD_TASK。この端末のキャラの画面に出る）。部屋はすぐ片づき、通路に戻る（だれかが選び終わるのを待たない）
 import { addLog } from '../../common';
 import { sceneHeroes } from '../../heroes';
+import { dungeonTheme } from '../../dungeon';
 import type { RoomBehavior } from '../types';
 
 export const behavior: RoomBehavior = {
   id: 'altar',
   enter(game, room) {
-    for (const h of sceneHeroes(game)) if (!h.retired && !h.cardTask && h.deck.length) h.cardTask = 'altar';
+    // 古代の晶洞（2026-11-14 寄り道の値打ち）: 祭壇はテーマの altarUses 回（2回）使える。残りの回数は altarLeft
+    const uses = dungeonTheme(game.dungeon?.theme)?.reward?.altarUses ?? 1;
+    for (const h of sceneHeroes(game)) {
+      if (h.retired || h.cardTask || !h.deck.length) continue;
+      h.cardTask = 'altar';
+      if (uses > 1) h.altarLeft = uses - 1;
+    }
     room.cleared = true;
     game.mode = 'dungeon';
     addLog(game, '晶石の祭壇が光っている。カードを1枚ずつ、強化か変異ができる');

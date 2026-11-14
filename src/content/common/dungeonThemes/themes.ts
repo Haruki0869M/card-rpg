@@ -9,10 +9,11 @@ export const dungeonThemes: DungeonThemeDef[] = [
     order: 1,
     name: '古代の晶洞',
     mark: '💎',
-    description: 'イベントと宝箱が多く、戦闘は少なめ。宝箱のお金+50%。奥に晶石の祭壇',
+    // 寄り道の値打ち（2026-11-14 オーナーの返事 5-A）: 宝箱のお金+50% の代わりに、晶石の祭壇を2回使える
+    description: 'イベントと宝箱が多く、戦闘は少なめ。奥に晶石の祭壇（カードの強化か変異を2回）',
     weights: { battle: 22, elite: 8, event: 30, chest: 30, rest: 10 },
     fixedRoom: 'crystalAltar',
-    reward: { chestGold: 1.5 },
+    reward: { altarUses: 2 },
   },
   {
     id: 'sealedLabyrinth',
@@ -32,10 +33,11 @@ export const dungeonThemes: DungeonThemeDef[] = [
     order: 3,
     name: '無法者の隠れ処',
     mark: '🗡',
-    description: '戦闘が多く、敵は数が多い組。戦闘のお金+30%。奥に闇商人（専用の装備を売る）',
+    // 寄り道の値打ち（2026-11-14 オーナーの返事 5-A）: 戦闘のお金+30% の代わりに、闇商人の専用の装備を2つから選べる
+    description: '戦闘が多く、敵は数が多い組。奥に闇商人（専用の装備を2つ並べる。1つ選んで買える）',
     weights: { battle: 50, elite: 16, event: 12, chest: 12, rest: 10 },
     fixedRoom: 'blackMarket',
     largeGroups: true,
-    reward: { battleGold: 1.3 },
+    reward: { blackMarketChoices: 2 },
   },
 ];

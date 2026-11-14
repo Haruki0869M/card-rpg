@@ -1,7 +1,7 @@
 // ===== 戦闘のユニット（味方・敵）の共通処理: 名前・ログ・ダメージ・回復・戦闘不能 =====
 import { BALANCE } from '../../data/balance';
 import { fireAbilities, healToBlockOf, enduresOf, rageStackOf } from '../abilities';
-import { getEnemy } from '../../data/enemies';
+import { getEnemy, phasesOf } from '../../data/enemies';
 import type { AbilitySource, AllyState, BattleEvent, BattleState, EnemyState } from '../../types';
 import type { Rng } from '../rng';
 import { fallbackLoneIntents, retargetAfterDeath } from './intents';
@@ -26,7 +26,7 @@ export const findUnit = (state: BattleState, id: string): Unit | undefined => fi
 
 export function enemyName(enemy: EnemyState): string {
   const def = getEnemy(enemy.defId);
-  const phaseName = enemy.phase > 0 ? def.phases?.[enemy.phase - 1]?.name : undefined;
+  const phaseName = enemy.phase > 0 ? phasesOf(enemy)?.[enemy.phase - 1]?.name : undefined;
   return (def.rare ? '★' : '') + (phaseName ?? def.name) + (enemy.nameSuffix ? ` ${enemy.nameSuffix}` : '');
 }
 
@@ -75,22 +75,47 @@ function killEnemy(state: BattleState, enemy: EnemyState, rng: Rng, events: Batt
   events.push({ type: 'death', unitId: enemy.uid });
   // かばう相手がいなくなった敵は、予告を代わりの行動（闇の剣）に変える
   fallbackLoneIntents(state, rng, events);
+  // 最後の中ボス（2026-11-14 寄り道の値打ち 柱5）: 相方（同じ段階の出どころ phaseSet を持つ、ほかの敵 = 中ボスの組の相手）が全部倒れたら、
+  // 残った方が「相方が倒れると入る段階」に入る。呼ばれた敵・仲間を呼ぶで来た敵は相方に数えない
+  if (enemy.summoned) return;
+  const partnerOf = (o: EnemyState, x: EnemyState) => x !== o && !x.summoned && x.phaseSet === o.phaseSet;
+  for (const o of state.enemies) {
+    if (o.dead || o.summoned || state.enemies.some((x) => partnerOf(o, x) && !x.dead)) continue;
+    const phases = phasesOf(o);
+    const i = phases?.findIndex((p, k) => !!p.onPartnerDown && o.phase < k + 1) ?? -1;
+    if (i >= 0) enterPhase(state, o, i, events, '相方が倒れ、');
+  }
+}
+
+/** 段階 i（0から）に入る: 行動の順番を最初に戻し、ログ・演出。災厄の加護「炉の熱」が掛かった大物なら、味方全員に火傷（2026-11-14） */
+function enterPhase(state: BattleState, enemy: EnemyState, i: number, events: BattleEvent[], why = '') {
+  const phases = phasesOf(enemy)!;
+  enemy.phase = i + 1;
+  enemy.seqIndex = 0;
+  enemy.history = [];
+  addLog(state, `${why}${getEnemy(enemy.defId).name}が「${phases[i].name}」に姿を変えた！`);
+  // ボスの段階（2026-11-14）: 次の予告が開幕の一手になる事と、この段階の新しい決まりをログに出す（今の予告は変えない）
+  const opening = phases[i].openingActionId ? phases[i].actions.find((a) => a.id === phases[i].openingActionId) : undefined;
+  if (opening) addLog(state, `🌀次は「${opening.name}」をしてくる${phases[i].rule ? `（${phases[i].rule}）` : ''}`);
+  events.push({ type: 'enemyPhase', enemyUid: enemy.uid, name: phases[i].name });
+  const burn = state.boon?.phaseBurn;
+  if (burn && state.boon!.uid === enemy.uid) {
+    for (const a of state.allies) {
+      if (a.dead) continue;
+      a.statuses.burn = (a.statuses.burn ?? 0) + burn;
+      events.push({ type: 'status', unitId: a.id, status: 'burn', amount: burn });
+    }
+    addLog(state, `💀炉の熱（業火の魔人の加護）: 味方全員に火傷${burn}`);
+  }
 }
 
 /** ボスの段階の切り替え（HPが一定以下になったら） */
 function checkEnemyPhase(state: BattleState, enemy: EnemyState, events: BattleEvent[]) {
-  const phases = getEnemy(enemy.defId).phases;
+  const phases = phasesOf(enemy);
   if (!phases || enemy.dead) return;
   for (let i = phases.length - 1; i >= 0; i--) {
     if (enemy.phase < i + 1 && enemy.hp * 100 <= enemy.maxHp * phases[i].belowHpPct) {
-      enemy.phase = i + 1;
-      enemy.seqIndex = 0;
-      enemy.history = [];
-      addLog(state, `${getEnemy(enemy.defId).name}が「${phases[i].name}」に姿を変えた！`);
-      // ボスの段階（2026-11-14）: 次の予告が開幕の一手になる事と、この段階の新しい決まりをログに出す（今の予告は変えない）
-      const opening = phases[i].openingActionId ? phases[i].actions.find((a) => a.id === phases[i].openingActionId) : undefined;
-      if (opening) addLog(state, `🌀次は「${opening.name}」をしてくる${phases[i].rule ? `（${phases[i].rule}）` : ''}`);
-      events.push({ type: 'enemyPhase', enemyUid: enemy.uid, name: phases[i].name });
+      enterPhase(state, enemy, i, events);
       return;
     }
   }

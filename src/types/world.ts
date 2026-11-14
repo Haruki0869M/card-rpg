@@ -281,15 +281,37 @@ export interface ScourgeDef {
   /** 札に出す悪さの短い文（店+25%）と、知らせ・説明の文 */
   curseShort: string;
   curseText: string;
-  /** 倒した時の報酬。gold = 戦った全員で山分け / corruption = 侵食度を下げる量（寄り道の浄化とは別） / elixir = 秘薬の数 */
-  reward: { gold?: number; corruption?: number; elixir?: number };
+  /**
+   * 倒した時の報酬。gold = 戦った全員で山分け / corruption = 侵食度を下げる量（寄り道の浄化とは別） / elixir = 秘薬の数 /
+   * freeShop = 町の店の品（装備・消耗品）を1つ無料でもらえる券の数（パーティみんなの物。2026-11-14 盗賊王の 300G の代わり）
+   */
+  reward: { gold?: number; corruption?: number; elixir?: number; freeShop?: number };
   /** 専用の装備（必ず落とす。ItemDef.source = 'scourge'） */
   gear: string;
   /** 倒した時の文（店の値段が元に戻った） */
   clearText: string;
+  /**
+   * 災厄の加護（2026-11-14 寄り道の値打ち 柱1）: 生きている間、鍵と最後のダンジョンのボス・中ボスの戦闘に足される決まり（HP・攻撃の倍率は使わない）。
+   * 保存しない（生きている災厄から毎回求める）。name = 「用心棒」など / text = 何が起きるか（札・長押しに出す）
+   */
+  boon: ScourgeBoon;
   /** 出た時の文（物語の窓に出す。1〜2行） */
   appearText: string;
 }
+
+/**
+ * 災厄の加護の種類（world/scourgeBoons.ts が戦闘に付ける）:
+ * bodyguard = 戦闘の始めに手下（enemy）が1体加わる / regen = 大物が敵の番の始めに最大HPの pct% 回復（呪い・癒し封じで減る）/
+ * huntFirst = 大物の最初の予告が「手負い狙い」（action = 共通の加護の行動のID）/ breakWard = 大物への最初の BREAK が1回だけ効かない /
+ * phaseBurn = 大物が段階の境目を越えるたび、味方全員に火傷 amount
+ */
+export type ScourgeBoon = { name: string; text: string } & (
+  | { kind: 'bodyguard'; enemy: string }
+  | { kind: 'regen'; pct: number }
+  | { kind: 'huntFirst'; action: string }
+  | { kind: 'breakWard' }
+  | { kind: 'phaseBurn'; amount: number }
+);
 
 export interface Raid {
   townId: string;
@@ -372,6 +394,13 @@ export interface WorldState {
    */
   scourgeCount?: number;
   scourgesMet?: string[];
+  /**
+   * 見破り（2026-11-14 寄り道の値打ち 柱2）: ランダムダンジョンの主を倒して見破った、鍵と最後のダンジョンのID（そのボスの大技と開幕の一手は、完全成功だけで崩れる）。
+   * 無ければ空（古い保存）
+   */
+  insight?: string[];
+  /** 盗賊王の無料券（町の店の装備・消耗品を1つ無料。パーティみんなの物。2026-11-14）。無ければ0 */
+  freeShop?: number;
 }
 
 export interface ShopStock {
