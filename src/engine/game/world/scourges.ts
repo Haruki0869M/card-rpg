@@ -7,15 +7,16 @@ import { BALANCE } from '../../../data/balance';
 import { getItem } from '../../../data/items';
 import { getDifficulty } from '../../../data/rules';
 import { corruptionName, getScenario } from '../../../data/scenarios';
+import { TERMS } from '../../../data/terms';
 import { SCOURGES, TERRAINS } from '../../../data/world';
-import type { GameState, Hero, ItemInstance, RewardState, ScourgeDef, Wanderer, WorldState } from '../../../types';
+import type { GameState, Hero, ItemInstance, RewardState, ScenarioMapDef, ScourgeDef, Wanderer, WorldState } from '../../../types';
 import type { Rng } from '../../rng';
 import { addItem, addLog, leastLoaded, splitGold } from '../common';
 import { jobWeapons } from '../hero';
 import { livingHeroes, mapHeroes } from '../heroes';
 import { newItem } from '../loot';
 import { hexDistance, neighbors } from './hex';
-import { isWideMap, laneOfTile } from './lanes';
+import { isWideMap, laneOfCol, laneOfTile } from './lanes';
 import { corruptionLevelBonus } from './wanderers';
 import { aliveScourges } from './scourgeCurse';
 import { describeAbility } from '../../abilities';
@@ -32,9 +33,38 @@ export function scourgesDue(w: WorldState): number {
   return Math.min(s.max, n);
 }
 
+/**
+ * そのシナリオに出る災厄（シナリオ2の作り直し §2-2）: 地図の scourges の一覧（省略は SCOURGES.all 全部）。
+ * 並びは SCOURGES.all の順のまま（一覧に無い物を除くだけ）。シナリオ1は今の5体が今の順で残るので、選ぶ時の乱数の順番は変わらない
+ */
+export function scourgesFor(scenarioId: string): readonly ScourgeDef[] {
+  const list = getScenario(scenarioId).map?.scourges;
+  return list ? SCOURGES.all.filter((d) => list.includes(d.id)) : SCOURGES.all;
+}
+
+/**
+ * 災厄の文の「侵食度」（札の短い文では「侵食」）を、そのシナリオの悪化の名前（シナリオ2は「冬の深さ」）にする（シナリオ2の作り直し §2-2）。
+ * シナリオ1は悪化の名前が「侵食度」なので、文は今と同じ。災厄の文では「侵食」を悪化の名前の意味だけに使う
+ */
+export function scourgeText(game: Pick<GameState, 'scenarioId'>, text: string): string {
+  const name = corruptionName(game.scenarioId);
+  return name === TERMS.corruption ? text : text.replace(CORRUPTION_WORD, name);
+}
+/** 「侵食度」か、短い「侵食」（TERMS.corruption の最後の「度」を省いた形） */
+const CORRUPTION_WORD = new RegExp(`${TERMS.corruption.replace(/度$/, '')}度?`, 'g');
+
+/**
+ * 災厄を置ける帯の id（シナリオ2の作り直し §2-2）: 街道の骨格の点が通る帯（シナリオ1は中央の街道）を除いた帯（シナリオ1は西と東）。
+ * 街道の骨格が無い地図は全部の帯。帯の無い地図は空
+ */
+export function scourgeLanes(def: Pick<ScenarioMapDef, 'lanes' | 'highway'> | undefined): Set<string> {
+  const highway = new Set((def?.highway ?? []).map(([c]) => (def ? laneOfCol(def, c)?.id : undefined)));
+  return new Set((def?.lanes ?? []).map((l) => l.id).filter((id) => !highway.has(id)));
+}
+
 /** 新しい冒険の地図を作った時（広い地図だけ）: まだ1体も出ていない */
 export function initScourges(game: GameState, w: WorldState) {
-  if (!isWideMap(game, w) || !SCOURGES.all.length) return;
+  if (!isWideMap(game, w) || !scourgesFor(game.scenarioId).length) return;
   w.scourgeCount = 0;
   w.scourgesMet = [];
 }
@@ -44,7 +74,7 @@ export function initScourges(game: GameState, w: WorldState) {
  * 古い保存（scourgeCount が無い）: 地図は作り直さない。もう越えた節目の分は出さず、これから越える節目では出る
  */
 export function tickScourges(game: GameState, w: WorldState, rng: Rng) {
-  if (!isWideMap(game, w) || !SCOURGES.all.length) return;
+  if (!isWideMap(game, w) || !scourgesFor(game.scenarioId).length) return;
   if (w.scourgeCount === undefined) {
     w.scourgeCount = scourgesDue(w);
     w.scourgesMet ??= [];
@@ -54,10 +84,12 @@ export function tickScourges(game: GameState, w: WorldState, rng: Rng) {
   if (spawnScourge(game, w, rng)) w.scourgeCount += 1;
 }
 
-/** 災厄を置けるマス: 西か東の帯・陸の空きマス・街道から roadDistance マス以上・世界マップの一番近いキャラから heroDistance の範囲・歩いて行ける */
+/** 災厄を置けるマス: 街道の帯でない帯（シナリオ1は西か東）・陸の空きマス・街道から roadDistance マス以上・世界マップの一番近いキャラから heroDistance の範囲・歩いて行ける */
 export function scourgeCandidates(game: GameState, w: WorldState): number[] {
   const s = BALANCE.scourge;
-  const road = getScenario(game.scenarioId).map?.roadTerrain;
+  const map = getScenario(game.scenarioId).map;
+  const road = map?.roadTerrain;
+  const lanes = scourgeLanes(map);
   const onMap = mapHeroes(game).map((h) => w.pos[h.id]).filter((i): i is number => i !== undefined);
   // 全員がダンジョンの中なら、その入口から測る
   const heroes = onMap.length ? onMap : livingHeroes(game).map((h) => w.pos[h.id]).filter((i): i is number => i !== undefined);
@@ -77,7 +109,7 @@ export function scourgeCandidates(game: GameState, w: WorldState): number[] {
   for (const i of reach) {
     if (w.tiles[i].f || busy.has(i) || !land(i)) continue;
     const lane = laneOfTile(game, w, i);
-    if (lane !== 'west' && lane !== 'east') continue;
+    if (lane === undefined || !lanes.has(lane)) continue;
     if (roads.some((r) => hexDistance(w, r, i) < s.roadDistance)) continue;
     const d = Math.min(...heroes.map((h) => hexDistance(w, h, i)));
     if (d < lo || d > hi) continue;
@@ -99,7 +131,7 @@ export function spawnScourge(game: GameState, w: WorldState, rng: Rng): Wanderer
   const met = w.scourgesMet ?? [];
   // 寄り道の値打ち（2026-11-14 柱3 の2）: 専用の装備をだれも使えない種類（黄金冠・冥獄鎌など）は、使えるキャラがいる時だけ候補に入れる（乱数は今のまま冒険の Rng）
   const party = game.heroes.filter((h) => !h.retired);
-  const kinds = SCOURGES.all.filter((d) => !met.includes(d.id) && scourgeFits(party, d));
+  const kinds = scourgesFor(game.scenarioId).filter((d) => !met.includes(d.id) && scourgeFits(party, d));
   if (!kinds.length) return undefined;
   const cands = scourgeCandidates(game, w);
   if (!cands.length) return undefined;
@@ -113,8 +145,8 @@ export function spawnScourge(game: GameState, w: WorldState, rng: Rng): Wanderer
   if (watched) w.tiles[tile].seen = true;
   const seen = w.tiles[tile].seen;
   const lines = [
-    def.appearText,
-    `${def.curseText}。`,
+    scourgeText(game, def.appearText),
+    `${scourgeText(game, def.curseText)}。`,
     seen ? (watched ? '塔の見張りが場所を知らせてくれた（地図の💀）。' : '場所は地図の💀の所。') : 'くわしい場所は、見晴らしの塔に登ると分かる。',
     // 倒すと手に入る専用の装備の効果（2026-11-13。長いので最後に置く）
     `倒すと元に戻り、専用の装備「${getItem(def.gear).name}」を落とす（${scourgeGearText(def).replace(/。$/, '')}）。`,
@@ -123,7 +155,7 @@ export function spawnScourge(game: GameState, w: WorldState, rng: Rng): Wanderer
   ];
   // 回1: 制覇の物語などの後ろに足さず、その窓を閉じた後に別の窓で出す。地域（「嘆きの沼の東」）までは最初から分かる
   queueStory(w, { title: `💀 ${def.name}が、${placeName(game, w, tile)}に現れた！`, lines });
-  addLog(game, `💀 ${def.name}が現れた！（${def.curseText}）`);
+  addLog(game, `💀 ${def.name}が現れた！（${scourgeText(game, def.curseText)}）`);
   return wd;
 }
 
@@ -169,8 +201,8 @@ export function onScourgeDefeated(game: GameState, def: ScourgeDef, heroes: Hero
     got.push(`${corruptionName(game.scenarioId)}が${Math.round((before - w.corruption) * 10) / 10}%下がった`);
   }
   got.push(`専用の装備「${getItem(def.gear).name}」${def.reward.elixir ? `と「${getItem(ELIXIR_ID).name}」` : ''}を手に入れた`);
-  pushStory(w, `💀 ${def.short}を倒した！`, [def.clearText, ...got.map((x) => `${x}。`)]);
-  addLog(game, `💀 ${def.name}を倒した！ ${def.clearText}`);
+  pushStory(w, `💀 ${def.short}を倒した！`, [scourgeText(game, def.clearText), ...got.map((x) => `${x}。`)]);
+  addLog(game, `💀 ${def.name}を倒した！ ${scourgeText(game, def.clearText)}`);
 }
 
 export const ELIXIR_ID = 'scourgeElixir';
@@ -206,8 +238,8 @@ export function scourgeList(game: GameState): { id: string; name: string; short:
     id: def.id,
     name: def.name,
     short: def.short,
-    curseShort: def.curseShort,
-    curseText: def.curseText,
+    curseShort: scourgeText(game, def.curseShort),
+    curseText: scourgeText(game, def.curseText),
     seen: !!w.tiles[wd.tile]?.seen,
     tile: wd.tile,
     gearName: getItem(def.gear).name,

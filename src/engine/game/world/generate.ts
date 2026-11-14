@@ -20,8 +20,10 @@ import { initScourges } from './scourges';
 
 const pick = <T,>(list: readonly T[], rng: Rng) => list[rng.int(list.length)];
 
-/** 薬草の群生地のイベント（src/content/common/randomEvents/herbField.ts） */
+/** 薬草の群生地のイベント（src/content/common/randomEvents/herbField.ts）。地図の herbEvent を省略した時の「回復のマス」 */
 export const HERB_EVENT = 'herbField';
+/** その地図の「回復のマス」のイベントの id（シナリオ2の作り直し §2-1。省略は薬草の群生地） */
+export const herbEventOf = (def: Pick<ScenarioMapDef, 'herbEvent'> | undefined): string => def?.herbEvent ?? HERB_EVENT;
 /** 【提案】祠を「多く置く帯」に置く確率（外れたら地域のどこでも） */
 const PREFER_CHANCE = 0.75;
 /** 【提案】盆地・半島の宝箱が黄金箱になる確率（それ以外は装飾箱） */
@@ -259,7 +261,8 @@ export function createWorld(game: GameState, rng: Rng): WorldState {
     }, def.prefer?.chest);
     if (mapEvents.length) place(reg.events ?? 0, () => ({ kind: 'event', id: pick(mapEvents, rng).id }));
     // 薬草の群生地（段階6a）: 決めた帯に置く
-    if (reg.herbs && EVENTS.tryGet(HERB_EVENT)) place(reg.herbs, () => ({ kind: 'event', id: HERB_EVENT }), def.prefer?.herb, true);
+    const herb = herbEventOf(def);
+    if (reg.herbs && EVENTS.tryGet(herb)) place(reg.herbs, () => ({ kind: 'event', id: herb }), def.prefer?.herb, true);
     if (shrineIds.length) place(reg.shrines ?? 0, () => ({ kind: 'shrine', id: pick(shrineIds, rng) }), def.prefer?.shrine);
     // ランダムダンジョン: prefer が配列なら、1つ目は1つ目の帯・2つ目は2つ目の帯（段階7a: 西と東に1つずつ）
     const rdLane = def.prefer?.randomDungeon;

@@ -8,6 +8,9 @@ export const frozenKingdomMap: ScenarioMapDef = {
   height: 35,
   start: [3, 33],
   roadTerrain: 'road',
+  // 出る災厄（シナリオ2の作り直し §2-2・オーナーの返事 1-A）。氷嵐の魔女は手下がもともと雪の敵なので共通で出す。
+  // このシナリオの3体は次の区切りで足す。今の 8×35 は広い地図ではないので、まだ災厄は出ない
+  scourges: ['stormWitch'],
   regions: [
     {
       id: 'iceCastleWaste',
