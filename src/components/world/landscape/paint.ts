@@ -156,10 +156,13 @@ function roadPattern(ctx: CanvasRenderingContext2D, R: number, angle: number, cx
 const patCache = new Map<string, CanvasPattern | null>();
 let patR = 0;
 
+/** 地面の絵を借りる地形（湖の氷 = 氷原の絵を、明るい色の上に敷く。違いは paintTile の「氷の照り」で出す） */
+const TERRAIN_ART: Record<string, string> = { lakeIce: 'ice' };
+
 /** 地形の模様（描いた絵を R*4 の大きさで敷く）。絵がまだ読み込まれていなければ色だけ */
 function terrainPattern(ctx: CanvasRenderingContext2D, id: string, R: number, cache: Map<string, CanvasPattern | null>): CanvasPattern | null {
   if (cache.has(id)) return cache.get(id)!;
-  const img = loadedImage(artImage(`terrain/${id}`));
+  const img = loadedImage(artImage(`terrain/${TERRAIN_ART[id] ?? id}`));
   let p: CanvasPattern | null = null;
   if (img) {
     p = ctx.createPattern(img, 'repeat');
@@ -342,6 +345,40 @@ export function paintRange(ctx: CanvasRenderingContext2D, inp: PaintInput, y0: n
     ctx.lineWidth = Math.max(1, R * 0.035);
     ctx.lineCap = 'round';
     ctx.stroke();
+
+    // 湖の氷（シナリオ2。滑って速く進む道）: つるつるの照り（どのマスも同じ向きの白い筋）と、細いひび
+    if (t.t === 'lakeIce') {
+      const hsh = (s: number) => hash01(i, s);
+      ctx.lineCap = 'round';
+      // 白い照り: 右上がりの筋を2〜3本（長さと場所だけマスごとに変える）
+      const n = 2 + (hsh(130) < 0.5 ? 1 : 0);
+      for (let q = 0; q < n; q++) {
+        const sx = cx + (hash01(i * 4 + q, 131) - 0.5) * R * 0.9;
+        const sy = cy + (hash01(i * 4 + q, 132) - 0.5) * R * 0.7;
+        const len = R * (0.28 + hash01(i * 4 + q, 133) * 0.3);
+        ctx.beginPath();
+        ctx.moveTo(sx - len * 0.5, sy + len * 0.2);
+        ctx.lineTo(sx + len * 0.5, sy - len * 0.2);
+        ctx.strokeStyle = q === 0 ? 'rgba(255,255,255,.75)' : 'rgba(240,250,255,.45)';
+        ctx.lineWidth = Math.max(1, R * (q === 0 ? 0.06 : 0.035));
+        ctx.stroke();
+      }
+      // 細いひび（3マスに1つくらい。枝が1本）
+      if (hsh(134) < 0.36) {
+        const sx = cx + (hsh(135) - 0.5) * R * 0.7, sy = cy + (hsh(136) - 0.3) * R * 0.5;
+        const ang = hsh(137) * Math.PI;
+        const dx = Math.cos(ang) * R * 0.26, dy = Math.sin(ang) * R * 0.14;
+        ctx.beginPath();
+        ctx.moveTo(sx - dx, sy - dy);
+        ctx.lineTo(sx + dx * 0.1, sy + dy * 0.3);
+        ctx.lineTo(sx + dx, sy + dy);
+        ctx.moveTo(sx + dx * 0.1, sy + dy * 0.3);
+        ctx.lineTo(sx + dx * 0.1 - dy * 0.9, sy + dy * 0.3 + dx * 0.35);
+        ctx.strokeStyle = 'rgba(52,96,132,.55)';
+        ctx.lineWidth = Math.max(0.7, R * 0.025);
+        ctx.stroke();
+      }
+    }
 
     // 川（見た目だけ）: 墨のふち → 水の色 → 光の線
     const rk = rivers.get(i);

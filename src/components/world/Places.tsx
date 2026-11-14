@@ -37,7 +37,7 @@ import {
   statChance,
   corruptionShown,
   scourgeAt,
-  scourgeRewardText,
+  scourgeRewardText, scourgeText,
   scourgesWith,
   rumorText,
 } from '../../engine';
@@ -99,7 +99,7 @@ export function EncounterScreen() {
           <div className={`font-display text-outline text-center text-[24px] ${scourge ? 'text-fuchsia-200' : 'text-red-200'}`}>{e.ambushed ? '夜襲だ！' : scourge ? `💀 ${scourge.name}！` : wd?.raidTown ? '町を襲う魔物！' : '魔物に遭遇した！'}</div>
           {scourge && (
             <div className="panel mt-1 rounded-xl border border-fuchsia-400/50 p-2 text-[12px] leading-4" data-encounter-scourge={scourge.id}>
-              <div className="text-fuchsia-100">いま世界に: {scourge.curseText}</div>
+              <div className="text-fuchsia-100">いま世界に: {scourgeText(game, scourge.curseText)}</div>
               <div className="mt-0.5 text-amber-100">倒すと: 悪さが消える。{scourgeRewardText(game, scourge)}</div>
               <div className="mt-0.5 text-zinc-300">逃げても、災厄は巣に残る（また挑める）</div>
             </div>
