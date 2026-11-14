@@ -1,17 +1,30 @@
 // ===== ワールドマップの駒（チェスの駒のようなミニチュア） =====
 // 丸い台座（上面も側面もプレイヤーの色・ふちは金）。台座の上に立つのは:
-//   - src/assets/art/piece/<職業ID>-<male|female>.webp があれば、そのミニチュアの絵
+//   - src/assets/art/piece/<基本職ID>-<male|female>.webp があれば、そのミニチュアの絵
+//     （駒は基本職の16人分だけ。転職しても、転職の元をたどった基本職の駒を使う。2026-11-14 オーナーの決定）
 //   - 無ければ、今の顔の絵をメダルにして立てる（仮の見た目）
 // 移動では「持ち上げる → 隣のマスへ → カツンと置く」。見た目だけで、ゲームの状態や乱数には関係しない。
 import { useId } from 'react';
 import { artImage, CharacterArt } from '../../art';
+import { CLASSES } from '../../data/classes';
 import type { Hero } from '../../types';
 
 /** 仮の見た目の顔のメダルの直径（駒の箱の大きさに対する割合） */
 export const MEDAL = 0.72;
 
+/** 転職の元（from）をたどって、基本職のIDを返す（元が無ければ、そのジョブ自身） */
+export function baseClassId(classId: string): string {
+  let id = classId;
+  for (let i = 0; i < 8; i++) {
+    const from = CLASSES.tryGet(id)?.from?.[0];
+    if (!from) break;
+    id = from;
+  }
+  return id;
+}
+
 export function pieceImage(hero: Pick<Hero, 'classId' | 'gender'>) {
-  return artImage(`piece/${hero.classId}-${hero.gender}`);
+  return artImage(`piece/${baseClassId(hero.classId)}-${hero.gender}`);
 }
 
 interface Props {
