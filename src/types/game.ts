@@ -469,6 +469,12 @@ export interface EventState {
   random?: boolean;
   /** イベントの結果で始まる戦闘（「つづける」で始まる） */
   battle?: EventBattle;
+  /**
+   * みんなで決めた判定つきの選択肢と、挑む役（2人以上のプレイヤー。実機の不具合① 2026-11-14・案A）。
+   * ある間は「挑む段」: 挑む役の持ち主だけがフォーカスを決めて挑む（EVENT_CHALLENGE）／任せる（EVENT_HANDOVER）／選び直す（EVENT_RECHOOSE）。
+   * 保存の版は上げない（無い = 選ぶ段。古い保存もそのまま選ぶ段から）
+   */
+  decided?: { optionIndex: number; heroId: string };
   /** 選んだ結果（選ぶ前は undefined） */
   result?: { optionIndex: number; heroId?: string; results?: ('focus' | 'hit' | 'miss')[]; success: boolean; text: string; loot: Loot[] };
 }
@@ -674,6 +680,12 @@ export type GameCommand =
   | { type: 'OPEN_CHEST'; playerId: PlayerId; heroId: string; recipientId?: string; focusUsed: number }
   | { type: 'LEAVE_CHEST'; playerId: PlayerId }
   | { type: 'CHOOSE_EVENT'; playerId: PlayerId; optionIndex: number; heroId?: string; focusUsed: number }
+  /** 挑む段（EventState.decided）: 挑む役（heroId = 今の挑む役）の持ち主がフォーカスを決めて挑む */
+  | { type: 'EVENT_CHALLENGE'; playerId: PlayerId; heroId: string; focusUsed: number }
+  /** 挑む段: 挑む役を別のキャラに任せる（heroId = 今の挑む役。任せる先は toHeroId。点検 F1） */
+  | { type: 'EVENT_HANDOVER'; playerId: PlayerId; heroId: string; toHeroId: string }
+  /** 挑む段: 選ぶ段に戻る（heroId = 今の挑む役。挑めるキャラがいない時は省いてよい） */
+  | { type: 'EVENT_RECHOOSE'; playerId: PlayerId; heroId?: string }
   | { type: 'FINISH_EVENT'; playerId: PlayerId }
   | { type: 'REST'; playerId: PlayerId; kind: 'hp' | 'focus' | 'upgrade' }
   | { type: 'RETREAT'; playerId: PlayerId }

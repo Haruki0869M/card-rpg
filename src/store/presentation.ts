@@ -236,7 +236,7 @@ export function explorationNotices(before: GameState, after: GameState, wire: Ga
     const bonus = petExplore(after.heroes.find(h => h.id === cmd.heroId)).luckBonus;
     if (bonus) add(cmd.heroId, `宝箱の運+${bonus}%`);
   }
-  if (cmd.type === 'CHOOSE_EVENT' && !prev.event?.result && next.event?.result) {
+  if ((cmd.type === 'CHOOSE_EVENT' || cmd.type === 'EVENT_CHALLENGE') && !prev.event?.result && next.event?.result) {
     const resolved = next.event.result, option = prev.event && EVENTS.get(prev.event.eventId).options[resolved.optionIndex];
     if (option?.check && resolved.heroId) {
       const who = after.heroes.find(h => h.id === resolved.heroId);

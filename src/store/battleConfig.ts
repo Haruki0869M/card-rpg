@@ -27,6 +27,8 @@ export const myPlayer = (): PlayerId => localPlayers?.[0] ?? LOCAL_PLAYER;
 export function actorOf(game: GameState, cmd: GameCommand): PlayerId {
   const heroPlayer = (id?: string) => (id ? game.heroes.find((h) => h.id === id)?.playerId : undefined);
   const first = localPlayers ? myPlayer() : (game.heroes.find((h) => !h.retired)?.playerId ?? LOCAL_PLAYER);
+  // 票の取り消し・入れ直しを、その席として送る（イベントの選択肢の取り消し。実機の不具合① 2026-11-14）。この端末の席でなければ、今までどおり
+  if (cmd.type === 'VOTE' && isLocalPlayer(cmd.playerId)) return cmd.playerId;
   const c = cmd as Record<string, unknown>;
   let id = (c.heroId ?? c.userId ?? c.fromHeroId) as string | undefined;
   if (cmd.type === 'CHOOSE_GROWTH') id = game.reward?.levelUps[0]?.heroId;

@@ -16,6 +16,7 @@ import { moveCostOf, neighbors, pathTo } from './game/world/hex';
 import { isWideMap } from './game/world/lanes';
 import { insightTarget, shortcutTile } from './game/world/detour';
 import { shortcutEntrance } from './game/game';
+import { eventChallenger } from './game/eventChallenge';
 import {
   applyGameCommand,
   canEquip,
@@ -576,6 +577,11 @@ export function botStep(g: GameState, log: BotLog, memo: BotMemo, inScene = fals
     case 'event': {
       const ev = g.event!;
       if (ev.result) return send(g, { type: 'FINISH_EVENT', playerId: pid(g) }, log);
+      // 2人以上: みんなで選んだ判定つきの選択肢の「挑む段」（実機の不具合① 2026-11-14）。挑む役の持ち主として、フォーカス0で挑む
+      if (ev.decided) {
+        const who = eventChallenger(g);
+        return send(g, who ? { type: 'EVENT_CHALLENGE', playerId: who.playerId, heroId: who.id, focusUsed: 0 } : { type: 'EVENT_RECHOOSE', playerId: pid(g) }, log);
+      }
       const def = EVENTS.get(ev.eventId);
       const party = livingHeroes(g).filter((x) => (!g.party || g.party.includes(x.id)) && (g.activeScene || ev.tile === undefined || !g.world || x.id === g.world.turn));
       // 選べる選択肢と、選ぶキャラ（お金がいる時は払えるキャラ）
