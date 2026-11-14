@@ -130,8 +130,8 @@ describe('第2弾: 表のとおりの割り当て（行動の名前・札・予�
     const a = actionOf(r);
     expect(a, `${r.id}.${r.act}`).toBeDefined();
     expect(a.name).toBe(r.name);
-    // 2026-11-14（特殊な行動のばらし）: 蒸気の精だけ大技でない（BREAK できない）。中身（数値・予告の文・1行の案内）は敵ごと（behaviorVariety.test.ts）
-    expect(!!a.big).toBe(r.id !== 'steamSprite');
+    // 2026-11-14（特殊な行動のばらし）: 中身（数値・予告の文・1行の案内）は敵ごと（behaviorVariety.test.ts）。蒸気の精も大技（オーナーの返事で戻した）
+    expect(!!a.big).toBe(true);
     expect(a.behavior).toBe(r.kind);
     expect(behaviorFromEffects(a)).toBe(r.kind);
     expect(a.hint && a.hint !== HINT[r.kind], `${r.id} の予告の文は敵ごと`).toBeTruthy();

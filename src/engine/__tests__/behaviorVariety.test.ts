@@ -247,10 +247,26 @@ describe('癒し封じ: だれに・どう消えるかが敵ごと', () => {
     s = nextTurn(s);
     expect(s.enemies[1].hp).toBe(106);
   });
-  it('蒸気の精: 大技ではない（BREAK できない）', () => {
-    const s = battle(['steamSprite', 'bvDummy']);
+  // 2026-11-14 オーナーの返事: ほかの癒し封じと同じに大技（紫の札）。中身（全員に1＋狙った1人に火傷1・ブロック無し）は敵ごとの形
+  it('蒸気の精: 大技（紫の札・弱点で完全成功の時だけ崩せる）。起きると全員に癒し封じ1・狙った1人に火傷1・ブロック無し', () => {
+    let s = battle(['steamSprite', 'bvDummy']);
     setIntent(s, 0, 'mist', s.allies[0].id);
-    expect(intentView(s, s.enemies[0])!.big).toBe(false);
+    const v = intentView(s, s.enemies[0])!;
+    expect(v.big).toBe(true);
+    expect(v.details.join(' ')).toMatch(/弱点の属性（氷）で、しかも完全成功/);
+    s = nextTurn(s);
+    expect(s.allies.map((a) => a.statuses.healSeal ?? 0)).toEqual([1, 1]);
+    expect(s.allies.map((a) => (a.statuses.burn ?? 0) > 0)).toEqual([true, false]);
+    expect(s.enemies[0].block).toBe(0);
+  });
+  it('蒸気の精: BREAK すると行動ごと止まる（癒し封じも火傷も付かない）', () => {
+    let s = battle(['steamSprite', 'bvDummy']);
+    setIntent(s, 0, 'mist', s.allies[0].id);
+    s.enemies[0].broken = true;
+    s = nextTurn(s);
+    expect(s.allies.map((a) => a.statuses.healSeal ?? 0)).toEqual([0, 0]);
+    expect(s.allies.map((a) => a.statuses.burn ?? 0)).toEqual([0, 0]);
+    expect(s.log.map((l) => l.text).join(' ')).toMatch(/体勢が崩れて「まとわりつく熱気」ができなかった/);
   });
   it('夢織り: もう癒し封じが付いている味方だけ眠る（遅延1）', () => {
     let s = battle(['dreamWeaver', 'bvDummy']);

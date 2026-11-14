@@ -19,8 +19,9 @@ export const steamSprite: EnemyDef = {
   firstActionId: 'mist',
   actions: [
     { id: 'scald', name: '熱い湯気', effects: [{ kind: 'damage', amount: 5 }, { kind: 'applyStatus', status: 'burn', amount: 1 }] },
-    // 「白い霧」を癒し封じに置き換えた。ID は古い保存のために残す。3つ目の地域なのでブロック8（BREAK されると行動ごと止まる）
-    { id: 'mist', name: 'まとわりつく熱気', behavior: 'healSeal', brief: '毎回少しずつ回復を封じる', hint: '味方全員の回復が1ターン半分になり、狙った1人に火傷1。大技ではないので BREAK できない。先に倒す', effects: [{ kind: 'applyStatus', status: 'healSeal', amount: 1, to: 'foes' }, { kind: 'applyStatus', status: 'burn', amount: 1 }] },
+    // 「白い霧」を癒し封じに置き換えた。ID は古い保存のために残す。
+    // 2026-11-14（特殊な行動のばらし・オーナーの返事）: ほかの癒し封じと同じに大技（紫の札。弱点の氷で完全成功の時だけ崩せる。ダメージが無いので BREAK すると行動ごと止まる）。中身（全員に1＋狙った1人に火傷1・ブロック無し）は敵ごとの形のまま
+    { id: 'mist', name: 'まとわりつく熱気', big: true, behavior: 'healSeal', brief: '毎回少しずつ回復を封じる', hint: '味方全員の回復が1ターン半分になり、狙った1人に火傷1。BREAK すると止まる。先に倒すか、崩す', effects: [{ kind: 'applyStatus', status: 'healSeal', amount: 1, to: 'foes' }, { kind: 'applyStatus', status: 'burn', amount: 1 }] },
     { id: 'jet', name: '蒸気の噴射', effects: [{ kind: 'damage', amount: 10, element: 'fire' }] },
   ],
 };
