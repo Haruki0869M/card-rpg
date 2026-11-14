@@ -405,12 +405,13 @@ function afterPetAct(state: BattleState, rng: Rng, events: BattleEvent[], owner:
  * 戦闘開始時ではない能力を先に選ぶ（無ければ戦闘開始時の能力をもう1回）。対象が要る効果は、先頭の生きている敵へ。
  * 何も起きなかった時（例: まだカードを使っていないターンの子狼）は undefined
  */
-export function petActOnce(state: BattleState, rng: Rng, events: BattleEvent[], owner: Unit, depth = 0): string | undefined {
+export function petActOnce(state: BattleState, rng: Rng, events: BattleEvent[], owner: Unit, depth = 0, target?: Unit): string | undefined {
   if (owner.dead || isEnemy(owner) || petCapped(owner)) return undefined;
   const list = abilitiesOf(owner).filter((ab) => ab.pet && isTriggered(ab.effect));
   const ab = list.find((a) => isTriggered(a.effect) && a.effect.when !== 'battleStart') ?? list[0];
   if (!ab || !isTriggered(ab.effect)) return undefined;
-  const ctx = makeCtx(state, rng, events, owner, { target: foesOf(state, owner)[0], depth, via: 'pet' });
+  // target: かこめ！（2026-11-14）は、カードの対象の敵を狙う。省略は先頭の生きている敵
+  const ctx = makeCtx(state, rng, events, owner, { target: target && !target.dead ? target : foesOf(state, owner)[0], depth, via: 'pet' });
   let any = false;
   for (const eff of ab.effect.do) any = applyEffect(ctx, eff) || any;
   if (!any) return undefined;

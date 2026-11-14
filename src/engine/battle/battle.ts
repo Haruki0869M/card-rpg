@@ -36,7 +36,7 @@ import { helpedAllies, recordSupport, selfSnapshot, supportSnapshot } from './su
 import { afterAttackCard, attackElement, consumeAttackCharge, cardElements, cardHpCost, chargedMultiplier, tierHpCost } from './cardState';
 import { slotPreviewLimitOf } from './preview';
 import { allyHasWeakCard } from './breakRules';
-import { isStrikingSummon, summonStrikeOnce } from './summons';
+import { isStrikingSummon, summonDamageOf, summonStrikeOnce } from './summons';
 import { activeStatuses, actionFailChanceOf, applyTick, chancePenaltyOf, consumeStatus, decayStatuses, emptyStatuses, skipActionStatus, takeDrawPenalty, takeManaPenalty, tickHealOf } from './statuses';
 import { abilityTriggered, addLog, enemyName, findAlly, healUnit, loseHp, nameOf, unitIdOf } from './units';
 
@@ -784,7 +784,7 @@ function summonsAttack(state: BattleState, ally: AllyState, rng: Rng, events: Ba
     if (again.length) {
       const focus2 = ally.summonFocus?.turn === state.turn ? again.find((e) => e.uid === ally.summonFocus!.uid) : undefined;
       const t2 = focus2 ?? (s.targetId ? again.find(e => e.uid === s.targetId) ?? again[0] : again[rng.int(again.length)]);
-      const loss2 = dealDamage(makeCtx(state, rng, events, ally, { target: t2, via: 'summon' }), t2, s.damage, s.element);
+      const loss2 = dealDamage(makeCtx(state, rng, events, ally, { target: t2, via: 'summon' }), t2, summonDamageOf(ally, s), s.element);
       if (loss2 > 0 && !ally.dead) fireAbilities(state, rng, events, ally, 'summonHit', { target: t2, depth: 1 });
       abilityTriggered(state, ally.id, twice!.name, events, twice!.source);
       addLog(state, `${ally.name}の${s.name}がもう1回攻撃！ ${enemyName(t2)}に${loss2}ダメージ`);
