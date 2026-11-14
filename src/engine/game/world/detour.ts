@@ -211,6 +211,34 @@ export const scourgeFits = (heroes: Hero[], def: ScourgeDef) => gearUsable(heroe
 
 // ---------- 画面用 ----------
 
+/**
+ * 地図のマスの説明に足す、寄り道の値打ちの行（行く前に何が得られるか・何が掛かっているかの手がかり）:
+ * - ランダムダンジョン（踏破していない）: 「主を倒すと: 秘宝を3つから1つ・👁見破り（〇〇のボス）・抜け道」
+ * - 鍵と最後のダンジョン: 掛かっている加護（💀）・見破っていれば「👁見破り済み」とボスの段階の境目と開幕の一手
+ */
+export function dungeonDetourLines(game: Pick<GameState, 'world' | 'scenarioId' | 'clearedDungeons'>, tile: number): string[] {
+  const w = game.world;
+  const f = w?.tiles[tile]?.f;
+  if (!w || f?.kind !== 'dungeon') return [];
+  const def = DUNGEONS.tryGet(f.id);
+  if (!def) return [];
+  if (def.random) {
+    if (f.used) return [];
+    const target = insightTarget(game);
+    return [`主を倒すと: 秘宝を3つから1つ・${target ? `👁見破り（${target.name}のボス）・` : ''}抜け道`];
+  }
+  if (!def.rewardKey && !def.finale) return [];
+  const out: string[] = [];
+  const boons = activeBoons(w);
+  if (boons.length) out.push(`💀加護: ${boons.map((d) => `「${d.boon.name}」`).join('')}（ボス・中ボスの戦闘に掛かる）`);
+  if (hasInsight(game, def.id)) {
+    const boss = getEnemy(def.pools.boss[0]);
+    const marks = (boss.phases ?? []).map((p) => `HP${p.belowHpPct}%で「${p.actions.find((a) => a.id === p.openingActionId)?.name ?? p.name}」${p.rule ? `（${p.rule}）` : ''}`);
+    out.push(`👁見破り済み: ${boss.name}の大技と開幕の一手は、完全成功だけで崩せる${marks.length ? `。段階: ${marks.join('／')}` : ''}`);
+  }
+  return out;
+}
+
 /** 加護の一覧（名前・中身・掛けている災厄）。札・入口・戦闘の長押しに出す */
 export function boonViews(game: Pick<GameState, 'world'>): { scourge: string; short: string; name: string; text: string }[] {
   return activeBoons(game.world).map((d) => ({ scourge: d.name, short: d.short, name: d.boon.name, text: d.boon.text }));

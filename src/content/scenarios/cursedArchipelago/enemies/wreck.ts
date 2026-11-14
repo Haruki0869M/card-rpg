@@ -63,6 +63,23 @@ export const krakenTentacle: EnemyDef = {
     { id: 'crush', name: '船ごと締め上げる', big: true, effects: [{ kind: 'damage', amount: 21 }] },
   ],
   abilities: [{ name: '深海の怪力', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 10 }] } }],
+  // 最後の中ボス（2026-11-14 寄り道の値打ち 柱5）: 中ボスの部屋の戦闘だけの段階。HP50%か、相方が倒れると入る。数字は【提案】
+  midbossPhases: [
+    {
+      belowHpPct: 50,
+      onPartnerDown: true,
+      name: '怒れるクラーケンの触腕',
+      pattern: 'sequence',
+      openingActionId: 'ktDeepCall',
+      rule: '仲間を呼ぶ（2回まで。弱点で BREAK すると止まる。先に倒すか、全体攻撃で）',
+      actions: [
+        { id: 'ktDeepCall', name: '深海から呼ぶ', big: true, scripted: true, behavior: 'call', brief: '幽霊水夫を1体呼ぶ', hint: '幽霊水夫を1体呼ぶ。雷の弱点で BREAK すると止まる。先に倒すか、全体攻撃で', effects: [{ kind: 'summonEnemy', enemy: 'ghostDeckhand', uses: 2, call: true, orElse: 'ktSqueeze' }] },
+        { id: 'ktSqueeze', name: '締め上げる', effects: [{ kind: 'damage', amount: 18 }] },
+        { id: 'ktLash', name: '触腕の薙ぎ', effects: [{ kind: 'damage', amount: 9, to: 'foes' }] },
+        { id: 'ktCallAgain', name: 'もう一度呼ぶ', big: true, behavior: 'call', brief: '幽霊水夫を1体呼ぶ', hint: '幽霊水夫を1体呼ぶ。雷の弱点で BREAK すると止まる。先に倒すか、全体攻撃で', effects: [{ kind: 'summonEnemy', enemy: 'ghostDeckhand', uses: 2, call: true, orElse: 'ktSqueeze' }] },
+      ],
+    },
+  ],
 };
 
 /** 海の魔女の亜種。属性が雷 */

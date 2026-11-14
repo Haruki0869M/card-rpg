@@ -15,7 +15,8 @@ export const scourges: ScourgeDef[] = [
     curse: { shopPrice: 25 },
     curseShort: '店+25%',
     curseText: 'すべての町の店の値段が25%高い（売る値段は変わらない）',
-    reward: { gold: 300 },
+    // 寄り道の値打ち（2026-11-14 オーナーの返事 5-A）: お金は余るので、300G の代わりに「町の店の品を1つ無料」の券
+    reward: { freeShop: 1 },
     gear: 'greedCrown',
     // 災厄の加護（2026-11-14 寄り道の値打ち 柱1。計画の表のまま。数字は【提案】）
     boon: { kind: 'bodyguard', enemy: 'banditThug', name: '用心棒', text: '大物の戦闘の始めに、盗賊の手下が1体加わる（先に倒すか、全体攻撃で）' },

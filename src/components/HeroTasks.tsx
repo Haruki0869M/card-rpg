@@ -160,7 +160,7 @@ function CardTask({ hero, send }: { hero: Hero; send: (c: GameCommand) => void }
   const picked = pickedInst ? (upgrading ? getCard(pickedInst.cardId, true) : cardOf(pickedInst)) : undefined;
   return (
     <Frame title={title} hero={hero}>
-      <div className="mt-1 text-center text-[13px] text-zinc-300">{TASK_TEXT[task]}</div>
+      <div className="mt-1 text-center text-[13px] text-zinc-300">{TASK_TEXT[task]}{task === 'altar' && hero.altarLeft ? `（この後もう${hero.altarLeft}回）` : ''}</div>
       {task === 'altar' && (
         <>
           <div className="mt-2 grid grid-cols-2 gap-1.5" data-altar-modes>
@@ -219,7 +219,7 @@ function Peddler({ hero, send }: { hero: Hero; send: (c: GameCommand) => void })
       <div className="mt-1 flex items-center justify-center gap-1 text-[14px] font-bold text-amber-200">
         <Coins size={15} /> 所持金 {hero.gold}G
       </div>
-      {black && <div className="mt-1 text-center text-[12px] leading-4 text-zinc-300" data-black-market>「専用」の装備は、ここと黄金箱でしか手に入らない。値段は町より高め。買わなくてもよい</div>}
+      {black && <div className="mt-1 text-center text-[12px] leading-4 text-zinc-300" data-black-market>「専用」の装備は、ここと黄金箱でしか手に入らない。値段は町より高め。買わなくてもよい{shop.items.some((x) => x.group) ? '（専用の装備は2つのうち1つだけ買える）' : ''}</div>}
       <div className="mt-2 flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto">
         {shop.items.map((s, i) => {
           const it = getItem(s.item.itemId);

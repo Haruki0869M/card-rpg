@@ -97,6 +97,24 @@ export const shadowChild: EnemyDef = {
     // （記憶喰いの「記憶を食べる」と同じ単体の形。今の4ダメージは外した）。特殊な行動の札は付けない、ふつうの行動
     { id: 'hideSeek', name: 'かくれんぼ', effects: [{ kind: 'block', amount: 12 }, { kind: 'drainFocus', amount: 1 }] },
   ],
+  // 最後の中ボス（2026-11-14 寄り道の値打ち 柱5）: 中ボスの部屋の戦闘だけの段階。HP50%か、相方が倒れると入る。数字は【提案】
+  midbossPhases: [
+    {
+      belowHpPct: 50,
+      onPartnerDown: true,
+      name: '光に焼かれない影の子',
+      pattern: 'sequence',
+      openingActionId: 'shInvert',
+      rule: '弱点と耐性が裏返る: 聖が効かなくなり、闇が弱点に変わる（合う属性の札を、その時に使う）',
+      weak: ['dark'],
+      resist: ['holy'],
+      actions: [
+        { id: 'shInvert', name: '影と光が入れ替わる', big: true, scripted: true, hint: '影と光が入れ替わる（ブロック10）。ここから聖が効かず、闇が弱点', effects: [{ kind: 'block', amount: 10 }] },
+        { id: 'shGrasp', name: '影のつかみ', effects: [{ kind: 'damage', amount: 11, element: 'dark' }] },
+        { id: 'shLullaby', name: '影の子守歌', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }, { kind: 'damage', amount: 4 }] },
+      ],
+    },
+  ],
 };
 
 export const lostMemory: EnemyDef = {
@@ -156,6 +174,24 @@ export const dreamWeaver: EnemyDef = {
     { id: 'weave', name: '覚めない眠りの糸', big: true, behavior: 'healSeal', hint: '味方全員の回復が、2ターン半分になる。BREAK するか、先に回復を使う', effects: [{ kind: 'applyStatus', status: 'healSeal', amount: 2, to: 'foes' }, { kind: 'block', amount: 10 }] },
     { id: 'thread', name: '呪いの糸', big: true, effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }, { kind: 'damage', amount: 8 }] },
     { id: 'net', name: '夢の網', big: true, effects: [{ kind: 'damage', amount: 6, to: 'foes' }] },
+  ],
+  // 最後の中ボス（2026-11-14 寄り道の値打ち 柱5）: 中ボスの部屋の戦闘だけの段階。HP50%か、相方が倒れると入る。数字は【提案】
+  midbossPhases: [
+    {
+      belowHpPct: 50,
+      onPartnerDown: true,
+      name: '裏返った夢織り',
+      pattern: 'sequence',
+      openingActionId: 'dwInvert',
+      rule: '弱点と耐性が裏返る: 聖が効かなくなり、闇が弱点に変わる（合う属性の札を、その時に使う）',
+      weak: ['dark'],
+      resist: ['holy'],
+      actions: [
+        { id: 'dwInvert', name: '夢を裏返す', big: true, scripted: true, hint: '夢が裏返る（ブロック12）。ここから聖が効かず、闇が弱点', effects: [{ kind: 'block', amount: 12 }] },
+        { id: 'dwCurseThread', name: '裏返しの糸', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }, { kind: 'damage', amount: 9 }] },
+        { id: 'dwDreamNet', name: '悪い夢の網', effects: [{ kind: 'damage', amount: 7, to: 'foes' }] },
+      ],
+    },
   ],
 };
 

@@ -40,6 +40,22 @@ export const ghostDeckhand: EnemyDef = {
     { id: 'wail', name: '亡者の叫び', effects: [{ kind: 'damage', amount: 5 }, { kind: 'applyStatus', status: 'vulnerable', amount: 1 }] },
   ],
   abilities: [{ name: 'すり抜ける体', description: '戦闘開始時（呼ばれて現れた時も）、ブロック6', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 6 }] } }],
+  // 最後の中ボス（2026-11-14 寄り道の値打ち 柱5）: 中ボスの部屋の戦闘だけの段階。HP50%か、相方が倒れると入る。数字は【提案】
+  midbossPhases: [
+    {
+      belowHpPct: 50,
+      onPartnerDown: true,
+      name: '取り残された幽霊水夫',
+      pattern: 'sequence',
+      openingActionId: 'gdCrewCall',
+      rule: '仲間を呼ぶ（2回まで。弱点で BREAK すると止まる。先に倒すか、全体攻撃で）',
+      actions: [
+        { id: 'gdCrewCall', name: '仲間の亡者を呼ぶ', big: true, scripted: true, behavior: 'call', brief: '幽霊水夫を1体呼ぶ', hint: '幽霊水夫を1体呼ぶ。聖か火の弱点で BREAK すると止まる。先に倒すか、全体攻撃で', effects: [{ kind: 'summonEnemy', enemy: 'ghostDeckhand', uses: 1, call: true, orElse: 'gdRustHook' }] },
+        { id: 'gdRustHook', name: '錆びた鉤爪の連打', effects: [{ kind: 'damage', amount: 6, hits: 2 }] },
+        { id: 'gdMourn', name: '亡者の嘆き', effects: [{ kind: 'damage', amount: 5 }, { kind: 'applyStatus', status: 'vulnerable', amount: 1 }] },
+      ],
+    },
+  ],
 };
 
 export const pirateGunner: EnemyDef = {

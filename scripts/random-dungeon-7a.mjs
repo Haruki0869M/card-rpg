@@ -172,6 +172,20 @@ for (const [width, height] of SIZES) {
   }
   if (!exclusive) problems.push(`${tag}: 12回開けても専用の装備が出なかった`);
   else {
+    // 2026-11-14（寄り道の値打ち）: 秘宝を3つから1つ選ぶ（押すと説明の窓 → 「これを選ぶ」）
+    for (let k = 0; k < 20 && !(await page.locator('[data-relic-picker]').count()); k++) {
+      await page.mouse.click(width / 2, 80);
+      await page.waitForTimeout(300);
+    }
+    if (!(await page.locator('[data-relic-option]').count())) problems.push(`${tag}: 黄金箱の秘宝の3択が出ない`);
+    else {
+      await page.screenshot({ path: `${OUT}/${tag}-relic-pick.png` });
+      await check(page, tag, '秘宝の3択');
+      await page.locator('[data-relic-option]').first().click();
+      await page.waitForTimeout(300);
+      await page.locator('[data-item-pick-action]').click();
+      await page.waitForTimeout(500);
+    }
     for (let k = 0; k < 20 && !(await page.locator('[data-exclusive-tag]').count()); k++) {
       await page.mouse.click(width / 2, height / 2);
       await page.waitForTimeout(300);
@@ -185,7 +199,8 @@ for (const [width, height] of SIZES) {
   if (await leave.count()) await leave.click();
   else problems.push(`${tag}: 黄金箱の後の「ダンジョン制覇！」のボタンが無い`);
   await page.waitForTimeout(800);
-  const back = page.getByRole('button', { name: /地上に戻る/ });
+  // 2026-11-14（寄り道の値打ち）: 抜け道がある時は「入口へ戻る」と「抜け道を通る」の2つ。ここでは入口へ戻る
+  const back = page.getByRole('button', { name: /地上に戻る|入口へ戻る/ });
   if (await back.count()) await back.click();
   else problems.push(`${tag}: 「地上に戻る」のボタンが無い`);
   await page.waitForTimeout(800);

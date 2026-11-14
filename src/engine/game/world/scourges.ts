@@ -118,6 +118,8 @@ export function spawnScourge(game: GameState, w: WorldState, rng: Rng): Wanderer
     seen ? (watched ? '塔の見張りが場所を知らせてくれた（地図の💀）。' : '場所は地図の💀の所。') : 'くわしい場所は、見晴らしの塔に登ると分かる。',
     // 倒すと手に入る専用の装備の効果（2026-11-13。長いので最後に置く）
     `倒すと元に戻り、専用の装備「${getItem(def.gear).name}」を落とす（${scourgeGearText(def).replace(/。$/, '')}）。`,
+    // 寄り道の値打ち（2026-11-14 柱1）: 生きている間、鍵と最後のダンジョンのボス・中ボスに掛かる加護
+    `💀加護: ボス・中ボスとの戦闘に「${def.boon.name}」（${def.boon.text.replace(/。$/, '')}）。`,
   ];
   // 回1: 制覇の物語などの後ろに足さず、その窓を閉じた後に別の窓で出す。地域（「嘆きの沼の東」）までは最初から分かる
   queueStory(w, { title: `💀 ${def.name}が、${placeName(game, w, tile)}に現れた！`, lines });
@@ -197,7 +199,7 @@ export function scourgeLoot(game: GameState, reward: RewardState, survivors: Her
 }
 
 /** 画面用: 生きている災厄の一覧（名前・悪さ・場所が見えているか・倒した時の報酬の文） */
-export function scourgeList(game: GameState): { id: string; name: string; short: string; curseShort: string; curseText: string; seen: boolean; tile: number; rewardText: string; gearName: string; gearText: string }[] {
+export function scourgeList(game: GameState): { id: string; name: string; short: string; curseShort: string; curseText: string; seen: boolean; tile: number; rewardText: string; gearName: string; gearText: string; boonName: string; boonText: string }[] {
   const w = game.world;
   if (!w) return [];
   return aliveScourges(w).map(({ wd, def }) => ({
@@ -211,6 +213,8 @@ export function scourgeList(game: GameState): { id: string; name: string; short:
     gearName: getItem(def.gear).name,
     gearText: scourgeGearText(def),
     rewardText: scourgeRewardText(game, def),
+    boonName: def.boon.name,
+    boonText: def.boon.text,
   }));
 }
 

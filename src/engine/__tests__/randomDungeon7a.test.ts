@@ -369,8 +369,13 @@ describe('段階7a: 闇商人と晶石の祭壇', () => {
     const [a, b] = g.heroes;
     // 強化
     const c0 = a.deck[0];
+    // 2026-11-14（寄り道の値打ち 5-A）: 古代の晶洞の祭壇は2回使える（1回目の後も作業が残り、2回目で終わる）
+    expect(a.altarLeft).toBe(1);
     expect(doCardTask(g, a, c0.uid, createRng(1), 'upgrade')).toBeUndefined();
     expect(a.deck[0].upgraded).toBe(true);
+    expect(a.cardTask).toBe('altar');
+    expect(a.altarLeft).toBe(0);
+    expect(doCardTask(g, a, a.deck[1].uid, createRng(1), 'upgrade')).toBeUndefined();
     expect(a.cardTask).toBeUndefined();
     // 変異（同じ種なら同じ結果・同じ格）
     const c1 = b.deck.find((c) => altarTransmutePool(g, b, c.cardId).length)!;

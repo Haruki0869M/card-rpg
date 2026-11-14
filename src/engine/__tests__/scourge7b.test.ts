@@ -79,7 +79,8 @@ describe('段階7b: 災厄の中ボスのデータ', () => {
     expect(SCOURGES.get('miasmaNecro').curse.corruptionPerTurn).toBe(0.5);
     expect(SCOURGES.get('nightmareBeast').curse.campHeal).toBe(0.5);
     expect(SCOURGES.get('stormWitch').curse.nightLevel).toBe(1);
-    expect(SCOURGES.get('greedKing').reward.gold).toBe(300);
+    // 2026-11-14（寄り道の値打ち 5-A）: 盗賊王の 300G は「店の品を1つ無料」の券に替えた
+    expect(SCOURGES.get('greedKing').reward).toEqual({ freeShop: 1 });
     expect(SCOURGES.get('miasmaNecro').reward.corruption).toBe(5);
     expect(SCOURGES.get('nightmareBeast').reward.elixir).toBe(1);
     expect(SCOURGES.get('stormWitch').reward.elixir).toBe(1);
@@ -339,7 +340,7 @@ describe('段階7b: 戦い・倒した報酬・逃げても残る', () => {
     expect(aliveScourges(four.world)[0].wd.enemies).toHaveLength(4);
   });
 
-  it('盗賊王を倒す: 悪さが消え、300G・侵食度 −3%・専用の装備（必ず）・物語の窓', () => {
+  it('盗賊王を倒す: 悪さが消え、店の品1つ無料の券・侵食度 −3%・専用の装備（必ず）・物語の窓', () => {
     let g = withScourge(newGame(), 'greedKing');
     g.world!.corruption = 30;
     const gold = g.heroes[0].gold;
@@ -350,7 +351,9 @@ describe('段階7b: 戦い・倒した報酬・逃げても残る', () => {
     expect(aliveScourges(g.world)).toHaveLength(0);
     expect(scourgeCurse(g).shopPrice).toBe(0);
     expect(g.world!.corruption).toBeCloseTo(before - 3);
-    expect(g.heroes[0].gold - gold).toBeGreaterThanOrEqual(300);
+    // 2026-11-14: お金の代わりに無料券（戦闘のお金だけ増える）
+    expect(g.heroes[0].gold - gold).toBeLessThan(300);
+    expect(g.world!.freeShop).toBe(1);
     expect(g.reward!.loot.some((l) => l.kind === 'item' && l.item.itemId === 'greedCrown')).toBe(true);
     expect(g.heroes[0].stash.some((i) => i.itemId === 'greedCrown')).toBe(true);
     const story = g.world!.story!;

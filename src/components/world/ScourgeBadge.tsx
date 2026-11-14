@@ -48,6 +48,10 @@ export function ScourgeStrip({ game }: { game: GameState }) {
         <span className="min-w-0 truncate text-[12px] font-normal text-amber-100" data-scourge-gear>
           倒すと: {list.map((s) => `「${s.gearName}」${s.gearText}`).join('／')}
         </span>
+        {/* 寄り道の値打ち（2026-11-14 柱1）: 生きている間、ボス・中ボスに掛かる加護（1行） */}
+        <span className="min-w-0 truncate text-[12px] font-normal text-violet-200" data-scourge-boon>
+          💀加護: ボスに{list.map((s) => `「${s.boonName}」`).join('')}
+        </span>
         </span>
         <span className="ml-auto shrink-0 text-[12px] font-normal text-fuchsia-300">説明</span>
       </button>
@@ -67,12 +71,13 @@ export function ScourgeStrip({ game }: { game: GameState }) {
                   <X size={20} />
                 </button>
               </div>
-              <div className="mt-1 text-[12px] leading-4 text-zinc-400">生きている間、世界に悪さをする。倒すと悪さが消え、専用の装備を必ず落とす。逃げても巣に残る。</div>
+              <div className="mt-1 text-[12px] leading-4 text-zinc-400">生きている間、世界に悪さをし、鍵と最後のダンジョンのボス・中ボスに加護を掛ける。倒すと両方消え、専用の装備を必ず落とす。逃げても巣に残る。</div>
               <div className="mt-2 flex min-h-0 flex-col gap-1.5 overflow-y-auto">
                 {list.map((s) => (
                   <div key={s.id} className="rounded-xl border border-fuchsia-400/40 bg-black/40 p-2 text-[13px] leading-5" data-scourge-row={s.id}>
                     <div className="font-bold text-fuchsia-100">💀 {s.name}</div>
                     <div className="text-zinc-200">悪さ: {s.curseText}</div>
+                    <div className="text-violet-200" data-scourge-row-boon>加護（ボス・中ボスの戦闘）: 《{s.boonName}》{s.boonText}</div>
                     <div className="text-amber-100">倒すと: {s.rewardText}</div>
                     <div className="text-[12px] leading-4 text-amber-200/90" data-scourge-row-gear>装備の効果: {s.gearText}</div>
                     <div className={s.seen ? 'text-emerald-200' : 'text-zinc-300'} data-scourge-row-place>{scourgePlaceText(game, w, s.tile, s.seen)}</div>

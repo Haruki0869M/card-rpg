@@ -24,6 +24,22 @@ export const darkKnight: EnemyDef = {
     { id: 'guard', name: 'かばう', big: true, behavior: 'guard', fallbackIfAloneId: 'slash', hint: '次の味方の番の間、ほかの敵への単体攻撃を代わりに受ける。全体攻撃は通る', effects: [{ kind: 'guardAllies' }, { kind: 'block', amount: 10 }] },
     { id: 'cleave', name: 'なぎ払い', effects: [{ kind: 'damage', amount: 9, to: 'foes' }] },
   ],
+  // 最後の中ボス（2026-11-14 寄り道の値打ち 柱5）: 中ボスの部屋の戦闘だけの段階。HP50%か、相方が倒れると入る。数字は【提案】
+  midbossPhases: [
+    {
+      belowHpPct: 50,
+      onPartnerDown: true,
+      name: '主を失った魔王軍の騎士',
+      pattern: 'sequence',
+      openingActionId: 'dkShieldRend',
+      rule: '盾砕き: 当たるとブロックを全部壊す一撃（守りに頼らずに受ける。弱点で BREAK すると威力が半分）',
+      actions: [
+        { id: 'dkShieldRend', name: '闇の盾砕き', big: true, scripted: true, behavior: 'shatter', hint: '当たるとブロックを全部壊す。聖か雷の弱点で BREAK するか、ブロックに頼らずに受ける', effects: [{ kind: 'shieldBreak' }, { kind: 'damage', amount: 16, element: 'dark' }] },
+        { id: 'dkVengeance', name: '仇討ちの剣', effects: [{ kind: 'damage', element: 'dark', amount: 15 }] },
+        { id: 'dkSweep', name: '闇のなぎ払い', effects: [{ kind: 'damage', amount: 9, to: 'foes' }] },
+      ],
+    },
+  ],
 };
 
 export const gatekeeper: EnemyDef = {
@@ -42,6 +58,22 @@ export const gatekeeper: EnemyDef = {
     { id: 'crush', name: '大斧の一撃', big: true, effects: [{ kind: 'damage', amount: 24 }] },
     { id: 'whirl', name: '大旋風', big: true, effects: [{ kind: 'damage', element: 'thunder', amount: 11, to: 'foes' }] },
     { id: 'brace', name: '構え', effects: [{ kind: 'block', amount: 25 }] },
+  ],
+  // 最後の中ボス（2026-11-14 寄り道の値打ち 柱5）: 中ボスの部屋の戦闘だけの段階。HP50%か、相方が倒れると入る。数字は【提案】
+  midbossPhases: [
+    {
+      belowHpPct: 50,
+      onPartnerDown: true,
+      name: '怒れる門番ガルザ',
+      pattern: 'sequence',
+      openingActionId: 'gzGateCrush',
+      rule: '盾砕き: 当たるとブロックを全部壊す一撃（守りに頼らずに受ける。弱点で BREAK すると威力が半分）',
+      actions: [
+        { id: 'gzGateCrush', name: '門砕きの大斧', big: true, scripted: true, behavior: 'shatter', hint: '当たるとブロックを全部壊す。雷の弱点で BREAK するか、ブロックに頼らずに受ける', effects: [{ kind: 'shieldBreak' }, { kind: 'damage', amount: 22 }] },
+        { id: 'gzStorm', name: '雷鳴の大旋風', big: true, hint: '味方全員に雷のダメージ。ブロックで受けるか、雷で BREAK する', effects: [{ kind: 'damage', element: 'thunder', amount: 11, to: 'foes' }] },
+        { id: 'gzGlare', name: '門番の睨み', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'foes' }, { kind: 'damage', amount: 8 }] },
+      ],
+    },
   ],
 };
 

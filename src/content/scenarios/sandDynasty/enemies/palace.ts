@@ -22,6 +22,22 @@ export const stoneCat: EnemyDef = {
   ],
   // 叩いた相手に引っかき返す（1ターン2回まで）
   abilities: [{ name: '守り猫の爪', effect: { when: 'hurt', do: [{ kind: 'retaliate', amount: 4, perTurn: 2 }] } }],
+  // 最後の中ボス（2026-11-14 寄り道の値打ち 柱5）: 中ボスの部屋の戦闘だけの段階。HP50%か、相方が倒れると入る。数字は【提案】
+  midbossPhases: [
+    {
+      belowHpPct: 50,
+      onPartnerDown: true,
+      name: 'ひとりの石の猫像',
+      pattern: 'sequence',
+      openingActionId: 'scGlint',
+      rule: '手数読み: このターンにカードを何枚も使った味方に、枚数に応じたダメージ（使う枚数を絞る。弱点で BREAK すると威力が半分）',
+      actions: [
+        { id: 'scGlint', name: '猫の目が光る', big: true, scripted: true, behavior: 'punish', hint: 'このターンにカードを3枚以上使った味方に、枚数×2のダメージ', effects: [{ kind: 'punishPlays', amount: 2, min: 3 }] },
+        { id: 'scScratch', name: '砂岩の引っかき', effects: [{ kind: 'damage', amount: 6, hits: 2 }] },
+        { id: 'scLeap', name: '跳びかかる爪', effects: [{ kind: 'damage', amount: 13 }] },
+      ],
+    },
+  ],
 };
 
 export const colossusStatue: EnemyDef = {
@@ -43,6 +59,23 @@ export const colossusStatue: EnemyDef = {
     { id: 'shove', name: '盾で押し潰す', effects: [{ kind: 'block', amount: 12 }, { kind: 'damage', amount: 8 }] },
   ],
   abilities: [{ name: '砂岩の守り', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 12 }] } }],
+  // 最後の中ボス（2026-11-14 寄り道の値打ち 柱5）: 中ボスの部屋の戦闘だけの段階。HP50%か、相方が倒れると入る。数字は【提案】
+  midbossPhases: [
+    {
+      belowHpPct: 50,
+      onPartnerDown: true,
+      name: '目覚めた石像の巨兵',
+      pattern: 'sequence',
+      openingActionId: 'csStoneEye',
+      rule: '手数読み: このターンにカードを何枚も使った味方に、枚数に応じたダメージ（使う枚数を絞る。弱点で BREAK すると威力が半分）',
+      actions: [
+        { id: 'csStoneEye', name: '石の眼が見張る', big: true, scripted: true, behavior: 'punish', hint: 'このターンにカードを4枚以上使った味方に、枚数×3のダメージ', effects: [{ kind: 'punishPlays', amount: 3, min: 4 }] },
+        { id: 'csCrush', name: '巨兵の踏みつけ', effects: [{ kind: 'damage', amount: 17 }] },
+        { id: 'csQuake', name: '大地鳴らし', big: true, hint: '味方全員にダメージ。ブロックで受けるか、雷の弱点で BREAK する', effects: [{ kind: 'damage', amount: 8, to: 'foes' }] },
+        { id: 'csWatch', name: '石の眼が光る', behavior: 'punish', hint: 'このターンにカードを4枚以上使った味方に、枚数×3のダメージ', effects: [{ kind: 'punishPlays', amount: 3, min: 4 }] },
+      ],
+    },
+  ],
 };
 
 export const sandPharaoh: EnemyDef = {
