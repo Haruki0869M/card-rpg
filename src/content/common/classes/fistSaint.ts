@@ -10,7 +10,7 @@ export const fistSaint: ClassDef = {
   weaponType: 'fist', subWeapons: ['hammer'],
   battleAbility: { name: '後の先', description: '敵の攻撃をブロックで防ぐたび、防いだ量と同じ物理ダメージで反撃する（1回最大12・1ターン3回まで）', effect: { when: 'guarded', do: [{ kind: 'retaliateDealt', max: 12, perTurn: 3 }] } },
   exploreAbility: { id: 'fistSaintExplore', name: '受け流し', description: '罠やイベントで受けるダメージが半分', effect: { kind: 'eventDamageHalf' } },
-  requires: { feat: 'blockedTotal', count: 60, text: 'ブロックで敵の攻撃を合わせて60防ぐ' },
+  requires: { feat: 'blockedTotal', count: 50, text: 'ブロックで敵の攻撃を合わせて50防ぐ' },
   names: { male: ['ゲンジ', 'テツ', 'ロウ', 'シン'], female: ['カスミ', 'リン', 'ユエ', 'シズク'] },
   cardPool: ['fsSeeThrough', 'fsGuardForm', 'fsCounterStrike', 'axSteadfastFist', 'axParry', 'axSpikeArmor', 'axShieldSlam'],
   signature: ['fsSeeThrough', 'fsGuardForm', 'fsCounterStrike'],

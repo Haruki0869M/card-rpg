@@ -6,7 +6,7 @@ import { cardTargets, isAllyCard, needsCardTarget, selectedCardTarget, secondary
 
 import { BALANCE } from '../../data/balance';
 import { cardOf } from '../../data/cards';
-import { getClass } from '../../data/classes';
+import { CLASSES, getClass } from '../../data/classes';
 import { getEnemy, getEnemyAction } from '../../data/enemies';
 import { getStatus } from '../../data/statuses';
 import type {
@@ -55,6 +55,18 @@ export { slotPreviewLimitOf } from './preview';
 import { enemyLevelFactors } from './levels';
 export { enemyLevelFactors };
 
+/**
+ * 決め技（どれかの職の jobCards の札）を、切った山札のいちばん上に置く（2026-11-14 宿題6A）。
+ * 決め技を持っている人は、戦闘の最初の手札に決め技が必ず1枚来る（山札から引く形。手札の枚数は変えない）。
+ * 乱数は使わない（切った後の並びで、最初の決め技といちばん上の札を入れ替えるだけ）ので、乱数の順は崩れない。
+ */
+function finisherOnTop(pile: CardInstance[]): CardInstance[] {
+  const fin = new Set(CLASSES.all.flatMap((j) => j.jobCards ?? []));
+  const i = pile.findIndex((c) => fin.has(c.cardId));
+  if (i > 0) [pile[0], pile[i]] = [pile[i], pile[0]];
+  return pile;
+}
+
 export function createBattle(setup: BattleSetup): BattleState {
   const { seed, party, encounter } = setup;
   if (party.length < 1 || party.length > BALANCE.maxPartySize) throw new Error(`party size must be 1..${BALANCE.maxPartySize}`);
@@ -92,7 +104,7 @@ export function createBattle(setup: BattleSetup): BattleState {
       ...(m.weaponElement ? { weaponElement: m.weaponElement } : {}),
       ...(m.equippedWeaponType ? { equippedWeaponType: m.equippedWeaponType } : {}),
       statuses: { ...emptyStatuses(), ...(m.statuses as Statuses) },
-      drawPile: shuffle(cards, rng),
+      drawPile: finisherOnTop(shuffle(cards, rng)),
       hand: [],
       discard: [],
       dead: (m.hp ?? maxHp) <= 0,
