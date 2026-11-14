@@ -1228,7 +1228,7 @@ function onRandomDungeonCleared(game: GameState, run: DungeonRun) {
   const before = game.world?.insight?.length ?? 0;
   const seen = grantInsight(game);
   // 制覇の画面には、この制覇で新しく見破った物だけを出す（前に見破った物を出さない）
-  if (seen && game.dungeon && (game.world?.insight?.length ?? 0) > before) game.dungeon.insightGained = game.world!.insight!.at(-1);
+  if (seen && (game.world?.insight?.length ?? 0) > before) run.insightGained = game.world!.insight!.at(-1);
   if (seen) addLog(game, `👁見破り: 「${seen}」のボスの大技と開幕の一手が、完全成功だけで崩せるようになった（入口の長押しで、段階の決まりも読める）`);
 }
 

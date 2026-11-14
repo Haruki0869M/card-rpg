@@ -423,7 +423,7 @@ for (const [width, height] of SIZES) {
     g.clearedDungeons = ['emeraldTemple'];
     w.keys = ['emerald'];
     w.scourgeCount = 0;
-    w.scourgesMet = ['miasmaNecro', 'nightmareBeast', 'stormWitch', 'infernoDemon'];
+    w.scourgesMet = ['greedKing', 'miasmaNecro', 'nightmareBeast', 'infernoDemon'];
     w.wanderers = w.wanderers.filter((x) => !x.scourge);
     w.turn = g.heroes[0].id;
     w.acted = g.heroes.filter((h) => h.id !== w.turn).map((h) => h.id);
@@ -435,10 +435,10 @@ for (const [width, height] of SIZES) {
   await page.waitForTimeout(2400);
   {
     const body = await page.locator('body').innerText();
-    if (!/💀 強欲の盗賊王が、.+の(西|東)に現れた！/.test(body)) problems.push(`${tag}: 災厄の知らせ（題に地域）が出ない`);
+    if (!/💀 氷嵐の魔女が、.+の(西|東)に現れた！/.test(body)) problems.push(`${tag}: 災厄の知らせ（題に地域）が出ない`);
     if (!body.includes('すべての町の店の値段が25%高い')) problems.push(`${tag}: 災厄の知らせに「すべての町の店の値段が25%高い」が無い`);
     // 2026-11-13 から、落とす専用の装備の名前と効果も書く（scourges.ts。エンジンのテスト guide-r1.test.ts と同じ形）
-    if (!/倒すと元に戻り、専用の装備「強欲王の黄金冠」を落とす（.+）。/.test(body)) problems.push(`${tag}: 災厄の知らせに「倒すと元に戻り、専用の装備「強欲王の黄金冠」を落とす（効果）。」が無い`);
+    if (!/倒すと元に戻り、専用の装備「永久凍土の女皇衣」を落とす（.+）。/.test(body)) problems.push(`${tag}: 災厄の知らせに「倒すと元に戻り、専用の装備「永久凍土の女皇衣」を落とす（効果）。」が無い`);
     await page.screenshot({ path: `${OUT}/${tag}-12-scourge-alone.png` });
   }
   // 制覇の物語と重なった時: 物語の窓が出ている時に来た知らせは、閉じた後の別の窓（エンジンの並び。状態はエンジンが作った物を使う）
@@ -451,12 +451,12 @@ for (const [width, height] of SIZES) {
   await page.waitForTimeout(1500);
   {
     const b1 = await page.locator('body').innerText();
-    if (!b1.includes('翠の神殿') || b1.includes('強欲の盗賊王が')) problems.push(`${tag}: 制覇の物語の窓に、災厄の知らせが混ざっている`);
+    if (!b1.includes('翠の神殿') || b1.includes('氷嵐の魔女が')) problems.push(`${tag}: 制覇の物語の窓に、災厄の知らせが混ざっている`);
     await page.screenshot({ path: `${OUT}/${tag}-13-clear-story.png` });
     await page.getByRole('button', { name: 'つづける' }).click();
     await page.waitForTimeout(2200);
     const b2 = await page.locator('body').innerText();
-    if (!/💀 強欲の盗賊王が、.+に現れた！/.test(b2)) problems.push(`${tag}: 制覇の物語を閉じた後に、災厄の知らせが出ない`);
+    if (!/💀 氷嵐の魔女が、.+に現れた！/.test(b2)) problems.push(`${tag}: 制覇の物語を閉じた後に、災厄の知らせが出ない`);
     await page.screenshot({ path: `${OUT}/${tag}-14-scourge-after-clear.png` });
     await check(page, tag, '災厄の知らせ');
     await closeStory(page);

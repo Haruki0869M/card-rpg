@@ -356,6 +356,8 @@ describe('柱4: 抜け道', () => {
   it('制覇すると見破りがつく（次に挑む鍵のダンジョン）', () => {
     const g = cleared(34);
     expect(g.world!.insight).toEqual(['emeraldTemple']);
+    // 制覇の画面の知らせ用: この制覇で新しく見破った物（点検21）
+    expect((g.dungeon ?? g.expeditions?.[0]?.dungeon)?.insightGained).toBe('emeraldTemple');
   });
 });
 

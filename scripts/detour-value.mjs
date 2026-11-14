@@ -144,6 +144,7 @@ for (const [width, height] of SIZES) {
     for (const r of x.dungeon.rooms) r.cleared = true;
     x.mode = 'cleared';
     g.world.insight = ['emeraldTemple'];
+    x.dungeon.insightGained = 'emeraldTemple';
   });
   const shortcut = page.locator('[data-shortcut]');
   if (!(await shortcut.count())) problems.push(`${tag}: 制覇の画面に「抜け道を通る」が無い`);
