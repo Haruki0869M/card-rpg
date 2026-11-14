@@ -189,6 +189,7 @@ FACES = {
     ('archmage', 'male'): (0.467, 0.152, 0.15), ('archmage', 'female'): (0.447, 0.144, 0.15),
     ('hexer', 'male'): (0.471, 0.144, 0.15), ('hexer', 'female'): (0.414, 0.152, 0.15),
     ('phantomThief', 'female'): (0.50, 0.128, 0.16),
+    ('grandThief', 'male'): (0.488, 0.132, 0.15), ('grandThief', 'female'): (0.465, 0.148, 0.15),
     ('greatSage', 'male'): (0.475, 0.167, 0.15), ('greatSage', 'female'): (0.463, 0.159, 0.15),
     ('hadesLord', 'male'): (0.442, 0.148, 0.15), ('hadesLord', 'female'): (0.492, 0.155, 0.15),
 }
@@ -200,7 +201,7 @@ FACES.update({
 })
 # 穴埋め（fill_holes）をしない元画像。重装衛士は、細い槍を戻すため切り抜きを直している（.cut の絵を
 # scripts/art/fix_thin_cut.py で作り直し済み）。槍と足の間の背景が穴として埋まるので、穴埋めをしない
-NO_FILL_HOLES = {'bulwark-female', 'bulwark-male', 'lancer-male', 'lancer-female', 'archer-male', 'archer-female', 'tamer-male', 'tamer-female', 'archmage-male', 'archmage-female', 'hexer-male', 'hexer-female', 'brawler-male', 'brawler-female', 'phantomThief-male', 'phantomThief-female', 'phantomTamer-male', 'phantomTamer-female', 'shadow-female', 'dragoon-male', 'dragoon-female', 'holyKing-male', 'holyKing-female', 'beastMaster-male', 'beastMaster-female', 'bowSaint-male', 'bowSaint-female', 'greatSage-male', 'hadesLord-male', 'hadesLord-female'}
+NO_FILL_HOLES = {'bulwark-female', 'bulwark-male', 'lancer-male', 'lancer-female', 'archer-male', 'archer-female', 'tamer-male', 'tamer-female', 'archmage-male', 'archmage-female', 'hexer-male', 'hexer-female', 'brawler-male', 'brawler-female', 'phantomThief-male', 'phantomThief-female', 'phantomTamer-male', 'phantomTamer-female', 'shadow-female', 'dragoon-male', 'dragoon-female', 'holyKing-male', 'holyKing-female', 'beastMaster-male', 'beastMaster-female', 'bowSaint-male', 'bowSaint-female', 'greatSage-male', 'hadesLord-male', 'hadesLord-female', 'grandThief-male', 'grandThief-female', 'fistKing-male', 'fistKing-female', 'ninja-female'}
 # 表に無い職は、この値（x=0.5 は頭の位置を自動で探す）
 FACE_DEFAULT = (0.5, 0.085, 0.17)
 
