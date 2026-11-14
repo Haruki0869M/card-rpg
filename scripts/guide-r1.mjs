@@ -436,7 +436,7 @@ for (const [width, height] of SIZES) {
   {
     const body = await page.locator('body').innerText();
     if (!/💀 氷嵐の魔女が、.+の(西|東)に現れた！/.test(body)) problems.push(`${tag}: 災厄の知らせ（題に地域）が出ない`);
-    if (!body.includes('すべての町の店の値段が25%高い')) problems.push(`${tag}: 災厄の知らせに「すべての町の店の値段が25%高い」が無い`);
+    if (!body.includes('夜に出る魔物のレベルが、さらに1上がる')) problems.push(`${tag}: 災厄の知らせに「夜に出る魔物のレベルが、さらに1上がる」が無い`);
     // 2026-11-13 から、落とす専用の装備の名前と効果も書く（scourges.ts。エンジンのテスト guide-r1.test.ts と同じ形）
     if (!/倒すと元に戻り、専用の装備「永久凍土の女皇衣」を落とす（.+）。/.test(body)) problems.push(`${tag}: 災厄の知らせに「倒すと元に戻り、専用の装備「永久凍土の女皇衣」を落とす（効果）。」が無い`);
     await page.screenshot({ path: `${OUT}/${tag}-12-scourge-alone.png` });
