@@ -1,8 +1,8 @@
 // ===== シナリオ2の作り直し 区切り3a: 新しい災厄3体の「悪さ」「加護」「専用の装備」の仕組み =====
-// 災厄そのもの（敵・HP・段階）はまだ無いので、このテストの中だけで、案の文と数字（frozenKingdom/scourgeDrafts.ts）に仮の敵を付けて登録して確かめる。
+// 区切り3b で3体を登録した（frozenKingdom/scourges/）。このテストは悪さ・加護・専用の装備の決まりを見る（敵・段階は scourge3b.test.ts）。
 // 悪さ3つ（寒さ×2・街道が雪に埋もれる・視界−1）／加護3つ（白い息・鐘の響き・闇の帳）: 効く・倒すと戻る・防ぐ手が効く・1人と複数・保存して再開
 // 専用の装備: 登録されて一覧に入るまでは今までどおり／広い地図だけ災厄だけが落とす／古い 8×35 では今までどおり
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { BALANCE } from '../../data/balance';
 import { DUNGEONS } from '../../data/dungeons';
 import { EVENTS } from '../../data/events';
@@ -10,8 +10,7 @@ import { getEnemy, getEnemyAction } from '../../data/enemies';
 import { getItem, ITEMS } from '../../data/items';
 import { getScenario } from '../../data/scenarios';
 import { SCOURGES, TERRAINS } from '../../data/world';
-import { frozenScourgeDrafts } from '../../content/scenarios/frozenKingdom/scourgeDrafts';
-import type { BattleState, Command, GameCommand, GameState, PlayerId, ScourgeDef } from '../../types';
+import type { BattleState, Command, GameCommand, GameState, PlayerId } from '../../types';
 import { applyGameCommand, buildDungeon, createGame, createRng, incomingDamage, startBattleWith } from '../index';
 import { bellHitsOn } from '../battle/intents';
 import { bellLeft, bellNow, bellStrikes, veiledIntent } from '../battle/boons';
@@ -26,13 +25,9 @@ import { rollEquipment } from '../game/loot';
 import { timeOfDay } from '../game/world/time';
 import { intentView } from '../../components/format';
 
-// ---------- 仮の災厄（案のまま。敵だけ仮に氷嵐の魔女の物を借りる） ----------
+// ---------- シナリオ2の災厄3体（区切り3b で登録） ----------
 const IDS = ['whiteWolfKing', 'frostBellWraith', 'lampEaterShade'];
-beforeAll(() => {
-  for (const d of frozenScourgeDrafts)
-    if (!SCOURGES.has(d.id))
-      SCOURGES.register({ ...d, boss: 'scourgeStormWitch', minions: ['frostWolf', 'iceBat', 'frostWolf'], reward: { elixir: 1 }, appearText: '（仮）', clearText: '（仮）' } as ScourgeDef);
-});
+const frozenScourgeDrafts = IDS.map((id) => SCOURGES.get(id));
 
 const eventIds = EVENTS.forScenario('corruptionKing').filter((e) => e.where !== 'map' && e.where !== 'spawn').map((e) => e.id);
 function run(g: GameState, cmd: GameCommand): GameState {
@@ -114,8 +109,9 @@ describe('区切り3a: 3体の案のデータ', () => {
     expect(frozenScourgeDrafts[2].boon).toMatchObject({ seeItems: ['lampLantern'] });
   });
 
-  it('シナリオ2の地図の災厄の一覧は、まだ氷嵐の魔女だけ（3体は次の区切りで足す）', () => {
-    expect(getScenario('frozenKingdom').map!.scourges).toEqual(['stormWitch']);
+  it('シナリオ2の地図の災厄の一覧は、氷嵐の魔女と3体（区切り3b）。シナリオ1は今の5体のまま', () => {
+    expect(getScenario('frozenKingdom').map!.scourges).toEqual(['stormWitch', ...IDS]);
+    expect(getScenario('corruptionKing').map!.scourges).toEqual(['greedKing', 'miasmaNecro', 'nightmareBeast', 'stormWitch', 'infernoDemon']);
   });
 });
 
@@ -479,7 +475,8 @@ describe('専用の装備: 春待ちの外套・溶けぬ氷の腕輪・春告�
     return out;
   };
 
-  it('シナリオ2の一覧に入るまでは、登録されていても今までどおり（宝箱・店から出る）', () => {
+  it('シナリオ2の一覧に入っていなければ、登録されていても今までどおり（宝箱・店から出る）', () => {
+    map.scourges = ['stormWitch'];
     const g = newGame('frozenKingdom', ['P1'], ['priest']);
     for (const id of GEAR) expect(heldByScourge(g, getItem(id))).toBe(false);
     expect(scourgeHeldGear(g).size).toBe(0);
@@ -487,8 +484,7 @@ describe('専用の装備: 春待ちの外套・溶けぬ氷の腕輪・春告�
     expect(heldByScourge(g, { id: 'springWaitCloak', scourgeGear: 'notRegistered' })).toBe(false);
   });
 
-  it('一覧に入ると: 広い地図の冒険では宝箱・ドロップのくじから外れる。古い 8×35 の地図の冒険では今までどおり出る', () => {
-    map.scourges = [...(keep ?? []), ...IDS];
+  it('一覧に入ると（区切り3b からは、いつも）: 広い地図の冒険では宝箱・ドロップのくじから外れる。古い 8×35 の地図の冒険では今までどおり出る', () => {
     const g = newGame('frozenKingdom', ['P1', 'P2'], ['priest', 'warrior']);
     const held = scourgeHeldGear(g);
     expect([...held].sort()).toEqual([...GEAR].sort());
@@ -505,7 +501,6 @@ describe('専用の装備: 春待ちの外套・溶けぬ氷の腕輪・春告�
   });
 
   it('シナリオ1の冒険は何も外れない（品の出方と乱数の順番は今のまま）', () => {
-    map.scourges = [...(keep ?? []), ...IDS];
     const g = newGame('corruptionKing');
     expect(scourgeHeldGear(g).size).toBe(0);
     for (const s of [1, 2, 3]) expect(rollEquipment('epic', g.heroes, createRng(s), { scenario: g.scenarioId, held: scourgeHeldGear(g) }).id).toBe(rollEquipment('epic', g.heroes, createRng(s), { scenario: g.scenarioId }).id);

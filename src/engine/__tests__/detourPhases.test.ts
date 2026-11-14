@@ -38,11 +38,15 @@ function ruleKind(ph: EnemyPhaseDef): string {
   if (op.effects.some((e) => e.kind === 'healToPct')) return 'rewind';
   if (op.behavior) return op.behavior;
   if (op.effects.some((e) => e.kind === 'applyStatus' && e.status === 'regen')) return 'regen';
+  // 区切り3b（シナリオ2の3体）: 吹雪に隠れる・鐘のこだま・灯喰い
+  if (ph.focusFeed) return 'focusFeed';
+  if (op.effects.some((e) => e.kind === 'hide')) return 'hide';
+  if (op.effects.some((e) => e.kind === 'echoBlow')) return 'echo';
   return '?';
 }
 
 describe('柱5 データ', () => {
-  it('災厄5体: HP50%で段階1つ。開幕の一手・決まりの説明がある。5体ともちがう決まりで、1段目の紫の札の種類と重ならない', () => {
+  it('災厄8体（区切り3b でシナリオ2の3体を足した）: HP50%で段階1つ。開幕の一手・決まりの説明がある。8体ともちがう決まりで、1段目の紫の札の種類と重ならない', () => {
     const kinds = SCOURGE_BOSSES.map((id) => {
       const def = getEnemy(id);
       expect(def.phases, id).toHaveLength(1);
@@ -50,6 +54,7 @@ describe('柱5 データ', () => {
       expect(ph.belowHpPct, id).toBe(50);
       expect(ph.rule!.length, id).toBeGreaterThan(8);
       expect(ph.actions.some((a) => a.id === ph.openingActionId), id).toBe(true);
+      expect(def.phases![0].actions.length, id).toBeGreaterThan(1);
       expect(ph.actions.filter((a) => !a.scripted).length, id).toBeGreaterThan(0);
       const k = ruleKind(ph);
       expect(k, id).not.toBe('?');
@@ -57,7 +62,7 @@ describe('柱5 データ', () => {
       expect(base.has(k as never), `${id} ${k}`).toBe(false);
       return k;
     });
-    expect(new Set(kinds).size).toBe(5);
+    expect(new Set(kinds).size).toBe(8);
   });
 
   it('最後の中ボス14体（7本×2体）: 中ボスだけの段階（相方が倒れても入る）。ふつうの段階（phases）は持たない。7本でちがう決まり、組の2体は同じ決まり', () => {

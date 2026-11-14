@@ -64,6 +64,21 @@ export function pendingOpening(enemy: Pick<EnemyState, 'defId' | 'phase' | 'phas
   return ph?.openingActionId ? ph.actions.find((a) => a.id === ph.openingActionId) : undefined;
 }
 
+/**
+ * 灯喰い（区切り3b）: 今働いている「喰った灯」の決まり（段階の focusFeed）。その段階の開幕の一手を予告した時から働く
+ * （開幕の一手が凍結などで行われなくても、数えは止まらない）。無ければ undefined
+ */
+export function focusFeedOf(enemy: Pick<EnemyState, 'defId' | 'phase' | 'phaseOpened' | 'dead' | 'phaseSet'>): EnemyPhaseDef['focusFeed'] {
+  if (enemy.dead || enemy.phase <= 0 || (enemy.phaseOpened ?? 0) < enemy.phase) return undefined;
+  return phaseDefOf(enemy)?.focusFeed;
+}
+
+/** 灯喰い: この敵のダメージの攻撃1回に足す数（喰った灯 × per。決まりが無ければ0） */
+export function lampBonus(enemy: Pick<EnemyState, 'defId' | 'phase' | 'phaseOpened' | 'dead' | 'phaseSet' | 'lampEaten'>): number {
+  const f = focusFeedOf(enemy);
+  return f ? Math.min(f.max, enemy.lampEaten ?? 0) * f.per : 0;
+}
+
 /** HPバーの境目の線: まだ越えていない段階の境目（HPの割合 0〜1・段階の番号・名前・開幕の一手・新しい決まり）。段階の無い敵は空 */
 export function phaseMarks(enemy: Pick<EnemyState, 'defId' | 'phase' | 'phaseSet'>): { at: number; phase: number; name: string; opening?: string; rule?: string; partner?: boolean }[] {
   const phases = phasesOf(enemy) ?? [];

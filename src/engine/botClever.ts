@@ -278,7 +278,8 @@ export function cleverBattleCommand(b: BattleState, adjust?: BattleAdjust): Comm
       let focus = card.slots >= 3 ? Math.min(card.slots, a.focus) : 0;
       if (isAttack(card)) {
         if (card.target === 'enemy') {
-          const cands = guard ? [guard] : foes;
+          // 区切り3b: 吹雪に隠れている敵（白狼王）には、単体の攻撃は外れる。相手から外す（隠れている敵しかいなければ、このカードは使わない = 全体攻撃・守りに回る）
+          const cands = guard ? [guard] : foes.filter((e) => !e.hidden);
           let pick: { score: number; focus: number; e: EnemyState } | undefined;
           for (const e of cands) {
             const s0 = attackScore(b, a, card, e);
@@ -291,7 +292,7 @@ export function cleverBattleCommand(b: BattleState, adjust?: BattleAdjust): Comm
           targetId = pick.e.uid;
         } else {
           // 全体攻撃: 敵の中で一番点の高い相手で数える。かばう敵がいる時は、全体攻撃が通るので少し上げる
-          score = Math.max(...foes.map((e) => (adjust ? adjust.attack(a, card, e, attackScore(b, a, card, e)) : attackScore(b, a, card, e)).score)) + (guard ? 15 : 0) + 5 * (foes.length - 1);
+          score = Math.max(...foes.map((e) => (adjust ? adjust.attack(a, card, e, attackScore(b, a, card, e)) : attackScore(b, a, card, e)).score)) + (guard || foes.some((e) => e.hidden) ? 15 : 0) + 5 * (foes.length - 1);
         }
       } else if (card.target === 'enemy') {
         // ダメージの無い、敵1体へのカード（弱体など）: かばう敵がいればその敵、いなければ大技の予告の敵 → 左の敵

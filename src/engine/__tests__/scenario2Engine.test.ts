@@ -252,20 +252,35 @@ describe('区切り1: 災厄の置き場（街道の帯でない帯）', () => {
 });
 
 describe('区切り1: シナリオに出る災厄の一覧（ScenarioMapDef.scourges）', () => {
-  it('シナリオ1は一覧を書かない = 今の5体が今の順。シナリオ2は氷嵐の魔女だけ（新しい3体は次の区切り）', () => {
-    expect(getScenario(CK).map!.scourges).toBeUndefined();
+  it('区切り3b: シナリオ1の地図は今の5体を今の順で書く。シナリオ2は氷嵐の魔女と3体。一覧の無い地図は、共通とそのシナリオだけの災厄', () => {
+    expect(getScenario(CK).map!.scourges).toEqual(['greedKing', 'miasmaNecro', 'nightmareBeast', 'stormWitch', 'infernoDemon']);
     expect(scourgesFor(CK).map((d) => d.id)).toEqual(['greedKing', 'miasmaNecro', 'nightmareBeast', 'stormWitch', 'infernoDemon']);
-    expect(getScenario(FK).map!.scourges).toEqual(['stormWitch']);
-    expect(scourgesFor(FK).map((d) => d.id)).toEqual(['stormWitch']);
+    expect(getScenario(FK).map!.scourges).toEqual(['stormWitch', 'whiteWolfKing', 'frostBellWraith', 'lampEaterShade']);
+    expect(scourgesFor(FK).map((d) => d.id)).toEqual(['stormWitch', 'whiteWolfKing', 'frostBellWraith', 'lampEaterShade']);
+    // 一覧を消すと: シナリオ1 = 共通の5体だけ（シナリオ2の3体は出ない）／シナリオ2 = 共通の5体とシナリオ2の3体
+    const ck = getScenario(CK).map as ScenarioMapDef;
+    const fk = getScenario(FK).map as ScenarioMapDef;
+    const [keepCk, keepFk] = [ck.scourges, fk.scourges];
+    try {
+      delete ck.scourges;
+      delete fk.scourges;
+      expect(scourgesFor(CK).map((d) => d.id)).toEqual(['greedKing', 'miasmaNecro', 'nightmareBeast', 'stormWitch', 'infernoDemon']);
+      expect(scourgesFor(FK).map((d) => d.id)).toEqual(['greedKing', 'miasmaNecro', 'nightmareBeast', 'stormWitch', 'infernoDemon', 'whiteWolfKing', 'frostBellWraith', 'lampEaterShade']);
+      expect(scourgesFor('sandDynasty').map((d) => d.id)).toEqual(['greedKing', 'miasmaNecro', 'nightmareBeast', 'stormWitch', 'infernoDemon']);
+    } finally {
+      ck.scourges = keepCk;
+      fk.scourges = keepFk;
+    }
   });
 
   it('一覧の順に関係なく、選ぶ候補は SCOURGES.all の順（乱数の順番が一覧の書き方で変わらない）', () => {
     const map = getScenario(CK).map as ScenarioMapDef;
+    const keep = map.scourges;
     try {
       map.scourges = ['infernoDemon', 'greedKing'];
       expect(scourgesFor(CK).map((d) => d.id)).toEqual(['greedKing', 'infernoDemon']);
     } finally {
-      delete map.scourges;
+      map.scourges = keep;
     }
   });
 

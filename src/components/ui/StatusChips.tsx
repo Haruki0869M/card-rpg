@@ -39,6 +39,8 @@ export function StatusChips({
   onTap,
   tauntedBy,
   guarding,
+  hidden,
+  lamp,
 }: {
   s: Statuses;
   side: 'ally' | 'enemy';
@@ -46,9 +48,13 @@ export function StatusChips({
   tauntedBy?: string;
   /** かばう（敵の特殊な行動） */
   guarding?: boolean;
+  /** 吹雪に隠れている（白狼王。区切り3b） */
+  hidden?: boolean;
+  /** 喰った灯の数（灯を喰らう影。決まりが働いている時だけ。区切り3b） */
+  lamp?: number;
 }) {
   const list = activeStatuses(s);
-  if (!list.length && !tauntedBy && !guarding) return null;
+  if (!list.length && !tauntedBy && !guarding && !hidden && lamp === undefined) return null;
   return (
     <div className="flex max-h-10 flex-wrap justify-center gap-0.5 overflow-y-auto">
       {list.map(({ def, amount }) => (
@@ -56,6 +62,8 @@ export function StatusChips({
       ))}
       {tauntedBy && <Chip status="taunt" amount={1} side={side} by={tauntedBy} onTap={onTap} />}
       {guarding && <Chip status="guard" amount={1} side={side} onTap={onTap} />}
+      {hidden && <Chip status="hidden" amount={1} side={side} onTap={onTap} />}
+      {lamp !== undefined && <Chip status="lamp" amount={lamp} side={side} onTap={onTap} />}
     </div>
   );
 }

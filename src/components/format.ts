@@ -9,7 +9,10 @@ import { behaviorBadge, FRENZY_BADGE } from '../data/enemyBehaviors';
 import { blockSkippedOnBreak } from '../engine';
 import { breakRuleOf } from '../engine/battle/breakRules';
 import { countName, punishHits } from '../engine/battle/effects/kinds/punishPlays';
-import { huntApplies, huntWhenText } from '../engine/battle/effects/kinds/damage';
+import { damageHits, huntApplies, huntWhenText } from '../engine/battle/effects/kinds/damage';
+import { HIDE_TEXT } from '../engine/battle/effects/kinds/hide';
+import { echoHitDamage } from '../engine/battle/intents';
+import { focusFeedOf, lampBonus } from '../engine/battle/phases';
 import { getEnemy } from '../data/enemies';
 import { SCOURGES } from '../data/world';
 import { bellLeft, bellStrikes, veiledIntent } from '../engine/battle/boons';
@@ -38,7 +41,8 @@ export const longEffect = (e: CardEffect, card?: CardDef): string => describeEff
 /** hidden = 災厄の加護「闇の帳」で数字が見えない（区切り3a。種類と狙いだけ見せる） */
 export type IntentPart =
   | { kind: 'attack'; damage: number; hits: number; targetId?: string; element?: string; hidden?: boolean }
-  | { kind: 'attackAll'; damage: number; hits: number; element?: string; hidden?: boolean }
+  /** label = 「味方全員」の代わりの短い文字（鐘のこだまは「こだま」。区切り3b） */
+  | { kind: 'attackAll'; damage: number; hits: number; element?: string; hidden?: boolean; label?: string }
   | { kind: 'block'; amount: number; others: boolean; hidden?: boolean }
   | { kind: 'debuff'; status: StatusId; amount: number; targetId?: string; all: boolean }
   /** その他の効果（効果の種類のアイコン＋短い数値） */
@@ -94,13 +98,25 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
   const mul = enemy.nextActionMultiplier ?? 1;
   // 残り香（2026-11-14 開幕の一手）: 崩した後は、元の効果の代わりに残る軽い効果を見せる（倍率は掛からない）
   const residue = enemy.broken && action.breakResidue?.length ? action.breakResidue : undefined;
+  // 灯喰い（区切り3b）: ダメージの攻撃1回ごとに、喰った灯の分を足す（倍率の前。battle.ts の executeAction と同じ）
+  const lamp = residue ? 0 : lampBonus(enemy);
   for (const raw of residue ?? action.effects) {
     // 特殊な行動に足したブロックは、BREAK されると付かない（battle.ts の executeIntent と同じ）
     if (enemy.broken && blockSkippedOnBreak(action, raw)) continue;
-    const eff = !residue && mul !== 1 && 'amount' in raw && raw.amount !== undefined ? { ...raw, amount: Math.floor(raw.amount * mul) } : raw;
+    const add = raw.kind === 'damage' ? lamp : 0;
+    const eff = !residue && (mul !== 1 || add) && 'amount' in raw && raw.amount !== undefined ? { ...raw, amount: Math.floor((raw.amount + add) * mul) } : raw;
     const to = targetOf(eff);
+    // 鐘のこだま（区切り3b）: 今返る量（このターンに受けた、いちばん大きな一撃。味方の番の間に育つ）
+    if (eff.kind === 'echoBlow') {
+      const dmg = echoHitDamage(enemy, eff.max, undefined);
+      parts.push({ kind: 'attackAll', damage: dmg, hits: 1, label: 'こだま' });
+      details.push(`🔔鐘のこだま: 今は味方全員に${dmg}が返る（このターンに亡霊へ当てた、いちばん大きな一撃。最大${eff.max}。ブロックで防げる。毒・火傷は数えない。殴るたびに育つ）`);
+      continue;
+    }
     if (eff.kind === 'damage') {
-      const hits = eff.hits ?? 1;
+      // 群れの牙（区切り3b）: 回数は生きている敵の数（手下を倒すと、その場で減る）
+      const hits = damageHits(eff, enemy, state);
+      const pack = eff.packHits ? `（回数 = 生きている敵の数${hits}。手下を倒すと減る）` : '';
       if (to === 'target') {
         // 手負い狙い: 狙った相手のHPが今、半分以下なら倍率込みの値
         // 手負い狙い（2026-11-14: 倍率の掛かる時が敵ごとにちがう。huntWhen）
@@ -108,11 +124,11 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
         const dmg = enemyHitDamage(enemy, eff.amount, target, low);
         parts.push({ kind: 'attack', damage: dmg, hits, targetId: target?.id, element: eff.element });
         const when = huntWhenText(eff);
-        details.push(`${targetName}に${dmg}の${elementText(eff.element)}ダメージ${hits > 1 ? `×${hits}回` : ''}${elementStatusText(eff.element)}${eff.lowHpMul ? (low !== 1 ? `（${when}ので×${eff.lowHpMul} 反映済み）` : `（当たる時に${when.replace(/の$/, '')}なら×${eff.lowHpMul}）`) : ''}${eff.pierce && !enemy.broken ? '（ブロックを無視する）' : ''}`);
+        details.push(`${targetName}に${dmg}の${elementText(eff.element)}ダメージ${hits > 1 ? `×${hits}回` : ''}${pack}${elementStatusText(eff.element)}${eff.lowHpMul ? (low !== 1 ? `（${when}ので×${eff.lowHpMul} 反映済み）` : `（当たる時に${when.replace(/の$/, '')}なら×${eff.lowHpMul}）`) : ''}${eff.pierce && !enemy.broken ? '（ブロックを無視する）' : ''}`);
       } else {
         const dmg = enemyHitDamage(enemy, eff.amount, undefined);
         parts.push({ kind: 'attackAll', damage: dmg, hits, element: eff.element });
-        details.push(`${eff.lowOnly ? 'HPが半分以下の味方全員' : '味方全員'}に${dmg}の${elementText(eff.element)}ダメージ${hits > 1 ? `×${hits}回` : ''}${elementStatusText(eff.element)}（状態異常で増減あり${eff.lowOnly ? '。だれも半分以下でなければ空振り' : ''}）`);
+        details.push(`${eff.lowOnly ? 'HPが半分以下の味方全員' : '味方全員'}に${dmg}の${elementText(eff.element)}ダメージ${hits > 1 ? `×${hits}回` : ''}${pack}${elementStatusText(eff.element)}（状態異常で増減あり${eff.lowOnly ? '。だれも半分以下でなければ空振り' : ''}）`);
       }
     } else if (eff.kind === 'block' && (to === 'self' || to === 'otherAllies' || to === 'allies')) {
       parts.push({ kind: 'block', amount: eff.amount, others: to !== 'self' });
@@ -156,6 +172,11 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
       if (def.dealtMultiplier !== undefined) details.push(`（${def.name}によりダメージ×${def.dealtMultiplier} 反映済み）`);
   }
   if (mul !== 1) details.push(`（次の行動の威力 ×${mul} 反映済み）`);
+  // 灯喰い（区切り3b）: 喰った灯の数と、足した攻撃
+  const feed = focusFeedOf(enemy);
+  if (feed) details.push(`🕯喰った灯 ${Math.min(feed.max, enemy.lampEaten ?? 0)}/${feed.max}: 攻撃+${lamp}${lamp ? '（反映済み）' : ''}。味方がフォーカスを1つ使うたび+${feed.per}。BREAK すると0に戻る`);
+  // 吹雪に隠れる（区切り3b）: 隠れている間は、単体のカードが外れる
+  if (enemy.hidden) details.unshift(`❄吹雪に隠れている: ${HIDE_TEXT}`);
   // ダメージの無い大技（浄化・仲間を呼ぶ・かばう・癒し封じ）は、BREAK すると起きない（battle.ts の executeIntent）
   const stops = breakStopsAction(action);
   const res = breakResidueText(action);

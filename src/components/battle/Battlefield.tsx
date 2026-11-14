@@ -19,7 +19,7 @@ import { speedFactor, useBattle, type UnitFx } from '../../store/battleStore';
 import type { AllyState, BattleState, EnemyState } from '../../types';
 import { breakPreview, intentBrief, intentView, type IntentPart } from '../format';
 import { breakRuleOf } from '../../engine/battle/breakRules';
-import { enemyResist, enemyWeak, phaseMarks } from '../../engine/battle/phases';
+import { enemyResist, enemyWeak, focusFeedOf, phaseMarks } from '../../engine/battle/phases';
 import { HpBar } from '../ui/HpBar';
 import { EffectChip, ELEMENT_ICONS, Shield, Skull, statusStyle, Swords } from '../ui/icons';
 import { Flame } from 'lucide-react';
@@ -155,7 +155,7 @@ function IntentPartView({ p, narrow }: { p: IntentPart; narrow: boolean }) {
       return (
         <span className="flex max-w-full flex-wrap items-center justify-center gap-0.5 text-red-300" style={el ? { color: el.color } : undefined}>
           <Icon size={14} strokeWidth={2.6} />
-          <span className="text-[12px]">味方全員</span>
+          <span className="text-[12px]">{p.label ?? '味方全員'}</span>
           <span className="tabular-nums" data-veiled-number={p.hidden || undefined}>{p.hidden ? '？' : p.hits > 1 ? `${p.damage}×${p.hits}` : p.damage}</span>
         </span>
       );
@@ -468,7 +468,7 @@ const EnemyUnit = memo(function EnemyUnit({
           {!narrow && <BehaviorBrief enemy={enemy} maxW={slotW - 8} />}
           <BreakHint enemy={enemy} narrow={narrow} maxW={narrow ? slotW - 4 : slotW - 8} />
           <AimMarks battle={battle} enemyUid={enemy.uid} />
-          <StatusChips s={enemy.statuses} side="enemy" onTap={onTap} tauntedBy={enemy.tauntedBy} guarding={enemy.guarding} />
+          <StatusChips s={enemy.statuses} side="enemy" onTap={onTap} tauntedBy={enemy.tauntedBy} guarding={enemy.guarding} hidden={enemy.hidden} lamp={focusFeedOf(enemy) ? Math.min(focusFeedOf(enemy)!.max, enemy.lampEaten ?? 0) : undefined} />
         </div>
       )}
     </div>
