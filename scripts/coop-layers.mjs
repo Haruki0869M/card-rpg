@@ -193,8 +193,46 @@ const summary = {};
 let r;
 try {
   r = await setupRoom();
-  await enterDungeon(r);
   const { A, B } = r;
+
+  // ---- 0) 世界マップのマスのイベントで、P1 の手番を待っている（下に待ちの帯 TurnLock が出る）----
+  // 前は待ちの帯（z-55・押せる覆い）がシート（z-50）の下 34% に乗り、シートの下が黒く消えて押せなかった
+  {
+    const L0 = 'マスのイベントの待ち';
+    const g = structuredClone(r.g0);
+    const w = g.world;
+    w.story = undefined;
+    w.turn = r.h1;
+    for (const h of g.heroes) w.pos[h.id] = w.pos[r.h1];
+    g.mode = 'event';
+    g.party = [r.h1];
+    g.event = { eventId: 'rStrayBird', tile: w.pos[r.h1], random: true };
+    await r.inject(g);
+    const lock = await tryUntil(async () => (await B.locator('[data-turn-lock]').count()) > 0, 4000);
+    check(lock, `${L0}: P2 の画面に待ちの帯（〜さんが選んでいます）`);
+    await api(B, () => window.__online.openSheet('party'));
+    await sheetOk(B, 'party', L0);
+    const bottom = await B.evaluate(() => {
+      const t = document.elementFromPoint(195, innerHeight - 30);
+      return !!t && !!t.closest('[data-sheet="party"]');
+    });
+    check(bottom, `${L0}: シートの下の端（画面の下から30px）が、待ちの帯ではなくシート`);
+    // 参考: 前の重なり（シート z-50）に戻すと、下の端に何が乗るか（直す前の形の再現。合否には入れない）
+    const old = await B.evaluate(() => {
+      const s = document.querySelector('[data-sheet="party"]');
+      const keep = s.style.zIndex;
+      s.style.zIndex = '50';
+      const t = document.elementFromPoint(195, innerHeight - 30);
+      const what = t?.closest('[data-turn-lock]') ? '待ちの帯（data-turn-lock）' : t?.closest('[data-sheet]') ? 'シート' : String(t?.className).slice(0, 40);
+      s.style.zIndex = keep;
+      return what;
+    });
+    console.log(`   参考: 前の重なり（シート z-50）なら、下の端は「${old}」`);
+    await shot(B, `${L0}-party`);
+    await closeSheet(B, 'party', L0);
+  }
+
+  await enterDungeon(r);
 
   // ---- 1) 扉の投票の待ち ----
   const L1 = '扉の投票の待ち';
