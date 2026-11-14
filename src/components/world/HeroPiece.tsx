@@ -41,6 +41,12 @@ export const TIER_METAL: Record<JobTier, { light: string; mid: string; dark: str
   special: { light: '#ead2ff', mid: '#9a5ad6', dark: '#3e1866' },
 };
 
+/** 描いた台座の絵の寸法（scripts/art/build_pedestal.py が表示する値）: 横:縦と、上面のだ円の真ん中の高さ（絵の高さに対する割合） */
+const BASE_ART = { aspect: 3.232, topCy: 0.341 };
+
+/** 絵の形でくり抜く（白い所だけ残す） */
+const maskOf = (url: string) => ({ WebkitMaskImage: `url(${url})`, maskImage: `url(${url})`, WebkitMaskSize: '100% 100%', maskSize: '100% 100%' });
+
 /** 台座の見た目に使う、今のジョブの段と、得意な武器の絵 */
 export function pedestalLook(classId: string): { tier: JobTier; icon?: string } {
   const c = CLASSES.tryGet(classId);
@@ -75,6 +81,7 @@ export function HeroPiece({ hero, size: s, ringColor, active, hopping, stepKey, 
   const metal = TIER_METAL[tier];
   const baseArt = artImage('ui/piece-base');
   const bandArt = artImage('ui/piece-base-band');
+  const rimArt = artImage('ui/piece-base-rim');
   const plateArt = artImage(`ui/piece-plate-${tier}`);
   const gems = tier === 'top' || tier === 'special';
   return (
@@ -96,13 +103,21 @@ export function HeroPiece({ hero, size: s, ringColor, active, hopping, stepKey, 
       <span key={`lf${stepKey}`} className={`absolute inset-0 block ${lift}`} style={{ animationDuration: dur }}>
         {/* 台座: 描いた絵があれば絵（側面の帯だけプレイヤーの色に染める）、無ければプログラムで描く */}
         {baseArt ? (
-          <span className="absolute" style={{ left: s * 0.02, top: s * 0.6, width: s * 0.96, height: s * 0.4 }} data-piece-base={tier}>
+          // 描いた台座（scripts/art/build_pedestal.py）。横:縦 = BASE_ART.aspect。上面のだ円の真ん中を、前の台座と同じ高さ（0.746s）に置く
+          <span
+            className="absolute"
+            style={{ left: s * 0.02, top: s * (0.746 - (0.96 / BASE_ART.aspect) * BASE_ART.topCy), width: s * 0.96, height: (s * 0.96) / BASE_ART.aspect }}
+            data-piece-base={tier}
+          >
             <img src={baseArt} alt="" draggable={false} decoding="async" className="absolute inset-0 h-full w-full" />
-            {bandArt && (
-              <span
-                className="absolute inset-0"
-                style={{ background: ringColor, mixBlendMode: 'multiply', WebkitMaskImage: `url(${bandArt})`, maskImage: `url(${bandArt})`, WebkitMaskSize: '100% 100%', maskSize: '100% 100%' }}
-              />
+            {/* 側面の帯をプレイヤーの色に（灰色の陰影が残るように、かけ合わせる） */}
+            {bandArt && <span className="absolute inset-0" style={{ background: ringColor, mixBlendMode: 'multiply', ...maskOf(bandArt) }} />}
+            {/* ふちを段の金属の色に（明るさは絵のまま、色だけ変える）。金の段は絵のまま */}
+            {rimArt && tier !== 'top' && <span className="absolute inset-0" style={{ background: metal.mid, mixBlendMode: 'color', ...maskOf(rimArt) }} />}
+            {gems && (
+              <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
+                {[16, 84].map((gx) => <ellipse key={gx} cx={gx} cy={70} rx="2.6" ry="8.4" fill={tier === 'special' ? '#e6b8ff' : '#ff6b6b'} stroke="#1a1208" strokeWidth="0.8" />)}
+              </svg>
             )}
           </span>
         ) : (
