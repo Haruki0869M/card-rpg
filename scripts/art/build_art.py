@@ -534,6 +534,8 @@ def build_items():
 
 # ---------------- お供（ペット） ----------------
 # 元画像は pet-<お供ID>-<色ID>.(webp|png)。SRC に有る物を全部、pet/<お供ID>-<色ID>.webp にする（無い色は飛ばす）
+PET_KEEP_GAPS = {'blackCat-russianBlue'}
+
 def build_pets():
     import glob, re
     for f in sorted(glob.glob(os.path.join(SRC, 'pet-*'))):
@@ -542,7 +544,8 @@ def build_pets():
         key = m.group(1)
         name = f'pet/{key}'
         if not want(name): continue
-        fig = trim(despeckle(fill_holes(cutout(f'pet-{key}'), f'pet-{key}', always=True)), 24)
+        # 丸めたしっぽの内側など、本当の隙間がある絵は、背景と同じ色の穴を残す（always=False）
+        fig = trim(despeckle(fill_holes(cutout(f'pet-{key}'), f'pet-{key}', always=key not in PET_KEEP_GAPS)), 24)
         save(rim(square(fig, 160, 0.04), (8, 6, 12), 0.6, 2), f'{name}.webp', 82)
 
 # ---------------- ワールドマップの駒（ちびキャラのミニチュア） ----------------
