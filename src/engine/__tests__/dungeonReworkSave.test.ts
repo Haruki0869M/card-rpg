@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { DUNGEONS } from '../../data/dungeons';
 import { EVENTS } from '../../data/events';
-import { finaleLayout, keyLayout1, keyLayout3 } from '../../content/common/dungeonLayouts';
+import { finaleLayout, keyLayout1, keyLayout2, keyLayout3 } from '../../content/common/dungeonLayouts';
 import { isLegacyLayout, reachableRooms } from '../game/dungeon';
 import { migrateGame } from '../game/migrations';
 import type { DungeonDef, GameCommand, GameState, PlayerId } from '../../types';
@@ -13,9 +13,10 @@ import { applyGameCommand, buildDungeon, createGame, createRng } from '../index'
 const P: PlayerId = 'P1';
 type Layout = NonNullable<DungeonDef['layout']>;
 
-/** シナリオ2の作り直す前の並び（2026-11-14 まで。型 + その時のイベント）。沈んだ聖堂は保留で、まだ前の並びのまま（作り直したら足す） */
+/** シナリオ2の作り直す前の並び（型 + その時のイベント。沈んだ聖堂は 2026-11-15 まで、ほかの3か所は 2026-11-14 まで） */
 const BEFORE: Record<string, Layout> = {
   crystalCave: keyLayout1({ first: 'frostBridge', second: 'buriedChest', story: 'crystalGate' }),
+  sunkenCathedral: keyLayout2({ first: 'iceSilhouette', second: 'frozenCamp', story: 'bishopAltar' }),
   giantMine: keyLayout3({ first: 'buriedChest', second: 'furTrader', story: 'giantGate' }),
   iceCastle: finaleLayout({ first: 'iceSilhouette', story: 'queenThrone' }),
 };
