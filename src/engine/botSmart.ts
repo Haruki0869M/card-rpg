@@ -5,6 +5,7 @@
 //   items = 消耗品の使い時: 倒れそうな時・ボスや中ボス・大技の予告の時に使う。戦闘の外でも、傷が深ければ薬を使う
 //   team  = 仲間どうしの連携: 倒し切れる敵・こちらを強く殴る敵に集中する。敵の番に受けるダメージ（画面の被弾予定）を見て守る。BREAK を弱点の仲間に任せる
 //   time  = 時間（侵食度）の使い方: 侵食度と残りのダンジョンの数を見て、間に合わない時は寄り道・レベル上げ・町へ戻るのをやめる
+//           （2026-11-14: 1つのダンジョンの見込みを、この冒険の実際の伸び方から出す。寄り道は「時間の余り」と見込みを比べて決める = smartDetour）
 //
 // ずるをしない（工夫する bot と同じ決まり）:
 //   - 見るのは画面に出ている情報だけ（自分たちの山札・装備・袋・お金、店の品物、敵の予告と被弾予定、侵食度、制覇したダンジョン）。
@@ -32,6 +33,8 @@ import { canEquip, heroMaxHp, pouchLimitOf, STAT_IDS } from './game/hero';
 import { findHero, livingHeroes } from './game/heroes';
 import { corruptionShown } from './game/world/corruptionShown';
 import { hexDistance } from './game/world/hex';
+import { aliveScourges } from './game/world/scourgeCurse';
+import { isRandomDungeonTile } from './game/world/randomDungeons';
 
 //   weak  = ボスの弱点に合わせる（2026-11-13 docs/tasks/break-read-plan.md §4。測るため）: 属性の攻撃をほとんど持たないキャラ（物理）は、
 //           「属性の付与」の装飾品が次の目的のダンジョンのボスの弱点に合う時だけ買って付ける（合わない属性は買わない・付けない）。
@@ -632,10 +635,72 @@ export function teamAdjust(b: BattleState): BattleAdjust {
  * 今の侵食度（画面の整数の値）に足して 100 に届くなら「時間が足りない」
  */
 export function timeLate(g: GameState): boolean {
+  return !!g.world && timeSlack(g) <= 0;
+}
+
+/**
+ * 1つのダンジョンに見込む侵食度（2026-11-14 寄り道の値打ち 柱6: 実際の伸び方から出す）。
+ * 鍵のダンジョンを1つ以上制覇していれば「今の侵食度 ÷ 制覇した鍵のダンジョンの数」（寄り道の分も入った、この冒険の実際の伸び方）、
+ * 無ければ TIME_PER_DUNGEON。どちらも TIME_PER_DUNGEON より小さくはしない（見込みを甘くしない）
+ */
+export function timePerDungeon(g: GameState): number {
   const w = g.world;
-  if (!w) return false;
+  if (!w) return TIME_PER_DUNGEON;
+  const done = DUNGEONS.forScenario(g.scenarioId).filter((d) => !d.random && d.rewardKey && g.clearedDungeons.includes(d.id)).length;
+  return done ? Math.max(TIME_PER_DUNGEON, corruptionShown(w.corruption) / done) : TIME_PER_DUNGEON;
+}
+
+/** 時間の余り（侵食度の%）: 100 −（今の侵食度 ＋ 残りのダンジョン × 見込み ＋ 余裕）。0 以下なら「時間が足りない」 */
+export function timeSlack(g: GameState): number {
+  const w = g.world;
+  if (!w) return Infinity;
   const left = DUNGEONS.forScenario(g.scenarioId).filter((d) => !d.random && (d.rewardKey || d.finale) && !g.clearedDungeons.includes(d.id)).length;
-  return corruptionShown(w.corruption) + left * TIME_PER_DUNGEON + TIME_MARGIN >= 100;
+  return 100 - (corruptionShown(w.corruption) + left * timePerDungeon(g) + TIME_MARGIN);
+}
+
+// ---------- 6. 寄り道の判断（2026-11-14 docs/tasks/detour-value-plan.md 柱6。測るため） ----------
+
+/** 寄り道1回に見込む侵食度（%）。災厄 = 歩き＋戦闘 / ランダムダンジョン = 歩き＋5行（bot の作戦の提案） */
+const DETOUR_COST = { scourge: 4, random: 8 };
+/** 挑み直しの上限（災厄は全部の合計・ランダムダンジョンは入った回数） */
+const DETOUR_TRIES = { scourge: 4, random: 3 };
+/** 寄り道してよいHPの割合（全員がこれより上）・見晴らしの塔へ寄ってよい距離・寄り道の行き先の遠さの上限（マス） */
+const DETOUR_HP_LINE = 0.6;
+const DETOUR_TOWER = 8;
+const DETOUR_FAR = 14;
+
+/**
+ * 賢い bot の寄り道（工夫する bot の「1か所だけ・1体だけ」の決め打ちの代わり）。見るのは画面に出ている物だけ:
+ * 侵食度・残りのダンジョン（時間の余り）・霧の晴れた災厄とランダムダンジョンの場所・HP。乱数は使わない。
+ * - 時間の余りが寄り道の見込みより大きい時だけ行く（time の工夫を外した時は、余りを見ない）
+ * - 災厄: 生きていて場所の見えている災厄の、近い方から（生きている災厄は、どれも次のボスに加護を掛ける。倒すと消える）。見えていなければ近くの塔へ
+ * - ランダムダンジョン: 見えている、まだ踏破していない所の近い方から（worth が「行く値打ちがある」と言う時だけ）
+ */
+export function smartDetour(
+  g: GameState,
+  at: number,
+  cm: { randomTries: number; scourgeTries: number },
+  sm: SmartMemo,
+  worth: { random: (g: GameState) => boolean } = { random: () => true },
+): { tile: number; why: 'town' | 'grind' | 'dungeon'; kind: 'scourge' | 'tower' | 'random' } | undefined {
+  const w = g.world;
+  if (!w || w.keys.length < 1) return undefined;
+  if (livingHeroes(g).some((h) => h.hp <= heroMaxHp(h) * DETOUR_HP_LINE)) return undefined;
+  const slack = smartUses(sm, 'time') ? timeSlack(g) : Infinity;
+  const near = (tiles: number[]) => tiles.filter((i) => hexDistance(w, at, i) <= DETOUR_FAR).sort((a, b) => hexDistance(w, at, a) - hexDistance(w, at, b) || a - b)[0];
+  const alive = aliveScourges(w);
+  if (alive.length && slack >= DETOUR_COST.scourge && cm.scourgeTries < DETOUR_TRIES.scourge) {
+    const t = near(alive.filter(({ wd }) => w.tiles[wd.tile].seen).map(({ wd }) => wd.tile));
+    if (t !== undefined) return { tile: t, why: 'grind', kind: 'scourge' };
+    const towers = w.tiles.flatMap((x, i) => (x.f?.kind === 'tower' && !x.f.used && x.seen && hexDistance(w, at, i) <= DETOUR_TOWER ? [i] : []));
+    const tw = near(towers);
+    if (tw !== undefined) return { tile: tw, why: 'dungeon', kind: 'tower' };
+  }
+  if (slack >= DETOUR_COST.random && cm.randomTries < DETOUR_TRIES.random && worth.random(g)) {
+    const t = near(w.tiles.flatMap((x, i) => (isRandomDungeonTile(x.f) && !x.f!.used && x.seen ? [i] : [])));
+    if (t !== undefined) return { tile: t, why: 'dungeon', kind: 'random' };
+  }
+  return undefined;
 }
 
 /** 世界マップで町へ戻るHPの割合（時間が足りない時は低くする） */

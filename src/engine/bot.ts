@@ -53,6 +53,7 @@ import {
   smartPickCardCommand,
   smartRemoveCardCommand,
   smartShopDetour,
+  smartDetour,
   smartTownCardCommand,
   smartTownShopCommand,
   smartUses,
@@ -71,7 +72,12 @@ export interface BotLog {
   rooms?: number;
   /** 賢い bot の操作がゲームに断られた数（失敗には数えない。断られた操作は同じ場面では二度と送らない） */
   refused?: number;
+  /** 寄り道（災厄・塔・ランダムダンジョン）へ向かったワールドターン（数えるだけ。2026-11-14） */
+  detourTurns?: number[];
 }
+
+/** 賢い bot: ランダムダンジョンへ行く値打ちがあるか（2026-11-14 寄り道の値打ち） */
+const DETOUR_WORTH = { random: (_g: GameState) => true };
 
 /** 次の操作を決めるだけの時（オンライン協力のテスト）は、ここに入れて動かさない */
 let capture: GameCommand[] | null = null;
@@ -210,7 +216,7 @@ function questGateTarget(g: GameState, at: number, goal: string): { tile: number
 const BOT_QUEST_DETOUR = 6;
 
 /** 世界マップでの行き先（HPが減ったら町、レベルが足りなければ近くの敵、それ以外は次のダンジョン） */
-function worldTarget(g: GameState, at: number, straight = false, cm?: CleverMemo, sm?: SmartMemo): { tile: number; why: 'town' | 'grind' | 'dungeon' } {
+function worldTarget(g: GameState, at: number, straight = false, cm?: CleverMemo, sm?: SmartMemo): { tile: number; why: 'town' | 'grind' | 'dungeon'; detour?: boolean } {
   const w = g.world!;
   const heroes = livingHeroes(g);
   const goal = goalDungeon(g, straight);
@@ -243,9 +249,10 @@ function worldTarget(g: GameState, at: number, straight = false, cm?: CleverMemo
     if (t !== undefined) return { tile: t, why: 'town' };
   }
   // 工夫する bot: 寄り道（災厄・見晴らしの塔・ランダムダンジョン）
+  // 賢い bot（2026-11-14 寄り道の値打ち 柱6）: 決め打ちではなく、時間の余りと見えている物で決める（smartDetour）
   if (cm && cleverUses(cm, 'detour') && !late) {
-    const d = cleverDetour(g, at, cm);
-    if (d) return { tile: d.tile, why: d.why };
+    const d = sm ? smartDetour(g, at, cm, sm, DETOUR_WORTH) : cleverDetour(g, at, cm);
+    if (d) return { tile: d.tile, why: d.why, detour: true };
   }
   if (!straight && avgLv < need && !late) {
     // 災厄の中ボス（段階7b）には、自動プレイは挑まない（寄り道は「工夫する bot」の段階で）
@@ -285,6 +292,8 @@ function worldStep(g: GameState, log: BotLog, memo: BotMemo): GameState {
   const p = pid(g, h.id);
   const at = w.pos[h.id];
   const target = worldTarget(g, at, memo.straight, memo.clever, memo.smart);
+  // 測る道具: 寄り道へ向かったワールドターン（数えるだけ）
+  if (target.detour && !(log.detourTurns ??= []).includes(w.worldTurn)) log.detourTurns.push(w.worldTurn);
   const key = `${w.worldTurn}:${h.id}:${at}`;
   // 目的地に着いたら入る（1手番に1回だけ）
   if (at === target.tile && !memo.interacted.has(key)) {
