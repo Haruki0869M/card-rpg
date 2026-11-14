@@ -77,6 +77,26 @@ function flowPath(ctx: CanvasRenderingContext2D, v: V[], cx: number, cy: number,
   }
 }
 
+/** 道のふちと、模様の絵が無い時の土の色 */
+const ROAD_EDGE = '#6e5533';
+const ROAD_SOIL = '#c6a272';
+/** 土の道の模様（terrain/road-path。256px・つなぎ目なし。わだちが縦（上下）に走る）。描く ctx ごとに1つ作り置く */
+const roadPats = new WeakMap<object, CanvasPattern | null>();
+function roadPattern(ctx: CanvasRenderingContext2D, R: number, angle: number, cx: number, cy: number): CanvasPattern | null {
+  let p = roadPats.get(ctx);
+  if (p === undefined) {
+    const img = loadedImage(artImage('terrain/road-path'));
+    if (!img) return null;
+    p = ctx.createPattern(img, 'repeat');
+    roadPats.set(ctx, p);
+  }
+  if (!p || typeof DOMMatrix === 'undefined') return p ?? null;
+  // 道の向きに、絵のわだち（縦）を合わせる。絵の1枚 = マスの大きさの 0.8 倍
+  const s = (R * 0.8) / 256;
+  p.setTransform(new DOMMatrix().translateSelf(cx, cy).rotateSelf(((angle - Math.PI / 2) * 180) / Math.PI).scaleSelf(s, s));
+  return p;
+}
+
 const patCache = new Map<string, CanvasPattern | null>();
 let patR = 0;
 
@@ -302,22 +322,40 @@ export function paintRange(ctx: CanvasRenderingContext2D, inp: PaintInput, y0: n
         }
       }
     }
-    // 道（3本の線: 影・土・わだち）
+    // 道（2026-11-14 直し: ふち → 土の道の模様の絵。真ん中の点線はやめた）
+    // ふちは不透明の色で、マスの辺の真ん中で平らに切る（butt）。前は半透明のふちを丸く重ねていたので、
+    // マスのつなぎ目に濃い丸い継ぎ目が出ていた
     const ks = links.get(i);
     if (ks) {
+      const ww = wob * 0.6;
+      ctx.lineCap = 'butt';
+      flowPath(ctx, v, cx, cy, ks, ww);
+      ctx.strokeStyle = ROAD_EDGE;
+      ctx.lineWidth = R * 0.32;
+      ctx.stroke();
+      if (ks.length !== 2) {
+        // 行き止まり・分かれ道の真ん中は丸く
+        ctx.beginPath();
+        ctx.arc(cx, cy, R * 0.16, 0, Math.PI * 2);
+        ctx.fillStyle = ROAD_EDGE;
+        ctx.fill();
+      }
+      // 土: 下の色を敷いてから、模様の絵を道の向きに合わせて重ねる（絵のわだちが道に沿うように）
       ctx.lineCap = 'round';
-      flowPath(ctx, v, cx, cy, ks, wob * 0.6);
-      ctx.strokeStyle = 'rgba(58,42,20,.55)';
-      ctx.lineWidth = R * 0.34;
-      ctx.stroke();
-      ctx.strokeStyle = '#b8945c';
       ctx.lineWidth = R * 0.24;
-      ctx.stroke();
-      ctx.strokeStyle = 'rgba(216,188,132,.8)';
-      ctx.lineWidth = Math.max(0.8, R * 0.06);
-      ctx.setLineDash([R * 0.12, R * 0.16]);
-      ctx.stroke();
-      ctx.setLineDash([]);
+      const spokes = ks.length === 2 ? [ks] : ks.map((k) => [k]);
+      for (const sp of spokes) {
+        flowPath(ctx, v, cx, cy, sp, ww);
+        ctx.strokeStyle = ROAD_SOIL;
+        ctx.stroke();
+        const a = mid(v, sp[0]);
+        const b = sp.length === 2 ? mid(v, sp[1]) : ([cx, cy] as V);
+        const p = roadPattern(ctx, R, Math.atan2(b[1] - a[1], b[0] - a[0]), cx, cy);
+        if (p) {
+          ctx.strokeStyle = p;
+          ctx.stroke();
+        }
+      }
       // 川と交わる所は橋
       if (rk) {
         const a = mid(v, ks[0]);

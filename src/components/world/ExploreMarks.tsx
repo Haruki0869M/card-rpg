@@ -3,6 +3,18 @@
 // 絵が来たら、この中の Mini を差し替えるだけでよい（ゲームの中身・地図の描き方には触れない）。
 import type { SpawnKind, WorldState } from '../../types';
 import { spawnTurnsLeft } from '../../engine/game/world/explore';
+import { artImage } from '../../art';
+
+/** 描いた絵（箱庭の絵。墨線＋淡い水彩）。x, y = マスの上の面の中心。足元を中心より少し下に置く */
+function ArtMini({ href, x, y, R, size }: { href: string; x: number; y: number; R: number; size: number }) {
+  const big = R * size;
+  return (
+    <>
+      <ellipse cx={x} cy={y + big * 0.33} rx={big * 0.38} ry={big * 0.11} fill="rgba(0,0,0,.5)" />
+      <image href={href} x={x - big / 2} y={y - big * 0.62} width={big} height={big} />
+    </>
+  );
+}
 
 type Center = (i: number) => { x: number; y: number };
 
@@ -11,6 +23,13 @@ export function TowerMini({ x, y, R, used, fogTop }: { x: number; y: number; R: 
   const h = R * 1.35;
   const bw = R * 0.42;
   const top = y - h * 0.62;
+  const art = fogTop ? undefined : artImage('landscape/place-watchtower');
+  if (art)
+    return (
+      <g data-feature="tower:watchtower" data-used={used || undefined} opacity={used ? 0.45 : 1} pointerEvents="none">
+        <ArtMini href={art} x={x} y={y} R={R} size={1.6} />
+      </g>
+    );
   return (
     <g data-feature={fogTop ? undefined : 'tower:watchtower'} data-used={used || undefined} opacity={used ? 0.45 : 1} pointerEvents="none">
       <ellipse cx={x} cy={y + R * 0.38} rx={R * 0.5} ry={R * 0.15} fill="rgba(0,0,0,.5)" />
@@ -146,6 +165,8 @@ function ThiefMini({ x, y, R }: { x: number; y: number; R: number }) {
 }
 
 const MINI: Record<SpawnKind, (p: { x: number; y: number; R: number }) => React.JSX.Element> = { star: StarMini, peddler: PeddlerMini, thief: ThiefMini };
+/** 出現スポットの描いた絵（あれば仮の図の代わりに使う） */
+const SPAWN_ART: Record<SpawnKind, string> = { star: 'landscape/spawn-star', peddler: 'landscape/place-merchant', thief: 'landscape/spawn-thief' };
 
 /** 出現スポットの印と、消えるまでのターン数（残1は赤） */
 export function SpawnMarks({ w, R, center }: { w: WorldState; R: number; center: Center }) {
@@ -156,10 +177,11 @@ export function SpawnMarks({ w, R, center }: { w: WorldState; R: number; center:
         const { x, y } = center(s.tile);
         const left = spawnTurnsLeft(w, s);
         const Mini = MINI[s.kind];
+        const art = artImage(SPAWN_ART[s.kind]);
         const fs = Math.max(12, R * 0.42);
         return (
           <g key={s.id} data-spawn={s.kind} data-spawn-left={left} pointerEvents="none">
-            <Mini x={x} y={y} R={R} />
+            {art ? <ArtMini href={art} x={x} y={y} R={R} size={1.35} /> : <Mini x={x} y={y} R={R} />}
             <rect x={x + R * 0.12} y={y - R * 1.02} width={fs * 2.3} height={fs * 1.25} rx={fs * 0.6} fill={left <= 1 ? '#5a0a0a' : '#1a1408'} stroke={left <= 1 ? '#ff8a8a' : '#ffd76a'} strokeWidth={1.5} />
             <text x={x + R * 0.12 + fs * 1.15} y={y - R * 1.02 + fs * 0.95} textAnchor="middle" fontSize={fs} fontWeight={900} fill={left <= 1 ? '#ffb0b0' : '#ffe9a8'}>
               残{left}
