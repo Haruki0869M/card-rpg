@@ -225,7 +225,7 @@ function Content({ d, battle, game }: { d: Detail; battle: BattleState; game: Ga
         {a.attackCharge && <p className="text-[13px]">居合：次の{a.attackCharge.category === 'physical' ? '物理' : '攻撃'}カード×{a.attackCharge.multiplier}。使用まで持続。</p>}
         {a.imbuedElement && <p className="text-[13px]">魔法剣：次の物理攻撃に{getElement(a.imbuedElement).name}属性。使用まで持続。</p>}
         {a.airborne && <p className="text-[13px]">跳躍：次の味方ターンに着地し、対象へ{a.airborne.amount}を基準とする攻撃。</p>}
-        {a.summons?.map((m, i) => <p key={`${m.id}:${i}`} className="text-[13px]">{m.icon}{m.name}：{m.echoPct ? `攻撃時に${m.echoPct}%で追撃` : `${m.trigger === 'enemyBeforeAction' ? '対象の敵が行動する直前' : 'ターン終了時'}に${m.damage}の攻撃`}{m.targetId && `／対象：${battle.enemies.find(e => e.uid === m.targetId)?.defId ? enemyName(battle.enemies.find(e => e.uid === m.targetId)!) : '不在'}`}{m.effects?.length ? `／${m.effects.map(e => describeEffect(e)).join('・')}` : ''}{m.intercept ? '／被弾を一度防いで消える' : ''}。{m.turns >= 99 ? '戦闘中持続' : `残り${m.turns}ターン`}。</p>)}
+        {a.summons?.map((m, i) => <p key={`${m.id}:${i}`} className="text-[13px]">{m.icon}{m.name}：{m.echoPct ? `攻撃時に${m.echoPct}%で追撃` : `${m.trigger === 'enemyBeforeAction' ? '対象の敵が行動する直前' : 'ターン終了時'}に${m.damage}${m.blockPct ? `＋ブロックの${m.blockPct}%（最大+${m.blockMax ?? 99}）` : ''}の攻撃`}{m.targetId && `／対象：${battle.enemies.find(e => e.uid === m.targetId)?.defId ? enemyName(battle.enemies.find(e => e.uid === m.targetId)!) : '不在'}`}{m.effects?.length ? `／${m.effects.map(e => describeEffect(e)).join('・')}` : ''}{m.intercept ? '／被弾を一度防いで消える' : ''}。{m.turns >= 99 ? '戦闘中持続' : `残り${m.turns}ターン`}。</p>)}
       </>;
     }
     case 'status': {

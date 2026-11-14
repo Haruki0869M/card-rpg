@@ -10,7 +10,7 @@ import type { EffectHandler } from '../types';
 declare module '../../../../types' {
   interface EffectParams {
     /** overflow = もう stackLimit 体いる時は、呼ぶ代わりに、その仲間（同じ id の召喚）が全員1回ずつ攻撃する（段階7b: 魂喰らいの冥獄鎌） */
-    summon: { id: string; name: string; icon: string; damage: number; turns: number; element?: string; echoPct?: number; intercept?: boolean; counter?: number; stackLimit?: number; replace?: boolean; targeted?: boolean; trigger?: 'enemyBeforeAction'; effects?: Effect[]; overflow?: boolean };
+    summon: { id: string; name: string; icon: string; damage: number; turns: number; element?: string; echoPct?: number; intercept?: boolean; counter?: number; stackLimit?: number; replace?: boolean; targeted?: boolean; trigger?: 'enemyBeforeAction'; effects?: Effect[]; overflow?: boolean; /** 装甲砲台: 撃つたびに今のブロックの blockPct% を足す（最大 blockMax） */ blockPct?: number; blockMax?: number };
   }
 }
 
@@ -39,7 +39,7 @@ export const effect: EffectHandler<'summon'> = {
     }
     const cur = e.stackLimit ? undefined : list.find((x) => x.id === e.id);
     if (cur) {
-      if (e.replace) Object.assign(cur, { turns, damage: e.damage, targetId, trigger: e.trigger, effects: e.effects, element: e.element });
+      if (e.replace) Object.assign(cur, { turns, damage: e.damage, targetId, trigger: e.trigger, effects: e.effects, element: e.element, blockPct: e.blockPct, blockMax: e.blockMax });
       else { cur.turns = Math.max(cur.turns, turns); cur.damage = Math.max(cur.damage, e.damage); }
     } else {
       let id = e.id;
@@ -47,13 +47,13 @@ export const effect: EffectHandler<'summon'> = {
         const counters = (ctx.source.counters ??= {});
         id = `${e.id}:${counters[`summon:${e.id}`] = (counters[`summon:${e.id}`] ?? 0) + 1}`;
       }
-      list.push({ id, group: e.stackLimit ? e.id : undefined, name: e.name, icon: e.icon, damage: e.damage, turns, element: e.element, echoPct: e.echoPct, intercept: e.intercept, ...(e.counter ? { counter: e.counter } : {}), targetId, trigger: e.trigger, effects: e.effects });
+      list.push({ id, group: e.stackLimit ? e.id : undefined, name: e.name, icon: e.icon, damage: e.damage, turns, element: e.element, echoPct: e.echoPct, intercept: e.intercept, ...(e.counter ? { counter: e.counter } : {}), ...(e.blockPct ? { blockPct: e.blockPct, blockMax: e.blockMax } : {}), targetId, trigger: e.trigger, effects: e.effects });
     }
     ctx.events.push({ type: 'ability', unitId: unitIdOf(ctx.source), name: e.name, source: { kind: 'summon', id: e.id, label: e.name } });
     ctx.parts.push(`${e.name}を呼んだ`);
     return true;
   },
   describe: (e) =>
-    e.overflow && e.stackLimit ? `${e.name}を呼ぶ（戦闘の間ずっと、ターン終了時にランダムな敵へ${e.damage}のダメージ、最大${e.stackLimit}体。${e.stackLimit}体いる時は、代わりに${e.name}が全員1回ずつ攻撃）` : e.trigger ? `${e.name}を設置（選んだ敵が行動する直前に${(e.effects ?? []).map(x => describeEffect(x)).join('・')}。最大${e.turns}ターン。同種は新しい対象・期間で上書き）` : e.echoPct ? `${e.name}を呼ぶ（攻撃時に${e.echoPct}%の威力で追撃、被弾時に消えてダメージを0に）` : `${e.name}を呼ぶ（${e.turns >= 99 ? '戦闘の間ずっと' : `${e.turns}ターン`}、ターン終了時に${e.targeted ? '選んだ敵' : 'ランダムな敵'}へ${e.damage}の${e.element ? `${getElement(e.element).name}属性` : ''}ダメージ${e.stackLimit ? `、最大${e.stackLimit}体` : ''}${e.replace ? '。同種は新しい対象・期間で上書き' : ''}）`,
+    e.blockPct ? `${e.name}を置き直す（${e.turns}ターン、ターン終了時に${e.targeted ? '選んだ敵' : 'ランダムな敵'}へ${e.damage}＋自分の今のブロックの${e.blockPct}%（最大+${e.blockMax ?? 99}）のダメージ。ブロックは減らない。同種は上書き）` : e.overflow && e.stackLimit ? `${e.name}を呼ぶ（戦闘の間ずっと、ターン終了時にランダムな敵へ${e.damage}のダメージ、最大${e.stackLimit}体。${e.stackLimit}体いる時は、代わりに${e.name}が全員1回ずつ攻撃）` : e.trigger ? `${e.name}を設置（選んだ敵が行動する直前に${(e.effects ?? []).map(x => describeEffect(x)).join('・')}。最大${e.turns}ターン。同種は新しい対象・期間で上書き）` : e.echoPct ? `${e.name}を呼ぶ（攻撃時に${e.echoPct}%の威力で追撃、被弾時に消えてダメージを0に）` : `${e.name}を呼ぶ（${e.turns >= 99 ? '戦闘の間ずっと' : `${e.turns}ターン`}、ターン終了時に${e.targeted ? '選んだ敵' : 'ランダムな敵'}へ${e.damage}の${e.element ? `${getElement(e.element).name}属性` : ''}ダメージ${e.stackLimit ? `、最大${e.stackLimit}体` : ''}${e.replace ? '。同種は新しい対象・期間で上書き' : ''}）`,
   short: (e) => `${e.damage}`,
 };
