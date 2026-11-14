@@ -15,8 +15,11 @@ export const pistonFist: EnemyDef = {
   weak: ['thunder'],
   resist: ['poison'],
   pattern: 'sequence',
+  // 敵の特殊な行動・第2弾（docs/tasks/enemy-behaviors-round2-plan.md §3・fix-plan §4）: 盾砕きを1ターン目に予告する（もとから順番の1番目）
+  firstActionId: 'piston',
   actions: [
-    { id: 'piston', name: 'ピストンの突き', effects: [{ kind: 'damage', amount: 12 }] },
+    // 「ピストンの突き」を盾砕きに置き換えた（ブロックを0にしてから、同じ12のダメージ）。ID は古い保存のために残す
+    { id: 'piston', name: '杭打ち', big: true, behavior: 'shatter', hint: '当たるとブロックを全部壊す。BREAK するか、ブロックに頼らずに受ける', effects: [{ kind: 'shieldBreak' }, { kind: 'damage', amount: 12 }] },
     { id: 'shock', name: '床を打つ衝撃', effects: [{ kind: 'damage', amount: 6, to: 'foes' }] },
     { id: 'retract', name: '腕を引き戻す', effects: [{ kind: 'block', amount: 10 }] },
   ],
@@ -102,7 +105,9 @@ export const clockworkSage: EnemyDef = {
   ],
   abilities: [{ name: '真鍮の外装', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 8 }] } }],
   phases: [
-    { belowHpPct: 50, name: '針の早まった賢者', pattern: 'sequence', actions: [
+    // ボスの段階（2026-11-14）: 巻き戻し（逆回し。1回だけ）。答え: 雷で BREAK・呪い
+    { belowHpPct: 50, name: '針の早まった賢者', pattern: 'sequence', openingActionId: 'reverse', rule: '1回だけ時を巻き戻し、HPを最大の半分まで戻す（雷で BREAK すると止まる。呪いで戻る量が減る）', actions: [
+      { id: 'reverse', name: '時を巻き戻す', big: true, scripted: true, hint: 'HPを最大の50%まで戻す（1回だけ）。雷の弱点で BREAK すると止まる。呪い・癒し封じで戻る量が減る', effects: [{ kind: 'healToPct', pct: 50 }, { kind: 'block', amount: 10 }] },
       { id: 'accel', name: '加速', big: true, effects: [{ kind: 'damage', amount: 7, hits: 3 }] },
       { id: 'toll', name: '終わりの鐘', big: true, effects: [{ kind: 'damage', amount: 12, element: 'thunder', to: 'foes' }] },
       { id: 'rewind2', name: '最後の逆回し', effects: [{ kind: 'heal', amount: 10, to: 'self' }, { kind: 'block', amount: 20 }] },
@@ -120,8 +125,11 @@ export const venomBoilerCrab: EnemyDef = makeVariant(boilerCrab, {
   gold: 9,
   weak: ['ice', 'thunder'],
   resist: ['fire'],
+  // 敵の特殊な行動・第2弾（round2 §3・fix-plan §4）: 亜種のこの敵だけ「鉄の甲羅」をかばうに置き換えた。ID は古い保存のために残す。元のボイラーの蟹は変えていない。
+  // ほかの敵がいる時は、1ターン目に必ず「鉄の甲羅でかばう」（1体だけの時は両のはさみ）。4つ目の地域なのでブロック10（BREAK されると行動ごと止まる）
+  firstActionId: 'shell',
   actions: [
-    { id: 'shell', name: '鉄の甲羅', effects: [{ kind: 'block', amount: 12 }] },
+    { id: 'shell', name: '鉄の甲羅でかばう', big: true, behavior: 'guard', fallbackIfAloneId: 'double', hint: '次の味方の番の間、ほかの敵への単体攻撃を代わりに受ける。全体攻撃は通る', effects: [{ kind: 'guardAllies' }, { kind: 'block', amount: 10 }] },
     { id: 'pinch', name: '毒液のはさみ', effects: [{ kind: 'damage', amount: 8, element: 'poison' }, { kind: 'applyStatus', status: 'poison', amount: 2 }] },
     { id: 'double', name: '両のはさみ', effects: [{ kind: 'damage', amount: 6, hits: 2 }] },
   ],

@@ -2,7 +2,7 @@
 import { BALANCE } from '../../data/balance';
 import { petAbilities } from './pets';
 import { getClass } from '../../data/classes';
-import { getItem } from '../../data/items';
+import { getItem, POUCH_LIMIT } from '../../data/items';
 import type { CardInstance, EquipSlot, Hero, ItemDef, JobTier, PartyMemberSpec, StatId, Stats } from '../../types';
 
 export const STAT_IDS: StatId[] = ['str', 'vit', 'int', 'per', 'dex', 'agi', 'luk'];
@@ -10,6 +10,14 @@ export const EQUIP_SLOTS: EquipSlot[] = ['weapon', 'armor', 'accessory'];
 
 export function equippedItems(hero: Hero): ItemDef[] {
   return EQUIP_SLOTS.map((s) => hero.equipment[s]).filter((x): x is NonNullable<typeof x> => !!x).map((i) => getItem(i.itemId));
+}
+
+/**
+ * 道具袋に持てる数（ふつうは POUCH_LIMIT。錬金術師のベルトなど、装備で増える。段階7a）。
+ * 外して数が減っても、入っている物は消さない（減った分は、使うか渡すまで新しく入らないだけ）
+ */
+export function pouchLimitOf(hero: Hero): number {
+  return POUCH_LIMIT + equippedItems(hero).reduce((n, i) => n + (i.pouchBonus ?? 0), 0);
 }
 
 /** 能力値 = 職業の初期値 + 成長ボーナス + 装備 */
@@ -57,18 +65,19 @@ export const jobWeapons = (classId: string): string[] => {
 };
 
 /** 武器の専用カード（戦闘時に山札へ加わる） */
-export function weaponCards(hero: Hero): CardInstance[] {
+export function weaponCards(hero: Hero, solo = false): CardInstance[] {
   const w = hero.equipment.weapon;
   if (!w) return [];
   const def = getItem(w.itemId);
   return (def.cards ?? []).flatMap((c) =>
-    Array.from({ length: c.count }, (_, i) => ({ uid: `${w.uid}-${c.cardId}-${i}`, cardId: c.cardId, fromWeapon: true })),
+    Array.from({ length: c.count }, (_, i) => ({ uid: `${w.uid}-${c.cardId}-${i}`, cardId: solo && c.soloCardId ? c.soloCardId : c.cardId, fromWeapon: true })),
   );
 }
 
 /** 戦闘で使う山札（自分の山札 + 武器のカード） */
-export function battleDeck(hero: Hero): CardInstance[] {
-  return [...hero.deck, ...weaponCards(hero)];
+/** solo = 戦闘に1人だけ（武器のカードが1人用に変わる物がある） */
+export function battleDeck(hero: Hero, solo = false): CardInstance[] {
+  return [...hero.deck, ...weaponCards(hero, solo)];
 }
 
 /** 次のレベルまでに必要な経験値 */
@@ -84,7 +93,8 @@ export function expToNext(level: number, classId?: string): number {
 export const jobTierIndex = (tier: JobTier | undefined) => (tier === 'mid' ? 1 : tier === 'top' || tier === 'special' ? 2 : 0);
 
 /** 戦闘に参加する時の設定 */
-export function toPartyMember(hero: Hero): PartyMemberSpec {
+/** solo は true の時だけ1人用（.map(toPartyMember) で渡る番号は使わない） */
+export function toPartyMember(hero: Hero, solo?: unknown): PartyMemberSpec {
   return {
     heroId: hero.id,
     classId: hero.classId,
@@ -97,12 +107,13 @@ export function toPartyMember(hero: Hero): PartyMemberSpec {
     focus: hero.focus,
     focusMax: heroFocusMax(hero),
     stats: heroStats(hero),
-    deck: battleDeck(hero),
+    deck: battleDeck(hero, solo === true),
     startBlock: heroStartBlock(hero),
     gold: hero.gold,
     extraDraw: heroExtraDraw(hero),
     abilities: heroAbilities(hero),
     statuses: hero.nextBattleStatuses,
+    ...(hero.petFeast ? { petFeast: hero.petFeast } : {}),
     ...(hero.pet ? { pet: { petId: hero.pet.petId, color: hero.pet.color, name: hero.pet.name, love: hero.pet.love } } : {}),
     ...(heroWeaponElement(hero) ? { weaponElement: heroWeaponElement(hero) } : {}),
       ...(hero.equipment.weapon ? { equippedWeaponType: getItem(hero.equipment.weapon.itemId).weaponType } : {}),

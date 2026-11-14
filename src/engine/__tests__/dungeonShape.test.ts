@@ -5,12 +5,13 @@ import { BALANCE } from '../../data/balance';
 import { DUNGEONS } from '../../data/dungeons';
 import { ENEMIES } from '../../data/enemies';
 import { EVENTS } from '../../data/events';
-import { getRoomType } from '../../data/rules';
+import { DUNGEON_THEMES, getRoomType } from '../../data/rules';
 import { SCENARIOS } from '../../data/scenarios';
-import { DEPTH_TIER_NAME, depthStep, depthTier, dungeonRows, isLegacyLayout } from '../game/dungeon';
+import { DEPTH_TIER_NAME, depthStep, depthTier, dungeonRows, isLegacyLayout, roomKind } from '../game/dungeon';
 import { cardRewardOdds } from '../game/loot';
 import type { DungeonDef, GameCommand, GameState, PlayerId } from '../../types';
 import { applyGameCommand, buildDungeon, createGame, createRng } from '../index';
+import { keyLayout1 } from '../../content/common/dungeonLayouts';
 
 const P: PlayerId = 'P1';
 type Layout = NonNullable<DungeonDef['layout']>;
@@ -32,16 +33,38 @@ function allPaths(layout: Layout): string[][] {
   layout[0].forEach((_, c) => walk(0, c, []));
   return out;
 }
-/** 偏り防止の決まりに反している所（無ければ undefined） */
-function biasOf(path: string[]): string | undefined {
-  let battles = 0;
-  for (let i = 0; i < path.length; i++) {
-    battles = path[i] === 'battle' ? battles + 1 : 0;
-    if (battles > 2) return `通常の戦闘が3連続（${i - 1}行目〜）`;
-    if (i && path[i] === 'rest' && path[i - 1] === 'rest') return `休憩→休憩（${i}行目）`;
-    if (i && path[i] === 'event' && path[i - 1] === 'event') return `イベント→イベント（${i}行目）`;
-  }
-  return undefined;
+/** 部屋の並びの形（type とつながり。イベント・宝箱の中身は見ない） */
+const shapeOf = (L: Layout) => JSON.stringify(L.map((row) => row.map((x) => [x.type, x.next])));
+/**
+ * 1つ目の鍵の型（keyLayout1）で作ったダンジョンか（シナリオ2〜7の6か所）。
+ * 2026-11-13（点検19の問題 A1・オーナーの OK）: この型だけ「ふつうの戦闘は2回以上」・選ぶ所 6 以上
+ */
+const isKeyLayout1 = (d: DungeonDef) => !!d.layout && shapeOf(d.layout) === shapeOf(keyLayout1({ first: 'a', second: 'b', story: 'c' }));
+/**
+ * ボスの前が「休憩 → イベント → ボス」の8行の鍵のダンジョンか（1つ目の鍵の型と、2026-11-13 の案イで同じ形にした翠の神殿）。
+ * 休憩の後に戦う部屋が無いので、ふつうの戦闘の下限は1つ目の鍵の型と同じ 2回（2026-11-13 点検19の問題 A1 でオーナーが OK した扱い）
+ */
+const isShortKeyShape = (d: DungeonDef) => {
+  const L = d.layout!;
+  return !d.finale && L.length === 8 && restRowOf(L) === L.length - 3 && L[L.length - 2][0].type === 'event';
+};
+/** 戦う部屋（ふつうの戦闘・強敵・中ボス・ボス） */
+const isCombat = (type: string) => !!getRoomType(type).battle;
+/**
+ * ボスの前の休憩の行（ボスの前の3行のうち、ボスに近い順で最初の「休憩1つだけの行」）。
+ * 2026-11-13（強敵の計画 柱3・案イ）: 2つ目の鍵の型は「休憩 → ふつうの戦闘 → 物語の部屋 → ボス」なので、ボスの4行前まで見る
+ */
+const restRowOf = (L: Layout) => [L.length - 2, L.length - 3, L.length - 4].find((r) => L[r].length === 1 && L[r][0].type === 'rest')!;
+/** 入口からボスまでの全部の道（行の番号つき） */
+function allRowPaths(L: Layout): { r: number; type: string }[][] {
+  const out: { r: number; type: string }[][] = [];
+  const walk = (r: number, c: number, path: { r: number; type: string }[]) => {
+    const next = [...path, { r, type: L[r][c].type }];
+    if (!L[r][c].next.length) out.push(next);
+    else for (const n of L[r][c].next) walk(r + 1, n, next);
+  };
+  L[0].forEach((_, c) => walk(0, c, []));
+  return out;
 }
 
 describe('固定ダンジョン28か所の形', () => {
@@ -68,11 +91,14 @@ describe('固定ダンジョン28か所の形', () => {
     const L = d.layout!;
     expect(L[0].every((r) => r.type === 'battle')).toBe(true);
     expect(L[L.length - 1].map((r) => r.type)).toEqual(['boss']);
-    // ボスの前は「休憩」か「休憩→物語の部屋」
-    expect(
-      L.slice(-3, -1).some((row) => row.length === 1 && row[0].type === 'rest'),
-      '休憩',
-    ).toBe(true);
+    // ボスの前は「休憩」か「休憩→物語の部屋」か「休憩→ふつうの戦闘→物語の部屋」（2026-11-13 案イ）。
+    // 休憩の後の行は部屋が1つで、宝箱・休憩は置かない。イベント（物語の部屋）はボスの直前だけ
+    const rest = restRowOf(L);
+    expect(rest, '休憩').toBeGreaterThanOrEqual(L.length - 4);
+    for (let r = rest + 1; r < L.length - 1; r++) {
+      expect(L[r], `${r}行`).toHaveLength(1);
+      expect(L[r][0].type, `${r}行`).toBe(r === L.length - 2 ? 'event' : 'battle');
+    }
     for (let r = 0; r + 1 < L.length; r++) {
       for (const room of L[r]) {
         expect(room.next.length, `${r}`).toBeGreaterThan(0);
@@ -92,33 +118,137 @@ describe('固定ダンジョン28か所の形', () => {
     }
   });
 
-  it.each(fixed().map((d) => [d.id, d] as const))('%s: どの道でも 休憩→休憩なし・イベント→イベントなし・通常の戦闘は最大2連続', (_id, d) => {
-    const paths = allPaths(d.layout!);
+  // 部屋の並びの決まり（docs/review/2026-11-13-room-variety2.md。2026-11-13 の2回目の直し。例外の一覧は置かない）
+  it.each(fixed().map((d) => [d.id, d] as const))('%s: 行の部屋は1〜3つ・同じ行は全部ちがう type・どの辺も同じ type でない', (_id, d) => {
+    const L = d.layout!;
+    L.forEach((row, r) => {
+      expect(row.length, `${r}行`).toBeGreaterThanOrEqual(1);
+      expect(row.length, `${r}行`).toBeLessThanOrEqual(3);
+      expect(new Set(row.map((x) => x.type)).size, `${r}行`).toBe(row.length);
+      row.forEach((room, c) => {
+        expect(new Set(room.next).size, `${r}:${c}`).toBe(room.next.length);
+        room.next.forEach((n) => expect(L[r + 1][n].type, `${r}:${c}→${r + 1}:${n}`).not.toBe(room.type));
+      });
+    });
+  });
+
+  // 戦闘の濃さ（憲章1・3）: どの道でも、戦う部屋でない部屋が3つ以上続かない。ふつうの戦闘は鍵で3回以上・最後で4回以上。
+  // 5行目（敵が1体増える行）からボスの前の休憩の手前までに、戦う部屋が鍵で2回以上・最後で3回以上（中ボスを含む）。
+  // ただし、その間の行の数がそれより少ない時は、行の数まで（1つ目の鍵の8行のダンジョンは、ボスの前が「休憩→物語の部屋」なので、
+  // 5行目より後で休憩の前は1行しかない。docs/review/2026-11-13-room-variety2.md に書いた）。
+  // 2026-11-13（強敵の計画 柱3・案イ）: 休憩を1行前に出した翠の神殿・2つ目の鍵の型も、同じ数え方で1行（= 1回以上）。
+  // ふつうの戦闘の下限は、ボスの前が「休憩 → イベント → ボス」の8行の鍵（1つ目の鍵の型と翠の神殿）だけ 2回以上
+  it.each(fixed().map((d) => [d.id, d] as const))('%s: どの道でも、戦わない部屋は2つまで・ふつうの戦闘が下限以上・奥の戦う部屋が下限以上', (_id, d) => {
+    const L = d.layout!;
+    const rest = restRowOf(L);
+    const from = BALANCE.depthBonus.extraEnemyFromStep * BALANCE.depthBonus.rowsPerStep;
+    const deepWant = Math.min(d.finale ? 3 : 2, rest - from);
+    const paths = allRowPaths(L);
     expect(paths.length).toBeGreaterThan(1);
-    for (const p of paths) expect(biasOf(p), p.join('→')).toBeUndefined();
-    // どの道でも、ボスを入れて戦闘が3回以上ある（宝箱と休憩だけでは奥へ行けない）
-    for (const p of paths) expect(p.filter((t) => getRoomType(t).battle).length, p.join('→')).toBeGreaterThanOrEqual(3);
+    for (const p of paths) {
+      const label = p.map((x) => x.type).join('→');
+      let run = 0;
+      for (const x of p) {
+        run = isCombat(x.type) ? 0 : run + 1;
+        expect(run, label).toBeLessThan(3);
+      }
+      expect(p.filter((x) => x.type === 'battle').length, label).toBeGreaterThanOrEqual(d.finale ? 4 : isShortKeyShape(d) ? 2 : 3);
+      expect(p.filter((x) => x.r >= from && x.r < rest && isCombat(x.type)).length, label).toBeGreaterThanOrEqual(deepWant);
+    }
+  });
+
+  // 強敵は「選ぶ物」（憲章3）: 強敵の部屋は、同じ行に強敵でない部屋がある。強敵と別の物を選べる扉が1つ以上ある。
+  // 選ぶ所（行き先が2つ以上の部屋）が2つ以上あり、「どちらの扉も同じ type」の選択は無い。一本道の行（部屋が1つ）は、
+  // ボスの前の「休憩 →（物語の部屋）→ ボス」を除いて、3行以上続かない
+  it.each(fixed().map((d) => [d.id, d] as const))('%s: 強敵は避けられる・選ぶ所がある・一本道が長く続かない', (_id, d) => {
+    const L = d.layout!;
+    for (const [r, row] of L.entries()) if (row.some((x) => x.type === 'elite')) expect(row.some((x) => x.type !== 'elite'), `${r}行`).toBe(true);
+    const choices = L.flatMap((row, r) => row.filter((x) => x.next.length >= 2).map((x) => x.next.map((n) => L[r + 1][n].type)));
+    expect(choices.length).toBeGreaterThanOrEqual(2);
+    for (const ts of choices) expect(new Set(ts).size, ts.join('/')).toBeGreaterThan(1);
+    expect(choices.some((ts) => ts.includes('elite') && ts.some((t) => t !== 'elite'))).toBe(true);
+    let single = 0;
+    for (let r = 0; r < restRowOf(L); r++) {
+      single = L[r].length === 1 ? single + 1 : 0;
+      expect(single, `${r}行`).toBeLessThan(3);
+    }
+  });
+
+  // 2026-11-13 強敵の計画（docs/tasks/elite-plan.md 柱3）: どのダンジョンにも、強敵を1回も通らない道がある（挑むか避けるかを選べる。憲章3）。
+  // 前は7か所（翠の神殿・2つ目の鍵の型の6か所）を外していた。オーナーが選んだ案イ（休憩を1行前に出す）で直したので、例外は無い
+  // （docs/review/2026-11-13-elite.md §3・§10）
+  it.each(fixed().map((d) => [d.id, d] as const))('%s: 強敵を1回も通らない道がある', (id, d) => {
+    expect(allPaths(d.layout!).some((p) => !p.includes('elite')), id).toBe(true);
+  });
+
+  // 2026-11-13（点検19の問題 A1）: 1つ目の鍵の型は、シナリオ2〜7の6か所。選ぶ所は 6 以上（直す前 bf628d5 と同じ数）。
+  // 宝箱の格（コモン・鍵付きのレア）は残す。シナリオ1の翠の神殿は、この型ではない（2026-11-13 の案イで、ボスの前の形とふつうの戦闘の下限だけ同じになった）
+  it('1つ目の鍵の型: シナリオ2〜7の6か所・選ぶ所 6 以上・宝箱の格は残す', () => {
+    const k1 = fixed().filter(isKeyLayout1);
+    expect(k1.map((d) => DUNGEONS.scenarioOf(d.id)).sort()).toEqual(SCENARIOS.all.map((s) => s.id).filter((s) => s !== 'corruptionKing').sort());
+    for (const d of k1) {
+      expect(keyed(DUNGEONS.scenarioOf(d.id)!)[0].id).toBe(d.id);
+      expect(d.layout!.flat().filter((x) => x.next.length >= 2).length, d.id).toBeGreaterThanOrEqual(6);
+      const chests = d.layout!.flat().filter((x) => x.type === 'chest').map((x) => `${x.chest!.rarity}${x.chest!.locked ? '鍵' : ''}`);
+      expect(chests.sort(), d.id).toEqual(['common', 'rare鍵']);
+    }
+  });
+
+  // 同じ型の写し（シナリオ2〜7）は、イベントが違うだけで、ほかのシナリオのイベントを借りない（同じダンジョンで同じイベントを2回使わない）
+  it.each(fixed().map((d) => [d.id, d] as const))('%s: イベントはそのシナリオの物・同じダンジョンで重ならない', (id, d) => {
+    const ids = d.layout!.flat().filter((x) => x.type === 'event').map((x) => x.eventId!);
+    expect(new Set(ids).size).toBe(ids.length);
+    const sid = DUNGEONS.scenarioOf(id);
+    for (const e of ids) expect(EVENTS.forScenario(sid!).some((x) => x.id === e), e).toBe(true);
   });
 });
 
+/** 同じ種類（扉の予兆と同じ分け方）の部屋が続いている所（無ければ undefined。憲章3。2026-11-13） */
+function sameKindOf(path: string[]): string | undefined {
+  for (let i = 1; i < path.length; i++) if (roomKind(path[i]) === roomKind(path[i - 1])) return `${path[i - 1]}→${path[i]}（${i}行目）`;
+  return undefined;
+}
+
 describe('ランダムダンジョンの偏り防止', () => {
-  it('種を変えても、どの道でも決まりを守る。行の数は 6＋ボス のまま', () => {
+  it('種を変えても、どの道でも同じ種類の部屋が続かない（扉の予兆と同じ分け方。2026-11-13 に全部の種類へ広げた）。行の数は 4＋ボス', () => {
     const randoms = DUNGEONS.all.filter((d) => d.random);
     expect(randoms).toHaveLength(7);
-    const eventIds = EVENTS.forScenario('corruptionKing')
-      .filter((e) => e.where !== 'map' && e.where !== 'spawn')
-      .map((e) => e.id);
+    let layouts = 0;
+    let rowDups = 0;
+    let multiRows = 0;
     for (const d of randoms) {
-      for (let seed = 1; seed <= 60; seed++) {
-        const run = buildDungeon(d.id, createRng(seed), 0, eventIds);
-        expect(dungeonRows(run)).toBe(7);
-        const layout: Layout = [];
-        for (const room of run.rooms) (layout[room.row] ??= [])[room.col] = { type: room.type, next: room.next.map((id) => Number(id.split('c')[1])) };
-        for (const p of allPaths(layout)) expect(biasOf(p), `${d.id} seed${seed}: ${p.join('→')}`).toBeUndefined();
-        expect(isLegacyLayout(run)).toBe(false);
+      const eventIds = EVENTS.forScenario(DUNGEONS.scenarioOf(d.id)!)
+        .filter((e) => e.where !== 'map' && e.where !== 'spawn')
+        .map((e) => e.id);
+      for (const theme of [undefined, 'crystalGrotto', 'sealedLabyrinth', 'outlawDen']) {
+        for (let seed = 1; seed <= 100; seed++) {
+          const run = buildDungeon(d.id, createRng(seed * 7919 + 13), 0, eventIds, theme);
+          layouts++;
+          expect(dungeonRows(run)).toBe(5);
+          expect(isLegacyLayout(run)).toBe(false);
+          expect(run.rooms[0].type).toBe('battle');
+          // どの辺も、同じ type ではない・同じ種類（予兆）でもない
+          const by = new Map(run.rooms.map((r) => [r.id, r]));
+          for (const room of run.rooms) for (const n of room.next) expect(roomKind(by.get(n)!.type), `${d.id} ${theme} seed${seed}: ${room.id}→${n}`).not.toBe(roomKind(room.type));
+          const layout: Layout = [];
+          for (const room of run.rooms) (layout[room.row] ??= [])[room.col] = { type: room.type, next: room.next.map((id) => Number(id.split('c')[1])) };
+          for (const p of allPaths(layout)) expect(sameKindOf(p), `${d.id} seed${seed}: ${p.join('→')}`).toBeUndefined();
+          // 同じ行の部屋は、なるべく全部ちがう type（1行目の戦闘は除く。出せる種類が足りない時だけ重なる）
+          layout.forEach((row, r) => {
+            if (r > 0 && row.length > 1 && new Set(row.map((x) => x.type)).size < row.length) rowDups++;
+            if (r > 0 && row.length > 1) multiRows++;
+          });
+          // テーマの部屋は最後の行（ボスの前）に1つ
+          if (theme) expect(layout[3].map((r) => r.type)).toEqual([getRoomType(DUNGEON_THEMES.get(theme).fixedRoom).id]);
+        }
       }
     }
+    expect(layouts).toBe(2800);
+    // 2026-11-13 の測定: 部屋が2つ以上の行 3955 のうち、重なりは 49（前は 2191）。2% を超えたら作り方を見直す
+    expect(multiRows).toBeGreaterThan(3000);
+    expect(rowDups / multiRows).toBeLessThan(0.02);
   });
+
 });
 
 describe('深さ（2行ごとに +1。段階3で 3行ごと → 2行ごと）', () => {

@@ -77,7 +77,13 @@ async function playBattle(page) {
   for (let guard = 0; guard < 60; guard++) {
     await waitForBattlePresentation(page);
     if (await page.locator('button:has-text("報酬を受け取る"), button:has-text("冒険の結果へ"), [data-result-button], button:has-text("ダンジョンへ戻る")').count()) return;
-    const endBtn = page.locator('button:has-text("ターン終了"):not([disabled])');
+    // 詳細の窓（装備・カードの説明）が開いていたら閉じる（説明の文に「ターン終了」が入った装備のボタンを、終了のボタンと取り違えないように）
+    if (await page.locator('[data-detail-backdrop]').count()) {
+      await page.keyboard.press('Escape').catch(() => {});
+      await page.locator('[data-detail-backdrop]').first().click({ position: { x: 5, y: 5 }, timeout: 2000 }).catch(() => {});
+      continue;
+    }
+    const endBtn = page.locator('button:has-text("ターン終了"):not([disabled]):not([data-item-detail]):not([data-detail-card])');
     if (!(await endBtn.count())) {
       await page.waitForTimeout(150);
       continue;
@@ -252,6 +258,11 @@ async function run(party, difficulty) {
     if (await page.locator('[data-sanctuary]').count() && await clickText(page, '世界マップへ')) continue;
     // 世界マップ: 翠の神殿へ向かう
     if (await page.locator('[data-world-map]').count() && !(await page.getByText('撤退', { exact: true }).count())) {
+      // 光るマスが地図の右の操作ボタン（見取り図など。段階6a）の下にあると、ボタンを押してしまう。見取り図が開いたら閉じる
+      if (await page.locator('[data-overview-close]').count()) {
+        await page.locator('[data-overview-close]').click({ timeout: 3000 }).catch(() => {});
+        continue;
+      }
       if (!seen.has('world')) {
         seen.add('world');
         await check(page, 'world');
@@ -286,7 +297,20 @@ async function run(party, difficulty) {
         const hd = nav && nav.hero != null ? dist(nav.hero) : Infinity;
         if (best !== null && bestD < hd) {
           await reach.nth(best).scrollIntoViewIfNeeded();
-          const b = await reach.nth(best).boundingBox();
+          let b = await reach.nth(best).boundingBox();
+          // 右の操作ボタン（見取り図・拡大・戻る）の下なら、地図を横に動かしてから押す（広い地図は横にもスクロールする。段階6a）
+          const under = async (bb) => {
+            for (const sel of ['[data-zoom-controls]', '[data-recenter]']) {
+              const c = await page.locator(sel).boundingBox().catch(() => null);
+              if (c && bb.x + bb.width / 2 >= c.x - 4 && bb.x + bb.width / 2 <= c.x + c.width + 4 && bb.y + bb.height / 2 >= c.y - 4 && bb.y + bb.height / 2 <= c.y + c.height + 4) return true;
+            }
+            return false;
+          };
+          if (b && (await under(b))) {
+            await page.evaluate(() => document.querySelector('[data-world-map]')?.scrollBy({ left: 120, behavior: 'instant' }));
+            await page.waitForTimeout(80);
+            b = await reach.nth(best).boundingBox();
+          }
           await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
           await page.waitForTimeout(80);
           if (await page.locator('button:has-text("移動する")').count()) {
@@ -332,7 +356,8 @@ async function run(party, difficulty) {
       await page.waitForTimeout(150);
       continue;
     }
-    if (await page.locator('button:has-text("ターン終了")').count()) {
+    // 装備の説明の文に「ターン終了」が入っている時（宝箱の中身など）は、戦闘と取り違えない
+    if (await page.locator('button:has-text("ターン終了"):not([data-item-detail]):not([data-detail-card])').count()) {
       if (!seen.has('battle')) {
         seen.add('battle');
         await check(page, 'battle');

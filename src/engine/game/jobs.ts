@@ -1,10 +1,11 @@
 import { facilityMembers, facilityVisit } from './world/facilities';
+import { petLoveLevel } from './pets';
 // ===== 転職（spec §6.4） =====
 // 段は 基本 → 中位 → 最上位。中位からは、条件を満たすと特殊ジョブ（脇道）にも転職できる。
 // 転職するとLv1に戻る。成長ボーナス・山札・装備は引き継ぎ、前のジョブの戦闘の特殊能力を1つ持ち越す。
 // 基本→中位 = 戦闘・探索中以外 / 中位→最上位 = 町の聖堂・祠・神殿 / 中位→特殊 = 神殿・対応する祭壇
 import { BALANCE } from '../../data/balance';
-import { CARDS } from '../../data/cards';
+import { CARDS, cardLineages, cardWeaponTypes } from '../../data/cards';
 import { CLASSES, getClass } from '../../data/classes';
 import { getItem } from '../../data/items';
 import { SANCTUARIES } from '../../data/world';
@@ -28,7 +29,9 @@ export function addFeat(hero: Pick<Hero, 'feats'>, key: string, n = 1) {
 }
 
 /** 記録の値 */
-export const featOf = (hero: Pick<Hero, 'feats'>, key: string) => hero.feats?.[key] ?? 0;
+/** 転職の条件の記録の数。petBond = お供の懐き度が♡3以上の時の、お供の行動の合計（調教師。お供がいなければ0。区切りF） */
+export const featOf = (hero: Pick<Hero, 'feats'> & { pet?: Hero['pet'] }, key: string) =>
+  key === 'petBond' ? (hero.pet && petLoveLevel(hero.pet.love) >= 3 ? hero.pet.acts : 0) : (hero.feats?.[key] ?? 0);
 
 /**
  * キャラが今いる所（転職できるかの判定用）。
@@ -119,10 +122,25 @@ export function jobOptions(hero: Hero, game?: GameState): JobOption[] {
     }).map(o => ({ ...o, progress: o.job.requires ? featOf(hero, o.job.requires.feat) : undefined, needLevel: jobChangeLevel(o.job), count: o.job.requires?.count }));
 }
 
-/** 転職した時に選べる専用カード（3枚。無ければ報酬の候補の先頭から） */
+/** そのジョブにしか無い札か（共通・武器種・系統に置かれておらず、ほかのジョブの報酬にも無い） */
+export function jobOnlyCard(job: ClassDef, id: string): boolean {
+  const c = CARDS.tryGet(id);
+  if (!c || c.common || cardWeaponTypes(c).length || cardLineages(c).length) return false;
+  return !CLASSES.all.some((j) => j.id !== job.id && j.cardPool.includes(id));
+}
+
+/**
+ * 転職した時に選べる専用カード（3枚）。
+ * オーナーの決定（2026-11-12）: 「そのジョブにしか無い札」を先に並べる（代表の並び → 報酬の並びの順）。
+ * 3枚に足りないジョブだけ、残りを代表・報酬の並びの上から足す。
+ * 転職で必ず入る札（jobCards = 決め技）は候補に出さない（点検 2026-11-13 F4: 時魔道士の「時間停止」が2枚取れた）。
+ */
 export function signatureCards(job: ClassDef): string[] {
-  const ids = job.signature?.length ? job.signature : job.cardPool;
-  return ids.filter((id) => CARDS.has(id)).slice(0, 3);
+  // 自分の決め技も、ほかの職の決め技も出さない（決め技は、その職の転職でだけ入る）
+  const given = new Set([...(job.jobCards ?? []), ...finisherCards()]);
+  const order = [...new Set([...(job.signature ?? []), ...job.cardPool])].filter((id) => CARDS.has(id) && !given.has(id));
+  const own = order.filter((id) => jobOnlyCard(job, id));
+  return [...own, ...order.filter((id) => !own.includes(id))].slice(0, 3);
 }
 
 /** 転職する。Lv1に戻り、前のジョブの戦闘の特殊能力を持ち越す */
@@ -185,8 +203,8 @@ export function announceJobs(game: GameState, hero: Hero) {
  * ジョブ寄りの候補（報酬のカードの「必ず1枚」に使う。K7）: 今と前のジョブの専用カード・今のジョブの系統のカード・
  * 装備している武器の種類のカード（武器が無ければ、そのジョブの得意な武器）。共通カード・異端カードは入れない
  */
-export function heroJobCardPool(hero: Hero): string[] {
-  const pool = heroCardPool(hero);
+export function heroJobCardPool(hero: Hero, solo = false): string[] {
+  const pool = heroCardPool(hero, solo);
   const own = new Set<string>();
   for (const cls of [hero.classId, ...(hero.jobs ?? [])]) for (const id of getClass(cls).cardPool) own.add(id);
   const w = hero.equipment.weapon;
@@ -194,21 +212,35 @@ export function heroJobCardPool(hero: Hero): string[] {
   const lineage = getClass(hero.classId).lineage;
   return pool.filter((id) => {
     const c = CARDS.get(id);
-    if (c.common || c.heresy) return false;
-    if (c.weaponType) return c.weaponType === weapon;
-    if (c.lineage) return c.lineage === lineage;
-    return own.has(id);
+    if (c.heresy) return false;
+    // 1枚が複数の場所に置かれている時（区切りD）: 自分のジョブのカード・今の武器・系統のどれかに当たれば入る
+    if (own.has(id)) return true;
+    if (c.common) return false;
+    const wts = cardWeaponTypes(c);
+    const lins = cardLineages(c);
+    if (!wts.length && !lins.length) return own.has(id);
+    return wts.includes(weapon) || (!!lineage && lins.includes(lineage));
   });
 }
 
-export function heroCardPool(hero: Hero): string[] {
+/**
+ * 決め技（どれかのジョブの jobCards の札）の一覧。決め技は、その職に転職した時に1枚だけ入る札なので、
+ * 報酬・イベントのカード・変異・行商人・町の店の候補には出さない（2026-11-13。点検 F4 の続き）
+ */
+export function finisherCards(): Set<string> {
+  return new Set(CLASSES.all.flatMap((j) => j.jobCards ?? []));
+}
+
+/** solo = 1人プレイ（キャラが1人）。連携のカード（teamOnly）と決め技は入れない */
+export function heroCardPool(hero: Hero, solo = false): string[] {
   const ids = new Set<string>();
   for (const cls of [hero.classId, ...(hero.jobs ?? [])]) for (const id of getClass(cls).cardPool) if (CARDS.has(id)) ids.add(id);
   const weapons = new Set(jobWeapons(hero.classId));
   const lineage = getClass(hero.classId).lineage;
   for (const c of CARDS.all) {
-    if (c.heresy) continue;
-    if (c.common || (c.weaponType && weapons.has(c.weaponType)) || (c.lineage && c.lineage === lineage)) ids.add(c.id);
+    if (c.heresy || (solo && c.teamOnly)) continue;
+    if (c.common || cardWeaponTypes(c).some((w) => weapons.has(w)) || (!!lineage && cardLineages(c).includes(lineage))) ids.add(c.id);
   }
-  return [...ids];
+  const fin = finisherCards();
+  return [...ids].filter((id) => !fin.has(id) && !(solo && CARDS.get(id).teamOnly));
 }

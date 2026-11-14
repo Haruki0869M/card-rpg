@@ -2,7 +2,8 @@ import { SettingsControls } from '../ui/SettingsControls';
 import { TERMS } from '../../data/terms';
 // ===== タイトル画面 =====
 import { motion } from 'framer-motion';
-import { BookOpen, HelpCircle, Play, Settings2, UserPlus, Users } from 'lucide-react';
+import { BookOpen, HelpCircle, Play, Settings2, UserPlus, Users, Wifi } from 'lucide-react';
+import { ROOM_MISSING } from '../../net/room';
 import { useHelp } from '../../store/help';
 import { useState } from 'react';
 import { BattleBackground } from '../../art';
@@ -15,6 +16,52 @@ import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { continueSummary, overwriteText } from './titleSummary';
 
 export const GAME_TITLE = TERMS.gameTitle;
+
+/**
+ * 回3 D: 直前に入っていたオンラインの部屋に戻る（「部屋に参加」の中の「前の部屋に戻る」と同じ動き）。
+ * 1人用の「つづきから」と取り違えないよう、別の行に、オンラインの印と合言葉をつけて出す
+ */
+function BackToRoom() {
+  const code = useOnline((s) => s.lastCode);
+  const join = useOnline((s) => s.joinRoom);
+  const busy = useOnline((s) => s.busy);
+  const setScreen = useBattle((s) => s.setScreen);
+  const [msg, setMsg] = useState<string | null>(null);
+  const go = async () => {
+    if (!code) return;
+    setMsg(null);
+    if (await join(code)) {
+      setScreen(useOnline.getState().room?.game ? 'game' : 'lobby');
+      return;
+    }
+    const err = useOnline.getState().error;
+    if (err === ROOM_MISSING) {
+      // 部屋がもう無い: 次からはこのボタンを出さない
+      setMsg(`部屋（${code}）は、もうありません。新しく部屋を作るか、合言葉で参加してください`);
+      useOnline.getState().forgetLastRoom();
+    } else setMsg(err ?? 'つながりませんでした。もう一度押してください');
+  };
+  return (
+    <>
+      {code && (
+      <button disabled={busy} onClick={go} data-back-to-room className="btn btn-dark flex min-h-[52px] items-center gap-2 rounded-2xl border border-sky-300/50 px-3 text-left disabled:opacity-60">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-sky-300/60 bg-black/40">
+          <Wifi size={18} className="text-sky-300" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="font-display block text-[17px] text-sky-50">{busy ? 'つないでいます…' : `前の部屋（${code}）に戻る`}</span>
+          <span className="block text-[12px] leading-4 text-zinc-400">オンライン協力の、さっきまでいた部屋</span>
+        </span>
+      </button>
+      )}
+      {msg && (
+        <div role="alert" className="rounded-lg bg-red-950/80 px-3 py-2 text-[13px] text-red-100">
+          {msg}
+        </div>
+      )}
+    </>
+  );
+}
 
 export function TitleScreen() {
   const game = useBattle((s) => s.game);
@@ -83,6 +130,7 @@ export function TitleScreen() {
             </span>
           </button>
         )}
+        {onlineOk && <BackToRoom />}
         {/* 小さなメニュー: 宝石の丸いボタン */}
         <div className="mt-1 flex justify-around">
           {(

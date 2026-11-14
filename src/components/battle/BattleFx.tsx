@@ -1,10 +1,10 @@
 // ===== 戦闘の手ごたえの演出（段階B）: 技名の帯・命中のエフェクト・盾で弾く =====
 // 見た目だけ。状態・乱数・同期には触れない。粒の置き方は決まった形（乱数を使わない）。
-// 高速モードは時間を半分、動きを減らす（OS の設定・ゲームの「簡易」）では揺れ・広がりを抑えて、ふわっと出して消すだけ。
+// 高速モードは時間を半分、動きを減らす（OS の設定・ゲームの「簡易」）では火花と揺れを止める（斬撃の線・魔法陣・白い層は出す。段階4）。
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Swords } from 'lucide-react';
-import { memo, useEffect, useState, type CSSProperties } from 'react';
-import { ItemImage } from '../../art';
+import { memo, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { EnemyArt, ItemImage } from '../../art';
 import { TIMING } from '../../data/balance';
 import { getCard } from '../../data/cards';
 import { getElement } from '../../data/elements';
@@ -41,7 +41,7 @@ function useFlash(id: number | undefined, seconds: number): number | undefined {
 /** 敵の技の属性（技の名前から探す。変身後の技も探す） */
 function enemyActionElement(defId: string, name: string): string | undefined {
   const def = getEnemy(defId);
-  const lists: EnemyActionDef[][] = [def.actions, ...((def.phases ?? []) as { actions?: EnemyActionDef[] }[]).map((p) => p.actions ?? [])];
+  const lists: EnemyActionDef[][] = [def.actions, ...([...(def.phases ?? []), ...(def.midbossPhases ?? [])] as { actions?: EnemyActionDef[] }[]).map((p) => p.actions ?? [])];
   for (const list of lists) {
     const a = list.find((x) => x.name === name);
     if (!a) continue;
@@ -213,19 +213,162 @@ function ImpactShape({ fx, dur, calm }: { fx: ImpactFx; dur: number; calm: boole
   }
 }
 
-/** ユニットの上の命中のエフェクト（受けたユニットの絵の箱に重ねる） */
-export const ImpactLayer = memo(function ImpactLayer({ unitId }: { unitId: string }) {
-  const fx = useBattle((s) => s.impactFx[unitId]);
+/** 戦場の中での、ユニットの絵の箱の位置（px） */
+export type UnitRect = { id: string; x: number; y: number; w: number; h: number };
+
+/**
+ * 命中のエフェクト（段階4）: 敵の立ち絵の外（戦場の直下の専用の層）に、受けたユニットの絵の箱の位置で出す。
+ * 倒れる敵の絵と一緒に薄くならない・スロットの板などの重なり順に左右されないように
+ */
+const ImpactLayer = memo(function ImpactLayer({ rect }: { rect: UnitRect }) {
+  const fx = useBattle((s) => s.impactFx[rect.id]);
   const { k, calm } = useFxPace();
   const dur = TIMING.impactFx * k;
   const shown = useFlash(fx?.id, dur + 0.05);
   if (!fx || shown !== fx.id) return null;
   return (
-    <div key={fx.id} className="pointer-events-none absolute inset-0 z-[25]" style={fx.big && !calm ? { transform: 'scale(1.35)' } : undefined} data-impact={fx.style} data-impact-unit={unitId}>
+    <div
+      key={fx.id}
+      className="pointer-events-none absolute"
+      style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, ...(fx.big && !calm ? { transform: 'scale(1.35)' } : {}) }}
+      data-impact={fx.style}
+      data-impact-unit={rect.id}
+    >
       <ImpactShape fx={fx} dur={dur} calm={calm} />
     </div>
   );
 });
+
+/**
+ * 被弾の白いフラッシュ（段階4）: 絵に filter: brightness をかけるのをやめ、白い半透明の層を重ねて消す（端末の GPU との相性の問題を避ける）。
+ * 動きを減らす設定（OS・ゲームの「簡易」）の時も出す（最低限の形として残す）
+ */
+const HitFlash = memo(function HitFlash({ rect }: { rect: UnitRect }) {
+  const fx = useBattle((s) => s.unitFx[rect.id]);
+  const { k } = useFxPace();
+  const dur = TIMING.hitFlash * 2 * k;
+  const hit = fx?.kind === 'hit' ? fx.id : undefined;
+  const shown = useFlash(hit, dur + 0.05);
+  if (hit === undefined || shown !== hit) return null;
+  return (
+    <span
+      key={hit}
+      className="fx-hit-flash"
+      style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, ['--d' as string]: `${dur}s` } as CSSProperties}
+      data-hit-flash={rect.id}
+    />
+  );
+});
+
+/** 戦場の直下の、命中のエフェクトと白いフラッシュの専用の層（z-35） */
+export function ImpactField({ rects }: { rects: UnitRect[] }) {
+  return (
+    <div className="pointer-events-none absolute inset-0 z-[35]" data-impact-field>
+      {rects.map((r) => (
+        <HitFlash key={`f${r.id}`} rect={r} />
+      ))}
+      {rects.map((r) => (
+        <ImpactLayer key={`i${r.id}`} rect={r} />
+      ))}
+    </div>
+  );
+}
+
+// ---------- 敵が倒れた演出（回2） ----------
+
+/** 破片の飛ぶ向き（度）と大きさ（px）。決まった形（乱数は使わない） */
+const SHARDS = [
+  { a: 12, r: 1, s: 14 }, { a: 48, r: 0.8, s: 10 }, { a: 84, r: 1.1, s: 16 }, { a: 118, r: 0.85, s: 11 },
+  { a: 152, r: 1, s: 13 }, { a: 190, r: 0.75, s: 10 }, { a: 226, r: 1.05, s: 15 }, { a: 262, r: 0.9, s: 12 },
+  { a: 298, r: 1, s: 14 }, { a: 334, r: 0.8, s: 10 },
+];
+const SHARDS_BOSS = [...SHARDS, { a: 30, r: 1.25, s: 12 }, { a: 136, r: 1.3, s: 12 }, { a: 208, r: 1.25, s: 13 }, { a: 316, r: 1.3, s: 12 }];
+/** 破片の形（三角・四角の欠け） */
+const SHARD_SHAPES = ['polygon(50% 0, 100% 100%, 0 80%)', 'polygon(0 0, 100% 30%, 60% 100%)', 'polygon(20% 0, 100% 50%, 30% 100%, 0 40%)'];
+
+type DeathItem = { key: number; rect: UnitRect; defId: string; phase?: number; boss: boolean; dur: number; lead: number; calm: boolean };
+
+/**
+ * 敵が倒れた演出: 白く光る → 赤黒く光って砕けて散る（破片・少し揺れる）→ 消える。
+ * とどめのコマ（store の deathFx）で始める（命中の演出の後に見える）。絵の写しをこの層に描くので、
+ * 「仲間を呼ぶ」で倒れた敵の枠が外れても、演出は最後まで続く。
+ * 動きを減らす設定（OS・ゲームの「簡易」）では、白く光って消えるだけ（破片と揺れは出さない）
+ */
+export function DeathField({ rects, enemies, bossLike }: { rects: UnitRect[]; enemies: { uid: string; defId: string; phase?: number }[]; bossLike: (uid: string) => boolean }) {
+  const deathFx = useBattle((s) => s.deathFx);
+  const { k, calm } = useFxPace();
+  const [list, setList] = useState<DeathItem[]>([]);
+  // 出し始める前からあった合図（戦場を出し直した時など）は、もう一度は出さない
+  const seen = useRef<Set<number>>(null as unknown as Set<number>);
+  if (!seen.current) seen.current = new Set(Object.values(useBattle.getState().deathFx).map((x) => x.id));
+  const latest = useRef({ rects, enemies, bossLike, k, calm });
+  latest.current = { rects, enemies, bossLike, k, calm };
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+  useEffect(() => {
+    const add: DeathItem[] = [];
+    const now = latest.current;
+    for (const [uid, fx] of Object.entries(deathFx)) {
+      if (seen.current.has(fx.id)) continue;
+      seen.current.add(fx.id);
+      const rect = now.rects.find((r) => r.id === uid);
+      const e = now.enemies.find((x) => x.uid === uid);
+      if (!rect || !e) continue;
+      const boss = now.bossLike(uid);
+      const dur = (boss ? TIMING.enemyDeathBoss : TIMING.enemyDeath) * now.k;
+      const lead = TIMING.enemyDeathLead * now.k;
+      add.push({ key: fx.id, rect, defId: e.defId, phase: e.phase, boss, dur, lead, calm: now.calm });
+      timers.current.push(setTimeout(() => setList((l) => l.filter((x) => x.key !== fx.id)), (lead + dur + 0.05) * 1000));
+    }
+    if (add.length) setList((l) => [...l, ...add]);
+  }, [deathFx]);
+  if (!list.length) return null;
+  return (
+    <div className="pointer-events-none absolute inset-0 z-[34]" data-death-field>
+      {list.map((d) => (
+        <DeathBurst key={d.key} d={d} />
+      ))}
+    </div>
+  );
+}
+
+function DeathBurst({ d }: { d: DeathItem }) {
+  const { rect, dur, lead, calm, boss } = d;
+  const shards = boss ? SHARDS_BOSS : SHARDS;
+  const reach = Math.max(36, rect.w * (boss ? 0.75 : 0.6));
+  const grow = boss ? 1.4 : 1;
+  return (
+    <div
+      className={`death-burst ${calm ? 'death-calm' : ''}`}
+      style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, ['--d' as string]: `${dur}s`, ['--lead' as string]: `${lead}s` } as CSSProperties}
+      data-death={d.key}
+      data-death-boss={boss || undefined}
+      data-death-calm={calm || undefined}
+    >
+      {/* 絵の写し（揺れて、少しふくらんでから消える） */}
+      <div className="death-ghost">
+        <EnemyArt defId={d.defId} phase={d.phase} className="h-full w-full" />
+      </div>
+      <span className="death-white" />
+      {!calm && <span className="death-red" />}
+      {!calm &&
+        shards.map((s, i) => (
+          <span
+            key={i}
+            className="death-shard"
+            style={{
+              ['--a' as string]: `${s.a}deg`,
+              ['--reach' as string]: `${Math.round(reach * s.r)}px`,
+              ['--spin' as string]: `${(i % 2 ? 1 : -1) * (120 + i * 25)}deg`,
+              width: Math.round(s.s * grow),
+              height: Math.round(s.s * grow),
+              clipPath: SHARD_SHAPES[i % SHARD_SHAPES.length],
+            } as CSSProperties}
+          />
+        ))}
+    </div>
+  );
+}
 
 /** 敵の攻撃を味方のブロックで防いだ: 味方の前に青い盾が出て「ブロック！」と弾く */
 export const GuardLayer = memo(function GuardLayer({ unitId }: { unitId: string }) {

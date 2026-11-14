@@ -2,6 +2,7 @@
 // 敵の組み合わせはダンジョンごと（enemies/ の専用の敵）。
 // 制覇すると星環が手に入り、3つそろうと最終ダンジョンに入れる。ボスの手前に「物語の部屋」（event）を置く
 import type { DungeonDef } from '../../../../types';
+import { finaleLayout, keyLayout1, keyLayout2, keyLayout3 } from '../../../common/dungeonLayouts';
 
 const WINDMILL_POOLS: DungeonDef['pools'] = {
   battle: [['windSprite', 'clockworkSoldier'], ['starJelly', 'gearBeetle'], ['stormWindSprite', 'clockworkSoldier'], ['windSprite', 'starJelly', 'gearBeetle']],
@@ -37,92 +38,15 @@ const CAVE_POOLS: DungeonDef['pools'] = {
 
 type Layout = NonNullable<DungeonDef['layout']>;
 
+// 部屋の並びは4つの型（src/content/common/dungeonLayouts.ts）を、このダンジョンのイベントで埋めた物
 /** 風車の塔（入門。突風と星屑の箱） */
-const windmillLayout: Layout = [
-  [{ type: 'battle', next: [0, 1] }],
-  [
-    { type: 'battle', next: [0, 1] },
-    { type: 'event', eventId: 'skyWindGap', next: [1, 2] },
-  ],
-  [
-    { type: 'chest', chest: { rarity: 'common', locked: false }, next: [0, 1] },
-    { type: 'elite', next: [0, 1] },
-    { type: 'rest', next: [0] },
-  ],
-  [
-    { type: 'battle', next: [0, 1] },
-    { type: 'event', eventId: 'starDustChest', next: [0] },
-  ],
-  [
-    { type: 'battle', next: [0] },
-    { type: 'chest', chest: { rarity: 'rare', locked: true }, next: [0] },
-  ],
-  [{ type: 'rest', next: [0] }],
-  [{ type: 'event', eventId: 'windKeeperHall', next: [0] }],
-  [{ type: 'boss', next: [] }],
-];
+const windmillLayout: Layout = keyLayout1({ first: 'skyWindGap', second: 'starDustChest', story: 'windKeeperHall' });
 
-/** 星見の天文台（壁画と時計仕掛けの罠。強敵が2回） */
-const observatoryLayout: Layout = [
-  [{ type: 'battle', next: [0, 1] }],
-  [
-    { type: 'event', eventId: 'constellationMural', next: [0, 1] },
-    { type: 'battle', next: [1] },
-  ],
-  [
-    { type: 'battle', next: [0, 1] },
-    { type: 'rest', next: [1, 2] },
-  ],
-  [
-    { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
-    { type: 'elite', next: [0, 1] },
-    { type: 'event', eventId: 'clockworkTrap', next: [1] },
-  ],
-  [
-    { type: 'battle', next: [0, 1] },
-    { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
-  ],
-  [
-    { type: 'battle', next: [0] },
-    { type: 'elite', next: [0] },
-  ],
-  [{ type: 'rest', next: [0] }],
-  [{ type: 'event', eventId: 'librarianDesk', next: [0] }],
-  [{ type: 'boss', next: [] }],
-];
+/** 星見の天文台（壁画と時計仕掛けの罠） */
+const observatoryLayout: Layout = keyLayout2({ first: 'constellationMural', second: 'clockworkTrap', story: 'librarianDesk' });
 
-/** 月光の庭（泉と飛行船の行商人。分かれ道が多い） */
-const moonGardenLayout: Layout = [
-  [{ type: 'battle', next: [0, 1] }],
-  [
-    { type: 'battle', next: [0, 1] },
-    { type: 'event', eventId: 'moonPetalFountain', next: [1, 2] },
-  ],
-  [
-    { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
-    { type: 'elite', next: [0, 1] },
-    { type: 'battle', next: [1] },
-  ],
-  [
-    { type: 'rest', next: [0, 1] },
-    { type: 'event', eventId: 'skyPeddler', next: [1] },
-  ],
-  [
-    { type: 'battle', next: [0, 1] },
-    { type: 'battle', next: [1] },
-  ],
-  [
-    { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
-    { type: 'elite', next: [0, 1] },
-  ],
-  [
-    { type: 'battle', next: [0] },
-    { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
-  ],
-  [{ type: 'rest', next: [0] }],
-  [{ type: 'event', eventId: 'moonMaidenGarden', next: [0] }],
-  [{ type: 'boss', next: [] }],
-];
+/** 月光の庭（泉と飛行船の行商人） */
+const moonGardenLayout: Layout = keyLayout3({ first: 'moonPetalFountain', second: 'skyPeddler', story: 'moonMaidenGarden' });
 
 export const windmillTower: DungeonDef = {
   id: 'windmillTower',
@@ -178,42 +102,7 @@ export const skyCastle: DungeonDef = {
   bossChest: 'legend',
   requiresKeys: ['ringWind', 'ringStar', 'ringMoon'],
   finale: true,
-  layout: [
-    [{ type: 'battle', next: [0, 1] }],
-    [
-      { type: 'battle', next: [0] },
-      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0, 1] },
-    ],
-    [
-      { type: 'elite', next: [0, 1] },
-      { type: 'battle', next: [1] },
-    ],
-    [
-      { type: 'rest', next: [0, 1] },
-      { type: 'event', eventId: 'skyPeddler', next: [1] },
-    ],
-    [
-      { type: 'battle', next: [0, 1] },
-      { type: 'elite', next: [1] },
-    ],
-    [
-      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
-      { type: 'battle', next: [0] },
-    ],
-    [{ type: 'midboss', next: [0] }],
-    [{ type: 'rest', next: [0, 1] }],
-    [
-      { type: 'battle', next: [0, 1] },
-      { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
-    ],
-    [
-      { type: 'elite', next: [0] },
-      { type: 'battle', next: [0] },
-    ],
-    [{ type: 'rest', next: [0] }],
-    [{ type: 'event', eventId: 'starQueenThrone', next: [0] }],
-    [{ type: 'boss', next: [] }],
-  ],
+  layout: finaleLayout({ first: 'skyPeddler', story: 'starQueenThrone' }),
 };
 
 // ランダムダンジョン: 星屑の洞窟（部屋の並びを自動生成）
@@ -226,5 +115,6 @@ export const starDustCave: DungeonDef = {
   pools: CAVE_POOLS,
   bossChest: 'legend',
   random: true,
-  rows: 6,
+  // 段階7a: 全5行（4行＋ボスの行）
+  rows: 4,
 };

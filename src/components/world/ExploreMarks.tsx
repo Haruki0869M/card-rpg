@@ -7,12 +7,12 @@ import { spawnTurnsLeft } from '../../engine/game/world/explore';
 type Center = (i: number) => { x: number; y: number };
 
 /** 見晴らしの塔（石の塔と小さな旗）。登った後は薄くする */
-export function TowerMini({ x, y, R, used }: { x: number; y: number; R: number; used?: boolean }) {
+export function TowerMini({ x, y, R, used, fogTop }: { x: number; y: number; R: number; used?: boolean; /** 霧の上の塔の先として描く（施設の印は付けない） */ fogTop?: boolean }) {
   const h = R * 1.35;
   const bw = R * 0.42;
   const top = y - h * 0.62;
   return (
-    <g data-feature="tower:watchtower" data-used={used || undefined} opacity={used ? 0.45 : 1} pointerEvents="none">
+    <g data-feature={fogTop ? undefined : 'tower:watchtower'} data-used={used || undefined} opacity={used ? 0.45 : 1} pointerEvents="none">
       <ellipse cx={x} cy={y + R * 0.38} rx={R * 0.5} ry={R * 0.15} fill="rgba(0,0,0,.5)" />
       {/* 塔の胴（下が少し広い） */}
       <path d={`M${x - bw * 0.62} ${y + R * 0.36} L${x - bw * 0.48} ${top + R * 0.2} L${x + bw * 0.48} ${top + R * 0.2} L${x + bw * 0.62} ${y + R * 0.36} Z`} fill="#b9ab92" stroke="#3a3128" strokeWidth={1.4} />
@@ -26,6 +26,67 @@ export function TowerMini({ x, y, R, used }: { x: number; y: number; R: number; 
       <rect x={x - bw * 0.12} y={y - h * 0.22} width={bw * 0.24} height={R * 0.2} rx={bw * 0.12} fill="#2a2018" />
       <line x1={x} y1={top - R * 0.13} x2={x} y2={top - R * 0.55} stroke="#3a3128" strokeWidth={1.4} />
       <path d={`M${x} ${top - R * 0.55} l${R * 0.32} ${R * 0.09} l${-R * 0.32} ${R * 0.09} Z`} fill="#6ac8ff" stroke="#1a3a5a" strokeWidth={1} />
+    </g>
+  );
+}
+
+/**
+ * 霧の上に見える塔の先（回1）: まだ見えていないマスの塔は、見張り台と旗だけを霧の上に出す（まわりは霧のまま）。
+ * x, y = 霧の面の中心。clipPath で、胴の下の方を切る
+ */
+export function TowerTop({ x, y, R, id }: { x: number; y: number; R: number; id: string }) {
+  // 霧の上でも目に入るように、塔を少し大きく（1.3倍）描き、胴の上の方まで出す
+  const k = 1.3;
+  const cut = y - R * 0.3;
+  return (
+    <g data-tower-top={id} pointerEvents="none">
+      <defs>
+        <clipPath id={`tower-top-${id}`}>
+          <rect x={x - R * 2} y={y - R * 4} width={R * 4} height={cut - (y - R * 4)} />
+        </clipPath>
+        <linearGradient id={`tower-top-fade-${id}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#e8ebf8" stopOpacity={0} />
+          <stop offset="1" stopColor="#e8ebf8" stopOpacity={0.9} />
+        </linearGradient>
+        <radialGradient id={`tower-top-halo-${id}`}>
+          <stop offset="0" stopColor="#fff6d0" stopOpacity={0.55} />
+          <stop offset="1" stopColor="#fff6d0" stopOpacity={0} />
+        </radialGradient>
+      </defs>
+      {/* 霧の中の目印になる、うすい光 */}
+      <ellipse cx={x} cy={y - R * 0.95} rx={R * 0.85} ry={R * 0.95} fill={`url(#tower-top-halo-${id})`} />
+      <g clipPath={`url(#tower-top-${id})`}>
+        <g transform={`translate(${x} ${y}) scale(${k}) translate(${-x} ${-y})`}>
+          <TowerMini x={x} y={y} R={R} fogTop />
+        </g>
+      </g>
+      {/* 塔の立っているマス（霧の面）の印（見えない。確認スクリプトがマスの場所を知るため） */}
+      <circle cx={x} cy={y} r={1} fill="none" data-tower-foot />
+      {/* 霧から突き出している所を、白くぼかす */}
+      <rect x={x - R * 0.55} y={cut - R * 0.3} width={R * 1.1} height={R * 0.32} fill={`url(#tower-top-fade-${id})`} />
+    </g>
+  );
+}
+
+/**
+ * 分かれ道の立て札（回1）: 木の柱と、ダンジョンの方へ向いた矢印の板。east = 右向き（東の方）、false なら左向き。
+ * x, y = 立てる所（マスの上の面）
+ */
+export function SignpostMini({ x, y, R, east }: { x: number; y: number; R: number; east: boolean }) {
+  // 小さい画面でも目に入るように、マスの半径の約1.1倍の高さ
+  const s = (R * 1.3) / 100;
+  const flip = east ? 1 : -1;
+  return (
+    <g transform={`translate(${x.toFixed(1)},${y.toFixed(1)}) scale(${(s * flip).toFixed(4)},${s.toFixed(4)})`} data-signpost-mini pointerEvents="none">
+      <ellipse cx="0" cy="6" rx="18" ry="6" fill="rgba(0,0,0,.45)" />
+      {/* 柱 */}
+      <rect x="-5" y="-78" width="10" height="84" rx="2" fill="#8a5a32" stroke="#3a2412" strokeWidth="3" />
+      {/* 矢印の板 */}
+      <path d="M-30 -74 H22 L38 -60 L22 -46 H-30 Z" fill="#d8b070" stroke="#3a2412" strokeWidth="3.5" strokeLinejoin="round" />
+      <path d="M-22 -60 H18" stroke="#6a4a22" strokeWidth="4" strokeLinecap="round" />
+      <path d="M8 -67 L19 -60 L8 -53" fill="none" stroke="#6a4a22" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+      {/* 小さな板（下） */}
+      <rect x="-20" y="-38" width="40" height="12" rx="2" fill="#c49a5e" stroke="#3a2412" strokeWidth="3" />
     </g>
   );
 }

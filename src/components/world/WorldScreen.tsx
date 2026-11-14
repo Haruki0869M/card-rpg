@@ -3,7 +3,7 @@ import { spawnAt, spawnTurnsLeft, SPAWN_NAME } from '../../engine/game/world/exp
 // ===== 世界マップの画面（spec §8・§20.3）=====
 // 上: 侵食度・命の灯火・ゴールド・時間帯 / 中: 地図 / 下: 手番のキャラの操作（移動力の判定・移動・入る・野営・待機）
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Coins, Dices, Flame, Hourglass, Menu, Moon, ScrollText, Star, Sun, Sunrise, Sunset, Tent, Users } from 'lucide-react';
+import { Coins, Compass, Dices, Flame, Hourglass, Menu, Moon, ScrollText, Star, Sun, Sunrise, Sunset, Tent, Users } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { BALANCE } from '../../data/balance';
 import { DUNGEONS } from '../../data/dungeons';
@@ -29,9 +29,24 @@ import {
   timeOfDay,
   turnsUntilNightChange,
   worldDiceBonus,
+  terrainDiceBonus,
   diceAverage,
   corruptionShown,
   dungeonJoin,
+  randomDungeonView,
+  dungeonDetourLines,
+  scourgeCurse,
+  scourgesWith,
+  guideGoal,
+  goalLineText,
+  goalShortText,
+  routeToward,
+  dungeonGateError,
+  dungeonTile,
+  laneDefOfTile,
+  signposts,
+  signpostText,
+  type GuideGoal,
 } from '../../engine';
 import { isLocalPlayer, isOnlinePlay } from '../../store/battleConfig';
 import { useBattle, type WorldMovePresentation } from '../../store/battleStore';
@@ -43,6 +58,7 @@ import { PlayerTag, showOwners } from '../Sheets';
 import { DiceOverlay, DiceResult, bonusText } from '../ui/DiceRoll';
 import { Bar, HeroFace, Screen } from '../ui/game';
 import { WorldMap } from './WorldMap';
+import { ScourgeStrip } from './ScourgeBadge';
 import { arrivalView, moveButtonText, MoveStatus, useMovePlayback } from './WorldMoveScene';
 import { canChangeNow } from '../JobSheet';
 import { useElementSize } from '../../hooks/useElementSize';
@@ -50,7 +66,7 @@ import { useElementSize } from '../../hooks/useElementSize';
 const TIME_ICON: Record<TimeOfDay, typeof Sun> = { morning: Sunrise, noon: Sun, evening: Sunset, night: Moon };
 
 /** 上部のバー: 侵食度・命の灯火・ゴールド・時間帯・メニュー */
-export function WorldTopBar({ game, goldHeroId }: { game: GameState; /** 所持金を出すキャラ（町・神殿・祠では切り替えたキャラ。無ければ世界マップの手番のキャラ） */ goldHeroId?: string }) {
+export function WorldTopBar({ game, goldHeroId, goalLine }: { game: GameState; /** 所持金を出すキャラ（町・神殿・祠では切り替えたキャラ。無ければ世界マップの手番のキャラ） */ goldHeroId?: string; /** 「次の目的」の行（回1。世界マップだけ。上の帯のすぐ下、💀の札の上に出す） */ goalLine?: React.ReactNode }) {
   const openSheet = useBattle((s) => s.openSheet);
   const w = game.world!;
   const time = timeOfDay(w.worldTurn);
@@ -58,7 +74,9 @@ export function WorldTopBar({ game, goldHeroId }: { game: GameState; /** 所持�
   const until = turnsUntilNightChange(w.worldTurn);
   const next = nextCorruptionStage(game);
   const cName = corruptionName(game.scenarioId);
+  const curse = scourgeCurse(game);
   return (
+    <>
     <div className="panel z-10 flex shrink-0 items-center gap-1.5 px-2 py-1" data-cutin-anchor>
       <button
         // 押すと遊び方の「侵食度」（一番上に今の値と次の段階）を開く。以前のトーストの代わり
@@ -68,8 +86,12 @@ export function WorldTopBar({ game, goldHeroId }: { game: GameState; /** 所持�
         data-help-open="corruption"
       >
         <span className="flex items-center justify-between text-[12px] leading-4">
-          <span className="font-display text-fuchsia-200">{cName}</span>
-          <b className="tabular-nums text-fuchsia-100">{corruptionShown(w.corruption)}%</b>
+          <span className="font-display whitespace-nowrap text-fuchsia-200">{cName}</span>
+          <span className="flex items-center gap-1 whitespace-nowrap">
+            {/* 災厄（瘴気を紡ぐ死霊術師）が生きている間は、世界マップの番ごとの伸びが増える（2026-11-13） */}
+            {curse.corruptionPerTurn > 0 && <span className="text-[12px] font-normal text-fuchsia-300" aria-label={`災厄のせいで、番ごとに+${curse.corruptionPerTurn}%`} data-corruption-scourge>💀+{curse.corruptionPerTurn}%</span>}
+            <b className="tabular-nums text-fuchsia-100">{corruptionShown(w.corruption)}%</b>
+          </span>
         </span>
         <Bar value={w.corruption} max={100} color="linear-gradient(90deg,#6a2a9a,#e04aff)" height={6} />
         {/* 次の段階は省略せずに全文（2行まで） */}
@@ -99,6 +121,8 @@ export function WorldTopBar({ game, goldHeroId }: { game: GameState; /** 所持�
           <Hourglass size={12} />
           {until.night ? `朝まで${until.turns}` : `夜まで${until.turns}`}
         </span>
+        {/* 災厄（氷嵐の魔女）が生きている間は、夜の魔物のレベルがさらに上がる（夜の間だけ出す。2026-11-13） */}
+        {time === 'night' && curse.nightLevel > 0 && <span className="text-fuchsia-300" data-night-scourge>💀敵Lv+{curse.nightLevel}</span>}
       </div>
       <button onClick={() => openSheet('quests')} aria-label="依頼" className="btn btn-dark flex h-11 w-11 shrink-0 items-center justify-center rounded-lg">
         <ScrollText size={20} />
@@ -107,6 +131,10 @@ export function WorldTopBar({ game, goldHeroId }: { game: GameState; /** 所持�
         <Menu size={22} />
       </button>
     </div>
+    {goalLine}
+    {/* 災厄の中ボスの札（段階7b）。いる時だけ */}
+    <ScourgeStrip game={game} />
+    </>
   );
 }
 
@@ -155,6 +183,26 @@ function MoveProposal({ game }: { game: GameState }) {
   );
 }
 
+/**
+ * 「次の目的」の行（回1）: 上の帯のすぐ下に、いつも1行（災厄の💀の札がある時は、その上）。押すと、その場所へ地図を動かす（霧の中でも）。
+ * 方角は、自分のキャラ（手番のキャラが自分のならそれ、ちがえば自分の最初のキャラ）の場所から
+ */
+function GoalLine({ game, goal, from, onFocus }: { game: GameState; goal: GuideGoal; from: number | undefined; onFocus: () => void }) {
+  const text = goalLineText(game, goal, from);
+  return (
+    <button
+      onClick={onFocus}
+      // 高さ700px未満の画面（360×640 など）では出さない: 1行（44px）を足すと、操作パネルに隠れていない地図がほとんど無くなるため（回1の報告に案を書いた）
+      className="btn z-10 mx-2 mt-1 hidden min-h-11 shrink-0 items-center gap-1 rounded-lg border border-amber-200/50 bg-[#2a1c06]/85 px-2 text-left text-[13px] leading-4 font-bold text-amber-100 [@media(min-height:700px)]:flex"
+      aria-label={`${text}。押すと地図がその場所へ動きます`}
+      data-goal-line={goal.dungeonId}
+    >
+      <Compass size={15} className="shrink-0 text-amber-300" />
+      <span className="min-w-0 flex-1 truncate">{text}</span>
+    </button>
+  );
+}
+
 /** パーティの小さな状態（顔のアイコンと細いHP。地図を広くとるため小さく） */
 function PartyRow({ game }: { game: GameState }) {
   const openSheet = useBattle((s) => s.openSheet);
@@ -198,22 +246,34 @@ function PartyRow({ game }: { game: GameState }) {
           </button>
         );
       })}
-      <button
-        onClick={() => openSheet('party', self.id)}
-        aria-label={`${self.name}のステータスを見る`}
-        className="btn ml-auto flex h-11 min-w-0 shrink items-center gap-1 rounded-lg border border-amber-200/40 bg-[#2a2040]/90 px-2 text-amber-100 shadow"
-        data-status-button
-      >
-        <HeroFace hero={self} size={22} />
-        <span className="flex min-w-0 flex-col items-start leading-[15px]">
-          <span className="text-[13px] font-bold whitespace-nowrap">ステータス</span>
-          <span className="max-w-[88px] truncate text-[12px] text-zinc-300">
-            {owners ? `${isOnlinePlay() && isLocalPlayer(self.playerId) ? '自分' : self.playerId}・` : ''}
-            {self.name}
-          </span>
-        </span>
-      </button>
+      <StatusButton game={game} self={self} className="ml-auto" />
     </div>
+  );
+}
+
+/**
+ * 「ステータス」のボタン（自分のキャラのステータス・装備の付け替え・仲間への受け渡しの窓を開く）。
+ * 世界マップの下の列と、町・神殿・祭壇の画面の上（回2）で同じ物を使う。窓はこの端末だけで開く（ほかの人の操作は止めない）
+ */
+export function StatusButton({ game, self, className = '' }: { game: GameState; self: Hero; className?: string }) {
+  const openSheet = useBattle((s) => s.openSheet);
+  const owners = showOwners(game);
+  return (
+    <button
+      onClick={() => openSheet('party', self.id)}
+      aria-label={`${self.name}のステータスを見る`}
+      className={`btn flex h-11 min-w-0 shrink items-center gap-1 rounded-lg border border-amber-200/40 bg-[#2a2040]/90 px-2 text-amber-100 shadow ${className}`}
+      data-status-button
+    >
+      <HeroFace hero={self} size={22} />
+      <span className="flex min-w-0 flex-col items-start leading-[15px]">
+        <span className="text-[13px] font-bold whitespace-nowrap">ステータス</span>
+        <span className="max-w-[88px] truncate text-[12px] text-zinc-300">
+          {owners ? `${isOnlinePlay() && isLocalPlayer(self.playerId) ? '自分' : self.playerId}・` : ''}
+          {self.name}
+        </span>
+      </span>
+    </button>
   );
 }
 
@@ -281,15 +341,25 @@ function HandoffOverlay({ hero, onStart }: { hero: Hero; onStart: () => void }) 
 }
 
 /** 地図のマスの説明（タップしたマス） */
-function tileInfo(game: GameState, i: number): string {
+function tileInfo(game: GameState, i: number, goal?: GuideGoal): string {
   const w = game.world!;
   const t = w.tiles[i];
-  if (!t.seen) return 'まだ霧に包まれている';
+  if (!t.seen) {
+    // 回1: 霧の上に見えている物（塔の先・次の目的地の印）は、何かが分かる
+    if (t.f?.kind === 'tower') return '見晴らしの塔: 登ると、まわりが見える';
+    if (goal && goal.tile === i) return `まだ霧に包まれている（次の目的: ${goal.name}）`;
+    return 'まだ霧に包まれている';
+  }
   const terr = getTerrain(t.t);
   const parts = [terr.sea ? `${terr.name}（${w.ship ? `船で移動力${terr.shipCost ?? 1}` : '船が必要です'}）` : `${terr.name}（移動力${terr.moveCost || '×'}）`];
   const f = t.f;
   if (f?.kind === 'town') parts.push(TOWNS.get(f.id).name + (w.fallenTowns.includes(f.id) ? '（陥落）' : ''));
-  if (f?.kind === 'dungeon') parts.push(DUNGEONS.get(f.id).name);
+  // ランダムダンジョン（段階7a）: テーマの印と名前・全5行・黄金箱・テーマの特徴。踏破済みならそう書く
+  const rd = randomDungeonView(w, i);
+  if (rd) parts.push(rd.done ? `${rd.theme?.mark ?? ''}${rd.name}（踏破済み）` : `${rd.theme?.mark ?? ''}${rd.name}：全5行・最奥に黄金箱。${rd.theme?.description ?? ''}`);
+  else if (f?.kind === 'dungeon') parts.push(DUNGEONS.get(f.id).name);
+  // 寄り道の値打ち（2026-11-14）: 行く前に分かる手がかり（ランダムダンジョンのご褒美・掛かっている加護・見破り）
+  parts.push(...dungeonDetourLines(game, i));
   if (f?.kind === 'temple' || f?.kind === 'altar') parts.push(SANCTUARIES.get(f.id).name);
   if (f?.kind === 'shrine') parts.push(SHRINES.get(f.id).name + (f.used ? '（祈り済み）' : ''));
   if (f?.kind === 'event' || f?.kind === 'landmark') parts.push((EVENTS.tryGet(f.id)?.title ?? '何かがある') + (f.used ? '（調べた）' : ''));
@@ -299,6 +369,11 @@ function tileInfo(game: GameState, i: number): string {
   if (sp) parts.push(`${SPAWN_NAME[sp.kind]}（あと${spawnTurnsLeft(w, sp)}ターン）`);
   const wd = w.wanderers.find((x) => x.tile === i);
   if (wd) parts.push(`敵: ${wd.enemies.map((e) => `${getEnemy(e.defId).name} Lv${e.level ?? 1}`).join('・')}${wd.raidTown ? '（町を襲撃中）' : ''}`);
+  // 回1: 分かれ道の立て札
+  for (const p of signposts(game, w)) if (p.tile === i) parts.push(`立て札「${signpostText(p)}」`);
+  // 3つの道（2026-11-14）: 広い地図の帯の性質（行く前に違いが分かるように）
+  const lane = laneDefOfTile(game, w, i);
+  if (lane?.hint) parts.push(`${lane.mark ?? ''}${lane.name}: ${lane.hint}${lane.ambush && lane.ambush !== 1 ? `（夜の野営の夜襲×${lane.ambush}）` : ''}`);
   return parts.join(' / ');
 }
 
@@ -313,7 +388,11 @@ function interactLabel(game: GameState, tile: number): string | undefined {
     // 先に入った仲間の組がいれば、合流する（組が通路にいる時だけ。戦闘中などは、押すと「終わってから」と知らせる）
     const join = dungeonJoin(game, tile);
     const lead = join ? game.heroes.find((h) => join.exp.heroes.includes(h.id) && h.hp > 0) : undefined;
-    return join ? `${lead?.name ?? '仲間'}たちに合流する（${DUNGEONS.get(f.id).name}）` : `${DUNGEONS.get(f.id).name}に入る`;
+    // ランダムダンジョン（段階7a）: テーマの名前で出す。踏破済みは入れない（ボタンを出さない）
+    const rd = randomDungeonView(game.world!, tile);
+    if (rd?.done && !join) return undefined;
+    const name = rd ? `${rd.theme?.mark ?? ''}${rd.name}` : DUNGEONS.get(f.id).name;
+    return join ? `${lead?.name ?? '仲間'}たちに合流する（${name}）` : `${name}に入る`;
   }
   if (f.kind === 'temple' || f.kind === 'altar') return `${SANCTUARIES.get(f.id).name}に入る`;
   if (f.used) return undefined;
@@ -331,11 +410,23 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
   // 移動中は、パネルを外さずに見えなくして、その上に小さな「移動中…」の帯を重ねる（パネルの高さが変わらないので、カメラも合わせ直さない）
   const [panelBox, panelSize] = useElementSize<HTMLDivElement>();
   const dispatchGame = useBattle((s) => s.dispatchGame);
+  const continueStory = useBattle((s) => s.continueStory);
+  const heldStories = useBattle((s) => s.heldStories);
   const w = game.world!;
+  // 出す物語の窓: この端末でまだ押していない（ほかの人が閉じた）窓を先に、無ければ今の窓（点検 F6）
+  const storyPage = heldStories[0] ?? w.story;
   const hero = game.heroes.find((h) => h.id === w.turn);
   const here = hero ? w.pos[hero.id] : undefined;
   const [selected, setSelected] = useState<number | undefined>();
   const [info, setInfo] = useState<string | undefined>();
+  // 回1: 地図をそのマスへ動かす頼み（「次の目的」の行・扉が開かない時の「場所を見る」）と、扉が開かない時の知らせ
+  const [focus, setFocus] = useState<{ tile: number; seq: number } | undefined>();
+  const focusOn = (tile: number) => setFocus((f) => ({ tile, seq: (f?.seq ?? 0) + 1 }));
+  const [gateNote, setGateNote] = useState<{ text: string; tile?: number } | undefined>();
+  // 回1: 見取り図のボタンの最初の案内（この端末で1回だけ。出した時に覚えて、閉じるか手番が変わるまで出す）
+  const hintSeen = useBattle((s) => s.settings.overviewHintSeen);
+  const setSettings = useBattle((s) => s.setSettings);
+  const [hintOn, setHintOn] = useState(false);
   const [withMe, setWithMe] = useState<Record<string, boolean>>({});
   // 手番の受け渡し: 担当プレイヤーが変わったら画面を隠す
   const players = new Set(livingHeroes(game).map((h) => h.playerId));
@@ -356,7 +447,11 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
   useEffect(() => {
     setSelected(undefined);
     setInfo(undefined);
+    setGateNote(undefined);
   }, [w.turn, w.move]);
+  useEffect(() => {
+    setHintOn(false);
+  }, [w.turn]);
 
   // 移動のサイコロ: この画面を開いた後に新しく振った時だけ、真ん中で転がす（オンラインの仲間の画面でも）
   const moveDiceKey = w.moveDice ? `move:${game.seed}:${w.moveDice.seq}` : undefined;
@@ -381,7 +476,18 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
   }, [w, here]);
   const path = useMemo(() => (selected !== undefined && here !== undefined && w.move ? pathTo(reachable(w, here, w.move), selected) : undefined), [selected, here, w]);
 
+  // 回1: 冒険の最初の自分の番に、見取り図の案内を1回だけ（物語・受け渡しの窓が閉じてから）
+  const hintReady = !hintSeen && !!hero && here !== undefined && !turnExp && isLocalPlayer(hero.playerId) && !storyPage && !needHandoff && !movement;
+  useEffect(() => {
+    if (!hintReady) return;
+    setHintOn(true);
+    setSettings({ overviewHintSeen: true });
+  }, [hintReady, setSettings]);
+
   if (!hero || here === undefined) return null;
+  // 回1: 次の目的（方角は自分のキャラの場所から）
+  const selfHero = isLocalPlayer(hero.playerId) ? hero : (game.heroes.find((h) => isLocalPlayer(h.playerId) && !h.retired && w.pos[h.id] !== undefined) ?? hero);
+  const goal = guideGoal(game);
   const companions = heroesAt(game, here).filter((h) => h.id !== hero.id);
   // 同行: 自分（同じ担当）のキャラはタップで選ぶ。他の人のキャラは誘って、承知してもらった時だけ
   const ownMate = (h: { playerId: PlayerId }) => h.playerId === hero.playerId;
@@ -393,19 +499,48 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
   };
   const label = interactLabel(game, here);
   const chance = statChance(hero, 'agi', 'move');
-  const diceBonus = worldDiceBonus(hero);
+  // 広い地図では、街道の上で振ると +1（段階6a。エンジンの rollMove と同じ足し方）
+  const roadBonus = terrainDiceBonus(game, w, here);
+  const diceBonus = [...worldDiceBonus(hero), ...roadBonus];
   const bonusSum = diceBonus.reduce((n, b) => n + b.value, 0);
   const avg = diceAverage(BALANCE.moveDiceSides, diceBonus);
   // フォーカスで振り直せるか（目を見た後・まだ動く前・1回だけ）
   const md = w.moveDice;
   const canReroll = mine && !!md && !md.rerolled && w.move === md.total && w.pos[hero.id] === w.prevTile && hero.focus >= 1;
   const ambush = campAmbushChance(game, hero.id);
+  // 悪夢の魔獣（災厄の中ボス・段階7b）が生きている間は、野営のHPの回復が半分
+  const nightmare = scourgesWith(game, 'campHeal')[0];
   const climate = climateAt(game, here);
   const onTown = w.tiles[here].f?.kind === 'town';
   const canCamp = !onTown && (w.move === null || w.move >= BALANCE.moveBase);
   const pid = hero.playerId;
 
   const tapTile = (i: number) => {
+    // 回1の追加: 移動力が足りない施設を押した時（自分の番だけ）。届かない施設へ向かう道のうち、この番で行ける一番先のマスを選ぶ（動かすのは、今までどおり確かめてから）
+    const place = w.tiles[i]?.seen && !!w.tiles[i].f && i !== here;
+    if (mine && place && !reach?.has(i)) {
+      if (w.move === null) {
+        setSelected(undefined);
+        setInfo(`${tileInfo(game, i, goal)} / サイコロを振ると、進める`);
+        return;
+      }
+      if (w.move > 0) {
+        const route = routeToward(w, here, i, w.move);
+        if (!route) {
+          setSelected(undefined);
+          setInfo(`ここへは、回り道が要る（${tileInfo(game, i, goal)}）`);
+          return;
+        }
+        if (route.stop === undefined) {
+          setSelected(undefined);
+          setInfo(`あと${route.total}マス。この番は、この道を進めない（${tileInfo(game, i, goal)}）`);
+          return;
+        }
+        setSelected(route.stop);
+        setInfo(`あと${route.total}マス。この番は、ここまで進める（${tileInfo(game, i, goal)}）`);
+        return;
+      }
+    }
     if (mine && reach?.has(i) && i !== here) {
       if (selected === i) {
         // 選んだマスと説明は、移動の演出が終わるまで残す（パネルの高さが変わると地図の大きさが変わるため）。
@@ -413,18 +548,18 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
         dispatchGame({ type: 'WORLD_MOVE', playerId: pid, heroId: hero.id, to: i, companions: chosenCompanions });
       } else {
         setSelected(i);
-        setInfo(tileInfo(game, i));
+        setInfo(tileInfo(game, i, goal));
       }
     } else {
       setSelected(undefined);
-      setInfo(tileInfo(game, i));
+      setInfo(tileInfo(game, i, goal));
     }
   };
 
   const scenario = getScenario(game.scenarioId);
   return (
     <Screen>
-      <WorldTopBar game={game} />
+      <WorldTopBar game={game} goalLine={goal && <GoalLine game={game} goal={goal} from={w.pos[selfHero.id] ?? here} onFocus={() => focusOn(goal.tile)} />} />
       <PartyRow game={game} />
       {/* 地図。タップしたマスの説明は、地図の上に重ねたパネルのすぐ上に出す（行が増えて地図が狭くならないように。フェーズ2-D） */}
       <div className="relative flex min-h-0 flex-1 flex-col" data-world-area>
@@ -436,16 +571,36 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
           movement={playback}
           onTapTile={playback ? () => {} : tapTile}
           bottomInset={panelSize.height}
+          goalTile={goal?.tile}
+          focusRequest={focus}
+          overviewHint={hintOn}
+          onOverviewHintClose={() => setHintOn(false)}
         />
         {info && !playback && (
           <div className="pointer-events-none absolute inset-x-0 z-10 bg-black/75 py-1 pr-14 pl-3 text-[12px] leading-4 text-zinc-100" style={{ bottom: panelSize.height }} data-tile-info>
             {info}
           </div>
         )}
+        {/* 回1: 扉が開かない時の知らせ（鍵のダンジョンの方角と地域。「場所を見る」で、そこへ地図を動かす）。
+            操作パネルの高さを変えないように、地図の下の端（パネルのすぐ上）に重ねる。右の「戻る」のボタンは避ける */}
+        {gateNote && !playback && (
+          <div className="panel panel-gold-edge absolute left-2 right-[60px] z-30 flex items-center gap-1.5 rounded-xl p-1.5 text-[13px] leading-[18px]" style={{ bottom: panelSize.height + 6 }} role="alert" data-gate-note>
+            <span className="min-w-0 flex-1">{gateNote.text}</span>
+            <span className="flex shrink-0 flex-col gap-1">
+              {gateNote.tile !== undefined && (
+                <button onClick={() => focusOn(gateNote.tile!)} className="btn btn-gold h-11 rounded-lg px-2 text-[13px] font-bold" data-gate-look>
+                  場所を見る
+                </button>
+              )}
+              <button onClick={() => setGateNote(undefined)} className="btn btn-dark h-11 rounded-lg px-2 text-[13px] font-bold" data-gate-close>
+                閉じる
+              </button>
+            </span>
+          </div>
+        )}
       {/* 地図の下の端に重ねる操作パネル（高さが変わっても地図は動かない） */}
       <div ref={panelBox} className="absolute inset-x-0 bottom-0 z-20" data-world-panel>
       {w.moveProposal && (isOnlinePlay() || autoAgreeFailed) && <MoveProposal game={game} />}
-
       {/* 手番の表示と操作パネル。移動の演出中は、パネルを見えなくして小さな「移動中…」の帯だけを見せ、地図を広く見せる（フェーズ2-D） */}
       {movement && playback && (
         <div className="absolute inset-x-0 bottom-0 z-40">
@@ -499,7 +654,23 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
                 {hero.focus}/{heroFocusMax(hero)}
               </span>
             </div>
-            <div className="text-[12px] text-zinc-400">{getTerrain(w.tiles[here].t).name}・{scenario.map!.regions[w.tiles[here].r].name}</div>
+            {/* 高さ700px以上の画面（と、次の目的が無い時）は、今までどおり地形と地域 */}
+            <div className={`text-[12px] text-zinc-400 ${goal ? '[@media(max-height:699.98px)]:hidden' : ''}`}>{getTerrain(w.tiles[here].t).name}・{scenario.map!.regions[w.tiles[here].r].name}</div>
+            {/* 回1の追加: 高さ700px未満の画面は、この行に「次: 沈黙の地下墓所（東）」（押すと、そこへ地図が動く）。
+                入りきらない時は、右の地形と地域から先に切る（それでも入らなければ、次の目的も …で切る） */}
+            {goal && (
+              <button
+                onClick={() => focusOn(goal.tile)}
+                // 押せる所は44pxの高さ（上の名前の行に重ねる。下のボタンには重ねない）。行の高さは変えない
+                className="btn relative -mt-7 hidden min-h-11 w-full min-w-0 items-end gap-1 text-left text-[12px] leading-4 [@media(max-height:699.98px)]:flex"
+                aria-label={`${goalLineText(game, goal, w.pos[selfHero.id] ?? here)}。押すと地図がその場所へ動きます`}
+                data-goal-short={goal.dungeonId}
+              >
+                <Compass size={13} className="shrink-0 text-amber-300" />
+                <span className="max-w-full shrink-0 truncate font-bold text-amber-200 underline decoration-amber-300/50 underline-offset-2" data-goal-short-text>{goalShortText(game, goal, w.pos[selfHero.id] ?? here)}</span>
+                <span className="min-w-0 flex-1 truncate text-zinc-400">・{getTerrain(w.tiles[here].t).name}・{scenario.map!.regions[w.tiles[here].r].name}</span>
+              </button>
+            )}
           </div>
           {w.move !== null && (
             <div className="flex shrink-0 flex-col items-center rounded-lg bg-black/40 px-2 py-0.5">
@@ -565,7 +736,21 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
         {/* その場の施設に入る（省略せずに全文で、広いボタン） */}
         {label && (
             <button
-              onClick={() => dispatchGame({ type: 'WORLD_INTERACT', playerId: pid, heroId: hero.id, party: [hero.id, ...chosenCompanions] })}
+              onClick={() => {
+                // 回1: 鍵が足りなくて扉が開かない時は、地図の上に知らせを出す（「場所を見る」で、鍵のダンジョンへ地図を動かす）。
+                // エンジンも同じ理由で断るので、送らずに知らせだけ出す
+                const f = w.tiles[here].f;
+                const def = f?.kind === 'dungeon' ? DUNGEONS.get(f.id) : undefined;
+                const gate = def && !def.random ? dungeonGateError(game, def, here) : undefined;
+                if (gate) {
+                  const missing = def!.requiresKeys?.find((k) => !w.keys.includes(k));
+                  const keyDungeon = missing && !def!.finale ? DUNGEONS.forScenario(game.scenarioId).find((d) => d.rewardKey === missing) : undefined;
+                  const keyTile = keyDungeon ? dungeonTile(w, keyDungeon.id) : -1;
+                  setGateNote({ text: gate, tile: keyTile >= 0 ? keyTile : undefined });
+                  return;
+                }
+                dispatchGame({ type: 'WORLD_INTERACT', playerId: pid, heroId: hero.id, party: [hero.id, ...chosenCompanions] });
+              }}
               className="btn btn-dark font-display mt-1.5 flex min-h-12 w-full items-center justify-center gap-1.5 rounded-xl px-2 text-[16px] leading-5 text-amber-100 shadow-[0_0_12px_rgba(255,200,90,.35)]"
               data-interact
             >
@@ -591,6 +776,7 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
               data-roll-move
             >
               <Dices size={20} /> サイコロを振る
+              {roadBonus.length > 0 && <span className="ml-1 rounded-full bg-black/25 px-2 text-[13px] leading-6" data-road-bonus>{roadBonus.map((b) => `${b.label}ボーナス +${b.value}`).join('・')}</span>}
             </button>
           ) : selected !== undefined ? (
             <button onClick={() => tapTile(selected)} className="btn btn-gold font-display h-12 rounded-xl text-[17px] leading-5">
@@ -629,6 +815,7 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
               className="btn btn-dark flex h-11 items-center justify-center gap-0.5 rounded-lg text-[12px] font-bold"
             >
               <Tent size={15} /> 野営{ambush ? `${ambush}%` : ''}
+              {nightmare && <span className="ml-0.5 text-[12px] text-fuchsia-300" data-camp-scourge>💀回復半分</span>}
             </button>
             <button onClick={() => dispatchGame({ type: 'WORLD_WAIT', playerId: pid, heroId: hero.id })} className="btn btn-dark h-11 rounded-lg text-[12px] font-bold">
               {w.move === null ? '待機' : '手番を終える'}
@@ -644,8 +831,9 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
       {/* 移動の演出中は、上の情報欄・仲間の列・地図のタップも受け付けない（以前の移動画面と同じ） */}
       {movement && <div className="absolute inset-0 z-30" aria-hidden data-move-blocker />}
       <AnimatePresence>
-        {w.story && <StoryOverlay key="story" title={w.story.title} lines={w.story.lines} onNext={() => dispatchGame({ type: 'STORY_CONTINUE', playerId: pid })} />}
-        {!w.story && needHandoff && (
+        {/* 点検 F6: ほかの人の「つづける」で閉じた窓は、この端末で押すまで先に出す（heldStories。オンラインだけ） */}
+        {storyPage && <StoryOverlay key="story" title={storyPage.title} lines={storyPage.lines} onNext={() => continueStory(pid)} />}
+        {!storyPage && needHandoff && (
           <HandoffOverlay
             key="handoff"
             hero={hero}

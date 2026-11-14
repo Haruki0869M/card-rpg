@@ -15,8 +15,11 @@ export const cometFox: EnemyDef = {
   weak: ['dark'],
   resist: ['holy'],
   pattern: 'sequence',
+  // 敵の特殊な行動・第2弾（docs/tasks/enemy-behaviors-round2-plan.md §3・fix-plan §4）: 盾砕きを1ターン目に予告する（もとから順番の1番目）
+  firstActionId: 'tail',
   actions: [
-    { id: 'tail', name: '彗星の尾', effects: [{ kind: 'damage', amount: 11, element: 'holy' }] },
+    // 「彗星の尾」を盾砕きに置き換えた（ブロックを0にしてから、同じ聖11のダメージ）。ID は古い保存のために残す
+    { id: 'tail', name: '彗星の衝突', big: true, behavior: 'shatter', hint: '当たるとブロックを全部壊す。BREAK するか、ブロックに頼らずに受ける', effects: [{ kind: 'shieldBreak' }, { kind: 'damage', amount: 11, element: 'holy' }] },
     { id: 'dash', name: '星を蹴る', effects: [{ kind: 'damage', amount: 4, hits: 2 }] },
     { id: 'shine', name: '尾の光', effects: [{ kind: 'block', amount: 7 }] },
   ],
@@ -34,8 +37,12 @@ export const harpGuardian: EnemyDef = {
   weak: ['dark'],
   resist: ['holy'],
   pattern: 'sequence',
+  // 敵の特殊な行動・第2弾（round2 §3・fix-plan §4）: 癒し封じを1ターン目に予告する（もとから順番の1番目）
+  firstActionId: 'song',
   actions: [
-    { id: 'song', name: '眠りの調べ', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'foes' }] },
+    // 「眠りの調べ」（脆弱1・全体）を癒し封じに置き換えた。ID は古い保存のために残す。
+    // 元の脆弱は弱めて残す（狙った1人に脆弱1。fix-plan §2 の 2-4）。4つ目の地域なのでブロック10（BREAK されると行動ごと止まる）
+    { id: 'song', name: '癒しを鎮める調べ', big: true, behavior: 'healSeal', hint: '味方全員の回復が、2ターン半分になる。BREAK するか、先に回復を使う', effects: [{ kind: 'applyStatus', status: 'healSeal', amount: 2, to: 'foes' }, { kind: 'applyStatus', status: 'vulnerable', amount: 1 }, { kind: 'block', amount: 10 }] },
     { id: 'strike', name: '竪琴の一撃', effects: [{ kind: 'damage', amount: 13 }] },
     { id: 'chord', name: '守りの和音', effects: [{ kind: 'block', amount: 8, to: 'allies' }] },
   ],
@@ -51,8 +58,11 @@ export const holyMoonWolf: EnemyDef = makeVariant(moonWolf, {
   gold: 12,
   weak: ['dark'],
   resist: ['holy'],
+  // 敵の特殊な行動・第2弾（round2 §3・fix-plan §4）: 亜種のこの敵だけ「聖なる牙」を手負い狙いに置き換えた（同じ聖14・HPが半分以下なら×1.5）。
+  // ID は古い保存のために残す。1ターン目に予告する（もとから順番の1番目）。元の月の狼は変えていない
+  firstActionId: 'bite',
   actions: [
-    { id: 'bite', name: '聖なる牙', effects: [{ kind: 'damage', amount: 14, element: 'holy' }] },
+    { id: 'bite', name: '弱った獲物への牙', big: true, behavior: 'hunt', hint: 'HPの割合がいちばん低い味方を狙う。HPが半分以下だと×1.5', effects: [{ kind: 'damage', amount: 14, element: 'holy', lowHpMul: 1.5 }] },
     { id: 'howl', name: '月光の遠吠え', effects: [{ kind: 'block', amount: 9 }, { kind: 'damage', amount: 5, element: 'holy' }] },
     { id: 'pounce', name: '光の飛びかかり', effects: [{ kind: 'damage', amount: 7, hits: 2, element: 'holy' }] },
   ],

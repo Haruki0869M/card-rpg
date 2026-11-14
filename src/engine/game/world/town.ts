@@ -4,12 +4,14 @@ import { BALANCE } from '../../../data/balance';
 import { CARDS } from '../../../data/cards';
 import { getClass } from '../../../data/classes';
 import { getItem, ITEMS } from '../../../data/items';
+import { DUNGEONS, isFirstKeyDungeon } from '../../../data/dungeons';
+import { getEnemy } from '../../../data/enemies';
 import { QUESTS, SHRINES, TOWNS } from '../../../data/world';
 import { PETS } from '../../../data/pets';
 import { getScenario } from '../../../data/scenarios';
 import { startTileOf } from './start';
 import type { GameCommand, GameState, ShopStock } from '../../../types';
-import type { Rng } from '../../rng';
+import { createRng, type Rng } from '../../rng';
 import { addItem, addLog, addLoot, earnGold, ownedBy, shopPriceFor } from '../common';
 import { rarityIndex } from '../dungeon';
 import { pickCard, withoutStarterCards } from '../cardTags';
@@ -28,6 +30,73 @@ const isEquipped = (game: GameState, uid: string) => game.heroes.some((h) => Obj
 /** 売値 */
 export const sellPrice = (itemId: string) => Math.floor((BALANCE.itemPrice[getItem(itemId).rarity] ?? 30) * BALANCE.sellRatio);
 
+/**
+ * 必ず並ぶ品の町（BALANCE.shopFeatured・docs/tasks/break-read-plan.md §3）: 進む順で region 番目の地域にある町。
+ * その地域に町が無ければ、その次（先へ進む側）の地域にある町。同じ地域に2つあれば、先に着く方（スタートに近い方）。
+ * 地図の regions は上（最後の地域）から下（始まりの地域）の順で、町の場所（at の行）で地域を決める
+ */
+export function featuredShopTownOf(scenarioId: string): string | undefined {
+  const map = getScenario(scenarioId).map;
+  if (!map) return undefined;
+  const regionOf = (row: number) => map.regions.findIndex((r) => row >= r.rows[0] && row <= r.rows[1]);
+  const target = map.regions.length - BALANCE.shopFeatured.region;
+  const towns = map.features
+    .filter((f) => f.kind === 'town')
+    .map((f) => ({ id: f.id as string, r: regionOf(f.at[1]), row: f.at[1] }))
+    .filter((t) => t.r >= 0 && t.r <= target)
+    .sort((a, b) => b.r - a.r || b.row - a.row);
+  return towns[0]?.id;
+}
+
+/**
+ * そのシナリオの「後半の大物」（2026-11-13・点検19の 3-2）: 2つ目・3つ目の鍵のダンジョンのボスと、最後のダンジョンの中ボスとボス。
+ * データから作る（鍵をくれて入るのに鍵が要るダンジョンの pools.boss と、最後のダンジョンの pools.midboss・pools.boss。ランダムダンジョンは入れない）
+ */
+export function lateBigEnemiesOf(scenarioId: string): string[] {
+  const out: string[] = [];
+  for (const d of DUNGEONS.forScenario(scenarioId)) {
+    if (d.random) continue;
+    if (d.finale) out.push(...(d.pools.midboss ?? []), ...d.pools.boss);
+    else if (d.rewardKey && !isFirstKeyDungeon(d)) out.push(...d.pools.boss);
+  }
+  return out;
+}
+
+/** 「属性の付与」の装飾品が、属性の無い物理攻撃を変える属性（無ければ undefined） */
+const convertIntoOf = (itemId: string) => (getItem(itemId).ability?.effect as { modifier?: string; into?: string } | undefined)?.into;
+
+/**
+ * 必ず並ぶ品の候補と重み（2026-11-13 オーナーの OK）: BALANCE.shopFeatured.items のうち、後半の大物（lateBigEnemiesOf）の弱点の属性に合う物。
+ * 重み = その属性が弱点の大物の数。合う物が1つも無いシナリオは、5つ全部（重み1ずつ。前と同じ）。
+ * 5つに無い属性（毒など）が弱点の大物は数えない
+ */
+export function featuredShopCandidatesOf(scenarioId: string): { itemId: string; weight: number }[] {
+  const bigs = lateBigEnemiesOf(scenarioId).map((id) => getEnemy(id));
+  const list = BALANCE.shopFeatured.items.map((itemId) => {
+    const el = convertIntoOf(itemId);
+    return { itemId, weight: el ? bigs.filter((e) => e.weak?.includes(el)).length : 0 };
+  });
+  const hit = list.filter((x) => x.weight > 0);
+  return hit.length ? hit : list.map((x) => ({ itemId: x.itemId, weight: 1 }));
+}
+
+/**
+ * その冒険で、必ず並ぶ品（featuredShopCandidatesOf のうち1つ）。冒険の種から決める（冒険の乱数は使わない = ほかの抽選の順番を変えない）。
+ * 冒険の間、いつも同じ物
+ */
+export function featuredShopItemOf(game: Pick<GameState, 'seed' | 'scenarioId'>): string {
+  const list = featuredShopCandidatesOf(game.scenarioId);
+  const total = list.reduce((a, x) => a + x.weight, 0);
+  let x = createRng((game.seed ^ FEATURED_SALT) >>> 0).int(total);
+  for (const c of list) {
+    if (x < c.weight) return c.itemId;
+    x -= c.weight;
+  }
+  return list[list.length - 1].itemId;
+}
+/** 必ず並ぶ品を決める乱数の種に混ぜる値（ほかの抽選と重ならないように） */
+const FEATURED_SALT = 0x5f0e7a11;
+
 /** 品揃えを作る（町に入った時。一定のワールドターンごとに入れ替わる） */
 export function ensureShop(game: GameState, rng: Rng): ShopStock {
   const w = game.world!;
@@ -39,9 +108,15 @@ export function ensureShop(game: GameState, rng: Rng): ShopStock {
   const items: ShopStock['items'] = [];
   const price = (id: string) => BALANCE.itemPrice[getItem(id).rarity] ?? 30;
   for (const id of town.shop.fixed ?? []) items.push({ kind: 'item', item: newItem(game, getItem(id)), price: price(id) });
+  // 必ず並ぶ品（3つ目の地域の町。入れ替わっても、売り切れの後でも、冒険の間は同じ品がまた並ぶ）
+  if (featuredShopTownOf(game.scenarioId) === town.id) {
+    const id = featuredShopItemOf(game);
+    items.push({ kind: 'item', item: newItem(game, getItem(id)), price: price(id), featured: true });
+  }
   const types = new Set(game.heroes.filter((h) => !h.retired).flatMap((h) => jobWeapons(h.classId)));
-  const equip = ITEMS.all.filter((i) => i.slot !== 'consumable' && (!i.scenario || i.scenario === game.scenarioId) && (i.slot !== 'weapon' || types.has(i.weaponType!)));
-  const cons = ITEMS.all.filter((i) => i.slot === 'consumable' && !(town.shop.fixed ?? []).includes(i.id));
+  // ランダムダンジョンの専用の装備（段階7a）は町の店に出さない
+  const equip = ITEMS.all.filter((i) => i.slot !== 'consumable' && !i.source && (!i.scenario || i.scenario === game.scenarioId) &&(i.slot !== 'weapon' || types.has(i.weaponType!)));
+  const cons = ITEMS.all.filter((i) => i.slot === 'consumable' && !i.noShop && !i.source && !(town.shop.fixed ?? []).includes(i.id));
   const pickByRarity = (pool: typeof ITEMS.all) => {
     for (let tries = 0; tries < 10; tries++) {
       const r = pickWeighted(lowWeights, rng);
@@ -64,11 +139,11 @@ export function ensureShop(game: GameState, rng: Rng): ShopStock {
   for (let k = 0; k < town.shop.cards && heroes.length; k++) {
     const h = heroes[k % heroes.length];
     // 基本のカード（最初の山札の21種）は並べない（フェーズ3）
-    const pool = withoutStarterCards(heroCardPool(h));
+    const pool = withoutStarterCards(heroCardPool(h, game.heroes.length === 1));
     let g = pickWeighted(odds, rng);
     let cand: string[] = [];
     for (; g >= 0 && !cand.length; g--) cand = pool.filter((id) => rarityIndex(CARDS.get(id).rarity ?? 'common') === g);
-    const cardId = cand.length ? pickCard(cand, h, rng, true, BALANCE.smartDraw.shopStrength) : pool[0];
+    const cardId = cand.length ? pickCard(cand, h, rng, true, BALANCE.smartDraw.shopStrength, heroes) : pool[0];
     cards.push({ cardId, heroId: h.id, price: BALANCE.cardPrice[CARDS.get(cardId).rarity ?? 'common'] ?? 40 });
   }
   const stock = { refreshedAt: w.worldTurn, items, cards };
@@ -94,10 +169,15 @@ export function townBuy(game: GameState, cmd: Cmd<'TOWN_BUY'>, rng: Rng): string
   const v = facilityHero(game, cmd.playerId, cmd.heroId)!;
   // カードは、町に入ったキャラの職業のものだけ買える
   if (!('item' in entry) && getClass(findHero(game, entry.heroId)?.classId ?? '').id !== v.classId) return `${v.name}の職業のカードではありません`;
-  const price = shopPriceFor(v, entry.price);
+  // 盗賊王の無料券（2026-11-14）: 装備・消耗品だけ。券を1枚使って、お金を払わない
+  const free = !!cmd.free;
+  if (free && !('item' in entry)) return '無料券はカードには使えません';
+  if (free && !(game.world?.freeShop ?? 0)) return '無料券がありません';
+  const price = free ? 0 : shopPriceFor(v, entry.price, game);
   if (v.gold < price) return 'ゴールドが足りません';
   v.gold -= price;
   entry.sold = true;
+  if (free) game.world!.freeShop! -= 1;
   if ('item' in entry) addLog(game, `${v.name}が${addItem(game, v, entry.item, false)}を買った（${price}G）`);
   else {
     const h = v;

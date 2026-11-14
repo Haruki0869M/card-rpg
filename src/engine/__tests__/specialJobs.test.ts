@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { signatureCards } from '../game/jobs';
 import { BALANCE } from '../../data/balance';
 import { getCard } from '../../data/cards';
 import { CLASSES } from '../../data/classes';
@@ -10,6 +11,7 @@ import { applyCommand, applyGameCommand, createBattle, createGame, createRng, mi
 import { applyEffect, dealDamage, makeCtx } from '../battle/effects';
 import { intentView } from '../../components/format';
 import { giveHand, nextTurn, play } from './helpers';
+const k1 = (id: string) => !id.startsWith('ax'); // 区切りD の軸のカード（ax…）は、職の専用カードの数に入れない
 
 const jobs = ['samurai', 'magicKnight', 'timeMage', 'necromancer', 'darkKnight'];
 ENEMIES.register({ id: 'specialJobDummy', name: '検証用の敵', icon: 'T', maxHp: 100000, baseLevel: 1, exp: 1, gold: 1,
@@ -37,9 +39,11 @@ function inTemple(): GameState {
 
 describe('特殊職5職のデータと転職', () => {
   it('専用6枚ずつ計30枚が自動登録され、各職にエピック2枚以上ある', () => {
-    expect(new Set(jobs.flatMap(id => CLASSES.get(id).cardPool)).size).toBe(30);
+    // 区切りD: 同じ中身のカードをまとめた（30 → 27）
+    // 2026-11-12: 専用の札が足りなかった6職に1枚ずつ足した（docs/tasks/job-unique-cards-plan.md）。この5職では侍の「居合の構え」・魔剣士の「二重付与」（27 → 29・侍と魔剣士は7枚）
+    expect(new Set(jobs.flatMap(id => CLASSES.get(id).cardPool.filter(k1))).size).toBe(29);
     for (const id of jobs) {
-      const j = CLASSES.get(id); expect(j.tier).toBe('special'); expect(j.cardPool).toHaveLength(6);
+      const j = CLASSES.get(id); expect(j.tier).toBe('special'); expect(j.cardPool.filter(k1)).toHaveLength(id === 'samurai' || id === 'magicKnight' ? 7 : 6);
       expect(j.signature).toEqual(j.cardPool.slice(0, 3));
       expect(j.cardPool.filter(c => getCard(c).rarity === 'epic').length).toBeGreaterThanOrEqual(2);
     }
@@ -59,7 +63,7 @@ describe('特殊職5職のデータと転職', () => {
     expect(jobOptions(h, g).find(o => o.job.id === id)?.progress).toBe(j.requires!.count - 1);
     h.feats[j.requires!.feat]++;
     const r = applyGameCommand(g, { type: 'CHANGE_JOB', playerId: 'P1', heroId: h.id, jobId: id }); expect(r.error).toBeUndefined(); g = r.state;
-    expect(g.heroes[0].classId).toBe(id); expect(g.heroes[0].level).toBe(1); expect(g.heroes[0].jobPick).toEqual(j.signature);
+    expect(g.heroes[0].classId).toBe(id); expect(g.heroes[0].level).toBe(1); expect(g.heroes[0].jobPick).toEqual(signatureCards(j)); // そのジョブにしか無い札を先に（オーナーの決定 2026-11-12）
     expect(g.heroes[0].equipment.weapon?.itemId).toBe(j.startingEquipment.weapon);
     expect(jobOptions(g.heroes[0], g)).toEqual([]);
     if (id === 'timeMage') expect(g.heroes[0].deck.some(c => c.cardId === 'timeStop')).toBe(true);
@@ -84,44 +88,48 @@ describe('侍の居合', () => {
     s = nextTurn(s); expect(s.allies[0].attackCharge?.multiplier).toBe(4);
   });
   it('防御カードを使ったターンは蓄積せず、すでに蓄えた倍率は維持する', () => {
-    let s = use(battle('samurai'), 'samuraiPoise'); s = nextTurn(s); expect(s.allies[0].attackCharge).toBeUndefined();
+    let s = use(battle('samurai'), 'cmGrit'); s = nextTurn(s); expect(s.allies[0].attackCharge).toBeUndefined();
     s = nextTurn(s); expect(s.allies[0].attackCharge?.multiplier).toBe(2);
     s = use(s, 'samuraiFocus'); s = nextTurn(s); expect(s.allies[0].attackCharge?.multiplier).toBe(2);
   });
   it('2回攻撃の各回に倍率とブロックを適用し、1枚使うと消費する', () => {
     let s = nextTurn(battle('samurai')); const e = s.enemies[0]; e.block = 5;
     const hp = e.hp; s = use(s, 'samuraiSwallow');
-    expect(hp - s.enemies[0].hp).toBe(31); expect(s.allies[0].attackCharge).toBeUndefined();
-    const hp2 = s.enemies[0].hp; s = use(s, 'samuraiDrawCut'); expect(hp2 - s.enemies[0].hp).toBe(9);
+    expect(hp - s.enemies[0].hp).toBe(31);
+    // 蓄えた×4は使い切る。完全成功なら、燕返し《残心》（区切りD-5）で新しく×2を蓄える
+    const perfect = s.log.at(-1)!.text.includes('完全成功');
+    expect(s.allies[0].attackCharge?.multiplier).toBe(perfect ? 2 : undefined);
+    delete s.allies[0].attackCharge;
+    const hp2 = s.enemies[0].hp; s = use(s, 'lnGiQuick'); expect(hp2 - s.enemies[0].hp).toBe(8); // 憲章5: 「精密射撃」（9）を「手早い攻撃」（8）にまとめた
   });
   it('予測と実ダメージが一致し、魔法攻撃では消費しない', () => {
     let s = nextTurn(battle('samurai')); s = use(s, 'bladeFire'); expect(s.allies[0].attackCharge?.multiplier).toBe(2);
-    const card = getCard('samuraiDrawCut'), predicted = tierDamageAgainst(s.allies[0], card, s.enemies[0]).at(-1)!;
+    const card = getCard('lnGiQuick'), predicted = tierDamageAgainst(s.allies[0], card, s.enemies[0]).at(-1)!;
     const hp = s.enemies[0].hp; s = use(s, card.id); expect(hp - s.enemies[0].hp).toBe(predicted);
   });
 });
 
 describe('魔剣士の魔法剣', () => {
-  it.each([['bladeFire', 'fire', 13], ['bladeIce', 'ice', 4]])('%sの属性を次の物理攻撃に宿し弱点・耐性を反映する', (id, element, damage) => {
+  it.each([['bladeFire', 'fire', 12], ['iceLance', 'ice', 4]])('%sの属性を次の物理攻撃に宿し弱点・耐性を反映する', (id, element, damage) => {
     let s = use(battle('magicKnight'), id); expect(s.allies[0].imbuedElement).toBe(element);
-    const predicted = tierDamageAgainst(s.allies[0], getCard('bladeStrike'), s.enemies[0]).at(-1)!;
-    const hp = s.enemies[0].hp; s = use(s, 'bladeStrike');
+    const predicted = tierDamageAgainst(s.allies[0], getCard('lnGiQuick'), s.enemies[0]).at(-1)!;
+    const hp = s.enemies[0].hp; s = use(s, 'lnGiQuick');
     expect(hp - s.enemies[0].hp).toBe(damage); expect(predicted).toBe(damage); expect(s.allies[0].imbuedElement).toBeUndefined();
   });
   it('防御と次ターンを挟んでも保持し、多段物理カード全体へ属性を乗せる', () => {
-    let s = use(battle('magicKnight'), 'bladeFire'); s = use(s, 'bladeBarrier'); s = nextTurn(s);
+    let s = use(battle('magicKnight'), 'bladeFire'); s = use(s, 'gambleGuard'); s = nextTurn(s);
     expect(s.allies[0].imbuedElement).toBe('fire');
     const hp = s.enemies[0].hp; s = use(s, 'bladeRelease'); expect(hp - s.enemies[0].hp).toBe(48); expect(s.allies[0].imbuedElement).toBeUndefined();
   });
   it('元からある属性は上書きせず、無属性部分にだけ記憶した属性を使う', () => {
     const s = battle('magicKnight'), a = s.allies[0], e = s.enemies[0]; a.imbuedElement = 'fire';
-    const ctx = makeCtx(s, createRng(1), [], a, { card: getCard('bladeStrike'), target: e });
+    const ctx = makeCtx(s, createRng(1), [], a, { card: getCard('lnGiQuick'), target: e });
     const hp = e.hp; applyEffect(ctx, { kind: 'damage', amount: 10, element: 'ice' }); expect(hp - e.hp).toBe(5);
     applyEffect(ctx, { kind: 'damage', amount: 10 }); expect(hp - e.hp).toBe(20);
   });
   it('複数属性の魔法は最後の属性を記憶し、属性のない魔法では記憶を変えない', () => {
     let s = use(battle('magicKnight'), 'elementRevelation'); expect(s.allies[0].imbuedElement).toBe('thunder');
-    s = use(s, 'timeArrow'); expect(s.allies[0].imbuedElement).toBe('thunder');
+    s = use(s, 'cmArcaneArrow'); expect(s.allies[0].imbuedElement).toBe('thunder');
   });
 });
 
@@ -182,7 +190,7 @@ describe('暗黒騎士とHP支払い', () => {
   });
   it.each(['bloodBlade', 'bloodShield', 'bloodOffering', 'bloodSweep', 'bloodAbyss', 'graveWhisper'])('%sのHP支払いで戦闘不能になる場合、支払い・乱数・効果の前に拒否する', id => {
     const s = battle('darkKnight'), a = s.allies[0], card = getCard(id);
-    a.hp = card.tiers[0].effects.filter(e => e.kind === 'payHp').reduce((n, e) => n + e.amount, 0);
+    a.hp = card.tiers[0].effects.filter(e => e.kind === 'payHp').reduce((n, e) => n + (e.amount ?? 0), 0);
     a.mana = 20; giveHand(s, a.id, [id]); const copy = structuredClone(s);
     const r = applyCommand(s, play(a.id, 't0', s.enemies[0].uid, 0));
     expect(r.error).toContain('戦闘不能'); expect(r.state).toEqual(copy); expect(s).toEqual(copy);
@@ -196,16 +204,16 @@ describe('暗黒騎士とHP支払い', () => {
 });
 
 describe('祭壇の半減と保存再開', () => {
-  it('新規地図は祭壇5・神殿2で、10職すべての印を共用祭壇がカバーする', () => {
+  it('新規地図は祭壇5・神殿2で、特殊職14職すべての印を共用祭壇がカバーする（区切りFで4職を足した）', () => {
     const g = fresh(), fs = g.world!.tiles.map(t => t.f);
     expect(fs.filter(f => f?.kind === 'altar')).toHaveLength(5); expect(fs.filter(f => f?.kind === 'temple')).toHaveLength(2);
-    expect(new Set(SANCTUARIES.all.flatMap(s => s.altars ?? [])).size).toBe(10);
+    expect(new Set(SANCTUARIES.all.flatMap(s => s.altars ?? [])).size).toBe(14);
   });
   it.each(jobs)('%sの能力状態を保存して再開しても、同じコマンドで同じ結果になり入力は変わらない', id => {
     const g = fresh(), h = g.heroes[0]; h.classId = id;
     const s = createBattle({ seed: 6, party: [toPartyMember(h)], encounter: { id: 'special', name: '検証', enemies: [{ defId: 'specialJobDummy' }] } });
     s.allies[0].attackCharge = { multiplier: 4, category: 'physical' }; s.allies[0].imbuedElement = 'fire';
-    s.enemies[0].skipNextAction = true; giveHand(s, h.id, ['samuraiDrawCut']); s.allies[0].mana = 20;
+    s.enemies[0].skipNextAction = true; giveHand(s, h.id, ['lnGiQuick']); s.allies[0].mana = 20;
     g.mode = 'battle'; g.battle = s; g.party = [h.id];
     const resumed = migrateGame(JSON.parse(JSON.stringify(g)))!; const copy = structuredClone(g);
     const cmd = { type: 'BATTLE' as const, command: play(h.id, 't0', s.enemies[0].uid, 0) };

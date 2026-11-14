@@ -14,7 +14,7 @@ describe('職業の戦闘の特殊能力', () => {
     expect(damageMultiplierFor(w, strike).multiplier).toBe(1);
     const [c] = giveHand(s, 'a0', ['strike']);
     const { state, events } = applyCommand(s, play('a0', c.uid, 'e0', 1));
-    expect(state.enemies[0].hp).toBe(52 - 9); // 7 × 1.3 = 9.1
+    expect(state.enemies[0].hp).toBe(57 - 9); // 敵HP 52×1.1=57。7 × 1.3 = 9.1
     expect(events.some((e) => e.type === 'ability' && e.name === '剣の心得')).toBe(true);
   });
 
@@ -79,13 +79,14 @@ describe('基本ジョブの特殊能力（spec §6.4）', () => {
   it('連撃（武闘家）: そのターンの2枚目からの物理ダメージ+25%', () => {
     const s = createBattle(setup(5, ['monk', 'mage']));
     s.enemies[0].hp = s.enemies[0].maxHp = 999;
-    const hand = giveHand(s, 'a0', ['wQuickStab', 'wQuickStab']);
+    const hand = giveHand(s, 'a0', ['strike', 'strike']);
     let r = applyCommand(s, play('a0', hand[0].uid, 'e0', 1));
     const first = 999 - r.state.enemies[0].hp;
     r = applyCommand(r.state, play('a0', hand[1].uid, 'e0', 1));
     const second = 999 - first - r.state.enemies[0].hp;
-    expect(first).toBe(4);
-    expect(second).toBe(5); // 4 × 1.25
+    // 区切りG-1: 「早業」は「小手調べ」にまとめた。ここは「ストライク」（7）で確かめる
+    expect(first).toBe(7);
+    expect(second).toBe(8); // 7 × 1.25（切り捨て）
   });
   it('幻獣ゲージ（召喚士）: 魔法カード3回ごとに幻獣がランダムな敵へ9ダメージ', () => {
     const s = createBattle(setup(5, ['summoner', 'mage']));
@@ -113,10 +114,10 @@ describe('基本ジョブの特殊能力（spec §6.4）', () => {
     const s = createBattle(setup(5, ['thief', 'mage']));
     s.enemies[0].block = 10;
     s.enemies[0].hp = s.enemies[0].maxHp = 999;
-    const [c] = giveHand(s, 'a0', ['wQuickStab']);
+    const [c] = giveHand(s, 'a0', ['cmProbe']);
     const r = applyCommand(s, play('a0', c.uid, 'e0', 1));
-    // 4ダメージでブロックが6に減り、そこから3を盗む
+    // 3ダメージでブロックが7に減り、そこから3を盗む（区切りG-1: 「早業」を「小手調べ」にまとめた）
     expect(r.state.allies[0].block).toBe(3);
-    expect(r.state.enemies[0].block).toBe(3);
+    expect(r.state.enemies[0].block).toBe(4);
   });
 });

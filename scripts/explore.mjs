@@ -1,4 +1,4 @@
-// 段階6 探索の仕組み: 見晴らしの塔・時間で消える出現スポット・v16 の保存の引き継ぎを、スマホ幅で確かめる（P2 のキャラで操作）。
+// 段階6 探索の仕組み: 見晴らしの塔・時間で消える出現スポット・保存して再開を、スマホ幅で確かめる（P2 のキャラで操作）。
 // 使い方: npm run build のあと vite preview を立てて node scripts/explore.mjs（URL で場所を変えられる）
 import { mkdir } from 'node:fs/promises';
 import { chromium, layoutIssues, URL, depart } from './lib.mjs';
@@ -37,7 +37,8 @@ try {
   base.game.heroes[1].playerId = 'P2';
   const p2Banner = async () => check(await page.getByText('現在は P2', { exact: false }).count() > 0, 'P2 の手番になっていない');
   const towers = base.game.world.tiles.flatMap((t, i) => (t.f?.kind === 'tower' ? [i] : []));
-  check(towers.length >= 2 && towers.length <= 3, `塔の数が違う: ${towers.length}`);
+  // 広い地図（段階6a）は、地図のデータ（prefer.tower）の数だけ塔を置く（シナリオ1は4か所。置ける場所が無ければ少ないこともある）
+  check(towers.length >= 2 && towers.length <= 4, `塔の数が違う: ${towers.length}`);
   console.log(`OK: 新しい冒険に見晴らしの塔が${towers.length}か所`);
 
   // 1. 見晴らしの塔（P2 のキャラが登る）
@@ -110,24 +111,23 @@ try {
     console.log(`OK: P2 が ${labels[kind][1]} に入った`);
   }
 
-  // 4. v16 の保存（塔・スポット無し）から再開すると、v17 になり塔が足される
+  // 4. 今の版の保存から再開すると、塔と出現スポットがそのまま残る。
+  //    （前は「v16 の保存に塔を足す」を確かめていたが、2026-11-11 オーナーの決定で v23 より前の保存は読まなくなった。src/engine/game/migrations.ts）
   {
-    const old = structuredClone(base); old.version = old.game.version = 16;
-    const w = old.game.world;
-    for (const t of w.tiles) if (t.f?.kind === 'tower') delete t.f;
-    delete w.spawns; delete w.nextSpawnAt; delete w.nextSpawnId;
-    w.story = undefined; old.game.mode = 'world';
-    await resume(old);
+    const cur = structuredClone(base);
+    const w = cur.game.world;
+    w.story = undefined; cur.game.mode = 'world';
+    await resume(cur);
     await page.getByText('王都クリスタリアに入る', { exact: true }).click();
     const m = await save();
-    check(m.game.version === 17, `v17 にならない: ${m.game.version}`);
-    check(m.game.world.tiles.filter((t) => t.f?.kind === 'tower').length === towers.length, '古い保存に塔が足されない');
+    check(m.game.version === base.game.version, `保存の版が変わった: ${m.game.version}（今の版 ${base.game.version}）`);
+    check(m.game.world.tiles.filter((t) => t.f?.kind === 'tower').length === towers.length, '再開すると塔の数が変わる');
     check(Array.isArray(m.game.world.spawns) && typeof m.game.world.nextSpawnAt === 'number', '出現スポットの情報が無い');
     w.tiles.forEach((t, i) => {
       const n = m.game.world.tiles[i];
-      check(t.t === n.t && t.r === n.r && t.seen === n.seen, `古い地図のマス${i}が変わった`);
+      check(t.t === n.t && t.r === n.r && t.seen === n.seen, `再開すると地図のマス${i}が変わった`);
     });
-    console.log('OK: v16 の保存から再開（地図はそのまま、塔を足して v17）');
+    console.log('OK: 今の版の保存から再開（地図・塔・出現スポットはそのまま）');
   }
   check(errors.length === 0, `ページのエラー: ${errors.join(' / ')}`);
   console.log('すべて OK');

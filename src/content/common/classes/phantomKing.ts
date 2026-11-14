@@ -10,5 +10,6 @@ export const phantomKing: ClassDef = {
   battleAbility: { name: '王の軍勢', effect: { when: 'battleStart', do: [{ kind: 'summon', id: 'royalPhantom', name: '王の幻獣', icon: '🐉', damage: 8, turns: 99 }] } },
   exploreAbility: { id: 'phantomKingExplore', name: '幻獣の翼', description: '視界+2', effect: { kind: 'tracking', vision: 2, hiddenFindBonus: 0 } },
   requires: { feat: 'mana', count: 80, text: 'マナを合わせて80使う' },
-  cardPool: ["royalPhoenix","phantomCommand","royalTortoise","phantomGift","phantomLegion"], signature: ["royalPhoenix","phantomCommand","royalTortoise"],
+  cardPool: ["royalPhoenix","phantomCommand","royalTortoise","feedBeast","phantomLegion"], signature: ["royalPhoenix","phantomCommand","royalTortoise"],
+  jobCards: ['fxBahamut'], // 区切りD: 決め技（転職した時に山札へ1枚）
 };

@@ -10,5 +10,6 @@ export const bowSaint: ClassDef = {
   battleAbility: { name: '必中', effect: { modifier: 'completeSlots', if: [{ kind: 'usedFocus' }, { kind: 'cardSingleTarget' }, { kind: 'cardHasDamage' }] } },
   exploreAbility: { id: 'bowSaintExplore', name: '鷹の目', description: '視界+2・奇襲の判定+15%', effect: { kind: 'combined', effects: [{ kind: 'tracking', vision: 2, hiddenFindBonus: 0 }, { kind: 'checkBonus', check: 'ambush', bonus: 15 }] } },
   requires: { feat: 'perfects', count: 20, text: '完全成功20回' },
-  cardPool: ["saintArrow","hawkVolley","skyPiercer","hawkFocus","heavenRain"], signature: ["saintArrow","hawkVolley","skyPiercer"],
+  cardPool: ["cmAllOut","lnBuFlurry","skyPiercer","hawkFocus","heavenRain","bsChaseArrow"], signature: ["cmAllOut","lnBuFlurry","skyPiercer"],
+  jobCards: ['fxMeteorArrow'], // 区切りD: 決め技（転職した時に山札へ1枚）
 };

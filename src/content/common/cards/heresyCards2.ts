@@ -23,6 +23,16 @@ function c(id: string, name: string, category: CardCategory, cost: number, baseC
 }
 
 const t = (name: string, effect: AbilityDef['effect']): AbilityDef => ({ name, effect });
+const payPct = (pct: number): Effect => ({ kind: 'payHp', pct });
+/** 捨て身の覚醒: この戦闘の間、攻撃カードのダメージ×1.3・毎ターン開始時に1枚引く（区切りD） */
+const AWAKEN: Effect = { kind: 'grantAbility', abilities: [
+  { name: '捨て身の覚醒', effect: { modifier: 'damageDealt', multiplier: 1.3, if: [{ kind: 'cardHasDamage' }] } },
+  { name: '捨て身の覚醒', effect: { when: 'turnStart', do: [{ kind: 'draw', amount: 1 }] } },
+] };
+/** 血染めの盾: この戦闘の間、攻撃をブロックで受け止めたら、攻撃者に8ダメージ（1ターン3回まで。区切りD） */
+const THORNS: Effect = { kind: 'grantAbility', abilities: [
+  { name: '血の棘', effect: { when: 'blocked', do: [{ kind: 'retaliate', amount: 8, perTurn: 3 }] } },
+] };
 
 export const HERESY_CARDS_2: CardDef[] = [
   c('heresyDevilDeal', '悪魔の取引', 'skill', 0, 90, 'self', [[pay(10), draw(3)], [pay(10), draw(3), mana(2)]], t('取引成立', { when: 'perfect', do: [focus(1)] })),
@@ -34,8 +44,10 @@ export const HERESY_CARDS_2: CardDef[] = [
   c('heresyForbiddenRite', '禁断の儀式', 'skill', 1, 80, 'self', [[pay(8), ba(6)], [pay(8), ba(10)], [pay(8), ba(14)]], t('生贄の加護', { when: 'perfect', do: [healAll(3)] })),
   c('heresyTimeTheft', '時の盗み', 'skill', 0, 90, 'self', [[pay(6), draw(2), focus(1)], [pay(6), draw(2), focus(2)]], t('盗んだ時間', { when: 'perfect', do: [mana(1)] }), { exhaust: true }),
   c('heresyVortex', '呪詛の渦', 'magic', 2, 60, 'allEnemies', [[el('dark', 4), me('curse', 1)], [el('dark', 8), me('curse', 1)], [el('dark', 12), me('curse', 1)]], t('渦の底', { when: 'kill', do: [mana(1)] })),
-  c('heresyAwakening', '捨て身の覚醒', 'skill', 0, 90, 'self', [[pay(12), focus(3), mana(2)], [pay(12), focus(3), mana(3), draw(1)]], t('覚醒', { when: 'turnStart', do: [focus(1)] }), { exhaust: true }),
-  c('heresyBloodShield', '血染めの盾', 'skill', 1, 85, 'self', [[pay(5), b(12)], [pay(5), b(16)], [pay(5), b(20)]], t('赤い防壁', { when: 'hurt', do: [b(3)] })),
+  // 区切りD: 魂の売却と同じ中身だったので作り直し（Gemini の判定）。今のHPの半分を払って、この戦闘の間ずっと攻撃が強くなる
+  c('heresyAwakening', '捨て身の覚醒', 'skill', 0, 90, 'self', [[payPct(50), AWAKEN], [payPct(50), AWAKEN, draw(1)]], t('捨て身', { modifier: 'exhaust' }), { exhaust: true }),
+  // 区切りD: 暗黒の盾と同じ向きだったので作り直し（Gemini の判定）。ブロックが残っている間、殴ってきた敵に血の棘を返す
+  c('heresyBloodShield', '血染めの盾', 'skill', 1, 85, 'self', [[pay(6), b(14), THORNS], [pay(6), b(20), THORNS]], t('血の棘', { when: 'blocked', do: [{ kind: 'retaliate', amount: 8, perTurn: 3 }] })),
   c('heresyEroding', '蝕む力', 'physical', 1, 70, 'enemy', [[d(6), me('weak', 1)], [d(11), me('weak', 1)], [d(16), me('weak', 2)]], t('蝕みの牙', { modifier: 'ignoreBlock' })),
   c('heresyDespair', '絶望の宣告', 'skill', 2, 70, 'allEnemies', [[all('vulnerable', 2), all('weak', 2), me('vulnerable', 2)], [all('vulnerable', 3), all('weak', 3), me('vulnerable', 2)], [all('vulnerable', 3), all('weak', 3), d(6), me('vulnerable', 3)]], t('終わりの予感', { when: 'perfect', do: [mana(2)] })),
   c('heresyGamble', '運命の賭け', 'skill', 1, 80, 'self', [[pay(7), draw(2)], [pay(7), draw(3)], [pay(7), draw(3), mana(2)]], t('賽は投げられた', { when: 'perfect', do: [focus(1)] })),

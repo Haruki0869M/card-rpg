@@ -5,6 +5,7 @@ import { CLASSES, getClass } from '../../../../data/classes';
 import { ITEMS } from '../../../../data/items';
 import { rarityIndex } from '../../dungeon';
 import { jobWeapons } from '../../hero';
+import { finisherCards } from '../../jobs';
 import type { OutcomeHandler } from '../types';
 
 declare module '../../../../types' {
@@ -23,7 +24,7 @@ export const outcome: OutcomeHandler<'peddler'> = {
     const k = (100 - o.discount) / 100;
     const [lo, hi] = o.rarity ?? [1, 2];
     const goods = ITEMS.all.filter(
-      (i) => (!i.scenario || i.scenario === game.scenarioId) && (i.slot === 'weapon' ? jobWeapons(h.classId).includes(i.weaponType ?? '') : i.slot === 'accessory') && rarityIndex(i.rarity) >= lo && rarityIndex(i.rarity) <= hi,
+      (i) => !i.source && (!i.scenario || i.scenario === game.scenarioId) &&(i.slot === 'weapon' ? jobWeapons(h.classId).includes(i.weaponType ?? '') : i.slot === 'accessory') && rarityIndex(i.rarity) >= lo && rarityIndex(i.rarity) <= hi,
     );
     const items = [];
     for (let n = 0; n < 2 && goods.length; n++) {
@@ -32,7 +33,9 @@ export const outcome: OutcomeHandler<'peddler'> = {
     }
     // 他の系統のジョブのカード（レア以上）
     const lin = getClass(h.classId).lineage;
-    const pool = [...new Set(CLASSES.all.filter((c) => c.lineage && c.lineage !== lin).flatMap((c) => c.cardPool))].filter((id) => CARDS.has(id) && rarityIndex(CARDS.get(id).rarity ?? 'common') >= Math.min(lo, 2));
+    // 決め技（転職でだけ入る札）は並べない
+    const fin = finisherCards();
+    const pool = [...new Set(CLASSES.all.filter((c) => c.lineage && c.lineage !== lin).flatMap((c) => c.cardPool))].filter((id) => CARDS.has(id) && !fin.has(id) && rarityIndex(CARDS.get(id).rarity ?? 'common') >= Math.min(lo, 2));
     const cards = [];
     for (let n = 0; n < 2 && pool.length; n++) {
       const id = pool.splice(rng.int(pool.length), 1)[0];

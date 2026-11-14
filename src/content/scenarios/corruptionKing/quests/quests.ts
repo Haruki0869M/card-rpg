@@ -20,9 +20,9 @@ export const quests: QuestDef[] = [
   },
   {
     id: 'holyWater',
-    title: '墓守の聖水',
-    text: '墓守の老人「亡者を鎮める聖水がほしい。王都の店で売っておるはずじゃ」',
-    objective: { kind: 'deliverItem', itemId: 'holyWater' },
+    title: '墓守の万能薬',
+    text: '墓守の老人「亡者の呪いにも効く万能薬がほしい。王都の店で売っておるはずじゃ」',
+    objective: { kind: 'deliverItem', itemId: 'antidote' },
     reward: [{ kind: 'lives', amount: 1 }, { kind: 'exp', amount: 40 }],
     rewardText: '命の灯火+1と経験値40',
   },

@@ -2,12 +2,13 @@
 // 背景の上に、敵（上段）と味方（下段）が向かい合う。動きの演出はラッパー要素の transform だけで行う。
 
 import { motion, useAnimate, useReducedMotion } from 'framer-motion';
-import { memo, useEffect, useMemo, type ReactNode } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { create } from 'zustand';
 import type React from 'react';
 import { BattleBackground, CharacterArt, EnemyArt, preloadEnemyPhases } from '../../art';
 import { getPet } from '../../data/pets';
 import { PetToken } from '../ui/PetToken';
-import { TIMING } from '../../data/balance';
+import { BALANCE, TIMING } from '../../data/balance';
 import { PLAYER_COLOR } from '../../data/theme';
 import { cardOf } from '../../data/cards';
 import { getEnemy, getEnemyAction } from '../../data/enemies';
@@ -16,11 +17,14 @@ import { useElementSize } from '../../hooks/useElementSize';
 import { useDetail, usePress } from '../../hooks/usePress';
 import { speedFactor, useBattle, type UnitFx } from '../../store/battleStore';
 import type { AllyState, BattleState, EnemyState } from '../../types';
-import { intentView, type IntentPart } from '../format';
+import { breakPreview, intentBrief, intentView, type IntentPart } from '../format';
+import { breakRuleOf } from '../../engine/battle/breakRules';
+import { enemyResist, enemyWeak, phaseMarks } from '../../engine/battle/phases';
 import { HpBar } from '../ui/HpBar';
 import { EffectChip, ELEMENT_ICONS, Shield, Skull, statusStyle, Swords } from '../ui/icons';
 import { Flame } from 'lucide-react';
 import { getElement } from '../../data/elements';
+import { SCOURGES } from '../../data/world';
 import { StatusChips } from '../ui/StatusChips';
 import { UnitPopups } from './Popups';
 import { SlotOverlay } from './SlotOverlay';
@@ -28,7 +32,7 @@ import { isAllyCard } from '../../engine/battle/targets';
 import { isOnlinePlay } from '../../store/battleConfig';
 import { seatModeOf } from '../../store/seats';
 import './battleFx.css';
-import { CalloutBand, GuardLayer, ImpactLayer } from './BattleFx';
+import { CalloutBand, DeathField, GuardLayer, ImpactField, type UnitRect } from './BattleFx';
 
 /** 個体ごとの呼吸の周期と始まりをずらす（IDの文字から決める。乱数は使わない） */
 export function breathStyle(id: string, base: number, spread: number, sway: number): React.CSSProperties {
@@ -55,15 +59,11 @@ function useUnitMotion(unitId: string, side: 'ally' | 'enemy') {
     const frames = calm ? { opacity: [1, 0.6, 1] } : fx.kind === 'attack'
       ? { x: [0, 12 * dir, 0], y: [0, -12 * dir, 0], scale: [1, 1.08, 1] }
       : fx.kind === 'cast' ? { y: [0, -10, 0], scale: [1, 1.06, 1] }
-      // 被弾（段階B）: 小刻みな揺れ（白いフラッシュは中の絵に重ねる）
+      // 被弾（段階B）: 小刻みな揺れ（白いフラッシュは戦場の命中の層に出す。段階4）
       : { x: [0, -6 * dir, 6 * dir, -5 * dir, 4 * dir, -2 * dir, 0] };
     const controls = animate(scope.current, frames, { duration: (calm ? 0.14 : fx.kind === 'hit' ? 0.24 : 0.28) * k, ease: 'easeOut' });
-    // 被弾の白いフラッシュ（0.06秒・明るさ2.8倍）。動きを減らす設定では出さない
-    const inner = scope.current.firstElementChild as HTMLElement | null;
-    const flash = fx.kind === 'hit' && !calm && inner
-      ? animate(inner, { filter: ['brightness(2.8)', 'brightness(2.8)', 'brightness(1)'] }, { duration: TIMING.hitFlash * 2 * k, times: [0, 0.5, 1], ease: 'linear' })
-      : undefined;
-    return () => { controls.stop(); flash?.stop(); };
+    // 被弾の白いフラッシュは、戦場の命中の層に白い半透明の層で出す（段階4。BattleFx.tsx の HitFlash）
+    return () => controls.stop();
   }, [fx?.id, fast, simple, reduced]);
   return scope;
 }
@@ -86,7 +86,7 @@ function SynergyShake({ children }: { children: ReactNode }) {
     const controls = animate(scope.current, { x: [0, -3, 3, -2, 0] }, { duration: TIMING.synergyShake / speedFactor({ fastMode: fast }), ease: 'linear' });
     return () => controls.stop();
   }, [fx?.id]);
-  // 段階B: 大ダメージ・完全成功で戦場全体（背景ごと）を0.12秒揺らす
+  // 段階B: 大ダメージ・完全成功で戦場全体（背景ごと）を揺らす（段階4で 0.12 → 0.16秒）
   useEffect(() => {
     if (!big || !scope.current) return;
     scope.current.dataset.fieldShake = String(big.id);
@@ -107,6 +107,16 @@ function TargetFace({ allyId }: { allyId?: string }) {
   );
 }
 
+/**
+ * 戦場に並べる敵。ふつうは倒れた敵も並びに残す（途中で並びが動かないように）。
+ * 「仲間を呼ぶ」で並びが BALANCE.maxEnemies を超えた時だけ、倒れた敵を前から外して枠の数を保つ（生きている敵は最大数まで）
+ */
+export function fieldEnemies(enemies: EnemyState[]): EnemyState[] {
+  let extra = enemies.length - BALANCE.maxEnemies;
+  if (extra <= 0) return enemies;
+  return enemies.filter((e) => !(e.dead && extra-- > 0));
+}
+
 /** 予告の宛先に出す短い名前（長い名前は4文字＋「…」）。担当（P1など）は全員同じことがあるので出さない */
 export const shortName = (name: string) => ([...name].length > 5 ? `${[...name].slice(0, 4).join('')}…` : name);
 
@@ -116,7 +126,8 @@ function IntentTargetName({ id }: { id?: string }) {
   // 敵が3体以上で枠が狭い時も、短い名前で出す（「→P1」だと、2人とも P1 の時に誰か分からない）
   return a ? <span className="order-first w-full truncate text-center text-[12px] leading-4" data-intent-name>→{shortName(a.name)}</span> : null;
 }
-function IntentPartView({ p }: { p: IntentPart }) {
+/** narrow = 敵が3体以上で枠が狭い（状態異常の予告も、狙いの名前を1行目に折り返す。2026-11-13） */
+function IntentPartView({ p, narrow }: { p: IntentPart; narrow: boolean }) {
   switch (p.kind) {
     case 'attack': {
       const el = p.element ? getElement(p.element) : undefined;
@@ -151,7 +162,7 @@ function IntentPartView({ p }: { p: IntentPart }) {
     case 'debuff': {
       const st = statusStyle(p.status);
       return (
-        <span className="flex items-center gap-0.5" style={{ color: st.color }}>
+        <span className={`flex items-center gap-0.5 ${narrow ? 'max-w-full flex-wrap justify-center' : ''}`} style={{ color: st.color }}>
           <st.Icon size={14} strokeWidth={2.6} />
           {p.all ? <span className="text-[12px]">味方全員</span> : <><TargetFace allyId={p.targetId} /><IntentTargetName id={p.targetId} /></>}
           <span className="tabular-nums">{p.amount}</span>
@@ -163,33 +174,112 @@ function IntentPartView({ p }: { p: IntentPart }) {
   }
 }
 
-function IntentBubble({ enemy, onTap }: { enemy: EnemyState; onTap: () => void }) {
+/**
+ * 敵が3体以上の時に、敵の列の下の1行に案内を出す敵（この端末だけの見た目の状態。戦闘の結果・相方の画面は変わらない）。
+ * 予告の枠を押すと、その敵の案内に切り替わる
+ */
+const useBriefFocus = create<{ uid?: string; set: (uid: string) => void }>((set) => ({ set: (uid) => set({ uid }) }));
+
+/**
+ * 敵が3体以上の時の、案内の1行に出す敵【提案】: 狙っている敵（カードを選んで狙いを決めた敵）→ 最後に予告の枠を押した敵 → 左から1体目。
+ * どれも、特殊な行動を予告していて、まだ崩していない敵だけ
+ */
+export function briefEnemy(battle: BattleState, enemies: EnemyState[], targetId?: string, focusUid?: string): { enemy: EnemyState; count: number } | undefined {
+  // 強敵の本気（🔥本気）の予告も、特殊な行動と同じく案内の1行に出す（2026-11-13）
+  const list = enemies.filter((e) => !!intentBrief(e.dead ? null : intentView(battle, e)));
+  const enemy = list.find((e) => e.uid === targetId) ?? list.find((e) => e.uid === focusUid) ?? list[0];
+  return enemy && { enemy, count: list.length };
+}
+
+function IntentBubble({ enemy, onTap, narrow }: { enemy: EnemyState; onTap: () => void; narrow: boolean }) {
   const battle = useBattle((s) => s.battle);
   const retargetKey = useBattle((s) => s.retargets[enemy.uid] ?? 0);
-  const press = usePress(onTap, { type: 'intent', uid: enemy.uid });
+  const setFocus = useBriefFocus((s) => s.set);
+  const press = usePress(() => {
+    setFocus(enemy.uid);
+    onTap();
+  }, { type: 'intent', uid: enemy.uid });
+  // 敵が3体以上の時、下の案内の1行に出ている敵の札は、金の縁で目立たせる
+  const focusUid = useBriefFocus((s) => s.uid);
+  const briefOn = useBattle((s) => narrow && briefEnemy(s.battle, fieldEnemies(s.battle.enemies), s.selection?.targetId, focusUid)?.enemy.uid === enemy.uid);
   const view = intentView(battle, enemy);
   return (
-    <div {...press} className="flex min-h-[24px] items-center justify-center">
+    // 敵が3体以上の時は、枠を敵の欄の幅に収める（中身は折り返す。画面の外・隣の敵の枠に出ないように。2026-11-13）
+    <div {...press} className={`flex min-h-[24px] items-center justify-center ${narrow ? 'w-full min-w-0' : ''}`}>
       {view && (
         <motion.div
           key={retargetKey}
           initial={retargetKey ? { scale: 1.45 } : false}
           animate={{ scale: 1 }}
           transition={{ type: 'spring', stiffness: 500, damping: 18 }}
-          className="relative flex max-w-full flex-wrap items-center justify-center gap-1 rounded-lg border border-red-300/50 bg-[#1c0a10]/90 px-1.5 py-0.5 text-[14px] leading-5 font-black shadow-[0_2px_0_rgba(0,0,0,.6)]"
+          className={`relative flex max-w-full flex-wrap items-center justify-center rounded-lg border border-red-300/50 bg-[#1c0a10]/90 py-0.5 text-[14px] leading-5 font-black shadow-[0_2px_0_rgba(0,0,0,.6)] ${narrow ? 'gap-x-0.5 px-1' : 'gap-1 px-1.5'}`}
           data-intent={enemy.uid}
           data-intent-big={view.big || undefined}
           data-intent-broken={view.broken || undefined}
-          style={view.broken ? { borderColor: 'rgba(251,191,36,.9)' } : view.big ? { borderColor: 'rgba(255,90,90,.95)', boxShadow: '0 0 8px rgba(255,80,80,.7), 0 2px 0 rgba(0,0,0,.6)' } : undefined}
+          data-intent-behavior={(!view.broken && view.behavior?.id) || undefined}
+          data-intent-frenzy={(!view.broken && !!view.frenzy) || undefined}
+          style={
+            view.broken
+              ? { borderColor: 'rgba(251,191,36,.9)' }
+              : view.frenzy
+                ? { borderColor: 'rgba(253,186,116,.95)', boxShadow: '0 0 9px rgba(249,115,22,.9), 0 2px 0 rgba(0,0,0,.6)' }
+              : view.behavior
+                ? { borderColor: 'rgba(216,180,254,.95)', boxShadow: '0 0 8px rgba(192,132,252,.8), 0 2px 0 rgba(0,0,0,.6)' }
+                : view.big
+                  ? { borderColor: 'rgba(255,90,90,.95)', boxShadow: '0 0 8px rgba(255,80,80,.7), 0 2px 0 rgba(0,0,0,.6)' }
+                  : undefined
+          }
         >
-          {/* 大技の予告（体勢を崩せる）。崩した後は「BREAK」の札に変わる */}
+          {/* ボスの段階（2026-11-14）: 開幕の一手の札（🌀第2段階。青紫。本気の橙の札と同じ大きさ）。ほかの札（紫・赤・BREAK）の前に並べる */}
+          {view.opening && (
+            <span
+              className={`order-first rounded bg-gradient-to-b from-indigo-400 to-violet-700 text-[12px] leading-4 font-black whitespace-nowrap text-white ring-1 ring-sky-200/90 ${narrow ? 'px-0.5' : 'px-1'}`}
+              data-opening-mark={view.opening.phase}
+              data-opening-short={narrow || undefined}
+            >
+              🌀{narrow ? view.opening.short : view.opening.label}
+            </span>
+          )}
+          {/* 数え読み（2026-11-14）: 予告の枠の右上に残りの数（0 = この予告が数え読みの行動）。敵が3体以上で狭い時は、枠の内側の角（画面の端の敵がはみ出さない） */}
+          {view.countdown && (
+            <span
+              className={`absolute -top-2 ${narrow ? 'right-0' : '-right-2'} z-[1] flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-0.5 text-[12px] leading-none font-black tabular-nums ring-1 ${view.countdown.fire ? 'bg-red-600 text-white ring-yellow-200' : 'bg-indigo-950 text-sky-100 ring-sky-300'}`}
+              data-countdown={view.countdown.left}
+              title={`あと${view.countdown.left}回の予告で「${view.countdown.actionName}」`}
+            >
+              {view.countdown.left}
+            </span>
+          )}
+          {/* 大技の予告（体勢を崩せる）。崩した後は「BREAK」の札に変わる。敵の特殊な行動は、赤い「大技」ではなく紫の札（⚠️手数読み など） */}
           {view.broken ? (
             <span className="order-first rounded bg-amber-400 px-1 text-[12px] leading-4 font-black whitespace-nowrap text-amber-950" data-break-mark>⚡BREAK</span>
+          ) : view.frenzy ? (
+            // 強敵の本気（2026-11-13）: 紫の札・赤い大技の札と見分けられる橙の札。BREAK できるかは、下の BREAK の印で分かる
+            <span
+              className={`order-first rounded bg-gradient-to-b from-orange-400 to-orange-700 text-[12px] leading-4 font-black whitespace-nowrap text-white ring-1 ring-yellow-200/90 ${narrow ? 'px-0.5' : 'px-1'} ${briefOn ? 'ring-2 ring-amber-300' : ''}`}
+              data-frenzy-mark
+              data-frenzy-short={narrow || undefined}
+              data-brief-on={briefOn || undefined}
+            >
+              {view.frenzy.icon}
+              {narrow ? view.frenzy.short : view.frenzy.label}
+            </span>
+          ) : view.behavior ? (
+            <span
+              className={`order-first rounded bg-gradient-to-b from-fuchsia-500 to-purple-700 text-[12px] leading-4 font-black whitespace-nowrap text-white ${narrow ? 'px-0.5' : 'px-1'} ${briefOn ? 'ring-2 ring-amber-300' : 'ring-1 ring-amber-300/90'}`}
+              data-behavior-mark={view.behavior.id}
+              data-behavior-short={narrow || undefined}
+              data-brief-on={briefOn || undefined}
+            >
+              {view.behavior.icon}
+              {/* 敵が3体以上で枠が狭い時は短い名前（例「⚠️手数」）。何をされるかは、敵の列の下の1行に出す */}
+              {narrow ? view.behavior.short : view.behavior.label}
+            </span>
           ) : view.big ? (
             <span className="order-first flex items-center rounded bg-red-600 px-1 text-[12px] leading-4 font-black whitespace-nowrap text-white" data-big-mark><Flame size={12} strokeWidth={2.8} />大技</span>
           ) : null}
           {view.parts.map((p, i) => (
-            <IntentPartView key={i} p={p} />
+            <IntentPartView key={i} p={p} narrow={narrow} />
           ))}
           {/* お供の先読み: 次のターンの行動の名前（枠の中の最後の行。下の味方や狙いの名前に重ねない） */}
           {enemy.queuedActionId && (
@@ -210,7 +300,10 @@ const EnemyUnit = memo(function EnemyUnit({
   slotW,
   spriteH,
   boxH,
+  narrow,
 }: {
+  /** 敵が3体以上で枠が狭い（BREAK の印を短い形にする） */
+  narrow: boolean;
   enemy: EnemyState;
   left: number;
   top: number;
@@ -251,6 +344,23 @@ const EnemyUnit = memo(function EnemyUnit({
   }, [battle, enemy]);
   const breath = useMemo(() => breathStyle(enemy.uid + enemy.defId, 2.5, 0.9, 0.6), [enemy.uid, enemy.defId]);
   const footW = Math.min(slotW - 4, h * 0.9);
+  // 回2: 倒れた演出。とどめのコマ（deathFx）が来たら、絵は戦場の演出の層（DeathField）の写しに任せて、すぐ隠す。
+  // 合図が来るまでは絵を残す（命中 → 倒れる、の順に見えるように）。合図が来ないまま時間が過ぎたら、今までどおり薄くして消す
+  const death = useBattle((s) => s.deathFx[enemy.uid]);
+  const fast = useBattle((s) => s.settings.fastMode);
+  const [gone, setGone] = useState(!!enemy.dead);
+  const staleDeath = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (!enemy.dead) {
+      setGone(false);
+      return;
+    }
+    staleDeath.current = useBattle.getState().deathFx[enemy.uid]?.id;
+    const t = setTimeout(() => setGone(true), (TIMING.enemyDeathFallback * 1000) / speedFactor({ fastMode: fast }));
+    return () => clearTimeout(t);
+  }, [enemy.dead]);
+  const ghost = !!enemy.dead && !!death && death.id !== staleDeath.current;
+  const hidden = ghost || (!!enemy.dead && gone);
 
   return (
     <div
@@ -285,8 +395,9 @@ const EnemyUnit = memo(function EnemyUnit({
         {lit && <TargetRing width={footW * 1.12} />}
         <motion.div
           className="absolute bottom-0"
-          animate={enemy.dead ? { opacity: 0, scale: 0.85, y: 10 } : { opacity: dimmed ? 0.6 : 1, scale: 1, y: 0 }}
-          transition={{ duration: enemy.dead ? 0.45 : 0.15 }}
+          animate={ghost ? { opacity: 0, scale: 1, y: 0 } : hidden ? { opacity: 0, scale: 0.85, y: 10 } : { opacity: dimmed ? 0.6 : 1, scale: 1, y: 0 }}
+          transition={ghost ? { duration: 0, delay: 0.03 } : { duration: hidden ? 0.45 : 0.15 }}
+          data-enemy-gone={hidden ? (ghost ? 'burst' : 'fade') : undefined}
           style={{ width: h * 0.85, height: h }}
           data-enemy-sprite={enemy.uid}
           data-spot={lit ? 'lit' : dimmed ? 'dim' : undefined}
@@ -300,7 +411,6 @@ const EnemyUnit = memo(function EnemyUnit({
               <EnemyArt defId={enemy.defId} phase={enemy.phase} className="h-full w-full" />
             </div>
           </div>
-          <ImpactLayer unitId={enemy.uid} />
         </motion.div>
         {/* 狙う敵: 足元の光る輪・絵の発光・頭の上の矢印（予測の数字は下の操作パネルに出す。絵は隠さない） */}
         {isTarget && (
@@ -321,19 +431,114 @@ const EnemyUnit = memo(function EnemyUnit({
         // 予告は味方の立ち絵より手前に出す（画面が低くて重なっても、狙いと数字を読めるように）
         <div className="relative z-[6] mt-0.5 flex flex-col items-center gap-0.5 transition-opacity duration-150" style={{ width: barW, opacity: dimmed ? 0.8 : 1 }} data-enemy-info>
           <div className="text-outline w-full truncate text-center text-[12px] leading-[14px] font-bold text-zinc-100">
-            <span className="text-amber-300">Lv{enemy.level}</span> {enemyName(enemy)}
+            <span className="text-amber-300">Lv{enemy.level}</span>
+            {/* 寄り道の値打ち（2026-11-14）: 加護の数（💀）と見破り（👁）の小さな印（名前より前 = 狭い時に名前の方が省かれる）。中身は長押し */}
+            {battle.boon?.uid === enemy.uid && <span className="ml-0.5 text-violet-300" data-boon-mark={battle.boon.ids.length}>💀{battle.boon.ids.length}</span>}
+            {battle.insight === enemy.uid && <span className="ml-0.5 text-emerald-300" data-insight-mark>👁</span>} {enemyName(enemy)}
           </div>
-          <HpBar hp={enemy.hp} max={enemy.maxHp} block={enemy.block} tone="enemy" height={12} />
-          <ElementMarks defId={enemy.defId} />
+          <HpBar hp={enemy.hp} max={enemy.maxHp} block={enemy.block} tone="enemy" height={12} marks={phaseMarks(enemy).map((m) => m.at)} />
+          <ElementMarks enemy={enemy} />
           {/* 次の行動の予告（HPのすぐ下。誰を狙っているかの顔つき） */}
-          <IntentBubble enemy={enemy} onTap={onTap} />
+          <IntentBubble enemy={enemy} onTap={onTap} narrow={narrow} />
+          {!narrow && <BehaviorBrief enemy={enemy} maxW={slotW - 8} />}
+          <BreakHint enemy={enemy} narrow={narrow} maxW={narrow ? slotW - 4 : slotW - 8} />
           <AimMarks battle={battle} enemyUid={enemy.uid} />
-          <StatusChips s={enemy.statuses} side="enemy" onTap={onTap} tauntedBy={enemy.tauntedBy} />
+          <StatusChips s={enemy.statuses} side="enemy" onTap={onTap} tauntedBy={enemy.tauntedBy} guarding={enemy.guarding} />
         </div>
       )}
     </div>
   );
 });
+
+/**
+ * 敵の特殊な行動の直し: 特殊な行動の予告の札の下に、いつも出す短い1行の案内（例:「4枚以上使うと反撃」）。
+ * 長押ししなくても見える。敵が3体以上で枠が狭い時は出さない（札だけ。文は長押しの説明で読める）。崩した後は出さない
+ */
+function BehaviorBrief({ enemy, maxW }: { enemy: EnemyState; maxW: number }) {
+  // 強敵の本気の時は橙（「威力×1.5」。特殊な行動もある時は1つにまとめる）
+  const brief = useBattle((s) => intentBrief(enemy.dead ? null : intentView(s.battle, enemy))?.text);
+  const frenzy = !enemy.dead && !!enemy.intent?.frenzy && !enemy.broken;
+  if (!brief) return null;
+  return (
+    <span
+      className={`w-max rounded px-1 text-center text-[12px] leading-4 font-bold ring-1 [overflow-wrap:anywhere] [word-break:keep-all] ${frenzy ? 'bg-orange-950/90 text-orange-100 ring-orange-300/80' : 'bg-purple-950/90 text-fuchsia-100 ring-fuchsia-300/70'}`}
+      style={{ maxWidth: Math.max(60, maxW) }}
+      data-behavior-brief
+      data-brief-kind={frenzy ? 'frenzy' : 'behavior'}
+    >
+      {brief}
+    </span>
+  );
+}
+
+/** 敵が3体以上の時の、特殊な行動の案内の1行の高さ（敵の列の下に、この分の場所を取る） */
+const BRIEF_BAR_H = 20;
+
+/**
+ * 敵が3体以上の時の、特殊な行動の案内の1行（2026-11-13【提案】）。予告の枠が狭くて案内を敵ごとに出せないので、
+ * 敵の列の下・味方の立ち絵の上に1つだけ出す。出す敵は briefEnemy（狙っている敵 → 最後に押した札の敵 → 左から1体目）。
+ * 特殊な行動の敵が2体以上いる時は「1/2」のように数を出し、その敵の札を金の縁で目立たせる。押せない（下の操作を邪魔しない）
+ */
+function BehaviorBriefBar({ top, maxW }: { top: number; maxW: number }) {
+  const focusUid = useBriefFocus((s) => s.uid);
+  // 文字列で返す（先頭の1文字 = 本気なら 'F'。zustand の選び方は、同じ値なら描き直さない）
+  const key = useBattle((s) => {
+    const list = fieldEnemies(s.battle.enemies);
+    const b = briefEnemy(s.battle, list, s.selection?.targetId, focusUid);
+    if (!b) return undefined;
+    const v = intentView(s.battle, b.enemy)!;
+    const br = intentBrief(v)!;
+    const order = list.filter((e) => briefEnemy(s.battle, [e])).findIndex((e) => e.uid === b.enemy.uid) + 1;
+    return `${v.frenzy ? 'F' : 'B'}${br.icon}${shortName(enemyName(b.enemy))}：${br.text}${b.count > 1 ? `（${order}/${b.count}）` : ''}`;
+  });
+  if (!key) return null;
+  const info = { frenzy: key.startsWith('F') };
+  const text = key.slice(1);
+  return (
+    <div
+      className={`pointer-events-none absolute left-1/2 z-[7] -translate-x-1/2 rounded px-1.5 text-center text-[12px] leading-4 font-bold whitespace-nowrap ring-1 ${info.frenzy ? 'bg-orange-950/90 text-orange-100 ring-orange-300/80' : 'bg-purple-950/90 text-fuchsia-100 ring-fuchsia-300/70'}`}
+      style={{ top, maxWidth: maxW }}
+      data-behavior-brief-bar
+      data-brief-kind={info.frenzy ? 'frenzy' : 'behavior'}
+    >
+      {text}
+    </div>
+  );
+}
+
+/**
+ * 回2: 大技の予告の枠のすぐ下に、カードを選ぶ前からいつも出す BREAK の印。
+ * 止め方の文は今の決まり（予告の説明の「弱点の属性で攻撃・完全成功で攻撃」）と同じ。弱点の属性はその敵のデータの弱点の印（▲と同じ絵）。
+ * 出す条件は「大技の予告・まだ BREAK していない・その行動をする」（breakPreview と同じ）。敵が3体以上の時は短い形
+ */
+function BreakHint({ enemy, narrow, maxW }: { enemy: EnemyState; narrow: boolean; maxW: number }) {
+  const show = useBattle((s) => !enemy.dead && !!breakPreview(s.battle, enemy));
+  // 案Y（2026-11-13）: ボス・中ボス・災厄で弱点を持つ敵は「弱点（属性）で完全成功 → BREAK」。決まりは breakRules.ts の breakRuleOf から読む
+  const strict = useBattle((s) => breakRuleOf(s.battle, enemy).weakAndPerfect);
+  const ruleWeak = useBattle((s) => breakRuleOf(s.battle, enemy).weak.join(','));
+  if (!show) return null;
+  // 弱点の印: 「弱点で完全成功」の時は一時的な弱点（油壺）も入れる（その時だけ崩せる属性を全部見せる）
+  const weak = strict ? ruleWeak.split(',').filter(Boolean) : enemyWeak(enemy);
+  const icons = weak.map((id) => {
+    const el = getElement(id);
+    const Icon = ELEMENT_ICONS[el.icon] ?? Swords;
+    return <Icon key={id} size={12} strokeWidth={2.8} className="inline align-[-2px]" style={{ color: el.color }} aria-label={el.name} />;
+  });
+  // 短い形は1行に収める（かっこは半角の幅。折り返すと味方の立ち絵の頭に重なりやすい）
+  const els = weak.length ? (narrow ? <>({icons})</> : <>（{icons}）</>) : null;
+  return (
+    <span
+      className={`w-max rounded bg-black/80 text-center text-[12px] leading-4 font-black text-amber-200 ring-1 ring-amber-400/80 ${narrow ? 'px-px tracking-[-0.03em] whitespace-nowrap' : 'px-1 [overflow-wrap:anywhere] [word-break:keep-all]'}`}
+      style={{ maxWidth: Math.max(60, maxW) }}
+      data-break-hint={narrow ? 'short' : 'long'}
+      data-break-rule={strict ? 'weak-perfect' : 'any'}
+    >
+      ⚡{strict
+        ? (narrow ? <>{els}+完全</> : <>弱点{els}で完全成功 → BREAK</>)
+        : narrow ? <>BREAK可{els}</> : weak.length ? <>弱点{els}か完全成功で BREAK</> : <>完全成功で BREAK</>}
+    </span>
+  );
+}
 
 /** 狙う敵の足元で回るターゲットリング（横に寝かせた輪。中の目盛りがゆっくり回る） */
 function TargetRing({ width }: { width: number }) {
@@ -352,10 +557,10 @@ function TargetRing({ width }: { width: number }) {
 }
 
 /** 敵の弱点（▲ 属性の色）と耐性（▼ 灰色）。長押しの詳細を見なくても分かるように */
-function ElementMarks({ defId }: { defId: string }) {
-  const def = getEnemy(defId);
-  const weak = def.weak ?? [];
-  const resist = def.resist ?? [];
+function ElementMarks({ enemy }: { enemy: EnemyState }) {
+  // ボスの段階（2026-11-14）: 段階・予告で変わる今の弱点と耐性（phases.ts。エンジンと同じ関数）
+  const weak = enemyWeak(enemy);
+  const resist = enemyResist(enemy);
   if (!weak.length && !resist.length) return null;
   const mark = (id: string, kind: 'weak' | 'resist') => {
     const el = getElement(id);
@@ -445,7 +650,6 @@ const AllySprite = memo(function AllySprite({ ally, left, bottom, h, active, fie
           </span>
         </div>
       )}
-      <ImpactLayer unitId={ally.id} />
       <GuardLayer unitId={ally.id} />
       {/* 数字は、そのキャラの頭のすぐ上に出す */}
       <UnitPopups unitId={ally.id} top="-6px" />
@@ -496,7 +700,8 @@ const Embers = memo(function Embers() {
 
 export function Battlefield() {
   const [ref, size] = useElementSize<HTMLDivElement>();
-  const enemies = useBattle((s) => s.battle.enemies);
+  const allEnemies = useBattle((s) => s.battle.enemies);
+  const enemies = useMemo(() => fieldEnemies(allEnemies), [allEnemies]);
   const allies = useBattle((s) => s.battle.allies);
   const activeId = useBattle((s) => s.activeId);
   const phase = useBattle((s) => s.battle.phase);
@@ -513,9 +718,14 @@ export function Battlefield() {
   const enemyTop = 4;
   // 名前 + HP + 行動の予告（狙いの名前の行を含む）+ 先読みの行 + 状態異常
   const foresee = enemies.some((e) => !e.dead && e.queuedActionId);
+  // 回2: 大技の予告の下の BREAK の印の行（敵が1体は1行・3体以上は短い形で1行。2体は長い形が2行に折り返すことがある）
+  const breakRow = useBattle((s) => fieldEnemies(s.battle.enemies).some((e) => !e.dead && !!breakPreview(s.battle, e)));
+  const breakRowH = breakRow ? (enemies.length === 2 ? 34 : 18) : 0;
   // 属性の印の行（16）・各行の間（0.5×5）・3体以上の時に互い違いにずらす分（10）も数える
   // 予告の枠は「→名前」の行（16）＋数字の行（20）＋枠の余白（6）の2行ぶん
-  const enemyInfoH = 14 + 14 + 16 + 42 + 16 + (foresee ? 18 : 0) + 18 + 10 + (nE >= 3 ? 10 : 0);
+  // 敵が3体以上で、特殊な行動を予告している敵がいる時は、敵の列の下に案内の1行（BehaviorBriefBar）の場所も取る
+  const briefBar = useBattle((s) => nE >= 3 && !!briefEnemy(s.battle, fieldEnemies(s.battle.enemies)));
+  const enemyInfoH = 14 + 14 + 16 + 42 + 16 + (foresee ? 18 : 0) + breakRowH + 18 + 10 + (nE >= 3 ? 10 : 0) + (briefBar ? BRIEF_BAR_H : 0);
   // 敵の列の下端と味方の頭の間に少し余白を残す（予告の枠が立ち絵の頭に重ならないように）
   const enemySpriteH = Math.max(40, Math.min(H * 0.56 - enemyInfoH, enemySlotW * 1.15));
   // 大きな敵（size > 1）は、絵の箱より上へはみ出して描かれ、戦場の上の端（上の帯）で体が切れていた。
@@ -528,11 +738,40 @@ export function Battlefield() {
   // 味方の立ち絵は、敵の列（予告まで）の下に収まる高さにする。画面が低い時でも元の6割より小さくしない
   const allyFull = Math.min(H * 0.42, (allyAreaW / nA) * 1.25);
   const enemyBottom = enemyTop + enemySpriteH + enemyInfoH;
+  // 案内の1行は、敵の欄（名前〜状態異常）の一番下のすぐ下に置く。欄の高さは予告の中身で変わるので、描いた後に測る
+  const [infoBottom, setInfoBottom] = useState(0);
+  useLayoutEffect(() => {
+    const root = ref.current;
+    if (!briefBar || !root) return;
+    const top = root.getBoundingClientRect().top;
+    const b = Math.max(0, ...[...root.querySelectorAll('[data-enemy-info]')].map((el) => el.getBoundingClientRect().bottom - top));
+    if (Math.abs(b - infoBottom) > 0.5) setInfoBottom(b);
+  });
   const allyH = Math.max(48, allyFull * 0.6, Math.min(allyFull, H - 6 - enemyBottom));
   // 段階A: 操作パネルが戦場に重なってよい高さ（味方の下半身まで＝立ち絵の下45%）。パネルの最大の高さに使う
   useEffect(() => {
     ref.current?.parentElement?.style.setProperty('--ally-reach', `${Math.round(6 + allyH * 0.45)}px`);
   }, [allyH]);
+  // 段階4: 命中のエフェクトを出す位置（敵・味方の絵の箱。下の並べ方と同じ計算）
+  const enemyX = (i: number) => enemySlotW * (i + 0.5);
+  const enemyY = (i: number) => enemyTop + (nE >= 3 && i % 2 === 1 ? 10 : 0);
+  const allyX = (i: number) => (allyAreaW / nA) * (i + 0.5) + (nA <= 2 ? W * 0.02 : 0);
+  const allyBottom = (i: number) => 6 + (nA >= 3 && i % 2 === 1 ? 8 : 0);
+  // 回2: 倒れた演出を少し長く・大きくする敵（災厄の本体・ボスと中ボスの部屋のいちばん大きい敵）
+  const bossRoom = useBattle((s) => !!s.battle.boss || !!s.battle.midboss);
+  const bossLike = (uid: string) => {
+    const e = allEnemies.find((x) => x.uid === uid);
+    if (!e) return false;
+    if (SCOURGES.all.some((d) => d.boss === e.defId)) return true;
+    return bossRoom && (getEnemy(e.defId).size ?? 1) >= Math.max(...allEnemies.map((x) => getEnemy(x.defId).size ?? 1));
+  };
+  const impactRects: UnitRect[] = [
+    ...enemies.map((e, i) => {
+      const h = enemyUnitH * (getEnemy(e.defId).size ?? 1);
+      return { id: e.uid, x: enemyX(i) - (h * 0.85) / 2, y: enemyY(i) + enemySpriteH - h, w: h * 0.85, h };
+    }),
+    ...allies.map((a, i) => ({ id: a.id, x: allyX(i) - allyH * 0.4, y: H - allyBottom(i) - allyH, w: allyH * 0.8, h: allyH })),
+  ];
 
   return (
     <div ref={ref} className="relative min-h-[190px] flex-1 overflow-hidden">
@@ -548,29 +787,35 @@ export function Battlefield() {
             <EnemyUnit
               key={e.uid}
               enemy={e}
-              left={enemySlotW * (i + 0.5)}
-              top={enemyTop + (nE >= 3 && i % 2 === 1 ? 10 : 0)}
+              left={enemyX(i)}
+              top={enemyY(i)}
               slotW={enemySlotW}
               spriteH={enemyUnitH}
               boxH={enemySpriteH}
+              narrow={nE >= 3}
             />
           ))}
+          {briefBar && <BehaviorBriefBar top={Math.max(enemyBottom - BRIEF_BAR_H + 2, infoBottom + 2)} maxW={W - 16} />}
           {allies.map((a, i) => (
             <AllySprite
               key={a.id}
               ally={a}
               fieldW={W}
-              left={(allyAreaW / nA) * (i + 0.5) + (nA <= 2 ? W * 0.02 : 0)}
-              bottom={6 + (nA >= 3 && i % 2 === 1 ? 8 : 0)}
+              left={allyX(i)}
+              bottom={allyBottom(i)}
               h={allyH}
               active={a.id === activeId && phase === 'ally'}
             />
           ))}
+          {/* 回2: 倒れた演出（命中の層の下。命中の演出が上に重なって、命中 → 倒れる、の順に見える） */}
+          <DeathField rects={impactRects} enemies={allEnemies} bossLike={bossLike} />
+          <ImpactField rects={impactRects} />
         </>
       )}
       </SynergyShake>
       <CalloutBand top={22} />
-      <div className="pointer-events-none absolute inset-x-0 top-[46%] z-40 flex justify-center">
+      {/* スロットの板（段階4）: 戦場の中央ではなく、下の端（手札の上）の細い帯に出す（命中の演出・敵の予告に重ならないように） */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-1 z-40 flex justify-center">
         <SlotOverlay />
       </div>
       <SeatLabel />
@@ -592,7 +837,7 @@ function TargetLines({ W, H, enemySlotW, enemyTop, enemySpriteH, allyAreaW, ally
   const battle = useBattle((s) => s.battle);
   const nA = battle.allies.length;
   const lines: { x1: number; y1: number; x2: number; y2: number; key: string }[] = [];
-  battle.enemies.forEach((e, i) => {
+  fieldEnemies(battle.enemies).forEach((e, i) => {
     if (e.dead || !e.intent?.targetId) return;
     const view = intentView(battle, e);
     if (!view?.parts.some((p) => p.kind === 'attack')) return;

@@ -149,13 +149,13 @@ for (const [w, h] of SIZES) {
   await page.waitForTimeout(200);
   const cand = page.locator('[data-item-detail="mithrilSword"]').first();
   if (!(await cand.getByText('今と比べて：').count())) await fail('候補の行に「今と比べて：」が無い');
-  if (!(await cand.getByText(/《見切り》/).count())) await fail('候補の行に特殊能力の見出しが無い');
+  if (!(await cand.getByText(/《白銀の冴え》/).count())) await fail('候補の行に特殊能力の見出しが無い');
   const eq0 = await equipBefore();
   await cand.click();
   await waitOpen('候補の武器');
   if ((await equipBefore()) !== eq0) await fail('候補の詳細を開いただけで装備が変わった');
-  for (const t of ['この装備の能力', '《見切り》', '山札に加わるカード', '今と比べて']) if (!(await popup.getByText(t).count())) await fail(`候補の詳細に「${t}」が無い`);
-  if (!(await popup.locator('[data-item-compare]').getByText(/特殊能力：《.*》→《見切り》/).count())) await fail('特殊能力の入れ替わり（《A》→《B》）が出ない');
+  for (const t of ['この装備の能力', '《白銀の冴え》', '山札に加わるカード', '今と比べて']) if (!(await popup.getByText(t).count())) await fail(`候補の詳細に「${t}」が無い`);
+  if (!(await popup.locator('[data-item-compare]').getByText(/特殊能力：《.*》→《白銀の冴え》/).count())) await fail('特殊能力の入れ替わり（《A》→《B》）が出ない');
   await checkLayout('候補の詳細');
   await shot('candidate');
   // 専用カードを押すとカードの詳細 → 戻るで装備の詳細へ

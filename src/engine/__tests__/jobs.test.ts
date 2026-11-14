@@ -1,5 +1,6 @@
 // 転職（J3a）: 場所・経験値の持ち越し・専用カードの3択・カードの候補・スマート抽選・中位ジョブの能力の部品
 import { describe, expect, it } from 'vitest';
+import { signatureCards } from '../game/jobs';
 import { getCard } from '../../data/cards';
 import { CLASSES } from '../../data/classes';
 import type { GameCommand, GameState, PlayerId } from '../../types';
@@ -16,6 +17,7 @@ import { visionOf } from '../game/world/fog';
 import { BALANCE } from '../../data/balance';
 import type { BattleState } from '../../types';
 import { rollChanceFor, tierDamageAgainst } from '../battle/battle';
+const k1 = (id: string) => !id.startsWith('ax'); // 区切りD の軸のカード（ax…）は、K1・職の専用カードの数に入れない
 
 const P: PlayerId = 'P1';
 ENEMIES.register({ id: 'topJobDummy', name: '検証用の敵', icon: 'T', maxHp: 10000, baseLevel: 1, exp: 1, gold: 1, size: 1.5,
@@ -76,7 +78,7 @@ describe('転職の場所と手順', () => {
     expect(n.level).toBe(1);
     expect(n.exp).toBe(expToNext(1, 'swordmaster') - 1);
     expect(n.carried).toBe('warrior');
-    expect(n.jobPick).toEqual(CLASSES.get('swordmaster').signature);
+    expect(n.jobPick).toEqual(signatureCards(CLASSES.get('swordmaster')));
     // 選ぶまで次の転職はできない・選べるのは3枚だけ
     expect(applyGameCommand(g, { type: 'PICK_JOB_CARD', playerId: P, heroId: n.id, cardId: 'strike' }).error).toBeTruthy();
     const before = n.deck.length;
@@ -100,7 +102,7 @@ describe('転職の場所と手順', () => {
     g = run(g, { type: 'CHANGE_JOB', playerId: P, heroId: g.heroes[0].id, jobId: 'berserker' });
     const pool = heroCardPool(g.heroes[0]);
     expect(pool).toContain('bloodFeast');
-    expect(pool).toContain('mightyBlow');
+    expect(pool).toContain('lanceCharge');
   });
 
   it('使えない武器は持ち物へ移り、そのジョブの最初の武器を持つ', () => {
@@ -146,13 +148,13 @@ describe('中位ジョブの能力の部品', () => {
     const e = s.enemies[0];
     e.statuses.poison = 2;
     e.statuses.weak = 1;
-    expect(damageModifiers(s, s.allies[0], getCard('vitalStab'), e).multiplier).toBeCloseTo(1.4, 5);
+    expect(damageModifiers(s, s.allies[0], getCard('cmTackle'), e).multiplier).toBeCloseTo(1.4, 5);
   });
 
   it('弓術士: 1体を狙う攻撃の成功率+10%', () => {
     const s = battle(['archer']);
     const a = s.allies[0];
-    const one = getCard('aimedShot');
+    const one = getCard('cmAllOut');
     const aoe = getCard('arrowRain');
     const plain = createBattle(setup(5, ['hunter'])).allies[0];
     expect(chanceFor(a, one) - chanceFor({ ...a, classId: 'hunter', abilities: [] }, one)).toBe(10);
@@ -228,7 +230,7 @@ describe('中位ジョブの能力の部品', () => {
 
   it('剣豪: 完全成功で同じ敵に追加の一撃', () => {
     let s = battle(['swordmaster']);
-    giveHand(s, s.allies[0].id, ['doubleSlash']);
+    giveHand(s, s.allies[0].id, ['lnBuFlurry']);
     const e = s.enemies[0];
     e.hp = e.maxHp = 999;
     s = applyCommand(s, play(s.allies[0].id, 't0', e.uid, 2)).state;
@@ -245,8 +247,10 @@ describe('最上位13職の転職とカード', () => {
   const topJobs = CLASSES.all.filter(c => c.tier === 'top');
   it('13職それぞれが専用5枚・代表3枚を持つ', () => {
     expect(topJobs).toHaveLength(13);
-    expect(new Set(topJobs.flatMap(j => j.cardPool)).size).toBe(65);
-    for (const j of topJobs) { expect(j.cardPool).toHaveLength(5); expect(j.signature).toEqual(j.cardPool.slice(0, 3)); }
+    // 区切りD: 同じ中身のカードをまとめた（65 → 62）。憲章5: 数字だけ違う札もまとめた（62 → 60。ビーストマスターは「群れの強襲」を置き換えずに消したので4枚）
+    // 2026-11-12: 専用の札が足りなかった6職に1枚ずつ足した（docs/tasks/job-unique-cards-plan.md）。最上位では弓聖の「追い矢」・ビーストマスターの「狙いを合わせろ」（60 → 62。弓聖6枚・ビーストマスター5枚）
+    expect(new Set(topJobs.flatMap(j => j.cardPool.filter(k1))).size).toBe(62);
+    for (const j of topJobs) { expect(j.cardPool.filter(k1)).toHaveLength(j.id === 'bowSaint' ? 6 : 5); expect(j.signature).toEqual(j.cardPool.slice(0, 3)); }
   });
   it.each(topJobs.map(j => [j.id, j] as const))('%s: レベル・実績・場所を満たした時だけ転職できる', (_, j) => {
     let g = newGame(['warrior']);
@@ -263,7 +267,7 @@ describe('最上位13職の転職とカード', () => {
     g = run(g, { type: 'CHANGE_JOB', playerId: P, heroId: h.id, jobId: j.id });
     expect(g.heroes[0].level).toBe(1); expect(g.heroes[0].carried).toBe(j.from![0]);
     expect(g.heroes[0].deck.length).toBe(before + (j.jobCards?.length ?? 0));
-    expect(g.heroes[0].jobPick).toEqual(j.signature);
+    expect(g.heroes[0].jobPick).toEqual(signatureCards(j));
   });
   it.each(['miracle', 'plunder', 'jump'])('%s: 同名の複数枚も含め1戦闘1回、次の戦闘で使える', id => {
     let s = topBattle(['warrior']);
@@ -299,7 +303,7 @@ describe('最上位の戦闘能力', () => {
     for (const a of s.allies) expect(a.damageBonus).toBeCloseTo(0.5);
   });
   it('拳王: 最後の攻撃対象へ使ったカード数×2の追撃', () => {
-    let s = topBattle(['fistKing']); s = topPlay(s, 'saintSlash'); s = topPlay(s, 'breathControl');
+    let s = topBattle(['fistKing']); s = topPlay(s, 'saintSlash'); s = topPlay(s, 'ninjaBreath');
     const hp = s.enemies[0].hp;
     s = applyCommand(s, { type: 'END_TURN', playerId: P }).state;
     expect(hp - s.enemies[0].hp).toBe(4);
@@ -310,8 +314,8 @@ describe('最上位の戦闘能力', () => {
     expect(dealDamage(ctx, e, 10, 'fire')).toBe(19);
     expect(dealDamage(ctx, e, 10, 'ice')).toBe(5);
     expect(dealDamage(ctx, e, 10)).toBe(10);
-    const predicted = tierDamageAgainst(a, getCard('sageFlame'), e).at(-1)!;
-    const hp = e.hp; const n = topPlay(s, 'sageFlame'); expect(hp - n.enemies[0].hp).toBe(predicted);
+    const predicted = tierDamageAgainst(a, getCard('flameStorm'), e).at(-1)!;
+    const hp = e.hp; const n = topPlay(s, 'flameStorm'); expect(hp - n.enemies[0].hp).toBe(predicted);
   });
   it('冥王: ターン開始にHP3を払いマナ1を得る', () => {
     const s = topBattle(['hadesLord']); expect(s.allies[0].hp).toBe(s.allies[0].maxHp - 3); expect(s.allies[0].mana).toBe(BALANCE.manaPerTurn + 1);
@@ -320,7 +324,7 @@ describe('最上位の戦闘能力', () => {
     let s = topBattle(['phantomKing', 'beastMaster']);
     expect(s.allies[0].summons?.map(x => x.damage)).toEqual([8]); expect(s.allies[1].summons?.map(x => x.damage)).toEqual([4, 4, 4]);
     s = nextTurn(s); expect(s.allies[0].summons?.[0].turns).toBe(99);
-    expect(s.enemies[0].hp).toBeLessThan(10000);
+    expect(s.enemies[0].hp).toBeLessThan(11000); // 10000 × 2人の敵HP倍率1.1
   });
   it('聖王: 味方が倒れると30%で復活、2回目は復活しない（継続ダメージも対象）', () => {
     const s = topBattle(['holyKing', 'warrior']); const a = s.allies[1];
@@ -356,7 +360,7 @@ describe('最上位の戦闘能力', () => {
     const n = topPlay(s, 'heavenRain', 1); expect(n.stats.perfects).toBe(topPlay(baseline, 'heavenRain', 1).stats.perfects);
   });
   it('忍者: 分身2体が各半分で追撃し、被弾ごとに1体消える', () => {
-    let s = topBattle(['ninja']); s = topPlay(s, 'shadowShuriken');
+    let s = topBattle(['ninja']); s = topPlay(s, 'lnGiQuick');
     expect(6000 - s.enemies[0].hp).toBe(16);
     const a = s.allies[0], hp = a.hp; const ctx = makeCtx(s, createRng(1), [], s.enemies[0]);
     dealDamage(ctx, a, 10); expect(a.hp).toBe(hp); expect(a.summons).toHaveLength(1);
@@ -417,7 +421,7 @@ describe('最上位の戦闘能力', () => {
     applyEffect(ctx, { kind: 'stealIntent', multiplier: 0.5 }); expect(s.allies[0].block).toBe(6);
   });
   it('同じコマンドと種なら分身・召喚を含め結果が一致し、入力は変わらない', () => {
-    const s = topBattle(['ninja', 'phantomKing']); giveHand(s, 'a0', ['shadowShuriken']); const copy = structuredClone(s);
+    const s = topBattle(['ninja', 'phantomKing']); giveHand(s, 'a0', ['lnGiQuick']); const copy = structuredClone(s);
     const cmd = play('a0', 't0', s.enemies[0].uid, 1);
     expect(applyCommand(s, cmd)).toEqual(applyCommand(s, cmd)); expect(s).toEqual(copy);
   });

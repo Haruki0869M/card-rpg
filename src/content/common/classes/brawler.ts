@@ -25,8 +25,8 @@ export const brawler: ClassDef = {
   tier: 'mid',
   lineage: 'bu',
   from: ['monk'],
-  signature: ['comboRush', 'chiBurst', 'hundredKicks'],
+  signature: ['lnBuFlurry', 'lnGiFeint', 'hundredKicks'],
   startingEquipment: { weapon: 'clothWraps', armor: 'travelerClothes' },
-  cardPool: ['comboRush', 'chiBurst', 'hundredKicks', 'jab2', 'guardBreak', 'fistOfFury'],
+  cardPool: ['lnBuFlurry', 'lnGiFeint', 'hundredKicks', 'cmProbe', 'guardBreak', 'fistOfFury', 'axFlurryGuard', 'brFinishFist'],
   growthWeights: { agi: 3, str: 2, dex: 2 },
 };

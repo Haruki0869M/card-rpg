@@ -6,7 +6,7 @@ export const weaponsGun: ItemDef[] = [
   {
     id: "rifledGun", name: "精密銃", slot: "weapon", weaponType: "gun", rarity: "rare", icon: "gun",
     description: "使わずに残したマナ1につき、次のターン最初の物理カードの最初の1発のダメージ+4（最大+8）。", stats: {"dex":5}, tags: ["physical","mana"],
-    cards: [{"cardId":"wtGunArmorPiercing","count":2}],
+    cards: [{"cardId":"axLoadRound","count":2}],
     ability: {"name":"弾込め","description":"使わずに残したマナ1につき、次のターン最初の物理カードの最初の1発のダメージ+4（最大+8）。","effect":{"when":"turnEnd","do":[{"kind":"counter","key":"loaded","fromMana":true,"max":2,"text":"弾を込めた"}]},"also":[{"modifier":"damageDealt","multiplier":1,"add":4,"once":true,"if":[{"kind":"cardCategory","category":"physical"},{"kind":"playedCategoryCount","category":"physical","max":0},{"kind":"counterAtLeast","key":"loaded","n":1,"label":"弾を込めた次のターン"}]},{"modifier":"damageDealt","multiplier":1,"add":4,"once":true,"if":[{"kind":"cardCategory","category":"physical"},{"kind":"playedCategoryCount","category":"physical","max":0},{"kind":"counterAtLeast","key":"loaded","n":2,"label":"弾を2発込めた次のターン"}]}]},
   },
   {
@@ -27,7 +27,7 @@ export const weaponsGun: ItemDef[] = [
   {
     id: "duelistsGun", name: "早抜きの銃", slot: "weapon", weaponType: "gun", rarity: "legend", icon: "gun",
     description: "戦闘の1ターン目、物理カードのコスト−1（0より下がらない）。", stats: {"dex":12}, tags: ["physical","mana"],
-    cards: [{"cardId":"wtGunFanFire","count":2}],
+    cards: [{"cardId":"axQuickDraw","count":2}],
     ability: {"name":"早撃ち","description":"戦闘の1ターン目、物理カードのコスト−1（0より下がらない）。","effect":{"modifier":"cardCost","delta":-1,"if":[{"kind":"cardCategory","category":"physical"},{"kind":"turnAtMost","turn":1}]}},
   },
 ];

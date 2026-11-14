@@ -36,7 +36,10 @@ export const siegeImp: EnemyDef = {
   actions: [
     {"id": "stone", "name": "砦の投石", "effects": [{"kind": "damage", "amount": 14}]},
     {"id": "scatter", "name": "散る火の粉", "effects": [{"kind": "damage", "amount": 6, "to": "foes"}]},
-    {"id": "guard", "name": "瓦礫の構え", "effects": [{"kind": "block", "amount": 9}]},
+    // 敵の特殊な行動 1回目（docs/tasks/enemy-behaviors-plan.md §7）: 守る行動「瓦礫の構え」を仲間を呼ぶ（灰コウモリ）に置き換えた。呼べない時は「砦の投石」。ID は古い保存のために残す
+    // 直し（docs/tasks/enemy-behaviors-fix-plan.md §3）: 呼べる時（生きている敵が上限より少ない・回数が残っている）は、順番を飛ばして優先する。
+    // 2ターン続けては呼ばない（rest 1 ＋ noRepeat）。ブロック8を足した（BREAK されると、行動ごと止まり、ブロックも付かない）
+    {"id": "guard", "name": "仲間を呼ぶ", big: true, behavior: "call", cutIn: {when: "canSummon", rest: 1, noRepeat: true}, hint: "仲間を1体呼ぶ。その前に倒すか、BREAK する", "effects": [{"kind": "summonEnemy", "enemy": "ashBat", "uses": 2, "call": true, "orElse": "stone"}, {"kind": "block", "amount": 8}]},
   ],
 };
 
@@ -52,9 +55,13 @@ export const cursedHound: EnemyDef = {
   weak: ["holy", "thunder"],
   resist: ["dark"],
   pattern: "sequence",
+  // 敵の特殊な行動の直し（docs/tasks/enemy-behaviors-fix-plan.md §3）: 癒し封じを1ターン目に予告する（2ターン目からは呪紋の牙・二連の爪・癒し封じの順）
+  firstActionId: "brace",
   actions: [
     {"id": "bite", "name": "呪紋の牙", "effects": [{"kind": "damage", "amount": 14}]},
     {"id": "flurry", "name": "二連の爪", "effects": [{"kind": "damage", "amount": 6, "hits": 2}]},
-    {"id": "brace", "name": "呪紋の構え", "effects": [{"kind": "block", "amount": 12}]},
+    // 敵の特殊な行動 1回目（docs/tasks/enemy-behaviors-plan.md §7）: 守る行動「呪紋の構え」を癒し封じの呪いに置き換えた。ID は古い保存のために残す
+    // 直し（§3）: ブロック8を足した（BREAK されると、行動ごと止まり、ブロックも付かない）
+    {"id": "brace", "name": "癒し封じの呪い", big: true, behavior: "healSeal", hint: "味方全員の回復が、2ターン半分になる。BREAK するか、先に回復を使う", "effects": [{"kind": "applyStatus", "status": "healSeal", "amount": 2, "to": "foes"}, {"kind": "block", "amount": 8}]},
   ],
 };

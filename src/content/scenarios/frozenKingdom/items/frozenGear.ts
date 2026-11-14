@@ -7,7 +7,7 @@ export const frozenGear: ItemDef[] = [
   {
     id: "blizzardBow", name: "吹雪の弓", slot: "weapon", weaponType: "bow", rarity: "rare", icon: "bow", scenario: "frozenKingdom",
     description: "敵全体を狙うカードが完全成功した時、ランダムな敵1体に「凍結」1（ボスには代わりに「弱体」1）。1ターンに1回。", stats: {"dex":5,"per":3}, tags: ["physical","ice","freeze","aoe"],
-    cards: [{"cardId":"wtBowShower","count":2}],
+    cards: [{"cardId":"wtAxeWhirl","count":2}],
     ability: {"name":"吹雪","description":"敵全体を狙うカードが完全成功した時、ランダムな敵1体に「凍結」1（ボスには代わりに「弱体」1）。1ターンに1回。","effect":{"when":"perfect","if":[{"kind":"cardAoe"},{"kind":"oncePerTurn","key":"blizzardBow"}],"do":[{"kind":"applyStatus","status":"freeze","amount":1,"bossStatus":"weak","to":"randomFoe"}]}},
   },
   {
@@ -23,6 +23,6 @@ export const frozenGear: ItemDef[] = [
   // ----- 装飾品 -----
   { id: 'lampLantern', name: '灯火のランタン', slot: 'accessory', rarity: 'rare', icon: 'charm', scenario: 'frozenKingdom', description: '消えない小さな灯。戦闘ごとに、味方全員が最初に受ける悪い状態異常を1回防ぐ。', ability: { name: '暖かい灯', effect: { modifier: 'statusGuard', allies: true, perBattle: 1 } } },
   { id: 'crystalNecklace', name: '氷晶の首飾り', slot: 'accessory', rarity: 'epic', icon: 'amulet', description: '属性の無い物理攻撃に、氷の力が宿る。', tags: ['ice'], stats: { int: 4 }, ability: { name: '氷の付与', effect: { modifier: 'convertElement', into: 'ice' } } },
-  { id: 'thawRing', name: '雪解けの指輪', slot: 'accessory', rarity: 'epic', icon: 'ring', scenario: 'frozenKingdom', description: '凍結の状態異常を持つターンの始めに、自分の凍結を治す。', tags: ['ice'], stats: { vit: 4 }, ability: { name: '雪解け', effect: { when: 'turnStart', if: [{ kind: 'selfStatus', status: 'freeze' }], do: [{ kind: 'cleanse', to: 'self' }] } } },
+  { id: 'thawRing', name: '雪解けの指輪', slot: 'accessory', rarity: 'epic', icon: 'ring', scenario: 'frozenKingdom', description: '凍結の状態異常を持つターンの始めに、自分の凍結を治す。', tags: ['ice'], stats: { vit: 4 }, ability: { name: '雪解け', effect: { when: 'turnStartBefore', if: [{ kind: 'selfStatus', status: 'freeze' }], do: [{ kind: 'cleanse', to: 'self' }] } } },
   { id: 'everIceBracer', name: '溶けぬ氷の腕輪', slot: 'accessory', rarity: 'legend', icon: 'crest', scenario: 'frozenKingdom', description: '戦闘の始めに、ランダムな敵1体を凍らせる（ボスには代わりに「弱体」1）。「凍結」か「弱体」の敵に与えるダメージが1.35倍になる。', tags: ['ice', 'freeze', 'weak'], stats: { int: 8 }, ability: { name: '絶対零度', description: '「凍結」か「弱体」の敵に与えるダメージ×1.35。戦闘開始時：ランダムな敵1体に「凍結」1（ボスとの戦闘では代わりに「弱体」1）', effect: { modifier: 'damageDealt', multiplier: 1.35, if: [{ kind: 'targetAnyStatus', statuses: ['freeze', 'weak'] }] }, also: [{ when: 'battleStart', do: [{ kind: 'applyStatus', status: 'freeze', amount: 1, to: 'randomFoe', bossStatus: 'weak' }] }] } },
 ];

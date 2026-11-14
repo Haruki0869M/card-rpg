@@ -13,13 +13,13 @@ export const weaponsWhip: ItemDef[] = [
   {
     id: "companionWhip", name: "相棒の鞭", slot: "weapon", weaponType: "whip", rarity: "rare", icon: "whip",
     description: "物理カードが完全成功した後、お供が1回行動する。1ターンに1回。（お供の行動は、全部合わせて1ターンに4回まで）", stats: {"dex":2,"per":2}, tags: ["physical","pet"],
-    cards: [{"cardId":"wtWhipSweep","count":2}],
+    cards: [{"cardId":"axPetCharge","count":2}],
     ability: {"name":"号令","description":"物理カードが完全成功した後、お供が1回行動する。1ターンに1回。（お供の行動は、全部合わせて1ターンに4回まで）","effect":{"when":"perfect","if":[{"kind":"cardCategory","category":"physical"},{"kind":"hasPet"},{"kind":"oncePerTurn","key":"companionWhip"}],"do":[{"kind":"petAct"}]}},
   },
   {
     id: "rendingWhip", name: "傷裂きの鞭", slot: "weapon", weaponType: "whip", rarity: "epic", icon: "whip",
     description: "「弱体」の敵への、お供・召喚（砲台・罠・群れの獣）の攻撃のダメージ+3。", stats: {"dex":4,"per":4}, tags: ["pet","weak"],
-    cards: [{"cardId":"wtWhipTaming","count":2}],
+    cards: [{"cardId":"axPackHunt","count":2}],
     ability: {"name":"追い込み","description":"「弱体」の敵への、お供・召喚（砲台・罠・群れの獣）の攻撃のダメージ+3。","effect":{"modifier":"damageDealt","multiplier":1,"add":3,"if":[{"kind":"viaCompanion"},{"kind":"targetHasStatus","status":"weak"}]}},
   },
   // レジェンド

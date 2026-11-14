@@ -10,6 +10,6 @@ export const shrineMaiden: ClassDef = {
   battleAbility: { name: '祈りの余韻', effect: { when: 'turnStart', do: [{ kind: 'heal', amount: 1, to: 'allies' }] } },
   exploreAbility: { id: 'shrineMaidenExplore', name: '清めの鈴', description: '瘴気の判定+20%', effect: { kind: 'checkBonus', check: 'miasma', bonus: 20 } },
   requires: { feat: 'prayers', count: 2, text: '祠で2回祈る' },
-  cardPool: ['maidenHeal', 'maidenPurify', 'maidenWard', 'maidenFocus', 'maidenLight', 'divinePossession'], signature: ['maidenHeal', 'maidenPurify', 'maidenWard'],
+  cardPool: ['maidenHeal', 'maidenPurify', 'cmRally', 'samuraiFocus', 'maidenLight', 'divinePossession', 'axReversalSeal'], signature: ['maidenHeal', 'maidenPurify', 'cmRally'],
   jobCards: ['divinePossession'],
 };

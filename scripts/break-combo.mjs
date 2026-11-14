@@ -81,10 +81,14 @@ async function run(width) {
   const hintText = await hints.innerText().catch(() => '');
   if (!hintText.includes('BREAK')) ng(`手がかりに BREAK が無い（${hintText}）`);
   if (!hintText.includes('この攻撃で')) ng(`弱点の火球なのに「この攻撃で BREAK」になっていない（${hintText}）`);
-  // 弱点の案内は、的の札に出る（新しい依頼文 パート5-1）。同じ事を下の手がかりに重ねて出さない
+  // 弱点の案内（計画書 第2版 §5-1）: 的の札は短い「弱点×1.5」、長い文は札の下の行に BREAK の後で出す。状態異常の行と重ねない
   const weakText = await page.locator('[data-weak-chip="fire"] [data-weak-guide]').innerText().catch(() => '');
-  if (!weakText.includes('弱点×1.5！') || !weakText.includes('完全成功で火傷確定')) ng(`的の札に「弱点×1.5！（完全成功で火傷確定）」が出ない（${weakText}）`);
-  if (hintText.includes('完全成功で火傷')) ng(`弱点の案内が、的の札と下の手がかりに重なって出ている（${hintText}）`);
+  if (weakText.trim() !== '弱点×1.5') ng(`的の札に短い「弱点×1.5」が出ない（${weakText}）`);
+  const kinds = await hints.locator('[data-counter-hint]').evaluateAll((es) => es.map((e) => e.getAttribute('data-counter-hint')));
+  const weakLine = await hints.locator('[data-counter-hint="weak"]').innerText().catch(() => '');
+  if (weakLine !== '弱点×1.5！（完全成功で火傷確定）') ng(`札の下に「弱点×1.5！（完全成功で火傷確定）」が出ない（${weakLine}）`);
+  if (kinds.indexOf('break') < 0 || kinds.indexOf('break') > kinds.indexOf('weak')) ng(`BREAK → 弱点 の順に並んでいない（${kinds.join(',')}）`);
+  if (kinds.includes('status')) ng(`弱点の行と、状態異常の行が重なって出ている（${hintText}）`);
   if ((await page.locator('[data-break-chip]').getAttribute('data-break-chip').catch(() => null)) !== 'now') ng('狙う敵のチップに BREAK の印が無い');
   await shot('2-hints-weak');
   await page.getByLabel('キャンセル').click();
@@ -134,4 +138,4 @@ if (problems.length) {
   console.log('NG:\n' + problems.join('\n'));
   process.exit(1);
 }
-console.log('OK: 大技の印・BREAK の手がかりと結果（威力半分・弱体1・ブロック0）・的の札の「弱点×1.5！（完全成功で火傷確定）」・連携の段階（360/390/480）');
+console.log('OK: 大技の印・BREAK の手がかりと結果（威力半分・弱体1・ブロック0）・的の札の「弱点×1.5」と札の下の「弱点×1.5！（完全成功で火傷確定）」・連携の段階（360/390/480）');

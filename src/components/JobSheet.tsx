@@ -1,7 +1,7 @@
 // ===== 転職（転職先の一覧と、転職した時の専用カードの3択。設計 v2 §3） =====
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowUpCircle, Check, Lock, MapPin, X } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { getCard } from '../data/cards';
 import { getClass } from '../data/classes';
 import { WEAPON_TYPES } from '../data/rules';
@@ -10,6 +10,7 @@ import { isLocalPlayer } from '../store/battleConfig';
 import { useBattle } from '../store/battleStore';
 import type { ClassDef, GameState, Hero, JobTier } from '../types';
 import { CardBody } from './ui/CardBody';
+import { CardPickPanel } from './ui/CardPickPanel';
 import { ConfirmDialog } from './ui/ConfirmDialog';
 import { HeroFace } from './ui/game';
 
@@ -162,36 +163,51 @@ export function JobSheetBody() {
 export function JobPickOverlay() {
   const full = useBattle((s) => s.full);
   const dispatchWire = useBattle((s) => s.dispatchWire);
+  // 押したカード（回2: 戦闘のカード報酬と同じく、下に説明の窓を開く。決めるのは窓の「このカードにする」だけ）
   const [sel, setSel] = useState<string | null>(null);
+  const close = useCallback(() => setSel(null), []);
   const hero = full?.heroes.find((h) => h.jobPick?.length && isLocalPlayer(h.playerId));
   if (!hero) return null;
   const job = getClass(hero.classId);
   const aff = affinityFromStats(heroStats(hero));
+  const picked = sel && hero.jobPick!.includes(sel) ? getCard(sel) : undefined;
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 z-[70] flex flex-col items-center justify-center bg-black/85 px-3" data-job-pick>
-      <div className="font-display text-outline text-center text-[24px] text-amber-100">{job.name}に転職した！</div>
-      <div className="mt-1 text-center text-[14px] text-zinc-200">{hero.name}の山札に加える専用カードを1枚選んでください（残りは報酬に出るようになります）</div>
-      <div className="mt-3 flex w-full justify-center gap-2">
-        {hero.jobPick!.map((id) => {
-          const card = getCard(id);
-          return (
-            <button key={id} onClick={() => setSel(id)} className="btn shrink-0" aria-label={card.name} aria-pressed={sel === id}>
-              <CardBody card={card} chance={finalChance(card, aff)} width={108} height={168} selected={sel === id} />
-            </button>
-          );
-        })}
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 z-[70] flex flex-col overflow-y-auto overscroll-contain bg-black/85 px-3 py-3" data-job-pick>
+      {/* 説明を開いて縦に収まらない時は、この中だけ縦にスクロールする（収まる時は真ん中に置く） */}
+      <div className="my-auto flex w-full flex-col items-center">
+        <div className="font-display text-outline text-center text-[24px] text-amber-100">{job.name}に転職した！</div>
+        <div className="mt-1 text-center text-[14px] text-zinc-200">{hero.name}の山札に加える専用カードを1枚選んでください（残りは報酬に出るようになります）</div>
+        <div className="mt-3 flex w-full justify-center gap-2">
+          {hero.jobPick!.map((id, i) => {
+            const card = getCard(id);
+            return (
+              <button key={id} onClick={() => setSel((x) => (x === id ? null : id))} className="btn shrink-0" aria-label={card.name} aria-pressed={sel === id} data-pick-card={i}>
+                <CardBody card={card} chance={finalChance(card, aff)} width={108} height={168} selected={sel === id} />
+              </button>
+            );
+          })}
+        </div>
+        {!picked && <div className="mt-3 text-center text-[12px] text-zinc-400">カードを押すと、くわしい説明が出ます</div>}
+        {picked && (
+          <div className="w-full max-w-md">
+            <CardPickPanel
+              card={picked}
+              chance={finalChance(picked, aff)}
+              who={`${hero.name}の成功率`}
+              action={
+                <>
+                  <Check size={20} /> このカードにする
+                </>
+              }
+              onAction={() => {
+                dispatchWire({ type: 'PICK_JOB_CARD', playerId: hero.playerId, heroId: hero.id, cardId: picked.id });
+                setSel(null);
+              }}
+              onClose={close}
+            />
+          </div>
+        )}
       </div>
-      <button
-        disabled={!sel}
-        onClick={() => {
-          if (!sel) return;
-          dispatchWire({ type: 'PICK_JOB_CARD', playerId: hero.playerId, heroId: hero.id, cardId: sel });
-          setSel(null);
-        }}
-        className="btn btn-gold font-display mt-4 flex h-12 w-full max-w-xs items-center justify-center gap-1.5 rounded-xl text-[18px] disabled:opacity-40"
-      >
-        <Check size={20} /> このカードにする
-      </button>
     </motion.div>
   );
 }

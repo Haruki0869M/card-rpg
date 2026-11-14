@@ -10,7 +10,8 @@ import { isReach, slotTiming } from '../../store/slotTiming';
 const STYLE = {
   focus: { bg: 'linear-gradient(180deg,#ffe9a8,#e2a72a)', border: '#fff3c4', color: '#5a3a06', Icon: Star },
   hit: { bg: 'linear-gradient(180deg,#5af2a8,#138a50)', border: '#b8ffd8', color: '#06301a', Icon: Check },
-  miss: { bg: 'linear-gradient(180deg,#5a2430,#2a0c12)', border: '#ff7a8a', color: '#ff9aa8', Icon: X },
+  // 段階4: 失敗は枠を明るい赤（#ff4d6d）＋赤い光（.slot-miss）、文字を白に（暗い所でも見えるように）
+  miss: { bg: 'linear-gradient(180deg,#5a2430,#2a0c12)', border: '#ff4d6d', color: '#ffffff', Icon: X },
 } as const;
 
 /** 回っている枠の中を流れる絵柄（✓・×・★ が縦に流れる） */
@@ -33,6 +34,7 @@ function SpinningReel({ reach }: { reach: boolean }) {
  * フォーカスの枠は最初から金色の確定枠。最後の1枠で完全成功のリーチなら、その枠の光を強める。
  * 全枠成功は「完全成功！」と金色に弾けて、攻撃のエフェクトへつなぐ（効果のコマはスロットが止まってから出る）。
  * 操作は止めない（演出中も次のカードを選べる）
+ * 段階4: 戦場の下の端（手札の上）に、横に並べた細い帯で出す（左に枠、右に「完全成功！」と結果の文）
  */
 export function SlotOverlay() {
   const fx = useBattle((s) => s.rollFx);
@@ -90,14 +92,14 @@ export function SlotOverlay() {
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.08 }}
-          className={`relative flex max-w-[calc(100%-24px)] flex-col items-center gap-1 rounded-xl border px-3 py-1.5 ${
+          className={`relative flex max-w-[calc(100%-24px)] flex-row items-center gap-2 rounded-xl border px-2 py-1 ${
             fx.perfect && finished ? 'border-amber-300 bg-[#2a1a06]/90 shadow-[0_0_24px_rgba(255,200,80,.45)]' : 'border-white/25 bg-black/80'
           }`}
           data-slot-overlay={finished ? 'done' : 'spinning'}
         >
           {/* 完全成功: 金色に弾ける輪 */}
           {fx.perfect && finished && !calm && <span className="slot-perfect-burst" style={{ animationDuration: `${0.45 / speed}s` }} />}
-          <div className="flex gap-1">
+          <div className="flex shrink-0 gap-1">
             {fx.results.map((r, i) => {
               if (!done.has(i)) return <SpinningReel key={`s${i}`} reach={reach && i === timing.last} />;
               const st = STYLE[r];
@@ -107,7 +109,7 @@ export function SlotOverlay() {
                   initial={r === 'focus' ? { opacity: 1, scale: 1 } : calm ? { opacity: 0 } : { opacity: 0, scale: 1.6 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.06 }}
-                  className={`flex h-9 w-9 items-center justify-center rounded-lg border-2 ${r === 'focus' ? 'slot-focus-locked' : ''}`}
+                  className={`flex h-9 w-9 items-center justify-center rounded-lg border-2 ${r === 'focus' ? 'slot-focus-locked' : r === 'miss' ? 'slot-miss' : ''}`}
                   style={{ background: st.bg, borderColor: st.border, color: st.color }}
                   data-slot-result={r}
                 >
@@ -116,28 +118,32 @@ export function SlotOverlay() {
               );
             })}
           </div>
-          {finished && fx.perfect && (
-            <motion.div
-              initial={calm ? { opacity: 0 } : { opacity: 0, scale: 1.6 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.1 }}
-              className="font-display text-outline text-[22px] leading-7 tracking-[0.12em] text-amber-300"
-              style={{ textShadow: '0 0 8px rgba(255,200,80,.95), 0 0 18px rgba(255,170,40,.6), 0 1px 2px #000' }}
-              data-perfect-callout
-            >
-              完全成功！
-            </motion.div>
-          )}
-          {finished && !!summary && (
-            <motion.div
-              initial={{ opacity: 0, scale: 1.3 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.08 }}
-              className={`font-display text-outline line-clamp-2 text-center text-[18px] leading-6 break-words ${fx.perfect ? 'text-amber-200' : 'text-white'}`}
-              data-roll-summary
-            >
-              {summary}
-            </motion.div>
+          {finished && (fx.perfect || !!summary) && (
+            <div className="flex min-w-0 flex-col items-center">
+              {fx.perfect && (
+                <motion.div
+                  initial={calm ? { opacity: 0 } : { opacity: 0, scale: 1.6 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.1 }}
+                  className="font-display text-outline text-[20px] leading-6 tracking-[0.12em] whitespace-nowrap text-amber-300"
+                  style={{ textShadow: '0 0 8px rgba(255,200,80,.95), 0 0 18px rgba(255,170,40,.6), 0 1px 2px #000' }}
+                  data-perfect-callout
+                >
+                  完全成功！
+                </motion.div>
+              )}
+              {!!summary && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 1.3 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.08 }}
+                  className={`font-display text-outline line-clamp-2 text-center text-[16px] leading-5 break-words ${fx.perfect ? 'text-amber-200' : 'text-white'}`}
+                  data-roll-summary
+                >
+                  {summary}
+                </motion.div>
+              )}
+            </div>
           )}
         </motion.div>
       )}

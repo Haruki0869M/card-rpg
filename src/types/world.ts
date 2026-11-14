@@ -21,6 +21,11 @@ export interface TerrainDef {
   /** 海（K4 段3）。moveCost は 0 のまま（陸の処理では今までどおり通れない）。船があるパーティだけが shipCost（既定1）で進める */
   sea?: boolean;
   shipCost?: number;
+  /**
+   * 移動のサイコロのボーナス（段階6a。街道 = +1）。この地形に立って移動のサイコロを振ると足される。
+   * 広い地図（ScenarioMapDef.lanes があり、保存の地図がその大きさの時）だけで使う。前の幅の地図では足さない
+   */
+  moveDiceBonus?: number;
 }
 
 /** 寒さ・暑さ。ratio（最大HPの割合）を省略すると BALANCE.climateDamageRatio */
@@ -59,6 +64,57 @@ export interface RegionDef {
   shrines?: number;
   /** ランダムダンジョン（このダンジョンIDを置く） */
   randomDungeons?: string[];
+  /** 薬草の群生地（段階6a）の数。ScenarioMapDef.prefer.herb の帯に置く */
+  herbs?: number;
+}
+
+/** 帯（段階6a）: 列の範囲に名前と地形の出やすさの倍率を付ける。地域の割合に掛け合わせる（書いていない地形は1倍） */
+export interface LaneDef {
+  id: string;
+  name: string;
+  cols: [number, number];
+  terrain: Record<string, number>;
+  // ---- 3つの道（2026-11-14・docs/tasks/three-roads-plan.md）。省略は今までどおり（1倍・0）----
+  /** 帯の印（絵文字）と、行く前に見せる短い説明（マスの説明・見取り図の札） */
+  mark?: string;
+  hint?: string;
+  /** 見取り図の札の短い言葉（1行。省略は hint） */
+  tag?: string;
+  /** 徘徊する敵が湧くマスの重み（地域の中で。省略 1）。敵の総数は変えず、どの帯に出るかだけを変える */
+  spawnWeight?: number;
+  /** この帯に湧いた徘徊する敵のレベルの加算（省略 0） */
+  enemyLevel?: number;
+  /** 夜の野営の夜襲の確率の倍率（省略 1） */
+  ambush?: number;
+  /** この帯の宝箱の良さ: 「奥の地域」の段を何段先にするか（省略 0） */
+  chestDepth?: number;
+}
+
+/**
+ * 仕切り（段階6a）: 帯の間に置く、通れない地形の列。六角のマスは奇数の行が半マス右にずれているので、
+ * 偶数の行は even 列・奇数の行は odd 列に置くと、すき間の無い1本の壁になる（even = odd + 1 で、ほぼまっすぐ）。
+ * rows の中から gaps 個の行を Rng で選んで切れ目（峠・橋）にする（その地域の一番多い陸の地形）。道のマスは壁にしない
+ */
+export interface BarrierDef {
+  even: number;
+  odd: number;
+  rows: [number, number];
+  terrain: string;
+  gaps: number;
+}
+
+/**
+ * 寄り道の地形（段階6a）。at = 中のマス（宝箱か祠を必ず置く）。
+ * basin（盆地）: まわりの6マスを wall の地形で囲み、open の向きの1マスだけを入口にする。
+ * peninsula（半島）: at と、open の向きの隣（首）のまわりを wall の地形（湖）にする。首の先が岸。
+ * 向きは 0=右・1=右上・2=左上・3=左・4=左下・5=右下（hex.ts の neighbors と同じ順）
+ */
+export interface PocketDef {
+  kind: 'basin' | 'peninsula';
+  at: [col: number, row: number];
+  open: number;
+  wall: string;
+  content: 'chest' | 'shrine';
 }
 
 /** マップに固定で置くもの */
@@ -112,6 +168,17 @@ export interface ScenarioMapDef {
   /** 施設（町・ダンジョンなど）のまわり何マスを、海でなく陸にするか（K4。小さすぎる島で詰まらないように。省略は0） */
   landAround?: number;
   corruptionStages: CorruptionStage[];
+  // ---- 広い地図（段階6a。overhaul-plan-v2 §2）。無いシナリオは今までどおり ----
+  /** 帯（西・中央・東など）。あると「広い地図」: 街道ボーナス・帯に合わせた置き方を使う */
+  lanes?: LaneDef[];
+  /** 街道の骨格（通る点の並び。町と最後のダンジョンを結ぶ）。ほかの施設は、一番近い道から脇道でつなぐ */
+  highway?: [col: number, row: number][];
+  barriers?: BarrierDef[];
+  pockets?: PocketDef[];
+  /** 置く物を多く置く帯（帯の id）。tower は塔1つずつの帯（下から順） */
+  /** randomDungeon は、配列なら地域の randomDungeons の1つずつの帯（段階7a: 西と東に1つずつ） */
+  /** chest は宝箱を多く置く帯（3つの道・2026-11-14） */
+  prefer?: { shrine?: string; herb?: string; randomDungeon?: string | string[]; altar?: string; tower?: string[]; chest?: string };
 }
 
 export interface ScenarioStory {
@@ -169,10 +236,12 @@ export type TimeOfDay = 'morning' | 'noon' | 'evening' | 'night';
 export interface MapFeature {
   kind: FeatureKind;
   id: string;
-  /** 使い終わった（宝箱・イベント・祠） */
+  /** 使い終わった（宝箱・イベント・祠。ランダムダンジョンは「踏破済み」= もう入れない。段階7a） */
   used?: boolean;
   /** ランダムに置いた宝箱の見た目 */
   chest?: { rarity: Rarity; locked: boolean };
+  /** ランダムダンジョンのテーマ（段階7a。地図を作る時に決める。古い保存には無く、初めて入る時に決める） */
+  theme?: string;
 }
 
 export interface Tile {
@@ -204,7 +273,60 @@ export interface Wanderer {
   raidTown?: string;
   /** レアの敵の組（地図に星印で出る。K3） */
   rare?: true;
+  /** 災厄の中ボス（段階7b・overhaul-plan-v2 §3）の ID。動かない。生きている間、世界に悪さをする */
+  scourge?: string;
 }
+
+/**
+ * 災厄の中ボス（段階7b・overhaul-plan-v2 §3）。src/content/common/scourges/ に1体ずつ置く（自動で登録）。
+ * 悪さは「種類＋数字」で書く（名前や ID で分岐しない）。生きている災厄の悪さは足し合わせる（world/scourges.ts の scourgeCurse）
+ */
+export interface ScourgeDef {
+  id: string;
+  order?: number;
+  /** 名前（強欲の盗賊王）と、札に出す短い名前（盗賊王） */
+  name: string;
+  short: string;
+  /** 災厄の本体の敵ID / 取り巻きの敵ID（前から順に、2人まで=2体・4人=3体） */
+  boss: string;
+  minions: string[];
+  /** 生きている間の悪さ。shopPrice = 町の店の値段 +N% / corruptionPerTurn = 世界マップの番の侵食度 +N% / campHeal = 野営のHPの回復の倍率 / nightLevel = 夜の敵のレベル +N /
+   *  battleBurn = 戦闘の開始時、味方全員に「火傷」N（段階7c: 業火の魔人） */
+  curse: { shopPrice?: number; corruptionPerTurn?: number; campHeal?: number; nightLevel?: number; battleBurn?: number };
+  /** 札に出す悪さの短い文（店+25%）と、知らせ・説明の文 */
+  curseShort: string;
+  curseText: string;
+  /**
+   * 倒した時の報酬。gold = 戦った全員で山分け / corruption = 侵食度を下げる量（寄り道の浄化とは別） / elixir = 秘薬の数 /
+   * freeShop = 町の店の品（装備・消耗品）を1つ無料でもらえる券の数（パーティみんなの物。2026-11-14 盗賊王の 300G の代わり）
+   */
+  reward: { gold?: number; corruption?: number; elixir?: number; freeShop?: number };
+  /** 専用の装備（必ず落とす。ItemDef.source = 'scourge'） */
+  gear: string;
+  /** 倒した時の文（店の値段が元に戻った） */
+  clearText: string;
+  /**
+   * 災厄の加護（2026-11-14 寄り道の値打ち 柱1）: 生きている間、鍵と最後のダンジョンのボス・中ボスの戦闘に足される決まり（HP・攻撃の倍率は使わない）。
+   * 保存しない（生きている災厄から毎回求める）。name = 「用心棒」など / text = 何が起きるか（札・長押しに出す）
+   */
+  boon: ScourgeBoon;
+  /** 出た時の文（物語の窓に出す。1〜2行） */
+  appearText: string;
+}
+
+/**
+ * 災厄の加護の種類（world/scourgeBoons.ts が戦闘に付ける）:
+ * bodyguard = 戦闘の始めに手下（enemy）が1体加わる / regen = 大物が敵の番の始めに最大HPの pct% 回復（呪い・癒し封じで減る）/
+ * huntFirst = 大物の最初の予告が「手負い狙い」（action = 共通の加護の行動のID）/ breakWard = 大物への最初の BREAK が1回だけ効かない /
+ * phaseBurn = 大物が段階の境目を越えるたび、味方全員に火傷 amount
+ */
+export type ScourgeBoon = { name: string; text: string } & (
+  | { kind: 'bodyguard'; enemy: string }
+  | { kind: 'regen'; pct: number }
+  | { kind: 'huntFirst'; action: string }
+  | { kind: 'breakWard' }
+  | { kind: 'phaseBurn'; amount: number }
+);
 
 export interface Raid {
   townId: string;
@@ -264,6 +386,16 @@ export interface WorldState {
   shops: Record<string, ShopStock>;
   /** 画面に出す物語（冒頭・地域の紹介・エンディング） */
   story?: { title: string; lines: string[] };
+  /**
+   * 次に出す物語の窓（回1）: 物語の窓が出ている時に来た知らせ（災厄が現れた・通り過ぎた時）は、後ろに足さずにここに並べ、
+   * 今の窓を閉じた後に1つずつ出す。無ければ空（古い保存データは無いまま）
+   */
+  storyQueue?: { title: string; lines: string[] }[];
+  /**
+   * 物語の窓の版（点検 2026-11-13 F6）: 出ている窓を閉じた時・出ている窓の中身が変わった時に1増える。
+   * 「つづける」はこの番号を持って送り、番号が違えば（もう閉じた窓への押し）何もしない。無ければ 0（古い保存データ）
+   */
+  storyVer?: number;
   /** 時間で消える出現スポット（段階6・v17）。無ければ空 / 次に出るワールドターン / 次の番号 */
   spawns?: TimedSpawn[];
   nextSpawnAt?: number;
@@ -271,11 +403,25 @@ export interface WorldState {
   /** 同行の誘い（誘われたキャラ → 誘ったキャラ）と、承知した同行（同じ形）。手番が変わると消える */
   invites?: Record<string, string>;
   follow?: Record<string, string>;
+  /**
+   * 災厄の中ボス（段階7b）: 出た回数（節目の数。古い保存は無く、最初のワールドターンの終わりに「もう越えた節目の数」にする）と、
+   * 出た災厄の ID（同じ種類は2回出ない）。広い地図だけで使う
+   */
+  scourgeCount?: number;
+  scourgesMet?: string[];
+  /**
+   * 見破り（2026-11-14 寄り道の値打ち 柱2）: ランダムダンジョンの主を倒して見破った、鍵と最後のダンジョンのID（そのボスの大技と開幕の一手は、完全成功だけで崩れる）。
+   * 無ければ空（古い保存）
+   */
+  insight?: string[];
+  /** 盗賊王の無料券（町の店の装備・消耗品を1つ無料。パーティみんなの物。2026-11-14）。無ければ0 */
+  freeShop?: number;
 }
 
 export interface ShopStock {
   refreshedAt: number;
-  items: { kind: 'item'; item: ItemInstance; price: number; sold?: boolean }[];
+  /** featured = 必ず並ぶ品（BALANCE.shopFeatured。3つ目の地域の町の「属性の付与」の装飾品） */
+  items: { kind: 'item'; item: ItemInstance; price: number; sold?: boolean; featured?: true }[];
   cards: { cardId: string; heroId: string; price: number; sold?: boolean }[];
 }
 

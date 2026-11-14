@@ -4,13 +4,13 @@ import { detachFollower } from './world/group';
 // 戦闘中の操作は BATTLE コマンドで戦闘エンジン（applyCommand）に渡す。
 
 import { BALANCE } from '../../data/balance';
-import { CARDS } from '../../data/cards';
+import { CARDS, getCard } from '../../data/cards';
 import { getClass } from '../../data/classes';
-import { DUNGEONS } from '../../data/dungeons';
+import { DUNGEONS, isFirstKeyDungeon } from '../../data/dungeons';
 import { corruptionName, getScenario } from '../../data/scenarios';
 import { getEnemy } from '../../data/enemies';
 import { EVENTS } from '../../data/events';
-import { getItem, POUCH_LIMIT } from '../../data/items';
+import { getItem } from '../../data/items';
 import type {
   EventBattle,
   BattleEvent,
@@ -29,7 +29,9 @@ import type {
   EncounterSpec,
   Facing,
   ChestState,
+  DungeonRun,
 } from '../../types';
+import { ensureTileTheme } from './world/randomDungeons';
 import { applyCommand, createBattle, STATE_VERSION } from '../battle/battle';
 import { createRng, type Rng } from '../rng';
 import { applyOutcome, checkOutcome, hasOutcomeKind, makeOutcomeCtx } from './outcomes';
@@ -39,7 +41,7 @@ import { addItem, addLog, addLoot, restMultiplierOf, hiddenChestChance, isPartyP
 import { getDifficulty } from '../../data/rules';
 import { isBossRoom, roomBehavior, roomTypeOf } from './rooms';
 import { growthHandler, growthOptions } from './growth';
-import { RARITY_NAME } from '../../data/terms';
+import { RARITY_NAME, STAT_LABEL } from '../../data/terms';
 import { createWorld } from './world/generate';
 import { corruptionLevelBonus, wandererLevel } from './world/wanderers';
 import {
@@ -66,8 +68,12 @@ import {
 import { questGatedNext } from './world/questGate';
 import { leaveSanctuary, leaveShrine, leaveTown, questAccept, questReport, shrineChoose, bringMyPet, townBuy, townInn, townRemoveCard, townSell } from './world/town';
 import { getRoomType } from '../../data/rules';
-import { TERRAINS } from '../../data/world';
-import { buildDungeon, depthTier, findRoom, isLegacyLayout, RARITIES, rarityIndex, reachableRooms } from './dungeon';
+import { SCOURGES, TERRAINS } from '../../data/world';
+import { onScourgeDefeated, scourgeCurse, scourgeLoot, scourgesWith } from './world/scourges';
+import { applyInsight, applyScourgeBoons, grantInsight, shortcutTile } from './world/detour';
+import { revealAround } from './world/fog';
+import { addLog as battleLog } from '../battle/units';
+import { buildDungeon, depthTier, findRoom, isLegacyLayout, RARITIES, rarityIndex, reachableRooms, themeReward } from './dungeon';
 import { canMove, cellKey, DIRS, doorFront, doorNorthOf, findPath, moveIntoRoom, posOf, revealSeen, turnTo } from './dungeonMap';
 import { canWatchHere, watchSpot } from './dungeonOmen';
 import {
@@ -78,15 +84,18 @@ import {
   heroFocusMax,
   heroMaxHp,
   heroStats,
+  pouchLimitOf,
+  STAT_IDS,
   toPartyMember,
 } from './hero';
 import { needsVote, tally, VOTED_COMMANDS, voteCtx, voters } from './votes';
 import { encounterJoin, worldInvite, worldInviteAnswer } from './world/world';
+import { bumpStoryVer } from './world/guide';
 import { EXPEDITION_MODES, findExpedition, mount, restoreSceneFields, saveSceneFields, unmount } from './scenes';
 import { addFeat, announceJobs, changeJob, pickJobCard } from './jobs';
 import { addPetActs, addPetLove, adoptPet, patPet } from './pets';
 import { doCardTask, peddlerBuy } from './tasks';
-import { cardRewardOdds, chestOdds, newItem, rollCardOffers, rollChestContents, rollConsumable, rollEquipment, rollGrade } from './loot';
+import { cardRewardOdds, chestOdds, newItem, rollCardOffers, rollChestContents, rollConsumable, rollEquipment, rollExclusive, rollGrade } from './loot';
 
 export const GAME_VERSION = STATE_VERSION;
 
@@ -373,7 +382,7 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
         break;
       }
       case 'USE_POUCH_ITEM': {
-        const r = usePouchItem(game, cmd);
+        const r = usePouchItem(game, cmd, rng);
         error = r.error;
         battleEvents = r.events;
         break;
@@ -405,7 +414,7 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
         if (!h || !ownedBy(h, cmd.playerId)) error = '担当していないキャラです';
         else if (cmd.type === 'ADOPT_PET') error = adoptPet(game, h, cmd.petId, cmd.color, cmd.name);
         else if (cmd.type === 'PET_PAT') error = patPet(game, h);
-        else if (cmd.type === 'CARD_TASK') error = doCardTask(game, h, cmd.cardUid, rng);
+        else if (cmd.type === 'CARD_TASK') error = doCardTask(game, h, cmd.cardUid, rng, cmd.altar);
         else error = peddlerBuy(game, h, cmd.kind, cmd.index);
         break;
       }
@@ -426,6 +435,9 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
       case 'LEAVE_CHEST':
         error = leaveChest(game, cmd.playerId, rng);
         break;
+      case 'PICK_RELIC':
+        error = pickRelic(game, cmd.playerId, cmd.optionIndex);
+        break;
       case 'CHOOSE_EVENT':
         error = chooseEvent(game, cmd.playerId, cmd.optionIndex, cmd.heroId, cmd.focusUsed, rng);
         break;
@@ -439,7 +451,7 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
         error = retreat(game, cmd.playerId, rng);
         break;
       case 'RETURN_TO_HUB':
-        error = returnToHub(game, cmd.playerId, rng);
+        error = returnToHub(game, cmd.playerId, rng, cmd.kind);
         break;
       case 'EQUIP':
         error = equip(game, cmd.playerId, cmd.heroId, cmd.itemUid);
@@ -489,7 +501,7 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
         error = encounterContinue(game, cmd, rng);
         break;
       case 'STORY_CONTINUE':
-        error = storyContinue(game);
+        error = storyContinue(game, cmd.storyVer);
         break;
       case 'TOWN_BUY':
         error = townBuy(game, cmd, rng);
@@ -555,8 +567,11 @@ function enterDungeon(game: GameState, playerId: string, dungeonId: string, rng:
   return undefined;
 }
 
-/** 世界マップのダンジョンの入口から入る（そのマスにいて参加するキャラだけ。spec §9.1） */
-export function enterDungeonFromWorld(game: GameState, dungeonId: string, party: string[], rng: Rng) {
+/**
+ * 世界マップのダンジョンの入口から入る（そのマスにいて参加するキャラだけ。spec §9.1）。
+ * tile = 入口のマス（ランダムダンジョンは、そのマスのテーマで作り、制覇したらそのマスを踏破済みにする。段階7a）
+ */
+export function enterDungeonFromWorld(game: GameState, dungeonId: string, party: string[], rng: Rng, tile?: number) {
   const levelBonus = getDifficulty(game.difficulty).enemyLevel + (game.world ? corruptionLevelBonus(game, game.world) : 0);
   const eventIds = EVENTS.forScenario(game.scenarioId)
     .filter((e) => e.where !== 'map' && e.where !== 'spawn')
@@ -564,7 +579,9 @@ export function enterDungeonFromWorld(game: GameState, dungeonId: string, party:
   const random = !!DUNGEONS.get(dungeonId).random;
   const dRng = random ? createRng(game.randomDungeonSeed) : rng;
   if (random) game.randomDungeonSeed = (Math.imul(game.randomDungeonSeed, 1103515245) + 12345) >>> 0;
-  game.dungeon = buildDungeon(dungeonId, dRng, levelBonus + (random ? game.clearedDungeons.length : 0), eventIds);
+  const theme = random && game.world && tile !== undefined ? ensureTileTheme(game.world, tile) : undefined;
+  game.dungeon = buildDungeon(dungeonId, dRng, levelBonus + (random ? game.clearedDungeons.length : 0), eventIds, theme);
+  if (random && tile !== undefined) game.dungeon.tile = tile;
   game.party = party;
   game.mode = 'dungeon';
   addLog(game, `${game.dungeon.name}に入った`);
@@ -607,21 +624,61 @@ function partyAttackMul(game: GameState, n: number): number {
   return BALANCE.enemyAttackByPartySize[n] ?? 1;
 }
 
+/**
+ * 地域ごとの敵のHPの倍率（BALANCE.enemyHpByRegion。書いていない地域・地図の無い時は 1）。
+ * 地域は、戦闘の場所のマス（徘徊する敵・イベント）か、場面の先頭のキャラがいるマス（ダンジョンの中なら、ダンジョンの入口のマス）で決める
+ */
+function regionMulOf(game: GameState, heroId: string | undefined, table: Readonly<Record<string, number>>): number {
+  const w = game.world;
+  const tile = game.battleInfo?.tile ?? (heroId !== undefined ? w?.pos[heroId] : undefined);
+  if (!w || tile === undefined || !w.tiles[tile]) return 1;
+  const id = getScenario(game.scenarioId).map?.regions[w.tiles[tile].r]?.id;
+  return (id !== undefined ? table[id] : undefined) ?? 1;
+}
+
 /** 戦闘を始める（今の場面の参加者で）。surprise = 奇襲成功（敵は1ターン目に動けない） */
 export function startBattleWith(game: GameState, enemies: EncounterSpec['enemies'], roomType: string, rng: Rng, opts: { surprise?: boolean; background?: string } = {}) {
-  const party = sceneHeroes(game).map(toPartyMember);
+  // 区切りD: 戦闘に1人だけの時は、武器のカードが1人用に変わる物がある（湧泉のリュート）
+  const inScene = sceneHeroes(game);
+  const party = inScene.map((h) => toPartyMember(h, inScene.length === 1));
   const diff = getDifficulty(game.difficulty);
+  const rb = getRoomType(roomType).battle;
+  const rank = rb?.boss ? 'boss' : rb?.pool === 'midboss' ? 'midboss' : rb?.pool === 'elite' ? 'elite' : 'normal';
+  // 地域ごと・格ごとの倍率（測るための入れ物。既定は全部 1 で、前と全く同じ値を渡す）
+  // 強敵（elite）の倍率は、組の全員ではなく強敵の本体（eliteBody の敵）だけに掛ける（2026-11-13 強敵の計画 柱2。下の eliteBodyHpMul）
+  const hpMul = regionMulOf(game, inScene[0]?.id, BALANCE.enemyHpByRegion) * (rank === 'elite' ? 1 : (BALANCE.enemyHpByRank[rank] ?? 1));
+  const eliteBodyHpMul = rank === 'elite' ? (BALANCE.enemyHpByRank.elite ?? 1) : 1;
+  const atkMul = regionMulOf(game, inScene[0]?.id, BALANCE.enemyAttackByRegion);
+  // 2026-11-13（pre-deploy19 の問題 A2）: 鍵の順番で1つ目のダンジョンのボスの部屋は、大技の BREAK が今までどおり（effects の needsWeakPerfect）
+  const dungeonDef = game.dungeon ? DUNGEONS.tryGet(game.dungeon.dungeonId) : undefined;
+  const firstKeyBoss = !!rb?.boss && !!dungeonDef && isFirstKeyDungeon(dungeonDef);
   game.battle = createBattle({
     seed: rng.int(1_000_000_000),
     party,
-    encounter: { id: game.battleInfo?.wandererId ?? game.dungeon?.currentRoomId ?? 'battle', name: getRoomType(roomType).name, enemies, ...(getRoomType(roomType).battle?.boss ? { boss: true } : {}), ...(getRoomType(roomType).battle?.pool === 'midboss' ? { midboss: true } : {}) },
-    enemyHpMul: diff.enemyHp,
-    enemyAttackMul: (diff.enemyAttack ?? 1) * partyAttackMul(game, party.length),
+    encounter: { id: game.battleInfo?.wandererId ?? game.dungeon?.currentRoomId ?? 'battle', name: getRoomType(roomType).name, enemies, ...(getRoomType(roomType).battle?.boss ? { boss: true } : {}), ...(getRoomType(roomType).battle?.pool === 'midboss' ? { midboss: true } : {}), ...(getRoomType(roomType).battle?.pool === 'elite' ? { elite: true } : {}), ...(firstKeyBoss ? { firstKeyBoss: true } : {}) },
+    enemyHpMul: hpMul === 1 ? diff.enemyHp : (diff.enemyHp ?? 1) * hpMul,
+    ...(eliteBodyHpMul !== 1 ? { eliteBodyHpMul } : {}),
+    enemyAttackMul: (diff.enemyAttack ?? 1) * partyAttackMul(game, party.length) * atkMul,
     surprise: opts.surprise,
     readyCheck: game.online,
   });
+  // 段階7c: 業火の魔人の悪さ — 生きている間、戦闘の開始時（1ターン目の始めの処理の後）に味方全員に「火傷」。1ターン目の間は見えていて、味方の番の終わりに燃える（今の火傷の決まり）。
+  // 敵の行動ではない（世界の悪さ）ので、敵からの状態異常を防ぐ能力・悪夢の毛皮のきっかけにはならない（罠の「次の戦闘の状態異常」と同じ扱い）
+  const burn = scourgeCurse(game).battleBurn;
+  if (burn > 0) {
+    const b = game.battle;
+    for (const a of b.allies) {
+      if (a.dead) continue;
+      a.statuses.burn = (a.statuses.burn ?? 0) + burn;
+      (b.openingEvents ??= []).push({ type: 'status', unitId: a.id, status: 'burn', amount: burn });
+    }
+    battleLog(b, `💀${scourgesWith(game, 'battleBurn').map((d) => d.short).join('・')}のせいで、全員に火傷${burn}`);
+  }
+  // 寄り道の値打ち（2026-11-14）: 鍵と最後のダンジョンのボス・中ボスに、生きている災厄の加護。見破ったボスの戦闘は、大物の大技が完全成功で崩れる
+  applyScourgeBoons(game, game.battle);
+  applyInsight(game, game.battle);
   game.battleBackground = opts.background ?? worldBackground(game);
-  for (const h of sceneHeroes(game)) h.nextBattleStatuses = {};
+  for (const h of sceneHeroes(game)) { h.nextBattleStatuses = {}; delete h.petFeast; }
   game.mode = 'battle';
 }
 
@@ -661,6 +718,16 @@ function syncHeroesFromBattle(game: GameState, revive: boolean) {
     h.hp = a.dead ? (revive ? 1 : 0) : a.hp;
     h.focus = a.focus;
   }
+}
+
+/**
+ * 部屋の種類が落とす装備のエピック率（%。テーマの倍率を掛ける前）。byDepth の部屋（強敵）は深層ボーナスの段で変わる（BALANCE.eliteEpicChanceByDepth。
+ * 段が表より深ければ表の最後）。tier = 深層ボーナスの段（ダンジョンの外・古い形のダンジョンは 0）
+ */
+export function equipmentEpicChance(drop: { epicChance: number; byDepth?: boolean }, tier: number): number {
+  if (!drop.byDepth) return drop.epicChance;
+  const t = BALANCE.eliteEpicChanceByDepth;
+  return t[Math.min(Math.max(0, tier), t.length - 1)] ?? drop.epicChance;
 }
 
 function finishBattle(game: GameState, playerId: string, rng: Rng): string | undefined {
@@ -715,7 +782,14 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
   let exp = 0;
   let gold = 0;
   const rt = getRoomType(room?.type ?? game.battleInfo?.roomType ?? 'battle');
-  if (!room) onWandererDefeated(game, rng);
+  // 寄り道の値打ち（2026-11-14 柱5）: 災厄が逃げた（盗賊王の「宝を抱えて逃げる」）時は、倒していない。災厄は地図に残り（HPは元に戻る）、パーティは前のマスへ下がる
+  const scourgeFled = !room && b.enemies.some((e) => e.fled && SCOURGES.all.some((d) => d.boss === e.defId));
+  const defeatedWanderer = !room && !scourgeFled ? onWandererDefeated(game, rng) : undefined;
+  if (scourgeFled && game.world) {
+    const w = game.world;
+    for (const a of b.allies) if (w.prevTile !== undefined) w.pos[a.id] = w.prevTile;
+    addLog(game, '💀災厄は宝を抱えて逃げた。まだ地図に残っている（倒すまで悪さと加護は消えない）');
+  }
   // 深層ボーナス: ダンジョンの奥の部屋ほど、お金・経験値が増え、カードのコモンが減る（古い形のダンジョンには付けない）
   const tier = room && run && !isLegacyLayout(run) ? depthTier(room.row) : 0;
   const rewardMul = (getDifficulty(game.difficulty).reward ?? 1) * (1 + BALANCE.depthBonus.reward[tier]);
@@ -729,7 +803,9 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
     gold += Math.max(0, Math.round(def.gold * k * (0.85 + rng.next() * 0.3)));
   }
   // 待ち伏せを迎え撃った時などのお金の倍率・戦闘中に手に入れたお金
-  gold = Math.round(gold * (game.battleInfo?.goldMul ?? 1)) + (b.bonusGold ?? 0);
+  // ランダムダンジョンのテーマ（無法者の隠れ処: 戦闘のお金+30%。封魔の地下迷宮: カードと装備のエピック2倍。段階7a）
+  const tr = themeReward(room ? run : undefined);
+  gold = Math.round(gold * (game.battleInfo?.goldMul ?? 1) * (b.goldMul ?? 1) * tr.battleGold) + (b.bonusGold ?? 0);
   // お金は生き残った参加者で山分け
   const survivorHeroes = survivors.map((id) => findHero(game, id)!).filter(Boolean);
   // 装備の「勝った時のゴールド+○%」（王の印章指輪など）。生き残った仲間の中で一番大きい物だけ効く（重ならない）
@@ -742,7 +818,7 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
   const onWin = game.battleInfo?.onWin;
   if (onWin?.length) applyOutcomes(game, onWin, survivorHeroes[0], rng);
 
-  const cardOdds = cardRewardOdds(rt.battle?.cardOdds ?? 'battle', tier);
+  const cardOdds = cardRewardOdds(rt.battle?.cardOdds ?? 'battle', tier, tr.epicMul);
   const reward: RewardState = { gold, exp: [], levelUps: [], cardOffers: survivors.flatMap((id) => rollCardOffers(game, [id], rng, cardOdds)), cardOdds, cardDone: [], cardPicked: false, loot: [] };
   for (const id of survivors) {
     const h = findHero(game, id)!;
@@ -764,7 +840,7 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
   // ドロップ（部屋の種類の設定どおり）。ボスの大宝箱は報酬の後に開ける
   const drop = rt.battle;
   if (drop?.equipmentDrop) {
-    const item = newItem(game, rollEquipment(rng.next() * 100 < drop.equipmentDrop.epicChance ? 'epic' : 'rare', game.heroes, rng, { scenario: game.scenarioId }));
+    const item = newItem(game, rollEquipment(rng.next() * 100 < equipmentEpicChance(drop.equipmentDrop, tier) * tr.epicMul ? 'epic' : 'rare', game.heroes, rng, { scenario: game.scenarioId }));
     const to = leastLoaded(survivorHeroes);
     // 2人以上のプレイヤーが生き残ったら、みんなで取り合う（欲しい / 余れば / いらない → 運の判定）
     if (new Set(survivorHeroes.map((h) => h.playerId)).size > 1) reward.claim = { item, heroes: survivorHeroes.map((h) => h.id), choices: {} };
@@ -779,6 +855,12 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
       reward.loot.push({ kind: 'item', item, to: to.id });
       addItem(game, to, item, true);
     }
+  }
+  // 災厄の中ボス（段階7b）: 悪さが消え、お金・侵食度・物語の窓。専用の装備（必ず）と秘薬は報酬の画面で渡す
+  const scourge = defeatedWanderer?.scourge ? SCOURGES.tryGet(defeatedWanderer.scourge) : undefined;
+  if (scourge && survivorHeroes.length) {
+    onScourgeDefeated(game, scourge, survivorHeroes);
+    scourgeLoot(game, reward, survivorHeroes, scourge);
   }
   // 封魔の宝箱の番人との戦闘: 勝つと、その宝箱を開ける（隠し宝箱の抽選はしない）
   const sealedFight = !!room && game.chest?.roomId === room.id && !!game.chest.spec.sealed;
@@ -1010,13 +1092,30 @@ function openChest(game: GameState, playerId: string, heroId: string, focusUsed:
   const results = rollWithFocus(slots, focusUsed, statChance(h, 'luk', 'luck'), rng);
   const n = successes(results);
   recordCheck(h, 'luk', results, 1);
-  const oddsBefore = chestOdds(c.spec.rarity, 0);
-  const odds = chestOdds(c.spec.rarity, n);
+  // ランダムダンジョンのテーマのご褒美（ボスの黄金箱には掛けない。段階7a）
+  const tr = c.roomId && !c.spec.big ? themeReward(game.dungeon) : themeReward(undefined);
+  const oddsBefore = chestOdds(c.spec.rarity, 0, tr.epicMul);
+  const odds = chestOdds(c.spec.rarity, n, tr.epicMul);
   const grade = rollGrade(odds, rng);
   const omen = grade === 'legend' && rng.next() * 100 < BALANCE.chestOmenChance;
   c.grade = grade;
   c.lastRoll = { kind: 'luck', heroId, results, success: n === slots, oddsBefore, odds, grade, gradeChance: odds[rarityIndex(grade)], omen };
   c.contents = rollChestContents(game, grade, !!c.spec.big, rng);
+  if (tr.chestGold !== 1) for (const l of c.contents) if (l.kind === 'gold') l.amount = Math.round(l.amount * tr.chestGold);
+  // ランダムダンジョンのボスの黄金箱: 専用の装備が1つ「余分に」出ることがある（段階7a・overhaul-plan-v2 §4-3。ふつうの中身はそのまま）
+  // 寄り道の値打ち（2026-11-14 柱3）: 秘宝は BALANCE.randomDungeon.relicChoices 個の候補（重ならない）から1つ選ぶ（PICK_RELIC。選ぶまで立ち去れない）。
+  // 候補はここで引く（開けた時の乱数。選ぶ時は乱数を使わない）。選んだ物が中身の2つ目に入る
+  if (c.spec.big && game.dungeon?.random && rng.next() * 100 < BALANCE.randomDungeon.exclusiveChance) {
+    const relics: ItemInstance[] = [];
+    for (let k = 0; k < BALANCE.randomDungeon.relicChoices; k++) {
+      const ex = rollExclusive(game, sceneHeroes(game), rng, relics.map((r) => r.itemId));
+      if (ex) relics.push(newItem(game, ex));
+    }
+    if (relics.length) {
+      c.relics = relics;
+      c.exclusive = true;
+    }
+  }
   // 品物は指定した受取人へ。判定と実績は開けたキャラのまま。お金は、ふつうの宝箱も大宝箱も、場面のキャラで山分け（2026-11-10 オーナーの決定）。
   if (recipientId && !shared) for (const loot of c.contents) if (loot.kind === 'card') loot.heroId = recipient.id;
   if (shared) {
@@ -1031,11 +1130,38 @@ function openChest(game: GameState, playerId: string, heroId: string, focusUsed:
   return undefined;
 }
 
+/**
+ * 黄金箱の秘宝を、候補から1つ選ぶ（2026-11-14 寄り道の値打ち 柱3）。2人以上のプレイヤーはみんなで決める（多数決・同じ数なら開けた人。votes.ts）。
+ * 選んだ秘宝は中身の2つ目に入り、2人以上なら今までの取り合い、1人なら使えるキャラ（武器は持てるジョブ）に。乱数は使わない
+ */
+function pickRelic(game: GameState, playerId: string, optionIndex: number): string | undefined {
+  if (!isPartyPlayer(game, playerId)) return 'このパーティのプレイヤーではありません';
+  const c = game.chest;
+  if (game.mode !== 'chest' || !c?.relics?.length || !c.contents) return '選べる秘宝はありません';
+  if (c.relicPicked !== undefined) return 'もう秘宝を選びました';
+  const item = c.relics[optionIndex];
+  if (!Number.isInteger(optionIndex) || !item) return '選択肢がありません';
+  c.relicPicked = optionIndex;
+  c.contents.splice(1, 0, { kind: 'item', item });
+  const scene = sceneHeroes(game).filter((x) => !x.retired);
+  if (chestShared(game)) (c.claims ??= []).push({ item, heroes: scene.map((x) => x.id), choices: {} });
+  else {
+    const def = getItem(item.itemId);
+    const opener = (c.opener ? findHero(game, c.opener) : undefined) ?? scene[0];
+    const fit = [opener, ...scene].filter((x): x is Hero => !!x && !canEquip(x, def));
+    const to = fit[0] ?? opener;
+    if (to) addLoot(game, [{ kind: 'item', item }], [to]);
+  }
+  addLog(game, `秘宝「${getItem(item.itemId).name}」を選んだ`);
+  return undefined;
+}
+
 function leaveChest(game: GameState, playerId: string, rng: Rng): string | undefined {
   if (!isPartyPlayer(game, playerId)) return 'このパーティのプレイヤーではありません';
   const c = game.chest;
   const run = game.dungeon;
   if (game.mode !== 'chest' || !c) return '宝箱がありません';
+  if (c.relics?.length && c.contents && c.relicPicked === undefined) return '先に秘宝を1つ選んでください';
   if (c.claims?.some((x) => !x.rolls)) return '宝箱の中身の取り合いが終わっていません';
   if (sealStep(c) === 'guard') return '封印を解いた。番人からは、もう立ち去れない';
   const te = worldTurnError(game, playerId, c.tile !== undefined);
@@ -1059,6 +1185,7 @@ function leaveChest(game: GameState, playerId: string, rng: Rng): string | undef
     for (const h of sceneHeroes(game)) if (h.pet) h.pet.dungeonClears = (h.pet.dungeonClears ?? 0) + 1;
     if (!game.clearedDungeons.includes(run.dungeonId)) game.clearedDungeons.push(run.dungeonId);
     addLog(game, `${run.name}を制覇した！`);
+    if (game.world && run.random) onRandomDungeonCleared(game, run);
     if (game.world) onDungeonCleared(game, run.dungeonId, rng);
   } else game.mode = 'dungeon';
   return undefined;
@@ -1079,6 +1206,25 @@ export function nextGoalLines(game: GameState): string[] {
   return finale ? [`鍵がそろった。${finale.name}へ向かおう。`] : [];
 }
 
+/**
+ * ランダムダンジョンを制覇した時（段階7a・オーナーの決定 6-A と 3-A）: 入口のマスを「踏破済み」にして閉じ（1か所1回）、侵食度を少し下げる（寄り道の浄化）。
+ * 入口のマスは、入った時に記録したマス（古い保存の途中のダンジョンは、場面の入口のマス）
+ */
+function onRandomDungeonCleared(game: GameState, run: DungeonRun) {
+  const w = game.world!;
+  const tile = run.tile ?? (game.activeScene ? findExpedition(game, game.activeScene)?.entranceTile : undefined);
+  const f = tile !== undefined ? w.tiles[tile]?.f : undefined;
+  if (f?.kind === 'dungeon' && f.id === run.dungeonId) f.used = true;
+  const drop = BALANCE.corruptionOnRandomDungeonClear;
+  if (drop > 0 && w.corruption > 0) {
+    w.corruption = Math.max(0, w.corruption - drop);
+    addLog(game, `${corruptionName(game.scenarioId)}が${drop}%下がった`);
+  }
+  // 寄り道の値打ち（2026-11-14 柱2）: 見破り。次に挑む鍵のダンジョン（全部済んでいれば最後）のボスを見破る
+  const seen = grantInsight(game);
+  if (seen) addLog(game, `👁見破り: 「${seen}」のボスの大技と開幕の一手が、完全成功だけで崩せるようになった（入口の長押しで、段階の決まりも読める）`);
+}
+
 /** 世界マップのダンジョンを制覇した時（封印の鍵・侵食度・依頼・最終ダンジョンならエンディング） */
 function onDungeonCleared(game: GameState, dungeonId: string, rng: Rng) {
   const w = game.world!;
@@ -1093,9 +1239,19 @@ function onDungeonCleared(game: GameState, dungeonId: string, rng: Rng) {
     addLog(game, `${corruptionName(game.scenarioId)}が${drop}%下がった`);
   }
   questSignal(game, { kind: 'clearDungeon', dungeonId });
-  if (def.clearStory?.length && !def.finale) w.story = { title: def.name, lines: [...def.clearStory, ...nextGoalLines(game)] };
+  if (def.clearStory?.length && !def.finale) {
+    // 回1: 世界マップに別の知らせ（災厄が現れた など）が出ていたら、消さずに制覇の物語の後へ回す
+    if (w.story) {
+      w.storyQueue = [w.story, ...(w.storyQueue ?? [])];
+      // 点検 F6: 出ていた窓が後ろへ回った。前の窓への「つづける」で、制覇の物語を閉じない
+      bumpStoryVer(w);
+    }
+    w.story = { title: def.name, lines: [...def.clearStory, ...nextGoalLines(game)] };
+  }
   if (def.finale) {
     const story = getScenario(game.scenarioId).story;
+    delete w.storyQueue;
+    if (w.story) bumpStoryVer(w);
     w.story = { title: 'エンディング', lines: story?.ending ?? ['魔王は封じられた。'] };
     game.mode = 'ending';
   }
@@ -1251,11 +1407,26 @@ function retreat(game: GameState, playerId: string, rng: Rng): string | undefine
   return undefined;
 }
 
-function returnToHub(game: GameState, playerId: string, rng: Rng): string | undefined {
+function returnToHub(game: GameState, playerId: string, rng: Rng, kind?: 'shortcut'): string | undefined {
   if (!isPartyPlayer(game, playerId)) return 'このパーティのプレイヤーではありません';
   if (game.mode !== 'cleared') return 'まだ帰還できません';
+  // 寄り道の値打ち（2026-11-14 柱4）: ランダムダンジョンの抜け道。場面のキャラ（ダンジョンの外の仲間は入らない）が、出口のマスに出る
+  if (kind === 'shortcut') {
+    const tile = game.dungeon?.random ? shortcutTile(game, shortcutEntrance(game)) : undefined;
+    if (tile === undefined || !game.world) return '抜け道はありません';
+    for (const h of sceneHeroes(game)) game.world.pos[h.id] = tile;
+    addLog(game, '抜け道を通って、次の目的地の近くに出た');
+    leaveDungeon(game, rng);
+    revealAround(game, game.world);
+    return undefined;
+  }
   leaveDungeon(game, rng);
   return undefined;
+}
+
+/** 抜け道を探す入口（入った時に記録した入口のマス。古い保存の途中のダンジョンは、場面の入口のマス） */
+export function shortcutEntrance(game: GameState): number | undefined {
+  return game.dungeon?.tile ?? (game.activeScene ? findExpedition(game, game.activeScene)?.entranceTile : undefined);
 }
 
 /** ダンジョンを出る（世界マップがあれば入口のマスへ戻り、入ったキャラの手番は終わる。無ければ仮の拠点へ） */
@@ -1336,6 +1507,7 @@ function unequip(game: GameState, playerId: string, heroId: string, slot: keyof 
 function usePouchItem(
   game: GameState,
   cmd: Extract<GameCommand, { type: 'USE_POUCH_ITEM' }>,
+  rng: Rng,
 ): { error?: string; events: BattleEvent[] } {
   // 使うキャラ自身の袋から
   const owner = findHero(game, cmd.userId);
@@ -1367,6 +1539,34 @@ function usePouchItem(
   const other = otherSceneError(game, user.id) ?? otherSceneError(game, cmd.targetId);
   if (other) return { error: other, events: [] };
   if (!target || target.hp <= 0) return { error: '対象が戦闘不能です', events: [] };
+  // 区切りE: テントの設営具（その場で野営して手番を終える）・カード鍛錬の砥石（選んだカードを強化）
+  const field = def.use.find((e) => e.kind === 'fieldOnly');
+  if (field && field.kind === 'fieldOnly' && field.what === 'tent') {
+    if (game.mode !== 'world') return { error: '世界マップで使います', events: [] };
+    const err = camp(game, { type: 'WORLD_CAMP', playerId: cmd.playerId, heroId: user.id }, rng, { tent: true });
+    if (err) return { error: err, events: [] };
+    const at = owner.pouch.findIndex((p) => p.uid === cmd.itemUid);
+    if (at >= 0) owner.pouch.splice(at, 1);
+    return { events: [] };
+  }
+  // 段階7b: 災厄討ちの秘薬（選んだ能力値を、この冒険の間 +amount。冒険をまたいでは残らない）
+  if (field && field.kind === 'fieldOnly' && field.what === 'elixir') {
+    if (!cmd.stat || !STAT_IDS.includes(cmd.stat)) return { error: '上げる能力値を選んでください', events: [] };
+    const n = field.amount ?? BALANCE.scourge.elixirStat;
+    target.bonusStats[cmd.stat] = (target.bonusStats[cmd.stat] ?? 0) + n;
+    owner.pouch.splice(idx, 1);
+    addLog(game, `${user.name}が${def.name}を使った。${target.name}の${STAT_LABEL[cmd.stat]}が${n}上がった（この冒険の間）`);
+    return { events: [] };
+  }
+  if (field && field.kind === 'fieldOnly' && field.what === 'whetstone') {
+    const card = target.deck.find((c) => c.uid === cmd.cardUid);
+    if (!card) return { error: '強化するカードを選んでください', events: [] };
+    if (card.upgraded) return { error: 'そのカードは、もう強化されています', events: [] };
+    card.upgraded = true;
+    owner.pouch.splice(idx, 1);
+    addLog(game, `${user.name}が${def.name}で${target.name}の「${getCard(card.cardId).name}」を強化した`);
+    return { events: [] };
+  }
   // 戦闘の効果と同じ名前の冒険の効果を使う（無ければ戦闘中にしか使えない）
   if (!def.use.every((e) => hasOutcomeKind(e.kind))) return { error: '戦闘中にしか使えません', events: [] };
   const octx = makeOutcomeCtx(game, createRng(game.rngState), target);
@@ -1402,7 +1602,7 @@ function give(game: GameState, cmd: Extract<GameCommand, { type: 'GIVE' }>): str
   for (const bag of ['stash', 'pouch'] as const) {
     const i = from[bag].findIndex((x) => x.uid === cmd.itemUid);
     if (i < 0) continue;
-    if (bag === 'pouch' && to.pouch.length >= POUCH_LIMIT) return `${to.name}の袋がいっぱいです`;
+    if (bag === 'pouch' && to.pouch.length >= pouchLimitOf(to)) return `${to.name}の袋がいっぱいです`;
     const [it] = from[bag].splice(i, 1);
     to[bag].push(it);
     addLog(game, `${from.name}が${to.name}に「${getItem(it.itemId).name}」を渡した`);

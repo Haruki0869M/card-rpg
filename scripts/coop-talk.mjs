@@ -2,6 +2,7 @@
 // - ダンジョン: P2 が方向ボタン・地図の扉を押すと、P1 の画面に「P2: こっち！」が出る。約8秒で消える。手番の人が向きを変えると消える
 // - 宝箱: 開け役を2人で選ぶ（全員一致で決まる）→ 開け役の担当が開ける → 中身を「欲しい／余れば」で取り合う → 先へ進める
 // - 店: 残りの数・最後の1つの確認（ゲーム内の窓）・P2 の画面に「〇〇が△△を買った（残り0）」・「ほしい！」の印
+// - 災厄の中ボス（段階7b）: 2台に札・P2 が自分で「加わる」・2人で中ボスの戦闘・勝つと専用の装備の取り合い
 // 状態は、エミュレーターの時だけ読み込む確認用の口（src/dev/onlineDebug.ts の inject）で差し込む。
 // 事前に: npx vite build && npx vite preview --port 4242 --host 127.0.0.1 &   と   npm run emulators &
 // 使い方: URL=http://127.0.0.1:4242/card-rpg/ WIDTH=390 node scripts/coop-talk.mjs（WIDTH を 360 にしてもう1回）
@@ -298,6 +299,73 @@ await until(async () => /買った（残り0）/.test(await B.locator('body').in
 check(true, 'P2 の画面に「〇〇が△△を買った（残り0）」');
 await shot(B, 'shop-notice-P2');
 check(!/買った（残り0）/.test(await A.locator('body').innerText()), 'P1（買った人）には仲間のお知らせを出さない');
+
+// ===== 4. 2人で災厄の中ボスに挑む（段階7b） =====
+{
+  const g = structuredClone(g0);
+  const w = g.world;
+  // 盗賊王を、王都から少し離れた陸のマスに置く。2人はその隣のマス（P2 は同行していない＝自分で「加わる」を答える）
+  const land = (i) => i >= 0 && i < w.tiles.length && !w.tiles[i].f && ['plains', 'forest', 'hills', 'swamp'].includes(w.tiles[i].t);
+  const nest = w.tiles.findIndex((t, i) => land(i) && land(i - 1) && i % w.width > 1 && Math.floor(i / w.width) > 30);
+  w.wanderers = [{ id: 'wSc', tile: nest, enemies: [{ defId: 'scourgeGreedKing', level: 3 }, { defId: 'banditThug', level: 3 }, { defId: 'banditArcher', level: 3 }], scourge: 'greedKing' }];
+  w.scourgeCount = 1;
+  w.scourgesMet = ['greedKing'];
+  for (const h of g.heroes) { w.pos[h.id] = nest - 1; h.lastRandomEvent = w.worldTurn; }
+  w.tiles[nest].seen = true;
+  w.tiles[nest - 1].seen = true;
+  w.follow = {};
+  w.turn = h1;
+  w.move = 4;
+  w.prevTile = nest - 1;
+  w.story = undefined;
+  w.visitedRegions = Array.from({ length: 200 }, (_, i) => i);
+  await inject(g);
+  check((await A.locator('[data-scourge-strip]').count()) === 1 && (await B.locator('[data-scourge-strip]').count()) === 1, '2台とも上に災厄の札が出る');
+  await send(A, { type: 'WORLD_MOVE', playerId: 'P1', heroId: h1, to: nest, companions: [] });
+  await until(async () => (await Promise.all([A, B].map((p) => p.evaluate(() => window.__online.mode())))).every((m) => m === 'encounter'), 8000, 'scourge encounter');
+  await wait(500);
+  check((await A.locator('[data-encounter-scourge]').count()) === 1 && (await B.locator('[data-encounter-scourge]').count()) === 1, '2台とも遭遇の画面に災厄の説明が出る');
+  await shot(B, 'scourge-encounter-P2');
+  await layout(B, '災厄の遭遇（P2）');
+  // P2 が自分のキャラで「加わる」を押す
+  await B.getByRole('button', { name: /返事待ち/ }).click();
+  await wait(600);
+  const ge = await A.evaluate(() => window.__online.game());
+  check(ge.encounter?.joins?.[h2] === true, 'P2 が「加わる」と答えられる（だれも止まらない）');
+  await A.getByRole('button', { name: /戦う/ }).click();
+  await until(async () => (await Promise.all([A, B].map((p) => p.evaluate(() => window.__online.mode())))).every((m) => m === 'battle'), 8000, 'scourge battle');
+  const gb = await A.evaluate(() => window.__online.game());
+  check(!!gb.battle?.midboss && gb.battle.allies.length === 2, `2人とも災厄の戦闘に入る（中ボスの戦闘・味方${gb.battle?.allies.length}人）`);
+  await wait(800);
+  await shot(B, 'scourge-battle-P2');
+  // 勝った所まで進めた状態を差し込み、戦闘を終える
+  for (const e of gb.battle.enemies) { e.dead = true; e.hp = 0; }
+  gb.battle.phase = 'victory';
+  await inject(gb);
+  await send(A, { type: 'FINISH_BATTLE', playerId: 'P1' });
+  await until(async () => (await Promise.all([A, B].map((p) => p.evaluate(() => window.__online.mode())))).every((m) => m === 'reward'), 8000, 'scourge reward');
+  await wait(600);
+  const gr = await A.evaluate(() => window.__online.game());
+  check(gr.reward?.claim?.item.itemId === 'greedCrown', '専用の装備「強欲王の黄金冠」が取り合いに出る');
+  check(!gr.world.wanderers.some((x) => x.scourge) && JSON.stringify(gr.world.story ?? {}).includes('盗賊王を倒した'), '倒すと災厄が消え、「倒した！」の知らせが用意される');
+  // レベルアップの成長を選び終えるまでは、取り合いの欄は出ない（今までと同じ流れ）。それぞれの担当の人が選ぶ
+  for (let k = 0; k < 12; k++) {
+    const lu = (await A.evaluate(() => window.__online.game())).reward?.levelUps?.[0];
+    if (!lu) break;
+    const owner = gr.heroes.find((h) => h.id === lu.heroId).playerId;
+    await send(owner === 'P1' ? A : B, { type: 'CHOOSE_GROWTH', playerId: owner, optionIndex: Math.max(0, lu.options.findIndex((o) => o.kind === 'maxHp' || o.kind === 'stat')) });
+  }
+  await wait(600);
+  const claimB = B.locator('[data-claim]');
+  if (await claimB.count()) {
+    await shot(B, 'scourge-claim-P2');
+    await B.locator('[data-claim]').getByRole('button', { name: 'いらない' }).click();
+    await A.locator('[data-claim]').getByRole('button', { name: '欲しい' }).click();
+    await until(async () => !!(await A.evaluate(() => window.__online.game())).reward?.claim?.winner, 6000, 'claim winner');
+    const gw = await A.evaluate(() => window.__online.game());
+    check(gw.reward.claim.winner === h1, '「欲しい」の P1 が専用の装備を受け取った');
+  } else check(false, 'P2 の画面に取り合いの欄が出ない');
+}
 
 await browser.close();
 if (problems.length) {

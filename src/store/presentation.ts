@@ -45,6 +45,8 @@ export interface PresentationFrame {
   shake?: boolean;
   /** 段階B: 敵の攻撃を味方のブロックで防いだ（味方の前に盾を出して弾く） */
   guards?: string[];
+  /** 回2: このコマで倒れた敵（倒れた演出を、とどめの一撃の後に始める。見た目だけ） */
+  deaths?: string[];
 }
 
 export interface CalloutDraft { side: 'ally' | 'enemy'; actorId: string; cardId?: string; actionName?: string }
@@ -76,6 +78,7 @@ export function battleFrames(events: BattleEvent[], allyIds: ReadonlySet<string>
   // カードの効果音（攻撃の種類・魔法の属性など）は、最初に効果が見えるコマで鳴らす
   let pendingCast: SoundId | undefined;
   const tailSounds: SoundId[] = [];
+  const tailDeaths: string[] = [];
   const roll = events.find(e => e.type === 'roll');
   const act = events.find(e => e.type === 'enemyAct');
   // 段階B: 当たった時の見た目（味方のカード = 武器種・属性で決める。敵の技 = 赤い爪あと。ほか = 衝撃）
@@ -147,7 +150,7 @@ export function battleFrames(events: BattleEvent[], allyIds: ReadonlySet<string>
     else if (e.type === 'resource' && e.amount < 0) { popups.push({ unitId: e.unitId, tone: 'status', text: `${e.resource === 'focus' ? 'フォーカス' : 'マナ'}${e.amount}` }); sounds.push('sfx_status_debuff'); }
     else if (e.type === 'death') {
       // 倒れた音は、とどめのコマに重ねる（コマを増やすと演出の間が変わるので）
-      if (!allyIds.has(e.unitId)) { const last = frames[frames.length - 1]; if (last) (last.sounds ??= []).push('sfx_enemy_down'); else tailSounds.push('sfx_enemy_down'); }
+      if (!allyIds.has(e.unitId)) { const last = frames[frames.length - 1]; if (last) { (last.sounds ??= []).push('sfx_enemy_down'); (last.deaths ??= []).push(e.unitId); } else { tailSounds.push('sfx_enemy_down'); tailDeaths.push(e.unitId); } }
     } else if (e.type === 'phase') {
       const snd: SoundId | undefined = e.phase === 'victory' ? 'jgl_victory' : e.phase === 'defeat' ? 'jgl_defeat' : e.phase === 'ally' ? 'sfx_turn_start' : e.phase === 'enemy' ? 'sfx_turn_enemy' : undefined;
       if (snd) tailSounds.push(snd);
@@ -192,6 +195,12 @@ export function battleFrames(events: BattleEvent[], allyIds: ReadonlySet<string>
     const last = frames[frames.length - 1];
     if (last) last.sounds = [...new Set([...(last.sounds ?? []), ...tailSounds])];
     else frames.push({ delay: 0, sounds: [...new Set(tailSounds)] });
+  }
+  // 回2: コマが無い時に倒れた敵は、最後のコマ（無ければ音のコマ）で倒れる
+  if (tailDeaths.length) {
+    const last = frames[frames.length - 1];
+    if (last) last.deaths = [...(last.deaths ?? []), ...tailDeaths];
+    else frames.push({ delay: 0, deaths: tailDeaths });
   }
   return frames;
 }

@@ -22,7 +22,7 @@ export const roomTypes: RoomTypeDef[] = [
     bg: '#4a0c18',
     behavior: 'battle',
     omen: 'elite',
-    battle: { pool: 'elite', levelBonus: 1, cardOdds: 'elite', equipmentDrop: { epicChance: 10 } },
+    battle: { pool: 'elite', levelBonus: 1, cardOdds: 'elite', equipmentDrop: { epicChance: 10, byDepth: true } },
     layoutWeight: 14,
   },
   { id: 'event', order: 3, name: 'イベント', icon: 'sparkles', color: '#9ad8ff', bg: '#10304a', behavior: 'event', layoutWeight: 16 },

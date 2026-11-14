@@ -24,8 +24,44 @@ export const BALANCE = {
   /** 成功率の下限・上限（%） */
   chanceMin: 5,
   chanceMax: 95,
-  /** 戦闘に参加した味方の人数ごとの敵HP倍率（index = 人数。端数切り捨て） */
-  enemyHpByPartySize: [0, 0.6, 1.0, 1.35, 2.2] as readonly number[],
+  /**
+   * 戦闘に参加した味方の人数ごとの敵HP倍率（index = 人数。端数切り捨て）
+   * 2026-11-12: カードが強くなった分、2〜4人の敵のHPを+10%（オーナーの決定。docs/tasks/difficulty-restore-plan.md）
+   */
+  enemyHpByPartySize: [0, 0.6, 1.1, 1.49, 2.42] as readonly number[],
+  /**
+   * 地域ごとの敵のHPの倍率（キー = 地図の地域の id。書いていない地域は 1 = 変えない）。世界マップの戦闘と、その地域にあるダンジョンの戦闘に掛かる。
+   * 2026-11-13 回4: 測るための入れ物（既定は空 = 今と同じ）。数値を入れるかはオーナーが測定の表を見て決める
+   */
+  enemyHpByRegion: {} as Readonly<Record<string, number>>,
+  /**
+   * 地域ごとの敵の攻撃の倍率（キー = 地図の地域の id。書いていない地域は 1）。地域の決め方は enemyHpByRegion と同じ。
+   * 2026-11-13 つまみの測定: 測るための入れ物（既定は空 = 今と同じ）。
+   * 2026-11-13 案Y で後半の地域 ×1.5 を入れたが、オーナーが案Y を取りやめた（数字の帳尻合わせになるため。docs/tasks/break-read-plan.md）ので空に戻した
+   */
+  enemyAttackByRegion: {} as Readonly<Record<string, number>>,
+  /**
+   * 敵の格ごとのHPの倍率（boss = ボスの部屋 / midboss = 中ボスの部屋と災厄 / elite = 強敵の部屋 / normal = それ以外。書いていない格は 1）。
+   * 2026-11-13 つまみの測定: 測るための入れ物（既定は空 = 今と同じ）。
+   * 2026-11-13 案Y で大物 ×2 を入れたが、オーナーが案Y を取りやめたので空に戻した。
+   * 2026-11-13 強敵の計画（docs/tasks/elite-plan.md 柱2）: elite は「強敵の本体」（強敵の組から来た敵。奥で足されるふつうの戦闘の敵・町を襲う敵には掛からない）だけに掛ける。
+   * 値は ×1.2・×1.3・×1.5 を測って決めた（docs/review/2026-11-13-elite.md。×1.5 だけで、強敵の戦闘の長さ・倒れる味方・強敵に負ける事がはっきり増えた）
+   */
+  enemyHpByRank: { elite: 1.5 } as Readonly<Partial<Record<'boss' | 'midboss' | 'elite' | 'normal', number>>>,
+  /**
+   * 強敵の本気（docs/tasks/elite-plan.md 柱1）: 強敵の本体のHPが最大の hpBelow を切ると、次の予告がその敵のいちばん強い攻撃になり、威力が ×power。1戦闘に1回
+   */
+  eliteFrenzy: { hpBelow: 0.5, power: 1.5 },
+  /**
+   * 強敵の部屋の装備のエピック率（%。深層ボーナスの段 = 入口 / 浅層 / 中層 / 深層。docs/tasks/elite-plan.md 柱4）。
+   * ランダムダンジョンのテーマの倍率（封魔の地下迷宮のエピック ×2）は、今までどおりこの値に掛ける
+   */
+  eliteEpicChanceByDepth: [10, 10, 20, 35] as readonly number[],
+  /**
+   * 稼いだお金（戦闘の報酬・宝箱・売値・災厄や町を守った報酬・袋が満杯で換えたお金。earnGold を通る物全部）の倍率。端数は切り捨て。
+   * 初期の所持金・仲間からの送金には掛けない。2026-11-13 つまみの測定: 測るための入れ物（既定 1 = 今と同じ）
+   */
+  goldGainMul: 1 as number,
   /** 戦闘に参加した味方の人数ごとの敵の攻撃倍率（4人の時だけ少し強くする。2人・3人は変えない） */
   enemyAttackByPartySize: [1, 1, 1, 1.4, 1.8] as readonly number[],
   /** 敵のレベルが baseLevel より1上がるごとの増加率 */
@@ -72,7 +108,7 @@ export const BALANCE = {
   randomEventChance: 20,
   randomEventBadMul: 1.5,
   /** 報酬のスマート抽選: 重なった印1つごとの重みの上乗せ・重みの上限・ショップの係数（設計 v2 §2） */
-  smartDraw: { perTag: 0.5, maxWeight: 3, shopStrength: 0.5 },
+  smartDraw: { perTag: 0.5, maxWeight: 3, shopStrength: 0.5, /** 宿題7: 回復役のいないパーティで、共通の回復のカードの出やすさの倍率【提案】 */ healerlessHeal: 2 },
   /** 報酬の候補の基本の重み（ジョブ専用カードは1）: 得意武器・使える武器・系統・共通のカード（K1） */
   cardPoolWeight: { mainWeapon: 1, subWeapon: 0.5, lineage: 0.7, common: 0.8 },
   /** 戦闘の報酬のカード（キャラごとに3枚）のうち、必ず「ジョブ専用・系統・装備している武器種」のカードから選ぶ枚数（先頭から。K7 オーナー決定）。当てはまるカードが無ければ今までどおり */
@@ -119,6 +155,11 @@ export const BALANCE = {
   chestEquipChance: { common: 60, rare: 65, epic: 100, legend: 100 } as Record<string, number>,
   /** 中身の格がレア以下の時に、おまけの消費アイテムが付く確率（%） */
   chestBonusConsumable: 25,
+  /**
+   * 中身の格がエピック・レジェンドの時に、装備とは別に、同じ格の消耗品が付く確率（%）。
+   * レジェンド = 神々の神酒・不死鳥の羽根・時の砂時計のどれか（お店で売らない3つの出どころ）。2026-11-13 まとめ役の指示
+   */
+  chestTopConsumable: { epic: 25, legend: 100 } as Record<string, number>,
   /**
    * 封魔の宝箱（依頼の「金の扉 ＝ 宝物庫 または 封魔の宝箱（罠・戦闘つき高レア箱）」。数値はすべて提案）。
    * - chance: 宝箱の部屋が、ダンジョンを作る時に封魔の宝箱に変わる確率（%）。fromRow 行目（入口が0）より奥の宝箱だけ
@@ -180,12 +221,81 @@ export const BALANCE = {
    * 添字 = 先に攻撃した別の味方の人数（0人=なし / 1人=連携 / 2人=大連携 / 3人以上=極連携）
    */
   comboBonus: [0, 0.2, 0.35, 0.5] as readonly number[],
+  /** 連携の上乗せの合計の上限（ファイナル・ユニゾンなどを重ねても +200% まで。区切りD・Gemini の判定） */
+  comboBonusMax: 2.0,
+  /** ブロックの上限・次のターンに残せるブロックの上限（不落の城塞を使ったターンだけ keepBlockFortify。区切りD） */
+  blockMax: 99,
+  /** 聖光の上限（聖騎士・聖王 / ほかの職。区切りD: 僧侶の系統にも聖光を開く） */
+  holyLightMaxPaladin: 5,
+  holyLightMaxOthers: 3,
+  keepBlockCap: 25,
+  keepBlockFortify: 50,
   /**
    * BREAK（体勢崩し。抜本的な見直し §3-2・オーナーの決定 3-A）: 敵が大技の予告を出しているターンに、
    * 弱点の属性で攻撃する／完全成功で攻撃を当てる／そのターンの合計ダメージが最大HPの breakDamagePct% 以上、のどれかで崩せる。
-   * 崩すと、その予告の威力が breakPower 倍・弱体 breakWeak・ブロック0。1つの予告に1回
+   * 崩すと、その予告の威力が breakPower 倍・breakStatus（今は脆弱）breakWeak・ブロック0。1つの予告に1回。
+   * 2026-11-13 BREAK を読み合いにする（オーナーの決定。docs/tasks/break-read-plan.md §2）:
+   * - ボス・中ボス・災厄の大技 → 「弱点の属性で、しかも完全成功」の時だけ崩れる（下の breakNeedsWeakPerfect・breakNeedsWeakPerfectRanks・breakDamagePctByRank）
+   * - 特殊な行動（紫の札。行動に behavior が付いている物）→ どの戦闘でも同じ（下の breakBehaviorNeedsWeakPerfect・breakDamagePctBehavior）
+   * - 強敵・ふつうの敵の赤い大技 → 今までどおり上の3つのどれか
+   * - 弱点を持たない敵は、どれでも完全成功で崩れる。合計ダメージでは崩れない
    */
   breakDamagePct: 20,
+  /**
+   * 敵の格ごとの「合計ダメージで BREAK」の線（%）。書いていない格は breakDamagePct。Infinity = 合計ダメージでは崩れない（弱点・完全成功だけ）。
+   * 格: boss = ボスの部屋 / midboss = 中ボスの部屋と災厄 / elite = 強敵の部屋（封魔の宝箱・町を襲う敵を含む）/ normal = それ以外。
+   * 2026-11-13 回4: 測るための入れ物。
+   * 2026-11-13 オーナーの決定（案Y の BA）: ボス・中ボス・災厄は合計ダメージでは崩れない（強敵・ふつうの敵は breakDamagePct のまま）
+   */
+  breakDamagePctByRank: { boss: Infinity, midboss: Infinity } as Readonly<Partial<Record<'boss' | 'midboss' | 'elite' | 'normal', number>>>,
+  /**
+   * 敵の格ごとに「完全成功だけで崩れるか」（false = 崩れない。弱点・合計ダメージの線は別）。書いていない格は true（今のまま）。
+   * カードの能力で崩す物（魔力の楔の「成功1でも崩せる」・閃光の破砕玉・崩しの効果）は、ここに関係なく今のまま崩せる。
+   * 2026-11-13 つまみの測定: 測るための入れ物（既定は空 = 今と同じ）
+   */
+  breakPerfectByRank: {} as Readonly<Partial<Record<'boss' | 'midboss' | 'elite' | 'normal', boolean>>>,
+  /**
+   * true = 憲章4の文のとおり「弱点の属性で、しかも完全成功」の時だけ崩れる（弱点を持たない敵は、完全成功だけで崩れる）。
+   * 合計ダメージの線は breakDamagePctByRank で別に決める。カードの能力で崩す物は今のまま。
+   * 2026-11-13 つまみの測定: 測るための入れ物。
+   * 2026-11-13 オーナーの決定（案Y の BA）: true（当てる格は breakNeedsWeakPerfectRanks = ボス・中ボス・災厄だけ）
+   */
+  breakNeedsWeakPerfect: true as boolean,
+  /**
+   * breakNeedsWeakPerfect を当てる格（書いていない = 全部の格）。例: ['boss', 'midboss'] = 大物だけ「弱点で、しかも完全成功」。
+   * ほかの格は今の決まりのまま（弱点・完全成功・合計ダメージのどれかで崩れる）。
+   * 2026-11-13 つまみの測定2（ア）: 測るための入れ物。
+   * 2026-11-13 オーナーの決定（案Y の BA）: ['boss', 'midboss']（ボス・中ボスの部屋と災厄。災厄の戦闘は中ボスの印を持つ）
+   */
+  breakNeedsWeakPerfectRanks: ['boss', 'midboss'] as readonly ('boss' | 'midboss' | 'elite' | 'normal')[] | undefined,
+  /**
+   * true = 特殊な行動（紫の札。行動のデータに behavior が付いている物）の予告は、どの戦闘でも「弱点の属性で、しかも完全成功」の時だけ崩れる
+   * （弱点を持たない敵は完全成功で崩れる）。カードの能力で崩す物（魔力の楔・閃光の破砕玉・崩しの効果）は今のまま。
+   * 2026-11-13 オーナーの決定（docs/tasks/break-read-plan.md §2・§7 の 1 = A）
+   */
+  breakBehaviorNeedsWeakPerfect: true as boolean,
+  /**
+   * 特殊な行動（紫の札）の予告の「合計ダメージで BREAK」の線（%）。undefined = 格ごとの線（breakDamagePctByRank）のまま。Infinity = 合計ダメージでは崩れない。
+   * 2026-11-13 オーナーの決定（docs/tasks/break-read-plan.md §2）: Infinity
+   */
+  breakDamagePctBehavior: Infinity as number | undefined,
+  /**
+   * true = 「弱点で、しかも完全成功」の決まりの時でも、その味方の手札・山札・捨て札に、その敵の弱点を突けるカードが1枚も無ければ、
+   * その味方の完全成功で崩せる（判定は src/engine/battle/breakRules.ts）。
+   * 2026-11-13 つまみの測定2（イ）: 測るための入れ物（既定 false = 今と同じ）
+   */
+  breakPerfectNoWeakCard: false as boolean,
+  /**
+   * 「弱点で、しかも完全成功」の決まりの時でも、重い一撃の完全成功なら崩せる: カードの枠が slots 以上か、使ったフォーカスが focus 以上。
+   * 2026-11-13 つまみの測定2（エ）: 測るための入れ物（既定 undefined = 今と同じ）
+   */
+  breakPerfectHeavy: undefined as { slots: number; focus: number } | undefined,
+  /**
+   * 崩した時に付ける状態（'weak' = 弱体 / 'vulnerable' = 脆弱）と、ブロックを0にするか。
+   * 2026-11-13 まとめ役の指示で 'weak' → 'vulnerable'（崩した敵は、受けるダメージが増える）。量は breakWeak（名前は前のまま）
+   */
+  breakStatus: 'vulnerable' as 'weak' | 'vulnerable',
+  breakClearsBlock: true as boolean,
   breakPower: 0.5,
   breakWeak: 1,
   /** 先読みができる感知の成功率（%）。フクロウのお供・霊感の探索能力でもできる（扉の先の中身と、次の次の行の色が分かる） */
@@ -208,6 +318,29 @@ export const BALANCE = {
   corruptionPerRelayMove: 1,
   /** 侵食度: 鍵のダンジョンを制覇した時に下がる量（ダンジョンごとの corruptionOnClear が無い時。§4 B で 5→2、ダンジョンを大きくした時に 2→3（提案）） */
   corruptionOnKeyDungeonClear: 3,
+  /** 侵食度: ランダムダンジョンを制覇した時に下がる量（寄り道の浄化。overhaul-plan-v2 §7 の決定 3-A の始めの数字。段階8で測って決める） */
+  corruptionOnRandomDungeonClear: 2,
+  /**
+   * ランダムダンジョン（段階7a・overhaul-plan-v2 §4-3）。
+   * - exclusiveChance: ボスの黄金箱から、専用の装備が1つ「余分に」出る確率（%）。
+   *   憲章2「最奥の主を倒すと必ず黄金箱が開き、秘宝装備が手に入る」に合わせて 60 → 100（2026-11-13 オーナーの決定 A）
+   * - blackMarketPriceMul: 闇商人の値段の倍率（町の店の値段 × これ）【提案】
+   * - blackMarketGoods: 闇商人が専用の装備のほかに並べる、レア以上の品の数【提案】
+   */
+  /**
+   * ランダムダンジョン。shortcutRange = 抜け道の出口を探す範囲（入口から陸を歩いて何歩まで。2026-11-14 寄り道の値打ち 柱4・【提案】）/
+   * relicChoices = 黄金箱の秘宝の候補の数（同じ柱3）
+   */
+  randomDungeon: { exclusiveChance: 100, blackMarketPriceMul: 1.5, blackMarketGoods: 2, shortcutRange: 8, relicChoices: 3 },
+  /**
+   * 災厄の中ボス（段階7b・overhaul-plan-v2 §3。数字は計画の【提案】のまま。段階8で測って決める）。広い地図（帯のある地図）だけに出る。
+   * - max: 1冒険に出る数 / firstCorruption: 1体目は「1つ目の鍵を取った時」か、その前に侵食度がこれを越えた時 / milestones: 2体目・3体目の侵食度
+   * - levelBonus: その地域の敵のレベル+N（夜の加算は入れない） / minions: 取り巻きの数（4人の冒険は minions4p）
+   * - heroDistance: 世界マップにいる一番近いキャラから何マス / roadDistance: 街道（道の地形）から何マス以上離れたマス
+   * - towerReveal: 登った見晴らしの塔からこのマス以内に出た災厄は、自動で場所が見える
+   * - purify: 倒した時に侵食度が下がる量（寄り道の浄化。オーナーの決定 3-A の始めの数字） / elixirStat: 秘薬で上がる能力値
+   */
+  scourge: { max: 3, firstCorruption: 15, milestones: [35, 55] as readonly number[], levelBonus: 2, minions: 2, minions4p: 3, heroDistance: [5, 9] as readonly [number, number], roadDistance: 3, towerReveal: 12, purify: 3, elixirStat: 5 },
   /** 野営の回復（HPは最大HPの割合）と、夜に野営した時の夜襲の確率（%） */
   campHpRatio: 0.2,
   campFocus: 1,
@@ -252,6 +385,16 @@ export const BALANCE = {
   maxBlessings: 3,
   /** ショップ: 品揃えが入れ替わる間隔（ワールドターン）、格ごとの値段、売値の割合 */
   shopRefreshTurns: 8,
+  /**
+   * 必ず並ぶ品（2026-11-13 オーナーの決定・docs/tasks/break-read-plan.md §3）: 進む順で region 番目の地域の町
+   * （その地域に町が無ければ、その次にある町）の店に、items のうち1つを必ず並べる。どれかは冒険の種で決まる（冒険の間、同じ物）。
+   * 値段は、その品の格の itemPrice（今はエピック）。items = 「属性の付与」の装飾品（属性の無い物理攻撃が、その属性になる）
+   * 2026-11-13（点検19の 3-2）: 選ぶのは、そのシナリオの後半の大物の弱点に合う物だけ（重み = 弱点の大物の数。town.ts の featuredShopCandidatesOf）
+   */
+  shopFeatured: {
+    region: 3,
+    items: ['emberRing', 'stormRing', 'crystalNecklace', 'meteorRing', 'nightmareRing'] as readonly string[],
+  },
   itemPrice: { common: 30, rare: 70, epic: 160, legend: 400 } as Record<string, number>,
   cardPrice: { common: 40, rare: 75, epic: 140, legend: 300 } as Record<string, number>,
   sellRatio: 0.5,
@@ -295,13 +438,21 @@ export const TIMING = {
   /** 重なりの演出（Step C）の戦場の揺れ（秒。見た目だけ。高速の設定では短くなる） */
   synergyShake: 0.12,
   /** 戦闘の見た目の改修（段階B。秒・提案）: 技名の帯 / 被弾の白いフラッシュ / 戦場の揺れ / HPの残像が残る時間・追いかける時間 / 命中のエフェクト / 盾 */
+  /** 段階4（当たった瞬間の演出）で長くした: 白いフラッシュ 全体0.12→0.18秒（hitFlash×2）・揺れ 0.12→0.16秒・残像の保持 0.35→0.45秒・命中 0.42→0.5秒 */
   callout: 0.5,
-  hitFlash: 0.06,
-  fieldShake: 0.12,
-  hpGhostHold: 0.35,
+  hitFlash: 0.09,
+  fieldShake: 0.16,
+  hpGhostHold: 0.45,
   hpGhostChase: 0.28,
-  impactFx: 0.42,
+  impactFx: 0.5,
   guardFx: 0.5,
+  /** 回2: 敵が倒れた演出（白く光る → 赤黒く砕けて散る → 消える）。ボス・中ボス・災厄は少し長く。高速は半分（秒・提案） */
+  enemyDeath: 0.45,
+  enemyDeathBoss: 0.7,
+  /** とどめの命中が先に見えるように、倒れた演出を始めるまでの短い間（この間は絵がそのまま残る） */
+  enemyDeathLead: 0.08,
+  /** 倒れた合図（とどめのコマ）が来ないまま、この秒数が過ぎたら、今までどおり薄くして消す（保険） */
+  enemyDeathFallback: 1.5,
   /** 敵1体の行動間隔（前の敵の数字の表示が終わってから、次の敵が動くまでの間）。段階Cで 0.4 → 0.55（オーナー承認。高速は半分） */
   enemyStep: 0.55,
   /** 「ターン N」「敵のターン」の帯の表示時間（数字の表示が全部終わってから出す） */

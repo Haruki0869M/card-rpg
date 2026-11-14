@@ -35,6 +35,8 @@ export interface StaticMsg {
   dpr: number;
   top: number;
   chunk: number;
+  /** 立つ物（木・峰・岩など）を描かない（小さく縮小した時。段階6a） */
+  bare?: boolean;
 }
 export interface SeenMsg {
   type: 'seen';
@@ -138,7 +140,7 @@ async function handle(m: ToWorker) {
   const g = geom;
   if (!items) {
     const noProp = new Set(s.noProp);
-    items = scatter({ w: { width: s.width, height: s.height, tiles }, geom: g, levels: s.levels, links: s.links, rivers: s.rivers, stage: s.stage, blocked: (i) => s.f[i] || noProp.has(i) });
+    items = s.bare ? [] : scatter({ w: { width: s.width, height: s.height, tiles }, geom: g, levels: s.levels, links: s.links, rivers: s.rivers, stage: s.stage, blocked: (i) => s.f[i] || noProp.has(i) });
   }
   let cv = chunks.get(m.k);
   const full = !cv || !m.band;

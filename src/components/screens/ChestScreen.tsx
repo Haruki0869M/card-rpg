@@ -2,13 +2,14 @@
 // 格はエンジンが1回だけ抽選済み。ここは結果を「段階的に見せる」だけ（ガセ演出なし: 光・リーチ・予告は本当の格のときだけ出る）
 import { VoteChips, VoteStatus } from '../ui/Votes';
 import { chestLeaveGate } from './worldTurnGate';
-import { OthersTurnNote } from './OnlineScreens';
+import { OthersTurnNote, WaitNotes } from './OnlineScreens';
+import { chestClaimWaits } from './waitNotes';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Check, ChevronsRight, Lock, Sparkles, Star, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BattleBackground, ChestImage } from '../../art';
 import { BALANCE, REVEAL_TIMING, VIBRATION } from '../../data/balance';
-import { chestOdds, chestShared, expectedChestOdds, findHero, rarityIndex, sealStep, statChance, sceneBackground, sceneHeroes } from '../../engine';
+import { chestOdds, chestShared, expectedChestOdds, findHero, rarityIndex, sealStep, statChance, sceneBackground, sceneHeroes, themeReward } from '../../engine';
 import { PLAYER_COLOR } from '../../data/theme';
 import { useOnline } from '../../store/onlineStore';
 import { ClaimPanel } from '../ui/ClaimPanel';
@@ -23,6 +24,7 @@ import { CHEST_NAME, fmtPct, OddsBar } from '../ui/ChestOdds';
 import { HeroFace, RARITY_STYLE, Screen } from '../ui/game';
 import { CHEST_VIDEO_SECONDS, ChestVideo, chestVideoUrl } from './ChestVideo';
 import { LootList } from './RoomScreens';
+import { RelicPicker } from './RelicPicker';
 
 /** 光の色（白 → 青 → 紫 → 金）。本当の格の色で止まる */
 const LIGHT = ['#ffffff', '#5ab0ff', '#c58bff', '#ffcf4a'];
@@ -300,9 +302,11 @@ export function ChestScreen() {
   const hero = opener ?? sceneHeroes(game).find((h) => h.id === heroId) ?? sceneHeroes(game)[0];
   const chance = statChance(hero, 'luk', 'luck');
   const slots = BALANCE.chestLuckSlots;
-  const expected = useMemo(() => expectedChestOdds(look, slots, Math.min(focus, slots, hero.focus), chance), [look, slots, focus, hero.focus, chance]);
-  const perfectOdds = useMemo(() => chestOdds(look, slots), [look, slots]);
-  const shownOdds = !opened ? expected : roll?.odds && (passed('shift') || showResult || !roll.oddsBefore) ? roll.odds : (roll?.oddsBefore ?? chestOdds(look, 0));
+  // 封魔の地下迷宮の宝箱はエピックが出やすい（ボスの黄金箱は別。段階7a。エンジンの openChest と同じ決め方）
+  const epicMul = chest.roomId && !chest.spec.big ? themeReward(game.dungeon).epicMul : 1;
+  const expected = useMemo(() => expectedChestOdds(look, slots, Math.min(focus, slots, hero.focus), chance, epicMul), [look, slots, focus, hero.focus, chance, epicMul]);
+  const perfectOdds = useMemo(() => chestOdds(look, slots, epicMul), [look, slots, epicMul]);
+  const shownOdds = !opened ? expected : roll?.odds && (passed('shift') || showResult || !roll.oddsBefore) ? roll.odds : (roll?.oddsBefore ?? chestOdds(look, 0, epicMul));
 
   const r = RARITY_STYLE[showResult ? grade : look];
   const title = chest.spec.big ? `大宝箱（${CHEST_NAME[look]}）` : chest.spec.sealed ? `封魔の宝箱（${CHEST_NAME[look]}）` : CHEST_NAME[look];
@@ -603,11 +607,15 @@ export function ChestScreen() {
               </button>
             </div>
           </>
+        ) : opened && chest.relics?.length && chest.relicPicked === undefined ? (
+          // 寄り道の値打ち（2026-11-14）: 黄金箱の秘宝を3つから1つ選ぶ（選ぶまで先へ進めない）
+          <RelicPicker game={game} chest={chest} />
         ) : claimIdx >= 0 ? (
           // 中身の取り合い（ステップ2）: 1つずつ。決まった物は上の一覧に「→ 名前」で出る
           <div className="-mt-3 max-h-[46vh] overflow-y-auto overscroll-contain" data-claim-area>
             <ClaimPanel claim={chest.claims![claimIdx]} index={claimIdx} title={`中身を取り合う（${claimIdx + 1}/${chest.claims!.length}）`} />
             <div className="mt-1 text-center text-[12px] text-zinc-400">残り{claimsLeft}つ。全部決まると先へ進めます</div>
+            <WaitNotes notes={chestClaimWaits(game, isLocalPlayer)} className="mt-1" />
           </div>
         ) : claimsLeft === 0 && !leaveGate.canLeave ? (
           // 世界マップの宝箱: 手番のキャラの担当の人が「先へ進む」を押す。ほかの人にはだれを待っているかを出す

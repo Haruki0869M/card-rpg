@@ -10,7 +10,7 @@ export const randomForest: DungeonDef = {
   baseLevel: 4,
   pools: { ...RANDOM_FOREST_POOLS, boss: ['treeWarden', 'toxicShroom'] },
   bossChest: 'legend',
-  // 拠点に戻るたびに中身が変わる（クリアした数だけ敵が強くなる）
+  // 入るたびに中身が変わる（制覇したダンジョンの数だけ敵が強くなる）。段階7a: 全5行（4行＋ボスの行）。テーマ（並びとご褒美）は地図のマスに記録する
   random: true,
-  rows: 6,
+  rows: 4,
 };

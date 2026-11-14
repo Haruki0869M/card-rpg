@@ -34,7 +34,7 @@ import {
   WORLD_SCENE,
 } from '../engine';
 import type { Room } from '../net/room';
-import type { BattleEvent, BattleState, Command, Difficulty, DungeonRun, GameCommand, GameResult, GameState, Gender, PlayerId, SlotResult } from '../types';
+import type { BattleEvent, BattleState, Command, Difficulty, DungeonRun, GameCommand, GameResult, GameState, Gender, PlayerId, SlotResult, StatId } from '../types';
 import { pickAllyTarget } from './healTarget';
 import { actorOf, autoName, battleActorOf, isLocalPlayer, isOnlinePlay, LOCAL_PLAYER } from './battleConfig';
 import { handoffReplacesCutin } from './handoff';
@@ -159,11 +159,20 @@ interface StoreState {
   impactFx: Record<string, ImpactFx>;
   fieldShake: { id: number } | null;
   guardFx: Record<string, { id: number }>;
+  /** 回2: 敵が倒れた演出を始める合図（とどめのコマで出す。見た目だけ。状態・乱数・同期は変えない） */
+  deathFx: Record<string, { id: number }>;
   retargets: Record<string, number>;
   flash: { cardUid: string; text: string; id: number } | null;
   hint: { text: string; id: number } | null;
   /** 画面下に出す短いお知らせ（エラーなど） */
   toast: { text: string; id: number } | null;
+  /**
+   * 点検 2026-11-13 F6（オンライン）: ほかの人の「つづける」で閉じた物語の窓のうち、この端末でまだ押していない物。
+   * この端末だけの表示で、押すまで出しておく（ゲームの状態・進行は変えない）
+   */
+  heldStories: { title: string; lines: string[] }[];
+  /** 物語の窓の「つづける」（この端末だけの窓が残っていれば、それを閉じる。無ければ今の窓を閉じる操作を送る） */
+  continueStory: (playerId: PlayerId) => void;
 
   setScreen: (s: Screen) => void;
   /** 見る場面を切り替える */
@@ -184,7 +193,9 @@ interface StoreState {
   /** force = 確認なしで終える（確認の窓の「ターンを終了する」） */
   endTurn: (force?: boolean) => void;
   /** 道具を使う（userId = 袋の持ち主。戦闘中は操作中のキャラ） */
-  usePouch: (itemUid: string, targetHeroId: string, userId?: string) => string | undefined;
+  /** cardUid = カード鍛錬の砥石で強化するカード（区切りE） */
+  /** stat = 災厄討ちの秘薬で上げる能力値（段階7b） */
+  usePouch: (itemUid: string, targetHeroId: string, userId?: string, cardUid?: string, stat?: StatId) => string | undefined;
   setSettings: (s: Partial<Settings>) => void;
   /** heroId: パーティの窓で最初に見せるキャラ（世界マップの顔を押した時など） */
   openSheet: (s: Sheet, heroId?: string) => void;
@@ -199,6 +210,8 @@ interface StoreState {
   loadRemote: (game: GameState) => void;
   /** オンライン協力をやめた: この端末の1人用の冒険（保存）に戻す */
   exitOnline: () => void;
+  /** オンライン協力: この端末がホストを引き継いだ（敵の行動を進める役も引き継ぐ。回3 C） */
+  onBecameHost: () => void;
   /** 戻る操作などで一番上のものを閉じる。閉じたら true */
   closeTop: () => boolean;
 }
@@ -301,6 +314,8 @@ export const setStoreRoom = (r: Room | null) => {
 };
 /** ホストが送った「敵の行動」がまだ戻ってきていない */
 let enemyInFlight = false;
+/** この端末で「つづける」を押した物語の窓の版（点検 F6。押していない窓が、ほかの人の操作で閉じた時だけ、この端末に残す） */
+let storyPressed: number | null = null;
 
 /** この端末の担当で、まだ行動できる（使えるカードが残っている）仲間がいるか。オンラインで準備完了した席は数えない */
 export function canStillAct(battle: BattleState): boolean {
@@ -422,7 +437,7 @@ export const useBattle = create<StoreState>((set, get) => {
     presentationTimer = null; frames = []; pendingNotices = [];
     for (const timer of uiTimers) clearTimeout(timer);
     uiTimers.clear();
-    set({ presentationBusy: false, phaseBanner: null, cutins: [], petPulses: {}, popups: [], unitFx: {}, rollFx: null, synergyFx: null, callout: null, impactFx: {}, fieldShake: null, guardFx: {} });
+    set({ presentationBusy: false, phaseBanner: null, cutins: [], petPulses: {}, popups: [], unitFx: {}, rollFx: null, synergyFx: null, callout: null, impactFx: {}, fieldShake: null, guardFx: {}, deathFx: {} });
     if (enemyWaiting) { enemyWaiting = false; setTimeout(scheduleEnemy, 0); }
   };
   /** 見ている戦闘の手番が変わっていたら、帯を出す手番を返す（出したことにする） */
@@ -451,6 +466,9 @@ export const useBattle = create<StoreState>((set, get) => {
   const pumpNotices = () => {
     if (get().worldMoves.length) return;
     while (pendingNotices.length && get().cutins.length < TIMING.cutinVisible) {
+      // 同じキャラのお供のカットインは、前のが消えてから出す（双子の魂の鈴の2回の行動で、お供が2回、順に跳ねるように。段階7a）
+      const head = pendingNotices[0];
+      if (head.source?.kind === 'pet' && get().cutins.some((c) => c.unitId === head.unitId && c.source?.kind === 'pet')) break;
       const n = pendingNotices.shift()!, id = fxId++;
       set(s => ({ cutins: [...s.cutins, { ...n, id }], petPulses: { ...s.petPulses, [n.unitId]: { id } } }));
       // お供の能力カットイン: きらりと鳴いて知らせる（K6）
@@ -487,6 +505,7 @@ export const useBattle = create<StoreState>((set, get) => {
     if (frame.callout) set({ callout: { ...frame.callout, id: fxId++ } });
     if (frame.impacts?.length) set(s => ({ impactFx: { ...s.impactFx, ...Object.fromEntries(frame.impacts!.map(({ unitId, ...rest }) => [unitId, { ...rest, id: fxId++ }])) } }));
     if (frame.guards?.length) set(s => ({ guardFx: { ...s.guardFx, ...Object.fromEntries(frame.guards!.map(id => [id, { id: fxId++ }])) } }));
+    if (frame.deaths?.length) set(s => ({ deathFx: { ...s.deathFx, ...Object.fromEntries(frame.deaths!.map(id => [id, { id: fxId++ }])) } }));
     if (frame.shake) set({ fieldShake: { id: fxId++ } });
     for (const p of frame.popups ?? []) addPopup(p);
     showNotices(frame.notices ?? []);
@@ -544,6 +563,7 @@ export const useBattle = create<StoreState>((set, get) => {
     impactFx: {},
     fieldShake: null,
     guardFx: {},
+    deathFx: {},
     retargets: {},
     flash: null,
     hint: null,
@@ -614,6 +634,11 @@ export const useBattle = create<StoreState>((set, get) => {
       if (mine) vibrate(get().settings, VIBRATION.turn);
       playSound(mine ? 'sfx_turn_cutin' : 'sfx_turn_notice');
     }
+    // 点検 F6: オンラインで、ほかの人の「つづける」で物語の窓が閉じた。この端末でまだ押していなければ、押すまで出しておく
+    const bw = before?.world;
+    if (room && bw?.story && unwrapCommand(wire).command.type === 'STORY_CONTINUE' && (full.world?.storyVer ?? 0) !== (bw.storyVer ?? 0) && storyPressed !== (bw.storyVer ?? 0)) {
+      patch.heldStories = [...get().heldStories, bw.story];
+    }
     const lm = full.world?.lastMove;
     if (before && scene === WORLD_SCENE && cmdScene === WORLD_SCENE && lm && lm.seq !== before.world?.lastMove?.seq && lm.path.length > 1) {
       patch.worldMoves = [...get().worldMoves, { id: fxId++, game: full, before }];
@@ -673,6 +698,15 @@ export const useBattle = create<StoreState>((set, get) => {
     settings: loadSettings(),
     worldMoves: [],
     presentationBusy: false, phaseBanner: null, cutins: [], petPulses: {}, turnCutin: null, doorOpen: null,
+    heldStories: [],
+    continueStory: (playerId) => {
+      const held = get().heldStories;
+      if (held.length) return set({ heldStories: held.slice(1) });
+      const w = get().full?.world;
+      if (!w?.story) return;
+      storyPressed = w.storyVer ?? 0;
+      get().dispatchGame({ type: 'STORY_CONTINUE', playerId, storyVer: w.storyVer ?? 0 });
+    },
     finishWorldMove: id => {
       set(s => ({ worldMoves: s.worldMoves[0]?.id === id ? s.worldMoves.slice(1) : s.worldMoves }));
       if (!get().worldMoves.length) { pumpNotices(); scheduleEnemy(); }
@@ -691,6 +725,7 @@ export const useBattle = create<StoreState>((set, get) => {
     impactFx: {},
     fieldShake: null,
     guardFx: {},
+    deathFx: {},
     retargets: {},
     flash: null,
     hint: null,
@@ -726,7 +761,8 @@ export const useBattle = create<StoreState>((set, get) => {
         difficulty: d.difficulty,
         party: d.party.map((m) => ({ ...m, playerId: m.playerId ?? LOCAL_PLAYER })),
       });
-      set({ worldMoves: [], full: game, scene: WORLD_SCENE, game, screen: 'game', battle: EMPTY_BATTLE, sheet: null, selection: null });
+      storyPressed = null;
+      set({ worldMoves: [], full: game, scene: WORLD_SCENE, game, screen: 'game', battle: EMPTY_BATTLE, sheet: null, selection: null, heldStories: [] });
       scheduleSave(get);
     },
 
@@ -752,14 +788,22 @@ export const useBattle = create<StoreState>((set, get) => {
       const local = loadSave();
       const scene = pickScene(local?.game ?? null, WORLD_SCENE, true);
       const game = viewIn(local?.game ?? null, scene);
-      set({ worldMoves: [], full: local?.game ?? null, scene, game, activeId: local?.activeId ?? '', screen: 'title', confirmAbandon: false, sheet: null, battle: game?.battle ?? EMPTY_BATTLE, selection: null });
+      storyPressed = null;
+      set({ worldMoves: [], full: local?.game ?? null, scene, game, activeId: local?.activeId ?? '', screen: 'title', confirmAbandon: false, sheet: null, battle: game?.battle ?? EMPTY_BATTLE, selection: null, heldStories: [] });
+    },
+
+    onBecameHost: () => {
+      // 前のホストが送るはずだった敵の行動は、もう来ない。止まっている敵の番があれば、ここから進める
+      enemyInFlight = false;
+      scheduleEnemy();
     },
 
     abandonGame: () => {
       clearPresentation();
       if (enemyTimer) clearTimeout(enemyTimer);
       enemyTimer = null;
-      set({ worldMoves: [], activeId: '', draft: defaultDraft(), full: null, scene: WORLD_SCENE, game: null, screen: 'title', confirmAbandon: false, sheet: null, battle: EMPTY_BATTLE, selection: null });
+      storyPressed = null;
+      set({ worldMoves: [], activeId: '', draft: defaultDraft(), full: null, scene: WORLD_SCENE, game: null, screen: 'title', confirmAbandon: false, sheet: null, battle: EMPTY_BATTLE, selection: null, heldStories: [] });
       if (saveTimer) clearTimeout(saveTimer);
       saveTimer = null;
       enemyInFlight = false;
@@ -841,7 +885,7 @@ export const useBattle = create<StoreState>((set, get) => {
         return;
       }
       const card = cardOf(inst);
-      const reason = unusableReason(battle, ally, card);
+      const reason = unusableReason(battle, ally, card, inst.uid);
       if (reason) {
         set({ flash: { cardUid, text: reason, id: fxId++ } });
         return;
@@ -954,11 +998,11 @@ export const useBattle = create<StoreState>((set, get) => {
       get().dispatch({ type: 'END_TURN', playerId: LOCAL_PLAYER });
     },
 
-    usePouch: (itemUid, targetHeroId, userId) => {
+    usePouch: (itemUid, targetHeroId, userId, cardUid, stat) => {
       const { game, activeId } = get();
       if (!game) return;
       const user = game.mode === 'battle' ? activeId : (userId ?? game.heroes.find((h) => h.pouch.some((p) => p.uid === itemUid))?.id ?? targetHeroId);
-      const err = get().dispatchGame({ type: 'USE_POUCH_ITEM', playerId: LOCAL_PLAYER, itemUid, userId: user, targetId: targetHeroId });
+      const err = get().dispatchGame({ type: 'USE_POUCH_ITEM', playerId: LOCAL_PLAYER, itemUid, userId: user, targetId: targetHeroId, ...(cardUid ? { cardUid } : {}), ...(stat ? { stat } : {}) });
       if (!err) { set({ sheet: null }); get().showToast('道具を使いました'); }
       return err;
     },

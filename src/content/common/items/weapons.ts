@@ -3,26 +3,27 @@ import type { ItemDef } from '../../../types';
 
 export const weapons: ItemDef[] = [
   // 剣
-  { id: 'copperSword', name: '銅の剣', slot: 'weapon', weaponType: 'sword', rarity: 'common', icon: 'sword', description: '駆け出しの剣士の相棒。', cards: [{ cardId: 'wSlash', count: 2 }] },
+  { id: 'copperSword', name: '銅の剣', slot: 'weapon', weaponType: 'sword', rarity: 'common', icon: 'sword', description: '駆け出しの剣士の相棒。', cards: [{ cardId: 'strike', count: 2 }] },
   {
     id: "steelSword", name: "鋼の剣", slot: "weapon", weaponType: "sword", rarity: "rare", icon: "sword",
-    description: "物理カードが完全成功した後、自分に「応援」1（次のカードの成功率+10%）。1ターンに1回。", stats: {"str":4}, tags: ["physical"],
-    cards: [{"cardId":"wSteelCombo","count":2}],
-    ability: {"name":"見切り","description":"物理カードが完全成功した後、自分に「応援」1（次のカードの成功率+10%）。1ターンに1回。","effect":{"when":"perfect","if":[{"kind":"cardCategory","category":"physical"},{"kind":"oncePerTurn","key":"steelSword"}],"do":[{"kind":"applyStatus","status":"inspired","amount":1,"to":"self"}]}},
+    description: "物理カードが成功0だった後、次の物理カードの成功率+20%。1ターンに1回。", stats: {"str":4}, tags: ["physical"],
+    cards: [{"cardId":"cmAllOut","count":2}],
+    // 区切りG-2（2026-11-12）: 《見切り》→《立て直し》。熾火の剣《魔法剣》と同じ作り（数えを立てて、次の物理カードで消す）
+    ability: {"name":"立て直し","description":"物理カードが成功0だった後、次の物理カードの成功率+20%。1ターンに1回。","effect":{"modifier":"cardChance","bonus":20,"if":[{"kind":"cardCategory","category":"physical"},{"kind":"counterAtLeast","key":"steelRecover","n":1,"label":"物理カードが成功0だった後の"}]},"also":[{"when":"afterCard","if":[{"kind":"cardCategory","category":"physical"},{"kind":"counterAtLeast","key":"steelRecover","n":1}],"do":[{"kind":"counter","key":"steelRecover","set":0,"silent":true}]},{"when":"afterCard","if":[{"kind":"cardCategory","category":"physical"},{"kind":"cardSlots","min":1},{"kind":"successesAtMost","count":0},{"kind":"oncePerTurn","key":"steelSword"}],"do":[{"kind":"counter","key":"steelRecover","set":1,"text":"次の物理カードの成功率+20%"}]}]},
   },
   {
     id: "mithrilSword", name: "ミスリルソード", slot: "weapon", weaponType: "sword", rarity: "epic", icon: "sword",
     description: "カードが完全成功した後、自分に「応援」1（1ターンに1回）。「応援」を持ったままターンを終えると、応援1つにつきブロック3。", stats: {"str":8,"agi":5}, tags: ["physical","block"],
-    cards: [{"cardId":"wMithrilSlash","count":2}],
+    cards: [{"cardId":"axArmorPierce","count":2}],
     ability: {"name":"白銀の冴え","description":"カードが完全成功した後、自分に「応援」1（1ターンに1回）。「応援」を持ったままターンを終えると、応援1つにつきブロック3。","effect":{"when":"perfect","if":[{"kind":"oncePerTurn","key":"mithrilSword"}],"do":[{"kind":"applyStatus","status":"inspired","amount":1,"to":"self"}]},"also":[{"when":"turnEnd","if":[{"kind":"selfStatus","status":"inspired","min":1}],"do":[{"kind":"blockFromStatus","status":"inspired","of":"self","mult":3}]}]},
   },
   { id: 'flameSword', name: '炎の大剣', slot: 'weapon', weaponType: 'sword', rarity: 'legend', icon: 'sword', description: '刀身に炎の精霊が宿る大剣。', stats: { str: 12 }, cards: [{ cardId: 'wFlameSlash', count: 2 }] , ability: { name: '炎の精霊', effect: { when: 'perfect', if: [{ kind: 'cardCategory', category: 'physical' }, { kind: 'cardHasDamage' }], do: [{ kind: 'applyStatus', status: 'burn', amount: 2 }] } } },
   // 杖
-  { id: 'oakStaff', name: '樫の杖', slot: 'weapon', weaponType: 'staff', rarity: 'common', icon: 'staff', description: '魔法を学ぶ者が最初に持つ杖。', cards: [{ cardId: 'wManaBolt', count: 2 }] },
+  { id: 'oakStaff', name: '樫の杖', slot: 'weapon', weaponType: 'staff', rarity: 'common', icon: 'staff', description: '魔法を学ぶ者が最初に持つ杖。', cards: [{ cardId: 'magicArrow', count: 2 }] },
   {
     id: "magusStaff", name: "魔導士の杖", slot: "weapon", weaponType: "staff", rarity: "rare", icon: "staff",
     description: "魔法カードが弱点を突いた時、その敵に追加で4ダメージ。1ターンに1回。", stats: {"int":5}, tags: ["magic"],
-    cards: [{"cardId":"wManaTorrent","count":2}],
+    cards: [{"cardId":"iceLance","count":2}],
     ability: {"name":"弱点突き","description":"魔法カードが弱点を突いた時、その敵に追加で4ダメージ。1ターンに1回。","effect":{"when":"afterCard","if":[{"kind":"cardCategory","category":"magic"},{"kind":"weakHit"},{"kind":"oncePerTurn","key":"magusStaff"}],"do":[{"kind":"damage","amount":4,"to":"weakHit"}]}},
   },
   {
@@ -36,7 +37,7 @@ export const weapons: ItemDef[] = [
   {
     id: "steelHammer", name: "鋼の槌", slot: "weapon", weaponType: "hammer", rarity: "rare", icon: "hammer",
     description: "自分にブロックがある間、物理カードの基本ダメージ+3（1回の攻撃ごと。力などの倍率もかかる）。", stats: {"str":4,"vit":3}, tags: ["physical","block"],
-    cards: [{"cardId":"wIronHammer","count":2}],
+    cards: [{"cardId":"axShieldSlam","count":2}],
     ability: {"name":"盾打ち","description":"自分にブロックがある間、物理カードの基本ダメージ+3（1回の攻撃ごと。力などの倍率もかかる）。","effect":{"modifier":"damageDealt","multiplier":1,"add":3,"if":[{"kind":"cardCategory","category":"physical"},{"kind":"selfBlockAtLeast","n":1}]}},
   },
   {
@@ -47,11 +48,11 @@ export const weapons: ItemDef[] = [
   },
   { id: 'guardianMaul', name: '守護神の大槌', slot: 'weapon', weaponType: 'hammer', rarity: 'legend', icon: 'hammer', description: '仲間を守る大地の力が宿る。', stats: { vit: 10, str: 5 }, maxHp: 12, cards: [{ cardId: 'wEarthGuard', count: 2 }] , ability: { name: '守護神', effect: { modifier: 'coverLethal', chance: 35 } } },
   // 弓
-  { id: 'hunterBow', name: '狩人の弓', slot: 'weapon', weaponType: 'bow', rarity: 'common', icon: 'bow', description: '森の狩人の使い慣れた弓。', cards: [{ cardId: 'wAimedShot', count: 2 }] },
+  { id: 'hunterBow', name: '狩人の弓', slot: 'weapon', weaponType: 'bow', rarity: 'common', icon: 'bow', description: '森の狩人の使い慣れた弓。', cards: [{ cardId: 'strike', count: 2 }] },
   {
     id: "steelBow", name: "鋼の弓", slot: "weapon", weaponType: "bow", rarity: "rare", icon: "bow",
     description: "大技を予告している敵を狙うカードの成功率+15%。", stats: {"dex":4}, tags: ["physical","single"],
-    cards: [{"cardId":"wDoubleShot","count":2}],
+    cards: [{"cardId":"axVitalShot","count":2}],
     ability: {"name":"崩しの矢","description":"大技を予告している敵を狙うカードの成功率+15%。","effect":{"modifier":"cardChance","bonus":15,"if":[{"kind":"targetBigIntent"}]}},
   },
   {
@@ -64,10 +65,10 @@ export const weapons: ItemDef[] = [
   { id: 'clothWraps', name: '布の手甲', slot: 'weapon', weaponType: 'fist', rarity: 'common', icon: 'fist', description: '拳を守る、使い込んだ布の手甲。', cards: [{ cardId: 'wJab', count: 2 }] },
   { id: 'apprenticeTome', name: '見習いの魔導書', slot: 'weapon', weaponType: 'tome', rarity: 'common', icon: 'tome', description: '召喚の呪文が記された古い魔導書。', cards: [{ cardId: 'wSpiritSpark', count: 2 }] },
   { id: 'woodScepter', name: '木の錫杖', slot: 'weapon', weaponType: 'scepter', rarity: 'common', icon: 'scepter', description: '鈴の付いた、祈りのための錫杖。', cards: [{ cardId: 'wChime', count: 2 }] },
-  { id: 'rustyDagger', name: '古びた短剣', slot: 'weapon', weaponType: 'dagger', rarity: 'common', icon: 'dagger', description: '刃こぼれした、よく手になじむ短剣。', cards: [{ cardId: 'wQuickStab', count: 2 }] },
-  { id: 'ironSpear', name: '鉄の槍', slot: 'weapon', weaponType: 'spear', rarity: 'common', icon: 'spear', description: '長くまっすぐな鉄の槍。', cards: [{ cardId: 'wThrust', count: 2 }] },
-  { id: 'plainKatana', name: '無銘の刀', slot: 'weapon', weaponType: 'katana', rarity: 'common', icon: 'katana', description: '銘の無い、よく斬れる刀。', cards: [{ cardId: 'wIaiCut', count: 2 }] },
-  { id: 'woodAxe', name: '木こりの斧', slot: 'weapon', weaponType: 'axe', rarity: 'common', icon: 'axe', description: '分厚い刃の、重たい斧。', cards: [{ cardId: 'wCleave', count: 2 }] },
+  { id: 'rustyDagger', name: '古びた短剣', slot: 'weapon', weaponType: 'dagger', rarity: 'common', icon: 'dagger', description: '刃こぼれした、よく手になじむ短剣。', cards: [{ cardId: 'cmProbe', count: 2 }] },
+  { id: 'ironSpear', name: '鉄の槍', slot: 'weapon', weaponType: 'spear', rarity: 'common', icon: 'spear', description: '長くまっすぐな鉄の槍。', cards: [{ cardId: 'lnSeiSmite', count: 2 }] },
+  { id: 'plainKatana', name: '無銘の刀', slot: 'weapon', weaponType: 'katana', rarity: 'common', icon: 'katana', description: '銘の無い、よく斬れる刀。', cards: [{ cardId: 'lnGiQuick', count: 2 }] },
+  { id: 'woodAxe', name: '木こりの斧', slot: 'weapon', weaponType: 'axe', rarity: 'common', icon: 'axe', description: '分厚い刃の、重たい斧。', cards: [{ cardId: 'cmTackle', count: 2 }] },
   { id: 'rustyScythe', name: '錆びた大鎌', slot: 'weapon', weaponType: 'scythe', rarity: 'common', icon: 'scythe', description: '刃に黒い染みの残る、不吉な大鎌。', cards: [{ cardId: 'wReap', count: 2 }], tags: ['curse'] },
-  { id: 'leatherWhip', name: '革の鞭', slot: 'weapon', weaponType: 'whip', rarity: 'common', icon: 'whip', description: '獣を導くための、しなやかな革の鞭。', cards: [{ cardId: 'wLash', count: 2 }] },
+  { id: 'leatherWhip', name: '革の鞭', slot: 'weapon', weaponType: 'whip', rarity: 'common', icon: 'whip', description: '獣を導くための、しなやかな革の鞭。', cards: [{ cardId: 'palmStrike', count: 2 }] },
 ];

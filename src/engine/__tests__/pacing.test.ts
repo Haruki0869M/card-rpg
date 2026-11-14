@@ -153,21 +153,24 @@ describe('3つ目の鍵のダンジョンの関門（町の依頼）', () => {
 });
 
 describe('引き締めた地図（高さ35。抜本的な見直し §2-6）', () => {
-  it.each(SCENARIOS.all.map((s) => [s.id] as const))('%s: 鍵のダンジョンまでの行の差が 11・9・10、高さ35', (sid) => {
+  // 段階6a（overhaul-plan-v2 §2-1）: 広い地図（帯のある地図）は 15列×42行・スタート [7,40]。行の差は同じ比率で約1.2倍（13・11・12）
+  it.each(SCENARIOS.all.map((s) => [s.id] as const))('%s: 鍵のダンジョンまでの行の差が 11・9・10、高さ35（広い地図は 13・11・12、高さ42）', (sid) => {
     const map = SCENARIOS.get(sid).map!;
-    expect(map.height).toBe(35);
-    expect(map.start).toEqual([3, 33]);
+    const wide = !!map.lanes?.length;
+    expect(map.height).toBe(wide ? 42 : 35);
+    expect(map.start).toEqual(wide ? [7, 40] : [3, 33]);
     const keyed = DUNGEONS.forScenario(sid).filter((d) => d.rewardKey && !d.random).sort((a, b) => a.baseLevel - b.baseLevel);
     const row = (id: string) => map.features.find((f) => f.id === id)!.at[1];
-    expect(map.start[1] - row(keyed[0].id)).toBe(11);
-    expect(row(keyed[0].id) - row(keyed[1].id)).toBe(9);
-    expect(row(keyed[1].id) - row(keyed[2].id)).toBe(10);
+    const gaps = wide ? [13, 11, 12] : [11, 9, 10];
+    expect(map.start[1] - row(keyed[0].id)).toBe(gaps[0]);
+    expect(row(keyed[0].id) - row(keyed[1].id)).toBe(gaps[1]);
+    expect(row(keyed[1].id) - row(keyed[2].id)).toBe(gaps[2]);
     expect(row(DUNGEONS.forScenario(sid).find((d) => d.finale)!.id)).toBe(0);
     // 地域は隙間なく、上から下までつながっている
     const regions = [...map.regions].sort((a, b) => a.rows[0] - b.rows[0]);
     expect(regions[0].rows[0]).toBe(0);
     for (let i = 1; i < regions.length; i++) expect(regions[i].rows[0]).toBe(regions[i - 1].rows[1] + 1);
-    expect(regions[regions.length - 1].rows[1]).toBe(34);
+    expect(regions[regions.length - 1].rows[1]).toBe(map.height - 1);
     // 町・ダンジョン・名所は地図の中で、同じマスに重ならない
     const at = map.features.map((f) => f.at.join());
     expect(new Set(at).size).toBe(at.length);
@@ -215,8 +218,11 @@ describe('転職の速さ（§5）', () => {
   });
   it('最上位・特殊職の条件の数（計画書 §2-6 の表。聖王 20・幻獣王 80 は 2026-11-11 の依頼文の例に合わせた）', () => {
     const want: Record<string, number> = {
-      swordSaint: 22, bowSaint: 20, holyKing: 20, bard: 12, phantomKing: 80, timeMage: 70, fistKing: 35, pope: 22, grandThief: 250, overlord: 10, beastMaster: 8,
-      greatSage: 6, magicKnight: 6, hadesLord: 4, necromancer: 3, ninja: 6, dragoon: 2, darkKnight: 3, samurai: 6, gambler: 6, astrologer: 3, machinist: 3, shrineMaiden: 2,
+      // 2026-11-14 宿題6A: 2つ目の鍵の中でそろうように減らした（聖王・教皇・大怪盗・覇王・ビーストマスター・大賢者・冥王・死霊術師・忍者・拳聖。docs/review/2026-11-14-growth-fix.md）
+      swordSaint: 22, bowSaint: 20, holyKing: 6, bard: 12, phantomKing: 80, timeMage: 70, fistKing: 35, pope: 9, grandThief: 150, overlord: 7, beastMaster: 4,
+      greatSage: 3, magicKnight: 6, hadesLord: 2, necromancer: 2, ninja: 4, dragoon: 2, darkKnight: 3, samurai: 6, gambler: 6, astrologer: 3, machinist: 3, shrineMaiden: 2,
+      // 区切りF の新ジョブ4職
+      fistSaint: 50, bulwark: 3, dragonVein: 4, petTrainer: 15,
     };
     const withReq = CLASSES.all.filter((c) => c.requires);
     expect(withReq.map((c) => c.id).sort()).toEqual(Object.keys(want).sort());

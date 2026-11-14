@@ -1,5 +1,5 @@
 // ===== 効果の部品の決まりごと =====
-import type { AbilityDef, AbilityNotice, BattleEvent, BattleState, CardDef, Effect, EffectKind, EffectTarget, EffectParams } from '../../../types';
+import type { AbilityDef, AbilityNotice, BattleEvent, BattleState, CardDef, Effect, EffectKind, EffectTarget, EffectParams, EnemyState } from '../../../types';
 import type { Rng } from '../../rng';
 import type { Unit } from '../units';
 
@@ -24,6 +24,8 @@ export interface EffectCtx {
   tierEffects?: Effect[];
   /** カードではない攻撃の出どころ（pet = お供の能力 / summon = 砲台・罠・召喚。追い込み） */
   via?: 'pet' | 'summon';
+  /** 分身の追撃（召喚の攻撃。かばう敵に逸らされない） */
+  echo?: boolean;
   /** 今のカードが弱点を突いた敵（効果の対象 weakHit） */
   weakTarget?: Unit;
   /** 今のカードで支援が成立した味方（効果の対象 helped） */
@@ -34,12 +36,23 @@ export interface EffectCtx {
   addOnceUsed?: boolean;
   /** HPに与えたダメージの合計（吸収などが読む） */
   dealt: number;
+  /** きっかけになった状態異常（段階7b: 自分に付いた悪い状態異常をうつす。悪夢の毛皮） */
+  statusId?: string;
   /** 結果の短い表示（ログ・カードの結果の表示） */
   parts: string[];
   /** 効果を受けた相手のID（敵の行動の演出用） */
   hitIds: string[];
   /** 「×N回」の攻撃の数え（total = 当てた回数 / landed = HPに当たった回数。二の矢） */
   multi?: { total: number; landed: number };
+  /** 区切りD: このカードで連携が起きた・挟撃の陣のブロックをもらった・カードの成功の数 */
+  comboLanded?: boolean;
+  successes?: number;
+  /**
+   * つまみの測定2（2026-11-13・測るだけ）: カードを使った時の、使ったフォーカス・その味方が敵の弱点を突けるカードを持っているか。
+   * BREAK の決まり（BALANCE.breakPerfectHeavy・breakPerfectNoWeakCard）だけが読む。既定の値では読まない
+   */
+  focusUsed?: number;
+  hasWeakCard?: (enemy: EnemyState) => boolean;
   /** 働いた常時型の能力の名前（重複なし。演出用） */
   fired: AbilityNotice[];
   /** 能力の連鎖の深さ（無限に続かないように） */

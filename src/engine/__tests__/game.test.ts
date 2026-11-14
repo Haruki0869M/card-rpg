@@ -65,7 +65,7 @@ describe('冒険の開始', () => {
     expect(heroMaxHp(w)).toBe(60 + 5 + 5); // 皮の鎧＋体力70（60を超えた分の半分。M3-C6）
     // 最初の道具（回復薬2つ）はキャラに順番に配られる
     expect(g.heroes.reduce((n, h) => n + h.pouch.length, 0)).toBe(2);
-    expect(battleDeck(w).filter((c) => c.fromWeapon).map((c) => c.cardId)).toEqual(['wSlash', 'wSlash']);
+    expect(battleDeck(w).filter((c) => c.fromWeapon).map((c) => c.cardId)).toEqual(['strike', 'strike']);
     expect(battleDeck(w)).toHaveLength(12);
     expect(g.mode).toBe('hub');
   });
@@ -115,7 +115,7 @@ describe('装備', () => {
     g = run(g, { type: 'EQUIP', playerId: P, heroId: 'h0', itemUid: 'x1' });
     expect(heroStats(g.heroes[0]).str).toBe(before + 4);
     expect(g.heroes[0].stash.some((s) => s.itemId === 'copperSword')).toBe(true);
-    expect(battleDeck(g.heroes[0]).filter((c) => c.fromWeapon).map((c) => c.cardId)).toEqual(['wSteelCombo', 'wSteelCombo']);
+    expect(battleDeck(g.heroes[0]).filter((c) => c.fromWeapon).map((c) => c.cardId)).toEqual(['cmAllOut', 'cmAllOut']);
     g = run(g, { type: 'EQUIP', playerId: P, heroId: 'h0', itemUid: 'x3' });
     expect(heroFocusMax(g.heroes[0])).toBe(BALANCE.focusMax + 1);
     expect(statChance(g.heroes[0], 'luk')).toBe(Math.min(95, 40 + 5));
@@ -178,7 +178,7 @@ describe('宝箱', () => {
     }
     expect(counts.legend).toBeGreaterThan(0);
     expect(counts.epic).toBeGreaterThan(0);
-  });
+  }, 20000); // 冒険を400回作る（段階6a でシナリオ1の地図が2.25倍になり、1回あたり約2ms→5ms。全部のテストを並べて動かすと5秒を超えるため）
   it('鍵開けに失敗すると罠（全員5ダメージ）。成功すれば開けられる', () => {
     let failed = false;
     let opened = false;
@@ -249,10 +249,10 @@ describe('戦闘 → 報酬 → 成長', () => {
 describe('新しい戦闘の要素', () => {
   it('全体攻撃・全員ブロック・全員回復', () => {
     const s = createBattle({ seed: 1, party: party('warrior', 'guardian'), encounter: { id: 't', name: 't', enemies: [{ defId: 'goblinScout' }, { defId: 'goblinScout' }] } });
-    s.allies[0].hand = [{ uid: 'z1', cardId: 'sweep' }];
+    s.allies[0].hand = [{ uid: 'z1', cardId: 'lnBuSwipe' }];
     let r = applyCommand(s, { type: 'PLAY_CARD', playerId: 'P1', characterId: 'a0', cardInstanceId: 'z1', focusUsed: 2 });
     expect(r.error).toBeUndefined();
-    expect(r.state.enemies.every((e) => e.hp === e.maxHp - 10)).toBe(true); // 8 × 剣の心得（完全成功で1.3倍）
+    expect(r.state.enemies.map((e) => e.maxHp - e.hp)).toEqual([6, 6]); // 5 × 剣の心得（完全成功で1.3倍）。憲章5: 「旋風撃」（8）を「払い斬り」（5）にまとめた
     const s2 = r.state;
     s2.allies[1].hand = [{ uid: 'z2', cardId: 'guardFormation' }, { uid: 'z3', cardId: 'holyLight' }];
     s2.allies[0].hp = 30;
@@ -282,8 +282,12 @@ describe('新しい戦闘の要素', () => {
     expect(r.state.enemies[0].phase).toBe(1);
     expect(enemyName(r.state.enemies[0])).toBe('怒れる古樹');
     expect(r.events.some((e) => e.type === 'enemyPhase')).toBe(true);
-    // 次のターンの行動は第2形態の行動から選ばれる
+    // 次のターンの行動は第2形態の開幕の一手（2026-11-14 ボスの段階）、その次から第2形態の行動から選ばれる
     let st = applyCommand(r.state, { type: 'END_TURN', playerId: 'P1' }).state;
+    while (st.phase === 'enemy') st = applyCommand(st, { type: 'ENEMY_STEP' }).state;
+    expect(st.enemies[0].intent?.actionId).toBe('rootDown');
+    expect(st.enemies[0].intent?.opening).toBe(1);
+    st = applyCommand(st, { type: 'END_TURN', playerId: 'P1' }).state;
     while (st.phase === 'enemy') st = applyCommand(st, { type: 'ENEMY_STEP' }).state;
     expect(['rageStorm', 'stranglingVine', 'rotSpores']).toContain(st.enemies[0].intent?.actionId);
   });
@@ -383,7 +387,9 @@ function autoPlay(g: GameState, dungeonId: string, maxSteps = 4000): GameState {
       }
       case 'chest': {
         const c = g.chest!;
-        if (c.contents) g = run(g, { type: 'LEAVE_CHEST', playerId: P });
+        // 2026-11-14（寄り道の値打ち）: ランダムダンジョンの黄金箱は、秘宝を3つから1つ選んでから立ち去る
+        if (c.contents && c.relics?.length && c.relicPicked === undefined) g = run(g, { type: 'PICK_RELIC', playerId: P, optionIndex: 0 });
+        else if (c.contents) g = run(g, { type: 'LEAVE_CHEST', playerId: P });
         else {
           const h = g.heroes.find((x) => x.hp > 0)!;
           g = run(g, { type: 'OPEN_CHEST', playerId: P, heroId: h.id, focusUsed: 0 });

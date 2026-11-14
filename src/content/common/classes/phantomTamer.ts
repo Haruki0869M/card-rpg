@@ -28,6 +28,6 @@ export const phantomTamer: ClassDef = {
   from: ['summoner'],
   signature: ['summonWolfSpirit', 'phantomLink', 'summonPhoenix'],
   startingEquipment: { weapon: 'apprenticeTome', armor: 'travelerClothes' },
-  cardPool: ['summonWolfSpirit', 'phantomLink', 'summonPhoenix', 'spiritShield', 'beckon', 'summonTortoise'],
+  cardPool: ['summonWolfSpirit', 'phantomLink', 'summonPhoenix', 'spiritShield', 'lnGiTrick', 'summonTortoise'],
   growthWeights: { int: 3, per: 3 },
 };

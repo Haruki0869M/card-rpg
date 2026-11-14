@@ -69,7 +69,7 @@ describe('町で買った装備を、すぐ装備する（フェーズ2-A）', (
 describe('買った時のお知らせ', () => {
   it('装備品は「すぐ装備」の窓、道具・カードは短い文', () => {
     expect(boughtNotice(1, 'レオン', 'h0', { kind: 'card', cardName: '払い斬り' })).toEqual({ id: 1, kind: 'text', text: '「払い斬り」をレオンの山札に加えた！' });
-    expect(boughtNotice(2, 'レオン', 'h0', { kind: 'item', itemUid: 'i1', itemId: 'holyWater' })).toMatchObject({ kind: 'text', text: expect.stringContaining('道具袋へ') });
+    expect(boughtNotice(2, 'レオン', 'h0', { kind: 'item', itemUid: 'i1', itemId: 'antidote' })).toMatchObject({ kind: 'text', text: expect.stringContaining('道具袋へ') });
     const g = inCapital();
     const i = equipIndex(g, 'h0');
     const it = g.world!.shops[g.town!.townId].items[i].item;

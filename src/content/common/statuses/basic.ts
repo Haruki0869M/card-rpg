@@ -8,10 +8,12 @@ export const statuses: StatusDef[] = [
   { id: 'burn', name: '火傷', icon: 'flame', color: '#ffa04a', bg: '#5a2208', harmful: true, tickDamage: 4 },
   { id: 'poison', name: '毒', icon: 'biohazard', color: '#9aff6a', bg: '#1e4a10', harmful: true, tickDamage: 'stacks' },
   { id: 'paralysis', name: '痺れ', icon: 'zap', color: '#ffe04a', bg: '#4a3a08', harmful: true, chancePenalty: 15, actionFailChance: 30 },
-  { id: 'freeze', name: '凍結', icon: 'snowflake', color: '#9ae8ff', bg: '#0a3a5a', harmful: true, skipAction: true, manaPenalty: 1, decay: 0, maxStacks: 1 },
+  { id: 'freeze', name: '凍結', icon: 'snowflake', color: '#9ae8ff', bg: '#0a3a5a', harmful: true, skipAction: true, manaPenalty: 1, decay: 0, maxStacks: 1, guideNote: '敵の行動阻止！' },
   // 遅延（砂時計のゴーレムなど）: 時の流れを遅らせ、次のターンに引くカードを減らす。凍結（マナ-1）・痺れ（成功率-）とは別
   { id: 'delay', name: '遅延', icon: 'hourglass', color: '#e8c890', bg: '#4a3418', harmful: true, drawPenalty: 1, decay: 0, maxStacks: 2, description: '味方は次のターンの初めに引くカードが数値分減る（最大2。引いた時に消える）' },
   { id: 'curse', name: '呪い', icon: 'skull', color: '#d08aff', bg: '#2a0a3a', harmful: true, healMultiplier: 0.5 },
+  // 癒し封じ（呪紋の魔犬の「癒し封じの呪い」）: HPの回復が半分。回復の共通の処理（healUnit）で掛かるので、カード・道具・能力・再生のどれにも効く
+  { id: 'healSeal', name: '癒し封じ', icon: 'heartOff', color: '#ff9ad0', bg: '#4a0a2e', harmful: true, healMultiplier: 0.5, description: 'HPの回復が半分になる（端数切り捨て）。フェーズ終了時に1減る' },
   // 良い効果（万能薬では消えない）
   { id: 'regen', name: '再生', icon: 'heartPulse', color: '#6ad8ff', bg: '#0a2e4a', harmful: false, tickHeal: 'stacks' },
   // 応援: 次に使うカードの成功率+10%（1つにつき。カードを使うと消える。セキセイインコ）

@@ -31,20 +31,41 @@ export function actorOf(game: GameState, cmd: GameCommand): PlayerId {
   let id = (c.heroId ?? c.userId ?? c.fromHeroId) as string | undefined;
   if (cmd.type === 'CHOOSE_GROWTH') id = game.reward?.levelUps[0]?.heroId;
   if (cmd.type === 'PICK_CARD' && cmd.offerIndex !== null) id = game.reward?.cardOffers[cmd.offerIndex]?.heroId;
-  // オンライン協力: キャラを指さない操作（物語を進める・報酬を閉じるなど）は、押した人の操作
-  if (!id && localPlayers) return myPlayer();
-  // ローカル協力では、世界マップから開いた画面でも担当者を引き継ぐ。
-  // ダンジョン内の操作と投票は従来の経路に任せる。
-  if (!id && game.world && !game.activeScene) {
-    if (game.mode === 'town') id = game.town?.heroId;
-    else if (game.mode === 'shrine') id = game.shrine?.heroId;
-    else if (game.mode === 'sanctuary') id = game.sanctuary?.heroId;
-    else if (game.mode === 'encounter') id = game.encounter?.heroId;
-    else if ((game.mode === 'event' && game.event?.tile !== undefined)
-      || (game.mode === 'chest' && game.chest?.tile !== undefined)) id = game.world.turn;
+  if (id) return heroPlayer(id) ?? first;
+  const owner = heroPlayer(sceneOwnerId(game));
+  // オンライン協力: キャラを指さない操作（物語を進める・報酬を閉じるなど）は、押した人の操作。
+  // ただし、その場面の担当の席を、この端末が動かせる時（ホストが「代わりに操作」している席）は、その席で送る（点検 2026-11-13 F1）。
+  // ダンジョンの場面は、場面にいるのが1つの席のキャラだけの時、その席を担当とみなす（オンラインだけ。1台の時の動きは変えない）
+  if (localPlayers) {
+    const seat = owner ?? soleScenePlayer(game);
+    return seat && localPlayers.includes(seat) ? seat : myPlayer();
   }
-  if (!id && game.world && game.mode === 'world') id = game.world.turn;
-  return heroPlayer(id) ?? first;
+  return owner ?? first;
+}
+
+/**
+ * キャラを指さない操作の、その場面の担当のキャラ。
+ * 世界マップから開いた画面（町・祠・神殿・遭遇・マスの宝箱とイベント）は訪れたキャラか手番のキャラ。
+ * ダンジョン内の操作と投票は従来の経路に任せる（undefined）
+ */
+function sceneOwnerId(game: GameState): string | undefined {
+  if (!game.world) return undefined;
+  if (!game.activeScene) {
+    if (game.mode === 'town') return game.town?.heroId;
+    if (game.mode === 'shrine') return game.shrine?.heroId;
+    if (game.mode === 'sanctuary') return game.sanctuary?.heroId;
+    if (game.mode === 'encounter') return game.encounter?.heroId;
+    if ((game.mode === 'event' && game.event?.tile !== undefined) || (game.mode === 'chest' && game.chest?.tile !== undefined)) return game.world.turn;
+  }
+  if (game.mode === 'world') return game.world.turn;
+  return undefined;
+}
+
+/** ダンジョンの場面（見ている組）にいる生きているキャラが、1つの席の物だけなら、その席 */
+function soleScenePlayer(game: GameState): PlayerId | undefined {
+  if (!game.activeScene) return undefined;
+  const seats = new Set(game.heroes.filter((h) => !h.retired && h.hp > 0 && (!game.party || game.party.includes(h.id))).map((h) => h.playerId));
+  return seats.size === 1 ? [...seats][0] : undefined;
 }
 
 /** 戦闘のコマンドを送るプレイヤー */

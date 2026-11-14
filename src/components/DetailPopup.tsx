@@ -6,9 +6,12 @@ import { STAT_LABEL } from '../data/terms';
 import { CharacterArt, EnemyArt } from '../art';
 import { getCard } from '../data/cards';
 import { getClass } from '../data/classes';
-import { getEnemy } from '../data/enemies';
+import { getEnemy, phasesOf } from '../data/enemies';
 import { affinityFromStats, affinityOf, chanceFor, describeEffect, describeAbility, enemyHitDamage, enemyName, finalChance, findAlly, findEnemy, heroStats, incomingDamage, statsOf, targetOf, tierDistribution, toPercents } from '../engine';
 import { getEnemyAction } from '../data/enemies';
+import { enemyResist, enemyWeak, phaseDefOf, phaseMarks } from '../engine/battle/phases';
+import { battleBoonViews } from '../engine/game/world/detour';
+import { currentActionSet } from '../engine/battle/intents';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ItemDetailContent } from './ItemDetail';
 import { type Detail, useDetail } from '../hooks/usePress';
@@ -16,7 +19,7 @@ import { useBattle } from '../store/battleStore';
 import type { Affinity, BattleState, EnemyActionDef, EnemyState, GameState, StatId } from '../types';
 import { CATEGORY_LABEL, intentView, longEffect, tierTitle } from './format';
 import { RARITY_STYLE } from './ui/game';
-import { CATEGORY_STYLE, ElementTag, statusStyle } from './ui/icons';
+import { CATEGORY_STYLE, ElementTag, MARK_STATUSES, statusStyle } from './ui/icons';
 import { BALANCE } from '../data/balance';
 
 function signed(n: number) {
@@ -85,8 +88,13 @@ function Content({ d, battle, game }: { d: Detail; battle: BattleState; game: Ga
     case 'intent': {
       const e = inBattle ? findEnemy(battle, d.uid) : undefined;
       if (!e) return null;
-      const def = getEnemy(e.defId);
       const iv = intentView(battle, e);
+      // ボスの段階（2026-11-14）: 今の弱点・耐性（段階と予告で変わる）・今の段階の決まり・まだ越えていない境目
+      const weak = enemyWeak(e);
+      const resist = enemyResist(e);
+      const ph = phaseDefOf(e);
+      const marks = e.dead ? [] : phaseMarks(e);
+      const set = currentActionSet(e);
       return (
         <div className="flex gap-2">
           <EnemyArt defId={e.defId} className="h-[78px] w-[66px] shrink-0" />
@@ -100,6 +108,11 @@ function Content({ d, battle, game }: { d: Detail; battle: BattleState; game: Ga
             {iv ? (
               <div className="mt-1 text-[13px]">
                 <div className="font-bold text-red-300">次の行動：「{iv.name}」</div>
+                {/* 敵の特殊な行動: 何が起きるか・どうすれば止まるか */}
+                {/* 強敵の本気: なぜ強いか・どう受けるか */}
+                {iv.frenzy && !iv.broken && <div className="my-0.5 rounded bg-orange-500/20 px-1.5 py-0.5 font-bold text-orange-200" data-intent-frenzy-hint>{iv.frenzy.icon}{iv.frenzy.label}: {iv.frenzy.long}</div>}
+                {iv.opening && <div className="my-0.5 rounded bg-indigo-500/25 px-1.5 py-0.5 font-bold text-indigo-100" data-intent-opening-hint>🌀{iv.opening.label}: {iv.opening.long}</div>}
+                {iv.hint && <div className="my-0.5 rounded bg-amber-400/15 px-1.5 py-0.5 font-bold text-amber-200" data-intent-hint>{iv.hint}</div>}
                 {iv.details.map((t, i) => (
                   <div key={i}>・{t}</div>
                 ))}
@@ -108,22 +121,38 @@ function Content({ d, battle, game }: { d: Detail; battle: BattleState; game: Ga
               <div className="mt-1 text-[13px] text-zinc-400">{e.dead ? '撃破済み' : '行動済み'}</div>
             )}
             {e.tauntedBy && <div className="text-[13px] text-amber-300">{findAlly(battle, e.tauntedBy)?.name}に挑発されている</div>}
-            {(def.weak?.length || def.resist?.length) && (
+            {e.guarding && !e.dead && <div className="text-[13px] text-sky-300">仲間をかばっている（ほかの敵への単体攻撃を代わりに受ける。全体攻撃は通る）</div>}
+            {/* ボスの段階: 今の段階の決まりと、この先の境目（HPバーの線） */}
+            {ph?.rule && <div className="mt-1 text-[12px] text-indigo-200" data-phase-rule>🌀今の段階「{ph.name}」: {ph.rule}</div>}
+            {marks.map((m) => (
+              <div key={m.phase} className="text-[12px] text-sky-200" data-phase-ahead={m.phase}>
+                ▼HP{Math.round(m.at * 100)}%を切る{m.partner ? 'か、相方が倒れる' : ''}と「{m.name}」になる。{m.opening ? `最初に「${m.opening}」をしてくる` : ''}{m.rule ? `（${m.rule}）` : ''}
+              </div>
+            ))}
+            {/* 寄り道の値打ち（2026-11-14）: この大物に掛かっている災厄の加護と、見破り */}
+            {battle.boon?.uid === e.uid &&
+              battleBoonViews(battle).map((b) => (
+                <div key={b.name} className="mt-0.5 text-[12px] leading-4 text-violet-200" data-boon-row>
+                  💀加護《{b.name}》（{b.scourge}）: {b.text}
+                </div>
+              ))}
+            {battle.insight === e.uid && <div className="mt-0.5 text-[12px] leading-4 text-emerald-200" data-insight-row>👁見破り: この敵の大技と開幕の一手は、弱点でなくても完全成功だけで崩せる</div>}
+            {(weak.length > 0 || resist.length > 0) && (
               <div className="mt-1 flex flex-wrap gap-x-2 text-[12px]">
-                {def.weak?.length ? (
+                {weak.length ? (
                   <span>
                     弱点（×{BALANCE.elementWeakMul}）：
-                    {def.weak.map((x) => (
+                    {weak.map((x) => (
                       <span key={x} className="mr-1">
                         <ElementTag id={x} />
                       </span>
                     ))}
                   </span>
                 ) : null}
-                {def.resist?.length ? (
+                {resist.length ? (
                   <span className="text-zinc-300">
                     耐性（×{BALANCE.elementResistMul}・状態異常なし）：
-                    {def.resist.map((x) => (
+                    {resist.map((x) => (
                       <span key={x} className="mr-1">
                         <ElementTag id={x} />
                       </span>
@@ -134,9 +163,9 @@ function Content({ d, battle, game }: { d: Detail; battle: BattleState; game: Ga
             )}
             <EnemyStats e={e} />
             <div className="mt-1 text-[12px] text-zinc-500">
-              {def.pattern === 'sequence'
-                ? `行動順：${def.actions.map((a) => a.name).join(' → ')} → 最初に戻る`
-                : `ランダム行動：${def.actions.map((a) => a.name).join(' / ')}`}
+              {set.pattern === 'sequence'
+                ? `行動順：${set.actions.map((a) => a.name).join(' → ')} → 最初に戻る`
+                : `ランダム行動：${set.actions.map((a) => a.name).join(' / ')}`}
             </div>
           </div>
         </div>
@@ -196,7 +225,7 @@ function Content({ d, battle, game }: { d: Detail; battle: BattleState; game: Ga
         {a.attackCharge && <p className="text-[13px]">居合：次の{a.attackCharge.category === 'physical' ? '物理' : '攻撃'}カード×{a.attackCharge.multiplier}。使用まで持続。</p>}
         {a.imbuedElement && <p className="text-[13px]">魔法剣：次の物理攻撃に{getElement(a.imbuedElement).name}属性。使用まで持続。</p>}
         {a.airborne && <p className="text-[13px]">跳躍：次の味方ターンに着地し、対象へ{a.airborne.amount}を基準とする攻撃。</p>}
-        {a.summons?.map((m, i) => <p key={`${m.id}:${i}`} className="text-[13px]">{m.icon}{m.name}：{m.echoPct ? `攻撃時に${m.echoPct}%で追撃` : `${m.trigger === 'enemyBeforeAction' ? '対象の敵が行動する直前' : 'ターン終了時'}に${m.damage}の攻撃`}{m.targetId && `／対象：${battle.enemies.find(e => e.uid === m.targetId)?.defId ? enemyName(battle.enemies.find(e => e.uid === m.targetId)!) : '不在'}`}{m.effects?.length ? `／${m.effects.map(e => describeEffect(e)).join('・')}` : ''}{m.intercept ? '／被弾を一度防いで消える' : ''}。{m.turns >= 99 ? '戦闘中持続' : `残り${m.turns}ターン`}。</p>)}
+        {a.summons?.map((m, i) => <p key={`${m.id}:${i}`} className="text-[13px]">{m.icon}{m.name}：{m.echoPct ? `攻撃時に${m.echoPct}%で追撃` : `${m.trigger === 'enemyBeforeAction' ? '対象の敵が行動する直前' : 'ターン終了時'}に${m.damage}${m.blockPct ? `＋ブロックの${m.blockPct}%（最大+${m.blockMax ?? 99}）` : ''}の攻撃`}{m.targetId && `／対象：${battle.enemies.find(e => e.uid === m.targetId)?.defId ? enemyName(battle.enemies.find(e => e.uid === m.targetId)!) : '不在'}`}{m.effects?.length ? `／${m.effects.map(e => describeEffect(e)).join('・')}` : ''}{m.intercept ? '／被弾を一度防いで消える' : ''}。{m.turns >= 99 ? '戦闘中持続' : `残り${m.turns}ターン`}。</p>)}
       </>;
     }
     case 'status': {
@@ -207,12 +236,12 @@ function Content({ d, battle, game }: { d: Detail; battle: BattleState; game: Ga
           <Title>
             <span className="inline-flex items-center gap-1" style={{ color: st.color }}>
               <st.Icon size={18} /> {st.name}
-              {d.status !== 'taunt' && ` ${d.amount}`}
+              {!MARK_STATUSES.has(d.status) && ` ${d.amount}`}
             </span>
           </Title>
           <div className="text-[13px]">{st.text}</div>
           {by && <div className="text-[13px] text-amber-300">挑発した味方：{by.name}</div>}
-          {d.status !== 'taunt' && (
+          {!MARK_STATUSES.has(d.status) && (
             <div className="mt-1 text-[12px] text-zinc-400">
               {getStatus(d.status).decay === 0 ? `蓄積量${d.amount}。自然には減りません。` : `残り${Math.ceil(d.amount / (getStatus(d.status).decay ?? 1))}ターン相当（現在値${d.amount}）。${d.side === 'enemy' ? '敵' : '味方'}フェーズ終了時に${getStatus(d.status).decay ?? 1}減少。`}追加の消費条件は上の効果説明を確認してください。
             </div>
@@ -228,7 +257,7 @@ function actionText(e: EnemyState, a: EnemyActionDef): string {
   const parts = a.effects.map((eff) => {
     if (eff.kind === 'damage') {
       const hits = eff.hits ?? 1;
-      return `${targetOf(eff) === 'target' ? '' : '全体に'}${enemyHitDamage(e, eff.amount, undefined)}ダメージ${hits > 1 ? `×${hits}` : ''}`;
+      return `${targetOf(eff) === 'target' ? '' : '全体に'}${enemyHitDamage(e, eff.amount, undefined)}ダメージ${hits > 1 ? `×${hits}` : ''}${eff.lowHpMul ? `（HPが半分以下の相手に×${eff.lowHpMul}）` : ''}`;
     }
     return describeEffect(eff, 'enemy');
   });
@@ -255,8 +284,8 @@ function EnemyStats({ e }: { e: EnemyState }) {
           <span className="font-display text-fuchsia-200">《{ab.name}》</span> {describeAbility(ab)}
         </div>
       ))}
-      {def.phases?.length ? (
-        <div className="mt-0.5 text-amber-200">{def.phases.map((ph) => `HP${ph.belowHpPct}%以下で「${ph.name}」に変わる`).join('／')}</div>
+      {phasesOf(e)?.length ? (
+        <div className="mt-0.5 text-amber-200">{phasesOf(e)!.map((ph) => `HP${ph.belowHpPct}%以下${ph.onPartnerDown ? 'か、相方が倒れると' : 'で'}「${ph.name}」に変わる`).join('／')}</div>
       ) : null}
     </div>
   );

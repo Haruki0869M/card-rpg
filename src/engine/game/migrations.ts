@@ -2,6 +2,7 @@
 // 保存データの形を変えた時は、GAME_VERSION（= battle の STATE_VERSION）を1つ上げ、ここに「前の版 → 次の版」の直し方を1つ足す。
 // 直し方が無い古い版は読み込まない（タイトルで「つづきから」が出ないだけで、新しく始められる）。
 import { CARDS } from '../../data/cards';
+import { MERGED_CARDS } from '../../data/cards/merged';
 import { CLASSES } from '../../data/classes';
 import { DUNGEONS } from '../../data/dungeons';
 import { ENEMIES } from '../../data/enemies';
@@ -16,7 +17,46 @@ type Loose = Record<string, any>; // eslint-disable-line @typescript-eslint/no-e
 
 // v17 までの保存データは読まない（2026-11-11 オーナーの決定: 装備の作り直しで、古い保存は捨てて良い。置き換えの表は作らない）。
 // それより前の「直し方」（v3〜v16）は、もう通らないので消した。次に形を変える時は、ここに 18(g) { ... } から足す。
-const MIGRATIONS: Record<number, (g: Loose) => void> = {};
+const MIGRATIONS: Record<number, (g: Loose) => void> = {
+  // v23 → v24（2026-11-12・憲章5）: 数字だけ違うカードをまとめた。消した札を、残した札に読み替える
+  23(g) { renameCards(g); },
+  // v24 → v25（2026-11-12・区切りG-1）: 武器にだけ付いていた札11枚と、区切りFの2枚をまとめた
+  24(g) { renameCards(g); },
+  // v25 → v26（2026-11-12・区切りG-2）: 鋼の連撃 → 手早い攻撃（MERGED_CARDS）。魔法の法衣 → 学び手の法衣
+  25(g) { renameCards(g); renameItems(g); },
+};
+
+/** 無くした装備 → 読み替える先（区切りG-2） */
+const RENAMED_ITEMS: Record<string, string> = { magicRobe: 'commonAdeptRobe' };
+
+/** 保存データの中の装備のID（itemId の項目。持ち物・袋・装備・行商人・町の店・宝箱の中身など、どこにあっても）を読み替える */
+function renameItems(v: unknown): void {
+  if (Array.isArray(v)) { v.forEach((x) => renameItems(x)); return; }
+  if (!v || typeof v !== 'object') return;
+  const o = v as Loose;
+  for (const k of Object.keys(o)) {
+    if (k === 'itemId' && typeof o[k] === 'string') { if (RENAMED_ITEMS[o[k]]) o[k] = RENAMED_ITEMS[o[k]]; }
+    else renameItems(o[k]);
+  }
+}
+
+/** 保存データの中のカードのID（cardId の項目と、名前に card が入る並び）を、まとめた先に読み替える。敵の行動のID（同じ文字の物がある）には触らない */
+function renameCards(v: unknown, key = ''): void {
+  if (Array.isArray(v)) {
+    const cardList = /card|jobPick|exhausted/i.test(key);
+    v.forEach((x, i) => {
+      if (typeof x === 'string') { if (cardList && MERGED_CARDS[x]) v[i] = MERGED_CARDS[x]; }
+      else renameCards(x, key);
+    });
+    return;
+  }
+  if (!v || typeof v !== 'object') return;
+  const o = v as Loose;
+  for (const k of Object.keys(o)) {
+    if (k === 'cardId' && typeof o[k] === 'string') { if (MERGED_CARDS[o[k]]) o[k] = MERGED_CARDS[o[k]]; }
+    else renameCards(o[k], k);
+  }
+}
 
 /**
  * 版を上げずに直す物:

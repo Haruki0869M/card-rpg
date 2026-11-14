@@ -36,8 +36,11 @@ export const moonRabbit: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'mallet', name: '月の杵', effects: [{ kind: 'damage', amount: 10 }] },
-    { id: 'hex', name: '月影の呪い', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }, { kind: 'block', amount: 4 }] },
     { id: 'hop', name: '跳ねる杵つき', effects: [{ kind: 'damage', amount: 5, hits: 2 }] },
+    // 敵の特殊な行動・第2弾（docs/tasks/enemy-behaviors-round2-plan.md §3・fix-plan §4）: 「月影の呪い」（呪い2＋ブロック4）を浄化に置き換えた。ID は古い保存のために残す。
+    // 元の呪いは弱めて残す（狙った1人に呪い1。fix-plan §2 の 2-4）。自分に悪い状態異常がある時は割り込む（割り込んだら次の2ターンは割り込まない）。
+    // 順番の最後にも残す（2番目から最後へ移した）。3つ目の地域なので1種類につき6回復
+    { id: 'hex', name: '月の薬を搗く', big: true, behavior: 'purify', cutIn: { when: 'afflicted', rest: 2 }, hint: '状態異常を全部消して回復する。その前に起爆するか、BREAK する', effects: [{ kind: 'purify', amount: 6 }, { kind: 'applyStatus', status: 'curse', amount: 1 }] },
   ],
 };
 
@@ -104,11 +107,15 @@ export const starLibrarian: EnemyDef = {
       belowHpPct: 50,
       name: '星の雨を呼ぶ司書',
       pattern: 'sequence',
+      // ボスの段階（2026-11-14）: 弱点が入れ替わる（予告ごと: 火・雷・闇・氷。予告に出る）。答え: 合う属性の札をその時に
+      openingActionId: 'turnPage',
+      rule: 'ページをめくるたび、弱点が入れ替わる（今の弱点は予告に出る。合う属性の札をその時に）',
       actions: [
-        { id: 'rain', name: '星の雨', big: true, effects: [{ kind: 'damage', amount: 12, element: 'holy', to: 'foes' }] },
-        { id: 'shelf', name: '書架の壁', effects: [{ kind: 'block', amount: 16 }, { kind: 'damage', amount: 7 }] },
-        { id: 'meteor', name: '落ちる一番星', big: true, effects: [{ kind: 'damage', amount: 26 }] },
-        { id: 'fate', name: '書かれた結末', big: true, effects: [{ kind: 'applyStatus', status: 'weak', amount: 1, to: 'foes' }, { kind: 'damage', amount: 6, to: 'foes' }] },
+        { id: 'turnPage', name: 'ページをめくる', scripted: true, weakWhile: ['ice'], hint: 'この予告の間の弱点は氷だけ。ページをめくるたび（予告ごと）に弱点が変わる', effects: [{ kind: 'block', amount: 12 }, { kind: 'applyStatus', status: 'weak', amount: 1, to: 'foes' }] },
+        { id: 'rain', name: '星の雨', big: true, weakWhile: ['fire'], effects: [{ kind: 'damage', amount: 12, element: 'holy', to: 'foes' }] },
+        { id: 'shelf', name: '書架の壁', weakWhile: ['thunder'], effects: [{ kind: 'block', amount: 16 }, { kind: 'damage', amount: 7 }] },
+        { id: 'meteor', name: '落ちる一番星', big: true, weakWhile: ['dark'], effects: [{ kind: 'damage', amount: 26 }] },
+        { id: 'fate', name: '書かれた結末', big: true, weakWhile: ['ice'], effects: [{ kind: 'applyStatus', status: 'weak', amount: 1, to: 'foes' }, { kind: 'damage', amount: 6, to: 'foes' }] },
       ],
     },
   ],

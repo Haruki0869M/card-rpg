@@ -10,7 +10,11 @@ import {
   Copy,
   Droplet,
   HeartCrack,
+  HeartOff,
   Megaphone,
+  ShieldOff,
+  ShieldHalf,
+  Eye,
   Shield,
   Skull,
   Snowflake,
@@ -45,6 +49,7 @@ export const STATUS_ICONS: Record<string, LucideIcon> = {
   sparkles: Sparkles,
   zap: Zap,
   hourglass: Hourglass,
+  heartOff: HeartOff,
 };
 
 /** 属性のアイコン（属性のデータの icon のキー → アイコン） */
@@ -79,10 +84,21 @@ const TAUNT_STYLE: StatusStyle = {
   text: 'このユニットの単体攻撃の対象が、挑発した味方に固定される（次の敵フェーズ終了まで）',
 };
 
+/** かばう（魔王軍の騎士。状態異常ではないが、同じ並びに出す） */
+const GUARD_STYLE: StatusStyle = {
+  Icon: ShieldHalf,
+  name: 'かばう',
+  color: '#9ad0ff',
+  bg: '#0a2a4a',
+  text: '次の味方の番の間、ほかの敵を狙った単体攻撃のカードのダメージを、この敵が代わりに受ける。全体攻撃・お供と召喚の攻撃は、そのまま通る。この敵が倒れたら終わる',
+};
+/** 状態異常ではない印（数を出さない） */
+export const MARK_STATUSES = new Set(['taunt', 'guard']);
 const styleCache = new Map<string, StatusStyle>();
 /** 状態異常の見た目（データから作る） */
 export function statusStyle(id: string): StatusStyle {
   if (id === 'taunt') return TAUNT_STYLE;
+  if (id === 'guard') return GUARD_STYLE;
   let st = styleCache.get(id);
   if (!st) {
     const d = getStatus(id);
@@ -116,6 +132,10 @@ const EFFECT_ICON: Record<string, { Icon: LucideIcon; color: string }> = {
   payHp: { Icon: HeartCrack, color: '#ff8aa0' },
   drainFocus: { Icon: StarOff, color: '#ffd54a' },
   summonEnemy: { Icon: Users, color: '#c8b0ff' },
+  shieldBreak: { Icon: ShieldOff, color: '#ff9a7a' },
+  purify: { Icon: Sparkles, color: '#9affd0' },
+  punishPlays: { Icon: Eye, color: '#ffb07a' },
+  guardAllies: { Icon: ShieldHalf, color: '#9ad0ff' },
   retaliate: { Icon: Swords, color: '#ffb07a' },
 };
 const FALLBACK_EFFECT_ICON = { Icon: Sparkles, color: '#e0d8c0' };

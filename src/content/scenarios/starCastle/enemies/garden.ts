@@ -37,7 +37,9 @@ export const thornFairy: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'needle', name: '茨の針', effects: [{ kind: 'damage', amount: 7 }, { kind: 'applyStatus', status: 'poison', amount: 2 }] },
-    { id: 'tangle', name: 'からまる茨', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1 }, { kind: 'block', amount: 5 }] },
+    // 敵の特殊な行動・第2弾（docs/tasks/enemy-behaviors-round2-plan.md §3・fix-plan §4）: 「からまる茨」を仲間を呼ぶ（風の精）に置き換えた。ID は古い保存のために残す。
+    // 呼べる時は優先・2ターン続けては呼ばない・1戦闘に2回まで。呼べない時は「いたずらの棘」。4つ目の地域なのでブロック10
+    { id: 'tangle', name: 'いたずら仲間を呼ぶ', big: true, behavior: 'call', cutIn: { when: 'canSummon', rest: 1, noRepeat: true }, hint: '仲間を1体呼ぶ。その前に倒すか、BREAK する', effects: [{ kind: 'summonEnemy', enemy: 'windSprite', uses: 2, call: true, orElse: 'prick' }, { kind: 'block', amount: 10 }] },
     { id: 'prick', name: 'いたずらの棘', effects: [{ kind: 'damage', amount: 5, hits: 2 }] },
   ],
 };
@@ -107,7 +109,11 @@ export const moonMaiden: EnemyDef = {
       belowHpPct: 50,
       name: '満月の力に目覚めた乙女',
       pattern: 'sequence',
+      // ボスの段階（2026-11-14）: 再生＋浄化（今の満月の再生は残す）。答え: 一気に削る・闇で BREAK
+      openingActionId: 'moonRite',
+      rule: '状態異常を払って回復し、満月の再生も続く（闇で BREAK すると止まる。一気に削る）',
       actions: [
+        { id: 'moonRite', name: '月の禊', big: true, behavior: 'purify', cutIn: { when: 'afflicted', rest: 2 }, hint: '状態異常を全部消して回復する（1種類につき6）。その前に起爆するか、闇の弱点で BREAK する。満月の再生も残るので、一気に削る', effects: [{ kind: 'purify', amount: 6 }, { kind: 'applyStatus', status: 'regen', amount: 3, to: 'self' }] },
         { id: 'fullMoon', name: '満月の力', effects: [{ kind: 'block', amount: 12, to: 'allies' }, { kind: 'applyStatus', status: 'regen', amount: 4, to: 'self' }] },
         { id: 'lunar', name: '満月の光', big: true, effects: [{ kind: 'damage', amount: 14, element: 'holy', to: 'foes' }] },
         { id: 'briar', name: '茨の檻', big: true, effects: [{ kind: 'damage', amount: 29 }] },
@@ -144,9 +150,12 @@ export const hourglassGolem: EnemyDef = {
   weak: ['thunder'],
   resist: ['poison'],
   pattern: 'sequence',
+  // 敵の特殊な行動・第2弾（round2 §3・fix-plan §4）: 手数読みを1ターン目に予告する（2ターン目からは止まる砂・石の拳・手数読みの順）
+  firstActionId: 'turn',
   actions: [
     { id: 'sand', name: '止まる砂', effects: [{ kind: 'damage', amount: 6 }, { kind: 'applyStatus', status: 'delay', amount: 1 }] },
     { id: 'fist', name: '石の拳', effects: [{ kind: 'damage', amount: 12 }] },
-    { id: 'turn', name: '砂時計を返す', effects: [{ kind: 'block', amount: 12 }] },
+    // 「砂時計を返す」を手数読みに置き換えた。ID は古い保存のために残す。4つ目の地域なのでブロック10（BREAK されると付かない）
+    { id: 'turn', name: '砂時計で数える', big: true, behavior: 'punish', hint: 'このターンにカードを4枚以上使った味方に、枚数×2のダメージ', effects: [{ kind: 'punishPlays', amount: 2, min: 4 }, { kind: 'block', amount: 10 }] },
   ],
 };

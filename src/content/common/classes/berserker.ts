@@ -27,6 +27,6 @@ export const berserker: ClassDef = {
   from: ['warrior'],
   signature: ['recklessSwing', 'bloodRage', 'ragingStorm'],
   startingEquipment: { weapon: 'woodAxe', armor: 'leatherArmor' },
-  cardPool: ['recklessSwing', 'bloodRage', 'ragingStorm', 'cleaveThrough', 'warHowl', 'bloodFeast'],
+  cardPool: ['recklessSwing', 'bloodRage', 'ragingStorm', 'lnBuSwipe', 'warHowl', 'bloodFeast', 'axAdversity', 'axLifeline'],
   growthWeights: { str: 4, vit: 3 },
 };

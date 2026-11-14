@@ -9,6 +9,7 @@ export const hadesLord: ClassDef = {
   stats: { ...hexer.stats, int: hexer.stats.int + 8, vit: hexer.stats.vit + 8 },
   battleAbility: { name: '深淵', effect: { when: 'turnStart', do: [{ kind: 'payHp', amount: 3 }, { kind: 'gainMana', amount: 1 }] } },
   exploreAbility: { id: 'hadesLordExplore', name: '瘴気の主', description: '瘴気の判定+30%', effect: { kind: 'checkBonus', check: 'miasma', bonus: 30 } },
-  requires: { feat: 'kills:cursed', count: 4, text: '呪われた敵を4体倒す' },
-  cardPool: ["abyssScythe","underworldCurse","soulBanquet","darkTribute","deathJudgment"], signature: ["abyssScythe","underworldCurse","soulBanquet"],
+  requires: { feat: 'kills:cursed', count: 2, text: '呪われた敵を2体倒す' },
+  cardPool: ["abyssScythe","underworldCurse","soulBanquet","bloodOffering","deathJudgment","axCurseReturn"], signature: ["abyssScythe","underworldCurse","soulBanquet"],
+  jobCards: ['fxAbyssVerdict'], // 区切りD: 決め技（転職した時に山札へ1枚）
 };

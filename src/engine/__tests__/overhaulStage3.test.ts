@@ -43,7 +43,7 @@ const intend = (s: BattleState, actionId: string) => {
 const breaks = (events: { type: string }[]) => events.filter((e) => e.type === 'break') as { type: 'break'; why: string }[];
 
 describe('BREAK（大技の予告を崩す。オーナーの決定 3-A）', () => {
-  it('完全成功で攻撃を当てると崩れる: 威力が半分・弱体1・ブロック0。1つの予告に1回だけ', () => {
+  it('完全成功で攻撃を当てると崩れる: 威力が半分・脆弱1・ブロック0。1つの予告に1回だけ', () => {
     const s = intend(gateBattle(), 'crush');
     s.enemies[0].block = 30;
     const before = intentHitsOn(s.enemies[0], s.allies[0])[0];
@@ -56,11 +56,16 @@ describe('BREAK（大技の予告を崩す。オーナーの決定 3-A）', () =
     const e = r.state.enemies[0];
     expect(e.broken).toBe(true);
     expect(e.nextActionMultiplier).toBe(BALANCE.breakPower);
-    expect(e.statuses.weak).toBe(BALANCE.breakWeak);
+    // BREAK で付く状態は脆弱（2026-11-13 に弱体から変えた）
+    expect(BALANCE.breakStatus).toBe('vulnerable');
+    // 重い一撃も脆弱を付けるので、BREAK の分は出来事（status）で確かめる
+    expect(r.events.some((x) => x.type === 'status' && x.unitId === e.uid && x.status === 'vulnerable' && x.amount === BALANCE.breakWeak)).toBe(true);
+    expect(e.statuses.vulnerable).toBeGreaterThanOrEqual(BALANCE.breakWeak);
+    expect(e.statuses.weak ?? 0).toBe(0);
     expect(e.block).toBe(0);
-    // 予告の数字: 半分（切り捨て）に、弱体の ×0.75
+    // 予告の数字: 半分（切り捨て）。脆弱は敵の攻撃を減らさない
     const after = intentHitsOn(e, r.state.allies[0])[0];
-    expect(after).toBeLessThanOrEqual(Math.ceil(before * 0.5 * 0.75));
+    expect(after).toBeLessThanOrEqual(Math.ceil(before * 0.5));
     expect(after).toBeGreaterThan(0);
     expect(canBreak(e)).toBe(false);
     // フォーカスで全部の枠を決めたので、乱数の流れは「乱数を使わないカード」と同じだけ（BREAK は乱数を引かない）
@@ -161,9 +166,11 @@ describe('BREAK（大技の予告を崩す。オーナーの決定 3-A）', () =
     }
     // 隠しボス（名所のイベントの戦闘にだけ出る。HPが大きい）も大技を持つ
     // 亜種（絵と行動を元の敵から引き継ぐ）は、元の敵が強敵なら大技も引き継ぐ
-    for (const e of ENEMIES.all) if (big(e.id) && !strong.has(e.id) && !(e.variantOf && strong.has(e.variantOf))) expect(e.maxHp, `${e.id} は強敵の組にも隠しボスにも当てはまらない`).toBeGreaterThanOrEqual(250);
-    // 大技は、ダメージのある行動だけ
-    for (const e of ENEMIES.all) for (const a of [e.actions, ...(e.phases ?? []).map((p) => p.actions)].flat()) if (a.big) expect(a.effects.some((x) => x.kind === 'damage'), `${e.id}.${a.id}`).toBe(true);
+    // 敵の特殊な行動（予告の文 hint 付き。docs/tasks/enemy-behaviors-plan.md §7）は、ふつうの敵にも付く大技なので、この2つの決まりの外
+    const special = (id: string) => [getEnemy(id).actions, ...(getEnemy(id).phases ?? []).map((p) => p.actions)].flat().some((a) => a.big && !a.hint);
+    for (const e of ENEMIES.all) if (special(e.id) && !strong.has(e.id) && !(e.variantOf && strong.has(e.variantOf))) expect(e.maxHp, `${e.id} は強敵の組にも隠しボスにも当てはまらない`).toBeGreaterThanOrEqual(250);
+    // 大技は、ダメージのある行動だけ（敵の特殊な行動は除く。ダメージの無い物は BREAK すると起きない）
+    for (const e of ENEMIES.all) for (const a of [e.actions, ...(e.phases ?? []).map((p) => p.actions)].flat()) if (a.big && !a.hint) expect(a.effects.some((x) => x.kind === 'damage'), `${e.id}.${a.id}`).toBe(true);
   });
 });
 

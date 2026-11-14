@@ -1,4 +1,4 @@
-// J3d第1段階: 旧保存の移行、神殿・祭壇の入退場と転職画面をスマホ幅で確認する。
+// J3d第1段階: 神殿・祭壇の数（読めない古い保存は出ない事）、神殿・祭壇の入退場と転職画面をスマホ幅で確認する。
 import { mkdir } from 'node:fs/promises';
 import { chromium, layoutIssues, URL, depart } from './lib.mjs';
 
@@ -27,23 +27,18 @@ try {
   await depart(page, { exact: true });
   await page.waitForTimeout(300);
   const base = await save();
-  // 神殿の無いv8の保存を模した状態。地図の番号・地形・霧・既存施設を比較する。
-  const old = structuredClone(base); old.version = old.game.version = 8;
-  for (const t of old.game.world.tiles) if (['temple', 'altar'].includes(t.f?.kind)) delete t.f;
-  old.game.world.story = undefined;
-  await resume(old);
-  // 保存は操作後に更新されるため、メニューではなく世界マップの待機を実行する。
-  await page.getByText('王都クリスタリアに入る', { exact: true }).click();
-  const migrated = await save();
-  check(migrated.game.version === 17, '旧保存の版が更新されない'); // 保存の版（STATE_VERSION）を上げたら、ここも合わせる
-  check(migrated.game.world.tiles.filter(t => ['temple', 'altar'].includes(t.f?.kind)).length === 7, '旧地図に施設が追加されない');
-  check(migrated.game.rngState !== undefined, '乱数状態がない');
-  old.game.world.tiles.forEach((t, i) => {
-    const n = migrated.game.world.tiles[i];
-    check(t.t === n.t && t.r === n.r && t.seen === n.seen, `旧地図のマス${i}が変化`);
-    if (t.f) check(JSON.stringify(t.f) === JSON.stringify(n.f), `既存施設${i}が変化`);
-  });
-  console.log('OK: 神殿の無いv8保存から再開、地図・既存施設を維持');
+  // 新しい冒険の地図に、神殿2か所・祭壇5か所がある
+  check(base.game.world.tiles.filter(t => ['temple', 'altar'].includes(t.f?.kind)).length === 7, '新しい地図の神殿・祭壇の数が違う');
+  check(base.game.rngState !== undefined, '乱数状態がない');
+  // 2026-11-11 オーナーの決定: v23 より前の保存は読まない（src/engine/game/migrations.ts）。
+  // 前はここで「神殿の無い v8 の保存に施設を足す」を確かめていたが、その移し替えは無くなった。古すぎる保存は「つづきから」に出ないことを確かめる
+  {
+    const old = structuredClone(base); old.version = old.game.version = 8;
+    await page.evaluate(d => localStorage.setItem('card-rpg/adventure', JSON.stringify(d)), old);
+    await page.reload(); await page.waitForTimeout(500);
+    check(await page.getByText('つづきから', { exact: true }).count() === 0, '読めない古い保存（v8）が「つづきから」に出る');
+    console.log('OK: 読めない古い保存（v8）は「つづきから」に出ない');
+  }
   for (const width of [360, 390, 480]) {
     await page.setViewportSize({ width, height: 780 });
     for (const id of ['pilgrimTemple', 'samuraiAltar']) {

@@ -2,8 +2,12 @@ import { BALANCE } from '../../../data/balance';
 import { getScenario } from '../../../data/scenarios';
 import { SANCTUARIES, TERRAINS } from '../../../data/world';
 import type { GameState, WorldState } from '../../../types';
-import { neighbors, rowOf } from './hex';
+import { colOf, neighbors, rowOf } from './hex';
 import { startTileOf } from './start';
+import { isWideMap, laneOfCol } from './lanes';
+
+/** 【提案】祭壇を決めた帯の外に置く時の、目安の行からの離れ具合の上乗せ（行） */
+const ALTAR_LANE_PENALTY = 4;
 
 /** 旧10祭壇を5つの共用祭壇へ統合する。滞在中なら、そのマスを優先して残す。 */
 export function consolidateSanctuaries(game: GameState) {
@@ -49,11 +53,15 @@ export function addSanctuaries(game: GameState, w: WorldState): string[] {
     game.event?.tile, game.chest?.tile, game.shrine?.tile, game.encounter?.tile, game.sanctuary?.tile,
   ]);
   const missing: string[] = [];
+  // 広い地図（段階6a）: 祭壇は決めた帯（東）を優先する。帯の外は、目安の行から ALTAR_LANE_PENALTY 行離れているのと同じ扱い（空きが無ければ今までどおり）
+  const altarLane = isWideMap(game, w) ? map.prefer?.altar : undefined;
+  const away = (kind: string, i: number) => (kind === 'altar' && altarLane && laneOfCol(map, colOf(w, i))?.id !== altarLane ? ALTAR_LANE_PENALTY : 0);
   for (const def of SANCTUARIES.forScenario(game.scenarioId)) {
     if (w.tiles.some(t => t.f?.kind === def.kind && t.f.id === def.id)) continue;
     const targetRow = (w.height - 1) * (1 - def.progress);
     const candidates = [...distance.keys()].filter(i => !w.tiles[i].f && !occupied.has(i));
-    candidates.sort((a, b) => Math.abs(rowOf(w, a) - targetRow) - Math.abs(rowOf(w, b) - targetRow)
+    const score = (i: number) => Math.abs(rowOf(w, i) - targetRow) + away(def.kind, i);
+    candidates.sort((a, b) => score(a) - score(b)
       || distance.get(a)! - distance.get(b)! || a - b);
     const tile = candidates[0];
     if (tile === undefined) { missing.push(def.id); continue; }

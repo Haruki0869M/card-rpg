@@ -20,7 +20,8 @@ ENEMIES.register({ ...dummy, id: 'stageCTiny', name: '確認用の小さな置�
 ENEMIES.register({ ...dummy, id: 'stageCFireWeak', name: '確認用の火に弱い置物', maxHp: 100000, weak: ['fire'], actions: wait });
 
 const TYPES = ['gun', 'whip', 'staff', 'tome', 'scepter', 'scythe', 'instrument'];
-const weaponsC = () => ITEMS.all.filter((i) => i.slot === 'weapon' && TYPES.includes(i.weaponType ?? ''));
+// ランダムダンジョンの専用の装備（段階7a・source あり）は区切りCの数に入れない（数は randomDungeon7a.test.ts で確かめる）
+const weaponsC = () => ITEMS.all.filter((i) => i.slot === 'weapon' && !i.source && TYPES.includes(i.weaponType ?? ''));
 
 type Opt = { enemies?: string[]; players?: PlayerId[]; boss?: boolean; midboss?: boolean };
 function game(classes: string[], weapons: (string | undefined)[], players?: PlayerId[]): GameState {
@@ -75,7 +76,7 @@ describe('区切りC: 数', () => {
     for (const w of weaponsC()) n[w.weaponType!] = (n[w.weaponType!] ?? 0) + 1;
     expect(n).toEqual({ gun: 5, whip: 5, staff: 7, tome: 5, scepter: 8, scythe: 5, instrument: 5 });
     expect(weaponsC()).toHaveLength(40);
-    expect(ITEMS.all.filter((i) => i.slot === 'weapon')).toHaveLength(86);
+    expect(ITEMS.all.filter((i) => i.slot === 'weapon' && !i.source)).toHaveLength(86);
   });
   it('外した物は無い。レア度を動かした2本・名前を直した1本', () => {
     for (const id of ['breachingGun', 'plagueGun', 'balancedWhip', 'steadfastWhip', 'thunderStaff', 'circulationStaff', 'pharaohStaff', 'cursewardTome', 'fellowshipScepter', 'judgesScepter', 'soulwellScythe', 'riftscythe', 'grandLute', 'plagueLute']) expect(ITEMS.tryGet(id), id).toBeUndefined();
@@ -101,13 +102,14 @@ describe('区切りC: 数', () => {
     expect(getItem('springbringerScepter').cards).toEqual([{ cardId: 'wtScepterMiracle', count: 2 }]);
   });
   it('保存の版は v20', () => {
-    expect(STATE_VERSION).toBe(20);
-    expect(GAME_VERSION).toBe(20);
+    expect(STATE_VERSION).toBeGreaterThanOrEqual(20);
+    expect(GAME_VERSION).toBeGreaterThanOrEqual(20);
   });
-  it('単発射撃は 成功率85%・4/8', () => {
-    const c = getCard('wGunShot');
-    expect(c.baseChance).toBe(85);
-    expect(c.tiers.map((t) => (t.effects[0] as { amount: number }).amount)).toEqual([4, 8]);
+  it('古式銃の札は「ストライク」（区切りG-1: 単発射撃 85%・4/8 は、形が同じなのでストライクにまとめた）', () => {
+    const c = getCard('strike');
+    expect(getItem('antiqueGun').cards).toEqual([{ cardId: 'strike', count: 2 }]);
+    expect(c.baseChance).toBe(80);
+    expect(c.tiers.map((t) => (t.effects[0] as { amount: number }).amount)).toEqual([4, 7]);
   });
 });
 

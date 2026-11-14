@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { signatureCards } from '../game/jobs';
 import { BALANCE } from '../../data/balance';
 import { getCard } from '../../data/cards';
 import { CLASSES } from '../../data/classes';
@@ -9,6 +10,7 @@ import type { BattleState, Command, PlayerId } from '../../types';
 import { applyCommand, applyGameCommand, chanceFor, createBattle, createGame, createRng, describeEffect, effectShort, jobOptions, migrateGame, rollChanceFor, rollSlots, slotPreviewLimitOf } from '../index';
 import { applyEffect, dealDamage, makeCtx } from '../battle/effects';
 import { giveHand, nextTurn } from './helpers';
+const k1 = (id: string) => !id.startsWith('ax'); // 区切りD の軸のカード（ax…）は、K1・職の専用カードの数に入れない
 
 const jobs = ['shrineMaiden', 'astrologer', 'machinist', 'bard', 'gambler'];
 ENEMIES.register({ id: 'finalJobDummy', name: '確認用の敵', icon: 'T', maxHp: 100000, baseLevel: 1, exp: 1, gold: 1, pattern: 'sequence',
@@ -26,18 +28,21 @@ function use(s: BattleState, cardId: string, index = 0, focus = getCard(cardId).
   const cmd = cardCommand(s, cardId, index, focus, target), r = applyCommand(s, cmd); expect(r.error).toBeUndefined(); return r.state;
 }
 function reserve(s: BattleState, index = 0, focus = 0) {
-  const cmd = cardCommand(s, 'starRay', index, focus);
+  const cmd = cardCommand(s, 'cmArcaneArrow', index, focus);
   const r = applyCommand(s, { ...cmd, type: 'PREVIEW_CARD' }); expect(r.error).toBeUndefined(); return r.state;
 }
 const fresh = () => createGame({ seed: 17, scenarioId: 'corruptionKing', difficulty: 'normal', party: [{ classId: 'warrior', name: '確認', gender: 'male', playerId: 'P1' }] });
 
 describe('後半5職のデータ・転職', () => {
   it('全44職・特殊10職、後半各6枚と代表3枚、エピック2枚以上を自動登録する', () => {
-    expect(CLASSES.all).toHaveLength(44); expect(CLASSES.all.filter(j => j.tier === 'special')).toHaveLength(10);
-    expect(new Set(jobs.flatMap(id => CLASSES.get(id).cardPool)).size).toBe(30);
+    // 区切りF: 新ジョブ4職を足した（44 → 48・特殊 10 → 14）
+    expect(CLASSES.all).toHaveLength(48); expect(CLASSES.all.filter(j => j.tier === 'special')).toHaveLength(14);
+    // 区切りD: 同じ中身のカードをまとめたので、職どうしで同じカードを使う所がある（30 → 24）
+    // 2026-11-12: 専用の札が足りなかった6職に1枚ずつ足した（docs/tasks/job-unique-cards-plan.md）。この5職では占星術師の「星の導き」だけ（24 → 25・占星術師は7枚）
+    expect(new Set(jobs.flatMap(id => CLASSES.get(id).cardPool.filter(k1))).size).toBe(25);
     for (const id of jobs) {
-      const j = CLASSES.get(id); expect(j.cardPool).toHaveLength(6); expect(j.signature).toEqual(j.cardPool.slice(0, 3));
-      expect(j.cardPool.filter(c => getCard(c).rarity === 'epic').length).toBeGreaterThanOrEqual(2);
+      const j = CLASSES.get(id); expect(j.cardPool.filter(k1)).toHaveLength(id === 'astrologer' ? 7 : 6); expect(j.signature).toEqual(j.cardPool.slice(0, 3));
+      // 「エピック2枚以上」の決まりは、やめた（オーナーの決定 2026-11-12。憲章4: 数の目標を捨てる）
     }
   });
   it.each([
@@ -56,13 +61,13 @@ describe('後半5職のデータ・転職', () => {
     expect(jobOptions(h, g).find(o => o.job.id === id)?.ready).toBe(true);
     const before = h.deck.length;
     const changed = applyGameCommand(g, { type: 'CHANGE_JOB', playerId: 'P1', heroId: h.id, jobId: id }); expect(changed.error).toBeUndefined(); g = changed.state;
-    expect(g.heroes[0].jobPick).toEqual(j.signature);
-    const picked = applyGameCommand(g, { type: 'PICK_JOB_CARD', playerId: 'P1', heroId: h.id, cardId: j.signature![0] }); expect(picked.error).toBeUndefined();
+    expect(g.heroes[0].jobPick).toEqual(signatureCards(j)); // そのジョブにしか無い札を先に（オーナーの決定 2026-11-12）
+    const picked = applyGameCommand(g, { type: 'PICK_JOB_CARD', playerId: 'P1', heroId: h.id, cardId: signatureCards(j)[0] }); expect(picked.error).toBeUndefined();
     expect(picked.state.heroes[0].deck.length).toBe(before + 1 + (j.jobCards?.length ?? 0));
     expect(picked.state.heroes[0].jobPick).toBeUndefined();
   });
   it('銃と楽器の初期武器には対応する武器カードが2枚ずつ付く', () => {
-    for (const [weapon, type, card] of [['antiqueGun', 'gun', 'wGunShot'], ['travelerLute', 'instrument', 'wEncouragingNote']]) {
+    for (const [weapon, type, card] of [['antiqueGun', 'gun', 'strike'], ['travelerLute', 'instrument', 'wEncouragingNote']]) {
       expect(WEAPON_TYPES.has(type)).toBe(true); expect(ITEMS.get(weapon).cards).toEqual([{ cardId: card, count: 2 }]);
     }
   });
@@ -70,12 +75,12 @@ describe('後半5職のデータ・転職', () => {
 
 describe('星読みの予約・振り直し・保存', () => {
   it.each([0, 1, 2])('フォーカス%d: 同じ種なら20回やり直しても表示と振り直しの結果・最終状態が一致する', focus => {
-    const s = battle(), cmd = cardCommand(s, 'starRay', 0, focus), copy = structuredClone(s);
+    const s = battle(), cmd = cardCommand(s, 'cmArcaneArrow', 0, focus), copy = structuredClone(s);
     const previewCmd: Command = { ...cmd, type: 'PREVIEW_CARD' };
     const expected = applyCommand(s, previewCmd); expect(expected.error).toBeUndefined();
     for (let n = 0; n < 20; n++) expect(applyCommand(s, previewCmd)).toEqual(expected);
     expect(s).toEqual(copy);
-    const rng = createRng(s.rngState), chance = rollChanceFor(s.allies[0], getCard('starRay'), focus);
+    const rng = createRng(s.rngState), chance = rollChanceFor(s.allies[0], getCard('cmArcaneArrow'), focus);
     expect(expected.state.slotPreview?.results).toEqual(rollSlots(2, focus, chance, rng));
     expect(expected.state.slotPreview?.rerollResults).toEqual(rollSlots(2, focus, chance, rng));
     expect(expected.state.rngState).toBe(rng.state);
@@ -104,7 +109,7 @@ describe('星読みの予約・振り直し・保存', () => {
     const cmd: Command = { type: 'CONFIRM_PREVIEW', playerId: 'P1', characterId: 'a0' };
     const r = applyCommand(s, cmd); expect(r.error).toBeUndefined(); expect(r.events.find(e => e.type === 'roll')).toMatchObject({ results: first });
     expect(applyCommand(r.state, cmd).error).toBeDefined(); expect(applyCommand(r.state, cmd).state).toEqual(r.state);
-    const next = cardCommand(r.state, 'starRay'); expect(applyCommand(r.state, { ...next, type: 'PREVIEW_CARD' }).error).toContain('使えません');
+    const next = cardCommand(r.state, 'cmArcaneArrow'); expect(applyCommand(r.state, { ...next, type: 'PREVIEW_CARD' }).error).toContain('使えません');
     expect(slotPreviewLimitOf(battle().allies[0])).toBe(1); expect(battle().allies[0].slotPreviewUsed).toBe(0);
   });
   it('振り直しを2回送っても乱数・結果・支払いは進まない', () => {
@@ -127,7 +132,7 @@ describe('星読みの予約・振り直し・保存', () => {
     expect(applyCommand(s, { type: 'CONFIRM_PREVIEW', playerId: 'P2', characterId: 'a1' }).error).toBeUndefined();
   });
   it('拒否された予約は使用回数・乱数・支払いを変えない', () => {
-    const s = battle(), cmd = cardCommand(s, 'starRay');
+    const s = battle(), cmd = cardCommand(s, 'cmArcaneArrow');
     for (const invalid of [{ ...cmd, playerId: 'P2' }, { ...cmd, focusUsed: 999 }, { ...cmd, targetId: 'missing' }]) {
       const copy = structuredClone(s), r = applyCommand(s, { ...invalid, type: 'PREVIEW_CARD' } as Command);
       expect(r.error).toBeDefined(); expect(r.state).toEqual(copy); expect(s).toEqual(copy);
@@ -209,7 +214,7 @@ describe('機工士の砲台・罠', () => {
   it('罠で敵を倒したら敵の攻撃は行われず、別の攻撃で対象が倒れた罠は不発で消える', () => {
     let s = battle(['machinist']); s.allies[0].summons = []; s = use(s, 'placeTrap'); s.enemies[0].hp = 1;
     const hp = s.allies[0].hp; s = nextTurn(s); expect(s.phase).toBe('victory'); expect(s.allies[0].hp).toBe(hp);
-    s = battle(['machinist']); s = use(s, 'placeTrap'); s.enemies[0].hp = 1; s = use(s, 'machineShot');
+    s = battle(['machinist']); s = use(s, 'placeTrap'); s.enemies[0].hp = 1; s = use(s, 'lnGiQuick');
     expect(s.allies[0].summons?.some(t => t.trigger)).toBe(false);
   });
 });
@@ -219,7 +224,7 @@ describe('吟遊詩人の仲間支援', () => {
     let s = battle(['bard', 'warrior', 'mage', 'hunter']); const card = getCard('samuraiMoon'), base = s.allies.map(a => chanceFor(a, card));
     s = use(s, 'bardCourage'); s = use(s, 'bardCourage');
     for (let i = 0; i < 4; i++) { expect(s.allies[i].statuses.songInspired).toBe(1); expect(chanceFor(s.allies[i], card)).toBe(Math.min(95, base[i] + 10)); }
-    s = use(s, 'starRay', 1); expect(s.allies[1].statuses.songInspired).toBe(0); expect(s.allies[2].statuses.songInspired).toBe(1);
+    s = use(s, 'cmArcaneArrow', 1); expect(s.allies[1].statuses.songInspired).toBe(0); expect(s.allies[2].statuses.songInspired).toBe(1);
   });
   it('他プレイヤーのフォーカスを上限まで回復し、歌の余韻は1ターン1回だけ', () => {
     let s = battle(['bard', 'warrior', 'mage', 'hunter']); for (const a of s.allies.slice(1)) a.focus = 0;
@@ -227,14 +232,14 @@ describe('吟遊詩人の仲間支援', () => {
     s = use(s, 'bardFocus'); expect(s.allies[0].block).toBe(10); expect(s.allies[0].feats?.['support:others']).toBe(2);
   });
   it('自分だけの防御や、上限で効果のない支援では余韻を発動しない', () => {
-    let s = battle(['bard', 'warrior']); s = use(s, 'starWard'); expect(s.allies[0].block).toBe(10);
+    let s = battle(['bard', 'warrior']); s = use(s, 'gambleGuard'); expect(s.allies[0].block).toBe(10);
     s = use(s, 'bardFocus', 0, 0); expect(s.allies[0].block).toBeLessThanOrEqual(14); expect(s.allies[0].feats?.['support:others']).toBeUndefined();
     expect(s.allies[0].counters?.['once:songAfterglow']).toBeUndefined();
   });
   it('同じ初期状態・P1/P2コマンド列を各端末で処理すると支援と消費が一致する', () => {
     const initial = battle(['bard', 'warrior']); const first = cardCommand(initial, 'bardCourage');
     let a = applyCommand(structuredClone(initial), first).state, b = applyCommand(structuredClone(initial), first).state;
-    const second = cardCommand(a, 'starRay', 1); giveHand(b, b.allies[1].id, ['starRay']); b.allies[1].mana = 20; b.allies[1].focus = 6;
+    const second = cardCommand(a, 'cmArcaneArrow', 1); giveHand(b, b.allies[1].id, ['cmArcaneArrow']); b.allies[1].mana = 20; b.allies[1].focus = 6;
     a = applyCommand(a, second).state; b = applyCommand(b, second).state; expect(a).toEqual(b);
     const forged = applyCommand(a, { ...second, playerId: 'P1' }); expect(forged.error).toContain('担当'); expect(forged.state).toEqual(a);
   });

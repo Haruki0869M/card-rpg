@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { botNextCommand } from '../../engine/bot';
 import { commandPlayer, createBattle, heroAbilities, stateHash, toPartyMember } from '../../engine';
-import { MemoryHub } from '../memoryBackend';
+import { type MemoryClient, MemoryHub } from '../memoryBackend';
 import { normalizeCode, Room, RoomError, seqKey, SNAPSHOT_EVERY } from '../room';
 
 /** 通知と非同期の処理が落ち着くまで待つ */
@@ -112,7 +112,7 @@ describe('特殊職の通信と再接続', () => {
     const { rooms } = await specialBattle(['bard', 'warrior', 'mage', 'hunter']);
     for (const r of rooms) {
       r.game!.battle!.allies[0].hand = [{ uid: 'song', cardId: 'bardCourage' }];
-      r.game!.battle!.allies[1].hand = [{ uid: 'attack', cardId: 'starRay' }];
+      r.game!.battle!.allies[1].hand = [{ uid: 'attack', cardId: 'cmArcaneArrow' }];
     }
     await rooms[0].send({ type: 'BATTLE', command: { type: 'PLAY_CARD', playerId: 'P1', characterId: 'h0', cardInstanceId: 'song', focusUsed: 0 } }); await settle();
     expect(allSame(rooms)).toBe(true); expect(rooms[3].game!.battle!.allies.map(a => a.statuses.songInspired)).toEqual([1, 1, 1, 1]);
@@ -122,7 +122,7 @@ describe('特殊職の通信と再接続', () => {
   });
   it('P2の星読みを全端末が共有し、結果確認中の再接続でも予約・乱数が一致する', async () => {
     const { hub, host, rooms } = await specialBattle(['warrior', 'astrologer']);
-    for (const r of rooms) r.game!.battle!.allies[1].hand = [{ uid: 'star', cardId: 'starRay' }];
+    for (const r of rooms) r.game!.battle!.allies[1].hand = [{ uid: 'star', cardId: 'cmArcaneArrow' }];
     await rooms[1].send({ type: 'BATTLE', command: { type: 'PREVIEW_CARD', playerId: 'P2', characterId: 'h1', cardInstanceId: 'star', targetId: host.game!.battle!.enemies[0].uid, focusUsed: 0 } }); await settle();
     expect(allSame(rooms)).toBe(true); const preview = structuredClone(host.game!.battle!.slotPreview), rng = host.game!.battle!.rngState, seq = host.seq;
     await rooms[0].send({ type: 'BATTLE', command: { type: 'CONFIRM_PREVIEW', playerId: 'P1', characterId: 'h1' } }); await settle();
@@ -272,6 +272,142 @@ describe('切断と再接続・ホストの引き継ぎ', () => {
     expect(host.isHost).toBe(false);
     expect(allSame(rooms)).toBe(true);
   }, 30_000);
+
+  it('回3 C: ホストのページが止まった（接続は残ったまま）時も、「動いている」が古くなったら次の人が引き継ぎ、そのまま続けられる', async () => {
+    const { hub, rooms } = await playing(2, 2);
+    await drive(rooms, 6);
+    const [host, b] = rooms;
+    type Inside = { beatTimer: ReturnType<typeof setInterval> | null; stopHosting(): void; checkHost(): void; startBeat(): void };
+    const h = host as unknown as Inside;
+    // スマホが眠った: タイマーも処理も止まる。接続（online）は残る
+    if (h.beatTimer) clearInterval(h.beatTimer);
+    h.beatTimer = null;
+    h.stopHosting();
+    expect(hub.read(`rooms/${host.code}/members/u0/online`)).toBe(true);
+    // まだ新しいうちは引き継がない
+    (b as unknown as Inside).checkHost();
+    await settle(30);
+    expect(b.isHost).toBe(false);
+    // 時間がたって、ホストの「動いている」が古くなった
+    const t0 = Date.now();
+    hub.clock = () => Date.now() - t0 + t0 + 40_000;
+    expect(b.seatOnline('P1')).toBe(false);
+    (b as unknown as Inside).checkHost();
+    await settle(30);
+    expect(b.isHost).toBe(true);
+    await b.setProxy('P1', true);
+    await settle();
+    const before = b.seq;
+    await drive([b], 12);
+    expect(b.seq).toBeGreaterThan(before);
+    // 目を覚ました: ホストは戻らず、記録に追いつく（新しいホストは、その間も「動いている」を書き続けている）
+    await b.backend.set(`rooms/${b.code}/members/u1/beat`, hub.clock());
+    await settle();
+    h.startBeat();
+    await settle(30);
+    expect(host.isHost).toBe(false);
+    expect(allSame(rooms)).toBe(true);
+    expect(b.seatOnline('P1')).toBe(true);
+  }, 30_000);
+
+  describe('ホストの引き継ぎの直し（2026-11-14）: 目を覚ました古いホストが、古い状態で記録を書かない', () => {
+    type Inside = {
+      beatTimer: ReturnType<typeof setInterval> | null;
+      stopHosting(): void;
+      checkHost(): void;
+      startBeat(): void;
+      queue: { key: string; by: string; cmd: string }[];
+      processQueue(): Promise<void>;
+      handleRequest(req: { key: string; by: string; cmd: string }): Promise<'retry' | void>;
+      reqSub: unknown;
+    };
+    /** ホストのページが凍り、相方が引き継いで steps 手進める。古いホストは、まだ自分がホストだと思っている */
+    async function frozenOldHost(steps: number) {
+      const { hub, rooms } = await playing(2, 2);
+      await drive(rooms, 6);
+      const [host, b] = rooms;
+      const h = host as unknown as Inside;
+      if (h.beatTimer) clearInterval(h.beatTimer);
+      h.beatTimer = null;
+      (host.backend as MemoryClient).paused = true;
+      const t0 = Date.now();
+      hub.clock = () => Date.now() - t0 + t0 + 40_000;
+      (b as unknown as Inside).checkHost();
+      await settle(30);
+      expect(b.isHost).toBe(true);
+      await b.setProxy('P1', true);
+      await settle();
+      await drive([b], steps);
+      // 古いホストの頭の中は、凍った時のまま
+      expect(host.isHost).toBe(true);
+      expect(host.seq).toBeLessThan(b.seq);
+      const log = () => JSON.stringify(hub.read(`rooms/${host.code}/log`));
+      return { hub, host, b, h, log };
+    }
+    /** 古いホストの状態で通る操作を、部屋の依頼として置く（目を覚ました時に、たまっていた依頼として届く物） */
+    async function staleRequest(host: Room, hub: MemoryHub, key: string) {
+      const cmd = botNextCommand(host.game!, { interacted: new Set<string>() })!;
+      const req = { by: host.uid, cmd: JSON.stringify(cmd) };
+      hub.write(`rooms/${host.code}/requests/${key}`, req);
+      return { key, ...req };
+    }
+
+    it('目を覚ました古いホストは、部屋のホストを読み直して、依頼を処理しない（記録は変わらない）', async () => {
+      const { hub, host, b, h, log } = await frozenOldHost(12);
+      const before = log();
+      const req = await staleRequest(host, hub, 'zzzz-stale-1');
+      h.queue.push(req);
+      await h.processQueue();
+      expect(log()).toBe(before);
+      expect(h.reqSub).toBeNull();
+      // 目を覚ますと、新しいホストに合わせて追いつく。新しいホストが依頼を処理する
+      (host.backend as MemoryClient).paused = false;
+      await settle(30);
+      expect(host.isHost).toBe(false);
+      expect(b.isHost).toBe(true);
+      expect(allSame([host, b])).toBe(true);
+    }, 30_000);
+
+    it('ホストの確かめをすり抜けても、もう書かれた番号は上書きしない（transaction）', async () => {
+      const { hub, host, b, h, log } = await frozenOldHost(12);
+      const before = log();
+      const n = host.seq + 1;
+      const theirs = JSON.stringify(hub.read(`rooms/${host.code}/log/${seqKey(n)}`));
+      expect(theirs).not.toBe('null');
+      const req = await staleRequest(host, hub, 'zzzz-stale-2');
+      expect(await h.handleRequest(req)).toBe('retry');
+      expect(JSON.stringify(hub.read(`rooms/${host.code}/log/${seqKey(n)}`))).toBe(theirs);
+      expect(log()).toBe(before);
+      (host.backend as MemoryClient).paused = false;
+      await settle(30);
+      expect(allSame([host, b])).toBe(true);
+    }, 30_000);
+
+    it('古い状態で断らない: 次の番号の記録がもうあれば、エラーを書かずにやり直しにする', async () => {
+      const { hub, host, h } = await frozenOldHost(12);
+      const req = { key: 'zzzz-stale-3', by: 'u1', cmd: JSON.stringify({ type: 'ENTER_ROOM', playerId: 'P1', roomId: 'no-such-room' }) };
+      hub.write(`rooms/${host.code}/requests/${req.key}`, { by: req.by, cmd: req.cmd });
+      expect(await h.handleRequest(req)).toBe('retry');
+      expect(hub.read(`rooms/${host.code}/errors/u1`)).toBeNull();
+      expect(hub.read(`rooms/${host.code}/requests/${req.key}`)).not.toBeNull();
+    }, 30_000);
+
+    it('同じ依頼は二重に記録しない（新しいホストが記録した依頼が、古いホストにも届いた時）', async () => {
+      const { hub, host, b, h, log } = await frozenOldHost(4);
+      (host.backend as MemoryClient).paused = false;
+      await settle(30);
+      expect(allSame([host, b])).toBe(true);
+      // 新しいホストが処理した依頼のキー（記録に入っている）
+      const entries = hub.read(`rooms/${host.code}/log`) as Record<string, { req?: string; by: string; cmd: string }>;
+      const last = entries[seqKey(b.seq)];
+      expect(last.req).toBeTruthy();
+      const before = log();
+      // 古いホストが、まだホストだと思ったまま、同じ依頼を受け取った
+      expect(await h.handleRequest({ key: last.req!, by: last.by, cmd: last.cmd })).toBeUndefined();
+      expect(log()).toBe(before);
+      expect(allSame([host, b])).toBe(true);
+    }, 30_000);
+  });
 
   it('全員抜けても、同じ合言葉で入り直して続きから遊べる', async () => {
     const { hub, rooms } = await playing(2);

@@ -52,8 +52,11 @@ export const pillowGolem: EnemyDef = {
   pattern: 'sequence',
   actions: [
     { id: 'smother', name: '圧しかかり', effects: [{ kind: 'damage', amount: 9 }] },
-    { id: 'fluff', name: '羽毛の盾', effects: [{ kind: 'block', amount: 12 }] },
     { id: 'drowse', name: '眠気のあくび', effects: [{ kind: 'applyStatus', status: 'delay', amount: 1 }, { kind: 'damage', amount: 4 }] },
+    // 敵の特殊な行動・第2弾（docs/tasks/enemy-behaviors-round2-plan.md §3・fix-plan §4）: 「羽毛の盾」を浄化に置き換えた。ID は古い保存のために残す。
+    // 自分に悪い状態異常がある時は割り込む（割り込んだら次の2ターンは割り込まない）。順番の最後にも残す（2番目から最後へ移した）。
+    // 3つ目の地域なので1種類につき6回復
+    { id: 'fluff', name: 'ひと眠り', big: true, behavior: 'purify', cutIn: { when: 'afflicted', rest: 2 }, hint: '状態異常を全部消して回復する。その前に起爆するか、BREAK する', effects: [{ kind: 'purify', amount: 6 }] },
   ],
 };
 
@@ -90,7 +93,27 @@ export const shadowChild: EnemyDef = {
   actions: [
     { id: 'whisper', name: 'ささやき', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }] },
     { id: 'hand', name: '影の手', effects: [{ kind: 'damage', amount: 10, element: 'dark' }] },
-    { id: 'hideSeek', name: 'かくれんぼ', effects: [{ kind: 'block', amount: 10 }, { kind: 'damage', amount: 4 }] },
+    // 敵の特殊な行動・第2弾（fix-plan §2 の 2-2・§7 の4）: 手数読みは付けず、「かくれんぼ」を ブロック12＋狙った1人のフォーカスを1奪う にした
+    // （記憶喰いの「記憶を食べる」と同じ単体の形。今の4ダメージは外した）。特殊な行動の札は付けない、ふつうの行動
+    { id: 'hideSeek', name: 'かくれんぼ', effects: [{ kind: 'block', amount: 12 }, { kind: 'drainFocus', amount: 1 }] },
+  ],
+  // 最後の中ボス（2026-11-14 寄り道の値打ち 柱5）: 中ボスの部屋の戦闘だけの段階。HP50%か、相方が倒れると入る。数字は【提案】
+  midbossPhases: [
+    {
+      belowHpPct: 50,
+      onPartnerDown: true,
+      name: '光に焼かれない影の子',
+      pattern: 'sequence',
+      openingActionId: 'shInvert',
+      rule: '弱点と耐性が裏返る: 聖が効かなくなり、闇が弱点に変わる（合う属性の札を、その時に使う）',
+      weak: ['dark'],
+      resist: ['holy'],
+      actions: [
+        { id: 'shInvert', name: '影と光が入れ替わる', big: true, scripted: true, hint: '影と光が入れ替わる（ブロック10）。ここから聖が効かず、闇が弱点', effects: [{ kind: 'block', amount: 10 }] },
+        { id: 'shGrasp', name: '影のつかみ', effects: [{ kind: 'damage', amount: 11, element: 'dark' }] },
+        { id: 'shLullaby', name: '影の子守歌', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }, { kind: 'damage', amount: 4 }] },
+      ],
+    },
   ],
 };
 
@@ -144,10 +167,31 @@ export const dreamWeaver: EnemyDef = {
   gold: 20,
   weak: ['holy'],
   pattern: 'sequence',
+  // 敵の特殊な行動・第2弾（round2 §3・fix-plan §4）: 癒し封じを1ターン目に予告する（もとから順番の1番目）
+  firstActionId: 'weave',
   actions: [
-    { id: 'weave', name: '眠気の糸', effects: [{ kind: 'applyStatus', status: 'weak', amount: 1, to: 'foes' }, { kind: 'block', amount: 6 }] },
+    // 「眠気の糸」（弱体1・全体＋ブロック6）を癒し封じに置き換えた。ID は古い保存のために残す。5つ目の地域なのでブロック10（BREAK されると行動ごと止まる）
+    { id: 'weave', name: '覚めない眠りの糸', big: true, behavior: 'healSeal', hint: '味方全員の回復が、2ターン半分になる。BREAK するか、先に回復を使う', effects: [{ kind: 'applyStatus', status: 'healSeal', amount: 2, to: 'foes' }, { kind: 'block', amount: 10 }] },
     { id: 'thread', name: '呪いの糸', big: true, effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }, { kind: 'damage', amount: 8 }] },
     { id: 'net', name: '夢の網', big: true, effects: [{ kind: 'damage', amount: 6, to: 'foes' }] },
+  ],
+  // 最後の中ボス（2026-11-14 寄り道の値打ち 柱5）: 中ボスの部屋の戦闘だけの段階。HP50%か、相方が倒れると入る。数字は【提案】
+  midbossPhases: [
+    {
+      belowHpPct: 50,
+      onPartnerDown: true,
+      name: '裏返った夢織り',
+      pattern: 'sequence',
+      openingActionId: 'dwInvert',
+      rule: '弱点と耐性が裏返る: 聖が効かなくなり、闇が弱点に変わる（合う属性の札を、その時に使う）',
+      weak: ['dark'],
+      resist: ['holy'],
+      actions: [
+        { id: 'dwInvert', name: '夢を裏返す', big: true, scripted: true, hint: '夢が裏返る（ブロック12）。ここから聖が効かず、闇が弱点', effects: [{ kind: 'block', amount: 12 }] },
+        { id: 'dwCurseThread', name: '裏返しの糸', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }, { kind: 'damage', amount: 9 }] },
+        { id: 'dwDreamNet', name: '悪い夢の網', effects: [{ kind: 'damage', amount: 7, to: 'foes' }] },
+      ],
+    },
   ],
 };
 
@@ -192,7 +236,11 @@ export const dreamEater: EnemyDef = {
       belowHpPct: 60,
       name: '食べる夢喰い',
       pattern: 'sequence',
+      // ボスの段階（2026-11-14）: フォーカスを食べる（今の「忘れさせる」も残す）。答え: フォーカスを先に使う・聖で BREAK
+      openingActionId: 'eatDreams',
+      rule: '味方全員のフォーカスを食べる（聖で BREAK すると止まる。フォーカスは先に使う）',
       actions: [
+        { id: 'eatDreams', name: '夢を食べ尽くす', big: true, scripted: true, hint: '味方全員のフォーカスを2ずつ食べる。聖の弱点で BREAK すると止まる。食べられる前にフォーカスを使っておく', effects: [{ kind: 'drainFocus', amount: 2, to: 'foes' }, { kind: 'block', amount: 14 }] },
         { id: 'devourAll', name: '全部食べる', big: true, effects: [{ kind: 'damage', amount: 14, to: 'foes' }] },
         { id: 'forgetAll', name: '忘れさせる', big: true, effects: [{ kind: 'drainFocus', amount: 2, to: 'foes' }, { kind: 'damage', amount: 8, to: 'foes' }] },
         { id: 'maw', name: '大きな口', big: true, effects: [{ kind: 'damage', amount: 26, element: 'dark' }] },
@@ -203,6 +251,11 @@ export const dreamEater: EnemyDef = {
       belowHpPct: 30,
       name: '思い出す夢喰い',
       pattern: 'sequence',
+      // ボスの段階（2026-11-14）: 弱点が変わる（思い出す: 弱点 聖 → 闇・耐性 闇 → 聖）。答え: 変わった弱点（闇）で
+      openingActionId: 'remember',
+      rule: '思い出して、弱点が闇に変わる（聖は効きにくくなる。予告と弱点の印に出る）',
+      weak: ['dark'],
+      resist: ['holy'],
       actions: [
         { id: 'remember', name: '思い出す', big: true, effects: [{ kind: 'damage', amount: 18, element: 'holy', to: 'foes' }] },
         { id: 'tears', name: '涙', big: true, effects: [{ kind: 'damage', amount: 32, element: 'dark' }] },

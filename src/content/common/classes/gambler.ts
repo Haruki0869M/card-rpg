@@ -11,5 +11,6 @@ export const gambler: ClassDef = {
   battleAbility: { name: '勝負勘', effect: { when: 'afterCard', if: [{ kind: 'cardHasDamage' }, { kind: 'successesAtMost', count: 0 }, { kind: 'focusNotFull' }, { kind: 'oncePerTurn', key: 'gambleRecovery' }], do: [{ kind: 'gainFocus', amount: BALANCE.specialJobs.failureFocus }] } },
   exploreAbility: { id: 'gamblerExplore', name: '運の嗅覚', description: '宝箱の運の判定+15%', effect: { kind: 'checkBonus', check: 'luck', bonus: 15 } },
   requires: { feat: 'checks:luk', count: 6, text: '運の判定を6回成功' },
-  cardPool: ['gambleStrike', 'gambleTwin', 'gambleGuard', 'gambleFocus', 'gambleDraw', 'gambleFinale'], signature: ['gambleStrike', 'gambleTwin', 'gambleGuard'],
+  cardPool: ['gambleStrike', 'gambleTwin', 'gambleGuard', 'samuraiFocus', 'gambleDraw', 'gambleFinale'], signature: ['gambleStrike', 'gambleTwin', 'gambleGuard'],
+  jobCards: ['fxAllOrNothing'], // 区切りD: 決め技（転職した時に山札へ1枚）
 };

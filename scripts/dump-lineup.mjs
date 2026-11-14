@@ -53,8 +53,8 @@ try {
       return `成功${range}: ${fx}`;
     }).join(' ／ ');
     const marks = [];
-    if (c.weaponType) marks.push(`武器種:${wname(c.weaponType)}`);
-    if (c.lineage) marks.push(`系統:${LIN[c.lineage] ?? c.lineage}`);
+    for (const w of [c.weaponType, ...(c.weaponTypes ?? [])].filter(Boolean)) marks.push(`武器種:${wname(w)}`);
+    for (const l of [c.lineage, ...(c.lineages ?? [])].filter(Boolean)) marks.push(`系統:${LIN[l] ?? l}`);
     if (c.common) marks.push('共通');
     if (c.heresy) marks.push('異端');
     if (c.exhaust) marks.push('戦闘中1回');
@@ -79,7 +79,9 @@ try {
     if (it.explore?.campHeal) p.push(`野営の回復+${Math.round(it.explore.campHeal * 100)}%`);
     if (it.explore?.petEvent) p.push(`お供を連れている時、イベントの判定+${it.explore.petEvent}%`);
     const ab = it.ability ? ` 《${it.ability.name}》${safe(() => describeAbility(it.ability))}` : '';
-    const sc = it.scenario ? `｛シナリオ限定:${it.scenario}｝` : '';
+    if (it.pouchBonus) p.push(`道具袋+${it.pouchBonus}`);
+    // 段階7a: ランダムダンジョンの専用の装備（黄金箱と闇商人だけ）・仲間がいる時だけ出る物
+    const sc = (it.scenario ? `｛シナリオ限定:${it.scenario}｝` : '') + (it.source === 'randomDungeon' ? '｛専用:黄金箱・闇商人だけ｝' : '') + (it.teamOnly ? '｛仲間がいる時だけ｝' : '');
     return `- **${it.name}**［${RAR[it.rarity]}］${p.join('・')}${ab}${p.length || ab ? '' : it.description}${sc}`;
   };
   const count = (list, f) => { const m = {}; for (const x of list) { const k = f(x); m[k] = (m[k] ?? 0) + 1; } return m; };

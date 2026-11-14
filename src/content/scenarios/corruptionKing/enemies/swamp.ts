@@ -40,9 +40,12 @@ export const mireSlime: EnemyDef = {
   gold: 5,
   pattern: 'sequence',
   actions: [
-    { id: 'harden', name: '泥の膜', effects: [{ kind: 'block', amount: 8 }, { kind: 'damage', amount: 4 }] },
     { id: 'splash', name: '毒泥の飛沫', effects: [{ kind: 'applyStatus', status: 'poison', amount: 3, to: 'foes' }] },
     { id: 'tackle', name: '体当たり', effects: [{ kind: 'damage', element: 'poison', amount: 5, hits: 2 }] },
+    // 敵の特殊な行動 1回目（docs/tasks/enemy-behaviors-plan.md §7）: 守る行動「泥の膜」を浄化（脱皮）に置き換えた。ID は古い保存のために残す
+    // 1ターン目は状態異常がまだ付いていない事が多く空振りになるので、順番の最後に回した
+    // 直し（docs/tasks/enemy-behaviors-fix-plan.md §3）: 自分に悪い状態異常がある時は、順番を飛ばして割り込む（割り込んだら次の2ターンは割り込まない）。順番の3番目にも残す
+    { id: 'harden', name: '浄化の脱皮', big: true, behavior: 'purify', cutIn: { when: 'afflicted', rest: 2 }, hint: '状態異常を全部消して回復する。その前に起爆するか、BREAK する', effects: [{ kind: 'purify', amount: 6 }] },
   ],
 };
 
@@ -95,7 +98,11 @@ export const mordea: EnemyDef = {
       belowHpPct: 50,
       name: '冥府の屍術師',
       pattern: 'sequence',
+      // ボスの段階（2026-11-14）: 癒し封じ＋自分の回復（順番にも入る）。答え: 聖で BREAK・回復に頼らない組には効きが小さい
+      openingActionId: 'deathSeal',
+      rule: '味方の回復を半分にする封印を撒き、自分は回復する（聖で BREAK すると止まる）',
       actions: [
+        { id: 'deathSeal', name: '冥府の封印', big: true, behavior: 'healSeal', hint: '味方全員の回復が2ターン半分になり、モルデアはHPを15回復する。聖の弱点で BREAK すると止まる。回復に頼らない組には効きが小さい', effects: [{ kind: 'applyStatus', status: 'healSeal', amount: 2, to: 'foes' }, { kind: 'heal', amount: 15, to: 'self' }] },
         { id: 'necromance', name: '死霊の宴', big: true, effects: [{ kind: 'heal', amount: 20, to: 'self' }, { kind: 'damage', element: 'dark', amount: 10, to: 'foes' }] },
         { id: 'soulRip', name: '魂裂き', big: true, effects: [{ kind: 'damage', element: 'dark', amount: 22 }] },
         { id: 'plague', name: '疫病の霧', big: true, effects: [{ kind: 'applyStatus', status: 'poison', amount: 4, to: 'foes' }, { kind: 'damage', amount: 5, to: 'foes' }] },

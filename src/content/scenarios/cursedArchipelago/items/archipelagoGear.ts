@@ -13,13 +13,13 @@ export const archipelagoGear: ItemDef[] = [
   {
     id: "harpoon", name: "大物狩りの銛", slot: "weapon", weaponType: "spear", rarity: "rare", icon: "spear", scenario: "cursedArchipelago",
     description: "ボス・中ボスとの戦闘の間、物理カードの成功率+10%。", stats: {"str":6,"dex":2}, tags: ["physical"],
-    cards: [{"cardId":"wtSpearDouble","count":2}],
+    cards: [{"cardId":"lnBuFlurry","count":2}],
     ability: {"name":"大物狩り","description":"ボス・中ボスとの戦闘の間、物理カードの成功率+10%。","effect":{"modifier":"cardChance","bonus":10,"if":[{"kind":"cardCategory","category":"physical"},{"kind":"bossBattle"}]}},
   },
   {
     id: 'lighthouseScepter', name: '灯台守の錫杖', slot: 'weapon', weaponType: 'scepter', rarity: 'legend', icon: 'scepter', scenario: 'cursedArchipelago',
     description: '回復のカードが完全成功すると、ランダムな敵1体に「脆弱」1を与える。1ターンに1回。灯が霧の中の敵を照らす。', stats: { int: 8, vit: 4 }, tags: ['holy', 'heal', 'vulnerable'],
-    cards: [{ cardId: 'wtScepterJudgment', count: 2 }],
+    cards: [{ cardId: 'lnSeiDivinePunish', count: 2 }],
     ability: { name: '霧払いの灯', description: '回復のカードが完全成功した時（1ターンに1回）：ランダムな敵1体に「脆弱」1', effect: { when: 'perfect', if: [{ kind: 'cardHasHeal' }, { kind: 'oncePerTurn', key: 'lighthouseScepter' }], do: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'randomFoe' }] } },
   },
   // ----- 鎧 -----
@@ -30,5 +30,4 @@ export const archipelagoGear: ItemDef[] = [
   { id: 'oldCompass', name: '古い羅針盤', slot: 'accessory', rarity: 'rare', icon: 'charm', scenario: 'cursedArchipelago', description: '休む場所を指す羅針盤。ダンジョンの地図に、休憩部屋が最初から出る。', explore: { reveal: 'rest' } },
   { id: 'stormRing', name: '嵐の指輪', slot: 'accessory', rarity: 'epic', icon: 'ring', description: '属性の無い物理攻撃に、雷の力が宿る。', tags: ['thunder'], stats: { agi: 4 }, ability: { name: '雷の付与', effect: { modifier: 'convertElement', into: 'thunder' } } },
   { id: 'mistLantern', name: '霧払いのランタン', slot: 'accessory', rarity: 'epic', icon: 'charm', scenario: 'cursedArchipelago', description: 'そのターンに最初に使うカードの成功率が、15%上がる。', tags: ['heavy', 'highCost'], stats: { vit: 4 }, ability: { name: '霧を払う光', description: 'そのターンに最初に使うカードの成功率+15%', effect: { modifier: 'cardChance', bonus: 15, if: [{ kind: 'playedAtMost', count: 0 }] } } },
-  { id: 'goldenAnchor', name: '黄金の錨', slot: 'accessory', rarity: 'legend', icon: 'crest', scenario: 'cursedArchipelago', description: 'ターンの始めに、前のターンのブロックが最大15まで残る。沈まない意志の証。', tags: ['block'], stats: { vit: 10 }, ability: { name: '不動の錨', description: 'ターンの始めに、前のターンのブロックが最大15まで残る', effect: { modifier: 'keepBlock', max: 15 } } },
 ];

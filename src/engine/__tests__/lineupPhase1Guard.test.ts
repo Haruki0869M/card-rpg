@@ -152,7 +152,7 @@ describe('深淵の飾り（エピック）: 「呪い」の敵にダメージ�
     const s = battleWith(CURSE_EPIC);
     const me = s.allies[0];
     for (const e of s.enemies) e.statuses.curse = 3;
-    giveHand(s, me.id, ['sweep']);
+    giveHand(s, me.id, ['lnBuSwipe']);
     const { state, events } = use(s, me.id, 't0', undefined, 2);
     expect(state.enemies.every((e) => e.hp < FOE_HP)).toBe(true);
     expect(state.allies[0].hp).toBe(HP);
@@ -265,7 +265,7 @@ describe('急所の飾り（エピック）: 「脆弱」の敵に完全成功�
     const s = battleWith(VULN_EPIC);
     const me = s.allies[0];
     for (const e of s.enemies) e.statuses.vulnerable = 3;
-    giveHand(s, me.id, ['sweep']);
+    giveHand(s, me.id, ['lnBuSwipe']);
     const { state, events } = use(s, me.id, 't0', undefined, 2);
     expect(wasPerfect(events)).toBe(true);
     expect(state.allies[0].hand).toHaveLength(0);
@@ -288,7 +288,7 @@ describe('急所の飾り（エピック）: 「脆弱」の敵に完全成功�
     const s = battleWith(VULN_EPIC);
     const me = s.allies[0];
     expect(s.enemies[0].statuses.vulnerable ?? 0).toBe(0);
-    giveHand(s, me.id, ['mightyBlow']); // 渾身の一撃: 完全成功で脆弱1
+    giveHand(s, me.id, ['lanceCharge']); // 渾身の一撃: 完全成功で脆弱1
     const { state, events } = use(s, me.id, 't0', s.enemies[0].uid, 2);
     expect(state.enemies[0].statuses.vulnerable).toBeGreaterThanOrEqual(1);
     expect(state.allies[0].hand).toHaveLength(1);

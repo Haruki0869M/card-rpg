@@ -33,6 +33,14 @@ export function neighbors(w: Pick<WorldState, 'width' | 'height'>, i: number): n
   return out;
 }
 
+/** 向き d（0=右・1=右上・2=左上・3=左・4=左下・5=右下）の隣のマス（地図の外は undefined） */
+export function neighborInDir(w: Pick<WorldState, 'width' | 'height'>, i: number, d: number): number | undefined {
+  const c = colOf(w, i);
+  const r = rowOf(w, i);
+  const [dc, dr] = (r % 2 ? ODD : EVEN)[((d % 6) + 6) % 6];
+  return inside(w, c + dc, r + dr) ? idxOf(w, c + dc, r + dr) : undefined;
+}
+
 /** 2マスの距離（ヘックスの歩数） */
 export function hexDistance(w: Pick<WorldState, 'width'>, a: number, b: number): number {
   const toCube = (i: number) => {
@@ -90,6 +98,29 @@ export function pathTo(map: Map<number, { cost: number; prev: number }>, to: num
   for (let cur = to; cur >= 0 && map.has(cur); cur = map.get(cur)!.prev) {
     if (map.get(cur)!.prev < 0) break;
     path.unshift(cur);
+  }
+  return path;
+}
+
+/**
+ * まっすぐな道（広い地図の街道・脇道。段階6a）: 1歩ずつ、目的地に近づく隣のマスのうち、a と b を結ぶ線に一番近いマスを選ぶ。
+ * straightPath（幅を探す最短経路）は、隣の調べる順で右へ寄った道になるため、広い地図ではこちらを使う。乱数は使わない（道案内の立て札も、同じ線で街道を求め直す）
+ */
+export function linePath(w: Pick<WorldState, 'width' | 'height'>, a: number, b: number): number[] {
+  const xy = (i: number) => ({ x: colOf(w, i) + 0.5 * (rowOf(w, i) & 1), y: rowOf(w, i) * 0.866 });
+  const A = xy(a), B = xy(b);
+  const len = Math.hypot(B.x - A.x, B.y - A.y) || 1;
+  const off = (i: number) => {
+    const p = xy(i);
+    return Math.abs((B.x - A.x) * (A.y - p.y) - (A.x - p.x) * (B.y - A.y)) / len;
+  };
+  const path = [a];
+  for (let cur = a; cur !== b && path.length <= w.width * w.height; ) {
+    const d = hexDistance(w, cur, b);
+    const next = neighbors(w, cur).filter((n) => hexDistance(w, n, b) < d).sort((p, q) => off(p) - off(q) || p - q)[0];
+    if (next === undefined) break;
+    path.push(next);
+    cur = next;
   }
   return path;
 }

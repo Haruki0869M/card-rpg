@@ -10,13 +10,14 @@ import { SCENARIOS, isScenarioUnlocked } from '../../data/scenarios';
 import { clearedScenarioIds } from '../../store/profile';
 import { useProfile } from '../../store/profileStore';
 import { PLAYER_COLOR } from '../../data/theme';
-import { livingHeroes, waitingPlayers } from '../../engine';
+import { livingHeroes, notVoted, voters, waitingPlayers } from '../../engine';
 import { normalizeCode, SEATS } from '../../net/room';
 import { autoName, isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
-import { PROXY_WAIT_SEC, useOnline } from '../../store/onlineStore';
+import { proxyReadyAt, proxyWaitLeft, useOnline } from '../../store/onlineStore';
 import type { GameState, PlayerId } from '../../types';
 import { HeroFace, Screen } from '../ui/game';
+import { chestClaimWaits, facilityWaits, rewardWaits } from './waitNotes';
 
 /** 定型のスタンプ（spec §7.1） */
 export const STAMPS = ['いいね！', '待って！', 'ここ行こう', 'ありがとう', 'まかせて', 'ごめん！'];
@@ -271,15 +272,30 @@ export function LobbyScreen() {
 
 // ---------- 遊んでいる間 ----------
 
-/** 今だれの操作を待っているか（席。手番・準備完了・成長の選択） */
+/** 今だれの操作を待っているか（席。手番・準備完了・成長の選択・みんなで決める場面の票） */
 export function awaitedSeats(game: GameState): PlayerId[] {
+  const base = [...awaitedTurnSeats(game)];
+  // ホストの引き継ぎの直し（2026-11-14・点検 D 2-2）: ダンジョンの中のみんなで決める場面（扉・撤退・イベント・続ける・宝箱の開け役）と
+  // 報酬の「続ける」で、まだ選んでいない席も待っている（相手が眠ったら「代わりに操作」の窓を出すため）。戦闘中・世界マップは今のまま
+  if (game.mode !== 'battle' && game.mode !== 'world' && (game.activeScene || game.mode === 'reward') && voters(game).length > 1)
+    for (const p of notVoted(game)) if (!base.includes(p)) base.push(p);
+  return base;
+}
+
+function awaitedTurnSeats(game: GameState): PlayerId[] {
   if (game.mode === 'world' && game.world && !game.world.story) {
     const h = game.heroes.find((x) => x.id === game.world!.turn);
     return h ? [h.playerId] : [];
   }
   if (game.mode === 'battle' && game.battle?.phase === 'ally') return waitingPlayers(game.battle);
-  if (game.mode === 'reward' && game.reward?.levelUps.length) {
-    const h = game.heroes.find((x) => x.id === game.reward!.levelUps[0].heroId);
+  // 回3 A・C: 報酬（成長・カード・取り合い）・宝箱の取り合い・施設も、まだ選んでいない人を待っている
+  const all = () => false;
+  const seats = (notes: { playerId: PlayerId }[]) => [...new Set(notes.map((n) => n.playerId))];
+  if (game.mode === 'reward') return seats(rewardWaits(game, all));
+  if (game.mode === 'chest' && game.chest?.claims?.some((c) => !c.rolls)) return seats(chestClaimWaits(game, all));
+  if (game.mode === 'town' || game.mode === 'shrine' || game.mode === 'sanctuary') return seats(facilityWaits(game, all));
+  if (game.mode === 'encounter' && game.encounter) {
+    const h = game.heroes.find((x) => x.id === game.encounter!.heroId);
     return h ? [h.playerId] : [];
   }
   return [];
@@ -311,12 +327,12 @@ export function OnlinePanel() {
             {mem.name}
             {room.meta!.hostUid === Object.entries(room.members).find(([, x]) => x === mem)?.[0] && <Crown size={13} className="ml-1 inline text-amber-300" />}
           </span>
-          {!mem.online && room.isHost && mem.seat !== room.seat && (
+          {!room.alive(mem) && room.isHost && mem.seat !== room.seat && (
             <button onClick={() => setProxy(mem.seat, !room.meta!.proxy?.[mem.seat])} className="btn btn-dark h-11 rounded-lg px-2 text-[12px] font-bold">
               {room.meta!.proxy?.[mem.seat] ? '代わりの操作をやめる' : '代わりに操作する'}
             </button>
           )}
-          {mem.online ? <Wifi size={14} className="text-emerald-300" /> : <WifiOff size={14} className="text-zinc-500" />}
+          {room.alive(mem) ? <Wifi size={14} className="text-emerald-300" /> : <WifiOff size={14} className="text-zinc-500" />}
         </div>
       ))}
       <div className="grid grid-cols-3 gap-1">
@@ -343,11 +359,22 @@ export function OnlineOverlay() {
   useOnline((s) => s.tick);
   const stamp = useOnline((s) => s.stamp);
   const offlineSince = useOnline((s) => s.offlineSince);
+  const proxyHold = useOnline((s) => s.proxyHold);
   const setProxy = useOnline((s) => s.setProxy);
+  const holdProxy = useOnline((s) => s.holdProxy);
   const game = useBattle((s) => s.game);
   const screen = useBattle((s) => s.screen);
   const [shownStamp, setShownStamp] = useState<number | null>(null);
   const [, setNow] = useState(0);
+  const hostNote = useOnline((s) => s.hostNote);
+  const [shownHost, setShownHost] = useState<number | null>(null);
+  // 回3 C: ホストの引き継ぎの知らせは12秒出す
+  useEffect(() => {
+    if (!hostNote) return;
+    setShownHost(hostNote.id);
+    const t = setTimeout(() => setShownHost(null), 12000);
+    return () => clearTimeout(t);
+  }, [hostNote]);
   useEffect(() => {
     if (!stamp) return;
     setShownStamp(stamp.id);
@@ -366,14 +393,24 @@ export function OnlineOverlay() {
     .filter((x) => x.target && x.by && isLocalPlayer(x.target.playerId));
   const offlineAwaited = awaitedSeats(game).filter((p) => !room.seatOnline(p) && !room.meta?.proxy?.[p] && livingHeroes(game).some((h) => h.playerId === p));
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 z-[70] flex flex-col items-center gap-1 px-3 pt-14">
+    <div data-online-overlay className="pointer-events-none absolute inset-x-0 top-0 z-[70] flex flex-col items-center gap-1 px-3 pt-14">
       {!room.connected && (
         <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-red-950/90 px-3 py-1.5 text-[13px] text-red-100">
           <WifiOff size={16} /> 通信が切れました。つながり直しています…
         </div>
       )}
+      {hostNote && shownHost === hostNote.id && (
+        <div className="pointer-events-auto flex w-full max-w-[400px] items-start gap-1.5 rounded-xl border border-amber-300/40 bg-black/90 px-3 py-2 text-[13px] text-amber-50" role="status" data-host-note>
+          <Crown size={16} className="mt-0.5 shrink-0 text-amber-300" />
+          <span>
+            ホスト（{hostNote.oldName}さん）との接続が切れました。{hostNote.mine ? 'あなたがホストを引き継ぎました。このまま続けられます' : `${hostNote.newName}さんが引き継ぎました。このまま続けられます`}
+          </span>
+        </div>
+      )}
       {offlineAwaited.map((p) => {
-        const left = Math.max(0, PROXY_WAIT_SEC - Math.floor((Date.now() - (offlineSince[p] ?? Date.now())) / 1000));
+        const now = room.backend.now();
+        const member = Object.values(room.members).find((m) => m.seat === p);
+        const left = proxyWaitLeft(now, proxyReadyAt(member, offlineSince[p] ?? now, proxyHold[p]));
         return (
           <div key={p} className="pointer-events-auto flex w-full max-w-[400px] flex-col gap-1 rounded-xl border border-amber-300/40 bg-black/90 px-3 py-2 text-[13px] text-amber-50">
             <div className="flex items-center gap-1.5">
@@ -387,7 +424,7 @@ export function OnlineOverlay() {
                   <button onClick={() => setProxy(p, true)} className="btn btn-gold h-11 flex-1 rounded-lg text-[13px] font-bold">
                     代わりに操作する
                   </button>
-                  <button onClick={() => useOnline.setState({ offlineSince: { ...offlineSince, [p]: Date.now() } })} className="btn btn-dark h-11 flex-1 rounded-lg text-[13px] font-bold">
+                  <button onClick={() => holdProxy(p)} className="btn btn-dark h-11 flex-1 rounded-lg text-[13px] font-bold">
                     もう少し待つ
                   </button>
                 </div>
@@ -441,6 +478,25 @@ export function OthersTurnNote({ seat, name, what }: { seat: PlayerId; name: str
         {name}が{what}
       </span>
      
+    </div>
+  );
+}
+
+/** 回3 A: 待っている相手と、相手が今していること（1行ずつ。「P2 ナツさんが、リナの山札に加えるカードを選んでいます」） */
+export function WaitNotes({ notes, className = '' }: { notes: { playerId: PlayerId; what: string }[]; className?: string }) {
+  useOnline((s) => s.tick);
+  if (!notes.length) return null;
+  const room = useOnline.getState().room;
+  return (
+    <div className={`flex flex-col gap-1 rounded-xl bg-black/50 px-2 py-1.5 ${className}`} role="status" data-wait-notes>
+      {notes.map((n, i) => (
+        <div key={i} className="flex items-start gap-1.5 text-[13px] leading-5 text-zinc-100">
+          <SeatChip p={n.playerId} small />
+          <span className="min-w-0">
+            {room?.seatName(n.playerId) ?? n.playerId}さんが、{n.what}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }

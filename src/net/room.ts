@@ -50,7 +50,17 @@ export interface Member {
   seat: PlayerId;
   joinedAt: number;
   online: boolean;
+  /** 最後に「動いている」と書いた時刻（回3 C。古い端末は書かないので ? 付き） */
+  beat?: number;
 }
+
+/** 「動いている」を書く間隔 */
+export const BEAT_MS = 10_000;
+/**
+ * これより長く「動いている」が書かれていない人は、接続が残っていても止まっている（スマホが眠った・ページが凍った）とみなす（回3 C）。
+ * ホストなら、残っている中で一番早く入った人が引き継ぐ。
+ */
+export const STALE_MS = 35_000;
 
 export interface Slot {
   classId: string;
@@ -68,6 +78,8 @@ export interface Stamp {
 interface LogEntry {
   by: string;
   cmd: string;
+  /** どの依頼から作ったか（requests のキー。二重に記録しないため。古い記録には無い） */
+  req?: string;
 }
 interface Snapshot {
   seq: number;
@@ -92,6 +104,16 @@ export type RoomEvent =
   | { type: 'host'; hostUid: string };
 
 export const seqKey = (n: number) => String(n).padStart(9, '0');
+/** 覚えておく処理済みの依頼の数 */
+const DONE_REQS = 500;
+/** 記録を書けなかった依頼を、やり直す回数 */
+const MAX_TRIES = 3;
+interface QueuedRequest {
+  key: string;
+  by: string;
+  cmd: string;
+  tries?: number;
+}
 const roomPath = (code: string, ...rest: string[]) => join('rooms', code, ...rest);
 
 export function randomCode(rand: () => number = Math.random): string {
@@ -107,6 +129,8 @@ export const normalizeCode = (s: string) =>
     .slice(0, 4);
 
 export class RoomError extends Error {}
+/** 合言葉の部屋が無い（消えた）時の文。タイトルの「前の部屋に戻る」で見分ける */
+export const ROOM_MISSING = 'その合言葉の部屋はありません';
 
 export class Room {
   meta: RoomMeta | null = null;
@@ -126,12 +150,17 @@ export class Room {
   private subs: Unsubscribe[] = [];
   private logSub: Unsubscribe | null = null;
   private reqSub: Unsubscribe | null = null;
-  private queue: { key: string; by: string; cmd: string }[] = [];
+  private queue: QueuedRequest[] = [];
   private processing = false;
   private hashes = new Map<number, string>();
+  /** 記録に入った依頼のキー（同じ依頼を二重に記録しないため。新しい物だけ覚える） */
+  private doneReqs = new Set<string>();
   private pendingCheck: Snapshot | null = null;
   private resyncing: Promise<void> | null = null;
   private closed = false;
+  private beatTimer: ReturnType<typeof setInterval> | null = null;
+  /** 直前のホスト（引き継ぎの知らせに使う。回3 C） */
+  prevHostUid: string | null = null;
 
   private constructor(
     readonly backend: Backend,
@@ -154,9 +183,13 @@ export class Room {
     if (this.isHost) for (const p of SEATS) if (this.meta?.proxy?.[p] && !out.includes(p)) out.push(p);
     return out;
   }
-  /** 席の人が接続中か（誰もいない席は false） */
+  /** その人が今動いているか: 接続中で、「動いている」の書き込みが古すぎない（書かない古い端末は、接続中なら動いているとみなす） */
+  alive(m: Member | undefined): boolean {
+    return !!m && m.online && (m.beat === undefined || this.backend.now() - m.beat < STALE_MS);
+  }
+  /** 席の人が接続中（動いている）か（誰もいない席は false） */
   seatOnline(p: PlayerId): boolean {
-    return Object.values(this.members).some((m) => m.seat === p && m.online);
+    return Object.values(this.members).some((m) => m.seat === p && this.alive(m));
   }
   seatName(p: PlayerId): string | undefined {
     return Object.values(this.members).find((m) => m.seat === p)?.name;
@@ -214,7 +247,7 @@ export class Room {
     const code = normalizeCode(rawCode);
     if (code.length !== 4) throw new RoomError('合言葉は4文字です');
     const meta = await backend.get<RoomMeta>(roomPath(code, 'meta'));
-    if (!meta) throw new RoomError('その合言葉の部屋はありません');
+    if (!meta) throw new RoomError(ROOM_MISSING);
     if (meta.version !== GAME_VERSION || meta.content !== contentVersion()) throw new RoomError('ゲームの版が部屋と違います。ページを読み込み直してください');
     const me = await backend.get<Member>(roomPath(code, 'members', backend.uid));
     if (!me) {
@@ -263,7 +296,7 @@ export class Room {
         this.emit({ type: 'meta' });
         // 人数が変わったら枠も作り直す（増やした時は枠のデータが変わらず、枠の知らせが来ないため）
         if (sizeChanged) this.rebuildSlots();
-        if (m.hostUid !== oldHost) this.onHostChanged();
+        if (m.hostUid !== oldHost) this.onHostChanged(oldHost);
         if (m.status === 'playing' && (!wasPlaying || !this.game)) void this.resync('start');
       }),
       b.onValue<Record<string, Member>>(p('members'), (m) => {
@@ -294,6 +327,39 @@ export class Room {
     );
     if (this.meta?.status === 'playing') await this.resync('join');
     if (this.isHost) this.startHosting();
+    this.startBeat();
+  }
+
+  /**
+   * 回3 C: 「動いている」を一定の間隔で書き、ほかの人が止まっていないかを見る。
+   * ページが凍る（スマホが眠る）と、接続は残ったまま何も処理しなくなるので、接続の印だけでは気づけない。
+   * ホストが止まっていたら、checkHost で引き継ぐ。だれかの「動いている」が変わったら、画面を書き直す
+   */
+  private startBeat() {
+    if (this.beatTimer || this.closed) return;
+    let lastBeat = 0;
+    let lastAlive = '';
+    const tick = () => {
+      if (this.closed || !this.connected) return;
+      const now = this.backend.now();
+      if (now - lastBeat >= BEAT_MS) {
+        lastBeat = now;
+        void this.backend.set(roomPath(this.code, 'members', this.uid, 'beat'), now).catch(() => {});
+      }
+      const alive = Object.keys(this.members)
+        .sort()
+        .map((k) => (this.alive(this.members[k]) ? 1 : 0))
+        .join('');
+      if (alive !== lastAlive) {
+        const first = lastAlive === '';
+        lastAlive = alive;
+        if (!first) this.emit({ type: 'members' });
+      }
+      this.checkHost();
+    };
+    tick();
+    this.beatTimer = setInterval(tick, BEAT_MS / 2);
+    (this.beatTimer as { unref?: () => void }).unref?.();
   }
 
   /** 部屋を出る（データは残るので、同じ合言葉でまた入れる） */
@@ -309,6 +375,8 @@ export class Room {
 
   dispose() {
     this.closed = true;
+    if (this.beatTimer) clearInterval(this.beatTimer);
+    this.beatTimer = null;
     for (const u of this.subs) u();
     this.subs = [];
     this.logSub?.();
@@ -459,6 +527,7 @@ export class Room {
     this.seq = n;
     this.hashes.set(n, stateHash(this.game));
     if (this.hashes.size > SNAPSHOT_EVERY * 3) this.hashes.delete(Math.min(...this.hashes.keys()));
+    if (entry.req) this.rememberReq(entry.req);
     this.emit({ type: 'command', seq: n, by: entry.by, cmd, result });
     if (this.pendingCheck && this.pendingCheck.seq === n) this.compare(this.pendingCheck);
     return true;
@@ -497,33 +566,82 @@ export class Room {
     this.queue = [];
   }
 
+  private rememberReq(key: string) {
+    this.doneReqs.add(key);
+    if (this.doneReqs.size > DONE_REQS) this.doneReqs.delete(this.doneReqs.values().next().value!);
+  }
+
   private async processQueue() {
     if (this.processing) return;
     this.processing = true;
     try {
-      // 引き継いだ直後など: 書かれている記録に追いついてから
-      await this.catchUp();
-      // 切断中は処理しない（書き込みが後から届いて、引き継いだホストとぶつからないように）
       while (this.queue.length && this.isHost && this.connected && !this.closed) {
-        const req = this.queue.shift()!;
-        await this.handleRequest(req);
+        // 処理を始める前に、部屋のホスト・記録・依頼を読み直す（ホストの引き継ぎ 2026-11-14）。
+        // 目を覚ました古いホストが、自分はもうホストでない事・記録が先へ進んでいる事に気づく前に書かないため
+        if (!(await this.refresh())) break;
+        while (this.queue.length && this.isHost && this.connected && !this.closed) {
+          const req = this.queue.shift()!;
+          const r = await this.handleRequest(req);
+          if (r === 'retry') {
+            // だれかが先に記録を書いた（自分は遅れていた）: 追いついてから、同じ依頼をやり直す
+            req.tries = (req.tries ?? 0) + 1;
+            if (req.tries <= MAX_TRIES) this.queue.unshift(req);
+            break;
+          }
+        }
       }
     } finally {
       this.processing = false;
     }
   }
 
-  private async catchUp() {
-    const log = await this.backend.get<Record<string, LogEntry>>(roomPath(this.code, 'log'));
-    for (const k of Object.keys(log ?? {}).sort()) {
-      const n = Number(k);
-      if (n === this.seq + 1) this.applyEntry(n, log![k]);
+  /**
+   * ホストの仕事を続けてよいか確かめ、記録に追いつく。
+   * - 部屋の hostUid が自分でなければ、ホストの仕事をやめる（false）
+   * - 部屋にもう無い依頼（新しいホストが処理した物）は、待ち行列から捨てる
+   * - 記録の古い分が消えていて追いつけない時は、保存（snapshot）から取り直す
+   */
+  private async refresh(depth = 0): Promise<boolean> {
+    const p = (...r: string[]) => roomPath(this.code, ...r);
+    const [hostUid, log, reqs] = await Promise.all([
+      this.backend.get<string>(p('meta', 'hostUid')),
+      this.backend.get<Record<string, LogEntry>>(p('log')),
+      this.backend.get<Record<string, unknown>>(p('requests')),
+    ]);
+    if (this.closed) return false;
+    if (hostUid !== this.uid) {
+      this.stopHosting();
+      return false;
     }
+    this.queue = this.queue.filter((q) => reqs?.[q.key] !== undefined);
+    const keys = Object.keys(log ?? {})
+      .map(Number)
+      .filter((n) => n > this.seq)
+      .sort((a, b) => a - b);
+    if (keys.length && keys[0] !== this.seq + 1) {
+      // 間が抜けている（古い記録が消えた）: 保存から取り直して、もう一度読む
+      if (depth >= 2) return false;
+      await this.resync('gap');
+      return this.refresh(depth + 1);
+    }
+    for (const n of keys) if (n === this.seq + 1 && !this.applyEntry(n, log![seqKey(n)])) return false;
+    return true;
   }
 
-  private async handleRequest(req: { key: string; by: string; cmd: string }) {
+  /** 次の番号の記録が、もう部屋にあるか（自分が遅れているか） */
+  private async behind(): Promise<boolean> {
+    return (await this.backend.get<LogEntry>(roomPath(this.code, 'log', seqKey(this.seq + 1)))) !== null;
+  }
+
+  /** 依頼を1つ処理する。'retry' = 記録を書けなかった（ほかの端末が先に書いた） */
+  private async handleRequest(req: QueuedRequest): Promise<'retry' | void> {
     const p = (...r: string[]) => roomPath(this.code, ...r);
     if (!this.game) return;
+    // もう記録に入っている依頼（目を覚ました古いホストと、新しいホストの両方が受け取った物）は、二重に記録しない
+    if (this.doneReqs.has(req.key)) {
+      await this.backend.remove(p('requests', req.key)).catch(() => {});
+      return;
+    }
     let cmd: GameCommand;
     try {
       cmd = JSON.parse(req.cmd) as GameCommand;
@@ -534,38 +652,56 @@ export class Room {
     const result = applyGameCommand(this.game, cmd);
     const now = this.backend.now();
     if (result.error) {
+      // 断る前に、記録が先へ進んでいないか確かめる（古い状態で断って、相方の操作を消さないため）
+      if (await this.behind()) return 'retry';
       await this.backend.update({ [p('requests', req.key)]: null, [p('errors', req.by)]: { text: result.error, at: now } });
       return;
     }
     const n = this.seq + 1;
-    const u: Record<string, unknown> = {
-      [p('log', seqKey(n))]: { by: req.by, cmd: req.cmd } satisfies LogEntry,
-      [p('requests', req.key)]: null,
-      [p('meta', 'updatedAt')]: now,
-      [join('roomIndex', this.code)]: now,
-    };
+    const entry: LogEntry = { by: req.by, cmd: req.cmd, req: req.key };
+    // 自分の画面には先に出す（ホストの操作の速さは今のまま）。記録を書けなかったら、部屋から取り直して直す
     this.game = result.state;
     this.seq = n;
     const hash = stateHash(this.game);
     this.hashes.set(n, hash);
     if (this.hashes.size > SNAPSHOT_EVERY * 3) this.hashes.delete(Math.min(...this.hashes.keys()));
+    this.emit({ type: 'command', seq: n, by: req.by, cmd, result });
+    // その番号がまだ空の時だけ書く（古いホストが、新しいホストの書いた記録を上書きしないため）
+    let committed = false;
+    try {
+      committed = (await this.backend.transaction<LogEntry>(p('log', seqKey(n)), (cur) => (cur ? undefined : entry))).committed;
+    } catch {
+      committed = false;
+    }
+    if (!committed) {
+      await this.resync('error');
+      return 'retry';
+    }
+    this.rememberReq(req.key);
+    const u: Record<string, unknown> = {
+      [p('requests', req.key)]: null,
+      [p('meta', 'updatedAt')]: now,
+      [join('roomIndex', this.code)]: now,
+    };
     if (n % SNAPSHOT_EVERY === 0) {
-      u[p('snapshot')] = { seq: n, game: JSON.stringify(this.game), hash } satisfies Snapshot;
       // 古い記録は消して、部屋のデータを小さく保つ（一つ前の snapshot より前）
       for (let k = n - 2 * SNAPSHOT_EVERY + 1; k <= n - SNAPSHOT_EVERY; k++) if (k > 0) u[p('log', seqKey(k))] = null;
+      const snap: Snapshot = { seq: n, game: JSON.stringify(this.game), hash };
+      // 保存は、今の保存より新しい時だけ書く
+      void this.backend.transaction<Snapshot>(p('snapshot'), (cur) => (cur && cur.seq >= n ? undefined : snap)).catch(() => {});
     }
-    this.emit({ type: 'command', seq: n, by: req.by, cmd, result });
     await this.backend.update(u);
   }
 
-  /** ホストが切断していたら、残っている中で一番早く入った人が引き継ぐ */
+  /** ホストが切断していたら（止まっていたら）、残っている中で一番早く入った人が引き継ぐ */
   private checkHost() {
     const m = this.meta;
     if (!m || this.closed || !this.connected) return;
     const host = this.members[m.hostUid];
-    if (host?.online) return;
+    if (this.alive(host)) return;
+    // 自分は今動いているので、自分の「動いている」が古く見えても候補に入れる（書き込みが届く前）
     const next = Object.entries(this.members)
-      .filter(([, x]) => x.online)
+      .filter(([uid, x]) => (uid === this.uid ? x.online : this.alive(x)))
       .sort((a, b) => a[1].joinedAt - b[1].joinedAt)[0];
     if (next?.[0] !== this.uid) return;
     const old = m.hostUid;
@@ -580,7 +716,8 @@ export class Room {
     this.emit({ type: 'slots' });
   }
 
-  private onHostChanged() {
+  private onHostChanged(oldHost?: string) {
+    this.prevHostUid = oldHost ?? null;
     this.emit({ type: 'host', hostUid: this.meta!.hostUid });
     if (this.isHost) {
       // 引き継いだ: 自分が代わりに操作するのは、切断中の席だけ

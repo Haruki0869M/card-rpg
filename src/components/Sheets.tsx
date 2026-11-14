@@ -9,7 +9,7 @@ import { CharacterArt } from '../art';
 import { cardOf } from '../data/cards';
 import { getClass } from '../data/classes';
 import { getItem, POUCH_LIMIT } from '../data/items';
-import { EQUIP_SLOTS, STAT_IDS, affinityFromStats, jobOptions, battleDeck, canEquip, describeAbility, expToNext, findAlly, heroFocusMax, heroMaxHp, heroStats, weaponRarity } from '../engine';
+import { EQUIP_SLOTS, STAT_IDS, affinityFromStats, jobOptions, battleDeck, canBreak, canEquip, enemyName, itemTargetsEnemy, describeAbility, expToNext, findAlly, heroFocusMax, heroMaxHp, heroStats, pouchLimitOf, weaponRarity } from '../engine';
 import { LOCAL_PLAYER, isLocalPlayer, isOnlinePlay } from '../store/battleConfig';
 import { PLAYER_COLOR } from '../data/theme';
 import { useBattle } from '../store/battleStore';
@@ -507,6 +507,9 @@ function PouchRow({ itemId, heroId, onTap, className, children }: { itemId: stri
   );
 }
 
+/** 戦闘の外でだけ使う道具の種類（区切りE: テント・砥石など） */
+const fieldKind = (def: { use?: { kind: string; what?: string }[] }) => def.use?.find((e) => e.kind === 'fieldOnly')?.what;
+
 function PouchSheet() {
   const game = useBattle((s) => s.game)!;
   const battle = useBattle((s) => s.battle);
@@ -514,6 +517,8 @@ function PouchSheet() {
   const openSheet = useBattle((s) => s.openSheet);
   const activeId = useBattle((s) => s.activeId);
   const [chosen, setChosen] = useState<string | null>(null);
+  // 区切りE: カード鍛錬の砥石で、強化するカードを選んでいるキャラ
+  const [stoneHero, setStoneHero] = useState<string | null>(null);
   const inBattle = game.mode === 'battle';
   // だれの袋か: 戦闘中は操作中のキャラ、それ以外は選べる（この端末のキャラで、今の場面にいる）
   const own = sceneLocalHeroes(game);
@@ -523,14 +528,17 @@ function PouchSheet() {
   const groups = new Map<string, string[]>();
   for (const p of pouch) groups.set(p.itemId, [...(groups.get(p.itemId) ?? []), p.uid]);
   const chosenDef = chosen ? getItem(pouch.find((p) => p.uid === chosen)?.itemId ?? 'potion') : null;
-  const targets = game.heroes.filter((h) => !h.retired && (!game.party || game.party.includes(h.id)) && (!game.world || game.party || game.world.pos[h.id] === game.world.pos[owner?.id ?? ''])).map((h) => {
+  // 使える相手: 自分と、同じ場面にいる仲間（回3 B: 世界マップで、同じマスにいてもダンジョンの中の仲間は入れない。
+  // 前は入っていて、押すと「そのキャラはダンジョンの中です」と断られた。渡す相手の一覧 placeMates と同じ決まり）
+  const mates = owner ? placeMates(game, owner) : [];
+  const targets = game.heroes.filter((h) => h === owner || mates.includes(h)).map((h) => {
     const a = inBattle ? battle.allies.find((x) => x.id === h.id) : undefined;
     const hp = a ? a.hp : h.hp;
     const max = a ? a.maxHp : heroMaxHp(h);
     return { h, hp, max, dead: a ? a.dead : h.hp <= 0 };
   });
   return (
-    <BottomSheet title={`${owner?.name ?? ''}の道具袋（${pouch.length}/${POUCH_LIMIT}）`} onClose={() => openSheet(null)}>
+    <BottomSheet title={`${owner?.name ?? ''}の道具袋（${pouch.length}/${owner ? pouchLimitOf(owner) : POUCH_LIMIT}）`} onClose={() => openSheet(null)}>
       {!inBattle && own.length > 1 && (
         <div className="mb-1 flex gap-1">
           {own.map((h) => (
@@ -558,7 +566,10 @@ function PouchSheet() {
               key={itemId}
               itemId={itemId}
               heroId={owner?.id}
-              onTap={() => setChosen(active ? null : uids[0])}
+              onTap={() => {
+                setChosen(active ? null : uids[0]);
+                setStoneHero(null);
+              }}
               className={`btn flex min-h-14 items-center gap-2 rounded-lg border px-2 text-left ${active ? 'border-amber-300 bg-amber-500/10' : 'border-white/10 bg-black/30'}`}
             >
               <ItemIcon item={it} size={42} />
@@ -572,7 +583,65 @@ function PouchSheet() {
           );
         })}
       </div>
-      {chosenDef && (
+      {chosenDef && fieldKind(chosenDef) === 'tent' && !inBattle && (
+        <div className="mt-2 rounded-xl border border-amber-400/40 bg-black/40 p-2">
+          <div className="text-[13px] text-zinc-300">{owner?.name}がテントを張って野営します。夜の魔物に襲われず、HPとフォーカスを50%回復して、手番が終わります。</div>
+          <button onClick={() => { const error = usePouch(chosen!, owner!.id, owner?.id); if (!error) setChosen(null); }} className="btn btn-gold mt-1 h-12 w-full rounded-lg text-[14px] font-bold">ここで野営する</button>
+        </div>
+      )}
+      {chosenDef && fieldKind(chosenDef) === 'elixir' && stoneHero && !inBattle && (
+        <div className="mt-2 rounded-xl border border-amber-400/40 bg-black/40 p-2" data-elixir-stats>
+          <div className="text-[13px] text-zinc-300">{game.heroes.find((h) => h.id === stoneHero)?.name}のどの能力値を上げる？（この冒険の間 +{(chosenDef.use?.find((e) => e.kind === 'fieldOnly') as { amount?: number } | undefined)?.amount ?? 5}）</div>
+          <div className="mt-1 grid grid-cols-4 gap-1">
+            {STAT_IDS.map((st) => (
+              <button key={st} onClick={() => { const error = usePouch(chosen!, stoneHero, owner?.id, undefined, st); if (!error) { setChosen(null); setStoneHero(null); } }} className="btn btn-dark flex h-11 flex-col items-center justify-center rounded-lg text-[12px] leading-4 font-bold" data-elixir-stat={st}>
+                {STAT_LABEL[st]}
+                <span className="tabular-nums text-zinc-400">{heroStats(game.heroes.find((h) => h.id === stoneHero)!)[st]}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {chosenDef && fieldKind(chosenDef) === 'whetstone' && stoneHero && !inBattle && (
+        <div className="mt-2 rounded-xl border border-amber-400/40 bg-black/40 p-2">
+          <div className="text-[13px] text-zinc-300">強化するカードを選んでください（この冒険の間だけ。成功率+10%・効果の数値が上がる）</div>
+          <div className="mt-1 flex max-h-72 flex-col gap-1 overflow-y-auto">
+            {(game.heroes.find((h) => h.id === stoneHero)?.deck ?? []).filter((c) => !c.upgraded).filter((c, i, all) => all.findIndex((x) => x.cardId === c.cardId) === i).map((c) => (
+              <button key={c.uid} onClick={() => { const error = usePouch(chosen!, stoneHero, owner?.id, c.uid); if (!error) { setChosen(null); setStoneHero(null); } }} className="btn btn-dark flex h-11 items-center gap-2 rounded-lg px-2 text-left text-[13px]">
+                <span className="min-w-0 flex-1 truncate font-bold">{cardOf(c).name}</span>
+                <span className="text-[12px] text-amber-200">→ {cardOf({ cardId: c.cardId, upgraded: true }).name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {chosenDef && inBattle && itemTargetsEnemy(chosenDef.use) && (
+        <div className="mt-2 rounded-xl border border-amber-400/40 bg-black/40 p-2" data-pouch-foes>
+          <div className="text-[13px] text-zinc-300">「{chosenDef.name}」をどの敵に使う？</div>
+          <div className="mt-1 grid grid-cols-2 gap-1">
+            {battle.enemies.filter((e) => !e.dead).map((e) => (
+              <button
+                key={e.uid}
+                onClick={() => {
+                  const error = usePouch(chosen!, e.uid, owner?.id);
+                  if (!error) setChosen(null);
+                }}
+                className="btn btn-dark flex h-12 items-center gap-1.5 rounded-lg px-2 text-left"
+              >
+                <span className="min-w-0 flex-1 leading-4">
+                  <span className="block truncate text-[13px] font-bold">{enemyName(e)}</span>
+                  <span className="block text-[12px] text-zinc-400 tabular-nums">
+                    HP {e.hp}/{e.maxHp}
+                    {canBreak(e) && <span className="ml-1 text-amber-300">大技の予告</span>}
+                  </span>
+                </span>
+                <ArrowRight size={16} className="ml-auto text-amber-300" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {chosenDef && !(inBattle && itemTargetsEnemy(chosenDef.use)) && fieldKind(chosenDef) !== 'tent' && !((fieldKind(chosenDef) === 'whetstone' || fieldKind(chosenDef) === 'elixir') && stoneHero) && (
         <div className="mt-2 rounded-xl border border-amber-400/40 bg-black/40 p-2">
           <div className="text-[13px] text-zinc-300">
             「{chosenDef.name}」を誰に使う？{chosenDef.use?.some((e) => e.kind === 'escape') && '（使うと戦闘から逃げる）'}
@@ -581,8 +650,10 @@ function PouchSheet() {
             {targets.map(({ h, hp, max, dead }) => (
               <button
                 key={h.id}
-                disabled={chosenDef.use?.some(e => e.kind === 'revive') ? !dead : dead}
+                disabled={chosenDef.use?.some((e) => e.kind === 'phoenix') ? false : chosenDef.use?.some((e) => e.kind === 'revive') ? !dead : dead}
                 onClick={() => {
+                  // 砥石は、先にだれのカードかを選ぶ
+                  if (fieldKind(chosenDef) === 'whetstone' || fieldKind(chosenDef) === 'elixir') { setStoneHero(h.id); return; }
                   const error = usePouch(chosen!, h.id, owner?.id);
                   if (!error) setChosen(null);
                 }}

@@ -28,6 +28,6 @@ export const bishop: ClassDef = {
   from: ['priest'],
   signature: ['greaterHeal', 'sanctify', 'massHeal'],
   startingEquipment: { weapon: 'woodScepter', armor: 'travelerClothes' },
-  cardPool: ['greaterHeal', 'sanctify', 'massHeal', 'purify', 'wardOfFaith', 'resurgence'],
+  cardPool: ['greaterHeal', 'sanctify', 'massHeal', 'purify', 'wardOfFaith', 'resurgence', 'axOverflowBlessing', 'axSeraphim', 'axReversalSeal'],
   growthWeights: { per: 4, vit: 2, int: 1 },
 };

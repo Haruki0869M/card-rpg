@@ -1,3 +1,4 @@
+import { useReducedMotion } from 'framer-motion';
 import { Minus, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { playSound } from '../../audio/player';
@@ -56,6 +57,8 @@ export function SettingsControls() {
   const settings = useBattle(s => s.settings), set = useBattle(s => s.setSettings);
   const won = useProfile(s => s.profile.battles.length);
   const guide = guideWanted(settings, won);
+  // 端末の「動きを減らす」（Android の「アニメーションを削除」など）が有効だと、戦闘の火花と揺れは出ない（段階4）
+  const reducedOs = useReducedMotion();
   const choice = 'btn min-h-11 flex-1 rounded-lg border px-2 text-[14px] font-bold';
   return <div className="flex flex-col gap-3" data-settings-controls>
     <div role="group" aria-label="移動・戦闘アニメ速度">
@@ -67,6 +70,7 @@ export function SettingsControls() {
       <div className="mb-1 text-[14px] font-bold">お供・能力カットイン</div>
       <div className="flex gap-2">{(['standard', 'simple'] as const).map(mode => <button key={mode} aria-pressed={settings.cutinMode === mode} onClick={() => set({ cutinMode: mode })} className={`${choice} ${settings.cutinMode === mode ? 'border-amber-300 bg-amber-500/20 text-amber-100' : 'border-white/20 bg-black/30'}`}>{mode === 'standard' ? '標準' : '簡易'}</button>)}</div>
       <p className="mt-1 text-[12px] text-zinc-300">簡易は動きを抑え、能力名と数値を短く表示します</p>
+      {reducedOs && <p className="mt-1 text-[12px] font-bold text-amber-200" role="note" data-reduced-motion-note>端末の『アニメーションを削除』が有効です</p>}
     </div>
     <VolumeRow label="効果音" field="sfxVolume" sample="sfx_ui_ok" />
     <VolumeRow label="お供の鳴き声" field="petVolume" sample="pet_okame" />

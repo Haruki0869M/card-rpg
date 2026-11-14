@@ -34,8 +34,11 @@ export const clayGolem: EnemyDef = {
   weak: ['thunder', 'ice'],
   resist: ['poison', 'fire'],
   pattern: 'sequence',
+  // 敵の特殊な行動・第2弾（docs/tasks/enemy-behaviors-round2-plan.md §3・fix-plan §4）: ほかの敵がいる時は、1ターン目に必ず「身代わりの土人形」（1体だけの時は重い拳）
+  firstActionId: 'harden',
   actions: [
-    { id: 'harden', name: '粘土を固める', effects: [{ kind: 'block', amount: 12 }] },
+    // 「粘土を固める」をかばうに置き換えた。ID は古い保存のために残す。4つ目の地域なのでブロック10（BREAK されると行動ごと止まる）
+    { id: 'harden', name: '身代わりの土人形', big: true, behavior: 'guard', fallbackIfAloneId: 'fist', hint: '次の味方の番の間、ほかの敵への単体攻撃を代わりに受ける。全体攻撃は通る', effects: [{ kind: 'guardAllies' }, { kind: 'block', amount: 10 }] },
     { id: 'fist', name: '重い拳', effects: [{ kind: 'damage', amount: 12 }] },
     { id: 'slam', name: '叩きつけ', effects: [{ kind: 'damage', amount: 7 }, { kind: 'block', amount: 6 }] },
   ],
@@ -142,7 +145,9 @@ export const stoneGuardianBeast: EnemyDef = {
   ],
   abilities: [{ name: '砂岩の体', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 8 }] } }],
   phases: [
-    { belowHpPct: 50, name: '咆哮する守護獣', pattern: 'sequence', actions: [
+    // ボスの段階（2026-11-14）: 溜め（跳びかかり。順番でもくり返す）。答え: 溜めを雷で BREAK・守り
+    { belowHpPct: 50, name: '咆哮する守護獣', pattern: 'sequence', openingActionId: 'crouch', rule: '身を沈め、次の予告で跳びかかる（溜めを雷で BREAK すると、跳びかかりも消える）', actions: [
+      { id: 'crouch', name: '身を沈める', big: true, chargeTo: 'pounce', hint: '次の予告が「砕ける跳びかかり」（単体28）になる。雷の弱点で BREAK すると溜めが止まり、跳びかかりも消える。止められなければ狙われた味方を守る', effects: [{ kind: 'block', amount: 14 }] },
       { id: 'roar', name: '石の咆哮', big: true, effects: [{ kind: 'damage', amount: 12, to: 'foes' }] },
       { id: 'pounce', name: '砕ける跳びかかり', big: true, effects: [{ kind: 'damage', amount: 28 }] },
       { id: 'guard', name: 'ひび割れた守り', effects: [{ kind: 'block', amount: 24 }] },
@@ -156,13 +161,17 @@ export const cursedMummy: EnemyDef = makeVariant(mummy, {
   actions: [
     { id: 'grab', name: '呪詛の手', effects: [{ kind: 'damage', amount: 11, element: 'dark' }] },
     { id: 'curse', name: '王墓の呪い', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }, { kind: 'damage', amount: 5, element: 'dark' }] },
-    { id: 'wrap', name: '黒い包帯', effects: [{ kind: 'block', amount: 9 }] },
+    // 敵の特殊な行動・第2弾（round2 §3・fix-plan §4）: 亜種のこの敵だけ「黒い包帯」を浄化に置き換えた。ID は古い保存のために残す。元のミイラは変えていない。
+    // 自分に悪い状態異常がある時は割り込む（割り込んだら次の2ターンは割り込まない）。順番の最後にも残す。4つ目の地域なので1種類につき8回復
+    { id: 'wrap', name: '包帯を巻き直す', big: true, behavior: 'purify', cutIn: { when: 'afflicted', rest: 2 }, hint: '状態異常を全部消して回復する。その前に起爆するか、BREAK する', effects: [{ kind: 'purify', amount: 8 }] },
   ],
 });
 
 export const stormVulture: EnemyDef = makeVariant(vulture, {
   id: 'stormVulture', name: '雷禿鷲', aura: 'storm', maxHp: 32, baseLevel: 7, exp: 13, gold: 9,
   weak: ['ice'], resist: ['thunder'],
+  // 敵の特殊な行動・第2弾: 元の禿鷲の「1ターン目の手負い狙い」が伝わらないように、1ターン目の行動は無し（今までどおり、順番の1番目から）
+  firstActionId: undefined,
   actions: [
     { id: 'talons', name: '雷の鉤爪', effects: [{ kind: 'damage', amount: 6, hits: 2, element: 'thunder' }] },
     { id: 'circle', name: '雷雲を旋回する', effects: [{ kind: 'block', amount: 7 }] },

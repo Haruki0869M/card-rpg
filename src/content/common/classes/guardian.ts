@@ -36,6 +36,6 @@ export const guardian: ClassDef = {
   tier: 'base',
   lineage: 'sei',
   startingEquipment: { weapon: 'ironSpear', armor: 'leatherArmor' },
-  cardPool: ['guardFormation', 'shieldStance', 'holyLight', 'counterShield', 'rally', 'shieldBash', 'warCry', 'guard', 'judgment', 'sanctuary'],
+  cardPool: ['guardFormation', 'guard', 'holyLight', 'shieldBash', 'rally', 'warCry', 'judgment', 'sanctuary', 'axShieldSlam', 'axFortress', 'axIronMarch'],
   growthWeights: { vit: 4, dex: 2, str: 2 },
 };

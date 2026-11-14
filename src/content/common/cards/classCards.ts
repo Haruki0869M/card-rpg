@@ -9,50 +9,6 @@ const b = (amount: number) => ({ kind: 'block', amount }) as const;
 export const CLASS_CARDS: CardDef[] = [
   // ---------- 戦士 ----------
   {
-    id: 'mightyBlow',
-    name: '渾身の一撃',
-    category: 'physical',
-    cost: 2,
-    slots: 2,
-    baseChance: 65,
-    target: 'enemy',
-    rarity: 'rare',
-    tiers: [
-      { minSuccesses: 0, effects: [d(6)] },
-      { minSuccesses: 1, effects: [d(14)] },
-      { minSuccesses: 2, effects: [d(24), { kind: 'applyStatus', status: 'vulnerable', amount: 1 }] },
-    ],
-  },
-  {
-    id: 'ironWall',
-    name: '鉄壁',
-    category: 'skill',
-    cost: 1,
-    slots: 2,
-    baseChance: 80,
-    target: 'self',
-    tiers: [
-      { minSuccesses: 0, effects: [b(6)] },
-      { minSuccesses: 1, effects: [b(10)] },
-      { minSuccesses: 2, effects: [b(15)] },
-    ],
-  },
-  {
-    id: 'sweep',
-    name: '旋風撃',
-    category: 'physical',
-    cost: 1,
-    slots: 2,
-    baseChance: 75,
-    target: 'allEnemies',
-    rarity: 'rare',
-    tiers: [
-      { minSuccesses: 0, effects: [d(3)] },
-      { minSuccesses: 1, effects: [d(5)] },
-      { minSuccesses: 2, effects: [d(8)] },
-    ],
-  },
-  {
     id: 'battleCry',
     name: '雄叫び',
     category: 'skill',
@@ -63,19 +19,6 @@ export const CLASS_CARDS: CardDef[] = [
     tiers: [
       { minSuccesses: 0, effects: [b(3)] },
       { minSuccesses: 1, effects: [{ kind: 'gainMana', amount: 1 }, { kind: 'draw', amount: 1 }] },
-    ],
-  },
-  {
-    id: 'charge',
-    name: '突撃',
-    category: 'physical',
-    cost: 1,
-    slots: 1,
-    baseChance: 80,
-    target: 'enemy',
-    tiers: [
-      { minSuccesses: 0, effects: [d(5)] },
-      { minSuccesses: 1, effects: [d(9)] },
     ],
   },
   // ---------- 魔道士 ----------
@@ -125,20 +68,6 @@ export const CLASS_CARDS: CardDef[] = [
     ],
   },
   {
-    id: 'manaShield',
-    name: '魔力の盾',
-    category: 'skill',
-    cost: 1,
-    slots: 2,
-    baseChance: 80,
-    target: 'self',
-    tiers: [
-      { minSuccesses: 0, effects: [b(5)] },
-      { minSuccesses: 1, effects: [b(9)] },
-      { minSuccesses: 2, effects: [b(12), { kind: 'gainFocus', amount: 1 }] },
-    ],
-  },
-  {
     id: 'deepFocus',
     name: '瞑想',
     category: 'skill',
@@ -168,19 +97,6 @@ export const CLASS_CARDS: CardDef[] = [
     ],
   },
   {
-    id: 'shieldStance',
-    name: '盾の構え',
-    category: 'skill',
-    cost: 1,
-    slots: 1,
-    baseChance: 85,
-    target: 'self',
-    tiers: [
-      { minSuccesses: 0, effects: [b(6)] },
-      { minSuccesses: 1, effects: [b(11)] },
-    ],
-  },
-  {
     id: 'holyLight',
     name: '聖なる光',
     category: 'magic',
@@ -193,20 +109,6 @@ export const CLASS_CARDS: CardDef[] = [
       { minSuccesses: 0, effects: [{ kind: 'heal', amount: 3, to: 'allies' }] },
       { minSuccesses: 1, effects: [{ kind: 'heal', amount: 4, to: 'allies' }, { kind: 'applyStatus', status: 'regen', amount: 2, to: 'allies' }] },
       { minSuccesses: 2, effects: [{ kind: 'heal', amount: 6, to: 'allies' }, { kind: 'applyStatus', status: 'regen', amount: 3, to: 'allies' }] },
-    ],
-  },
-  {
-    id: 'counterShield',
-    name: '反撃の盾',
-    category: 'physical',
-    cost: 1,
-    slots: 2,
-    baseChance: 75,
-    target: 'enemy',
-    tiers: [
-      { minSuccesses: 0, effects: [b(4)] },
-      { minSuccesses: 1, effects: [b(6), d(5)] },
-      { minSuccesses: 2, effects: [b(8), d(10)] },
     ],
   },
   {

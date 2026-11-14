@@ -76,6 +76,69 @@ describe('画面から送る操作の担当者', () => {
     expect(send(selected.state, finish).state.mode).toBe('world');
   });
 
+  // 点検 2026-11-13 F1: ホストが P2 の席を「代わりに操作」している時（この端末 = P1 + P2）、P2 の番の場面は P2 として送る
+  it.each(cases)('代わりに操作: %sの%sを、担当の P2 として送る', (mode, cmd) => {
+    const g = eventOnP2();
+    g.mode = mode;
+    g.chest = { tile: 0, spec: { rarity: 'common', locked: false }, unlocked: false };
+    g.town = { townId: '町', heroId: 'h1' };
+    g.shrine = { shrineId: '祠', tile: 0, heroId: 'h1' };
+    g.encounter = { wandererId: '敵', tile: 0, heroId: 'h1', candidates: ['h1'] };
+    setLocalPlayers(['P1', 'P2']);
+    expect(actorOf(g, cmd)).toBe('P2');
+    // 担当が自分（P1）の場面は、今までどおり P1
+    g.world!.turn = 'h0';
+    g.town = { townId: '町', heroId: 'h0' };
+    g.shrine = { shrineId: '祠', tile: 0, heroId: 'h0' };
+    g.encounter = { wandererId: '敵', tile: 0, heroId: 'h0', candidates: ['h0'] };
+    expect(actorOf(g, cmd)).toBe('P1');
+  });
+
+  it('代わりに操作: P2 の番の世界マップのイベントを、ホストの端末で選んで先へ進められる', () => {
+    const g = eventOnP2();
+    setLocalPlayers(['P1', 'P2']);
+    const selected = send(g, choice);
+    expect(selected.error).toBeUndefined();
+    const next = send(selected.state, finish);
+    expect(next.error).toBeUndefined();
+    expect(next.state.mode).toBe('world');
+  });
+
+  it('代わりに操作: P2 だけがいるダンジョンの場面で、お金を払う選択肢（キャラの指定なし）を P2 として送る', () => {
+    const g = eventOnP2();
+    g.activeScene = '探索中';
+    g.party = ['h1'];
+    g.event = { eventId: 'rStrayBird', roomId: '部屋' };
+    g.heroes[1].gold = 100;
+    const pay: GameCommand = { type: 'CHOOSE_EVENT', playerId: 'P1', optionIndex: 2, focusUsed: 0 };
+    // 1台の時は今までどおり（最初の席）
+    expect(actorOf(g, pay)).toBe('P1');
+    // ふつうのオンライン: P1 の端末からは P1 のまま（P2 の分は払えない）、P2 の端末からは P2
+    setLocalPlayers(['P1']);
+    expect(send(g, pay).error).toMatch(/ゴールド/);
+    setLocalPlayers(['P2']);
+    expect(actorOf(g, pay)).toBe('P2');
+    // ホストが P2 を代わりに操作: P2 として送り、通る
+    setLocalPlayers(['P1', 'P2']);
+    expect(actorOf(g, pay)).toBe('P2');
+    const r = send(g, pay);
+    expect(r.error).toBeUndefined();
+    expect(r.state.heroes[1].gold).toBe(50);
+  });
+
+  it('代わりに操作: P2 の番の世界マップの宝箱の「先へ進む」が通る（代わりの操作が無ければ今までどおり断られる）', () => {
+    const g = eventOnP2();
+    g.event = undefined;
+    g.mode = 'chest';
+    g.chest = { tile: g.world!.pos.h1, spec: { rarity: 'common', locked: false }, unlocked: true, contents: [] };
+    setLocalPlayers(['P1']);
+    expect(send(g, { type: 'LEAVE_CHEST', playerId: 'P1' }).error).toMatch(/手番/);
+    setLocalPlayers(['P1', 'P2']);
+    const left = send(g, { type: 'LEAVE_CHEST', playerId: 'P1' });
+    expect(left.error).toBeUndefined();
+    expect(left.state.mode).toBe('world');
+  });
+
   it('キャラ指定の行商人操作では、そのキャラの担当者を維持する', () => {
     const g = eventOnP2();
     expect(actorOf(g, { type: 'PEDDLER_BUY', playerId: 'P1', heroId: 'h1' })).toBe('P2');
