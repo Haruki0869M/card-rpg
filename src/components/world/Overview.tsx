@@ -7,7 +7,7 @@ import { useMemo } from 'react';
 import { DUNGEONS } from '../../data/dungeons';
 import { getScenario } from '../../data/scenarios';
 import { TERRAINS, TOWNS } from '../../data/world';
-import { aliveScourges, colOf, nextGoalDungeon, randomDungeonView, rowOf } from '../../engine';
+import { aliveScourges, colOf, isWideMap, nextGoalDungeon, randomDungeonView, rowOf } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
 import type { GameState, Tile } from '../../types';
 import { PLAYER_COLORS } from './pieceLayout';
@@ -99,6 +99,8 @@ export function Overview({ game, onPick, onClose }: { game: GameState; onPick: (
 
   const icon = (m: Mark) => (m.kind === 'town' ? House : m.kind === 'finale' ? Castle : m.kind === 'tower' ? Binoculars : DoorOpen);
   const color = (m: Mark) => (m.fallen ? '#7a6a7a' : m.kind === 'scourge' ? '#e070ff' : m.kind === 'town' ? '#ffe9a8' : m.kind === 'finale' ? '#ff6a5a' : m.kind === 'tower' ? '#e8e0c8' : m.kind === 'random' ? '#c8a0ff' : '#ff9a7a');
+  // 3つの道（2026-11-14）: 広い地図の帯の札（西・中央・東の順。行く前に違いが分かるように）
+  const lanes = isWideMap(game, w) ? (getScenario(game.scenarioId).map?.lanes ?? []).filter((l) => l.hint) : [];
   // 印の大きさ（小さい画面でも押せるように、マスより大きく描く。押せる所はさらに大きい）
   const M = Math.max(14, R * 1.9);
 
@@ -113,6 +115,16 @@ export function Overview({ game, onPick, onClose }: { game: GameState; onPick: (
           <X size={20} className="text-amber-200" />
         </button>
       </div>
+      {lanes.length > 0 && (
+        <div className="mx-3 mb-1.5 grid shrink-0 gap-1" style={{ gridTemplateColumns: `repeat(${lanes.length}, minmax(0, 1fr))` }} data-overview-lanes>
+          {lanes.map((l) => (
+            <div key={l.id} className="rounded border border-amber-200/25 bg-black/50 px-1.5 py-0.5 text-[12px] leading-[15px]" title={l.hint} data-overview-lane={l.id}>
+              <div className="truncate font-bold text-amber-100">{l.mark}{l.name}</div>
+              <div className="truncate text-zinc-300">{l.tag ?? l.hint}</div>
+            </div>
+          ))}
+        </div>
+      )}
       <div ref={box} className="relative mx-3 mb-3 min-h-0 flex-1">
         {size.width > 0 && (
           <svg
@@ -154,7 +166,7 @@ export function Overview({ game, onPick, onClose }: { game: GameState; onPick: (
                   <circle cx={p.x} cy={p.y} r={M * 0.75} fill="transparent" />
                   <circle cx={p.x} cy={p.y} r={M * 0.5} fill="rgba(0,0,0,.7)" stroke={color(m)} strokeWidth={1.2} />
                   {m.mark ? (
-                    <text x={p.x} y={p.y + M * 0.22} textAnchor="middle" fontSize={M * 0.62} data-overview-theme={m.mark}>{m.mark}</text>
+                    <text x={p.x} y={p.y + M * 0.22} textAnchor="middle" fontSize={Math.max(12, M * 0.62)} data-overview-theme={m.mark}>{m.mark}</text>
                   ) : (
                     <Icon x={p.x - M * 0.33} y={p.y - M * 0.33} width={M * 0.66} height={M * 0.66} color={color(m)} strokeWidth={2.4} />
                   )}

@@ -267,15 +267,21 @@ function worldTarget(g: GameState, at: number, straight = false, cm?: CleverMemo
   return { tile: tileOf(g, 'dungeon', goal)!, why: 'dungeon' };
 }
 
-/** 各マスから to まで歩いてかかる移動力（霧・敵は見ない。地形の移動力だけ。通れないマスは入らない） */
-function walkCostTo(w: WorldState, to: number): Map<number, number> {
+/**
+ * 3つの道（2026-11-14）: 賢い bot が目的地へ向かう時、見えている徘徊する敵のマスに足す移動力【提案】。
+ * 街道が混んでいる時は、西か東の帯へ回り道をする（育てるために敵を狙う時は足さない）
+ */
+const SMART_ENEMY_DETOUR = 6;
+
+/** 各マスから to まで歩いてかかる移動力（霧は見ない。地形の移動力だけ。通れないマスは入らない）。avoid のマスは SMART_ENEMY_DETOUR を足す */
+function walkCostTo(w: WorldState, to: number, avoid?: Set<number>): Map<number, number> {
   const dist = new Map<number, number>([[to, 0]]);
   const open = [to];
   while (open.length) {
     let k = 0;
     for (let j = 1; j < open.length; j++) if (dist.get(open[j])! < dist.get(open[k])!) k = j;
     const cur = open.splice(k, 1)[0];
-    const step = dist.get(cur)! + Math.max(1, moveCostOf(w, cur));
+    const step = dist.get(cur)! + Math.max(1, moveCostOf(w, cur)) + (avoid?.has(cur) && cur !== to ? SMART_ENEMY_DETOUR : 0);
     for (const n of neighbors(w, cur)) {
       if (moveCostOf(w, n) <= 0) continue;
       const old = dist.get(n);
@@ -327,8 +333,12 @@ function worldStep(g: GameState, log: BotLog, memo: BotMemo): GameState {
     const reach = reachable(w, at, w.move);
     let best = at;
     // 広い地図（段階6a）: 仕切りの壁で行き止まりにならないように、歩いてかかる移動力で近い所を選ぶ。前の地図は今までどおり（まっすぐの距離）
-    const far = isWideMap(g, w) ? walkCostTo(w, target.tile) : undefined;
-    const dist = (i: number) => (far ? (far.get(i) ?? Infinity) : hexDistance(w, i, target.tile));
+    // 3つの道（2026-11-14）: 賢い bot は、目的地へ向かう時に見えている敵を避ける（街道が混んでいれば帯へ回る）。直行・工夫する bot は今までどおり
+    const avoid = memo.smart && isWideMap(g, w) && target.why !== 'grind'
+      ? new Set(w.wanderers.filter((x) => x.tile !== target.tile && w.tiles[x.tile].seen).map((x) => x.tile))
+      : undefined;
+    const far = isWideMap(g, w) ? walkCostTo(w, target.tile, avoid) : undefined;
+    const dist = (i: number) => (far ? (far.get(i) ?? Infinity) + (avoid?.has(i) ? SMART_ENEMY_DETOUR : 0) : hexDistance(w, i, target.tile));
     // 災厄の中ボスの巣を通る道は選ばない（今の自動プレイは災厄に挑まない。段階7b）
     // 工夫する bot は、目指している災厄の巣だけは通ってよい（そこが行き先）
     const nests = new Set(w.wanderers.filter((x) => x.scourge && !(memo.clever && x.tile === target.tile)).map((x) => x.tile));
