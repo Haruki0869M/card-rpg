@@ -73,7 +73,7 @@ export const pirateGunner: EnemyDef = {
     { id: 'barrage', name: '甲板の砲撃', effects: [{ kind: 'damage', amount: 5, to: 'foes' }] },
     // 敵の特殊な行動・第2弾（docs/tasks/enemy-behaviors-round2-plan.md §3・fix-plan §4）: 「弾込め」を仲間を呼ぶ（海賊の下っ端）に置き換えた。ID は古い保存のために残す。
     // 呼べる時は優先・2ターン続けては呼ばない・1戦闘に2回まで。呼べない時は「至近の一発」。3つ目の地域なのでブロック8
-    { id: 'reload', name: '呼び子を吹く', big: true, behavior: 'call', cutIn: { when: 'canSummon', rest: 1, noRepeat: true }, hint: '仲間を1体呼ぶ。その前に倒すか、BREAK する', effects: [{ kind: 'summonEnemy', enemy: 'pirateGrunt', uses: 2, call: true, orElse: 'point' }, { kind: 'block', amount: 8 }] },
+    { id: 'reload', name: '呼び子を吹く', big: true, scripted: true, behavior: 'call', cutIn: { when: 'hurt', rest: 1, noRepeat: true }, brief: '弱ると呼び子を吹く', hint: 'HPが半分を切ると、呼び子で海賊の下っ端を呼ぶ（2回まで）。半分から一気に倒せば呼ばれない', effects: [{ kind: 'summonEnemy', enemy: 'pirateGrunt', uses: 2, call: true, orElse: 'point' }, { kind: 'block', amount: 8 }] },
     { id: 'point', name: '至近の一発', effects: [{ kind: 'damage', amount: 12 }] },
   ],
 };
@@ -96,7 +96,7 @@ export const siren: EnemyDef = {
     { id: 'claw', name: '濡れた爪', effects: [{ kind: 'damage', amount: 9 }] },
     // 「呪いの調べ」（呪い2＋5ダメージ）を癒し封じに置き換えた。ID は古い保存のために残す。
     // 元の呪いは弱めて残す（狙った1人に呪い1。fix-plan §2 の 2-4）。3つ目の地域なのでブロック8（BREAK されると行動ごと止まる）
-    { id: 'lament', name: '癒しを拒む歌', big: true, behavior: 'healSeal', hint: '味方全員の回復が、2ターン半分になる。BREAK するか、先に回復を使う', effects: [{ kind: 'applyStatus', status: 'healSeal', amount: 2, to: 'foes' }, { kind: 'applyStatus', status: 'curse', amount: 1 }, { kind: 'block', amount: 8 }] },
+    { id: 'lament', name: '癒しを拒む歌', big: true, behavior: 'healSeal', brief: '歌の間、回復が半分', hint: '味方全員の回復が3ターン半分になる。セイレーンが倒れると、癒し封じは全部消える', effects: [{ kind: 'applyStatus', status: 'healSeal', amount: 3, to: 'foes' }, { kind: 'bindSeal' }, { kind: 'block', amount: 8 }] },
   ],
 };
 

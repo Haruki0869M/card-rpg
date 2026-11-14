@@ -38,7 +38,7 @@ export const clayGolem: EnemyDef = {
   firstActionId: 'harden',
   actions: [
     // 「粘土を固める」をかばうに置き換えた。ID は古い保存のために残す。4つ目の地域なのでブロック10（BREAK されると行動ごと止まる）
-    { id: 'harden', name: '身代わりの土人形', big: true, behavior: 'guard', fallbackIfAloneId: 'fist', hint: '次の味方の番の間、ほかの敵への単体攻撃を代わりに受ける。全体攻撃は通る', effects: [{ kind: 'guardAllies' }, { kind: 'block', amount: 10 }] },
+    { id: 'harden', name: '身代わりの土人形', big: true, behavior: 'guard', fallbackIfAloneId: 'fist', brief: '崩れるまで代わりに受ける', hint: '次の味方の番の間、ほかの敵への単体攻撃を代わりに受ける。自分のブロックが0になると、かばうのをやめる（BREAK でも0）', effects: [{ kind: 'guardAllies', untilBlockGone: true }, { kind: 'block', amount: 12 }] },
     { id: 'fist', name: '重い拳', effects: [{ kind: 'damage', amount: 12 }] },
     { id: 'slam', name: '叩きつけ', effects: [{ kind: 'damage', amount: 7 }, { kind: 'block', amount: 6 }] },
   ],
@@ -163,7 +163,7 @@ export const cursedMummy: EnemyDef = makeVariant(mummy, {
     { id: 'curse', name: '王墓の呪い', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }, { kind: 'damage', amount: 5, element: 'dark' }] },
     // 敵の特殊な行動・第2弾（round2 §3・fix-plan §4）: 亜種のこの敵だけ「黒い包帯」を浄化に置き換えた。ID は古い保存のために残す。元のミイラは変えていない。
     // 自分に悪い状態異常がある時は割り込む（割り込んだら次の2ターンは割り込まない）。順番の最後にも残す。4つ目の地域なので1種類につき8回復
-    { id: 'wrap', name: '包帯を巻き直す', big: true, behavior: 'purify', cutIn: { when: 'afflicted', rest: 2 }, hint: '状態異常を全部消して回復する。その前に起爆するか、BREAK する', effects: [{ kind: 'purify', amount: 8 }] },
+    { id: 'wrap', name: '包帯を巻き直す', big: true, behavior: 'purify', cutIn: { when: 'afflicted', rest: 2 }, brief: '毒と火傷だけ消す', hint: '毒と火傷だけを消して、1種類につき回復10。呪い・脆弱・弱体は残る（割り込むのも毒・火傷がある時だけ）', effects: [{ kind: 'purify', amount: 10, only: ['poison', 'burn'] }] },
   ],
 });
 

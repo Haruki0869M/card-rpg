@@ -32,6 +32,8 @@ export interface EffectCtx {
   helped?: Unit[];
   /** この効果のまとまりで、弱点の属性で攻撃した敵のID */
   weakHitIds?: string[];
+  /** 鎧通し（敵の盾砕き・氷の剣士。2026-11-14）: このダメージはブロックを無視する（damage の効果の pierce が、当てる間だけ立てる） */
+  pierce?: boolean;
   /** 「最初の1回の攻撃にだけ足すダメージ」を、もう使った */
   addOnceUsed?: boolean;
   /** HPに与えたダメージの合計（吸収などが読む） */

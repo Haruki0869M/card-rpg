@@ -56,7 +56,7 @@ export const pillowGolem: EnemyDef = {
     // 敵の特殊な行動・第2弾（docs/tasks/enemy-behaviors-round2-plan.md §3・fix-plan §4）: 「羽毛の盾」を浄化に置き換えた。ID は古い保存のために残す。
     // 自分に悪い状態異常がある時は割り込む（割り込んだら次の2ターンは割り込まない）。順番の最後にも残す（2番目から最後へ移した）。
     // 3つ目の地域なので1種類につき6回復
-    { id: 'fluff', name: 'ひと眠り', big: true, behavior: 'purify', cutIn: { when: 'afflicted', rest: 2 }, hint: '状態異常を全部消して回復する。その前に起爆するか、BREAK する', effects: [{ kind: 'purify', amount: 6 }] },
+    { id: 'fluff', name: 'ひと眠り', big: true, behavior: 'purify', cutIn: { when: 'afflicted', rest: 2 }, brief: '眠って治すが無防備', hint: '状態異常を全部消して1種類につき回復10。その後、寝ぼけて自分に脆弱2。次の番に叩く', effects: [{ kind: 'purify', amount: 10 }, { kind: 'applyStatus', status: 'vulnerable', amount: 2, to: 'self' }] },
   ],
 };
 
@@ -171,7 +171,7 @@ export const dreamWeaver: EnemyDef = {
   firstActionId: 'weave',
   actions: [
     // 「眠気の糸」（弱体1・全体＋ブロック6）を癒し封じに置き換えた。ID は古い保存のために残す。5つ目の地域なのでブロック10（BREAK されると行動ごと止まる）
-    { id: 'weave', name: '覚めない眠りの糸', big: true, behavior: 'healSeal', hint: '味方全員の回復が、2ターン半分になる。BREAK するか、先に回復を使う', effects: [{ kind: 'applyStatus', status: 'healSeal', amount: 2, to: 'foes' }, { kind: 'block', amount: 10 }] },
+    { id: 'weave', name: '覚めない眠りの糸', big: true, behavior: 'healSeal', brief: '封じが残る者は眠る', hint: 'もう癒し封じが付いている味方は眠り（遅延1。次に引く札-1）、それから味方全員の回復が2ターン半分になる。癒し封じを払うか、切れてから受ける', effects: [{ kind: 'applyStatus', status: 'delay', amount: 1, to: 'foes', onlyIf: { has: 'healSeal' } }, { kind: 'applyStatus', status: 'healSeal', amount: 2, to: 'foes' }, { kind: 'block', amount: 10 }] },
     { id: 'thread', name: '呪いの糸', big: true, effects: [{ kind: 'applyStatus', status: 'curse', amount: 2 }, { kind: 'damage', amount: 8 }] },
     { id: 'net', name: '夢の網', big: true, effects: [{ kind: 'damage', amount: 6, to: 'foes' }] },
   ],
@@ -240,7 +240,7 @@ export const dreamEater: EnemyDef = {
       openingActionId: 'eatDreams',
       rule: '味方全員のフォーカスを食べる（聖で BREAK すると止まる。フォーカスは先に使う）',
       actions: [
-        { id: 'eatDreams', name: '夢を食べ尽くす', big: true, scripted: true, hint: '味方全員のフォーカスを2ずつ食べる。聖の弱点で BREAK すると止まる。食べられる前にフォーカスを使っておく', effects: [{ kind: 'drainFocus', amount: 2, to: 'foes' }, { kind: 'block', amount: 14 }] },
+        { id: 'eatDreams', name: '夢を食べ尽くす', big: true, scripted: true, hint: '味方全員のフォーカスを2ずつ食べる。聖の弱点で BREAK すると止まる。食べられる前にフォーカスを使っておく。BREAK しても、ひと口だけ食べる（全員のフォーカス-1）', breakResidue: [{ kind: 'drainFocus', amount: 1, to: 'foes' }], effects: [{ kind: 'drainFocus', amount: 2, to: 'foes' }, { kind: 'block', amount: 14 }] },
         { id: 'devourAll', name: '全部食べる', big: true, effects: [{ kind: 'damage', amount: 14, to: 'foes' }] },
         { id: 'forgetAll', name: '忘れさせる', big: true, effects: [{ kind: 'drainFocus', amount: 2, to: 'foes' }, { kind: 'damage', amount: 8, to: 'foes' }] },
         { id: 'maw', name: '大きな口', big: true, effects: [{ kind: 'damage', amount: 26, element: 'dark' }] },

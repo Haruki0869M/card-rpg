@@ -551,7 +551,7 @@ export function smartBattleItemCommand(g: GameState, sm: SmartMemo, b: BattleSta
 }
 
 /** 敵の予告が、味方全員に与える予定のダメージの合計 */
-const intentDamageAll = (b: BattleState, e: EnemyState) => b.allies.reduce((n, a) => n + intentHitsOn(e, a).reduce((m, x) => m + x, 0), 0);
+const intentDamageAll = (b: BattleState, e: EnemyState) => b.allies.reduce((n, a) => n + intentHitsOn(e, a, b.allies).reduce((m, x) => m + x, 0), 0);
 
 /**
  * 戦闘の外（世界マップ・ダンジョン）で使う道具: 傷の深い仲間に回復の薬（無駄にしない量の時だけ）・砥石で一番良い札を強化・秘薬で主に使う能力値・

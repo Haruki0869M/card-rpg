@@ -20,7 +20,7 @@ export const shark: EnemyDef = {
     { id: 'circle', name: '獲物のまわりを泳ぐ', effects: [{ kind: 'block', amount: 6 }] },
     { id: 'chomp', name: '大顎の一撃', effects: [{ kind: 'damage', amount: 20 }] },
     // 「食いちぎる」（8ダメージ＋脆弱1）を手負い狙いに置き換えた（同じ8ダメージ・HPが半分以下なら×1.5）。ID は古い保存のために残す
-    { id: 'tear', name: '血の匂いを追う', big: true, behavior: 'hunt', hint: 'HPの割合がいちばん低い味方を狙う。HPが半分以下だと×1.5', effects: [{ kind: 'damage', amount: 8, lowHpMul: 1.5 }] },
+    { id: 'tear', name: '血の匂いを追う', big: true, behavior: 'hunt', brief: '小さい者を狙い血をすする', hint: 'HPの量がいちばん少ない味方を狙う（割合でなく）。HPが半分以下だと×1.5。当てたダメージの半分を回復する', effects: [{ kind: 'damage', amount: 8, lowHpMul: 1.5, huntBy: 'hp' }, { kind: 'healPctOfDealt', pct: 50 }] },
   ],
 };
 
@@ -41,7 +41,7 @@ export const conchKnight: EnemyDef = {
   actions: [
     // 「巻き貝の盾」をかばうに置き換えた。ID は古い保存のために残す。今ある「とげの殻」（殴られると反撃）と組になる。
     // 4つ目の地域なのでブロック10（BREAK されると行動ごと止まる）
-    { id: 'shell', name: '殻でかばう', big: true, behavior: 'guard', fallbackIfAloneId: 'lance', hint: '次の味方の番の間、ほかの敵への単体攻撃を代わりに受ける。全体攻撃は通る', effects: [{ kind: 'guardAllies' }, { kind: 'block', amount: 10 }] },
+    { id: 'shell', name: '殻でかばう', big: true, behavior: 'guard', fallbackIfAloneId: 'lance', brief: '代わりに受けて半分に', hint: '次の味方の番の間、ほかの敵への単体攻撃を代わりに受け、殻でダメージを半分にする。全体攻撃・お供は通る', effects: [{ kind: 'guardAllies', half: true }] },
     { id: 'lance', name: '貝殻の槍', effects: [{ kind: 'damage', amount: 13 }] },
     { id: 'bash', name: '殻ごと体当たり', effects: [{ kind: 'damage', amount: 7 }, { kind: 'block', amount: 6 }] },
   ],
@@ -83,7 +83,7 @@ export const octopusLarva: EnemyDef = {
   actions: [
     // 「墨を吐く」（脆弱2）を手数読みに置き換えた。ID は古い保存のために残す。
     // 元の脆弱は弱めて残す（狙った1人に脆弱1。fix-plan §2 の 2-4）。4つ目の地域なのでブロック10（BREAK されると付かない）
-    { id: 'ink', name: '八本の腕で待ち構える', big: true, behavior: 'punish', hint: 'このターンにカードを4枚以上使った味方に、枚数×2のダメージ', effects: [{ kind: 'punishPlays', amount: 2, min: 4 }, { kind: 'applyStatus', status: 'vulnerable', amount: 1 }, { kind: 'block', amount: 10 }] },
+    { id: 'ink', name: '八本の腕で待ち構える', big: true, behavior: 'punish', brief: '合計6枚以上で全員に', hint: '味方みんなが使ったカードの合計が6枚以上なら、全員に合計×1。パーティで合計を数えて絞る', effects: [{ kind: 'punishPlays', amount: 1, min: 6, scope: 'team' }, { kind: 'block', amount: 10 }] },
     { id: 'grip', name: '八本の腕', effects: [{ kind: 'damage', amount: 3, hits: 3 }] },
     { id: 'squeeze', name: '吸盤で締める', effects: [{ kind: 'damage', amount: 9 }, { kind: 'applyStatus', status: 'weak', amount: 1 }] },
   ],

@@ -1102,6 +1102,10 @@ function openChest(game: GameState, playerId: string, heroId: string, focusUsed:
   c.lastRoll = { kind: 'luck', heroId, results, success: n === slots, oddsBefore, odds, grade, gradeChance: odds[rarityIndex(grade)], omen };
   c.contents = rollChestContents(game, grade, !!c.spec.big, rng);
   if (tr.chestGold !== 1) for (const l of c.contents) if (l.kind === 'gold') l.amount = Math.round(l.amount * tr.chestGold);
+  // 封魔の宝箱（2026-11-14 宿題8-4・オーナーの返事 5A）: 番人が強くなった分、中身を1段良くする = エピックの消耗品を必ず1つ足す
+  // （中身にエピック以上の消耗品がもう入っていれば足さない。足す時だけ乱数を1回引く）
+  if (c.spec.sealed && !c.contents.some((l) => l.kind === 'item' && getItem(l.item.itemId).slot === 'consumable' && rarityIndex(getItem(l.item.itemId).rarity) >= rarityIndex('epic')))
+    c.contents.push({ kind: 'item', item: newItem(game, rollConsumable('epic', rng)) });
   // ランダムダンジョンのボスの黄金箱: 専用の装備が1つ「余分に」出ることがある（段階7a・overhaul-plan-v2 §4-3。ふつうの中身はそのまま）
   // 寄り道の値打ち（2026-11-14 柱3）: 秘宝は BALANCE.randomDungeon.relicChoices 個の候補（重ならない）から1つ選ぶ（PICK_RELIC。選ぶまで立ち去れない）。
   // 候補はここで引く（開けた時の乱数。選ぶ時は乱数を使わない）。選んだ物が中身の2つ目に入る

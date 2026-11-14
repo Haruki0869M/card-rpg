@@ -40,7 +40,7 @@ export const moonRabbit: EnemyDef = {
     // 敵の特殊な行動・第2弾（docs/tasks/enemy-behaviors-round2-plan.md §3・fix-plan §4）: 「月影の呪い」（呪い2＋ブロック4）を浄化に置き換えた。ID は古い保存のために残す。
     // 元の呪いは弱めて残す（狙った1人に呪い1。fix-plan §2 の 2-4）。自分に悪い状態異常がある時は割り込む（割り込んだら次の2ターンは割り込まない）。
     // 順番の最後にも残す（2番目から最後へ移した）。3つ目の地域なので1種類につき6回復
-    { id: 'hex', name: '月の薬を搗く', big: true, behavior: 'purify', cutIn: { when: 'afflicted', rest: 2 }, hint: '状態異常を全部消して回復する。その前に起爆するか、BREAK する', effects: [{ kind: 'purify', amount: 6 }, { kind: 'applyStatus', status: 'curse', amount: 1 }] },
+    { id: 'hex', name: '月の薬を搗く', big: true, behavior: 'purify', cutIn: { when: 'afflicted', rest: 2 }, brief: '仲間ごと清める', hint: '敵みんなの状態異常を消し、1種類につき回復4。狙った1人に呪い1。うさぎを先に倒す', effects: [{ kind: 'purify', amount: 4, to: 'allies' }, { kind: 'applyStatus', status: 'curse', amount: 1 }] },
   ],
 };
 

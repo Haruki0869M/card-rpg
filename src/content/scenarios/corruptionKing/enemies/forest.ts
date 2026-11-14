@@ -119,7 +119,7 @@ export const treantKing: EnemyDef = {
       openingActionId: 'rootDown',
       rule: '根を張って「再生」。毎ターン回復する（火で BREAK すると止まる。呪いで回復が減る）',
       actions: [
-        { id: 'rootDown', name: '深く根を張る', big: true, scripted: true, hint: '自分に「再生」8（毎ターン、残りの数だけHPが戻る）とブロック10。火の弱点で BREAK すると止まる。止められなければ一気に削るか、呪いで回復を減らす', effects: [{ kind: 'applyStatus', status: 'regen', amount: 8, to: 'self' }, { kind: 'block', amount: 10 }] },
+        { id: 'rootDown', name: '深く根を張る', big: true, scripted: true, hint: '自分に「再生」8（毎ターン、残りの数だけHPが戻る）とブロック10。火の弱点で BREAK すると止まる。止められなければ一気に削るか、呪いで回復を減らす。BREAK しても、浅い根で再生3だけ残る', breakResidue: [{ kind: 'applyStatus', status: 'regen', amount: 3, to: 'self' }], effects: [{ kind: 'applyStatus', status: 'regen', amount: 8, to: 'self' }, { kind: 'block', amount: 10 }] },
         { id: 'rageStorm', name: '怒りの暴風', big: true, effects: [{ kind: 'damage', amount: 11, to: 'foes' }] },
         { id: 'stranglingVine', name: '絞め殺す蔓', big: true, effects: [{ kind: 'damage', amount: 20 }] },
         {

@@ -21,7 +21,7 @@ export const barnacleBeast: EnemyDef = {
     // 敵の特殊な行動・第2弾（round2 §3・fix-plan §4）: 「フジツボの殻」を浄化に置き換えた。ID は古い保存のために残す。
     // 自分に悪い状態異常がある時は割り込む（割り込んだら次の2ターンは割り込まない）。順番の最後にも残す（1番目から最後へ移した）。
     // 5つ目の地域なので1種類につき8回復
-    { id: 'crust', name: '古い殻を落とす', big: true, behavior: 'purify', cutIn: { when: 'afflicted', rest: 2 }, hint: '状態異常を全部消して回復する。その前に起爆するか、BREAK する', effects: [{ kind: 'purify', amount: 8 }] },
+    { id: 'crust', name: '古い殻を落とす', big: true, behavior: 'purify', cutIn: { when: 'afflicted', rest: 2 }, brief: '殻ごと投げ返す', hint: '状態異常を全部消して1種類につき回復6。消した状態異常を1ずつ、味方全員に付ける。種類を絞るか、付いたら払う', effects: [{ kind: 'purify', amount: 6, scatter: true }] },
   ],
 };
 
@@ -143,7 +143,7 @@ export const ghostAdmiral: EnemyDef = {
       openingActionId: 'crownCall',
       rule: '王冠号を呼び寄せ、次の予告で「王冠号と共に」（溜めを聖で BREAK すると、その一撃も消える）',
       actions: [
-        { id: 'crownCall', name: '王冠号を呼び寄せる', big: true, chargeTo: 'sink', hint: '次の予告が「王冠号と共に」（単体34）になる。聖の弱点で BREAK すると溜めが止まり、その一撃も消える', effects: [{ kind: 'block', amount: 16 }] },
+        { id: 'crownCall', name: '王冠号を呼び寄せる', big: true, chargeTo: 'sink', hint: '次の予告が「王冠号と共に」（単体34）になる。聖の弱点で BREAK すると溜めが止まり、その一撃も消える。崩した人は亡霊の船に睨まれて脆弱1', breakBacklash: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'attacker' }], effects: [{ kind: 'block', amount: 16 }] },
         { id: 'grief', name: '婚礼の鐘は鳴らず', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'foes' }, { kind: 'block', amount: 18 }] },
         { id: 'broadside', name: '最後の一斉射撃', big: true, effects: [{ kind: 'damage', amount: 18, to: 'foes' }] },
         { id: 'sink', name: '王冠号と共に', big: true, effects: [{ kind: 'damage', amount: 34 }] },

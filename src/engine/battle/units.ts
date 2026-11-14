@@ -71,6 +71,14 @@ function killEnemy(state: BattleState, enemy: EnemyState, rng: Rng, events: Batt
   enemy.tauntedBy = undefined;
   enemy.block = 0;
   delete enemy.guarding;
+  delete enemy.guardStyle;
+  // 歌の癒し封じ（セイレーン）: 倒れると、味方全員の癒し封じが消える
+  if (enemy.sealBound) {
+    delete enemy.sealBound;
+    let any = false;
+    for (const a of state.allies) if (!a.dead && (a.statuses.healSeal ?? 0) > 0) { a.statuses.healSeal = 0; any = true; }
+    if (any) addLog(state, `${enemyName(enemy)}の歌が止み、癒し封じが消えた`);
+  }
   addLog(state, `${enemyName(enemy)}を倒した`);
   events.push({ type: 'death', unitId: enemy.uid });
   // かばう相手がいなくなった敵は、予告を代わりの行動（闇の剣）に変える

@@ -44,7 +44,7 @@ const MOON_RABBIT_ORIGINAL: EnemyDef['actions'] = [
 const ECHO_CONVEYOR_BOT_ACTIONS: EnemyDef['actions'] = [
   { id: 'press', name: '流れ作業の一撃', effects: [{ kind: 'damage', amount: 7 }] },
   { id: 'press2', name: '流れ作業の一撃', effects: [{ kind: 'damage', amount: 7 }] },
-  { id: 'reset', name: '動きを点検する', big: true, behavior: 'punish', hint: 'このターンにカードを4枚以上使った味方に、枚数×2のダメージ', effects: [{ kind: 'punishPlays', amount: 2, min: 4 }, { kind: 'block', amount: 10 }] },
+  { id: 'reset', name: '動きを点検する', big: true, behavior: 'punish', brief: '0コスト2枚で反撃', hint: 'コスト0の札を2枚以上使った味方に、枚数×2とフォーカス-1。0コストを絞れば何もしない', effects: [{ kind: 'punishPlays', amount: 2, min: 2, count: 'zero', focus: 1 }, { kind: 'block', amount: 10 }] },
 ];
 /**
  * 夢のスパナのゴーレム: 「ネジを締め直す」を仲間を呼ぶ（夢の機械兵）に置き換えた。ID は古い保存のために残す。
@@ -52,7 +52,7 @@ const ECHO_CONVEYOR_BOT_ACTIONS: EnemyDef['actions'] = [
  */
 const ECHO_WRENCH_GOLEM_ACTIONS: EnemyDef['actions'] = [
   { id: 'swing', name: 'スパナの一撃', effects: [{ kind: 'damage', amount: 11 }] },
-  { id: 'tighten', name: '夢の人形を組み直す', big: true, behavior: 'call', cutIn: { when: 'canSummon', rest: 1, noRepeat: true }, hint: '仲間を1体呼ぶ。その前に倒すか、BREAK する', effects: [{ kind: 'summonEnemy', enemy: 'echoConveyorBot', uses: 2, call: true, orElse: 'swing' }, { kind: 'block', amount: 10 }] },
+  { id: 'tighten', name: '夢の人形を組み直す', big: true, behavior: 'call', cutIn: { when: 'canSummon', rest: 1, noRepeat: true }, brief: '手数読みの兵を呼ぶ', hint: '夢の機械兵（コスト0の札を数える手数読み）を呼ぶ（2回まで）。呼ばれた次の番は0コストを絞るか、先に倒す', effects: [{ kind: 'summonEnemy', enemy: 'echoConveyorBot', uses: 2, call: true, orElse: 'swing' }, { kind: 'block', amount: 10 }] },
   { id: 'bash', name: '振り下ろし', effects: [{ kind: 'damage', amount: 7 }, { kind: 'applyStatus', status: 'weak', amount: 1 }] },
 ];
 /** 夢の石像の巨兵: 「盾で押し潰す」（ブロック12＋8。再来は聖9）をかばうに置き換えた。ID は古い保存のために残す。6つ目の地域なのでブロック10。1体の時は「巨兵の拳」 */
@@ -60,7 +60,7 @@ const ECHO_COLOSSUS_ACTIONS: EnemyDef['actions'] = [
   { id: 'wall', name: '石の大盾', effects: [{ kind: 'block', amount: 24 }] },
   { id: 'fist', name: '巨兵の拳', big: true, effects: [{ kind: 'damage', amount: 17 }] },
   { id: 'stomp', name: '地響き', big: true, effects: [{ kind: 'damage', amount: 8, to: 'foes' }] },
-  { id: 'shove', name: '巨兵が立ちはだかる', big: true, behavior: 'guard', fallbackIfAloneId: 'fist', hint: '次の味方の番の間、ほかの敵への単体攻撃を代わりに受ける。全体攻撃は通る', effects: [{ kind: 'guardAllies' }, { kind: 'block', amount: 10 }] },
+  { id: 'shove', name: '巨兵が立ちはだかる', big: true, behavior: 'guard', fallbackIfAloneId: 'fist', brief: '仲間みんなに盾', hint: '次の味方の番の間、ほかの敵への単体攻撃を代わりに受け、ほかの敵みんなにブロック6（巨兵には付かない）。巨兵を先に崩す', effects: [{ kind: 'guardAllies' }, { kind: 'block', amount: 6, to: 'otherAllies' }] },
 ];
 
 // ----- 通常12体 -----
@@ -69,7 +69,13 @@ export const echoBogGhoul: EnemyDef = dreamEcho(bogGhoul, { id: 'echoBogGhoul', 
 export const echoFrostWolf: EnemyDef = dreamEcho(frostWolf, { id: 'echoFrostWolf', name: '夢の雪狼', aura: 'shadow', element: 'dark' });
 export const echoIceSwordsman: EnemyDef = dreamEcho(iceSwordsman, { id: 'echoIceSwordsman', name: '夢の氷の剣士', aura: 'storm', element: 'thunder', actions: ICE_SWORDSMAN_ORIGINAL });
 // 夢の鮫（表の手負い狙い）: 元の人喰い鮫の「血の匂いを追う」（8 → 再来は毒9・HPが半分以下なら×1.5）をそのまま使い、1ターン目に予告する
-export const echoShark: EnemyDef = dreamEcho(shark, { id: 'echoShark', name: '夢の鮫', aura: 'venom', element: 'poison', firstActionId: 'tear' });
+/** 夢の鮫（2026-11-14 特殊な行動のばらし §3-5）: 人喰い鮫の行動を写さず、「HPが半分以下の味方全員を噛む」（だれもいなければ空振り）。1ターン目の予告はやめた */
+const ECHO_SHARK_ACTIONS: EnemyDef['actions'] = [
+  { id: 'circle', name: '獲物のまわりを泳ぐ', effects: [{ kind: 'block', amount: 6 }] },
+  { id: 'chomp', name: '大顎の一撃', effects: [{ kind: 'damage', amount: 20 }] },
+  { id: 'tear', name: '血の匂いを追う', big: true, behavior: 'hunt', brief: '半分以下の全員を噛む', hint: 'HPが半分以下の味方全員に噛みつく（毒9）。だれも半分以下でなければ空振り。だれも半分を切らせない', effects: [{ kind: 'damage', amount: 8, to: 'foes', lowOnly: true }] },
+];
+export const echoShark: EnemyDef = dreamEcho(shark, { id: 'echoShark', name: '夢の鮫', aura: 'venom', element: 'poison', actions: ECHO_SHARK_ACTIONS });
 export const echoDrownedSailor: EnemyDef = dreamEcho(drownedSailor, { id: 'echoDrownedSailor', name: '夢の溺れた水夫', aura: 'frost', element: 'ice' });
 export const echoMummy: EnemyDef = dreamEcho(mummy, { id: 'echoMummy', name: '夢のミイラ', aura: 'ember', element: 'fire' });
 export const echoSandScorpion: EnemyDef = dreamEcho(sandScorpion, { id: 'echoSandScorpion', name: '夢の砂蠍', aura: 'storm', element: 'thunder' });
@@ -131,7 +137,7 @@ export const echoGhostAdmiral: EnemyDef = dreamEcho(ghostAdmiral, {
   id: 'echoGhostAdmiral', name: '夢の亡霊提督', aura: 'storm', element: 'thunder',
   phases: [
     { ...basePhase(ghostAdmiral, 0, ['seekWeak']), openingActionId: 'dreamSeal', rule: '目覚めを拒む霧で、味方の回復を半分にする（聖で BREAK すると止まる。回復に頼らない）',
-      actions: [{ id: 'dreamSeal', name: '目覚めを拒む霧', big: true, behavior: 'healSeal', hint: SEAL_HINT, effects: [{ kind: 'applyStatus', status: 'healSeal', amount: 2, to: 'foes' }, { kind: 'block', amount: 12 }] }, ...basePhase(ghostAdmiral, 0, ['seekWeak']).actions] },
+      actions: [{ id: 'dreamSeal', name: '目覚めを拒む霧', big: true, behavior: 'healSeal', hint: `${SEAL_HINT}。崩した人は霧を吸って癒し封じ2`, breakBacklash: [{ kind: 'applyStatus', status: 'healSeal', amount: 2, to: 'attacker' }], effects: [{ kind: 'applyStatus', status: 'healSeal', amount: 2, to: 'foes' }, { kind: 'block', amount: 12 }] }, ...basePhase(ghostAdmiral, 0, ['seekWeak']).actions] },
     { ...basePhase(ghostAdmiral, 1, ['crownCall']), openingActionId: 'dreamSeal2', rule: '永い眠りの霧で、回復を半分にして呪う（聖で BREAK すると止まる。回復に頼らない）',
       actions: [{ id: 'dreamSeal2', name: '永い眠りの霧', big: true, scripted: true, behavior: 'healSeal', hint: SEAL_HINT, effects: [{ kind: 'applyStatus', status: 'healSeal', amount: 2, to: 'foes' }, { kind: 'applyStatus', status: 'curse', amount: 1, to: 'foes' }, { kind: 'block', amount: 14 }] }, ...basePhase(ghostAdmiral, 1, ['crownCall']).actions] },
   ],

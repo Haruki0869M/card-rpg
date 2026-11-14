@@ -39,7 +39,7 @@ export const blizzardSnake: EnemyDef = {
   actions: [
     {"id": "bite", "name": "毒の牙", "effects": [{"kind": "damage", "amount": 8}, {"kind": "applyStatus", "status": "poison", "amount": 2}]},
     // 「雪を巻く」を癒し封じに置き換えた。ID は古い保存のために残す。4つ目の地域なのでブロック10（BREAK されると行動ごと止まる）
-    {"id": "coil", "name": "凍傷の牙", big: true, behavior: "healSeal", hint: "味方全員の回復が、2ターン半分になる。BREAK するか、先に回復を使う", "effects": [{"kind": "applyStatus", "status": "healSeal", "amount": 2, "to": "foes"}, {"kind": "block", "amount": 10}]},
+    { id: 'coil', name: '凍傷の牙', big: true, behavior: 'healSeal', brief: '噛んだ1人の回復を封じる', hint: '狙った1人に7ダメージと癒し封じ3（回復が半分）。ダメージがあるので、BREAK しても半分で起きる。狙われた人を守るか、ほかの人が回復役に', effects: [{ kind: 'damage', amount: 7 }, { kind: 'applyStatus', status: 'healSeal', amount: 3 }] },
     {"id": "chill", "name": "吹雪の締めつけ", "effects": [{"kind": "applyStatus", "status": "freeze", "amount": 1}]},
   ],
 };
@@ -62,7 +62,7 @@ export const iceSwordsman: EnemyDef = {
     {"id": "combo", "name": "二の太刀", "effects": [{"kind": "damage", "amount": 5, "hits": 2}]},
     {"id": "stance", "name": "霜刃の構え", "effects": [{"kind": "block", "amount": 9}]},
     // 「氷刃の突き」を盾砕きに置き換えた（ブロックを0にしてから、同じ12のダメージ）。ID は古い保存のために残す
-    {"id": "thrust", "name": "鎧通しの突き", big: true, behavior: "shatter", hint: "当たるとブロックを全部壊す。BREAK するか、ブロックに頼らずに受ける", "effects": [{"kind": "shieldBreak"}, {"kind": "damage", "amount": 12}]},
+    { id: 'thrust', name: '鎧通しの突き', big: true, behavior: 'shatter', brief: 'ブロックを無視して突く', hint: 'ブロックを無視して12（ブロックは壊れずに残る）。BREAK すると、ふつうに当たって威力も半分', effects: [{ kind: 'damage', amount: 12, pierce: true }] },
   ],
   // 最後の中ボス（2026-11-14 寄り道の値打ち 柱5）: 中ボスの部屋の戦闘だけの段階。HP50%か、相方が倒れると入る。数字は【提案】
   midbossPhases: [
@@ -146,7 +146,7 @@ export const frostGiant: EnemyDef = {
   phases: [
     // ボスの段階（2026-11-14）: 盾砕き（順番にも入る）。答え: 守りに頼らない・火・毒の弱点で押し切る
     { belowHpPct: 50, name: "怒れる霜の巨人", pattern: 'sequence', openingActionId: 'smashGuard', rule: '当たるとブロックを全部壊す一撃（火・毒で BREAK すると威力が半分。守りに頼らず受ける）', actions: [
-      { id: 'smashGuard', name: '盾ごと砕く大槌', big: true, behavior: 'shatter', hint: '当たるとブロックを全部壊す。BREAK するか、ブロックに頼らずに受ける', effects: [{ kind: 'shieldBreak' }, { kind: 'damage', amount: 18 }] },
+      { id: 'smashGuard', name: '盾ごと砕く大槌', big: true, behavior: 'shatter', hint: '当たるとブロックを全部壊す。BREAK するか、ブロックに頼らずに受ける。BREAK しても盾は砕ける（威力は半分の9）', breakResidue: [{ kind: 'shieldBreak', force: true }, { kind: 'damage', amount: 9 }], effects: [{ kind: 'shieldBreak' }, { kind: 'damage', amount: 18 }] },
       {"id": "rage", "name": "怒りの大槌", big: true, "effects": [{"kind": "damage", "amount": 28}]},
       {"id": "guard", "name": "怒りの構え", "effects": [{"kind": "block", "amount": 24}]},
       {"id": "quake", "name": "鉱山を揺らす", big: true, "effects": [{"kind": "damage", "amount": 12, "to": "foes"}]},
@@ -158,4 +158,4 @@ export const venomIceSlime: EnemyDef = makeVariant(iceSlime, {"id": "venomIceSli
 
 // 敵の特殊な行動・第2弾（round2 §3・fix-plan §4）: 亜種のこの敵だけ「雷氷の矢」を手負い狙いに置き換えた（同じ雷11・HPが半分以下なら×1.5）。
 // ID は古い保存のために残す。1ターン目に予告する（もとから順番の1番目）。元の極寒の弓兵は変えていない
-export const stormIceArcher: EnemyDef = makeVariant(iceArcher, {"id": "stormIceArcher", "name": "雷氷の弓兵", "aura": "storm", "maxHp": 34, "baseLevel": 7, "exp": 13, "gold": 9, "weak": ["fire"], "resist": ["ice", "thunder"], firstActionId: "arrow", "actions": [{"id": "arrow", "name": "弱った者を射抜く", big: true, behavior: "hunt", hint: "HPの割合がいちばん低い味方を狙う。HPが半分以下だと×1.5", "effects": [{"kind": "damage", "amount": 11, "element": "thunder", "lowHpMul": 1.5}]}, {"id": "volley", "name": "散る雷矢", "effects": [{"kind": "damage", "amount": 5, "element": "thunder", "to": "foes"}]}, {"id": "brace", "name": "雷矢の構え", "effects": [{"kind": "block", "amount": 7}]}]});
+export const stormIceArcher: EnemyDef = makeVariant(iceArcher, {"id": "stormIceArcher", "name": "雷氷の弓兵", "aura": "storm", "maxHp": 34, "baseLevel": 7, "exp": 13, "gold": 9, "weak": ["fire"], "resist": ["ice", "thunder"], firstActionId: "arrow", "actions": [{ id: 'arrow', name: '弱った者を射抜く', big: true, behavior: 'hunt', brief: '守りの無い所を射抜く', hint: 'HPの割合がいちばん低い味方を狙う。当たる時にブロックが無いと×1.5（HPは見ない）。狙われた人にブロックを', effects: [{ kind: 'damage', amount: 11, element: 'thunder', lowHpMul: 1.5, huntWhen: 'noBlock' }] }, {"id": "volley", "name": "散る雷矢", "effects": [{"kind": "damage", "amount": 5, "element": "thunder", "to": "foes"}]}, {"id": "brace", "name": "雷矢の構え", "effects": [{"kind": "block", "amount": 7}]}]});

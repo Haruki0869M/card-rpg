@@ -21,7 +21,7 @@ export const iceFisher: EnemyDef = {
     { id: 'hook', name: '釣り針の一撃', effects: [{ kind: 'damage', amount: 9 }] },
     { id: 'reel', name: '糸を巻く', effects: [{ kind: 'damage', amount: 4 }, { kind: 'applyStatus', status: 'weak', amount: 1 }] },
     // 「氷の穴にこもる」を手数読みに置き換えた。ID は古い保存のために残す。3つ目の地域なのでブロック8（BREAK されると付かない）
-    { id: 'hole', name: '糸を張って待つ', big: true, behavior: 'punish', hint: 'このターンにカードを4枚以上使った味方に、枚数×2のダメージ', effects: [{ kind: 'punishPlays', amount: 2, min: 4 }, { kind: 'block', amount: 8 }] },
+    { id: 'hole', name: '糸を張って待つ', big: true, behavior: 'punish', brief: '一番使った1人を釣る', hint: 'このターンにカードを3枚以上使った味方のうち、いちばん多く使った1人だけに枚数×3。手数を2人で分ければ軽い', effects: [{ kind: 'punishPlays', amount: 3, min: 3, scope: 'most' }, { kind: 'block', amount: 8 }] },
   ],
 };
 
