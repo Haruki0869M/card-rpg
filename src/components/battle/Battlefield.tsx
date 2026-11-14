@@ -19,7 +19,7 @@ import { speedFactor, useBattle, type UnitFx } from '../../store/battleStore';
 import type { AllyState, BattleState, EnemyState } from '../../types';
 import { breakPreview, intentBrief, intentView, type IntentPart } from '../format';
 import { breakRuleOf } from '../../engine/battle/breakRules';
-import { enemyResist, enemyWeak, phaseMarks } from '../../engine/battle/phases';
+import { enemyResist, enemyWeak, focusFeedOf, phaseMarks } from '../../engine/battle/phases';
 import { HpBar } from '../ui/HpBar';
 import { EffectChip, ELEMENT_ICONS, Shield, Skull, statusStyle, Swords } from '../ui/icons';
 import { Flame } from 'lucide-react';
@@ -136,18 +136,27 @@ function IntentPartView({ p, narrow }: { p: IntentPart; narrow: boolean }) {
         <span className="flex max-w-full flex-wrap items-center justify-center gap-0.5 text-red-300" style={el ? { color: el.color } : undefined}>
           <Icon size={14} strokeWidth={2.6} />
           <TargetFace allyId={p.targetId} /><IntentTargetName id={p.targetId} />
-          <span className="tabular-nums">{p.hits > 1 ? `${p.damage}×${p.hits}` : p.damage}</span>
+          <span className="tabular-nums" data-veiled-number={p.hidden || undefined}>{p.hidden ? '？' : p.hits > 1 ? `${p.damage}×${p.hits}` : p.damage}</span>
         </span>
       );
     }
+    case 'veiled':
+      // 闇の帳（区切り3a）: 特殊な効果（状態異常など）の中身は見えない。狙いだけ見せる
+      return (
+        <span className={`flex items-center gap-0.5 text-violet-200 ${narrow ? 'max-w-full flex-wrap justify-center' : ''}`} data-veiled-part>
+          <span className="text-[12px]">✦</span>
+          {p.all ? <span className="text-[12px]">味方全員</span> : p.targetId ? <><TargetFace allyId={p.targetId} /><IntentTargetName id={p.targetId} /></> : null}
+          <span>？</span>
+        </span>
+      );
     case 'attackAll': {
       const el = p.element ? getElement(p.element) : undefined;
       const Icon = el ? (ELEMENT_ICONS[el.icon] ?? Skull) : Skull;
       return (
         <span className="flex max-w-full flex-wrap items-center justify-center gap-0.5 text-red-300" style={el ? { color: el.color } : undefined}>
           <Icon size={14} strokeWidth={2.6} />
-          <span className="text-[12px]">味方全員</span>
-          <span className="tabular-nums">{p.hits > 1 ? `${p.damage}×${p.hits}` : p.damage}</span>
+          <span className="text-[12px]">{p.label ?? '味方全員'}</span>
+          <span className="tabular-nums" data-veiled-number={p.hidden || undefined}>{p.hidden ? '？' : p.hits > 1 ? `${p.damage}×${p.hits}` : p.damage}</span>
         </span>
       );
     }
@@ -156,7 +165,7 @@ function IntentPartView({ p, narrow }: { p: IntentPart; narrow: boolean }) {
         <span className="flex items-center gap-0.5 text-sky-300">
           <Shield size={14} strokeWidth={2.6} />
           {p.others && <span className="text-[12px]">仲間</span>}
-          <span className="tabular-nums">{p.amount}</span>
+          <span className="tabular-nums" data-veiled-number={p.hidden || undefined}>{p.hidden ? '？' : p.amount}</span>
         </span>
       );
     case 'debuff': {
@@ -278,9 +287,25 @@ function IntentBubble({ enemy, onTap, narrow }: { enemy: EnemyState; onTap: () =
           ) : view.big ? (
             <span className="order-first flex items-center rounded bg-red-600 px-1 text-[12px] leading-4 font-black whitespace-nowrap text-white" data-big-mark><Flame size={12} strokeWidth={2.8} />大技</span>
           ) : null}
+          {/* 災厄の加護（区切り3a）: 闇の帳（名前と数字が隠れている。押すと見る方法）・鐘の響き（鐘の番 / 次の鐘まで） */}
+          {view.veil && (
+            <span className={`order-first rounded bg-gradient-to-b from-slate-600 to-slate-900 text-[12px] leading-4 font-black whitespace-nowrap text-violet-100 ring-1 ring-violet-300/80 ${narrow ? 'px-0.5' : 'px-1'}`} data-veil-mark title={view.veil.long}>
+              🌑{narrow ? '帳' : '闇の帳'}
+            </span>
+          )}
+          {view.bell?.now && (
+            <span className={`order-first rounded bg-gradient-to-b from-amber-300 to-amber-600 text-[12px] leading-4 font-black whitespace-nowrap text-amber-950 ring-1 ring-yellow-100 ${narrow ? 'px-0.5' : 'px-1'}`} data-bell-mark="now" title={view.bell.long}>
+              🔔{narrow ? '鐘' : '鐘の番 全員に半分'}
+            </span>
+          )}
           {view.parts.map((p, i) => (
             <IntentPartView key={i} p={p} narrow={narrow} />
           ))}
+          {view.bell && !view.bell.now && (
+            <span className="order-last rounded-full bg-amber-950/95 px-1.5 text-[12px] leading-4 font-bold whitespace-nowrap text-amber-200 ring-1 ring-amber-300/60" data-bell-mark={view.bell.left} title={view.bell.long}>
+              🔔{narrow ? view.bell.left : `あと${view.bell.left}ターン`}
+            </span>
+          )}
           {/* お供の先読み: 次のターンの行動の名前（枠の中の最後の行。下の味方や狙いの名前に重ねない） */}
           {enemy.queuedActionId && (
             <span className="order-last max-w-full truncate rounded-full bg-sky-950/95 px-1.5 text-[12px] leading-4 font-bold text-sky-200 ring-1 ring-sky-300/60" data-foresee>
@@ -425,7 +450,7 @@ const EnemyUnit = memo(function EnemyUnit({
           </motion.div>
         )}
         {/* 数字は、その敵の絵の頭のすぐ上に出す（箱の上の空きではなく、絵の上の端に合わせる） */}
-        <UnitPopups unitId={enemy.uid} top={`${Math.max(0, boxH - h - 6)}px`} />
+        <UnitPopups unitId={enemy.uid} top={`${Math.max(0, boxH - h - 6)}px`} breakDrop={Math.round(h * 0.4)} />
       </div>
       {!enemy.dead && (
         // 予告は味方の立ち絵より手前に出す（画面が低くて重なっても、狙いと数字を読めるように）
@@ -443,7 +468,7 @@ const EnemyUnit = memo(function EnemyUnit({
           {!narrow && <BehaviorBrief enemy={enemy} maxW={slotW - 8} />}
           <BreakHint enemy={enemy} narrow={narrow} maxW={narrow ? slotW - 4 : slotW - 8} />
           <AimMarks battle={battle} enemyUid={enemy.uid} />
-          <StatusChips s={enemy.statuses} side="enemy" onTap={onTap} tauntedBy={enemy.tauntedBy} guarding={enemy.guarding} />
+          <StatusChips s={enemy.statuses} side="enemy" onTap={onTap} tauntedBy={enemy.tauntedBy} guarding={enemy.guarding} hidden={enemy.hidden} lamp={focusFeedOf(enemy) ? Math.min(focusFeedOf(enemy)!.max, enemy.lampEaten ?? 0) : undefined} />
         </div>
       )}
     </div>

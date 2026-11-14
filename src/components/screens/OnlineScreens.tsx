@@ -1,5 +1,6 @@
 // ===== オンライン協力の画面（部屋に参加・待合室・遊んでいる間の表示。spec §7.2） =====
 import { TopBar } from '../ui/fancy';
+import { LAYER } from '../ui/layers';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Copy, Crown, LogIn, Share2, Swords, Users, Wifi, WifiOff } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -10,13 +11,15 @@ import { SCENARIOS, isScenarioUnlocked } from '../../data/scenarios';
 import { clearedScenarioIds } from '../../store/profile';
 import { useProfile } from '../../store/profileStore';
 import { PLAYER_COLOR } from '../../data/theme';
-import { livingHeroes, notVoted, voters, waitingPlayers } from '../../engine';
+import { eventChallenger, livingHeroes, notVoted, voters, waitingPlayers } from '../../engine';
+import { OPEN_EXTERNAL_PARAM } from '../../net/inAppBrowser';
 import { normalizeCode, SEATS } from '../../net/room';
 import { autoName, isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
 import { proxyReadyAt, proxyWaitLeft, useOnline } from '../../store/onlineStore';
 import type { GameState, PlayerId } from '../../types';
 import { HeroFace, Screen } from '../ui/game';
+import { InAppBrowserNote } from '../ui/InAppBrowserNote';
 import { chestClaimWaits, facilityWaits, rewardWaits } from './waitNotes';
 
 /** 定型のスタンプ（spec §7.1） */
@@ -34,6 +37,8 @@ export function inviteUrl(code: string) {
   u.hash = '';
   u.searchParams.delete('as');
   u.searchParams.set('room', code);
+  // LINE で送った時、最初から外のブラウザ（Chrome など）で開くための印（点検 F4）。このゲームは読まない
+  u.searchParams.set(OPEN_EXTERNAL_PARAM, '1');
   return u.toString();
 }
 
@@ -70,6 +75,7 @@ export function JoinScreen() {
     <Screen>
       <TopBar title="部屋に参加" onBack={() => setScreen('title')} />
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-4">
+        <InAppBrowserNote />
         <NameInput />
         <div>
           <div className="text-[13px] text-zinc-300">合言葉（4文字）</div>
@@ -277,6 +283,9 @@ export function awaitedSeats(game: GameState): PlayerId[] {
   const base = [...awaitedTurnSeats(game)];
   // ホストの引き継ぎの直し（2026-11-14・点検 D 2-2）: ダンジョンの中のみんなで決める場面（扉・撤退・イベント・続ける・宝箱の開け役）と
   // 報酬の「続ける」で、まだ選んでいない席も待っている（相手が眠ったら「代わりに操作」の窓を出すため）。戦闘中・世界マップは今のまま
+  // イベントの挑む段（実機の不具合① 2026-11-14）: 待っているのは挑む役の持ち主だけ（票はもう無い）
+  const challenger = game.mode === 'event' && game.event?.decided && !game.event.result ? eventChallenger(game) : undefined;
+  if (challenger) return base.includes(challenger.playerId) ? base : [...base, challenger.playerId];
   if (game.mode !== 'battle' && game.mode !== 'world' && (game.activeScene || game.mode === 'reward') && voters(game).length > 1)
     for (const p of notVoted(game)) if (!base.includes(p)) base.push(p);
   return base;
@@ -393,7 +402,7 @@ export function OnlineOverlay() {
     .filter((x) => x.target && x.by && isLocalPlayer(x.target.playerId));
   const offlineAwaited = awaitedSeats(game).filter((p) => !room.seatOnline(p) && !room.meta?.proxy?.[p] && livingHeroes(game).some((h) => h.playerId === p));
   return (
-    <div data-online-overlay className="pointer-events-none absolute inset-x-0 top-0 z-[70] flex flex-col items-center gap-1 px-3 pt-14">
+    <div data-online-overlay style={{ zIndex: LAYER.online }} className="pointer-events-none absolute inset-x-0 top-0 flex flex-col items-center gap-1 px-3 pt-14">
       {!room.connected && (
         <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-red-950/90 px-3 py-1.5 text-[13px] text-red-100">
           <WifiOff size={16} /> 通信が切れました。つながり直しています…

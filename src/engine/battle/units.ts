@@ -72,6 +72,7 @@ function killEnemy(state: BattleState, enemy: EnemyState, rng: Rng, events: Batt
   enemy.block = 0;
   delete enemy.guarding;
   delete enemy.guardStyle;
+  delete enemy.hidden;
   // 歌の癒し封じ（セイレーン）: 倒れると、味方全員の癒し封じが消える
   if (enemy.sealBound) {
     delete enemy.sealBound;

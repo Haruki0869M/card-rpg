@@ -175,14 +175,22 @@ for (const [w, h] of SIZES) {
   await tapBackdrop();
   await waitClosed('長押しの後の外タップ');
   if ((await equipBefore()) !== eq0) await fail('外を押して閉じた時、下の「装備」が押された');
-  // 持ち物の欄
-  const inv = page.locator('[data-item-detail="luckyCharm"]').last();
-  await inv.scrollIntoViewIfNeeded();
-  await inv.click();
-  await waitOpen('持ち物の装飾品');
+  // 持ち物の欄（実機の不具合⑥の後: 行を押すと「渡す」の枠が開く。詳しい説明は長押し）
+  const invRow = page.locator('[data-item-row="luckyCharm"]').last();
+  if (!(await invRow.count())) await fail('持ち物の欄に幸運のお守りの行が無い');
+  const inv = invRow.locator('[data-row-tap]');
+  await longPress(inv);
+  if (!(await isOpen())) await fail('持ち物の長押しで開いた窓が、指を離すと消えた');
   if (!(await popup.getByText('幸運のお守り').count())) await fail('持ち物の詳細の名前が違う');
   await popup.getByText('詳細を閉じる', { exact: true }).click();
   await waitClosed('持ち物の装飾品');
+  if (await invRow.getAttribute('data-open')) await fail('持ち物の長押しで、「渡す」の枠まで開いた');
+  await inv.click();
+  await page.waitForTimeout(200);
+  if (await isOpen()) await fail('持ち物の行を押しただけで詳細が開いた');
+  if (!(await invRow.getAttribute('data-open'))) await fail('持ち物の行を押しても「渡す」の枠が開かない');
+  await invRow.locator('[data-row-give]').click();
+  await page.waitForTimeout(150);
   await page.keyboard.press('Escape');
   await page.waitForTimeout(200);
 
@@ -281,14 +289,17 @@ for (const [w, h] of SIZES) {
     await checkLayout('取り合いの詳細');
     await popup.getByText('詳細を閉じる', { exact: true }).click();
     await waitClosed('取り合いの品物');
+    // 実機の不具合④の後: 取り合いは画面の真ん中の層（data-claim-center）に出て、下の戦利品の一覧は隠れる（押せない）。
+    // その間は戦利品の行を押さない（戦利品の行は、宝箱の画面の一覧で確かめる）
     const loot = page.locator('[data-item-detail="steelSword"]').first();
-    if (await loot.count()) {
+    if (!(await page.locator('[data-claim-center] [data-claim]').count())) await fail('取り合いが画面の真ん中の層（data-claim-center）に出ていない');
+    if ((await loot.count()) && !(await page.locator('[data-claim-center]').count())) {
       await loot.click();
       await waitOpen('戦利品');
       await shot('loot');
       await popup.getByText('詳細を閉じる', { exact: true }).click();
       await waitClosed('戦利品');
-    } else console.log(`  （${width}px: 取り合いの間は戦利品の一覧が出ないため、戦利品の行は宝箱の画面で確かめる）`);
+    } else console.log(`  （${width}px: 取り合いの間は戦利品の一覧が真ん中の層に隠れるため、戦利品の行は宝箱の画面で確かめる）`);
   }
 
   // ===== 宝箱の中身（宝箱の画面の一覧） =====

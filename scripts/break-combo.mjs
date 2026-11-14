@@ -1,4 +1,4 @@
-// 見直しの段階3の戦闘の表示: 大技の印・BREAK の手がかりと演出・弱点の案内（弱点×1.5！）・連携の段階（連携／大連携／極連携）。
+// 見直しの段階3の戦闘の表示（BREAK で付く状態は 2026-11-13 から脆弱1。src/data/balance.ts の breakStatus）: 大技の印・BREAK の手がかりと演出・弱点の案内（弱点×1.5！）・連携の段階（連携／大連携／極連携）。
 // 4人で樹の番人（弱点は火・大技 = 根の拘束）と戦う形を保存の上で作り、360・390・480 の幅で見る。
 // 使い方: URL=http://127.0.0.1:<番号>/card-rpg/ node scripts/break-combo.mjs
 import { mkdir } from 'node:fs/promises';
@@ -104,7 +104,7 @@ async function run(width) {
   if (!(await page.locator('[data-break-mark]').count())) ng('予告の枠に「BREAK」の札が無い');
   await page.waitForTimeout(700);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('card-rpg/adventure')).game.expeditions[0].battle.enemies[0]);
-  if (!(saved.broken && saved.nextActionMultiplier === 0.5 && saved.block === 0 && saved.statuses.weak >= 1)) ng(`BREAK の中身が違う（${JSON.stringify({ broken: saved.broken, mul: saved.nextActionMultiplier, block: saved.block, weak: saved.statuses.weak })}）`);
+  if (!(saved.broken && saved.nextActionMultiplier === 0.5 && saved.block === 0 && saved.statuses.vulnerable >= 1)) ng(`BREAK の中身が違う（${JSON.stringify({ broken: saved.broken, mul: saved.nextActionMultiplier, block: saved.block, vulnerable: saved.statuses.vulnerable })}）`);
   await shot('4-broken');
 
   // 連携の段階: 1人目が攻撃済み → 2人目から見て「連携+20%」→ 2人目も攻撃 → 3人目から見て「大連携+35%」→ 4人目から見て「極連携+50%」
@@ -138,4 +138,4 @@ if (problems.length) {
   console.log('NG:\n' + problems.join('\n'));
   process.exit(1);
 }
-console.log('OK: 大技の印・BREAK の手がかりと結果（威力半分・弱体1・ブロック0）・的の札の「弱点×1.5」と札の下の「弱点×1.5！（完全成功で火傷確定）」・連携の段階（360/390/480）');
+console.log('OK: 大技の印・BREAK の手がかりと結果（威力半分・脆弱1・ブロック0）・的の札の「弱点×1.5」と札の下の「弱点×1.5！（完全成功で火傷確定）」・連携の段階（360/390/480）');

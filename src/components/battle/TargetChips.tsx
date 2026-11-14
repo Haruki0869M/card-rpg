@@ -24,11 +24,13 @@ function MiniIntent({ p }: { p?: IntentPart }) {
     return (
       <span className="flex shrink-0 items-center gap-px text-red-300 tabular-nums" style={el ? { color: el.color } : undefined}>
         <Icon size={12} strokeWidth={2.6} />
-        {p.hits > 1 ? `${p.damage}×${p.hits}` : p.damage}
+        {p.hidden ? '？' : p.hits > 1 ? `${p.damage}×${p.hits}` : p.damage}
       </span>
     );
   }
-  if (p.kind === 'block') return <span className="flex shrink-0 items-center gap-px text-sky-300 tabular-nums"><Shield size={12} strokeWidth={2.6} />{p.amount}</span>;
+  if (p.kind === 'block') return <span className="flex shrink-0 items-center gap-px text-sky-300 tabular-nums"><Shield size={12} strokeWidth={2.6} />{p.hidden ? '？' : p.amount}</span>;
+  // 闇の帳（区切り3a）: 特殊な効果の中身は見えない
+  if (p.kind === 'veiled') return <span className="shrink-0 text-violet-200">✦？</span>;
   if (p.kind === 'debuff') {
     const st = statusStyle(p.status);
     return <span className="flex shrink-0 items-center" style={{ color: st.color }}><st.Icon size={12} strokeWidth={2.6} /></span>;
@@ -58,6 +60,8 @@ function useChipPredictions(battle: BattleState, allyId: string, cardUid: string
     const badges: Record<string, KillBadge> = {};
     // 大技の予告を崩せるか（BREAK）: now = 一番出やすい段で崩せる / perfect = 完全成功なら崩せる
     const breaks: Record<string, 'now' | 'perfect' | undefined> = {};
+    // 区切り3b: 吹雪に隠れていて、このカードのダメージは外れる
+    const missed: Record<string, boolean | undefined> = {};
     const ally = battle.allies.find((a) => a.id === allyId);
     const inst = ally?.hand.find((c) => c.uid === cardUid);
     const tiers = inst ? cardOf(inst).tiers.map((t) => t.minSuccesses) : [];
@@ -74,18 +78,19 @@ function useChipPredictions(battle: BattleState, allyId: string, cardUid: string
       const loss = (t: number) => total(t)?.hpLoss;
       if (canBreak(e)) breaks[e.uid] = total(tier)?.breaks ? 'now' : top >= 0 && total(top)?.breaks ? 'perfect' : undefined;
       preds[e.uid] = loss(tier);
+      if (total(tier)?.missed) missed[e.uid] = true;
       const s = sure >= 0 ? loss(sure) : undefined;
       if (s && s[0] >= e.hp) badges[e.uid] = 'sure';
       else if (top >= 0 && (loss(top)?.[0] ?? 0) >= e.hp) badges[e.uid] = 'perfect';
     }
-    return { preds, badges, breaks };
+    return { preds, badges, breaks, missed };
   }, [battle, allyId, cardUid, focus, tier, allyTargetId]);
 }
 
 export function TargetChips({ allyId, cardUid, focus, tier, tierLabel, targetId, allyTargetId }: { allyId: string; cardUid: string; focus: number; tier: number; tierLabel: string; targetId?: string; allyTargetId?: string }) {
   const battle = useBattle((s) => s.battle);
   const tapEnemy = useBattle((s) => s.tapEnemy);
-  const { preds, badges, breaks } = useChipPredictions(battle, allyId, cardUid, focus, tier, allyTargetId);
+  const { preds, badges, breaks, missed } = useChipPredictions(battle, allyId, cardUid, focus, tier, allyTargetId);
   const ally = battle.allies.find((a) => a.id === allyId);
   const inst = ally?.hand.find((c) => c.uid === cardUid);
   const card = inst ? cardOf(inst) : undefined;
@@ -119,6 +124,7 @@ export function TargetChips({ allyId, cardUid, focus, tier, tierLabel, targetId,
               data-chip-prediction={text}
               data-kill-badge={badges[e.uid]}
               data-break-chip={breaks[e.uid]}
+              data-miss-chip={missed[e.uid] || undefined}
               data-weak-chip={guide?.kind === 'weak' ? (guide.element ?? 'any') : undefined}
               data-resist-chip={guide?.kind === 'resist' ? guide.element : undefined}
               className={`relative flex min-h-11 min-w-0 flex-col justify-center rounded-lg border px-1 py-0.5 text-left leading-4 ${on ? 'border-sky-300 bg-sky-900/60 ring-2 ring-sky-300' : 'border-zinc-600 bg-black/40'}`}
@@ -141,6 +147,7 @@ export function TargetChips({ allyId, cardUid, focus, tier, tierLabel, targetId,
                 {text.split(' → ').map((t, i) => <span key={i} className="whitespace-nowrap">{i ? `→ ${t}` : t}</span>)}
               </span>
               {/* 大技の予告を出している敵: この攻撃で体勢を崩せるか（順番: 撃破 → BREAK → 弱点） */}
+              {missed[e.uid] && <span className="text-[12px] font-black whitespace-nowrap text-sky-100">❄外れる</span>}
               {breaks[e.uid] && !kill && <span className="text-[12px] font-black whitespace-nowrap text-amber-300">{breaks[e.uid] === 'now' ? '⚡BREAK!' : '⚡完全でBREAK'}</span>}
               {guide?.kind === 'weak' && (
                 <span className="truncate text-[12px] leading-4 font-black whitespace-nowrap" style={{ color: edge }} data-weak-guide>

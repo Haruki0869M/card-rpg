@@ -53,6 +53,8 @@ export { slotPreviewLimitOf } from './preview';
 // ---------- 生成 ----------
 
 import { enemyLevelFactors } from './levels';
+import { bellEffects, bellStrikes } from './boons';
+import { focusFeedOf, lampBonus } from './phases';
 export { enemyLevelFactors };
 
 /**
@@ -141,7 +143,8 @@ export function createBattle(setup: BattleSetup): BattleState {
       phase: 0,
       ...(body ? { eliteBody: true } : {}),
       // 最後の中ボス（2026-11-14 寄り道の値打ち 柱5）: 中ボスの部屋の戦闘だけ、中ボスの段階（midbossPhases）を読む
-      ...(encounter.midboss && def.midbossPhases?.length ? { phaseSet: 'midboss' as const } : {}),
+      // 区切り3b: 災厄の戦闘も中ボスの扱いだが、手下（氷の剣士など）は最後の中ボスだけの段階を使わない
+      ...(encounter.midboss && !encounter.scourge && def.midbossPhases?.length ? { phaseSet: 'midboss' as const } : {}),
     };
   });
 
@@ -286,6 +289,8 @@ function startAllyPhase(state: BattleState, rng: Rng, events: BattleEvent[]) {
     delete e.tempWeak;
     delete e.pincer;
     delete e.pincerFocus;
+    // 区切り3b: 鐘のこだまの数え（いちばん大きな一撃）は、味方の番ごとに数え直す
+    delete e.echoMax;
   }
   for (const a of state.allies) {
     a.played = 0;
@@ -527,6 +532,7 @@ function playCard(state: BattleState, cmd: Extract<Command, { type: 'PLAY_CARD' 
   ally.focus -= focusUsed;
   ally.hand.splice(idx, 1);
   state.stats.focusUsed += focusUsed;
+  if (focusUsed > 0) feedLamps(state, ally, focusUsed);
 
   // 判定
   // 天穿ちなど: 残りの枠も全部成功になる能力（1ターンに1枚の物は、ここで使った事にする。星読みで予約した時も同じ）
@@ -704,7 +710,7 @@ export function resultSummary(resultLabel: string, parts: string[]): string {
 }
 
 /** 予測の合計（1体ぶん）。値は [低い方, 高い方]（抽選のある攻撃は倍率の最小・最大） */
-export interface PredictTotals { id: string; damage: [number, number]; hpLoss: [number, number]; heal: [number, number]; block: [number, number]; hits: [number, number]; /** この成功数なら、この敵の大技の予告を崩せる（BREAK。低い方の見込みでも崩せる時だけ） */ breaks?: boolean; /** 低い方・高い方のどちらの見込みでも付く状態異常（表示だけ。弱点の案内の「完全成功で〇〇確定」） */ statuses?: string[] }
+export interface PredictTotals { id: string; damage: [number, number]; hpLoss: [number, number]; heal: [number, number]; block: [number, number]; hits: [number, number]; /** この成功数なら、この敵の大技の予告を崩せる（BREAK。低い方の見込みでも崩せる時だけ） */ breaks?: boolean; /** 低い方・高い方のどちらの見込みでも付く状態異常（表示だけ。弱点の案内の「完全成功で〇〇確定」） */ statuses?: string[]; /** 吹雪に隠れていて、このカードのダメージは外れる（区切り3b） */ missed?: boolean }
 
 /**
  * 実際のカード処理を複製上で試し、キャラごとの合計を返す。元の状態・乱数・予約は一切進めない。
@@ -749,7 +755,8 @@ export function predictCardTotals(state: BattleState, characterId: string, cardI
     const breaks = samples.every(events => events.some(e => e.type === 'break' && e.enemyUid === id));
     const given = samples.map(events => new Set(events.flatMap(e => (e.type === 'status' && e.unitId === id ? [e.status] : []))));
     const statuses = [...given[0]].filter(st => given.every(g => g.has(st)));
-    return { id, damage: range('damage'), hpLoss: range('hpLoss'), heal: range('heal'), block: range('block'), hits: range('hits'), ...(breaks ? { breaks } : {}), ...(statuses.length ? { statuses } : {}) };
+    const missed = samples.every(events => events.some(e => e.type === 'damage' && e.unitId === id && e.missed) && !events.some(e => e.type === 'damage' && e.unitId === id && !e.missed));
+    return { id, damage: range('damage'), hpLoss: range('hpLoss'), heal: range('heal'), block: range('block'), hits: range('hits'), ...(breaks ? { breaks } : {}), ...(statuses.length ? { statuses } : {}), ...(missed ? { missed } : {}) };
   });
 }
 
@@ -765,7 +772,9 @@ export function predictCard(state: BattleState, characterId: string, cardInstanc
 export function predictTexts(list: PredictTotals[]): { id: string; text: string }[] {
   return list.flatMap(t => {
     const parts: string[] = [];
-    if (t.damage[1] || t.hits[1]) parts.push(`ダメージ${rangeText(t.damage)}（${rangeText(t.hits)}回・HP減少${rangeText(t.hpLoss)}）`);
+    // 区切り3b: 吹雪に隠れている敵には、単体のカードのダメージは外れる
+    if (t.missed) parts.push('外れる（吹雪に隠れている）');
+    else if (t.damage[1] || t.hits[1]) parts.push(`ダメージ${rangeText(t.damage)}（${rangeText(t.hits)}回・HP減少${rangeText(t.hpLoss)}）`);
     if (t.heal[1]) parts.push(`HP回復${rangeText(t.heal)}`);
     if (t.block[1]) parts.push(`ブロック+${rangeText(t.block)}`);
     return parts.length ? [{ id: t.id, text: parts.join('・') }] : [];
@@ -856,6 +865,8 @@ function endTurn(state: BattleState, playerId: string, rng: Rng, events: BattleE
     e.block = 0;
     delete e.guarding;
     delete e.guardStyle;
+    // 区切り3b: 吹雪に隠れる（白狼王）も、敵の番の始めに終わる
+    delete e.hidden;
   }
   state.phase = 'enemy';
   state.enemyCursor = 0;
@@ -978,19 +989,64 @@ function executeAction(state: BattleState, enemy: EnemyState, action: EnemyActio
     delete enemy.nextActionMultiplier;
     return false;
   }
+  // 災厄の加護「鐘の響き」（区切り3a）: 鐘の番の大物の単体攻撃か（行動の前に、狙いと一緒に決める。挑発で狙いが変わっていれば、その相手）
+  const bell = bellStrikes(state, enemy) ? state.boon!.bell! : undefined;
+  const bellTarget = enemy.intent?.targetId;
   // 演出用のイベントは先に積み、対象の一覧は効果を使った後に埋まる
   events.push({ type: 'enemyAct', enemyUid: enemy.uid, actionName: action.name, targetIds: ctx.hitIds });
   const actionMultiplier = enemy.nextActionMultiplier ?? 1;
   delete enemy.nextActionMultiplier;
+  ctx.actionMul = actionMultiplier;
+  // 灯喰い（区切り3b）: ダメージの攻撃1回ごとに、喰った灯の分を足す（倍率の前に足す = BREAK すると足した分も半分）
+  const lamp = lampBonus(enemy);
   for (const eff of action.effects) {
     // 特殊な行動に足したブロックは、BREAK されていると付かない（崩れた体勢で守りは固められない。ブロックは BREAK で0のまま）
     if (enemy.broken && blockSkippedOnBreak(action, eff)) continue;
-    applyEffect(ctx, 'amount' in eff && eff.amount !== undefined ? { ...eff, amount: Math.floor(eff.amount * actionMultiplier) } : eff);
+    applyEffect(ctx, 'amount' in eff && eff.amount !== undefined ? { ...eff, amount: Math.floor((eff.amount + (eff.kind === 'damage' ? lamp : 0)) * actionMultiplier) } : eff);
   }
   for (const n of ctx.fired) abilityTriggered(state, enemy.uid, n.name, events, n.source);
   addLog(state, `${enemyName(enemy)}「${action.name}」${ctx.parts.join(' / ')}`);
+  if (bell && !enemy.dead) bellEcho(state, ctx, enemy, action, actionMultiplier, bellTarget, bell.pct);
   enemy.intent = undefined;
   return true;
+}
+
+/**
+ * 災厄の加護「鐘の響き」（区切り3a・docs/tasks/scenario2-theme-scourge-proposal.md §3 A案）: 鐘の番の大物の単体攻撃は、狙われた味方のほかの全員にも pct% 響く。
+ * 単体のダメージの効果1つ・1回ごとに、ほかの味方1人ずつへ、同じ元の値 × pct%（敵の攻撃力・状態異常・属性の守り・ブロックは、ふつうの攻撃と同じに効く）。
+ * 響きでは属性の状態異常は付かない（ダメージだけ）。BREAK で弱まった行動（残り香）・止まった大技・休んだ時は響かない（ここまで来ない）
+ */
+function bellEcho(state: BattleState, ctx: ReturnType<typeof makeCtx>, enemy: EnemyState, action: EnemyActionDef, mul: number, targetId: string | undefined, pct: number) {
+  const others = state.allies.filter((a) => !a.dead && a.id !== targetId);
+  if (!others.length) return;
+  const got = new Map<string, number>();
+  ctx.noStatus = true;
+  for (const eff of bellEffects(action)) {
+    const base = Math.floor(eff.amount * mul);
+    for (let h = 0; h < (eff.hits ?? 1); h++)
+      for (const a of others) {
+        if (a.dead || enemy.dead) continue;
+        got.set(a.id, (got.get(a.id) ?? 0) + dealDamage(ctx, a, base, eff.element, pct / 100));
+      }
+  }
+  delete ctx.noStatus;
+  addLog(state, `🔔鐘の響き: ${others.map((a) => `${a.name}に${got.get(a.id) ?? 0}`).join(' / ')}`);
+}
+
+/**
+ * 灯喰い（灯を喰らう影の段階。2026-11-14 区切り3b・docs/tasks/scenario2-theme-scourge-proposal.md §2-3 A案）:
+ * 味方がフォーカスを使った時、決まりの働いている敵（段階の focusFeed）の「喰った灯」を、使った数だけ増やす（上限 max）
+ */
+function feedLamps(state: BattleState, ally: AllyState, used: number) {
+  for (const e of state.enemies) {
+    const f = focusFeedOf(e);
+    if (!f) continue;
+    const before = Math.min(f.max, e.lampEaten ?? 0);
+    const after = Math.min(f.max, before + used);
+    if (after === before) continue;
+    e.lampEaten = after;
+    addLog(state, `🕯${enemyName(e)}が${ally.name}のフォーカスの灯を喰った（喰った灯 ${after}/${f.max}・攻撃+${after * f.per}）`);
+  }
 }
 
 /** ユニットのID（味方は id、敵は uid） */

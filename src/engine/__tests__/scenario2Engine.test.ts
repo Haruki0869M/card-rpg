@@ -86,11 +86,13 @@ const BEFORE: Record<number, { kinds: string[]; state: string }> = {
 };
 /**
  * 作り直しの前のコードで取った、7本の新しい冒険（種1〜3・2人）の状態の指紋。地図の生成と乱数の順番が変わっていない事。
- * シナリオ2だけは、区切り2で地図を 15×42 に作り直したので、区切り2の地図で取り直した（前の 8×35 は 8695f871・b725699b・b35b9ce7）
+ * シナリオ2だけは、区切り2で地図を 15×42 に作り直したので、区切り2の地図で取り直した（前の 8×35 は 8695f871・b725699b・b35b9ce7）。
+ * 2026-11-14 B組の区切り2: シナリオ2だけのテーマ「氷漬けの宝物庫」を足し、シナリオ2はテーマを4つから選ぶ（混ぜる乱数が1回増える）ので取り直した
+ * （前は 18abebb9・5a847cfb・d7dec7f1）。ほかの6本は前のまま
  */
 const BEFORE_MAPS: Record<string, string[]> = {
   corruptionKing: ['26c62f2f', 'e61644da', 'b4f77cef'],
-  frozenKingdom: ['18abebb9', '5a847cfb', 'd7dec7f1'],
+  frozenKingdom: ['75fe636c', 'a2511bd2', 'd070f8a1'],
   cursedArchipelago: ['c475394c', 'f650664b', 'a54306f8'],
   sandDynasty: ['bb9a8be6', '93b10c4a', 'd723aecd'],
   starCastle: ['3636fe91', 'd44fae16', 'f00ba5cb'],
@@ -250,20 +252,35 @@ describe('区切り1: 災厄の置き場（街道の帯でない帯）', () => {
 });
 
 describe('区切り1: シナリオに出る災厄の一覧（ScenarioMapDef.scourges）', () => {
-  it('シナリオ1は一覧を書かない = 今の5体が今の順。シナリオ2は氷嵐の魔女だけ（新しい3体は次の区切り）', () => {
-    expect(getScenario(CK).map!.scourges).toBeUndefined();
+  it('区切り3b: シナリオ1の地図は今の5体を今の順で書く。シナリオ2は氷嵐の魔女と3体。一覧の無い地図は、共通とそのシナリオだけの災厄', () => {
+    expect(getScenario(CK).map!.scourges).toEqual(['greedKing', 'miasmaNecro', 'nightmareBeast', 'stormWitch', 'infernoDemon']);
     expect(scourgesFor(CK).map((d) => d.id)).toEqual(['greedKing', 'miasmaNecro', 'nightmareBeast', 'stormWitch', 'infernoDemon']);
-    expect(getScenario(FK).map!.scourges).toEqual(['stormWitch']);
-    expect(scourgesFor(FK).map((d) => d.id)).toEqual(['stormWitch']);
+    expect(getScenario(FK).map!.scourges).toEqual(['stormWitch', 'whiteWolfKing', 'frostBellWraith', 'lampEaterShade']);
+    expect(scourgesFor(FK).map((d) => d.id)).toEqual(['stormWitch', 'whiteWolfKing', 'frostBellWraith', 'lampEaterShade']);
+    // 一覧を消すと: シナリオ1 = 共通の5体だけ（シナリオ2の3体は出ない）／シナリオ2 = 共通の5体とシナリオ2の3体
+    const ck = getScenario(CK).map as ScenarioMapDef;
+    const fk = getScenario(FK).map as ScenarioMapDef;
+    const [keepCk, keepFk] = [ck.scourges, fk.scourges];
+    try {
+      delete ck.scourges;
+      delete fk.scourges;
+      expect(scourgesFor(CK).map((d) => d.id)).toEqual(['greedKing', 'miasmaNecro', 'nightmareBeast', 'stormWitch', 'infernoDemon']);
+      expect(scourgesFor(FK).map((d) => d.id)).toEqual(['greedKing', 'miasmaNecro', 'nightmareBeast', 'stormWitch', 'infernoDemon', 'whiteWolfKing', 'frostBellWraith', 'lampEaterShade']);
+      expect(scourgesFor('sandDynasty').map((d) => d.id)).toEqual(['greedKing', 'miasmaNecro', 'nightmareBeast', 'stormWitch', 'infernoDemon']);
+    } finally {
+      ck.scourges = keepCk;
+      fk.scourges = keepFk;
+    }
   });
 
   it('一覧の順に関係なく、選ぶ候補は SCOURGES.all の順（乱数の順番が一覧の書き方で変わらない）', () => {
     const map = getScenario(CK).map as ScenarioMapDef;
+    const keep = map.scourges;
     try {
       map.scourges = ['infernoDemon', 'greedKing'];
       expect(scourgesFor(CK).map((d) => d.id)).toEqual(['greedKing', 'infernoDemon']);
     } finally {
-      delete map.scourges;
+      map.scourges = keep;
     }
   });
 

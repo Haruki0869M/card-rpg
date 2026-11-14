@@ -306,8 +306,11 @@ async function run(party, difficulty) {
             }
             return false;
           };
-          if (b && (await under(b))) {
-            await page.evaluate(() => document.querySelector('[data-world-map]')?.scrollBy({ left: 120, behavior: 'instant' }));
+          // 右・左・下・上の順に地図を動かしてみる（シナリオ2の広い地図は、右の端・上の端で横に動かせず、
+          // 目的のマスが「見取り図」のボタンの下に残って押せないまま止まった。2026-11-15・種 874651857）
+          for (const [left, top] of [[120, 0], [-120, 0], [0, -100], [0, 100]]) {
+            if (!b || !(await under(b))) break;
+            await page.evaluate(([left, top]) => document.querySelector('[data-world-map]')?.scrollBy({ left, top, behavior: 'instant' }), [left, top]);
             await page.waitForTimeout(80);
             b = await reach.nth(best).boundingBox();
           }

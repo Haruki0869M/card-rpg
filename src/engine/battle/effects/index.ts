@@ -288,6 +288,11 @@ export function breakEnemy(ctx: EffectCtx, enemy: EnemyState, why: 'weak' | 'per
   }
   enemy.broken = true;
   enemy.nextActionMultiplier = (enemy.nextActionMultiplier ?? 1) * BALANCE.breakPower;
+  // 灯喰い（灯を喰らう影の段階・区切り3b）: BREAK で、喰った灯が0に戻る（光で影が散る）
+  if (enemy.lampEaten) {
+    addLog(ctx.state, `🕯灯が散った: ${nameOf(enemy)}の喰った灯が0に戻った（${enemy.lampEaten} → 0）`);
+    enemy.lampEaten = 0;
+  }
   if (BALANCE.breakClearsBlock) enemy.block = 0;
   ctx.events.push({ type: 'break', enemyUid: enemy.uid, why });
   // 付ける状態は balance の breakStatus（2026-11-13 から脆弱）
@@ -358,6 +363,40 @@ function guardRetort(ctx: EffectCtx, guard: EnemyState, attacker: Unit) {
   }
 }
 
+// ---------- 吹雪に隠れる・鐘のこだま（シナリオ2の災厄の段階。2026-11-14 区切り3b） ----------
+
+/** その敵の今の予告が、鐘のこだま（echoBlow の効果を持つ行動）か */
+export function echoesNow(enemy: EnemyState): boolean {
+  if (enemy.dead || !enemy.intent) return false;
+  return getEnemyAction(enemy.defId, enemy.intent.actionId).effects.some((e) => e.kind === 'echoBlow');
+}
+
+/**
+ * 吹雪に隠れた敵に、単体のカードの一撃が外れた: ダメージは0（ブロック・HP・連携の記録・属性の状態異常は何も起きない）。
+ * BREAK はできる（オーナーの決定 5-A: 弱点の火で完全成功なら「炎で吹雪を払う」= 次の奇襲が半分）。乱数は引かない
+ */
+function hiddenMiss(ctx: EffectCtx, v: EnemyState, element: string | undefined): number {
+  const { state, rng, events, source } = ctx;
+  events.push({ type: 'damage', unitId: v.uid, amount: 0, rawAmount: 0, blocked: 0, sourceId: unitIdOf(source), missed: true });
+  if (!ctx.parts.includes(HIDDEN_MISS)) {
+    ctx.parts.push(HIDDEN_MISS);
+    events.push({ type: 'ability', unitId: v.uid, name: '吹雪に隠れている' });
+    addLog(state, `❄${nameOf(v)}は吹雪に隠れている。単体のカードは外れた（全体攻撃・お供・毒・道具は当たる）`);
+  }
+  if (!canBreak(v) || isEnemy(source)) return 0;
+  const alwaysWeak = cardModifier(ctx.cardAbilities, 'alwaysWeak').length > 0;
+  const weakHit = (!!element && isWeakTo(v, element)) || alwaysWeak || !!source.guided;
+  const earlyBreak = cardModifier(ctx.cardAbilities, 'breakOnSuccess').some((e) => (ctx.successes ?? 0) >= e.min);
+  const why = breakReason(state, v, weakHit, !!ctx.perfect && !!ctx.card, earlyBreak && !!ctx.card, { card: ctx.card, focusUsed: ctx.focusUsed, hasWeakCard: ctx.hasWeakCard && (() => ctx.hasWeakCard!(v)) });
+  if (why) {
+    breakEnemy(ctx, v, why);
+    if (ctx.depth < 3 && !source.dead) fireAbilities(state, rng, events, source, 'broke', { target: v, depth: ctx.depth + 1 });
+  }
+  return 0;
+}
+/** 外れた時の、カードの結果の短い表示 */
+export const HIDDEN_MISS = '吹雪で外れた';
+
 // ---------- ダメージ（ダメージの効果・特殊能力から使う） ----------
 
 /**
@@ -389,6 +428,8 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
       if (guard.guardStyle?.half) extraMultiplier *= 0.5;
     }
   }
+  // 吹雪に隠れる（白狼王の段階。2026-11-14 区切り3b）: 線引きはかばうと同じ。かばう敵に逸らされた一撃は、かばう敵に当たる（隠れていなければ）
+  if (!isEnemy(source) && isEnemy(v) && v.hidden && ctx.card?.target === 'enemy' && v === ctx.target && !ctx.via && !ctx.echo) return hiddenMiss(ctx, v, element);
   let mods = damageModifiers(state, source, ctx.card, v, ctx.cardAbilities, ctx.perfect, element, ctx.via);
   // 鎧通し（氷の剣士。2026-11-14）: この一撃はブロックを無視する（ブロックは壊れずに残る）
   if (ctx.pierce) mods = { ...mods, ignoreBlock: true };
@@ -486,6 +527,8 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   events.push({ type: 'damage', unitId: unitIdOf(v), amount: r.hpLoss, rawAmount: dmg, blocked: r.blocked, sourceId: unitIdOf(source) });
   if (isEnemy(v)) state.stats.totalDamage += r.hpLoss;
   ctx.dealt += r.hpLoss;
+  // 鐘のこだま（凍て鐘の亡霊の段階・区切り3b）: こだまの予告が出ている味方の番に受けた、1回の当たりでいちばん大きいHPのダメージを覚える（敵の番には数えない = 連鎖しない）
+  if (isEnemy(v) && !isEnemy(source) && state.phase === 'ally' && r.hpLoss > (v.echoMax ?? 0) && echoesNow(v)) v.echoMax = r.hpLoss;
   if (isEnemy(source) !== isEnemy(v) && !ctx.hitIds.includes(unitIdOf(v))) ctx.hitIds.push(unitIdOf(v));
   afterHpLoss(state, v, rng, events);
   // かばった敵の反撃（空の騎士の光・毒液の蟹の毒。2026-11-14）: 代わりに受けた一撃ごとに、攻撃した味方へ
@@ -507,7 +550,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
     }
   }
   // 属性の状態異常（HPに当たった時。完全成功なら必ず。耐性があれば効かない）
-  if (element && r.hpLoss > 0 && !v.dead) {
+  if (element && r.hpLoss > 0 && !v.dead && !ctx.noStatus) {
     const el = getElement(element);
     // 乱数の順番を変えないように、先に確率を引いてから「防ぐ能力」を見る
     if (el.status && !resistsElement(v, element) && (ctx.perfect || rng.next() * 100 < (el.chance ?? 0)) && !(isEnemy(source) !== isEnemy(v) && guardStatus(state, events, v, el.status))) {

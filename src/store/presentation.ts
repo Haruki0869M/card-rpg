@@ -2,6 +2,7 @@ import { TIMING, BALANCE } from '../data/balance';
 import { EVENTS } from '../data/events';
 import { getStatus } from '../data/statuses';
 import { getCard } from '../data/cards';
+import { getItem } from '../data/items';
 import { petExplore } from '../engine/game/pets';
 import { unwrapCommand, viewOf } from '../engine/game/scenes';
 import { timeOfDay } from '../engine/game/world/time';
@@ -126,7 +127,9 @@ export function battleFrames(events: BattleEvent[], allyIds: ReadonlySet<string>
         }
       }
       if (e.amount > 0) popups.push({ unitId: e.unitId, tone: 'damage', text: `-${e.amount}`, ...(bigTier && !allyIds.has(e.unitId) ? { tier: bigTier } : {}) });
-      if (e.blocked > 0 || e.amount === 0) popups.push({ unitId: e.unitId, tone: 'zero', text: e.blocked > 0 ? `防御${e.blocked}` : '0' });
+      // 吹雪に隠れた敵に外れた一撃は「0」ではなく「❄外れ」（持ち越しの直し。ダメージ0と見分ける）
+      if (e.missed && e.amount === 0) popups.push({ unitId: e.unitId, tone: 'zero', text: '❄外れ' });
+      else if (e.blocked > 0 || e.amount === 0) popups.push({ unitId: e.unitId, tone: 'zero', text: e.blocked > 0 ? `防御${e.blocked}` : '0' });
       if (e.amount > 0 || e.blocked > 0) motions.push({ unitId: e.unitId, kind: 'hit' });
       sounds.push(damageSound(e.amount, e.blocked, allyIds.has(e.unitId)));
       // 段階B: 命中のエフェクト。行動した本人の攻撃ならその見た目、ほか（反撃・召喚など）は衝撃
@@ -236,7 +239,7 @@ export function explorationNotices(before: GameState, after: GameState, wire: Ga
     const bonus = petExplore(after.heroes.find(h => h.id === cmd.heroId)).luckBonus;
     if (bonus) add(cmd.heroId, `宝箱の運+${bonus}%`);
   }
-  if (cmd.type === 'CHOOSE_EVENT' && !prev.event?.result && next.event?.result) {
+  if ((cmd.type === 'CHOOSE_EVENT' || cmd.type === 'EVENT_CHALLENGE') && !prev.event?.result && next.event?.result) {
     const resolved = next.event.result, option = prev.event && EVENTS.get(prev.event.eventId).options[resolved.optionIndex];
     if (option?.check && resolved.heroId) {
       const who = after.heroes.find(h => h.id === resolved.heroId);
@@ -333,4 +336,23 @@ export function explorationSounds(before: GameState, after: GameState, wire: Gam
   if (ribbon) out.push('sfx_pet_ribbon');
   else if (heart) out.push('sfx_pet_heart');
   return [...new Set(out)];
+}
+
+/**
+ * 物を受け取った側の知らせ（実機の不具合⑥ 2026-11-14）。
+ * 仲間が渡した物（GIVE）が、この端末のキャラに届いた時だけ文を返す。渡した人がこの端末の席なら出さない
+ * （渡した側には、画面が「回復薬をルーシアに渡しました」を出すため。1台で全員を動かす時も同じ）
+ */
+export function receiveNotice(before: GameState, after: GameState, wire: GameCommand, isLocal: (p: GameState['heroes'][number]['playerId']) => boolean): string | null {
+  const cmd = unwrapCommand(wire).command;
+  if (cmd.type !== 'GIVE' || isLocal(cmd.playerId)) return null;
+  const to = after.heroes.find((h) => h.id === cmd.toHeroId);
+  const from = after.heroes.find((h) => h.id === cmd.fromHeroId);
+  const toBefore = before.heroes.find((h) => h.id === cmd.toHeroId);
+  if (!to || !from || !toBefore || !isLocal(to.playerId)) return null;
+  if (cmd.gold !== undefined) return to.gold > toBefore.gold ? `${from.name}から${cmd.gold}Gを受け取りました` : null;
+  const got = [...to.stash, ...to.pouch].find((x) => x.uid === cmd.itemUid);
+  const had = [...toBefore.stash, ...toBefore.pouch].some((x) => x.uid === cmd.itemUid);
+  if (!got || had) return null;
+  return `${from.name}から${getItem(got.itemId).name}を受け取りました`;
 }

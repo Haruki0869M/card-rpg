@@ -89,13 +89,13 @@
   background:
     linear-gradient(180deg, #fbe7a4, #b88a36) top / 100% 2px no-repeat,
     linear-gradient(180deg, #b88a36, #fbe7a4) bottom / 100% 2px no-repeat,
-    linear-gradient(90deg, rgba(20, 34, 80, 0.2), rgba(30, 56, 130, 0.94) 18%, rgba(22, 40, 100, 0.94) 82%, rgba(20, 34, 80, 0.2));
+    linear-gradient(90deg, rgba(20, 34, 80, 0.85), rgba(30, 56, 130, 0.97) 18%, rgba(22, 40, 100, 0.97) 82%, rgba(20, 34, 80, 0.85));
 }
 .callout-enemy {
   background:
     linear-gradient(180deg, #ffb0a0, #a8302a) top / 100% 2px no-repeat,
     linear-gradient(180deg, #a8302a, #ffb0a0) bottom / 100% 2px no-repeat,
-    linear-gradient(90deg, rgba(80, 10, 16, 0.2), rgba(130, 20, 30, 0.94) 18%, rgba(100, 14, 22, 0.94) 82%, rgba(80, 10, 16, 0.2));
+    linear-gradient(90deg, rgba(80, 10, 16, 0.85), rgba(130, 20, 30, 0.97) 18%, rgba(100, 14, 22, 0.97) 82%, rgba(80, 10, 16, 0.85));
 }
 .callout-gem {
   transform: rotate(45deg);

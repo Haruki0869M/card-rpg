@@ -40,4 +40,27 @@ export const dungeonThemes: DungeonThemeDef[] = [
     largeGroups: true,
     reward: { blackMarketChoices: 2 },
   },
+  // 2026-11-14 シナリオ2の作り直し（docs/tasks/scenario2-theme-scourge-proposal.md §1 A案・オーナーの OK）: シナリオ2だけのテーマ。
+  // 部屋に入るたびに凍え+1・HPが「凍え×2%」減る（1で止まる）。焚き火（休憩）で凍えは0。奥の氷漬けの箱は、凍えたまま着くほど良い箱。
+  // 宝箱は奥の1つだけ（割合0）・封魔にしない。古い保存のテーマ決めと、ほかのシナリオの乱数の順番を変えないよう、データの最後に置く。
+  // 割合と箱の格の境目は【提案】（案の表のとおり: 凍え1 = 鉄箱 / 2 = 装飾箱 / 4 = 黄金箱。3 は道の作りでは出ないが、装飾箱）
+  {
+    id: 'frozenVault',
+    order: 4,
+    name: '氷漬けの宝物庫',
+    mark: '🧊',
+    description: '部屋ごとに凍えが積もり、HPが減る。焚き火で凍えは消える。奥の氷漬けの箱は、凍えているほど良い品',
+    weights: { battle: 25, elite: 25, event: 20, rest: 30 },
+    fixedRoom: 'frozenChest',
+    sealedChance: 0,
+    scenario: 'frozenKingdom',
+    chill: {
+      hpPercent: 2,
+      chest: [
+        { min: 4, rarity: 'legend' },
+        { min: 2, rarity: 'epic' },
+        { min: 0, rarity: 'rare' },
+      ],
+    },
+  },
 ];

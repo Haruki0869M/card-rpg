@@ -9,9 +9,11 @@ import { activeStatuses, skipActionStatus, tickDamageOf } from './statuses';
 import { canSummonEnemy } from './effects/kinds/summonEnemy';
 import { BALANCE } from '../../data/balance';
 import { addLog, enemyName } from './units';
-import { pendingOpening } from './phases';
+import { lampBonus, pendingOpening } from './phases';
 import { punishHits } from './effects/kinds/punishPlays';
-import { huntApplies } from './effects/kinds/damage';
+import { damageHits, huntApplies } from './effects/kinds/damage';
+import { echoAmount } from './effects/kinds/echoBlow';
+import { bellEffects, bellStrikes, veiledIntent } from './boons';
 
 export function livingAllies(state: BattleState): AllyState[] {
   return state.allies.filter((a) => !a.dead);
@@ -22,9 +24,9 @@ export function isSingleAttack(action: EnemyActionDef): boolean {
   return action.effects.some((e) => e.kind === 'damage' && targetOf(e) === 'target');
 }
 
-/** BREAK されると起きない大技か（ダメージの無い行動: 浄化・仲間を呼ぶ・かばう・癒し封じなど。ダメージのある大技は威力が半分） */
+/** BREAK されると起きない大技か（ダメージの無い行動: 浄化・仲間を呼ぶ・かばう・癒し封じなど。ダメージのある大技は威力が半分。鐘のこだまも半分 = 区切り3b） */
 export function breakStopsAction(action: EnemyActionDef): boolean {
-  return !!action.big && !action.effects.some((e) => e.kind === 'damage' || e.kind === 'punishPlays');
+  return !!action.big && !action.effects.some((e) => e.kind === 'damage' || e.kind === 'punishPlays' || e.kind === 'echoBlow');
 }
 
 /**
@@ -282,7 +284,7 @@ export function strongestAttack(enemy: EnemyState, state: BattleState): EnemyAct
   let bestScore = 0;
   for (const a of currentActionSet(enemy).actions) {
     if (actionIsUseless(enemy, state, a)) continue;
-    const score = a.effects.reduce((s, e) => (e.kind === 'damage' ? s + e.amount * (e.hits ?? 1) * (targetOf(e) === 'foes' ? n : 1) : s), 0);
+    const score = a.effects.reduce((s, e) => (e.kind === 'damage' ? s + e.amount * damageHits(e, enemy, state) * (targetOf(e) === 'foes' ? n : 1) : s), 0);
     if (score <= 0) continue;
     if (score > bestScore || (score === bestScore && !!a.big && !best?.big)) {
       best = a;
@@ -369,9 +371,18 @@ export function enemyHitDamage(enemy: EnemyState, base: number, target: AllyStat
 /** 手負い狙いの倍率（相手のHPが今、最大の半分以下なら lowHpMul） */
 export const lowHpMulOn = (lowHpMul: number | undefined, target: AllyState | undefined) => (lowHpMul && target && target.hp * 2 <= target.maxHp ? lowHpMul : 1);
 
+/**
+ * 鐘のこだま（区切り3b）: 今返る予定のダメージ1回分（「そのまま」= 敵のレベルの攻撃力は掛けない。味方の状態異常は反映。ブロック考慮前）
+ */
+export function echoHitDamage(enemy: EnemyState, max: number, ally: AllyState | undefined): number {
+  const base = echoAmount(enemy, max);
+  return base > 0 ? enemyHitDamage(enemy, base, ally, 1 / Math.max(0.0001, enemy.attackMul)) : 0;
+}
+
 /** 敵の行動が ally に与える予定ダメージ（1回あたりの値の配列。ブロック考慮前） */
 /** allies = 味方全員（手数読みの「いちばん多い1人」「みんなの合計」を数える。省略は ally だけで数える） */
-export function intentHitsOn(enemy: EnemyState, ally: AllyState, allies?: AllyState[]): number[] {
+/** enemies = 敵全員（群れの牙の回数 = 生きている敵の数を数える。区切り3b。省略は回数1） */
+export function intentHitsOn(enemy: EnemyState, ally: AllyState, allies?: AllyState[], enemies?: EnemyState[]): number[] {
   if (enemy.dead || !enemy.intent || ally.dead) return [];
   if (enemy.skipNextAction) return [];
   // 凍結で次の行動を休む敵は攻撃しない
@@ -386,14 +397,22 @@ export function intentHitsOn(enemy: EnemyState, ally: AllyState, allies?: AllySt
       if (h && eff.amount > 0) hits.push(enemyHitDamage(enemy, h.mul * Math.floor(eff.amount * (enemy.nextActionMultiplier ?? 1)), ally));
       continue;
     }
+    // 鐘のこだま（区切り3b）: 今のターンに受けた、いちばん大きな一撃（味方の番の間に育つ）
+    if (eff.kind === 'echoBlow') {
+      const d = echoHitDamage(enemy, eff.max, ally);
+      if (d > 0) hits.push(d);
+      continue;
+    }
     if (eff.kind !== 'damage') continue;
     const to = targetOf(eff);
     if (to === 'target' ? enemy.intent.targetId !== ally.id : to !== 'foes') continue;
     // 手負いだけに噛みつく（夢の鮫）: HPが半分より多い味方には当たらない
     if (eff.lowOnly && ally.hp * 2 > ally.maxHp) continue;
     const low = eff.huntWhen ? (eff.lowHpMul && huntApplies(eff, ally) ? eff.lowHpMul : 1) : lowHpMulOn(eff.lowHpMul, ally);
-    const dmg = enemyHitDamage(enemy, Math.floor(eff.amount * (enemy.nextActionMultiplier ?? 1)), ally, low);
-    for (let i = 0; i < (eff.hits ?? 1); i++) hits.push(dmg);
+    // 灯喰い（区切り3b）: 喰った灯の分を、1回ごとに足す（倍率の前）
+    const dmg = enemyHitDamage(enemy, Math.floor((eff.amount + lampBonus(enemy)) * (enemy.nextActionMultiplier ?? 1)), ally, low);
+    const n = damageHits(eff, enemy, enemies ? { allies: allies ?? [ally], enemies } : undefined);
+    for (let i = 0; i < n; i++) hits.push(dmg);
   }
   return hits;
 }
@@ -403,12 +422,30 @@ export function dotDamage(ally: AllyState): number {
   return tickDamageOf(ally.statuses);
 }
 
-/** 被弾予定（インテント合計 − 現在のブロック ＋ 毒・火傷）。かばう（確率）は含めない */
-export function incomingDamage(state: BattleState, ally: AllyState): number {
+/**
+ * 災厄の加護「鐘の響き」（区切り3a）: 鐘の番の大物の単体攻撃が、狙われていない ally に響く予定のダメージ（1回あたりの値の配列。ブロック考慮前）。
+ * 実際の響き（battle.ts の bellEcho）と同じ計算: 元の値 × pct% を、ふつうの攻撃と同じ補正で
+ */
+export function bellHitsOn(state: Pick<BattleState, 'boon' | 'turn'>, enemy: EnemyState, ally: AllyState): number[] {
+  if (ally.dead || !bellStrikes(state, enemy) || enemy.intent?.targetId === ally.id || enemy.skipNextAction || skipActionStatus(enemy.statuses)) return [];
+  const pct = state.boon!.bell!.pct;
+  const hits: number[] = [];
+  for (const eff of bellEffects(getEnemyAction(enemy.defId, enemy.intent!.actionId))) {
+    const dmg = enemyHitDamage(enemy, Math.floor(eff.amount * (enemy.nextActionMultiplier ?? 1)), ally, pct / 100);
+    for (let i = 0; i < (eff.hits ?? 1); i++) hits.push(dmg);
+  }
+  return hits;
+}
+
+/**
+ * 被弾予定（インテント合計 − 現在のブロック ＋ 毒・火傷）。かばう（確率）は含めない。鐘の響き（区切り3a）は含める。
+ * shown = 画面に出す値（闇の帳で隠れている予告は数えない。bot・戦闘の処理は shown なしで、隠れた予告も数える）
+ */
+export function incomingDamage(state: BattleState, ally: AllyState, shown = false): number {
   if (ally.dead) return 0;
   let total = 0;
   let shields = ally.summons?.filter(s => s.intercept).length ?? 0;
-  for (const e of state.enemies) for (const h of intentHitsOn(e, ally, state.allies)) {
+  for (const e of state.enemies) for (const h of shown && veiledIntent(state, e) ? [] : [...intentHitsOn(e, ally, state.allies, state.enemies), ...bellHitsOn(state, e, ally)]) {
     if (ally.airborne || (h > 0 && shields-- > 0)) continue;
     total += h;
   }

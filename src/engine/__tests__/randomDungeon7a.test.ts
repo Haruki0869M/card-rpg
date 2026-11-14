@@ -37,9 +37,12 @@ function newGame(scenarioId = 'corruptionKing', seed = 5, players: PlayerId[] = 
 // ---------- ダンジョンの形 ----------
 
 describe('段階7a: ランダムダンジョンの形（全5行・テーマ）', () => {
-  it('テーマは3つ。4行目の部屋は 晶石の祭壇・休憩・闇商人。どれも扉の予兆がある部屋の種類', () => {
-    expect(DUNGEON_THEMES.all.map((t) => t.id)).toEqual(THEMES);
-    expect(DUNGEON_THEMES.all.map((t) => t.fixedRoom)).toEqual(['crystalAltar', 'rest', 'blackMarket']);
+  // 2026-11-14: シナリオ2だけのテーマ「氷漬けの宝物庫」（frozenVault）をデータの最後に足した（frozenVault.test.ts）。どのシナリオでも出るのは3つのまま
+  it('どのシナリオでも出るテーマは3つ。4行目の部屋は 晶石の祭壇・休憩・闇商人。どれも扉の予兆がある部屋の種類', () => {
+    const common = DUNGEON_THEMES.all.filter((t) => !t.scenario);
+    expect(common.map((t) => t.id)).toEqual(THEMES);
+    expect(DUNGEON_THEMES.all.map((t) => t.id)).toEqual([...THEMES, 'frozenVault']);
+    expect(common.map((t) => t.fixedRoom)).toEqual(['crystalAltar', 'rest', 'blackMarket']);
     for (const t of DUNGEON_THEMES.all) expect(getRoomType(t.fixedRoom).name).toBeTruthy();
     expect(DUNGEON_THEMES.get('sealedLabyrinth').enemyLevel).toBe(1);
   });
@@ -106,7 +109,8 @@ describe('段階7a: 世界マップのランダムダンジョン', () => {
       expect(tiles, sc).toHaveLength(2);
       const themes = tiles.map((i) => g.world!.tiles[i].f!.theme);
       expect(new Set(themes).size).toBe(2);
-      expect(themes.every((x) => THEMES.includes(x!))).toBe(true);
+      // シナリオ2は、シナリオ2だけのテーマ（氷漬けの宝物庫）も候補
+      expect(themes.every((x) => [...THEMES, ...(sc === 'frozenKingdom' ? ['frozenVault'] : [])].includes(x!))).toBe(true);
       expect(randomTiles(newGame(sc, seed)).map((i) => newGame(sc, seed).world!.tiles[i].f!.theme)).toEqual(themes);
     }
     for (const sc of ['sandDynasty', 'cursedArchipelago', 'clockworkEmpire', 'starCastle', 'dreamLabyrinth']) {

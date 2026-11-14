@@ -8,10 +8,12 @@ import { addLog } from '../common';
 import { heroMaxHp } from '../hero';
 import { mapHeroes } from '../heroes';
 import { laneDefOfTile } from './lanes';
+import { scourgeCurse } from './scourgeCurse';
 
 /**
  * そのマスの寒さ・暑さ（地形が優先、無ければ地域）。町のマスは対象外。
- * 広い地図では、帯の倍率（LaneDef.climate。シナリオ2の作り直し §2-1）を割合に掛ける（0 以下なら無し）。帯の無い地図・古い保存は今までどおり
+ * 広い地図では、帯の倍率（LaneDef.climate。シナリオ2の作り直し §2-1）を割合に掛ける（0 以下なら無し）。帯の無い地図・古い保存は今までどおり。
+ * 災厄の悪さ「寒さ ×N」（白狼王。区切り3a）は、寒さの時だけ、帯の倍率と掛け算で足す（暑さには掛けない。生きている間だけ）
  */
 export function climateAt(game: GameState, tile: number): ClimateDef | undefined {
   const w = game.world;
@@ -21,7 +23,9 @@ export function climateAt(game: GameState, tile: number): ClimateDef | undefined
   // 夜だけ別の設定がある時は、夜はそちらになる（昼は暑く夜は寒い砂漠など）
   const now = base?.night !== undefined && timeOfDay(w.worldTurn) === 'night' ? (base.night === 'none' ? undefined : base.night) : base;
   if (!now) return now;
-  const mul = laneDefOfTile(game, w, tile)?.climate ?? 1;
+  const lane = laneDefOfTile(game, w, tile)?.climate ?? 1;
+  const cold = now.kind === 'cold' ? scourgeCurse(game).coldMul : 1;
+  const mul = cold === 1 ? lane : lane * cold;
   if (mul === 1) return now;
   if (mul <= 0) return undefined;
   return { kind: now.kind, ratio: (now.ratio ?? BALANCE.climateDamageRatio) * mul };

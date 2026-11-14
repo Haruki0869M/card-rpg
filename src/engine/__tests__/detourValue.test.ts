@@ -64,8 +64,8 @@ function passTurn(g: GameState): GameState {
 // ---------- 柱1 災厄の加護 ----------
 
 describe('柱1: 災厄の加護（生きている災厄1体につき、大物の戦闘に決まりが1つ）', () => {
-  it('5体とも別の種類の加護。HP・攻撃の倍率は使わない', () => {
-    expect(SCOURGES.all.map((d) => d.boon.kind)).toEqual(['bodyguard', 'regen', 'huntFirst', 'breakWard', 'phaseBurn']);
+  it('8体とも別の種類の加護（区切り3b でシナリオ2の3体を足した）。HP・攻撃の倍率は使わない', () => {
+    expect(SCOURGES.all.map((d) => d.boon.kind)).toEqual(['bodyguard', 'regen', 'huntFirst', 'breakWard', 'phaseBurn', 'frostBreath', 'bellToll', 'darkVeil']);
     for (const d of SCOURGES.all) {
       expect(d.boon.name.length, d.id).toBeGreaterThan(0);
       expect(d.boon.text.length, d.id).toBeGreaterThan(0);

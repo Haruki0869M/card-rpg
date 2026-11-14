@@ -1,6 +1,7 @@
 // K2/K3の土台: 新しい条件・効果・装備の探索効果・シナリオ限定装備・敵の亜種
 import { describe, expect, it } from 'vitest';
 import { ENEMIES } from '../../data/enemies';
+import { SCOURGES } from '../../data/world';
 import { ITEMS } from '../../data/items';
 import { AURA_IDS } from '../../data/enemyAuras';
 import { makeVariant } from '../../data/enemyVariant';
@@ -188,6 +189,12 @@ describe('K3 敵の亜種', () => {
       expect(base, `${v.id}: 元の敵 ${v.variantOf}`).toBeDefined();
       expect(base!.variantOf, `${v.id}: 亜種の亜種にしない`).toBeUndefined();
       expect(AURA_IDS, `${v.id}: オーラ`).toContain(v.aura);
+      // 災厄の本体（区切り3b）: variantOf は絵を借りるためだけ（白狼王は雪狼と同じ火の弱点・氷の耐性 = オーナー OK 済みの案）。
+      // 属性の代わりに、行動と段階がまるごと別の敵である事を見る
+      if (SCOURGES.all.some((d) => d.boss === v.id)) {
+        expect(json(v.actions) !== json(base!.actions) && !!v.phases?.length, `${v.id}: 災厄は行動と段階が別`).toBe(true);
+        continue;
+      }
       expect(differs(v, base!), `${v.id}: 属性か開幕の特性を変える`).toBe(true);
     }
   });

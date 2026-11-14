@@ -80,6 +80,12 @@ export interface ItemDef {
    */
   /** scourge = 災厄の中ボスが必ず落とす専用の装備と秘薬（段階7b。ほかのどこにも出ない） */
   source?: 'randomDungeon' | 'scourge';
+  /**
+   * 災厄だけが落とす印（シナリオ2の作り直し §2-2・§8-2。シナリオの伝説品を災厄の専用の装備に移した物）: 落とす災厄の ID。
+   * その災厄が登録されていて・そのシナリオに出る災厄の一覧に入っていて・広い地図の冒険の時だけ、宝箱・店・ドロップ・行商人・闇商人に出ない（world/scourgeGear.ts）。
+   * それ以外（古い 8×35 の地図の冒険・災厄がまだ登録されていない時）は、今までどおり出る
+   */
+  scourgeGear?: string;
   /** 仲間がいる時だけ出る（1人で遊ぶ冒険では出さない。共鳴する絆の指輪） */
   teamOnly?: boolean;
   /** 道具袋に持てる数を増やす（錬金術師のベルト） */
@@ -226,6 +232,16 @@ export interface DungeonThemeDef {
    * altarUses = 晶石の祭壇で強化か変異ができる回数（省略は1）/ blackMarketChoices = 闇商人が並べる専用の装備の数（1つ買うと、ほかは下がる。省略は1）
    */
   reward?: { chestGold?: number; battleGold?: number; epicMul?: number; altarUses?: number; blackMarketChoices?: number };
+  /**
+   * そのシナリオでだけ候補にするテーマ（シナリオID）。無ければ全シナリオ（2026-11-14 シナリオ2の作り直し・氷漬けの宝物庫）。
+   * 古い保存のテーマ決め（ensureTileTheme）では選ばない（前と同じ結果にするため）
+   */
+  scenario?: string;
+  /**
+   * 凍え（氷漬けの宝物庫。docs/tasks/scenario2-theme-scourge-proposal.md §1 A案）: 部屋に入るたびに凍え+1、その場の全員のHPが「凍え × hpPercent%」減る
+   * （HPは1で止まる）。休憩の部屋に入ると凍えは0（その部屋の寒さは受けない）。chest = 奥の箱の格（入った時の凍えが min 以上の、最初の物）
+   */
+  chill?: { hpPercent: number; chest: { min: number; rarity: Rarity }[] };
 }
 
 export interface ChestSpec {
@@ -310,6 +326,8 @@ export interface DungeonRun {
   seen?: string[];
   /** 「周囲の警戒」（フォーカス1）を使った通路（今いる部屋のID か 'entrance'。1つの通路で1回だけ。その通路にいる間、先読みが見える） */
   watchedAt?: string;
+  /** 凍え（テーマに chill がある時だけ。部屋に入るたびに+1・休憩で0。古い保存・ほかのテーマには無い = 0） */
+  chill?: number;
 }
 
 /** 向き（0=北・奥 / 1=東 / 2=南 / 3=西） */
@@ -451,6 +469,12 @@ export interface EventState {
   random?: boolean;
   /** イベントの結果で始まる戦闘（「つづける」で始まる） */
   battle?: EventBattle;
+  /**
+   * みんなで決めた判定つきの選択肢と、挑む役（2人以上のプレイヤー。実機の不具合① 2026-11-14・案A）。
+   * ある間は「挑む段」: 挑む役の持ち主だけがフォーカスを決めて挑む（EVENT_CHALLENGE）／任せる（EVENT_HANDOVER）／選び直す（EVENT_RECHOOSE）。
+   * 保存の版は上げない（無い = 選ぶ段。古い保存もそのまま選ぶ段から）
+   */
+  decided?: { optionIndex: number; heroId: string };
   /** 選んだ結果（選ぶ前は undefined） */
   result?: { optionIndex: number; heroId?: string; results?: ('focus' | 'hit' | 'miss')[]; success: boolean; text: string; loot: Loot[] };
 }
@@ -656,6 +680,12 @@ export type GameCommand =
   | { type: 'OPEN_CHEST'; playerId: PlayerId; heroId: string; recipientId?: string; focusUsed: number }
   | { type: 'LEAVE_CHEST'; playerId: PlayerId }
   | { type: 'CHOOSE_EVENT'; playerId: PlayerId; optionIndex: number; heroId?: string; focusUsed: number }
+  /** 挑む段（EventState.decided）: 挑む役（heroId = 今の挑む役）の持ち主がフォーカスを決めて挑む */
+  | { type: 'EVENT_CHALLENGE'; playerId: PlayerId; heroId: string; focusUsed: number }
+  /** 挑む段: 挑む役を別のキャラに任せる（heroId = 今の挑む役。任せる先は toHeroId。点検 F1） */
+  | { type: 'EVENT_HANDOVER'; playerId: PlayerId; heroId: string; toHeroId: string }
+  /** 挑む段: 選ぶ段に戻る（heroId = 今の挑む役。挑めるキャラがいない時は省いてよい） */
+  | { type: 'EVENT_RECHOOSE'; playerId: PlayerId; heroId?: string }
   | { type: 'FINISH_EVENT'; playerId: PlayerId }
   | { type: 'REST'; playerId: PlayerId; kind: 'hp' | 'focus' | 'upgrade' }
   | { type: 'RETREAT'; playerId: PlayerId }

@@ -27,6 +27,8 @@ const api = {
   /** 画面と同じ道で操作を送る */
   send: (cmd: GameCommand) => useBattle.getState().dispatchWire(cmd) ?? null,
   setProxy: (p: 'P1' | 'P2' | 'P3' | 'P4', on: boolean) => useOnline.getState().setProxy(p, on),
+  /** 席の人が動いているか（切れてから約10秒は true。実機の不具合③） */
+  seatOnline: (p: 'P1' | 'P2' | 'P3' | 'P4') => !!useOnline.getState().room?.seatOnline(p),
   goOffline: () => useOnline.getState().room?.backend.goOffline(),
   goOnline: () => useOnline.getState().room?.backend.goOnline(),
   stamp: (k: string) => useOnline.getState().sendStamp(k),
@@ -39,10 +41,11 @@ const api = {
     const g = game as Parameters<typeof stateHash>[0];
     const s = { seq: r.seq, game: JSON.stringify(g), hash: stateHash(g) };
     await r.backend.set(`rooms/${r.code}/snapshot`, s);
-    (r as unknown as { adopt: (s: unknown, why: string) => void }).adopt(s, 'error');
+    // 理由は 'start'（'error' だと、版の違う2台の見分け（点検 F2）が、同じ番号への差し込みを数えてしまう）
+    (r as unknown as { adopt: (s: unknown, why: string) => void }).adopt(s, 'start');
     return null;
   },
-  resync: () => useOnline.getState().room?.resync('error'),
+  resync: () => useOnline.getState().room?.resync('join'),
   /** 画面の今の様子（確認用。回3） */
   ui: () => {
     const s = useBattle.getState();

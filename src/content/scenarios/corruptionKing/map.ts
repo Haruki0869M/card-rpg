@@ -9,6 +9,9 @@ export const corruptionKingMap: ScenarioMapDef = {
   height: 42,
   start: [7, 40],
   roadTerrain: 'road',
+  // 出る災厄（シナリオ2の作り直し 区切り3b）: 今の5体を、今の並び順のまま書く（ほかのシナリオだけの災厄 = シナリオ2の3体を出さない。
+  // 一覧は SCOURGES.all の順のまま一覧に無い物を除くだけなので、候補と選ぶ乱数の順番は前と同じ）
+  scourges: ['greedKing', 'miasmaNecro', 'nightmareBeast', 'stormWitch', 'infernoDemon'],
   regions: [
     {
       id: 'castleRegion',

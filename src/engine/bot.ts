@@ -16,6 +16,7 @@ import { moveCostOf, neighbors, pathTo } from './game/world/hex';
 import { isWideMap } from './game/world/lanes';
 import { insightTarget, shortcutTile } from './game/world/detour';
 import { shortcutEntrance } from './game/game';
+import { eventChallenger } from './game/eventChallenge';
 import {
   applyGameCommand,
   canEquip,
@@ -377,7 +378,8 @@ function battleStep(g: GameState, log: BotLog, memo: BotMemo): GameState {
       const c = a.hand.find((x) => !unusableReason(b, a, cardOf(x), x.uid));
       if (!c) continue;
       const card = cardOf(c);
-      const target = b.enemies.find((e) => !e.dead)?.uid;
+      // 区切り3b: 吹雪に隠れている敵（単体のカードが外れる）より、隠れていない敵を先に（いなければ今までどおり）
+      const target = (b.enemies.find((e) => !e.dead && !e.hidden) ?? b.enemies.find((e) => !e.dead))?.uid;
       const focus = card.slots >= 3 ? Math.min(card.slots, a.focus) : 0;
       return send(g, { type: 'BATTLE', command: { type: 'PLAY_CARD', playerId: a.playerId, characterId: a.id, cardInstanceId: c.uid, targetId: card.target === 'enemy' ? target : isAllyCard(card) ? cardTargets(g.battle!, a, card).sort((x,y) => x.hp/x.maxHp-y.hp/y.maxHp).map(unitIdOf)[0] : undefined, allyTargetId: card.secondaryTarget ? cardTargets(b, a, secondaryCard(card)).sort((x,y) => x.hp/x.maxHp-y.hp/y.maxHp).map(unitIdOf)[0] : undefined, focusUsed: focus } }, log);
     }
@@ -576,6 +578,11 @@ export function botStep(g: GameState, log: BotLog, memo: BotMemo, inScene = fals
     case 'event': {
       const ev = g.event!;
       if (ev.result) return send(g, { type: 'FINISH_EVENT', playerId: pid(g) }, log);
+      // 2人以上: みんなで選んだ判定つきの選択肢の「挑む段」（実機の不具合① 2026-11-14）。挑む役の持ち主として、フォーカス0で挑む
+      if (ev.decided) {
+        const who = eventChallenger(g);
+        return send(g, who ? { type: 'EVENT_CHALLENGE', playerId: who.playerId, heroId: who.id, focusUsed: 0 } : { type: 'EVENT_RECHOOSE', playerId: pid(g) }, log);
+      }
       const def = EVENTS.get(ev.eventId);
       const party = livingHeroes(g).filter((x) => (!g.party || g.party.includes(x.id)) && (g.activeScene || ev.tile === undefined || !g.world || x.id === g.world.turn));
       // 選べる選択肢と、選ぶキャラ（お金がいる時は払えるキャラ）

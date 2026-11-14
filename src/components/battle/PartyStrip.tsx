@@ -3,7 +3,8 @@ import { getElement } from '../../data/elements';
 // ===== 味方のステータス枠（顔・HP・マナ・フォーカス・被弾予定・担当プレイヤー） =====
 import { Star } from 'lucide-react';
 import { memo } from 'react';
-import { incomingDamage, isDone, usableCardCount } from '../../engine';
+import { incomingDamage, intentHitsOn, isDone, usableCardCount } from '../../engine';
+import { veiledIntent } from '../../engine/battle/boons';
 import { useDetail, usePress } from '../../hooks/usePress';
 import { isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
@@ -24,7 +25,9 @@ const AllyCard = memo(function AllyCard({ ally }: { ally: AllyState }) {
   const active = activeId === ally.id && battle.phase === 'ally';
   const mine = isLocalPlayer(ally.playerId);
   const done = battle.phase === 'ally' && isDone(battle, ally);
-  const incoming = incomingDamage(battle, ally);
+  // 闇の帳（区切り3a）: 隠れた予告の数字は足さない。その予告に狙われていれば「？」を付ける
+  const incoming = incomingDamage(battle, ally, true);
+  const veiled = !ally.dead && battle.enemies.some((e) => veiledIntent(battle, e) && intentHitsOn(e, ally, battle.allies).length > 0);
   const lethal = !ally.dead && incoming >= ally.hp && incoming > 0;
   const usable = usableCardCount(battle, ally);
 
@@ -51,9 +54,9 @@ const AllyCard = memo(function AllyCard({ ally }: { ally: AllyState }) {
       <div className="flex items-center gap-1">
         <span className={`min-w-0 flex-1 truncate text-[12px] leading-[14px] font-bold ${active ? 'text-amber-100' : 'text-zinc-200'}`}>{ally.name}</span>
         {/* 被弾の予告（HPバーの上の赤い点滅と同じ量） */}
-        {!ally.dead && incoming > 0 && (
+        {!ally.dead && (incoming > 0 || veiled) && (
           <span className={`absolute top-[14px] -right-1 z-10 rounded-full px-1.5 text-[12px] leading-4 font-black tabular-nums shadow-[0_2px_4px_rgba(0,0,0,.7)] ${lethal ? 'blink-red bg-red-600 text-white' : 'bg-red-950 text-red-200 ring-1 ring-red-500'}`} data-incoming={incoming}>
-            {lethal ? '☠' : ''}-{incoming}
+            {lethal ? '☠' : ''}{incoming > 0 ? `-${incoming}` : ''}{veiled ? '？' : ''}
           </span>
         )}
       </div>

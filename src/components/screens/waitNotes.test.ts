@@ -38,13 +38,17 @@ function reward(g: GameState, opts: { lu?: string; cards?: string[]; claim?: Rec
 }
 
 describe('回3 A: 待っている相手と、していること', () => {
-  it('取り合いで「余れば」を押した P1 には、P2 がカードと取り合いを選んでいる事が出る', () => {
-    const g = reward(twoPlayers(), { cards: ['h0'], claim: { h0: 'greed' } });
+  it('取り合いで「余れば」を押した P1 には、P2 が取り合いを選んでいる事が出る（④(1): 取り合いはカードが全員終わってから）', () => {
+    const g = reward(twoPlayers(), { cards: ['h0', 'h1'], claim: { h0: 'greed' } });
     const w = rewardWaits(g, p1);
-    expect(w.map((n) => n.playerId)).toEqual(['P2', 'P2']);
-    expect(w[0].what).toBe('リナの山札に加えるカードを選んでいます');
-    expect(w[1].what).toContain('リナで、戦利品（');
-    expect(w[1].what).toContain('）を欲しいか選んでいます');
+    expect(w.map((n) => n.playerId)).toEqual(['P2']);
+    expect(w[0].what).toContain('リナで、戦利品（');
+    expect(w[0].what).toContain('）を欲しいか選んでいます');
+  });
+
+  it('④(1): P2 のカードがまだの間は、取り合いの待ちは書かない（P2 にはまだ取り合いが見えていない）', () => {
+    const g = reward(twoPlayers(), { cards: ['h0'], claim: { h0: 'greed' } });
+    expect(rewardWaits(g, p1)).toEqual([{ playerId: 'P2', what: 'リナの山札に加えるカードを選んでいます' }]);
   });
 
   it('P2 のレベルアップの成長の間: P1 には「レベルアップの成長を選んでいます」', () => {

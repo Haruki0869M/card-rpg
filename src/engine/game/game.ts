@@ -32,6 +32,7 @@ import type {
   DungeonRun,
 } from '../../types';
 import { ensureTileTheme } from './world/randomDungeons';
+import { applyRoomChill } from './dungeonChill';
 import { applyCommand, createBattle, STATE_VERSION } from '../battle/battle';
 import { createRng, type Rng } from '../rng';
 import { applyOutcome, checkOutcome, hasOutcomeKind, makeOutcomeCtx } from './outcomes';
@@ -71,6 +72,7 @@ import { getRoomType } from '../../data/rules';
 import { SCOURGES, TERRAINS } from '../../data/world';
 import { onScourgeDefeated, scourgeCurse, scourgeLoot, scourgesWith } from './world/scourges';
 import { applyInsight, applyScourgeBoons, grantInsight, shortcutTile } from './world/detour';
+import { scourgeHeldGear } from './world/scourgeGear';
 import { revealAround } from './world/fog';
 import { addLog as battleLog } from '../battle/units';
 import { buildDungeon, depthTier, findRoom, isLegacyLayout, RARITIES, rarityIndex, reachableRooms, themeReward } from './dungeon';
@@ -89,6 +91,7 @@ import {
   toPartyMember,
 } from './hero';
 import { needsVote, tally, VOTED_COMMANDS, voteCtx, voters } from './votes';
+import { eventChallenger, eventChallengers, eventPayer, eventShared } from './eventChallenge';
 import { encounterJoin, worldInvite, worldInviteAnswer } from './world/world';
 import { bumpStoryVer } from './world/guide';
 import { EXPEDITION_MODES, findExpedition, mount, restoreSceneFields, saveSceneFields, unmount } from './scenes';
@@ -319,9 +322,14 @@ function castVote(game: GameState, cmd: Extract<GameCommand, { type: 'VOTE' }>, 
   }
   if (!VOTED_COMMANDS.has(cmd.command.type)) return { error: 'みんなで決める操作ではありません', ...none };
   // 判定するキャラを選ぶ選択肢は、そのキャラの担当として動かす（だれのキャラを選んでもよい）
-  const heroId = (cmd.command as { heroId?: string }).heroId;
+  // イベントの選択（実機の不具合① 2026-11-14・案A）: 票には選択肢だけを入れる（キャラとフォーカスは入れない。挑む役は決まった後に自動で決まる）
+  const heroId = cmd.command.type === 'CHOOSE_EVENT' ? undefined : (cmd.command as { heroId?: string }).heroId;
   const actor = heroId ? findHero(game, heroId)?.playerId : undefined;
-  const inner = { ...cmd.command, playerId: actor ?? cmd.playerId } as GameCommand;
+  const inner = (
+    cmd.command.type === 'CHOOSE_EVENT'
+      ? { type: 'CHOOSE_EVENT', playerId: cmd.playerId, optionIndex: cmd.command.optionIndex, focusUsed: 0 }
+      : { ...cmd.command, playerId: actor ?? cmd.playerId }
+  ) as GameCommand;
   // 通る操作か、先に確かめる（状態は変えない）
   const probe = runCommand(structuredClone(game), inner, createRng(game.rngState), true);
   if (probe.error) return { error: probe.error, ...none };
@@ -439,7 +447,12 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
         error = pickRelic(game, cmd.playerId, cmd.optionIndex);
         break;
       case 'CHOOSE_EVENT':
-        error = chooseEvent(game, cmd.playerId, cmd.optionIndex, cmd.heroId, cmd.focusUsed, rng);
+        error = eventShared(game) ? decideEvent(game, cmd.optionIndex, rng) : chooseEvent(game, cmd.playerId, cmd.optionIndex, cmd.heroId, cmd.focusUsed, rng);
+        break;
+      case 'EVENT_CHALLENGE':
+      case 'EVENT_HANDOVER':
+      case 'EVENT_RECHOOSE':
+        error = eventChallengeStep(game, cmd, rng);
         break;
       case 'FINISH_EVENT':
         error = finishEvent(game, cmd.playerId, rng);
@@ -608,6 +621,8 @@ function enterRoom(game: GameState, playerId: string, roomId: string, rng: Rng):
   revealSeen(run);
   run.currentRoomId = room.id;
   moveIntoRoom(run, room.id);
+  // 凍え（氷漬けの宝物庫。2026-11-14）: 部屋の動きの前に、凍えを数えてHPを減らし、氷漬けの箱の格を決める（ほかのダンジョンでは何もしない）
+  applyRoomChill(game, room);
   roomBehavior(roomTypeOf(room).behavior).enter(game, room, rng);
   return undefined;
 }
@@ -655,7 +670,7 @@ export function startBattleWith(game: GameState, enemies: EncounterSpec['enemies
   game.battle = createBattle({
     seed: rng.int(1_000_000_000),
     party,
-    encounter: { id: game.battleInfo?.wandererId ?? game.dungeon?.currentRoomId ?? 'battle', name: getRoomType(roomType).name, enemies, ...(getRoomType(roomType).battle?.boss ? { boss: true } : {}), ...(getRoomType(roomType).battle?.pool === 'midboss' ? { midboss: true } : {}), ...(getRoomType(roomType).battle?.pool === 'elite' ? { elite: true } : {}), ...(firstKeyBoss ? { firstKeyBoss: true } : {}) },
+    encounter: { id: game.battleInfo?.wandererId ?? game.dungeon?.currentRoomId ?? 'battle', name: getRoomType(roomType).name, enemies, ...(getRoomType(roomType).battle?.boss ? { boss: true } : {}), ...(getRoomType(roomType).battle?.pool === 'midboss' ? { midboss: true } : {}), ...(getRoomType(roomType).battle?.pool === 'elite' ? { elite: true } : {}), ...(firstKeyBoss ? { firstKeyBoss: true } : {}), ...(roomType === 'scourge' ? { scourge: true } : {}) },
     enemyHpMul: hpMul === 1 ? diff.enemyHp : (diff.enemyHp ?? 1) * hpMul,
     ...(eliteBodyHpMul !== 1 ? { eliteBodyHpMul } : {}),
     enemyAttackMul: (diff.enemyAttack ?? 1) * partyAttackMul(game, party.length) * atkMul,
@@ -840,7 +855,7 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
   // ドロップ（部屋の種類の設定どおり）。ボスの大宝箱は報酬の後に開ける
   const drop = rt.battle;
   if (drop?.equipmentDrop) {
-    const item = newItem(game, rollEquipment(rng.next() * 100 < equipmentEpicChance(drop.equipmentDrop, tier) * tr.epicMul ? 'epic' : 'rare', game.heroes, rng, { scenario: game.scenarioId }));
+    const item = newItem(game, rollEquipment(rng.next() * 100 < equipmentEpicChance(drop.equipmentDrop, tier) * tr.epicMul ? 'epic' : 'rare', game.heroes, rng, { scenario: game.scenarioId, held: scourgeHeldGear(game) }));
     const to = leastLoaded(survivorHeroes);
     // 2人以上のプレイヤーが生き残ったら、みんなで取り合う（欲しい / 余れば / いらない → 運の判定）
     if (new Set(survivorHeroes.map((h) => h.playerId)).size > 1) reward.claim = { item, heroes: survivorHeroes.map((h) => h.id), choices: {} };
@@ -1338,6 +1353,71 @@ function chooseEvent(
   const loot = applyOutcomes(game, outs, actor, rng);
   ev.result = { optionIndex, heroId: actor?.id, results, success: ok, text: ok ? opt.successText : (opt.failText ?? ''), loot };
   return undefined;
+}
+
+/**
+ * 2人以上で、みんなで選択肢を決めた（実機の不具合① 2026-11-14・案A）。
+ * 判定つき: いちばん得意なキャラを挑む役にして「挑む段」で止まる（乱数は引かない）。
+ * 判定なし: すぐ実行。払う物があれば、払えるキャラのうち並び順で最初のキャラが払う（eventPayer）
+ */
+function decideEvent(game: GameState, optionIndex: number, rng: Rng): string | undefined {
+  const ev = game.event;
+  if (game.mode !== 'event' || !ev) return 'イベント中ではありません';
+  if (ev.result) return 'もう選びました';
+  if (ev.decided) return 'もう選択肢は決まりました（挑む段です）';
+  const opt = EVENTS.get(ev.eventId).options[optionIndex];
+  const st = eventOptionState(game, ev.eventId, optionIndex);
+  if (!opt || !st.visible) return '選択肢がありません';
+  if (st.reason) return st.reason;
+  if (!opt.check) {
+    const payer = eventPayer(game, optionIndex);
+    if (opt.cost || opt.costFocus || opt.costItem) {
+      if (!payer) return '払えるキャラがいません';
+      return chooseEvent(game, payer.playerId, optionIndex, payer.id, 0, rng);
+    }
+    const lead = sceneHeroes(game)[0];
+    return chooseEvent(game, lead?.playerId ?? 'P1', optionIndex, undefined, 0, rng);
+  }
+  const best = eventChallengers(game, optionIndex)[0];
+  if (!best) return '挑めるキャラがいません';
+  ev.decided = { optionIndex, heroId: best.id };
+  addLog(game, `「${opt.label}」に決まった。${best.name}が挑む`);
+  return undefined;
+}
+
+/** 挑む段の操作（挑戦する・任せる・選び直す）。どれも heroId = 今の挑む役で送る（点検 F1） */
+function eventChallengeStep(game: GameState, cmd: Extract<GameCommand, { type: 'EVENT_CHALLENGE' | 'EVENT_HANDOVER' | 'EVENT_RECHOOSE' }>, rng: Rng): string | undefined {
+  const ev = game.event;
+  if (game.mode !== 'event' || !ev) return 'イベント中ではありません';
+  if (ev.result) return 'もう選びました';
+  const d = ev.decided;
+  if (!d) return 'まだ選択肢が決まっていません';
+  const who = eventChallenger(game);
+  // 挑めるキャラがいなくなった時は、場面のだれでも選び直せる
+  if (!who) {
+    if (cmd.type !== 'EVENT_RECHOOSE') return '挑めるキャラがいません。選び直してください';
+    if (!isPartyPlayer(game, cmd.playerId)) return 'このパーティのプレイヤーではありません';
+  } else {
+    if (cmd.heroId !== who.id) return `挑むのは${who.name}です`;
+    if (!ownedBy(who, cmd.playerId)) return `${who.playerId} ${who.name}の担当の人が決めます`;
+  }
+  if (cmd.type === 'EVENT_RECHOOSE') {
+    delete ev.decided;
+    game.vote = undefined;
+    addLog(game, '選択肢を選び直す');
+    return undefined;
+  }
+  if (cmd.type === 'EVENT_HANDOVER') {
+    const to = eventChallengers(game, d.optionIndex).find((h) => h.id === cmd.toHeroId);
+    if (!to || to.id === who!.id) return 'そのキャラには任せられません';
+    d.heroId = to.id;
+    addLog(game, `${who!.name}は${to.name}に任せた`);
+    return undefined;
+  }
+  // 挑む: 今までの判定の処理（成功率の式・フォーカスの効き目・乱数の引き方は同じ）。挑む役が払う物も払う
+  const err = chooseEvent(game, cmd.playerId, d.optionIndex, who!.id, cmd.focusUsed, rng);
+  if (!err) delete ev.decided;
+  return err;
 }
 
 function finishEvent(game: GameState, playerId: string, rng: Rng): string | undefined {

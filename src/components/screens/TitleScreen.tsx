@@ -13,6 +13,7 @@ import { HeroFace, Screen } from '../ui/game';
 import { Motes } from '../ui/fancy';
 import { Lorebook } from '../lorebook/Lorebook';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { InAppBrowserNote } from '../ui/InAppBrowserNote';
 import { continueSummary, overwriteText } from './titleSummary';
 
 export const GAME_TITLE = TERMS.gameTitle;
@@ -131,6 +132,7 @@ export function TitleScreen() {
           </button>
         )}
         {onlineOk && <BackToRoom />}
+        {onlineOk && <InAppBrowserNote />}
         {/* 小さなメニュー: 宝石の丸いボタン */}
         <div className="mt-1 flex justify-around">
           {(

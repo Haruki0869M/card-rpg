@@ -11,15 +11,18 @@ import { DUNGEONS } from '../../../data/dungeons';
 import { getEnemy } from '../../../data/enemies';
 import { getItem } from '../../../data/items';
 import { SCOURGES, TERRAINS } from '../../../data/world';
-import type { BattleEvent, BattleState, DungeonDef, EnemyState, GameState, Hero, ItemDef, ScourgeDef, WorldState } from '../../../types';
-import { fireAbilities } from '../../abilities';
+import { getStatus } from '../../../data/statuses';
+import type { BattleEvent, BattleState, DungeonDef, EnemyState, GameState, Hero, ItemDef, ScourgeBoon, ScourgeDef, WorldState } from '../../../types';
+import { fireAbilities, guardStatus } from '../../abilities';
 import { decideIntent, weakestAlly } from '../../battle/intents';
 import { enemyLevelFactors } from '../../battle/levels';
-import { emptyStatuses } from '../../battle/statuses';
+import { addStatus, emptyStatuses } from '../../battle/statuses';
 import { addLog as battleLog, enemyName } from '../../battle/units';
 import { createRng } from '../../rng';
-import { jobWeapons } from '../hero';
+import { equippedItems, jobWeapons } from '../hero';
 import { aliveScourges } from './scourgeCurse';
+import { CHEST_NAME } from '../../../data/terms';
+import { dungeonTheme } from '../dungeon';
 import { hexDistance, neighbors } from './hex';
 
 // ---------- 柱1 災厄の加護 ----------
@@ -65,11 +68,51 @@ export function applyScourgeBoons(game: GameState, b: BattleState): void {
     } else if (boon.kind === 'huntFirst' && big.intent) {
       big.intent = { actionId: boon.action, targetId: weakestAlly(b) };
       big.history = [...big.history.slice(0, -1), boon.action];
-    }
+    } else if (boon.kind === 'bellToll') b.boon.bell = { every: boon.every, pct: boon.pct };
+    else if (boon.kind === 'darkVeil') {
+      // 闇の帳（区切り3a）: 大物の最初の予告（今出ていれば今のターン。奇襲で予告が無ければ次のターン）の名前と数字を隠す。
+      // 見破った大物・味方のだれかが見通す装備（灯火のランタン）を着けている時は掛からない（加護の一覧には出る）
+      const see = seesThroughVeil(game, b, boon.seeItems);
+      // 見破り（applyInsight はこの後に付くので、同じ条件をここで見る: 見破ったダンジョンのボスの部屋）
+      const seen = !!b.boss && !b.midboss && !!game.dungeon && hasInsight(game, game.dungeon.dungeonId);
+      if (seen || see) {
+        battleLog(b, `💀${d.boon.name}（${d.name}の加護）: ${see ? `${see}が闇を照らし、` : '見破っているので、'}予告は全部見えている`);
+        continue;
+      }
+      b.boon.veil = big.intent ? b.turn : b.turn + 1;
+    } else if (boon.kind === 'frostBreath') applyFrostBreath(b, big, boon, rng, events);
     battleLog(b, `💀${d.boon.name}（${d.name}の加護）: ${d.boon.text}`);
   }
   b.openingEvents = events;
   b.rngState = rng.state;
+}
+
+/**
+ * 白い息（区切り3a・docs/tasks/scenario2-theme-scourge-proposal.md §7）: 戦闘の始め（1ターン目の手札とマナが決まった後）に、生きている味方1人（戦闘の乱数）に status。
+ * 戦闘に出る味方が1人なら、代わりに soloStatus（オーナーの決定: 1人の時だけ「弱体」）。
+ * 敵から受ける悪い状態異常と同じ通り道（guardStatus）を通すので、灯火のランタン・春待ちの外套などで防げる。雪解けの指輪は2ターン目の始めに治す
+ */
+function applyFrostBreath(b: BattleState, big: EnemyState, boon: Extract<ScourgeBoon, { kind: 'frostBreath' }>, rng: ReturnType<typeof createRng>, events: BattleEvent[]) {
+  const alive = b.allies.filter((a) => !a.dead);
+  if (!alive.length) return;
+  const status = b.allies.length === 1 ? boon.soloStatus : boon.status;
+  const t = alive[rng.int(alive.length)];
+  if (guardStatus(b, events, t, status)) return;
+  addStatus(t.statuses, status, boon.amount);
+  events.push({ type: 'status', unitId: t.id, status, amount: boon.amount });
+  battleLog(b, `💀${boon.name}: ${t.name}に「${getStatus(status).name}」${boon.amount}`);
+  // 自分に悪い状態異常が付いた（悪夢の毛皮など）: 敵の行動で付いた時と同じきっかけ
+  if (getStatus(status).harmful) fireAbilities(b, rng, events, t, 'statusTaken', { statusId: status, dealt: boon.amount, attacker: big, depth: 1 });
+}
+
+/** 闇の帳を見通す装備を、戦闘に出ている味方のだれかが着けていれば、その装備の名前（無ければ undefined） */
+function seesThroughVeil(game: GameState, b: BattleState, items: string[]): string | undefined {
+  for (const a of b.allies) {
+    const h = game.heroes.find((x) => x.id === a.id);
+    const it = h ? equippedItems(h).find((i) => items.includes(i.id)) : undefined;
+    if (it) return it.name;
+  }
+  return undefined;
 }
 
 /** 用心棒の手下（大物と同じレベル・同じ人数と難易度の補正。呼ばれた敵と同じく報酬なし） */
@@ -225,12 +268,22 @@ export function dungeonDetourLines(game: Pick<GameState, 'world' | 'scenarioId' 
   if (def.random) {
     if (f.used) return [];
     const target = insightTarget(game);
-    return [`主を倒すと: 秘宝を選べる（最大3つから1つ）・${target ? `👁見破り（${target.name}のボス）・` : ''}抜け道`];
+    const out = [`主を倒すと: 秘宝を選べる（最大3つから1つ）・${target ? `👁見破り（${target.name}のボス）・` : ''}抜け道`];
+    // 区切り3b: テーマ「🧊 氷漬けの宝物庫」の中身（凍え・焚き火・奥の箱）を、行く前に分かるように
+    const chill = dungeonTheme(f.theme)?.chill;
+    if (chill) {
+      const up = chill.chest.slice().reverse();
+      const grades = `${up.filter((c) => c.min > 0).map((c) => `凍え${c.min}以上で${CHEST_NAME[c.rarity]}`).join('・')}。少ないと${CHEST_NAME[up[0].rarity]}`;
+      out.push(`🧊凍え: 部屋に入るたびに凍え+1、HPが「凍え×${chill.hpPercent}%」減る（HPは1で止まる）。🔥焚き火で凍えは0に戻る。奥の氷漬けの箱は、凍えたまま着くほど良い（${grades}）`);
+    }
+    return out;
   }
   if (!def.rewardKey && !def.finale) return [];
   const out: string[] = [];
   const boons = activeBoons(w);
   if (boons.length) out.push(`💀加護: ${boons.map((d) => `「${d.boon.name}」`).join('')}（ボス・中ボスの戦闘に掛かる）`);
+  // 闇の帳（区切り3a）: 見る方法を、行く前にも出す（予告が隠れる加護なので、備えられるように）
+  for (const d of boons) if (d.boon.kind === 'darkVeil') out.push(`💀${d.boon.name}: ${d.boon.text}`);
   if (hasInsight(game, def.id)) {
     const boss = getEnemy(def.pools.boss[0]);
     const marks = (boss.phases ?? []).map((p) => `HP${p.belowHpPct}%で「${p.actions.find((a) => a.id === p.openingActionId)?.name ?? p.name}」${p.rule ? `（${p.rule}）` : ''}`);

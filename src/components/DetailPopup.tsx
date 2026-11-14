@@ -1,5 +1,6 @@
 import { getPet } from '../data/pets';
 import { guardStyleText } from '../engine/battle/effects/kinds/guardAllies';
+import { HIDE_TEXT } from '../engine/battle/effects/kinds/hide';
 import { getStatus } from '../data/statuses';
 import { getElement } from '../data/elements';
 import { STAT_LABEL } from '../data/terms';
@@ -13,6 +14,7 @@ import { getEnemyAction } from '../data/enemies';
 import { enemyResist, enemyWeak, phaseDefOf, phaseMarks } from '../engine/battle/phases';
 import { battleBoonViews } from '../engine/game/world/detour';
 import { currentActionSet } from '../engine/battle/intents';
+import { veiledIntent } from '../engine/battle/boons';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ItemDetailContent } from './ItemDetail';
 import { type Detail, useDetail } from '../hooks/usePress';
@@ -20,7 +22,7 @@ import { useBattle } from '../store/battleStore';
 import type { Affinity, BattleState, EnemyActionDef, EnemyState, GameState, StatId } from '../types';
 import { CATEGORY_LABEL, intentView, longEffect, tierTitle } from './format';
 import { RARITY_STYLE } from './ui/game';
-import { CATEGORY_STYLE, ElementTag, MARK_STATUSES, statusStyle } from './ui/icons';
+import { CATEGORY_STYLE, ElementTag, MARK_STATUSES, PSEUDO_STATUSES, statusStyle } from './ui/icons';
 import { BALANCE } from '../data/balance';
 
 function signed(n: number) {
@@ -124,6 +126,8 @@ function Content({ d, battle, game }: { d: Detail; battle: BattleState; game: Ga
             {e.tauntedBy && <div className="text-[13px] text-amber-300">{findAlly(battle, e.tauntedBy)?.name}に挑発されている</div>}
             {/* 2026-11-14: かばう形は敵ごと（傷ついた仲間だけ・崩れるまで・半分・返す） */}
             {e.guarding && !e.dead && <div className="text-[13px] text-sky-300">仲間をかばっている: {guardStyleText(e.guardStyle ?? {})}</div>}
+            {/* 区切り3b: 吹雪に隠れる（白狼王）・灯喰い（灯を喰らう影） */}
+            {e.hidden && !e.dead && <div className="text-[13px] text-sky-200" data-hidden-row>❄吹雪に隠れている: {HIDE_TEXT}</div>}
             {/* ボスの段階: 今の段階の決まりと、この先の境目（HPバーの線） */}
             {ph?.rule && <div className="mt-1 text-[12px] text-indigo-200" data-phase-rule>🌀今の段階「{ph.name}」: {ph.rule}</div>}
             {marks.map((m) => (
@@ -204,7 +208,7 @@ function Content({ d, battle, game }: { d: Detail; battle: BattleState; game: Ga
                 <span className="font-display text-fuchsia-200">《{ab.name}》</span> {describeAbility(ab)}
               </div>
             ))}
-            <div className="mt-0.5 text-[13px] text-red-300">被弾予定 {incomingDamage(battle, a)}（ブロック差し引き後）</div>
+            <div className="mt-0.5 text-[13px] text-red-300">被弾予定 {incomingDamage(battle, a, true)}（ブロック差し引き後{battle.enemies.some((e) => veiledIntent(battle, e)) ? '。闇の帳で隠れた予告の分は入らない' : ''}）</div>
           </div>
         </div>
       );
@@ -243,7 +247,7 @@ function Content({ d, battle, game }: { d: Detail; battle: BattleState; game: Ga
           </Title>
           <div className="text-[13px]">{st.text}</div>
           {by && <div className="text-[13px] text-amber-300">挑発した味方：{by.name}</div>}
-          {!MARK_STATUSES.has(d.status) && (
+          {!PSEUDO_STATUSES.has(d.status) && (
             <div className="mt-1 text-[12px] text-zinc-400">
               {getStatus(d.status).decay === 0 ? `蓄積量${d.amount}。自然には減りません。` : `残り${Math.ceil(d.amount / (getStatus(d.status).decay ?? 1))}ターン相当（現在値${d.amount}）。${d.side === 'enemy' ? '敵' : '味方'}フェーズ終了時に${getStatus(d.status).decay ?? 1}減少。`}追加の消費条件は上の効果説明を確認してください。
             </div>
@@ -259,7 +263,7 @@ function actionText(e: EnemyState, a: EnemyActionDef): string {
   const parts = a.effects.map((eff) => {
     if (eff.kind === 'damage') {
       const hits = eff.hits ?? 1;
-      return `${targetOf(eff) === 'target' ? '' : '全体に'}${enemyHitDamage(e, eff.amount, undefined)}ダメージ${hits > 1 ? `×${hits}` : ''}${eff.lowHpMul ? `（HPが半分以下の相手に×${eff.lowHpMul}）` : ''}`;
+      return `${targetOf(eff) === 'target' ? '' : '全体に'}${enemyHitDamage(e, eff.amount, undefined)}ダメージ${eff.packHits ? '×生きている敵の数' : hits > 1 ? `×${hits}` : ''}${eff.lowHpMul ? `（HPが半分以下の相手に×${eff.lowHpMul}）` : ''}`;
     }
     return describeEffect(eff, 'enemy');
   });

@@ -9,8 +9,13 @@ import { behaviorBadge, FRENZY_BADGE } from '../data/enemyBehaviors';
 import { blockSkippedOnBreak } from '../engine';
 import { breakRuleOf } from '../engine/battle/breakRules';
 import { countName, punishHits } from '../engine/battle/effects/kinds/punishPlays';
-import { huntApplies, huntWhenText } from '../engine/battle/effects/kinds/damage';
+import { damageHits, huntApplies, huntWhenText } from '../engine/battle/effects/kinds/damage';
+import { HIDE_TEXT } from '../engine/battle/effects/kinds/hide';
+import { echoHitDamage } from '../engine/battle/intents';
+import { focusFeedOf, lampBonus } from '../engine/battle/phases';
 import { getEnemy } from '../data/enemies';
+import { SCOURGES } from '../data/world';
+import { bellLeft, bellStrikes, veiledIntent } from '../engine/battle/boons';
 import type { BattleState, CardDef, CardEffect, EnemyBehaviorId, EnemyState, StatusId } from '../types';
 
 export { CATEGORY_LABEL };
@@ -33,13 +38,17 @@ export function tierTitle(card: CardDef, i: number): string {
 /** 詳細表示用の全文（効果の部品の説明文。全体カードなら「敵全員に」） */
 export const longEffect = (e: CardEffect, card?: CardDef): string => describeEffect(e, 'ally', card);
 
+/** hidden = 災厄の加護「闇の帳」で数字が見えない（区切り3a。種類と狙いだけ見せる） */
 export type IntentPart =
-  | { kind: 'attack'; damage: number; hits: number; targetId?: string; element?: string }
-  | { kind: 'attackAll'; damage: number; hits: number; element?: string }
-  | { kind: 'block'; amount: number; others: boolean }
+  | { kind: 'attack'; damage: number; hits: number; targetId?: string; element?: string; hidden?: boolean }
+  /** label = 「味方全員」の代わりの短い文字（鐘のこだまは「こだま」。区切り3b） */
+  | { kind: 'attackAll'; damage: number; hits: number; element?: string; hidden?: boolean; label?: string }
+  | { kind: 'block'; amount: number; others: boolean; hidden?: boolean }
   | { kind: 'debuff'; status: StatusId; amount: number; targetId?: string; all: boolean }
   /** その他の効果（効果の種類のアイコン＋短い数値） */
-  | { kind: 'other'; effect: CardEffect };
+  | { kind: 'other'; effect: CardEffect }
+  /** 闇の帳で中身が見えない「特殊」（状態異常・そのほかの効果。狙いだけ見せる） */
+  | { kind: 'veiled'; targetId?: string; all: boolean };
 
 export interface IntentView {
   parts: IntentPart[];
@@ -59,6 +68,10 @@ export interface IntentView {
   opening?: { phase: number; label: string; short: string; long: string };
   /** 数え読み（2026-11-14）: left = あと何回の予告で actionName を出すか（fire = この予告がその行動）・turns = 最初の数 */
   countdown?: { left: number; turns: number; fire: boolean; actionName: string };
+  /** 災厄の加護「闇の帳」（区切り3a）: この予告は名前と数字が見えない。long = 長押しの説明（見る方法） */
+  veil?: { long: string };
+  /** 災厄の加護「鐘の響き」（区切り3a）: now = この予告が鐘の番の単体攻撃（ほかの味方にも響く）/ left = 次の鐘の番まで / long = 長押しの説明 */
+  bell?: { now: boolean; left: number; long: string };
 }
 
 /** 予告の札の下・敵が3体以上の時の案内の1行に出す文（本気・特殊な行動）。両方の時は1つにまとめる。崩した後は出さない */
@@ -85,13 +98,25 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
   const mul = enemy.nextActionMultiplier ?? 1;
   // 残り香（2026-11-14 開幕の一手）: 崩した後は、元の効果の代わりに残る軽い効果を見せる（倍率は掛からない）
   const residue = enemy.broken && action.breakResidue?.length ? action.breakResidue : undefined;
+  // 灯喰い（区切り3b）: ダメージの攻撃1回ごとに、喰った灯の分を足す（倍率の前。battle.ts の executeAction と同じ）
+  const lamp = residue ? 0 : lampBonus(enemy);
   for (const raw of residue ?? action.effects) {
     // 特殊な行動に足したブロックは、BREAK されると付かない（battle.ts の executeIntent と同じ）
     if (enemy.broken && blockSkippedOnBreak(action, raw)) continue;
-    const eff = !residue && mul !== 1 && 'amount' in raw && raw.amount !== undefined ? { ...raw, amount: Math.floor(raw.amount * mul) } : raw;
+    const add = raw.kind === 'damage' ? lamp : 0;
+    const eff = !residue && (mul !== 1 || add) && 'amount' in raw && raw.amount !== undefined ? { ...raw, amount: Math.floor((raw.amount + add) * mul) } : raw;
     const to = targetOf(eff);
+    // 鐘のこだま（区切り3b）: 今返る量（このターンに受けた、いちばん大きな一撃。味方の番の間に育つ）
+    if (eff.kind === 'echoBlow') {
+      const dmg = echoHitDamage(enemy, eff.max, undefined);
+      parts.push({ kind: 'attackAll', damage: dmg, hits: 1, label: 'こだま' });
+      details.push(`🔔鐘のこだま: 今は味方全員に${dmg}が返る（このターンに亡霊へ当てた、いちばん大きな一撃。最大${eff.max}。ブロックで防げる。毒・火傷は数えない。殴るたびに育つ）`);
+      continue;
+    }
     if (eff.kind === 'damage') {
-      const hits = eff.hits ?? 1;
+      // 群れの牙（区切り3b）: 回数は生きている敵の数（手下を倒すと、その場で減る）
+      const hits = damageHits(eff, enemy, state);
+      const pack = eff.packHits ? `（回数 = 生きている敵の数${hits}。手下を倒すと減る）` : '';
       if (to === 'target') {
         // 手負い狙い: 狙った相手のHPが今、半分以下なら倍率込みの値
         // 手負い狙い（2026-11-14: 倍率の掛かる時が敵ごとにちがう。huntWhen）
@@ -99,11 +124,11 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
         const dmg = enemyHitDamage(enemy, eff.amount, target, low);
         parts.push({ kind: 'attack', damage: dmg, hits, targetId: target?.id, element: eff.element });
         const when = huntWhenText(eff);
-        details.push(`${targetName}に${dmg}の${elementText(eff.element)}ダメージ${hits > 1 ? `×${hits}回` : ''}${elementStatusText(eff.element)}${eff.lowHpMul ? (low !== 1 ? `（${when}ので×${eff.lowHpMul} 反映済み）` : `（当たる時に${when.replace(/の$/, '')}なら×${eff.lowHpMul}）`) : ''}${eff.pierce && !enemy.broken ? '（ブロックを無視する）' : ''}`);
+        details.push(`${targetName}に${dmg}の${elementText(eff.element)}ダメージ${hits > 1 ? `×${hits}回` : ''}${pack}${elementStatusText(eff.element)}${eff.lowHpMul ? (low !== 1 ? `（${when}ので×${eff.lowHpMul} 反映済み）` : `（当たる時に${when.replace(/の$/, '')}なら×${eff.lowHpMul}）`) : ''}${eff.pierce && !enemy.broken ? '（ブロックを無視する）' : ''}`);
       } else {
         const dmg = enemyHitDamage(enemy, eff.amount, undefined);
         parts.push({ kind: 'attackAll', damage: dmg, hits, element: eff.element });
-        details.push(`${eff.lowOnly ? 'HPが半分以下の味方全員' : '味方全員'}に${dmg}の${elementText(eff.element)}ダメージ${hits > 1 ? `×${hits}回` : ''}${elementStatusText(eff.element)}（状態異常で増減あり${eff.lowOnly ? '。だれも半分以下でなければ空振り' : ''}）`);
+        details.push(`${eff.lowOnly ? 'HPが半分以下の味方全員' : '味方全員'}に${dmg}の${elementText(eff.element)}ダメージ${hits > 1 ? `×${hits}回` : ''}${pack}${elementStatusText(eff.element)}（状態異常で増減あり${eff.lowOnly ? '。だれも半分以下でなければ空振り' : ''}）`);
       }
     } else if (eff.kind === 'block' && (to === 'self' || to === 'otherAllies' || to === 'allies')) {
       parts.push({ kind: 'block', amount: eff.amount, others: to !== 'self' });
@@ -147,6 +172,11 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
       if (def.dealtMultiplier !== undefined) details.push(`（${def.name}によりダメージ×${def.dealtMultiplier} 反映済み）`);
   }
   if (mul !== 1) details.push(`（次の行動の威力 ×${mul} 反映済み）`);
+  // 灯喰い（区切り3b）: 喰った灯の数と、足した攻撃
+  const feed = focusFeedOf(enemy);
+  if (feed) details.push(`🕯喰った灯 ${Math.min(feed.max, enemy.lampEaten ?? 0)}/${feed.max}: 攻撃+${lamp}${lamp ? '（反映済み）' : ''}。味方がフォーカスを1つ使うたび+${feed.per}。BREAK すると0に戻る`);
+  // 吹雪に隠れる（区切り3b）: 隠れている間は、単体のカードが外れる
+  if (enemy.hidden) details.unshift(`❄吹雪に隠れている: ${HIDE_TEXT}`);
   // ダメージの無い大技（浄化・仲間を呼ぶ・かばう・癒し封じ）は、BREAK すると起きない（battle.ts の executeIntent）
   const stops = breakStopsAction(action);
   const res = breakResidueText(action);
@@ -170,7 +200,58 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
   if (countdown) details.push(countdown.fire ? `数え読みが0になった: この予告が「${countdown.actionName}」` : `数え読み: あと${countdown.left}回の予告で「${countdown.actionName}」（数えている間に BREAK すると1つ戻る）`);
   // 弱点が予告と一緒に変わる行動（満ち潮・引き潮）
   if (action.weakWhile?.length) details.push(`この予告の間の弱点: ${elementNames(action.weakWhile)}`);
-  return { parts, name: action.name, details, big: !!action.big, broken: !!enemy.broken, ...(action.hint ? { hint: action.hint } : {}), ...(badge ? { behavior: badge } : {}), ...(frenzy ? { frenzy } : {}), ...(opening ? { opening } : {}), ...(countdown ? { countdown } : {}) };
+  // 災厄の加護「鐘の響き」（区切り3a）: 大物の予告に、鐘の番の印と、次の鐘までのターン
+  const bell = bellBadge(state, enemy);
+  if (bell?.now) details.push(bell.long);
+  const view: IntentView = { parts, name: action.name, details, big: !!action.big, broken: !!enemy.broken, ...(action.hint ? { hint: action.hint } : {}), ...(badge ? { behavior: badge } : {}), ...(frenzy ? { frenzy } : {}), ...(opening ? { opening } : {}), ...(countdown ? { countdown } : {}), ...(bell ? { bell } : {}) };
+  // 災厄の加護「闇の帳」（区切り3a）: 名前と数字を隠す（種類・狙い・大技かどうかは見せる）
+  return veiledIntent(state, enemy) ? veilView(state, enemy, view, frozen?.name) : view;
+}
+
+/** 鐘の響きの印（鐘の響きが掛かった戦闘の大物の予告だけ。ほかは undefined） */
+function bellBadge(state: BattleState, enemy: EnemyState): IntentView['bell'] {
+  const left = bellLeft(state);
+  if (left === undefined || enemy.uid !== state.boon?.uid) return undefined;
+  const now = bellStrikes(state, enemy);
+  const pct = state.boon.bell!.pct;
+  const share = pct === 50 ? '半分' : `${pct}%`;
+  return {
+    now,
+    left,
+    long: now
+      ? `🔔鐘の番: この単体攻撃は、ほかの味方全員にも${share}響く（ブロックで防げる。全員で守る・BREAK する）`
+      : `🔔次の鐘の番まで、あと${left}ターン（鐘の番の単体攻撃は、ほかの味方全員にも${share}響く）`,
+  };
+}
+
+/**
+ * 闇の帳の予告: 名前と数字を「？」にする。攻撃（狙い）・全体攻撃・守り・特殊（状態異常など）の種類と、大技（崩せる）かどうかは見せる。
+ * 長押しの説明には、加護の文（見る方法）を出す
+ */
+function veilView(state: BattleState, enemy: EnemyState, v: IntentView, frozen?: string): IntentView {
+  const parts: IntentPart[] = [];
+  for (const p of v.parts) {
+    const q: IntentPart =
+      p.kind === 'attack' ? { kind: 'attack', damage: 0, hits: 1, targetId: p.targetId, hidden: true }
+      : p.kind === 'attackAll' ? { kind: 'attackAll', damage: 0, hits: 1, hidden: true }
+      : p.kind === 'block' ? { kind: 'block', amount: 0, others: p.others, hidden: true }
+      : { kind: 'veiled', targetId: p.kind === 'debuff' && !p.all ? p.targetId : undefined, all: p.kind === 'debuff' && p.all };
+    // 同じ種類が続く時は1つにまとめる（数で中身を推し量れないように）
+    const last = parts.at(-1);
+    if (last && last.kind === q.kind && JSON.stringify(last) === JSON.stringify(q)) continue;
+    parts.push(q);
+  }
+  const big = !!v.big || !!v.behavior;
+  const kinds = [...new Set(parts.map((p) => (p.kind === 'attack' ? '攻撃' : p.kind === 'attackAll' ? '全体攻撃' : p.kind === 'block' ? '守り' : '特殊')))].join('・');
+  const boon = (state.boon?.ids ?? []).map((id) => SCOURGES.tryGet(id)).find((d) => d?.boon.kind === 'darkVeil');
+  const long = boon ? `🌑${boon.boon.name}（${boon.name}の加護）: ${boon.boon.text}` : '🌑闇の帳: この予告は名前と数字が見えない';
+  const details = [
+    ...(frozen ? [`${frozen}で、この行動は休む`] : []),
+    `種類: ${kinds || '？'}（名前と数字は闇に隠れている）`,
+    ...(v.broken ? ['体勢が崩れている（BREAK）'] : big ? [`大技！ ${breakHowText(state, enemy)}`] : []),
+    long,
+  ];
+  return { parts, name: '？？？', details, big: big && !v.broken, broken: v.broken, veil: { long } };
 }
 
 /** 本気の予告を、凍結・時間停止で休む時の札（本気は空振り。文だけ） */
@@ -232,7 +313,8 @@ export function breakPreview(state: BattleState, enemy: EnemyState): { name: str
   if (!now?.big || now.broken || enemy.skipNextAction) return undefined;
   const st = BALANCE.breakStatus;
   const after = intentView(state, { ...enemy, broken: true, nextActionMultiplier: (enemy.nextActionMultiplier ?? 1) * BALANCE.breakPower, statuses: { ...enemy.statuses, [st]: (enemy.statuses[st] ?? 0) + BALANCE.breakWeak } });
-  const dmg = (v: IntentView | null) => { const p = v?.parts.find((x) => x.kind === 'attack' || x.kind === 'attackAll'); return p && (p.kind === 'attack' || p.kind === 'attackAll') ? p.damage * p.hits : undefined; };
+  // 闇の帳（区切り3a）: 数字は見せない（崩せることだけ分かる）
+  const dmg = (v: IntentView | null) => { if (v?.veil) return undefined; const p = v?.parts.find((x) => x.kind === 'attack' || x.kind === 'attackAll'); return p && (p.kind === 'attack' || p.kind === 'attackAll') ? p.damage * p.hits : undefined; };
   const stops = breakStopsAction(getEnemyAction(enemy.defId, enemy.intent!.actionId));
   return { name: now.name, from: dmg(now), to: dmg(after), ...(stops ? { stops } : {}) };
 }

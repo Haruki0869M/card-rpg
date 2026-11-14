@@ -544,6 +544,11 @@ export interface EnemyPhaseDef {
   resist?: string[];
   /** 相方（同じ戦闘の、呼ばれていないほかの敵）が全部倒れた時にも、この段階に入る（HPの境目とは別の入り方。2026-11-14 最後の中ボス） */
   onPartnerDown?: boolean;
+  /**
+   * 灯喰い（シナリオ2の災厄「灯を喰らう影」の段階。2026-11-14 区切り3b）: この段階の開幕の一手を予告した時から、味方がフォーカスを1つ使うたび
+   * 「喰った灯」（EnemyState.lampEaten）が+1（max まで）。この敵のダメージの攻撃は、1回ごとに「喰った灯 × per」だけ強くなる。BREAK で0に戻る
+   */
+  focusFeed?: { per: number; max: number };
 }
 
 export interface EncounterSpec {
@@ -559,6 +564,8 @@ export interface EncounterSpec {
   elite?: boolean;
   /** 各シナリオの、鍵の順番で1つ目のダンジョンのボスの戦闘（大技の BREAK は今までどおり。effects の needsWeakPerfect） */
   firstKeyBoss?: boolean;
+  /** 世界マップの災厄の戦闘（中ボスと同じ扱い。最後のダンジョンの中ボスの部屋だけの段階 midbossPhases は使わない。2026-11-14 区切り3b） */
+  scourge?: boolean;
 }
 
 // ---------- 戦闘の状態 ----------
@@ -773,6 +780,15 @@ export interface EnemyState {
   countdown?: { actionId: string; turns: number; left: number };
   /** 段階のデータの出どころ（'midboss' = 敵のデータの midbossPhases を読む。省略は phases。2026-11-14） */
   phaseSet?: 'midboss';
+  /**
+   * 吹雪に隠れている（シナリオ2の災厄「白狼王」の段階。2026-11-14 区切り3b）: 「敵1体が対象のカード」でこの敵に与えるダメージは0（外れる）。
+   * 線引きは、かばうと同じ（全体攻撃・お供と召喚・分身・毒などの継続ダメージ・反撃・道具は当たる）。BREAK はできる。敵の番の始め・倒れた時に消える
+   */
+  hidden?: boolean;
+  /** 鐘のこだま（シナリオ2の災厄「凍て鐘の亡霊」の段階・区切り3b）: こだまの予告が出ている味方の番に、この敵が受けた1回の当たりでいちばん大きいHPのダメージ（味方の番の始めに消す） */
+  echoMax?: number;
+  /** 灯喰い（シナリオ2の災厄「灯を喰らう影」の段階・区切り3b）: 喰った灯の数（EnemyPhaseDef.focusFeed）。BREAK で0 */
+  lampEaten?: number;
 }
 
 export type Phase = 'ally' | 'enemy' | 'victory' | 'defeat' | 'escaped';
@@ -832,9 +848,10 @@ export interface BattleState {
   firstKeyBoss?: boolean;
   /**
    * 災厄の加護（2026-11-14 寄り道の値打ち 柱1）: この戦闘に掛かっている加護。ids = 加護を掛けている災厄のID / uid = 大物（加護の決まりが掛かる敵）/
-   * regen = 大物が敵の番の始めに回復する最大HPの% / ward = 最初の BREAK を1回防ぐ（wardUsed = もう防いだ）/ phaseBurn = 大物が段階を越えるたびの火傷
+   * regen = 大物が敵の番の始めに回復する最大HPの% / ward = 最初の BREAK を1回防ぐ（wardUsed = もう防いだ）/ phaseBurn = 大物が段階を越えるたびの火傷 /
+   * bell = 鐘の響き（every の倍数のターンの鐘の番に、大物の単体攻撃がほかの味方にも pct% 響く）/ veil = 闇の帳（このターンの大物の予告は、名前と数字が画面に見えない）
    */
-  boon?: { ids: string[]; uid: string; regen?: number; ward?: boolean; wardUsed?: boolean; phaseBurn?: number };
+  boon?: { ids: string[]; uid: string; regen?: number; ward?: boolean; wardUsed?: boolean; phaseBurn?: number; bell?: { every: number; pct: number }; veil?: number };
   /** 見破ったボスの戦闘（2026-11-14 寄り道の値打ち 柱2）: 見破った大物（この uid の敵）の大技と開幕の一手は、完全成功だけで崩れる */
   insight?: string;
 }
@@ -926,7 +943,7 @@ export type BattleEvent =
       perfect: boolean;
       summary: string;
     }
-  | { type: 'damage'; unitId: string; amount: number; rawAmount?: number; blocked: number; sourceId?: string }
+  | { type: 'damage'; unitId: string; amount: number; rawAmount?: number; blocked: number; sourceId?: string; /** 吹雪に隠れた敵に、単体のカードが外れた（区切り3b） */ missed?: boolean }
   | { type: 'resource'; unitId: string; resource: 'focus' | 'mana'; amount: number }
   | { type: 'block'; unitId: string; amount: number }
   | { type: 'status'; unitId: string; status: StatusId; amount: number }

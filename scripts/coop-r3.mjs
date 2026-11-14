@@ -231,40 +231,39 @@ async function phaseA() {
   note(`始め: P1 の下の文「${await text(A, '[data-wait-notes]')}」`);
   summary.A.push({ step: '始め', P1: { levelUpOverlay: !!lvA, cards: cardsA, waitNotes: await text(A, '[data-wait-notes]') }, P2: { levelUpOverlay: !!lvB } });
 
-  // P1: 自分の分（取り合い → カード）を先に済ませられるか
-  const greed = A.locator('[data-claim] button', { hasText: '余れば' });
-  if (await greed.count()) {
-    await greed.first().click();
-    await wait(800);
-  }
+  // 実機の不具合④(1)（2026-11-15）で順番を「成長 → 自分のカード → 全員がそろってから取り合い」に変えた。
+  // P1: P2 がレベルアップを選んでいる間に、自分のカードを先に済ませられる（取り合いはまだ出ない）
+  check(!(await A.locator('[data-claim]').count()), 'P1: 成長とカードが全員そろうまで、取り合いの窓は出ない');
   if (cardsA) await pickCard(A);
   const g1 = await game(A);
-  const p1Done = g1.reward?.claim?.choices?.[h1] === 'greed' && g1.reward?.cardDone?.includes(h1);
-  check(p1Done, 'P1 は、P2 がレベルアップを選んでいる間に、自分の取り合いの返事とカードを済ませられる');
+  const p1Done = !!g1.reward?.cardDone?.includes(h1);
+  check(p1Done, 'P1 は、P2 がレベルアップを選んでいる間に、自分のカードを済ませられる');
   await shot(A, 'A2-P1-waiting');
   const waitA = await text(A, '[data-wait-notes]');
   note(`P1 が自分の分を済ませた後の、P1 の下の文「${waitA || (await text(A, '.shrink-0 .rounded-xl'))}」`);
   check(/ナツさんが、.*レベルアップの成長を選んでいます/.test(waitA), 'P1 に「ナツさんが、〇〇のレベルアップの成長を選んでいます」と出る');
   summary.A.push({ step: 'P1 が自分の分を済ませた', P1: { done: p1Done, waitNotes: waitA } });
 
-  // P2: レベルアップ → 取り合いの窓がカードより上に出る → 取り合い → カード
+  // P2: レベルアップ → カード（取り合いはまだ出ない）→ カードを選ぶと、2台とも取り合いが真ん中に
   await B.getByText('レベルアップ！').waitFor({ timeout: 5000 }).catch(() => {});
   await B.locator('.absolute.inset-0 button').first().click().catch(() => {});
   await wait(1200);
   await shot(B, 'A3-P2-after-levelup');
-  const claimBox = await B.locator('[data-claim]').first().boundingBox().catch(() => null);
-  const cardBox = await B.locator('[data-pick-card]').first().boundingBox().catch(() => null);
-  check(!!claimBox && !!cardBox && claimBox.y < cardBox.y, 'P2: 自分の取り合いの返事がまだの時は、取り合いの窓がカードより上に出る');
+  check((await B.locator('[data-pick-card]').count()) > 0 && !(await B.locator('[data-claim]').count()), 'P2: 成長の後は自分のカード（取り合いはまだ出ない）');
   const waitA2 = await text(A, '[data-wait-notes]');
   note(`P2 がレベルアップを選んだ後の、P1 の下の文「${waitA2}」`);
-  check(/カードを選んでいます/.test(waitA2) && /欲しいか選んでいます/.test(waitA2), 'P1 に、P2 がカードと取り合いを選んでいる事が出る');
+  check(/カードを選んでいます/.test(waitA2) && !/欲しいか選んでいます/.test(waitA2), 'P1 に、P2 がカードを選んでいる事が出る（取り合いはまだ）');
   await shot(A, 'A4-P1-waiting-cards');
+  await pickCard(B);
+  await wait(1000);
+  check((await A.locator('[data-claim-center]').count()) > 0 && (await B.locator('[data-claim-center]').count()) > 0, '2人ともカードを選び終えたら、2台とも取り合いが真ん中に出る');
   await B.locator('[data-claim] button', { hasText: '欲しい' }).first().click();
   await wait(1000);
   const waitA3 = await text(A, '[data-wait-notes]');
   note(`P2 が取り合いに答えた後の、P1 の下の文「${waitA3}」`);
-  await shot(A, 'A5-P1-claim-done');
-  await pickCard(B);
+  await shot(A, 'A5-P1-claim');
+  await A.locator('[data-claim] button', { hasText: '余れば' }).first().click();
+  await wait(1000);
   const fin = await A.getByRole('button', { name: /先へ進む/ }).count();
   check(fin > 0, '2人とも選び終えたら、P1 に「先へ進む」が出る');
   await shot(A, 'A6-P1-finish');

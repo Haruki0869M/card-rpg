@@ -32,6 +32,29 @@ button {
   touch-action: manipulation;
 }
 
+/* 下から出るシートの高さ（実機の不具合② 2026-11-14）。シートの土台は Sheets.tsx の BottomSheet */
+.sheet-tall {
+  height: 92%;
+}
+.sheet-short {
+  max-height: 86%;
+}
+/* 縦 640px より低い画面（LINE 内ブラウザなど）: 背の高いシートは画面いっぱい・キャラの絵を小さく */
+@media (max-height: 639.98px) {
+  .sheet-tall {
+    height: 100%;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+  }
+  .sheet-short {
+    max-height: 100%;
+  }
+  .sheet-art {
+    height: 88px;
+    width: 66px;
+  }
+}
+
 .safe-pad {
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);

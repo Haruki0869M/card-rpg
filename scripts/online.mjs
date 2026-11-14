@@ -160,7 +160,9 @@ await shot(A, 'stamp');
 
 // ---- 1台が切断 → ホストが代わりに操作 → 戻って追いつく ----
 await C.evaluate(() => window.__online.goOffline());
-await wait(1500);
+// 実機の不具合③: 切れてから約10秒は「動いている」扱い（その間に代わりに操作を入れると、戻ってきた扱いで自動で外れる）。
+// 画面と同じく、ホストが「切れている」と見てから代わりに操作する
+await until(() => A.evaluate((p) => !window.__online.seatOnline(p), `P${PEOPLE}`), 25000, 'offline seen');
 await A.evaluate((p) => window.__online.setProxy(p, true), `P${PEOPLE}`);
 await wait(500);
 await shot(A, 'offline');
@@ -173,7 +175,8 @@ console.log('切断して戻る:', r.ok ? 'OK' : 'NG', r.hs.join(' '));
 
 // ---- ホストが切断 → 次の人が引き継ぐ ----
 await A.evaluate(() => window.__online.goOffline());
-await until(() => B.evaluate(() => window.__online.isHost()), 20000, 'host handover');
+// ふつうの切断の引き継ぎは、約10秒待ってから（実機の不具合③・点検 F3）
+await until(() => B.evaluate(() => window.__online.isHost()), 30000, 'host handover');
 await B.evaluate(() => window.__online.setProxy('P1', true));
 await wait(500);
 await drive(pages.slice(1), 30);

@@ -6,6 +6,7 @@ import { heroAbilities, heroMaxHp } from '../engine/game/hero';
 import { petAbilities } from '../engine/game/pets';
 import type { BattleEvent } from '../types';
 import { battleFrames, explorationNotices } from './presentation';
+import { BATTLE_LAYER } from '../components/ui/layers';
 import { normalizeSettings } from './settings';
 
 const fresh = () => createGame({ seed: 7, scenarioId: 'corruptionKing', difficulty: 'normal', party: [{ classId: 'warrior', name: '確認', gender: 'male', playerId: 'P1' }] });
@@ -147,5 +148,14 @@ describe('探索のお供通知と旧設定', () => {
     const cmd = { type: 'WORLD_WAIT' as const, playerId: 'P1' as const, heroId: 'h0' };
     expect(explorationNotices(g, next, cmd).map(n => n.name)).toContain('夜でもよく見える');
     expect(explorationNotices(next, next, cmd)).toEqual([]);
+  });
+  it('吹雪に隠れた敵に外れた一撃は「0」ではなく「❄外れ」（ダメージ0・防御と見分ける）', () => {
+    const f = battleFrames([{ type: 'damage', unitId: 'e0', sourceId: 'a0', amount: 0, rawAmount: 0, blocked: 0, missed: true }, { type: 'damage', unitId: 'e1', sourceId: 'a0', amount: 0, blocked: 0 }]);
+    const texts = f.flatMap(x => x.popups ?? []).map(p => [p.unitId, p.text]);
+    expect(texts).toEqual([['e0', '❄外れ'], ['e1', '0']]);
+  });
+  it('技名の帯は数字（⚡BREAK! など）より手前。命中のエフェクトより後ろ（実機の不具合④(2)）', () => {
+    expect(BATTLE_LAYER.callout).toBeGreaterThan(BATTLE_LAYER.unitPopup);
+    expect(BATTLE_LAYER.impact).toBeGreaterThan(BATTLE_LAYER.callout);
   });
 });

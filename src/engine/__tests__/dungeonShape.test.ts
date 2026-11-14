@@ -47,9 +47,9 @@ const isKeyLayout1 = (d: DungeonDef) => !!d.layout && shapeOf(d.layout) === shap
 const REWORKED_SCENARIOS: string[] = ['frozenKingdom'];
 /**
  * 作り直したシナリオの中で、まだ型のままのダンジョン（決まりと形のテーマが両立せず、まとめ役・オーナーの判断待ち）。
- * 沈んだ聖堂: 「砂時計」は5行目に戦わない部屋（凍った壁画）を1つだけ置くが、決まり「5行目〜休憩の前に戦う部屋が2回以上（9行の鍵）」と両立しない
+ * 2026-11-15: 沈んだ聖堂は、オーナーの決定（計画 §11 の案イ「じょうご」の形）で作り直したので、今は無い
  */
-const REWORK_PENDING: string[] = ['sunkenCathedral'];
+const REWORK_PENDING: string[] = [];
 const TEMPLATES = { keyLayout1, keyLayout2, keyLayout3, finaleLayout };
 /**
  * ボスの前が「休憩 → イベント → ボス」の8行の鍵のダンジョンか（1つ目の鍵の型と、2026-11-13 の案イで同じ形にした翠の神殿）。
