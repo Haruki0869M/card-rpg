@@ -7,10 +7,25 @@
 // ⑥ 秘薬: 道具の袋から使うと、能力値を選ぶ画面が出て、選ぶと+5
 // を写真に撮り、はみ出し・12px未満の文字・小さすぎるボタンを調べる。
 // 使い方: npx vite build && npx vite preview を起こしてから node scripts/scourge-7b.mjs（URL で変更可）
+// シナリオを選ぶ: SC7B_SCENARIO=frozenKingdom node scripts/scourge-7b.mjs（省略は1本目の corruptionKing。シナリオ2の作り直し 計画 §8-2）。
+// 1本目以外は、伝承の書の記録に「ほかのシナリオをクリア済み」と入れて解放してから選ぶ（adventure.mjs と同じ）。
+// 確かめる災厄の種類（盗賊王・魔獣）は保存を書き換えて置くので、どのシナリオでも同じ（悪さの札・店・野営の文の画面を見る）
 import { mkdirSync } from 'node:fs';
 import { chromium, layoutIssues, URL, depart } from './lib.mjs';
 
-const OUT = process.env.SC7B_OUTPUT ?? 'screenshots/scourge-7b';
+const SCENARIO_NAMES = {
+  corruptionKing: '侵食の魔王',
+  frozenKingdom: '凍てつく王国',
+  cursedArchipelago: '呪われた群島',
+  sandDynasty: '砂塵の王朝',
+  starCastle: '星降る天空城',
+  clockworkEmpire: '機械仕掛けの帝国',
+  dreamLabyrinth: '夢幻の大迷宮',
+};
+const FIRST_SCENARIO = 'corruptionKing';
+const SCENARIO = process.env.SC7B_SCENARIO ?? FIRST_SCENARIO;
+if (!SCENARIO_NAMES[SCENARIO]) throw new Error(`知らないシナリオ: ${SCENARIO}（${Object.keys(SCENARIO_NAMES).join(' / ')}）`);
+const OUT = process.env.SC7B_OUTPUT ?? (SCENARIO === FIRST_SCENARIO ? 'screenshots/scourge-7b' : `screenshots/scourge-7b-${SCENARIO}`);
 const KEY = 'card-rpg/adventure';
 mkdirSync(OUT, { recursive: true });
 const SIZES = [
@@ -26,8 +41,20 @@ async function start(page, players) {
     localStorage.clear();
     localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true, vibration: false, firstGuide: false }));
   });
+  // 1本目以外: ほかのシナリオをクリア済みの記録を入れて解放する
+  if (SCENARIO !== FIRST_SCENARIO) {
+    const clears = Object.fromEntries(Object.keys(SCENARIO_NAMES).filter((id) => id !== SCENARIO).map((id) => [id, 1]));
+    await page.evaluate((c) => localStorage.setItem('card-rpg/profile', JSON.stringify({ version: 1, clears: c })), clears);
+  }
   await page.reload();
   await page.getByText('新しい冒険').click();
+  if (SCENARIO !== FIRST_SCENARIO) {
+    const card = page.locator('[data-scenarios] button', { hasText: SCENARIO_NAMES[SCENARIO] }).first();
+    await card.scrollIntoViewIfNeeded();
+    await card.click();
+    if (await card.locator('[data-scenario-lock]').count()) problems.push(`シナリオ ${SCENARIO} が解放されていない`);
+    await page.waitForTimeout(150);
+  }
   await page.getByText(`${players}人`, { exact: true }).click();
   await page.getByText('キャラクター作成へ').click();
   await depart(page);
@@ -243,4 +270,4 @@ await browser.close();
 if (problems.length) {
   console.error(problems.join('\n'));
   process.exitCode = 1;
-} else console.log(`scourge-7b: OK（${SIZES.length}つの大きさ。写真は ${OUT}）`);
+} else console.log(`scourge-7b: OK（${SCENARIO}・${SIZES.length}つの大きさ。写真は ${OUT}）`);

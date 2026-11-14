@@ -507,7 +507,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
     }
   }
   // 属性の状態異常（HPに当たった時。完全成功なら必ず。耐性があれば効かない）
-  if (element && r.hpLoss > 0 && !v.dead) {
+  if (element && r.hpLoss > 0 && !v.dead && !ctx.noStatus) {
     const el = getElement(element);
     // 乱数の順番を変えないように、先に確率を引いてから「防ぐ能力」を見る
     if (el.status && !resistsElement(v, element) && (ctx.perfect || rng.next() * 100 < (el.chance ?? 0)) && !(isEnemy(source) !== isEnemy(v) && guardStatus(state, events, v, el.status))) {

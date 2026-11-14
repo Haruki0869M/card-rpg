@@ -309,8 +309,11 @@ export interface ScourgeDef {
   boss: string;
   minions: string[];
   /** 生きている間の悪さ。shopPrice = 町の店の値段 +N% / corruptionPerTurn = 世界マップの番の侵食度 +N% / campHeal = 野営のHPの回復の倍率 / nightLevel = 夜の敵のレベル +N /
-   *  battleBurn = 戦闘の開始時、味方全員に「火傷」N（段階7c: 業火の魔人） */
-  curse: { shopPrice?: number; corruptionPerTurn?: number; campHeal?: number; nightLevel?: number; battleBurn?: number };
+   *  battleBurn = 戦闘の開始時、味方全員に「火傷」N（段階7c: 業火の魔人） /
+   *  シナリオ2の作り直し 区切り3a（docs/tasks/scenario2-rework-plan.md §2-2・§8-1）:
+   *  coldMul = 寒さのダメージの倍率（寒さだけ。帯の倍率と掛け算。白狼王）/ buryRoad = 街道が雪に埋もれ、街道の移動ボーナスが無くなる（湖の氷などほかの地形は残る。凍て鐘の亡霊）/
+   *  visionDown = 昼も夜もキャラの視界 −N（最低1マス。灯を喰らう影） */
+  curse: { shopPrice?: number; corruptionPerTurn?: number; campHeal?: number; nightLevel?: number; battleBurn?: number; coldMul?: number; buryRoad?: boolean; visionDown?: number };
   /**
    * 札に出す悪さの短い文（店+25%）と、知らせ・説明の文。
    * 文の中の「侵食度」と短い「侵食」（TERMS.corruption）は、画面に出す時にそのシナリオの悪化の名前（corruptionName。シナリオ2は「冬の深さ」）に置き換わる（engine の scourgeText）
@@ -322,7 +325,7 @@ export interface ScourgeDef {
    * freeShop = 町の店の品（装備・消耗品）を1つ無料でもらえる券の数（パーティみんなの物。2026-11-14 盗賊王の 300G の代わり）
    */
   reward: { gold?: number; corruption?: number; elixir?: number; freeShop?: number };
-  /** 専用の装備（必ず落とす。ItemDef.source = 'scourge'） */
+  /** 専用の装備（必ず落とす。ItemDef.source = 'scourge'。シナリオの伝説品を移した物は ItemDef.scourgeGear = この災厄の ID） */
   gear: string;
   /** 倒した時の文（店の値段が元に戻った） */
   clearText: string;
@@ -339,7 +342,11 @@ export interface ScourgeDef {
  * 災厄の加護の種類（world/scourgeBoons.ts が戦闘に付ける）:
  * bodyguard = 戦闘の始めに手下（enemy）が1体加わる / regen = 大物が敵の番の始めに最大HPの pct% 回復（呪い・癒し封じで減る）/
  * huntFirst = 大物の最初の予告が「手負い狙い」（action = 共通の加護の行動のID）/ breakWard = 大物への最初の BREAK が1回だけ効かない /
- * phaseBurn = 大物が段階の境目を越えるたび、味方全員に火傷 amount
+ * phaseBurn = 大物が段階の境目を越えるたび、味方全員に火傷 amount /
+ * シナリオ2の作り直し 区切り3a（docs/tasks/scenario2-theme-scourge-proposal.md §3・§4・§7。オーナーの返事 4・5・7 = A）:
+ * frostBreath = 戦闘の始め（1ターン目が始まった後）に、味方1人（戦闘の乱数で選ぶ）に status を amount。戦闘に出る味方が1人なら代わりに soloStatus（状態異常を防ぐ能力で防げる）/
+ * bellToll = every ターンごと（every の倍数のターン）の「鐘の番」に、大物の単体攻撃が、狙われた味方のほかの全員にも pct% 響く（ブロックで防げる。属性の状態異常は付かない）/
+ * darkVeil = 大物の最初の予告の名前と数字が画面に見えない（種類と大技かどうかは見える）。味方のだれかが seeItems の装備を着けている・見破った大物には掛からない
  */
 export type ScourgeBoon = { name: string; text: string } & (
   | { kind: 'bodyguard'; enemy: string }
@@ -347,6 +354,9 @@ export type ScourgeBoon = { name: string; text: string } & (
   | { kind: 'huntFirst'; action: string }
   | { kind: 'breakWard' }
   | { kind: 'phaseBurn'; amount: number }
+  | { kind: 'frostBreath'; status: string; soloStatus: string; amount: number }
+  | { kind: 'bellToll'; every: number; pct: number }
+  | { kind: 'darkVeil'; seeItems: string[] }
 );
 
 export interface Raid {

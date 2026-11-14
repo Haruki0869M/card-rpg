@@ -6,15 +6,16 @@ import { equippedItems } from '../hero';
 import { hexDistance } from './hex';
 import { timeOfDay } from './time';
 import { exploreEffects } from '../exploreAbilities';
+import { scourgeCurse } from './scourgeCurse';
 
-/** キャラの視界（夜は狭くなる。狩人の追跡で広がる） */
+/** キャラの視界（夜は狭くなる。狩人の追跡で広がる。災厄の悪さ「視界 −N」（灯を喰らう影。区切り3a）は昼も夜も狭める。最低1マス） */
 export function visionOf(game: GameState, w: WorldState, heroId: string): number {
   const h = game.heroes.find((x) => x.id === heroId);
   const es = h ? exploreEffects(h) : [];
   const pe = petExplore(h);
   const bonus = es.reduce((n, e) => n + (e.kind === 'tracking' ? e.vision : 0), 0) + (pe.vision ?? 0) + (h ? equippedItems(h).reduce((n, i) => n + (i.explore?.vision ?? 0), 0) : 0);
   const night = timeOfDay(w.worldTurn) === 'night' && !pe.nightVision && !es.some(e => e.kind === 'travel' && e.nightVision);
-  return Math.max(1, BALANCE.visionRange + bonus - (night ? BALANCE.nightVisionPenalty : 0));
+  return Math.max(1, BALANCE.visionRange + bonus - (night ? BALANCE.nightVisionPenalty : 0) - scourgeCurse({ world: w }).visionDown);
 }
 
 export function revealAround(game: GameState, w: WorldState) {

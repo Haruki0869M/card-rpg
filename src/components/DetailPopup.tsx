@@ -13,6 +13,7 @@ import { getEnemyAction } from '../data/enemies';
 import { enemyResist, enemyWeak, phaseDefOf, phaseMarks } from '../engine/battle/phases';
 import { battleBoonViews } from '../engine/game/world/detour';
 import { currentActionSet } from '../engine/battle/intents';
+import { veiledIntent } from '../engine/battle/boons';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ItemDetailContent } from './ItemDetail';
 import { type Detail, useDetail } from '../hooks/usePress';
@@ -204,7 +205,7 @@ function Content({ d, battle, game }: { d: Detail; battle: BattleState; game: Ga
                 <span className="font-display text-fuchsia-200">《{ab.name}》</span> {describeAbility(ab)}
               </div>
             ))}
-            <div className="mt-0.5 text-[13px] text-red-300">被弾予定 {incomingDamage(battle, a)}（ブロック差し引き後）</div>
+            <div className="mt-0.5 text-[13px] text-red-300">被弾予定 {incomingDamage(battle, a, true)}（ブロック差し引き後{battle.enemies.some((e) => veiledIntent(battle, e)) ? '。闇の帳で隠れた予告の分は入らない' : ''}）</div>
           </div>
         </div>
       );

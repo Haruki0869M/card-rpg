@@ -12,6 +12,7 @@ import { addLog, enemyName } from './units';
 import { pendingOpening } from './phases';
 import { punishHits } from './effects/kinds/punishPlays';
 import { huntApplies } from './effects/kinds/damage';
+import { bellEffects, bellStrikes, veiledIntent } from './boons';
 
 export function livingAllies(state: BattleState): AllyState[] {
   return state.allies.filter((a) => !a.dead);
@@ -403,12 +404,30 @@ export function dotDamage(ally: AllyState): number {
   return tickDamageOf(ally.statuses);
 }
 
-/** 被弾予定（インテント合計 − 現在のブロック ＋ 毒・火傷）。かばう（確率）は含めない */
-export function incomingDamage(state: BattleState, ally: AllyState): number {
+/**
+ * 災厄の加護「鐘の響き」（区切り3a）: 鐘の番の大物の単体攻撃が、狙われていない ally に響く予定のダメージ（1回あたりの値の配列。ブロック考慮前）。
+ * 実際の響き（battle.ts の bellEcho）と同じ計算: 元の値 × pct% を、ふつうの攻撃と同じ補正で
+ */
+export function bellHitsOn(state: Pick<BattleState, 'boon' | 'turn'>, enemy: EnemyState, ally: AllyState): number[] {
+  if (ally.dead || !bellStrikes(state, enemy) || enemy.intent?.targetId === ally.id || enemy.skipNextAction || skipActionStatus(enemy.statuses)) return [];
+  const pct = state.boon!.bell!.pct;
+  const hits: number[] = [];
+  for (const eff of bellEffects(getEnemyAction(enemy.defId, enemy.intent!.actionId))) {
+    const dmg = enemyHitDamage(enemy, Math.floor(eff.amount * (enemy.nextActionMultiplier ?? 1)), ally, pct / 100);
+    for (let i = 0; i < (eff.hits ?? 1); i++) hits.push(dmg);
+  }
+  return hits;
+}
+
+/**
+ * 被弾予定（インテント合計 − 現在のブロック ＋ 毒・火傷）。かばう（確率）は含めない。鐘の響き（区切り3a）は含める。
+ * shown = 画面に出す値（闇の帳で隠れている予告は数えない。bot・戦闘の処理は shown なしで、隠れた予告も数える）
+ */
+export function incomingDamage(state: BattleState, ally: AllyState, shown = false): number {
   if (ally.dead) return 0;
   let total = 0;
   let shields = ally.summons?.filter(s => s.intercept).length ?? 0;
-  for (const e of state.enemies) for (const h of intentHitsOn(e, ally, state.allies)) {
+  for (const e of state.enemies) for (const h of shown && veiledIntent(state, e) ? [] : [...intentHitsOn(e, ally, state.allies), ...bellHitsOn(state, e, ally)]) {
     if (ally.airborne || (h > 0 && shields-- > 0)) continue;
     total += h;
   }

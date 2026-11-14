@@ -9,6 +9,7 @@ import { RARITIES, rarityIndex } from './dungeon';
 import { pickCard, withoutStarterCards } from './cardTags';
 import { jobWeapons } from './hero';
 import { heroCardPool, heroJobCardPool } from './jobs';
+import { scourgeHeldGear } from './world/scourgeGear';
 
 const pick = <T,>(list: readonly T[], rng: Rng) => list[rng.int(list.length)];
 
@@ -44,12 +45,13 @@ export const rollGrade = (odds: readonly number[], rng: Rng): Rarity => RARITIES
 
 /**
  * レア度に合う装備（パーティの誰かが使える武器を優先）。
- * scenario: そのシナリオ専用の装備（ItemDef.scenario）も候補に入れる。他のシナリオ専用の装備は出さない / slot: 装備の種類をしぼる
+ * scenario: そのシナリオ専用の装備（ItemDef.scenario）も候補に入れる。他のシナリオ専用の装備は出さない / slot: 装備の種類をしぼる /
+ * held: この冒険では災厄だけが落とす品（world/scourgeGear.ts の scourgeHeldGear。区切り3a）。候補から外す（空なら今までと同じ候補・同じ乱数）
  */
-export function rollEquipment(rarity: Rarity, heroes: Hero[], rng: Rng, opts: { scenario?: string; slot?: ItemDef['slot'] } = {}): ItemDef {
+export function rollEquipment(rarity: Rarity, heroes: Hero[], rng: Rng, opts: { scenario?: string; slot?: ItemDef['slot']; held?: ReadonlySet<string> } = {}): ItemDef {
   const types = new Set(heroes.flatMap((h) => jobWeapons(h.classId)));
   // 出どころが決まっている装備（ランダムダンジョンの専用の装備）は、ふつうのくじ引きに入れない（段階7a）
-  const base = ITEMS.all.filter((i) => i.slot !== 'consumable' && !i.source && (!opts.slot || i.slot === opts.slot) && (!i.scenario || i.scenario === opts.scenario));
+  const base = ITEMS.all.filter((i) => i.slot !== 'consumable' && !i.source && (!opts.slot || i.slot === opts.slot) && (!i.scenario || i.scenario === opts.scenario) && !opts.held?.has(i.id));
   const pool = base.filter((i) => i.rarity === rarity && (i.slot !== 'weapon' || types.has(i.weaponType!)));
   const fallback = base.filter((i) => rarityIndex(i.rarity) <= rarityIndex(rarity) && (i.slot !== 'weapon' || types.has(i.weaponType!)));
   return pick(pool.length ? pool : fallback.length ? fallback : base, rng);
@@ -81,7 +83,8 @@ export function blackMarketStock(game: GameState, h: Hero, rng: Rng, choices = 1
   }
   // ふつうの品: そのキャラが使える武器・鎧・装飾品のレア以上（ほかのシナリオの限定品と専用の装備は出さない）
   const types = new Set(jobWeapons(h.classId));
-  const goods = ITEMS.all.filter((i) => i.slot !== 'consumable' && !i.source && (!i.scenario || i.scenario === game.scenarioId) && (i.slot !== 'weapon' || types.has(i.weaponType!)) && rarityIndex(i.rarity) >= 1);
+  const held = scourgeHeldGear(game);
+  const goods = ITEMS.all.filter((i) => i.slot !== 'consumable' && !i.source && (!i.scenario || i.scenario === game.scenarioId) && !held.has(i.id) && (i.slot !== 'weapon' || types.has(i.weaponType!)) && rarityIndex(i.rarity) >= 1);
   for (let n = 0; n < BALANCE.randomDungeon.blackMarketGoods && goods.length; n++) {
     const def = goods.splice(rng.int(goods.length), 1)[0];
     items.push({ item: newItem(game, def), price: price(def) });
@@ -111,7 +114,7 @@ export function newItem(game: GameState, def: ItemDef) {
 export function rollChestContents(game: GameState, grade: Rarity, big: boolean, rng: Rng): Loot[] {
   const out: Loot[] = [];
   const equip = big || rng.next() * 100 < (BALANCE.chestEquipChance[grade] ?? 100);
-  const main = equip ? rollEquipment(grade, game.heroes, rng, { scenario: game.scenarioId }) : rollConsumable(grade, rng);
+  const main = equip ? rollEquipment(grade, game.heroes, rng, { scenario: game.scenarioId, held: scourgeHeldGear(game) }) : rollConsumable(grade, rng);
   out.push({ kind: 'item', item: newItem(game, main) });
   const g = BALANCE.chestGold[grade] ?? 10;
   out.push({ kind: 'gold', amount: Math.round(g * (0.8 + rng.next() * 0.4)) * (big ? 2 : 1) });

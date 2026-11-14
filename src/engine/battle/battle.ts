@@ -53,6 +53,7 @@ export { slotPreviewLimitOf } from './preview';
 // ---------- 生成 ----------
 
 import { enemyLevelFactors } from './levels';
+import { bellEffects, bellStrikes } from './boons';
 export { enemyLevelFactors };
 
 /**
@@ -978,6 +979,9 @@ function executeAction(state: BattleState, enemy: EnemyState, action: EnemyActio
     delete enemy.nextActionMultiplier;
     return false;
   }
+  // 災厄の加護「鐘の響き」（区切り3a）: 鐘の番の大物の単体攻撃か（行動の前に、狙いと一緒に決める。挑発で狙いが変わっていれば、その相手）
+  const bell = bellStrikes(state, enemy) ? state.boon!.bell! : undefined;
+  const bellTarget = enemy.intent?.targetId;
   // 演出用のイベントは先に積み、対象の一覧は効果を使った後に埋まる
   events.push({ type: 'enemyAct', enemyUid: enemy.uid, actionName: action.name, targetIds: ctx.hitIds });
   const actionMultiplier = enemy.nextActionMultiplier ?? 1;
@@ -989,8 +993,31 @@ function executeAction(state: BattleState, enemy: EnemyState, action: EnemyActio
   }
   for (const n of ctx.fired) abilityTriggered(state, enemy.uid, n.name, events, n.source);
   addLog(state, `${enemyName(enemy)}「${action.name}」${ctx.parts.join(' / ')}`);
+  if (bell && !enemy.dead) bellEcho(state, ctx, enemy, action, actionMultiplier, bellTarget, bell.pct);
   enemy.intent = undefined;
   return true;
+}
+
+/**
+ * 災厄の加護「鐘の響き」（区切り3a・docs/tasks/scenario2-theme-scourge-proposal.md §3 A案）: 鐘の番の大物の単体攻撃は、狙われた味方のほかの全員にも pct% 響く。
+ * 単体のダメージの効果1つ・1回ごとに、ほかの味方1人ずつへ、同じ元の値 × pct%（敵の攻撃力・状態異常・属性の守り・ブロックは、ふつうの攻撃と同じに効く）。
+ * 響きでは属性の状態異常は付かない（ダメージだけ）。BREAK で弱まった行動（残り香）・止まった大技・休んだ時は響かない（ここまで来ない）
+ */
+function bellEcho(state: BattleState, ctx: ReturnType<typeof makeCtx>, enemy: EnemyState, action: EnemyActionDef, mul: number, targetId: string | undefined, pct: number) {
+  const others = state.allies.filter((a) => !a.dead && a.id !== targetId);
+  if (!others.length) return;
+  const got = new Map<string, number>();
+  ctx.noStatus = true;
+  for (const eff of bellEffects(action)) {
+    const base = Math.floor(eff.amount * mul);
+    for (let h = 0; h < (eff.hits ?? 1); h++)
+      for (const a of others) {
+        if (a.dead || enemy.dead) continue;
+        got.set(a.id, (got.get(a.id) ?? 0) + dealDamage(ctx, a, base, eff.element, pct / 100));
+      }
+  }
+  delete ctx.noStatus;
+  addLog(state, `🔔鐘の響き: ${others.map((a) => `${a.name}に${got.get(a.id) ?? 0}`).join(' / ')}`);
 }
 
 /** ユニットのID（味方は id、敵は uid） */

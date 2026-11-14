@@ -832,9 +832,10 @@ export interface BattleState {
   firstKeyBoss?: boolean;
   /**
    * 災厄の加護（2026-11-14 寄り道の値打ち 柱1）: この戦闘に掛かっている加護。ids = 加護を掛けている災厄のID / uid = 大物（加護の決まりが掛かる敵）/
-   * regen = 大物が敵の番の始めに回復する最大HPの% / ward = 最初の BREAK を1回防ぐ（wardUsed = もう防いだ）/ phaseBurn = 大物が段階を越えるたびの火傷
+   * regen = 大物が敵の番の始めに回復する最大HPの% / ward = 最初の BREAK を1回防ぐ（wardUsed = もう防いだ）/ phaseBurn = 大物が段階を越えるたびの火傷 /
+   * bell = 鐘の響き（every の倍数のターンの鐘の番に、大物の単体攻撃がほかの味方にも pct% 響く）/ veil = 闇の帳（このターンの大物の予告は、名前と数字が画面に見えない）
    */
-  boon?: { ids: string[]; uid: string; regen?: number; ward?: boolean; wardUsed?: boolean; phaseBurn?: number };
+  boon?: { ids: string[]; uid: string; regen?: number; ward?: boolean; wardUsed?: boolean; phaseBurn?: number; bell?: { every: number; pct: number }; veil?: number };
   /** 見破ったボスの戦闘（2026-11-14 寄り道の値打ち 柱2）: 見破った大物（この uid の敵）の大技と開幕の一手は、完全成功だけで崩れる */
   insight?: string;
 }
