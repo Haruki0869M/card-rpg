@@ -308,6 +308,27 @@ async function run(party, difficulty) {
         const hd = nav && nav.hero != null ? dist(nav.hero) : Infinity;
         if (best !== null && bestD < hd) {
           await reach.nth(best).scrollIntoViewIfNeeded();
+          // 狭い画面 回1: 目的のマスの真ん中に地図以外（下の操作パネル・ボタン）が乗っていたら、
+          // 見えている地図（パネルより上）の真ん中へ地図を動かす（パネルの「〜と話す」などを押してしまわないように）
+          const moved = await page.evaluate((i) => {
+            const el = document.querySelectorAll('[data-reach]')[i];
+            const map = document.querySelector('[data-world-map]');
+            if (!el || !map) return false;
+            const b = el.getBoundingClientRect();
+            const x = b.left + b.width / 2;
+            const y = b.top + b.height / 2;
+            const t = document.elementFromPoint(x, y);
+            if (t && t.closest('[data-world-map]') && !t.closest('button')) return false;
+            const m = map.getBoundingClientRect();
+            const panel = document.querySelector('[data-world-panel]')?.getBoundingClientRect();
+            const cy = (m.top + 64 + (panel ? panel.top : m.bottom)) / 2;
+            map.scrollBy({ left: x - (m.left + m.width / 2), top: y - cy, behavior: 'instant' });
+            return true;
+          }, best);
+          if (moved) {
+            panFixes++;
+            await page.waitForTimeout(80);
+          }
           let b = await reach.nth(best).boundingBox();
           // 右の操作ボタン（見取り図・拡大・戻る）の下なら、地図を横に動かしてから押す（広い地図は横にもスクロールする。段階6a）
           // 狭い画面 回1: 下の操作パネル・マスの説明の帯の下（地図の上に重なる）も「隠れている」に入れる
