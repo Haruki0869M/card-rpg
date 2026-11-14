@@ -11,7 +11,7 @@ import { DEPTH_TIER_NAME, depthStep, depthTier, dungeonRows, isLegacyLayout, roo
 import { cardRewardOdds } from '../game/loot';
 import type { DungeonDef, GameCommand, GameState, PlayerId } from '../../types';
 import { applyGameCommand, buildDungeon, createGame, createRng } from '../index';
-import { keyLayout1 } from '../../content/common/dungeonLayouts';
+import { finaleLayout, keyLayout1, keyLayout2, keyLayout3 } from '../../content/common/dungeonLayouts';
 
 const P: PlayerId = 'P1';
 type Layout = NonNullable<DungeonDef['layout']>;
@@ -40,6 +40,17 @@ const shapeOf = (L: Layout) => JSON.stringify(L.map((row) => row.map((x) => [x.t
  * 2026-11-13（点検19の問題 A1・オーナーの OK）: この型だけ「ふつうの戦闘は2回以上」・選ぶ所 6 以上
  */
 const isKeyLayout1 = (d: DungeonDef) => !!d.layout && shapeOf(d.layout) === shapeOf(keyLayout1({ first: 'a', second: 'b', story: 'c' }));
+/**
+ * 型の写しをやめて、並びをファイルに直接書いたシナリオ（2026-11-14 シナリオ2〜7の作り直し。docs/tasks/scenario2-rework-plan.md §2-4・§3-3 の6）。
+ * 作り直すたびに足す。シナリオ1（corruptionKing）は前から手作り
+ */
+const REWORKED_SCENARIOS: string[] = ['frozenKingdom'];
+/**
+ * 作り直したシナリオの中で、まだ型のままのダンジョン（決まりと形のテーマが両立せず、まとめ役・オーナーの判断待ち）。
+ * 沈んだ聖堂: 「砂時計」は5行目に戦わない部屋（凍った壁画）を1つだけ置くが、決まり「5行目〜休憩の前に戦う部屋が2回以上（9行の鍵）」と両立しない
+ */
+const REWORK_PENDING: string[] = ['sunkenCathedral'];
+const TEMPLATES = { keyLayout1, keyLayout2, keyLayout3, finaleLayout };
 /**
  * ボスの前が「休憩 → イベント → ボス」の8行の鍵のダンジョンか（1つ目の鍵の型と、2026-11-13 の案イで同じ形にした翠の神殿）。
  * 休憩の後に戦う部屋が無いので、ふつうの戦闘の下限は1つ目の鍵の型と同じ 2回（2026-11-13 点検19の問題 A1 でオーナーが OK した扱い）
@@ -183,10 +194,12 @@ describe('固定ダンジョン28か所の形', () => {
 
   // 2026-11-13（点検19の問題 A1）: 1つ目の鍵の型は、シナリオ2〜7の6か所。選ぶ所は 6 以上（直す前 bf628d5 と同じ数）。
   // 宝箱の格（コモン・鍵付きのレア）は残す。シナリオ1の翠の神殿は、この型ではない（2026-11-13 の案イで、ボスの前の形とふつうの戦闘の下限だけ同じになった）
-  it('1つ目の鍵の型: シナリオ2〜7の6か所・選ぶ所 6 以上・宝箱の格は残す', () => {
+  // 2026-11-14: 作り直したシナリオ（REWORKED_SCENARIOS）の1つ目の鍵は、型の写しでなくなった。選ぶ所 6 以上・宝箱の格は同じ決まりのまま当てる
+  it('1つ目の鍵の型: 作り直していないシナリオの1つ目の鍵・選ぶ所 6 以上・宝箱の格は残す（作り直したシナリオの1つ目の鍵も同じ数）', () => {
     const k1 = fixed().filter(isKeyLayout1);
-    expect(k1.map((d) => DUNGEONS.scenarioOf(d.id)).sort()).toEqual(SCENARIOS.all.map((s) => s.id).filter((s) => s !== 'corruptionKing').sort());
-    for (const d of k1) {
+    const notReworked = SCENARIOS.all.map((s) => s.id).filter((s) => s !== 'corruptionKing' && !REWORKED_SCENARIOS.includes(s));
+    expect(k1.map((d) => DUNGEONS.scenarioOf(d.id)).sort()).toEqual(notReworked.sort());
+    for (const d of [...k1, ...REWORKED_SCENARIOS.map((sid) => keyed(sid)[0])]) {
       expect(keyed(DUNGEONS.scenarioOf(d.id)!)[0].id).toBe(d.id);
       expect(d.layout!.flat().filter((x) => x.next.length >= 2).length, d.id).toBeGreaterThanOrEqual(6);
       const chests = d.layout!.flat().filter((x) => x.type === 'chest').map((x) => `${x.chest!.rarity}${x.chest!.locked ? '鍵' : ''}`);
@@ -200,6 +213,33 @@ describe('固定ダンジョン28か所の形', () => {
     expect(new Set(ids).size).toBe(ids.length);
     const sid = DUNGEONS.scenarioOf(id);
     for (const e of ids) expect(EVENTS.forScenario(sid!).some((x) => x.id === e), e).toBe(true);
+  });
+});
+
+// 2026-11-14 シナリオ2〜7の作り直し（docs/tasks/scenario2-rework-plan.md §2-4）: 作り直したシナリオのダンジョンは、そのシナリオだけの並び。
+// 並び = 部屋の種類とつながり（イベント・宝箱の中身は見ない）。REWORKED_SCENARIOS に足すと、対象が広がる
+describe('作り直したシナリオのダンジョンの並び（型の写しでない）', () => {
+  const templateShapes = Object.entries(TEMPLATES).map(([name, f]) => [name, shapeOf(f({ first: 'a', second: 'b', story: 'c' }))] as const);
+  const reworked = (sid: string) => DUNGEONS.forScenario(sid).filter((d) => d.layout && !d.random && !REWORK_PENDING.includes(d.id));
+  // 比べる相手: シナリオ1の4か所と、作り直したシナリオ全部のダンジョン
+  const handMade = () => ['corruptionKing', ...REWORKED_SCENARIOS].flatMap(reworked);
+
+  it.each(REWORKED_SCENARIOS)('%s: 型4つ・シナリオ1の4か所・作り直したほかのダンジョン・同じシナリオの中で、並びが全部ちがう', (sid) => {
+    const mine = reworked(sid);
+    expect(mine.length + DUNGEONS.forScenario(sid).filter((d) => REWORK_PENDING.includes(d.id)).length).toBe(4);
+    for (const d of mine) {
+      for (const [name, s] of templateShapes) expect(shapeOf(d.layout!), `${d.id} = ${name}`).not.toBe(s);
+      for (const o of handMade()) if (o.id !== d.id) expect(shapeOf(d.layout!), `${d.id} = ${o.id}`).not.toBe(shapeOf(o.layout!));
+    }
+  });
+
+  it.each(REWORKED_SCENARIOS)('%s: 道中のイベントは、シナリオの中で1か所ずつ（物語の部屋も同じ）', (sid) => {
+    const ids = reworked(sid).flatMap((d) => d.layout!.flat().filter((x) => x.type === 'event').map((x) => x.eventId!));
+    expect(new Set(ids).size, ids.join(',')).toBe(ids.length);
+  });
+
+  it('保留のダンジョンは、作り直したシナリオの物だけ', () => {
+    for (const id of REWORK_PENDING) expect(REWORKED_SCENARIOS).toContain(DUNGEONS.scenarioOf(id));
   });
 });
 
