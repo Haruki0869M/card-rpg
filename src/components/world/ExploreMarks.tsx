@@ -91,7 +91,32 @@ export function TowerTop({ x, y, R, id }: { x: number; y: number; R: number; id:
  * 分かれ道の立て札（回1）: 木の柱と、ダンジョンの方へ向いた矢印の板。east = 右向き（東の方）、false なら左向き。
  * x, y = 立てる所（マスの上の面）
  */
-export function SignpostMini({ x, y, R, east }: { x: number; y: number; R: number; east: boolean }) {
+/** 立て札の絵の寸法（scripts/art/make_signpost.py が作る。柱 115×353・板 214×93・板を付ける所 = 柱の絵の中の (30.6, 73)） */
+const SIGN = { postW: 115, postH: 353, boardW: 214, boardH: 93, hangX: 30.6, hangY: 73 };
+/** 板の傾き（度。右向きの板を、時計回りに回す角度）。西の3つは板を左右に返してから、逆に回す */
+const SIGN_TILT: Record<string, number> = { 東: 0, 西: 0, 北東: -32, 北西: -32, 南東: 32, 南西: 32, 北: -78, 南: 78 };
+/** 立て札の高さ ÷ マスの半径 */
+export const SIGN_HEIGHT = 1.25;
+
+export function SignpostMini({ x, y, R, east, dir }: { x: number; y: number; R: number; east: boolean; dir?: string }) {
+  const post = artImage('landscape/sign-post');
+  const board = artImage('landscape/sign-board');
+  if (post && board) {
+    // 描いた絵（箱庭と同じ絵柄）: 柱の足元 = (x, y)。板は、行き先の向き（8つ）に回す
+    const k = (R * SIGN_HEIGHT) / SIGN.postH;
+    const left = dir ? dir.includes('西') : !east;
+    const tilt = SIGN_TILT[dir ?? ''] ?? 0;
+    const hx = (SIGN.hangX - SIGN.postW / 2) * k, hy = (SIGN.hangY - SIGN.postH) * k;
+    return (
+      <g transform={`translate(${x.toFixed(1)},${y.toFixed(1)})`} data-signpost-mini data-signpost-dir={dir} pointerEvents="none">
+        <ellipse cx={0} cy={0} rx={R * 0.26} ry={R * 0.09} fill="rgba(0,0,0,.4)" />
+        <image href={post} x={(-SIGN.postW / 2) * k} y={-SIGN.postH * k + R * 0.04} width={SIGN.postW * k} height={SIGN.postH * k} />
+        <g transform={`translate(${hx.toFixed(1)},${(hy + R * 0.04).toFixed(1)}) rotate(${left ? -tilt : tilt}) scale(${left ? -1 : 1},1)`}>
+          <image href={board} x={(-SIGN.boardW / 2) * k} y={(-SIGN.boardH / 2) * k} width={SIGN.boardW * k} height={SIGN.boardH * k} />
+        </g>
+      </g>
+    );
+  }
   // 小さい画面でも目に入るように、マスの半径の約1.1倍の高さ
   const s = (R * 1.3) / 100;
   const flip = east ? 1 : -1;

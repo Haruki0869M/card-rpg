@@ -896,7 +896,7 @@ export function WorldMap({
                     <ArrowRight x={x + R * 0.45 - R * 0.24} y={y - R * 0.2 - R * 0.24} width={R * 0.48} height={R * 0.48} color="#3a2412" strokeWidth={3} transform={east ? undefined : `rotate(180 ${x + R * 0.45} ${y - R * 0.2})`} />
                   </g>
                 ) : (
-                  <SignpostMini x={x + (east ? R * 0.62 : -R * 0.62)} y={y + R * 0.05} R={R} east={east} />
+                  <SignpostMini x={x + (east ? R * 0.62 : -R * 0.62)} y={y + R * 0.05} R={R} east={east} dir={p.dir} />
                 )}
               </g>
             );
