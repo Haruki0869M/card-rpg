@@ -46,6 +46,7 @@ import {
   laneDefOfTile,
   signposts,
   signpostText,
+  warmthNote,
   type GuideGoal,
 } from '../../engine';
 import { isLocalPlayer, isOnlinePlay } from '../../store/battleConfig';
@@ -511,6 +512,8 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
   // 悪夢の魔獣（災厄の中ボス・段階7b）が生きている間は、野営のHPの回復が半分
   const nightmare = scourgesWith(game, 'campHeal')[0];
   const climate = climateAt(game, here);
+  // 温泉で温まっている間は、寒さの注意の代わりに「温まっている」と出す（暑さの注意はそのまま）
+  const warm = warmthNote(game, hero.id);
   const onTown = w.tiles[here].f?.kind === 'town';
   const canCamp = !onTown && (w.move === null || w.move >= BALANCE.moveBase);
   const pid = hero.playerId;
@@ -803,7 +806,12 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
                 </button>
               ) : null;
             })}
-          {climate && (
+          {warm && (
+            <p className="text-[12px] leading-4 text-orange-200" data-warmth-note>
+              {warm}
+            </p>
+          )}
+          {climate && !(warm && climate.kind === 'cold') && (
             <p className="text-[12px] leading-4 text-sky-200" data-climate-note>
               {climate.kind === 'cold' ? '❄️ 寒さ' : '☀️ 暑さ'}で毎ターン体力が減る（野営すれば防げる。ただし回復は半分）
             </p>

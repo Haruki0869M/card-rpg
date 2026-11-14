@@ -6,7 +6,7 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'rea
 import { artImage, EnemyArt } from '../../art';
 import { DUNGEONS } from '../../data/dungeons';
 import { getTerrain, QUESTS, SANCTUARIES, SHRINES, TERRAINS, TOWNS } from '../../data/world';
-import { colOf, dungeonTheme, objectiveHandler, partySenses, randomDungeonView, rowOf, signposts, timeOfDay } from '../../engine';
+import { colOf, dungeonTheme, isWarm, objectiveHandler, partySenses, randomDungeonView, rowOf, signposts, timeOfDay } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
 import { speedFactor, useBattle } from '../../store/battleStore';
 import { TIMING } from '../../data/balance';
@@ -1110,6 +1110,16 @@ export function WorldMap({
                   />
                 )}
                 <HeroPiece hero={h} size={s} ringColor={PLAYER_COLORS[h.playerId]} active={active} hopping={hopping} stepKey={moving ? anim!.i : 'still'} stepMs={stepMs} simple={simple} />
+                {/* 温泉で温まっている間の印（シナリオ2。寒さを受けない）。駒の右上に小さな湯けむりの札 */}
+                {isWarm(w, id) && (
+                  <span
+                    className="pointer-events-none absolute flex items-center justify-center rounded-full border border-orange-200/90 bg-orange-950/85 leading-none text-orange-100"
+                    data-hero-warm={id}
+                    style={{ left: s * 0.62, top: s * 0.02, width: Math.max(16, s * 0.3), height: Math.max(16, s * 0.3), fontSize: Math.max(11, s * 0.2) }}
+                  >
+                    ♨
+                  </span>
+                )}
                 {/* お供: 肩に乗る・足元で1歩遅れてぴょこぴょこ付いてくる */}
                 {h.pet && (() => {
                   const sp = petSpot(h.pet.petId, s);
