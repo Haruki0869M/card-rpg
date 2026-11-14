@@ -1,6 +1,7 @@
 // 区切りD: ビルドの軸のカード（docs/tasks/lineup-phase2-cards.md の「★ 憲章の目での見直し」と、先頭の囲みが最新）
 // ID は ax + 名前。置き場所（ジョブ）は各ジョブの cardPool、武器種・系統は weaponTypes・lineages に書く。
 // 連携のカード（軸③）は teamOnly（1人プレイの報酬・店には出ない。オーナーの決定）。数値はすべて【提案】（Gemini の文の数は、そのまま）
+import { BALANCE } from '../../../data/balance';
 import type { AbilityDef, AbilityEffect, CardCategory, CardDef, CardTarget, Effect, Lineage, Rarity, StatId } from '../../../types';
 
 const d = (amount: number): Effect => ({ kind: 'damage', amount });
@@ -38,6 +39,11 @@ const STEADFAST: Effect[] = [
   { kind: 'steadfast', pct: 50, max: 12 },
   { kind: 'grantAbility', turns: 1, abilities: [{ name: '不動の拳', effect: { modifier: 'damageDealt', multiplier: 1, addFromCounter: 'fudo', once: true, if: [{ kind: 'cardCategory', category: 'physical' }, { kind: 'playedCategoryCount', category: 'physical', max: 0 }, { kind: 'counterAtLeast', key: 'fudo', n: 1, label: '不動の構えの次のターン' }] } }] },
 ];
+/** 魔力の結界: このターンの終わりに、使わずに残ったマナ1につき per のブロック（最大18。マナは使い切る）。そのブロックは次のターンへ残る（ふつうの上限25） */
+const manaWard = (per: number): Effect[] => [
+  { kind: 'grantAbility', turns: 0, abilities: [{ name: '魔力の結界', effect: { when: 'turnEnd', do: [{ kind: 'blockFromMana', per, max: 18 }] } }] },
+  { kind: 'grantAbility', turns: 1, abilities: [{ name: '結界の名残', effect: { modifier: 'keepBlock', max: 25 } }] },
+];
 /** 輪唱: このターン、連携が起きるたびに、起こした味方が回復する（味方みんなで1ターン4回まで。元の文どおり） */
 const roundSong = (n: number): Effect => ({ kind: 'grantAbility', turns: 0, to: 'allies', abilities: [{ name: '輪唱', effect: { when: 'combo', if: [{ kind: 'perTurn', key: 'roundSong', max: 4, team: true }], do: [heal(n)] } }] });
 
@@ -51,6 +57,10 @@ const el = (element: string, amount: number): Effect => ({ kind: 'damage', amoun
 const LIFELINE: Effect = { kind: 'grantAbility', turns: 0, abilities: [{ name: '命綱', effect: { modifier: 'endure' } }] };
 /** 命綱（完全成功）: 次のターンのマナ+1 */
 const NEXT_MANA: Effect = { kind: 'grantAbility', turns: 1, abilities: [{ name: '命綱の息継ぎ', effect: { when: 'turnStart', do: [{ kind: 'gainMana', amount: 1 }] } }] };
+/** 装甲砲台（2026-11-14・docs/tasks/job-axes-plan2.md 機工士A）: 砲台を置き直す。撃つたびに今のブロックの40%を足す（最大+10）。数値は【提案】 */
+const ARMORED_TURRET: Effect = { kind: 'summon', id: 'turret', name: '砲台', icon: '⚙', damage: BALANCE.specialJobs.turretDamage, turns: BALANCE.specialJobs.deviceTurns, replace: true, targeted: true, blockPct: 40, blockMax: 10 };
+/** かこめ！（同・調教師A）: 対象の悪い状態異常1種類につき、お供がその敵へ1回行動（状態異常は消さない） */
+const pounce = (max: number): Effect => ({ kind: 'petPounce', max });
 
 export const AXIS_CARDS: CardDef[] = [
   // ===== 軸① ブロック変換・反撃 =====
@@ -63,6 +73,11 @@ export const AXIS_CARDS: CardDef[] = [
   c('axIronMarch', '鉄壁の進軍', 'physical', 2, 70, 'allEnemies', [[slam(30, 24, undefined, 'target')], [slam(50, 24, undefined, 'target')], [slam(70, 24, undefined, 'target')]], { rarity: 'epic', stat: 'vit', tags: ['block', 'aoe'] }),
   c('axThornVow', '茨の誓い', 'skill', 1, 75, 'self', [[ba(3), spikes('茨の誓い', 3, 4, 'allies', 'thornVow')], [ba(5), spikes('茨の誓い', 4, 4, 'allies', 'thornVow')], [ba(7), spikes('茨の誓い', 5, 4, 'allies', 'thornVow')]], { rarity: 'epic', tags: ['block'], lineages: ['sei'] }),
   c('axSteadfastFist', '不動の拳', 'skill', 1, 80, 'self', [[b(4), ...STEADFAST], [b(6), ...STEADFAST], [b(8), ...STEADFAST]], { rarity: 'rare', stat: 'vit', tags: ['block'], weaponTypes: ['fist'] }),
+  // 宿題3（2026-11-14・docs/tasks/job-axes-plan.md）: 魔の系統の重装（貯める＝魔力の結界 → 撃つ＝障壁の魔弾）。数値は【提案】
+  c('axManaWard', '魔力の結界', 'magic', 1, 80, 'self', [[b(2), ...manaWard(3)], [b(3), ...manaWard(4)], [b(4), ...manaWard(5)]], { rarity: 'rare', stat: 'int', tags: ['block'], lineages: ['ma'] }),
+  // 2026-11-14（docs/tasks/job-axes-plan2.md 機工士A）: 機工士の重装の「撃つ」側。置き場は機工士だけ。数値は【提案】
+  c('axArmoredTurret', '装甲砲台', 'skill', 1, 80, 'enemy', [[b(4), ARMORED_TURRET], [b(6), ARMORED_TURRET], [b(8), ARMORED_TURRET]], { rarity: 'rare', stat: 'int', tags: ['block', 'summon'] }),
+  c('axWardBolt', '障壁の魔弾', 'magic', 1, 75, 'enemy', [[slam(50, 30)], [slam(80, 30)], [slam(110, 30)]], { rarity: 'rare', stat: 'int', tags: ['block'], lineages: ['ma'], trait: t('魔弾の照準', { modifier: 'weaknessElement' }) }),
 
   // ===== 軸② BREAK・弱点 =====
   c('axArmorPierce', '鎧通しの一撃', 'physical', 1, 75, 'enemy', [[d(4)], [d(8)], [d(12)]], { rarity: 'rare', lineages: ['bu', 'gi'], weaponTypes: ['katana'], trait: t('体勢崩し', { modifier: 'damageDealt', multiplier: 2, if: [{ kind: 'targetBigIntent' }] }, [{ modifier: 'breakCount', multiplier: 2, if: [{ kind: 'targetBigIntent' }] }]) }),
@@ -86,6 +101,8 @@ export const AXIS_CARDS: CardDef[] = [
   c('axIceShatter', '氷砕き', 'physical', 1, 75, 'enemy', [[d(5), SHATTER], [d(9), SHATTER], [d(14), SHATTER]], { rarity: 'rare', tags: ['freeze'], weaponTypes: ['hammer', 'axe', 'fist'], trait: t('氷塊粉砕', { modifier: 'damageDealt', multiplier: 2.5, if: [{ kind: 'targetHasStatus', status: 'freeze' }] }) }),
   c('axCurseReturn', '呪詛返しの契り', 'magic', 1, 75, 'allEnemies', [[{ kind: 'cleanseBurst', per: 6, element: 'dark' }], [{ kind: 'cleanseBurst', per: 9, element: 'dark' }], [{ kind: 'cleanseBurst', per: 12, element: 'dark' }]], { rarity: 'epic', tags: ['curse', 'aoe'], trait: t('呪詛返し', { when: 'afterCard', do: [{ kind: 'applyStatus', status: 'curse', amount: 3, to: 'foes' }] }) }),
   c('axCurseHarvest', '呪いの刈り入れ', 'physical', 1, 75, 'enemy', [[el('dark', 4), HARVEST], [el('dark', 7), HARVEST], [el('dark', 10), HARVEST]], { rarity: 'rare', tags: ['curse'], weaponTypes: ['scythe'] }),
+  // 2026-11-14（docs/tasks/job-axes-plan2.md 調教師A）: 調教師の状態異常の受け皿。置き場は調教師だけ。数値は【提案】
+  c('axSurround', 'かこめ！', 'physical', 1, 75, 'enemy', [[d(3), pounce(2)], [d(5), pounce(2)], [d(7), pounce(3)]], { rarity: 'rare', tags: ['pet'] }),
   c('axCollapse', '総崩れ', 'physical', 2, 65, 'enemy', [[collapse(5)], [collapse(9)], [collapse(13)], [collapse(18)]], { rarity: 'epic', lineages: ['gi'] }),
 
   // ===== 軸⑤ オーバーヒール・聖光 =====
@@ -105,7 +122,7 @@ export const AXIS_CARDS: CardDef[] = [
   c('axChantMark', '詠唱の栞', 'skill', 0, 85, 'self', [[draw(1)], [{ kind: 'drawDiscount', category: 'magic', delta: -1 }]], { weaponTypes: ['tome'] }),
 
   // ===== 背水（HPを払う見返り） =====
-  c('axAdversity', '逆境の刃', 'physical', 1, 75, 'enemy', [[{ kind: 'missingHpDamage', amount: 4, pct: 20, max: 12 }], [{ kind: 'missingHpDamage', amount: 7, pct: 20, max: 12 }], [{ kind: 'missingHpDamage', amount: 10, pct: 20, max: 12 }]], { rarity: 'rare', weaponTypes: ['axe', 'katana'] }),
+  c('axAdversity', '逆境の刃', 'physical', 1, 75, 'enemy', [[{ kind: 'missingHpDamage', amount: 4, pct: 20, max: 12 }], [{ kind: 'missingHpDamage', amount: 7, pct: 20, max: 12 }], [{ kind: 'missingHpDamage', amount: 10, pct: 20, max: 12 }]], { rarity: 'rare', weaponTypes: ['axe', 'katana', 'spear'] }),
   c('axBloodPrice', '血の代価', 'skill', 1, 85, 'self', [[{ kind: 'bloodPrice', max: 15 }], [{ kind: 'bloodPrice', max: 15, blockPct: 50 }]], { rarity: 'rare', lineages: ['bu'] }),
   c('axLifeline', '命綱', 'skill', 1, 80, 'self', [[LIFELINE], [LIFELINE], [LIFELINE, NEXT_MANA]], { rarity: 'epic', exhaust: true, trait: t('命綱', { modifier: 'exhaust' }) }),
 ];

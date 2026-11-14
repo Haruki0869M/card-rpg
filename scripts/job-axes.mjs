@@ -22,8 +22,8 @@ const AXES = {
     when: ['blocked'],
     cond: ['selfBlockAtLeast'],
     scale: [],
-    /** damageDealt の addFromBlock（今のブロックを威力に） */
-    special: (o) => !!o.addFromBlock,
+    /** damageDealt の addFromBlock（今のブロックを威力に）・装甲砲台（砲台がブロックの割合を足す。2026-11-14） */
+    special: (o) => !!o.addFromBlock || (o.kind === 'summon' && !!o.blockPct),
   },
   overheal: {
     name: 'オーバーヒール',
@@ -35,7 +35,7 @@ const AXES = {
   },
   burst: {
     name: '状態異常バースト',
-    kind: ['detonateStatus', 'statusBurst', 'statusScale', 'statusKindsDamage', 'tickNow', 'abyss', 'collapse', 'mirrorStatus', 'moveStatus', 'usedElementStatuses', 'freshStatus', 'veinBreak'],
+    kind: ['detonateStatus', 'statusBurst', 'statusScale', 'statusKindsDamage', 'tickNow', 'abyss', 'collapse', 'mirrorStatus', 'moveStatus', 'usedElementStatuses', 'freshStatus', 'veinBreak', 'petPounce'],
     modifier: ['statusBonus'],
     when: ['detonate', 'foeTick'],
     cond: ['targetStatusAtLeast'],

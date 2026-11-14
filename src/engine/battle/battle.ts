@@ -6,7 +6,7 @@ import { cardTargets, isAllyCard, needsCardTarget, selectedCardTarget, secondary
 
 import { BALANCE } from '../../data/balance';
 import { cardOf } from '../../data/cards';
-import { getClass } from '../../data/classes';
+import { CLASSES, getClass } from '../../data/classes';
 import { getEnemy, getEnemyAction } from '../../data/enemies';
 import { getStatus } from '../../data/statuses';
 import type {
@@ -36,7 +36,7 @@ import { helpedAllies, recordSupport, selfSnapshot, supportSnapshot } from './su
 import { afterAttackCard, attackElement, consumeAttackCharge, cardElements, cardHpCost, chargedMultiplier, tierHpCost } from './cardState';
 import { slotPreviewLimitOf } from './preview';
 import { allyHasWeakCard } from './breakRules';
-import { isStrikingSummon, summonStrikeOnce } from './summons';
+import { isStrikingSummon, summonDamageOf, summonStrikeOnce } from './summons';
 import { activeStatuses, actionFailChanceOf, applyTick, chancePenaltyOf, consumeStatus, decayStatuses, emptyStatuses, skipActionStatus, takeDrawPenalty, takeManaPenalty, tickHealOf } from './statuses';
 import { abilityTriggered, addLog, enemyName, findAlly, healUnit, loseHp, nameOf, unitIdOf } from './units';
 
@@ -54,6 +54,18 @@ export { slotPreviewLimitOf } from './preview';
 
 import { enemyLevelFactors } from './levels';
 export { enemyLevelFactors };
+
+/**
+ * 決め技（どれかの職の jobCards の札）を、切った山札のいちばん上に置く（2026-11-14 宿題6A）。
+ * 決め技を持っている人は、戦闘の最初の手札に決め技が必ず1枚来る（山札から引く形。手札の枚数は変えない）。
+ * 乱数は使わない（切った後の並びで、最初の決め技といちばん上の札を入れ替えるだけ）ので、乱数の順は崩れない。
+ */
+function finisherOnTop(pile: CardInstance[]): CardInstance[] {
+  const fin = new Set(CLASSES.all.flatMap((j) => j.jobCards ?? []));
+  const i = pile.findIndex((c) => fin.has(c.cardId));
+  if (i > 0) [pile[0], pile[i]] = [pile[i], pile[0]];
+  return pile;
+}
 
 export function createBattle(setup: BattleSetup): BattleState {
   const { seed, party, encounter } = setup;
@@ -92,7 +104,7 @@ export function createBattle(setup: BattleSetup): BattleState {
       ...(m.weaponElement ? { weaponElement: m.weaponElement } : {}),
       ...(m.equippedWeaponType ? { equippedWeaponType: m.equippedWeaponType } : {}),
       statuses: { ...emptyStatuses(), ...(m.statuses as Statuses) },
-      drawPile: shuffle(cards, rng),
+      drawPile: finisherOnTop(shuffle(cards, rng)),
       hand: [],
       discard: [],
       dead: (m.hp ?? maxHp) <= 0,
@@ -775,7 +787,7 @@ function summonsAttack(state: BattleState, ally: AllyState, rng: Rng, events: Ba
     if (again.length) {
       const focus2 = ally.summonFocus?.turn === state.turn ? again.find((e) => e.uid === ally.summonFocus!.uid) : undefined;
       const t2 = focus2 ?? (s.targetId ? again.find(e => e.uid === s.targetId) ?? again[0] : again[rng.int(again.length)]);
-      const loss2 = dealDamage(makeCtx(state, rng, events, ally, { target: t2, via: 'summon' }), t2, s.damage, s.element);
+      const loss2 = dealDamage(makeCtx(state, rng, events, ally, { target: t2, via: 'summon' }), t2, summonDamageOf(ally, s), s.element);
       if (loss2 > 0 && !ally.dead) fireAbilities(state, rng, events, ally, 'summonHit', { target: t2, depth: 1 });
       abilityTriggered(state, ally.id, twice!.name, events, twice!.source);
       addLog(state, `${ally.name}の${s.name}がもう1回攻撃！ ${enemyName(t2)}に${loss2}ダメージ`);

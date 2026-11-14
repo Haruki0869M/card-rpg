@@ -74,6 +74,20 @@ export interface LaneDef {
   name: string;
   cols: [number, number];
   terrain: Record<string, number>;
+  // ---- 3つの道（2026-11-14・docs/tasks/three-roads-plan.md）。省略は今までどおり（1倍・0）----
+  /** 帯の印（絵文字）と、行く前に見せる短い説明（マスの説明・見取り図の札） */
+  mark?: string;
+  hint?: string;
+  /** 見取り図の札の短い言葉（1行。省略は hint） */
+  tag?: string;
+  /** 徘徊する敵が湧くマスの重み（地域の中で。省略 1）。敵の総数は変えず、どの帯に出るかだけを変える */
+  spawnWeight?: number;
+  /** この帯に湧いた徘徊する敵のレベルの加算（省略 0） */
+  enemyLevel?: number;
+  /** 夜の野営の夜襲の確率の倍率（省略 1） */
+  ambush?: number;
+  /** この帯の宝箱の良さ: 「奥の地域」の段を何段先にするか（省略 0） */
+  chestDepth?: number;
 }
 
 /**
@@ -163,7 +177,8 @@ export interface ScenarioMapDef {
   pockets?: PocketDef[];
   /** 置く物を多く置く帯（帯の id）。tower は塔1つずつの帯（下から順） */
   /** randomDungeon は、配列なら地域の randomDungeons の1つずつの帯（段階7a: 西と東に1つずつ） */
-  prefer?: { shrine?: string; herb?: string; randomDungeon?: string | string[]; altar?: string; tower?: string[] };
+  /** chest は宝箱を多く置く帯（3つの道・2026-11-14） */
+  prefer?: { shrine?: string; herb?: string; randomDungeon?: string | string[]; altar?: string; tower?: string[]; chest?: string };
 }
 
 export interface ScenarioStory {

@@ -8,13 +8,19 @@ import { abilityTriggered, addLog, enemyName } from './units';
 /** ターン終了時に攻撃する召喚か（追撃・身代わり・きっかけ待ちの召喚は入らない） */
 export const isStrikingSummon = (s: SummonState) => !s.echoPct && !s.trigger;
 
+/** 召喚の1発のダメージ。装甲砲台は、持ち主の今のブロックの blockPct% を足す（最大 blockMax。ブロックは減らない） */
+export function summonDamageOf(ally: AllyState, s: SummonState): number {
+  if (!s.blockPct) return s.damage;
+  return s.damage + Math.min(s.blockMax ?? Infinity, Math.floor((Math.max(0, ally.block) * s.blockPct) / 100));
+}
+
 /**
  * 召喚 s が敵 t を1回攻撃する。与えたHPのダメージを返す。
  * label はログの書き方（省略: 「〇〇の砲台が△△を攻撃！」）
  */
 export function summonStrikeOnce(state: BattleState, ally: AllyState, s: SummonState, t: EnemyState, rng: Rng, events: BattleEvent[], label?: string): number {
   const ctx = makeCtx(state, rng, events, ally, { target: t, via: 'summon' });
-  const loss = dealDamage(ctx, t, s.damage, s.element);
+  const loss = dealDamage(ctx, t, summonDamageOf(ally, s), s.element);
   // きっかけ: 自分の砲台・召喚が敵にダメージを与えた（観測射撃）
   if (loss > 0 && !ally.dead) fireAbilities(state, rng, events, ally, 'summonHit', { target: t, depth: 1 });
   abilityTriggered(state, ally.id, s.name, events, { kind: 'summon', id: s.id, label: s.name });

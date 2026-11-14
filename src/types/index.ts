@@ -851,6 +851,9 @@ export interface SummonState {
   intercept?: boolean;
   /** 身代わりで攻撃を受けた時、攻撃者にこのダメージを返す（無明逆流れ。区切りD） */
   counter?: number;
+  /** 装甲砲台（2026-11-14）: 撃つたびに、持ち主の今のブロックの blockPct% をダメージに足す（最大 blockMax。ブロックは減らない） */
+  blockPct?: number;
+  blockMax?: number;
   id: string;
   name: string;
   icon: string;

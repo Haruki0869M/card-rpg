@@ -14,7 +14,7 @@ export const petTrainer: ClassDef = {
   exploreAbility: { id: 'petTrainerExplore', name: '懐き上手', description: 'お供の懐き度の上がり方が2倍。休憩などでお供を撫でると、その場の仲間全員のフォーカス+1（1回につき1回）', effect: { kind: 'combined', effects: [] } },
   requires: { feat: 'petBond', count: 15, text: 'お供の懐き度が♡3以上で、お供の行動が合わせて15回' },
   names: { male: ['ポポ', 'ハル', 'ソラ', 'ルカ'], female: ['ミミ', 'ココ', 'ユキ', 'ナナ'] },
-  cardPool: ['ptPat', 'ptTogether', 'axTreat', 'axPetCharge', 'axPackHunt'],
+  cardPool: ['ptPat', 'ptTogether', 'axTreat', 'axPetCharge', 'axPackHunt', 'axSurround'],
   signature: ['ptPat', 'ptTogether', 'axTreat'],
   jobCards: ['fxBondRampage'],
 };
