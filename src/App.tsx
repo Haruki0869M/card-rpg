@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { BottomBar, TopBar } from './components/battle/Bars';
 import { ConfirmDialog } from './components/ui/ConfirmDialog';
 import { Battlefield } from './components/battle/Battlefield';
+import { StatusListPopup } from './components/battle/StatusListPopup';
 import { FocusPanel } from './components/battle/FocusPanel';
 import { useElementSize } from './hooks/useElementSize';
 import { SlotPreviewDialog } from './components/battle/SlotPreviewDialog';
@@ -107,6 +108,7 @@ function BattleScreen() {
       {!presenting && <ResultScreen />}
       <SlotPreviewDialog />
       <EndTurnConfirm />
+      <StatusListPopup />
     </div>
   );
 }

@@ -19,6 +19,8 @@ export const LAYER = {
   sheet: 64,
   /** シートの上の確認の窓（冒険をやめる確認） */
   sheetConfirm: 66,
+  /** 戦闘の「状態の一覧」（状態の印の「＋N」を押すと開く。StatusListPopup。この端末だけの窓。待ちの帯・通信の知らせより手前） */
+  statusList: 68,
   /** カード選び（転職のカード選び = JobPickOverlay は LAYER.cardPick を使う・キャラの課題 HeroTaskOverlay は z-70 のまま）・伝承の書 */
   cardPick: 70,
   /** 遊び方・用語集（HelpScreen は z-75 のまま） */

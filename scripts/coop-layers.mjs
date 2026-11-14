@@ -6,6 +6,8 @@
 //   - 「使う」→ 相手 → HP が戻る・シートは開いたまま
 //   - イベントの画面（世界マップのマス・ダンジョンの投票・挑む段）の下の帯「装備」「道具」で開ける。待ちの帯（TurnLock）に重ならない（2026-11-15）
 //   - 投票中・挑む段で、道具袋から回復薬を使って戻っても、自分の票・フォーカスの指定が消えない
+//   - 狭い画面の直し 回3（2026-11-15）: 戦闘で P2 が「ターン終了」して P1 を待っている間に、状態の印の「＋N」（敵・味方）を押すと
+//     状態の一覧が開き、「閉じる」で閉じる。開け閉めしても P1 の番は止まらない。COOP_LAYERS_ONLY=status でこの所だけ通す
 // P2 の操作は画面のボタンで押す。
 // エミュレーター（demo-card-rpg）だけを使う（URL の ?emu=）。本番の Firebase には書かない。
 // 使い方: URL=http://127.0.0.1:4193/card-rpg/ node scripts/coop-layers.mjs   （COOP_LAYERS_OUTPUT で写真の場所）
@@ -208,10 +210,96 @@ async function openCloseWhileWaiting(r, label) {
 }
 
 const summary = {};
+const ONLY_STATUS = process.env.COOP_LAYERS_ONLY === 'status';
+
+/** 戦闘の状態の一覧（P2 の待ち中）。世界マップで2人一緒に敵とぶつかって戦闘を始め、印を付ける */
+async function statusListWhileWaiting(r) {
+  const L = '戦闘の状態の一覧（P2 の待ち中）';
+  const { A, B } = r;
+  const send = async (page, cmd) => {
+    const err = await api(page, (c) => window.__online.send(c), cmd);
+    if (err) throw new Error(`${JSON.stringify(cmd).slice(0, 80)}: ${err}`);
+    await wait(500);
+  };
+  const g = structuredClone(r.g0);
+  const w = g.world;
+  const from = w.pos[r.h1];
+  const W = w.width;
+  const col = from % W, row = Math.floor(from / W);
+  const dirs = row & 1 ? [[1, 0], [1, -1], [0, -1], [-1, 0], [0, 1], [1, 1]] : [[1, 0], [0, -1], [-1, -1], [-1, 0], [-1, 1], [0, 1]];
+  const to = dirs.map(([dc, dr]) => (row + dr) * W + col + dc).find((i) => i >= 0 && i < w.tiles.length && !w.tiles[i].f && w.tiles[i].t !== 'sea' && w.tiles[i].t !== 'mountain');
+  for (const h of g.heroes) {
+    w.pos[h.id] = from;
+    h.lastRandomEvent = w.worldTurn;
+  }
+  w.tiles[to].seen = true;
+  w.wanderers = [{ id: 'wst', tile: to, enemies: [{ defId: 'forestWolf', level: 1 }] }];
+  w.follow = { [r.h2]: r.h1 };
+  w.turn = r.h1;
+  w.move = 3;
+  w.story = undefined;
+  w.visitedRegions = Array.from({ length: 200 }, (_, i) => i);
+  await r.inject(g);
+  await send(A, { type: 'WORLD_MOVE', playerId: 'P1', heroId: r.h1, to, companions: [r.h2] });
+  await send(B, { type: 'WORLD_MOVE_AGREE', playerId: 'P2', accept: true });
+  await until(async () => (await game(A)).mode === 'encounter', 8000, 'encounter');
+  await send(A, { type: 'ENCOUNTER_CHOOSE', playerId: 'P1', heroId: r.h1, choice: 'fight', participants: [r.h1, r.h2], focusUsed: 0 });
+  await until(async () => (await game(A)).mode === 'battle', 8000, 'battle');
+  await wait(1500);
+  // 敵に5つ（❄隠れている・かばう・毒・脆弱・弱体）、P2 の味方に4つ
+  const gb = await game(A);
+  const b = gb.battle;
+  b.enemies[0].statuses = { poison: 3, vulnerable: 2, weak: 1 };
+  b.enemies[0].hidden = true;
+  b.enemies[0].guarding = true;
+  const p2 = b.allies.find((a) => a.playerId === 'P2');
+  p2.statuses = { poison: 2, weak: 1, burn: 1, curse: 2 };
+  await r.inject(gb);
+  await until(async () => (await game(B))?.battle?.enemies?.[0]?.hidden === true, 8000, 'marks on P2');
+  await wait(800);
+  // P2 は先に「ターン終了」して、P1 を待つ
+  await send(B, { type: 'BATTLE', command: { type: 'END_TURN', playerId: 'P2' } });
+  await wait(800);
+  const phase0 = (await game(A))?.battle?.phase;
+  check(phase0 === 'ally', `${L}: P1 の番が続いている（${phase0}）`);
+  await shot(B, 'status-P2-waiting');
+  for (const side of ['enemy', 'ally']) {
+    const more = B.locator(side === 'enemy' ? '[data-enemy] [data-status-more]' : '[data-ally] [data-status-more]');
+    if (!(await more.count())) {
+      check(false, `${L}: P2 の画面の${side === 'enemy' ? '敵' : '味方'}に「＋N」の札がある`);
+      continue;
+    }
+    await press(B, more, `${L}: P2 が${side === 'enemy' ? '敵' : '味方'}の「＋N」`);
+    const open = await tryUntil(async () => (await B.locator('[data-status-list]').count()) === 1, 2000);
+    check(open, `${L}: ${side === 'enemy' ? '敵' : '味方'}の状態の一覧が開く`);
+    const rows = await B.locator('[data-status-list] [data-status-list-row]').count();
+    check(rows === (side === 'enemy' ? 5 : 4), `${L}: 一覧の行 ${rows}（本当は ${side === 'enemy' ? 5 : 4}）`);
+    await shot(B, `status-P2-list-${side}`);
+    await press(B, '[data-status-list-close]', `${L}: 一覧の「閉じる」`);
+    check(await tryUntil(async () => (await B.locator('[data-status-list]').count()) === 0, 2000), `${L}: 閉じる`);
+  }
+  // P1 の画面でも開け閉めでき、P1 はそのまま手番を続けられる（ターン終了が押せる）
+  const moreA = A.locator('[data-enemy] [data-status-more]');
+  if (await moreA.count()) {
+    await press(A, moreA, `${L}: P1 も敵の「＋N」`);
+    check((await A.locator('[data-status-list]').count()) === 1, `${L}: P1 の画面でも一覧が開く`);
+    await A.keyboard.press('Escape');
+    await wait(300);
+    check((await A.locator('[data-status-list]').count()) === 0, `${L}: P1 の画面の一覧は Esc でも閉じる`);
+  }
+  // P1 はそのまま手番を続けられる（使えるカードが押せる・味方の番のまま）
+  await press(A, '[data-card-index][data-usable]', `${L}: P1 の手札のカード`, { click: false });
+  check((await game(A))?.battle?.phase === 'ally', `${L}: 開け閉めの後も味方の番のまま`);
+  await shot(A, 'status-P1-after');
+  summary.status = true;
+}
+
 let r;
 try {
   r = await setupRoom();
   const { A, B } = r;
+  await statusListWhileWaiting(r);
+  if (!ONLY_STATUS) {
 
   // ---- 0) 世界マップのマスのイベントで、P1 の手番を待っている（下に待ちの帯 TurnLock が出る）----
   // 前は待ちの帯（z-55・押せる覆い）がシート（z-50）の下 34% に乗り、シートの下が黒く消えて押せなかった
@@ -376,6 +464,7 @@ try {
     check(!!before && before === after, `${L6}: 道具袋から戻ってもフォーカスの指定がそのまま（${before} / ${after}）`);
     check(!!(await game(A))?.expeditions?.[0]?.event?.decided, `${L6}: 挑む段のまま`);
     await shot(owner, `${L6}-after-pouch`);
+  }
   }
   summary.done = true;
 } catch (e) {

@@ -11,6 +11,8 @@ import { useBattle } from '../../store/battleStore';
 import type { AllyState } from '../../types';
 import { HpBar } from '../ui/HpBar';
 import { StatusChips } from '../ui/StatusChips';
+import { useBattleLowScreen } from './lowScreen';
+import { allyMarks } from './statusMarks';
 
 export { PLAYER_COLOR };
 
@@ -30,6 +32,8 @@ const AllyCard = memo(function AllyCard({ ally }: { ally: AllyState }) {
   const veiled = !ally.dead && battle.enemies.some((e) => veiledIntent(battle, e) && intentHitsOn(e, ally, battle.allies).length > 0);
   const lethal = !ally.dead && incoming >= ally.hp && incoming > 0;
   const usable = usableCardCount(battle, ally);
+  const low = useBattleLowScreen();
+  const marks = allyMarks(ally);
 
   return (
     <div
@@ -82,11 +86,11 @@ const AllyCard = memo(function AllyCard({ ally }: { ally: AllyState }) {
             ally.focus
           )}
         </span>
-        <span className={`ml-auto ${usable > 0 ? 'text-zinc-200' : 'text-zinc-500'}`}>{ally.dead ? '' : !mine ? '' : done ? '済' : `${usable}枚`}</span>
+        {/* 回3: 低い画面は、状態の印を小さい札にしてこの行の中に入れる（欄が伸びて画面からはみ出さないように） */}
+        {low && <StatusChips marks={marks} side="ally" unit={ally.id} maxW={60} inline />}
+        <span className={`${low && marks.length ? 'shrink-0' : 'ml-auto'} ${usable > 0 ? 'text-zinc-200' : 'text-zinc-500'}`}>{ally.dead ? '' : !mine ? '' : done ? '済' : `${usable}枚`}</span>
       </div>
-      <div className="relative mt-1">
-        <StatusChips s={ally.statuses} side="ally" onTap={() => setActive(ally.id)} />
-      </div>
+      <div className="relative mt-1">{!low && <StatusChips marks={marks} side="ally" unit={ally.id} maxW={120} />}</div>
       {/* 戦闘不能: 枠を暗くして、勝てば戻ることを書く（全文「戦闘不能（勝利でHP1復帰）」は詳細に。ステップB） */}
       {ally.dead && (
         <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center rounded-xl bg-black/60 text-center text-[12px] leading-4 font-bold" data-fallen-note>

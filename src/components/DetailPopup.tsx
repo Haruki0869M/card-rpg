@@ -24,6 +24,8 @@ import { CATEGORY_LABEL, intentView, longEffect, tierTitle } from './format';
 import { RARITY_STYLE } from './ui/game';
 import { CATEGORY_STYLE, ElementTag, MARK_STATUSES, PSEUDO_STATUSES, statusStyle } from './ui/icons';
 import { BALANCE } from '../data/balance';
+import { StatusListBody } from './battle/StatusListPopup';
+import { allyMarks, enemyMarks, type Mark } from './battle/statusMarks';
 
 function signed(n: number) {
   return n > 0 ? `+${n}%` : n < 0 ? `${n}%` : '±0%';
@@ -167,6 +169,7 @@ function Content({ d, battle, game }: { d: Detail; battle: BattleState; game: Ga
                 ) : null}
               </div>
             )}
+            <MarksSection marks={enemyMarks(e)} battle={battle} />
             <EnemyStats e={e} />
             <div className="mt-1 text-[12px] text-zinc-500">
               {set.pattern === 'sequence'
@@ -208,6 +211,7 @@ function Content({ d, battle, game }: { d: Detail; battle: BattleState; game: Ga
                 <span className="font-display text-fuchsia-200">《{ab.name}》</span> {describeAbility(ab)}
               </div>
             ))}
+            <MarksSection marks={allyMarks(a)} battle={battle} />
             <div className="mt-0.5 text-[13px] text-red-300">被弾予定 {incomingDamage(battle, a, true)}（ブロック差し引き後{battle.enemies.some((e) => veiledIntent(battle, e)) ? '。闇の帳で隠れた予告の分は入らない' : ''}）</div>
           </div>
         </div>
@@ -256,6 +260,17 @@ function Content({ d, battle, game }: { d: Detail; battle: BattleState; game: Ga
       );
     }
   }
+}
+
+/** 状態の一覧（回3: 「＋N」の札で開く一覧と同じ。毒・脆弱なども長押しの説明で読める） */
+function MarksSection({ marks, battle }: { marks: Mark[]; battle: BattleState }) {
+  if (!marks.length) return null;
+  return (
+    <div className="mt-1" data-detail-status-list>
+      <div className="text-[12px] font-bold text-zinc-300">付いている状態（{marks.length}つ）</div>
+      <StatusListBody marks={marks} battle={battle} />
+    </div>
+  );
 }
 
 /** 敵の行動1つの短い説明（今の攻撃力で計算したダメージ） */
