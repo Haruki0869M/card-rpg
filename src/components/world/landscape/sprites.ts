@@ -56,9 +56,15 @@ const ART: Partial<Record<ItemKind, string[]>> = {
   grass: ['landscape/prop-grass'],
   flower: ['landscape/prop-flower'],
   mushroom: ['landscape/prop-mushroom'],
+  deadTree: ['landscape/tree-dead-1', 'landscape/tree-dead-2'],
+  crystal: ['landscape/blight-crystal'],
+  peak: ['landscape/peak-lone', 'landscape/peak-high', 'landscape/peak-mid'],
+  volcano: ['landscape/volcano-cone'],
+  reeds: ['landscape/swamp-reeds-1', 'landscape/swamp-reeds-2'],
+  snowPine: ['landscape/snow-pine-1', 'landscape/snow-pine-2'],
 };
 /** 絵の高さ ÷ 立つ物の高さ h（絵には周りの余白があるので、少し大きめに描く） */
-const ART_SCALE: Partial<Record<ItemKind, number>> = { broadleaf: 1.3, pine: 1.3, plainsTree: 1.3, hill: 2.1, rock: 2.2, grass: 2.3, flower: 2.3, mushroom: 1.9 };
+const ART_SCALE: Partial<Record<ItemKind, number>> = { broadleaf: 1.3, pine: 1.3, plainsTree: 1.3, hill: 2.1, rock: 2.2, grass: 2.3, flower: 2.3, mushroom: 1.9, deadTree: 1.3, crystal: 2.2, peak: 1.15, volcano: 1.15, reeds: 1.5, snowPine: 1.3 };
 function sceneryImage(k: ItemKind, v: number): SceneImage | undefined {
   const keys = [...(ART[k] ?? []), ...artImageIds('scenery').filter((id) => id === k || id.startsWith(`${k}-`)).map((id) => `scenery/${id}`)].filter((key) => artImage(key));
   if (!keys.length) return undefined;

@@ -37,7 +37,12 @@ const FEATURE_COLOR: Record<string, string> = { town: '#ffe9a8', dungeon: '#ff9a
 function placeImage(f: NonNullable<WorldState['tiles'][number]['f']>): string | undefined {
   // 箱庭の試作の絵（ChatGPT。墨線＋淡い水彩）があれば、それを使う
   const capital = !!(f.kind === 'town' && TOWNS.tryGet(f.id)?.capital);
-  const box = f.kind === 'town' ? artImage(capital ? 'landscape/place-capital' : 'landscape/place-town') : f.kind === 'shrine' ? artImage('landscape/place-shrine') : undefined;
+  const box =
+    f.kind === 'town'
+      ? artImage(capital ? 'landscape/place-capital' : 'landscape/place-town')
+      : f.kind === 'shrine' || f.kind === 'dungeon' || f.kind === 'landmark'
+        ? artImage(`landscape/place-${f.kind}`)
+        : undefined;
   if (box) return box;
   if (f.kind === 'town') return artImage(capital ? 'place/capital' : 'place/town');
   if (f.kind === 'chest') return artImage(`chest/${f.chest?.rarity ?? 'common'}`);

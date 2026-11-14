@@ -8,7 +8,7 @@ import { GROUND_K } from './diorama';
 
 /** 場所の種類 → 絵のキー（絵があればそれを使う。イベントは箱庭の試作のテントの絵） */
 export type MiniKind = 'event' | 'temple' | 'altar' | 'finale';
-export const MINI_ART_KEY: Record<MiniKind, string> = { event: 'landscape/place-tent', temple: 'place/temple', altar: 'place/altar', finale: 'place/finale' };
+export const MINI_ART_KEY: Record<MiniKind, string> = { event: 'landscape/place-tent', temple: 'landscape/place-temple', altar: 'landscape/place-altar', finale: 'landscape/place-finale' };
 
 /**
  * 場所のミニチュア。x, y = マスの上の面の中心、R = マスの半径。
