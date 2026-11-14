@@ -42,9 +42,9 @@ export const TIER_METAL: Record<JobTier, { light: string; mid: string; dark: str
 };
 
 /** 描いた台座の絵の寸法（scripts/art/build_pedestal.py が表示する値）: 横:縦と、上面のだ円の真ん中の高さ（絵の高さに対する割合） */
-const BASE_ART = { aspect: 2.801, topCy: 0.295, bandMid: 0.783 };
+const BASE_ART = { aspect: 3.232, topCy: 0.341, bandMid: 0.826 };
 /** 描いた台座の置き方（駒の箱の大きさ s に対する割合）。台座の下の端は前の台座と同じ（0.942）。
- *  台座が高い分（2026-11-15 オーナーの依頼で側面を 1.7 倍）、上面と駒の絵を lift だけ持ち上げる */
+ *  台座が高い時は、その分だけ上面と駒の絵を持ち上げる（1.7 倍の高さを試したが、オーナーが今の薄い方を選んだ。今は持ち上げ 0） */
 const BASE_H = 0.96 / BASE_ART.aspect;
 const BASE_TOP = 0.942 - BASE_H;
 const BASE_LIFT = 0.746 - (BASE_TOP + BASE_ART.topCy * BASE_H);

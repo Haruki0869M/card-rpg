@@ -63,7 +63,7 @@ rim = cv2.dilate(np.where(gold & (rgba[..., 3] > 128), 255, 0).astype(np.uint8),
 rim = cv2.GaussianBlur(rim, (3, 3), 0)
 
 # 台座を高くする（2026-11-15 オーナーの依頼）: 側面の帯だけを、列ごとに縦に引きのばす（上面のだ円の形は変えない）
-TALL = float(os.environ.get('TALL', '1.7'))
+TALL = float(os.environ.get('TALL', '1.0'))  # 1.7 を試したが、オーナーが薄い方（1.0）を選んだ（2026-11-15）
 cols = np.arange(W)
 has = band.max(0) > 128
 tt = np.array([np.argmax(band[:, x] > 128) if has[x] else -1 for x in cols], float)
