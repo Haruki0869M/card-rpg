@@ -134,6 +134,11 @@ const worldBox = (page) =>
     };
   });
 /** その要素の真ん中に、ほかの物が乗っていないか */
+/** 消えるまで待つ（閉じる時の薄くなる動きを待つ。重い時のため最大2秒） */
+const gone = async (page, sel) => {
+  await page.locator(sel).first().waitFor({ state: 'detached', timeout: 2000 }).catch(() => {});
+  return !(await page.locator(sel).count());
+};
 const onTop = (page, sel) =>
   page.evaluate((s) => {
     const el = document.querySelector(s);
@@ -209,13 +214,11 @@ export async function worldMapChecks({ browser, BASE, OUT, check }) {
       await shot('4-skull-open');
       const sb = await skull.boundingBox();
       await page.mouse.click(sb.x + sb.width / 2, sb.y + sb.height / 2);
-      await wait(400);
-      check(!(await page.locator('[data-scourge-dialog]').count()), `${tag} 💀 をもう1度押す（窓の外）と閉じる`, 'world');
+      check(await gone(page, '[data-scourge-dialog]'), `${tag} 💀 をもう1度押す（窓の外）と閉じる`, 'world');
       await skull.click();
       await wait(300);
       await page.locator('[data-scourge-close]').click();
-      await wait(300);
-      check(!(await page.locator('[data-scourge-dialog]').count()), `${tag} 説明の窓は×でも閉じる`, 'world');
+      check(await gone(page, '[data-scourge-dialog]'), `${tag} 説明の窓は×でも閉じる`, 'world');
       // 🔍: 押すと ＋・標準・− が開く → もう1度押すと閉じる → 開いて地図を押すと閉じる（マスは選ばない）
       check((await page.locator('[data-zoom-controls][data-zoom-folded="closed"]').count()) === 1 && !(await page.locator('[data-zoom-in]').count()), `${tag} 拡大のボタンは畳んだ形（見取り図＋🔍）`, 'world');
       await page.locator('[data-zoom-toggle]').click();

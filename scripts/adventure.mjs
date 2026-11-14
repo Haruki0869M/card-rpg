@@ -115,7 +115,7 @@ async function playBattle(page) {
     const card = cards.first();
     const box = await card.boundingBox();
     // 低い画面（ADVENTURE_VIEWPORT=390x540 など）はカードが低いので、カードの高さの中を押す（下の「山札」のボタンを押さないように）
-    await page.mouse.click(box.x + 14, box.y + Math.min(70, box.height * 0.45));
+    await page.mouse.click(box.x + 14, box.y + (page.viewportSize().height < 640 ? 24 : Math.min(70, box.height * 0.45)));
     await page.waitForTimeout(40);
     if (await page.getByText('敵をタップ').count()) {
       const e = page.locator('[data-enemy]:not([data-dead])').first();
