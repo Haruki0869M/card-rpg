@@ -45,11 +45,13 @@ const hasDamage = (card: CardDef) => card.tiers.some((t) => t.effects.some((e) =
  * - 耐性: 敵の耐性の属性（弱点を突いた扱いでも、耐性が先。エンジンの倍率と同じ）
  * - perfectStatuses = 完全成功の時の予測で、その敵に必ず付く状態異常（predictCardTotals の statuses）。
  *   この中に、当たる属性の状態異常がある時だけ「完全成功で〇〇確定」を出す（耐性・ブロックで防がれる・倒してしまう時は出ない）
- * - guarded = ほかの敵にかばわれていて、この敵には当たらない（案内を出さない）
+ * - guarded = ほかの敵にかばわれていて、この敵には当たらない（案内を出さない）。吹雪に隠れている敵への単体のカードも同じ（区切り3b）
  */
 export function elementGuide(battle: BattleState, ally: AllyState | undefined, card: CardDef | undefined, enemy: EnemyState, perfectStatuses?: string[]): ElementGuide | undefined {
   if (!ally || !card || !hasDamage(card) || enemy.dead) return undefined;
   if (card.target === 'enemy' && battle.enemies.some((e) => !e.dead && e.guarding && e !== enemy)) return undefined;
+  // 区切り3b: 吹雪に隠れている敵には、単体のカードのダメージは外れる（弱点の倍率の案内は出さない。BREAK の案内は FocusPanel が出す）
+  if (card.target === 'enemy' && enemy.hidden) return undefined;
   const element = hitElement(ally, card, enemy);
   if (element && isResistTo(enemy, element)) return { kind: 'resist', element, chip: '▼耐性' };
   const alwaysWeak = cardModifier(cardTraitAbilities(card), 'alwaysWeak').length > 0;

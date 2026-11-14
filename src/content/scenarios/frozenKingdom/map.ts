@@ -14,8 +14,9 @@ export const frozenKingdomMap: ScenarioMapDef = {
   start: [7, 40],
   roadTerrain: 'road',
   // 出る災厄（シナリオ2の作り直し §2-2・オーナーの返事 1-A）。氷嵐の魔女は手下がもともと雪の敵なので共通で出す。
-  // このシナリオの3体（白狼王・凍て鐘の亡霊・灯を喰らう影）は次の区切りで足す。それまでは、出る災厄は魔女の1体だけ
-  scourges: ['stormWitch'],
+  // 区切り3b: このシナリオの3体（白狼王・凍て鐘の亡霊・灯を喰らう影。frozenKingdom/scourges/）を足した。4体から1冒険3体
+  // （灯を喰らう影は、専用の装備の錫杖を使えるジョブがいないパーティには出ない = 残りの3体）
+  scourges: ['stormWitch', 'whiteWolfKing', 'frostBellWraith', 'lampEaterShade'],
   // 回復のマス（地域の herbs の数だけ、prefer.herb の帯に置く）は温泉
   herbEvent: 'hotSpring',
   regions: [

@@ -36,6 +36,8 @@ export interface EffectCtx {
   noStatus?: boolean;
   /** 鎧通し（敵の盾砕き・氷の剣士。2026-11-14）: このダメージはブロックを無視する（damage の効果の pierce が、当てる間だけ立てる） */
   pierce?: boolean;
+  /** 敵の行動の威力の倍率（BREAK・強奪などの nextActionMultiplier。amount を持たない効果 = 鐘のこだまが読む。区切り3b） */
+  actionMul?: number;
   /** 「最初の1回の攻撃にだけ足すダメージ」を、もう使った */
   addOnceUsed?: boolean;
   /** HPに与えたダメージの合計（吸収などが読む） */

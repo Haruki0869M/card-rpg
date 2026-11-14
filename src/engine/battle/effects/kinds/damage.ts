@@ -2,7 +2,8 @@
 import { dealDamage, resolveTargets, targetOf } from '..';
 import { getElement } from '../../../../data/elements';
 import { getStatus } from '../../../../data/statuses';
-import { isEnemy, nameOf, type Unit } from '../../units';
+import { isEnemy, nameOf, sideOf, type Unit } from '../../units';
+import type { BattleState } from '../../../../types';
 import { activeStatuses } from '../../statuses';
 import { chargedMultiplier } from '../../cardState';
 import { extraHitsOf } from '../../../abilities';
@@ -19,8 +20,9 @@ declare module '../../../../types' {
      * huntWhen = lowHpMul が掛かる時（省略 = HPが半分以下 / noBlock = 当たる時にブロックが無い / afflicted = 悪い状態異常がある）
      * lowOnly = 味方全員への攻撃のうち、HPが半分以下の味方にだけ当たる（だれもいなければ空振り）
      * pierce = ブロックを無視する（壊さない。BREAK されていると無視しない）
+     * packHits = 回数を「今生きている、使う側の数」にする（敵なら生きている敵の数。自分も数える。hits の代わり。白狼王の群れの牙。2026-11-14 区切り3b）
      */
-    damage: { amount: number; hits?: number; element?: string; outcomes?: { weight: number; multiplier: number }[]; lowHpMul?: number; huntBy?: 'hp' | 'lastHit' | 'afflicted'; huntWhen?: 'noBlock' | 'afflicted'; lowOnly?: boolean; pierce?: boolean };
+    damage: { amount: number; hits?: number; element?: string; outcomes?: { weight: number; multiplier: number }[]; lowHpMul?: number; huntBy?: 'hp' | 'lastHit' | 'afflicted'; huntWhen?: 'noBlock' | 'afflicted'; lowOnly?: boolean; pierce?: boolean; packHits?: boolean };
   }
 }
 
@@ -32,6 +34,15 @@ export function huntApplies(e: { huntWhen?: 'noBlock' | 'afflicted' }, t: Unit):
   if (e.huntWhen === 'noBlock') return t.block <= 0;
   if (e.huntWhen === 'afflicted') return isAfflicted(t);
   return t.hp * 2 <= t.maxHp;
+}
+
+/**
+ * ダメージの回数（データの hits。packHits なら、今生きている、使う側の数 = 敵の行動なら生きている敵の数。自分も数える）。
+ * 予告の数字・実際の攻撃・bot が同じ関数を読む（手下を倒すと、予告の回数がその場で減る）。乱数は使わない
+ */
+export function damageHits(e: { hits?: number; packHits?: boolean }, source: Unit | undefined, state: Pick<BattleState, 'allies' | 'enemies'> | undefined): number {
+  if (e.packHits && source && state) return Math.max(1, sideOf(state as BattleState, source).filter((u) => !u.dead).length);
+  return e.hits ?? 1;
 }
 
 /** 倍率が掛かる時の文（説明用） */
@@ -48,9 +59,10 @@ export const effect: EffectHandler<'damage'> = {
       for (const o of e.outcomes) { multiplier = o.multiplier; roll -= o.weight; if (roll < 0) break; }
       ctx.parts.push(`勝負×${multiplier}`);
     }
-    const multi = (e.hits ?? 1) >= 2 && !isEnemy(ctx.source) ? (ctx.multi ??= { total: 0, landed: 0 }) : undefined;
+    const multi = damageHits(e, ctx.source, ctx.state) >= 2 && !isEnemy(ctx.source) ? (ctx.multi ??= { total: 0, landed: 0 }) : undefined;
     // 区切りD: 弾込め — 次の「×N回」のカードの回数+1（使ったら消える）
-    let hits = e.hits ?? 1;
+    // 区切り3b: 群れの牙 — 回数は、使う時に生きている仲間の数（自分も数える）
+    let hits = damageHits(e, ctx.source, ctx.state);
     const src = ctx.source;
     if (hits >= 2 && !isEnemy(src) && src.extraHits && ctx.card) { hits += src.extraHits; delete src.extraHits; ctx.parts.push('弾込め'); }
     // 段階7a: 連装ガトリング銃 — 「×N回」のカードの攻撃は、いつも回数+1（カードの攻撃だけ。能力・お供の追撃には付かない）
@@ -90,7 +102,8 @@ export const effect: EffectHandler<'damage'> = {
     const low = e.lowHpMul ? `（${huntWhenText(e)}相手には×${e.lowHpMul}）` : '';
     const only = e.lowOnly ? '（HPが半分以下の相手にだけ当たる。だれもいなければ空振り）' : '';
     const pierce = e.pierce ? '（ブロックを無視する。ブロックは壊れずに残る。BREAK されると無視しない）' : '';
-    return `${who}${e.amount}の${el ? `${el.name}属性` : ''}ダメージ${(e.hits ?? 1) > 1 ? `×${e.hits}回` : ''}${st}${gamble}${low}${only}${pierce}`;
+    const pack = e.packHits ? '×「生きている仲間の数」回（自分も数える）' : '';
+    return `${who}${e.amount}の${el ? `${el.name}属性` : ''}ダメージ${(e.hits ?? 1) > 1 ? `×${e.hits}回` : ''}${pack}${st}${gamble}${low}${only}${pierce}`;
   },
   short: (e) => `${e.outcomes?.length ? `${Math.floor(e.amount * Math.min(...e.outcomes.map(o => o.multiplier)))}〜${Math.floor(e.amount * Math.max(...e.outcomes.map(o => o.multiplier)))}` : e.amount}${(e.hits ?? 1) > 1 ? `×${e.hits}` : ''}`,
   upgrade: (e) => ({ ...e, amount: upgradeAmount(e.amount) }),

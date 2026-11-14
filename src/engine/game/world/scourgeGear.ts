@@ -2,9 +2,9 @@
 // シナリオの伝説品を、そのシナリオの災厄の専用の装備に移す（ItemDef.scourgeGear = 落とす災厄の ID）。
 // 印のある品は、次の3つが全部そろう冒険でだけ、宝箱・店・ドロップ・行商人・闇商人に出ない（災厄が必ず落とす）:
 //   1. その災厄が登録されている（SCOURGES にある。専用の装備がその品）
-//   2. その冒険のシナリオに出る災厄の一覧（ScenarioMapDef.scourges。省略は全部）に入っている
+//   2. その冒険のシナリオに出る災厄の一覧（ScenarioMapDef.scourges。省略は共通とそのシナリオだけの災厄）に入っている
 //   3. 広い地図の冒険（古い 8×35 の地図の保存では、今までどおり宝箱・店から出る。災厄が出ないので、取れない品を作らない）
-// 災厄がまだ登録されていない間（区切り3a の時点）は、印があっても今までどおり出る。乱数は引かない（候補から外すだけ）
+// 災厄が登録されていない時は、印があっても今までどおり出る（区切り3b でシナリオ2の3体を登録した）。乱数は引かない（候補から外すだけ）
 import { ITEMS } from '../../../data/items';
 import { getScenario } from '../../../data/scenarios';
 import { SCOURGES } from '../../../data/world';
@@ -20,8 +20,9 @@ export function heldByScourge(game: Pick<GameState, 'scenarioId' | 'world'>, ite
   if (SCOURGES.tryGet(sid)?.gear !== item.id) return false;
   // ほかのシナリオの限定品は、もともとその冒険の宝箱・店に出ない（外す必要が無い）
   if (item.scenario && item.scenario !== game.scenarioId) return false;
+  // 一覧の無い地図は、共通とそのシナリオだけの災厄（world/scourges.ts の scourgesFor と同じ決まり）
   const list = getScenario(game.scenarioId).map?.scourges;
-  return !list || list.includes(sid);
+  return list ? list.includes(sid) : SCOURGES.forScenario(game.scenarioId).some((d) => d.id === sid);
 }
 
 /** この冒険で、宝箱・店などから外す品の ID（無ければ空） */

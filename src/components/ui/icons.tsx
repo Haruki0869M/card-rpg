@@ -18,6 +18,8 @@ import {
   Shield,
   Skull,
   Snowflake,
+  CloudSnow,
+  Bell,
   Sun,
   Moon,
   Zap,
@@ -92,13 +94,33 @@ const GUARD_STYLE: StatusStyle = {
   bg: '#0a2a4a',
   text: '次の味方の番の間、ほかの敵を狙った単体攻撃のカードのダメージを、この敵が代わりに受ける。全体攻撃・お供と召喚の攻撃は、そのまま通る。この敵が倒れたら終わる',
 };
+/** 吹雪に隠れている（白狼王の段階。区切り3b。状態異常ではないが、同じ並びに出す） */
+const HIDDEN_STYLE: StatusStyle = {
+  Icon: CloudSnow,
+  name: '吹雪に隠れている',
+  color: '#d8f0ff',
+  bg: '#1a2a3a',
+  text: '次の敵の番まで、単体のカードのダメージは外れる（0）。全体攻撃・お供と召喚・毒などの継続ダメージ・反撃・道具は当たる。状態異常だけの効果は付く。BREAK はできる',
+};
+/** 喰った灯（灯を喰らう影の段階。区切り3b。数 = 喰った灯） */
+const LAMP_STYLE: StatusStyle = {
+  Icon: Flame,
+  name: '喰った灯',
+  color: '#e0b0ff',
+  bg: '#2a1240',
+  text: '味方がフォーカスを1つ使うたび+1（最大6）。1つにつき、この敵の攻撃が+2。この敵を BREAK すると0に戻る',
+};
 /** 状態異常ではない印（数を出さない） */
-export const MARK_STATUSES = new Set(['taunt', 'guard']);
+export const MARK_STATUSES = new Set(['taunt', 'guard', 'hidden']);
+/** 状態異常ではない印（数を出す物も含む。長押しで「残りターン」を出さない） */
+export const PSEUDO_STATUSES = new Set(['taunt', 'guard', 'hidden', 'lamp']);
 const styleCache = new Map<string, StatusStyle>();
 /** 状態異常の見た目（データから作る） */
 export function statusStyle(id: string): StatusStyle {
   if (id === 'taunt') return TAUNT_STYLE;
   if (id === 'guard') return GUARD_STYLE;
+  if (id === 'hidden') return HIDDEN_STYLE;
+  if (id === 'lamp') return LAMP_STYLE;
   let st = styleCache.get(id);
   if (!st) {
     const d = getStatus(id);
@@ -136,6 +158,8 @@ const EFFECT_ICON: Record<string, { Icon: LucideIcon; color: string }> = {
   purify: { Icon: Sparkles, color: '#9affd0' },
   punishPlays: { Icon: Eye, color: '#ffb07a' },
   guardAllies: { Icon: ShieldHalf, color: '#9ad0ff' },
+  hide: { Icon: CloudSnow, color: '#d8f0ff' },
+  echoBlow: { Icon: Bell, color: '#fff2b0' },
   retaliate: { Icon: Swords, color: '#ffb07a' },
 };
 const FALLBACK_EFFECT_ICON = { Icon: Sparkles, color: '#e0d8c0' };

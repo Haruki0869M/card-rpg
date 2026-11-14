@@ -478,10 +478,10 @@ describe('区切り2: 温泉（全員のHP回復＋次の朝まで寒さを受�
   });
 });
 
-describe('区切り2: 災厄（このシナリオの3体は次の区切り。今は氷嵐の魔女だけ）', () => {
-  it('出る候補は氷嵐の魔女だけ。節目を全部越えても1体だけで、ワールドターンは止まらずに進む', () => {
-    expect(scourgesFor(FK).map((d) => d.id)).toEqual(['stormWitch']);
-    // 魔女の専用の装備を使えるキャラがいるパーティ（いなければ0体）
+describe('区切り3b: 災厄（氷嵐の魔女とこのシナリオの3体。4体から1冒険3体）', () => {
+  it('出る候補は4体。節目を全部越えても3体までで、同じ種類は出ない。ワールドターンは止まらずに進む', () => {
+    const LIST = ['stormWitch', 'whiteWolfKing', 'frostBellWraith', 'lampEaterShade'];
+    expect(scourgesFor(FK).map((d) => d.id)).toEqual(LIST);
     let g = createGame({ seed: 4020, scenarioId: FK, difficulty: 'normal', party: ['mage', 'warrior'].map((classId, i) => ({ classId, gender: 'male' as const, name: `h${i}`, playerId: `P${i + 1}` as PlayerId })) });
     g = run(g, { type: 'STORY_CONTINUE', playerId: 'P1' });
     expect(g.world!.scourgeCount).toBe(0);
@@ -497,9 +497,10 @@ describe('区切り2: 災厄（このシナリオの3体は次の区切り。今
       expect(g.world!.worldTurn, `turn ${t}`).toBe(start + 1);
     }
     const alive = aliveScourges(g.world).map((x) => x.def.id);
-    expect(alive.length).toBeLessThanOrEqual(1);
-    for (const id of alive) expect(id).toBe('stormWitch');
-    expect(g.world!.scourgesMet!.every((id) => id === 'stormWitch')).toBe(true);
+    expect(alive.length).toBeLessThanOrEqual(3);
+    expect(new Set(alive).size).toBe(alive.length);
+    for (const id of alive) expect(LIST).toContain(id);
+    expect(g.world!.scourgesMet!.every((id) => LIST.includes(id))).toBe(true);
   });
 });
 

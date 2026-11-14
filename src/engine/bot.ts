@@ -378,7 +378,8 @@ function battleStep(g: GameState, log: BotLog, memo: BotMemo): GameState {
       const c = a.hand.find((x) => !unusableReason(b, a, cardOf(x), x.uid));
       if (!c) continue;
       const card = cardOf(c);
-      const target = b.enemies.find((e) => !e.dead)?.uid;
+      // 区切り3b: 吹雪に隠れている敵（単体のカードが外れる）より、隠れていない敵を先に（いなければ今までどおり）
+      const target = (b.enemies.find((e) => !e.dead && !e.hidden) ?? b.enemies.find((e) => !e.dead))?.uid;
       const focus = card.slots >= 3 ? Math.min(card.slots, a.focus) : 0;
       return send(g, { type: 'BATTLE', command: { type: 'PLAY_CARD', playerId: a.playerId, characterId: a.id, cardInstanceId: c.uid, targetId: card.target === 'enemy' ? target : isAllyCard(card) ? cardTargets(g.battle!, a, card).sort((x,y) => x.hp/x.maxHp-y.hp/y.maxHp).map(unitIdOf)[0] : undefined, allyTargetId: card.secondaryTarget ? cardTargets(b, a, secondaryCard(card)).sort((x,y) => x.hp/x.maxHp-y.hp/y.maxHp).map(unitIdOf)[0] : undefined, focusUsed: focus } }, log);
     }

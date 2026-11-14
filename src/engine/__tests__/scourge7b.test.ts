@@ -14,13 +14,15 @@ import { shopPriceFor } from '../game/common';
 import { rollConsumable, rollEquipment, rollExclusive } from '../game/loot';
 import { colOf, hexDistance } from '../game/world/hex';
 import { laneOfTile } from '../game/world/lanes';
-import { aliveScourges, scourgeCandidates, scourgeCurse, scourgesDue, spawnScourge, tickScourges } from '../game/world/scourges';
+import { aliveScourges, scourgeCandidates, scourgeCurse, scourgesDue, scourgesFor, spawnScourge, tickScourges } from '../game/world/scourges';
 import { wandererLevel } from '../game/world/wanderers';
 import { climbWatchtower } from '../game/world/explore';
 import { RARITIES } from '../game/dungeon';
 
 const IDS = ['greedKing', 'miasmaNecro', 'nightmareBeast', 'stormWitch', 'infernoDemon'];
 const GEAR = ['greedCrown', 'soulReaperScythe', 'nightmarePelt', 'permafrostGown', 'infernoCore'];
+/** シナリオ2だけの災厄（区切り3b） */
+const FROZEN_IDS = ['whiteWolfKing', 'frostBellWraith', 'lampEaterShade'];
 
 function run(g: GameState, cmd: GameCommand): GameState {
   const r = applyGameCommand(g, cmd);
@@ -71,8 +73,10 @@ function withScourge(g: GameState, id: string): GameState {
 
 describe('段階7b: 災厄の中ボスのデータ', () => {
   it('5種類（計画 §3-2 の4種類＋段階7c の業火の魔人）。悪さはそれぞれ別の種類・本体の敵と専用の装備がある', () => {
-    expect(SCOURGES.all.map((d) => d.id)).toEqual(IDS);
-    expect(SCOURGES.all.map((d) => Object.keys(d.curse)[0])).toEqual(['shopPrice', 'corruptionPerTurn', 'campHeal', 'nightLevel', 'battleBurn']);
+    // 区切り3b: シナリオ2だけの3体を足した（全部で8体）。シナリオ1に出るのは今の5体のまま（地図の一覧）
+    expect(SCOURGES.all.map((d) => d.id)).toEqual([...IDS, ...FROZEN_IDS]);
+    expect(scourgesFor('corruptionKing').map((d) => d.id)).toEqual(IDS);
+    expect(SCOURGES.all.map((d) => Object.keys(d.curse)[0])).toEqual(['shopPrice', 'corruptionPerTurn', 'campHeal', 'nightLevel', 'battleBurn', 'coldMul', 'buryRoad', 'visionDown']);
     expect(SCOURGES.get('infernoDemon').curse.battleBurn).toBe(1);
     expect(SCOURGES.get('infernoDemon').reward).toEqual({ elixir: 1 });
     expect(SCOURGES.get('greedKing').curse.shopPrice).toBe(25);
@@ -84,16 +88,17 @@ describe('段階7b: 災厄の中ボスのデータ', () => {
     expect(SCOURGES.get('miasmaNecro').reward.corruption).toBe(5);
     expect(SCOURGES.get('nightmareBeast').reward.elixir).toBe(1);
     expect(SCOURGES.get('stormWitch').reward.elixir).toBe(1);
-    expect(SCOURGES.all.map((d) => d.gear)).toEqual(GEAR);
+    expect(SCOURGES.all.map((d) => d.gear)).toEqual([...GEAR, 'springWaitCloak', 'everIceBracer', 'springbringerScepter']);
     for (const d of SCOURGES.all) {
       expect(ENEMIES.has(d.boss), d.id).toBe(true);
       for (const m of d.minions) expect(ENEMIES.has(m), `${d.id} ${m}`).toBe(true);
       expect(d.minions.length).toBeGreaterThanOrEqual(BALANCE.scourge.minions4p);
-      expect(getItem(d.gear).source).toBe('scourge');
+      // 区切り3b: シナリオ2の3体の専用の装備は、シナリオの伝説品を移した物（source ではなく scourgeGear の印）
+      expect(getItem(d.gear).source === 'scourge' || getItem(d.gear).scourgeGear === d.id, d.id).toBe(true);
     }
   });
 
-  it('本体の戦い方は5体とも別々。特殊な行動（大技の予告）は2種類まで・全部に予告の文がある・味方の番を止める行動は無い', () => {
+  it('本体の戦い方は8体とも別々（区切り3b でシナリオ2の3体を足した）。特殊な行動（大技の予告）は2種類まで・全部に予告の文がある・味方の番を止める行動は無い', () => {
     const shapes = new Set<string>();
     for (const d of SCOURGES.all) {
       const e = getEnemy(d.boss);
@@ -106,7 +111,7 @@ describe('段階7b: 災厄の中ボスのデータ', () => {
       expect(e.variantOf && ENEMIES.has(e.variantOf), d.id).toBe(true);
       shapes.add(big.map((a) => a.effects.map((x) => x.kind).join('+')).sort().join('|'));
     }
-    expect(shapes.size).toBe(5);
+    expect(shapes.size).toBe(8);
   });
 
   it('専用の装備と秘薬は、宝箱・ドロップ・町の店・行商人・黄金箱・闇商人には出ない', () => {

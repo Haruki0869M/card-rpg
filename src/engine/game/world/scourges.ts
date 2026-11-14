@@ -34,12 +34,14 @@ export function scourgesDue(w: WorldState): number {
 }
 
 /**
- * そのシナリオに出る災厄（シナリオ2の作り直し §2-2）: 地図の scourges の一覧（省略は SCOURGES.all 全部）。
- * 並びは SCOURGES.all の順のまま（一覧に無い物を除くだけ）。シナリオ1は今の5体が今の順で残るので、選ぶ時の乱数の順番は変わらない
+ * そのシナリオに出る災厄（シナリオ2の作り直し §2-2）: 地図の scourges の一覧。
+ * 並びは SCOURGES.all の順のまま（一覧に無い物を除くだけ）。シナリオ1は地図に今の5体を書いてあるので、選ぶ時の乱数の順番は変わらない。
+ * 区切り3b: 一覧の無い地図（これから広い地図にするシナリオ）は、共通の災厄（common/scourges）と、そのシナリオだけの災厄（scenarios/<id>/scourges）。
+ * ほかのシナリオだけの災厄（シナリオ2の3体など）は出ない
  */
 export function scourgesFor(scenarioId: string): readonly ScourgeDef[] {
   const list = getScenario(scenarioId).map?.scourges;
-  return list ? SCOURGES.all.filter((d) => list.includes(d.id)) : SCOURGES.all;
+  return list ? SCOURGES.all.filter((d) => list.includes(d.id)) : SCOURGES.forScenario(scenarioId);
 }
 
 /**

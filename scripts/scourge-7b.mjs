@@ -266,6 +266,80 @@ for (const [width, height] of SIZES) {
   if (errors.length) problems.push(`${tag}: ページのエラー ${errors.join(' / ')}`);
   await page.close();
 }
+
+// ---- ⑦ シナリオ2だけ: 新しい災厄3体の戦闘の画面（区切り3b）。段階の決まり（吹雪に隠れる・鐘のこだま・灯喰い）の予告と印。
+// 低い画面（390×540）でも、予告の札が画面からはみ出さない事 ----
+if (SCENARIO === 'frozenKingdom') {
+  const NEW = [
+    { id: 'whiteWolfKing', boss: 'scourgeWhiteWolfKing', minions: ['frostWolf', 'frostWolf'], name: '白狼王', want: ['data-status="hidden"'] },
+    { id: 'frostBellWraith', boss: 'scourgeBellWraith', minions: ['frozenSoldier', 'iceSwordsman'], name: '凍て鐘の亡霊', want: ['こだま'] },
+    { id: 'lampEaterShade', boss: 'scourgeLightEater', minions: ['frozenGhoul', 'frostSprite'], name: '灯を喰らう影', want: ['data-status="lamp"'] },
+  ];
+  for (const [width, height] of [...SIZES, [390, 540]]) {
+    const tag = `${width}x${height}`;
+    const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await start(page, 2);
+    for (const s of NEW) {
+      await edit(page, (g, s) => {
+        const w = g.world;
+        w.story = undefined;
+        const h = g.heroes.find((x) => x.id === w.turn) ?? g.heroes[0];
+        const tile = w.pos[h.id];
+        w.wanderers = w.wanderers.filter((x) => !x.scourge);
+        w.wanderers.push({ id: `w${w.nextWandererId++}`, tile, enemies: [s.boss, ...s.minions].map((defId) => ({ defId, level: 7 })), scourge: s.id });
+        w.scourgesMet = [s.id];
+        w.prevTile = tile;
+        delete g.battle;
+        g.mode = 'encounter';
+        g.encounter = { wandererId: w.wanderers.at(-1).id, tile, heroId: h.id, candidates: [h.id] };
+      }, s);
+      await page.getByRole('button', { name: /戦う/ }).click();
+      await page.waitForTimeout(1500);
+      const gb = await game(page);
+      if (gb.mode !== 'battle' || gb.battle?.enemies[0].defId !== s.boss) {
+        problems.push(`${tag}: ${s.name}の戦闘が始まらない（mode=${gb.mode}）`);
+        continue;
+      }
+      // 段階に入った姿にする（白狼王 = 隠れて奇襲の予告 / 亡霊 = こだまの予告と、ここまでの一撃 / 影 = 喰った灯3と大顎の予告）
+      await edit(page, (g, id) => {
+        const e = g.battle.enemies[0];
+        const t = g.battle.allies[0].id;
+        e.phase = 1;
+        e.phaseOpened = 1;
+        e.history = [];
+        if (id === 'whiteWolfKing') { e.hidden = true; e.intent = { actionId: 'wkAmbush', targetId: t }; }
+        if (id === 'frostBellWraith') { e.echoMax = 18; e.intent = { actionId: 'bwEcho' }; }
+        if (id === 'lampEaterShade') { e.lampEaten = 3; e.intent = { actionId: 'leGreatJaw', targetId: t }; }
+      }, s.id);
+      await handoff(page);
+      await page.waitForTimeout(600);
+      const html = await page.content();
+      for (const w of s.want) if (!html.includes(w)) problems.push(`${tag}: ${s.name}の戦闘に「${w}」が無い`);
+      const box = await page.locator('[data-intent="e0"]').boundingBox();
+      if (!box) problems.push(`${tag}: ${s.name}の予告の札が無い`);
+      else if (box.x < 0 || box.y < 0 || box.x + box.width > width + 0.5 || box.y + box.height > height + 0.5) problems.push(`${tag}: ${s.name}の予告の札が画面からはみ出す（${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)}×${Math.round(box.height)}）`);
+      await page.screenshot({ path: `${OUT}/${tag}-10-${s.id}.png` });
+      await check(page, tag, `${s.name}の戦闘`);
+      // 予告の長押しの窓（段階の決まりの文）
+      await page.locator('[data-intent="e0"]').click({ delay: 600 }).catch(() => {});
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: `${OUT}/${tag}-11-${s.id}-detail.png` });
+      await page.keyboard.press('Escape').catch(() => {});
+      await edit(page, (g) => {
+        delete g.battle;
+        delete g.battleInfo;
+        delete g.party;
+        g.mode = 'world';
+        g.world.wanderers = g.world.wanderers.filter((x) => !x.scourge);
+      });
+    }
+    if (errors.length) problems.push(`${tag}: ページのエラー（新しい3体） ${errors.join(' / ')}`);
+    await page.close();
+  }
+}
+
 await browser.close();
 if (problems.length) {
   console.error(problems.join('\n'));

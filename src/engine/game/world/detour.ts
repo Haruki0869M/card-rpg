@@ -21,6 +21,8 @@ import { addLog as battleLog, enemyName } from '../../battle/units';
 import { createRng } from '../../rng';
 import { equippedItems, jobWeapons } from '../hero';
 import { aliveScourges } from './scourgeCurse';
+import { CHEST_NAME } from '../../../data/terms';
+import { dungeonTheme } from '../dungeon';
 import { hexDistance, neighbors } from './hex';
 
 // ---------- 柱1 災厄の加護 ----------
@@ -266,7 +268,15 @@ export function dungeonDetourLines(game: Pick<GameState, 'world' | 'scenarioId' 
   if (def.random) {
     if (f.used) return [];
     const target = insightTarget(game);
-    return [`主を倒すと: 秘宝を選べる（最大3つから1つ）・${target ? `👁見破り（${target.name}のボス）・` : ''}抜け道`];
+    const out = [`主を倒すと: 秘宝を選べる（最大3つから1つ）・${target ? `👁見破り（${target.name}のボス）・` : ''}抜け道`];
+    // 区切り3b: テーマ「🧊 氷漬けの宝物庫」の中身（凍え・焚き火・奥の箱）を、行く前に分かるように
+    const chill = dungeonTheme(f.theme)?.chill;
+    if (chill) {
+      const up = chill.chest.slice().reverse();
+      const grades = `${up.filter((c) => c.min > 0).map((c) => `凍え${c.min}以上で${CHEST_NAME[c.rarity]}`).join('・')}。少ないと${CHEST_NAME[up[0].rarity]}`;
+      out.push(`🧊凍え: 部屋に入るたびに凍え+1、HPが「凍え×${chill.hpPercent}%」減る（HPは1で止まる）。🔥焚き火で凍えは0に戻る。奥の氷漬けの箱は、凍えたまま着くほど良い（${grades}）`);
+    }
+    return out;
   }
   if (!def.rewardKey && !def.finale) return [];
   const out: string[] = [];

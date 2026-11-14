@@ -17,6 +17,7 @@ import { resistsElement } from '../../engine/battle/effects';
 import type { AllyState, BattleState, CardDef } from '../../types';
 import { breakPreview, elementNames } from '../format';
 import { breakRuleOf } from '../../engine/battle/breakRules';
+import { focusFeedOf } from '../../engine/battle/phases';
 import { rollChanceFor, findAlly, tierDistribution, toPercents, slotPreviewLimitOf } from '../../engine';
 import { useBattle } from '../../store/battleStore';
 import { CATEGORY_STYLE, EffectChip, ELEMENT_ICONS } from '../ui/icons';
@@ -37,7 +38,7 @@ function pickValue(totals: PredictTotals[], kind: 'damage' | 'block' | 'heal', t
 /** 完全成功で必ず付く状態異常の、ひとことの効き目（依頼の文: 氷=行動を止める・雷=30%で行動失敗・火=火傷） */
 const STATUS_HINT: Record<string, string> = { freeze: '敵の行動を止める！', paralysis: '30%で敵の行動が失敗！', burn: '毎ターン火傷のダメージ！', poison: '毎ターン毒のダメージ！', curse: '敵の回復が半分！' };
 
-interface CounterHint { kind: 'break' | 'weak' | 'status'; text: string; color: string; icon?: string }
+interface CounterHint { kind: 'break' | 'weak' | 'status' | 'miss' | 'lamp'; text: string; color: string; icon?: string }
 /**
  * 敵の予告を潰す手がかり。乱数の結果は使わない（完全成功の時に必ず起きる事と、成功数だけで決まる事だけを出す）。
  * - BREAK: 狙う敵（全体カードなら大技を出している敵）が、どの成功数から体勢を崩せるか（大技 48→18 の数字つき）
@@ -48,6 +49,10 @@ function counterHints(battle: BattleState, ally: AllyState, card: CardDef, targe
   const out: CounterHint[] = [];
   const foes = battle.enemies.filter((e) => !e.dead && (card.target === 'allEnemies' || e.uid === targetId));
   if (card.target !== 'enemy' && card.target !== 'allEnemies') return out;
+  // 区切り3b: 吹雪に隠れている敵（白狼王）には、単体のカードのダメージは外れる（かばう敵に逸らされる時は除く）
+  const hiddenFoe = card.target === 'enemy' ? foes.find((e) => e.hidden) : undefined;
+  if (hiddenFoe && !battle.enemies.some((x) => !x.dead && x.guarding && x !== hiddenFoe))
+    out.push({ kind: 'miss', color: '#d8f0ff', text: `❄${unitName(battle, hiddenFoe.uid)}は吹雪に隠れている: ダメージは外れる（全体攻撃・お供・毒・道具は当たる。BREAK はできる）` });
   for (const e of foes) {
     const bp = breakPreview(battle, e);
     if (!bp) continue;
@@ -135,6 +140,14 @@ export function FocusPanel() {
 
   // 予告を潰す手がかり（抜本的な見直し §3-2）: 大技の予告を崩せる成功数と、完全成功で必ず付く属性の状態異常
   const hints = !preds || needsTarget ? [] : counterHints(battle, ally, card, selection.targetId, preds.map((p) => p.now), label);
+  // 灯喰い（区切り3b）: フォーカスを使うと、影の攻撃が強くなる
+  for (const e of battle.enemies) {
+    const f = focusFeedOf(e);
+    if (!f) continue;
+    const now = Math.min(f.max, e.lampEaten ?? 0);
+    const next = Math.min(f.max, now + selection.focus);
+    hints.push({ kind: 'lamp', color: '#e0b0ff', text: selection.focus > 0 && next > now ? `🕯フォーカスを使うと${unitName(battle, e.uid)}の攻撃+${(next - now) * f.per}（喰った灯 ${now}→${next}/${f.max}。BREAK で0）` : `🕯フォーカス1つにつき${unitName(battle, e.uid)}の攻撃+${f.per}（喰った灯 ${now}/${f.max}）` });
+  }
 
   // 一番出やすい成功数（同じ確率なら上の成功数）。狙う敵のチップの予測に使う
   const likelyTier = probs.reduce((best, p, i) => (p >= probs[best] ? i : best), 0);
@@ -145,6 +158,12 @@ export function FocusPanel() {
     const used = new Set<string>();
     return card.tiers[i].effects.flatMap((e) => {
       if (!p || (e.kind !== 'damage' && e.kind !== 'block' && e.kind !== 'heal')) return [{ e, value: undefined as string | undefined }];
+      // 区切り3b: 吹雪に隠れている敵には外れる
+      if (e.kind === 'damage' && p.now.find((t) => t.id === selection.targetId)?.missed) {
+        if (used.has(e.kind)) return [];
+        used.add(e.kind);
+        return [{ e, value: '外れ' }];
+      }
       const r = pickValue(e.kind === 'heal' ? p.hurt : p.now, e.kind, e.kind === 'heal' ? selection.allyTargetId ?? selection.targetId : selection.targetId);
       if (!r) return [{ e, value: undefined }];
       if (used.has(e.kind)) return [];
