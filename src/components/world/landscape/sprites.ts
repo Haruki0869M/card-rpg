@@ -613,7 +613,7 @@ export function drawItem(ctx: CanvasRenderingContext2D, it: SceneItem) {
 /** 立つ物の上下の広がり（描き直す区切りを決める）。上 = 足元から上へ、下 = 足元から下へ */
 export function itemExtent(it: SceneItem): { up: number; down: number } {
   if (it.k === 'ridge') return { up: it.h * 1.2 + Math.abs((it.y2 ?? it.y) - it.y), down: Math.abs((it.y2 ?? it.y) - it.y) + it.h * 0.2 };
-  if (it.k === 'crystal') return { up: it.h * 1.4, down: it.h * 0.6 };
+  if (it.k === 'crystal') return { up: it.h * Math.max(1.4, (ART_SCALE.crystal ?? 1) + 0.1), down: it.h * 0.6 };
   // 描いた絵は h より大きく描く（ART_SCALE）。上に余裕を持たせないと、区切りの境目で木の上が切れる
   return { up: it.h * Math.max(1.25, (ART_SCALE[it.k] ?? 1.15) + 0.1), down: it.h * 0.4 };
 }

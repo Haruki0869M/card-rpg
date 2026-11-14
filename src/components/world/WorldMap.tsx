@@ -766,6 +766,17 @@ export function WorldMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [heroSpots, w.wanderers, w.downed, anim?.path, center, R, w.tiles]);
   const frontTint = FRONT_TINT[time];
+  // 奥行き（2026-11-14）: 施設の絵は景色の上の層なので、そのままだと、奥の施設が手前の木・山を踏んで見える。
+  // 見えている施設のまわりだけ、「施設の足元より手前にある木・山」を施設の上に描き直す（透かさない。時間帯の色は、この後の層が掛ける）
+  const facilitySpots = useMemo(
+    () =>
+      w.tiles.flatMap((t, tile): FrontSpot[] => {
+        if (!t.f || !t.seen) return [];
+        const { x, y } = center(tile);
+        return [{ key: `f${tile}`, x: x - R * 1.45, y: y - R * 2.1, w: R * 2.9, h: R * 3.1, footY: y + R * 0.2, z: 0, solid: true }];
+      }),
+    [w.tiles, center, R],
+  );
 
   return (
     <div ref={wrapRef} className="relative min-h-0 flex-1" style={{ touchAction: 'pan-x pan-y' }}>
@@ -782,6 +793,8 @@ export function WorldMap({
         <FogSilhouettes w={w} tiles={tiles} geom={geom} levels={levels} finale={finaleTiles.values().next().value} padTop={padY} night={time === 'night'} />
         {/* 施設（立体のミニチュア・描いた絵）。時間帯の色の下に置く（夜は暗くなり、町などの明かりだけが光る） */}
         <FeatureLayer tiles={w.tiles} geom={geom} finaleTiles={finaleTiles} fallenTowns={w.fallenTowns} compact={compact} />
+        {/* 奥行き: 施設より手前にある木・山を、施設の上に描き直す */}
+        {pinchZoom === null && !compact && <DepthFront spots={facilitySpots} items={sceneItems} tint={undefined} />}
         {/* 時間帯の光（朝 = 斜めの光、夕方 = オレンジ、夜 = 青い月明かり）。地図といっしょに動く1枚の色なので、描き直しは起きない */}
         {light.wash && <div className="pointer-events-none absolute" style={{ left: 0, top: -padY, width: W, height: padY + H + padBottom, background: light.wash }} data-time-light={time} />}
         {/* 夜と夕方の明かり（町・祠・神殿・祭壇・野営のたき火） */}
