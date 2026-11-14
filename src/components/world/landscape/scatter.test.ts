@@ -43,6 +43,22 @@ describe('景色の置き方（見た目だけ）', () => {
     expect(scatter({ ...inp, stage: 3 }).some((it) => it.k === 'crystal' || it.k === 'crack')).toBe(true);
   });
 
+  it('雪原には雪だまりと雪の岩、氷原には氷の結晶・岩・木が立ち、湖の氷はほとんど空いている', () => {
+    const kinds = (terrainId: string) => {
+      const ts = tiles.map((t) => ({ ...t, t: terrainId, f: undefined })) as unknown as WorldState['tiles'];
+      const items = scatter({ w: { ...w, tiles: ts }, geom, levels: ts.map(() => 1), links: new Map(), rivers: new Map(), blocked: () => false, stage: 0 });
+      return { set: new Set(items.map((it) => it.k)), n: items.length };
+    };
+    const snow = kinds('snow').set;
+    expect(snow.has('snowPine') && snow.has('snowDrift') && snow.has('snowRock')).toBe(true);
+    const ice = kinds('ice');
+    expect([...ice.set].sort()).toEqual(['iceCrystal', 'iceRock', 'iceTree']);
+    const lake = kinds('lakeIce');
+    expect([...lake.set].every((k) => k === 'iceCrystal' || k === 'snowDrift')).toBe(true);
+    // 湖の氷は滑って進む道: 立つ物は氷原の半分より少ない
+    expect(lake.n).toBeLessThan(ice.n / 2);
+  });
+
   it('見ていないマスには何も置かない', () => {
     const hidden = tiles.map((t) => ({ ...t, seen: false })) as WorldState['tiles'];
     expect(scatter({ w: { ...w, tiles: hidden }, geom, levels, links: new Map(), rivers: new Map(), blocked: () => false, stage: 3 })).toEqual([]);

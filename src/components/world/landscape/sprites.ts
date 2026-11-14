@@ -62,9 +62,14 @@ const ART: Partial<Record<ItemKind, string[]>> = {
   volcano: ['landscape/volcano-cone'],
   reeds: ['landscape/swamp-reeds-1', 'landscape/swamp-reeds-2'],
   snowPine: ['landscape/snow-pine-1', 'landscape/snow-pine-2'],
+  iceCrystal: ['landscape/ice-crystal-1', 'landscape/ice-crystal-2'],
+  iceRock: ['landscape/ice-rock'],
+  iceTree: ['landscape/ice-tree'],
+  snowDrift: ['landscape/snow-drift'],
+  snowRock: ['landscape/snow-rock'],
 };
 /** 絵の高さ ÷ 立つ物の高さ h（絵には周りの余白があるので、少し大きめに描く） */
-const ART_SCALE: Partial<Record<ItemKind, number>> = { broadleaf: 1.3, pine: 1.3, plainsTree: 1.3, hill: 2.1, rock: 2.2, grass: 2.3, flower: 2.3, mushroom: 1.9, deadTree: 1.3, crystal: 2.2, peak: 1.15, volcano: 1.15, reeds: 1.5, snowPine: 1.3 };
+const ART_SCALE: Partial<Record<ItemKind, number>> = { broadleaf: 1.3, pine: 1.3, plainsTree: 1.3, hill: 2.1, rock: 2.2, grass: 2.3, flower: 2.3, mushroom: 1.9, deadTree: 1.3, crystal: 2.2, peak: 1.15, volcano: 1.15, reeds: 1.5, snowPine: 1.3, iceCrystal: 1.35, iceRock: 2.0, iceTree: 1.25, snowDrift: 2.9, snowRock: 2.2 };
 function sceneryImage(k: ItemKind, v: number): SceneImage | undefined {
   const keys = [...(ART[k] ?? []), ...artImageIds('scenery').filter((id) => id === k || id.startsWith(`${k}-`)).map((id) => `scenery/${id}`)].filter((key) => artImage(key));
   if (!keys.length) return undefined;
@@ -586,6 +591,7 @@ export function drawItem(ctx: CanvasRenderingContext2D, it: SceneItem) {
     case 'mushroom':
       return mushroom(ctx, it.x, it.y, it.h);
     case 'deadTree':
+    case 'iceTree':
       return deadTree(ctx, it.x, it.y, it.h, it.v);
     case 'peak':
       return peak(ctx, it.x, it.y, it.h, it.v);
@@ -594,8 +600,11 @@ export function drawItem(ctx: CanvasRenderingContext2D, it: SceneItem) {
     case 'ridge':
       return ridge(ctx, it);
     case 'hill':
+    case 'snowDrift':
       return hill(ctx, it.x, it.y, it.h, it.v);
     case 'rock':
+    case 'iceRock':
+    case 'snowRock':
       return rock(ctx, it.x, it.y, it.h, it.v);
     case 'grass':
       return grass(ctx, it.x, it.y, it.h, it.v);
@@ -604,6 +613,7 @@ export function drawItem(ctx: CanvasRenderingContext2D, it: SceneItem) {
     case 'reeds':
       return reeds(ctx, it.x, it.y, it.h);
     case 'crystal':
+    case 'iceCrystal':
       return crystal(ctx, it.x, it.y, it.h, it.v);
     case 'crack':
       return crack(ctx, it.x, it.y, it.h, it.v);

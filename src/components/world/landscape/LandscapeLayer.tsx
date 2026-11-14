@@ -411,6 +411,16 @@ const HexShapes = memo(function HexShapes({ tiles, geom, levels }: { tiles: Worl
   );
 });
 
+
+/**
+ * 地平線の絵（シナリオ → 絵）。まだ見えていない最後の城の方角に、うっすら見える。
+ * 表に無いシナリオは魔王城（シナリオ1と同じ）。絵が増えたら、ここに足す
+ */
+const SKYLINE_ART: Record<string, string> = {
+  frozenKingdom: 'landscape/skyline-snow-peak',
+};
+export const skylineArt = (scenarioId: string | undefined) => (scenarioId && SKYLINE_ART[scenarioId]) || 'landscape/skyline-demon-castle';
+
 /**
  * 霧の向こうのシルエット（オーナーの決定で入れる）。見えている所から4マス以内の、まだ見ていない山・火山を、
  * 霧の色で淡く（遠いほど薄く）。最後の城は、まだ見ていない間、地図の上の余白（地平線）に大きく淡く立てる
@@ -423,6 +433,7 @@ export const FogSilhouettes = memo(function FogSilhouettes({
   finale,
   padTop,
   night,
+  scenarioId,
 }: {
   w: Pick<WorldState, 'width' | 'height'>;
   tiles: WorldState['tiles'];
@@ -431,9 +442,11 @@ export const FogSilhouettes = memo(function FogSilhouettes({
   finale?: number;
   padTop: number;
   night: boolean;
+  /** 地平線の絵を選ぶ（SKYLINE_ART） */
+  scenarioId?: string;
 }) {
   const { R } = geom;
-  const skyline = artImage('landscape/skyline-demon-castle');
+  const skyline = artImage(skylineArt(scenarioId));
   const shapes = useMemo(() => {
     // 見えているマスからの距離（幅優先・4マスまで）
     const dist = new Map<number, number>();

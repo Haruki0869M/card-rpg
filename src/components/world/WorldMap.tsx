@@ -790,7 +790,7 @@ export function WorldMap({
         {!compact && <WaterLayer tiles={tiles} geom={geom} levels={levels} />}
         <FogSea tiles={tiles} geom={geom} levels={levels} padTop={padY} padBottom={padBottom} miasma={miasma} fresh={freshRef.current} time={time} />
         {/* 霧の向こうの山のシルエットと、地平線の最後の城 */}
-        <FogSilhouettes w={w} tiles={tiles} geom={geom} levels={levels} finale={finaleTiles.values().next().value} padTop={padY} night={time === 'night'} />
+        <FogSilhouettes w={w} tiles={tiles} geom={geom} levels={levels} finale={finaleTiles.values().next().value} padTop={padY} night={time === 'night'} scenarioId={game.scenarioId} />
         {/* 施設（立体のミニチュア・描いた絵）。時間帯の色の下に置く（夜は暗くなり、町などの明かりだけが光る） */}
         <FeatureLayer tiles={w.tiles} geom={geom} finaleTiles={finaleTiles} fallenTowns={w.fallenTowns} compact={compact} />
         {/* 奥行き: 施設より手前にある木・山を、施設の上に描き直す */}
