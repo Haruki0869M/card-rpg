@@ -450,7 +450,7 @@ export function paintRange(ctx: CanvasRenderingContext2D, inp: PaintInput, y0: n
             return { a: m, c: [(m[0] + cx) / 2 + ww * 0.5, (m[1] + cy) / 2] as V, b: [cx, cy] as V };
           });
       // 広場（町・施設の足元）と、分かれ道の真ん中の丸
-      const hubR = place ? R * 0.6 : ks.length !== 2 ? R * 0.27 : 0;
+      const hubR = place ? R * 0.6 : ks.length > 2 ? R * 0.27 : 0;
       const hubK = place ? ky : 0.86;
       const hubY = cy + (place ? R * 0.1 * ky : 0);
       /** 先細りの幅（u = 0 がマスの辺、1 が真ん中） */

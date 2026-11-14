@@ -49,10 +49,8 @@ export function signpostBox(x: number, y: number, R: number, east: boolean, comp
   }
   const sx = x + (east ? R * 0.62 : -R * 0.62);
   const sy = y + R * 0.05;
-  const s = (R * 1.3) / 100;
-  // 板の左右（東向きは -30〜38、西向きは左右が逆）・柱の上〜影
-  const l = east ? -30 : -38, r = east ? 38 : 30;
-  return { x0: sx + l * s, y0: sy - 78 * s, x1: sx + r * s, y1: sy + 6 * s };
+  // 絵の立て札（柱の高さ R×1.25。板は柱の少し左に付き、幅 R×0.76。北・南は板が縦になるので、上に少し余裕）
+  return { x0: sx - R * 0.5, y0: sy - R * 1.38, x1: sx + R * 0.3, y1: sy + R * 0.09 };
 }
 
 export const inBox = (b: Box, px: number, py: number) => px >= b.x0 && px <= b.x1 && py >= b.y0 && py <= b.y1;
