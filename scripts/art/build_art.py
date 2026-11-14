@@ -188,6 +188,7 @@ FACES = {
     ('lancer', 'female'): (0.566, 0.145, 0.15),
     ('archmage', 'male'): (0.467, 0.152, 0.15), ('archmage', 'female'): (0.447, 0.144, 0.15),
     ('hexer', 'male'): (0.471, 0.144, 0.15), ('hexer', 'female'): (0.414, 0.152, 0.15),
+    ('phantomThief', 'female'): (0.50, 0.128, 0.16),
 }
 # 帽子・冠・鎌などで自動の位置がずれる職は、目で確認して決めた値（J4）
 FACES.update({
@@ -198,7 +199,7 @@ FACES.update({
 })
 # 穴埋め（fill_holes）をしない元画像。重装衛士は、細い槍を戻すため切り抜きを直している（.cut の絵を
 # scripts/art/fix_thin_cut.py で作り直し済み）。槍と足の間の背景が穴として埋まるので、穴埋めをしない
-NO_FILL_HOLES = {'bulwark-female', 'bulwark-male', 'lancer-male', 'lancer-female', 'archer-male', 'archer-female', 'tamer-male', 'tamer-female', 'archmage-male', 'archmage-female', 'hexer-male', 'hexer-female'}
+NO_FILL_HOLES = {'bulwark-female', 'bulwark-male', 'lancer-male', 'lancer-female', 'archer-male', 'archer-female', 'tamer-male', 'tamer-female', 'archmage-male', 'archmage-female', 'hexer-male', 'hexer-female', 'brawler-male', 'brawler-female', 'phantomThief-male', 'phantomThief-female'}
 # 表に無い職は、この値（x=0.5 は頭の位置を自動で探す）
 FACE_DEFAULT = (0.5, 0.085, 0.17)
 
