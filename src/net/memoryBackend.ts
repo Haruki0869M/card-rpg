@@ -69,7 +69,7 @@ export class MemoryHub {
 
   flush() {
     for (const l of [...this.listeners]) {
-      if (!l.client.online || !this.listeners.includes(l)) continue;
+      if (!l.client.online || l.client.paused || !this.listeners.includes(l)) continue;
       const val = this.read(l.path);
       if (l.kind === 'value') {
         const s = JSON.stringify(val);
@@ -103,6 +103,15 @@ export class MemoryHub {
 
 export class MemoryClient implements Backend {
   online = true;
+  private frozen = false;
+  /** ページが凍っている（スマホが眠った）: 接続は残ったまま、知らせが届かない。false に戻すと、たまった分がまとめて届く */
+  get paused() {
+    return this.frozen;
+  }
+  set paused(v: boolean) {
+    this.frozen = v;
+    if (!v) this.hub.schedule();
+  }
   private disconnectOps: [string, unknown][] = [];
   private connectedCbs = new Set<(c: boolean) => void>();
   constructor(

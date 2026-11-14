@@ -77,6 +77,35 @@ describe.skipIf(!process.env.EMU)('Firebase（エミュレーター）', () => {
     for (const r of rooms) r.dispose();
   }, 180_000);
 
+  it('ホストの引き継ぎの直し（2026-11-14）: 古い状態の端末が、もう書かれた番号に記録を書こうとしても上書きしない（transaction）', async () => {
+    const [a, b] = await Promise.all([client(), client()]);
+    const host = await Room.create(a, { name: 'A', scenarioId: 'corruptionKing', difficulty: 'easy', partySize: 2 });
+    const rb = await Room.join(b, host.code, 'B');
+    const rooms = [host, rb];
+    await host.claimSlot(0, { classId: 'warrior', gender: 'male', name: 'A' });
+    await rb.claimSlot(1, { classId: 'mage', gender: 'female', name: 'B' });
+    await until(() => host.startProblem() === null, 5000, 'slots');
+    await host.start(5);
+    await until(() => rooms.every((r) => r.game), 5000, 'start');
+    await drive(rooms, 5);
+    // B の頭の中を、5手目の時に戻す（凍っていた端末と同じ）
+    const oldGame = structuredClone(rb.game!);
+    const oldSeq = rb.seq;
+    await drive(rooms, 6);
+    const key = `log/${String(oldSeq + 1).padStart(9, '0')}`;
+    const theirs = JSON.stringify(await a.get(`rooms/${host.code}/${key}`));
+    const inside = rb as unknown as { game: unknown; seq: number; handleRequest(r: { key: string; by: string; cmd: string }): Promise<'retry' | void> };
+    inside.game = oldGame;
+    inside.seq = oldSeq;
+    const cmd = botNextCommand(oldGame, { interacted: new Set<string>() })!;
+    expect(await inside.handleRequest({ key: 'zzzz-emu-stale', by: b.uid, cmd: JSON.stringify(cmd) })).toBe('retry');
+    expect(JSON.stringify(await a.get(`rooms/${host.code}/${key}`))).toBe(theirs);
+    // 取り直して、また全員一致する
+    await until(() => rb.seq === host.seq, 10_000, 'resync');
+    expect(same(rooms)).toBe(true);
+    for (const r of rooms) r.dispose();
+  }, 60_000);
+
   it('セキュリティルール: 部屋に入っていない人は、部屋の中身を読めない', async () => {
     const [a, x] = await Promise.all([client(), client()]);
     const host = await Room.create(a, { name: 'A', scenarioId: 'corruptionKing', difficulty: 'easy', partySize: 1 });
