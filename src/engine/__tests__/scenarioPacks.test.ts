@@ -11,11 +11,12 @@ import { createGame } from '../index';
 /** 固有装備の数は、区切りC（残り7種類の武器を40本に）の後の数。 [シナリオID, 固有装備の数, 前の本（解放条件）, このシナリオだけの突発イベントのID] */
 const PACKS: [string, number, string | string[], string[]][] = [
   ['frozenKingdom', 7, 'corruptionKing', ['frozenBlizzard', 'frozenTraveler', 'frozenIceTreasure', 'frozenWolfPup', 'frozenPetShiver']],
-  ['cursedArchipelago', 8, 'frozenKingdom', ['seaStorm', 'seaDriftingSailor', 'seaFloatingChest', 'seaDolphin', 'mistPetSeasick']],
+  // 宿題3（2026-11-14）: 黄金の錨・天使の羽衣はどこでも出るようにしたので、群島 8→7・星の城 7→6
+  ['cursedArchipelago', 7, 'frozenKingdom', ['seaStorm', 'seaDriftingSailor', 'seaFloatingChest', 'seaDolphin', 'mistPetSeasick']],
   ['sandDynasty', 8, 'cursedArchipelago', ['sandStorm', 'sandLostCaravan', 'sandMirage', 'sandFennec', 'sandPetHeat']],
   ['dreamLabyrinth', 7, ['corruptionKing', 'frozenKingdom', 'cursedArchipelago', 'sandDynasty', 'starCastle', 'clockworkEmpire'], ['dreamNightmareMist', 'dreamLostTraveler', 'dreamSnowSand', 'dreamSleepyCat', 'dreamPetMemory']],
   ['clockworkEmpire', 5, 'starCastle', ['steamVentBurst', 'mechBrokenAutomaton', 'gearScrapPile', 'mechKitten', 'mechPetOily']],
-  ['starCastle', 7, 'sandDynasty', ['skyGust', 'starShower', 'starLostAstronomer', 'starBirdOnCloud', 'skyPetStarGazer']],
+  ['starCastle', 6, 'sandDynasty', ['skyGust', 'starShower', 'starLostAstronomer', 'starBirdOnCloud', 'skyPetStarGazer']],
 ];
 
 describe.each(PACKS)('追加シナリオ %s', (sid, gearCount, prevRaw, randomIds) => {
