@@ -48,5 +48,6 @@ export { activeBoons, battleBoonViews, bigEnemyOf, boonViews, dungeonDetourLines
 export * from './hash';
 export * from './game/scenes';
 export * from './game/votes';
+export * from './game/eventChallenge';
 
 export * from './battle/targets';

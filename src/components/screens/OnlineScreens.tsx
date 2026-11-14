@@ -10,7 +10,7 @@ import { SCENARIOS, isScenarioUnlocked } from '../../data/scenarios';
 import { clearedScenarioIds } from '../../store/profile';
 import { useProfile } from '../../store/profileStore';
 import { PLAYER_COLOR } from '../../data/theme';
-import { livingHeroes, notVoted, voters, waitingPlayers } from '../../engine';
+import { eventChallenger, livingHeroes, notVoted, voters, waitingPlayers } from '../../engine';
 import { normalizeCode, SEATS } from '../../net/room';
 import { autoName, isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
@@ -277,6 +277,9 @@ export function awaitedSeats(game: GameState): PlayerId[] {
   const base = [...awaitedTurnSeats(game)];
   // ホストの引き継ぎの直し（2026-11-14・点検 D 2-2）: ダンジョンの中のみんなで決める場面（扉・撤退・イベント・続ける・宝箱の開け役）と
   // 報酬の「続ける」で、まだ選んでいない席も待っている（相手が眠ったら「代わりに操作」の窓を出すため）。戦闘中・世界マップは今のまま
+  // イベントの挑む段（実機の不具合① 2026-11-14）: 待っているのは挑む役の持ち主だけ（票はもう無い）
+  const challenger = game.mode === 'event' && game.event?.decided && !game.event.result ? eventChallenger(game) : undefined;
+  if (challenger) return base.includes(challenger.playerId) ? base : [...base, challenger.playerId];
   if (game.mode !== 'battle' && game.mode !== 'world' && (game.activeScene || game.mode === 'reward') && voters(game).length > 1)
     for (const p of notVoted(game)) if (!base.includes(p)) base.push(p);
   return base;

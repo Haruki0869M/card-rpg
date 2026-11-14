@@ -98,6 +98,34 @@ function backend(): Promise<Backend> {
   return backendPromise;
 }
 
+/**
+ * 版の違う2台の見分け（点検 F2・案A）。ずれ（hash）か通らない操作（error）で取り直した時に、
+ * 前と同じ番号へ取り直すのが2回続いたら true（相手と同じ操作を自分のエンジンで動かせない = ゲームの版が違う）。
+ * 1回目の知らせの後は、番号が進むまで出さない（何度も出さない）
+ */
+export const VERSION_MISMATCH_TEXT = 'ゲームの版が相手と違います。2台ともページを読み込み直してください';
+export interface ResyncLoop {
+  seq: number;
+  count: number;
+  shown: boolean;
+}
+export function noteResync(st: ResyncLoop, seq: number, reason: string): boolean {
+  if (reason !== 'error' && reason !== 'hash') {
+    st.seq = seq;
+    st.count = 0;
+    st.shown = false;
+    return false;
+  }
+  if (seq === st.seq) st.count++;
+  else Object.assign(st, { seq, count: 1, shown: false });
+  if (st.count >= 2 && !st.shown) {
+    st.shown = true;
+    return true;
+  }
+  return false;
+}
+const resyncLoop: ResyncLoop = { seq: -1, count: 0, shown: false };
+
 const last = loadLast();
 let stampId = 1;
 
@@ -117,6 +145,8 @@ export const useOnline = create<OnlineState>((set, get) => {
           break;
         case 'resync':
           if (room.game) useBattle.getState().loadRemote(room.game);
+          // 版の違う2台（点検 F2）: ずれの直しが同じ所で続いたら、読み込み直しを頼む（遊びかけの部屋は捨てない）
+          if (noteResync(resyncLoop, e.seq, e.reason)) useBattle.getState().showToast(VERSION_MISMATCH_TEXT, 'error');
           break;
         case 'stamp':
           set({ stamp: { id: stampId++, seat: e.stamp.seat, name: room.seatName(e.stamp.seat) ?? e.stamp.seat, kind: e.stamp.kind } });
