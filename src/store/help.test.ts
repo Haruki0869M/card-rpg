@@ -24,6 +24,17 @@ describe('遊び方・用語集の中身', () => {
     for (const w of ['赤＝魔物の群れ', '紫＝強敵の棲処', '金＝宝物庫', '緑＝焚き火の休憩所', '青＝未知の祭壇・行商人', '先読み', '周囲の警戒', '技を磨く', '手番が1回終わります']) expect(d).toContain(w);
   });
 
+  it('シナリオ2の道・寒さ・温泉・凍え・災厄と、オンラインの新しい流れを説明している（数はデータから）', () => {
+    const w = topicOf('world')!.body.join('');
+    for (const x of ['3つの道', '見取り図', '凍った湖の近道', '薪の街道', '巨人の尾根', '湖の氷', 'サイコロ+2', '♨', '次の朝まで寒さを受けません', '野営']) expect(w, x).toContain(x);
+    const d = topicOf('dungeon')!.body.join('');
+    for (const x of ['氷漬けの宝物庫', '凍え×2%', '焚き火', '凍え4で黄金箱']) expect(d, x).toContain(x);
+    const c = topicOf('corruption')!.body.join('');
+    for (const x of ['寒さで減るHPが2倍', '街道が雪に埋もれる', '視界−1', '白い息', '鐘の響き', '闇の帳', '吹雪に隠れる', '鐘のこだま', '最大40', '灯喰い', '最大6つ']) expect(c, x).toContain(x);
+    const o = topicOf('coop')!.body.join('');
+    for (const x of ['「装備」「道具」', '成長ボーナス → 自分のカード', '取り合い', '長押し', '約10秒', '読み込み直して']) expect(o, x).toContain(x);
+  });
+
   it('用語集の行き先の項目がある', () => {
     for (const g of GLOSSARY) if (g.topic) expect(topicOf(g.topic), g.term).toBeTruthy();
   });

@@ -4,6 +4,14 @@ import { BALANCE } from '../../data/balance';
 import { getStatus } from '../../data/statuses';
 import { OMEN_INFO } from '../../engine/game/dungeonOmen';
 import { breakDamagePctOf, needsWeakPerfect } from '../../engine/battle/effects';
+import { ENEMIES } from '../../data/enemies';
+import { EVENTS } from '../../data/events';
+import { DUNGEON_THEMES } from '../../data/rules';
+import { getScenario } from '../../data/scenarios';
+import { SCOURGES, TERRAINS } from '../../data/world';
+import { CHEST_NAME } from '../../data/terms';
+import { OFFLINE_GRACE_MS } from '../../net/room';
+import type { ScourgeDef } from '../../types';
 
 /** BREAK で敵に付く状態（例: 「脆弱1」） */
 const breakStatusText = () => `${getStatus(BALANCE.breakStatus).name}${BALANCE.breakWeak}`;
@@ -31,6 +39,106 @@ function strictBreakText(): string {
   // 2026-11-13: 鍵の順番で1つ目のダンジョンのボスは、今までどおり（effects の needsWeakPerfect の firstKeyBoss。決まりから読む）
   const firstKey = needsWeakPerfect({ boss: true }) && !needsWeakPerfect({ boss: true, firstKeyBoss: true }) ? 'なお、1つ目の鍵のダンジョンのボスの大技は、今までどおり崩せます（紫の札は除く）。' : '';
   return `ただし、${who}は、弱点の属性で、しかも完全成功で攻撃した時だけ崩せます（完全成功だけ${strictNoDamage() ? '・大きなダメージ' : ''}では崩れません。弱点を持たない相手は、完全成功で崩せます）。${firstKey}予告の下の「⚡弱点（属性）で完全成功 → BREAK」が目印です。まとめると、赤い札 = 今までどおり／${who.replace('ボス・中ボス・災厄の大技', '大物')} = 弱点の属性で完全成功。`;
+}
+
+// ===== 2026-11-15: シナリオ2（凍てつく王国）の道・寒さ・温泉・凍え・災厄（数はデータから読む。書き写さない） =====
+const FROZEN = 'frozenKingdom';
+/** シナリオの名前（「」付き） */
+const scenarioName = (id: string) => `「${getScenario(id).name}」`;
+/** 倍率の短い書き方（2 → ×2・0.5 → ×0.5） */
+const times = (v: number) => `×${Math.round(v * 100) / 100}`;
+
+/** シナリオ2の3つの道（見取り図の札と同じ名前・印・説明） */
+function frozenLanesText(): string {
+  const lanes = (getScenario(FROZEN).map?.lanes ?? []).filter((l) => l.hint);
+  return `${scenarioName(FROZEN)}の道: ${lanes.map((l) => `${l.mark ?? ''}${l.name}＝${l.hint}`).join('／')}。`;
+}
+
+/** シナリオ2の3つの道の寒さの倍率（帯の倍率。無い道は ×1） */
+function frozenLaneColdText(): string {
+  const lanes = (getScenario(FROZEN).map?.lanes ?? []).filter((l) => l.hint);
+  return lanes.map((l) => `${l.name}${times(l.climate ?? 1)}`).join('・');
+}
+
+/** 湖の氷（移動力・サイコロのボーナス） */
+function lakeIceText(): string {
+  const t = TERRAINS.get('lakeIce');
+  return `${t.name}: 凍った湖の上は滑って速く、移動力${t.moveCost}・サイコロ+${t.moveDiceBonus ?? 0}。ただし寒いマスです。`;
+}
+
+/** 温泉（回復の量はイベントのデータから） */
+function hotSpringText(): string {
+  const ev = EVENTS.get('hotSpring');
+  const opt = ev.options.find((o) => o.success?.some((x) => x.kind === 'warmth'));
+  const heal = opt?.success?.find((x) => x.kind === 'heal') as { amount?: number } | undefined;
+  return `♨温泉（${ev.title}）: 湯につかると、全員のHP+${heal?.amount ?? 0}と、次の朝まで寒さを受けません（地図の駒に♨の印）。`;
+}
+
+/** 氷漬けの宝物庫（凍え） */
+function frozenVaultText(): string {
+  const th = DUNGEON_THEMES.get('frozenVault');
+  const c = th.chill!;
+  const grades = c.chest
+    .filter((g) => g.min > 0)
+    .slice()
+    .reverse()
+    .map((g) => `凍え${g.min}で${CHEST_NAME[g.rarity]}`)
+    .join('・');
+  return `${scenarioName(FROZEN)}だけのテーマ: ${th.mark}${th.name}。部屋に入るたびに凍えが1つ積もり、その場の全員のHPが「凍え×${c.hpPercent}%」減ります（HPは1で止まる）。焚き火（休憩の部屋）に入ると凍えは0。奥の氷漬けの箱は、凍えているほど良い箱です（${grades}）。温まるか、凍えたまま奥へ急ぐかを選びます。`;
+}
+
+/** シナリオ2だけの災厄（シナリオ1の地図に無い物） */
+function frozenScourges(): ScourgeDef[] {
+  const first = new Set(getScenario('corruptionKing').map?.scourges ?? []);
+  return (getScenario(FROZEN).map?.scourges ?? []).filter((id) => !first.has(id)).map((id) => SCOURGES.get(id));
+}
+
+/** 災厄の悪さの短い文（データの値から） */
+function curseText(d: ScourgeDef): string {
+  const c = d.curse;
+  if (c.coldMul) return `寒さで減るHPが${c.coldMul}倍`;
+  if (c.buryRoad) return '街道が雪に埋もれる（街道の上のサイコロ+1が無くなる）';
+  if (c.visionDown) return `昼も夜も視界−${c.visionDown}`;
+  return d.curseShort ?? d.name;
+}
+
+/** 災厄の加護の短い文（データの値から） */
+function boonText(d: ScourgeDef): string {
+  const b = d.boon;
+  switch (b.kind) {
+    case 'frostBreath':
+      return `${d.boon.name}（戦闘の始めに味方1人が${getStatus(b.status).name}${b.amount}）`;
+    case 'bellToll':
+      return `${d.boon.name}（${b.every}ターンごとの🔔鐘の番に、ボス・中ボスの単体攻撃がほかの味方にも${b.pct}%響く）`;
+    case 'darkVeil':
+      return `${d.boon.name}（ボス・中ボスの最初の予告の名前と数字が見えない）`;
+    default:
+      return d.boon.name;
+  }
+}
+
+/** 災厄の段階（HPが半分を切った後）の短い文（敵のデータの値から） */
+function phaseText(d: ScourgeDef): string {
+  const ph = ENEMIES.get(d.boss).phases?.[0];
+  if (!ph) return '';
+  const name = (ph.rule ?? ph.name).split(':')[0].split('：')[0];
+  const effects = ph.actions?.flatMap((a) => a.effects) ?? [];
+  if (effects.some((e) => e.kind === 'hide')) return `${name}（次の敵の番まで、単体のカードは外れる。全体攻撃・お供・毒などは当たる）`;
+  const echo = effects.find((e) => e.kind === 'echoBlow') as { max?: number } | undefined;
+  if (echo) return `${name}（こだまの予告のターンに当てたいちばん大きな一撃が、敵の番に味方全員へ返る。最大${echo.max}）`;
+  if (ph.focusFeed) return `${name}（味方がフォーカスを1つ使うたび、影の攻撃+${ph.focusFeed.per}。最大${ph.focusFeed.max}つ。BREAK で0）`;
+  return name;
+}
+
+/** シナリオ2の災厄の段落 */
+function frozenScourgeText(): string {
+  const list = frozenScourges();
+  return `💀${scenarioName(FROZEN)}の災厄: 悪さは「${list.map(curseText).join('」「')}」のどれか。加護は ${list.map(boonText).join('・')}。`;
+}
+
+/** シナリオ2の災厄の段階の段落 */
+function frozenScourgePhaseText(): string {
+  return `${scenarioName(FROZEN)}の災厄は、HPが半分を切ると ${frozenScourges().map(phaseText).join('・')}。予告の札と長押しで、打てる手が読めます。`;
 }
 
 export type HelpTopicId =
@@ -86,6 +194,11 @@ export const HELP_TOPICS: HelpTopic[] = [
       '朝→昼→夕方→夜と時間が進みます。夜は視界が狭くなり、敵が増えて強くなります。',
       '町以外では「野営」でHPとフォーカスを少し回復できます。夜の野営は夜襲に注意（確率はボタンに出ます）。',
       `何もないマスで止まると、${BALANCE.randomEventChance}%で突発イベントが起きます。`,
+      '3つの道（広い地図のシナリオ）: 地図は西・中央・東の道に分かれ、シナリオごとに道の性格が違います（速い・寒い・魔物が多い・宝が多い など）。地図の「見取り図」の上の札で、行く前に違いが分かります。',
+      frozenLanesText(),
+      `寒さ（寒い地域のシナリオ）: 雪原・氷原・湖の氷など寒いマスに立ったままワールドターンが終わると、HPが少し減ります（奥の地域ほど多い・HPは1で止まる・町は寒くない）。道によって倍率が違います（${frozenLaneColdText()}）。その番に野営したキャラと、温泉で温まったキャラは受けません。`,
+      lakeIceText(),
+      hotSpringText(),
     ],
   },
   {
@@ -118,7 +231,8 @@ export const HELP_TOPICS: HelpTopic[] = [
       '合流: 仲間が先に入ったダンジョンの入口に着いたら、「〇〇たちに合流する」で同じ組に入れます（組が通路にいる時だけ。戦闘や宝箱の途中なら、終わるのを待ちましょう）。合流すると、組の今の場所から一緒に進みます。',
       '一番奥のボスを倒すと大宝箱。途中で撤退もできますが、手に入れた宝箱の中身を1つ失います。',
       `ランダムダンジョン（寄り道）: 全5行の短いダンジョンです。最奥の主を倒すと必ず黄金箱が開き、${BALANCE.randomDungeon.exclusiveChance >= 100 ? '必ず' : `${BALANCE.randomDungeon.exclusiveChance}%で`}「専用」の装備（ここと闇商人でしか手に入らない）も1つ出ます。1か所1回だけで、制覇すると踏破済みになり、侵食度が${BALANCE.corruptionOnRandomDungeonClear}%下がります（負けた時は入り直せます）。`,
-      'テーマは3つ: 💎古代の晶洞（イベントと宝箱が多い・晶石の祭壇でカードを強化か変異を2回）／⛓封魔の地下迷宮（強敵と封魔の宝箱が多い・敵Lv+1・エピックが2倍出やすい）／🗡無法者の隠れ処（戦闘が多い・闇商人が専用の装備を2つ並べ、1つ選んで買える）。',
+      'どのシナリオでも出るテーマは3つ: 💎古代の晶洞（イベントと宝箱が多い・晶石の祭壇でカードを強化か変異を2回）／⛓封魔の地下迷宮（強敵と封魔の宝箱が多い・敵Lv+1・エピックが2倍出やすい）／🗡無法者の隠れ処（戦闘が多い・闇商人が専用の装備を2つ並べ、1つ選んで買える）。',
+      frozenVaultText(),
       '最奥の主を倒すと: 黄金箱の秘宝を3つから1つ選べる（2人以上はみんなで決める）・👁見破り（次に挑む鍵のダンジョンのボスの大技と開幕の一手が、完全成功だけで崩せる）・帰りに「抜け道」を選ぶと、次の目的地の近くに出られる。',
     ],
   },
@@ -176,6 +290,8 @@ export const HELP_TOPICS: HelpTopic[] = [
       '一定の値をこえるごとに、敵が増える・強くなるなど世界が変わります。次の変化は上のバーに出ています。',
       `💀災厄の中ボス（広い地図のシナリオ）: 1つ目の鍵を取った時（その前に${BALANCE.scourge.firstCorruption}%を越えたらその時）・${BALANCE.scourge.milestones.join('%・')}%で、1体ずつ現れます（最大${BALANCE.scourge.max}体）。生きている間は「店の値段が高い」「侵食度が速く上がる」「野営の回復が半分」「夜の敵が強い」のどれかの悪さをします。倒すと悪さが消え、専用の装備を必ず落とし、侵食度が${BALANCE.scourge.purify}%下がります。逃げても巣に残ります。場所は見晴らしの塔に登ると見えます。`,
       '💀災厄の加護: 生きている災厄1体ごとに、鍵と最後のダンジョンのボス・中ボスとの戦闘に決まりが1つ足されます（用心棒の手下・毎ターンの回復・最初の予告が手負い狙い・最初の BREAK が1回効かない・段階を越えるたびに火傷）。倒しに行くか、背負ったまま急ぐかを選べます。災厄の札・ダンジョンの入口・ボスの長押しで、掛かっている加護が読めます。災厄はHPが半分を切ると姿が変わります（逃げる・回復する・溜める・弱点が変わる・再生）。',
+      frozenScourgeText(),
+      frozenScourgePhaseText(),
       '100%になるとゲームオーバーです。',
     ],
   },
@@ -227,6 +343,11 @@ export const HELP_TOPICS: HelpTopic[] = [
       'オンライン協力: 冒険の準備で「部屋を作る」と合言葉が出ます。仲間はタイトルの「部屋に参加」から合言葉を入れます。',
       '戦闘は全員が同時にカードを使えます。ダンジョンの扉や次の行き先は、みんなで選んで決めます。',
       'ダンジョンのイベント: まず「どれにするか」をみんなで選びます（もう一度押すと取り消し）。判定がある時は、いちばん得意なキャラが挑む役になり、その担当の人がフォーカスを決めて挑みます（ほかのキャラに任せる・選び直すもできます）。お金などを払う選択肢は、払えるキャラのうち並びが先のキャラが払います。',
+      'イベントの画面の下の帯の「装備」「道具」で、投票中・挑む段・待っている間も、パーティと道具袋を開けます（回復薬を使って戻っても、自分の票やフォーカスの指定はそのまま）。',
+      '戦闘の勝利画面: 成長ボーナス → 自分のカード → 全員がそろってから戦利品の取り合い、の順に出ます。',
+      'パーティ・装備の持ち物の行を押すと「使う」「渡す」が出ます（道具袋は、行を押すと使う相手が出ます）。詳しい説明は長押しで読めます。',
+      `仲間の通信が切れた知らせは、一瞬の切断では出ません（約${Math.round(OFFLINE_GRACE_MS / 1000)}秒待ってから出ます）。`,
+      '新しい版が公開されたら、2台とも読み込み直してください（版が違うと同じ部屋で遊べません。公開の前に作った部屋には、入り直せないことがあります）。',
       'この案内や説明の画面は、自分のスマホだけに出ます。ほかの人の画面や冒険は変わりません。',
     ],
   },
@@ -265,6 +386,10 @@ export const GLOSSARY: { term: string; text: string; topic?: HelpTopicId }[] = [
   { term: '命の灯火', text: 'パーティ共有のやり直しの回数。', topic: 'lives' },
   { term: '侵食度', text: '世界のむしばまれ具合。100%でゲームオーバー。', topic: 'corruption' },
   { term: '野営', text: '町の外で休んでHPとフォーカスを少し回復。夜は夜襲に注意。', topic: 'world' },
+  { term: '3つの道', text: '広い地図の西・中央・東の道。シナリオごとに性格が違い、見取り図の札で分かります。', topic: 'world' },
+  { term: '寒さ', text: '寒いマスでワールドターンが終わるとHPが減る。野営と温泉で防げます。', topic: 'world' },
+  { term: '温泉（♨）', text: 'HPが回復し、次の朝まで寒さを受けない。', topic: 'world' },
+  { term: '凍え', text: '氷漬けの宝物庫で部屋ごとに積もり、HPが減る。焚き火で0。奥の箱は凍えているほど良い。', topic: 'dungeon' },
   { term: '転職', text: '新しいジョブになること。Lv1に戻り、能力を1つ持ち越します。', topic: 'jobs' },
   { term: '神殿・祭壇', text: '中位から特殊ジョブへ転職できる特別な場所。', topic: 'jobs' },
   { term: '懐き度', text: 'お供との仲の良さ（♡1〜5）。見た目だけで強さは変わりません。', topic: 'pets' },

@@ -3,7 +3,7 @@
 import { VoteChips, VoteStatus } from '../ui/Votes';
 import { AnimatePresence, motion } from 'framer-motion';
 import { showVoteHint } from '../dungeon/hints';
-import { ArrowDown, ArrowUp, Backpack, Check, Coins, Compass, Crown, DoorClosed, DoorClosedLocked, Eye, Flame, Gem, Gift, LogOut, Menu, Skull, Sparkles, Star, Swords, Users, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, Coins, Compass, Crown, DoorClosed, DoorClosedLocked, Eye, Flame, Gem, Gift, LogOut, Menu, Skull, Sparkles, Star, Swords, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AnimatedDungeonView } from '../dungeon/DungeonAnim';
 import { corridorArt, OMEN_ICONS, OmenMark } from '../dungeon/DungeonView';
@@ -34,7 +34,6 @@ import {
   DEPTH_TIER_NAME,
   dungeonRows,
   isLegacyLayout,
-  heroMaxHp,
   notVoted,
   partyGold,
   posOf,
@@ -52,7 +51,7 @@ import { PLAYER_COLOR } from '../../data/theme';
 import { isLocalPlayer } from '../../store/battleConfig';
 import { useOnline } from '../../store/onlineStore';
 import { HeroFace } from '../ui/game';
-import { PetToken } from '../ui/PetToken';
+import { PartyBar } from '../ui/PartyBar';
 import type { DungeonRun, Facing, GameState, Room } from '../../types';
 import { useElementSize } from '../../hooks/useElementSize';
 import { LOCAL_PLAYER } from '../../store/battleConfig';
@@ -61,7 +60,7 @@ import { usePins, type PinsApi, type ShownPin } from '../../store/pins';
 import { PinBanner, PinChips } from '../ui/PinChips';
 import type { PinTarget } from '../../net/pins';
 import { getRoomType } from '../../data/rules';
-import { Bar, ItemIcon, Screen } from '../ui/game';
+import { ItemIcon, Screen } from '../ui/game';
 
 export { doorChoices, type DoorChoice };
 
@@ -539,37 +538,8 @@ export function DungeonScreen() {
         {showMap && <MapOverlay run={run} onClose={() => setShowMap(false)} myTurn={myTurn} pins={pins} canPin={canPin} pinsOf={pinsOf} />}
       </div>
       <ScoutBar busy={busy} />
-      {/* パーティ（顔と細いHP）と、装備・道具・撤退を1行に */}
-      <div className="flex shrink-0 items-center gap-1 px-2 pt-1.5 pb-3" data-dungeon-bar>
-        <div className="flex min-w-0 flex-1 gap-0.5 overflow-x-auto">
-          {partyHeroes.map((h) => (
-            <button key={h.id} onClick={() => openSheet('party')} aria-label={`${h.name} HP${h.hp}/${heroMaxHp(h)}`} className="btn relative flex h-11 w-11 shrink-0 flex-col items-center justify-center">
-              <HeroFace hero={h} size={30} dim={h.hp <= 0} />
-              <span className="mt-[2px] block w-[32px]">
-                <Bar value={h.hp} max={heroMaxHp(h)} color="linear-gradient(90deg,#22b45a,#7dffa8)" height={4} />
-              </span>
-              {/* 並びの欄は横にスクロールするので、はみ出すと上が切れる（ステップ1）。ボタンの内側の右上に置く */}
-              {h.pet && (
-                <span className="absolute top-0 right-0" data-party-pet>
-                  <PetToken ownerId={h.id} pet={h.pet} size={14} />
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-        {(
-          [
-            ['装備', Users, 'text-amber-300', () => openSheet('party')],
-            ['道具', Backpack, 'text-amber-300', () => openSheet('pouch')],
-            ['撤退', LogOut, 'text-red-300', () => setShowRetreat((v) => !v)],
-          ] as const
-        ).map(([label, Icon, color, on]) => (
-          <button key={label} onClick={on} className="btn btn-dark flex h-12 w-[52px] shrink-0 flex-col items-center justify-center rounded-xl text-[12px] leading-4 font-bold">
-            <Icon size={17} className={color} />
-            {label}
-          </button>
-        ))}
-      </div>
+      {/* パーティ（顔と細いHP）と、装備・道具・撤退を1行に（イベントの画面と同じ部品） */}
+      <PartyBar heroes={partyHeroes} extra={[['撤退', LogOut, 'text-red-300', () => setShowRetreat((v) => !v)]]} />
       <AnimatePresence>
         {showRetreat && (
           <motion.div

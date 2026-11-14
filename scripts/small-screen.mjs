@@ -8,6 +8,7 @@
 // 1台だけ・オンラインなし（本番の Firebase には何もしない）。
 // 使い方: vite preview を起こしてから URL=http://127.0.0.1:4193/card-rpg/ node scripts/small-screen.mjs
 //   SIZES=390x540,360x520 で大きさを変えられる。SMALL_SCREEN_OUTPUT で写真の場所。
+// 2026-11-15: イベントの画面の下の帯「装備」「道具」（1人・1台で2人・選ぶ段・挑む段）が、選択肢・挑む段のパネルに重ならず押せ、シートが開く。
 // ④⑤（2026-11-15）: 報酬（1人・1台で2人の取り合いの順番）と転職のカード選び（背景・1回では決まらない・ボタンが押せる）も通す。
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { chromium, startBattle } from './lib.mjs';
@@ -264,6 +265,61 @@ try {
         return { inView: b.top >= 0 && b.bottom <= innerHeight, onTop: !!t && (t === el || el.contains(t)) };
       }).catch(() => null);
       check(!!opt?.inView && !!opt?.onTop, `イベント: 1つ目の選択肢が押せる ${JSON.stringify(opt)}`, 'イベント');
+    }
+
+    // ---- イベントの画面の「装備」「道具」（2026-11-15）: 1人・1台で2人（選ぶ段）・1台で2人（判定のパネル） ----
+    // 1台で遊ぶ時は、選択肢を押すと下に判定のパネル（キャラ・フォーカス）が開く（オンラインの挑む段は coop-agree・coop-layers で見る）
+    for (const [players, stage] of [[1, '選ぶ段'], [2, '選ぶ段'], [2, '判定のパネル']]) {
+      const L = `イベントの装備・道具（${players}人・${stage}）`;
+      await startBattle(page, players, ['forestWolf']);
+      const d5 = await save(page);
+      const x = d5.game.expeditions?.find((e) => e.battle) ?? d5.game;
+      const run = x.dungeon ?? d5.game.dungeon;
+      x.mode = 'event';
+      delete x.battle;
+      delete x.vote;
+      x.event = { eventId: 'fallenTree', roomId: run.currentRoomId ?? run.rooms[0].id };
+      await load(page, d5);
+      await wait(700);
+      let focusBefore;
+      const focusText = async () => (await page.locator('[data-event-panel]').innerText().catch(() => '')).replace(/\s+/g, ' ').match(/フォーカス \d+ → \d+/)?.[0];
+      if (stage === '判定のパネル') {
+        await page.locator('[data-event-option="0"]').click();
+        await wait(400);
+        await page.getByRole('button', { name: 'フォーカスを増やす' }).click().catch(() => {});
+        await wait(200);
+        focusBefore = await focusText();
+      }
+      const m = await page.evaluate(() => {
+        const rect = (e) => (e ? (({ top, bottom }) => ({ top: Math.round(top), bottom: Math.round(bottom) }))(e.getBoundingClientRect()) : null);
+        const bar = document.querySelector('[data-dungeon-bar]');
+        const hit = (label) => {
+          const el = bar?.querySelector(`[data-bar-button="${label}"]`);
+          if (!el) return null;
+          const b = el.getBoundingClientRect();
+          const t = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+          return { top: Math.round(b.top), bottom: Math.round(b.bottom), inView: b.top >= 0 && b.bottom <= innerHeight + 1, onTop: !!t && (t === el || el.contains(t)), w: Math.round(b.width), h: Math.round(b.height) };
+        };
+        return { bar: rect(bar), scroll: rect(document.querySelector('[data-event-scroll]')), panel: rect(document.querySelector('[data-event-panel]')), party: hit('装備'), pouch: hit('道具'), innerHeight };
+      });
+      console.log(`   ${L}: ${JSON.stringify(m)}`);
+      rows.push({ size: `${W}x${H}`, name: L, ...m });
+      await page.screenshot({ path: `${OUT}/${H}-event-bar-${players}p-${stage === '判定のパネル' ? 'check' : 'choose'}.png` });
+      check(!!m.bar, `${L}: 下の帯がある`, 'イベント');
+      if (!m.bar) continue;
+      const above = m.panel ?? m.scroll;
+      check(!!above && above.bottom <= m.bar.top + 1, `${L}: 帯が選択肢・パネルの下で重ならない（上の下端 ${above?.bottom} / 帯の上端 ${m.bar.top}）`, 'イベント');
+      if (stage === '判定のパネル') check(!!m.panel && !!focusBefore, `${L}: 判定のパネルが出ていて、フォーカスを1つ決めた（${focusBefore}）`, 'イベント');
+      for (const [k, label, sheet] of [['party', '装備', 'party'], ['pouch', '道具', 'pouch']]) {
+        check(!!m[k]?.inView && !!m[k]?.onTop && m[k].h >= 44, `${L}: 「${label}」が画面の中で押せる（${JSON.stringify(m[k])}）`, 'イベント');
+        await page.locator(`[data-dungeon-bar] [data-bar-button="${label}"]`).click();
+        await wait(400);
+        check((await page.locator(`[data-sheet="${sheet}"]`).count()) > 0, `${L}: 「${label}」でシートが開く`, 'イベント');
+        if (players === 2 && stage === '選ぶ段') await inspect(page, H, `event-${sheet}`, SHEET(sheet), 'イベント');
+        await closeSheet(page, sheet);
+      }
+      check((await page.locator(stage === '判定のパネル' ? '[data-event-panel]' : '[data-event-option]').count()) > 0, `${L}: 閉じた後もイベントの画面のまま`, 'イベント');
+      if (stage === '判定のパネル') check((await focusText()) === focusBefore, `${L}: シートから戻ってもフォーカスの指定がそのまま（${focusBefore} / ${await focusText()}）`, 'イベント');
     }
 
     // ---- 報酬（④(1): 成長 → 自分のカード → 全員がそろってから取り合いを真ん中に） ----

@@ -5,6 +5,7 @@
 //  4) 戦闘: はじめての案内 ① → カードを選ぶと ② → 1枚使うと ③。上のバーの 侵食度・🔥 とメニューからも開ける
 //  5) どこで開いても、冒険の保存（card-rpg/adventure）は変わらない
 //  6) 2回目の戦闘（新しい冒険の戦闘）では案内が出ない。設定でONにすると出て、× で閉じると OFF に戻る
+//  8) 2026-11-15 に足した説明（3つの道・寒さ・湖の氷・温泉・氷漬けの宝物庫・シナリオ2の災厄・オンラインの新しい流れ）が、目次から開いた画面に出る
 //  7) 表示の問題（はみ出し・小さいボタン・12px未満の文字）が無い
 // 使い方: npx vite preview を起こしてから node scripts/help-guide.mjs
 import { chromium, depart, layoutIssues, URL, waitForBattlePresentation } from './lib.mjs';
@@ -104,8 +105,30 @@ for (const [width, height] of SIZES) {
     await shot('title-dungeon');
     await page.goBack();
     if (!(await helpIs('index'))) await ng('戻るで目次に戻らない');
+    // 8) 2026-11-15 に足した説明が、目次から開いた画面に出る（長い文でもはみ出さない）
+    const NEW_TEXT = {
+      world: ['3つの道', '凍った湖の近道', '寒さ（寒い地域のシナリオ）', '湖の氷', '♨温泉'],
+      dungeon: ['氷漬けの宝物庫'],
+      corruption: ['吹雪に隠れる', '鐘のこだま', '灯喰い', '白い息', '鐘の響き', '闇の帳'],
+      coop: ['「装備」「道具」', '取り合い', '長押し', '読み込み直して'],
+    };
+    for (const [topic, words] of Object.entries(NEW_TEXT)) {
+      await page.locator(`[data-help-topic="${topic}"]`).click();
+      if (!(await helpIs(topic))) {
+        await ng(`目次から「${topic}」が開かない`);
+        continue;
+      }
+      const text = await page.locator(`[data-help="${topic}"]`).innerText();
+      for (const w of words) if (!text.includes(w)) await ng(`「${topic}」に「${w}」が無い`);
+      await page.locator(`[data-help="${topic}"]`).getByText(words[words.length - 1], { exact: false }).first().scrollIntoViewIfNeeded().catch(() => {});
+      await shot(`title-${topic}-new`);
+      await check(`「${topic}」の説明`);
+      await page.goBack();
+      if (!(await helpIs('index'))) await ng(`「${topic}」から戻るで目次に戻らない`);
+    }
     await page.locator('[data-help-topic="glossary"]').click();
     if (!(await helpIs('glossary'))) await ng('用語集が開かない');
+    for (const term of ['3つの道', '寒さ', '温泉（♨）', '凍え']) if (!(await page.locator(`[data-help-term="${term}"]`).count())) await ng(`用語集に「${term}」が無い`);
     await shot('title-glossary');
     await check('用語集');
     await page.goBack();
