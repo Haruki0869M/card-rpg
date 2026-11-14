@@ -3,14 +3,27 @@
 import { create } from 'zustand';
 import type { Backend } from '../net/backend';
 import { emulatorFromUrl, onlineAvailable } from '../net/onlineEnv';
-import { normalizeCode, Room, RoomError, type Slot, type Stamp } from '../net/room';
+import { type Member, normalizeCode, Room, RoomError, type Slot, type Stamp, STALE_MS } from '../net/room';
 import type { PlayerId } from '../types';
 import { setLocalPlayers } from './battleConfig';
 import { setStoreRoom, useBattle } from './battleStore';
 
 const ONLINE_KEY = 'card-rpg/online';
-/** 切断した人の手番を、ホストが代わりに操作できるようになるまでの秒数 */
-export const PROXY_WAIT_SEC = 60;
+/**
+ * 止まった（切れた）人の分を、ホストが「代わりに操作する」を押せるようになる時刻（ホストの引き継ぎの直し 2026-11-14）。
+ * 前は「気づいてから60秒」で、ホストが眠ると引き継ぎの35秒と合わせて約95秒待った。
+ * 今は「最後に動いていた時から STALE_MS（35秒。止まったとみなす時）」。止まったとみなした時には、もうほぼ押せる。
+ * - 気づいてから最低 PROXY_GRACE_MS は待つ（戻ってくる瞬間にボタンが出たり消えたりしないため）【提案 5秒】
+ * - 「もう少し待つ」を押したら、PROXY_HOLD_MS 後にまた出す【提案 30秒】
+ * 時刻はどれも部屋の時計（backend.now()。サーバーとのずれを直した物）
+ */
+export const PROXY_GRACE_MS = 5_000;
+export const PROXY_HOLD_MS = 30_000;
+export function proxyReadyAt(m: Pick<Member, 'beat'> | undefined, noticedAt: number, holdUntil = 0): number {
+  return Math.max(noticedAt + PROXY_GRACE_MS, (m?.beat ?? noticedAt) + STALE_MS, holdUntil);
+}
+/** あと何秒で「代わりに操作する」を押せるか（0 = 今押せる） */
+export const proxyWaitLeft = (now: number, readyAt: number) => Math.max(0, Math.ceil((readyAt - now) / 1000));
 
 export interface StampFx {
   id: number;
@@ -29,8 +42,10 @@ interface OnlineState {
   /** 最後に入っていた部屋（タイトルの「部屋に戻る」） */
   lastCode: string | null;
   playerName: string;
-  /** 席ごとの、切断に気づいた時刻 */
+  /** 席ごとの、切断（止まった事）に気づいた時刻（部屋の時計） */
   offlineSince: Partial<Record<PlayerId, number>>;
+  /** 席ごとの、「もう少し待つ」を押して待つ終わりの時刻（部屋の時計） */
+  proxyHold: Partial<Record<PlayerId, number>>;
   /** 待合室で作っているキャラの枠 */
   editingSlot: number | null;
   /** 回3 C: ホストが切れて、ほかの人が引き継いだ知らせ（しばらく出す） */
@@ -49,6 +64,8 @@ interface OnlineState {
   start: () => Promise<void>;
   sendStamp: (kind: string) => void;
   setProxy: (p: PlayerId, on: boolean) => void;
+  /** 「もう少し待つ」 */
+  holdProxy: (p: PlayerId) => void;
 }
 
 function loadLast(): { code: string | null; name: string } {
@@ -116,10 +133,15 @@ export const useOnline = create<OnlineState>((set, get) => {
           break;
         }
         case 'members': {
-          // 切断に気づいた時刻を覚える（60秒たったら、ホストが代わりに操作できる）。止まっている人（スマホが眠った）も切断と同じに数える
+          // 切断に気づいた時刻を覚える（proxyReadyAt の時刻から、ホストが代わりに操作できる）。止まっている人（スマホが眠った）も切断と同じに数える
           const off: Partial<Record<PlayerId, number>> = {};
-          for (const m of Object.values(room.members)) if (!room.alive(m)) off[m.seat] = get().offlineSince[m.seat] ?? Date.now();
-          set({ offlineSince: off });
+          const hold: Partial<Record<PlayerId, number>> = {};
+          for (const m of Object.values(room.members))
+            if (!room.alive(m)) {
+              off[m.seat] = get().offlineSince[m.seat] ?? room.backend.now();
+              if (get().proxyHold[m.seat] !== undefined) hold[m.seat] = get().proxyHold[m.seat];
+            }
+          set({ offlineSince: off, proxyHold: hold });
           // 戻ってきた人の分の「代わりに操作」は自動でやめる
           if (room.isHost) for (const p of Object.keys(room.meta?.proxy ?? {}) as PlayerId[]) if (room.seatOnline(p)) void room.setProxy(p, false).catch(() => {});
           break;
@@ -163,6 +185,7 @@ export const useOnline = create<OnlineState>((set, get) => {
     lastCode: last.code,
     playerName: last.name,
     offlineSince: {},
+    proxyHold: {},
     editingSlot: null,
     hostNote: null,
 
@@ -187,7 +210,7 @@ export const useOnline = create<OnlineState>((set, get) => {
     },
     leaveRoom: async () => {
       const r = get().room;
-      set({ room: null, offlineSince: {}, editingSlot: null, hostNote: null });
+      set({ room: null, offlineSince: {}, proxyHold: {}, editingSlot: null, hostNote: null });
       setStoreRoom(null);
       setLocalPlayers(null);
       useBattle.getState().exitOnline();
@@ -199,6 +222,10 @@ export const useOnline = create<OnlineState>((set, get) => {
     start: () => withRoom((r) => r.start()),
     sendStamp: (kind) => void withRoom((r) => r.sendStamp(kind)),
     setProxy: (p, on) => void withRoom((r) => r.setProxy(p, on)),
+    holdProxy: (p) => {
+      const r = get().room;
+      if (r) set({ proxyHold: { ...get().proxyHold, [p]: r.backend.now() + PROXY_HOLD_MS } });
+    },
   };
 });
 

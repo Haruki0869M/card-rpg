@@ -729,6 +729,13 @@ async function caseC(where, action) {
     const t0 = Date.now();
     const tookOver = action === 'p2CloseReturn' ? true : await tryUntil(() => isHost(r.B), action === 'freeze' ? 60000 : 15000, 'takeover');
     row.tookOver = action === 'p2CloseReturn' ? '-' : tookOver ? `${Math.round((Date.now() - t0) / 1000)}秒で引き継いだ` : '引き継がない';
+    // ホストの引き継ぎの直し（2026-11-14）: 止まってから「代わりに操作する」が画面の窓に出るまでの秒数（敵の番は除く）
+    if (action !== 'p2CloseReturn' && where !== 'enemy') {
+      const btn = stay.locator('[data-online-overlay]').getByRole('button', { name: '代わりに操作する', exact: true });
+      const shown = await tryUntil(async () => (await btn.count()) > 0, 90000, 'proxy button');
+      row.proxyButton = shown ? `${Math.round((Date.now() - t0) / 1000)}秒で出た` : '90秒まで出ない';
+      check(shown && Date.now() - t0 <= 60000, `C ${where}/${action}: 止まってから60秒以内に「代わりに操作する」が出る（${row.proxyButton}）`);
+    }
     await wait(2500);
     row.overlay = await overlayText(stay);
     if (where === 'enemy') {

@@ -10,11 +10,11 @@ import { SCENARIOS, isScenarioUnlocked } from '../../data/scenarios';
 import { clearedScenarioIds } from '../../store/profile';
 import { useProfile } from '../../store/profileStore';
 import { PLAYER_COLOR } from '../../data/theme';
-import { livingHeroes, waitingPlayers } from '../../engine';
+import { livingHeroes, notVoted, voters, waitingPlayers } from '../../engine';
 import { normalizeCode, SEATS } from '../../net/room';
 import { autoName, isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
-import { PROXY_WAIT_SEC, useOnline } from '../../store/onlineStore';
+import { proxyReadyAt, proxyWaitLeft, useOnline } from '../../store/onlineStore';
 import type { GameState, PlayerId } from '../../types';
 import { HeroFace, Screen } from '../ui/game';
 import { chestClaimWaits, facilityWaits, rewardWaits } from './waitNotes';
@@ -272,8 +272,17 @@ export function LobbyScreen() {
 
 // ---------- 遊んでいる間 ----------
 
-/** 今だれの操作を待っているか（席。手番・準備完了・成長の選択） */
+/** 今だれの操作を待っているか（席。手番・準備完了・成長の選択・みんなで決める場面の票） */
 export function awaitedSeats(game: GameState): PlayerId[] {
+  const base = [...awaitedTurnSeats(game)];
+  // ホストの引き継ぎの直し（2026-11-14・点検 D 2-2）: ダンジョンの中のみんなで決める場面（扉・撤退・イベント・続ける・宝箱の開け役）と
+  // 報酬の「続ける」で、まだ選んでいない席も待っている（相手が眠ったら「代わりに操作」の窓を出すため）。戦闘中・世界マップは今のまま
+  if (game.mode !== 'battle' && game.mode !== 'world' && (game.activeScene || game.mode === 'reward') && voters(game).length > 1)
+    for (const p of notVoted(game)) if (!base.includes(p)) base.push(p);
+  return base;
+}
+
+function awaitedTurnSeats(game: GameState): PlayerId[] {
   if (game.mode === 'world' && game.world && !game.world.story) {
     const h = game.heroes.find((x) => x.id === game.world!.turn);
     return h ? [h.playerId] : [];
@@ -350,7 +359,9 @@ export function OnlineOverlay() {
   useOnline((s) => s.tick);
   const stamp = useOnline((s) => s.stamp);
   const offlineSince = useOnline((s) => s.offlineSince);
+  const proxyHold = useOnline((s) => s.proxyHold);
   const setProxy = useOnline((s) => s.setProxy);
+  const holdProxy = useOnline((s) => s.holdProxy);
   const game = useBattle((s) => s.game);
   const screen = useBattle((s) => s.screen);
   const [shownStamp, setShownStamp] = useState<number | null>(null);
@@ -382,7 +393,7 @@ export function OnlineOverlay() {
     .filter((x) => x.target && x.by && isLocalPlayer(x.target.playerId));
   const offlineAwaited = awaitedSeats(game).filter((p) => !room.seatOnline(p) && !room.meta?.proxy?.[p] && livingHeroes(game).some((h) => h.playerId === p));
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 z-[70] flex flex-col items-center gap-1 px-3 pt-14">
+    <div data-online-overlay className="pointer-events-none absolute inset-x-0 top-0 z-[70] flex flex-col items-center gap-1 px-3 pt-14">
       {!room.connected && (
         <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-red-950/90 px-3 py-1.5 text-[13px] text-red-100">
           <WifiOff size={16} /> 通信が切れました。つながり直しています…
@@ -397,7 +408,9 @@ export function OnlineOverlay() {
         </div>
       )}
       {offlineAwaited.map((p) => {
-        const left = Math.max(0, PROXY_WAIT_SEC - Math.floor((Date.now() - (offlineSince[p] ?? Date.now())) / 1000));
+        const now = room.backend.now();
+        const member = Object.values(room.members).find((m) => m.seat === p);
+        const left = proxyWaitLeft(now, proxyReadyAt(member, offlineSince[p] ?? now, proxyHold[p]));
         return (
           <div key={p} className="pointer-events-auto flex w-full max-w-[400px] flex-col gap-1 rounded-xl border border-amber-300/40 bg-black/90 px-3 py-2 text-[13px] text-amber-50">
             <div className="flex items-center gap-1.5">
@@ -411,7 +424,7 @@ export function OnlineOverlay() {
                   <button onClick={() => setProxy(p, true)} className="btn btn-gold h-11 flex-1 rounded-lg text-[13px] font-bold">
                     代わりに操作する
                   </button>
-                  <button onClick={() => useOnline.setState({ offlineSince: { ...offlineSince, [p]: Date.now() } })} className="btn btn-dark h-11 flex-1 rounded-lg text-[13px] font-bold">
+                  <button onClick={() => holdProxy(p)} className="btn btn-dark h-11 flex-1 rounded-lg text-[13px] font-bold">
                     もう少し待つ
                   </button>
                 </div>

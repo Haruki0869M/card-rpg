@@ -1,7 +1,7 @@
 // 回3 A: 待っている側に「だれが・何を選んでいるか」を出す
 import { describe, expect, it } from 'vitest';
 import { ITEMS } from '../../data/items';
-import { createGame } from '../../engine';
+import { createGame, voteCtx } from '../../engine';
 import type { GameState, PlayerId } from '../../types';
 import { awaitedSeats } from './OnlineScreens';
 import { chestClaimWaits, facilityWaits, rewardWaits } from './waitNotes';
@@ -69,8 +69,31 @@ describe('回3 A: 待っている相手と、していること', () => {
     expect(facilityWaits(g, p1)).toEqual([{ playerId: 'P2', what: 'リナで、まだ町を利用しています' }]);
   });
 
+  it('ホストの引き継ぎの直し: ダンジョンの扉の投票で、まだ選んでいない席も待っている（代わりに操作の窓を出す）', () => {
+    const g = twoPlayers();
+    g.mode = 'dungeon';
+    g.activeScene = 'x1';
+    // だれも選んでいない: 2人とも待っている
+    expect(awaitedSeats(g)).toEqual(['P1', 'P2']);
+    // P1 が扉を選んだ: P2 を待っている
+    g.vote = { ctx: voteCtx(g), picks: { P1: { type: 'ENTER_ROOM', playerId: 'P1', roomId: 'r1' } } };
+    expect(awaitedSeats(g)).toEqual(['P2']);
+    // 場面にいるのが1人の席だけなら、投票は無いので待たない
+    g.party = [g.heroes[0].id];
+    expect(awaitedSeats(g)).toEqual([]);
+    // 戦闘中・世界マップは今のまま（投票で待たない）
+    g.party = undefined;
+    g.mode = 'battle';
+    expect(awaitedSeats(g)).toEqual([]);
+  });
+
   it('切断した人を待っているか（代わりに操作の窓）: 報酬・取り合い・施設も数える', () => {
     const g = reward(twoPlayers(), { cards: ['h1'], claim: { h1: 'pass' } });
+    // P2 は選び終えて「続ける」も押した: P1 だけを待っている
+    g.vote = { ctx: voteCtx(g), picks: { P2: { type: 'FINISH_REWARD', playerId: 'P2' } } };
     expect(awaitedSeats(g)).toEqual(['P1']);
+    // ホストの引き継ぎの直し: P2 が「続ける」をまだ押していなければ、P2 も待っている（報酬の「続ける」は全員の票で決まる）
+    g.vote = undefined;
+    expect(awaitedSeats(g)).toEqual(['P1', 'P2']);
   });
 });

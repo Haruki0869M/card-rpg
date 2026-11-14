@@ -78,6 +78,8 @@ export interface Stamp {
 interface LogEntry {
   by: string;
   cmd: string;
+  /** どの依頼から作ったか（requests のキー。二重に記録しないため。古い記録には無い） */
+  req?: string;
 }
 interface Snapshot {
   seq: number;
@@ -102,6 +104,16 @@ export type RoomEvent =
   | { type: 'host'; hostUid: string };
 
 export const seqKey = (n: number) => String(n).padStart(9, '0');
+/** 覚えておく処理済みの依頼の数 */
+const DONE_REQS = 500;
+/** 記録を書けなかった依頼を、やり直す回数 */
+const MAX_TRIES = 3;
+interface QueuedRequest {
+  key: string;
+  by: string;
+  cmd: string;
+  tries?: number;
+}
 const roomPath = (code: string, ...rest: string[]) => join('rooms', code, ...rest);
 
 export function randomCode(rand: () => number = Math.random): string {
@@ -138,9 +150,11 @@ export class Room {
   private subs: Unsubscribe[] = [];
   private logSub: Unsubscribe | null = null;
   private reqSub: Unsubscribe | null = null;
-  private queue: { key: string; by: string; cmd: string }[] = [];
+  private queue: QueuedRequest[] = [];
   private processing = false;
   private hashes = new Map<number, string>();
+  /** 記録に入った依頼のキー（同じ依頼を二重に記録しないため。新しい物だけ覚える） */
+  private doneReqs = new Set<string>();
   private pendingCheck: Snapshot | null = null;
   private resyncing: Promise<void> | null = null;
   private closed = false;
@@ -513,6 +527,7 @@ export class Room {
     this.seq = n;
     this.hashes.set(n, stateHash(this.game));
     if (this.hashes.size > SNAPSHOT_EVERY * 3) this.hashes.delete(Math.min(...this.hashes.keys()));
+    if (entry.req) this.rememberReq(entry.req);
     this.emit({ type: 'command', seq: n, by: entry.by, cmd, result });
     if (this.pendingCheck && this.pendingCheck.seq === n) this.compare(this.pendingCheck);
     return true;
@@ -551,33 +566,82 @@ export class Room {
     this.queue = [];
   }
 
+  private rememberReq(key: string) {
+    this.doneReqs.add(key);
+    if (this.doneReqs.size > DONE_REQS) this.doneReqs.delete(this.doneReqs.values().next().value!);
+  }
+
   private async processQueue() {
     if (this.processing) return;
     this.processing = true;
     try {
-      // 引き継いだ直後など: 書かれている記録に追いついてから
-      await this.catchUp();
-      // 切断中は処理しない（書き込みが後から届いて、引き継いだホストとぶつからないように）
       while (this.queue.length && this.isHost && this.connected && !this.closed) {
-        const req = this.queue.shift()!;
-        await this.handleRequest(req);
+        // 処理を始める前に、部屋のホスト・記録・依頼を読み直す（ホストの引き継ぎ 2026-11-14）。
+        // 目を覚ました古いホストが、自分はもうホストでない事・記録が先へ進んでいる事に気づく前に書かないため
+        if (!(await this.refresh())) break;
+        while (this.queue.length && this.isHost && this.connected && !this.closed) {
+          const req = this.queue.shift()!;
+          const r = await this.handleRequest(req);
+          if (r === 'retry') {
+            // だれかが先に記録を書いた（自分は遅れていた）: 追いついてから、同じ依頼をやり直す
+            req.tries = (req.tries ?? 0) + 1;
+            if (req.tries <= MAX_TRIES) this.queue.unshift(req);
+            break;
+          }
+        }
       }
     } finally {
       this.processing = false;
     }
   }
 
-  private async catchUp() {
-    const log = await this.backend.get<Record<string, LogEntry>>(roomPath(this.code, 'log'));
-    for (const k of Object.keys(log ?? {}).sort()) {
-      const n = Number(k);
-      if (n === this.seq + 1) this.applyEntry(n, log![k]);
+  /**
+   * ホストの仕事を続けてよいか確かめ、記録に追いつく。
+   * - 部屋の hostUid が自分でなければ、ホストの仕事をやめる（false）
+   * - 部屋にもう無い依頼（新しいホストが処理した物）は、待ち行列から捨てる
+   * - 記録の古い分が消えていて追いつけない時は、保存（snapshot）から取り直す
+   */
+  private async refresh(depth = 0): Promise<boolean> {
+    const p = (...r: string[]) => roomPath(this.code, ...r);
+    const [hostUid, log, reqs] = await Promise.all([
+      this.backend.get<string>(p('meta', 'hostUid')),
+      this.backend.get<Record<string, LogEntry>>(p('log')),
+      this.backend.get<Record<string, unknown>>(p('requests')),
+    ]);
+    if (this.closed) return false;
+    if (hostUid !== this.uid) {
+      this.stopHosting();
+      return false;
     }
+    this.queue = this.queue.filter((q) => reqs?.[q.key] !== undefined);
+    const keys = Object.keys(log ?? {})
+      .map(Number)
+      .filter((n) => n > this.seq)
+      .sort((a, b) => a - b);
+    if (keys.length && keys[0] !== this.seq + 1) {
+      // 間が抜けている（古い記録が消えた）: 保存から取り直して、もう一度読む
+      if (depth >= 2) return false;
+      await this.resync('gap');
+      return this.refresh(depth + 1);
+    }
+    for (const n of keys) if (n === this.seq + 1 && !this.applyEntry(n, log![seqKey(n)])) return false;
+    return true;
   }
 
-  private async handleRequest(req: { key: string; by: string; cmd: string }) {
+  /** 次の番号の記録が、もう部屋にあるか（自分が遅れているか） */
+  private async behind(): Promise<boolean> {
+    return (await this.backend.get<LogEntry>(roomPath(this.code, 'log', seqKey(this.seq + 1)))) !== null;
+  }
+
+  /** 依頼を1つ処理する。'retry' = 記録を書けなかった（ほかの端末が先に書いた） */
+  private async handleRequest(req: QueuedRequest): Promise<'retry' | void> {
     const p = (...r: string[]) => roomPath(this.code, ...r);
     if (!this.game) return;
+    // もう記録に入っている依頼（目を覚ました古いホストと、新しいホストの両方が受け取った物）は、二重に記録しない
+    if (this.doneReqs.has(req.key)) {
+      await this.backend.remove(p('requests', req.key)).catch(() => {});
+      return;
+    }
     let cmd: GameCommand;
     try {
       cmd = JSON.parse(req.cmd) as GameCommand;
@@ -588,27 +652,44 @@ export class Room {
     const result = applyGameCommand(this.game, cmd);
     const now = this.backend.now();
     if (result.error) {
+      // 断る前に、記録が先へ進んでいないか確かめる（古い状態で断って、相方の操作を消さないため）
+      if (await this.behind()) return 'retry';
       await this.backend.update({ [p('requests', req.key)]: null, [p('errors', req.by)]: { text: result.error, at: now } });
       return;
     }
     const n = this.seq + 1;
-    const u: Record<string, unknown> = {
-      [p('log', seqKey(n))]: { by: req.by, cmd: req.cmd } satisfies LogEntry,
-      [p('requests', req.key)]: null,
-      [p('meta', 'updatedAt')]: now,
-      [join('roomIndex', this.code)]: now,
-    };
+    const entry: LogEntry = { by: req.by, cmd: req.cmd, req: req.key };
+    // 自分の画面には先に出す（ホストの操作の速さは今のまま）。記録を書けなかったら、部屋から取り直して直す
     this.game = result.state;
     this.seq = n;
     const hash = stateHash(this.game);
     this.hashes.set(n, hash);
     if (this.hashes.size > SNAPSHOT_EVERY * 3) this.hashes.delete(Math.min(...this.hashes.keys()));
+    this.emit({ type: 'command', seq: n, by: req.by, cmd, result });
+    // その番号がまだ空の時だけ書く（古いホストが、新しいホストの書いた記録を上書きしないため）
+    let committed = false;
+    try {
+      committed = (await this.backend.transaction<LogEntry>(p('log', seqKey(n)), (cur) => (cur ? undefined : entry))).committed;
+    } catch {
+      committed = false;
+    }
+    if (!committed) {
+      await this.resync('error');
+      return 'retry';
+    }
+    this.rememberReq(req.key);
+    const u: Record<string, unknown> = {
+      [p('requests', req.key)]: null,
+      [p('meta', 'updatedAt')]: now,
+      [join('roomIndex', this.code)]: now,
+    };
     if (n % SNAPSHOT_EVERY === 0) {
-      u[p('snapshot')] = { seq: n, game: JSON.stringify(this.game), hash } satisfies Snapshot;
       // 古い記録は消して、部屋のデータを小さく保つ（一つ前の snapshot より前）
       for (let k = n - 2 * SNAPSHOT_EVERY + 1; k <= n - SNAPSHOT_EVERY; k++) if (k > 0) u[p('log', seqKey(k))] = null;
+      const snap: Snapshot = { seq: n, game: JSON.stringify(this.game), hash };
+      // 保存は、今の保存より新しい時だけ書く
+      void this.backend.transaction<Snapshot>(p('snapshot'), (cur) => (cur && cur.seq >= n ? undefined : snap)).catch(() => {});
     }
-    this.emit({ type: 'command', seq: n, by: req.by, cmd, result });
     await this.backend.update(u);
   }
 
