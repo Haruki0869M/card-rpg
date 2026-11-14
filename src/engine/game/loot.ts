@@ -67,13 +67,18 @@ export function rollExclusive(game: GameState, heroes: Hero[], rng: Rng, except:
   return pool.length ? pick(pool, rng) : undefined;
 }
 
-/** 闇商人の品（段階7a）: 専用の装備1つ（そのキャラに合う物）＋ レア以上の品（町の店の値段 × 倍率）。カードは売らない */
-export function blackMarketStock(game: GameState, h: Hero, rng: Rng): NonNullable<Hero['peddler']> {
+/**
+ * 闇商人の品（段階7a）: 専用の装備（そのキャラに合う物）＋ レア以上の品（町の店の値段 × 倍率）。カードは売らない。
+ * 専用の装備は choices 個（2026-11-14 寄り道の値打ち: 無法者の隠れ処は2つ。同じ組 'exclusive' = 1つ買うと、ほかは下がる = 2つから選ぶ）
+ */
+export function blackMarketStock(game: GameState, h: Hero, rng: Rng, choices = 1): NonNullable<Hero['peddler']> {
   const k = BALANCE.randomDungeon.blackMarketPriceMul;
   const price = (def: ItemDef) => Math.round((BALANCE.itemPrice[def.rarity] ?? 60) * k);
   const items: NonNullable<Hero['peddler']>['items'] = [];
-  const ex = rollExclusive(game, [h], rng);
-  if (ex) items.push({ item: newItem(game, ex), price: price(ex) });
+  for (let n = 0; n < choices; n++) {
+    const ex = rollExclusive(game, [h], rng, items.map((x) => x.item.itemId));
+    if (ex) items.push({ item: newItem(game, ex), price: price(ex), ...(choices > 1 ? { group: 'exclusive' } : {}) });
+  }
   // ふつうの品: そのキャラが使える武器・鎧・装飾品のレア以上（ほかのシナリオの限定品と専用の装備は出さない）
   const types = new Set(jobWeapons(h.classId));
   const goods = ITEMS.all.filter((i) => i.slot !== 'consumable' && !i.source && (!i.scenario || i.scenario === game.scenarioId) && (i.slot !== 'weapon' || types.has(i.weaponType!)) && rarityIndex(i.rarity) >= 1);

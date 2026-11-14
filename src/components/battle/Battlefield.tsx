@@ -431,7 +431,10 @@ const EnemyUnit = memo(function EnemyUnit({
         // 予告は味方の立ち絵より手前に出す（画面が低くて重なっても、狙いと数字を読めるように）
         <div className="relative z-[6] mt-0.5 flex flex-col items-center gap-0.5 transition-opacity duration-150" style={{ width: barW, opacity: dimmed ? 0.8 : 1 }} data-enemy-info>
           <div className="text-outline w-full truncate text-center text-[12px] leading-[14px] font-bold text-zinc-100">
-            <span className="text-amber-300">Lv{enemy.level}</span> {enemyName(enemy)}
+            <span className="text-amber-300">Lv{enemy.level}</span>
+            {/* 寄り道の値打ち（2026-11-14）: 加護の数（💀）と見破り（👁）の小さな印（名前より前 = 狭い時に名前の方が省かれる）。中身は長押し */}
+            {battle.boon?.uid === enemy.uid && <span className="ml-0.5 text-violet-300" data-boon-mark={battle.boon.ids.length}>💀{battle.boon.ids.length}</span>}
+            {battle.insight === enemy.uid && <span className="ml-0.5 text-emerald-300" data-insight-mark>👁</span>} {enemyName(enemy)}
           </div>
           <HpBar hp={enemy.hp} max={enemy.maxHp} block={enemy.block} tone="enemy" height={12} marks={phaseMarks(enemy).map((m) => m.at)} />
           <ElementMarks enemy={enemy} />

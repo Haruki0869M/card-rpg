@@ -40,6 +40,23 @@ export const furnaceGolem: EnemyDef = {
     { id: 'slag', name: '溶けた鉄', effects: [{ kind: 'damage', amount: 7, hits: 2 }] },
   ],
   abilities: [{ name: '赤く燃える炉心', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 8 }] } }],
+  // 最後の中ボス（2026-11-14 寄り道の値打ち 柱5）: 中ボスの部屋の戦闘だけの段階。HP50%か、相方が倒れると入る。数字は【提案】
+  midbossPhases: [
+    {
+      belowHpPct: 50,
+      onPartnerDown: true,
+      name: '暴走する炉のゴーレム',
+      pattern: 'sequence',
+      openingActionId: 'fuOverheat',
+      rule: '数え読み3: 3回の予告の後に大技（数えている間に BREAK すると1つ戻る。守りを固めて受ける）',
+      actions: [
+        { id: 'fuOverheat', name: '炉心の暴走', big: true, scripted: true, countdown: { actionId: 'fuMeltdown', turns: 3 }, hint: '数え読みが始まる: 3回の予告の後に「炉心溶融」。数えている間に BREAK すると1つ戻る', effects: [{ kind: 'block', amount: 10 }] },
+        { id: 'fuMeltdown', name: '炉心溶融', big: true, scripted: true, hint: '味方全員に大きな火のダメージ。ブロックで受けるか、氷の弱点で BREAK して威力を半分にする', effects: [{ kind: 'damage', amount: 14, element: 'fire', to: 'foes' }] },
+        { id: 'fuRedFist', name: '赤熱の拳', effects: [{ kind: 'damage', amount: 17, element: 'fire' }] },
+        { id: 'fuSpatter', name: '溶けた鉄の飛沫', effects: [{ kind: 'damage', amount: 7, hits: 2 }] },
+      ],
+    },
+  ],
 };
 
 export const greatMachine: EnemyDef = {
@@ -84,4 +101,21 @@ export const ironCopperKnight: EnemyDef = makeVariant(copperKnight, {
   name: '鋼の銅騎士',
   aura: 'iron',
   abilities: [{ name: '鋼の重ね鎧', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 12 }] } }],
+  // 最後の中ボス（2026-11-14 寄り道の値打ち 柱5）: 中ボスの部屋の戦闘だけの段階。HP50%か、相方が倒れると入る。数字は【提案】
+  midbossPhases: [
+    {
+      belowHpPct: 50,
+      onPartnerDown: true,
+      name: 'ゼンマイを巻く鋼の銅騎士',
+      pattern: 'sequence',
+      openingActionId: 'ckWindUp',
+      rule: '数え読み3: 3回の予告の後に大技（数えている間に BREAK すると1つ戻る。守りを固めて受ける）',
+      actions: [
+        { id: 'ckWindUp', name: 'ゼンマイを巻く', big: true, scripted: true, countdown: { actionId: 'ckFullCharge', turns: 3 }, hint: '数え読みが始まる: 3回の予告の後に「全力の槍突撃」。数えている間に BREAK すると1つ戻る', effects: [{ kind: 'block', amount: 12 }] },
+        { id: 'ckFullCharge', name: '全力の槍突撃', big: true, scripted: true, hint: '大きな一撃。ブロックで受けるか、雷の弱点で BREAK して威力を半分にする', effects: [{ kind: 'damage', amount: 28 }] },
+        { id: 'ckThrust', name: '鋼の槍突き', effects: [{ kind: 'damage', amount: 16 }] },
+        { id: 'ckWideSweep', name: '鋼の薙ぎ払い', effects: [{ kind: 'damage', amount: 8, to: 'foes' }] },
+      ],
+    },
+  ],
 });

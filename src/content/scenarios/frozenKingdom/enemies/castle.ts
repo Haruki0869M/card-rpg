@@ -20,6 +20,23 @@ export const frostGuardian: EnemyDef = {
     {"id": "brace", "name": "氷壁の再生", "effects": [{"kind": "block", "amount": 14}, {"kind": "damage", "amount": 6}]},
   ],
   abilities: [{"name": "城門の守り", "effect": {"when": "battleStart", "do": [{"kind": "block", "amount": 10}]}}],
+  // 最後の中ボス（2026-11-14 寄り道の値打ち 柱5）: 中ボスの部屋の戦闘だけの段階。HP50%か、相方が倒れると入る。数字は【提案】
+  midbossPhases: [
+    {
+      belowHpPct: 50,
+      onPartnerDown: true,
+      name: '怒れる霜の守護者',
+      pattern: 'sequence',
+      openingActionId: 'fgRaiseWall',
+      rule: '溜め: 構えの次に大技（構えの間に弱点で BREAK すると大技も消える。守りを固めて受ける）',
+      actions: [
+        { id: 'fgRaiseWall', name: '氷壁を掲げる', big: true, scripted: true, chargeTo: 'fgGlacierFall', hint: '次の予告が「氷河落とし」になる。この間に闇か雷の弱点で BREAK すると、氷河落としも消える', effects: [{ kind: 'block', amount: 18 }] },
+        { id: 'fgGlacierFall', name: '氷河落とし', big: true, scripted: true, hint: '味方全員に大きな氷のダメージ。ブロックで受けるか、BREAK して威力を半分にする', effects: [{ kind: 'damage', amount: 13, element: 'ice', to: 'foes' }] },
+        { id: 'fgFrostFist', name: '凍る拳', effects: [{ kind: 'damage', amount: 16, element: 'ice' }] },
+        { id: 'fgRebuild', name: '氷壁の組み直し', effects: [{ kind: 'block', amount: 14 }, { kind: 'damage', amount: 6 }] },
+      ],
+    },
+  ],
 };
 
 export const whiteQueen: EnemyDef = {

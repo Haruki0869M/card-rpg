@@ -24,6 +24,22 @@ export const skyKnight: EnemyDef = {
     { id: 'guard', name: '天の盾', big: true, behavior: 'guard', fallbackIfAloneId: 'lance', hint: '次の味方の番の間、ほかの敵への単体攻撃を代わりに受ける。全体攻撃は通る', effects: [{ kind: 'guardAllies' }, { kind: 'block', amount: 10 }] },
     { id: 'sweep', name: '槍の薙ぎ払い', effects: [{ kind: 'damage', amount: 7, to: 'foes' }] },
   ],
+  // 最後の中ボス（2026-11-14 寄り道の値打ち 柱5）: 中ボスの部屋の戦闘だけの段階。HP50%か、相方が倒れると入る。数字は【提案】
+  midbossPhases: [
+    {
+      belowHpPct: 50,
+      onPartnerDown: true,
+      name: '誓いを立て直す空の騎士',
+      pattern: 'sequence',
+      openingActionId: 'skVow',
+      rule: '1回だけ祈りでHPを最大の半分まで戻す（弱点で BREAK すると止まる。呪い・癒し封じで戻る量が減る。境目を一気に越えるほど戻る量が増える）',
+      actions: [
+        { id: 'skVow', name: '誓いの立て直し', big: true, scripted: true, hint: 'HPを最大の50%まで戻す（1回だけ）。闇の弱点で BREAK すると止まる。呪い・癒し封じで戻る量が減る', effects: [{ kind: 'healToPct', pct: 50 }] },
+        { id: 'skCharge', name: '捨て身の突撃', effects: [{ kind: 'damage', amount: 16 }] },
+        { id: 'skSpin', name: '槍の大回転', effects: [{ kind: 'damage', amount: 7, to: 'foes' }] },
+      ],
+    },
+  ],
 };
 
 export const skyPaladin: EnemyDef = {
@@ -45,6 +61,22 @@ export const skyPaladin: EnemyDef = {
     { id: 'oath', name: '聖騎士の誓い', effects: [{ kind: 'block', amount: 8, to: 'allies' }, { kind: 'damage', amount: 8 }] },
   ],
   abilities: [{ name: '光輪の加護', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 10 }] } }],
+  // 最後の中ボス（2026-11-14 寄り道の値打ち 柱5）: 中ボスの部屋の戦闘だけの段階。HP50%か、相方が倒れると入る。数字は【提案】
+  midbossPhases: [
+    {
+      belowHpPct: 50,
+      onPartnerDown: true,
+      name: '祈る空の聖騎士',
+      pattern: 'sequence',
+      openingActionId: 'spPrayer',
+      rule: '1回だけ祈りでHPを最大の半分まで戻す（弱点で BREAK すると止まる。呪い・癒し封じで戻る量が減る。境目を一気に越えるほど戻る量が増える）',
+      actions: [
+        { id: 'spPrayer', name: '聖なる祈り', big: true, scripted: true, hint: 'HPを最大の50%まで戻す（1回だけ）。闇の弱点で BREAK すると止まる。呪い・癒し封じで戻る量が減る', effects: [{ kind: 'healToPct', pct: 50 }, { kind: 'block', amount: 10 }] },
+        { id: 'spHolyBlade', name: '光の剣', effects: [{ kind: 'damage', amount: 19, element: 'holy' }] },
+        { id: 'spStarfall', name: '星の裁き', big: true, hint: '味方全員に聖のダメージ。ブロックで受けるか、闇の弱点で BREAK する', effects: [{ kind: 'damage', amount: 10, element: 'holy', to: 'foes' }] },
+      ],
+    },
+  ],
 };
 
 export const starSeerQueen: EnemyDef = {

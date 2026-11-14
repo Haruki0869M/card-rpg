@@ -64,6 +64,23 @@ export const iceSwordsman: EnemyDef = {
     // 「氷刃の突き」を盾砕きに置き換えた（ブロックを0にしてから、同じ12のダメージ）。ID は古い保存のために残す
     {"id": "thrust", "name": "鎧通しの突き", big: true, behavior: "shatter", hint: "当たるとブロックを全部壊す。BREAK するか、ブロックに頼らずに受ける", "effects": [{"kind": "shieldBreak"}, {"kind": "damage", "amount": 12}]},
   ],
+  // 最後の中ボス（2026-11-14 寄り道の値打ち 柱5）: 中ボスの部屋の戦闘だけの段階。HP50%か、相方が倒れると入る。数字は【提案】
+  midbossPhases: [
+    {
+      belowHpPct: 50,
+      onPartnerDown: true,
+      name: '鞘を払った氷の剣士',
+      pattern: 'sequence',
+      openingActionId: 'isSheathe',
+      rule: '溜め: 構えの次に大技（構えの間に弱点で BREAK すると大技も消える。守りを固めて受ける）',
+      actions: [
+        { id: 'isSheathe', name: '霜刃を納める', big: true, scripted: true, chargeTo: 'isGlacierCut', hint: '次の予告が「氷河断ち」になる。この間に雷か聖の弱点で BREAK すると、氷河断ちも消える', effects: [{ kind: 'block', amount: 9 }] },
+        { id: 'isGlacierCut', name: '氷河断ち', big: true, scripted: true, hint: '大きな一撃。ブロックで受けるか、BREAK して威力を半分にする', effects: [{ kind: 'damage', amount: 22, element: 'ice' }] },
+        { id: 'isTwinCut', name: '二段斬り', effects: [{ kind: 'damage', amount: 6, hits: 2 }] },
+        { id: 'isColdEdge', name: '冷たい刃', effects: [{ kind: 'damage', amount: 11, element: 'ice' }] },
+      ],
+    },
+  ],
 };
 
 export const blizzardBeast: EnemyDef = {

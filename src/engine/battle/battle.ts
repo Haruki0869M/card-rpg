@@ -128,6 +128,8 @@ export function createBattle(setup: BattleSetup): BattleState {
       dead: false,
       phase: 0,
       ...(body ? { eliteBody: true } : {}),
+      // 最後の中ボス（2026-11-14 寄り道の値打ち 柱5）: 中ボスの部屋の戦闘だけ、中ボスの段階（midbossPhases）を読む
+      ...(encounter.midboss && def.midbossPhases?.length ? { phaseSet: 'midboss' as const } : {}),
     };
   });
 
@@ -357,6 +359,16 @@ function applyTickHeal(state: BattleState, u: AllyState | EnemyState, events: Ba
   if (amount <= 0) return;
   const h = healUnit(u, amount, events);
   if (h > 0) addLog(state, `${nameOf(u)}は${names.join('・')}でHP+${h}`);
+}
+
+/** 災厄の加護「瘴気の衣」（2026-11-14）: 大物が敵の番の始めに、最大HPの regen% を回復する（呪い・癒し封じで減る = healUnit の倍率） */
+function boonRegen(state: BattleState, events: BattleEvent[]) {
+  const bo = state.boon;
+  if (!bo?.regen) return;
+  const e = state.enemies.find((x) => x.uid === bo.uid && !x.dead);
+  if (!e) return;
+  const h = healUnit(e, Math.ceil((e.maxHp * bo.regen) / 100), events);
+  if (h > 0) addLog(state, `💀瘴気の衣（瘴気を紡ぐ死霊術師の加護）: ${nameOf(e)}はHP+${h}`);
 }
 
 /** 継続ダメージの状態異常（毒・火傷など。ブロックを無視）→ その状態異常は減る */
@@ -832,6 +844,7 @@ function endTurn(state: BattleState, playerId: string, rng: Rng, events: BattleE
   addLog(state, `--- 敵フェーズ ---`);
   events.push({ type: 'phase', phase: 'enemy' });
   for (const e of state.enemies) if (!e.dead) applyTickHeal(state, e, events);
+  boonRegen(state, events);
   for (const e of state.enemies) if (!e.dead) fireAbilities(state, rng, events, e, 'turnStart');
   checkEnd(state, events);
   return undefined;

@@ -30,6 +30,7 @@ export function doCardTask(game: GameState, h: Hero, cardUid: string | undefined
   if (!task) return 'カードを選ぶ作業はありません';
   if (!cardUid) {
     delete h.cardTask;
+    delete h.altarLeft;
     return undefined;
   }
   const idx = h.deck.findIndex((c) => c.uid === cardUid);
@@ -49,6 +50,11 @@ export function doCardTask(game: GameState, h: Hero, cardUid: string | undefined
       inst.upgraded = true;
       addLog(game, `晶石の祭壇で、${h.name}の「${name}」を強化した`);
     } else return '強化か変異かを選んでください';
+    // 古代の晶洞（2026-11-14 寄り道の値打ち）: 祭壇はもう1回使える
+    if (h.altarLeft) {
+      h.altarLeft -= 1;
+      return undefined;
+    }
     delete h.cardTask;
     return undefined;
   }
@@ -92,6 +98,9 @@ export function peddlerBuy(game: GameState, h: Hero, kind: 'item' | 'card' | und
   if (h.gold < entry.price) return 'ゴールドが足りません';
   h.gold -= entry.price;
   entry.sold = true;
+  // 同じ組の品（闇商人の専用の装備の2択。2026-11-14）は、1つ買うとほかは下がる
+  const group = 'group' in entry ? entry.group : undefined;
+  if (group) for (const x of shop.items) if (x.group === group) x.sold = true;
   if ('item' in entry) addLog(game, `${h.name}は行商人から${addItem(game, h, entry.item, false)}を買った（${entry.price}G）`);
   else {
     h.deck.push({ uid: `c${game.nextUid++}`, cardId: entry.cardId });

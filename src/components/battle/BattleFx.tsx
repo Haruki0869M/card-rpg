@@ -41,7 +41,7 @@ function useFlash(id: number | undefined, seconds: number): number | undefined {
 /** 敵の技の属性（技の名前から探す。変身後の技も探す） */
 function enemyActionElement(defId: string, name: string): string | undefined {
   const def = getEnemy(defId);
-  const lists: EnemyActionDef[][] = [def.actions, ...((def.phases ?? []) as { actions?: EnemyActionDef[] }[]).map((p) => p.actions ?? [])];
+  const lists: EnemyActionDef[][] = [def.actions, ...([...(def.phases ?? []), ...(def.midbossPhases ?? [])] as { actions?: EnemyActionDef[] }[]).map((p) => p.actions ?? [])];
   for (const list of lists) {
     const a = list.find((x) => x.name === name);
     if (!a) continue;

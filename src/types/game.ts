@@ -138,7 +138,9 @@ export interface Hero {
   /** altar = 晶石の祭壇（段階7a。1枚を＋に強化するか、同じ格の別のカードに変異させるかを、本人が選ぶ） */
   cardTask?: 'upgrade' | 'remove' | 'mutate' | 'altar';
   /** さすらいの行商人の品物（PEDDLER_BUY で買う）。kind = blackMarket は無法者の隠れ処の闇商人（段階7a。品と値段だけが違う） */
-  peddler?: { items: { item: ItemInstance; price: number; sold?: boolean }[]; cards: { cardId: string; price: number; sold?: boolean }[]; kind?: 'blackMarket' };
+  peddler?: { items: { item: ItemInstance; price: number; sold?: boolean; group?: string }[]; cards: { cardId: string; price: number; sold?: boolean }[]; kind?: 'blackMarket' };
+  /** 晶石の祭壇: 今の作業の後に、もう何回強化か変異ができるか（古代の晶洞は2回。2026-11-14。省略は0） */
+  altarLeft?: number;
   /** 武器に宿った属性（その武器を持っている間だけ） */
   weaponElement?: { uid: string; element: string };
   /** 最後に突発イベントが起きたワールドターン（2手番続けては起きない） */
@@ -219,8 +221,11 @@ export interface DungeonThemeDef {
   largeGroups?: boolean;
   /** 宝箱の部屋が封魔の宝箱になる確率（%。2行目から） */
   sealedChance?: number;
-  /** ご褒美の倍率（ボスの黄金箱には掛けない）。chestGold = 宝箱のお金 / battleGold = 戦闘のお金 / epicMul = カードと装備のエピックの重み */
-  reward?: { chestGold?: number; battleGold?: number; epicMul?: number };
+  /**
+   * ご褒美の倍率（ボスの黄金箱には掛けない）。chestGold = 宝箱のお金 / battleGold = 戦闘のお金 / epicMul = カードと装備のエピックの重み /
+   * altarUses = 晶石の祭壇で強化か変異ができる回数（省略は1）/ blackMarketChoices = 闇商人が並べる専用の装備の数（1つ買うと、ほかは下がる。省略は1）
+   */
+  reward?: { chestGold?: number; battleGold?: number; epicMul?: number; altarUses?: number; blackMarketChoices?: number };
 }
 
 export interface ChestSpec {
@@ -339,6 +344,12 @@ export interface ChestState {
   seal?: 'broken' | 'cleared';
   /** 2人以上のプレイヤーで開けた時: 中の品物（装備・消耗品）の取り合い（戦闘の装備と同じ「欲しい／余れば／いらない」） */
   claims?: LootClaim[];
+  /**
+   * ランダムダンジョンの黄金箱の秘宝の3択（2026-11-14 寄り道の値打ち 柱3）: 開けた時に引いた候補。PICK_RELIC で1つ選ぶまで立ち去れない。
+   * 選んだら relicPicked（候補の番号）。古い保存には無い（今までどおり、乱数の1つが中身に入っている）
+   */
+  relics?: ItemInstance[];
+  relicPicked?: number;
 }
 
 export interface ChestRoll {
@@ -646,7 +657,10 @@ export type GameCommand =
   | { type: 'FINISH_EVENT'; playerId: PlayerId }
   | { type: 'REST'; playerId: PlayerId; kind: 'hp' | 'focus' | 'upgrade' }
   | { type: 'RETREAT'; playerId: PlayerId }
-  | { type: 'RETURN_TO_HUB'; playerId: PlayerId }
+  /** kind = 'shortcut': ランダムダンジョンを制覇した後、抜け道を通って出る（2026-11-14。省略は入口へ戻る） */
+  | { type: 'RETURN_TO_HUB'; playerId: PlayerId; kind?: 'shortcut' }
+  /** ランダムダンジョンの黄金箱の秘宝を、3つの候補から1つ選ぶ（2人以上はみんなで決める。2026-11-14） */
+  | { type: 'PICK_RELIC'; playerId: PlayerId; optionIndex: number }
   | { type: 'EQUIP'; playerId: PlayerId; heroId: string; itemUid: string }
   | { type: 'UNEQUIP'; playerId: PlayerId; heroId: string; slot: EquipSlot }
   /** 同じ場所にいる仲間に、お金か持ち物を渡す */
@@ -677,7 +691,8 @@ export type GameCommand =
   /** storyVer = 押した時に見ていた物語の窓の版（WorldState.storyVer）。違えば何もしない。無い（古い形）時は今出ている窓を閉じる（点検 F6） */
   | { type: 'STORY_CONTINUE'; playerId: PlayerId; storyVer?: number }
   // ---------- 町・祠 ----------
-  | { type: 'TOWN_BUY'; playerId: PlayerId; heroId?: string; kind: 'item' | 'card'; index: number }
+  /** free = 盗賊王の無料券を使う（装備・消耗品だけ。2026-11-14） */
+  | { type: 'TOWN_BUY'; playerId: PlayerId; heroId?: string; kind: 'item' | 'card'; index: number; free?: boolean }
   | { type: 'TOWN_INN'; playerId: PlayerId; heroId?: string }
   /** 伝承の書のマイペットを呼ぶ（スタートの町で1人1回・お金。中身はその端末の記録から送る。乱数は使わない。K5） */
   | { type: 'BRING_MY_PET'; playerId: PlayerId; heroId: string; pet: { uid: string; petId: string; color: string; name: string; love: number } }

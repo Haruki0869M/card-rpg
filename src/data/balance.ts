@@ -327,7 +327,11 @@ export const BALANCE = {
    * - blackMarketPriceMul: 闇商人の値段の倍率（町の店の値段 × これ）【提案】
    * - blackMarketGoods: 闇商人が専用の装備のほかに並べる、レア以上の品の数【提案】
    */
-  randomDungeon: { exclusiveChance: 100, blackMarketPriceMul: 1.5, blackMarketGoods: 2 },
+  /**
+   * ランダムダンジョン。shortcutRange = 抜け道の出口を探す範囲（入口から陸を歩いて何歩まで。2026-11-14 寄り道の値打ち 柱4・【提案】）/
+   * relicChoices = 黄金箱の秘宝の候補の数（同じ柱3）
+   */
+  randomDungeon: { exclusiveChance: 100, blackMarketPriceMul: 1.5, blackMarketGoods: 2, shortcutRange: 8, relicChoices: 3 },
   /**
    * 災厄の中ボス（段階7b・overhaul-plan-v2 §3。数字は計画の【提案】のまま。段階8で測って決める）。広い地図（帯のある地図）だけに出る。
    * - max: 1冒険に出る数 / firstCorruption: 1体目は「1つ目の鍵を取った時」か、その前に侵食度がこれを越えた時 / milestones: 2体目・3体目の侵食度
