@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { botNextCommand } from '../../engine/bot';
 import { commandPlayer, createBattle, heroAbilities, stateHash, toPartyMember } from '../../engine';
 import { type MemoryClient, MemoryHub } from '../memoryBackend';
-import { normalizeCode, Room, RoomError, seqKey, SNAPSHOT_EVERY } from '../room';
+import { normalizeCode, OFFLINE_GRACE_MS, Room, RoomError, seqKey, SNAPSHOT_EVERY, watchWake } from '../room';
 
 /** 通知と非同期の処理が落ち着くまで待つ */
 // Windowsでは0msタイマーも約15ms待つため、400手分の待機が制限時間を超える。
@@ -12,6 +12,13 @@ beforeEach(() => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }));
 afterEach(() => vi.useRealTimers());
 async function settle(n = 12) {
   for (let i = 0; i < n; i++) await vi.advanceTimersByTimeAsync(1);
+}
+/** 部屋の時計とタイマーを ms 進める（「動いている」の書き込みは本物の時計なので、部屋の時計だけずらす） */
+async function passTime(hub: MemoryHub, ms: number) {
+  const prev = hub.clock;
+  hub.clock = () => prev() + ms;
+  await vi.advanceTimersByTimeAsync(ms);
+  await settle(30);
 }
 
 const classes = ['warrior', 'mage', 'guardian', 'hunter'];
@@ -232,12 +239,15 @@ describe('操作の同期', () => {
 
 describe('切断と再接続・ホストの引き継ぎ', () => {
   it('切断した端末は、つながり直すと追いつく（古い記録が消えていたら保存から取り直す）', async () => {
-    const { rooms } = await playing(3, 3);
+    const { hub, rooms } = await playing(3, 3);
     await drive(rooms, 5);
     const c = rooms[2];
     c.backend.goOffline();
     await settle();
     expect(rooms[0].members[c.uid].online).toBe(false);
+    // 実機の不具合③: 切れてから約10秒は「動いている」扱い（一瞬の切断では知らせない）。10秒たつと切れている
+    expect(rooms[0].seatOnline('P3')).toBe(true);
+    await passTime(hub, OFFLINE_GRACE_MS + 1_000);
     expect(rooms[0].seatOnline('P3')).toBe(false);
     // P3 のキャラの手番はホストが代わりに操作する
     await rooms[0].setProxy('P3', true);
@@ -251,12 +261,15 @@ describe('切断と再接続・ホストの引き継ぎ', () => {
     expect(allSame(rooms)).toBe(true);
   }, 30_000);
 
-  it('ホストが切断したら、次に入った人がホストになり、そのまま続けられる', async () => {
-    const { rooms } = await playing(3, 3);
+  it('ホストが切断したら、約10秒後に次に入った人がホストになり、そのまま続けられる', async () => {
+    const { hub, rooms } = await playing(3, 3);
     await drive(rooms, 8);
     const [host, b, c] = rooms;
     host.backend.goOffline();
     await settle(30);
+    // 実機の不具合③（点検 F3）: ふつうの切断は、すぐには引き継がない（一瞬の切断かもしれない）
+    expect(b.isHost).toBe(false);
+    await passTime(hub, OFFLINE_GRACE_MS + 1_000);
     expect(b.isHost).toBe(true);
     expect(c.isHost).toBe(false);
     await b.setProxy('P1', true);
@@ -424,4 +437,159 @@ describe('切断と再接続・ホストの引き継ぎ', () => {
     expect(stateHash(again.game)).toBe(hash);
     expect(hub.read(`rooms/${code}/log/${seqKey(seq)}`)).not.toBeNull();
   }, 30_000);
+});
+
+describe('実機の不具合③: 「通信が切れています」が何度も出る（接続の印・待ち・ホストの引き継ぎ）', () => {
+  type Inside = { fixMyMark(): void; checkHost(): void };
+  const online = (hub: MemoryHub, r: Room, uid: string) => hub.read(`rooms/${r.code}/members/${uid}/online`);
+
+  for (const people of [2, 3, 4]) {
+    it(`${people}人: 動いている端末の印が後から false と書かれても、自分ですぐ true に書き直す（知らせは出ない）`, async () => {
+      const { hub, rooms } = await playing(people);
+      await drive(rooms, 3);
+      const last = rooms[people - 1];
+      const seat = last.seat!;
+      // サーバーが古い接続の切断に後から気づいて false を書いた（スマホの電波の切り替え）
+      hub.write(`rooms/${last.code}/members/${last.uid}/online`, false);
+      await settle(30);
+      expect(online(hub, last, last.uid)).toBe(true);
+      expect(hub.read(`rooms/${last.code}/members/${last.uid}/beat`)).toBeGreaterThan(0);
+      await passTime(hub, OFFLINE_GRACE_MS + 1_000);
+      for (const r of rooms) expect(r.seatOnline(seat)).toBe(true);
+    }, 30_000);
+
+    it(`${people}人: 動いているホストは、印が false と書かれても引き継がれない`, async () => {
+      const { hub, rooms } = await playing(people);
+      await drive(rooms, 3);
+      const [host] = rooms;
+      hub.write(`rooms/${host.code}/members/${host.uid}/online`, false);
+      await settle(30);
+      await passTime(hub, OFFLINE_GRACE_MS + 1_000);
+      for (const r of rooms.slice(1)) (r as unknown as Inside).checkHost();
+      await settle(30);
+      expect(host.isHost).toBe(true);
+      for (const r of rooms.slice(1)) expect(r.isHost).toBe(false);
+      expect(online(hub, host, host.uid)).toBe(true);
+    }, 30_000);
+
+    it(`${people}人: ホストが「部屋を出る」と、待たずにすぐ次の人が引き継ぐ`, async () => {
+      const { rooms } = await playing(people);
+      await drive(rooms, 3);
+      const [host, b] = rooms;
+      await host.leave();
+      await settle(30);
+      expect(b.isHost).toBe(true);
+      expect(b.seatOnline('P1')).toBe(false);
+    }, 30_000);
+
+    it(`${people}人: ホストがふつうに切れると、約10秒は待ってから引き継ぐ。戻るとホストは代わらず追いつく`, async () => {
+      const { hub, rooms } = await playing(people);
+      await drive(rooms, 3);
+      const [host, b] = rooms;
+      host.backend.goOffline();
+      await settle(30);
+      await passTime(hub, OFFLINE_GRACE_MS / 2);
+      (b as unknown as Inside).checkHost();
+      await settle(30);
+      expect(b.isHost).toBe(false);
+      await passTime(hub, OFFLINE_GRACE_MS / 2 + 1_000);
+      expect(b.isHost).toBe(true);
+      for (const r of rooms.slice(2)) expect(r.isHost).toBe(false);
+      host.backend.goOnline();
+      await settle(30);
+      expect(host.isHost).toBe(false);
+      expect(allSame(rooms)).toBe(true);
+    }, 30_000);
+  }
+
+  it('ホストが一瞬だけ切れて戻ると、引き継がれず、知らせも出ない', async () => {
+    const { hub, rooms } = await playing(2);
+    await drive(rooms, 3);
+    const [host, b] = rooms;
+    host.backend.goOffline();
+    await settle(30);
+    expect(b.seatOnline('P1')).toBe(true);
+    await passTime(hub, 3_000);
+    host.backend.goOnline();
+    await settle(30);
+    await passTime(hub, OFFLINE_GRACE_MS);
+    expect(b.isHost).toBe(false);
+    expect(host.isHost).toBe(true);
+    expect(b.seatOnline('P1')).toBe(true);
+  }, 30_000);
+
+  it('知らせの待ち: 切れてから約10秒で「切れている」になり、画面へ知らせる。戻るとすぐ消える', async () => {
+    const { hub, rooms } = await playing(2);
+    const [host, b] = rooms;
+    let members = 0;
+    host.on((e) => e.type === 'members' && members++);
+    b.backend.goOffline();
+    await settle(30);
+    expect(host.seatOnline('P2')).toBe(true);
+    const before = members;
+    await passTime(hub, OFFLINE_GRACE_MS + 100);
+    expect(host.seatOnline('P2')).toBe(false);
+    expect(members).toBeGreaterThan(before);
+    b.backend.goOnline();
+    await settle(30);
+    expect(host.seatOnline('P2')).toBe(true);
+  }, 30_000);
+
+  it('知らせが出ている間に相手の操作が届いたら、すぐ「動いている」に戻る', async () => {
+    const { hub, rooms } = await playing(2);
+    const [host, b] = rooms;
+    // 相手の印だけが false のまま残った形を作る（書き直しを止める）
+    (b as unknown as Inside).fixMyMark = () => {};
+    hub.write(`rooms/${b.code}/members/${b.uid}/online`, false);
+    await settle(30);
+    await passTime(hub, OFFLINE_GRACE_MS + 100);
+    expect(host.seatOnline('P2')).toBe(false);
+    const seen: boolean[] = [];
+    host.on((e) => e.type === 'command' && e.by === b.uid && seen.push(host.seatOnline('P2')));
+    await drive(rooms, 40);
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every(Boolean)).toBe(true);
+  }, 30_000);
+
+  it('画面が戻った時（wake）: すぐ「動いている」を書き、記録が先へ進んでいたら取り直す', async () => {
+    const { hub, rooms } = await playing(2);
+    const [host, b] = rooms;
+    await drive(rooms, 3);
+    // 相方のページが裏に回った: 知らせが届かない。その間ホストが代わりに進める
+    (b.backend as MemoryClient).paused = true;
+    await host.setProxy('P2', true);
+    await settle();
+    await drive([host], 5);
+    expect(b.seq).toBeLessThan(host.seq);
+    const reasons: string[] = [];
+    b.on((e) => e.type === 'resync' && reasons.push(e.reason));
+    await passTime(hub, 3_000);
+    const beatBefore = hub.read(`rooms/${b.code}/members/${b.uid}/beat`) as number;
+    b.wake();
+    await settle(5);
+    expect(hub.read(`rooms/${b.code}/members/${b.uid}/beat`)).toBeGreaterThan(beatBefore);
+    await vi.advanceTimersByTimeAsync(2_000);
+    await settle(30);
+    expect(reasons).toContain('gap');
+    (b.backend as MemoryClient).paused = false;
+    await settle(30);
+    expect(allSame(rooms)).toBe(true);
+  }, 30_000);
+
+  it('watchWake: タブが表に戻った・ネットが戻った・ページが戻った時に呼ぶ（裏に回った時は呼ばない）', () => {
+    const win = new EventTarget();
+    const doc = Object.assign(new EventTarget(), { visibilityState: 'hidden' as DocumentVisibilityState });
+    let n = 0;
+    const stop = watchWake(() => n++, win as unknown as Window, doc as unknown as Document);
+    doc.dispatchEvent(new Event('visibilitychange'));
+    expect(n).toBe(0);
+    doc.visibilityState = 'visible';
+    doc.dispatchEvent(new Event('visibilitychange'));
+    win.dispatchEvent(new Event('online'));
+    win.dispatchEvent(new Event('pageshow'));
+    expect(n).toBe(3);
+    stop();
+    win.dispatchEvent(new Event('online'));
+    expect(n).toBe(3);
+  });
 });
