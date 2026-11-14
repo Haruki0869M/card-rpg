@@ -133,6 +133,8 @@ describe('段階7a: 世界マップのランダムダンジョン', () => {
     x.chest = { roomId: boss.id, spec: { rarity: 'legend', locked: false, big: true }, unlocked: true };
     const scene = (command: GameCommand): GameCommand => ({ type: 'SCENE', scene: x.id, command });
     let s = run(g, scene({ type: 'OPEN_CHEST', playerId: 'P1', heroId: 'h0', focusUsed: 0 }));
+    // 2026-11-14（寄り道の値打ち）: 黄金箱の秘宝は3つから1つ選んでから立ち去る
+    s = run(s, scene({ type: 'PICK_RELIC', playerId: 'P1', optionIndex: 0 }));
     s = run(s, scene({ type: 'LEAVE_CHEST', playerId: 'P1' }));
     return run(s, scene({ type: 'RETURN_TO_HUB', playerId: 'P1' }));
   }
@@ -273,7 +275,10 @@ describe('段階7a: 黄金箱と専用の装備', () => {
       boss.cleared = true;
       x.mode = 'chest';
       x.chest = { roomId: boss.id, spec: { rarity: 'legend', locked: false, big: true }, unlocked: true };
-      const s2 = run(g, { type: 'SCENE', scene: x.id, command: { type: 'OPEN_CHEST', playerId: 'P1', heroId: 'h0', focusUsed: 0 } });
+      const s1 = run(g, { type: 'SCENE', scene: x.id, command: { type: 'OPEN_CHEST', playerId: 'P1', heroId: 'h0', focusUsed: 0 } });
+      // 2026-11-14（寄り道の値打ち）: 秘宝は3つの候補から1つ選ぶと、中身の2つ目に入る
+      expect(s1.expeditions![0].chest!.relics).toHaveLength(3);
+      const s2 = run(s1, { type: 'SCENE', scene: x.id, command: { type: 'PICK_RELIC', playerId: 'P1', optionIndex: 0 } });
       const c = s2.expeditions![0].chest!;
       const items = c.contents!.filter((l) => l.kind === 'item').map((l) => getItem((l as { item: { itemId: string } }).item.itemId));
       // ふつうの中身: 1つ目の装備（専用ではない）と、消耗品
@@ -307,8 +312,10 @@ describe('段階7a: 黄金箱と専用の装備', () => {
       t.expeditions![0].chest = { roomId: boss.id, spec: { rarity: 'legend', locked: false, big: true }, unlocked: true, opener: 'h0' };
       s = run(t, { type: 'SCENE', scene: x.id, command: { type: 'OPEN_CHEST', playerId: 'P1', heroId: 'h0', focusUsed: 0 } });
     }
+    expect(s!.expeditions![0].chest!.exclusive).toBe(true);
+    // 2026-11-14（寄り道の値打ち）: 秘宝の3択をみんなで決めると、選んだ秘宝が取り合いに入る
+    for (const p of ['P1', 'P2'] as const) s = run(s!, { type: 'SCENE', scene: x.id, command: { type: 'VOTE', playerId: p, command: { type: 'PICK_RELIC', playerId: p, optionIndex: 1 } } });
     const c = s!.expeditions![0].chest!;
-    expect(c.exclusive).toBe(true);
     const claim = c.claims!.findIndex((cl) => getItem(cl.item.itemId).source === 'randomDungeon');
     expect(claim).toBeGreaterThanOrEqual(0);
     expect(c.claims![claim].heroes).toEqual(['h0', 'h1']);
@@ -362,8 +369,13 @@ describe('段階7a: 闇商人と晶石の祭壇', () => {
     const [a, b] = g.heroes;
     // 強化
     const c0 = a.deck[0];
+    // 2026-11-14（寄り道の値打ち 5-A）: 古代の晶洞の祭壇は2回使える（1回目の後も作業が残り、2回目で終わる）
+    expect(a.altarLeft).toBe(1);
     expect(doCardTask(g, a, c0.uid, createRng(1), 'upgrade')).toBeUndefined();
     expect(a.deck[0].upgraded).toBe(true);
+    expect(a.cardTask).toBe('altar');
+    expect(a.altarLeft).toBe(0);
+    expect(doCardTask(g, a, a.deck[1].uid, createRng(1), 'upgrade')).toBeUndefined();
     expect(a.cardTask).toBeUndefined();
     // 変異（同じ種なら同じ結果・同じ格）
     const c1 = b.deck.find((c) => altarTransmutePool(g, b, c.cardId).length)!;

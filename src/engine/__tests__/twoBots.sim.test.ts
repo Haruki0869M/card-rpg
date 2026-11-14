@@ -40,6 +40,8 @@
 // ボスの段階（2026-11-14・docs/tasks/boss-phase-plan.md §4）で足した数（テストの側だけ。エンジンの結果は変えない）:
 //   主のボス（ボスの部屋の戦闘で、段階を持つ敵がいる戦闘）の始まった数・終わった数・ラウンド・段階ごとのボスの行動の数・2段目／3段目まで行った数・
 //   開幕の一手の予告とその BREAK・終わった時に倒れていた味方・ボス戦での全滅・ボス戦に入った時のHPの割合（SIM_JSON の boss にボスごとの数も書く）
+// 寄り道の値打ち（2026-11-14・docs/tasks/detour-value-plan.md §4）で足した数（テストの側だけ）: 寄り道に使ったワールドターン・抜け道・ボス戦に掛かっていた加護・
+//   見破りの戦闘と大技の BREAK・ボス戦の全滅・3択で選んだ秘宝・災厄と最後の中ボスの段階ごとの行動（表の 8 と SIM_JSON の dt）。回復役なしの2人は SIM_PARTYSET=phys・mx
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -333,7 +335,29 @@ interface Run {
   eliteEpic: number;
   /** ボスの段階（2026-11-14）: 主のボスの戦闘の数え（下の BossCount） */
   boss: BossCount;
+  /** 寄り道の値打ち（2026-11-14）: 下の DetourCount */
+  dt: DetourCount;
 }
+
+/**
+ * 寄り道の値打ち（2026-11-14・docs/tasks/detour-value-plan.md §4）の数え（テストの側だけ。エンジンの結果は変えない）。
+ * turns = 寄り道に使ったワールドターン（bot が寄り道へ向かった番 ＋ ランダムダンジョンの中にいた番。重ねない）/ shortcut = 抜け道を通った回数 /
+ * bossFights・boons = 鍵と最後のダンジョンのボスの部屋の戦闘の数と、そこに掛かっていた加護の数の合計 / insightFights = 見破ったボスの戦闘 / insightBreaks = その戦闘で大物の大技を BREAK した数 /
+ * bossWiped = ボスの部屋の戦闘（鍵と最後）の全滅 / relics = 3択で選んだ秘宝（ID → 数）/
+ * scourgeActs・midActs = 災厄・最後の中ボスの、段階ごとの行動（0 = 最初・1 = 段階）/ partnerPhase = 相方が倒れて段階に入った数 / scourgeFled = 逃げた災厄
+ * （新しい仕組みの印は、前のコードには無いので、形を緩く読む）
+ */
+interface DetourCount {
+  turns: number; shortcut: number; bossFights: number; boons: number; insightFights: number; insightBreaks: number; bossWiped: number;
+  relics: Record<string, number>; scourgeActs: number[]; midActs: number[]; partnerPhase: number; scourgeFled: number;
+}
+const emptyDetour = (): DetourCount => ({ turns: 0, shortcut: 0, bossFights: 0, boons: 0, insightFights: 0, insightBreaks: 0, bossWiped: 0, relics: {}, scourgeActs: [0, 0], midActs: [0, 0], partnerPhase: 0, scourgeFled: 0 });
+/** 戦闘の加護・見破り（新しいコードだけにある） */
+const boonOf = (b: NonNullable<GameState['battle']>) => (b as { boon?: { ids: string[] } }).boon;
+const insightOf = (b: NonNullable<GameState['battle']>) => !!(b as { insight?: boolean }).insight;
+/** 災厄の戦闘か（敵に災厄の本体がいる）・最後のダンジョンの中ボスの戦闘か（中ボスの印があり、災厄ではない） */
+const isScourgeFight = (b: NonNullable<GameState['battle']>) => b.enemies.some((x) => x.defId.startsWith('scourge'));
+const isMidFight = (b: NonNullable<GameState['battle']>) => !!b.midboss && !isScourgeFight(b);
 
 /**
  * ボスの段階（2026-11-14）: 主のボス（ボスの部屋の戦闘で、段階を持つ敵がいる）の戦闘の数え。
@@ -373,7 +397,7 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
     bought: 0, sold: 0, equips: 0, itemsBattle: 0, itemsField: 0, removed: 0, skipped: 0, refused: 0, goldEnd: 0,
     fixedDungeonFights: 0, randomDungeonFights: 0, levelEnd: 0, sp: emptySpecials(), foes: {}, breakKind: { purple: 0, big: 0, red: 0 }, convBought: 0, convWorn: 0,
     restRoom: 0, camp: 0, inn: 0, towers: 0,
-    eliteOffered: 0, eliteChosen: 0, eliteOnly: 0, eliteFights: 0, eliteFinished: 0, eliteRounds: 0, eliteDowned: 0, eliteLost: 0, frenzy: 0, frenzyBroke: 0, eliteGear: 0, eliteEpic: 0, boss: emptyBoss() };
+    eliteOffered: 0, eliteChosen: 0, eliteOnly: 0, eliteFights: 0, eliteFinished: 0, eliteRounds: 0, eliteDowned: 0, eliteLost: 0, frenzy: 0, frenzyBroke: 0, eliteGear: 0, eliteEpic: 0, boss: emptyBoss(), dt: emptyDetour() };
   /** ボスの段階: 戦闘の種 → その戦闘で行った一番深い段階・開幕の一手を数えた印 */
   const bossSeen = new Map<number, number>();
   const openingSaid = new Set<string>();
@@ -381,6 +405,8 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
   const entered = new Set<string>();
   /** 予告を数えた印（戦闘の種:敵:ターン。同じ予告を2回数えない） */
   const said = new Set<string>();
+  /** 寄り道の値打ち: ランダムダンジョンの中にいたワールドターン */
+  const rdTurns = new Set<number>();
   H.hook = (pre, cmd, post, events) => {
     const b0 = battlesOf(pre);
     const b1 = battlesOf(post);
@@ -525,6 +551,50 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
         bossSeen.delete(b.seed);
       }
     }
+    // 寄り道の値打ち（2026-11-14）: テストの側だけで数える
+    {
+      const dt = r.dt;
+      if (post.world && dungeonsOf(post).some((d) => DUNGEONS.get(d.dungeonId).random)) rdTurns.add(post.world.worldTurn);
+      const had0 = new Set(b0.map((b) => b.seed));
+      const keyBoss = (b: NonNullable<GameState['battle']>, g: GameState) => {
+        if (!b.boss || b.midboss) return false;
+        const sc = scenesOf(g).find((x) => x.battle?.seed === b.seed);
+        return !!sc?.dungeon && !DUNGEONS.get(sc.dungeon.dungeonId).random;
+      };
+      for (const b of b1) {
+        if (had0.has(b.seed) || !keyBoss(b, post)) continue;
+        dt.bossFights++;
+        dt.boons += boonOf(b)?.ids.length ?? 0;
+        if (insightOf(b)) dt.insightFights++;
+      }
+      for (const b of b0) {
+        if (!left.has(b.seed) && keyBoss(b, pre) && b.phase === 'defeat') dt.bossWiped++;
+        if (insightOf(b)) for (const e of events) if (e.type === 'break' && b.enemies.some((x) => x.uid === e.enemyUid && !x.summoned && !x.broken && !!x.intent && !!getEnemyAction(x.defId, x.intent.actionId).big)) dt.insightBreaks++;
+        // 災厄・最後の中ボスの段階ごとの行動・相方が倒れて段階に入った数・逃げた災厄
+        const scourge = isScourgeFight(b);
+        const mid = isMidFight(b);
+        if (!scourge && !mid) continue;
+        for (const e of events) {
+          if (e.type !== 'enemyAct') continue;
+          const en = b.enemies.find((x) => x.uid === e.enemyUid && !x.summoned && !!x.intent);
+          if (en) (scourge ? dt.scourgeActs : dt.midActs)[Math.min(1, en.phase)]++;
+        }
+        const after = b1.find((x) => x.seed === b.seed);
+        if (mid && after) for (const en of after.enemies) {
+          const before = b.enemies.find((x) => x.uid === en.uid);
+          const partnerFell = after.enemies.some((x) => x.uid !== en.uid && !x.summoned && x.dead && !b.enemies.find((y) => y.uid === x.uid)?.dead);
+          if (before && !en.dead && en.phase > before.phase && partnerFell && en.hp * 2 > en.maxHp) dt.partnerPhase++;
+        }
+        if (scourge && !left.has(b.seed) && b.enemies.some((x) => x.defId.startsWith('scourge') && !!(x as { fled?: boolean }).fled)) dt.scourgeFled++;
+      }
+      const ic = cmd.type === 'SCENE' || cmd.type === 'VOTE' ? cmd.command : cmd;
+      if (ic?.type === 'RETURN_TO_HUB' && (ic as { kind?: string }).kind === 'shortcut') dt.shortcut++;
+      if ((ic?.type as string) === 'PICK_RELIC') {
+        const chest = cmd.type === 'SCENE' ? pre.expeditions?.find((x) => x.id === cmd.scene)?.chest : pre.chest;
+        const pick = (chest as { relics?: { itemId: string }[] } | undefined)?.relics?.[(ic as { optionIndex?: number }).optionIndex ?? -1];
+        if (pick) dt.relics[pick.itemId] = (dt.relics[pick.itemId] ?? 0) + 1;
+      }
+    }
     const d0 = dungeonsOf(pre).length;
     for (const d of dungeonsOf(post).slice(d0)) {
       entered.add(d.dungeonId);
@@ -555,6 +625,7 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
   const { game, log } = playToEnd(g0, 60000, opts);
   H.hook = undefined;
   r.refused = log.refused ?? 0;
+  r.dt.turns = new Set([...rdTurns, ...(log.detourTurns ?? [])]).size;
   r.errors = log.errors.length;
   r.clear = game.mode === 'ending';
   r.corr100 = !r.clear && (game.world?.corruption ?? 0) >= 100;
@@ -708,6 +779,21 @@ describe.skipIf(!process.env.SIM)(`物差し2本（直行 bot と工夫する bo
           L.push(`| ${p} | ${name[k]} | ${s((c) => c.started)} / ${fin} | ${s((c) => c.won)} / ${s((c) => c.wiped)} | ${per(s((c) => c.rounds))} | ${per(s((c) => c.acts[0]))} / ${per(s((c) => c.acts[1]))} / ${per(s((c) => c.acts[2]))} | ${f(pct(s((c) => c.reached[1]), fin))}% / ${f(pct(s((c) => c.reached[2]), s((c) => c.maxPhases[2])))}% | ${s((c) => c.opening)} / ${s((c) => c.openingBroke)} | ${per(s((c) => c.downed))} | ${f(pct(s((c) => c.entryHp), s((c) => c.started)))}% |`);
         }
       }
+      // 寄り道の値打ち（2026-11-14）
+      L.push('', '## 8. 寄り道の値打ち（1冒険の平均。ボス戦・加護・見破り・段階は全部の冒険の合計）', '');
+      L.push('| 人数 | bot | 寄り道のワールドターン | ランダムダンジョン（入った / 踏破）・災厄を倒した | 抜け道 | 鍵と最後のボス戦（数 / 全滅） | 加護（ボス戦に掛かっていた数の合計） | 見破り（戦闘 / 大技の BREAK） | 3択で選んだ秘宝 | 災厄の行動（最初 / 段階）・逃げた | 最後の中ボスの行動（最初 / 段階）・相方が倒れて段階 |');
+      L.push('|---|---|---|---|---|---|---|---|---|---|---|');
+      for (const [p, by] of Object.entries(all)) {
+        for (const k of BOTS) {
+          const rs = by[k];
+          if (!rs?.length) continue;
+          const s = (fn: (d: DetourCount) => number) => rs.reduce((n, r) => n + fn(r.dt), 0);
+          const a = (fn: (r: Run) => number) => avg(rs.map(fn));
+          const relics: Record<string, number> = {};
+          for (const r of rs) for (const [id, n] of Object.entries(r.dt.relics)) relics[id] = (relics[id] ?? 0) + n;
+          L.push(`| ${p} | ${name[k]} | ${f(a((r) => r.dt.turns), 1)} | ${f(a((r) => r.randomIn), 2)} / ${f(a((r) => r.randomDone), 2)}・${f(a((r) => r.scourgeKills), 2)} | ${f(a((r) => r.dt.shortcut), 2)} | ${s((d) => d.bossFights)} / ${s((d) => d.bossWiped)} | ${s((d) => d.boons)} | ${s((d) => d.insightFights)} / ${s((d) => d.insightBreaks)} | ${Object.entries(relics).sort((x, y) => y[1] - x[1]).map(([id, n]) => `${getItem(id).name}${n}`).join('・') || '-'} | ${s((d) => d.scourgeActs[0])} / ${s((d) => d.scourgeActs[1])}・${s((d) => d.scourgeFled)} | ${s((d) => d.midActs[0])} / ${s((d) => d.midActs[1])}・${s((d) => d.partnerPhase)} |`);
+        }
+      }
       const others = Object.values(all).flatMap((by) => BOTS.flatMap((k) => by[k] ?? [])).filter((r) => !r.clear && !r.wiped && !r.corr100).map((r) => r.endMode);
       if (others.length) L.push('', `負けの「ほか」の終わり方（game.mode）: ${[...new Set(others)].map((m) => `${m || '(空)'} ${others.filter((x) => x === m).length}`).join('・')}`);
       const where2: Record<string, number> = {};
@@ -766,6 +852,16 @@ describe.skipIf(!process.env.SIM)(`物差し2本（直行 bot と工夫する bo
                     y.finished += x.finished; y.rounds += x.rounds; y.wiped += x.wiped;
                     for (let i = 0; i < 3; i++) { y.acts[i] += x.acts[i]; y.reached[i] += x.reached[i]; }
                   }
+                }
+                return t;
+              })(),
+              // 寄り道の値打ち（2026-11-14）: 合計
+              dt: (() => {
+                const t = emptyDetour();
+                for (const r of rs) {
+                  for (const key of ['turns', 'shortcut', 'bossFights', 'boons', 'insightFights', 'insightBreaks', 'bossWiped', 'partnerPhase', 'scourgeFled'] as const) t[key] += r.dt[key];
+                  for (let i = 0; i < 2; i++) { t.scourgeActs[i] += r.dt.scourgeActs[i]; t.midActs[i] += r.dt.midActs[i]; }
+                  for (const [id, n] of Object.entries(r.dt.relics)) t.relics[id] = (t.relics[id] ?? 0) + n;
                 }
                 return t;
               })(),

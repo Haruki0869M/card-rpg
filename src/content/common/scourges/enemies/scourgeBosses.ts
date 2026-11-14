@@ -3,6 +3,8 @@
 // 戦い方は4体とも別々（憲章4・docs/tasks/enemy-behaviors-plan.md §2 の決まり）: 特殊な行動は1体に2種類まで。全部「大技の予告」と予告の文（hint）で見え、
 // BREAK・倒す順・守り・回復の前倒しのどれかで受けられる。味方の番を止める行動（凍結など）は使わない。
 // 強さは計画の目安「その時に挑める鍵のダンジョンのボスと同じくらい」（基準 Lv7。出る時に、その地域の敵のレベル+2 になる）。数字は【提案】
+// 段階（2026-11-14 docs/tasks/detour-value-plan.md 柱5）: 5体とも HP 50% で段階1つ・開幕の一手つき。決まりは5体ともちがう
+// （数え読みで逃げる・巻き戻し・溜め・弱点の入れ替え・再生）。1段目の紫の札とも重ならない。どれも回復しないで済む答えがある（rule と hint に書いた）。数字は【提案】
 import type { EnemyDef } from '../../../../types';
 
 /** 強欲の盗賊王（元の絵: 野盗の頭目）: 手下を呼び、金貨の嵐で全員を少しずつ削る。「頭目を先に倒すか、手下から片付けるか」 */
@@ -26,6 +28,21 @@ export const scourgeGreedKing: EnemyDef = {
     { id: 'taunt', name: 'あざ笑う', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1 }, { kind: 'damage', amount: 7 }] },
   ],
   abilities: [{ name: '王の貫禄', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 10 }] } }],
+  phases: [
+    {
+      belowHpPct: 50,
+      name: '宝を抱えた盗賊王',
+      pattern: 'sequence',
+      openingActionId: 'gkHoard',
+      rule: '数え読み3: 0になると宝を抱えて逃げる（戦闘が終わり、災厄は地図に残る。HPも元に戻る）。数えている間に BREAK すると1つ戻る。一気に倒す',
+      actions: [
+        { id: 'gkHoard', name: '宝を抱える', big: true, scripted: true, countdown: { actionId: 'gkEscape', turns: 3 }, hint: '数え読みが始まる: 3回の予告の後に「宝を抱えて逃げる」。数えている間に BREAK すると1つ戻る', effects: [{ kind: 'block', amount: 12 }] },
+        { id: 'gkEscape', name: '宝を抱えて逃げる', big: true, scripted: true, hint: '取り巻きと一緒に逃げる（戦闘が終わる。倒したことにならず、災厄は地図に残る）。BREAK すると止まる。その前に倒す', effects: [{ kind: 'flee', all: true }] },
+        { id: 'gkGoldAxe', name: '黄金の大斧・乱打', effects: [{ kind: 'damage', amount: 9, hits: 2 }] },
+        { id: 'gkCoinRain', name: '金貨の雨', big: true, hint: '味方全員に小さなダメージを3回。ブロックで受けるか、BREAK する', effects: [{ kind: 'damage', amount: 4, hits: 3, to: 'foes' }] },
+      ],
+    },
+  ],
 };
 
 /** 瘴気を紡ぐ死霊術師（元の絵: 呪われた神官）: 毒の霧をまき、自分の状態異常は脱ぎ捨てる。「起爆を1ターン早める」 */
@@ -48,6 +65,20 @@ export const scourgeMiasmaNecro: EnemyDef = {
     { id: 'bolt', name: '呪いの魔弾', effects: [{ kind: 'damage', amount: 14, element: 'dark' }] },
     { id: 'shed', name: '屍の脱皮', big: true, behavior: 'purify', hint: '状態異常を全部消して回復する。その前に起爆するか、BREAK する', effects: [{ kind: 'purify', amount: 8 }] },
     { id: 'seal', name: '癒し封じの瘴気', big: true, behavior: 'healSeal', hint: '味方全員の回復が、2ターン半分になる。BREAK するか、先に回復を使う', effects: [{ kind: 'applyStatus', status: 'healSeal', amount: 2, to: 'foes' }] },
+  ],
+  phases: [
+    {
+      belowHpPct: 50,
+      name: '屍の繭の死霊術師',
+      pattern: 'sequence',
+      openingActionId: 'mnCocoon',
+      rule: '1回だけ屍の繭でHPを最大の半分まで戻す（予告に出る。聖か火の弱点で BREAK すると止まる。呪い・癒し封じで戻る量が減る）',
+      actions: [
+        { id: 'mnCocoon', name: '屍の繭', big: true, scripted: true, hint: 'HPを最大の50%まで戻す（1回だけ）。聖か火の弱点で BREAK すると止まる。呪い・癒し封じで戻る量が減る', effects: [{ kind: 'healToPct', pct: 50 }] },
+        { id: 'mnSoulBolt', name: '魂を穿つ魔弾', effects: [{ kind: 'damage', amount: 16, element: 'dark' }] },
+        { id: 'mnRotMist', name: '腐れの霧', effects: [{ kind: 'applyStatus', status: 'poison', amount: 3, to: 'foes' }, { kind: 'damage', amount: 4, to: 'foes' }] },
+      ],
+    },
   ],
 };
 
@@ -72,6 +103,21 @@ export const scourgeNightmareBeast: EnemyDef = {
     { id: 'claws', name: '影の連撃', effects: [{ kind: 'damage', amount: 6, hits: 3 }] },
     { id: 'watch', name: '眠りを見張る', big: true, behavior: 'punish', hint: 'このターンにカードを4枚以上使った味方に、枚数×2のダメージ', effects: [{ kind: 'punishPlays', amount: 2, min: 4 }] },
   ],
+  phases: [
+    {
+      belowHpPct: 50,
+      name: '目覚めた悪夢の魔獣',
+      pattern: 'sequence',
+      openingActionId: 'nbGaze',
+      rule: '溜め: 「悪夢の凝視」の次は「悪夢の大顎」（大きな一撃）。凝視の間に聖の弱点で BREAK すると大顎も消える。守りを固めて受ける',
+      actions: [
+        { id: 'nbGaze', name: '悪夢の凝視', big: true, scripted: true, chargeTo: 'nbJaws', hint: '次の予告が「悪夢の大顎」になる。この間に BREAK すると大顎も消える', effects: [{ kind: 'applyStatus', status: 'weak', amount: 1, to: 'foes' }] },
+        { id: 'nbJaws', name: '悪夢の大顎', big: true, scripted: true, hint: '大きな一撃。ブロックで受けるか、BREAK して威力を半分にする', effects: [{ kind: 'damage', amount: 26, element: 'dark' }] },
+        { id: 'nbShadowRend', name: '影の乱れ裂き', effects: [{ kind: 'damage', amount: 7, hits: 3 }] },
+        { id: 'nbDread', name: '悪夢の吐息', effects: [{ kind: 'damage', amount: 6, to: 'foes' }] },
+      ],
+    },
+  ],
 };
 
 /** 氷嵐の魔女（元の絵: 雪の魔女）: ためたブロックを氷の槍で砕き、吹雪で全員を凍えさせる。「ブロックの使い時」 */
@@ -94,6 +140,22 @@ export const scourgeStormWitch: EnemyDef = {
     { id: 'lance', name: '氷槍・盾砕き', big: true, behavior: 'shatter', hint: '当たるとブロックを全部壊す。BREAK するか、ブロックに頼らずに受ける', effects: [{ kind: 'shieldBreak' }, { kind: 'damage', amount: 14, element: 'ice' }] },
     { id: 'mirror', name: '氷の鏡', effects: [{ kind: 'block', amount: 14 }, { kind: 'block', amount: 8, to: 'otherAllies' }] },
     { id: 'blizzard', name: '吹雪', big: true, hint: '味方全員に氷のダメージ。ブロックで受けるか、BREAK する', effects: [{ kind: 'damage', amount: 8, element: 'ice', to: 'foes' }] },
+  ],
+  phases: [
+    {
+      belowHpPct: 50,
+      name: '氷の鎧の魔女',
+      pattern: 'sequence',
+      openingActionId: 'swIceArmor',
+      rule: '氷の鎧: 火が効かなくなり、雷が弱点に変わる（合う属性の札を、その時に使う）',
+      weak: ['thunder'],
+      resist: ['ice', 'fire'],
+      actions: [
+        { id: 'swIceArmor', name: '氷の鎧', big: true, scripted: true, hint: '氷の鎧をまとう（ブロック16）。ここから火が効かず、雷が弱点', effects: [{ kind: 'block', amount: 16 }] },
+        { id: 'swIcicle', name: '氷柱の雨', effects: [{ kind: 'damage', amount: 5, hits: 2, element: 'ice', to: 'foes' }] },
+        { id: 'swFrostLance', name: '凍える槍', big: true, hint: '大きな氷の一撃。ブロックで受けるか、雷の弱点で BREAK する', effects: [{ kind: 'damage', amount: 18, element: 'ice' }] },
+      ],
+    },
   ],
 };
 
@@ -120,5 +182,19 @@ export const scourgeInfernoDemon: EnemyDef = {
     { id: 'eruption', name: '噴火', big: true, hint: '味方全員に火のダメージと「火傷」2。ブロックで受けるか、BREAK する', effects: [{ kind: 'damage', amount: 6, element: 'fire', to: 'foes' }, { kind: 'applyStatus', status: 'burn', amount: 2, to: 'foes' }] },
     { id: 'fist', name: '灼熱の拳', effects: [{ kind: 'damage', amount: 14, element: 'fire' }] },
     { id: 'inferno', name: '業火の炸裂', big: true, hint: '味方全員の「火傷」を起爆して消す（1つにつき4ダメージ・1人24まで）。先に火傷を治すか、BREAK する', effects: [{ kind: 'detonateStatus', status: 'burn', damagePer: 4, maxDamage: 24, to: 'foes' }] },
+  ],
+  phases: [
+    {
+      belowHpPct: 50,
+      name: '溶岩を浴びた魔人',
+      pattern: 'sequence',
+      openingActionId: 'idLavaBath',
+      rule: '溶岩の湯浴み: 再生10（毎ターン回復し、1ずつ減る）。氷の弱点で BREAK すると止まる。止められなければ一気に削る',
+      actions: [
+        { id: 'idLavaBath', name: '溶岩の湯浴み', big: true, scripted: true, hint: '自分に再生10（毎ターンの始めに回復し、1ずつ減る）とブロック10。氷の弱点で BREAK すると止まる', effects: [{ kind: 'applyStatus', status: 'regen', amount: 10, to: 'self' }, { kind: 'block', amount: 10 }] },
+        { id: 'idMagmaFist', name: '溶岩の拳', effects: [{ kind: 'damage', amount: 15, element: 'fire' }] },
+        { id: 'idEmbers', name: '火の粉の嵐', effects: [{ kind: 'applyStatus', status: 'burn', amount: 1, to: 'foes' }, { kind: 'damage', amount: 5, element: 'fire', to: 'foes' }] },
+      ],
+    },
   ],
 };

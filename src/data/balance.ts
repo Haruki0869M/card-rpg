@@ -108,7 +108,7 @@ export const BALANCE = {
   randomEventChance: 20,
   randomEventBadMul: 1.5,
   /** 報酬のスマート抽選: 重なった印1つごとの重みの上乗せ・重みの上限・ショップの係数（設計 v2 §2） */
-  smartDraw: { perTag: 0.5, maxWeight: 3, shopStrength: 0.5 },
+  smartDraw: { perTag: 0.5, maxWeight: 3, shopStrength: 0.5, /** 宿題7: 回復役のいないパーティで、共通の回復のカードの出やすさの倍率【提案】 */ healerlessHeal: 2 },
   /** 報酬の候補の基本の重み（ジョブ専用カードは1）: 得意武器・使える武器・系統・共通のカード（K1） */
   cardPoolWeight: { mainWeapon: 1, subWeapon: 0.5, lineage: 0.7, common: 0.8 },
   /** 戦闘の報酬のカード（キャラごとに3枚）のうち、必ず「ジョブ専用・系統・装備している武器種」のカードから選ぶ枚数（先頭から。K7 オーナー決定）。当てはまるカードが無ければ今までどおり */
@@ -327,7 +327,11 @@ export const BALANCE = {
    * - blackMarketPriceMul: 闇商人の値段の倍率（町の店の値段 × これ）【提案】
    * - blackMarketGoods: 闇商人が専用の装備のほかに並べる、レア以上の品の数【提案】
    */
-  randomDungeon: { exclusiveChance: 100, blackMarketPriceMul: 1.5, blackMarketGoods: 2 },
+  /**
+   * ランダムダンジョン。shortcutRange = 抜け道の出口を探す範囲（入口から陸を歩いて何歩まで。2026-11-14 寄り道の値打ち 柱4・【提案】）/
+   * relicChoices = 黄金箱の秘宝の候補の数（同じ柱3）
+   */
+  randomDungeon: { exclusiveChance: 100, blackMarketPriceMul: 1.5, blackMarketGoods: 2, shortcutRange: 8, relicChoices: 3 },
   /**
    * 災厄の中ボス（段階7b・overhaul-plan-v2 §3。数字は計画の【提案】のまま。段階8で測って決める）。広い地図（帯のある地図）だけに出る。
    * - max: 1冒険に出る数 / firstCorruption: 1体目は「1つ目の鍵を取った時」か、その前に侵食度がこれを越えた時 / milestones: 2体目・3体目の侵食度

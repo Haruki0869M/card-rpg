@@ -20,6 +20,7 @@ import { corruptionLevelBonus } from './wanderers';
 import { aliveScourges } from './scourgeCurse';
 import { describeAbility } from '../../abilities';
 import { bumpStoryVer, placeName, queueStory } from './guide';
+import { scourgeFits } from './detour';
 
 export { aliveScourges, scourgeCurse, scourgePrice, scourgesWith, type ScourgeCurse } from './scourgeCurse';
 
@@ -96,7 +97,9 @@ export function scourgeEnemies(game: GameState, w: WorldState, def: ScourgeDef, 
 /** 災厄を1体置く（まだ出ていない種類から乱数で選ぶ）。置けたら返す */
 export function spawnScourge(game: GameState, w: WorldState, rng: Rng): Wanderer | undefined {
   const met = w.scourgesMet ?? [];
-  const kinds = SCOURGES.all.filter((d) => !met.includes(d.id));
+  // 寄り道の値打ち（2026-11-14 柱3 の2）: 専用の装備をだれも使えない種類（黄金冠・冥獄鎌など）は、使えるキャラがいる時だけ候補に入れる（乱数は今のまま冒険の Rng）
+  const party = game.heroes.filter((h) => !h.retired);
+  const kinds = SCOURGES.all.filter((d) => !met.includes(d.id) && scourgeFits(party, d));
   if (!kinds.length) return undefined;
   const cands = scourgeCandidates(game, w);
   if (!cands.length) return undefined;
@@ -115,6 +118,8 @@ export function spawnScourge(game: GameState, w: WorldState, rng: Rng): Wanderer
     seen ? (watched ? '塔の見張りが場所を知らせてくれた（地図の💀）。' : '場所は地図の💀の所。') : 'くわしい場所は、見晴らしの塔に登ると分かる。',
     // 倒すと手に入る専用の装備の効果（2026-11-13。長いので最後に置く）
     `倒すと元に戻り、専用の装備「${getItem(def.gear).name}」を落とす（${scourgeGearText(def).replace(/。$/, '')}）。`,
+    // 寄り道の値打ち（2026-11-14 柱1）: 生きている間、鍵と最後のダンジョンのボス・中ボスに掛かる加護
+    `💀加護: ボス・中ボスとの戦闘に「${def.boon.name}」（${def.boon.text.replace(/。$/, '')}）。`,
   ];
   // 回1: 制覇の物語などの後ろに足さず、その窓を閉じた後に別の窓で出す。地域（「嘆きの沼の東」）までは最初から分かる
   queueStory(w, { title: `💀 ${def.name}が、${placeName(game, w, tile)}に現れた！`, lines });
@@ -151,6 +156,11 @@ export function onScourgeDefeated(game: GameState, def: ScourgeDef, heroes: Hero
   if (def.reward.gold) {
     splitGold(heroes, def.reward.gold);
     got.push(`${def.reward.gold}Gを${heroes.length > 1 ? '山分けした' : '手に入れた'}`);
+  }
+  // 盗賊王（2026-11-14 寄り道の値打ち）: 300G の代わりに、町の店の品（装備・消耗品）を1つ無料でもらえる券（パーティみんなの物）
+  if (def.reward.freeShop) {
+    w.freeShop = (w.freeShop ?? 0) + def.reward.freeShop;
+    got.push(`町の店の品を${def.reward.freeShop}つ無料でもらえる券を手に入れた`);
   }
   const drop = BALANCE.scourge.purify + (def.reward.corruption ?? 0);
   if (drop > 0 && w.corruption > 0) {
@@ -189,7 +199,7 @@ export function scourgeLoot(game: GameState, reward: RewardState, survivors: Her
 }
 
 /** 画面用: 生きている災厄の一覧（名前・悪さ・場所が見えているか・倒した時の報酬の文） */
-export function scourgeList(game: GameState): { id: string; name: string; short: string; curseShort: string; curseText: string; seen: boolean; tile: number; rewardText: string; gearName: string; gearText: string }[] {
+export function scourgeList(game: GameState): { id: string; name: string; short: string; curseShort: string; curseText: string; seen: boolean; tile: number; rewardText: string; gearName: string; gearText: string; boonName: string; boonText: string }[] {
   const w = game.world;
   if (!w) return [];
   return aliveScourges(w).map(({ wd, def }) => ({
@@ -203,6 +213,8 @@ export function scourgeList(game: GameState): { id: string; name: string; short:
     gearName: getItem(def.gear).name,
     gearText: scourgeGearText(def),
     rewardText: scourgeRewardText(game, def),
+    boonName: def.boon.name,
+    boonText: def.boon.text,
   }));
 }
 
@@ -216,6 +228,7 @@ export function scourgeGearText(def: ScourgeDef): string {
 export function scourgeRewardText(game: Pick<GameState, 'scenarioId'>, def: ScourgeDef): string {
   const parts = [`専用の装備「${getItem(def.gear).name}」`];
   if (def.reward.gold) parts.push(`${def.reward.gold}G（山分け）`);
+  if (def.reward.freeShop) parts.push(`店の品${def.reward.freeShop}つ無料の券`);
   if (def.reward.elixir) parts.push(`${getItem(ELIXIR_ID).name}`);
   parts.push(`${corruptionName(game.scenarioId)}−${BALANCE.scourge.purify + (def.reward.corruption ?? 0)}%`);
   return parts.join('・');

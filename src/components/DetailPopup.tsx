@@ -6,10 +6,11 @@ import { STAT_LABEL } from '../data/terms';
 import { CharacterArt, EnemyArt } from '../art';
 import { getCard } from '../data/cards';
 import { getClass } from '../data/classes';
-import { getEnemy } from '../data/enemies';
+import { getEnemy, phasesOf } from '../data/enemies';
 import { affinityFromStats, affinityOf, chanceFor, describeEffect, describeAbility, enemyHitDamage, enemyName, finalChance, findAlly, findEnemy, heroStats, incomingDamage, statsOf, targetOf, tierDistribution, toPercents } from '../engine';
 import { getEnemyAction } from '../data/enemies';
 import { enemyResist, enemyWeak, phaseDefOf, phaseMarks } from '../engine/battle/phases';
+import { battleBoonViews } from '../engine/game/world/detour';
 import { currentActionSet } from '../engine/battle/intents';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ItemDetailContent } from './ItemDetail';
@@ -125,9 +126,17 @@ function Content({ d, battle, game }: { d: Detail; battle: BattleState; game: Ga
             {ph?.rule && <div className="mt-1 text-[12px] text-indigo-200" data-phase-rule>🌀今の段階「{ph.name}」: {ph.rule}</div>}
             {marks.map((m) => (
               <div key={m.phase} className="text-[12px] text-sky-200" data-phase-ahead={m.phase}>
-                ▼HP{Math.round(m.at * 100)}%を切ると「{m.name}」になる。{m.opening ? `最初に「${m.opening}」をしてくる` : ''}{m.rule ? `（${m.rule}）` : ''}
+                ▼HP{Math.round(m.at * 100)}%を切る{m.partner ? 'か、相方が倒れる' : ''}と「{m.name}」になる。{m.opening ? `最初に「${m.opening}」をしてくる` : ''}{m.rule ? `（${m.rule}）` : ''}
               </div>
             ))}
+            {/* 寄り道の値打ち（2026-11-14）: この大物に掛かっている災厄の加護と、見破り */}
+            {battle.boon?.uid === e.uid &&
+              battleBoonViews(battle).map((b) => (
+                <div key={b.name} className="mt-0.5 text-[12px] leading-4 text-violet-200" data-boon-row>
+                  💀加護《{b.name}》（{b.scourge}）: {b.text}
+                </div>
+              ))}
+            {battle.insight === e.uid && <div className="mt-0.5 text-[12px] leading-4 text-emerald-200" data-insight-row>👁見破り: この敵の大技と開幕の一手は、弱点でなくても完全成功だけで崩せる</div>}
             {(weak.length > 0 || resist.length > 0) && (
               <div className="mt-1 flex flex-wrap gap-x-2 text-[12px]">
                 {weak.length ? (
@@ -275,8 +284,8 @@ function EnemyStats({ e }: { e: EnemyState }) {
           <span className="font-display text-fuchsia-200">《{ab.name}》</span> {describeAbility(ab)}
         </div>
       ))}
-      {def.phases?.length ? (
-        <div className="mt-0.5 text-amber-200">{def.phases.map((ph) => `HP${ph.belowHpPct}%以下で「${ph.name}」に変わる`).join('／')}</div>
+      {phasesOf(e)?.length ? (
+        <div className="mt-0.5 text-amber-200">{phasesOf(e)!.map((ph) => `HP${ph.belowHpPct}%以下${ph.onPartnerDown ? 'か、相方が倒れると' : 'で'}「${ph.name}」に変わる`).join('／')}</div>
       ) : null}
     </div>
   );

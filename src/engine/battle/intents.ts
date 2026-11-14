@@ -1,4 +1,4 @@
-import { getEnemy, getEnemyAction } from '../../data/enemies';
+import { getEnemy, getEnemyAction, phasesOf } from '../../data/enemies';
 import type { AllyState, BattleEvent, BattleState, EnemyActionDef, EnemyState } from '../../types';
 import type { Rng } from '../rng';
 import type { EnemyAiHandler } from './ai/types';
@@ -57,14 +57,14 @@ const isHuntAction = (action: EnemyActionDef) => action.effects.some((e) => e.ki
 /** 今の段階の行動の全部（決め方では選ばない scripted の行動も含む。開幕の一手・溜め・数え読みの行動を探す時に使う） */
 export function currentPhaseActions(enemy: EnemyState): EnemyActionDef[] {
   const def = getEnemy(enemy.defId);
-  const ph = enemy.phase > 0 ? def.phases?.[enemy.phase - 1] : undefined;
+  const ph = enemy.phase > 0 ? phasesOf(enemy)?.[enemy.phase - 1] : undefined;
   return ph ? ph.actions : def.actions;
 }
 
 /** 今の段階の行動の一覧と選び方（決め方で選ぶ行動だけ。scripted の行動は入れない） */
 export function currentActionSet(enemy: EnemyState) {
   const def = getEnemy(enemy.defId);
-  const ph = enemy.phase > 0 ? def.phases?.[enemy.phase - 1] : undefined;
+  const ph = enemy.phase > 0 ? phasesOf(enemy)?.[enemy.phase - 1] : undefined;
   const actions = currentPhaseActions(enemy).filter((a) => !a.scripted);
   if (ph) return { actions, pattern: ph.pattern, maxConsecutive: ph.maxConsecutive, firstActionId: undefined };
   return { actions, pattern: def.pattern, maxConsecutive: def.maxConsecutive, firstActionId: def.firstActionId };
