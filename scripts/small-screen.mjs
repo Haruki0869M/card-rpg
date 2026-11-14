@@ -8,7 +8,7 @@
 // 1台だけ・オンラインなし（本番の Firebase には何もしない）。
 // 使い方: vite preview を起こしてから URL=http://127.0.0.1:4193/card-rpg/ node scripts/small-screen.mjs
 //   SIZES=390x540,360x520 で大きさを変えられる。SMALL_SCREEN_OUTPUT で写真の場所。
-// 報酬・転職のカード選びは別の作業者が後で直すので、そこが落ちても「後で直す所」として一覧に出す（台本は使い回す）。
+// ④⑤（2026-11-15）: 報酬（1人・1台で2人の取り合いの順番）と転職のカード選び（背景・1回では決まらない・ボタンが押せる）も通す。
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { chromium, startBattle } from './lib.mjs';
 
@@ -16,7 +16,7 @@ const BASE = process.env.URL ?? 'http://localhost:4173/card-rpg/';
 if (/web\.app|firebaseapp/.test(BASE)) throw new Error('本番の URL では動かしません');
 const OUT = process.env.SMALL_SCREEN_OUTPUT ?? 'screenshots/small-screen';
 const SIZES = (process.env.SIZES ?? '390x540').split(',').map((s) => s.split('x').map(Number));
-const LATER = new Set(['報酬']); // 別の作業者が後で直す所（落ちても全体の失敗にしない）
+const LATER = new Set([]); // 別の作業者が後で直す所（落ちても全体の失敗にしない）。報酬・転職のカード選びは④⑤で直したので外した
 mkdirSync(OUT, { recursive: true });
 
 const problems = [];
@@ -266,25 +266,133 @@ try {
       check(!!opt?.inView && !!opt?.onTop, `イベント: 1つ目の選択肢が押せる ${JSON.stringify(opt)}`, 'イベント');
     }
 
-    // ---- 報酬（別の作業者が後で直す。落ちても一覧に出すだけ） ----
-    try {
-      await startBattle(page, 1, ['forestWolf']);
+    // ---- 報酬（④(1): 成長 → 自分のカード → 全員がそろってから取り合いを真ん中に） ----
+    /** 押す物の真ん中に、ほかの層が乗っていないか・画面の中か */
+    const hitAt = (sel) =>
+      page.evaluate((s) => {
+        const el = document.querySelector(s);
+        if (!el) return null;
+        el.scrollIntoView({ block: 'nearest' });
+        const b = el.getBoundingClientRect();
+        const t = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+        return { top: Math.round(b.top), bottom: Math.round(b.bottom), inView: b.top >= 0 && b.bottom <= innerHeight + 1, onTop: !!t && (t === el || el.contains(t)) };
+      }, sel);
+    const rewardState = async (players, claim) => {
+      await startBattle(page, players, ['forestWolf']);
       const d4 = await save(page);
       const x = d4.game.expeditions?.find((e) => e.battle) ?? d4.game;
-      const h = d4.game.heroes[0];
+      const ids = d4.game.heroes.map((h) => h.id);
       x.mode = 'reward';
       delete x.battle;
-      x.reward = { gold: 12, exp: [], levelUps: [], cardOffers: ['lanceCharge', 'cmPrepare', 'warCry'].map((cardId) => ({ cardId, heroId: h.id })), cardDone: [], cardOdds: [70, 25, 5], cardPicked: false, loot: [] };
+      x.reward = {
+        gold: 12,
+        exp: ids.map((heroId) => ({ heroId, gained: 14, fromLevel: 1, toLevel: 1, fromExp: 0, toExp: 14 })),
+        levelUps: [],
+        cardOffers: ids.flatMap((heroId) => ['lanceCharge', 'cmPrepare', 'warCry'].map((cardId) => ({ cardId, heroId }))),
+        cardDone: [],
+        cardOdds: [70, 25, 5],
+        cardPicked: false,
+        loot: [],
+        ...(claim ? { claim: { item: { uid: 'claim-1', itemId: 'steelSword' }, heroes: ids, choices: {} } } : {}),
+      };
       await load(page, d4);
+      await wait(900);
+    };
+    try {
+      // (a) 1人: 開いた時にカード3枚と「選ばない」が画面の中。カードを押すと説明が開き、「このカードを選ぶ」が押せる
+      await rewardState(1, false);
       await page.screenshot({ path: `${OUT}/${H}-reward.png` });
       const cards = await page.evaluate(() => [...document.querySelectorAll('[data-pick-card]')].map((e) => {
         const b = e.getBoundingClientRect();
         return { top: Math.round(b.top), bottom: Math.round(b.bottom), inView: b.top >= 0 && b.bottom <= innerHeight };
       }));
       console.log('   報酬のカード', JSON.stringify(cards));
-      check(cards.length > 0 && cards.every((c) => c.inView), `報酬: 開いた時にカードが画面の中（${cards.map((c) => `${c.top}〜${c.bottom}`).join(' ')} / ${H}）`, '報酬');
+      check(cards.length === 3 && cards.every((c) => c.inView), `報酬: 開いた時にカード3枚が画面の中（${cards.map((c) => `${c.top}〜${c.bottom}`).join(' ')} / ${H}）`, '報酬');
+      const skip = await hitAt('[data-reward-skip-card]');
+      check(!!skip?.inView && !!skip?.onTop, `報酬: 「カードを選ばない」が押せる ${JSON.stringify(skip)}`, '報酬');
+      await page.locator('[data-pick-card="1"]').click();
+      await wait(500);
+      const act = await hitAt('[data-card-pick-action]');
+      check(!!act?.inView && !!act?.onTop, `報酬: カードを押すと説明が開き「このカードを選ぶ」が押せる ${JSON.stringify(act)}`, '報酬');
+      const rw = (d) => (d.game.expeditions?.find((e) => e.reward) ?? d.game).reward;
+      check(!(rw(await save(page))?.cardDone ?? []).length, '報酬: カードを1回押しただけでは決まらない', '報酬');
+      await page.screenshot({ path: `${OUT}/${H}-reward-card-open.png` });
+
+      // (b) 1台で2人＋取り合い: カードの間は取り合いを出さない → 2人ともカードが終わると真ん中に取り合い
+      await rewardState(2, true);
+      check((await page.locator('[data-reward-step="card"]').count()) > 0, '報酬（2人）: 最初はカード', '報酬');
+      check(!(await page.locator('[data-claim-center]').count()) && (await page.locator('[data-claim-later]').count()) > 0, '報酬（2人）: カードの間は取り合いを出さず「全員が…選び終えたら…取り合いが出ます」と書く', '報酬');
+      await page.locator('[data-pick-card="0"]').click();
+      await wait(400);
+      const skip2 = await hitAt('[data-reward-skip-card]');
+      check(!!skip2?.inView && !!skip2?.onTop, `報酬（2人）: カードの説明を開いても「選ばない」が押せる ${JSON.stringify(skip2)}`, '報酬');
+      await page.screenshot({ path: `${OUT}/${H}-reward2-card-open.png` });
+      for (let i = 0; i < 2; i++) {
+        await page.locator('[data-reward-skip-card]').click();
+        await wait(700);
+      }
+      await page.locator('[data-claim-center]').waitFor({ timeout: 3000 }).catch(() => {});
+      await page.screenshot({ path: `${OUT}/${H}-reward2-claim.png` });
+      check((await page.locator('[data-claim-center]').count()) > 0, '報酬（2人）: 2人ともカードが終わると、取り合いが真ん中に出る', '報酬');
+      const claimBtns = await page.evaluate(() => [...document.querySelectorAll('[data-claim-center] button')].filter((b) => /欲しい|余れば|いらない/.test(b.textContent)).map((el) => {
+        const b = el.getBoundingClientRect();
+        const t = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+        return b.top >= 0 && b.bottom <= innerHeight + 1 && !!t && (t === el || el.contains(t));
+      }));
+      check(claimBtns.length === 6 && claimBtns.every(Boolean), `報酬（2人）: 取り合いの「欲しい／余れば／いらない」が全部画面の中で押せる（${claimBtns.filter(Boolean).length}/${claimBtns.length}）`, '報酬');
+      if (claimBtns.length) {
+        for (let i = 0; i < 2; i++) {
+          await page.locator('[data-claim-center] button', { hasText: '余れば' }).nth(i).click();
+          await wait(500);
+        }
+        await wait(400);
+        const fin = await hitAt('[data-reward-finish]');
+        check(!(await page.locator('[data-claim-center]').count()) && !!fin?.inView, `報酬（2人）: 2人とも答えると、真ん中の窓が消えて「先へ進む」 ${JSON.stringify(fin)}`, '報酬');
+        await page.screenshot({ path: `${OUT}/${H}-reward2-done.png` });
+      }
     } catch (e) {
       check(false, `報酬: 開けない（${e.message.split('\n')[0]}）`, '報酬');
+    }
+
+    // ---- 転職のカード選び（⑤: 背景が透けない・1回押しただけでは決まらない・説明とボタンが画面の中） ----
+    try {
+      await startBattle(page, 1, ['forestWolf']);
+      const d5 = await save(page);
+      const g5 = d5.game;
+      delete g5.expeditions;
+      delete g5.battle;
+      delete g5.dungeon;
+      delete g5.party;
+      g5.activeScene = undefined;
+      g5.mode = 'world';
+      g5.world.story = undefined;
+      g5.heroes[0].jobPick = ['lanceCharge', 'cmPrepare', 'warCry'];
+      await load(page, d5);
+      await closeStory(page);
+      await page.locator('[data-job-pick]').waitFor({ timeout: 3000 });
+      const bg = await page.locator('[data-job-pick]').evaluate((el) => getComputedStyle(el).backgroundColor);
+      const alpha = /rgba\(.*,\s*([\d.]+)\)/.exec(bg)?.[1];
+      check(!alpha || Number(alpha) >= 0.99, `転職のカード選び: 背景が不透明（${bg}）`, 'jobpick');
+      await page.screenshot({ path: `${OUT}/${H}-jobpick.png` });
+      const jc = await page.evaluate(() => [...document.querySelectorAll('[data-job-pick] [data-pick-card]')].map((e) => {
+        const b = e.getBoundingClientRect();
+        return b.top >= 0 && b.bottom <= innerHeight;
+      }));
+      check(jc.length === 3 && jc.every(Boolean), `転職のカード選び: 開いた時にカード3枚が画面の中（${jc.filter(Boolean).length}/${jc.length}）`, 'jobpick');
+      await page.locator('[data-job-pick] [data-pick-card="0"]').click();
+      await wait(500);
+      check(((await save(page)).game.heroes[0].jobPick ?? []).length === 3, '転職のカード選び: カードを1回押しただけでは決まらない', 'jobpick');
+      check((await page.locator('[data-job-pick] [data-card-pick-panel]').count()) > 0, '転職のカード選び: カードを押すと下に説明の窓が開く', 'jobpick');
+      const ja = await hitAt('[data-job-pick] [data-card-pick-action]');
+      check(!!ja?.inView && !!ja?.onTop, `転職のカード選び: 「このカードにする」が画面の中で押せる ${JSON.stringify(ja)}`, 'jobpick');
+      await page.screenshot({ path: `${OUT}/${H}-jobpick-open.png` });
+      await page.locator('[data-job-pick] [data-card-pick-action]').click();
+      await wait(600);
+      const after = (await save(page)).game.heroes[0];
+      check(!after.jobPick?.length && after.deck.some((c) => c.cardId === 'lanceCharge'), '転職のカード選び: 「このカードにする」で決まり、山札に入る', 'jobpick');
+      check(!(await page.locator('[data-job-pick]').count()), '転職のカード選び: 決めると閉じる', 'jobpick');
+    } catch (e) {
+      check(false, `転職のカード選び: 開けない（${e.message.split('\n')[0]}）`, 'jobpick');
     }
     await page.close();
   }

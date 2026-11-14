@@ -355,6 +355,11 @@ check(!/買った（残り0）/.test(await A.locator('body').innerText()), 'P1�
     const owner = gr.heroes.find((h) => h.id === lu.heroId).playerId;
     await send(owner === 'P1' ? A : B, { type: 'CHOOSE_GROWTH', playerId: owner, optionIndex: Math.max(0, lu.options.findIndex((o) => o.kind === 'maxHp' || o.kind === 'stat')) });
   }
+  // 実機の不具合④(1): 取り合いは、成長とカードが全員そろってから出る。それぞれの担当の人がカードを選ばない
+  for (const id of [...new Set(((await A.evaluate(() => window.__online.game())).reward?.cardOffers ?? []).map((o) => o.heroId))]) {
+    const owner = gr.heroes.find((h) => h.id === id).playerId;
+    await send(owner === 'P1' ? A : B, { type: 'PICK_CARD', playerId: owner, offerIndex: null, heroId: id });
+  }
   await wait(600);
   const claimB = B.locator('[data-claim]');
   if (await claimB.count()) {

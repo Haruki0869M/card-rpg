@@ -15,6 +15,7 @@ import { cardElementOf } from '../../store/hitStyle';
 import { speedFactor, useBattle, type ImpactFx } from '../../store/battleStore';
 import type { EnemyActionDef } from '../../types';
 import { CATEGORY_STYLE, ELEMENT_ICONS } from '../ui/icons';
+import { BATTLE_LAYER } from '../ui/layers';
 
 /** 演出の速さと、動きを減らすか */
 export function useFxPace() {
@@ -82,7 +83,7 @@ export function CalloutBand({ top }: { top: number }) {
   const element = enemy && callout.actionName ? enemyActionElement(enemy.defId, callout.actionName) : undefined;
   const ally = callout.side === 'ally';
   return (
-    <div className="pointer-events-none absolute inset-x-0 z-[28] flex justify-center px-3" style={{ top }}>
+    <div className="pointer-events-none absolute inset-x-0 flex justify-center px-3" style={{ top, zIndex: BATTLE_LAYER.callout }} data-callout-layer>
       <motion.div
         key={callout.id}
         initial={calm ? { opacity: 0 } : { opacity: 0, x: ally ? -36 : 36, scaleX: 0.7 }}
@@ -263,7 +264,7 @@ const HitFlash = memo(function HitFlash({ rect }: { rect: UnitRect }) {
 /** 戦場の直下の、命中のエフェクトと白いフラッシュの専用の層（z-35） */
 export function ImpactField({ rects }: { rects: UnitRect[] }) {
   return (
-    <div className="pointer-events-none absolute inset-0 z-[35]" data-impact-field>
+    <div className="pointer-events-none absolute inset-0" style={{ zIndex: BATTLE_LAYER.impact }} data-impact-field>
       {rects.map((r) => (
         <HitFlash key={`f${r.id}`} rect={r} />
       ))}
@@ -324,7 +325,7 @@ export function DeathField({ rects, enemies, bossLike }: { rects: UnitRect[]; en
   }, [deathFx]);
   if (!list.length) return null;
   return (
-    <div className="pointer-events-none absolute inset-0 z-[34]" data-death-field>
+    <div className="pointer-events-none absolute inset-0" style={{ zIndex: BATTLE_LAYER.death }} data-death-field>
       {list.map((d) => (
         <DeathBurst key={d.key} d={d} />
       ))}
