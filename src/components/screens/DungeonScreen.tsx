@@ -19,6 +19,8 @@ import {
   doorBeyond,
   doorDepthBonus,
   doorDetail,
+  chillDoorNote,
+  chillStatus,
   doorKind,
   omenOfType,
   omenInfoOf,
@@ -110,6 +112,7 @@ function DoorButtons({ game, choices, ok, canPin, pins, onOpen }: {
         const detail = doorDetail(game, room);
         const beyond = doorBeyond(game, room);
         const bonus = doorDepthBonus(run, room);
+        const chill = chillDoorNote(run, room);
         const roomPins = pins.at({ kind: 'door', id: room.id });
         const cmd = { type: 'ENTER_ROOM', playerId: LOCAL_PLAYER, roomId: room.id } as const;
         return (
@@ -142,6 +145,11 @@ function DoorButtons({ game, choices, ok, canPin, pins, onOpen }: {
               {bonus && (
                 <span className="max-w-full truncate text-[12px] leading-4 font-bold text-amber-200" data-door-bonus>
                   {bonus}
+                </span>
+              )}
+              {chill && (
+                <span className="line-clamp-2 max-w-full text-center text-[12px] leading-4 font-bold text-sky-200" data-door-chill>
+                  {chill}
                 </span>
               )}
               {beyond.length > 0 && (
@@ -408,6 +416,8 @@ export function DungeonScreen() {
   // 古い形（40行・52行）のダンジョンか / 今いる行（入口の通路は0）
   const oldShape = isLegacyLayout(run);
   const depthRow = (vr.rooms.find((r) => r.id === vr.currentRoomId)?.row ?? -1) + 1;
+  // 凍え（氷漬けの宝物庫だけ）: 今の凍えと、次の部屋で減るHP・焚き火と奥の箱の決まり
+  const chillNow = chillStatus(vr);
   const nav = dungeonNavigator(game);
   // 手番のキャラの担当が、この端末の人か
   const myTurn = dungeonTurnHere(game) && !!nav && isLocalPlayer(nav.playerId);
@@ -477,12 +487,22 @@ export function DungeonScreen() {
                 </span>
               )}
             </span>
+            {chillNow && (
+              <span className="panel flex h-7 shrink-0 items-center rounded-full px-2 text-[12px] font-bold text-sky-200 tabular-nums" data-chill={chillNow.chill}>
+                {chillNow.text}
+              </span>
+            )}
             {oldShape && (
               <span className="rounded-lg bg-black/75 px-2 py-0.5 text-[12px] leading-4 font-bold text-amber-200" data-old-shape>
                 このダンジョンは古い形です。撤退しても何も失いません。入り直すと新しい短い形になります
               </span>
             )}
           </div>
+          {chillNow && (
+            <span className="pointer-events-none inline-block rounded-lg bg-black/70 px-2 py-0.5 text-[12px] leading-4 text-sky-100" data-chill-note>
+              {chillNow.note}
+            </span>
+          )}
           {inRoom && inRoomStyle && (
             <span className="flex items-center gap-1 rounded-lg bg-black/70 px-2 py-0.5 text-[12px] leading-4 font-bold" style={{ color: inRoomStyle.color }} data-room-here>
               <inRoomStyle.Icon size={13} /> {inRoomStyle.name}の部屋{inRoom.cleared ? '（済）' : ''}

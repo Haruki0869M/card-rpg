@@ -226,6 +226,16 @@ export interface DungeonThemeDef {
    * altarUses = 晶石の祭壇で強化か変異ができる回数（省略は1）/ blackMarketChoices = 闇商人が並べる専用の装備の数（1つ買うと、ほかは下がる。省略は1）
    */
   reward?: { chestGold?: number; battleGold?: number; epicMul?: number; altarUses?: number; blackMarketChoices?: number };
+  /**
+   * そのシナリオでだけ候補にするテーマ（シナリオID）。無ければ全シナリオ（2026-11-14 シナリオ2の作り直し・氷漬けの宝物庫）。
+   * 古い保存のテーマ決め（ensureTileTheme）では選ばない（前と同じ結果にするため）
+   */
+  scenario?: string;
+  /**
+   * 凍え（氷漬けの宝物庫。docs/tasks/scenario2-theme-scourge-proposal.md §1 A案）: 部屋に入るたびに凍え+1、その場の全員のHPが「凍え × hpPercent%」減る
+   * （HPは1で止まる）。休憩の部屋に入ると凍えは0（その部屋の寒さは受けない）。chest = 奥の箱の格（入った時の凍えが min 以上の、最初の物）
+   */
+  chill?: { hpPercent: number; chest: { min: number; rarity: Rarity }[] };
 }
 
 export interface ChestSpec {
@@ -310,6 +320,8 @@ export interface DungeonRun {
   seen?: string[];
   /** 「周囲の警戒」（フォーカス1）を使った通路（今いる部屋のID か 'entrance'。1つの通路で1回だけ。その通路にいる間、先読みが見える） */
   watchedAt?: string;
+  /** 凍え（テーマに chill がある時だけ。部屋に入るたびに+1・休憩で0。古い保存・ほかのテーマには無い = 0） */
+  chill?: number;
 }
 
 /** 向き（0=北・奥 / 1=東 / 2=南 / 3=西） */

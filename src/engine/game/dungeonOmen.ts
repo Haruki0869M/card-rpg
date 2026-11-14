@@ -12,6 +12,7 @@ import type { DungeonRun, GameState, Hero, Room } from '../../types';
 import { statChance } from './common';
 import { exploreEffects } from './exploreAbilities';
 import { depthTier, DEPTH_TIER_NAME, findRoom, isLegacyLayout, reachableRooms } from './dungeon';
+import { chillChestPreview } from './dungeonChill';
 
 /** 予兆の種類（赤=通常の戦闘・紫=強敵・金=宝・緑=休憩・青=イベント） */
 export type DoorOmen = 'danger' | 'elite' | 'treasure' | 'rest' | 'mystery';
@@ -102,6 +103,9 @@ export function doorDetail(game: GameState, room: Room): string | undefined {
   const run = game.dungeon;
   if (!run || !isNextDoor(run, room) || !hasForesight(game)) return undefined;
   const t = getRoomType(room.type);
+  // 氷漬けの箱: 今の凍えのまま着いた時の格（箱の格は入った時に決まる）
+  const chilled = chillChestPreview(run, room);
+  if (chilled) return chilled;
   // 封魔の宝箱: 箱の種類と、番人の名前
   if (t.behavior === 'chest' && t.battle) return `${CHEST_NAME[room.chest?.rarity ?? 'epic']}・番人：${enemyNames(room) || '？'}`;
   if (t.battle) return enemyNames(room) || undefined;

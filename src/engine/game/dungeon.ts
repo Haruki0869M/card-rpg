@@ -178,6 +178,59 @@ function generateLayout(def: DungeonDef, rng: Rng, eventIds: string[], theme?: D
   return layout;
 }
 
+/** 凍えのテーマ（氷漬けの宝物庫）で、決まりに合う並びが出るまで作り直す回数（超えたら決まった並び。乱数はこのテーマの時だけ多く引く） */
+const CHILL_LAYOUT_TRIES = 30;
+
+/**
+ * 凍えのテーマの並びの決まり（2026-11-14 シナリオ2の作り直し。docs/tasks/scenario2-theme-scourge-proposal.md §1-4）:
+ * - 途中の行（2〜3行目）に、焚き火（休憩）の扉と、焚き火でない扉が並ぶ選択が1つ以上ある（運で焚き火が出ないと、選ぶ余地が無くなるため）【提案】
+ * - 途中の行に宝箱を出さない（宝箱は奥の氷漬けの箱1つだけ。テーマの割合が全部出せない時の、ふつうの割合からも出さない）
+ */
+export function chillLayoutOk(layout: NonNullable<DungeonDef['layout']>): boolean {
+  const mid = layout.slice(1, -2);
+  if (mid.some((row) => row.some((x) => getRoomType(x.type).behavior === 'chest'))) return false;
+  for (let r = 1; r <= mid.length; r++) {
+    for (const p of layout[r - 1]) {
+      const types = p.next.map((n) => layout[r][n].type);
+      if (types.includes('rest') && types.some((t) => t !== 'rest')) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * 決まった並び（凍えのテーマで、作り直しても決まりに合わなかった時。乱数は引かない）:
+ * 戦闘 →（焚き火 / イベント）→（戦闘 / 強敵）→ 氷漬けの箱 → ボス。4行（＋ボス）でない時は undefined
+ */
+function chillFallbackLayout(def: DungeonDef, theme: DungeonThemeDef, eventIds: string[]): NonNullable<DungeonDef['layout']> | undefined {
+  if ((def.rows ?? 6) !== 4) return undefined;
+  // イベントが無いシナリオ（今のデータには無い）は、2行目を「焚き火 / 強敵」・3行目を戦闘1つにする
+  const ev = eventIds[0];
+  return [
+    [{ type: 'battle', next: [0, 1] }],
+    [
+      { type: 'rest', next: [0] },
+      ev ? { type: 'event', eventId: ev, next: [0, 1] } : { type: 'elite', next: [0] },
+    ],
+    ev
+      ? [
+          { type: 'battle', next: [0] },
+          { type: 'elite', next: [0] },
+        ]
+      : [{ type: 'battle', next: [0] }],
+    [{ type: theme.fixedRoom, next: [0], chest: { rarity: 'rare', locked: false } }],
+    [{ type: 'boss', next: [] }],
+  ];
+}
+
+/** ランダムダンジョンの並び（凍えのテーマは、決まりに合うまで作り直す） */
+function generateThemedLayout(def: DungeonDef, rng: Rng, eventIds: string[], theme?: DungeonThemeDef): NonNullable<DungeonDef['layout']> {
+  if (!theme?.chill) return generateLayout(def, rng, eventIds, theme);
+  let last = generateLayout(def, rng, eventIds, theme);
+  for (let i = 1; i < CHILL_LAYOUT_TRIES && !chillLayoutOk(last); i++) last = generateLayout(def, rng, eventIds, theme);
+  return chillLayoutOk(last) ? last : (chillFallbackLayout(def, theme, eventIds) ?? last);
+}
+
 /** 封魔の宝箱の部屋の種類（データに1つ。無ければ封魔の宝箱は出ない） */
 const sealedChestType = () => ROOM_TYPES.all.find((t) => t.sealedChest);
 
@@ -216,7 +269,7 @@ export function buildDungeon(dungeonId: string, rng: Rng, levelBonus: number, ev
   const def = getDungeon(dungeonId);
   const random = !!def.random || !def.layout;
   const theme = random ? dungeonTheme(themeId) : undefined;
-  const layout = def.layout ?? generateLayout(def, rng, eventIds, theme);
+  const layout = def.layout ?? generateThemedLayout(def, rng, eventIds, theme);
   const lvBonus = levelBonus + (theme?.enemyLevel ?? 0);
   const id = (r: number, c: number) => `r${r}c${c}`;
   const rooms: Room[] = layout.flatMap((row, r) =>
