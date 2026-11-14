@@ -298,3 +298,9 @@
 ポーズ: 両手をそでの中に入れて、体の前で重ねる
 おそろいのマントの色: くすんだ紫
 ```
+
+## 結果（2026-11-15）
+- オーナーが試しの後、**案B で16枚すべて**作った。駒の絵（`src/assets/art/piece/*.webp`）を全部入れかえた。
+- 元の絵: `C:/dev/card-rpg-assets/chatgpt-pieces-travel/piece/`（前の武器を持った駒の元の絵は `C:/dev/card-rpg-assets/chatgpt-pieces/piece-weapon/` に残した）。
+- 背景は3通りで届いた（透明・真っ黒・市松模様の絵）。`scripts/art/precut_pieces.py` で消してから `SRC=C:/dev/card-rpg-assets/chatgpt-pieces-travel py scripts/art/build_art.py piece/`。狩人・男だけは、背景にもやが混じっていたので rembg で切り抜いた。
+- 案C（台座に今のジョブの札）は、まだ作っていない。
