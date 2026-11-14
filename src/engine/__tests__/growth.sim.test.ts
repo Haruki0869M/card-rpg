@@ -7,6 +7,8 @@
 // 環境変数（どれも省略できる）: SIM_SEEDS（種の数。1001 から。既定30）・SIM_DIFF（既定 normal）・SIM_SCENARIO（既定 corruptionKing）・
 //   SIM_PARTY（2人 / 4人 をカンマで。既定は両方）・SIM_BOT（smart / clever。既定 smart）・
 //   SIM_OUT（表の書き出し先。既定 screenshots/growth.md）・SIM_JSON（キャラごとの記録の書き出し先。省略で書かない）
+//   SIM_PARTIES（組を変える。「名前=職,職;名前=職,職」。省略で下の標準の2組）・
+//   SIM_MID（基本→中位の転職先を決める。「基本:中位,基本:中位」。bot が中位へ転職する時だけ、転職先を差し替える。測る道具の側だけ。2026-11-14 宿題6A）
 // パーティは twoBots.sim の標準（回復役 = 僧侶入り）と同じ: 2人 = 剣士＋僧侶 / 4人 = 剣士＋魔道士＋狩人＋僧侶。
 // 数えるのはテストの側だけ（エンジンの結果は変えない）。
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -15,12 +17,13 @@ import { describe, expect, it, vi } from 'vitest';
 import type { BattleEvent, GameCommand, GameState, PlayerId } from '../../types';
 
 type Hook = (pre: GameState, cmd: GameCommand, post: GameState, events: BattleEvent[]) => void;
-const H: { hook?: Hook } = {};
+const H: { hook?: Hook; steer?: (g: GameState, c: GameCommand) => GameCommand } = {};
 vi.mock('../index', async (orig) => {
   const m = (await orig()) as typeof import('../index');
   return {
     ...m,
-    applyGameCommand: (g: GameState, c: GameCommand) => {
+    applyGameCommand: (g: GameState, c0: GameCommand) => {
+      const c = H.steer ? H.steer(g, c0) : c0;
       const r = m.applyGameCommand(g, c);
       if (!r.error) H.hook?.(g, c, r.state, r.battleEvents ?? []);
       return r;
@@ -30,9 +33,9 @@ vi.mock('../index', async (orig) => {
 
 import { createGame } from '../index';
 import { playToEnd } from '../bot';
-import { finisherCards, featOf, jobOptions } from '../game/jobs';
+import { finisherCards, featOf, jobChangeLevel, jobOptions } from '../game/jobs';
 import { DUNGEONS } from '../../data/dungeons';
-import { getClass } from '../../data/classes';
+import { CLASSES, getClass } from '../../data/classes';
 import { getDifficulty } from '../../data/rules';
 
 const SCENARIO = process.env.SIM_SCENARIO ?? 'corruptionKing';
@@ -40,10 +43,14 @@ const SEEDS = Number(process.env.SIM_SEEDS ?? 30);
 const DIFF = process.env.SIM_DIFF ?? 'normal';
 const BOT = (process.env.SIM_BOT ?? 'smart') as 'smart' | 'clever';
 const OUT = process.env.SIM_OUT ?? 'screenshots/growth.md';
-const PARTIES: Record<string, string[]> = {
-  '2人': ['warrior', 'priest'],
-  '4人': ['warrior', 'mage', 'hunter', 'priest'],
-};
+const PARTIES: Record<string, string[]> = process.env.SIM_PARTIES
+  ? Object.fromEntries(process.env.SIM_PARTIES.split(';').map((x) => { const [n, cs] = x.split('='); return [n, cs.split(',')]; }))
+  : {
+      '2人': ['warrior', 'priest'],
+      '4人': ['warrior', 'mage', 'hunter', 'priest'],
+    };
+/** 基本→中位の転職先の差し替え（SIM_MID） */
+const MID: Record<string, string> = Object.fromEntries((process.env.SIM_MID ?? '').split(',').filter(Boolean).map((x) => x.split(':')));
 const KEYED = DUNGEONS.forScenario(SCENARIO).filter((d) => d.rewardKey && !d.random).sort((a, b) => a.baseLevel - b.baseLevel);
 const FINALE = DUNGEONS.forScenario(SCENARIO).find((d) => d.finale)!;
 /** 場所の並び（鍵1の前 → … → 最後の中 → クリアの後） */
@@ -68,6 +75,8 @@ interface HeroRec {
   /** 中位の時に、最上位の「レベルと条件」がそろった時（場所は見ない） / 特殊職のどれかがそろった時 */
   ready?: At;
   readySp?: At;
+  /** 中位の職から行ける職（最上位・特殊）ごと: 条件の数がそろった時・中位でレベルがそろった時・鍵2／鍵3を終えた時の条件の数 */
+  goals: Record<string, { feat?: At; level?: At; atKey2?: number; atKey3?: number }>;
   /** 決め技: 手に入れた（= 最上位・特殊への転職）・初めて手札に来た・初めて使った（どれも本人の何戦目か） */
   finGot?: number;
   finDrawn?: number;
@@ -93,12 +102,14 @@ interface Run {
 }
 
 const tierOf = (classId: string) => getClass(classId).tier ?? 'base';
+/** 中位の職から転職できる職（最上位・特殊） */
+const goalsOf = (midId: string) => CLASSES.all.filter((c) => c.from?.includes(midId) && (c.tier === 'top' || c.tier === 'special'));
 
 function runOne(classes: string[], seed: number): Run {
   const g0 = createGame({ seed, scenarioId: SCENARIO, difficulty: DIFF as never, party: classes.map((c, i) => ({ classId: c, gender: 'male', name: c + i, playerId: 'P1' as PlayerId })) });
   const FIN = finisherCards();
   const battlesOf = (g: GameState) => [g.battle, ...(g.expeditions ?? []).map((x) => x.battle)].filter((b): b is NonNullable<GameState['battle']> => !!b);
-  const recs = new Map<string, HeroRec>(g0.heroes.map((h) => [h.id, { start: h.classId, path: [h.classId], finFights: 0, finDrawnFights: 0, finPlayedFights: 0, ownFights: 0, endTier: 'base', endLevel: 1 }]));
+  const recs = new Map<string, HeroRec>(g0.heroes.map((h) => [h.id, { start: h.classId, path: [h.classId], finFights: 0, finDrawnFights: 0, finPlayedFights: 0, ownFights: 0, endTier: 'base', endLevel: 1, goals: {} }]));
   let fights = 0;
   const clearedAt: (number | undefined)[] = [...KEYED, FINALE].map(() => undefined);
   const entered = new Set<string>();
@@ -177,13 +188,38 @@ function runOne(classes: string[], seed: number): Run {
       if (!r.ready && q.some((o) => o.job.tier === 'top')) r.ready = at();
       if (!r.readySp && q.some((o) => o.job.tier === 'special')) r.readySp = at();
     }
+    // 中位の職から行ける職ごとの条件（転職した後も記録は数え続けるので、最上位になった後の特殊の条件も見える）
+    for (const h of post.heroes) {
+      const r = recs.get(h.id);
+      if (!r?.mid) continue;
+      for (const job of goalsOf(r.mid.job)) {
+        const gl = (r.goals[job.id] ??= {});
+        const at = (): At => ({ fight: fights, own: r.ownFights, level: h.level, place: placeOf(post, h.id), worldTurn: post.world?.worldTurn ?? 0, job: h.classId });
+        if (!gl.feat && (!job.requires || featOf(h, job.requires.feat) >= job.requires.count)) gl.feat = at();
+        if (!gl.level && h.classId === r.mid.job && h.level >= jobChangeLevel(job)) gl.level = at();
+        if (job.requires) {
+          if (gl.atKey2 === undefined && post.clearedDungeons.includes(KEYED[1].id)) gl.atKey2 = featOf(h, job.requires.feat);
+          if (gl.atKey3 === undefined && post.clearedDungeons.includes(KEYED[2].id)) gl.atKey3 = featOf(h, job.requires.feat);
+        }
+      }
+    }
     // 鍵・最後のダンジョンを終えた時
     [...KEYED, FINALE].forEach((d, i) => { if (clearedAt[i] === undefined && post.clearedDungeons.includes(d.id)) clearedAt[i] = fights; });
     // 入ったダンジョン（終わった場所の「中」の判定）
     for (const d of [post.dungeon, ...(post.expeditions ?? []).map((x) => x.dungeon)]) if (d) entered.add(d.dungeonId);
   };
+  H.steer = (g, c) => {
+    const inner = c.type === 'SCENE' || c.type === 'VOTE' ? c.command : c;
+    if (inner?.type !== 'CHANGE_JOB') return c;
+    const h = g.heroes.find((x) => x.id === inner.heroId);
+    const want = h && MID[h.classId];
+    if (!want || tierOf(inner.jobId) !== 'mid' || want === inner.jobId) return c;
+    const swapped = { ...inner, jobId: want };
+    return c.type === 'SCENE' || c.type === 'VOTE' ? ({ ...c, command: swapped } as GameCommand) : swapped;
+  };
   const { game, log } = playToEnd(g0, 60000, BOT === 'smart' ? { smart: true } : { clever: true });
   H.hook = undefined;
+  H.steer = undefined;
   expect(log.errors).toEqual([]);
   for (const h of game.heroes) {
     const r = recs.get(h.id)!;
@@ -268,6 +304,26 @@ describe.skipIf(!process.env.SIM)(`3幕の成長（${SCENARIO}・${DIFF}・${BOT
         for (const mid of [...new Set(hs.map((h) => h.mid!.job))]) {
           const xs = hs.filter((h) => h.mid!.job === mid && h.ready);
           L.push(`| ${p} | ${getClass(mid).name} | ${xs.length}/${hs.filter((h) => h.mid!.job === mid).length} | ${f(avg(xs.map((h) => h.ready!.fight)))} | ${placeCount(xs.map((h) => h.ready!.place))} | ${f(avg(xs.filter((h) => h.top).map((h) => h.top!.fight - h.ready!.fight)))} | ${xs.filter((h) => !h.top).length} | ${hs.filter((h) => h.mid!.job === mid && h.readySp).length}（${hs.filter((h) => h.mid!.job === mid && h.readySp && h.top?.tier === 'special').length}） |`);
+        }
+      }
+      L.push('', '## 3c. 行き先の職ごとの条件（中位になった人。条件の数は転職した後も数え続ける）', '');
+      L.push('- 「条件の数」= 条件の数がそろった時（レベルは見ない）。「そろった」= その上で、中位のままレベルもそろった時（最上位 Lv6・特殊 Lv5）。', '- 鍵2・鍵3を終えた時の条件の数は、その時まで残っていた人の中央値（25%点〜75%点）。', '');
+      L.push(`| 人数 | 中位の職 | 行き先 | 条件 | 中位になった人 | 条件の数がそろった人 | その何戦目（平均・中央） | その場所（${PLACES.join('・')}） | レベルもそろった人 | その何戦目（平均） | 鍵2を終えた時の数 | 鍵3を終えた時の数 | 転職した人 |`);
+      L.push('|---|---|---|---|---|---|---|---|---|---|---|---|---|');
+      const q = (xs: number[], p: number) => { if (!xs.length) return NaN; const s = [...xs].sort((a, b) => a - b); return s[Math.min(s.length - 1, Math.floor(p * (s.length - 1) + 0.5))]; };
+      for (const [p, rs] of Object.entries(all)) {
+        const hs = rs.flatMap((r) => r.heroes).filter((h) => h.mid);
+        for (const mid of [...new Set(hs.map((h) => h.mid!.job))]) {
+          const xs = hs.filter((h) => h.mid!.job === mid);
+          for (const job of goalsOf(mid)) {
+            const gs = xs.map((h) => h.goals?.[job.id] ?? {});
+            const ft = gs.filter((g) => g.feat).map((g) => g.feat!);
+            const rd = gs.filter((g) => g.feat && g.level).map((g) => (g.feat!.fight > g.level!.fight ? g.feat! : g.level!));
+            const k2 = gs.map((g) => g.atKey2).filter((x): x is number => x !== undefined);
+            const k3 = gs.map((g) => g.atKey3).filter((x): x is number => x !== undefined);
+            const qq = (xs2: number[]) => (xs2.length ? `${q(xs2, 0.5)}（${q(xs2, 0.25)}〜${q(xs2, 0.75)}）` : '-');
+            L.push(`| ${p} | ${getClass(mid).name} | ${job.name}（${job.tier === 'top' ? '最上位' : '特殊'}） | ${job.requires ? job.requires.text : 'なし'} | ${xs.length} | ${ft.length} | ${f(avg(ft.map((a) => a.fight)))}・${f(median(ft.map((a) => a.fight)))} | ${placeCount(ft.map((a) => a.place))} | ${rd.length} | ${f(avg(rd.map((a) => a.fight)))} | ${qq(k2)} | ${qq(k3)} | ${xs.filter((h) => h.top?.job === job.id).length} |`);
+          }
         }
       }
       L.push('', '## 4. 決め技（最上位・特殊に転職した人）', '');

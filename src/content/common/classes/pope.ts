@@ -9,7 +9,7 @@ export const pope: ClassDef = {
   stats: { ...bishop.stats, per: bishop.stats.per + 8, int: bishop.stats.int + 8 },
   battleAbility: { name: '慈愛', effect: { when: 'turnStart', do: [{ kind: 'heal', amount: 2, to: 'allies' }] } },
   exploreAbility: { id: 'popeExplore', name: '加護', description: '休憩・野営の回復+100%', effect: { kind: 'restBonus', multiplier: 2 } },
-  requires: { feat: 'success:heal', count: 22, text: '回復カードの成功22回' },
+  requires: { feat: 'success:heal', count: 9, text: '回復カードの成功9回' },
   cardPool: ["papalBlessing","papalLight","papalSanctuary","papalPrayer","miracle","axReversalSeal"], signature: ["papalBlessing","papalLight","papalSanctuary"],
   jobCards: ['miracle'],
 };

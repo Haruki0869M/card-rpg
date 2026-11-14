@@ -108,7 +108,7 @@ export const BALANCE = {
   randomEventChance: 20,
   randomEventBadMul: 1.5,
   /** 報酬のスマート抽選: 重なった印1つごとの重みの上乗せ・重みの上限・ショップの係数（設計 v2 §2） */
-  smartDraw: { perTag: 0.5, maxWeight: 3, shopStrength: 0.5 },
+  smartDraw: { perTag: 0.5, maxWeight: 3, shopStrength: 0.5, /** 宿題7: 回復役のいないパーティで、共通の回復のカードの出やすさの倍率【提案】 */ healerlessHeal: 2 },
   /** 報酬の候補の基本の重み（ジョブ専用カードは1）: 得意武器・使える武器・系統・共通のカード（K1） */
   cardPoolWeight: { mainWeapon: 1, subWeapon: 0.5, lineage: 0.7, common: 0.8 },
   /** 戦闘の報酬のカード（キャラごとに3枚）のうち、必ず「ジョブ専用・系統・装備している武器種」のカードから選ぶ枚数（先頭から。K7 オーナー決定）。当てはまるカードが無ければ今までどおり */

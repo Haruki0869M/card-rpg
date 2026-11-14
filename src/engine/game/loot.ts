@@ -157,7 +157,7 @@ export function rollCardOffers(game: GameState, heroIds: string[], rng: Rng, odd
     let cands: string[] = [];
     for (; grade >= 0 && !cands.length; grade--) cands = pool.filter((id) => rarityIndex(CARDS.get(id).rarity ?? 'common') === grade);
     // 3枚のうち最後の1枚は完全ランダム、ほかは今の山札・装備と相性の良いカードが出やすい（スマート抽選）
-    const cardId = pickCard(cands.length ? cands : pool, h, rng, offers.length < 2);
+    const cardId = pickCard(cands.length ? cands : pool, h, rng, offers.length < 2, 1, game.heroes);
     // 同じキャラの中で、同じカード・同じ名前のカードを重ねない（フェーズ3）
     const name = CARDS.get(cardId).name;
     if (!offers.some((o) => o.heroId === h.id && (o.cardId === cardId || CARDS.get(o.cardId).name === name))) offers.push({ cardId, heroId: h.id });
