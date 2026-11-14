@@ -3,6 +3,8 @@
 //   (1) 技名の帯は1本だけ（次の技が出たら置き換わる）
 //   (2) 帯と「⚡BREAK!」が同時に出ている間、帯の文字の真ん中に BREAK の文字が乗っていない（帯が手前、または重ならない位置）
 // を 50ms ごとに測る。1台・オンラインなし（本番の Firebase には何もしない）。
+// 狭い画面の直し 回3（2026-11-15）: 「⚡BREAK!」は技名の帯の下の端より下に出す（絵が 40px の時、帯の後ろに隠れていた）。
+//   (3) 帯と BREAK の文字が重ならない（帯の文字の範囲に BREAK の文字が入らない）。390×540 と 360×640 の敵3体を足した
 // 使い方: URL=http://localhost:<番号>/card-rpg/ node scripts/callout-break.mjs   CALLOUT_OUTPUT で写真の場所
 import { mkdirSync } from 'node:fs';
 import { chromium, startBattle } from './lib.mjs';
@@ -15,12 +17,13 @@ const FAST = process.env.CALLOUT_FAST === '1';
 const browser = await chromium.launch();
 const problems = [];
 
-async function run(W, H) {
+async function run(W, H, enemies = ['treeWarden']) {
+  const tag = `${W}x${H}${enemies.length > 1 ? `-敵${enemies.length}体` : ''}`;
   const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
   page.setDefaultTimeout(10000);
-  const ng = (t) => problems.push(`${W}x${H}: ${t}`);
+  const ng = (t) => problems.push(`${tag}: ${t}`);
   page.on('pageerror', (e) => ng(`画面の例外 ${e.message}`));
-  await startBattle(page, 2, ['treeWarden'], FAST);
+  await startBattle(page, 2, enemies, FAST);
   await page.getByText('ターン終了').waitFor();
   // 敵は大技を予告中・HP多め。1人目 = ヘビースイング（完全成功で BREAK）、2人目 = 火球
   await page.evaluate(() => {
@@ -101,30 +104,32 @@ async function run(W, H) {
   await fire(3);
   // BREAK が出たらすぐ2人目
   await page.waitForFunction(() => window.__cb.breakAt, null, { timeout: 8000, polling: 20 }).catch(() => ng('完全成功で攻撃したのに「⚡BREAK!」が出ない'));
-  await page.screenshot({ path: `${OUT}/${W}x${H}-1-break.png` });
+  await page.screenshot({ path: `${OUT}/${tag}-1-break.png` });
   await pick(1);
   await fire(0);
   await page.locator('[data-callout="ally"]').first().waitFor({ timeout: 4000 }).catch(() => {});
-  await page.screenshot({ path: `${OUT}/${W}x${H}-2-next-callout.png` });
+  await page.screenshot({ path: `${OUT}/${tag}-2-next-callout.png` });
   await page.waitForTimeout(1800);
   const s = await page.evaluate(() => {
     clearInterval(window.__cbTimer);
     const s = window.__cb;
     return { ...s, texts: [...s.texts] };
   });
-  console.log(`${W}x${H}: 帯と BREAK が同時 ${s.both}回・重なり ${s.overlap}回・BREAK が帯の文字の上 ${s.covered}回・帯は最大 ${s.maxBands}本・帯の文字 ${s.texts.join(' / ')}・2人目の帯（火球）と BREAK が同時 ${s.withNext}回`);
+  const sprite = await page.locator('[data-enemy-sprite]').first().evaluate((el) => Math.round(el.getBoundingClientRect().height)).catch(() => null);
+  console.log(`${tag}（敵の絵 ${sprite}px）: 帯と BREAK が同時 ${s.both}回・重なり ${s.overlap}回・BREAK が帯の文字の上 ${s.covered}回・帯は最大 ${s.maxBands}本・帯の文字 ${s.texts.join(' / ')}・2人目の帯（火球）と BREAK が同時 ${s.withNext}回`);
   if (s.maxBands > 1) ng(`技名の帯が同時に ${s.maxBands} 本出た（置き換わっていない）`);
   if (s.covered) ng(`「⚡BREAK!」が技名の帯の文字の上に乗った（${s.covered}回）`);
+  if (s.overlap) ng(`「⚡BREAK!」が技名の帯の文字と重なった（帯の後ろに隠れる。${s.overlap}回）`);
   if (!s.texts.length) ng('技名の帯が出ていない');
   if (!s.texts.includes('火球')) ng('2人目の技名の帯（火球）が出ていない');
   if (!s.withNext) console.log('   注意: 2人目の帯が出た時には BREAK の文字が消えていた（重なりの形を作れなかった）');
   await page.close();
 }
 
-for (const [w, h] of [[390, 540], [390, 844], [360, 640]]) await run(w, h);
+for (const [w, h, en] of [[390, 540], [390, 844], [360, 640], [390, 540, ['treeWarden', 'forestWolf', 'forestWolf']], [360, 640, ['treeWarden', 'forestWolf', 'forestWolf']]]) await run(w, h, en);
 await browser.close();
 if (problems.length) {
   console.log('NG:\n' + problems.join('\n'));
   process.exit(1);
 }
-console.log('OK: 技名の帯は1本で置き換わり、「⚡BREAK!」が帯の文字の上に乗らない（390×540・390×844・360×640）');
+console.log('OK: 技名の帯は1本で置き換わり、「⚡BREAK!」が帯の文字と重ならない（390×540・390×844・360×640・390×540 と 360×640 の敵3体）');

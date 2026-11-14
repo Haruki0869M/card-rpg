@@ -19,7 +19,7 @@ import { speedFactor, useBattle, type UnitFx } from '../../store/battleStore';
 import type { AllyState, BattleState, EnemyState } from '../../types';
 import { breakPreview, intentBrief, intentView, type IntentPart } from '../format';
 import { breakRuleOf } from '../../engine/battle/breakRules';
-import { enemyResist, enemyWeak, focusFeedOf, phaseMarks } from '../../engine/battle/phases';
+import { enemyResist, enemyWeak, phaseMarks } from '../../engine/battle/phases';
 import { HpBar } from '../ui/HpBar';
 import { EffectChip, ELEMENT_ICONS, Shield, Skull, statusStyle, Swords } from '../ui/icons';
 import { Flame } from 'lucide-react';
@@ -27,6 +27,9 @@ import { getElement } from '../../data/elements';
 import { SCOURGES } from '../../data/world';
 import { StatusChips } from '../ui/StatusChips';
 import { UnitPopups } from './Popups';
+import { enemyMarks } from './statusMarks';
+import { breakDropFor, CALLOUT_TOP } from './breakDrop';
+import { useBattleLowScreen } from './lowScreen';
 import { SlotOverlay } from './SlotOverlay';
 import { isAllyCard } from '../../engine/battle/targets';
 import { isOnlinePlay } from '../../store/battleConfig';
@@ -326,9 +329,12 @@ const EnemyUnit = memo(function EnemyUnit({
   spriteH,
   boxH,
   narrow,
+  tight,
 }: {
   /** 敵が3体以上で枠が狭い（BREAK の印を短い形にする） */
   narrow: boolean;
+  /** 回3: 絵を縮めても敵の欄が戦場に入らない時、状態の印を2つまででも小さい札にする */
+  tight: boolean;
   enemy: EnemyState;
   left: number;
   top: number;
@@ -450,7 +456,8 @@ const EnemyUnit = memo(function EnemyUnit({
           </motion.div>
         )}
         {/* 数字は、その敵の絵の頭のすぐ上に出す（箱の上の空きではなく、絵の上の端に合わせる） */}
-        <UnitPopups unitId={enemy.uid} top={`${Math.max(0, boxH - h - 6)}px`} breakDrop={Math.round(h * 0.4)} />
+        {/* 回3: 「⚡BREAK!」は技名の帯の下の端より下に出す（絵が小さい = 低い画面・敵3体以上の時も、帯に隠れない） */}
+        <UnitPopups unitId={enemy.uid} top={`${Math.max(0, boxH - h - 6)}px`} breakDrop={breakDropFor(h, top, Math.max(0, boxH - h - 6))} />
       </div>
       {!enemy.dead && (
         // 予告は味方の立ち絵より手前に出す（画面が低くて重なっても、狙いと数字を読めるように）
@@ -468,7 +475,8 @@ const EnemyUnit = memo(function EnemyUnit({
           {!narrow && <BehaviorBrief enemy={enemy} maxW={slotW - 8} />}
           <BreakHint enemy={enemy} narrow={narrow} maxW={narrow ? slotW - 4 : slotW - 8} />
           <AimMarks battle={battle} enemyUid={enemy.uid} />
-          <StatusChips s={enemy.statuses} side="enemy" onTap={onTap} tauntedBy={enemy.tauntedBy} guarding={enemy.guarding} hidden={enemy.hidden} lamp={focusFeedOf(enemy) ? Math.min(focusFeedOf(enemy)!.max, enemy.lampEaten ?? 0) : undefined} />
+          {/* 回3: 状態の印（大事な印が先。3つ以上・低い画面は小さい札の1行＋「＋N」） */}
+          <StatusChips marks={enemyMarks(enemy)} side="enemy" unit={enemy.uid} maxW={barW} small={tight} />
         </div>
       )}
     </div>
@@ -724,6 +732,9 @@ const Embers = memo(function Embers() {
   );
 });
 
+/** 敵の絵のいちばん小さい高さ（はみ出す時だけ。ふだんは 40px が下限） */
+const SPRITE_MIN = 28;
+
 export function Battlefield() {
   const [ref, size] = useElementSize<HTMLDivElement>();
   const allEnemies = useBattle((s) => s.battle.enemies);
@@ -740,20 +751,31 @@ export function Battlefield() {
 
   // 敵: 上側 58%。味方: 下側。人数が増えたら小さくする
   const nE = enemies.length;
+  // 回3: 低い画面は、敵が1〜2体でも「短い形」（BREAK の条件は短い札・特殊な行動の案内は下の1行。計画 項目2）
+  const low = useBattleLowScreen();
+  // 低い画面でなくても、絵を縮め・印を小さくしても敵の欄が戦場に入らない時は、短い形にする（cramped。下の測る所で決める）
+  const [cramped, setCramped] = useState(false);
+  const narrowAll = nE >= 3 || low || cramped;
   const enemySlotW = W / nE;
   const enemyTop = 4;
   // 名前 + HP + 行動の予告（狙いの名前の行を含む）+ 先読みの行 + 状態異常
   const foresee = enemies.some((e) => !e.dead && e.queuedActionId);
   // 回2: 大技の予告の下の BREAK の印の行（敵が1体は1行・3体以上は短い形で1行。2体は長い形が2行に折り返すことがある）
   const breakRow = useBattle((s) => fieldEnemies(s.battle.enemies).some((e) => !e.dead && !!breakPreview(s.battle, e)));
-  const breakRowH = breakRow ? (enemies.length === 2 ? 34 : 18) : 0;
+  const breakRowH = breakRow ? (enemies.length === 2 && !narrowAll ? 34 : 18) : 0;
   // 属性の印の行（16）・各行の間（0.5×5）・3体以上の時に互い違いにずらす分（10）も数える
   // 予告の枠は「→名前」の行（16）＋数字の行（20）＋枠の余白（6）の2行ぶん
   // 敵が3体以上で、特殊な行動を予告している敵がいる時は、敵の列の下に案内の1行（BehaviorBriefBar）の場所も取る
-  const briefBar = useBattle((s) => nE >= 3 && !!briefEnemy(s.battle, fieldEnemies(s.battle.enemies)));
+  const briefBar = useBattle((s) => narrowAll && !!briefEnemy(s.battle, fieldEnemies(s.battle.enemies)));
   const enemyInfoH = 14 + 14 + 16 + 42 + 16 + (foresee ? 18 : 0) + breakRowH + 18 + 10 + (nE >= 3 ? 10 : 0) + (briefBar ? BRIEF_BAR_H : 0);
   // 敵の列の下端と味方の頭の間に少し余白を残す（予告の枠が立ち絵の頭に重ならないように）
-  const enemySpriteH = Math.max(40, Math.min(H * 0.56 - enemyInfoH, enemySlotW * 1.15));
+  // 回3: 敵の欄（名前〜状態の印・案内の1行）が戦場の下の端からはみ出す時だけ、絵を 40px から最小 28px まで縮めて収める（計画 項目2。描いた後に測る）
+  const [squeeze, setSqueeze] = useState(0);
+  const [tight, setTight] = useState(false);
+  // 縮めても案内の1行まで入らない時: 案内の1行を、敵の欄の下ではなく、敵の絵の足元の高さに重ねる（状態の印・予告を隠さない）
+  const [briefUp, setBriefUp] = useState(false);
+  const baseSpriteH = Math.max(40, Math.min(H * 0.56 - enemyInfoH, enemySlotW * 1.15));
+  const enemySpriteH = Math.max(SPRITE_MIN, baseSpriteH - squeeze);
   // 大きな敵（size > 1）は、絵の箱より上へはみ出して描かれ、戦場の上の端（上の帯）で体が切れていた。
   // 一番大きい敵がちょうど箱に収まるように、大きさ 1 の高さを size で割る（敵どうしの大きさの比は変わらない。
   // 倒れた敵も数えて、途中で並びが動かないようにする）。箱の高さ（＝名前・予告の位置）は今までどおり
@@ -772,6 +794,30 @@ export function Battlefield() {
     const top = root.getBoundingClientRect().top;
     const b = Math.max(0, ...[...root.querySelectorAll('[data-enemy-info]')].map((el) => el.getBoundingClientRect().bottom - top));
     if (Math.abs(b - infoBottom) > 0.5) setInfoBottom(b);
+  });
+  useLayoutEffect(() => {
+    const root = ref.current;
+    if (!root || H <= 0) return;
+    const top = root.getBoundingClientRect().top;
+    const bottoms = [...root.querySelectorAll('[data-enemy-info]')].map((el) => el.getBoundingClientRect().bottom - top);
+    if (!bottoms.length) return;
+    // 案内の1行（敵の欄のすぐ下）も戦場に入れる
+    const over = Math.max(...bottoms) + (briefBar && !briefUp ? 2 + BRIEF_BAR_H : 0) - (H - 2);
+    // はみ出し 1px 以下・余り 1px 以下は動かさない（測るたびに揺れないように）
+    const maxSqueeze = Math.max(0, baseSpriteH - SPRITE_MIN);
+    if (over > 1) {
+      // はみ出す: まず絵を縮める。縮めきっても入らない時は、状態の印を小さい札にする（40px → 18px）
+      if (squeeze < maxSqueeze) setSqueeze(Math.min(maxSqueeze, Math.round(squeeze + over)));
+      else if (!tight) setTight(true);
+      else if (!narrowAll) setCramped(true);
+      else if (briefBar && !briefUp) setBriefUp(true);
+    } else if (over < -1) {
+      // 余る: 絵を戻す。戻しきって、大きな印に戻しても入る（余りが 22px＋α）時だけ大きな印に戻す
+      if (squeeze > 0) setSqueeze(Math.max(0, Math.round(squeeze + over)));
+      else if (briefUp && over < -(BRIEF_BAR_H + 4)) setBriefUp(false);
+      else if (cramped && over < -40) setCramped(false);
+      else if (tight && over < -26) setTight(false);
+    }
   });
   const allyH = Math.max(48, allyFull * 0.6, Math.min(allyFull, H - 6 - enemyBottom));
   // 段階A: 操作パネルが戦場に重なってよい高さ（味方の下半身まで＝立ち絵の下45%）。パネルの最大の高さに使う
@@ -800,7 +846,7 @@ export function Battlefield() {
   ];
 
   return (
-    <div ref={ref} className="relative min-h-[190px] flex-1 overflow-hidden">
+    <div ref={ref} className="relative min-h-[190px] flex-1 overflow-hidden" data-battlefield>
       <SynergyShake>
       {/* 背景も一緒に揺れる（揺れても端が見えないよう少し大きく） */}
       <BattleBackground kind={bgKind} className="absolute -inset-2 h-[calc(100%+16px)] w-[calc(100%+16px)]" />
@@ -818,10 +864,17 @@ export function Battlefield() {
               slotW={enemySlotW}
               spriteH={enemyUnitH}
               boxH={enemySpriteH}
-              narrow={nE >= 3}
+              narrow={narrowAll}
+              tight={tight}
             />
           ))}
-          {briefBar && <BehaviorBriefBar top={Math.max(enemyBottom - BRIEF_BAR_H + 2, infoBottom + 2)} maxW={W - 16} />}
+          {/* 回3: 案内の1行は戦場の下の端より上に置く（低い画面で、戦場の外に出て見えなかった） */}
+          {briefBar && (
+            <BehaviorBriefBar
+              top={briefUp ? Math.max(2, enemyTop + enemySpriteH - BRIEF_BAR_H) : Math.min(H - BRIEF_BAR_H - 2, Math.max(enemyBottom - BRIEF_BAR_H + 2, infoBottom + 2))}
+              maxW={W - 16}
+            />
+          )}
           {allies.map((a, i) => (
             <AllySprite
               key={a.id}
@@ -839,7 +892,7 @@ export function Battlefield() {
         </>
       )}
       </SynergyShake>
-      <CalloutBand top={22} />
+      <CalloutBand top={CALLOUT_TOP} />
       {/* スロットの板（段階4）: 戦場の中央ではなく、下の端（手札の上）の細い帯に出す（命中の演出・敵の予告に重ならないように） */}
       <div className="pointer-events-none absolute inset-x-0 bottom-1 z-40 flex justify-center">
         <SlotOverlay />

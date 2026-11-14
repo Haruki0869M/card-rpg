@@ -10,6 +10,9 @@
 //   SIZES=390x540,360x520 で大きさを変えられる。SMALL_SCREEN_OUTPUT で写真の場所。
 // 2026-11-15: イベントの画面の下の帯「装備」「道具」（1人・1台で2人・選ぶ段・挑む段）が、選択肢・挑む段のパネルに重ならず押せ、シートが開く。
 // ④⑤（2026-11-15）: 報酬（1人・1台で2人の取り合いの順番）と転職のカード選び（背景・1回では決まらない・ボタンが押せる）も通す。
+// 狭い画面の直し 回3（2026-11-15）: 戦闘の状態の印（battleStatusPart。BATTLE_SIZES の大きさ × 敵1/2/3体 × 印0/2/4つ × カードを選んだ時）。
+//   SMALL_SCREEN_PARTS=sheets,battle で通す所を選ぶ（既定は両方）。BATTLE_SIZES の既定は 390x540,360x520,390x844,360x640。
+//   BATTLE_ONLY_MEASURE=1 は数字と写真だけ（直す前の作りで「前」の写真を撮る時。落ちても失敗にしない）。
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { chromium, startBattle } from './lib.mjs';
 
@@ -108,9 +111,281 @@ const closeStory = async (p) => {
   }
 };
 
+// ===================== 戦闘の状態の印（狭い画面の直し 回3） =====================
+// 敵1/2/3体（白狼王が先頭。大技＋BREAK の条件）× 印0/2/4つ（敵の先頭は ❄隠れている を含む。味方にも印）× カードを選んだ時。
+//   - 印が切れていない（戦場の中・ほかの層が乗っていない）。出ている印＋「＋N」= 本当の数
+//   - 「＋N」は 44px の範囲で押せて、状態の一覧が開いて閉じる。一覧の行の数 = 本当の数
+//   - 予告（大技・狙い・数字）・弱点・BREAK の条件が戦場の中に見える
+//   - 全体がはみ出さない（味方の欄・手札・「ターン終了」の帯が重ならない・横にはみ出さない）
+const BATTLE_SIZES = (process.env.BATTLE_SIZES ?? '390x540,360x520,390x844,360x640').split(',').map((s) => s.split('x').map(Number));
+const ONLY_MEASURE = process.env.BATTLE_ONLY_MEASURE === '1';
+const battleRows = [];
+if (ONLY_MEASURE) LATER.add('battle');
+
+/** 印を付ける（n = 0・2・4）。敵の先頭（白狼王）は ❄隠れている を含む。味方の1人目にも n つ、2人目は 2つ（4の時） */
+async function setBattleMarks(page, n) {
+  await page.evaluate((n) => {
+    const k = 'card-rpg/adventure';
+    const d = JSON.parse(localStorage.getItem(k));
+    const b = d.game.expeditions?.[0]?.battle ?? d.game.battle;
+    b.enemies.forEach((e, i) => {
+      e.statuses = {};
+      delete e.hidden;
+      if (n === 2) {
+        if (i === 0) {
+          e.hidden = true;
+          e.statuses = { poison: 3 };
+        } else e.statuses = { poison: 3, weak: 1 };
+      }
+      if (n === 4) {
+        e.statuses = { poison: 3, vulnerable: 2, weak: 1 };
+        if (i === 0) e.hidden = true;
+      }
+      // 5 = 印4つ＋白狼王が特殊な行動（追い立てる）を予告 → 案内の1行も出る
+      if (n === 5) {
+        e.statuses = { poison: 3, vulnerable: 2, weak: 1 };
+        if (i === 0) {
+          e.hidden = true;
+          e.intent = { ...(e.intent ?? {}), actionId: 'wkHunt' };
+        }
+      }
+    });
+    b.allies.forEach((a, i) => {
+      a.statuses = n === 0 ? {} : n === 2 ? (i === 0 ? { poison: 2, weak: 1 } : {}) : i === 0 ? { poison: 2, weak: 1, burn: 1, curse: 2 } : { vulnerable: 1, weak: 1 };
+    });
+    b.phase = 'ally';
+    localStorage.setItem(k, JSON.stringify(d));
+  }, n);
+  await page.reload();
+  await page.getByText('つづきから', { exact: true }).click();
+  await page.getByText('ターン終了').first().waitFor();
+  await wait(900);
+}
+
+/** 戦闘の画面を測る */
+const measureBattle = (page) =>
+  page.evaluate(() => {
+    const R = (el) => {
+      if (!el) return null;
+      const b = el.getBoundingClientRect();
+      return { top: Math.round(b.top), bottom: Math.round(b.bottom), left: Math.round(b.left), right: Math.round(b.right), w: Math.round(b.width), h: Math.round(b.height) };
+    };
+    // 押せない印（小さい札）も、測る間だけ当たるようにして「上に何も乗っていないか」を見る
+    const st = document.createElement('style');
+    st.textContent = '[data-status],[data-status] *{pointer-events:auto!important}';
+    document.head.appendChild(st);
+    const onTop = (el) => {
+      const b = el.getBoundingClientRect();
+      const x = b.left + b.width / 2, y = b.top + b.height / 2;
+      if (y < 0 || y > innerHeight || x < 0 || x > innerWidth) return { ok: false, by: '画面の外' };
+      const t = document.elementFromPoint(x, y);
+      const ok = !!t && (t === el || el.contains(t));
+      return { ok, panel: !ok && !!t?.closest('[data-focus-panel]'), by: ok ? '' : `${t?.tagName}.${String(t?.className ?? '').slice(0, 40)}` };
+    };
+    const field = R(document.querySelector('[data-battlefield]'));
+    const enemies = [...document.querySelectorAll('[data-enemy]:not([data-dead])')].map((en) => {
+      const info = en.querySelector('[data-enemy-info]');
+      const row = en.querySelector('[data-status-row]');
+      const chips = [...en.querySelectorAll('[data-status]')].map((c) => ({ id: c.getAttribute('data-status'), ...R(c), hit: onTop(c) }));
+      const more = en.querySelector('[data-status-more]');
+      const intent = en.querySelector('[data-intent]');
+      return {
+        uid: en.getAttribute('data-enemy'),
+        info: R(info),
+        row: row ? { mode: row.getAttribute('data-status-row'), total: Number(row.getAttribute('data-status-total')), shown: row.getAttribute('data-status-shown') === null ? null : Number(row.getAttribute('data-status-shown')), ...R(row) } : null,
+        chips,
+        more: more ? { n: Number(more.getAttribute('data-status-more')), ...R(more) } : null,
+        intent: intent ? { ...R(intent), hit: onTop(intent) } : null,
+        breakHint: R(en.querySelector('[data-break-hint]')),
+        elements: R(en.querySelector('[data-elements]')),
+      };
+    });
+    const allies = [...document.querySelectorAll('[data-ally]')].map((a) => {
+      const row = a.querySelector('[data-status-row]');
+      return {
+        id: a.getAttribute('data-ally'),
+        card: R(a),
+        row: row ? { mode: row.getAttribute('data-status-row'), total: Number(row.getAttribute('data-status-total')), shown: row.getAttribute('data-status-shown') === null ? null : Number(row.getAttribute('data-status-shown')), ...R(row) } : null,
+        chips: [...a.querySelectorAll('[data-status]')].map((c) => ({ id: c.getAttribute('data-status'), ...R(c), hit: onTop(c) })),
+        more: a.querySelector('[data-status-more]') ? Number(a.querySelector('[data-status-more]').getAttribute('data-status-more')) : null,
+      };
+    });
+    st.remove();
+    const endTurn = [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('ターン終了'));
+    const dock = R(document.querySelector('[data-battle-dock]'));
+    const cards = [...document.querySelectorAll('[data-card-index]')].map((c) => c.getBoundingClientRect().bottom);
+    return {
+      innerHeight,
+      innerWidth,
+      appH: getComputedStyle(document.documentElement).getPropertyValue('--app-h').trim(),
+      field,
+      enemies,
+      allies,
+      strip: allies.length ? { top: Math.min(...allies.map((a) => a.card.top)), bottom: Math.max(...allies.map((a) => a.card.bottom)) } : null,
+      dock,
+      handBottom: cards.length ? Math.round(Math.max(...cards)) : null,
+      endTurn: R(endTurn),
+      overflowX: document.documentElement.scrollWidth > innerWidth + 1,
+      slot: R(document.querySelector('[data-slot-overlay]')),
+      brief: R(document.querySelector('[data-behavior-brief-bar]')),
+      focusPanel: R(document.querySelector('[data-focus-panel]')),
+    };
+  });
+
+/** 測った数字を確かめる。expect = 敵ごと・味方ごとの本当の印の数 */
+function checkBattle(tag, m, expectE, expectA, { allyCovered = false } = {}) {
+  const f = m.field;
+  // カードを選んだ時は、操作パネルが戦場の下（味方の下半身まで）に重なる作り（段階A。前から）。パネルの下になった物は数えて書くだけ
+  const seen = (h) => h.ok || (allyCovered && h.panel);
+  const underPanel = [];
+  check(!!f, `${tag}: 戦場がある`, 'battle');
+  if (!f) return;
+  m.enemies.forEach((e, i) => {
+    const want = expectE[i] ?? 0;
+    const total = e.row ? e.row.total : 0;
+    check(total === want, `${tag}: 敵${i + 1} の印の数 ${total}（本当は ${want}）`, 'battle');
+    if (e.row) {
+      const shown = e.row.shown ?? e.row.total;
+      check(shown + (e.more?.n ?? 0) === want, `${tag}: 敵${i + 1} 出ている印 ${shown}＋「＋${e.more?.n ?? 0}」= ${want}`, 'battle');
+      check(e.row.bottom <= f.bottom && e.row.top >= f.top, `${tag}: 敵${i + 1} の印の行が戦場の中（行 ${e.row.top}〜${e.row.bottom}・戦場 ${f.top}〜${f.bottom}）`, 'battle');
+      if (e.row.mode === 'small') check(e.row.h <= 20, `${tag}: 敵${i + 1} の小さい札の行は1行（高さ ${e.row.h}px）`, 'battle');
+      for (const c of e.chips) {
+        if (c.hit.panel && allyCovered) underPanel.push(`敵${i + 1}の印${c.id}`);
+        check(seen(c.hit), `${tag}: 敵${i + 1} の印 ${c.id} の上に何も乗っていない${c.hit.by ? `（${c.hit.by}）` : ''}`, 'battle');
+      }
+      if (i === 0 && want >= 1) check(e.chips[0]?.id === 'hidden', `${tag}: 敵1 の先頭の印は ❄隠れている（${e.chips[0]?.id}）`, 'battle');
+    }
+    if (e.intent?.hit.panel && allyCovered) underPanel.push(`敵${i + 1}の予告の真ん中`);
+    check(!!e.intent && e.intent.bottom <= f.bottom && seen(e.intent.hit), `${tag}: 敵${i + 1} の予告が戦場の中で見える ${e.intent ? `${e.intent.top}〜${e.intent.bottom}${e.intent.hit.by ? `・上に ${e.intent.hit.by}` : ''}` : '無い'}`, 'battle');
+    if (e.breakHint) check(e.breakHint.bottom <= f.bottom, `${tag}: 敵${i + 1} の BREAK の条件が戦場の中（${e.breakHint.bottom}）`, 'battle');
+    if (e.elements) check(e.elements.bottom <= f.bottom, `${tag}: 敵${i + 1} の弱点の印が戦場の中`, 'battle');
+  });
+  m.allies.forEach((a, i) => {
+    const want = expectA[i] ?? 0;
+    const total = a.row ? a.row.total : 0;
+    check(total === want, `${tag}: 味方${i + 1} の印の数 ${total}（本当は ${want}）`, 'battle');
+    if (a.row) {
+      const shown = a.row.shown ?? a.row.total;
+      check(shown + (a.more ?? 0) === want, `${tag}: 味方${i + 1} 出ている印 ${shown}＋「＋${a.more ?? 0}」= ${want}`, 'battle');
+      check(a.row.bottom <= a.card.bottom + 1 && a.row.top >= a.card.top - 1, `${tag}: 味方${i + 1} の印が味方の欄の中`, 'battle');
+      if (!allyCovered) for (const c of a.chips) check(c.hit.ok, `${tag}: 味方${i + 1} の印 ${c.id} の上に何も乗っていない${c.hit.by ? `（${c.hit.by}）` : ''}`, 'battle');
+    }
+  });
+  if (m.brief) {
+    check(m.brief.bottom <= f.bottom && m.brief.top >= f.top, `${tag}: 特殊な行動の案内の1行が戦場の中（${m.brief.top}〜${m.brief.bottom}）`, 'battle');
+    const hitRow = m.enemies.find((e) => e.row && e.row.bottom > m.brief.top && e.row.top < m.brief.bottom && e.row.right > m.brief.left && e.row.left < m.brief.right);
+    check(!hitRow, `${tag}: 案内の1行が状態の印に重ならない`, 'battle');
+  }
+  if (underPanel.length) console.log(`   参考 ${tag}: 操作パネルの下 = ${underPanel.join('・')}（パネルの狙う敵の札に予告・❄外れる・BREAK が出る）`);
+  check(!m.overflowX, `${tag}: 横にはみ出さない`, 'battle');
+  check(!!m.endTurn && m.endTurn.bottom <= m.innerHeight + 1, `${tag}: 「ターン終了」が画面の中（下の端 ${m.endTurn?.bottom}・画面 ${m.innerHeight}）`, 'battle');
+  check(!!m.dock && !!m.endTurn && m.dock.bottom <= m.endTurn.top + 1, `${tag}: 味方の欄と手札が「ターン終了」の帯に重ならない（手札の下 ${m.dock?.bottom}・帯の上 ${m.endTurn?.top}）`, 'battle');
+}
+
+async function battleStatusPart(browser) {
+  const sets = [
+    [1, ['scourgeWhiteWolfKing']],
+    [2, ['scourgeWhiteWolfKing', 'frostWolf']],
+    [3, ['scourgeWhiteWolfKing', 'frostWolf', 'frostWolf']],
+  ];
+  for (const [W, H] of BATTLE_SIZES) {
+    console.log(`\n===== 戦闘の状態の印 ${W}×${H} =====`);
+    const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
+    page.on('pageerror', (e) => check(false, `${W}x${H} 戦闘 pageerror: ${e.message}`, 'page'));
+    for (const [nE, enemies] of sets) {
+      await startBattle(page, 2, enemies);
+      await page.getByText('ターン終了').first().waitFor();
+      for (const n of [0, 2, 4, 5]) {
+        const tag = `${W}x${H} 敵${nE}体・印${n === 5 ? '4つ＋特殊な行動' : `${n}つ`}`;
+        await setBattleMarks(page, n);
+        const expectE = enemies.map((_, i) => (n === 0 ? 0 : n === 2 ? 2 : i === 0 ? 4 : 3));
+        if (n === 5) await page.locator('[data-behavior-brief-bar],[data-behavior-brief]').first().waitFor({ timeout: 3000 }).catch(() => check(false, `${tag}: 特殊な行動の案内が出ない`, 'battle'));
+        const expectA = n === 0 ? [0, 0] : n === 2 ? [2, 0] : [4, 2];
+        const m = await measureBattle(page);
+        await page.screenshot({ path: `${OUT}/battle-${W}x${H}-e${nE}-m${n}.png` });
+        battleRows.push({ tag, field: m.field, strip: m.strip, dock: m.dock, endTurn: m.endTurn, enemies: m.enemies.map((e) => ({ info: e.info, row: e.row, more: e.more, intent: e.intent && { top: e.intent.top, bottom: e.intent.bottom } })), allies: m.allies.map((a) => ({ card: a.card, row: a.row, more: a.more })) });
+        checkBattle(tag, m, expectE, expectA);
+        // カードを選んだ時（操作パネルが味方の欄に重なる = 味方の印は数だけ見る）
+        const card = page.locator('[data-card-index][data-usable]').first();
+        if (await card.count()) {
+          const box = await card.boundingBox();
+          await page.mouse.click(box.x + 14, box.y + Math.min(70, box.height / 2));
+          await wait(400);
+          const ms = await measureBattle(page);
+          await page.screenshot({ path: `${OUT}/battle-${W}x${H}-e${nE}-m${n}-card.png` });
+          checkBattle(`${tag}・カードを選んだ時`, ms, expectE, expectA, { allyCovered: true });
+          battleRows.push({ tag: `${tag}・カードを選んだ時`, field: ms.field, focusPanel: ms.focusPanel, enemies: ms.enemies.map((e) => ({ row: e.row, intent: e.intent && { top: e.intent.top, bottom: e.intent.bottom } })) });
+        }
+        // 「＋N」を押す → 状態の一覧 → 閉じる（印4つの時）
+        if (n === 4) {
+          await page.reload();
+          await page.getByText('つづきから', { exact: true }).click();
+          await page.getByText('ターン終了').first().waitFor();
+          await wait(800);
+          const mores = page.locator('[data-status-more]');
+          const cnt = await mores.count();
+          for (let i = 0; i < cnt; i++) {
+            const mo = mores.nth(i);
+            const info = await mo.evaluate((el) => {
+              const b = el.getBoundingClientRect();
+              const cx = b.left + b.width / 2, cy = b.top + b.height / 2;
+              // 押せる範囲: 真ん中から上下左右 20px（= 44px の範囲の中）も、この札に当たるか
+              const pts = [[0, 0], [0, -20], [0, 20], [-20, 0], [20, 0]].map(([dx, dy]) => {
+                const t = document.elementFromPoint(cx + dx, cy + dy);
+                return !!t && (t === el || el.contains(t));
+              });
+              const unit = el.closest('[data-status-row]')?.getAttribute('data-status-unit');
+              const total = Number(el.closest('[data-status-row]')?.getAttribute('data-status-total'));
+              return { pts, unit, total, side: el.closest('[data-ally]') ? 'ally' : 'enemy' };
+            });
+            const label = `${tag}: ${info.side === 'ally' ? '味方' : '敵'}の「＋N」`;
+            check(info.pts[0], `${label}が押せる（真ん中に何も乗っていない）`, 'battle');
+            check(info.pts.filter(Boolean).length >= 4, `${label}の押せる範囲が 44px ほど（上下左右 20px で当たる ${info.pts.map((p) => (p ? '○' : '×')).join('')}）`, 'battle');
+            await mo.click();
+            await wait(300);
+            const open = await page.locator(`[data-status-list="${info.unit}"]`).count();
+            check(open === 1, `${label}を押すと状態の一覧が開く`, 'battle');
+            const rowsN = await page.locator('[data-status-list] [data-status-list-row]').count();
+            check(rowsN === info.total, `${label}: 一覧の行 ${rowsN}（本当は ${info.total}）`, 'battle');
+            const closeHit = await page.locator('[data-status-list-close]').evaluate((el) => {
+              const b = el.getBoundingClientRect();
+              const t = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+              return { ok: !!t && (t === el || el.contains(t)), h: Math.round(b.height), inView: b.bottom <= innerHeight };
+            }).catch(() => null);
+            check(!!closeHit?.ok && closeHit.inView && closeHit.h >= 44, `${label}: 一覧の「閉じる」が押せる ${JSON.stringify(closeHit)}`, 'battle');
+            if (i === 0 || info.side === 'ally') await page.screenshot({ path: `${OUT}/battle-${W}x${H}-e${nE}-list-${info.side}.png` });
+            const sel0 = await page.locator('[data-focus-panel]').count();
+            await page.locator('[data-status-list-close]').click();
+            await wait(300);
+            check(!(await page.locator('[data-status-list]').count()), `${label}: 「閉じる」で閉じる`, 'battle');
+            check((await page.locator('[data-focus-panel]').count()) === sel0, `${label}: 一覧を開いて閉じても、カードの選び方は変わらない`, 'battle');
+          }
+          check(cnt > 0, `${tag}: 「＋N」の札がある（${cnt}個）`, 'battle');
+          // 敵の長押しの説明に、同じ一覧
+          const en = page.locator('[data-enemy]:not([data-dead])').first();
+          const eb = await en.boundingBox();
+          await page.mouse.move(eb.x + eb.width / 2, eb.y + 20);
+          await page.mouse.down();
+          await wait(700);
+          await page.mouse.up();
+          await wait(300);
+          const dl = await page.locator('[data-detail-popup] [data-detail-status-list] [data-status-list-row]').count();
+          check(dl === expectE[0], `${tag}: 敵の長押しの説明に状態の一覧（${dl}行・本当は ${expectE[0]}）`, 'battle');
+          await page.screenshot({ path: `${OUT}/battle-${W}x${H}-e${nE}-detail.png` });
+          await page.getByRole('button', { name: '詳細を閉じる' }).click().catch(() => {});
+          await wait(300);
+        }
+      }
+    }
+    await page.close();
+  }
+  writeFileSync(`${OUT}/battle-summary.json`, JSON.stringify(battleRows, null, 1));
+}
+
+const PARTS = new Set((process.env.SMALL_SCREEN_PARTS ?? 'sheets,battle').split(','));
 const browser = await chromium.launch();
 try {
-  for (const [W, H] of SIZES) {
+  for (const [W, H] of PARTS.has('sheets') ? SIZES : []) {
     console.log(`\n===== ${W}×${H} =====`);
     const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
     page.on('pageerror', (e) => check(false, `${W}x${H} pageerror: ${e.message}`, 'page'));
@@ -452,6 +727,7 @@ try {
     }
     await page.close();
   }
+  if (PARTS.has('battle')) await battleStatusPart(browser);
 } catch (e) {
   console.log('ERROR', e);
   problems.push(String(e).split('\n')[0]);
