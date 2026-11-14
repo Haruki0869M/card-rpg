@@ -33,6 +33,7 @@ import { TurnCutin } from './components/ui/TurnCutin';
 import { findAlly } from './engine';
 import { useBackButton } from './hooks/useBackButton';
 import { useAppHeight } from './hooks/useAppHeight';
+import { useLowScreen } from './hooks/useLowScreen';
 import { LAYER } from './components/ui/layers';
 import { HelpScreen } from './components/help/HelpScreen';
 import { useHelp } from './store/help';
@@ -242,6 +243,8 @@ export default function App() {
   useKeyboard();
   // 実機の不具合②: 見えている高さ（visualViewport）を --app-h に入れる（LINE 内ブラウザで下が切れないように）
   useAppHeight();
+  // 狭い画面 回0: 見えている高さが 640px 未満（672px 以上で戻る）の時は、いちばん外に data-low の印（低い画面の形に切り替える）
+  const low = useLowScreen();
 
   // 招待のリンク（?room=合言葉）で開いたら「部屋に参加」へ
   useEffect(() => {
@@ -265,7 +268,7 @@ export default function App() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="flex w-full justify-center bg-[#050407]" style={{ height: 'var(--app-h, 100dvh)' }} data-app-root>
+      <div className="flex w-full justify-center bg-[#050407]" style={{ height: 'var(--app-h, 100dvh)' }} data-app-root data-low={low ? '' : undefined}>
         <div className="relative flex h-full w-full max-w-[480px] flex-col overflow-hidden">
           {!moving && screen === 'game' && <SceneTabs />}
           <div className="relative flex min-h-0 w-full flex-1 justify-center">
