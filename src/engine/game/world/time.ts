@@ -20,3 +20,6 @@ export function turnsUntilNightChange(worldTurn: number): { night: boolean; turn
 
 /** 何日目か */
 export const dayOf = (worldTurn: number) => Math.floor((worldTurn - 1) / (BALANCE.turnsPerTimeOfDay * TIMES.length)) + 1;
+
+/** その日の最後のワールドターン（夜の最後。次のターンが次の朝）。温泉の効き目の終わり（シナリオ2の作り直し §8-2） */
+export const lastTurnOfDay = (worldTurn: number) => dayOf(worldTurn) * BALANCE.turnsPerTimeOfDay * TIMES.length;

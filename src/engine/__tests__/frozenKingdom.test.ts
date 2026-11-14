@@ -16,8 +16,8 @@ describe('凍てつく王国', () => {
   it('世界マップから始まり、町・ダンジョン・依頼が全部そろっている', () => {
     const g = newWorld();
     const w = g.world!;
-    expect(w.width).toBe(8);
-    expect(w.height).toBe(35);
+    expect(w.width).toBe(15);
+    expect(w.height).toBe(42);
     const sc = getScenario('frozenKingdom');
     for (const f of sc.map!.features) {
       const t = w.tiles.find((x) => x.f?.kind === f.kind && x.f.id === f.id);
