@@ -206,7 +206,15 @@ export function HeroPiece({ hero, size: s, ringColor, active, hopping, stepKey, 
               <path d="M4 4 H18 V11 Q18 17.5 11 21.5 Q4 17.5 4 11 Z" fill="#1d2440" />
             </>
           )}
-          {icon && <image href={icon} x="4" y="3.5" width="14" height="14" preserveAspectRatio="xMidYMid meet" />}
+          {/* 武器の絵は、銘板の内側（紺色の所）の形で切り抜き、少し小さめに置く（枠にはみ出さないように） */}
+          <clipPath id={`inner${uid}`}>
+            <path d={plateArt ? 'M3 4 H18.8 V12 Q18.8 18 10.9 21.4 Q3 18 3 12 Z' : 'M4.6 4.6 H17.4 V11 Q17.4 17 11 20.8 Q4.6 17 4.6 11 Z'} />
+          </clipPath>
+          {icon && (
+            <g clipPath={`url(#inner${uid})`}>
+              <image href={icon} x={plateArt ? 5.4 : 5.5} y={plateArt ? 5 : 5} width="11" height="11" preserveAspectRatio="xMidYMid meet" />
+            </g>
+          )}
         </svg>
       </span>
       {/* カツンと置いた時の小さな土ぼこり */}
