@@ -88,6 +88,12 @@ export interface LaneDef {
   ambush?: number;
   /** この帯の宝箱の良さ: 「奥の地域」の段を何段先にするか（省略 0） */
   chestDepth?: number;
+  /**
+   * この帯の寒さ・暑さの倍率（シナリオ2の作り直し・docs/tasks/scenario2-rework-plan.md §2-1。省略 1）。
+   * 地形か地域の寒さ・暑さがあるマスだけに掛ける（ダメージの最大HPの割合 × これ）。0 以下ならその帯では寒さ・暑さを受けない。
+   * 広い地図（isWideMap）の時だけ使う。前の幅の地図（古い保存）では掛けない
+   */
+  climate?: number;
 }
 
 /**
@@ -179,6 +185,13 @@ export interface ScenarioMapDef {
   /** randomDungeon は、配列なら地域の randomDungeons の1つずつの帯（段階7a: 西と東に1つずつ） */
   /** chest は宝箱を多く置く帯（3つの道・2026-11-14） */
   prefer?: { shrine?: string; herb?: string; randomDungeon?: string | string[]; altar?: string; tower?: string[]; chest?: string };
+  /** 地域の herbs の数だけ置く「回復のマス」のイベントの id（シナリオ2の作り直し §2-1。省略は薬草の群生地 herbField） */
+  herbEvent?: string;
+  /**
+   * このシナリオに出る災厄の id の一覧（シナリオ2の作り直し §2-2）。省略は今の全部（SCOURGES.all = シナリオ1の5体）。
+   * 選ぶ時は SCOURGES.all の順のまま、一覧に無い物を除くだけ（シナリオ1の候補と乱数の順番は変わらない）。災厄は広い地図だけに出る
+   */
+  scourges?: string[];
 }
 
 export interface ScenarioStory {
@@ -293,7 +306,10 @@ export interface ScourgeDef {
   /** 生きている間の悪さ。shopPrice = 町の店の値段 +N% / corruptionPerTurn = 世界マップの番の侵食度 +N% / campHeal = 野営のHPの回復の倍率 / nightLevel = 夜の敵のレベル +N /
    *  battleBurn = 戦闘の開始時、味方全員に「火傷」N（段階7c: 業火の魔人） */
   curse: { shopPrice?: number; corruptionPerTurn?: number; campHeal?: number; nightLevel?: number; battleBurn?: number };
-  /** 札に出す悪さの短い文（店+25%）と、知らせ・説明の文 */
+  /**
+   * 札に出す悪さの短い文（店+25%）と、知らせ・説明の文。
+   * 文の中の「侵食度」と短い「侵食」（TERMS.corruption）は、画面に出す時にそのシナリオの悪化の名前（corruptionName。シナリオ2は「冬の深さ」）に置き換わる（engine の scourgeText）
+   */
   curseShort: string;
   curseText: string;
   /**
