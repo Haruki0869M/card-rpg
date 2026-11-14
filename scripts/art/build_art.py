@@ -190,18 +190,18 @@ FACES = {
     ('hexer', 'male'): (0.471, 0.144, 0.15), ('hexer', 'female'): (0.414, 0.152, 0.15),
     ('phantomThief', 'female'): (0.50, 0.128, 0.16),
     ('grandThief', 'male'): (0.488, 0.132, 0.15), ('grandThief', 'female'): (0.465, 0.148, 0.15),
+    ('necromancer', 'male'): (0.450, 0.215, 0.15), ('necromancer', 'female'): (0.479, 0.206, 0.15),
+    ('timeMage', 'male'): (0.488, 0.182, 0.15), ('bulwark', 'male'): (0.513, 0.109, 0.15),
     ('greatSage', 'male'): (0.475, 0.167, 0.15), ('greatSage', 'female'): (0.463, 0.159, 0.15),
     ('hadesLord', 'male'): (0.442, 0.148, 0.15), ('hadesLord', 'female'): (0.492, 0.155, 0.15),
 }
 # 帽子・冠・鎌などで自動の位置がずれる職は、目で確認して決めた値（J4）
 FACES.update({
-    ('necromancer', 'female'): (0.421, 0.153, 0.156), ('necromancer', 'male'): (0.571, 0.139, 0.155),
     # 区切りF（槍の先が頭より上にあるため）
-    ('bulwark', 'male'): (0.466, 0.158, 0.156), ('bulwark', 'female'): (0.485, 0.118, 0.156),
 })
 # 穴埋め（fill_holes）をしない元画像。重装衛士は、細い槍を戻すため切り抜きを直している（.cut の絵を
 # scripts/art/fix_thin_cut.py で作り直し済み）。槍と足の間の背景が穴として埋まるので、穴埋めをしない
-NO_FILL_HOLES = {'bulwark-female', 'bulwark-male', 'lancer-male', 'lancer-female', 'archer-male', 'archer-female', 'tamer-male', 'tamer-female', 'archmage-male', 'archmage-female', 'hexer-male', 'hexer-female', 'brawler-male', 'brawler-female', 'phantomThief-male', 'phantomThief-female', 'phantomTamer-male', 'phantomTamer-female', 'shadow-female', 'dragoon-male', 'dragoon-female', 'holyKing-male', 'holyKing-female', 'beastMaster-male', 'beastMaster-female', 'bowSaint-male', 'bowSaint-female', 'greatSage-male', 'hadesLord-male', 'hadesLord-female', 'grandThief-male', 'grandThief-female', 'fistKing-male', 'fistKing-female', 'ninja-female', 'phantomKing-male', 'phantomKing-female'}
+NO_FILL_HOLES = {'bulwark-female', 'bulwark-male', 'lancer-male', 'lancer-female', 'archer-male', 'archer-female', 'tamer-male', 'tamer-female', 'archmage-male', 'archmage-female', 'hexer-male', 'hexer-female', 'brawler-male', 'brawler-female', 'phantomThief-male', 'phantomThief-female', 'phantomTamer-male', 'phantomTamer-female', 'shadow-female', 'dragoon-male', 'dragoon-female', 'holyKing-male', 'holyKing-female', 'beastMaster-male', 'beastMaster-female', 'bowSaint-male', 'bowSaint-female', 'greatSage-male', 'hadesLord-male', 'hadesLord-female', 'grandThief-male', 'grandThief-female', 'fistKing-male', 'fistKing-female', 'ninja-female', 'phantomKing-male', 'phantomKing-female', 'necromancer-male', 'necromancer-female', 'fistSaint-male', 'fistSaint-female', 'gambler-male', 'gambler-female', 'machinist-male', 'machinist-female', 'petTrainer-male', 'petTrainer-female', 'timeMage-male', 'timeMage-female', 'bard-female', 'dragonVein-male', 'dragonVein-female'}
 # 表に無い職は、この値（x=0.5 は頭の位置を自動で探す）
 FACE_DEFAULT = (0.5, 0.085, 0.17)
 
