@@ -647,6 +647,8 @@ export function WorldMap({
 
   // 回1の追加: 施設の名前の札（町・ダンジョン・塔・神殿・祭壇・祠。宝箱やイベントの印には出さない）
   const labelFont = Math.min(14, Math.max(12, Math.round(R * 0.4)));
+  const heroKey = Object.values(w.pos).join(',');
+  const heroTiles = useMemo(() => new Set(heroKey.split(',').map(Number)), [heroKey]);
   const labels = useMemo(() => {
     const out: PlaceLabel[] = [];
     w.tiles.forEach((t, i) => {
@@ -662,10 +664,11 @@ export function WorldMap({
       else if (f.kind === 'shrine') text = SHRINES.tryGet(f.id)?.name;
       if (!text) return;
       const { x, y } = geom.center(i);
-      out.push({ tile: i, text, rank: i === goalTile ? 0 : f.kind === 'town' ? 1 : f.kind === 'dungeon' ? 2 : 3, x, y: y + geom.R * 0.62 });
+      // キャラがそのマスにいる時は、駒の台座の下まで札を下げる（札は駒より手前に描くので、台座を隠さないように）
+      out.push({ tile: i, text, rank: i === goalTile ? 0 : f.kind === 'town' ? 1 : f.kind === 'dungeon' ? 2 : 3, x, y: y + geom.R * (heroTiles.has(i) ? 0.98 : 0.62) });
     });
     return placeLabels(out, labelFont, compact);
-  }, [w, geom, goalTile, labelFont, compact]);
+  }, [w, geom, goalTile, labelFont, compact, heroTiles]);
 
   // タップ: 押した所に見えている「上の面」を優先する（手前の行から調べる。高いマスが奥のマスに重なって見える所でも、見えている方を選ぶ）。
   // どの上の面でもない所（崖の側面など）は、今までどおり一番近いマスの中心
@@ -830,7 +833,8 @@ export function WorldMap({
                       <polygon points={hexPoints(x, y, R * TOP_SCALE - 2)} fill="none" stroke="#fff6c8" strokeWidth={1.5} />
                     </>
                   ) : (
-                    <polygon points={hexPoints(x, y, R * TOP_SCALE - 2)} fill="rgba(255,240,180,.2)" stroke="rgba(255,214,110,.85)" strokeWidth={1.8} />
+                    // 街道のマスは、白っぽい塗りを薄くする（枠が出ても、街道ボーナスの乗る道を目でたどれるように）
+                    <polygon points={hexPoints(x, y, R * TOP_SCALE - 2)} fill={links.has(i) ? 'rgba(255,240,180,.06)' : 'rgba(255,240,180,.2)'} stroke="rgba(255,214,110,.85)" strokeWidth={1.8} data-reach-road={links.has(i) ? '' : undefined} />
                   )}
                   {/* 数字の下敷き（木・テント・建物と重なっても読めるように）。縮小した時は数字を出さない（マスより大きくなるため） */}
                   {!compact && <circle cx={x} cy={y + R * 0.62 * GROUND_K - Math.max(12, R * 0.42) * 0.36} r={Math.max(12, R * 0.42) * 0.72} fill="rgba(28,18,8,.78)" stroke="rgba(255,214,110,.9)" strokeWidth={1.2} />}
@@ -930,8 +934,9 @@ export function WorldMap({
             );
           })}
         </svg>
-        {/* 回1の追加: 施設の名前の札と、届く時の「入れる」（夜でも読めるように、時間帯の色より上） */}
-        <svg width={W} height={H} className="pointer-events-none absolute inset-0 block" data-place-labels>
+        {/* 回1の追加: 施設の名前の札と、届く時の「入れる」（夜でも読めるように、時間帯の色より上）。
+            2026-11-14: 駒より手前に描く（町の上にキャラがいると、台座が名前の真ん中を隠していた） */}
+        <svg width={W} height={H} className="pointer-events-none absolute inset-0 block" style={{ zIndex: depthZ(w.height + 1, 0) }} data-place-labels>
           {labels.map((l) => {
             const t = w.tiles[l.tile];
             const dim = (t.f?.used && t.f.kind !== 'town') || (t.f?.kind === 'town' && w.fallenTowns.includes(t.f.id));

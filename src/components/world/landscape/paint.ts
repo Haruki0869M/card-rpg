@@ -80,6 +80,62 @@ function flowPath(ctx: CanvasRenderingContext2D, v: V[], cx: number, cy: number,
 /** 道のふちと、模様の絵が無い時の土の色 */
 const ROAD_EDGE = '#6e5533';
 const ROAD_SOIL = '#c6a272';
+/** 路肩に混ぜる土の色 */
+const ROAD_SHOULDER = '#5e4526';
+/** 路肩に草を描く地形（草の生える所） */
+const ROAD_GRASSY = new Set(['plains', 'forest', 'hills', 'swamp']);
+/** 道の線（2次のベジェ曲線）: a → b。c は曲げる点 */
+interface RoadSeg {
+  a: V;
+  c: V;
+  b: V;
+}
+const quadAt = (s: RoadSeg, u: number): V => {
+  const m = 1 - u;
+  return [m * m * s.a[0] + 2 * m * u * s.c[0] + u * u * s.b[0], m * m * s.a[1] + 2 * m * u * s.c[1] + u * u * s.b[1]];
+};
+/** 進む向き（長さ1） */
+const quadTangent = (s: RoadSeg, u: number): V => {
+  const m = 1 - u;
+  const dx = 2 * m * (s.c[0] - s.a[0]) + 2 * u * (s.b[0] - s.c[0]);
+  const dy = 2 * m * (s.c[1] - s.a[1]) + 2 * u * (s.b[1] - s.c[1]);
+  const len = Math.hypot(dx, dy) || 1;
+  return [dx / len, dy / len];
+};
+/** 道に直角の向き（長さ1） */
+const quadNormal = (s: RoadSeg, u: number): V => {
+  const [tx, ty] = quadTangent(s, u);
+  return [-ty, tx];
+};
+/** 幅が変わる帯（行き止まりの先細り）。width(u) = その場所の幅 */
+function ribbon(ctx: CanvasRenderingContext2D, s: RoadSeg, width: (u: number) => number) {
+  const N = 12;
+  const left: V[] = [], right: V[] = [];
+  for (let q = 0; q <= N; q++) {
+    const u = q / N;
+    const [px, py] = quadAt(s, u);
+    const [nx, ny] = quadNormal(s, u);
+    const h = width(u) / 2;
+    left.push([px + nx * h, py + ny * h]);
+    right.push([px - nx * h, py - ny * h]);
+  }
+  ctx.beginPath();
+  left.forEach((q, n) => (n ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])));
+  right.reverse().forEach((q) => ctx.lineTo(q[0], q[1]));
+  ctx.closePath();
+}
+/** 2つの色（#rrggbb）を混ぜる。k = b の割合。読めない色は b */
+const mixCache = new Map<string, string>();
+function mixHex(a: string, b: string, k: number): string {
+  const key = `${a}|${b}|${k.toFixed(2)}`;
+  let out = mixCache.get(key);
+  if (out) return out;
+  const rgb = (h: string) => (/^#[0-9a-f]{6}$/i.test(h) ? [1, 3, 5].map((n) => parseInt(h.slice(n, n + 2), 16)) : undefined);
+  const pa = rgb(a), pb = rgb(b);
+  out = pa && pb ? `rgb(${pa.map((x, n) => Math.round(x + (pb[n] - x) * k)).join(',')})` : b;
+  mixCache.set(key, out);
+  return out;
+}
 /** 土の道の模様（terrain/road-path。256px・つなぎ目なし。わだちが縦（上下）に走る）。描く ctx ごとに1つ作り置く */
 const roadPats = new WeakMap<object, CanvasPattern | null>();
 function roadPattern(ctx: CanvasRenderingContext2D, R: number, angle: number, cx: number, cy: number): CanvasPattern | null {
@@ -100,10 +156,13 @@ function roadPattern(ctx: CanvasRenderingContext2D, R: number, angle: number, cx
 const patCache = new Map<string, CanvasPattern | null>();
 let patR = 0;
 
+/** 地面の絵を借りる地形（湖の氷 = 氷原の絵を、明るい色の上に敷く。違いは paintTile の「氷の照り」で出す） */
+const TERRAIN_ART: Record<string, string> = { lakeIce: 'ice' };
+
 /** 地形の模様（描いた絵を R*4 の大きさで敷く）。絵がまだ読み込まれていなければ色だけ */
 function terrainPattern(ctx: CanvasRenderingContext2D, id: string, R: number, cache: Map<string, CanvasPattern | null>): CanvasPattern | null {
   if (cache.has(id)) return cache.get(id)!;
-  const img = loadedImage(artImage(`terrain/${id}`));
+  const img = loadedImage(artImage(`terrain/${TERRAIN_ART[id] ?? id}`));
   let p: CanvasPattern | null = null;
   if (img) {
     p = ctx.createPattern(img, 'repeat');
@@ -287,6 +346,40 @@ export function paintRange(ctx: CanvasRenderingContext2D, inp: PaintInput, y0: n
     ctx.lineCap = 'round';
     ctx.stroke();
 
+    // 湖の氷（シナリオ2。滑って速く進む道）: つるつるの照り（どのマスも同じ向きの白い筋）と、細いひび
+    if (t.t === 'lakeIce') {
+      const hsh = (s: number) => hash01(i, s);
+      ctx.lineCap = 'round';
+      // 白い照り: 右上がりの筋を2〜3本（長さと場所だけマスごとに変える）
+      const n = 2 + (hsh(130) < 0.5 ? 1 : 0);
+      for (let q = 0; q < n; q++) {
+        const sx = cx + (hash01(i * 4 + q, 131) - 0.5) * R * 0.9;
+        const sy = cy + (hash01(i * 4 + q, 132) - 0.5) * R * 0.7;
+        const len = R * (0.28 + hash01(i * 4 + q, 133) * 0.3);
+        ctx.beginPath();
+        ctx.moveTo(sx - len * 0.5, sy + len * 0.2);
+        ctx.lineTo(sx + len * 0.5, sy - len * 0.2);
+        ctx.strokeStyle = q === 0 ? 'rgba(255,255,255,.75)' : 'rgba(240,250,255,.45)';
+        ctx.lineWidth = Math.max(1, R * (q === 0 ? 0.06 : 0.035));
+        ctx.stroke();
+      }
+      // 細いひび（3マスに1つくらい。枝が1本）
+      if (hsh(134) < 0.36) {
+        const sx = cx + (hsh(135) - 0.5) * R * 0.7, sy = cy + (hsh(136) - 0.3) * R * 0.5;
+        const ang = hsh(137) * Math.PI;
+        const dx = Math.cos(ang) * R * 0.26, dy = Math.sin(ang) * R * 0.14;
+        ctx.beginPath();
+        ctx.moveTo(sx - dx, sy - dy);
+        ctx.lineTo(sx + dx * 0.1, sy + dy * 0.3);
+        ctx.lineTo(sx + dx, sy + dy);
+        ctx.moveTo(sx + dx * 0.1, sy + dy * 0.3);
+        ctx.lineTo(sx + dx * 0.1 - dy * 0.9, sy + dy * 0.3 + dx * 0.35);
+        ctx.strokeStyle = 'rgba(52,96,132,.55)';
+        ctx.lineWidth = Math.max(0.7, R * 0.025);
+        ctx.stroke();
+      }
+    }
+
     // 川（見た目だけ）: 墨のふち → 水の色 → 光の線
     const rk = rivers.get(i);
     const wob = (hash01(i, 95) - 0.5) * R * 0.3;
@@ -322,37 +415,156 @@ export function paintRange(ctx: CanvasRenderingContext2D, inp: PaintInput, y0: n
         }
       }
     }
-    // 道（2026-11-14 直し: ふち → 土の道の模様の絵。真ん中の点線はやめた）
-    // ふちは不透明の色で、マスの辺の真ん中で平らに切る（butt）。前は半透明のふちを丸く重ねていたので、
-    // マスのつなぎ目に濃い丸い継ぎ目が出ていた
+    // 街道（2026-11-14 オーナーの依頼で作り直し。「細い紐」に見えていた）:
+    //   ① 地面を少し明るい土の色に ② 路肩（地面の色に土を混ぜた、幅の広い2本）③ 墨のふち ④ 土の本体（模様の絵）⑤ 敷石・小石・草
+    //   行き止まりは先細りで草地に消える。町・施設のマスは、足元に小さな広場を敷く。分かれ道は真ん中を丸くつなぐ。
+    // 色は不透明で重ねる（半透明を重ねると、つなぎ目に濃い継ぎ目が出る）。マスの辺の真ん中では平らに切る（butt）
     const ks = links.get(i);
     if (ks) {
       const ww = wob * 0.6;
-      ctx.lineCap = 'butt';
-      flowPath(ctx, v, cx, cy, ks, ww);
-      ctx.strokeStyle = ROAD_EDGE;
-      ctx.lineWidth = R * 0.32;
-      ctx.stroke();
-      if (ks.length !== 2) {
-        // 行き止まり・分かれ道の真ん中は丸く
+      const xs = v.map((q) => q[0]), ys = v.map((q) => q[1]);
+      const hx = (Math.max(...xs) - Math.min(...xs)) / 2, hy = (Math.max(...ys) - Math.min(...ys)) / 2;
+      const ky = hy / R; // 地面の縦のつぶれ
+      const grassy = ROAD_GRASSY.has(id);
+      const base = getTerrain(id).color;
+      // ① 人が行き交うマスの地面: 真ん中をほんのり明るい土・黄緑に
+      const tint = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+      tint.addColorStop(0, grassy ? 'rgba(226,214,138,.34)' : 'rgba(222,204,160,.26)');
+      tint.addColorStop(0.55, grassy ? 'rgba(214,206,130,.2)' : 'rgba(214,196,150,.14)');
+      tint.addColorStop(1, 'rgba(214,200,130,0)');
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(hx * 0.98, hy * 0.92);
+      ctx.fillStyle = tint;
+      ctx.beginPath();
+      ctx.arc(0, 0, 1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      const place = !!t.f;
+      const taper = ks.length === 1 && !place;
+      const segs: RoadSeg[] = ks.length === 2
+        ? [{ a: mid(v, ks[0]), c: [cx + ww, cy + ww * 0.4], b: mid(v, ks[1]) }]
+        : ks.map((k) => {
+            const m = mid(v, k);
+            return { a: m, c: [(m[0] + cx) / 2 + ww * 0.5, (m[1] + cy) / 2] as V, b: [cx, cy] as V };
+          });
+      // 広場（町・施設の足元）と、分かれ道の真ん中の丸
+      const hubR = place ? R * 0.6 : ks.length !== 2 ? R * 0.27 : 0;
+      const hubK = place ? ky : 0.86;
+      const hubY = cy + (place ? R * 0.1 * ky : 0);
+      /** 先細りの幅（u = 0 がマスの辺、1 が真ん中） */
+      const thin = (wd: number) => (u: number) => wd * Math.max(0, 1 - Math.pow(u, 2.2)) * (0.55 + 0.45 * (1 - u));
+      /** 道の線を1本描く（先細りの時は帯を塗る） */
+      const line = (sg: RoadSeg, wd: number) => {
+        if (taper) {
+          ribbon(ctx, sg, thin(wd));
+          ctx.fill();
+          return;
+        }
+        ctx.lineWidth = wd;
         ctx.beginPath();
-        ctx.arc(cx, cy, R * 0.16, 0, Math.PI * 2);
-        ctx.fillStyle = ROAD_EDGE;
-        ctx.fill();
-      }
-      // 土: 下の色を敷いてから、模様の絵を道の向きに合わせて重ねる（絵のわだちが道に沿うように）
-      ctx.lineCap = 'round';
-      ctx.lineWidth = R * 0.24;
-      const spokes = ks.length === 2 ? [ks] : ks.map((k) => [k]);
-      for (const sp of spokes) {
-        flowPath(ctx, v, cx, cy, sp, ww);
-        ctx.strokeStyle = ROAD_SOIL;
+        ctx.moveTo(sg.a[0], sg.a[1]);
+        ctx.quadraticCurveTo(sg.c[0], sg.c[1], sg.b[0], sg.b[1]);
         ctx.stroke();
-        const a = mid(v, sp[0]);
-        const b = sp.length === 2 ? mid(v, sp[1]) : ([cx, cy] as V);
-        const p = roadPattern(ctx, R, Math.atan2(b[1] - a[1], b[0] - a[0]), cx, cy);
-        if (p) {
-          ctx.strokeStyle = p;
+      };
+      const hub = (grow: number) => {
+        if (!hubR) return;
+        ctx.beginPath();
+        ctx.ellipse(cx, hubY, hubR + grow, (hubR + grow) * hubK, 0, 0, Math.PI * 2);
+        ctx.fill();
+      };
+      /** 1つの層: 道の線（幅 wd）と、真ん中の丸（半径を grow だけ広げる）を同じ色で塗る */
+      const layer = (wd: number, grow: number, fill: string) => {
+        ctx.fillStyle = fill;
+        ctx.strokeStyle = fill;
+        for (const sg of segs) line(sg, wd);
+        hub(grow);
+      };
+      ctx.lineCap = 'butt';
+      ctx.lineJoin = 'round';
+      // ② 路肩: 地面の色に土の色を混ぜる（外は薄く、内は濃く。草地と道の境目がぱきっと割れない）
+      layer(R * 0.8, R * 0.17, mixHex(base, ROAD_SHOULDER, 0.2));
+      layer(R * 0.66, R * 0.1, mixHex(base, ROAD_SHOULDER, 0.42));
+      // ③ 墨のふち
+      layer(R * 0.53, R * 0.035, ROAD_EDGE);
+      // ④ 土の本体: 下の色を敷いてから、模様の絵（わだち）を道の向きに合わせて重ねる
+      layer(R * 0.46, 0, ROAD_SOIL);
+      for (const sg of segs) {
+        const pat = roadPattern(ctx, R, Math.atan2(sg.b[1] - sg.a[1], sg.b[0] - sg.a[0]), cx, cy);
+        if (!pat) break;
+        ctx.strokeStyle = pat;
+        ctx.fillStyle = pat;
+        line(sg, R * 0.46);
+      }
+      if (hubR) {
+        const pat = roadPattern(ctx, R, Math.PI / 2, cx, cy);
+        if (pat) {
+          ctx.fillStyle = pat;
+          hub(0);
+        }
+      }
+      // ⑤ 敷石・小石（道の両はしに沿って）と、路肩の草。場所はマスの番号から決める（毎回同じ）
+      const ink = 'rgba(58,40,20,.75)';
+      segs.forEach((sg, si) => {
+        const n = ks.length === 2 ? 7 : 4;
+        for (let q = 0; q < n; q++) {
+          const hsh = (salt: number) => hash01(i * 64 + si * 8 + q, salt);
+          const u = (q + 0.2 + hsh(110) * 0.6) / n;
+          if (taper && u > 0.62) continue;
+          const [px, py] = quadAt(sg, u);
+          const [nx, ny] = quadNormal(sg, u);
+          const side = q % 2 ? 1 : -1;
+          const off = R * (0.13 + hsh(111) * 0.07) * side;
+          const rr = R * (0.028 + hsh(112) * 0.03);
+          ctx.lineWidth = Math.max(0.6, R * 0.022);
+          ctx.beginPath();
+          ctx.ellipse(px + nx * off, py + ny * off, rr * 1.35, rr * 0.9, hsh(113) * Math.PI, 0, Math.PI * 2);
+          ctx.fillStyle = hsh(114) < 0.5 ? '#e6d6b0' : hsh(114) < 0.8 ? '#b8ab94' : '#9c8a6c';
+          ctx.fill();
+          ctx.strokeStyle = ink;
+          ctx.stroke();
+          // 路肩の草（草の生える地形だけ。3本の短い線）
+          if (grassy && hsh(115) < 0.55) {
+            const gx = px - nx * R * 0.29 * side, gy = py - ny * R * 0.29 * side;
+            ctx.strokeStyle = hsh(116) < 0.5 ? '#4f7a34' : '#6d9440';
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            for (const dx of [-0.045, 0, 0.045]) {
+              ctx.moveTo(gx + dx * R * 0.6, gy);
+              ctx.lineTo(gx + dx * R, gy - R * (0.075 + (dx === 0 ? 0.03 : 0)));
+            }
+            ctx.stroke();
+            ctx.lineCap = 'butt';
+          }
+        }
+      });
+      if (taper) {
+        // 行き止まり: 道の先に、踏み跡の土が点々と残って草地に消える
+        const sg = segs[0];
+        const [tx, ty] = quadTangent(sg, 1);
+        for (let q = 0; q < 4; q++) {
+          const u = 0.8 + q * 0.11;
+          const [px, py] = quadAt(sg, Math.min(1, u));
+          const ext = Math.max(0, u - 1) * R * 0.9;
+          ctx.beginPath();
+          ctx.ellipse(px + tx * ext + (hash01(i * 8 + q, 117) - 0.5) * R * 0.14, py + ty * ext + (hash01(i * 8 + q, 118) - 0.5) * R * 0.08, R * (0.07 - q * 0.012), R * (0.045 - q * 0.008), 0, 0, Math.PI * 2);
+          ctx.fillStyle = mixHex(base, ROAD_SOIL, 0.75 - q * 0.15);
+          ctx.fill();
+        }
+      }
+      if (place) {
+        // 広場の敷石（ふちに沿って丸く並べる）
+        ctx.lineWidth = Math.max(0.6, R * 0.022);
+        for (let q = 0; q < 10; q++) {
+          const ang = (q / 10) * Math.PI * 2 + hash01(i, 119) * 0.6;
+          const rad = hubR * (0.8 + hash01(i * 16 + q, 120) * 0.1);
+          const rr = R * (0.034 + hash01(i * 16 + q, 121) * 0.022);
+          ctx.beginPath();
+          ctx.ellipse(cx + Math.cos(ang) * rad, hubY + Math.sin(ang) * rad * ky, rr * 1.4, rr * 0.9, ang, 0, Math.PI * 2);
+          ctx.fillStyle = hash01(i * 16 + q, 122) < 0.6 ? '#e6d6b0' : '#b8ab94';
+          ctx.fill();
+          ctx.strokeStyle = ink;
           ctx.stroke();
         }
       }
