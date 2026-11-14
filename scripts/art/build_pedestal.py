@@ -54,10 +54,39 @@ band = cv2.morphologyEx(band.astype(np.uint8) * 255, cv2.MORPH_CLOSE, np.ones((7
 band = cv2.morphologyEx(band, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
 band = largest(band > 128)
 # 広げた分を、台座の中・金のふちの外に戻す
-gold = (rgb[..., 0] - rgb[..., 2] > 50) & (mx > 110)
+gold = (rgb[..., 0] - rgb[..., 2] > 50) & (mx > 110) & (rgb[..., 1] > rgb[..., 0] * 0.66)  # 木（緑が少ない赤茶）は入れない
 band = band & (rgba[..., 3] > 200) & ~gold
 band = np.where(band, 255, 0).astype(np.uint8)
 band = cv2.GaussianBlur(band, (3, 3), 0)
+# 金のふちの形（段の金属の色に染めるため）
+rim = cv2.dilate(np.where(gold & (rgba[..., 3] > 128), 255, 0).astype(np.uint8), np.ones((3, 3), np.uint8))
+rim = cv2.GaussianBlur(rim, (3, 3), 0)
+
+# 台座を高くする（2026-11-15 オーナーの依頼）: 側面の帯だけを、列ごとに縦に引きのばす（上面のだ円の形は変えない）
+TALL = float(os.environ.get('TALL', '1.7'))
+cols = np.arange(W)
+has = band.max(0) > 128
+tt = np.array([np.argmax(band[:, x] > 128) if has[x] else -1 for x in cols], float)
+bb = np.array([H - 1 - np.argmax(band[::-1, x] > 128) if has[x] else -1 for x in cols], float)
+xs_ok = cols[has]
+tt = np.interp(cols, xs_ok, tt[has])
+bb = np.interp(cols, xs_ok, bb[has])
+k5 = np.ones(15) / 15
+tt = np.convolve(np.pad(tt, 7, mode='edge'), k5, 'valid')
+bb = np.convolve(np.pad(bb, 7, mode='edge'), k5, 'valid')
+L = bb - tt
+dh = int(round(np.median(L[has]) * (TALL - 1)))
+H2 = H + dh
+yy = np.arange(H2)[:, None].astype(np.float32)
+T, B = tt[None, :], bb[None, :]
+sy = np.where(yy < T, yy, np.where(yy < B + dh, T + (yy - T) * (L[None, :] / (L[None, :] + dh)), yy - dh)).astype(np.float32)
+sx = np.broadcast_to(cols[None, :].astype(np.float32), sy.shape).copy()
+stretch = lambda a: cv2.remap(a, sx, sy, cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+rgba = stretch(rgba)
+band = stretch(band)
+rim = stretch(rim)
+H = H2
+rgb = rgba[..., :3].astype(int)
 # 上面（木）: 赤みが強い所。だ円の寸法を測る
 wood = (rgb[..., 0] - rgb[..., 2] > 40) & (rgb[..., 1] < rgb[..., 0] * 0.62) & (rgba[..., 3] > 128)
 wood = largest(cv2.morphologyEx(wood.astype(np.uint8), cv2.MORPH_OPEN, np.ones((5, 5), np.uint8)) > 0)
@@ -66,14 +95,15 @@ k = 512 / W
 Image.fromarray(rgba).resize((512, round(H * k)), Image.LANCZOS).save(os.path.join(OUT, 'piece-base.webp'), quality=88, method=6)
 bm = np.dstack([np.full_like(band, 255)] * 3 + [band])
 Image.fromarray(bm).resize((512, round(H * k)), Image.LANCZOS).save(os.path.join(OUT, 'piece-base-band.webp'), quality=90, method=6)
-# 金のふちの形（段の金属の色に染めるため）
-rim = cv2.dilate(np.where(gold & (rgba[..., 3] > 128), 255, 0).astype(np.uint8), np.ones((3, 3), np.uint8))
-rm = np.dstack([np.full_like(rim, 255)] * 3 + [cv2.GaussianBlur(rim, (3, 3), 0)])
+rm = np.dstack([np.full_like(rim, 255)] * 3 + [rim])
 Image.fromarray(rm).resize((512, round(H * k)), Image.LANCZOS).save(os.path.join(OUT, 'piece-base-rim.webp'), quality=90, method=6)
 print('base', (512, round(H * k)), 'aspect', round(W / H, 3))
 print('top face: cx %.3f cy %.3f rx %.3f ry %.3f (幅・高さに対する割合)' % (
     (wx.min() + wx.max()) / 2 / W, (wy.min() + wy.max()) / 2 / H, (wx.max() - wx.min()) / 2 / W, (wy.max() - wy.min()) / 2 / H))
 print('band rows %.3f-%.3f' % (np.where(band.max(1) > 128)[0].min() / H, np.where(band.max(1) > 128)[0].max() / H))
+cx = W // 2
+cb = np.where(band[:, cx] > 128)[0]
+print('band at center: %.3f-%.3f mid %.3f' % (cb.min() / H, cb.max() / H, (cb.min() + cb.max()) / 2 / H))
 
 # ---------- 銘板 ----------
 pl = np.array(Image.open(os.path.join(SRC, 'piece-plates.png')).convert('RGBA'))
