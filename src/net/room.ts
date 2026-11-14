@@ -61,6 +61,42 @@ export const BEAT_MS = 10_000;
  * ホストなら、残っている中で一番早く入った人が引き継ぐ。
  */
 export const STALE_MS = 35_000;
+/**
+ * 接続の印（online）が false になっても、これだけの間は「動いている」とみなす（実機の不具合③・点検 F3・F8 2026-11-15）。
+ * 一瞬の切断（電波の切り替え・アプリの切り替え）で「通信が切れています」を出さず、ホストも引き継がないため。
+ * 知らせの「待つ」もこの1つにまとめる（画面では足さない）。数えるのは、この端末が false に気づいた時から。
+ * 「部屋を出る」（leave）は beat を 0 と書くので、待たずにすぐ「いない」になる
+ */
+export const OFFLINE_GRACE_MS = 10_000;
+/** 自分の印の書き直し・画面が戻った時の書き込みを、続けてしすぎない間隔 */
+const REASSERT_GAP_MS = 2_000;
+/** 画面が戻った時、次の記録が部屋にあるのに届かなければ、これだけ待ってから取り直す */
+const WAKE_CATCHUP_MS = 1_500;
+
+type WakeWindow = Pick<Window, 'addEventListener' | 'removeEventListener'>;
+type WakeDocument = Pick<Document, 'addEventListener' | 'removeEventListener' | 'visibilityState'>;
+/**
+ * 画面が戻った時（タブが表に戻った・ネットが戻った・ページが戻った）に cb を呼ぶ（実機の不具合③）。
+ * ブラウザでない所（テスト）では何もしない
+ */
+export function watchWake(
+  cb: () => void,
+  win: WakeWindow | undefined = typeof window === 'undefined' ? undefined : window,
+  doc: WakeDocument | undefined = typeof document === 'undefined' ? undefined : document,
+): () => void {
+  if (!win || !doc) return () => {};
+  const onVisible = () => {
+    if (doc.visibilityState === 'visible') cb();
+  };
+  win.addEventListener('online', cb);
+  win.addEventListener('pageshow', cb);
+  doc.addEventListener('visibilitychange', onVisible);
+  return () => {
+    win.removeEventListener('online', cb);
+    win.removeEventListener('pageshow', cb);
+    doc.removeEventListener('visibilitychange', onVisible);
+  };
+}
 
 export interface Slot {
   classId: string;
@@ -159,6 +195,15 @@ export class Room {
   private resyncing: Promise<void> | null = null;
   private closed = false;
   private beatTimer: ReturnType<typeof setInterval> | null = null;
+  /** 最後に「動いている」を書いた時刻（部屋の時計） */
+  private lastBeat = 0;
+  /** 最後に自分の印を書き直した時刻 */
+  private lastReassert = 0;
+  /** 席 → この端末が、その人の印が false になったのに気づいた時刻（true に戻ったら消す） */
+  private offSince = new Map<PlayerId, number>();
+  /** 席 → その人の操作が最後に届いた時刻（操作が届く = 動いている） */
+  private heardAt = new Map<PlayerId, number>();
+  private timers = new Set<ReturnType<typeof setTimeout>>();
   /** 直前のホスト（引き継ぎの知らせに使う。回3 C） */
   prevHostUid: string | null = null;
 
@@ -183,9 +228,22 @@ export class Room {
     if (this.isHost) for (const p of SEATS) if (this.meta?.proxy?.[p] && !out.includes(p)) out.push(p);
     return out;
   }
-  /** その人が今動いているか: 接続中で、「動いている」の書き込みが古すぎない（書かない古い端末は、接続中なら動いているとみなす） */
+  /**
+   * その人が今動いているか: 接続中で、「動いている」の書き込みが古すぎない（書かない古い端末は、接続中なら動いているとみなす）。
+   * 実機の不具合③（2026-11-15）:
+   * - 部屋を出た人（beat = 0）は、すぐ「いない」
+   * - 操作が OFFLINE_GRACE_MS 以内に届いた人は、印にかかわらず動いている
+   * - 印が false でも、気づいてから OFFLINE_GRACE_MS の間は動いている扱い（一瞬の切断）
+   */
   alive(m: Member | undefined): boolean {
-    return !!m && m.online && (m.beat === undefined || this.backend.now() - m.beat < STALE_MS);
+    if (!m || m.beat === 0) return false;
+    const now = this.backend.now();
+    const heard = this.heardAt.get(m.seat);
+    if (heard !== undefined && now - heard < OFFLINE_GRACE_MS) return true;
+    const fresh = m.beat === undefined || now - m.beat < STALE_MS;
+    if (m.online) return fresh;
+    const since = this.offSince.get(m.seat);
+    return fresh && since !== undefined && now - since < OFFLINE_GRACE_MS;
   }
   /** 席の人が接続中（動いている）か（誰もいない席は false） */
   seatOnline(p: PlayerId): boolean {
@@ -287,6 +345,7 @@ export class Room {
         void b.onDisconnectSet(p('members', this.uid, 'online'), false).catch(() => {});
         void b.set(p('members', this.uid, 'online'), true).catch(() => {});
       }),
+      watchWake(() => this.wake()),
       b.onValue<RoomMeta>(p('meta'), (m) => {
         if (!m) return;
         const wasPlaying = this.meta?.status === 'playing';
@@ -301,7 +360,9 @@ export class Room {
       }),
       b.onValue<Record<string, Member>>(p('members'), (m) => {
         this.members = m ?? {};
+        this.noteOffline();
         this.emit({ type: 'members' });
+        this.fixMyMark();
         this.checkHost();
       }),
       b.onValue<Record<string, Slot>>(p('slots'), (s) => {
@@ -337,15 +398,13 @@ export class Room {
    */
   private startBeat() {
     if (this.beatTimer || this.closed) return;
-    let lastBeat = 0;
+    this.lastBeat = 0;
     let lastAlive = '';
     const tick = () => {
       if (this.closed || !this.connected) return;
       const now = this.backend.now();
-      if (now - lastBeat >= BEAT_MS) {
-        lastBeat = now;
-        void this.backend.set(roomPath(this.code, 'members', this.uid, 'beat'), now).catch(() => {});
-      }
+      if (now - this.lastBeat >= BEAT_MS) this.writeBeat(now);
+      this.fixMyMark();
       const alive = Object.keys(this.members)
         .sort()
         .map((k) => (this.alive(this.members[k]) ? 1 : 0))
@@ -362,11 +421,102 @@ export class Room {
     (this.beatTimer as { unref?: () => void }).unref?.();
   }
 
-  /** 部屋を出る（データは残るので、同じ合言葉でまた入れる） */
+  private writeBeat(now: number) {
+    this.lastBeat = now;
+    void this.backend.set(roomPath(this.code, 'members', this.uid, 'beat'), now).catch(() => {});
+  }
+
+  /**
+   * 実機の不具合③: この端末はつながって動いているのに、自分の接続の印が false になっていたら、すぐ true（と「動いている」）を書き直す。
+   * スマホが電波を切り替えた時など、サーバーが古い接続の切断に後から気づいて false を書き、それが残る事がある。
+   * 書き直さないと、相手の画面に「通信が切れています」が出続け、ホストなら動いているのに引き継がれる。
+   * 書くのは印が false の時だけ（ふだんは書き込みを増やさない）
+   */
+  private fixMyMark() {
+    const me = this.members[this.uid];
+    if (!me || me.online || this.closed || !this.connected) return;
+    const now = this.backend.now();
+    if (now - this.lastReassert < REASSERT_GAP_MS) return;
+    this.lastReassert = now;
+    this.lastBeat = now;
+    const p = (...r: string[]) => roomPath(this.code, 'members', this.uid, ...r);
+    void this.backend.onDisconnectSet(p('online'), false).catch(() => {});
+    void this.backend.update({ [p('online')]: true, [p('beat')]: now }).catch(() => {});
+  }
+
+  /** 印が false になった人に気づいた時刻を覚え、待つ時間が終わる頃に画面とホストを見直す */
+  private noteOffline() {
+    const now = this.backend.now();
+    const seats = new Set<PlayerId>();
+    for (const m of Object.values(this.members)) {
+      seats.add(m.seat);
+      if (m.online) this.offSince.delete(m.seat);
+      else if (!this.offSince.has(m.seat)) {
+        this.offSince.set(m.seat, now);
+        this.later(OFFLINE_GRACE_MS + 50, () => {
+          this.emit({ type: 'members' });
+          this.checkHost();
+        });
+      }
+    }
+    for (const s of [...this.offSince.keys()]) if (!seats.has(s)) this.offSince.delete(s);
+  }
+
+  /** その人の操作が届いた（動いている）。「切れている」と見えていたら、すぐ画面を書き直す */
+  private heard(uid: string) {
+    const m = this.members[uid];
+    if (!m) return;
+    const was = this.alive(m);
+    this.heardAt.set(m.seat, this.backend.now());
+    if (!was) this.emit({ type: 'members' });
+  }
+
+  private later(ms: number, fn: () => void) {
+    const t = setTimeout(() => {
+      this.timers.delete(t);
+      if (!this.closed) fn();
+    }, ms);
+    (t as { unref?: () => void }).unref?.();
+    this.timers.add(t);
+  }
+
+  /**
+   * 画面が戻った（タブが表に戻った・ネットが戻った・ページが戻った）: すぐ「動いている」を書き、自分の印を直し、
+   * 部屋の記録が先へ進んでいたら取り直す（実機の不具合③）。つながっていない時は、つながり直した時の処理に任せる
+   */
+  wake() {
+    if (this.closed || !this.connected) return;
+    const now = this.backend.now();
+    if (now - this.lastBeat >= REASSERT_GAP_MS) this.writeBeat(now);
+    this.fixMyMark();
+    this.emit({ type: 'members' });
+    this.checkHost();
+    void this.catchUp().catch(() => {});
+  }
+
+  private async catchUp() {
+    if (!this.game || this.resyncing) return;
+    const seq = this.seq;
+    const next = await this.backend.get<LogEntry>(roomPath(this.code, 'log', seqKey(seq + 1)));
+    if (this.closed) return;
+    if (next === null) {
+      // 次の記録が無い: 古い記録が消えるほど先へ進んでいたら、保存から取り直す
+      const snapSeq = await this.backend.get<number>(roomPath(this.code, 'snapshot', 'seq'));
+      if (!this.closed && snapSeq !== null && snapSeq > this.seq) void this.resync('gap');
+      return;
+    }
+    // 次の記録はある: ふつうは見張りがすぐ届ける。届かなければ取り直す
+    this.later(WAKE_CATCHUP_MS, () => {
+      if (this.seq === seq && !this.resyncing) void this.resync('gap');
+    });
+  }
+
+  /** 部屋を出る（データは残るので、同じ合言葉でまた入れる）。beat も 0 と書くので、ホストならすぐ引き継がれる（点検 F3） */
   async leave() {
     this.closed = true;
     try {
-      await this.backend.set(roomPath(this.code, 'members', this.uid, 'online'), false);
+      const p = (...r: string[]) => roomPath(this.code, 'members', this.uid, ...r);
+      await this.backend.update({ [p('online')]: false, [p('beat')]: 0 });
     } catch {
       /* 切断中なら onDisconnect で書かれる */
     }
@@ -377,6 +527,8 @@ export class Room {
     this.closed = true;
     if (this.beatTimer) clearInterval(this.beatTimer);
     this.beatTimer = null;
+    for (const t of this.timers) clearTimeout(t);
+    this.timers.clear();
     for (const u of this.subs) u();
     this.subs = [];
     this.logSub?.();
@@ -528,6 +680,7 @@ export class Room {
     this.hashes.set(n, stateHash(this.game));
     if (this.hashes.size > SNAPSHOT_EVERY * 3) this.hashes.delete(Math.min(...this.hashes.keys()));
     if (entry.req) this.rememberReq(entry.req);
+    this.heard(entry.by);
     this.emit({ type: 'command', seq: n, by: entry.by, cmd, result });
     if (this.pendingCheck && this.pendingCheck.seq === n) this.compare(this.pendingCheck);
     return true;
@@ -665,6 +818,7 @@ export class Room {
     const hash = stateHash(this.game);
     this.hashes.set(n, hash);
     if (this.hashes.size > SNAPSHOT_EVERY * 3) this.hashes.delete(Math.min(...this.hashes.keys()));
+    this.heard(req.by);
     this.emit({ type: 'command', seq: n, by: req.by, cmd, result });
     // その番号がまだ空の時だけ書く（古いホストが、新しいホストの書いた記録を上書きしないため）
     let committed = false;
@@ -699,9 +853,9 @@ export class Room {
     if (!m || this.closed || !this.connected) return;
     const host = this.members[m.hostUid];
     if (this.alive(host)) return;
-    // 自分は今動いているので、自分の「動いている」が古く見えても候補に入れる（書き込みが届く前）
+    // 自分は今つながって動いているので、自分の「動いている」が古く見えても・印が false でも（書き直す前）候補に入れる
     const next = Object.entries(this.members)
-      .filter(([uid, x]) => (uid === this.uid ? x.online : this.alive(x)))
+      .filter(([uid, x]) => (uid === this.uid ? x.beat !== 0 : this.alive(x)))
       .sort((a, b) => a[1].joinedAt - b[1].joinedAt)[0];
     if (next?.[0] !== this.uid) return;
     const old = m.hostUid;

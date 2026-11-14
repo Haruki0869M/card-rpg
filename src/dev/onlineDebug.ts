@@ -27,6 +27,8 @@ const api = {
   /** 画面と同じ道で操作を送る */
   send: (cmd: GameCommand) => useBattle.getState().dispatchWire(cmd) ?? null,
   setProxy: (p: 'P1' | 'P2' | 'P3' | 'P4', on: boolean) => useOnline.getState().setProxy(p, on),
+  /** 席の人が動いているか（切れてから約10秒は true。実機の不具合③） */
+  seatOnline: (p: 'P1' | 'P2' | 'P3' | 'P4') => !!useOnline.getState().room?.seatOnline(p),
   goOffline: () => useOnline.getState().room?.backend.goOffline(),
   goOnline: () => useOnline.getState().room?.backend.goOnline(),
   stamp: (k: string) => useOnline.getState().sendStamp(k),

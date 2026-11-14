@@ -11,12 +11,14 @@ import { clearedScenarioIds } from '../../store/profile';
 import { useProfile } from '../../store/profileStore';
 import { PLAYER_COLOR } from '../../data/theme';
 import { eventChallenger, livingHeroes, notVoted, voters, waitingPlayers } from '../../engine';
+import { OPEN_EXTERNAL_PARAM } from '../../net/inAppBrowser';
 import { normalizeCode, SEATS } from '../../net/room';
 import { autoName, isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
 import { proxyReadyAt, proxyWaitLeft, useOnline } from '../../store/onlineStore';
 import type { GameState, PlayerId } from '../../types';
 import { HeroFace, Screen } from '../ui/game';
+import { InAppBrowserNote } from '../ui/InAppBrowserNote';
 import { chestClaimWaits, facilityWaits, rewardWaits } from './waitNotes';
 
 /** 定型のスタンプ（spec §7.1） */
@@ -34,6 +36,8 @@ export function inviteUrl(code: string) {
   u.hash = '';
   u.searchParams.delete('as');
   u.searchParams.set('room', code);
+  // LINE で送った時、最初から外のブラウザ（Chrome など）で開くための印（点検 F4）。このゲームは読まない
+  u.searchParams.set(OPEN_EXTERNAL_PARAM, '1');
   return u.toString();
 }
 
@@ -70,6 +74,7 @@ export function JoinScreen() {
     <Screen>
       <TopBar title="部屋に参加" onBack={() => setScreen('title')} />
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-4">
+        <InAppBrowserNote />
         <NameInput />
         <div>
           <div className="text-[13px] text-zinc-300">合言葉（4文字）</div>
