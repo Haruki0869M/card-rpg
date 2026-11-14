@@ -4,6 +4,7 @@
 //   (2) 押した後に画面が変わらない → 自分の票の印・待ちの枠が見える（サブパネルに隠れない）
 //   (3) 押し直すとフォーカスが0に戻る → 押し直しは票の取り消し（パネルは開かない）。挑む段のフォーカスは相手の操作で戻らない
 // ほか: 先頭 = P2 と P1 の両方の並び・任せる・選び直す・払えない人も払う選択肢に入れられる・ホストの「代わりに操作」で挑む段を進める。
+// 2026-11-15: 投票中・挑む段に、画面の下の帯の「装備」「道具」でシートを開いて閉じても、自分の票・フォーカスの指定が消えない。
 // 高さ 844 と 540（390 幅）。P2 の操作は画面のボタンで押す（命令を直接送らない）。
 // エミュレーター（demo-card-rpg）だけを使う（URL の ?emu=）。本番の Firebase には書かない。
 // 使い方: URL=http://127.0.0.1:4190/card-rpg/ node scripts/coop-agree.mjs   （HEIGHTS=844,540 で高さを変えられる）
@@ -182,6 +183,17 @@ const visible = (p, sel) => p.locator(sel).first().isVisible().catch(() => false
 const pageOfSeat = (r, seat) => (seat === 'P1' ? r.A : r.B);
 
 /** ケース1: 先頭 = P2。P1 が先に押す → 印・待ちの枠 → 押し直し（取り消し）→ P2 が画面で押す → 挑む段 → 持ち主がフォーカス1で挑む */
+/** 画面の下の帯の「道具」「装備」を押して、シートが開く → ×で閉じる（2026-11-15） */
+async function sheetRoundTrip(p, label) {
+  for (const [btn, sheet] of [['道具', 'pouch'], ['装備', 'party']]) {
+    await press(p, `[data-dungeon-bar] [data-bar-button="${btn}"]`, `${label}: 「${btn}」`);
+    check(await tryUntil(async () => (await p.locator(`[data-sheet="${sheet}"]`).count()) > 0, 3000), `${label}: 「${btn}」でシートが開く`);
+    await shot(p, `${label.replace(/[: ]/g, '')}-${sheet}`);
+    await press(p, `[data-sheet="${sheet}"] [data-sheet-close]`, `${label}: ×`);
+    check(await tryUntil(async () => !(await p.locator(`[data-sheet="${sheet}"]`).count()), 3000), `${label}: 閉じた`);
+  }
+}
+
 async function caseLeadP2(r) {
   const label = '先頭P2';
   await atEvent(r, { order: [r.h2, r.h1] });
@@ -196,6 +208,10 @@ async function caseLeadP2(r) {
   check(await tryUntil(async () => !(await visible(r.A, '[data-my-vote-note]')), 4000), `${label}: 押し直すと票が取り消される（印が消える）`);
   check(!(await ev(r.A))?.decided && !(await r.A.locator('[aria-label="フォーカスを増やす"]').count()), `${label}: 押し直してもパネルは開かない`);
   await press(r.A, '[data-event-option="0"]', `${label}: P1 がもう一度入れる`);
+  // 票を入れたまま「道具」「装備」を開いて閉じる → 票はそのまま
+  await sheetRoundTrip(r.A, `${label}: 投票中の P1`);
+  check(await visible(r.A, '[data-my-vote-note]'), `${label}: シートから戻っても P1 の「✓ あなたが選択中」が残る`);
+  await sheetRoundTrip(r.B, `${label}: 待っている P2`);
   // P2 が画面のボタンで同じ選択肢
   await press(r.B, '[data-event-option="0"]', `${label}: P2 が画面で「倒木を押しのける」`);
   check(await tryUntil(async () => !!(await ev(r.A))?.decided, 6000), `${label}: 2人そろうと挑む段に進む（すぐには判定しない）`);
@@ -215,6 +231,9 @@ async function caseLeadP2(r) {
   await press(O, '[aria-label="フォーカスを増やす"]', `${label}: 持ち主がフォーカスを1つ増やす`);
   await api(N, () => window.__online.stamp('👍')).catch(() => {});
   await wait(1200);
+  // 挑む段: 持ち主が「装備」「道具」を開いて閉じる・持ち主でない人も開ける → フォーカスの指定はそのまま
+  await sheetRoundTrip(O, `${label}: 挑む段の持ち主`);
+  await sheetRoundTrip(N, `${label}: 挑む段の持ち主でない人`);
   const panel = await O.locator('[data-challenge]').first().innerText();
   check(new RegExp(`フォーカス ${who.focus} → ${who.focus - 1}`).test(panel.replace(/\s+/g, ' ')), `${label}: 相手の操作の後もフォーカスの指定が1のまま（勝手に0に戻らない）`);
   await press(O, '[data-challenge-go]', `${label}: 持ち主が「挑戦する」`);

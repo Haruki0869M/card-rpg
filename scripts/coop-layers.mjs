@@ -4,7 +4,9 @@
 //   - シートを開いたまま切って戻す（取り直し）→ シートは残り、開いていた行（中の選択）は消える。落ちない
 //   - 持ち物の行の「渡す」→ 行のすぐ下に枠 → 相手 → 確認 → 渡した側「回復薬を〜に渡しました」・受け取った側（P1）「〜から回復薬を受け取りました」
 //   - 「使う」→ 相手 → HP が戻る・シートは開いたまま
-// P2 の操作は画面のボタンで押す（ダンジョンのイベントの画面にはシートを開くボタンが無いので、そこだけ確認用の openSheet で開く）。
+//   - イベントの画面（世界マップのマス・ダンジョンの投票・挑む段）の下の帯「装備」「道具」で開ける。待ちの帯（TurnLock）に重ならない（2026-11-15）
+//   - 投票中・挑む段で、道具袋から回復薬を使って戻っても、自分の票・フォーカスの指定が消えない
+// P2 の操作は画面のボタンで押す。
 // エミュレーター（demo-card-rpg）だけを使う（URL の ?emu=）。本番の Firebase には書かない。
 // 使い方: URL=http://127.0.0.1:4193/card-rpg/ node scripts/coop-layers.mjs   （COOP_LAYERS_OUTPUT で写真の場所）
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -177,12 +179,28 @@ const closeSheet = async (p, name, label) => {
   check(await tryUntil(async () => !(await p.locator(`[data-sheet="${name}"]`).count()), 2000), `${label}: 閉じた`);
 };
 
-/** 待ち中に、パーティ・装備と道具袋を開いて閉じる。viaButtons = ダンジョンの画面の「装備」「道具」のボタンで開く */
-async function openCloseWhileWaiting(r, label, viaButtons) {
+/** 下の帯（扉の画面・イベントの画面の data-dungeon-bar）の「装備」「道具」 */
+const barButton = (p, btn) => p.locator(`[data-dungeon-bar] [data-bar-button="${btn}"]`);
+
+/** 「道具」で道具袋を開き、回復薬を自分のキャラに使って、×で閉じる（HP が戻ったかも見る） */
+async function usePotionVia(p, heroId, label) {
+  const hp0 = (await game(p)).heroes.find((h) => h.id === heroId).hp;
+  await press(p, barButton(p, '道具'), `${label}: 「道具」`);
+  if (!(await tryUntil(async () => (await p.locator('[data-sheet="pouch"]').count()) > 0, 3000))) return check(false, `${label}: 道具袋が開く`);
+  await press(p, '[data-sheet="pouch"] [data-pouch-item="potion"]', `${label}: 回復薬の行を押す（使う相手が出る）`);
+  await press(p, `[data-sheet="pouch"] [data-use-to="${heroId}"]`, `${label}: 自分のキャラに使う`);
+  check(await tryUntil(async () => (await game(p)).heroes.find((h) => h.id === heroId).hp > hp0, 5000), `${label}: HP が戻った`);
+  await shot(p, `${label}-pouch-used`);
+  // 道具袋は、使うと自分で閉じる（閉じていなければ×で閉じる）
+  if (await p.locator('[data-sheet="pouch"]').count()) await closeSheet(p, 'pouch', label);
+  check(await tryUntil(async () => !(await p.locator('[data-sheet="pouch"]').count()), 2000), `${label}: 道具袋が閉じた`);
+}
+
+/** 待ち中に、パーティ・装備と道具袋を、画面の下の帯の「装備」「道具」で開いて閉じる */
+async function openCloseWhileWaiting(r, label) {
   const B = r.B;
   for (const [name, btn] of [['party', '装備'], ['pouch', '道具']]) {
-    if (viaButtons) await press(B, B.locator('[data-dungeon-bar] button', { hasText: btn }), `${label}: P2 が「${btn}」`);
-    else await api(B, (n) => window.__online.openSheet(n), name);
+    await press(B, barButton(B, btn), `${label}: P2 が「${btn}」`);
     await sheetOk(B, name, `${label}・${name}`);
     await shot(B, `${label}-${name}`);
     await closeSheet(B, name, `${label}・${name}`);
@@ -210,7 +228,17 @@ try {
     await r.inject(g);
     const lock = await tryUntil(async () => (await B.locator('[data-turn-lock]').count()) > 0, 4000);
     check(lock, `${L0}: P2 の画面に待ちの帯（〜さんが選んでいます）`);
-    await api(B, () => window.__online.openSheet('party'));
+    // イベントの画面の下の帯（装備・道具）は、待ちの帯の上に出る（重ならない。画面のボタンで開く）
+    const lift = await B.evaluate(() => {
+      const bar = document.querySelector('[data-dungeon-bar]')?.getBoundingClientRect();
+      const lock = document.querySelector('[data-turn-lock]')?.getBoundingClientRect();
+      return bar && lock ? { barBottom: Math.round(bar.bottom), lockTop: Math.round(lock.top) } : null;
+    });
+    check(!!lift && lift.barBottom <= lift.lockTop + 1, `${L0}: 装備・道具の帯が待ちの帯の上 ${JSON.stringify(lift)}`);
+    await press(B, barButton(B, '道具'), `${L0}: P2 が「道具」`);
+    await sheetOk(B, 'pouch', L0);
+    await closeSheet(B, 'pouch', L0);
+    await press(B, barButton(B, '装備'), `${L0}: P2 が「装備」`);
     await sheetOk(B, 'party', L0);
     const bottom = await B.evaluate(() => {
       const t = document.elementFromPoint(195, innerHeight - 30);
@@ -239,7 +267,7 @@ try {
   await A.locator('[data-door-choice]').first().waitFor({ timeout: 8000 });
   await press(A, '[data-door-choice]', `${L1}: P1 が扉を選ぶ`);
   check(await tryUntil(async () => await B.getByText('あなたの選択を待っています').isVisible(), 5000), `${L1}: P2 の画面に「あなたの選択を待っています」`);
-  await openCloseWhileWaiting(r, L1, true);
+  await openCloseWhileWaiting(r, L1);
 
   // ---- 2) 知らせとシートが同時に出る・切って戻す ----
   const L2 = '知らせとシート';
@@ -321,12 +349,34 @@ try {
   await until(async () => (await game(A))?.expeditions?.[0]?.mode === 'event', 8000, 'event');
   await press(A, '[data-event-option="0"]', `${L5}: P1 が選択肢を選ぶ`);
   check(await tryUntil(async () => await B.locator('[data-vote-status]').isVisible(), 4000), `${L5}: P2 の画面に待ちの枠`);
-  await openCloseWhileWaiting(r, L5, false);
+  await openCloseWhileWaiting(r, L5);
   check(await B.locator('[data-event-option="0"]').count() > 0, `${L5}: 閉じた後もイベントの選択肢が残る`);
+  // 票を入れた P1 が、道具袋で回復薬を使って戻る → 自分の票はそのまま
+  await usePotionVia(A, r.h1, `${L5}・P1`);
+  check((await A.locator('[data-my-vote="1"][data-event-option="0"]').count()) > 0, `${L5}: P1 の画面で、自分の票（✓選択中）がそのまま`);
+  check((await game(A))?.expeditions?.[0]?.vote?.picks?.P1?.optionIndex === 0, `${L5}: 部屋の状態でも P1 の票がそのまま`);
   await press(B, '[data-event-option="0"]', `${L5}: P2 も同じ選択肢（画面のボタン）`);
   const L6 = '挑む段';
   check(await tryUntil(async () => !!(await game(A))?.expeditions?.[0]?.event?.decided, 6000), `${L6}: 挑む段に進む`);
-  await openCloseWhileWaiting(r, L6, false);
+  await openCloseWhileWaiting(r, L6);
+  // 挑む役の持ち主が、フォーカスを1つ決めてから道具袋で回復薬を使って戻る → フォーカスの指定はそのまま
+  {
+    const owner = (await A.locator('[data-challenge-mine="1"]').count()) ? A : B;
+    const ownerHero = await owner.locator('[data-challenge]').getAttribute('data-challenge-hero');
+    await press(owner, owner.getByRole('button', { name: 'フォーカスを増やす' }), `${L6}: 挑む役の人がフォーカス+1`);
+    const focusText = async () => (await owner.locator('[data-challenge]').innerText()).match(/フォーカス \d+ → \d+/)?.[0];
+    const before = await focusText();
+    const usable = (await game(owner)).heroes.find((h) => h.id === ownerHero).pouch.some((x) => x.itemId === 'potion');
+    if (usable) await usePotionVia(owner, ownerHero, `${L6}・挑む役`);
+    else {
+      await press(owner, barButton(owner, '道具'), `${L6}: 「道具」`);
+      await closeSheet(owner, 'pouch', L6);
+    }
+    const after = await focusText();
+    check(!!before && before === after, `${L6}: 道具袋から戻ってもフォーカスの指定がそのまま（${before} / ${after}）`);
+    check(!!(await game(A))?.expeditions?.[0]?.event?.decided, `${L6}: 挑む段のまま`);
+    await shot(owner, `${L6}-after-pouch`);
+  }
   summary.done = true;
 } catch (e) {
   console.log('ERROR', e);

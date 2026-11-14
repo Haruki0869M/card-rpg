@@ -19,6 +19,9 @@ import { chanceAtLeast, CheckPanel, RollStrip } from '../ui/CheckPanel';
 import { Crest, HeroFace, ItemIcon, itemSummary, RARITY_STYLE, Screen } from '../ui/game';
 import { canChangeNow } from '../JobSheet';
 import { PetToken } from '../ui/PetToken';
+import { PartyBar } from '../ui/PartyBar';
+import { TURN_LOCK_RATIO } from '../ui/TurnLock';
+import { showTurnLock } from './worldTurnGate';
 
 /** 判定に一番向いている、この端末のキャラ */
 function bestHero(heroes: Hero[], score: (h: Hero) => number): string {
@@ -285,6 +288,9 @@ export function EventScreen() {
           )}
         </div>
       )}
+      {/* 装備・道具（扉を選ぶ画面と同じ帯）。投票中・挑む段・待ちの間も押せる。開いて閉じても、票・フォーカスの指定はそのまま。
+          世界マップのマスで手番でない時は、下の「〇〇さんが選んでいます」の覆いの上に出す（覆いに重ねない） */}
+      <PartyBar heroes={sceneHeroes(game)} style={showTurnLock(game, isLocalPlayer) ? { marginBottom: `calc(var(--app-h, 100dvh) * ${TURN_LOCK_RATIO})` } : undefined} />
     </Screen>
   );
 }
