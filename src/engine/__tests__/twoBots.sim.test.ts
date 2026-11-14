@@ -63,7 +63,7 @@ vi.mock('../index', async (orig) => {
   };
 });
 
-import { createGame, aliveScourges, isRandomDungeonTile, omenOfType, reachableRooms } from '../index';
+import { createGame, aliveScourges, isRandomDungeonTile, laneOfTile, omenOfType, reachableRooms } from '../index';
 import { playToEnd } from '../bot';
 import type { CleverPart } from '../botClever';
 import type { SmartPart } from '../botSmart';
@@ -337,6 +337,8 @@ interface Run {
   boss: BossCount;
   /** 寄り道の値打ち（2026-11-14）: 下の DetourCount */
   dt: DetourCount;
+  /** 3つの道（2026-11-14）: 帯ごとの、世界マップの移動（行き先のマス）・世界マップの戦闘（ダンジョンの外）・開けた宝箱・祠・薬草 */
+  lanes: Record<string, LaneCount>;
 }
 
 /**
@@ -351,6 +353,8 @@ interface DetourCount {
   turns: number; shortcut: number; bossFights: number; boons: number; insightFights: number; insightBreaks: number; bossWiped: number;
   relics: Record<string, number>; scourgeActs: number[]; midActs: number[]; partnerPhase: number; scourgeFled: number;
 }
+interface LaneCount { moves: number; fights: number; chests: number; shrines: number; herbs: number }
+const emptyLane = (): LaneCount => ({ moves: 0, fights: 0, chests: 0, shrines: 0, herbs: 0 });
 const emptyDetour = (): DetourCount => ({ turns: 0, shortcut: 0, bossFights: 0, boons: 0, insightFights: 0, insightBreaks: 0, bossWiped: 0, relics: {}, scourgeActs: [0, 0], midActs: [0, 0], partnerPhase: 0, scourgeFled: 0 });
 /** 戦闘の加護・見破り（新しいコードだけにある） */
 const boonOf = (b: NonNullable<GameState['battle']>) => (b as { boon?: { ids: string[] } }).boon;
@@ -397,7 +401,7 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
     bought: 0, sold: 0, equips: 0, itemsBattle: 0, itemsField: 0, removed: 0, skipped: 0, refused: 0, goldEnd: 0,
     fixedDungeonFights: 0, randomDungeonFights: 0, levelEnd: 0, sp: emptySpecials(), foes: {}, breakKind: { purple: 0, big: 0, red: 0 }, convBought: 0, convWorn: 0,
     restRoom: 0, camp: 0, inn: 0, towers: 0,
-    eliteOffered: 0, eliteChosen: 0, eliteOnly: 0, eliteFights: 0, eliteFinished: 0, eliteRounds: 0, eliteDowned: 0, eliteLost: 0, frenzy: 0, frenzyBroke: 0, eliteGear: 0, eliteEpic: 0, boss: emptyBoss(), dt: emptyDetour() };
+    eliteOffered: 0, eliteChosen: 0, eliteOnly: 0, eliteFights: 0, eliteFinished: 0, eliteRounds: 0, eliteDowned: 0, eliteLost: 0, frenzy: 0, frenzyBroke: 0, eliteGear: 0, eliteEpic: 0, boss: emptyBoss(), dt: emptyDetour(), lanes: {} };
   /** ボスの段階: 戦闘の種 → その戦闘で行った一番深い段階・開幕の一手を数えた印 */
   const bossSeen = new Map<number, number>();
   const openingSaid = new Set<string>();
@@ -408,6 +412,23 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
   /** 寄り道の値打ち: ランダムダンジョンの中にいたワールドターン */
   const rdTurns = new Set<number>();
   H.hook = (pre, cmd, post, events) => {
+    // 3つの道: 世界マップの移動（行き先のマスの帯）・使った宝箱・祠・薬草（前は使っていない → 後で使った）
+    if (pre.world && post.world && pre.world.width === post.world.width) {
+      if (cmd.type === 'WORLD_MOVE') {
+        const ln = laneOfTile(post, post.world, cmd.to);
+        if (ln) (r.lanes[ln] ??= emptyLane()).moves++;
+      }
+      post.world.tiles.forEach((t, i) => {
+        const f0 = pre.world!.tiles[i]?.f;
+        if (!t.f?.used || !f0 || f0.used || f0.kind !== t.f.kind) return;
+        const ln = laneOfTile(post, post.world!, i);
+        if (!ln) return;
+        const c = (r.lanes[ln] ??= emptyLane());
+        if (t.f.kind === 'chest') c.chests++;
+        else if (t.f.kind === 'shrine') c.shrines++;
+        else if (t.f.kind === 'event' && t.f.id === 'herbField') c.herbs++;
+      });
+    }
     const b0 = battlesOf(pre);
     const b1 = battlesOf(post);
     if (b1.length > b0.length) r.fights += b1.length - b0.length;
@@ -429,6 +450,11 @@ function runOne(classes: string[], seed: number, bot: BotKind): Run {
       const reg = tile !== undefined && w.tiles[tile] ? MAP_REGIONS[w.tiles[tile].r]?.id ?? '?' : '?';
       const key = `${reg}${sc.dungeon ? `/${sc.dungeon.dungeonId}` : ''}`;
       r.where2[key] = (r.where2[key] ?? 0) + 1;
+      // 3つの道: ダンジョンの外の戦闘の帯
+      if (!sc.dungeon && tile !== undefined) {
+        const ln = laneOfTile(post, w, tile);
+        if (ln) (r.lanes[ln] ??= emptyLane()).fights++;
+      }
       for (const id of new Set(sc.battle.enemies.map((x) => x.defId))) r.foes[id] = (r.foes[id] ?? 0) + 1;
       if (sc.dungeon) {
         if (DUNGEONS.get(sc.dungeon.dungeonId).random) r.randomDungeonFights++;
@@ -794,6 +820,23 @@ describe.skipIf(!process.env.SIM)(`物差し2本（直行 bot と工夫する bo
           L.push(`| ${p} | ${name[k]} | ${f(a((r) => r.dt.turns), 1)} | ${f(a((r) => r.randomIn), 2)} / ${f(a((r) => r.randomDone), 2)}・${f(a((r) => r.scourgeKills), 2)} | ${f(a((r) => r.dt.shortcut), 2)} | ${s((d) => d.bossFights)} / ${s((d) => d.bossWiped)} | ${s((d) => d.boons)} | ${s((d) => d.insightFights)} / ${s((d) => d.insightBreaks)} | ${Object.entries(relics).sort((x, y) => y[1] - x[1]).map(([id, n]) => `${getItem(id).name}${n}`).join('・') || '-'} | ${s((d) => d.scourgeActs[0])} / ${s((d) => d.scourgeActs[1])}・${s((d) => d.scourgeFled)} | ${s((d) => d.midActs[0])} / ${s((d) => d.midActs[1])}・${s((d) => d.partnerPhase)} |`);
         }
       }
+      // 3つの道（2026-11-14）: 帯ごと（1冒険の平均）
+      L.push('', '## 9. 3つの道（1冒険の平均。移動 = 世界マップで動いた回数の行き先の帯・戦闘 = ダンジョンの外の戦闘・宝箱・祠・薬草 = 使った数）', '');
+      L.push('| 人数 | bot | 帯 | 移動（割合） | 戦闘 | 宝箱 | 祠 | 薬草 |');
+      L.push('|---|---|---|---|---|---|---|---|');
+      for (const [p, by] of Object.entries(all)) {
+        for (const k of BOTS) {
+          const rs = by[k];
+          if (!rs?.length) continue;
+          const ids = [...new Set(rs.flatMap((r) => Object.keys(r.lanes)))];
+          const total = rs.reduce((n, r) => n + Object.values(r.lanes).reduce((m, c) => m + c.moves, 0), 0);
+          for (const id of ids) {
+            const a = (fn: (c: LaneCount) => number) => f(avg(rs.map((r) => fn(r.lanes[id] ?? emptyLane()))), 2);
+            const mv = rs.reduce((n, r) => n + (r.lanes[id]?.moves ?? 0), 0);
+            L.push(`| ${p} | ${name[k]} | ${id} | ${a((c) => c.moves)}（${f(pct(mv, total))}%） | ${a((c) => c.fights)} | ${a((c) => c.chests)} | ${a((c) => c.shrines)} | ${a((c) => c.herbs)} |`);
+          }
+        }
+      }
       const others = Object.values(all).flatMap((by) => BOTS.flatMap((k) => by[k] ?? [])).filter((r) => !r.clear && !r.wiped && !r.corr100).map((r) => r.endMode);
       if (others.length) L.push('', `負けの「ほか」の終わり方（game.mode）: ${[...new Set(others)].map((m) => `${m || '(空)'} ${others.filter((x) => x === m).length}`).join('・')}`);
       const where2: Record<string, number> = {};
@@ -863,6 +906,11 @@ describe.skipIf(!process.env.SIM)(`物差し2本（直行 bot と工夫する bo
                   for (let i = 0; i < 2; i++) { t.scourgeActs[i] += r.dt.scourgeActs[i]; t.midActs[i] += r.dt.midActs[i]; }
                   for (const [id, n] of Object.entries(r.dt.relics)) t.relics[id] = (t.relics[id] ?? 0) + n;
                 }
+                return t;
+              })(),
+              lanes: (() => {
+                const t: Record<string, LaneCount> = {};
+                for (const r of rs) for (const [id, c] of Object.entries(r.lanes)) { const x = (t[id] ??= emptyLane()); for (const key of Object.keys(c) as (keyof LaneCount)[]) x[key] += c[key]; }
                 return t;
               })(),
               specials: Object.fromEntries((Object.keys(SPECIALS) as SpecialKind[]).map((s) => [s, { said: a((r) => r.sp[s].said), done: a((r) => r.sp[s].done), broke: a((r) => r.sp[s].broke) }])),
