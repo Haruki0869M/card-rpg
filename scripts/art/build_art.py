@@ -551,6 +551,7 @@ def build_pets():
 # ここでは: 切り抜く → 床の影を落とす → 足の裏を下端に、体の中心を左右の真ん中にそろえる。
 # 大きさは「高さ」でそろえる。正方形なので、横に長い武器（剣・鎌・槍）も体を小さくせずに収まる
 PIECE_W, PIECE_H = 180, 180
+PIECE_BASE_JOBS = {'warrior', 'guardian', 'hunter', 'mage', 'monk', 'thief', 'priest', 'summoner'}
 
 def sole_row(fig, th=160, frac=0.04):
     """足の裏の高さ: 濃い（不透明な）部分が、ある程度の幅で残っている一番下の行。
@@ -574,6 +575,8 @@ def build_pieces():
         m = re.match(r'(.+)-(male|female)\.(webp|png|jpg)$', os.path.basename(f))
         if not m: continue
         key = f'{m.group(1)}-{m.group(2)}'
+        # 駒は基本職の16人分だけ（転職しても基本職の駒を使う。2026-11-14 オーナーの決定）
+        if m.group(1) not in PIECE_BASE_JOBS: continue
         name = f'piece/{key}'
         if not want(name): continue
         fig = trim(despeckle(cutout(f'piece/{key}')), 24)
