@@ -132,7 +132,7 @@ for (const [width, height] of SIZES) {
   });
   const info3 = await tapHereInfo(page);
   notes.push(`${tag} ③ ランダムダンジョン: ${info3}`);
-  if (!/主を倒すと: 秘宝を3つから1つ・👁見破り（.+のボス）・抜け道/.test(info3)) problems.push(`${tag}: ランダムダンジョンの説明に「主を倒すと…」が無い（${info3}）`);
+  if (!/主を倒すと: 秘宝を選べる（最大3つから1つ）・👁見破り（.+のボス）・抜け道/.test(info3)) problems.push(`${tag}: ランダムダンジョンの説明に「主を倒すと…」が無い（${info3}）`);
   await page.screenshot({ path: `${OUT}/${tag}-3-random-dungeon-info.png` });
   await check(page, tag, 'ランダムダンジョンの説明');
 

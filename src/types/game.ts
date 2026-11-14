@@ -286,6 +286,8 @@ export interface DungeonDef {
 }
 
 export interface DungeonRun {
+  /** この制覇で新しく見破ったダンジョン（制覇の画面の知らせ用。見破れなかった時は無い。2026-11-14 点検21） */
+  insightGained?: string;
   dungeonId: string;
   /** ランダムダンジョンの時の名前 */
   name: string;

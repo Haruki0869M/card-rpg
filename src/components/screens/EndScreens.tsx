@@ -43,7 +43,7 @@ export function ClearedScreen() {
   // 寄り道の値打ち（2026-11-14）: ランダムダンジョンを制覇した時は、見破りの知らせと、抜け道（次の目的地の近くに出る）を選べる
   const random = !!game.dungeon?.random && !!game.world;
   const shortcut = random ? shortcutTile(game, shortcutEntrance(game)) : undefined;
-  const seen = random ? game.world!.insight?.at(-1) : undefined;
+  const seen = random ? game.dungeon?.insightGained : undefined;
   const goal = random ? nextKeyDungeon(game) : undefined;
   return (
     <Screen>

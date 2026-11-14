@@ -225,7 +225,7 @@ export function dungeonDetourLines(game: Pick<GameState, 'world' | 'scenarioId' 
   if (def.random) {
     if (f.used) return [];
     const target = insightTarget(game);
-    return [`主を倒すと: 秘宝を3つから1つ・${target ? `👁見破り（${target.name}のボス）・` : ''}抜け道`];
+    return [`主を倒すと: 秘宝を選べる（最大3つから1つ）・${target ? `👁見破り（${target.name}のボス）・` : ''}抜け道`];
   }
   if (!def.rewardKey && !def.finale) return [];
   const out: string[] = [];
