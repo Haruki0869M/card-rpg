@@ -1,24 +1,26 @@
-// ===== 戦闘の報酬（ゴールド → 経験値 → レベルアップ → カード → ドロップ） =====
+// ===== 戦闘の報酬（ゴールド → 経験値 → レベルアップ → カード → 戦利品の取り合い → ドロップ） =====
 import { VoteChips, VoteStatus } from '../ui/Votes';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowUpCircle, Coins, Gift, Heart, Sparkles, Star, TrendingUp } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { REVEAL_TIMING, VIBRATION } from '../../data/balance';
 import { cardOf, getCard } from '../../data/cards';
-import { cardOfferHeroes, expToNext, findHero, growthHandler, heroStats } from '../../engine';
+import { expToNext, findHero, growthHandler, heroStats } from '../../engine';
 import { finalChance } from '../../engine';
 import { affinityFromStats } from '../../engine';
 import { isLocalPlayer, LOCAL_PLAYER } from '../../store/battleConfig';
 import { speedFactor, useBattle, vibrate } from '../../store/battleStore';
 import { playSound } from '../../audio/player';
-import type { GrowthOption, Hero, Rarity } from '../../types';
+import type { GrowthOption, Hero, PlayerId, Rarity } from '../../types';
 import { CardFace } from '../ui/CardFace';
 import { CardPickPanel } from '../ui/CardPickPanel';
 import { Bar, Crest, HeroFace, RARITY_STYLE, Screen } from '../ui/game';
 import { LootList } from './RoomScreens';
 import { ClaimPanel } from '../ui/ClaimPanel';
 import { WaitNotes } from './OnlineScreens';
-import { rewardWaits } from './waitNotes';
+import { rewardClaimVisible, rewardStep, rewardWaits } from './waitNotes';
+import { getItem } from '../../data/items';
+import { useOnline } from '../../store/onlineStore';
 
 /** 成長ボーナスのアイコン（成長の種類の icon のキー → アイコン） */
 const GROWTH_ICONS: Record<string, typeof TrendingUp> = { trendingUp: TrendingUp, heart: Heart, star: Star, arrowUp: ArrowUpCircle };
@@ -190,25 +192,28 @@ export function RewardScreen() {
   const [upgradeFor, setUpgradeFor] = useState<number | null>(null);
   const lu = r.levelUps[0];
   const luHero = lu ? findHero(game, lu.heroId) : undefined;
-  // 回3 A: レベルアップの成長は先頭から順に選ぶ（エンジンの決まり）。ただし、ほかの人のキャラの番の間も、
-  // この端末の人は自分のカード報酬・取り合いの返事を先に進められる（エンジンはカードと取り合いを、成長の順と別に受け付ける）。
-  // 1台で全員を動かす時は、今までどおり成長が先
-  const luMine = !!luHero && isLocalPlayer(luHero.playerId);
-  // カード報酬（M3-C4）: 生き残ったキャラごとに、担当の人が同時に選ぶ。この端末のキャラから順に
-  const pending = cardOfferHeroes(r).filter((id) => !r.cardDone?.includes(id));
-  const minePending = pending.filter((id) => isLocalPlayer(findHero(game, id)?.playerId ?? LOCAL_PLAYER));
-  const cardHero = minePending[0];
-  // この端末のキャラで、まだ「欲しい／余れば／いらない」を選んでいない取り合い
-  const myClaimOpen = !!r.claim && !r.claim.rolls && r.claim.heroes.some((id) => !r.claim!.choices[id] && isLocalPlayer(findHero(game, id)?.playerId ?? LOCAL_PLAYER));
+  // 通信が切れていて、だれも代わりに操作していない席（その席の残りは、取り合いを出すのを止めない）
+  useOnline((s) => s.tick);
+  const room = useOnline((s) => s.room);
+  const isAway = (p: PlayerId) => !!room && !room.seatOnline(p) && !room.meta?.proxy?.[p];
+  // 実機の不具合④(1)（オーナーの決定）: 成長 → 自分のカード → 全員がそろってから戦利品の取り合い（真ん中に出す）。
+  // エンジンの決まりは変えず、出し方だけで順番を作る（rewardStep）。1台で全員を動かす時も同じ順番
+  const step = rewardStep(game, isLocalPlayer, isAway);
+  const luMine = step.kind === 'growth';
+  const cardHero = step.kind === 'card' ? step.heroId : undefined;
+  const claimVisible = rewardClaimVisible(game, isAway);
   // ほかの人が今していること（だれが・何を選んでいるか）
   const waits = rewardWaits(game, isLocalPlayer);
+  // カードを選ぶ間は経験値の行を細く2列にして、縦 540px でも開いた時にカード3枚が画面に入るようにする
+  const compact = !!cardHero;
+  const grid = compact && r.exp.length > 1;
 
   return (
     <Screen>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pt-3 pb-2">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pt-3 pb-2" data-reward-scroll data-reward-step={step.kind}>
         <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-center">
           <div
-            className="font-display text-[34px] leading-10"
+            className={`font-display ${compact ? 'text-[28px] leading-8' : 'text-[34px] leading-10'}`}
             style={{ background: 'linear-gradient(180deg,#fff6d0,#f2c24a 55%,#a86a12)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', filter: 'drop-shadow(0 2px 0 rgba(0,0,0,.8))' }}
           >
             勝利！
@@ -219,22 +224,23 @@ export function RewardScreen() {
         </motion.div>
 
         {/* 経験値 */}
-        <div className="mt-2 flex flex-col gap-1.5">
+        <div className={`mt-2 ${grid ? 'grid grid-cols-2 gap-1' : 'flex flex-col gap-1.5'}`} data-reward-exp>
           {r.exp.map((e, i) => {
             const h = findHero(game, e.heroId)!;
             const up = e.toLevel > e.fromLevel;
             return (
-              <motion.div key={e.heroId} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 + i * 0.08 }} className="panel flex items-center gap-2 rounded-lg p-1.5">
-                <HeroFace hero={h} size={34} />
+              <motion.div key={e.heroId} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 + i * 0.08 }} className={`panel flex items-center rounded-lg ${compact ? 'gap-1 p-1' : 'gap-2 p-1.5'}`}>
+                <HeroFace hero={h} size={compact ? 24 : 34} />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between text-[13px]">
-                    <span className="font-bold">{h.name}</span>
-                    <span className="tabular-nums text-violet-200">
-                      EXP +{e.gained}
+                  <div className={`flex items-center justify-between gap-1 ${compact ? 'text-[12px] leading-4' : 'text-[13px]'}`}>
+                    <span className="truncate font-bold">{h.name}</span>
+                    <span className="shrink-0 tabular-nums text-violet-200">
+                      {grid ? '+' : 'EXP +'}
+                      {e.gained}
                       {up && <span className="font-display ml-1 text-amber-300">Lv{e.toLevel}！</span>}
                     </span>
                   </div>
-                  <Bar value={e.toExp} max={expToNext(e.toLevel, h.classId)} color="linear-gradient(90deg,#8a6aff,#c8b0ff)" height={7} />
+                  <Bar value={e.toExp} max={expToNext(e.toLevel, h.classId)} color="linear-gradient(90deg,#8a6aff,#c8b0ff)" height={compact ? 5 : 7} />
                 </div>
               </motion.div>
             );
@@ -242,19 +248,23 @@ export function RewardScreen() {
           {game.heroes
             .filter((h) => (!game.party || game.party.includes(h.id)) && !r.exp.some((e) => e.heroId === h.id))
             .map((h) => (
-              <div key={h.id} className="flex items-center gap-2 rounded-lg bg-black/30 p-1.5 text-[12px] text-zinc-400">
-                <HeroFace hero={h} size={26} dim /> {h.name}は戦闘不能だったため経験値なし（HP1で復帰）
+              <div key={h.id} className={`flex items-center gap-2 rounded-lg bg-black/30 p-1.5 text-[12px] text-zinc-400 ${grid ? 'col-span-2' : ''}`}>
+                <HeroFace hero={h} size={compact ? 20 : 26} dim /> {h.name}は戦闘不能だったため経験値なし（HP1で復帰）
               </div>
             ))}
         </div>
 
         {/* カード報酬（裏向きで並び、1枚ずつめくれる。spec §13） */}
-        {/* 自分の取り合いの返事がまだなら、カードより上に出す（1回押すだけで、相手を待たせない） */}
-        {!luMine && r.claim && myClaimOpen && <ClaimPanel claim={r.claim} />}
-        {!luMine && cardHero && <RewardCards key={cardHero} heroId={cardHero} />}
-        {!luMine && (cardHero || myClaimOpen) && <WaitNotes notes={waits} className="mt-2" />}
+        {cardHero && <RewardCards key={cardHero} heroId={cardHero} />}
+        {cardHero && <WaitNotes notes={waits} className="mt-2" />}
 
-        {!luMine && r.claim && !myClaimOpen && <ClaimPanel claim={r.claim} />}
+        {/* 戦利品の取り合い: 全員の成長とカードが終わる前は、何が出るかだけ書く。答えるのは真ん中の窓。答えた後と結果はここに出す */}
+        {r.claim && !claimVisible && (
+          <div className="mt-3 rounded-lg bg-black/30 px-2 py-1.5 text-center text-[12px] text-zinc-300" data-claim-later>
+            全員が成長とカードを選び終えたら、戦利品（{getItem(r.claim.item.itemId).name}）の取り合いが出ます
+          </div>
+        )}
+        {r.claim && claimVisible && step.kind !== 'claim' && <ClaimPanel claim={r.claim} />}
 
         {/* ドロップ */}
         {r.loot.length > 0 && (
@@ -270,27 +280,44 @@ export function RewardScreen() {
         )}
       </div>
 
-      <div className="shrink-0 px-3 pt-1 pb-3">
-        {luMine ? null : cardHero ? (
-          <button onClick={() => dispatchGame({ type: 'PICK_CARD', playerId: LOCAL_PLAYER, offerIndex: null, heroId: cardHero })} className="btn btn-dark h-12 w-full rounded-xl text-[15px] font-bold">
+      <div className="shrink-0 px-3 pt-1 pb-3" data-reward-bottom>
+        {step.kind === 'growth' || step.kind === 'claim' ? null : cardHero ? (
+          <button onClick={() => dispatchGame({ type: 'PICK_CARD', playerId: LOCAL_PLAYER, offerIndex: null, heroId: cardHero })} className="btn btn-dark h-12 w-full rounded-xl text-[15px] font-bold" data-reward-skip-card>
             {findHero(game, cardHero)?.name}はカードを選ばない
           </button>
-        ) : myClaimOpen ? (
-          <div className="flex min-h-12 items-center justify-center rounded-xl bg-black/40 px-2 text-center text-[14px] text-zinc-300">上の「戦利品を取り合う」で、欲しいか選んでください</div>
-        ) : waits.length ? (
-          <WaitNotes notes={waits} />
-        ) : lu || pending.length || (r.claim && !r.claim.rolls) ? (
-          <div className="flex h-12 items-center justify-center rounded-xl bg-black/40 text-[14px] text-zinc-300">ほかの人が選び終えるのを待っています</div>
+        ) : step.kind === 'wait' ? (
+          step.notes.length ? (
+            <WaitNotes notes={step.notes} />
+          ) : (
+            <div className="flex h-12 items-center justify-center rounded-xl bg-black/40 text-[14px] text-zinc-300">ほかの人が選び終えるのを待っています</div>
+          )
         ) : (
           <>
             <VoteStatus className="mb-2" />
-            <button onClick={() => dispatchGame({ type: 'FINISH_REWARD', playerId: LOCAL_PLAYER })} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px]">
+            <button onClick={() => dispatchGame({ type: 'FINISH_REWARD', playerId: LOCAL_PLAYER })} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px]" data-reward-finish>
               {r.hiddenChest ? '隠し宝箱へ' : '先へ進む'}
               <VoteChips cmd={{ type: 'FINISH_REWARD', playerId: LOCAL_PLAYER }} />
             </button>
           </>
         )}
       </div>
+
+      {/* 戦利品の取り合い（全員の成長とカードが終わってから、画面の真ん中に出す。カードの説明に押し出されて見落とさない） */}
+      <AnimatePresence>
+        {step.kind === 'claim' && r.claim && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-40 flex flex-col overflow-y-auto overscroll-contain bg-black/80 px-3 py-3"
+            data-claim-center
+          >
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="my-auto w-full">
+              <ClaimPanel claim={r.claim} />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* レベルアップの成長ボーナス */}
       <AnimatePresence>

@@ -13,6 +13,8 @@ import { CardBody } from './ui/CardBody';
 import { CardPickPanel } from './ui/CardPickPanel';
 import { ConfirmDialog } from './ui/ConfirmDialog';
 import { HeroFace } from './ui/game';
+import { HiddenNoticeBadge } from './ui/HiddenNotices';
+import { LAYER } from './ui/layers';
 
 export const TIER_NAME: Record<JobTier, string> = { base: '基本', mid: '中位', top: '最上位', special: '特殊' };
 
@@ -166,13 +168,27 @@ export function JobPickOverlay() {
   // 押したカード（回2: 戦闘のカード報酬と同じく、下に説明の窓を開く。決めるのは窓の「このカードにする」だけ）
   const [sel, setSel] = useState<string | null>(null);
   const close = useCallback(() => setSel(null), []);
+  // 【提案】隠れている通信の知らせを見る間だけ、カード選びを下に畳む（選ぶまでは閉じられない。戻るボタンで開き直す）
+  const [peek, setPeek] = useState(false);
   const hero = full?.heroes.find((h) => h.jobPick?.length && isLocalPlayer(h.playerId));
   if (!hero) return null;
+  if (peek)
+    return (
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center px-3 pb-3" style={{ zIndex: LAYER.cardPick }} data-job-pick-peek>
+        <button onClick={() => setPeek(false)} className="btn btn-gold pointer-events-auto h-12 w-full max-w-md rounded-xl text-[15px] font-bold">
+          {hero.name}の専用カード選びに戻る
+        </button>
+      </div>
+    );
   const job = getClass(hero.classId);
   const aff = affinityFromStats(heroStats(hero));
   const picked = sel && hero.jobPick!.includes(sel) ? getCard(sel) : undefined;
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 z-[70] flex flex-col overflow-y-auto overscroll-contain bg-black/85 px-3 py-3" data-job-pick>
+    // 実機の不具合⑤: 背景は不透明（後ろのマップやダンジョンの文字が透けない。お供・カードの作業の画面と同じ地の色）
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 flex flex-col overflow-y-auto overscroll-contain bg-[#0b0910] px-3 py-3" style={{ zIndex: LAYER.cardPick }} data-job-pick>
+      <div className="flex shrink-0 justify-end">
+        <HiddenNoticeBadge onOpen={() => setPeek(true)} />
+      </div>
       {/* 説明を開いて縦に収まらない時は、この中だけ縦にスクロールする（収まる時は真ん中に置く） */}
       <div className="my-auto flex w-full flex-col items-center">
         <div className="font-display text-outline text-center text-[24px] text-amber-100">{job.name}に転職した！</div>

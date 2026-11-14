@@ -127,7 +127,9 @@ export function battleFrames(events: BattleEvent[], allyIds: ReadonlySet<string>
         }
       }
       if (e.amount > 0) popups.push({ unitId: e.unitId, tone: 'damage', text: `-${e.amount}`, ...(bigTier && !allyIds.has(e.unitId) ? { tier: bigTier } : {}) });
-      if (e.blocked > 0 || e.amount === 0) popups.push({ unitId: e.unitId, tone: 'zero', text: e.blocked > 0 ? `防御${e.blocked}` : '0' });
+      // 吹雪に隠れた敵に外れた一撃は「0」ではなく「❄外れ」（持ち越しの直し。ダメージ0と見分ける）
+      if (e.missed && e.amount === 0) popups.push({ unitId: e.unitId, tone: 'zero', text: '❄外れ' });
+      else if (e.blocked > 0 || e.amount === 0) popups.push({ unitId: e.unitId, tone: 'zero', text: e.blocked > 0 ? `防御${e.blocked}` : '0' });
       if (e.amount > 0 || e.blocked > 0) motions.push({ unitId: e.unitId, kind: 'hit' });
       sounds.push(damageSound(e.amount, e.blocked, allyIds.has(e.unitId)));
       // 段階B: 命中のエフェクト。行動した本人の攻撃ならその見た目、ほか（反撃・召喚など）は衝撃

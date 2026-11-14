@@ -450,7 +450,7 @@ const EnemyUnit = memo(function EnemyUnit({
           </motion.div>
         )}
         {/* 数字は、その敵の絵の頭のすぐ上に出す（箱の上の空きではなく、絵の上の端に合わせる） */}
-        <UnitPopups unitId={enemy.uid} top={`${Math.max(0, boxH - h - 6)}px`} />
+        <UnitPopups unitId={enemy.uid} top={`${Math.max(0, boxH - h - 6)}px`} breakDrop={Math.round(h * 0.4)} />
       </div>
       {!enemy.dead && (
         // 予告は味方の立ち絵より手前に出す（画面が低くて重なっても、狙いと数字を読めるように）

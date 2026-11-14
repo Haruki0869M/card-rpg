@@ -39,6 +39,7 @@ function sceneLocalHeroes(game: GameState): Hero[] {
 }
 import { Bar, Crest, HeroFace, ItemIcon, itemSummary, RARITY_STYLE, STAT_LABEL } from './ui/game';
 import { CATEGORY_STYLE, EffectChip } from './ui/icons';
+import { HiddenNoticeBadge } from './ui/HiddenNotices';
 
 /**
  * 下から出るシートの土台（実機の不具合② 2026-11-14）。
@@ -76,7 +77,9 @@ function BottomSheet({ name, title, onClose, children, tall }: { name: string; t
           data-sheet-panel
         >
           <div className="flex shrink-0 items-center justify-between gap-2 px-3 pt-1" data-sheet-header>
-            <div className="font-display min-w-0 truncate text-[18px] text-amber-100">{title}</div>
+            <div className="font-display min-w-0 flex-1 truncate text-[18px] text-amber-100">{title}</div>
+            {/* 【提案】通信の知らせはシートの後ろに回るので、出ている時だけ小さな印。押すとシートを閉じて知らせが見える */}
+            <HiddenNoticeBadge onOpen={onClose} />
             <button onClick={onClose} aria-label="閉じる" className="btn btn-dark flex h-11 w-11 shrink-0 items-center justify-center rounded-lg" data-sheet-close>
               <X size={22} />
             </button>

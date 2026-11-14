@@ -14,7 +14,7 @@ export const LAYER = {
   sheet: 64,
   /** シートの上の確認の窓（冒険をやめる確認） */
   sheetConfirm: 66,
-  /** カード選び（転職のカード選び・キャラの課題）・伝承の書。JobPickOverlay・HeroTaskOverlay は z-70 のまま */
+  /** カード選び（転職のカード選び = JobPickOverlay は LAYER.cardPick を使う・キャラの課題 HeroTaskOverlay は z-70 のまま）・伝承の書 */
   cardPick: 70,
   /** 遊び方・用語集（HelpScreen は z-75 のまま） */
   help: 75,
@@ -28,3 +28,17 @@ export const LAYER = {
 
 /** 重なりの順番の一覧（確認の台本・テスト用。下から順） */
 export const LAYER_ORDER = (Object.entries(LAYER) as [keyof typeof LAYER, number][]).sort((a, b) => a[1] - b[1]);
+
+// ===== 戦場の中の重なり（戦場の中だけで比べる。上の LAYER とは別の箱。実機の不具合④(2)） =====
+// 「⚡BREAK!」が技名の帯の上に乗って「⚡BREAK!ャンブルボルト」になった。技名の帯を数字より手前にし、
+// BREAK の文字は敵の絵の真ん中寄りへ下げて、帯の高さを避ける（Popups.tsx の breakDrop）。
+export const BATTLE_LAYER = {
+  /** 敵・味方の頭の上の数字（ダメージ・BREAK! など。UnitPopups） */
+  unitPopup: 30,
+  /** 技名の帯（CalloutBand）。数字より手前。帯は1本だけで、次の技が出たらすぐ置き換わる */
+  callout: 32,
+  /** 倒れた敵の演出（DeathField） */
+  death: 34,
+  /** 命中のエフェクト・白いフラッシュ（ImpactField） */
+  impact: 35,
+} as const;
