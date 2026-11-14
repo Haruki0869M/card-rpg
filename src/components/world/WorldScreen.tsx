@@ -37,6 +37,7 @@ import {
   dungeonDetourLines,
   scourgeCurse,
   scourgesWith,
+  scourgeList,
   guideGoal,
   goalLineText,
   goalShortText,
@@ -63,12 +64,15 @@ import { ScourgeStrip } from './ScourgeBadge';
 import { arrivalView, moveButtonText, MoveStatus, useMovePlayback } from './WorldMoveScene';
 import { canChangeNow } from '../JobSheet';
 import { useElementSize } from '../../hooks/useElementSize';
+import { useLowScreen } from '../../hooks/useLowScreen';
 
 const TIME_ICON: Record<TimeOfDay, typeof Sun> = { morning: Sunrise, noon: Sun, evening: Sunset, night: Moon };
 
 /** 上部のバー: 侵食度・命の灯火・ゴールド・時間帯・メニュー */
-export function WorldTopBar({ game, goldHeroId, goalLine }: { game: GameState; /** 所持金を出すキャラ（町・神殿・祠では切り替えたキャラ。無ければ世界マップの手番のキャラ） */ goldHeroId?: string; /** 「次の目的」の行（回1。世界マップだけ。上の帯のすぐ下、💀の札の上に出す） */ goalLine?: React.ReactNode }) {
+export function WorldTopBar({ game, goldHeroId, goalLine, scourgeInParty }: { game: GameState; /** 所持金を出すキャラ（町・神殿・祠では切り替えたキャラ。無ければ世界マップの手番のキャラ） */ goldHeroId?: string; /** 「次の目的」の行（回1。世界マップだけ。上の帯のすぐ下、💀の札の上に出す） */ goalLine?: React.ReactNode; /** 狭い画面 回1: 低い画面では、災厄の札を仲間の列の 💀×N に畳む（世界マップだけ） */ scourgeInParty?: boolean }) {
   const openSheet = useBattle((s) => s.openSheet);
+  // 狭い画面 回1: 低い画面（data-low）では、帯を1行にする（「次: 25%で…」は帯を押すと遊び方の一番上に出る）
+  const low = useLowScreen();
   const w = game.world!;
   const time = timeOfDay(w.worldTurn);
   const TimeIcon = TIME_ICON[time];
@@ -95,8 +99,8 @@ export function WorldTopBar({ game, goldHeroId, goalLine }: { game: GameState; /
           </span>
         </span>
         <Bar value={w.corruption} max={100} color="linear-gradient(90deg,#6a2a9a,#e04aff)" height={6} />
-        {/* 次の段階は省略せずに全文（2行まで） */}
-        <span className="text-[12px] leading-[15px] text-zinc-400">{next ? `次: ${next.at}%で${next.text}` : ''}</span>
+        {/* 次の段階は省略せずに全文（2行まで）。低い画面は出さない（押すと遊び方の一番上に「次: …」が出る） */}
+        <span className="text-[12px] leading-[15px] text-zinc-400 low:hidden" data-corruption-next>{next ? `次: ${next.at}%で${next.text}` : ''}</span>
       </button>
       {/* 命の灯火と所持金の列。押すと遊び方の「命の灯火」を開く（押しやすいように列ごと1つのボタン） */}
       <button
@@ -133,8 +137,8 @@ export function WorldTopBar({ game, goldHeroId, goalLine }: { game: GameState; /
       </button>
     </div>
     {goalLine}
-    {/* 災厄の中ボスの札（段階7b）。いる時だけ */}
-    <ScourgeStrip game={game} />
+    {/* 災厄の中ボスの札（段階7b）。いる時だけ。低い画面の世界マップは仲間の列の 💀×N に畳む（町などは1行の帯） */}
+    {!(low && scourgeInParty) && <ScourgeStrip game={game} />}
     </>
   );
 }
@@ -194,7 +198,7 @@ function GoalLine({ game, goal, from, onFocus }: { game: GameState; goal: GuideG
     <button
       onClick={onFocus}
       // 高さ700px未満の画面（360×640 など）では出さない: 1行（44px）を足すと、操作パネルに隠れていない地図がほとんど無くなるため（回1の報告に案を書いた）
-      className="btn z-10 mx-2 mt-1 hidden min-h-11 shrink-0 items-center gap-1 rounded-lg border border-amber-200/50 bg-[#2a1c06]/85 px-2 text-left text-[13px] leading-4 font-bold text-amber-100 [@media(min-height:700px)]:flex"
+      className="btn z-10 mx-2 mt-1 hidden min-h-11 shrink-0 items-center gap-1 rounded-lg border border-amber-200/50 bg-[#2a1c06]/85 px-2 text-left text-[13px] leading-4 font-bold text-amber-100 [@media(min-height:700px)]:flex low:hidden"
       aria-label={`${text}。押すと地図がその場所へ動きます`}
       data-goal-line={goal.dungeonId}
     >
@@ -207,13 +211,16 @@ function GoalLine({ game, goal, from, onFocus }: { game: GameState; goal: GuideG
 /** パーティの小さな状態（顔のアイコンと細いHP。地図を広くとるため小さく） */
 function PartyRow({ game }: { game: GameState }) {
   const openSheet = useBattle((s) => s.openSheet);
+  // 狭い画面 回1: 低い画面では、災厄の札を「💀×N」の小さなボタンにしてこの列に入れる。4人・狭い幅で入りきらない時は横に送れる
+  const low = useLowScreen();
+  const scourgeN = low ? scourgeList(game).length : 0;
   const setScene = useBattle((s) => s.setScene);
   const w = game.world!;
   const owners = showOwners(game);
   // 「ステータス」で開くキャラ: 手番のキャラが自分のならそれ、ちがえば自分の最初のキャラ
   const self = game.heroes.find((h) => h.id === w.turn && isLocalPlayer(h.playerId)) ?? game.heroes.find((h) => isLocalPlayer(h.playerId)) ?? game.heroes[0];
   return (
-    <div className="flex shrink-0 items-center gap-1.5 bg-black/50 px-2 py-0.5" data-party-row>
+    <div className={`flex shrink-0 items-center bg-black/50 px-2 py-0.5 ${low ? 'gap-1 overflow-x-auto [scrollbar-width:none]' : 'gap-1.5'}`} data-party-row>
       {game.heroes.map((h) => {
         const max = heroMaxHp(h);
         const active = h.id === w.turn;
@@ -247,7 +254,8 @@ function PartyRow({ game }: { game: GameState }) {
           </button>
         );
       })}
-      <StatusButton game={game} self={self} className="ml-auto" />
+      {scourgeN > 0 && <ScourgeStrip game={game} variant="button" className="ml-auto" />}
+      <StatusButton game={game} self={self} className={scourgeN > 0 ? '' : 'ml-auto'} fixed={low} />
     </div>
   );
 }
@@ -256,14 +264,14 @@ function PartyRow({ game }: { game: GameState }) {
  * 「ステータス」のボタン（自分のキャラのステータス・装備の付け替え・仲間への受け渡しの窓を開く）。
  * 世界マップの下の列と、町・神殿・祭壇の画面の上（回2）で同じ物を使う。窓はこの端末だけで開く（ほかの人の操作は止めない）
  */
-export function StatusButton({ game, self, className = '' }: { game: GameState; self: Hero; className?: string }) {
+export function StatusButton({ game, self, className = '', fixed }: { game: GameState; self: Hero; className?: string; /** 縮めない（低い画面の仲間の列。入りきらない時は列を横に送る） */ fixed?: boolean }) {
   const openSheet = useBattle((s) => s.openSheet);
   const owners = showOwners(game);
   return (
     <button
       onClick={() => openSheet('party', self.id)}
       aria-label={`${self.name}のステータスを見る`}
-      className={`btn flex h-11 min-w-0 shrink items-center gap-1 rounded-lg border border-amber-200/40 bg-[#2a2040]/90 px-2 text-amber-100 shadow ${className}`}
+      className={`btn flex h-11 ${fixed ? 'shrink-0' : 'min-w-0 shrink'} items-center gap-1 rounded-lg border border-amber-200/40 bg-[#2a2040]/90 px-2 text-amber-100 shadow ${className}`}
       data-status-button
     >
       <HeroFace hero={self} size={22} />
@@ -410,6 +418,8 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
   // 下の操作パネルは地図の上に重ねる。地図の枠はパネルの高さによらず同じ大きさで、1pxも動かない。
   // 移動中は、パネルを外さずに見えなくして、その上に小さな「移動中…」の帯を重ねる（パネルの高さが変わらないので、カメラも合わせ直さない）
   const [panelBox, panelSize] = useElementSize<HTMLDivElement>();
+  // 狭い画面 回1: 低い画面（見えている高さ 640px 未満。data-low）では、上と下を細い形にして地図を広くする（情報は消さず、置き場所を変える）
+  const low = useLowScreen();
   const dispatchGame = useBattle((s) => s.dispatchGame);
   const continueStory = useBattle((s) => s.continueStory);
   const heldStories = useBattle((s) => s.heldStories);
@@ -560,9 +570,51 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
   };
 
   const scenario = getScenario(game.scenarioId);
+  // 狭い画面 回1（低い画面だけ）: 下のパネルの部品
+  const unfollow = mine && followingGroup(game, hero.id).length > 1;
+  const doUnfollow = () => {
+    dispatchGame({ type: 'WORLD_UNFOLLOW', playerId: pid, heroId: hero.id });
+    setWithMe(Object.fromEntries(companions.map((h) => [h.id, false])));
+  };
+  const showCompanions = companions.length > 0 && (w.move === null || (w.move ?? 0) > 0);
+  const climateText = climate && !(warm && climate.kind === 'cold') ? `${climate.kind === 'cold' ? '❄️ 寒さ' : '☀️ 暑さ'}で毎ターン体力が減る（野営すれば防げる。ただし回復は半分）` : undefined;
+  const warmLeft = warm ? /あと(\d+)ターン/.exec(warm)?.[1] : undefined;
+  // 短い札を押すと、全文をパネルのすぐ上の帯（マスの説明と同じ所）に出す。もう1度押すと消える
+  const toggleInfo = (text: string) => setInfo((cur) => (cur === text ? undefined : text));
+  const diceHint = w.move ? (selected !== undefined ? 'もう一度タップか下のボタンで決定' : 'マスの数字は使う移動力') : '移動力を使い切った';
+  const campButton = (
+    <button
+      onClick={() => canCamp && dispatchGame({ type: 'WORLD_CAMP', playerId: pid, heroId: hero.id })}
+      disabled={!canCamp}
+      className={low ? 'btn btn-dark flex h-11 shrink-0 flex-col items-center justify-center rounded-lg px-2 text-[12px] leading-4 font-bold whitespace-nowrap' : 'btn btn-dark flex h-11 items-center justify-center gap-0.5 rounded-lg text-[12px] font-bold'}
+      aria-label={low ? `野営する${ambush ? `（夜襲${ambush}%）` : ''}${nightmare ? '（災厄のせいで回復半分）' : ''}` : undefined}
+      data-camp
+    >
+      {low ? (
+        <>
+          <span className="flex items-center gap-0.5"><Tent size={14} /> 野営{ambush ? `${ambush}%` : ''}</span>
+          {nightmare && <span className="text-[12px] text-fuchsia-300" data-camp-scourge>💀回復半分</span>}
+        </>
+      ) : (
+        <>
+          <Tent size={15} /> 野営{ambush ? `${ambush}%` : ''}
+          {nightmare && <span className="ml-0.5 text-[12px] text-fuchsia-300" data-camp-scourge>💀回復半分</span>}
+        </>
+      )}
+    </button>
+  );
+  const waitButton = (
+    <button
+      onClick={() => dispatchGame({ type: 'WORLD_WAIT', playerId: pid, heroId: hero.id })}
+      className={low ? 'btn btn-dark h-11 min-w-11 shrink-0 rounded-lg px-2 text-[12px] leading-4 font-bold' : 'btn btn-dark h-11 rounded-lg text-[12px] font-bold'}
+      data-world-wait={w.move === null ? 'wait' : 'end'}
+    >
+      {w.move === null ? '待機' : '手番を終える'}
+    </button>
+  );
   return (
     <Screen>
-      <WorldTopBar game={game} goalLine={goal && <GoalLine game={game} goal={goal} from={w.pos[selfHero.id] ?? here} onFocus={() => focusOn(goal.tile)} />} />
+      <WorldTopBar game={game} scourgeInParty goalLine={goal && <GoalLine game={game} goal={goal} from={w.pos[selfHero.id] ?? here} onFocus={() => focusOn(goal.tile)} />} />
       <PartyRow game={game} />
       {/* 地図。タップしたマスの説明は、地図の上に重ねたパネルのすぐ上に出す（行が増えて地図が狭くならないように。フェーズ2-D） */}
       <div className="relative flex min-h-0 flex-1 flex-col" data-world-area>
@@ -611,9 +663,9 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
         </div>
       )}
       <div className={`relative shrink-0 ${movement && playback ? 'invisible' : ''}`} aria-hidden={movement && playback ? true : undefined} data-world-controls>
-      <div className="shrink-0 bg-sky-950 px-3 py-1 text-center text-[14px] font-bold" data-current-turn>現在は {hero.playerId}（{hero.name}）の手番です</div>
+      <div className="shrink-0 bg-sky-950 px-3 py-1 text-center text-[14px] font-bold low:hidden" data-current-turn>現在は {hero.playerId}（{hero.name}）の手番です</div>
       {/* 手番のキャラの操作 */}
-      <div className="panel relative z-10 shrink-0 rounded-t-2xl px-3 pt-2 pb-3">
+      <div className="panel relative z-10 shrink-0 rounded-t-2xl px-3 pt-2 pb-3 low:pb-1.5">
         {turnExp && (
           <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 rounded-t-2xl bg-[#0b0910]/95 px-3 text-[14px] text-zinc-100">
             <span className="flex items-center gap-1.5">
@@ -658,14 +710,14 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
               </span>
             </div>
             {/* 高さ700px以上の画面（と、次の目的が無い時）は、今までどおり地形と地域 */}
-            <div className={`text-[12px] text-zinc-400 ${goal ? '[@media(max-height:699.98px)]:hidden' : ''}`}>{getTerrain(w.tiles[here].t).name}・{scenario.map!.regions[w.tiles[here].r].name}</div>
+            <div className={`text-[12px] text-zinc-400 ${goal ? '[@media(max-height:699.98px)]:hidden low:hidden' : ''}`}>{getTerrain(w.tiles[here].t).name}・{scenario.map!.regions[w.tiles[here].r].name}</div>
             {/* 回1の追加: 高さ700px未満の画面は、この行に「次: 沈黙の地下墓所（東）」（押すと、そこへ地図が動く）。
                 入りきらない時は、右の地形と地域から先に切る（それでも入らなければ、次の目的も …で切る） */}
             {goal && (
               <button
                 onClick={() => focusOn(goal.tile)}
                 // 押せる所は44pxの高さ（上の名前の行に重ねる。下のボタンには重ねない）。行の高さは変えない
-                className="btn relative -mt-7 hidden min-h-11 w-full min-w-0 items-end gap-1 text-left text-[12px] leading-4 [@media(max-height:699.98px)]:flex"
+                className="btn relative -mt-7 hidden min-h-11 w-full min-w-0 items-end gap-1 text-left text-[12px] leading-4 [@media(max-height:699.98px)]:flex low:flex"
                 aria-label={`${goalLineText(game, goal, w.pos[selfHero.id] ?? here)}。押すと地図がその場所へ動きます`}
                 data-goal-short={goal.dungeonId}
               >
@@ -675,6 +727,25 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
               </button>
             )}
           </div>
+          {/* 狭い画面 回1: 低い画面は、温泉・寒さを短い札に（押すと全文がパネルのすぐ上に出る。もう1度押すと消える） */}
+          {low && warm && (
+            <button onClick={() => toggleInfo(warm)} className="btn flex h-11 shrink-0 items-center rounded-lg border border-orange-300/50 bg-orange-950/60 px-1.5 text-[12px] leading-4 font-bold whitespace-nowrap text-orange-200" aria-label={warm} data-warmth-chip>
+              ♨{warmLeft ? `あと${warmLeft}` : ''}
+            </button>
+          )}
+          {low && climateText && (
+            <button onClick={() => toggleInfo(climateText)} className="btn flex h-11 shrink-0 items-center rounded-lg border border-sky-300/50 bg-sky-950/60 px-1.5 text-[12px] leading-4 font-bold whitespace-nowrap text-sky-200" aria-label={climateText} data-climate-chip={climate!.kind}>
+              {climate!.kind === 'cold' ? '❄️寒さ' : '☀️暑さ'}
+            </button>
+          )}
+          {/* 狭い画面 回1: 低い画面は、振る前もここに「移動力 1〜6・平均3.5」（サイコロの説明の行を1行に収めるため） */}
+          {w.move === null && low && (
+            <div className="flex shrink-0 flex-col items-center rounded-lg bg-black/40 px-1.5 py-0.5 text-[12px] leading-[13px] whitespace-nowrap" data-dice-range>
+              <span className="text-zinc-400">移動力</span>
+              <b className="text-[14px] leading-4 text-amber-200 tabular-nums">{1 + bonusSum}〜{BALANCE.moveDiceSides + bonusSum}</b>
+              <span className="text-zinc-400 tabular-nums">平均{avg.toFixed(1)}</span>
+            </div>
+          )}
           {w.move !== null && (
             <div className="flex shrink-0 flex-col items-center rounded-lg bg-black/40 px-2 py-0.5">
               <span className="text-[12px] text-zinc-400">移動力</span>
@@ -683,7 +754,14 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
           )}
         </div>
 
-        {md && (
+        {md && low && (
+          // 狭い画面 回1: 低い画面は、サイコロの結果と説明を字だけの1行に（振り直しのボタンは下の1段へ）
+          <div className="mt-0.5 flex min-h-[26px] items-center gap-2" data-dice-line>
+            <DiceResult dice={md} unit="移動力" />
+            <span className="ml-auto min-w-0 shrink text-right text-[12px] leading-4 text-zinc-300">{diceHint}</span>
+          </div>
+        )}
+        {md && !low && (
           <div className="mt-1 flex items-center gap-2">
             <DiceResult dice={md} unit="移動力" />
             {canReroll ? (
@@ -696,8 +774,8 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
           </div>
         )}
 
-        {mine && followingGroup(game, hero.id).length > 1 && <button className="btn btn-dark my-1 min-h-11 w-full rounded-lg text-[13px]" onClick={() => { dispatchGame({ type: 'WORLD_UNFOLLOW', playerId: pid, heroId: hero.id }); setWithMe(Object.fromEntries(companions.map(h => [h.id, false]))); }}>同行を解除して単独行動する</button>}
-        {companions.length > 0 && (w.move === null || (w.move ?? 0) > 0) && (
+        {unfollow && !(low && showCompanions) && <button className="btn btn-dark my-1 min-h-11 w-full rounded-lg text-[13px] low:my-0.5" onClick={doUnfollow} data-unfollow>同行を解除して単独行動する</button>}
+        {showCompanions && (
           <div className="mt-1 flex items-center gap-1">
             <span className="flex shrink-0 items-center gap-0.5 text-[12px] text-zinc-300">
               <Users size={14} />
@@ -733,6 +811,12 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
               );
             })}
             <span className="truncate text-[12px] text-zinc-500">{companions.some((c) => !ownMate(c)) ? '他の人のキャラは誘って承知してもらう' : 'タップで一緒に行くか選ぶ'}</span>
+            {/* 狭い画面 回1: 低い画面は「同行を解除」をこの行の右に（字は2行に折り返す。全文のまま） */}
+            {low && unfollow && (
+              <button className="btn btn-dark ml-auto flex h-11 w-[104px] shrink-0 items-center justify-center rounded-lg px-1 text-[12px] leading-4" onClick={doUnfollow} data-unfollow>
+                同行を解除して単独行動する
+              </button>
+            )}
           </div>
         )}
 
@@ -754,13 +838,19 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
                 }
                 dispatchGame({ type: 'WORLD_INTERACT', playerId: pid, heroId: hero.id, party: [hero.id, ...chosenCompanions] });
               }}
-              className="btn btn-dark font-display mt-1.5 flex min-h-12 w-full items-center justify-center gap-1.5 rounded-xl px-2 text-[16px] leading-5 text-amber-100 shadow-[0_0_12px_rgba(255,200,90,.35)]"
+              className="btn btn-dark font-display mt-1.5 flex min-h-12 w-full items-center justify-center gap-1.5 rounded-xl px-2 text-[16px] leading-5 text-amber-100 shadow-[0_0_12px_rgba(255,200,90,.35)] low:mt-1 low:min-h-11"
               data-interact
             >
               {label}
             </button>
           )}
-        {w.move === null && (
+        {w.move === null && low && (
+          // 狭い画面 回1: 低い画面は、サイコロの説明を1行に（移動力の幅と平均は名前の行の右。入らない時だけ折り返す。省かない）
+          <div className="mt-1 text-center text-[12px] leading-4 text-zinc-300" data-dice-preview>
+            {diceBonus.length ? <b className="text-sky-200">サイコロ{bonusText({ bonus: diceBonus } as never)}</b> : `素早さ${chance}%: ボーナスなし`}・<Star size={12} className="inline fill-amber-400/70 text-amber-300" />1で1回振り直せる
+          </div>
+        )}
+        {w.move === null && !low && (
           <div className="mt-1.5 flex flex-col items-center leading-4" data-dice-preview>
             <span className="text-[12px] text-zinc-300">
               サイコロ1つ{diceBonus.length ? <b className="text-sky-200">{bonusText({ bonus: diceBonus } as never)}</b> : `（素早さ${chance}%: ボーナスなし）`}
@@ -771,6 +861,54 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
           </div>
         )}
 
+        {low && (
+          // 狭い画面 回1: 低い画面は、助け起こす（あれば）＋ ボタン1段（振る／行き先・★振り直す・野営・待機／手番を終える）
+          <div className="mt-1 flex flex-col gap-1" data-low-actions>
+            {Object.entries(w.downed ?? {})
+              .filter(([, t]) => t === w.pos[hero.id])
+              .map(([id]) => {
+                const d = game.heroes.find((x) => x.id === id);
+                return d ? (
+                  <button
+                    key={id}
+                    onClick={() => dispatchGame({ type: 'WORLD_REVIVE', playerId: pid, heroId: hero.id, targetId: id })}
+                    className="btn btn-gold flex h-11 items-center justify-center gap-2 rounded-xl text-[14px] font-bold"
+                    data-revive={id}
+                  >
+                    <HeroFace hero={d} size={28} dim /> {d.name}を助け起こす（手番を使う）
+                  </button>
+                ) : null;
+              })}
+            <div className="flex gap-1.5">
+              {w.move === null ? (
+                <button
+                  onClick={() => dispatchGame({ type: 'WORLD_ROLL_MOVE', playerId: pid, heroId: hero.id })}
+                  className="btn btn-gold font-display flex h-11 min-w-0 flex-1 flex-col items-center justify-center rounded-xl leading-5"
+                  data-roll-move
+                >
+                  <span className="flex items-center gap-1 text-[17px] whitespace-nowrap"><Dices size={19} /> サイコロを振る</span>
+                  {roadBonus.length > 0 && <span className="rounded-full bg-black/25 px-2 text-[12px] leading-4" data-road-bonus>{roadBonus.map((b) => `${b.label}ボーナス +${b.value}`).join('・')}</span>}
+                </button>
+              ) : selected !== undefined ? (
+                <button onClick={() => tapTile(selected)} className="btn btn-gold font-display h-11 min-w-0 flex-1 rounded-xl px-1.5 text-[13px] leading-4" data-move-go>
+                  {moveButtonText(reach?.get(selected), path?.length)}
+                </button>
+              ) : (w.move ?? 0) > 0 && mine ? (
+                <button disabled className="btn btn-dark h-11 min-w-0 flex-1 rounded-xl px-1.5 text-[12px] leading-4 font-bold disabled:opacity-60" data-move-placeholder>
+                  光るマスをタップして行き先を選ぶ
+                </button>
+              ) : null}
+              {canReroll && (
+                <button onClick={() => dispatchGame({ type: 'WORLD_REROLL_MOVE', playerId: pid, heroId: hero.id })} className="btn btn-dark flex h-11 shrink-0 flex-col items-center justify-center rounded-lg px-1.5 text-[12px] leading-4 font-bold" data-reroll>
+                  <span className="flex items-center gap-0.5"><Star size={11} className="fill-amber-400/70 text-amber-300" />1で</span>振り直す
+                </button>
+              )}
+              {campButton}
+              {waitButton}
+            </div>
+          </div>
+        )}
+        {!low && (
         <div className="mt-2 flex flex-col gap-1.5">
           {w.move === null ? (
             <button
@@ -782,7 +920,7 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
               {roadBonus.length > 0 && <span className="ml-1 rounded-full bg-black/25 px-2 text-[13px] leading-6" data-road-bonus>{roadBonus.map((b) => `${b.label}ボーナス +${b.value}`).join('・')}</span>}
             </button>
           ) : selected !== undefined ? (
-            <button onClick={() => tapTile(selected)} className="btn btn-gold font-display h-12 rounded-xl text-[17px] leading-5">
+            <button onClick={() => tapTile(selected)} className="btn btn-gold font-display h-12 rounded-xl text-[17px] leading-5" data-move-go>
               {moveButtonText(reach?.get(selected), path?.length)}
             </button>
           ) : (w.move ?? 0) > 0 && mine ? (
@@ -801,6 +939,7 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
                   key={id}
                   onClick={() => dispatchGame({ type: 'WORLD_REVIVE', playerId: pid, heroId: hero.id, targetId: id })}
                   className="btn btn-gold flex h-12 items-center justify-center gap-2 rounded-xl text-[15px] font-bold"
+                  data-revive={id}
                 >
                   <HeroFace hero={d} size={30} dim /> {d.name}を助け起こす（手番を使う）
                 </button>
@@ -817,19 +956,11 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
             </p>
           )}
           <div className="grid grid-cols-2 gap-1.5">
-            <button
-              onClick={() => canCamp && dispatchGame({ type: 'WORLD_CAMP', playerId: pid, heroId: hero.id })}
-              disabled={!canCamp}
-              className="btn btn-dark flex h-11 items-center justify-center gap-0.5 rounded-lg text-[12px] font-bold"
-            >
-              <Tent size={15} /> 野営{ambush ? `${ambush}%` : ''}
-              {nightmare && <span className="ml-0.5 text-[12px] text-fuchsia-300" data-camp-scourge>💀回復半分</span>}
-            </button>
-            <button onClick={() => dispatchGame({ type: 'WORLD_WAIT', playerId: pid, heroId: hero.id })} className="btn btn-dark h-11 rounded-lg text-[12px] font-bold">
-              {w.move === null ? '待機' : '手番を終える'}
-            </button>
+            {campButton}
+            {waitButton}
           </div>
         </div>
+        )}
       </div>
       </div>
       </div>

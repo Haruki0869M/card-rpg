@@ -10,13 +10,17 @@
 //   SIZES=390x540,360x520 で大きさを変えられる。SMALL_SCREEN_OUTPUT で写真の場所。
 // 2026-11-15: イベントの画面の下の帯「装備」「道具」（1人・1台で2人・選ぶ段・挑む段）が、選択肢・挑む段のパネルに重ならず押せ、シートが開く。
 // ④⑤（2026-11-15）: 報酬（1人・1台で2人の取り合いの順番）と転職のカード選び（背景・1回では決まらない・ボタンが押せる）も通す。
+// 狭い画面 回1（2026-11-15）: 世界マップ（scripts/small-screen-world.mjs。WORLD_SIZES=390x540,360x520 が既定）。
+//   SMALL_SCREEN_PARTS=sheets,world（既定は両方）で、どれを通すか選べる。戦闘の所は別の作業者が別の関数で足す。
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { chromium, startBattle } from './lib.mjs';
+import { worldMapChecks } from './small-screen-world.mjs';
 
 const BASE = process.env.URL ?? 'http://localhost:4173/card-rpg/';
 if (/web\.app|firebaseapp/.test(BASE)) throw new Error('本番の URL では動かしません');
 const OUT = process.env.SMALL_SCREEN_OUTPUT ?? 'screenshots/small-screen';
 const SIZES = (process.env.SIZES ?? '390x540').split(',').map((s) => s.split('x').map(Number));
+const PARTS = new Set((process.env.SMALL_SCREEN_PARTS ?? 'sheets,world').split(','));
 const LATER = new Set([]); // 別の作業者が後で直す所（落ちても全体の失敗にしない）。報酬・転職のカード選びは④⑤で直したので外した
 mkdirSync(OUT, { recursive: true });
 
@@ -110,7 +114,9 @@ const closeStory = async (p) => {
 
 const browser = await chromium.launch();
 try {
-  for (const [W, H] of SIZES) {
+  // 狭い画面 回1: 世界マップ（低い画面の形）
+  if (PARTS.has('world')) await worldMapChecks({ browser, BASE, OUT, check });
+  for (const [W, H] of PARTS.has('sheets') ? SIZES : []) {
     console.log(`\n===== ${W}×${H} =====`);
     const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
     page.on('pageerror', (e) => check(false, `${W}x${H} pageerror: ${e.message}`, 'page'));

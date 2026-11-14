@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* 狭い画面 回0: 低い画面の形（[data-app-root] の data-low。src/hooks/useLowScreen.ts）。
+   `low:hidden` のように使う。属性の分だけ強いので、CSS の高さの線（[@media(min-height:700px)] など）より勝つ */
+@custom-variant low ([data-low] &);
+
 @theme {
   --font-sans: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif;
   --font-title: "Cinzel Decorative", "Zen Antique", serif;
