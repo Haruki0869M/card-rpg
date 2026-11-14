@@ -49,3 +49,8 @@
 
 返事は絵だけで大丈夫です。
 ```
+
+## 結果（2026-11-15）
+- 2枚とも届いた。元の絵: `C:/dev/card-rpg-assets/chatgpt-pedestal/`。`py scripts/art/build_pedestal.py C:/dev/card-rpg-assets/chatgpt-pedestal` で素材にした。
+- 台座のまわりに光のもやが描きこまれていたので、rembg で台座だけにした。側面の帯の形（piece-base-band）と金のふちの形（piece-base-rim）は、色から取り出した。
+- ゲームでは、帯をプレイヤーの色にかけ合わせ、ふちを段の金属の色に染める（金の段は絵のまま）。最上位と特殊は、帯に小さな宝石。
