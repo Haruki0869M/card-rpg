@@ -235,7 +235,7 @@ export function createWorld(game: GameState, rng: Rng): WorldState {
      */
     // 地域の空きマス（置くたびに作り直さず、置いたマスを抜く。並びは作り直した時と同じなので、選ばれるマスも同じ）
     let pool: number[] | undefined;
-    const place = (n: number, make: () => MapFeature, lane?: string, only = false) => {
+    const place = (n: number, make: (tile: number) => MapFeature, lane?: string, only = false) => {
       for (let k = 0; k < n; k++) {
         pool ??= free(reg.rows[0], reg.rows[1]);
         let cands = pool;
@@ -246,15 +246,17 @@ export function createWorld(game: GameState, rng: Rng): WorldState {
         }
         const tile = pick(cands, rng);
         pool.splice(pool.indexOf(tile), 1);
-        tiles[tile].f = make();
+        tiles[tile].f = make(tile);
       }
     };
     // 奥の地域ほど良い宝箱が出やすい
     const depth = def.regions.length - 1 - ri;
-    place(reg.chests ?? 0, () => {
-      const wts = [Math.max(20, 70 - depth * 12), 25 + depth * 4, 4 + depth * 4, 1 + depth];
+    // 3つの道（2026-11-14）: 宝箱は prefer.chest の帯（東の丘）に多く置き、その帯の宝箱は chestDepth 段だけ奥の地域の重みで選ぶ（広い地図だけ）
+    place(reg.chests ?? 0, (tile) => {
+      const d = depth + (wide ? (laneOfCol(def, colOf(w, tile))?.chestDepth ?? 0) : 0);
+      const wts = [Math.max(20, 70 - d * 12), 25 + d * 4, 4 + d * 4, 1 + d];
       return { kind: 'chest', id: 'mapChest', chest: { rarity: RARITIES[pickWeighted(wts, rng)], locked: rng.next() < 0.3 } };
-    });
+    }, def.prefer?.chest);
     if (mapEvents.length) place(reg.events ?? 0, () => ({ kind: 'event', id: pick(mapEvents, rng).id }));
     // 薬草の群生地（段階6a）: 決めた帯に置く
     if (reg.herbs && EVENTS.tryGet(HERB_EVENT)) place(reg.herbs, () => ({ kind: 'event', id: HERB_EVENT }), def.prefer?.herb, true);

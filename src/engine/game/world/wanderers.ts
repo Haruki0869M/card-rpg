@@ -8,7 +8,8 @@ import type { GameState, Wanderer, WorldState } from '../../../types';
 import type { Rng } from '../../rng';
 import { hexDistance, neighbors } from './hex';
 import { timeOfDay } from './time';
-import { isWideMap } from './lanes';
+import { isWideMap, laneDefOfTile } from './lanes';
+import { pickWeighted } from '../loot';
 import { startTileOf } from './start';
 import { scourgeCurse } from './scourgeCurse';
 
@@ -107,7 +108,8 @@ export function spawnWanderer(game: GameState, w: WorldState, rng: Rng, region: 
       cands.push(i);
     }
     if (!cands.length) return undefined;
-    tile = cands[rng.int(cands.length)];
+    // 3つの道（2026-11-14）: 広い地図は、帯の重み（街道は多く・西の森は少なく）でマスを選ぶ。乱数を引く回数は前と同じ1回
+    tile = reach ? cands[pickWeighted(cands.map((i) => laneDefOfTile(game, w, i)?.spawnWeight ?? 1), rng)] : cands[rng.int(cands.length)];
   }
   let group = reg.encounters[rng.int(reg.encounters.length)];
   // レアの組（K3）: 地域に rareEncounters がある時だけ、確率で置き換える（ある時だけ乱数を引くので、無い地域の流れは変わらない）。襲撃など場所を決めた配置では出さない
@@ -116,20 +118,26 @@ export function spawnWanderer(game: GameState, w: WorldState, rng: Rng, region: 
     group = reg.rareEncounters[rng.int(reg.rareEncounters.length)];
     rare = true;
   }
-  const level = wandererLevel(game, w, region);
+  // 3つの道: 帯のレベルの加算（東の丘 +1。広い地図だけ）
+  const level = wandererLevel(game, w, region) + (laneDefOfTile(game, w, tile)?.enemyLevel ?? 0);
   const wd: Wanderer = { id: `w${w.nextWandererId++}`, tile, enemies: group.map((defId) => ({ defId, level })), ...(rare ? { rare: true as const } : {}) };
   w.wanderers.push(wd);
   return wd;
 }
 
-/** ワールドターンの終わりに、敵が少し動く（町・施設・キャラのいるマスには入らない） */
-export function moveWanderers(w: WorldState, rng: Rng) {
+/**
+ * ワールドターンの終わりに、敵が少し動く（町・施設・キャラのいるマスには入らない）。
+ * 3つの道（2026-11-14）: 広い地図では、帯をまたいで動かない（湧いた帯の多い・少ないが、時間で薄まらないように）
+ */
+export function moveWanderers(w: WorldState, rng: Rng, game?: Pick<GameState, 'scenarioId'>) {
+  const wide = !!game && isWideMap(game, w);
   if (w.worldTurn % BALANCE.wandererMoveEvery !== 0) return;
   for (const wd of w.wanderers) {
     // 襲撃の敵と災厄の中ボス（巣にいる。段階7b）は動かない
     if (wd.raidTown || wd.scourge || rng.next() < 0.5) continue;
     const atSea = !!TERRAINS.get(w.tiles[wd.tile].t).sea;
-    const opts = neighbors(w, wd.tile).filter((n) => !blocked(w, n, atSea) && w.tiles[n].r === w.tiles[wd.tile].r);
+    const lane = wide ? laneDefOfTile(game!, w, wd.tile)?.id : undefined;
+    const opts = neighbors(w, wd.tile).filter((n) => !blocked(w, n, atSea) && w.tiles[n].r === w.tiles[wd.tile].r && (!wide || laneDefOfTile(game!, w, n)?.id === lane));
     if (opts.length) wd.tile = opts[rng.int(opts.length)];
   }
 }

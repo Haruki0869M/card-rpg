@@ -66,7 +66,10 @@ function run(seed: number, steps: number, c: Count) {
       const to = target(cmd, g);
       if (to !== undefined && w0.tiles[to]?.f) {
         c.moves++;
-        if (r.state.mode === 'encounter') c.encounterOnWayToFacility++;
+        // 襲撃されている町そのもの（行き先のマス）の敵との戦闘は、「途中」ではない（町を守る戦闘。3つの道で乱数の流れが変わり、種 1000 で出た）
+        const enc = r.state.encounter;
+        const raidAtTarget = !!enc && enc.tile === to && !!w0.wanderers.find((x) => x.id === enc.wandererId)?.raidTown;
+        if (r.state.mode === 'encounter' && !raidAtTarget) c.encounterOnWayToFacility++;
       }
     }
     g = r.state;

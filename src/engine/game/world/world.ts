@@ -25,7 +25,7 @@ import { ensureShop } from './town';
 import { dungeonGateError } from './questGate';
 import { bumpStoryVer, passByNotice, queueStory } from './guide';
 import { moveWanderers, spawnWanderer } from './wanderers';
-import { terrainDiceBonus } from './lanes';
+import { laneDefOfTile, terrainDiceBonus } from './lanes';
 import { scourgeCurse } from './scourgeCurse';
 import { tickScourges } from './scourges';
 
@@ -49,7 +49,9 @@ export function campAmbushChance(game: GameState, heroId: string): number {
     const e = getClass(h.classId).exploreAbility.effect;
     if (e.kind === 'nightAmbushReduction') mul = Math.min(mul, e.multiplier);
   }
-  return Math.round(BALANCE.nightAmbushChance * mul);
+  // 3つの道（2026-11-14）: 帯の夜襲の倍率（西の森は半分・東の丘は1.5倍。広い地図だけ）
+  const lane = laneDefOfTile(game, w, w.pos[heroId] ?? 0)?.ambush ?? 1;
+  return Math.min(100, Math.round(BALANCE.nightAmbushChance * mul * lane));
 }
 
 /** 次の侵食度の段階 */
@@ -140,7 +142,7 @@ function endWorldTurn(game: GameState, rng: Rng) {
   // 夜は魔物が増える
   const def = getScenario(game.scenarioId).map!;
   if (timeOfDay(w.worldTurn) === 'night' && rng.next() * 100 < BALANCE.nightSpawnChance) spawnWanderer(game, w, rng, rng.int(def.regions.length));
-  moveWanderers(w, rng);
+  moveWanderers(w, rng, game);
   // 時間で消える出現スポット（段階6）: 期限切れを消し、出る番なら1つ出す
   tickSpawns(game, w, rng);
   // 町への襲撃の期限

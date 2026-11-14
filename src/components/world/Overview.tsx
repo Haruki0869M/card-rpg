@@ -7,7 +7,7 @@ import { useMemo } from 'react';
 import { DUNGEONS } from '../../data/dungeons';
 import { getScenario } from '../../data/scenarios';
 import { TERRAINS, TOWNS } from '../../data/world';
-import { aliveScourges, colOf, nextGoalDungeon, randomDungeonView, rowOf } from '../../engine';
+import { aliveScourges, colOf, isWideMap, nextGoalDungeon, randomDungeonView, rowOf } from '../../engine';
 import { useElementSize } from '../../hooks/useElementSize';
 import type { GameState, Tile } from '../../types';
 import { PLAYER_COLORS } from './pieceLayout';
@@ -99,6 +99,8 @@ export function Overview({ game, onPick, onClose }: { game: GameState; onPick: (
 
   const icon = (m: Mark) => (m.kind === 'town' ? House : m.kind === 'finale' ? Castle : m.kind === 'tower' ? Binoculars : DoorOpen);
   const color = (m: Mark) => (m.fallen ? '#7a6a7a' : m.kind === 'scourge' ? '#e070ff' : m.kind === 'town' ? '#ffe9a8' : m.kind === 'finale' ? '#ff6a5a' : m.kind === 'tower' ? '#e8e0c8' : m.kind === 'random' ? '#c8a0ff' : '#ff9a7a');
+  // 3つの道（2026-11-14）: 広い地図の帯の札（西・中央・東の順。行く前に違いが分かるように）
+  const lanes = isWideMap(game, w) ? (getScenario(game.scenarioId).map?.lanes ?? []).filter((l) => l.hint) : [];
   // 印の大きさ（小さい画面でも押せるように、マスより大きく描く。押せる所はさらに大きい）
   const M = Math.max(14, R * 1.9);
 
@@ -113,6 +115,16 @@ export function Overview({ game, onPick, onClose }: { game: GameState; onPick: (
           <X size={20} className="text-amber-200" />
         </button>
       </div>
+      {lanes.length > 0 && (
+        <div className="mx-3 mb-1.5 grid shrink-0 gap-1" style={{ gridTemplateColumns: `repeat(${lanes.length}, minmax(0, 1fr))` }} data-overview-lanes>
+          {lanes.map((l) => (
+            <div key={l.id} className="rounded border border-amber-200/25 bg-black/50 px-1.5 py-0.5 leading-[14px]" data-overview-lane={l.id}>
+              <div className="truncate text-[12px] font-bold text-amber-100">{l.mark}{l.name}</div>
+              <div className="text-[11px] text-zinc-300">{l.hint}</div>
+            </div>
+          ))}
+        </div>
+      )}
       <div ref={box} className="relative mx-3 mb-3 min-h-0 flex-1">
         {size.width > 0 && (
           <svg

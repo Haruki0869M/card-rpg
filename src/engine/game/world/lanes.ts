@@ -24,6 +24,12 @@ export function laneOfTile(game: Pick<GameState, 'scenarioId'>, w: Pick<WorldSta
   return laneOfCol(getScenario(game.scenarioId).map!, colOf(w, i))?.id;
 }
 
+/** マスの帯（広い地図でなければ undefined）。3つの道（2026-11-14）: 敵の出方・夜襲・説明に使う */
+export function laneDefOfTile(game: Pick<GameState, 'scenarioId'>, w: Pick<WorldState, 'width' | 'height'>, i: number): LaneDef | undefined {
+  if (!isWideMap(game, w)) return undefined;
+  return laneOfCol(getScenario(game.scenarioId).map!, colOf(w, i));
+}
+
 /** 立っているマスの地形の、移動のサイコロのボーナス（街道 +1）。広い地図の時だけ。船の上（海）では付かない */
 export function terrainDiceBonus(game: Pick<GameState, 'scenarioId'>, w: WorldState, tile: number | undefined): DiceRoll['bonus'] {
   if (tile === undefined || !isWideMap(game, w)) return [];

@@ -103,12 +103,17 @@ export const corruptionKingMap: ScenarioMapDef = {
   ],
   // ---- 広い地図（段階6a）----
   lanes: [
-    // 西: 森が多い（森林ルート）。祠・薬草・ランダムダンジョン
-    { id: 'west', name: '西の森', cols: [0, 4], terrain: { forest: 3, swamp: 1.5, plains: 0.6, hills: 0.4, mountain: 0.6, lava: 0.5 } },
-    // 中央: 平原と街道（街道ルート）。町
-    { id: 'center', name: '中央の街道', cols: [5, 9], terrain: { plains: 3, forest: 0.4, swamp: 0.5, hills: 0.5, mountain: 0.3, water: 0.2, lava: 0.2 } },
-    // 東: 丘と山（険しいルート）。祭壇
-    { id: 'east', name: '東の丘', cols: [10, 14], terrain: { hills: 4, mountain: 2, forest: 0.5, plains: 0.6, swamp: 0.6, water: 0.6 } },
+    // 3つの道（2026-11-14・docs/tasks/three-roads-plan.md）: 敵の出方・夜襲・宝箱の良さを帯ごとに変える。数は全部【提案】。
+    // 敵の総数・宝箱の数は地域ごとに今のまま（どの帯に出るかだけ）
+    // 西: 森が多い（森林ルート）。遅いが安全（敵が少ない・夜襲が半分）。祠・薬草・ランダムダンジョン
+    { id: 'west', name: '西の森', mark: '🌲', hint: '遅いが安全（魔物が少ない・夜襲が半分）。祠と薬草で回復', spawnWeight: 0.4, ambush: 0.5,
+      cols: [0, 4], terrain: { forest: 3, swamp: 1.5, plains: 0.6, hills: 0.4, mountain: 0.6, lava: 0.5 } },
+    // 中央: 平原と街道（街道ルート）。速いが魔物が多い。町
+    { id: 'center', name: '中央の街道', mark: '🛣', hint: '速い（街道は移動+1）が、魔物が多い。町がある', spawnWeight: 2.5,
+      cols: [5, 9], terrain: { plains: 3, forest: 0.4, swamp: 0.5, hills: 0.5, mountain: 0.3, water: 0.2, lava: 0.2 } },
+    // 東: 丘と山（険しいルート）。遅くて危ない（魔物が Lv+1・夜襲が1.5倍）が、宝箱が多くて良い。祭壇
+    { id: 'east', name: '東の丘', mark: '⛰', hint: '遅くて危ない（魔物Lv+1・夜襲が多い）が、宝箱が多くて良い', enemyLevel: 1, ambush: 1.5, chestDepth: 2,
+      cols: [10, 14], terrain: { hills: 4, mountain: 2, forest: 0.5, plains: 0.6, swamp: 0.6, water: 0.6 } },
   ],
   highway: [[7, 40], [8, 31], [6, 20], [8, 10], [7, 0]],
   // 仕切り: 4〜5列目の間（偶数の行は5列・奇数の行は4列）と、9〜10列目の間（偶数10・奇数9）。真ん中の3地域に、地域ごとに切れ目2つ
@@ -127,7 +132,7 @@ export const corruptionKingMap: ScenarioMapDef = {
     { kind: 'basin', at: [1, 29], open: 3, wall: 'crag', content: 'shrine' },
     { kind: 'peninsula', at: [12, 38], open: 0, wall: 'water', content: 'chest' },
   ],
-  prefer: { shrine: 'west', herb: 'west', randomDungeon: ['west', 'east'], altar: 'east', tower: ['east', 'west', 'east', 'west'] },
+  prefer: { shrine: 'west', herb: 'west', randomDungeon: ['west', 'east'], altar: 'east', tower: ['east', 'west', 'east', 'west'], chest: 'east' },
   corruptionStages: [
     { at: 25, text: '徘徊する魔物が増え、町が襲われはじめる', spawn: 3, raid: true },
     { at: 50, text: '魔物が凶暴になる（敵のレベル+1）。町への襲撃が続く', spawn: 2, enemyLevel: 1, raid: true },
