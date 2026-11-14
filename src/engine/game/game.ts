@@ -32,6 +32,7 @@ import type {
   DungeonRun,
 } from '../../types';
 import { ensureTileTheme } from './world/randomDungeons';
+import { applyRoomChill } from './dungeonChill';
 import { applyCommand, createBattle, STATE_VERSION } from '../battle/battle';
 import { createRng, type Rng } from '../rng';
 import { applyOutcome, checkOutcome, hasOutcomeKind, makeOutcomeCtx } from './outcomes';
@@ -608,6 +609,8 @@ function enterRoom(game: GameState, playerId: string, roomId: string, rng: Rng):
   revealSeen(run);
   run.currentRoomId = room.id;
   moveIntoRoom(run, room.id);
+  // 凍え（氷漬けの宝物庫。2026-11-14）: 部屋の動きの前に、凍えを数えてHPを減らし、氷漬けの箱の格を決める（ほかのダンジョンでは何もしない）
+  applyRoomChill(game, room);
   roomBehavior(roomTypeOf(room).behavior).enter(game, room, rng);
   return undefined;
 }

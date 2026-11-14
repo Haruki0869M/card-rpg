@@ -86,11 +86,13 @@ const BEFORE: Record<number, { kinds: string[]; state: string }> = {
 };
 /**
  * 作り直しの前のコードで取った、7本の新しい冒険（種1〜3・2人）の状態の指紋。地図の生成と乱数の順番が変わっていない事。
- * シナリオ2だけは、区切り2で地図を 15×42 に作り直したので、区切り2の地図で取り直した（前の 8×35 は 8695f871・b725699b・b35b9ce7）
+ * シナリオ2だけは、区切り2で地図を 15×42 に作り直したので、区切り2の地図で取り直した（前の 8×35 は 8695f871・b725699b・b35b9ce7）。
+ * 2026-11-14 B組の区切り2: シナリオ2だけのテーマ「氷漬けの宝物庫」を足し、シナリオ2はテーマを4つから選ぶ（混ぜる乱数が1回増える）ので取り直した
+ * （前は 18abebb9・5a847cfb・d7dec7f1）。ほかの6本は前のまま
  */
 const BEFORE_MAPS: Record<string, string[]> = {
   corruptionKing: ['26c62f2f', 'e61644da', 'b4f77cef'],
-  frozenKingdom: ['18abebb9', '5a847cfb', 'd7dec7f1'],
+  frozenKingdom: ['75fe636c', 'a2511bd2', 'd070f8a1'],
   cursedArchipelago: ['c475394c', 'f650664b', 'a54306f8'],
   sandDynasty: ['bb9a8be6', '93b10c4a', 'd723aecd'],
   starCastle: ['3636fe91', 'd44fae16', 'f00ba5cb'],

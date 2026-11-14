@@ -9,6 +9,9 @@ import { dungeonTheme, themedDungeonName } from '../dungeon';
 /** そのマスがランダムダンジョンの入口か */
 export const isRandomDungeonTile = (f: MapFeature | undefined): f is MapFeature => f?.kind === 'dungeon' && !!DUNGEONS.tryGet(f.id)?.random;
 
+/** そのシナリオで選べるテーマ（シナリオの欄が無い物と、そのシナリオの物。データの順） */
+export const themesForScenario = (scenarioId: string | undefined): DungeonThemeDef[] => DUNGEON_THEMES.all.filter((t) => !t.scenario || t.scenario === scenarioId);
+
 /** 地図のランダムダンジョンのマス（左上から） */
 const randomDungeonTiles = (w: WorldState) => w.tiles.flatMap((t, i) => (isRandomDungeonTile(t.f) ? [i] : []));
 
@@ -18,8 +21,10 @@ const randomDungeonTiles = (w: WorldState) => w.tiles.flatMap((t, i) => (isRando
  */
 export function assignDungeonThemes(w: WorldState, rng: Rng) {
   const tiles = randomDungeonTiles(w);
-  if (!tiles.length || !DUNGEON_THEMES.all.length) return;
-  const order = shuffle(DUNGEON_THEMES.all.map((t) => t.id), rng);
+  // そのシナリオで選べるテーマ（シナリオだけのテーマはデータの最後なので、ほかのシナリオは前と同じ並び・同じ乱数の引き方。2026-11-14）
+  const themes = themesForScenario(DUNGEONS.scenarioOf(w.tiles[tiles[0]]?.f?.id ?? ''));
+  if (!tiles.length || !themes.length) return;
+  const order = shuffle(themes.map((t) => t.id), rng);
   tiles.forEach((i, k) => (w.tiles[i].f!.theme = order[k % order.length]));
 }
 
@@ -32,7 +37,8 @@ export function ensureTileTheme(w: WorldState, tile: number): string | undefined
   const f = w.tiles[tile]?.f;
   if (!isRandomDungeonTile(f)) return undefined;
   if (f.theme && dungeonTheme(f.theme)) return f.theme;
-  const all = DUNGEON_THEMES.all;
+  // シナリオだけのテーマ（scenario）は選ばない: 古い保存のテーマ決めを、テーマを足す前と同じにする（2026-11-14）
+  const all = DUNGEON_THEMES.all.filter((t) => !t.scenario);
   if (!all.length) return undefined;
   const used = new Set(randomDungeonTiles(w).filter((i) => i !== tile).map((i) => w.tiles[i].f!.theme));
   const theme = all.find((t) => !used.has(t.id)) ?? all[tile % all.length];

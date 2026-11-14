@@ -29,4 +29,18 @@ export const roomTypes: RoomTypeDef[] = [
     omenName: '闇商人',
     omenText: '専用の装備を売る（高め）',
   },
+  // 氷漬けの箱（氷漬けの宝物庫。2026-11-14 シナリオ2の作り直し）: 動きは宝箱。箱の格は、部屋に入った時の凍えで決まる（engine/game/dungeonChill.ts）。
+  // 並びのデータには書かない（テーマが4行目に1部屋置く）。扉の予兆は金（宝）
+  {
+    id: 'frozenChest',
+    order: 5.4,
+    name: '氷漬けの箱',
+    icon: 'gift',
+    color: '#bfe8ff',
+    bg: '#0c2a3a',
+    behavior: 'chest',
+    omen: 'treasure',
+    omenName: '氷漬けの箱',
+    omenText: '凍えているほど良い箱',
+  },
 ];
