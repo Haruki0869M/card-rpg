@@ -24,11 +24,13 @@ function MiniIntent({ p }: { p?: IntentPart }) {
     return (
       <span className="flex shrink-0 items-center gap-px text-red-300 tabular-nums" style={el ? { color: el.color } : undefined}>
         <Icon size={12} strokeWidth={2.6} />
-        {p.hits > 1 ? `${p.damage}×${p.hits}` : p.damage}
+        {p.hidden ? '？' : p.hits > 1 ? `${p.damage}×${p.hits}` : p.damage}
       </span>
     );
   }
-  if (p.kind === 'block') return <span className="flex shrink-0 items-center gap-px text-sky-300 tabular-nums"><Shield size={12} strokeWidth={2.6} />{p.amount}</span>;
+  if (p.kind === 'block') return <span className="flex shrink-0 items-center gap-px text-sky-300 tabular-nums"><Shield size={12} strokeWidth={2.6} />{p.hidden ? '？' : p.amount}</span>;
+  // 闇の帳（区切り3a）: 特殊な効果の中身は見えない
+  if (p.kind === 'veiled') return <span className="shrink-0 text-violet-200">✦？</span>;
   if (p.kind === 'debuff') {
     const st = statusStyle(p.status);
     return <span className="flex shrink-0 items-center" style={{ color: st.color }}><st.Icon size={12} strokeWidth={2.6} /></span>;

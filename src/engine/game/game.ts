@@ -72,6 +72,7 @@ import { getRoomType } from '../../data/rules';
 import { SCOURGES, TERRAINS } from '../../data/world';
 import { onScourgeDefeated, scourgeCurse, scourgeLoot, scourgesWith } from './world/scourges';
 import { applyInsight, applyScourgeBoons, grantInsight, shortcutTile } from './world/detour';
+import { scourgeHeldGear } from './world/scourgeGear';
 import { revealAround } from './world/fog';
 import { addLog as battleLog } from '../battle/units';
 import { buildDungeon, depthTier, findRoom, isLegacyLayout, RARITIES, rarityIndex, reachableRooms, themeReward } from './dungeon';
@@ -843,7 +844,7 @@ function finishBattle(game: GameState, playerId: string, rng: Rng): string | und
   // ドロップ（部屋の種類の設定どおり）。ボスの大宝箱は報酬の後に開ける
   const drop = rt.battle;
   if (drop?.equipmentDrop) {
-    const item = newItem(game, rollEquipment(rng.next() * 100 < equipmentEpicChance(drop.equipmentDrop, tier) * tr.epicMul ? 'epic' : 'rare', game.heroes, rng, { scenario: game.scenarioId }));
+    const item = newItem(game, rollEquipment(rng.next() * 100 < equipmentEpicChance(drop.equipmentDrop, tier) * tr.epicMul ? 'epic' : 'rare', game.heroes, rng, { scenario: game.scenarioId, held: scourgeHeldGear(game) }));
     const to = leastLoaded(survivorHeroes);
     // 2人以上のプレイヤーが生き残ったら、みんなで取り合う（欲しい / 余れば / いらない → 運の判定）
     if (new Set(survivorHeroes.map((h) => h.playerId)).size > 1) reward.claim = { item, heroes: survivorHeroes.map((h) => h.id), choices: {} };

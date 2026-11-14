@@ -6,6 +6,7 @@ import { ITEMS } from '../../../../data/items';
 import { rarityIndex } from '../../dungeon';
 import { jobWeapons } from '../../hero';
 import { finisherCards } from '../../jobs';
+import { scourgeHeldGear } from '../../world/scourgeGear';
 import type { OutcomeHandler } from '../types';
 
 declare module '../../../../types' {
@@ -23,8 +24,10 @@ export const outcome: OutcomeHandler<'peddler'> = {
     const { rng, game } = ctx;
     const k = (100 - o.discount) / 100;
     const [lo, hi] = o.rarity ?? [1, 2];
+    // 災厄だけが落とす品（区切り3a）は並べない
+    const held = scourgeHeldGear(game);
     const goods = ITEMS.all.filter(
-      (i) => !i.source && (!i.scenario || i.scenario === game.scenarioId) &&(i.slot === 'weapon' ? jobWeapons(h.classId).includes(i.weaponType ?? '') : i.slot === 'accessory') && rarityIndex(i.rarity) >= lo && rarityIndex(i.rarity) <= hi,
+      (i) => !i.source && (!i.scenario || i.scenario === game.scenarioId) && !held.has(i.id) &&(i.slot === 'weapon' ? jobWeapons(h.classId).includes(i.weaponType ?? '') : i.slot === 'accessory') && rarityIndex(i.rarity) >= lo && rarityIndex(i.rarity) <= hi,
     );
     const items = [];
     for (let n = 0; n < 2 && goods.length; n++) {
