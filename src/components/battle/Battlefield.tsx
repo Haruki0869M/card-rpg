@@ -19,6 +19,7 @@ import { speedFactor, useBattle, type UnitFx } from '../../store/battleStore';
 import type { AllyState, BattleState, EnemyState } from '../../types';
 import { breakPreview, intentBrief, intentView, type IntentPart } from '../format';
 import { breakRuleOf } from '../../engine/battle/breakRules';
+import { enemyResist, enemyWeak, phaseMarks } from '../../engine/battle/phases';
 import { HpBar } from '../ui/HpBar';
 import { EffectChip, ELEMENT_ICONS, Shield, Skull, statusStyle, Swords } from '../ui/icons';
 import { Flame } from 'lucide-react';
@@ -229,6 +230,26 @@ function IntentBubble({ enemy, onTap, narrow }: { enemy: EnemyState; onTap: () =
                   : undefined
           }
         >
+          {/* ボスの段階（2026-11-14）: 開幕の一手の札（🌀第2段階。青紫。本気の橙の札と同じ大きさ）。ほかの札（紫・赤・BREAK）の前に並べる */}
+          {view.opening && (
+            <span
+              className={`order-first rounded bg-gradient-to-b from-indigo-400 to-violet-700 text-[12px] leading-4 font-black whitespace-nowrap text-white ring-1 ring-sky-200/90 ${narrow ? 'px-0.5' : 'px-1'}`}
+              data-opening-mark={view.opening.phase}
+              data-opening-short={narrow || undefined}
+            >
+              🌀{narrow ? view.opening.short : view.opening.label}
+            </span>
+          )}
+          {/* 数え読み（2026-11-14）: 予告の枠の右上に残りの数（0 = この予告が数え読みの行動）。敵が3体以上で狭い時は、枠の内側の角（画面の端の敵がはみ出さない） */}
+          {view.countdown && (
+            <span
+              className={`absolute -top-2 ${narrow ? 'right-0' : '-right-2'} z-[1] flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-0.5 text-[12px] leading-none font-black tabular-nums ring-1 ${view.countdown.fire ? 'bg-red-600 text-white ring-yellow-200' : 'bg-indigo-950 text-sky-100 ring-sky-300'}`}
+              data-countdown={view.countdown.left}
+              title={`あと${view.countdown.left}回の予告で「${view.countdown.actionName}」`}
+            >
+              {view.countdown.left}
+            </span>
+          )}
           {/* 大技の予告（体勢を崩せる）。崩した後は「BREAK」の札に変わる。敵の特殊な行動は、赤い「大技」ではなく紫の札（⚠️手数読み など） */}
           {view.broken ? (
             <span className="order-first rounded bg-amber-400 px-1 text-[12px] leading-4 font-black whitespace-nowrap text-amber-950" data-break-mark>⚡BREAK</span>
@@ -412,8 +433,8 @@ const EnemyUnit = memo(function EnemyUnit({
           <div className="text-outline w-full truncate text-center text-[12px] leading-[14px] font-bold text-zinc-100">
             <span className="text-amber-300">Lv{enemy.level}</span> {enemyName(enemy)}
           </div>
-          <HpBar hp={enemy.hp} max={enemy.maxHp} block={enemy.block} tone="enemy" height={12} />
-          <ElementMarks defId={enemy.defId} />
+          <HpBar hp={enemy.hp} max={enemy.maxHp} block={enemy.block} tone="enemy" height={12} marks={phaseMarks(enemy).map((m) => m.at)} />
+          <ElementMarks enemy={enemy} />
           {/* 次の行動の予告（HPのすぐ下。誰を狙っているかの顔つき） */}
           <IntentBubble enemy={enemy} onTap={onTap} narrow={narrow} />
           {!narrow && <BehaviorBrief enemy={enemy} maxW={slotW - 8} />}
@@ -494,7 +515,7 @@ function BreakHint({ enemy, narrow, maxW }: { enemy: EnemyState; narrow: boolean
   const ruleWeak = useBattle((s) => breakRuleOf(s.battle, enemy).weak.join(','));
   if (!show) return null;
   // 弱点の印: 「弱点で完全成功」の時は一時的な弱点（油壺）も入れる（その時だけ崩せる属性を全部見せる）
-  const weak = strict ? ruleWeak.split(',').filter(Boolean) : getEnemy(enemy.defId).weak ?? [];
+  const weak = strict ? ruleWeak.split(',').filter(Boolean) : enemyWeak(enemy);
   const icons = weak.map((id) => {
     const el = getElement(id);
     const Icon = ELEMENT_ICONS[el.icon] ?? Swords;
@@ -533,10 +554,10 @@ function TargetRing({ width }: { width: number }) {
 }
 
 /** 敵の弱点（▲ 属性の色）と耐性（▼ 灰色）。長押しの詳細を見なくても分かるように */
-function ElementMarks({ defId }: { defId: string }) {
-  const def = getEnemy(defId);
-  const weak = def.weak ?? [];
-  const resist = def.resist ?? [];
+function ElementMarks({ enemy }: { enemy: EnemyState }) {
+  // ボスの段階（2026-11-14）: 段階・予告で変わる今の弱点と耐性（phases.ts。エンジンと同じ関数）
+  const weak = enemyWeak(enemy);
+  const resist = enemyResist(enemy);
   if (!weak.length && !resist.length) return null;
   const mark = (id: string, kind: 'weak' | 'resist') => {
     const el = getElement(id);

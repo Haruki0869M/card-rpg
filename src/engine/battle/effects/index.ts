@@ -7,6 +7,7 @@ import type { Rng } from '../../rng';
 import { BALANCE } from '../../../data/balance';
 import { getElement } from '../../../data/elements';
 import { getEnemy, getEnemyAction } from '../../../data/enemies';
+import { enemyWeak, isResistTo, isWeakTo } from '../phases';
 import { getStatus } from '../../../data/statuses';
 import { absorb, calcDamage } from '../damage';
 import { addStatus } from '../statuses';
@@ -159,9 +160,8 @@ export function upgradeEffect(e: Effect): Effect {
 /** 属性のダメージ倍率（敵の弱点×1.5・耐性×0.5。無属性・味方は1） */
 export function elementMultiplier(victim: Unit | undefined, element: string | undefined): number {
   if (!element || !victim || !isEnemy(victim)) return 1;
-  const def = getEnemy(victim.defId);
-  if (def.resist?.includes(element)) return BALANCE.elementResistMul;
-  if (def.weak?.includes(element) || victim.tempWeak === element) return BALANCE.elementWeakMul;
+  if (isResistTo(victim, element)) return BALANCE.elementResistMul;
+  if (isWeakTo(victim, element)) return BALANCE.elementWeakMul;
   return 1;
 }
 
@@ -247,7 +247,7 @@ export function perfectAloneBreaks(state: BreakRankState, enemy: Unit, t: Perfec
   if (needsWeakPerfect(state, enemy)) {
     // 「弱点で、しかも完全成功」の決まりでも、弱点を持たない敵は完全成功だけで崩れる（崩す手が無くならないように）
     if (!isEnemy(enemy)) return false;
-    if (!getEnemy(enemy.defId).weak?.length && !enemy.tempWeak) return true;
+    if (!enemyWeak(enemy).length && !enemy.tempWeak) return true;
     // つまみの測定2（イ）: 弱点を突けるカードを1枚も持たない味方は、完全成功で崩せる
     if (BALANCE.breakPerfectNoWeakCard && t.hasWeakCard && !t.hasWeakCard()) return true;
     // つまみの測定2（エ）: 重い一撃（枠が多いカード・フォーカスを多く使った）の完全成功は崩せる
@@ -283,6 +283,9 @@ export function breakEnemy(ctx: EffectCtx, enemy: EnemyState, why: 'weak' | 'per
   addStatus(enemy.statuses, st, BALANCE.breakWeak);
   ctx.events.push({ type: 'status', unitId: enemy.uid, status: st, amount: BALANCE.breakWeak });
   ctx.parts.push('BREAK！');
+  // 数え読み（ボスの段階・2026-11-14）: 数えている間に崩すと、1つ戻る（最初の数まで。数え読みの行動そのものの予告では戻らない）
+  const cd = enemy.countdown;
+  if (cd && !enemy.intent?.countdownFire && cd.left < cd.turns) cd.left += 1;
   addLog(ctx.state, `⚡BREAK！ ${nameOf(enemy)}の体勢が崩れた（次の行動の威力が半分・${getStatus(st).name}${BALANCE.breakWeak}${BALANCE.breakClearsBlock ? '・ブロック0' : ''}）`);
 }
 
@@ -302,7 +305,7 @@ function elementBoost(source: Unit, element: string, turn: number): number {
 }
 
 /** その属性に耐性があるか（状態異常が効かない） */
-export const resistsElement = (victim: Unit, element: string) => isEnemy(victim) && !!getEnemy(victim.defId).resist?.includes(element);
+export const resistsElement = (victim: Unit, element: string) => isEnemy(victim) && isResistTo(victim, element);
 
 // ---------- ダメージ（ダメージの効果・特殊能力から使う） ----------
 
@@ -317,7 +320,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   // 武器に宿った属性: 属性の無い物理攻撃がその属性になる（妖精の泉）
   element = convertedElement(source, ctx.card, attackElement(source, ctx.card, element));
   // 区切りD: エレメンタル・チェイン — 属性が無ければ、狙った敵の弱点の属性になる（耐性の無い最初の物）
-  if (!element && isEnemy(victim) && cardModifier(ctx.cardAbilities, 'weaknessElement').length) element = getEnemy(victim.defId).weak?.find((w) => !getEnemy(victim.defId).resist?.includes(w));
+  if (!element && isEnemy(victim) && cardModifier(ctx.cardAbilities, 'weaknessElement').length) element = enemyWeak(victim)[0];
   let v = victim;
   // かばう（魔王軍の騎士）: ほかの敵を狙った「敵1体が対象のカード」のダメージは、かばっている敵が受ける（2体いれば並びの前）。
   // 全体攻撃・お供と召喚の攻撃（via・分身）・道具・能力は、そのまま通る
@@ -367,7 +370,7 @@ export function dealDamage(ctx: EffectCtx, victim: Unit, base: number, element?:
   const exposed = isEnemy(v) && !isEnemy(source) && (!!v.exposed || alwaysWeak) && dmg > 0;
   const guided = !isEnemy(source) && !!source.guided && isEnemy(v) && dmg > 0;
   if (exposed && isEnemy(v)) delete v.exposed;
-  const weakHit = (!!element && isEnemy(v) && (!!getEnemy(v.defId).weak?.includes(element) || v.tempWeak === element)) || exposed || guided;
+  const weakHit = (!!element && isEnemy(v) && isWeakTo(v, element)) || exposed || guided;
   if (weakHit && dmg > 0 && !isEnemy(source) && !(ctx.weakHitIds ??= []).includes(unitIdOf(v))) ctx.weakHitIds.push(unitIdOf(v));
   // 連携攻撃の記録（このターンにこの敵を攻撃した味方）
   if (isEnemy(v) && !isEnemy(source)) {

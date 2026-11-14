@@ -41,13 +41,18 @@ export const whiteQueen: EnemyDef = {
   ],
   abilities: [{"name": "百年の氷衣", "effect": {"when": "battleStart", "do": [{"kind": "block", "amount": 8}]}}],
   phases: [
-    { belowHpPct: 60, name: "帰らぬ春を待つ姫", pattern: 'sequence', actions: [
+    // ボスの段階（2026-11-14）: 溜め（凍結の前触れ。順番でもくり返す）。答え: 溜めを火で BREAK・守り
+    { belowHpPct: 60, name: "帰らぬ春を待つ姫", pattern: 'sequence', openingActionId: 'frostBreath', rule: '冷気を溜め、次の予告で全体攻撃と凍結（溜めを火で BREAK すると、凍結も消える）', actions: [
+      { id: 'frostBreath', name: '春を拒む冷気を溜める', big: true, chargeTo: 'eternalFrost', hint: '次の予告が「永久凍結」（味方全員に氷10・狙った1人に凍結1）になる。火の弱点で BREAK すると溜めが止まり、永久凍結も消える', effects: [{ kind: 'block', amount: 14 }] },
+      { id: 'eternalFrost', name: '永久凍結', big: true, scripted: true, effects: [{ kind: 'damage', amount: 10, element: 'ice', to: 'foes' }, { kind: 'applyStatus', status: 'freeze', amount: 1 }] },
       {"id": "spring", "name": "帰らぬ春", big: true, "effects": [{"kind": "damage", "amount": 11, "element": "ice", "to": "foes"}]},
       {"id": "tears", "name": "王女の涙", big: true, "effects": [{"kind": "damage", "amount": 20, "element": "holy"}]},
       {"id": "wall", "name": "拒絶の氷壁", "effects": [{"kind": "block", "amount": 24}]},
       {"id": "memory", "name": "思い出の霜", "effects": [{"kind": "applyStatus", "status": "freeze", "amount": 1}, {"kind": "damage", "amount": 6}]},
     ] },
-    { belowHpPct: 30, name: "永遠の冬に呑まれた女王", pattern: 'sequence', actions: [
+    // ボスの段階（2026-11-14）: 弱点が増える（氷の殻が割れる。聖の耐性も消える）。答え: 増えた弱点（雷）と聖で押し切る
+    { belowHpPct: 30, name: "永遠の冬に呑まれた女王", pattern: 'sequence', openingActionId: 'shellShatter', rule: '氷の殻が割れて、雷も弱点になり、聖の耐性が消える（増えた弱点で押し切る）', addWeak: ['thunder'], resist: ['ice'], actions: [
+      { id: 'shellShatter', name: '割れた氷の殻が飛び散る', big: true, scripted: true, effects: [{ kind: 'damage', amount: 12, element: 'ice', to: 'foes' }] },
       {"id": "winter", "name": "永遠の冬", big: true, "effects": [{"kind": "damage", "amount": 16, "element": "ice", "to": "foes"}]},
       {"id": "prayer", "name": "砕けた祈り", big: true, "effects": [{"kind": "damage", "amount": 30, "element": "holy"}]},
       {"id": "solitude", "name": "百年の孤独", big: true, "effects": [{"kind": "block", "amount": 26}, {"kind": "damage", "amount": 8, "to": "foes"}]},

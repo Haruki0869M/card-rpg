@@ -1,6 +1,6 @@
 // 先読み: ランダムな敵 count 体の「次のターンの行動」まで決めて見せる。vulnerable があれば弱点を見抜いて脆弱も付ける（オカメインコ）
 import { addStatus } from '../../statuses';
-import { chooseAction } from '../../intents';
+import { previewNextAction } from '../../intents';
 import { isEnemy, nameOf, unitIdOf } from '../../units';
 import type { EffectHandler } from '../types';
 
@@ -19,7 +19,7 @@ export const effect: EffectHandler<'foresee'> = {
     const picked = [];
     while (picked.length < e.count && pool.length) picked.push(...pool.splice(ctx.rng.int(pool.length), 1));
     for (const en of picked) {
-      en.queuedActionId = chooseAction(en, ctx.state, ctx.rng).id;
+      en.queuedActionId = previewNextAction(en, ctx.state, ctx.rng).id;
       if (e.vulnerable) {
         addStatus(en.statuses, 'vulnerable', e.vulnerable);
         ctx.events.push({ type: 'status', unitId: unitIdOf(en), status: 'vulnerable', amount: e.vulnerable });

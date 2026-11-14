@@ -100,7 +100,11 @@ export const seaSerpentQueen: EnemyDef = {
       belowHpPct: 50,
       name: '怒れる海蛇の女王',
       pattern: 'sequence',
+      // ボスの段階（2026-11-14）: 巻き戻し（脱皮。1回だけ）。答え: 雷で BREAK・呪い
+      openingActionId: 'molt',
+      rule: '1回だけ脱皮して、HPを最大の半分まで戻す（雷で BREAK すると止まる。呪いで戻る量が減る）',
       actions: [
+        { id: 'molt', name: '脱皮して傷を捨てる', big: true, scripted: true, hint: 'HPを最大の50%まで戻す（1回だけ）。雷の弱点で BREAK すると止まる。呪い・癒し封じで戻る量が減る', effects: [{ kind: 'healToPct', pct: 50 }, { kind: 'block', amount: 8 }] },
         { id: 'miasma', name: '毒の潮', big: true, effects: [{ kind: 'applyStatus', status: 'poison', amount: 3, to: 'foes' }, { kind: 'damage', amount: 5, to: 'foes' }] },
         { id: 'crush', name: '大締め付け', big: true, effects: [{ kind: 'damage', amount: 20 }] },
         { id: 'shed', name: '脱皮', effects: [{ kind: 'block', amount: 18 }] },

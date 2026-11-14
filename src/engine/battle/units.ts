@@ -87,6 +87,9 @@ function checkEnemyPhase(state: BattleState, enemy: EnemyState, events: BattleEv
       enemy.seqIndex = 0;
       enemy.history = [];
       addLog(state, `${getEnemy(enemy.defId).name}が「${phases[i].name}」に姿を変えた！`);
+      // ボスの段階（2026-11-14）: 次の予告が開幕の一手になる事と、この段階の新しい決まりをログに出す（今の予告は変えない）
+      const opening = phases[i].openingActionId ? phases[i].actions.find((a) => a.id === phases[i].openingActionId) : undefined;
+      if (opening) addLog(state, `🌀次は「${opening.name}」をしてくる${phases[i].rule ? `（${phases[i].rule}）` : ''}`);
       events.push({ type: 'enemyPhase', enemyUid: enemy.uid, name: phases[i].name });
       return;
     }

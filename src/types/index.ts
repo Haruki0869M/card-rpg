@@ -430,6 +430,20 @@ export interface EnemyActionDef {
    * - noRepeat: 2ターン続けては、この行動をしない（続く時は代わりの行動。仲間を呼ぶ）
    */
   cutIn?: { when: 'afflicted' | 'canSummon'; rest?: number; noRepeat?: boolean };
+  /**
+   * 溜め（2026-11-14 ボスの段階）: この行動を予告した時、次の予告をこの行動（同じ段階の行動のID）に決める（予告の下に「次: 〇〇」）。
+   * 溜めの行動が BREAK・凍結などで行われなかった時は、溜めた行動も消える（次は元の順番から）
+   */
+  chargeTo?: string;
+  /**
+   * 数え読み（2026-11-14 ボスの段階）: この行動を予告した時から数え始める。予告のたびに1つ減り、0になった予告で actionId を必ず出す
+   * （出したら turns に戻って、くり返す）。数えている間に BREAK されると、1つ戻る（turns まで）。予告の枠の右上に残りの数
+   */
+  countdown?: { actionId: string; turns: number };
+  /** 決め方（順番・ランダム）では選ばない（開幕の一手・溜め・数え読みでだけ出す行動。2026-11-14） */
+  scripted?: boolean;
+  /** この行動を予告している間だけの弱点（敵のデータ・段階の弱点の代わり。満ち潮・引き潮のように、予告と一緒に変わる。2026-11-14） */
+  weakWhile?: string[];
 }
 
 /** 敵の特殊な行動の種類（手数読み・かばう・癒し封じ・仲間を呼ぶ・手負い狙い・盾砕き・浄化） */
@@ -481,6 +495,19 @@ export interface EnemyPhaseDef {
   actions: EnemyActionDef[];
   pattern: string;
   maxConsecutive?: number;
+  /**
+   * 開幕の一手（2026-11-14 ボスの段階・docs/tasks/boss-phase-plan.md 柱1）: この段階に入った次の予告で、必ず出す行動（この段階の actions のID）。
+   * 境目を切った時の予告は変えない。一撃で2つの境目を越えた時は、深い方の段階の物だけ
+   */
+  openingActionId?: string;
+  /** この段階で新しく入る決まりの短い説明（HPバーの境目・予告の長押しに出す。例「根を張り、毎ターン回復する」） */
+  rule?: string;
+  /** この段階で増える弱点（元の弱点に足す） */
+  addWeak?: string[];
+  /** この段階の弱点（元の弱点の代わり。入れ替わる時だけ） */
+  weak?: string[];
+  /** この段階の耐性（元の耐性の代わり） */
+  resist?: string[];
 }
 
 export interface EncounterSpec {
@@ -641,6 +668,10 @@ export interface Intent {
   targetId?: string;
   /** 強敵の本気の予告（いちばん強い攻撃・威力 ×BALANCE.eliteFrenzy.power。2026-11-13） */
   frenzy?: boolean;
+  /** ボスの段階の開幕の一手の予告（その段階の番号。🌀の札。2026-11-14） */
+  opening?: number;
+  /** 数え読みの行動そのものの予告（数えが0になった。2026-11-14） */
+  countdownFire?: boolean;
 }
 
 export interface EnemyState {
@@ -694,6 +725,10 @@ export interface EnemyState {
   eliteBody?: boolean;
   /** この戦闘で、もう本気になった（1戦闘に1回） */
   frenzyUsed?: boolean;
+  /** ボスの段階: 開幕の一手を、もう予告した一番深い段階の番号（任意。古い保存には無い = まだ出していない。2026-11-14） */
+  phaseOpened?: number;
+  /** ボスの段階: 数え読み（left = あと何回の予告で actionId を出すか。任意。古い保存には無い。2026-11-14） */
+  countdown?: { actionId: string; turns: number; left: number };
 }
 
 export type Phase = 'ally' | 'enemy' | 'victory' | 'defeat' | 'escaped';

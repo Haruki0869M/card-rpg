@@ -9,6 +9,7 @@ import { activeStatuses, skipActionStatus, tickDamageOf } from './statuses';
 import { canSummonEnemy } from './effects/kinds/summonEnemy';
 import { BALANCE } from '../../data/balance';
 import { addLog, enemyName } from './units';
+import { pendingOpening } from './phases';
 
 export function livingAllies(state: BattleState): AllyState[] {
   return state.allies.filter((a) => !a.dead);
@@ -53,12 +54,20 @@ export function weakestAlly(state: BattleState): string | undefined {
 /** 手負い狙いの行動か（HPが半分以下の相手に倍率がかかる単体攻撃を含む） */
 const isHuntAction = (action: EnemyActionDef) => action.effects.some((e) => e.kind === 'damage' && !!e.lowHpMul && targetOf(e) === 'target');
 
-/** 今の段階の行動の一覧と選び方 */
+/** 今の段階の行動の全部（決め方では選ばない scripted の行動も含む。開幕の一手・溜め・数え読みの行動を探す時に使う） */
+export function currentPhaseActions(enemy: EnemyState): EnemyActionDef[] {
+  const def = getEnemy(enemy.defId);
+  const ph = enemy.phase > 0 ? def.phases?.[enemy.phase - 1] : undefined;
+  return ph ? ph.actions : def.actions;
+}
+
+/** 今の段階の行動の一覧と選び方（決め方で選ぶ行動だけ。scripted の行動は入れない） */
 export function currentActionSet(enemy: EnemyState) {
   const def = getEnemy(enemy.defId);
   const ph = enemy.phase > 0 ? def.phases?.[enemy.phase - 1] : undefined;
-  if (ph) return { actions: ph.actions, pattern: ph.pattern, maxConsecutive: ph.maxConsecutive, firstActionId: undefined };
-  return { actions: def.actions, pattern: def.pattern, maxConsecutive: def.maxConsecutive, firstActionId: def.firstActionId };
+  const actions = currentPhaseActions(enemy).filter((a) => !a.scripted);
+  if (ph) return { actions, pattern: ph.pattern, maxConsecutive: ph.maxConsecutive, firstActionId: undefined };
+  return { actions, pattern: def.pattern, maxConsecutive: def.maxConsecutive, firstActionId: def.firstActionId };
 }
 
 const AIS = new Map<string, EnemyAiHandler>();
@@ -108,20 +117,25 @@ function cutInReady(enemy: EnemyState, state: BattleState, a: EnemyActionDef): b
   return !!call && canSummonEnemy(state, enemy, call);
 }
 
+/**
+ * 単独の時の代わり（fallbackIfAloneId）・呼べない時の代わり（orElse）・2ターン続けてはしない行動（noRepeat）を当てた、実際に予告する行動。乱数は使わない
+ */
+export function resolveAction(enemy: EnemyState, state: BattleState, a: EnemyActionDef): EnemyActionDef {
+  const last = enemy.history.at(-1);
+  const alone = !state.enemies.some((e) => !e.dead && e.uid !== enemy.uid);
+  let r = alone && a.fallbackIfAloneId ? getEnemyAction(enemy.defId, a.fallbackIfAloneId) : a;
+  // 仲間を呼ぶ: 満員・回数切れで呼べないと分かっている時は、予告の時点で代わりの行動（ふつうの攻撃）にする
+  const call = callEffectOf(r);
+  if (call?.orElse && !canSummonEnemy(state, enemy, call)) r = getEnemyAction(enemy.defId, call.orElse);
+  // 2ターン続けてはしない行動（仲間を呼ぶ）: 前のターンにしていたら、代わりの行動
+  if (r.cutIn?.noRepeat && last === r.id && fallbackIdOf(r)) r = getEnemyAction(enemy.defId, fallbackIdOf(r)!);
+  return r;
+}
+
 /** 次の行動を選ぶ（選び方は敵のデータの pattern。ai/ のファイルで増やせる） */
 export function chooseAction(enemy: EnemyState, state: BattleState, rng: Rng): EnemyActionDef {
   const set = currentActionSet(enemy);
-  const last = enemy.history.at(-1);
-  const alone = !state.enemies.some((e) => !e.dead && e.uid !== enemy.uid);
-  const resolve = (a: EnemyActionDef) => {
-    let r = alone && a.fallbackIfAloneId ? getEnemyAction(enemy.defId, a.fallbackIfAloneId) : a;
-    // 仲間を呼ぶ: 満員・回数切れで呼べないと分かっている時は、予告の時点で代わりの行動（ふつうの攻撃）にする
-    const call = callEffectOf(r);
-    if (call?.orElse && !canSummonEnemy(state, enemy, call)) r = getEnemyAction(enemy.defId, call.orElse);
-    // 2ターン続けてはしない行動（仲間を呼ぶ）: 前のターンにしていたら、代わりの行動
-    if (r.cutIn?.noRepeat && last === r.id && fallbackIdOf(r)) r = getEnemyAction(enemy.defId, fallbackIdOf(r)!);
-    return r;
-  };
+  const resolve = (a: EnemyActionDef) => resolveAction(enemy, state, a);
   // (a) 戦闘の1ターン目に必ず予告する行動（最初の段階・まだ何も予告していない時）。順番の敵は、その行動の次から続ける
   if (enemy.history.length === 0 && enemy.phase === 0 && set.firstActionId) {
     const i = set.actions.findIndex((a) => a.id === set.firstActionId);
@@ -141,21 +155,59 @@ export function chooseAction(enemy: EnemyState, state: BattleState, rng: Rng): E
   return handler.choose(enemy, state, rng, set, resolve);
 }
 
+/**
+ * お供の先読み（「次: 〇〇」）が見せる、次の予告の行動。予告を決める時（decideIntent）と同じ順で見る:
+ * まだ出していない開幕の一手 → 数え読みが0になる行動 → ふつうの選び方（chooseAction）
+ */
+export function previewNextAction(enemy: EnemyState, state: BattleState, rng: Rng): EnemyActionDef {
+  const op = pendingOpening(enemy);
+  if (op) return resolveAction(enemy, state, op);
+  const cd = enemy.countdown;
+  if (cd && cd.left - 1 <= 0) return getEnemyAction(enemy.defId, cd.actionId);
+  return chooseAction(enemy, state, rng);
+}
+
+/** 開幕の一手を、順番の位置に反映する（順番の敵は、開幕の一手の次から続ける。一覧に無ければ、そのまま） */
+function afterOpening(enemy: EnemyState, opening: EnemyActionDef) {
+  const actions = currentActionSet(enemy).actions;
+  const i = actions.findIndex((a) => a.id === opening.id);
+  if (i >= 0) enemy.seqIndex = (i + 1) % actions.length;
+}
+
 /** インテントを決定する（対象もこの時点でランダムに決めて表示する） */
 export function decideIntent(enemy: EnemyState, state: BattleState, rng: Rng): void {
   if (enemy.dead) {
     enemy.intent = undefined;
     return;
   }
+  // ボスの段階（2026-11-14）: 段階に入った次の予告は、必ずその段階の開幕の一手（先読み・溜めより先。一撃で2つ越えた時は深い方の物だけ）
+  const openingDef = pendingOpening(enemy);
+  const opening = openingDef && resolveAction(enemy, state, openingDef);
+  if (openingDef) enemy.phaseOpened = enemy.phase;
+  // 数え読み: 予告のたびに1つ減る。0になったら、その行動を出す（開幕の一手・先読み・溜めが先の時は、0のまま次の予告まで待つ）
+  const cd = enemy.countdown;
+  if (cd) cd.left = Math.max(0, cd.left - 1);
   // 先読みで次の行動が決まっていれば、それを使う（段階が変わって使えない行動なら選び直す）
-  const queued = enemy.queuedActionId && currentActionSet(enemy).actions.find((a) => a.id === enemy.queuedActionId);
+  const queued = !opening && enemy.queuedActionId ? currentPhaseActions(enemy).find((a) => a.id === enemy.queuedActionId) : undefined;
   enemy.queuedActionId = undefined;
+  const due = !opening && !queued && cd && cd.left <= 0 ? getEnemyAction(enemy.defId, cd.actionId) : undefined;
   // 強敵の本気: 先読みで見せた行動があれば、そちらを先に守る（本気は、その次の予告になる）
-  const frenzy = !queued && frenzyReady(enemy, state) ? strongestAttack(enemy, state) : undefined;
-  const action = queued || frenzy || chooseAction(enemy, state, rng);
+  const frenzy = !opening && !queued && !due && frenzyReady(enemy, state) ? strongestAttack(enemy, state) : undefined;
+  const action = opening || queued || due || frenzy || chooseAction(enemy, state, rng);
+  if (opening) afterOpening(enemy, openingDef!);
   enemy.history = [...enemy.history, action.id].slice(-5);
   // 手負い狙いは、HPの割合がいちばん低い味方を狙う（挑発で変えられる）
   enemy.intent = { actionId: action.id, targetId: needsTarget(action) ? (isHuntAction(action) ? weakestAlly(state) : pickRandomAlly(state, rng)) : undefined };
+  if (opening) enemy.intent.opening = enemy.phase;
+  // 数え読みの行動を出した（先読みで見せた時も）: 数えを最初に戻す
+  if (cd && action.id === cd.actionId && cd.left <= 0) {
+    enemy.intent.countdownFire = true;
+    cd.left = cd.turns;
+  }
+  // 数え読みを始める行動（開幕の一手など）
+  if (action.countdown) enemy.countdown = { actionId: action.countdown.actionId, turns: action.countdown.turns, left: action.countdown.turns };
+  // 溜め: 次の予告を決めておく（予告の下に「次: 〇〇」）
+  if (action.chargeTo && currentPhaseActions(enemy).some((a) => a.id === action.chargeTo)) enemy.queuedActionId = action.chargeTo;
   if (frenzy) {
     enemy.intent.frenzy = true;
     enemy.frenzyUsed = true;

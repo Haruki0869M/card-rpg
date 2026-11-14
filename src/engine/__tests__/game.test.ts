@@ -282,8 +282,12 @@ describe('新しい戦闘の要素', () => {
     expect(r.state.enemies[0].phase).toBe(1);
     expect(enemyName(r.state.enemies[0])).toBe('怒れる古樹');
     expect(r.events.some((e) => e.type === 'enemyPhase')).toBe(true);
-    // 次のターンの行動は第2形態の行動から選ばれる
+    // 次のターンの行動は第2形態の開幕の一手（2026-11-14 ボスの段階）、その次から第2形態の行動から選ばれる
     let st = applyCommand(r.state, { type: 'END_TURN', playerId: 'P1' }).state;
+    while (st.phase === 'enemy') st = applyCommand(st, { type: 'ENEMY_STEP' }).state;
+    expect(st.enemies[0].intent?.actionId).toBe('rootDown');
+    expect(st.enemies[0].intent?.opening).toBe(1);
+    st = applyCommand(st, { type: 'END_TURN', playerId: 'P1' }).state;
     while (st.phase === 'enemy') st = applyCommand(st, { type: 'ENEMY_STEP' }).state;
     expect(['rageStorm', 'stranglingVine', 'rotSpores']).toContain(st.enemies[0].intent?.actionId);
   });

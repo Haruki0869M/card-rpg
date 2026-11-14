@@ -11,6 +11,7 @@ export const HpBar = memo(function HpBar({
   tone,
   height = 14,
   incoming = 0,
+  marks,
 }: {
   hp: number;
   max: number;
@@ -19,6 +20,8 @@ export const HpBar = memo(function HpBar({
   height?: number;
   /** 次の敵の攻撃で減りそうな量（HPバーの上に赤く点滅させる） */
   incoming?: number;
+  /** ボスの段階の境目（HPの割合 0〜1。細い縦線と小さな▼。文字は出さない。2026-11-14） */
+  marks?: number[];
 }) {
   const ratio = Math.max(0, Math.min(1, hp / max));
   const k = useBattle((s) => 1 / speedFactor(s.settings));
@@ -57,6 +60,12 @@ export const HpBar = memo(function HpBar({
           />
         )}
         <div className="absolute inset-x-0 top-0 h-[40%] bg-white/20" />
+        {marks?.map((m) => (
+          // 境目の線（▼は文字ではなく三角の形。小さな字にしないため）。HPの数字より手前に出す（数字の縁取りで隠れないように）
+          <div key={m} className="pointer-events-none absolute inset-y-0 z-[1] w-[2px] -translate-x-1/2 bg-sky-100/95 shadow-[0_0_2px_rgba(0,0,0,.9)]" style={{ left: `${m * 100}%` }} data-phase-mark={Math.round(m * 100)}>
+            <div className="absolute top-0 left-1/2 h-0 w-0 -translate-x-1/2 border-x-[4px] border-t-[5px] border-x-transparent border-t-sky-100" />
+          </div>
+        ))}
         <div className="text-outline relative flex h-full items-center justify-center text-[12px] leading-none font-bold text-white tabular-nums">
           {hp}/{max}
         </div>

@@ -64,13 +64,18 @@ export const sandPharaoh: EnemyDef = {
   ],
   abilities: [{ name: '千年の包帯', effect: { when: 'battleStart', do: [{ kind: 'block', amount: 8 }] } }],
   phases: [
-    { belowHpPct: 60, name: '民のために永遠を求めた王', pattern: 'sequence', actions: [
+    // ボスの段階（2026-11-14）: 手数読み（順番にも入る）。答え: 手数を絞る・火・聖で BREAK
+    { belowHpPct: 60, name: '民のために永遠を求めた王', pattern: 'sequence', openingActionId: 'royalEye', rule: 'カードを4枚以上使った味方に反撃する（手数を絞る。火・聖で BREAK すると威力が半分）', actions: [
+      { id: 'royalEye', name: '王の監視', big: true, behavior: 'punish', hint: 'このターンにカードを4枚以上使った味方に、枚数×2のダメージ', effects: [{ kind: 'punishPlays', amount: 2, min: 4 }, { kind: 'block', amount: 12 }] },
       { id: 'famine', name: '飢えた民の記憶', big: true, effects: [{ kind: 'applyStatus', status: 'curse', amount: 2, to: 'foes' }, { kind: 'damage', amount: 6, to: 'foes' }] },
       { id: 'vow', name: '果たせなかった誓い', big: true, effects: [{ kind: 'damage', amount: 24, element: 'dark' }] },
       { id: 'tomb', name: '王墓の壁', effects: [{ kind: 'block', amount: 24 }] },
       { id: 'sand', name: 'こぼれ落ちる砂', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'foes' }, { kind: 'damage', amount: 6 }] },
     ] },
-    { belowHpPct: 30, name: '砂嵐に呑まれた王', pattern: 'sequence', actions: [
+    // ボスの段階（2026-11-14）: 数え読み（3回で大砂嵐。くり返す）。答え: BREAK で数を戻す・その前に倒す・守り
+    { belowHpPct: 30, name: '砂嵐に呑まれた王', pattern: 'sequence', openingActionId: 'stormOmen', rule: '数え読み: 3回の予告の後に「王国を埋める大砂嵐」（数えている間に BREAK すると1つ戻る）', actions: [
+      { id: 'stormOmen', name: '砂嵐の予兆', scripted: true, countdown: { actionId: 'greatStorm', turns: 3 }, hint: '3回の予告の後に「王国を埋める大砂嵐」（味方全員に24・脆弱1）。数えている間に BREAK すると、数が1つ戻る。数えが0になる前に倒すか、守りを固める', effects: [{ kind: 'block', amount: 14 }] },
+      { id: 'greatStorm', name: '王国を埋める大砂嵐', big: true, scripted: true, effects: [{ kind: 'damage', amount: 24, to: 'foes' }, { kind: 'applyStatus', status: 'vulnerable', amount: 1, to: 'foes' }] },
       { id: 'storm', name: '王国を呑む砂嵐', big: true, effects: [{ kind: 'damage', amount: 16, to: 'foes' }] },
       { id: 'last', name: '最後の王命', big: true, effects: [{ kind: 'damage', amount: 30, element: 'dark' }] },
       { id: 'dune', name: '民なき王国', big: true, effects: [{ kind: 'block', amount: 26 }, { kind: 'damage', amount: 8, to: 'foes' }] },

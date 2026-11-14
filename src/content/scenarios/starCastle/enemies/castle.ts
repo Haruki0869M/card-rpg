@@ -70,7 +70,11 @@ export const starSeerQueen: EnemyDef = {
       belowHpPct: 60,
       name: '予知の涙を流す女王',
       pattern: 'sequence',
+      // ボスの段階（2026-11-14）: 手数読み（予知。順番にも入る）。答え: 手数を絞る・闇で BREAK
+      openingActionId: 'prophecy',
+      rule: '予知: カードを4枚以上使った味方に反撃する（手数を絞る）',
       actions: [
+        { id: 'prophecy', name: '予知の眼', big: true, behavior: 'punish', hint: 'このターンにカードを4枚以上使った味方に、枚数×2のダメージ', effects: [{ kind: 'punishPlays', amount: 2, min: 4 }, { kind: 'block', amount: 12 }] },
         { id: 'tears', name: '星の涙', big: true, effects: [{ kind: 'damage', amount: 13, element: 'holy', to: 'foes' }] },
         { id: 'fate', name: '定められた結末', effects: [{ kind: 'applyStatus', status: 'curse', amount: 2, to: 'foes' }, { kind: 'damage', amount: 10 }] },
         { id: 'wall', name: '見通す壁', effects: [{ kind: 'block', amount: 24 }] },
@@ -81,7 +85,11 @@ export const starSeerQueen: EnemyDef = {
       belowHpPct: 30,
       name: '流星群を呼ぶ女王',
       pattern: 'sequence',
+      // ボスの段階（2026-11-14）: 溜め（流星群。2手先まで見える。順番でもくり返す）。答え: 溜めを闇で BREAK・2手先を見て守る
+      openingActionId: 'alignStars',
+      rule: '星を並べ、次の予告で流星群（2手先まで見える。溜めを闇で BREAK すると、流星群も消える）',
       actions: [
+        { id: 'alignStars', name: '星を並べる', big: true, chargeTo: 'meteors', hint: '次の予告が「流星群」（味方全員に聖19）になる。闇の弱点で BREAK すると溜めが止まり、流星群も消える', effects: [{ kind: 'block', amount: 16 }] },
         { id: 'meteors', name: '流星群', big: true, effects: [{ kind: 'damage', amount: 19, element: 'holy', to: 'foes' }] },
         { id: 'last', name: '最後の予言', big: true, effects: [{ kind: 'damage', amount: 36 }] },
         { id: 'sky', name: '星の天蓋', big: true, effects: [{ kind: 'block', amount: 26 }, { kind: 'damage', amount: 10, to: 'foes' }] },

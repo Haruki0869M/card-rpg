@@ -98,7 +98,11 @@ export const mordea: EnemyDef = {
       belowHpPct: 50,
       name: '冥府の屍術師',
       pattern: 'sequence',
+      // ボスの段階（2026-11-14）: 癒し封じ＋自分の回復（順番にも入る）。答え: 聖で BREAK・回復に頼らない組には効きが小さい
+      openingActionId: 'deathSeal',
+      rule: '味方の回復を半分にする封印を撒き、自分は回復する（聖で BREAK すると止まる）',
       actions: [
+        { id: 'deathSeal', name: '冥府の封印', big: true, behavior: 'healSeal', hint: '味方全員の回復が2ターン半分になり、モルデアはHPを15回復する。聖の弱点で BREAK すると止まる。回復に頼らない組には効きが小さい', effects: [{ kind: 'applyStatus', status: 'healSeal', amount: 2, to: 'foes' }, { kind: 'heal', amount: 15, to: 'self' }] },
         { id: 'necromance', name: '死霊の宴', big: true, effects: [{ kind: 'heal', amount: 20, to: 'self' }, { kind: 'damage', element: 'dark', amount: 10, to: 'foes' }] },
         { id: 'soulRip', name: '魂裂き', big: true, effects: [{ kind: 'damage', element: 'dark', amount: 22 }] },
         { id: 'plague', name: '疫病の霧', big: true, effects: [{ kind: 'applyStatus', status: 'poison', amount: 4, to: 'foes' }, { kind: 'damage', amount: 5, to: 'foes' }] },

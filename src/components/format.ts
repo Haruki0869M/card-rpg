@@ -3,7 +3,7 @@ import { getStatus } from '../data/statuses';
 import { BALANCE } from '../data/balance';
 import { activeStatuses, actionFailChanceOf, skipActionStatus } from '../engine';
 import { getElement } from '../data/elements';
-import { getEnemyAction } from '../data/enemies';
+import { getEnemy, getEnemyAction } from '../data/enemies';
 import { breakStopsAction, describeEffect, enemyHitDamage, findAlly, lowHpMulOn, targetOf } from '../engine';
 import { behaviorBadge, FRENZY_BADGE } from '../data/enemyBehaviors';
 import { blockSkippedOnBreak } from '../engine';
@@ -52,6 +52,10 @@ export interface IntentView {
   behavior?: { id: EnemyBehaviorId; icon: string; label: string; short: string; brief: string };
   /** 強敵の本気の予告（🔥本気の札。src/data/enemyBehaviors.ts の FRENZY_BADGE） */
   frenzy?: { icon: string; label: string; short: string; brief: string; long: string };
+  /** ボスの段階の開幕の一手（🌀の札。2026-11-14）: phase = 段階の番号（2段目 = 1）・label = 札の文字・short = 狭い時の札・long = 長押しの説明 */
+  opening?: { phase: number; label: string; short: string; long: string };
+  /** 数え読み（2026-11-14）: left = あと何回の予告で actionName を出すか（fire = この予告がその行動）・turns = 最初の数 */
+  countdown?: { left: number; turns: number; fire: boolean; actionName: string };
 }
 
 /** 予告の札の下・敵が3体以上の時の案内の1行に出す文（本気・特殊な行動）。両方の時は1つにまとめる。崩した後は出さない */
@@ -128,7 +132,22 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
   // 強敵の本気: 長押しの説明（DetailPopup）で、なぜ強いか・どう受けるかを出す
   // 大技でない行動は BREAK できないので、説明から「BREAK するか」を外す（pre-deploy20 の点検 1）
   const frenzy = enemy.intent.frenzy ? { ...FRENZY_BADGE, long: action.big ? FRENZY_BADGE.long : FRENZY_BADGE.longNoBreak } : undefined;
-  return { parts, name: action.name, details, big: !!action.big, broken: !!enemy.broken, ...(action.hint ? { hint: action.hint } : {}), ...(badge ? { behavior: badge } : {}), ...(frenzy ? { frenzy } : {}) };
+  // ボスの段階（2026-11-14）: 開幕の一手の札（🌀第2段階）と、数え読みの残り
+  const opening = openingBadge(enemy);
+  const cd = enemy.countdown;
+  const countdown = cd ? { left: enemy.intent.countdownFire ? 0 : cd.left, turns: cd.turns, fire: !!enemy.intent.countdownFire, actionName: getEnemyAction(enemy.defId, cd.actionId).name } : undefined;
+  if (countdown) details.push(countdown.fire ? `数え読みが0になった: この予告が「${countdown.actionName}」` : `数え読み: あと${countdown.left}回の予告で「${countdown.actionName}」（数えている間に BREAK すると1つ戻る）`);
+  // 弱点が予告と一緒に変わる行動（満ち潮・引き潮）
+  if (action.weakWhile?.length) details.push(`この予告の間の弱点: ${elementNames(action.weakWhile)}`);
+  return { parts, name: action.name, details, big: !!action.big, broken: !!enemy.broken, ...(action.hint ? { hint: action.hint } : {}), ...(badge ? { behavior: badge } : {}), ...(frenzy ? { frenzy } : {}), ...(opening ? { opening } : {}), ...(countdown ? { countdown } : {}) };
+}
+
+/** 開幕の一手の札（予告の印 intent.opening がある時だけ）。段階の名前と新しい決まりを長押しの説明にする */
+export function openingBadge(enemy: EnemyState): IntentView['opening'] {
+  const n = enemy.intent?.opening;
+  if (!n) return undefined;
+  const ph = getEnemy(enemy.defId).phases?.[n - 1];
+  return { phase: n, label: `第${n + 1}段階`, short: `${n + 1}段`, long: `「${ph?.name ?? ''}」になって最初の一手${ph?.rule ? `。この段階の新しい決まり: ${ph.rule}` : ''}` };
 }
 
 /** 属性の名前を「・」でつなぐ（例: 「雷・聖」） */

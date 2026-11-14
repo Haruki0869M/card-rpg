@@ -1,5 +1,5 @@
 // 夢の再来18体（通常12・エリート3・ボス3）。過去のシナリオの敵を、夢の形で蘇らせる（絵は使い回し）
-import type { EnemyDef } from '../../../../types';
+import type { EnemyDef, EnemyPhaseDef } from '../../../../types';
 import { bogGhoul } from '../../corruptionKing/enemies/swamp';
 import { forestWolf } from '../../corruptionKing/enemies/forest';
 import { iceKnight, } from '../../frozenKingdom/enemies/lake';
@@ -99,6 +99,40 @@ export const echoSeaWitch: EnemyDef = dreamEcho(seaWitch, { id: 'echoSeaWitch', 
 export const echoColossusStatue: EnemyDef = dreamEcho(colossusStatue, { id: 'echoColossusStatue', name: '夢の石像の巨兵', aura: 'holy', element: 'holy', actions: ECHO_COLOSSUS_ACTIONS, firstActionId: 'shove' });
 
 // ----- ボス3体（元のボスの段階をそのまま引き継ぎ、攻撃に夢の属性を足す。絵は元のボスの絵と変身の絵を使い回す） -----
-export const echoWhiteQueen: EnemyDef = dreamEcho(whiteQueen, { id: 'echoWhiteQueen', name: '夢の白の女王', aura: 'shadow', element: 'dark' });
-export const echoSandPharaoh: EnemyDef = dreamEcho(sandPharaoh, { id: 'echoSandPharaoh', name: '夢の砂塵の王', aura: 'venom', element: 'poison' });
-export const echoGhostAdmiral: EnemyDef = dreamEcho(ghostAdmiral, { id: 'echoGhostAdmiral', name: '夢の亡霊提督', aura: 'storm', element: 'thunder' });
+// ボスの段階（2026-11-14・docs/tasks/boss-phase-plan.md。オーナーの返事 4-A）: 夢の鍵のボス3体は、元のボスに無い決まりを持つ（写しにしない）。
+// 段階の行動は元のボスの物（2026-11-14 に元のボスへ足した決まりの行動は外す）に、夢の決まりの開幕の一手を足す。
+// 段階が2つあるので、2つ目の段階は同じ決まりをもう一度・強めて見せる【提案】（夢の砂塵の王は、弱点が表に戻る）
+/** 元のボスの i 番目の段階の行動から、元のボスの決まりの行動（drop）を外した物 */
+const basePhase = (base: EnemyDef, i: number, drop: string[]): EnemyPhaseDef => {
+  const p = base.phases![i];
+  return { belowHpPct: p.belowHpPct, name: p.name, pattern: p.pattern, actions: p.actions.filter((a) => !drop.includes(a.id)) };
+};
+const MAID_HINT = '子守歌の鳥を1体呼ぶ（倒しても報酬なし）。鳥は子守歌で女王を回復する。火の弱点で BREAK すると止まる。鳥を先に倒す';
+export const echoWhiteQueen: EnemyDef = dreamEcho(whiteQueen, {
+  id: 'echoWhiteQueen', name: '夢の白の女王', aura: 'shadow', element: 'dark',
+  phases: [
+    { ...basePhase(whiteQueen, 0, ['frostBreath', 'eternalFrost']), openingActionId: 'callMaid', rule: '夢の侍女（子守歌の鳥）を呼び、女王を回復させる（火で BREAK すると止まる。鳥を先に倒す）',
+      actions: [{ id: 'callMaid', name: '夢の侍女を呼ぶ', big: true, behavior: 'call', hint: MAID_HINT, effects: [{ kind: 'summonEnemy', enemy: 'lullabyBird', uses: 2, orElse: 'tears' }, { kind: 'block', amount: 10 }] }, ...basePhase(whiteQueen, 0, ['frostBreath', 'eternalFrost']).actions] },
+    { ...basePhase(whiteQueen, 1, ['shellShatter']), openingActionId: 'maidReturn', rule: '侍女をもう一度呼び戻す（火で BREAK すると止まる。鳥を先に倒す）',
+      actions: [{ id: 'maidReturn', name: '侍女たちを呼び戻す', big: true, scripted: true, behavior: 'call', hint: MAID_HINT, effects: [{ kind: 'summonEnemy', enemy: 'lullabyBird', uses: 3, orElse: 'prayer' }, { kind: 'block', amount: 14 }] }, ...basePhase(whiteQueen, 1, ['shellShatter']).actions] },
+  ],
+});
+export const echoSandPharaoh: EnemyDef = dreamEcho(sandPharaoh, {
+  id: 'echoSandPharaoh', name: '夢の砂塵の王', aura: 'venom', element: 'poison',
+  phases: [
+    { ...basePhase(sandPharaoh, 0, ['royalEye']), openingActionId: 'dreamFlip', rule: '夢が裏返り、弱点と耐性が入れ替わる（弱点は毒・闇、火・聖は効きにくい。弱点の印に出る）', weak: ['poison', 'dark'], resist: ['fire', 'holy'],
+      actions: [{ id: 'dreamFlip', name: '夢が裏返る', big: true, scripted: true, effects: [{ kind: 'damage', amount: 11, to: 'foes' }] }, ...basePhase(sandPharaoh, 0, ['royalEye']).actions] },
+    { ...basePhase(sandPharaoh, 1, ['stormOmen', 'greatStorm']), openingActionId: 'dreamFlipBack', rule: '夢が表に戻り、弱点と耐性も元に戻る（弱点は火・聖。弱点の印に出る）', weak: ['fire', 'holy'], resist: ['poison', 'dark'],
+      actions: [{ id: 'dreamFlipBack', name: '夢が表に戻る', big: true, scripted: true, effects: [{ kind: 'damage', amount: 14, to: 'foes' }] }, ...basePhase(sandPharaoh, 1, ['stormOmen', 'greatStorm']).actions] },
+  ],
+});
+const SEAL_HINT = '味方全員の回復が、2ターン半分になる。BREAK するか、先に回復を使う';
+export const echoGhostAdmiral: EnemyDef = dreamEcho(ghostAdmiral, {
+  id: 'echoGhostAdmiral', name: '夢の亡霊提督', aura: 'storm', element: 'thunder',
+  phases: [
+    { ...basePhase(ghostAdmiral, 0, ['seekWeak']), openingActionId: 'dreamSeal', rule: '目覚めを拒む霧で、味方の回復を半分にする（聖で BREAK すると止まる。回復に頼らない）',
+      actions: [{ id: 'dreamSeal', name: '目覚めを拒む霧', big: true, behavior: 'healSeal', hint: SEAL_HINT, effects: [{ kind: 'applyStatus', status: 'healSeal', amount: 2, to: 'foes' }, { kind: 'block', amount: 12 }] }, ...basePhase(ghostAdmiral, 0, ['seekWeak']).actions] },
+    { ...basePhase(ghostAdmiral, 1, ['crownCall']), openingActionId: 'dreamSeal2', rule: '永い眠りの霧で、回復を半分にして呪う（聖で BREAK すると止まる。回復に頼らない）',
+      actions: [{ id: 'dreamSeal2', name: '永い眠りの霧', big: true, scripted: true, behavior: 'healSeal', hint: SEAL_HINT, effects: [{ kind: 'applyStatus', status: 'healSeal', amount: 2, to: 'foes' }, { kind: 'applyStatus', status: 'curse', amount: 1, to: 'foes' }, { kind: 'block', amount: 14 }] }, ...basePhase(ghostAdmiral, 1, ['crownCall']).actions] },
+  ],
+});

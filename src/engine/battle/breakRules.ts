@@ -7,7 +7,7 @@
 //   耐性のある属性は数えない。消耗品・仲間の力（弱点看破の印など）は数えない（その人のカードだけを見る）。
 import { cardModifier, cardTraitAbilities, convertedElement } from '../abilities';
 import { cardOf } from '../../data/cards';
-import { getEnemy } from '../../data/enemies';
+import { enemyWeak, isResistTo, isWeakTo } from './phases';
 import type { AllyState, CardDef, EnemyState } from '../../types';
 import { attackElement } from './cardState';
 import { behaviorNeedsWeakPerfect, breakDamagePctOf, needsWeakPerfect, perfectAloneBreaks, type BreakRankState } from './effects';
@@ -27,8 +27,7 @@ export interface BreakRule {
   strictBy?: 'behavior' | 'rank';
 }
 export function breakRuleOf(state: BreakRankState, enemy: EnemyState): BreakRule {
-  const def = getEnemy(enemy.defId);
-  const weak = [...new Set([...(def.weak ?? []), ...(enemy.tempWeak ? [enemy.tempWeak] : [])])];
+  const weak = [...new Set([...enemyWeak(enemy), ...(enemy.tempWeak ? [enemy.tempWeak] : [])])];
   // 2026-11-13（docs/tasks/break-read-plan.md §2）: 紫の札（特殊な行動）の予告も「弱点で完全成功」。エンジンと同じ関数に敵を渡して読む
   const strict = needsWeakPerfect(state, enemy);
   const perfectAlone = perfectAloneBreaks(state, enemy);
@@ -45,15 +44,14 @@ export function breakRuleOf(state: BreakRankState, enemy: EnemyState): BreakRule
 
 /** そのカードが、その敵の弱点を突ける攻撃か（ダメージの効果のどれか1つでも） */
 export function cardHitsWeakness(ally: AllyState, card: CardDef, enemy: EnemyState): boolean {
-  const def = getEnemy(enemy.defId);
   const abilities = cardTraitAbilities(card);
   let any = false;
   for (const t of card.tiers) for (const e of t.effects) {
     if (e.kind !== 'damage') continue;
     any = true;
     let el = convertedElement(ally, card, attackElement(ally, card, e.element));
-    if (!el && cardModifier(abilities, 'weaknessElement').length) el = def.weak?.find((w) => !def.resist?.includes(w));
-    if (el && !def.resist?.includes(el) && (def.weak?.includes(el) || enemy.tempWeak === el)) return true;
+    if (!el && cardModifier(abilities, 'weaknessElement').length) el = enemyWeak(enemy)[0];
+    if (el && !isResistTo(enemy, el) && isWeakTo(enemy, el)) return true;
   }
   return any && cardModifier(abilities, 'alwaysWeak').length > 0;
 }

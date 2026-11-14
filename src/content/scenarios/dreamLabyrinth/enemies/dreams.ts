@@ -200,7 +200,11 @@ export const dreamEater: EnemyDef = {
       belowHpPct: 60,
       name: '食べる夢喰い',
       pattern: 'sequence',
+      // ボスの段階（2026-11-14）: フォーカスを食べる（今の「忘れさせる」も残す）。答え: フォーカスを先に使う・聖で BREAK
+      openingActionId: 'eatDreams',
+      rule: '味方全員のフォーカスを食べる（聖で BREAK すると止まる。フォーカスは先に使う）',
       actions: [
+        { id: 'eatDreams', name: '夢を食べ尽くす', big: true, scripted: true, hint: '味方全員のフォーカスを2ずつ食べる。聖の弱点で BREAK すると止まる。食べられる前にフォーカスを使っておく', effects: [{ kind: 'drainFocus', amount: 2, to: 'foes' }, { kind: 'block', amount: 14 }] },
         { id: 'devourAll', name: '全部食べる', big: true, effects: [{ kind: 'damage', amount: 14, to: 'foes' }] },
         { id: 'forgetAll', name: '忘れさせる', big: true, effects: [{ kind: 'drainFocus', amount: 2, to: 'foes' }, { kind: 'damage', amount: 8, to: 'foes' }] },
         { id: 'maw', name: '大きな口', big: true, effects: [{ kind: 'damage', amount: 26, element: 'dark' }] },
@@ -211,6 +215,11 @@ export const dreamEater: EnemyDef = {
       belowHpPct: 30,
       name: '思い出す夢喰い',
       pattern: 'sequence',
+      // ボスの段階（2026-11-14）: 弱点が変わる（思い出す: 弱点 聖 → 闇・耐性 闇 → 聖）。答え: 変わった弱点（闇）で
+      openingActionId: 'remember',
+      rule: '思い出して、弱点が闇に変わる（聖は効きにくくなる。予告と弱点の印に出る）',
+      weak: ['dark'],
+      resist: ['holy'],
       actions: [
         { id: 'remember', name: '思い出す', big: true, effects: [{ kind: 'damage', amount: 18, element: 'holy', to: 'foes' }] },
         { id: 'tears', name: '涙', big: true, effects: [{ kind: 'damage', amount: 32, element: 'dark' }] },

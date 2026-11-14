@@ -124,7 +124,9 @@ export const frozenBishop: EnemyDef = {
   ],
   abilities: [{"name": "凍った法衣", "effect": {"when": "battleStart", "do": [{"kind": "block", "amount": 6}]}}],
   phases: [
-    { belowHpPct: 50, name: "冬への祈り", pattern: 'sequence', actions: [
+    // ボスの段階（2026-11-14）: 浄化。開幕の一手と、状態異常が付いた時の割り込み。答え: 火・闇で BREAK・状態異常に頼らない
+    { belowHpPct: 50, name: "冬への祈り", pattern: 'sequence', openingActionId: 'cleanse', rule: '状態異常を払い、払った数だけ回復する（火・闇で BREAK すると止まる。状態異常に頼らず殴る）', actions: [
+      { id: 'cleanse', name: '凍える浄め', big: true, behavior: 'purify', cutIn: { when: 'afflicted', rest: 2 }, hint: '状態異常を全部消して回復する（1種類につき8）。その前に起爆するか、火・闇の弱点で BREAK する。状態異常に頼らず殴れば効かない', effects: [{ kind: 'purify', amount: 8 }, { kind: 'block', amount: 12 }] },
       {"id": "hymn", "name": "冷えた賛歌", big: true, "effects": [{"kind": "damage", "amount": 10, "element": "holy", "to": "foes"}]},
       {"id": "prayer", "name": "祈りの凍結", "effects": [{"kind": "applyStatus", "status": "freeze", "amount": 1}, {"kind": "block", "amount": 12}]},
       {"id": "judgment", "name": "沈んだ裁き", big: true, "effects": [{"kind": "damage", "amount": 22, "element": "holy"}]},

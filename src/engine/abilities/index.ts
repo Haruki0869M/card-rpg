@@ -7,6 +7,7 @@ import { BALANCE } from '../../data/balance';
 import { getClass } from '../../data/classes';
 import { getElement } from '../../data/elements';
 import { getEnemy } from '../../data/enemies';
+import { enemyWeak, isResistTo } from '../battle/phases';
 import { getStatus } from '../../data/statuses';
 import type { AbilityCondition, AbilityDef, AbilityNotice, AbilitySource, AbilityEffect, AbilityTrigger, BattleEvent, BattleState, CardDef, DamageScale, Effect } from '../../types';
 import { applyEffect, describeEffect, makeCtx } from '../battle/effects';
@@ -76,7 +77,7 @@ export function damageModifiers(state: BattleState | undefined, source: Unit, ca
     if (!('modifier' in e)) continue;
     if (e.modifier === 'weaknessDamage') {
       const el = element ?? (card?.category === 'physical' && !isEnemy(source) ? source.weaponElement : undefined);
-      if (el && victim && isEnemy(victim) && getEnemy(victim.defId).weak?.includes(el) && !getEnemy(victim.defId).resist?.includes(el) && testConditions(e.if, c)) {
+      if (el && victim && isEnemy(victim) && enemyWeak(victim).includes(el) && !isResistTo(victim, el) && testConditions(e.if, c)) {
         weak *= e.multiplier;
         out.active.push({ name: ab.name, source: ab.source ?? { kind: 'card', id: card?.id, label: card?.name } });
       }

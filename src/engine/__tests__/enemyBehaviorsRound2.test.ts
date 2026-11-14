@@ -271,13 +271,15 @@ describe('第2弾: 夢幻の大迷宮の変更（fix-plan §7 の4）', () => {
   });
 });
 
+const BOSS_PHASE_ECHOES = new Set(['echoWhiteQueen', 'echoSandPharaoh', 'echoGhostAdmiral']);
 describe('第2弾: 亜種に伝わっていない事', () => {
   const listed = new Set(ROUND2.map((r) => r.id));
   it('表に無い亜種は、特殊な行動も、1ターン目の行動も持たない（元の敵を変えても伝わらない）', () => {
     let n = 0;
     const bad: string[] = [];
     for (const def of ENEMIES.all) {
-      if (!def.variantOf || listed.has(def.id) || ROUND1.has(def.id) || SCOURGE.has(def.id)) continue;
+      // ボスの段階（2026-11-14・オーナーの返事 4-A）: 夢の鍵のボス3体は、元のボスに無い段階の決まり（増援・癒し封じ）を持つ
+      if (!def.variantOf || listed.has(def.id) || ROUND1.has(def.id) || SCOURGE.has(def.id) || BOSS_PHASE_ECHOES.has(def.id)) continue;
       n++;
       const acts = [...def.actions, ...(def.phases ?? []).flatMap((p) => p.actions)];
       if (acts.some((a) => a.behavior || behaviorFromEffects(a)) || def.firstActionId) bad.push(def.id);

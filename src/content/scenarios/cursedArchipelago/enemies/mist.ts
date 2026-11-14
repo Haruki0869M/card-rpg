@@ -146,8 +146,11 @@ export const pirateCaptainGuld: EnemyDef = {
       belowHpPct: 50,
       name: '亡霊の船長ガルド',
       pattern: 'sequence',
+      // ボスの段階（2026-11-14）: 呼ぶ（今の行動を紫の札にそろえて、開幕の一手にした）。答え: 聖・雷で BREAK・水夫を先に
+      openingActionId: 'crew',
+      rule: '幽霊水夫を呼ぶ（2回まで。聖・雷で BREAK すると止まる。水夫を先に倒すか、全体攻撃で）',
       actions: [
-        { id: 'crew', name: '起きろ、野郎ども', effects: [{ kind: 'summonEnemy', enemy: 'ghostDeckhand', uses: 2 }, { kind: 'block', amount: 10 }] },
+        { id: 'crew', name: '起きろ、野郎ども', big: true, behavior: 'call', hint: '幽霊水夫を1体呼ぶ（2回まで。倒しても報酬なし）。聖・雷の弱点で BREAK すると止まる。水夫を先に倒すか、全体攻撃で', effects: [{ kind: 'summonEnemy', enemy: 'ghostDeckhand', uses: 2, orElse: 'loot' }, { kind: 'block', amount: 10 }] },
         { id: 'loot', name: '亡者の略奪', big: true, effects: [{ kind: 'damage', amount: 22 }] },
         { id: 'volley', name: '幽霊船の一斉砲撃', big: true, effects: [{ kind: 'damage', amount: 10, to: 'foes' }] },
       ],

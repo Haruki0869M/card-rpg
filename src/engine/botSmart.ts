@@ -16,7 +16,7 @@ import { cardOf, getCard } from '../data/cards';
 import { getClass } from '../data/classes';
 import { DUNGEONS } from '../data/dungeons';
 import { getItem } from '../data/items';
-import { getEnemy } from '../data/enemies';
+import { enemyWeak } from './battle/phases';
 import { TOWNS } from '../data/world';
 import { BALANCE } from '../data/balance';
 import { elementGuide } from '../components/battle/elementGuide';
@@ -230,7 +230,7 @@ export function smartNoteBattle(g: GameState, sm: SmartMemo, b: BattleState) {
   const r = regionNow(g);
   const counts = r === undefined ? undefined : sm.regionWeak.get(r) ?? sm.regionWeak.set(r, new Map()).get(r)!;
   for (const e of b.enemies) {
-    const weak = getEnemy(e.defId).weak ?? [];
+    const weak = enemyWeak(e);
     sm.seenWeak.set(e.defId, weak);
     if (counts) for (const el of weak) counts.set(el, (counts.get(el) ?? 0) + 1);
   }
