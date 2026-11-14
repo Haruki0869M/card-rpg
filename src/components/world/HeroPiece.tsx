@@ -42,7 +42,12 @@ export const TIER_METAL: Record<JobTier, { light: string; mid: string; dark: str
 };
 
 /** 描いた台座の絵の寸法（scripts/art/build_pedestal.py が表示する値）: 横:縦と、上面のだ円の真ん中の高さ（絵の高さに対する割合） */
-const BASE_ART = { aspect: 3.232, topCy: 0.341 };
+const BASE_ART = { aspect: 2.801, topCy: 0.295, bandMid: 0.783 };
+/** 描いた台座の置き方（駒の箱の大きさ s に対する割合）。台座の下の端は前の台座と同じ（0.942）。
+ *  台座が高い分（2026-11-15 オーナーの依頼で側面を 1.7 倍）、上面と駒の絵を lift だけ持ち上げる */
+const BASE_H = 0.96 / BASE_ART.aspect;
+const BASE_TOP = 0.942 - BASE_H;
+const BASE_LIFT = 0.746 - (BASE_TOP + BASE_ART.topCy * BASE_H);
 
 /** 絵の形でくり抜く（白い所だけ残す） */
 const maskOf = (url: string) => ({ WebkitMaskImage: `url(${url})`, maskImage: `url(${url})`, WebkitMaskSize: '100% 100%', maskSize: '100% 100%' });
@@ -84,6 +89,8 @@ export function HeroPiece({ hero, size: s, ringColor, active, hopping, stepKey, 
   const rimArt = artImage('ui/piece-base-rim');
   const plateArt = artImage(`ui/piece-plate-${tier}`);
   const gems = tier === 'top' || tier === 'special';
+  // 描いた台座は高いので、駒の絵をその分だけ持ち上げる
+  const raise = baseArt ? BASE_LIFT : 0;
   return (
     <>
       {/* 床の影（駒を持ち上げると小さく薄くなる。影は床に残る） */}
@@ -103,10 +110,10 @@ export function HeroPiece({ hero, size: s, ringColor, active, hopping, stepKey, 
       <span key={`lf${stepKey}`} className={`absolute inset-0 block ${lift}`} style={{ animationDuration: dur }}>
         {/* 台座: 描いた絵があれば絵（側面の帯だけプレイヤーの色に染める）、無ければプログラムで描く */}
         {baseArt ? (
-          // 描いた台座（scripts/art/build_pedestal.py）。横:縦 = BASE_ART.aspect。上面のだ円の真ん中を、前の台座と同じ高さ（0.746s）に置く
+          // 描いた台座（scripts/art/build_pedestal.py）。横:縦 = BASE_ART.aspect。下の端を前の台座にそろえ、高い分は上へのばす
           <span
             className="absolute"
-            style={{ left: s * 0.02, top: s * (0.746 - (0.96 / BASE_ART.aspect) * BASE_ART.topCy), width: s * 0.96, height: (s * 0.96) / BASE_ART.aspect }}
+            style={{ left: s * 0.02, top: s * BASE_TOP, width: s * 0.96, height: s * BASE_H }}
             data-piece-base={tier}
           >
             <img src={baseArt} alt="" draggable={false} decoding="async" className="absolute inset-0 h-full w-full" />
@@ -163,7 +170,7 @@ export function HeroPiece({ hero, size: s, ringColor, active, hopping, stepKey, 
             draggable={false}
             decoding="async"
             className="absolute"
-            style={{ left: -s * 0.125, top: -s * 0.47, width: s * 1.25, height: s * 1.25, filter: 'drop-shadow(0 1px 1px #000)' }}
+            style={{ left: -s * 0.125, top: -s * (0.47 + raise), width: s * 1.25, height: s * 1.25, filter: 'drop-shadow(0 1px 1px #000)' }}
           />
         ) : (
           <>
@@ -183,7 +190,7 @@ export function HeroPiece({ hero, size: s, ringColor, active, hopping, stepKey, 
       </span>
       {/* 台座の前の銘板（駒の絵より手前に描く）。台座といっしょに持ち上がる */}
       <span key={`pl${stepKey}`} className={`pointer-events-none absolute inset-0 block ${lift}`} style={{ animationDuration: dur }}>
-        <svg className="absolute" style={{ left: s * 0.39, top: s * 0.71, width: s * 0.22, height: s * 0.26, overflow: 'visible' }} viewBox="0 0 22 26" aria-hidden data-piece-plate={tier}>
+        <svg className="absolute" style={{ left: s * 0.39, top: s * (baseArt ? BASE_TOP + BASE_ART.bandMid * BASE_H - 0.12 : 0.71), width: s * 0.22, height: s * 0.26, overflow: 'visible' }} viewBox="0 0 22 26" aria-hidden data-piece-plate={tier}>
           {plateArt ? (
             <image href={plateArt} x="-1" y="-1" width="24" height="28" preserveAspectRatio="xMidYMid meet" />
           ) : (
