@@ -17,6 +17,8 @@ export interface FrontSpot {
   footY: number;
   /** 重なりの順（その行の駒より上・手前の行の駒より下） */
   z: number;
+  /** 透かさずに描く（施設の手前の木・山。建物は透けて見える必要が無い） */
+  solid?: boolean;
 }
 
 /**
@@ -66,7 +68,7 @@ function FrontCanvas({ spot, items, tint, ver }: { spot: FrontSpot; items: Scene
     }
     cv.style.display = drew ? 'block' : 'none';
   }, [spot.x, spot.y, spot.w, spot.h, spot.footY, items, tint, ver]);
-  return <canvas ref={ref} className="pointer-events-none absolute" data-depth-front={spot.key} style={{ left: spot.x, top: spot.y, width: spot.w, height: spot.h, zIndex: spot.z, opacity: FRONT_OPACITY, ...FRONT_FADE }} />;
+  return <canvas ref={ref} className="pointer-events-none absolute" data-depth-front={spot.key} style={{ left: spot.x, top: spot.y, width: spot.w, height: spot.h, zIndex: spot.z, opacity: spot.solid ? 1 : FRONT_OPACITY, ...FRONT_FADE }} />;
 }
 
 /** 駒より手前の景色の物を、駒の上に重ねる */

@@ -2,7 +2,7 @@
 # 使い方: py scripts/art/split_diorama.py <元の絵> <大きさpx> <名前1> <名前2> ...
 #   名前の順 = 上の段の左から（行は物の足元の高さでまとめる）。名前に "-" を付けると、その物は捨てる。
 # 背景: 絵のふちにつながった白っぽい所だけを透明にする（物の中の白は残す）。
-# そろえ方: 物を正方形の真ん中に置き、足元を下のふちの少し上（余白 4%）に合わせる。webp。
+# そろえ方: 物を正方形の左右の真ん中に置き、足元を下の端（余白 1%）に合わせる。webp。
 import sys, os
 import numpy as np
 import cv2
@@ -47,6 +47,7 @@ for (bottom, left, i), name in zip(info, names):
     k = min(size * (1 - pad * 2) / crop.width, size * (1 - pad * 2) / crop.height)
     crop = crop.resize((max(1, round(crop.width * k)), max(1, round(crop.height * k))), Image.LANCZOS)
     c = Image.new('RGBA', (size, size))
-    c.alpha_composite(crop, ((size - crop.width) // 2, size - round(size * pad) - crop.height))
+    # 足元は絵の下の端（前の箱庭の絵と同じ決まり。ゲームは絵の下の真ん中を足元として置く）
+    c.alpha_composite(crop, ((size - crop.width) // 2, size - max(1, round(size * 0.01)) - crop.height))
     c.save(os.path.join(OUT, f'{name}.webp'), quality=85, method=6)
     print(name, crop.size)
