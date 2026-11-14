@@ -179,21 +179,29 @@ FACES = {
     ('hunter', 'female'): (0.5, 0.085, 0.17), ('hunter', 'male'): (0.5, 0.085, 0.17),
     ('guardian', 'female'): (0.5, 0.085, 0.17), ('guardian', 'male'): (0.5, 0.085, 0.17),
     ('mage', 'female'): (0.5, 0.13, 0.17), ('mage', 'male'): (0.5, 0.135, 0.17),
-    ('warrior', 'female'): (0.5, 0.085, 0.17), ('warrior', 'male'): (0.5, 0.085, 0.17),
+    ('warrior', 'female'): (0.69, 0.13, 0.15), ('warrior', 'male'): (0.5, 0.085, 0.17),
+    # 2026-11-14 ChatGPT の転職の立ち絵（ポニーテールで自動の位置がずれる）
+    ('swordmaster', 'female'): (0.70, 0.124, 0.15), ('swordSaint', 'female'): (0.607, 0.13, 0.15),
+    ('samurai', 'female'): (0.497, 0.131, 0.15), ('magicKnight', 'female'): (0.603, 0.131, 0.15),
+    ('overlord', 'female'): (0.579, 0.146, 0.15), ('berserker', 'female'): (0.617, 0.131, 0.15),
+    ('pope', 'male'): (0.55, 0.152, 0.15), ('pope', 'female'): (0.474, 0.154, 0.15),
+    ('lancer', 'female'): (0.566, 0.145, 0.15),
+    ('archmage', 'male'): (0.467, 0.152, 0.15), ('archmage', 'female'): (0.447, 0.144, 0.15),
+    ('hexer', 'male'): (0.471, 0.144, 0.15), ('hexer', 'female'): (0.414, 0.152, 0.15),
+    ('phantomThief', 'female'): (0.50, 0.128, 0.16),
+    ('grandThief', 'male'): (0.488, 0.132, 0.15), ('grandThief', 'female'): (0.465, 0.148, 0.15),
+    ('necromancer', 'male'): (0.450, 0.215, 0.15), ('necromancer', 'female'): (0.479, 0.206, 0.15),
+    ('timeMage', 'male'): (0.488, 0.182, 0.15), ('bulwark', 'male'): (0.513, 0.109, 0.15),
+    ('greatSage', 'male'): (0.475, 0.167, 0.15), ('greatSage', 'female'): (0.463, 0.159, 0.15),
+    ('hadesLord', 'male'): (0.442, 0.148, 0.15), ('hadesLord', 'female'): (0.492, 0.155, 0.15),
 }
 # 帽子・冠・鎌などで自動の位置がずれる職は、目で確認して決めた値（J4）
 FACES.update({
-    ('hadesLord', 'female'): (0.543, 0.158, 0.157), ('hadesLord', 'male'): (0.443, 0.136, 0.156),
-    ('necromancer', 'female'): (0.421, 0.153, 0.156), ('necromancer', 'male'): (0.571, 0.139, 0.155),
-    ('overlord', 'female'): (0.598, 0.196, 0.156),
-    ('pope', 'female'): (0.50, 0.172, 0.156), ('pope', 'male'): (0.553, 0.178, 0.156),
-    ('lancer', 'female'): (0.559, 0.168, 0.156), ('hexer', 'female'): (0.535, 0.192, 0.156),
     # 区切りF（槍の先が頭より上にあるため）
-    ('bulwark', 'male'): (0.466, 0.158, 0.156), ('bulwark', 'female'): (0.485, 0.118, 0.156),
 })
 # 穴埋め（fill_holes）をしない元画像。重装衛士は、細い槍を戻すため切り抜きを直している（.cut の絵を
 # scripts/art/fix_thin_cut.py で作り直し済み）。槍と足の間の背景が穴として埋まるので、穴埋めをしない
-NO_FILL_HOLES = {'bulwark-female', 'bulwark-male'}
+NO_FILL_HOLES = {'bulwark-female', 'bulwark-male', 'lancer-male', 'lancer-female', 'archer-male', 'archer-female', 'tamer-male', 'tamer-female', 'archmage-male', 'archmage-female', 'hexer-male', 'hexer-female', 'brawler-male', 'brawler-female', 'phantomThief-male', 'phantomThief-female', 'phantomTamer-male', 'phantomTamer-female', 'shadow-female', 'dragoon-male', 'dragoon-female', 'holyKing-male', 'holyKing-female', 'beastMaster-male', 'beastMaster-female', 'bowSaint-male', 'bowSaint-female', 'greatSage-male', 'hadesLord-male', 'hadesLord-female', 'grandThief-male', 'grandThief-female', 'fistKing-male', 'fistKing-female', 'ninja-female', 'phantomKing-male', 'phantomKing-female', 'necromancer-male', 'necromancer-female', 'fistSaint-male', 'fistSaint-female', 'gambler-male', 'gambler-female', 'machinist-male', 'machinist-female', 'petTrainer-male', 'petTrainer-female', 'timeMage-male', 'timeMage-female', 'bard-female', 'dragonVein-male', 'dragonVein-female'}
 # 表に無い職は、この値（x=0.5 は頭の位置を自動で探す）
 FACE_DEFAULT = (0.5, 0.085, 0.17)
 
@@ -526,6 +534,8 @@ def build_items():
 
 # ---------------- お供（ペット） ----------------
 # 元画像は pet-<お供ID>-<色ID>.(webp|png)。SRC に有る物を全部、pet/<お供ID>-<色ID>.webp にする（無い色は飛ばす）
+PET_KEEP_GAPS = {'blackCat-russianBlue'}
+
 def build_pets():
     import glob, re
     for f in sorted(glob.glob(os.path.join(SRC, 'pet-*'))):
@@ -534,7 +544,8 @@ def build_pets():
         key = m.group(1)
         name = f'pet/{key}'
         if not want(name): continue
-        fig = trim(despeckle(fill_holes(cutout(f'pet-{key}'), f'pet-{key}', always=True)), 24)
+        # 丸めたしっぽの内側など、本当の隙間がある絵は、背景と同じ色の穴を残す（always=False）
+        fig = trim(despeckle(fill_holes(cutout(f'pet-{key}'), f'pet-{key}', always=key not in PET_KEEP_GAPS)), 24)
         save(rim(square(fig, 160, 0.04), (8, 6, 12), 0.6, 2), f'{name}.webp', 82)
 
 # ---------------- ワールドマップの駒（ちびキャラのミニチュア） ----------------
@@ -543,6 +554,7 @@ def build_pets():
 # ここでは: 切り抜く → 床の影を落とす → 足の裏を下端に、体の中心を左右の真ん中にそろえる。
 # 大きさは「高さ」でそろえる。正方形なので、横に長い武器（剣・鎌・槍）も体を小さくせずに収まる
 PIECE_W, PIECE_H = 180, 180
+PIECE_BASE_JOBS = {'warrior', 'guardian', 'hunter', 'mage', 'monk', 'thief', 'priest', 'summoner'}
 
 def sole_row(fig, th=160, frac=0.04):
     """足の裏の高さ: 濃い（不透明な）部分が、ある程度の幅で残っている一番下の行。
@@ -566,6 +578,8 @@ def build_pieces():
         m = re.match(r'(.+)-(male|female)\.(webp|png|jpg)$', os.path.basename(f))
         if not m: continue
         key = f'{m.group(1)}-{m.group(2)}'
+        # 駒は基本職の16人分だけ（転職しても基本職の駒を使う。2026-11-14 オーナーの決定）
+        if m.group(1) not in PIECE_BASE_JOBS: continue
         name = f'piece/{key}'
         if not want(name): continue
         fig = trim(despeckle(cutout(f'piece/{key}')), 24)
