@@ -26,6 +26,7 @@ import { orderOnTile, pieceSpots, PLAYER_COLORS } from './pieceLayout';
 import { cameraTop, edgeArrow, mapPadBottom, mapPadY, revealLeft, revealTop, visibleH } from './mapCamera';
 import { anchorScroll, baseRadius, clampZoom, COMPACT_ZOOM, minZoomFor, stepZoom, ZOOM_MAX, ZOOM_MIN } from './mapZoom';
 import { Overview } from './Overview';
+import { useLowScreen } from '../../hooks/useLowScreen';
 import { artBox, FACILITY_LIFT, pickPlace, placeLabels, signpostBox, type ArtShape, type Box, type PlaceLabel } from './placeTap';
 
 const SQRT3 = Math.sqrt(3);
@@ -357,6 +358,10 @@ export function WorldMap({
   // 小さく縮小した時は、小さい文字と飾りを消し、施設は印だけにする
   const compact = zoom < COMPACT_ZOOM;
   const [overview, setOverview] = useState(false);
+  // 狭い画面 回1: 低い画面（data-low）は、拡大のボタンをいつも畳んだ形（見取り図＋🔍）。🔍 で ＋・標準・− が開き、もう1度 🔍 か地図を押すと閉じる
+  const low = useLowScreen();
+  const [zoomOpen, setZoomOpen] = useState(false);
+  const zoomTray = low && zoomOpen;
   // 霧が晴れた時だけ地形の層を作り直す（それ以外は前の層を使い回す）
   const tilesRef = useRef(w.tiles);
   const key = seenKey(w) + ':' + w.tiles.length;
@@ -429,7 +434,7 @@ export function WorldMap({
   const inset = Math.round(bottomInset);
   const reduced = useReducedMotion();
   // 拡大のボタンを縦に並べる高さ（「戻る」のボタン＋見取り図（字つきで少し高い）・拡大の4つ＋すき間 ≒ 258px）が、見えている地図に無い時は横に並べる
-  const compactZoom = size.height > 0 && visibleH(size.height, inset) < 279;
+  const compactZoom = low || (size.height > 0 && visibleH(size.height, inset) < 279);
   // 拡大を変える直前のスクロールと、残したい枠の中の点（ピンチの指の間・ボタンなら枠の真ん中）
   const zoomAnchor = useRef<{ left: number; top: number; ax: number; ay: number; padY: number; R: number } | null>(null);
   const lastCam = useRef<{ here?: number; turn: string; w: number; h: number; inset: number } | null>(null);
@@ -673,6 +678,11 @@ export function WorldMap({
   // タップ: 押した所に見えている「上の面」を優先する（手前の行から調べる。高いマスが奥のマスに重なって見える所でも、見えている方を選ぶ）。
   // どの上の面でもない所（崖の側面など）は、今までどおり一番近いマスの中心
   const tap = (e: React.MouseEvent) => {
+    // 狭い画面 回1: 🔍 の ＋・標準・− が開いている時は、地図を押すと閉じるだけ（マスは選ばない）
+    if (zoomTray) {
+      setZoomOpen(false);
+      return;
+    }
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const px = e.clientX - rect.left;
     const py = e.clientY - rect.top;
@@ -779,6 +789,21 @@ export function WorldMap({
         return [{ key: `f${tile}`, x: x - R * 1.45, y: y - R * 2.1, w: R * 2.9, h: R * 3.1, footY: y + R * 0.2, z: 0, solid: true }];
       }),
     [w.tiles, center, R],
+  );
+
+  // 拡大・標準・縮小のボタン（ふつうの画面は見取り図の下に並べる。低い画面は 🔍 で開く1列の中）
+  const zoomButtons = (
+    <>
+      <button onClick={() => applyZoom(stepZoom(zoom, 1, minZoom), true)} disabled={zoom >= ZOOM_MAX} aria-label="地図を拡大" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-full disabled:opacity-40" data-zoom-in>
+        <Plus size={20} className="text-amber-200" />
+      </button>
+      <button onClick={() => applyZoom(1, true)} disabled={zoom === ZOOM_MIN} aria-label="地図を標準の大きさに戻す" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-full text-[12px] font-bold text-amber-100 disabled:opacity-40" data-zoom-reset>
+        標準
+      </button>
+      <button onClick={() => applyZoom(stepZoom(zoom, -1, minZoom), true)} disabled={zoom <= minZoom} aria-label="地図を縮小" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-full disabled:opacity-40" data-zoom-out>
+        <Minus size={20} className="text-amber-200" />
+      </button>
+    </>
   );
 
   return (
@@ -1115,7 +1140,7 @@ export function WorldMap({
                   <span
                     className="pointer-events-none absolute flex items-center justify-center rounded-full border border-orange-200/90 bg-orange-950/85 leading-none text-orange-100"
                     data-hero-warm={id}
-                    style={{ left: s * 0.62, top: s * 0.02, width: Math.max(16, s * 0.3), height: Math.max(16, s * 0.3), fontSize: Math.max(11, s * 0.2) }}
+                    style={{ left: s * 0.62, top: s * 0.02, width: Math.max(18, s * 0.3), height: Math.max(18, s * 0.3), fontSize: Math.max(12, s * 0.2) }}
                   >
                     ♨
                   </span>
@@ -1190,6 +1215,7 @@ export function WorldMap({
         data-zoom-min={minZoom}
         data-zoom-compact={compact ? '' : undefined}
         data-zoom-layout={compactZoom ? 'row' : 'column'}
+        data-zoom-folded={low ? (zoomOpen ? 'open' : 'closed') : undefined}
       >
         {/* 見取り図（段階6a）: 大陸全体を1画面に。印を押すと、その場所へ地図を動かす。回1: 絵の下に「見取り図」の字 */}
         <div className="relative">
@@ -1217,15 +1243,21 @@ export function WorldMap({
             </div>
           )}
         </div>
-        <button onClick={() => applyZoom(stepZoom(zoom, 1, minZoom), true)} disabled={zoom >= ZOOM_MAX} aria-label="地図を拡大" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-full disabled:opacity-40" data-zoom-in>
-          <Plus size={20} className="text-amber-200" />
-        </button>
-        <button onClick={() => applyZoom(1, true)} disabled={zoom === ZOOM_MIN} aria-label="地図を標準の大きさに戻す" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-full text-[12px] font-bold text-amber-100 disabled:opacity-40" data-zoom-reset>
-          標準
-        </button>
-        <button onClick={() => applyZoom(stepZoom(zoom, -1, minZoom), true)} disabled={zoom <= minZoom} aria-label="地図を縮小" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-full disabled:opacity-40" data-zoom-out>
-          <Minus size={20} className="text-amber-200" />
-        </button>
+        {low && (
+          <button onClick={() => setZoomOpen((o) => !o)} aria-label={zoomOpen ? '拡大のボタンを閉じる' : '拡大のボタン（拡大・標準・縮小）を開く'} aria-expanded={zoomOpen} className={`btn btn-dark flex h-11 w-11 items-center justify-center rounded-full text-[18px] ${zoomOpen ? 'sel-on' : ''}`} data-zoom-toggle>
+            🔍
+          </button>
+        )}
+        {low ? (
+          // 低い画面: 🔍 を押した時だけ、畳んだボタンの下に ＋・標準・− の1列を出す
+          zoomOpen && (
+            <div className="absolute top-full right-0 mt-1.5 flex flex-row items-center gap-1.5 rounded-full bg-black/40 p-0.5" data-zoom-tray>
+              {zoomButtons}
+            </div>
+          )
+        ) : (
+          zoomButtons
+        )}
       </div>
       {/* 見取り図（段階6a）。印を押すと閉じて、その場所へ地図を動かす */}
       {overview && (

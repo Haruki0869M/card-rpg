@@ -4,6 +4,8 @@
 // 別のシナリオを通す時: ADVENTURE_SCENARIO=frozenKingdom node scripts/adventure.mjs（記録を入れて解放してから選ぶ）
 // 担当を「スマホを回して操作」（P1・P2…）にする時: ADVENTURE_SEATS=pass（省略は「1人で全員」から2人目だけ P2）
 // 他のセッションと同じポートを使わないよう、自分専用のポートで preview を起こし URL=http://127.0.0.1:<番号>/card-rpg/ を付ける
+// 画面の大きさ: ADVENTURE_VIEWPORT=390x540（狭い画面 回1。省略は今までどおり 360x640）。低い画面（高さ 640 未満）は世界マップが低い形になる
+// 世界マップのボタンは字ではなく data- の印で押す（低い画面で字の並びが変わっても止まらないように。狭い画面 回1）
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { chromium, confirmEndTurn, layoutIssues, URL, waitForWorldMovement, waitForBattlePresentation, depart } from './lib.mjs';
 
@@ -42,6 +44,8 @@ async function record(page, party, result) {
 const browser = await chromium.launch();
 const issues = new Set();
 const seen = new Set();
+// 目的のマスがボタン・パネルの下にあって、地図を動かし直した回数（狭い画面 回1。回2で 0 になる事を見る）
+let panFixes = 0;
 
 async function check(page, tag) {
   for (const i of await layoutIssues(page)) issues.add(`${tag}: ${i}`);
@@ -77,6 +81,11 @@ async function playBattle(page) {
   for (let guard = 0; guard < 60; guard++) {
     await waitForBattlePresentation(page);
     if (await page.locator('button:has-text("報酬を受け取る"), button:has-text("冒険の結果へ"), [data-result-button], button:has-text("ダンジョンへ戻る")').count()) return;
+    // うっかり開いたシート（山札・捨て札など）は閉じる（低い画面で、押す場所がずれた時）
+    if (await page.locator("[data-sheet] [data-sheet-close]").count()) {
+      await page.locator("[data-sheet] [data-sheet-close]").first().click({ timeout: 2000 }).catch(() => {});
+      continue;
+    }
     // 詳細の窓（装備・カードの説明）が開いていたら閉じる（説明の文に「ターン終了」が入った装備のボタンを、終了のボタンと取り違えないように）
     if (await page.locator('[data-detail-backdrop]').count()) {
       await page.keyboard.press('Escape').catch(() => {});
@@ -105,7 +114,8 @@ async function playBattle(page) {
     const availableCards = await cards.count();
     const card = cards.first();
     const box = await card.boundingBox();
-    await page.mouse.click(box.x + 14, box.y + 70);
+    // 低い画面（ADVENTURE_VIEWPORT=390x540 など）はカードが低いので、カードの高さの中を押す（下の「山札」のボタンを押さないように）
+    await page.mouse.click(box.x + 14, box.y + Math.min(70, box.height * 0.45));
     await page.waitForTimeout(40);
     if (await page.getByText('敵をタップ').count()) {
       const e = page.locator('[data-enemy]:not([data-dead])').first();
@@ -127,7 +137,8 @@ async function playBattle(page) {
 }
 
 async function run(party, difficulty) {
-  const ctx = await browser.newContext({ viewport: { width: 360, height: 640 }, hasTouch: true, isMobile: true });
+  const [vw, vh] = (process.env.ADVENTURE_VIEWPORT ?? '360x640').split('x').map(Number);
+  const ctx = await browser.newContext({ viewport: { width: vw, height: vh }, hasTouch: true, isMobile: true });
   const page = await ctx.newPage();
   // 前後の版を同じ冒険で比較するため、開始時の種だけを固定できるようにする。
   if (process.env.ADVENTURE_SEED) await page.addInitScript(seed => {
@@ -299,8 +310,9 @@ async function run(party, difficulty) {
           await reach.nth(best).scrollIntoViewIfNeeded();
           let b = await reach.nth(best).boundingBox();
           // 右の操作ボタン（見取り図・拡大・戻る）の下なら、地図を横に動かしてから押す（広い地図は横にもスクロールする。段階6a）
+          // 狭い画面 回1: 下の操作パネル・マスの説明の帯の下（地図の上に重なる）も「隠れている」に入れる
           const under = async (bb) => {
-            for (const sel of ['[data-zoom-controls]', '[data-recenter]']) {
+            for (const sel of ['[data-zoom-controls]', '[data-recenter]', '[data-world-panel]', '[data-tile-info]']) {
               const c = await page.locator(sel).boundingBox().catch(() => null);
               if (c && bb.x + bb.width / 2 >= c.x - 4 && bb.x + bb.width / 2 <= c.x + c.width + 4 && bb.y + bb.height / 2 >= c.y - 4 && bb.y + bb.height / 2 <= c.y + c.height + 4) return true;
             }
@@ -310,24 +322,26 @@ async function run(party, difficulty) {
           // 目的のマスが「見取り図」のボタンの下に残って押せないまま止まった。2026-11-15・種 874651857）
           for (const [left, top] of [[120, 0], [-120, 0], [0, -100], [0, 100]]) {
             if (!b || !(await under(b))) break;
+            panFixes++;
             await page.evaluate(([left, top]) => document.querySelector('[data-world-map]')?.scrollBy({ left, top, behavior: 'instant' }), [left, top]);
             await page.waitForTimeout(80);
             b = await reach.nth(best).boundingBox();
           }
           await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
           await page.waitForTimeout(80);
-          if (await page.locator('button:has-text("移動する")').count()) {
+          if (await page.locator('[data-move-go]').count()) {
             if (!seen.has('move')) {
               seen.add('move');
               await page.screenshot({ path: `screenshots/adv-move.png` });
             }
-            await page.locator('button:has-text("移動する")').click({ timeout: 3000 }).catch(() => {});
+            await page.locator('[data-move-go]').click({ timeout: 3000 }).catch(() => {});
             await page.waitForTimeout(250);
             continue;
           }
         }
       }
-      await clickText(page, '手番を終える') || (await clickText(page, '待機'));
+      // 「手番を終える」か「待機」（低い画面でも同じ印で押す）
+      await page.locator('[data-world-wait]').first().click({ timeout: 3000 }).catch(() => {});
       continue;
     }
     // 戦闘の全滅（ステップB: 灯火が残っていれば「敗北…」＋「町で態勢を立て直す」、灯火が無く仲間が残れば「力尽きた…」）
@@ -512,6 +526,7 @@ async function run(party, difficulty) {
 const results = [];
 for (const party of (process.env.ADVENTURE_PARTIES ?? '4,2').split(',').map(Number)) results.push(await run(party, 'やさしい'));
 await browser.close();
+console.log(`地図を動かし直した回数: ${panFixes}`);
 if (issues.size) console.log('issues:', [...issues]);
 // 一方の人数だけ通っても成功にしない。
 process.exit(issues.size || results.some(result => result !== 'cleared') ? 1 : 0);

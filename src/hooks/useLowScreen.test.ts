@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { visibleHeight } from './useAppHeight';
 import { LOW_ENTER, LOW_EXIT, nextLow } from './useLowScreen';
+import { LAYER } from '../components/ui/layers';
 
 const run = (hs: (number | null)[], start: boolean | null = null) => {
   let v = start;
@@ -40,5 +41,13 @@ describe('低い画面の切り替え（狭い画面 回0）', () => {
   });
   it('回転は切り替わる（大きく変わる時）', () => {
     expect(run([844, 390, 844])).toEqual([false, true, false]);
+  });
+});
+
+describe('低い画面の災厄の窓の層（回1）', () => {
+  it('待ちの帯・通信の知らせより手前、シートより奥', () => {
+    expect(LAYER.turnLock).toBeLessThan(LAYER.scourgeDialog);
+    expect(LAYER.online).toBeLessThan(LAYER.scourgeDialog);
+    expect(LAYER.scourgeDialog).toBeLessThan(LAYER.sheet);
   });
 });
