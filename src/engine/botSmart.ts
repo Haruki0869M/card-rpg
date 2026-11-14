@@ -349,6 +349,14 @@ export function smartTownShopCommand(g: GameState, sm: SmartMemo): SmartPick | u
       .map((e, index) => ({ e, index, def: getItem(e.item.itemId) }))
       .filter(({ e, def }) => !e.sold && def.slot !== 'consumable' && price(e.price) <= budget && smartGain(g, sm, v, def) > SHOP_MIN_GAIN)
       .sort((a, b) => smartGain(g, sm, v, b.def) - smartGain(g, sm, v, a.def) || a.index - b.index);
+    // 盗賊王の無料券（2026-11-14）: 点の上がり方が一番大きい装備に使う（値段は見ない。同じなら高い方）
+    if ((w.freeShop ?? 0) > 0) {
+      const free = stock.items
+        .map((e, index) => ({ e, index, def: getItem(e.item.itemId) }))
+        .filter(({ e, def }) => !e.sold && def.slot !== 'consumable' && smartGain(g, sm, v, def) > SHOP_MIN_GAIN)
+        .sort((a, b) => smartGain(g, sm, v, b.def) - smartGain(g, sm, v, a.def) || b.e.price - a.e.price || a.index - b.index)[0];
+      if (free) cmds.push({ type: 'TOWN_BUY', playerId: v.playerId, heroId: v.id, kind: 'item', index: free.index, free: true });
+    }
     for (const x of eq) cmds.push({ type: 'TOWN_BUY', playerId: v.playerId, heroId: v.id, kind: 'item', index: x.index });
     // 消耗品: 袋に空きがあれば。回復の道具は SHOP_HEAL_STOCK 個まで、ほかは袋に1つ空きを残す
     const room = pouchLimitOf(v) - v.pouch.length;
@@ -659,6 +667,23 @@ export function timeSlack(g: GameState): number {
 }
 
 // ---------- 6. 寄り道の判断（2026-11-14 docs/tasks/detour-value-plan.md 柱6。測るため） ----------
+
+/**
+ * 黄金箱の秘宝の3択: 場面の仲間のだれかが付けた時の点の上がり方（smartGain）が一番大きい候補（同じなら前の物）。
+ * shop の工夫を外した時は、いつも1つ目
+ */
+export function smartRelicIndex(g: GameState, sm: SmartMemo | undefined, heroes: Hero[]): number {
+  const relics = g.chest?.relics ?? [];
+  if (!sm || !smartUses(sm, 'shop')) return 0;
+  let best = 0;
+  let bestScore = -Infinity;
+  relics.forEach((r, i) => {
+    const def = getItem(r.itemId);
+    const s = Math.max(...heroes.map((h) => smartGain(g, sm, h, def)));
+    if (s > bestScore) (best = i), (bestScore = s);
+  });
+  return best;
+}
 
 /** 寄り道1回に見込む侵食度（%）。災厄 = 歩き＋戦闘 / ランダムダンジョン = 歩き＋5行（bot の作戦の提案） */
 const DETOUR_COST = { scourge: 4, random: 8 };

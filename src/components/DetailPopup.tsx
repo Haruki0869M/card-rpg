@@ -6,7 +6,7 @@ import { STAT_LABEL } from '../data/terms';
 import { CharacterArt, EnemyArt } from '../art';
 import { getCard } from '../data/cards';
 import { getClass } from '../data/classes';
-import { getEnemy } from '../data/enemies';
+import { getEnemy, phasesOf } from '../data/enemies';
 import { affinityFromStats, affinityOf, chanceFor, describeEffect, describeAbility, enemyHitDamage, enemyName, finalChance, findAlly, findEnemy, heroStats, incomingDamage, statsOf, targetOf, tierDistribution, toPercents } from '../engine';
 import { getEnemyAction } from '../data/enemies';
 import { enemyResist, enemyWeak, phaseDefOf, phaseMarks } from '../engine/battle/phases';
@@ -275,8 +275,8 @@ function EnemyStats({ e }: { e: EnemyState }) {
           <span className="font-display text-fuchsia-200">《{ab.name}》</span> {describeAbility(ab)}
         </div>
       ))}
-      {def.phases?.length ? (
-        <div className="mt-0.5 text-amber-200">{def.phases.map((ph) => `HP${ph.belowHpPct}%以下で「${ph.name}」に変わる`).join('／')}</div>
+      {phasesOf(e)?.length ? (
+        <div className="mt-0.5 text-amber-200">{phasesOf(e)!.map((ph) => `HP${ph.belowHpPct}%以下${ph.onPartnerDown ? 'か、相方が倒れると' : 'で'}「${ph.name}」に変わる`).join('／')}</div>
       ) : null}
     </div>
   );

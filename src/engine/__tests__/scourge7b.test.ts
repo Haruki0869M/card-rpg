@@ -42,12 +42,25 @@ function endTurn(g: GameState): GameState {
   }
   return g;
 }
+/**
+ * 2026-11-14（寄り道の値打ち 柱3 の2）: 盗賊王・死霊術師は、専用の装備を使えるキャラがいる時だけ出る。
+ * 種類を決めて出す時は、出す間だけパーティを「使える」ジョブ（盗賊・死霊術師）にする（置く場所はジョブに関係しない）
+ */
+function spawnFitting(t: GameState, w: GameState['world'] & object, rng: ReturnType<typeof createRng>, id?: string) {
+  const fit: Record<string, string> = { greedKing: 'thief', miasmaNecro: 'necromancer' };
+  const keep = t.heroes.map((h) => h.classId);
+  const want = id ? fit[id] : 'thief';
+  if (want) for (const h of t.heroes) h.classId = want;
+  const wd = spawnScourge(t, w, rng);
+  t.heroes.forEach((h, i) => (h.classId = keep[i]));
+  return wd;
+}
 /** 災厄を1体出す（種類を決めて置く） */
 function withScourge(g: GameState, id: string): GameState {
   const t = structuredClone(g);
   const w = t.world!;
   w.scourgesMet = IDS.filter((x) => x !== id);
-  const wd = spawnScourge(t, w, createRng(3));
+  const wd = spawnFitting(t, w, createRng(3), id);
   expect(wd?.scourge).toBe(id);
   w.scourgesMet = [id];
   w.story = undefined;
@@ -423,7 +436,7 @@ describe('段階7b: 見晴らしの塔で見える', () => {
     const towers = w.tiles.flatMap((t, i) => (t.f?.kind === 'tower' ? [i] : []));
     for (const i of towers) w.tiles[i].f!.used = true;
     w.scourgesMet = IDS.slice(1);
-    const wd = spawnScourge(g, w, createRng(9))!;
+    const wd = spawnFitting(g, w, createRng(9), 'greedKing')!;
     const near = towers.some((i) => hexDistance(w, i, wd.tile) <= BALANCE.scourge.towerReveal);
     expect(w.tiles[wd.tile].seen).toBe(near);
   });

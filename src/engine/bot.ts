@@ -14,6 +14,8 @@ import { questsShort } from './game/world/questGate';
 import type { GameCommand, GameState, Hero, PlayerId, WorldState } from '../types';
 import { moveCostOf, neighbors, pathTo } from './game/world/hex';
 import { isWideMap } from './game/world/lanes';
+import { insightTarget, shortcutTile } from './game/world/detour';
+import { shortcutEntrance } from './game/game';
 import {
   applyGameCommand,
   canEquip,
@@ -54,6 +56,7 @@ import {
   smartRemoveCardCommand,
   smartShopDetour,
   smartDetour,
+  smartRelicIndex,
   smartTownCardCommand,
   smartTownShopCommand,
   smartUses,
@@ -76,8 +79,8 @@ export interface BotLog {
   detourTurns?: number[];
 }
 
-/** 賢い bot: ランダムダンジョンへ行く値打ちがあるか（2026-11-14 寄り道の値打ち） */
-const DETOUR_WORTH = { random: (_g: GameState) => true };
+/** 賢い bot: ランダムダンジョンへ行く値打ちがあるか（2026-11-14 寄り道の値打ち: 見破りがまだ取れる = 見破っていない鍵・最後のダンジョンが残っている） */
+const DETOUR_WORTH = { random: (g: GameState) => !!insightTarget(g) };
 
 /** 次の操作を決めるだけの時（オンライン協力のテスト）は、ここに入れて動かさない */
 let capture: GameCommand[] | null = null;
@@ -541,6 +544,11 @@ export function botStep(g: GameState, log: BotLog, memo: BotMemo, inScene = fals
         const id = cl.heroes.find((x) => !cl.choices[x])!;
         return send(g, { type: 'CLAIM_LOOT', playerId: pid(g, id), heroId: id, choice: id === cl.heroes[0] ? 'need' : 'greed', index: ci }, log);
       }
+      // 黄金箱の秘宝の3択（2026-11-14）: 賢い bot は点で選ぶ。ほかの bot は1つ目
+      if (c.contents && c.relics?.length && c.relicPicked === undefined) {
+        const party = livingHeroes(g).filter((x) => !g.party || g.party.includes(x.id));
+        return send(g, { type: 'PICK_RELIC', playerId: pid(g), optionIndex: smartRelicIndex(g, memo.smart, party) }, log);
+      }
       if (c.contents) return send(g, { type: 'LEAVE_CHEST', playerId: pid(g) }, log);
       // 封魔の宝箱: 普通の bot は、だれかのHPが半分より少ない時は封印を解かずに立ち去る。直行 bot はいつも解く
       if (sealStep(c) === 'sealed' && !memo.straight && livingHeroes(g).some((x) => (!g.party || g.party.includes(x.id)) && x.hp < heroMaxHp(x) * 0.5)) return send(g, { type: 'LEAVE_CHEST', playerId: pid(g) }, log);
@@ -581,6 +589,8 @@ export function botStep(g: GameState, log: BotLog, memo: BotMemo, inScene = fals
       return send(g, { type: 'REST', playerId: pid(g), kind: 'hp' }, log);
     }
     case 'cleared':
+      // 賢い bot（2026-11-14 寄り道の値打ち 柱4）: ランダムダンジョンの抜け道があれば通る
+      if (memo.smart && g.dungeon?.random && shortcutTile(g, shortcutEntrance(g)) !== undefined) return send(g, { type: 'RETURN_TO_HUB', playerId: pid(g), kind: 'shortcut' }, log);
       return send(g, { type: 'RETURN_TO_HUB', playerId: pid(g) }, log);
     case 'town': {
       const t = g.town!;

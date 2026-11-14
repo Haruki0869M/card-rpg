@@ -3,7 +3,7 @@ import { getStatus } from '../data/statuses';
 import { BALANCE } from '../data/balance';
 import { activeStatuses, actionFailChanceOf, skipActionStatus } from '../engine';
 import { getElement } from '../data/elements';
-import { getEnemy, getEnemyAction } from '../data/enemies';
+import { getEnemyAction, phasesOf } from '../data/enemies';
 import { breakStopsAction, describeEffect, enemyHitDamage, findAlly, lowHpMulOn, targetOf } from '../engine';
 import { behaviorBadge, FRENZY_BADGE } from '../data/enemyBehaviors';
 import { blockSkippedOnBreak } from '../engine';
@@ -146,7 +146,7 @@ export function intentView(state: BattleState, enemy: EnemyState): IntentView | 
 export function openingBadge(enemy: EnemyState): IntentView['opening'] {
   const n = enemy.intent?.opening;
   if (!n) return undefined;
-  const ph = getEnemy(enemy.defId).phases?.[n - 1];
+  const ph = phasesOf(enemy)?.[n - 1];
   return { phase: n, label: `第${n + 1}段階`, short: `${n + 1}段`, long: `「${ph?.name ?? ''}」になって最初の一手${ph?.rule ? `。この段階の新しい決まり: ${ph.rule}` : ''}` };
 }
 

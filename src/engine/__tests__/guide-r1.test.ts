@@ -210,6 +210,8 @@ describe('回1: 災厄が出た時の知らせ（別の窓）と場所の文', (
     const w = g.world!;
     w.story = { title: '翠の神殿', lines: ['神殿の封印が解けた。'] };
     w.scourgesMet = ['miasmaNecro', 'nightmareBeast', 'stormWitch', 'infernoDemon'];
+    // 2026-11-14（寄り道の値打ち）: 盗賊王は、黄金冠を使えるキャラ（お金を得るカードを持つジョブにたどり着ける）がいる時だけ出る
+    g.heroes[0].classId = 'thief';
     const wd = spawnScourge(g, w, createRng(3))!;
     expect(wd.scourge).toBe('greedKing');
     expect(w.story).toEqual({ title: '翠の神殿', lines: ['神殿の封印が解けた。'] });

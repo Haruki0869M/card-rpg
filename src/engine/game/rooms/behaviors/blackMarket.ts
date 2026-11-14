@@ -3,12 +3,15 @@
 import { addLog } from '../../common';
 import { sceneHeroes } from '../../heroes';
 import { blackMarketStock } from '../../loot';
+import { dungeonTheme } from '../../dungeon';
 import type { RoomBehavior } from '../types';
 
 export const behavior: RoomBehavior = {
   id: 'blackMarket',
   enter(game, room, rng) {
-    for (const h of sceneHeroes(game)) if (!h.retired) h.peddler = blackMarketStock(game, h, rng);
+    // 無法者の隠れ処（2026-11-14 寄り道の値打ち）: 専用の装備を2つ並べ、1つ選んで買える（テーマの blackMarketChoices）
+    const choices = dungeonTheme(game.dungeon?.theme)?.reward?.blackMarketChoices ?? 1;
+    for (const h of sceneHeroes(game)) if (!h.retired) h.peddler = blackMarketStock(game, h, rng, choices);
     room.cleared = true;
     game.mode = 'dungeon';
     addLog(game, '闇商人が、店には無い品を広げた（買わなくてもよい）');

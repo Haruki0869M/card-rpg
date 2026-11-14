@@ -1,0 +1,225 @@
+// ===== 寄り道の値打ち（2026-11-14・docs/tasks/detour-value-plan.md。オーナーの返事 1〜5 すべて A）=====
+// - 柱1 災厄の加護: 生きている災厄1体ごとに、鍵と最後のダンジョンのボス・中ボスの戦闘に決まりが1つ足される（保存しない。生きている災厄から毎回求める）
+// - 柱2 見破り: ランダムダンジョンの主を倒すと、次に挑む鍵のダンジョン（全部済んでいれば最後）のボスを見破る（WorldState.insight）
+// - 柱4 抜け道: ランダムダンジョンを制覇して出る時、次に挑む鍵のダンジョンに一番近い、歩いて行ける空きマスに出られる
+// - 柱3 の2 災厄の種類をパーティに合わせる: 専用の装備をだれも使えない種類は、使えるキャラがいる時だけ候補に入れる
+// 乱数: 加護の手下と最初の予告は、戦闘の乱数（battle.rngState）で決める（冒険の Rng は引かない）。見破り・抜け道・災厄の候補は乱数を使わない
+import { BALANCE } from '../../../data/balance';
+import { CARDS } from '../../../data/cards';
+import { CLASSES } from '../../../data/classes';
+import { DUNGEONS } from '../../../data/dungeons';
+import { getEnemy } from '../../../data/enemies';
+import { getItem } from '../../../data/items';
+import { SCOURGES, TERRAINS } from '../../../data/world';
+import type { BattleEvent, BattleState, DungeonDef, EnemyState, GameState, Hero, ItemDef, ScourgeDef, WorldState } from '../../../types';
+import { fireAbilities } from '../../abilities';
+import { decideIntent, weakestAlly } from '../../battle/intents';
+import { enemyLevelFactors } from '../../battle/levels';
+import { emptyStatuses } from '../../battle/statuses';
+import { addLog as battleLog, enemyName } from '../../battle/units';
+import { createRng } from '../../rng';
+import { jobWeapons } from '../hero';
+import { aliveScourges } from './scourgeCurse';
+import { hexDistance, neighbors } from './hex';
+
+// ---------- 柱1 災厄の加護 ----------
+
+/** 加護の掛かる戦闘か: 鍵のダンジョンと最後のダンジョン（ランダムダンジョンではない）の、ボスか中ボスの部屋の戦闘 */
+export function boonBattle(game: Pick<GameState, 'dungeon'>, b: Pick<BattleState, 'boss' | 'midboss'>): boolean {
+  const d = game.dungeon ? DUNGEONS.tryGet(game.dungeon.dungeonId) : undefined;
+  return !!d && !d.random && (!!b.boss || !!b.midboss);
+}
+
+/** 大物（加護・見破りの決まりが掛かる敵）: 呼ばれていない、生きている敵の中で最大HPが一番大きい敵（同じなら並びの前） */
+export function bigEnemyOf(b: Pick<BattleState, 'enemies'>): EnemyState | undefined {
+  return b.enemies.filter((e) => !e.dead && !e.summoned).reduce<EnemyState | undefined>((best, e) => (!best || e.maxHp > best.maxHp ? e : best), undefined);
+}
+
+/** 今の加護（生きている災厄の加護。画面と戦闘の両方がここを読む） */
+export const activeBoons = (w: Pick<WorldState, 'wanderers'> | undefined): ScourgeDef[] => aliveScourges(w).map(({ def }) => def);
+
+/**
+ * 戦闘を始めた後（startBattleWith）: 加護の掛かる戦闘なら、生きている災厄の加護を付ける。
+ * 用心棒 = 手下を1体（戦場の空きがあれば。呼ばれた敵と同じ扱い = 報酬なし）/ 瘴気の衣・凍てつく守り・炉の熱 = 戦闘の印 /
+ * 悪夢の目 = 大物の最初の予告を「悪夢の目」（手負い狙い）に替える
+ */
+export function applyScourgeBoons(game: GameState, b: BattleState): void {
+  if (!game.world || !boonBattle(game, b)) return;
+  const defs = activeBoons(game.world);
+  const big = bigEnemyOf(b);
+  if (!defs.length || !big) return;
+  b.boon = { ids: defs.map((d) => d.id), uid: big.uid };
+  const rng = createRng(b.rngState);
+  const events: BattleEvent[] = b.openingEvents ?? [];
+  for (const d of defs) {
+    const boon = d.boon;
+    if (boon.kind === 'regen') b.boon.regen = (b.boon.regen ?? 0) + boon.pct;
+    else if (boon.kind === 'breakWard') b.boon.ward = true;
+    else if (boon.kind === 'phaseBurn') b.boon.phaseBurn = (b.boon.phaseBurn ?? 0) + boon.amount;
+    else if (boon.kind === 'bodyguard') {
+      if (b.enemies.length >= BALANCE.maxEnemies) continue;
+      const e = makeBodyguard(b, big, boon.enemy);
+      b.enemies.push(e);
+      decideIntent(e, b, rng);
+      fireAbilities(b, rng, events, e, 'battleStart');
+    } else if (boon.kind === 'huntFirst' && big.intent) {
+      big.intent = { actionId: boon.action, targetId: weakestAlly(b) };
+      big.history = [...big.history.slice(0, -1), boon.action];
+    }
+    battleLog(b, `💀${d.boon.name}（${d.name}の加護）: ${d.boon.text}`);
+  }
+  b.openingEvents = events;
+  b.rngState = rng.state;
+}
+
+/** 用心棒の手下（大物と同じレベル・同じ人数と難易度の補正。呼ばれた敵と同じく報酬なし） */
+function makeBodyguard(b: BattleState, big: EnemyState, enemyId: string): EnemyState {
+  const def = getEnemy(enemyId);
+  const own = getEnemy(big.defId);
+  const ownF = enemyLevelFactors(own, big.level);
+  const hpScale = big.maxHp / Math.max(1, own.maxHp * ownF.hp);
+  const atkScale = big.attackMul / ownF.attack;
+  const f = enemyLevelFactors(def, big.level);
+  const hp = Math.max(1, Math.floor(def.maxHp * f.hp * hpScale + 1e-9));
+  const same = b.enemies.filter((x) => x.defId === enemyId);
+  if (same.length === 1 && !same[0].nameSuffix) same[0].nameSuffix = 'A';
+  const e: EnemyState = {
+    uid: `e${b.enemies.length}`,
+    defId: enemyId,
+    nameSuffix: same.length ? String.fromCharCode(65 + same.length) : undefined,
+    level: big.level,
+    attackMul: f.attack * atkScale,
+    hp,
+    maxHp: hp,
+    block: 0,
+    statuses: emptyStatuses(),
+    seqIndex: 0,
+    history: [],
+    dead: false,
+    phase: 0,
+    summoned: true,
+  };
+  battleLog(b, `${enemyName(e)}（用心棒）が加わった！`);
+  return e;
+}
+
+// ---------- 柱2 見破り・柱4 抜け道の行き先 ----------
+
+/** 鍵のダンジョン（敵のレベルの低い順）→ 最後のダンジョンの順（自動プレイの順番と同じ。地図の上の「次に挑む」） */
+function keyOrder(scenarioId: string): DungeonDef[] {
+  const list = DUNGEONS.forScenario(scenarioId).filter((d) => !d.random && (d.rewardKey || d.finale));
+  return [...list.filter((d) => !d.finale).sort((a, b) => a.baseLevel - b.baseLevel), ...list.filter((d) => d.finale)];
+}
+
+/** 次に挑む鍵のダンジョン（まだ制覇していない、順番で最初の物。全部済んでいれば最後のダンジョン） */
+export function nextKeyDungeon(game: Pick<GameState, 'scenarioId' | 'clearedDungeons'>): DungeonDef | undefined {
+  return keyOrder(game.scenarioId).find((d) => !game.clearedDungeons.includes(d.id));
+}
+
+/** 見破りの行き先: 次に挑む鍵のダンジョンから順に、まだ見破っていない・制覇していない最初の物（無ければ undefined） */
+export function insightTarget(game: Pick<GameState, 'scenarioId' | 'clearedDungeons' | 'world'>): DungeonDef | undefined {
+  const have = game.world?.insight ?? [];
+  return keyOrder(game.scenarioId).find((d) => !game.clearedDungeons.includes(d.id) && !have.includes(d.id));
+}
+
+/** ランダムダンジョンの主を倒した時: 見破りを1つ（行き先の名前を返す。行き先が無ければ undefined） */
+export function grantInsight(game: GameState): string | undefined {
+  const w = game.world;
+  const d = insightTarget(game);
+  if (!w || !d) return undefined;
+  w.insight = [...(w.insight ?? []), d.id];
+  return d.name;
+}
+
+/** そのダンジョンを見破っているか */
+export const hasInsight = (game: Pick<GameState, 'world'>, dungeonId: string) => !!game.world?.insight?.includes(dungeonId);
+
+/** 戦闘を始めた後: 見破ったダンジョンのボスの部屋の戦闘なら、大物を見破る（battle.insight） */
+export function applyInsight(game: GameState, b: BattleState): void {
+  const run = game.dungeon;
+  if (!run || !b.boss || b.midboss || !hasInsight(game, run.dungeonId)) return;
+  const big = bigEnemyOf(b);
+  if (!big) return;
+  b.insight = big.uid;
+  battleLog(b, `👁見破り: ${enemyName(big)}の大技と開幕の一手は、完全成功だけで崩せる`);
+}
+
+/**
+ * 抜け道の出口（無ければ undefined）: ランダムダンジョンの入口から、陸を歩いて BALANCE.randomDungeon.shortcutRange 歩以内の空きマス
+ * （町・ダンジョンなどの場所・徘徊する敵・時間で消える物の無いマス）のうち、次に挑む鍵のダンジョンの入口に一番近いマス（同じならマスの番号の小さい方）。
+ * 入口より近くならない時は undefined（抜け道は無い）。乱数は使わない
+ */
+export function shortcutTile(game: Pick<GameState, 'world' | 'scenarioId' | 'clearedDungeons'>, entrance: number | undefined): number | undefined {
+  const w = game.world;
+  const goal = nextKeyDungeon(game);
+  if (!w || entrance === undefined || !goal) return undefined;
+  const target = w.tiles.findIndex((t) => t.f?.kind === 'dungeon' && t.f.id === goal.id);
+  if (target < 0) return undefined;
+  const land = (i: number) => {
+    const t = TERRAINS.get(w.tiles[i].t);
+    return t.moveCost > 0 && !t.sea;
+  };
+  const busy = new Set<number>([...w.wanderers.map((x) => x.tile), ...(w.spawns ?? []).map((x) => x.tile)]);
+  const range = BALANCE.randomDungeon.shortcutRange;
+  const steps = new Map<number, number>([[entrance, 0]]);
+  const q = [entrance];
+  for (let k = 0; k < q.length; k++) {
+    const d = steps.get(q[k])!;
+    if (d >= range) continue;
+    for (const n of neighbors(w, q[k])) if (!steps.has(n) && land(n)) (steps.set(n, d + 1), q.push(n));
+  }
+  let best: number | undefined;
+  for (const i of steps.keys()) {
+    if (i === entrance || w.tiles[i].f || busy.has(i)) continue;
+    if (best === undefined || hexDistance(w, i, target) < hexDistance(w, best, target) || (hexDistance(w, i, target) === hexDistance(w, best, target) && i < best)) best = i;
+  }
+  return best !== undefined && hexDistance(w, best, target) < hexDistance(w, entrance, target) ? best : undefined;
+}
+
+// ---------- 柱3 の2 災厄の種類をパーティに合わせる ----------
+
+/** そのジョブから転職でたどり着けるジョブ（自分も入れる） */
+function reachableJobs(classId: string): Set<string> {
+  const out = new Set([classId]);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const c of CLASSES.all) if (!out.has(c.id) && (c.from ?? []).some((f) => out.has(f))) (out.add(c.id), (grew = true));
+  }
+  return out;
+}
+
+/** 戦闘中にお金を得るカードを持つジョブか（強欲王の黄金冠のように、お金を得た時に働く装備を「使える」か） */
+const gainsGold = (classId: string) => CLASSES.get(classId).cardPool.some((id) => CARDS.has(id) && CARDS.get(id).tiers.some((t) => t.effects.some((e) => e.kind === 'gainGold')));
+
+/**
+ * その装備を、だれかが（今のジョブか、転職でたどり着けるジョブで）使えるか。
+ * 武器 = 持てる武器種 / お金を得た時に働く装備（能力のきっかけ goldGain）= お金を得るカードを持つジョブ / ほか = だれでも
+ */
+export function gearUsable(heroes: Hero[], item: ItemDef): boolean {
+  const effect = item.ability?.effect as { when?: string } | undefined;
+  return heroes.some((h) =>
+    [...reachableJobs(h.classId)].some((j) => {
+      if (item.slot === 'weapon' && !jobWeapons(j).includes(item.weaponType ?? '')) return false;
+      if (effect?.when === 'goldGain' && !gainsGold(j)) return false;
+      return true;
+    }),
+  );
+}
+
+/** 出てよい災厄か（専用の装備を、パーティのだれかが使える） */
+export const scourgeFits = (heroes: Hero[], def: ScourgeDef) => gearUsable(heroes, getItem(def.gear));
+
+// ---------- 画面用 ----------
+
+/** 加護の一覧（名前・中身・掛けている災厄）。札・入口・戦闘の長押しに出す */
+export function boonViews(game: Pick<GameState, 'world'>): { scourge: string; short: string; name: string; text: string }[] {
+  return activeBoons(game.world).map((d) => ({ scourge: d.name, short: d.short, name: d.boon.name, text: d.boon.text }));
+}
+
+/** 戦闘に掛かっている加護（戦闘の印 b.boon の災厄の ID から。倒した災厄が後から消えても、その戦闘の間は残る） */
+export function battleBoonViews(b: Pick<BattleState, 'boon'>): { scourge: string; name: string; text: string }[] {
+  return (b.boon?.ids ?? []).flatMap((id) => {
+    const d = SCOURGES.tryGet(id);
+    return d ? [{ scourge: d.name, name: d.boon.name, text: d.boon.text }] : [];
+  });
+}

@@ -387,7 +387,9 @@ function autoPlay(g: GameState, dungeonId: string, maxSteps = 4000): GameState {
       }
       case 'chest': {
         const c = g.chest!;
-        if (c.contents) g = run(g, { type: 'LEAVE_CHEST', playerId: P });
+        // 2026-11-14（寄り道の値打ち）: ランダムダンジョンの黄金箱は、秘宝を3つから1つ選んでから立ち去る
+        if (c.contents && c.relics?.length && c.relicPicked === undefined) g = run(g, { type: 'PICK_RELIC', playerId: P, optionIndex: 0 });
+        else if (c.contents) g = run(g, { type: 'LEAVE_CHEST', playerId: P });
         else {
           const h = g.heroes.find((x) => x.hp > 0)!;
           g = run(g, { type: 'OPEN_CHEST', playerId: P, heroId: h.id, focusUsed: 0 });
