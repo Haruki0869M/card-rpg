@@ -12,6 +12,11 @@ export type ItemKind =
   | 'plainsTree'
   | 'mushroom'
   | 'snowPine'
+  | 'iceCrystal'
+  | 'iceRock'
+  | 'iceTree'
+  | 'snowDrift'
+  | 'snowRock'
   | 'deadTree'
   | 'peak'
   | 'ridge'
@@ -77,6 +82,8 @@ const SPOTS: [number, number][] = [
 ];
 
 const isForest = (t: string) => t === 'forest';
+/** 氷の地形（氷原と、シナリオ2の「湖の氷」）。氷の結晶・氷の岩を立てる */
+const isIce = (t: string) => t === 'ice' || t === 'lakeIce';
 /** 峰の絵を立てる地形（段階6a の険しい山は、山より高い峰で描く。通れないことが見て分かるように） */
 const isPeakTerrain = (t: string) => t === 'mountain' || t === 'crag';
 
@@ -113,7 +120,25 @@ export function scatter({ w, geom, levels, links, rivers, blocked, stage }: Scat
     const h = (s: number) => hash01(i, s);
     // 侵食度が高いほど、森の木が枯れる（見た目だけ）
     const dead = (s: number) => stage >= 2 && hash01(i, 300 + s) < 0.12 * (stage - 1);
-    if (isForest(t) || t === 'snow' || (t === 'ice' && h(1) < 0.4)) {
+    if (isIce(t)) {
+      // 氷原: 氷の結晶・氷の岩・凍った木をまばらに。湖の氷は、滑って進む道なので、ほとんど何も置かない（結晶と雪だまりが少しだけ）
+      const lake = t === 'lakeIce';
+      const put = (k: ItemKind, s: number, size: number) => {
+        const x = c.x + (h(s) - 0.5) * R * 1.1;
+        const y = c.y + (h(s + 1) - 0.5) * R * 0.95 * GROUND_K;
+        if (clearOf(i, x, y, c, 0.3)) out.push({ k, x, y, h: R * size * (0.9 + h(s + 2) * 0.25), v: h(s + 3), tile: i });
+      };
+      if (lake) {
+        if (h(80) < 0.14) put('iceCrystal', 81, 0.5);
+        if (h(85) < 0.16) put('snowDrift', 86, 0.28);
+      } else {
+        if (h(1) < 0.4) put('iceTree', 90, 0.78);
+        if (h(80) < 0.5) put('iceCrystal', 81, 0.58);
+        if (h(94) < 0.3) put('iceRock', 95, 0.38);
+      }
+      continue;
+    }
+    if (isForest(t) || t === 'snow') {
       // 森: 少しずらした格子に 5〜8 本。森の地面の中の道・川の上には置かない
       const n = t === 'forest' ? 5 + Math.floor(h(2) * 4) : 2 + Math.floor(h(2) * 2);
       const order = SPOTS.map((_, j) => j).sort((a, b) => hash01(i * 16 + a, 5) - hash01(i * 16 + b, 5)).slice(0, n);
@@ -124,6 +149,19 @@ export function scatter({ w, geom, levels, links, rivers, blocked, stage }: Scat
         if (!clearOf(i, x, y, c, 0.3)) continue;
         const k: ItemKind = t !== 'forest' ? 'snowPine' : dead(j) ? 'deadTree' : hash01(i * 16 + j, 8) < 0.62 ? 'pine' : 'broadleaf';
         out.push({ k, x, y, h: R * (0.78 + hash01(i * 16 + j, 9) * 0.32), v: hash01(i * 16 + j, 10), tile: i });
+      }
+      // 雪原の足元: 雪だまり（2マスに1つくらい）と、雪をかぶった岩（5マスに1つくらい）
+      if (t === 'snow') {
+        if (h(100) < 0.45) {
+          const x = c.x + (h(101) - 0.5) * R * 1.0;
+          const y = c.y + (h(102) - 0.2) * R * 0.8 * GROUND_K;
+          if (clearOf(i, x, y, c, 0.3)) out.push({ k: 'snowDrift', x, y, h: R * 0.28, v: h(103), tile: i });
+        }
+        if (h(104) < 0.22) {
+          const x = c.x + (h(105) - 0.5) * R * 1.0;
+          const y = c.y + (h(106) - 0.5) * R * 0.9 * GROUND_K;
+          if (clearOf(i, x, y, c, 0.3)) out.push({ k: 'snowRock', x, y, h: R * 0.3, v: h(107), tile: i });
+        }
       }
       // 森の足元のキノコ（4マスに1つくらい）
       if (t === 'forest' && h(3) < 0.28) {
