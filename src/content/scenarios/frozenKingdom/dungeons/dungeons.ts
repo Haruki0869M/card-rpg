@@ -4,8 +4,8 @@ import type { DungeonDef } from '../../../../types';
 import { CASTLE_POOLS, CATHEDRAL_POOLS, CRYSTAL_POOLS, MINE_POOLS } from './pools';
 // 2026-11-14 シナリオ2の作り直し（docs/tasks/scenario2-rework-plan.md §2-4）: 氷晶の洞・霜の巨人の鉱山・氷の城は、型の写しをやめて
 // このシナリオだけの形をファイルに直接書いた（シナリオ1と同じ）。並びの決まりは src/engine/__tests__/dungeonShape.test.ts。
-// 沈んだ聖堂は「砂時計」の形が決まり（5行目の戦う部屋）と両立しないので保留（2つ目の鍵の型のまま。まとめ役に報告）
-import { keyLayout2 } from '../../../common/dungeonLayouts';
+// 沈んだ聖堂は「砂時計」の形が決まり（5行目の戦う部屋）と両立しなかったので、オーナーの決定（計画 §11 の案イ）で
+// 「上だけ広い・じょうご」の形にした（2026-11-15）。
 
 /** 氷晶の洞（入門。道中のイベントと鍵の戦いまで） */
 export const crystalCave: DungeonDef = {
@@ -60,7 +60,34 @@ export const sunkenCathedral: DungeonDef = {
   // 1つ目のダンジョンの鍵が要る（play-feedback-plan §4 C: 町や依頼を飛ばして、まっすぐ奥へ行けないように）
   requiresKeys: ['crystalWhite'],
   clearStory: ['司教は微笑み、光になって消えた。', '「どうか、姫様を止めて」', '氷晶の鍵（蒼）を手に入れた！'],
-  layout: keyLayout2({ first: 'iceSilhouette', second: 'frozenCamp', story: 'bishopAltar' }),
+  // 形「じょうご」（docs/tasks/scenario2-rework-plan.md §11 の案イ）: 行ごとの部屋の数 1-3-3-3-1-1-1-1-1。
+  // 2〜4行目は浸水した側廊（3部屋ずつ。凍った壁画は2行目）。側廊が5行目の「祭壇の間の番人」（ふつうの戦闘）へ1つに集まり、
+  // 休憩 → 納骨堂の戦闘 → 司教の祭壇（物語の部屋）→ ボス。強敵は側廊の3行に1部屋ずつ（やや戦闘が多い聖堂）。
+  // 4行目は次が番人の戦闘なので、戦闘を置けない（同じ type が続かない）。どの道でも、ふつうの戦闘は3〜4回・強敵は0〜2回。
+  // 強敵を通らない道 = 壁画 → 戦闘 → 鍵の宝箱 / レアの宝箱 → 戦闘 → 鍵の宝箱
+  layout: [
+    [{ type: 'battle', next: [0, 1, 2] }],
+    [
+      { type: 'event', eventId: 'frozenMural', next: [0, 1] },
+      { type: 'elite', next: [0, 2] },
+      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
+    ],
+    [
+      { type: 'battle', next: [0, 2] },
+      { type: 'elite', next: [0, 1] },
+      { type: 'rest', next: [0, 2] },
+    ],
+    [
+      { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
+      { type: 'rest', next: [0] },
+      { type: 'elite', next: [0] },
+    ],
+    [{ type: 'battle', next: [0] }],
+    [{ type: 'rest', next: [0] }],
+    [{ type: 'battle', next: [0] }],
+    [{ type: 'event', eventId: 'bishopAltar', next: [0] }],
+    [{ type: 'boss', next: [] }],
+  ],
 };
 
 /** 霜の巨人の鉱山（分かれ道が多く、強敵が2回出る） */
