@@ -50,6 +50,8 @@ import {
   warmthNote,
   type GuideGoal,
 } from '../../engine';
+// 狭い画面 回2（C）: 雪に埋もれた街道の知らせ（エンジンの文を読むだけ。engine の入口には出ていないので直に読む）
+import { roadBuriedNote } from '../../engine/game/world/lanes';
 import { isLocalPlayer, isOnlinePlay } from '../../store/battleConfig';
 import { useBattle, type WorldMovePresentation } from '../../store/battleStore';
 import { useOnline } from '../../store/onlineStore';
@@ -153,6 +155,67 @@ function MoveProposal({ game }: { game: GameState }) {
   const pr = w.moveProposal!;
   const leader = game.heroes.find((h) => h.id === pr.heroId)!;
   const mineToAnswer = pr.owners.filter((p) => !pr.agreed.includes(p) && isLocalPlayer(p));
+  const low = useLowScreen();
+  const answerOf = (p: string) => {
+    // 1台を回して遊ぶ時も、今の手番の人ではなく、その同行キャラの担当として返事を送る（store の actorOf が heroId から決める）
+    const heroId = pr.companions.find((id) => game.heroes.find((h) => h.id === id)?.playerId === p);
+    return (accept: boolean) => dispatchGame({ type: 'WORLD_MOVE_AGREE', playerId: p as PlayerId, heroId, accept });
+  };
+  const ownerChips = pr.owners.map((p) => (
+    <span key={p} className="flex shrink-0 items-center gap-1 rounded-full bg-black/50 px-2 py-0.5 text-[12px] leading-4 whitespace-nowrap">
+      <span className="h-[9px] w-[9px] rotate-45" style={{ background: PLAYER_COLOR[p as PlayerId] }} />
+      {p} {pr.agreed.includes(p) ? <b className="text-emerald-300">同意</b> : <span className="text-zinc-400">返事待ち</span>}
+    </span>
+  ));
+  if (low) {
+    // 狭い画面 回2（D）: 低い画面は、文を1行（12px）にして、返事のボタン（44px）を担当の札と同じ行に置く（地図を 150px 以上残す）。
+    // 文は短くするが「光るマスへ一緒に動く」「全員の同意で動く」「同意／返事待ち」はそのまま残す
+    return (
+      <div className="panel panel-gold-edge relative z-20 mx-2 -mt-1 shrink-0 rounded-xl px-2 py-1" data-move-proposal>
+        {mineToAnswer.length === 1 ? (
+          // 返事をする端末: 文（担当の返事の様子も文の中に）と、返事のボタン2つを1行に（窓の高さ ≒ ボタン1段）
+          <div className="flex items-center gap-1">
+            <span className="min-w-0 flex-1 text-[12px] leading-4">
+              <b>{leader.name}</b>と光るマスへ一緒に動く（全員の同意で動く）
+              {pr.owners.map((p) => (
+                <span key={p} className="ml-1 whitespace-nowrap">
+                  {p} {pr.agreed.includes(p) ? <b className="text-emerald-300">同意</b> : <span className="text-zinc-400">返事待ち</span>}
+                </span>
+              ))}
+            </span>
+            <button onClick={() => answerOf(mineToAnswer[0])(false)} className="btn btn-dark flex h-11 shrink-0 flex-col items-center justify-center rounded-lg px-1.5 text-[12px] leading-4 font-bold">
+              <span>{mineToAnswer[0]}:</span>
+              <span>同行をやめる</span>
+            </button>
+            <button onClick={() => answerOf(mineToAnswer[0])(true)} className="btn btn-gold flex h-11 shrink-0 flex-col items-center justify-center rounded-lg px-1.5 text-[13px] leading-4 font-bold">
+              <span>{mineToAnswer[0]}:</span>
+              <span>一緒に行く</span>
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-1.5 text-[12px] leading-4">
+              <HeroFace hero={leader} size={22} />
+              <span className="min-w-0 flex-1">
+                <b>{leader.name}</b>と光るマスへ一緒に動く（全員の同意で動く）
+              </span>
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-1">{ownerChips}</div>
+            {mineToAnswer.map((p) => (
+              <div key={p} className="mt-1 grid grid-cols-2 gap-1.5">
+                <button onClick={() => answerOf(p)(false)} className="btn btn-dark h-11 rounded-lg text-[12px] font-bold">
+                  {p}: 同行をやめる
+                </button>
+                <button onClick={() => answerOf(p)(true)} className="btn btn-gold h-11 rounded-lg text-[13px] font-bold">
+                  {p}: 一緒に行く
+                </button>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+    );
+  }
   return (
     <div className="panel panel-gold-edge relative z-20 mx-2 -mt-2 shrink-0 rounded-xl p-2" data-move-proposal>
       <div className="flex items-center gap-2 text-[13px]">
@@ -514,6 +577,9 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
   const roadBonus = terrainDiceBonus(game, w, here);
   const diceBonus = [...worldDiceBonus(hero), ...roadBonus];
   const bonusSum = diceBonus.reduce((n, b) => n + b.value, 0);
+  // 狭い画面 回2（C）: 凍て鐘の亡霊の悪さで、街道の +1 が無い時の知らせ（エンジンの文）。短い札は「❄街道 +1なし」、押すと全文
+  const buried = roadBuriedNote(game, w, here);
+  const buriedShort = buried ? /^❄ (.+?)が雪に埋もれている.*ボーナス (\+\d+) が無い/.exec(buried) : null;
   const avg = diceAverage(BALANCE.moveDiceSides, diceBonus);
   // フォーカスで振り直せるか（目を見た後・まだ動く前・1回だけ）
   const md = w.moveDice;
@@ -601,6 +667,18 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
           {nightmare && <span className="ml-0.5 text-[12px] text-fuchsia-300" data-camp-scourge>💀回復半分</span>}
         </>
       )}
+    </button>
+  );
+  // 狭い画面 回2（C）: 街道ボーナスの札の場所（振るボタンのすぐ右）に出す、雪に埋もれた街道の短い札。押すと全文がパネルのすぐ上に出る（寒さ・温泉の札と同じ形）
+  const buriedChip = buried && w.move === null && (
+    <button
+      onClick={() => toggleInfo(buried)}
+      className={`btn flex shrink-0 flex-col items-center justify-center rounded-lg border border-sky-300/50 bg-sky-950/60 px-1.5 text-[12px] leading-4 font-bold whitespace-nowrap text-sky-200 ${low ? 'h-11' : 'h-12 min-w-14'}`}
+      aria-label={buried}
+      data-road-buried
+    >
+      <span>❄{buriedShort?.[1] ?? '街道'}</span>
+      <span>{buriedShort?.[2] ?? '+1'}なし</span>
     </button>
   );
   const waitButton = (
@@ -898,6 +976,7 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
                   光るマスをタップして行き先を選ぶ
                 </button>
               ) : null}
+              {buriedChip}
               {canReroll && (
                 <button onClick={() => dispatchGame({ type: 'WORLD_REROLL_MOVE', playerId: pid, heroId: hero.id })} className="btn btn-dark flex h-11 shrink-0 flex-col items-center justify-center rounded-lg px-1.5 text-[12px] leading-4 font-bold" data-reroll>
                   <span className="flex items-center gap-0.5"><Star size={11} className="fill-amber-400/70 text-amber-300" />1で</span>振り直す
@@ -911,14 +990,17 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
         {!low && (
         <div className="mt-2 flex flex-col gap-1.5">
           {w.move === null ? (
+            <div className="flex gap-1.5">
             <button
               onClick={() => dispatchGame({ type: 'WORLD_ROLL_MOVE', playerId: pid, heroId: hero.id })}
-              className="btn btn-gold font-display flex h-12 items-center justify-center gap-1 rounded-xl text-[18px]"
+              className="btn btn-gold font-display flex h-12 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl text-[18px]"
               data-roll-move
             >
               <Dices size={20} /> サイコロを振る
               {roadBonus.length > 0 && <span className="ml-1 rounded-full bg-black/25 px-2 text-[13px] leading-6" data-road-bonus>{roadBonus.map((b) => `${b.label}ボーナス +${b.value}`).join('・')}</span>}
             </button>
+            {buriedChip}
+            </div>
           ) : selected !== undefined ? (
             <button onClick={() => tapTile(selected)} className="btn btn-gold font-display h-12 rounded-xl text-[17px] leading-5" data-move-go>
               {moveButtonText(reach?.get(selected), path?.length)}

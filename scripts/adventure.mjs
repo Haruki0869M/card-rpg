@@ -46,6 +46,12 @@ const issues = new Set();
 const seen = new Set();
 // 目的のマスがボタン・パネルの下にあって、地図を動かし直した回数（狭い画面 回1。回2で 0 になる事を見る）
 let panFixes = 0;
+// 狭い画面 回2: 何の下にあって動かし直したか（パネル・右のボタン・マスの説明の帯・ほか）
+const panFixBy = {};
+const panFix = (why) => {
+  panFixes++;
+  panFixBy[why] = (panFixBy[why] ?? 0) + 1;
+};
 
 async function check(page, tag) {
   for (const i of await layoutIssues(page)) issues.add(`${tag}: ${i}`);
@@ -319,14 +325,15 @@ async function run(party, difficulty) {
             const y = b.top + b.height / 2;
             const t = document.elementFromPoint(x, y);
             if (t && t.closest('[data-world-map]') && !t.closest('button')) return false;
+            const why = !t ? 'なし' : t.closest('[data-world-panel]') ? 'パネル' : t.closest('[data-zoom-controls],[data-recenter],[data-goal-arrow]') ? '右のボタン' : t.closest('[data-tile-info]') ? 'マスの説明の帯' : 'ほか';
             const m = map.getBoundingClientRect();
             const panel = document.querySelector('[data-world-panel]')?.getBoundingClientRect();
             const cy = (m.top + 64 + (panel ? panel.top : m.bottom)) / 2;
             map.scrollBy({ left: x - (m.left + m.width / 2), top: y - cy, behavior: 'instant' });
-            return true;
+            return why;
           }, best);
           if (moved) {
-            panFixes++;
+            panFix(moved);
             await page.waitForTimeout(80);
           }
           let b = await reach.nth(best).boundingBox();
@@ -335,15 +342,16 @@ async function run(party, difficulty) {
           const under = async (bb) => {
             for (const sel of ['[data-zoom-controls]', '[data-recenter]', '[data-world-panel]', '[data-tile-info]']) {
               const c = await page.locator(sel).boundingBox().catch(() => null);
-              if (c && bb.x + bb.width / 2 >= c.x - 4 && bb.x + bb.width / 2 <= c.x + c.width + 4 && bb.y + bb.height / 2 >= c.y - 4 && bb.y + bb.height / 2 <= c.y + c.height + 4) return true;
+              if (c && bb.x + bb.width / 2 >= c.x - 4 && bb.x + bb.width / 2 <= c.x + c.width + 4 && bb.y + bb.height / 2 >= c.y - 4 && bb.y + bb.height / 2 <= c.y + c.height + 4) return sel === '[data-world-panel]' ? 'パネル' : sel === '[data-tile-info]' ? 'マスの説明の帯' : '右のボタン';
             }
             return false;
           };
           // 右・左・下・上の順に地図を動かしてみる（シナリオ2の広い地図は、右の端・上の端で横に動かせず、
           // 目的のマスが「見取り図」のボタンの下に残って押せないまま止まった。2026-11-15・種 874651857）
           for (const [left, top] of [[120, 0], [-120, 0], [0, -100], [0, 100]]) {
-            if (!b || !(await under(b))) break;
-            panFixes++;
+            const why = b && (await under(b));
+            if (!why) break;
+            panFix(`${why}（ずらし）`);
             await page.evaluate(([left, top]) => document.querySelector('[data-world-map]')?.scrollBy({ left, top, behavior: 'instant' }), [left, top]);
             await page.waitForTimeout(80);
             b = await reach.nth(best).boundingBox();
@@ -547,7 +555,7 @@ async function run(party, difficulty) {
 const results = [];
 for (const party of (process.env.ADVENTURE_PARTIES ?? '4,2').split(',').map(Number)) results.push(await run(party, 'やさしい'));
 await browser.close();
-console.log(`地図を動かし直した回数: ${panFixes}`);
+console.log(`地図を動かし直した回数: ${panFixes}${panFixes ? `（${Object.entries(panFixBy).map(([k, v]) => `${k} ${v}`).join('・')}）` : ''}`);
 if (issues.size) console.log('issues:', [...issues]);
 // 一方の人数だけ通っても成功にしない。
 process.exit(issues.size || results.some(result => result !== 'cleared') ? 1 : 0);

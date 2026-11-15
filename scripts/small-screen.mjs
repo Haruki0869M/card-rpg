@@ -17,7 +17,9 @@
 //   BATTLE_ONLY_MEASURE=1 は数字と写真だけ（直す前の作りで「前」の写真を撮る時。落ちても失敗にしない）。
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { chromium, startBattle } from './lib.mjs';
-import { worldMapChecks } from './small-screen-world.mjs';
+import { edgeChecks, worldMapChecks } from './small-screen-world.mjs';
+// 狭い画面の直し 回2（2026-11-15）: SMALL_SCREEN_PARTS=edges で、地図の端のマス（EDGE_SIZES・EDGE_SEEDS・EDGE_SCENARIOS。EDGE_ONLY_MEASURE=1 で数字だけ）。
+//   4つの大きさ × 2シナリオ × 種で重いので、既定の PARTS には入れない。
 
 const BASE = process.env.URL ?? 'http://localhost:4173/card-rpg/';
 if (/web\.app|firebaseapp/.test(BASE)) throw new Error('本番の URL では動かしません');
@@ -390,6 +392,7 @@ const browser = await chromium.launch();
 try {
   // 狭い画面 回1: 世界マップ（低い画面の形）
   if (PARTS.has('world')) await worldMapChecks({ browser, BASE, OUT, check });
+  if (PARTS.has('edges')) await edgeChecks({ browser, BASE, OUT, check });
   for (const [W, H] of PARTS.has('sheets') ? SIZES : []) {
     console.log(`\n===== ${W}×${H} =====`);
     const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });

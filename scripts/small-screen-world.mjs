@@ -9,7 +9,9 @@
 //   (6) 手番の駒の真ん中を押すと地図に当たる（ボタン・帯に当たらない）
 //   (7) 4人: 仲間の列は横に送れる（はみ出しても、ステータスのボタンまで送れる）
 //   (8) CSS の高さは 720px だが、見えている高さ（visualViewport）が 540px の時も低い形（「次の目的」の行は出ず、パネルの短い「次:」が出る）
-//   (9) 通信の知らせ（LAYER.online）のカードが上に出ている時に、💀・🔍 が押せるか（記録だけ。結果は報告に書く）
+//   (9) 通信の知らせ（LAYER.online）のカードが上に出ている時に、💀・🔍 が押せるか（回2 で知らせを仲間の列の下へ出したので、落とす線にした）
+//   (10) 回2: 雪に埋もれた街道の札（振るボタンのすぐ右・押すと全文。ふつうの画面 390×844・360×640 も）
+//   edgeChecks（SMALL_SCREEN_PARTS=edges）: 地図の右の余白と、端のマス（下の方の説明）
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { depart, layoutIssues } from './lib.mjs';
 
@@ -148,6 +150,50 @@ const onTop = (page, sel) =>
     return !!t && (t === el || el.contains(t));
   }, sel);
 
+/** 街道のマス（災厄3体 = 凍て鐘の亡霊が生きている）に2人。振る前 */
+const buriedOf = (base) =>
+  variant(base, (g) => {
+    const w = g.world;
+    const start = w.pos[Object.keys(w.pos)[0]];
+    const sr = Math.floor(start / w.width);
+    let t = -1, best = Infinity;
+    w.tiles.forEach((x, i) => {
+      if (x.t !== 'road' || x.f) return;
+      const d = Math.abs(Math.floor(i / w.width) - sr);
+      if (d < best) (best = d), (t = i);
+    });
+    for (const id of Object.keys(w.pos)) w.pos[id] = t;
+    w.prevTile = t;
+    w.tiles[t].seen = true;
+    w.move = null;
+    w.moveDice = undefined;
+    w.warm = undefined;
+    addScourges(w, t);
+  });
+/** 狭い画面 回2（C）: 埋もれた街道の札がある・押すと全文（エンジンの文）・もう1度押すと消える・街道ボーナスの札は出ない */
+async function buriedCheck(page, BASE, base2, tag, shot, check) {
+  await load(page, BASE, buriedOf(base2));
+  const chip = page.locator('[data-road-buried]');
+  check((await chip.count()) === 1, `${tag} 雪に埋もれた街道の札がある（振るボタンのすぐ右）`, 'world');
+  check(!(await page.locator('[data-road-bonus]').count()), `${tag} 埋もれている時は「街道ボーナス +1」の札が出ない`, 'world');
+  if (!(await chip.count())) return;
+  const pos = await page.evaluate(() => {
+    const c = document.querySelector('[data-road-buried]').getBoundingClientRect();
+    const r = document.querySelector('[data-roll-move]').getBoundingClientRect();
+    return { sameRow: Math.abs(c.top + c.height / 2 - (r.top + r.height / 2)) < 6, rightOf: c.left >= r.right - 1, h: Math.round(c.height), text: document.querySelector('[data-road-buried]').innerText.replace(/\n/g, '') };
+  });
+  check(pos.sameRow && pos.rightOf && pos.h >= 44, `${tag} 札は振るボタンと同じ行の右・高さ ${pos.h}px（${pos.text}）`, 'world');
+  await chip.click();
+  await wait(250);
+  const t = await page.locator('[data-tile-info]').innerText().catch(() => '');
+  check(t === '❄ 街道が雪に埋もれている（凍て鐘の亡霊のせいで、街道ボーナス +1 が無い）', `${tag} 札を押すとエンジンの全文が出る（${t}）`, 'world');
+  await shot('road-buried');
+  await chip.click();
+  await wait(250);
+  check(!(await page.locator('[data-tile-info]').count()), `${tag} 札をもう1度押すと消える`, 'world');
+  for (const i of await layoutIssues(page)) check(false, `${tag} 埋もれた街道の時: ${i}`, 'world');
+}
+
 export async function worldMapChecks({ browser, BASE, OUT, check }) {
   const sizes = (process.env.WORLD_SIZES ?? '390x540,360x520').split(',').map((s) => s.split('x').map(Number));
   mkdirSync(OUT, { recursive: true });
@@ -272,6 +318,9 @@ export async function worldMapChecks({ browser, BASE, OUT, check }) {
         await shot('8-cold-chip');
       } else check(false, `${tag} 寒いマスなのに ❄ の札が無い`, 'world');
 
+      // ---- 狭い画面 回2（C）: 雪に埋もれた街道（凍て鐘の亡霊）の札。振るボタンのすぐ右・押すと全文 ----
+      await buriedCheck(page, BASE, base2, tag, shot, check);
+
       // ---- 町の画面: 災厄は1行の帯（畳まない） ----
       await load(page, BASE, townOf(base2));
       await page.locator('[data-interact]').click();
@@ -315,7 +364,10 @@ export async function worldMapChecks({ browser, BASE, OUT, check }) {
       const overlap = await page.evaluate(() => {
         const host = document.querySelector('[data-app-root] > div');
         const ov = document.createElement('div');
-        ov.style.cssText = 'position:absolute;left:0;right:0;top:0;z-index:62;pointer-events:none;display:flex;flex-direction:column;align-items:center;padding:56px 12px 0';
+        // 狭い画面 回2（B）: 本物の知らせ（OnlineOverlay）と同じ置き方 = 低い画面では仲間の列の下（本物は scripts/coop-small-world.mjs で見る）
+        const row = document.querySelector('[data-party-row]')?.getBoundingClientRect();
+        const top = row ? Math.max(56, Math.round(row.bottom - host.getBoundingClientRect().top + 4)) : 56;
+        ov.style.cssText = `position:absolute;left:0;right:0;top:0;z-index:62;pointer-events:none;display:flex;flex-direction:column;align-items:center;padding:${top}px 12px 0`;
         ov.innerHTML = '<div style="pointer-events:auto;width:100%;max-width:400px;height:64px;background:#000c;border-radius:12px"></div>';
         host.appendChild(ov);
         const hit = (s) => {
@@ -330,12 +382,27 @@ export async function worldMapChecks({ browser, BASE, OUT, check }) {
         return out;
       });
       H_.onlineOverlap = overlap;
+      // 💀 は落とす線。🔍 は記録だけ（知らせを仲間の列の下へ出したので、横いっぱいのカード = 同行の誘い・代わりに操作する の間は、
+      // 地図の右上の 見取り図・🔍 にかかる。切断の帯は細いのでかからない。回2 の報告に書いた）
+      check(overlap.skull === true, `${tag} 通信の知らせのカードが出ていても 💀 が押せる（🔍 は ${overlap.zoom ? '押せる' : '隠れる'}）`, 'world');
       console.log(`   通信の知らせ（高さ64pxのカード）が出ている時: 💀 ${overlap.skull ? '押せる' : '押せない'}・🔍 ${overlap.zoom ? '押せる' : '押せない'}`);
     } catch (e) {
       check(false, `${tag} 世界マップ: 途中で止まった（${String(e.message).split('\n')[0]}）`, 'world');
       await shot('error').catch(() => {});
     }
     heights.push(H_);
+    await page.close();
+  }
+
+  // ---- 狭い画面 回2（C）: ふつうの画面（390×844・360×640）でも、雪に埋もれた街道の札が出る ----
+  for (const [W, H] of [[390, 844], [360, 640]]) {
+    const tag = `${W}x${H}`;
+    const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
+    try {
+      await buriedCheck(page, BASE, base2, tag, (name) => page.screenshot({ path: `${OUT}/world-${tag}-${name}.png` }), check);
+    } catch (e) {
+      check(false, `${tag} 埋もれた街道: 途中で止まった（${String(e.message).split('\n')[0]}）`, 'world');
+    }
     await page.close();
   }
 
@@ -370,4 +437,226 @@ export async function worldMapChecks({ browser, BASE, OUT, check }) {
   writeFileSync(`${OUT}/world-heights.json`, JSON.stringify(heights, null, 2));
   console.log('\n----- 世界マップの見えている地図の高さ（px） -----');
   for (const h of heights) console.log(`${h.size}: ふつう ${h.solo} → 振った後 ${h.soloRolled}（マスの説明の上 ${h.soloInfo}） / 混んだ時 ${h.worst} → 振った後 ${h.worstRolled}（♨の全文の上 ${h.worstWarmInfo}） / 4人 ${h.worst4}`);
+}
+
+// ===== 狭い画面 回2（2026-11-15）: 地図の右の余白と、端のマス =====
+// 4つの大きさ × シナリオ1・2 × 種（EDGE_SEEDS）。地図を全部見えている形にして、
+//   (1) 右端・左端・上端・下端のマスを、指で地図をいちばん端まで動かした（左右の端は、見えている所の 2割・5割・8割の高さに置いた）時、
+//       マスの真ん中を押すとボタンでなく地図に当たるか（当たった物を数える）。右端のマスは実際に押して、マスが選ばれる（ボタンが動かない）事も見る
+//   (2) 駒を右端・左端・上端・下端のマスに置いて開いた時、駒の真ん中が地図に当たる（カメラが寄せる）
+//   (3) 初めの位置のスクロールの位置（前と後で同じ事を比べる）
+// EDGE_ONLY_MEASURE=1 は数字と写真だけ（直す前の作りで「前」を測る時。落ちても失敗にしない）
+const EDGE_SCN = { corruptionKing: '侵食の魔王', frozenKingdom: '凍てつく王国' };
+async function newSaveFor(browser, BASE, scenario, seed) {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await page.addInitScript((s) => {
+    const random = crypto.getRandomValues.bind(crypto);
+    crypto.getRandomValues = (a) => (a instanceof Uint32Array && a.length === 1 ? ((a[0] = s), a) : random(a));
+  }, seed);
+  await page.goto(BASE);
+  await page.evaluate((s) => {
+    localStorage.clear();
+    localStorage.setItem('card-rpg/settings', s);
+    const ids = ['corruptionKing', 'frozenKingdom', 'cursedArchipelago', 'sandDynasty', 'starCastle', 'clockworkEmpire', 'dreamLabyrinth'];
+    localStorage.setItem('card-rpg/profile', JSON.stringify({ version: 1, clears: Object.fromEntries(ids.map((i) => [i, 1])) }));
+  }, SETTINGS);
+  await page.reload();
+  await page.getByText('新しい冒険').click();
+  const card = page.locator('[data-scenarios] button', { hasText: EDGE_SCN[scenario] }).first();
+  await card.scrollIntoViewIfNeeded();
+  await card.click();
+  await wait(150);
+  await page.getByText('2人', { exact: true }).click();
+  await page.getByText('キャラクター作成へ').click();
+  await depart(page);
+  await wait(500);
+  const d = await page.evaluate((k) => JSON.parse(localStorage.getItem(k)), KEY);
+  d.game.world.story = undefined;
+  // 地図を全部見えている形に（端のマスの位置を [data-hex] で測るため）
+  for (const t of d.game.world.tiles) t.seen = true;
+  await page.close();
+  return d;
+}
+/** 地図の端のマスを押せるか。戻り値 { maxL, right/left/top/bottom: { ok, ng, by: {当たった物: 数} } } */
+const edgeProbe = (page) =>
+  page.evaluate(async () => {
+    const map = document.querySelector('[data-world-map]');
+    const frame = map.getBoundingClientRect();
+    const panel = document.querySelector('[data-world-panel]')?.getBoundingClientRect();
+    const visBottom = panel ? Math.min(frame.bottom, panel.top) : frame.bottom;
+    const vis = visBottom - frame.top;
+    const raf = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const sl0 = map.scrollLeft, st0 = map.scrollTop;
+    const c = new Map();
+    for (const g of document.querySelectorAll('[data-hex]')) {
+      const b = g.getBoundingClientRect();
+      c.set(Number(g.getAttribute('data-hex')), { x: b.left + b.width / 2 - frame.left + sl0, y: b.top + b.height / 2 - frame.top + st0 });
+    }
+    const save = JSON.parse(localStorage.getItem('card-rpg/adventure')).game.world;
+    const W = save.width, H = save.height;
+    const ids = [...c.keys()];
+    const edges = {
+      right: ids.filter((i) => i % W === W - 1),
+      left: ids.filter((i) => i % W === 0),
+      top: ids.filter((i) => Math.floor(i / W) === 0),
+      bottom: ids.filter((i) => Math.floor(i / W) === H - 1),
+    };
+    const maxL = map.scrollWidth - map.clientWidth, maxT = map.scrollHeight - map.clientHeight;
+    const out = { maxL };
+    const name = (t) => {
+      const e = t.closest('[data-zoom-controls],[data-recenter],[data-goal-arrow],[data-world-panel],[data-tile-info],[data-region-name],button,[data-party-row]');
+      if (!e) return t.tagName;
+      return [...e.attributes].map((a) => a.name).find((n) => n.startsWith('data-')) ?? e.tagName;
+    };
+    for (const [edge, list] of Object.entries(edges)) {
+      // ok/ng = 置いた位置ごと。tileNg = どの位置に置いても押せなかったマスの数（指で動かしても出せないマス）
+      const r = { ok: 0, ng: 0, by: {}, tileNg: 0 };
+      // どの端も、見えている所の 2割・5割・8割の高さに置いてみる（上下の端は、そのほかに次の目的地の矢印などが真ん中にある時も、ずらして押せるか）
+      const fracs = [0.2, 0.5, 0.8];
+      for (const i of list) {
+        const p = c.get(i);
+        let any = false, tried = false;
+        for (const f of fracs) {
+          const left = edge === 'right' ? maxL : edge === 'left' ? 0 : Math.max(0, Math.min(maxL, p.x - map.clientWidth / 2));
+          map.scrollTo({ left, top: Math.max(0, Math.min(maxT, p.y - f * vis)), behavior: 'instant' });
+          await raf();
+          const x = frame.left + p.x - map.scrollLeft, y = frame.top + p.y - map.scrollTop;
+          // 見えている所（枠の中・パネルより上）に置けなかった所は数えない（指で置けない位置）
+          if (x < frame.left || x > frame.right || y < frame.top + 4 || y > visBottom - 4) continue;
+          tried = true;
+          const t = document.elementFromPoint(x, y);
+          const good = !!t && !!t.closest('[data-world-map]') && !t.closest('button');
+          if (good) (r.ok++, (any = true));
+          else {
+            r.ng++;
+            const n = t ? name(t) : 'none';
+            r.by[n] = (r.by[n] ?? 0) + 1;
+          }
+        }
+        if (tried && !any) r.tileNg++;
+      }
+      out[edge] = r;
+    }
+    map.scrollTo({ left: sl0, top: st0, behavior: 'instant' });
+    await raf();
+    return out;
+  });
+/** 右端のマス（見えている所の真ん中の高さ・地図をいちばん右まで動かした所）を実際に押す。マスが選ばれて、ボタン（見取り図・拡大）が動かない */
+async function tapRightEdge(page) {
+  const p = await page.evaluate(async () => {
+    const map = document.querySelector('[data-world-map]');
+    const frame = map.getBoundingClientRect();
+    const panel = document.querySelector('[data-world-panel]')?.getBoundingClientRect();
+    const vis = (panel ? Math.min(frame.bottom, panel.top) : frame.bottom) - frame.top;
+    const W = JSON.parse(localStorage.getItem('card-rpg/adventure')).game.world.width;
+    const hexes = [...document.querySelectorAll('[data-hex]')].filter((g) => Number(g.getAttribute('data-hex')) % W === W - 1);
+    const pick = hexes[Math.floor(hexes.length / 2)];
+    const i = Number(pick.getAttribute('data-hex'));
+    let b = pick.getBoundingClientRect();
+    map.scrollTo({ left: map.scrollWidth, top: map.scrollTop + (b.top + b.height / 2 - frame.top) - vis * 0.5, behavior: 'instant' });
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    b = pick.getBoundingClientRect();
+    return { i, x: b.left + b.width / 2, y: b.top + b.height / 2, zoom: document.querySelector('[data-zoom-controls]')?.getAttribute('data-zoom') };
+  });
+  await page.mouse.click(p.x, p.y);
+  await wait(400);
+  const after = await page.evaluate(() => ({
+    info: document.querySelector('[data-tile-info]')?.textContent ?? '',
+    sel: document.querySelector('[data-selected]')?.getAttribute('data-selected') ?? null,
+    overview: !!document.querySelector('[data-overview-close]') || !!document.querySelector('[data-overview]'),
+    zoom: document.querySelector('[data-zoom-controls]')?.getAttribute('data-zoom'),
+    tray: !!document.querySelector('[data-zoom-tray]'),
+  }));
+  return { ...p, ...after, ok: (!!after.info || after.sel !== null) && !after.overview && after.zoom === p.zoom && !after.tray };
+}
+/** 駒をマス t に置いた保存データ（2人とも） */
+const heroAt = (base, t) =>
+  variant(base, (g) => {
+    for (const id of Object.keys(g.world.pos)) g.world.pos[id] = t;
+    g.world.prevTile = t;
+  });
+const landTile = (w, pred) => w.tiles.findIndex((x, i) => pred(i) && !x.f && !['sea', 'lake', 'deepSea', 'mountain', 'water'].includes(x.t));
+const pieceOk = (page) =>
+  page.evaluate(() => {
+    const act = document.querySelector('[data-hero][data-active]') ?? document.querySelector('[data-hero]');
+    const map = document.querySelector('[data-world-map]');
+    if (!act) return { hit: null };
+    const b = act.getBoundingClientRect();
+    const t = document.elementFromPoint(b.left + b.width / 2, b.top + b.height * 0.6);
+    const btn = t && t.closest('button');
+    return { hit: t ? !!t.closest('[data-world-map]') && !btn : false, by: btn ? [...btn.attributes].map((a) => a.name).find((n) => n.startsWith('data-')) : null, left: Math.round(map.scrollLeft), top: Math.round(map.scrollTop) };
+  });
+
+export async function edgeChecks({ browser, BASE, OUT, check }) {
+  const measureOnly = !!process.env.EDGE_ONLY_MEASURE;
+  const ck = (ok, what) => (measureOnly ? console.log(`${ok ? 'OK ' : 'NG '} ${what}（数字だけ）`) : check(ok, what, 'edges'));
+  const sizes = (process.env.EDGE_SIZES ?? '390x540,360x520,390x844,360x640').split(',').map((s) => s.split('x').map(Number));
+  const seeds = (process.env.EDGE_SEEDS ?? '11,874651857').split(',').map(Number);
+  const scns = (process.env.EDGE_SCENARIOS ?? 'corruptionKing,frozenKingdom').split(',');
+  mkdirSync(OUT, { recursive: true });
+  const rows = [];
+  for (const scn of scns) {
+    for (const seed of seeds) {
+      const base = await newSaveFor(browser, BASE, scn, seed);
+      writeFileSync(`${OUT}/edge-save-${scn}-${seed}.json`, JSON.stringify(base));
+      const w = base.game.world;
+      const W = w.width;
+      const startTile = w.pos[Object.keys(w.pos)[0]];
+      const near = (i) => Math.abs(Math.floor(i / W) - Math.floor(startTile / W)) < 6;
+      const spots = {
+        right: landTile(w, (i) => i % W === W - 1 && near(i)),
+        left: landTile(w, (i) => i % W === 0 && near(i)),
+        top: landTile(w, (i) => Math.floor(i / W) === 0),
+        bottom: landTile(w, (i) => Math.floor(i / W) === w.height - 1),
+      };
+      for (const [VW, VH] of sizes) {
+        const tag = `${scn}-${seed}-${VW}x${VH}`;
+        const page = await browser.newPage({ viewport: { width: VW, height: VH }, deviceScaleFactor: 1 });
+        page.on('pageerror', (e) => ck(false, `${tag} pageerror: ${e.message}`));
+        const row = { scn, seed, size: `${VW}x${VH}`, mapW: W };
+        try {
+          await load(page, BASE, base);
+          await wait(500);
+          row.start = await pieceOk(page);
+          await page.screenshot({ path: `${OUT}/edge-${tag}-start.png` });
+          const probe = await edgeProbe(page);
+          row.padRight = probe.maxL;
+          for (const e of ['right', 'left', 'top', 'bottom']) {
+            row[e] = probe[e];
+            // 落とす線: 指で動かしても出せないマスが無い事（置いた位置ごとの数は記録）
+            ck(probe[e].tileNg === 0, `${tag} ${e} の端のマス: 出せないマス ${probe[e].tileNg}（置いた位置ごと: 押せる ${probe[e].ok} / 押せない ${probe[e].ng} ${JSON.stringify(probe[e].by)}）`);
+          }
+          // 地図をいちばん右まで動かした写真（余白が見える）
+          await page.evaluate(() => {
+            const m = document.querySelector('[data-world-map]');
+            m.scrollTo({ left: m.scrollWidth, behavior: 'instant' });
+          });
+          await wait(300);
+          await page.screenshot({ path: `${OUT}/edge-${tag}-pulled-right.png` });
+          const tap = await tapRightEdge(page);
+          row.tapRight = tap.ok;
+          ck(tap.ok, `${tag} 右端のマスを押すと、マスが選ばれる（説明: ${tap.info.slice(0, 30)}…・選んだマス ${tap.sel}・拡大 ${tap.zoom}）`);
+          await page.screenshot({ path: `${OUT}/edge-${tag}-tap-right.png` });
+          // 駒を端のマスに置いて開く → 駒の真ん中が地図に当たる（ボタンの下に入らない）
+          row.piece = {};
+          for (const [e, t] of Object.entries(spots)) {
+            if (t < 0) continue;
+            await load(page, BASE, heroAt(base, t));
+            await wait(500);
+            const p = await pieceOk(page);
+            row.piece[e] = p;
+            ck(p.hit === true, `${tag} 駒を${e}の端（マス${t}）に置いた時、駒の真ん中が地図に当たる${p.by ? `（上に ${p.by}）` : ''}`);
+            if (e === 'right') await page.screenshot({ path: `${OUT}/edge-${tag}-piece-right.png` });
+          }
+        } catch (err) {
+          ck(false, `${tag} 途中で止まった（${String(err.message).split('\n')[0]}）`);
+        }
+        rows.push(row);
+        await page.close();
+      }
+    }
+  }
+  writeFileSync(`${OUT}/edge-summary.json`, JSON.stringify(rows, null, 1));
+  console.log('\n----- 端のマス（押せない数。right/left/top/bottom）・駒・初めの位置 -----');
+  for (const r of rows) console.log(`${r.scn} ${r.seed} ${r.size}: 右の余白 ${r.padRight}px / 位置ごとの押せない数 ${['right', 'left', 'top', 'bottom'].map((e) => r[e]?.ng ?? '-').join('/')}・出せないマス ${['right', 'left', 'top', 'bottom'].map((e) => r[e]?.tileNg ?? '-').join('/')} / 右端を押す ${r.tapRight ? 'OK' : 'NG'} / 駒 ${Object.entries(r.piece ?? {}).map(([e, p]) => `${e}:${p.hit ? 'OK' : 'NG'}`).join(' ')} / 初めの位置 (${r.start?.left},${r.start?.top})`);
 }

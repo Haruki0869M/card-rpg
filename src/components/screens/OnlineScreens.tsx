@@ -3,7 +3,7 @@ import { TopBar } from '../ui/fancy';
 import { LAYER } from '../ui/layers';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Copy, Crown, LogIn, Share2, Swords, Users, Wifi, WifiOff } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { BALANCE } from '../../data/balance';
 import { CLASSES } from '../../data/classes';
 import { DIFFICULTIES } from '../../data/rules';
@@ -20,6 +20,7 @@ import { proxyReadyAt, proxyWaitLeft, useOnline } from '../../store/onlineStore'
 import type { GameState, PlayerId } from '../../types';
 import { HeroFace, Screen } from '../ui/game';
 import { InAppBrowserNote } from '../ui/InAppBrowserNote';
+import { useLowScreen } from '../../hooks/useLowScreen';
 import { chestClaimWaits, facilityWaits, rewardWaits } from './waitNotes';
 
 /** 定型のスタンプ（spec §7.1） */
@@ -395,6 +396,17 @@ export function OnlineOverlay() {
     const t = setInterval(() => setNow((n) => n + 1), 1000);
     return () => clearInterval(t);
   }, []);
+  // 狭い画面 回2（B）: 低い画面では、知らせを仲間の列（世界マップの 💀×N がある列）より下に出す（地図の上に重なる。高さは今のまま）。
+  // 仲間の列が無い画面と、ふつうの画面は今までどおり上から 56px。描くたび（1秒ごと）に列の下の端を測り直す
+  const low = useLowScreen();
+  const box = useRef<HTMLDivElement>(null);
+  const [below, setBelow] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const el = box.current;
+    const row = low && el ? document.querySelector('[data-party-row]') : null;
+    const next = row && el ? Math.max(56, Math.round(row.getBoundingClientRect().bottom - el.getBoundingClientRect().top + 4)) : null;
+    if (next !== below) setBelow(next);
+  });
   if (!room || screen !== 'game' || !game) return null;
   // 同行に誘われている（この端末のキャラ）
   const invites = Object.entries(game.world?.invites ?? {})
@@ -402,7 +414,7 @@ export function OnlineOverlay() {
     .filter((x) => x.target && x.by && isLocalPlayer(x.target.playerId));
   const offlineAwaited = awaitedSeats(game).filter((p) => !room.seatOnline(p) && !room.meta?.proxy?.[p] && livingHeroes(game).some((h) => h.playerId === p));
   return (
-    <div data-online-overlay style={{ zIndex: LAYER.online }} className="pointer-events-none absolute inset-x-0 top-0 flex flex-col items-center gap-1 px-3 pt-14">
+    <div ref={box} data-online-overlay data-online-below={below ?? undefined} style={{ zIndex: LAYER.online, paddingTop: below ?? undefined }} className="pointer-events-none absolute inset-x-0 top-0 flex flex-col items-center gap-1 px-3 pt-14">
       {!room.connected && (
         <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-red-950/90 px-3 py-1.5 text-[13px] text-red-100">
           <WifiOff size={16} /> 通信が切れました。つながり直しています…

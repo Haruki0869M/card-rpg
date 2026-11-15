@@ -40,6 +40,58 @@ export function revealLeft(hereX: number, selX: number, scrollLeft: number, view
   return (hereX + selX) / 2 - viewW / 2;
 }
 
+// ===== 狭い画面 回2（項目1・オーナーの決定 Q6 = A。ふつうの画面にも入れる） =====
+// 地図の上下には余白があるが、左右には無かった。右上・右下の固定のボタンの列（見取り図・拡大・戻る）の下に
+// 右の端のマス・駒・♨ の札・地名の札が入り、押すとボタンに当たっていた。
+// 地図の右に、ボタンの列の幅ぶんの余白を足す（指で動かせば、右の端のマスをボタンの無い所まで引き出せる）。
+// カメラの初めの位置・追いかけ方は今までどおり真ん中（余白は自動では見せない = 横の位置は前と同じ範囲に収める）。
+// 駒・選んだマス・次の行き先がボタンの下に入る時だけ、いちばん小さく動かして寄せる（dodgeButtons）。
+
+/** 地図の右の余白（px）。ボタンの列の幅 56 ＋ 右の端 8 ＋ すき間 8 */
+export const MAP_PAD_RIGHT = 72;
+
+/** 前と同じ横の範囲（余白を見せない）に収めた、横のスクロールの位置。mapW = 地図の幅（余白を除く） */
+export const clampLeft = (left: number, viewW: number, mapW: number) => Math.max(0, Math.min(Math.max(0, mapW - viewW), left));
+
+/** 枠の中の四角（px） */
+export interface Box { left: number; top: number; right: number; bottom: number }
+
+/**
+ * 点（枠の中の座標 px, py。半径 r の丸として見る）が、固定のボタン（rects）にかかっていれば、かからない所へ寄せる
+ * スクロールの差（scrollLeft・scrollTop に足す量）を返す。かかっていなければ undefined。
+ * 寄せ方は、ボタンの左・右・上・下へ出す4つのうち、動く量がいちばん小さく、動かせる範囲（room）の中で、
+ * 寄せた後も真ん中が見えている所（view）の中にあり、ほかのボタンにもかからない物。どれもできなければ undefined（動かさない）
+ */
+export function dodgeButtons(
+  px: number,
+  py: number,
+  r: number,
+  rects: readonly Box[],
+  view: Box,
+  room: { left: number; right: number; up: number; down: number },
+): { dx: number; dy: number } | undefined {
+  const hits = (x: number, y: number) => rects.some((b) => x + r > b.left && x - r < b.right && y + r > b.top && y - r < b.bottom);
+  if (!hits(px, py)) return undefined;
+  const cands: { dx: number; dy: number }[] = [];
+  for (const b of rects) {
+    if (!(px + r > b.left && px - r < b.right && py + r > b.top && py - r < b.bottom)) continue;
+    // dx > 0 = 地図を左へ（点が左へ動く）。dy > 0 = 地図を上へ（点が上へ動く）
+    cands.push({ dx: px + r - b.left, dy: 0 }, { dx: -(b.right + r - px), dy: 0 }, { dx: 0, dy: py + r - b.top }, { dx: 0, dy: -(b.bottom + r - py) });
+  }
+  cands.sort((a, b) => Math.abs(a.dx) + Math.abs(a.dy) - (Math.abs(b.dx) + Math.abs(b.dy)));
+  for (const c of cands) {
+    const dx = Math.ceil(Math.abs(c.dx)) * Math.sign(c.dx);
+    const dy = Math.ceil(Math.abs(c.dy)) * Math.sign(c.dy);
+    if (dx > room.right || -dx > room.left || dy > room.down || -dy > room.up) continue;
+    const x = px - dx, y = py - dy;
+    // 真ん中が見えている所の中（端から r の半分より内側）。端の列のマスは丸の一部が枠の外に出ていてよい（押すのは真ん中）
+    if (x < view.left + r / 2 || x > view.right - r / 2 || y < view.top + r / 2 || y > view.bottom - r / 2) continue;
+    if (hits(x, y)) continue;
+    return { dx, dy };
+  }
+  return undefined;
+}
+
 /**
  * 地図の端の矢印（回1）: 目的地（枠の中の座標 px, py）が見えている所（box）の外にある時、
  * 見えている所の真ん中から目的地へ向かう線が box の端と交わる所と、向き（度。右 = 0、下 = 90）を返す。見えていれば undefined
