@@ -11,6 +11,7 @@ import type { WorldState } from '../../../types';
 import { GROUND_K, hexVerts, LEVEL_STEP, neighborAt, pts, TOP_SCALE } from '../diorama';
 import { artImage } from '../../../art';
 import { TERRAINS } from '../../../data/world';
+import { tideNow } from '../../../engine/game/world/time';
 import { paintRange, type PaintGeom, type PaintInput, type TerrainLook } from './paint';
 import type { FromWorker, ToWorker } from './paint.worker';
 import { scatter, type SceneItem } from './scatter';
@@ -37,7 +38,8 @@ const CAN_WORKER =
 let workerBroken = false;
 
 interface Props {
-  w: Pick<WorldState, 'width' | 'height'>;
+  /** worldTurn・tideFrozen は潮の地形の見た目（開いている・閉じている）に使う */
+  w: Pick<WorldState, 'width' | 'height'> & Partial<Pick<WorldState, 'worldTurn' | 'tideFrozen'>>;
   tiles: WorldState['tiles'];
   geom: PaintGeom;
   levels: readonly number[];
@@ -63,7 +65,12 @@ export const LandscapeLayer = memo(function LandscapeLayer({ w, tiles, geom, lev
   if (!frozen && drawGeom !== geom) setDrawGeom(geom);
   const g = frozen ? drawGeom : geom;
   const { R, W, H } = g;
-  const terrains = useMemo<TerrainLook>(() => Object.fromEntries(TERRAINS.all.map((t) => [t.id, { color: t.color, climate: t.climate }])), []);
+  // 今の潮（シナリオ3）。潮の地形は、今の潮で開いているかを見た目に渡す（潮が変わると描き直す）
+  const tide = w.worldTurn !== undefined ? tideNow({ worldTurn: w.worldTurn, tideFrozen: w.tideFrozen }) : undefined;
+  const terrains = useMemo<TerrainLook>(
+    () => Object.fromEntries(TERRAINS.all.map((t) => [t.id, { color: t.color, climate: t.climate, ...(t.id === 'reef' || t.tide ? { tideOpen: !!t.tide && t.tide === tide } : {}) }])),
+    [tide],
+  );
   // 立つ物の置き場所（画面のスレッドで描く時だけ作る。同じ材料なら作り置きを使う）
   const itemsMemo = useRef<{ deps: unknown[]; items: SceneItem[] } | null>(null);
   const getItems = () => {
@@ -85,7 +92,7 @@ export const LandscapeLayer = memo(function LandscapeLayer({ w, tiles, geom, lev
   useEffect(() => onImagesLoaded(() => setImgVer((v) => v + 1)), []);
 
   // 前に描いた時の状態（何が変わったかで、描き直す区切りを決める）
-  const last = useRef<{ g: PaintGeom; tiles: WorldState['tiles']; stage: number; ver: number; dpr: number; worker: boolean } | null>(null);
+  const last = useRef<{ g: PaintGeom; tiles: WorldState['tiles']; stage: number; ver: number; dpr: number; worker: boolean; terrains: TerrainLook } | null>(null);
   /** 描き直しを待つ区切り → その中の描き直す帯（地図の y） */
   const pending = useRef<Map<number, [number, number]>>(new Map());
   const raf = useRef(0);
@@ -302,10 +309,10 @@ export const LandscapeLayer = memo(function LandscapeLayer({ w, tiles, geom, lev
     const fresh = ensureWorker();
     const useWorker = !!worker.current;
     const prev = last.current;
-    last.current = { g, tiles, stage, ver: imgVer, dpr, worker: useWorker };
+    last.current = { g, tiles, stage, ver: imgVer, dpr, worker: useWorker, terrains };
     // 区切りの Canvas・img を作り直した時（最初・拡大を変えた時・別のスレッドをやめた時）は、画面のスレッドですぐ描く（白い絵が一瞬出ないように）
     const remade = !prev || prev.g !== g || prev.dpr !== dpr || prev.tiles.length !== tiles.length || prev.worker !== useWorker;
-    const all = fresh || remade || prev.stage !== stage || prev.ver !== imgVer;
+    const all = fresh || remade || prev.stage !== stage || prev.ver !== imgVer || prev.terrains !== terrains;
     if (all) {
       cancelAnimationFrame(raf.current);
       pending.current.clear();
@@ -346,7 +353,7 @@ export const LandscapeLayer = memo(function LandscapeLayer({ w, tiles, geom, lev
     }
     runPending();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [g, tiles, stage, imgVer, frozen, dpr, n, workerOff]);
+  }, [g, tiles, stage, imgVer, frozen, dpr, n, workerOff, terrains]);
   useEffect(() => () => cancelAnimationFrame(raf.current), []);
   void itemExtent;
 

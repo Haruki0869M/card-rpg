@@ -70,6 +70,12 @@ describe('景色の置き方（見た目だけ）', () => {
     expect(items.every((it) => ['lighthouse', 'seaReef', 'wreck'].includes(it.k))).toBe(true);
   });
 
+  it('暗礁には、いつも岩礁の絵が立つ', () => {
+    const ts = tiles.map((t) => ({ ...t, t: 'reef', f: undefined })) as unknown as WorldState['tiles'];
+    const items = scatter({ w: { ...w, tiles: ts }, geom, levels: ts.map(() => 0), links: new Map(), rivers: new Map(), blocked: () => false, stage: 0 });
+    for (let i = 0; i < ts.length; i++) expect(items.some((it) => it.tile === i && it.k === 'seaReef')).toBe(true);
+  });
+
   it('見ていないマスには何も置かない', () => {
     const hidden = tiles.map((t) => ({ ...t, seen: false })) as WorldState['tiles'];
     expect(scatter({ w: { ...w, tiles: hidden }, geom, levels, links: new Map(), rivers: new Map(), blocked: () => false, stage: 3 })).toEqual([]);

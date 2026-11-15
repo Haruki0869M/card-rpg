@@ -31,7 +31,10 @@ export interface PaintInput {
   terrains: TerrainLook;
 }
 
-export type TerrainLook = Record<string, Pick<TerrainDef, 'color' | 'climate'>>;
+export type TerrainLook = Record<string, Pick<TerrainDef, 'color' | 'climate'> & {
+  /** 潮の地形が、今の潮で開いているか（開く潮が無い地形 = 暗礁は false。潮の地形でなければ省略） */
+  tideOpen?: boolean;
+}>;
 
 type V = [number, number];
 
@@ -157,7 +160,7 @@ const patCache = new Map<string, CanvasPattern | null>();
 let patR = 0;
 
 /** 地面の絵を借りる地形（湖の氷 = 氷原の絵を、明るい色の上に敷く。違いは paintTile の「氷の照り」で出す） */
-const TERRAIN_ART: Record<string, string> = { lakeIce: 'ice' };
+const TERRAIN_ART: Record<string, string> = { lakeIce: 'ice', reef: 'sea', tideChannel: 'sea', tideFlat: 'desert' };
 
 /** 地形の模様（描いた絵を R*4 の大きさで敷く）。絵がまだ読み込まれていなければ色だけ */
 function terrainPattern(ctx: CanvasRenderingContext2D, id: string, R: number, cache: Map<string, CanvasPattern | null>): CanvasPattern | null {
@@ -170,6 +173,143 @@ function terrainPattern(ctx: CanvasRenderingContext2D, id: string, R: number, ca
   }
   if (p) cache.set(id, p);
   return p;
+}
+
+/**
+ * 潮の地形（シナリオ3）の上の面の飾り。開いている時・閉じている時が一目で分かるように描き分ける。
+ * - 暗礁: いつも閉じている。白い波が砕ける、とがった岩（立つ物の岩礁の絵も上に立つ）
+ * - 潮の水道（満ち潮で開く）: 開 = 青く深い水と、流れの白い筋。閉 = 水が引いて砂の浅瀬と岩が出る
+ * - 干潟（引き潮で開く）: 開 = ぬれた砂・潮だまり・さざ波の跡。閉 = 浅い水がかぶる
+ * 見た目だけ。場所の細かい違いはマスの番号から作るハッシュ（毎回同じ）
+ */
+function paintTide(ctx: CanvasRenderingContext2D, id: string, open: boolean, v: V[], cx: number, cy: number, R: number, i: number) {
+  const h = (s: number) => hash01(i, s);
+  ctx.save();
+  poly(ctx, v);
+  ctx.clip();
+  const blob = (x: number, y: number, rx: number, ry: number, rot: number) => {
+    ctx.beginPath();
+    ctx.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2);
+  };
+  const ky = GROUND_K;
+  if (id === 'reef') {
+    // 暗い水と、砕ける白い波
+    ctx.fillStyle = 'rgba(20,40,52,.35)';
+    poly(ctx, v);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(240,250,255,.75)';
+    ctx.lineWidth = Math.max(1, R * 0.05);
+    ctx.lineCap = 'round';
+    for (let q = 0; q < 4; q++) {
+      const x = cx + (hash01(i * 8 + q, 170) - 0.5) * R * 1.2;
+      const y = cy + (hash01(i * 8 + q, 171) - 0.5) * R * 0.9 * ky;
+      ctx.beginPath();
+      ctx.arc(x, y, R * (0.12 + hash01(i * 8 + q, 172) * 0.08), Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+    }
+  } else if (id === 'tideChannel') {
+    if (open) {
+      // 満ち潮: 深い青と、水道にそって流れる白い筋
+      ctx.fillStyle = 'rgba(20,90,150,.35)';
+      poly(ctx, v);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(230,248,255,.8)';
+      ctx.lineWidth = Math.max(1, R * 0.045);
+      ctx.lineCap = 'round';
+      for (let q = 0; q < 3; q++) {
+        const y = cy + (q - 1) * R * 0.32 * ky + (h(173 + q) - 0.5) * R * 0.1;
+        const x = cx + (h(176 + q) - 0.5) * R * 0.4;
+        ctx.beginPath();
+        ctx.moveTo(x - R * 0.34, y);
+        ctx.quadraticCurveTo(x - R * 0.1, y - R * 0.07, x + R * 0.14, y);
+        ctx.lineTo(x + R * 0.06, y - R * 0.06);
+        ctx.moveTo(x + R * 0.14, y);
+        ctx.lineTo(x + R * 0.06, y + R * 0.05);
+        ctx.stroke();
+      }
+    } else {
+      // 引き潮: 水が引いて、砂の浅瀬と岩が出る（通れない）
+      ctx.fillStyle = 'rgba(70,110,130,.35)';
+      poly(ctx, v);
+      ctx.fill();
+      for (let q = 0; q < 4; q++) {
+        const x = cx + (hash01(i * 8 + q, 180) - 0.5) * R * 1.1;
+        const y = cy + (hash01(i * 8 + q, 181) - 0.5) * R * 0.8 * ky;
+        blob(x, y, R * (0.22 + hash01(i * 8 + q, 182) * 0.12), R * 0.12 * ky * 1.3, hash01(i * 8 + q, 183) * 0.6);
+        ctx.fillStyle = 'rgba(206,186,140,.85)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(90,70,40,.6)';
+        ctx.lineWidth = Math.max(0.6, R * 0.025);
+        ctx.stroke();
+      }
+      for (let q = 0; q < 3; q++) {
+        const x = cx + (hash01(i * 8 + q, 184) - 0.5) * R * 0.9;
+        const y = cy + (hash01(i * 8 + q, 185) - 0.5) * R * 0.7 * ky;
+        ctx.beginPath();
+        ctx.moveTo(x - R * 0.09, y + R * 0.04);
+        ctx.lineTo(x - R * 0.03, y - R * 0.08);
+        ctx.lineTo(x + R * 0.06, y - R * 0.05);
+        ctx.lineTo(x + R * 0.1, y + R * 0.04);
+        ctx.closePath();
+        ctx.fillStyle = '#6d7378';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(30,30,30,.7)';
+        ctx.stroke();
+      }
+    }
+  } else if (id === 'tideFlat') {
+    if (open) {
+      // 引き潮: ぬれた砂。さざ波の跡と、小さな潮だまり・貝
+      ctx.fillStyle = 'rgba(120,100,70,.18)';
+      poly(ctx, v);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(90,72,46,.45)';
+      ctx.lineWidth = Math.max(0.7, R * 0.025);
+      for (let q = 0; q < 4; q++) {
+        const y = cy + (q - 1.5) * R * 0.24 * ky;
+        ctx.beginPath();
+        for (let s = 0; s <= 8; s++) {
+          const x = cx - R * 0.6 + s * R * 0.15;
+          const yy = y + Math.sin(s * 1.6 + h(186)) * R * 0.025;
+          if (s) ctx.lineTo(x, yy);
+          else ctx.moveTo(x, yy);
+        }
+        ctx.stroke();
+      }
+      for (let q = 0; q < 2; q++) {
+        const x = cx + (hash01(i * 8 + q, 187) - 0.5) * R * 0.9;
+        const y = cy + (hash01(i * 8 + q, 188) - 0.5) * R * 0.7 * ky;
+        blob(x, y, R * 0.16, R * 0.08, 0.2);
+        ctx.fillStyle = 'rgba(110,170,200,.75)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(240,250,255,.7)';
+        ctx.stroke();
+      }
+      for (let q = 0; q < 3; q++) {
+        blob(cx + (hash01(i * 8 + q, 189) - 0.5) * R, cy + (hash01(i * 8 + q, 190) - 0.5) * R * 0.8 * ky, R * 0.035, R * 0.025, 0);
+        ctx.fillStyle = '#f2e6d8';
+        ctx.fill();
+      }
+    } else {
+      // 満ち潮: 浅い水がかぶる（砂がうっすら透けて見える）
+      ctx.fillStyle = 'rgba(60,140,190,.6)';
+      poly(ctx, v);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(235,248,255,.65)';
+      ctx.lineWidth = Math.max(0.8, R * 0.035);
+      ctx.lineCap = 'round';
+      for (let q = 0; q < 3; q++) {
+        const x = cx + (hash01(i * 8 + q, 191) - 0.5) * R * 0.9;
+        const y = cy + (hash01(i * 8 + q, 192) - 0.5) * R * 0.7 * ky;
+        ctx.beginPath();
+        ctx.moveTo(x - R * 0.12, y);
+        ctx.quadraticCurveTo(x - R * 0.06, y - R * 0.05, x, y);
+        ctx.quadraticCurveTo(x + R * 0.06, y + R * 0.05, x + R * 0.12, y);
+        ctx.stroke();
+      }
+    }
+  }
+  ctx.restore();
 }
 
 /**
@@ -282,6 +422,7 @@ export function paintRange(ctx: CanvasRenderingContext2D, inp: PaintInput, y0: n
       ctx.fillStyle = 'rgba(10,30,8,.2)'; // 森の地面は少し暗く
       ctx.fill();
     }
+    if (ter.tideOpen !== undefined) paintTide(ctx, t.t, ter.tideOpen, v, cx, cy, R, i);
     // にじみ・影・岸辺は、上の面の中だけに描く
     ctx.save();
     poly(ctx, v);
