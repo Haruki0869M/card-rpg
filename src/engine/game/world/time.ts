@@ -23,3 +23,24 @@ export const dayOf = (worldTurn: number) => Math.floor((worldTurn - 1) / (BALANC
 
 /** その日の最後のワールドターン（夜の最後。次のターンが次の朝）。温泉の効き目の終わり（シナリオ2の作り直し §8-2） */
 export const lastTurnOfDay = (worldTurn: number) => dayOf(worldTurn) * BALANCE.turnsPerTimeOfDay * TIMES.length;
+
+// ---------- 潮（シナリオ3の作り直し §3-1） ----------
+
+/** 世界の潮（'high' = 満ち潮 / 'low' = 引き潮）。戦闘の中の潮（潮の神官の段階）とは別 */
+export type Tide = 'high' | 'low';
+export const TIDE_NAME: Record<Tide, string> = { high: '満ち潮', low: '引き潮' };
+
+/** ワールドターンの潮: 朝・昼 = 満ち潮、夕方・夜 = 引き潮（4ワールドターンごとに入れ替わる。乱数は使わない） */
+export const tideOf = (worldTurn: number): Tide => {
+  const t = timeOfDay(worldTurn);
+  return t === 'morning' || t === 'noon' ? 'high' : 'low';
+};
+
+/** 今の潮。止まっていれば（WorldState.tideFrozen）そのまま */
+export const tideNow = (w: { worldTurn: number; tideFrozen?: Tide }): Tide => w.tideFrozen ?? tideOf(w.worldTurn);
+
+/** 潮が変わるまで、あと何ワールドターンか（1 = 次のワールドターンで変わる） */
+export const turnsUntilTideChange = (worldTurn: number): number => {
+  const per = BALANCE.turnsPerTimeOfDay * 2;
+  return per - ((worldTurn - 1) % per);
+};

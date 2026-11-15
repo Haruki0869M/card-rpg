@@ -21,6 +21,7 @@ import { climbWatchtower, enterSpawn, spawnAt, tickSpawns } from './explore';
 import { hexDistance, moveCostOf, neighbors, pathTo, reachable } from './hex';
 import { objectiveHandler, type QuestSignal } from './objectives';
 import { timeOfDay } from './time';
+import { shutByTide } from './tide';
 import { ensureShop } from './town';
 import { dungeonGateError } from './questGate';
 import { bumpStoryVer, passByNotice, queueStory } from './guide';
@@ -303,7 +304,13 @@ export function agreeMove(game: GameState, cmd: Cmd<'WORLD_MOVE_AGREE'>, rng: Rn
   const h = findHero(game, pr.heroId)!;
   if (w.move === null) return '先に移動力を判定してください';
   const map = reachable(w, w.pos[h.id], w.move);
-  if (!map.has(pr.to)) return 'そこへは移動できません';
+  if (!map.has(pr.to)) {
+    // 潮が変わって行けなくなった時（シナリオ3の作り直し §3-1）: 提案を消して記録に1行（エラーにすると提案が残り、同意しても動けないまま止まる）。
+    // 手番の人は、別の行き先を選び直せる。潮の無い地図では今までどおり
+    if (!shutByTide(w, w.pos[h.id], pr.to)) return 'そこへは移動できません';
+    addLog(game, '潮が変わって、選んだ所へは行けなくなった（行き先を選び直してください）');
+    return undefined;
+  }
   const companions = pr.companions.map((id) => findHero(game, id)!).filter((c) => c && w.pos[c.id] === w.pos[h.id]);
   doMove(game, w, h, companions, pr.to, map, rng);
   return undefined;
@@ -681,7 +688,7 @@ function nearestTown(w: WorldState, from: number): number | undefined {
   while (queue.length) {
     const cur = queue.shift()!;
     for (const n of neighbors(w, cur)) {
-      if (reach.has(n) || moveCostOf(w, n) <= 0) continue;
+      if (reach.has(n) || moveCostOf(w, n, cur) <= 0) continue;
       reach.add(n);
       queue.push(n);
     }

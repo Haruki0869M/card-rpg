@@ -13,6 +13,7 @@ import { canReportQuest } from './game/world/town';
 import { questsShort } from './game/world/questGate';
 import type { GameCommand, GameState, Hero, PlayerId, WorldState } from '../types';
 import { moveCostOf, neighbors, pathTo } from './game/world/hex';
+import { isTideTile, tideTerrainsOf } from './game/world/tide';
 import { isWideMap } from './game/world/lanes';
 import { insightTarget, shortcutTile } from './game/world/detour';
 import { shortcutEntrance } from './game/game';
@@ -274,17 +275,25 @@ function worldTarget(g: GameState, at: number, straight = false, cm?: CleverMemo
  */
 const SMART_ENEMY_DETOUR = 6;
 
-/** 各マスから to まで歩いてかかる移動力（霧は見ない。地形の移動力だけ。通れないマスは入らない）。avoid のマスは SMART_ENEMY_DETOUR を足す */
-function walkCostTo(w: WorldState, to: number, avoid?: Set<number>): Map<number, number> {
+/**
+ * 各マスから to まで歩いてかかる移動力（霧は見ない。地形の移動力だけ。通れないマスは入らない）。avoid のマスは SMART_ENEMY_DETOUR を足す。
+ * 潮（シナリオ3の作り直し §3-1・点検 C1）: tideShut なら、潮のマスは「閉じている」として数える（中から出るのは今までどおり出られる）。
+ * 潮のマスの上に立っている時のために、潮のマスにも距離を付ける（そこから出る分だけ）
+ */
+function walkCostTo(w: WorldState, to: number, avoid?: Set<number>, tideShut = false): Map<number, number> {
+  const cost = (i: number, from?: number) => (tideShut && isTideTile(w, i) && !(from !== undefined && w.tiles[from].tideIn) ? 0 : moveCostOf(w, i, from));
   const dist = new Map<number, number>([[to, 0]]);
   const open = [to];
   while (open.length) {
     let k = 0;
     for (let j = 1; j < open.length; j++) if (dist.get(open[j])! < dist.get(open[k])!) k = j;
     const cur = open.splice(k, 1)[0];
-    const step = dist.get(cur)! + Math.max(1, moveCostOf(w, cur)) + (avoid?.has(cur) && cur !== to ? SMART_ENEMY_DETOUR : 0);
     for (const n of neighbors(w, cur)) {
-      if (moveCostOf(w, n) <= 0) continue;
+      if (cost(n) <= 0 && !isTideTile(w, n)) continue;
+      // n から cur へ入る移動力（潮のマスは入る向きで変わる。潮の無い地図では今までどおり cur の移動力）
+      const enter = cost(cur, n);
+      if (enter <= 0 && cur !== to) continue;
+      const step = dist.get(cur)! + Math.max(1, enter) + (avoid?.has(cur) && cur !== to ? SMART_ENEMY_DETOUR : 0);
       const old = dist.get(n);
       if (old === undefined || step < old) {
         dist.set(n, step);
@@ -293,6 +302,16 @@ function walkCostTo(w: WorldState, to: number, avoid?: Set<number>): Map<number,
     }
   }
   return dist;
+}
+
+/**
+ * 潮の行き来をしない道の見積もり（点検 C1【提案】）: まず潮のマスを通らない道で測り、行けない時だけ今の潮で測る
+ * （潮が開くまで待ってから渡る。開いた時だけ干潟へ向かい、閉じたら引き返す、をくり返さない）。潮の無い地図では今までどおり。テストからも読む
+ */
+export function walkCostToTide(w: WorldState, at: number, to: number, avoid?: Set<number>): Map<number, number> {
+  if (!tideTerrainsOf(w).length) return walkCostTo(w, to, avoid);
+  const shut = walkCostTo(w, to, avoid, true);
+  return shut.has(at) ? shut : walkCostTo(w, to, avoid);
 }
 
 function worldStep(g: GameState, log: BotLog, memo: BotMemo): GameState {
@@ -338,7 +357,7 @@ function worldStep(g: GameState, log: BotLog, memo: BotMemo): GameState {
     const avoid = memo.smart && isWideMap(g, w) && target.why !== 'grind'
       ? new Set(w.wanderers.filter((x) => x.tile !== target.tile && w.tiles[x.tile].seen).map((x) => x.tile))
       : undefined;
-    const far = isWideMap(g, w) ? walkCostTo(w, target.tile, avoid) : undefined;
+    const far = isWideMap(g, w) ? walkCostToTide(w, at, target.tile, avoid) : undefined;
     const dist = (i: number) => (far ? (far.get(i) ?? Infinity) + (avoid?.has(i) ? SMART_ENEMY_DETOUR : 0) : hexDistance(w, i, target.tile));
     // 災厄の中ボスの巣を通る道は選ばない（今の自動プレイは災厄に挑まない。段階7b）
     // 工夫する bot は、目指している災厄の巣だけは通ってよい（そこが行き先）

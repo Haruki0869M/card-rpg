@@ -5,6 +5,8 @@ export const mapEvents: EventDef[] = [
   {
     id: 'tideStone',
     where: 'map',
+    // 名所だけ（オーナーの決定 9・シナリオ3の作り直しの点検 C9）: 依頼の潮騒の石碑が、ふつうのイベントのくじで何個も出ないように
+    placed: true,
     title: '潮騒の石碑',
     icon: 'stele',
     text: '波しぶきに濡れた石碑に、古い歌が刻まれている。「三つの灯が重なる時、霧は晴れる」',

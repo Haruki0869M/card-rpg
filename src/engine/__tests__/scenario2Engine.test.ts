@@ -88,12 +88,15 @@ const BEFORE: Record<number, { kinds: string[]; state: string }> = {
  * 作り直しの前のコードで取った、7本の新しい冒険（種1〜3・2人）の状態の指紋。地図の生成と乱数の順番が変わっていない事。
  * シナリオ2だけは、区切り2で地図を 15×42 に作り直したので、区切り2の地図で取り直した（前の 8×35 は 8695f871・b725699b・b35b9ce7）。
  * 2026-11-14 B組の区切り2: シナリオ2だけのテーマ「氷漬けの宝物庫」を足し、シナリオ2はテーマを4つから選ぶ（混ぜる乱数が1回増える）ので取り直した
- * （前は 18abebb9・5a847cfb・d7dec7f1）。ほかの6本は前のまま
+ * （前は 18abebb9・5a847cfb・d7dec7f1）。ほかの6本は前のまま。
+ * 2026-11-16 シナリオ3の作り直し A組の区切り1: 名所の石碑（シナリオ2「春の歌の石碑」・シナリオ3「潮騒の石碑」）に placed を付けて、
+ * ふつうの地図のイベントのくじから外した（オーナーの決定 9）ので、シナリオ2・3だけ取り直した
+ * （前は シナリオ2 75fe636c・a2511bd2・d070f8a1／シナリオ3 c475394c・f650664b・a54306f8。placed を外すと前の値に戻る事を確かめた = 潮の仕組みは潮の無い地図を変えない）
  */
 const BEFORE_MAPS: Record<string, string[]> = {
   corruptionKing: ['26c62f2f', 'e61644da', 'b4f77cef'],
-  frozenKingdom: ['75fe636c', 'a2511bd2', 'd070f8a1'],
-  cursedArchipelago: ['c475394c', 'f650664b', 'a54306f8'],
+  frozenKingdom: ['fbb04c0b', '46fb1ed4', '0d9f556e'],
+  cursedArchipelago: ['03673bf7', '9f451a2a', '965383ac'],
   sandDynasty: ['bb9a8be6', '93b10c4a', 'd723aecd'],
   starCastle: ['3636fe91', 'd44fae16', 'f00ba5cb'],
   clockworkEmpire: ['786d6478', '1084b75f', '2cf54543'],

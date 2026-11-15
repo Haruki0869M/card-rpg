@@ -26,6 +26,15 @@ export interface TerrainDef {
    * 広い地図（ScenarioMapDef.lanes があり、保存の地図がその大きさの時）だけで使う。前の幅の地図では足さない
    */
   moveDiceBonus?: number;
+  /**
+   * 潮のマス（シナリオ3の作り直し §3-1）: この潮の間だけ開く（'high' = 満ち潮〔朝・昼〕/ 'low' = 引き潮〔夕方・夜〕。world/tide.ts）。
+   * moveCost は 0 のまま（地図の生成・敵・陸の歩ける所の計算では今までどおり「通れない」= 何も置かれず、敵も入らない）。
+   * 移動の計算（hex.ts moveCostOf）だけが、開いている間は移動力1を返す。閉じていても、入る向きだけ閉じる（オーナーの決定 6-A）:
+   * 潮のマスの上からはいつでも出られ、潮の首の盆地・入り江の中（Tile.tideIn）から首へもいつでも出られる
+   */
+  tide?: 'high' | 'low';
+  /** 潮のマスが開いている間も、船が要る（潮の水道。船で shipCost〔既定1〕）。省略は歩いて渡れる（干潟） */
+  tideShip?: boolean;
 }
 
 /** 寒さ・暑さ。ratio（最大HPの割合）を省略すると BALANCE.climateDamageRatio */
@@ -112,6 +121,12 @@ export interface BarrierDef {
   rows: [number, number];
   terrain: string;
   gaps: number;
+  /**
+   * 潮の切れ目（シナリオ3の作り直し §3-1）: 切れ目のうち count 個を、潮の地形（terrain。例: 潮の水道・干潟）にする。
+   * 乱数は引かない（選んだ切れ目を上から並べ、2つ目・4つ目…の順に潮にする）。いつも通れる切れ目を必ず1つは残す。
+   * 仕切りと盆地・半島を全部作り終えてから置く（後の処理で陸に戻されないように）。省略は今までどおり
+   */
+  tideGaps?: { terrain: string; count: number };
 }
 
 /**
@@ -126,6 +141,11 @@ export interface PocketDef {
   open: number;
   wall: string;
   content: 'chest' | 'shrine';
+  /**
+   * 入口（首）の地形（シナリオ3の作り直し §3-1。例: 干潟・潮の水道）。省略は今までどおり（その地域の陸）。
+   * 首を潮の地形にした時は、中のマスに Tile.tideIn を付ける（中から首へは、潮が閉じていても出られる）
+   */
+  neck?: string;
 }
 
 /** マップに固定で置くもの */
@@ -270,6 +290,11 @@ export interface Tile {
   f?: MapFeature;
   /** 霧が晴れている */
   seen: boolean;
+  /**
+   * 潮の首の盆地・入り江の中のマス（シナリオ3の作り直し §3-1・オーナーの決定 6-A）。ここから隣の潮のマスへは、潮が閉じていても出られる
+   * （入る向きだけ閉じる。閉じ込められない）。無ければ今までどおり（古い保存・ほかのシナリオには付かない）
+   */
+  tideIn?: true;
 }
 
 /** 時間で消える出現スポット（段階6）: 流れ星の落下地点・さすらいの行商人・黄金のコソ泥 */
@@ -418,6 +443,11 @@ export interface WorldState {
   warm?: Record<string, number>;
   /** 船を持っている（K4 段3。パーティ共有。あると海のマスを進める） */
   ship?: boolean;
+  /**
+   * 潮が止まっている（シナリオ3の作り直し・オーナーの決定 6-A）: あれば、時間帯にかかわらず、この潮のまま（world/tide.ts tideNow）。
+   * 災厄「渦潮の大海魔」の悪さ（次の区切り）が、出た時の潮を入れる口。無ければ時間帯で決まる（古い保存も）
+   */
+  tideFrozen?: 'high' | 'low';
   /** 町の品揃え（町ID → 売り物）。訪れた時に作り、ワールドターンが一定進むと入れ替わる */
   shops: Record<string, ShopStock>;
   /** 画面に出す物語（冒頭・地域の紹介・エンディング） */

@@ -48,6 +48,8 @@ import {
   signposts,
   signpostText,
   warmthNote,
+  tideStatus,
+  tideTileNote,
   type GuideGoal,
 } from '../../engine';
 // 狭い画面 回2（C）: 雪に埋もれた街道の知らせ（エンジンの文を読むだけ。engine の入口には出ていないので直に読む）
@@ -82,6 +84,7 @@ export function WorldTopBar({ game, goldHeroId, goalLine, scourgeInParty }: { ga
   const next = nextCorruptionStage(game);
   const cName = corruptionName(game.scenarioId);
   const curse = scourgeCurse(game);
+  const tide = tideStatus(w);
   return (
     <>
     <div className="panel z-10 flex shrink-0 items-center gap-1.5 px-2 py-1" data-cutin-anchor>
@@ -123,6 +126,8 @@ export function WorldTopBar({ game, goldHeroId, goalLine, scourgeInParty }: { ga
         <span className="flex items-center gap-0.5 font-bold text-sky-100">
           <TimeIcon size={14} className={time === 'night' ? 'text-indigo-300' : 'text-amber-300'} />
           {dayOf(w.worldTurn)}日目{TIME_NAME[time]}
+          {/* 潮の印（シナリオ3の作り直し §3-1。潮のマスのある地図だけ）。くわしくは下のパネルの札・マスの説明 */}
+          {tide && <span aria-label={tide.text} data-tide-icon={tide.tide}>{tide.icon}</span>}
         </span>
         <span className="flex items-center gap-0.5 text-zinc-400">
           <Hourglass size={12} />
@@ -423,7 +428,8 @@ function tileInfo(game: GameState, i: number, goal?: GuideGoal): string {
     return 'まだ霧に包まれている';
   }
   const terr = getTerrain(t.t);
-  const parts = [terr.sea ? `${terr.name}（${w.ship ? `船で移動力${terr.shipCost ?? 1}` : '船が必要です'}）` : `${terr.name}（移動力${terr.moveCost || '×'}）`];
+  // 潮のマス（シナリオ3の作り直し §3-1）: 「満ち潮の間だけ船で通れる。今は引き潮: あと3ターンで開く」
+  const parts = [terr.tide ? `${terr.name}（${tideTileNote(w, terr)}）` : terr.sea ? `${terr.name}（${w.ship ? `船で移動力${terr.shipCost ?? 1}` : '船が必要です'}）` : `${terr.name}（移動力${terr.moveCost || '×'}）`];
   const f = t.f;
   if (f?.kind === 'town') parts.push(TOWNS.get(f.id).name + (w.fallenTowns.includes(f.id) ? '（陥落）' : ''));
   // ランダムダンジョン（段階7a）: テーマの印と名前・全5行・黄金箱・テーマの特徴。踏破済みならそう書く
@@ -588,6 +594,8 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
   // 悪夢の魔獣（災厄の中ボス・段階7b）が生きている間は、野営のHPの回復が半分
   const nightmare = scourgesWith(game, 'campHeal')[0];
   const climate = climateAt(game, here);
+  // 潮の札（シナリオ3の作り直し §3-1）。潮のマスの無い地図では undefined（何も出さない）
+  const tide = tideStatus(w);
   // 温泉で温まっている間は、寒さの注意の代わりに「温まっている」と出す（暑さの注意はそのまま）
   const warm = warmthNote(game, hero.id);
   const onTown = w.tiles[here].f?.kind === 'town';
@@ -811,6 +819,13 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
               ♨{warmLeft ? `あと${warmLeft}` : ''}
             </button>
           )}
+          {/* 潮（シナリオ3の作り直し §3-1）: 低い画面は短い札（押すと全文がパネルのすぐ上に出る。寒さ・温泉の札と同じ形） */}
+          {low && tide && (
+            <button onClick={() => toggleInfo(tide.text)} className="btn flex h-11 shrink-0 flex-col items-center justify-center rounded-lg border border-cyan-300/50 bg-cyan-950/60 px-1.5 text-[12px] leading-4 font-bold whitespace-nowrap text-cyan-200" aria-label={tide.text} data-tide-chip={tide.tide}>
+              <span>{tide.short[0]}</span>
+              <span>{tide.short[1]}</span>
+            </button>
+          )}
           {low && climateText && (
             <button onClick={() => toggleInfo(climateText)} className="btn flex h-11 shrink-0 items-center rounded-lg border border-sky-300/50 bg-sky-950/60 px-1.5 text-[12px] leading-4 font-bold whitespace-nowrap text-sky-200" aria-label={climateText} data-climate-chip={climate!.kind}>
               {climate!.kind === 'cold' ? '❄️寒さ' : '☀️暑さ'}
@@ -1030,6 +1045,11 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
           {warm && (
             <p className="text-[12px] leading-4 text-orange-200" data-warmth-note>
               {warm}
+            </p>
+          )}
+          {tide && (
+            <p className="text-[12px] leading-4 text-cyan-200" data-tide-note={tide.tide}>
+              {tide.text}
             </p>
           )}
           {climate && !(warm && climate.kind === 'cold') && (
