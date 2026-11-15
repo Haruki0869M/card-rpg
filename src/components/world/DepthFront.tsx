@@ -19,6 +19,20 @@ export interface FrontSpot {
   z: number;
   /** 透かさずに描く（施設の手前の木・山。建物は透けて見える必要が無い） */
   solid?: boolean;
+  /** 駒が立っているマス（中心と大きさ）。このマスの峰・火山・尾根は、駒の足元の山なので描き直さない */
+  own?: { tile: number; x: number; y: number; R: number };
+}
+
+/**
+ * 駒が立っているマスの山（峰・火山）と、そのマスから出る尾根か。
+ * 山のマスに立つ駒は「山の上」にいるので、その山を駒の上に描き直すと、駒が山の後ろに隠れて見える（2026-11-15 東の尾根）
+ */
+export function ownMountain(it: SceneItem, own: FrontSpot['own']): boolean {
+  if (!own) return false;
+  if ((it.k === 'peak' || it.k === 'volcano') && it.tile === own.tile) return true;
+  if (it.k !== 'ridge') return false;
+  const near = (x: number, y: number) => Math.abs(x - own.x) < own.R * 0.6 && Math.abs(y - own.y) < own.R * 0.6;
+  return near(it.x, it.y) || near(it.x2 ?? it.x, it.y2 ?? it.y);
 }
 
 /**
@@ -51,6 +65,7 @@ function FrontCanvas({ spot, items, tint, ver }: { spot: FrontSpot; items: Scene
     let drew = false;
     for (const it of items) {
       if (it.y <= spot.footY) continue;
+      if (ownMountain(it, spot.own)) continue;
       const ext = itemExtent(it);
       // 上下・左右が、この四角に掛かる物だけ
       if (it.y - ext.up > spot.y + spot.h || it.y + ext.down < spot.y) continue;
@@ -67,7 +82,7 @@ function FrontCanvas({ spot, items, tint, ver }: { spot: FrontSpot; items: Scene
       ctx.fillRect(0, 0, cv.width, cv.height);
     }
     cv.style.display = drew ? 'block' : 'none';
-  }, [spot.x, spot.y, spot.w, spot.h, spot.footY, items, tint, ver]);
+  }, [spot.x, spot.y, spot.w, spot.h, spot.footY, spot.own, items, tint, ver]);
   return <canvas ref={ref} className="pointer-events-none absolute" data-depth-front={spot.key} style={{ left: spot.x, top: spot.y, width: spot.w, height: spot.h, zIndex: spot.z, opacity: spot.solid ? 1 : FRONT_OPACITY, ...FRONT_FADE }} />;
 }
 

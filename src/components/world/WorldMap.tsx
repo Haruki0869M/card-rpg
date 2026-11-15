@@ -297,6 +297,18 @@ const FeatureLayer = memo(function FeatureLayer({ tiles, geom, finaleTiles, fall
   );
 });
 
+/** 夜・夕方に、町の絵を時間帯の色の上にもう一度うすく重ねる濃さ（町の明かりで、町そのものが見えるように） */
+const LIT_TOWN: Partial<Record<TimeOfDay, number>> = { evening: 0.22, night: 0.5 };
+
+/** 明かりのついた町（落ちた町は除く）。施設の絵の層と同じ絵を、時間帯の色の上に重ねる */
+const LitTowns = memo(function LitTowns({ tiles, geom, finaleTiles, fallenTowns, opacity }: { tiles: WorldState['tiles']; geom: MapGeom; finaleTiles: ReadonlySet<number>; fallenTowns: string[]; opacity: number }) {
+  return (
+    <svg width={geom.W} height={geom.H} className="pointer-events-none absolute inset-0 block" style={{ opacity }} data-lit-towns>
+      {tiles.map((t, i) => (t.seen && t.f?.kind === 'town' && !fallenTowns.includes(t.f.id) ? <g key={`lt${i}`}>{featureArtInner(t, i, geom, finaleTiles, fallenTowns, false)}</g> : null))}
+    </svg>
+  );
+});
+
 // ---- 奥行き（2.5D）の重なりの順 ----
 // 奥（上の行）の物ほど下に、手前（下の行）の物ほど上に重ねる。1行につき DEPTH_STEP ずつ上げる。
 // 行の中の順: 敵の駒 → 倒れた仲間 → キャラの駒（同じマスの中は左奥から右手前）→ 動いている駒 → その行の駒より手前にある木・施設
@@ -802,7 +814,7 @@ export function WorldMap({
     return [...set].sort((a, b) => a - b).map((tile): FrontSpot & { tile: number } => {
       const { x, y } = center(tile);
       const front = w.tiles[tile]?.f && w.tiles[tile].seen ? FACILITY_FRONT * R * GROUND_K : 0;
-      return { key: `t${tile}`, tile, x: x - R * 1.45, y: y - R * 2.1, w: R * 2.9, h: R * 3.1, footY: y + front + R * 0.2, z: depthZ(rowOf(dims, tile), DEPTH_FRONT) };
+      return { key: `t${tile}`, tile, own: { tile, x, y, R }, x: x - R * 1.45, y: y - R * 2.1, w: R * 2.9, h: R * 3.1, footY: y + front + R * 0.2, z: depthZ(rowOf(dims, tile), DEPTH_FRONT) };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [heroSpots, w.wanderers, w.downed, anim?.path, center, R, w.tiles]);
@@ -818,6 +830,7 @@ export function WorldMap({
       }),
     [w.tiles, center, R],
   );
+  const townSpots = useMemo(() => facilitySpots.filter((sp) => w.tiles[Number(sp.key.slice(1))]?.f?.kind === 'town').map((sp) => ({ ...sp, key: `l${sp.key}` })), [facilitySpots, w.tiles]);
 
   // 拡大・標準・縮小のボタン（ふつうの画面は見取り図の下に並べる。低い画面は 🔍 で開く1列の中）
   const zoomButtons = (
@@ -854,6 +867,14 @@ export function WorldMap({
         {pinchZoom === null && !compact && <DepthFront spots={facilitySpots} items={sceneItems} tint={undefined} />}
         {/* 時間帯の光（朝 = 斜めの光、夕方 = オレンジ、夜 = 青い月明かり）。地図といっしょに動く1枚の色なので、描き直しは起きない */}
         {light.wash && <div className="pointer-events-none absolute" style={{ left: 0, top: -padY, width: W + padR, height: padY + H + padBottom, background: light.wash }} data-time-light={time} />}
+        {/* 夜と夕方: 町の絵を時間帯の色の上にうすく重ねる（2026-11-15。夜に町がほとんど見えなかった）。
+            町の手前の木・山は、その上に時間帯の色を掛けて描き直す（町が手前の木を踏まないように） */}
+        {!compact && LIT_TOWN[time] && (
+          <>
+            <LitTowns tiles={w.tiles} geom={geom} finaleTiles={finaleTiles} fallenTowns={w.fallenTowns} opacity={LIT_TOWN[time]!} />
+            {pinchZoom === null && <DepthFront spots={townSpots} items={sceneItems} tint={FRONT_TINT[time]} />}
+          </>
+        )}
         {/* 夜と夕方の明かり（町・祠・神殿・祭壇・野営のたき火） */}
         {light.glow > 0 &&
           glows.map((g) => (
