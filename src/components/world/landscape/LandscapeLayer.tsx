@@ -416,10 +416,13 @@ const HexShapes = memo(function HexShapes({ tiles, geom, levels }: { tiles: Worl
  * 地平線の絵（シナリオ → 絵）。まだ見えていない最後の城の方角に、うっすら見える。
  * 表に無いシナリオは魔王城（シナリオ1と同じ）。絵が増えたら、ここに足す
  */
-const SKYLINE_ART: Record<string, string> = {
-  frozenKingdom: 'landscape/skyline-snow-peak',
+const SKYLINE_ART: Record<string, string[]> = {
+  frozenKingdom: ['landscape/skyline-snow-peak'],
+  // 呪われた群島: 本番は霧の向こうの幽霊船（skyline-ghost-ship。ChatGPT で作る）。届くまでは、難破船の部品をかすませた仮の絵
+  cursedArchipelago: ['landscape/skyline-ghost-ship', 'landscape/skyline-wreck-haze'],
 };
-export const skylineArt = (scenarioId: string | undefined) => (scenarioId && SKYLINE_ART[scenarioId]) || 'landscape/skyline-demon-castle';
+/** 地平線の絵の名前（表の中で、絵がある最初の物） */
+export const skylineArt = (scenarioId: string | undefined) => (scenarioId && SKYLINE_ART[scenarioId]?.find((k) => artImage(k))) || 'landscape/skyline-demon-castle';
 
 /**
  * 霧の向こうのシルエット（オーナーの決定で入れる）。見えている所から4マス以内の、まだ見ていない山・火山を、

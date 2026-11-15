@@ -17,6 +17,9 @@ export type ItemKind =
   | 'iceTree'
   | 'snowDrift'
   | 'snowRock'
+  | 'lighthouse'
+  | 'seaReef'
+  | 'wreck'
   | 'deadTree'
   | 'peak'
   | 'ridge'
@@ -113,6 +116,14 @@ export function scatter({ w, geom, levels, links, rivers, blocked, stage }: Scat
   const clearOf = (i: number, x: number, y: number, c: { x: number; y: number }, gap: number) =>
     nearLine(x, y, c.x, c.y, R, links.get(i)) > R * gap && nearLine(x, y, c.x, c.y, R, rivers.get(i)) > R * gap;
 
+  // 灯台: 町ごとに1つ、町のとなりの海のマスのうち、ハッシュで選んだ1マス（町が海に面していなければ無し）
+  const lighthouseTiles = new Set<number>();
+  for (let j = 0; j < w.tiles.length; j++) {
+    if (w.tiles[j].f?.kind !== 'town') continue;
+    const seas = [0, 1, 2, 3, 4, 5].map((k) => neighborAt(w, j, k)).filter((n): n is number => n !== undefined && T(n) === 'sea');
+    if (seas.length) lighthouseTiles.add(seas.sort((a, b) => hash01(a, 140) - hash01(b, 140))[0]);
+  }
+
   for (let i = 0; i < w.tiles.length; i++) {
     if (!seen(i) || blocked(i)) continue;
     const t = T(i);
@@ -206,6 +217,17 @@ export function scatter({ w, geom, levels, links, rivers, blocked, stage }: Scat
     }
     if (t === 'blight' || t === 'ash') {
       if (h(28) < 0.6) out.push({ k: t === 'blight' ? 'deadTree' : 'rock', x: c.x + (h(29) - 0.5) * R * 0.8, y: c.y + (h(30) - 0.4) * R * 0.7 * GROUND_K, h: R * (t === 'blight' ? 0.75 : 0.26), v: h(31), tile: i });
+      continue;
+    }
+    if (t === 'sea') {
+      // 海（2026-11-16 シナリオ3）: 町のそばの海に灯台を1つ、ところどころに岩礁、まれに難破船。見た目だけ
+      if (lighthouseTiles.has(i)) {
+        out.push({ k: 'lighthouse', x: c.x + (h(150) - 0.5) * R * 0.2, y: c.y + R * 0.25 * GROUND_K, h: R * 1.05, v: h(151), tile: i });
+      } else if (h(152) < 0.025) {
+        out.push({ k: 'wreck', x: c.x + (h(153) - 0.5) * R * 0.4, y: c.y + (h(154) - 0.3) * R * 0.5 * GROUND_K, h: R * 0.6, v: h(155), tile: i });
+      } else if (h(156) < 0.13) {
+        out.push({ k: 'seaReef', x: c.x + (h(157) - 0.5) * R * 0.8, y: c.y + (h(158) - 0.4) * R * 0.7 * GROUND_K, h: R * (0.36 + h(159) * 0.12), v: h(160), tile: i });
+      }
       continue;
     }
     if (levels[i] === 0) continue; // 水・海

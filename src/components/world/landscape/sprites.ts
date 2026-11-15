@@ -67,9 +67,12 @@ const ART: Partial<Record<ItemKind, string[]>> = {
   iceTree: ['landscape/ice-tree'],
   snowDrift: ['landscape/snow-drift'],
   snowRock: ['landscape/snow-rock'],
+  lighthouse: ['landscape/sea-lighthouse'],
+  seaReef: ['landscape/sea-reef-1', 'landscape/sea-reef-2'],
+  wreck: ['landscape/sea-wreck'],
 };
 /** 絵の高さ ÷ 立つ物の高さ h（絵には周りの余白があるので、少し大きめに描く） */
-const ART_SCALE: Partial<Record<ItemKind, number>> = { broadleaf: 1.3, pine: 1.3, plainsTree: 1.3, hill: 2.1, rock: 2.2, grass: 2.3, flower: 2.3, mushroom: 1.9, deadTree: 1.3, crystal: 2.2, peak: 1.15, volcano: 1.15, reeds: 1.5, snowPine: 1.3, iceCrystal: 1.35, iceRock: 2.0, iceTree: 1.25, snowDrift: 2.9, snowRock: 2.2 };
+const ART_SCALE: Partial<Record<ItemKind, number>> = { broadleaf: 1.3, pine: 1.3, plainsTree: 1.3, hill: 2.1, rock: 2.2, grass: 2.3, flower: 2.3, mushroom: 1.9, deadTree: 1.3, crystal: 2.2, peak: 1.15, volcano: 1.15, reeds: 1.5, snowPine: 1.3, iceCrystal: 1.35, iceRock: 2.0, iceTree: 1.25, snowDrift: 2.9, snowRock: 2.2, lighthouse: 1.15, seaReef: 2.0, wreck: 1.6 };
 function sceneryImage(k: ItemKind, v: number): SceneImage | undefined {
   const keys = [...(ART[k] ?? []), ...artImageIds('scenery').filter((id) => id === k || id.startsWith(`${k}-`)).map((id) => `scenery/${id}`)].filter((key) => artImage(key));
   if (!keys.length) return undefined;
@@ -605,6 +608,9 @@ export function drawItem(ctx: CanvasRenderingContext2D, it: SceneItem) {
     case 'rock':
     case 'iceRock':
     case 'snowRock':
+    case 'seaReef':
+    case 'wreck':
+    case 'lighthouse':
       return rock(ctx, it.x, it.y, it.h, it.v);
     case 'grass':
       return grass(ctx, it.x, it.y, it.h, it.v);
