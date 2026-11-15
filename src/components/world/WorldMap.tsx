@@ -23,7 +23,7 @@ import { petSpot, PetToken } from '../ui/PetToken';
 import { HeroPiece } from './HeroPiece';
 import { SignpostMini, SpawnMarks, TowerMini, TowerTop } from './ExploreMarks';
 import { orderOnTile, pieceSpots, PLAYER_COLORS } from './pieceLayout';
-import { cameraTop, edgeArrow, mapPadBottom, mapPadY, revealLeft, revealTop, visibleH } from './mapCamera';
+import { cameraTop, clampLeft, dodgeButtons, edgeArrow, MAP_PAD_RIGHT, mapPadBottom, mapPadY, revealLeft, revealTop, visibleH } from './mapCamera';
 import { anchorScroll, baseRadius, clampZoom, COMPACT_ZOOM, minZoomFor, stepZoom, ZOOM_MAX, ZOOM_MIN } from './mapZoom';
 import { Overview } from './Overview';
 import { useLowScreen } from '../../hooks/useLowScreen';
@@ -431,6 +431,8 @@ export function WorldMap({
   // 地図の上下の余白（端のマスでも駒を真ん中に置ける。フェーズ2-D）。パネルは地図の上に重なるので、余白はパネルの高さによらない
   const padY = mapPadY(size.height);
   const padBottom = mapPadBottom(size.height);
+  // 狭い画面 回2: 地図の右の余白（ボタンの列の幅ぶん。指で動かせば、右の端のマスをボタンの無い所まで引き出せる）
+  const padR = MAP_PAD_RIGHT;
   const inset = Math.round(bottomInset);
   const reduced = useReducedMotion();
   // 拡大のボタンを縦に並べる高さ（「戻る」のボタン＋見取り図（字つきで少し高い）・拡大の4つ＋すき間 ≒ 258px）が、見えている地図に無い時は横に並べる
@@ -463,6 +465,30 @@ export function WorldMap({
       camAnim.current = k < 1 ? requestAnimationFrame(step) : 0;
     };
     camAnim.current = requestAnimationFrame(step);
+  };
+  // 狭い画面 回2: 固定のボタン（拡大の列・戻る）。カメラの行き先で、駒・選んだマス・次の行き先がこの下に入る時だけ寄せる
+  const zoomBox = useRef<HTMLDivElement>(null);
+  const recenterBox = useRef<HTMLButtonElement>(null);
+  /** カメラの行き先（left, top）で、マス tile がボタンにかかるなら、いちばん小さく動かして寄せた行き先（かからなければそのまま） */
+  const dodge = (el: HTMLElement, tile: number, left: number, top: number) => {
+    const maxL = Math.max(0, el.scrollWidth - el.clientWidth), maxT = Math.max(0, el.scrollHeight - el.clientHeight);
+    const L = Math.max(0, Math.min(maxL, left)), T = Math.max(0, Math.min(maxT, top));
+    const fr = el.getBoundingClientRect();
+    const rects = [zoomBox.current, recenterBox.current].flatMap((e) => {
+      const b = e?.getBoundingClientRect();
+      return b && b.width > 0 ? [{ left: b.left - fr.left - 4, top: b.top - fr.top - 4, right: b.right - fr.left + 4, bottom: b.bottom - fr.top + 4 }] : [];
+    });
+    if (!rects.length) return { left: L, top: T };
+    const { x, y } = center(tile);
+    // 駒の絵はマスの真ん中より上に立つので、丸の真ん中を少し上にする。丸の大きさは駒の絵の幅（≒ R）の7割
+    // （右の余白 72px で、奇数の行の右端のマスの真ん中は、ボタンの列の左の端より約23px 左まで出せる）
+    const d = dodgeButtons(x - L, y + padY - T - R * 0.25, R * 0.7, rects, { left: 0, top: 0, right: el.clientWidth, bottom: visibleH(el.clientHeight, inset) }, { left: L, right: maxL - L, up: T, down: maxT - T });
+    return d ? { left: L + d.dx, top: T + d.dy } : { left: L, top: T };
+  };
+  /** マスを見えている所の真ん中に置くカメラの行き先（横は前と同じ範囲 = 余白は見せない）。ボタンの下に入る時だけ寄せる */
+  const camFor = (el: HTMLElement, tile: number) => {
+    const { x, y } = center(tile);
+    return dodge(el, tile, clampLeft(x - el.clientWidth / 2, el.clientWidth, W), cameraTop(y, el.clientHeight, inset));
   };
   // 指やホイールで地図を動かしたら、カメラの動きを止める（取り合わない）
   useEffect(() => {
@@ -497,8 +523,8 @@ export function WorldMap({
     // 駒が歩いた・手番が変わった時は、跳ばずになめらかに追う（動きを減らす設定の時・枠の大きさや拡大が変わった時はすぐ合わせる）。
     // 歩いている間は、駒が1マス動く時間（駒の動きと同じ）でカメラも動かす。駒が画面の上でほぼ止まって見える
     const smooth = sameView && !anchor && !reduced && (prev.here !== here || prev.turn !== w.turn);
-    const { x, y } = center(here);
-    moveCam(el, x - el.clientWidth / 2, cameraTop(y, el.clientHeight, inset), smooth ? (anim ? stepMs * 0.8 : 350) : 0);
+    const to = camFor(el, here);
+    moveCam(el, to.left, to.top, smooth ? (anim ? stepMs * 0.8 : 350) : 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [here, w.turn, size.width, size.height, inset, center]);
 
@@ -577,7 +603,9 @@ export function WorldMap({
     const top = revealTop(center(here).y, center(selected).y, el.scrollTop, el.clientHeight, R * 1.2, inset);
     // 拡大している時は横にもはみ出すので、横も同じ決まりで見せる
     const left = revealLeft(center(here).x, center(selected).x, el.scrollLeft, el.clientWidth, R * 1.2);
-    if (top !== undefined || left !== undefined) moveCam(el, left ?? el.scrollLeft, top ?? el.scrollTop, reduced ? 0 : 300);
+    // 狭い画面 回2: 横は前と同じ範囲（余白は見せない）。選んだマスがボタンの下に入る時だけ寄せる
+    const to = dodge(el, selected, left !== undefined ? clampLeft(left, el.clientWidth, W) : el.scrollLeft, top ?? el.scrollTop);
+    if (Math.abs(to.left - el.scrollLeft) >= 1 || Math.abs(to.top - el.scrollTop) >= 1) moveCam(el, to.left, to.top, reduced ? 0 : 300);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
 
@@ -585,8 +613,8 @@ export function WorldMap({
   const focusTo = (tile: number) => {
     const el = box.current;
     if (!el) return;
-    const { x, y } = center(tile);
-    moveCam(el, x - el.clientWidth / 2, cameraTop(y, el.clientHeight, inset), reduced ? 0 : 350);
+    const to = camFor(el, tile);
+    moveCam(el, to.left, to.top, reduced ? 0 : 350);
   };
   useEffect(() => {
     if (focusRequest) focusTo(focusRequest.tile);
@@ -810,13 +838,14 @@ export function WorldMap({
     <div ref={wrapRef} className="relative min-h-0 flex-1" style={{ touchAction: 'pan-x pan-y' }}>
     <div ref={box} className="absolute inset-0 overflow-auto overscroll-contain bg-[#0b0910]" style={{ touchAction: 'pan-x pan-y' }} data-world-map>
       {/* 地図の外（上下の余白）も雲の海（FogSea が余白まで広げる）。下地は雲の色 */}
-      <div style={{ paddingTop: padY, paddingBottom: padBottom, width: W, background: time === 'night' ? '#20233c' : '#53587a' }} data-map-pad>
+      {/* 狭い画面 回2: 右にも余白（padR）。雲の海・時間帯の光も余白まで広げる */}
+      <div style={{ paddingTop: padY, paddingBottom: padBottom, width: W + padR, background: time === 'night' ? '#20233c' : '#53587a' }} data-map-pad>
       {/* 歩いている間は、雲と水の動きを止める（スマホで駒の動きをなめらかにするため） */}
       {/* isolate: 奥行きの重なりの順（大きな zIndex）を、地図の中だけに閉じ込める（下の操作の欄の上に出ないように） */}
       <div className="relative isolate" style={{ width: W, height: H }} onClick={(e) => { if (!anim) tap(e); }} data-walking={anim ? '' : undefined}>
         <LandscapeLayer w={w} tiles={tiles} geom={geom} levels={levels} links={links} rivers={rivers} under={under} roadTerrain={roadTerrain} noProp={finaleTiles} stage={stage} frozen={pinchZoom !== null} walking={!!anim} bare={compact} />
         {!compact && <WaterLayer tiles={tiles} geom={geom} levels={levels} />}
-        <FogSea tiles={tiles} geom={geom} levels={levels} padTop={padY} padBottom={padBottom} miasma={miasma} fresh={freshRef.current} time={time} />
+        <FogSea tiles={tiles} geom={geom} levels={levels} padTop={padY} padBottom={padBottom} padRight={padR} miasma={miasma} fresh={freshRef.current} time={time} />
         {/* 霧の向こうの山のシルエットと、地平線の最後の城 */}
         <FogSilhouettes w={w} tiles={tiles} geom={geom} levels={levels} finale={finaleTiles.values().next().value} padTop={padY} night={time === 'night'} scenarioId={game.scenarioId} />
         {/* 施設（立体のミニチュア・描いた絵）。時間帯の色の下に置く（夜は暗くなり、町などの明かりだけが光る） */}
@@ -824,7 +853,7 @@ export function WorldMap({
         {/* 奥行き: 施設より手前にある木・山を、施設の上に描き直す */}
         {pinchZoom === null && !compact && <DepthFront spots={facilitySpots} items={sceneItems} tint={undefined} />}
         {/* 時間帯の光（朝 = 斜めの光、夕方 = オレンジ、夜 = 青い月明かり）。地図といっしょに動く1枚の色なので、描き直しは起きない */}
-        {light.wash && <div className="pointer-events-none absolute" style={{ left: 0, top: -padY, width: W, height: padY + H + padBottom, background: light.wash }} data-time-light={time} />}
+        {light.wash && <div className="pointer-events-none absolute" style={{ left: 0, top: -padY, width: W + padR, height: padY + H + padBottom, background: light.wash }} data-time-light={time} />}
         {/* 夜と夕方の明かり（町・祠・神殿・祭壇・野営のたき火） */}
         {light.glow > 0 &&
           glows.map((g) => (
@@ -1166,9 +1195,10 @@ export function WorldMap({
           onClick={() => {
             const el = box.current;
             if (!el) return;
-            const { x, y } = center(here);
-            moveCam(el, x - el.clientWidth / 2, cameraTop(y, el.clientHeight, inset), reduced ? 0 : 350);
+            const to = camFor(el, here);
+            moveCam(el, to.left, to.top, reduced ? 0 : 350);
           }}
+          ref={recenterBox}
           aria-label="手番のキャラへ戻る"
           className="btn btn-dark absolute right-2 z-10 flex h-11 w-11 items-center justify-center rounded-full"
           style={{ bottom: inset + 8 }}
@@ -1206,6 +1236,7 @@ export function WorldMap({
       {/* 拡大・縮小（右手の親指で届くように、「戻る」のボタンの上に縦に並べる）。標準 = 1倍 */}
       {/* 見えている地図が低い時（小さい画面）は、縦に並べると上にはみ出すので、地図の右上に横に並べる */}
       <div
+        ref={zoomBox}
         style={compactZoom ? { top: 8 } : { bottom: inset + 60 }}
         className={`absolute right-2 z-10 flex items-center gap-1.5 ${compactZoom ? 'flex-row' : 'flex-col'}`}
         role="group"
@@ -1268,8 +1299,8 @@ export function WorldMap({
             setOverview(false);
             const el = box.current;
             if (!el) return;
-            const { x, y } = center(tile);
-            moveCam(el, x - el.clientWidth / 2, cameraTop(y, el.clientHeight, inset), reduced ? 0 : 350);
+            const to = camFor(el, tile);
+            moveCam(el, to.left, to.top, reduced ? 0 : 350);
           }}
         />
       )}

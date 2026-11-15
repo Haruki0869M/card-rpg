@@ -177,6 +177,8 @@ interface Props {
   /** 地図の上・下の余白（雲の海は余白まで広げる。地図の外が黒く見えないように） */
   padTop: number;
   padBottom: number;
+  /** 地図の右の余白（狭い画面 回2。ボタンの列の幅ぶん）。雲の海を右の余白まで広げる（マスの座標は左が原点なので変わらない） */
+  padRight?: number;
   /** 瘴気の色にする、まだ見ていないマス */
   miasma: (i: number) => boolean;
   /** 今、霧が晴れたばかりのマス */
@@ -185,8 +187,10 @@ interface Props {
 }
 
 /** 雲の海の層。WorldMap の地図の箱（上の余白の分だけ上へずらす）の中に置く */
-export const FogSea = memo(function FogSea({ tiles, geom, levels, padTop, padBottom, miasma, fresh, time }: Props) {
-  const { R, W, H } = geom;
+export const FogSea = memo(function FogSea({ tiles, geom, levels, padTop, padBottom, padRight = 0, miasma, fresh, time }: Props) {
+  const { R, H } = geom;
+  // 雲の海の幅 = 地図の幅＋右の余白
+  const W = geom.W + padRight;
   const totalH = Math.round(padTop + H + padBottom);
   const soft = R * 0.5;
   // 雲の海は、縦に CHUNK ずつの区切りに分けて描く（1枚の大きな画像だと、拡大した時にスマホの描画の上限を超えるため）
