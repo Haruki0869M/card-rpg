@@ -693,7 +693,11 @@ export function WorldMap({
   // 回1の追加: 施設の名前の札（町・ダンジョン・塔・神殿・祭壇・祠。宝箱やイベントの印には出さない）
   const labelFont = Math.min(14, Math.max(12, Math.round(R * 0.4)));
   const heroKey = Object.values(w.pos).join(',');
-  const heroTiles = useMemo(() => new Set(heroKey.split(',').map(Number)), [heroKey]);
+  const heroTiles = useMemo(() => {
+    const n = new Map<number, number>();
+    for (const v of heroKey.split(',')) n.set(Number(v), (n.get(Number(v)) ?? 0) + 1);
+    return n;
+  }, [heroKey]);
   const labels = useMemo(() => {
     const out: PlaceLabel[] = [];
     w.tiles.forEach((t, i) => {
@@ -710,7 +714,10 @@ export function WorldMap({
       if (!text) return;
       const { x, y } = geom.center(i);
       // キャラがそのマスにいる時は、駒の台座の下まで札を下げる（札は駒より手前に描くので、台座を隠さないように）
-      out.push({ tile: i, text, rank: i === goalTile ? 0 : f.kind === 'town' ? 1 : f.kind === 'dungeon' ? 2 : 3, x, y: y + geom.R * (heroTiles.has(i) ? 0.98 : 0.62) });
+      // キャラがそのマスにいる時は、いちばん下の駒の台座の下まで札を下げる（2026-11-15 オーナーの決定 B。札は駒より手前なので、台座と銘板を隠さないように）
+      const n = heroTiles.get(i) ?? 0;
+      const below = n ? Math.max(0.62, Math.max(...pieceSpots(n).map((sp) => sp.size * (0.942 - 0.62) + (sp.dy + FACILITY_FRONT) * GROUND_K)) + 0.04) : 0.62;
+      out.push({ tile: i, text, rank: i === goalTile ? 0 : f.kind === 'town' ? 1 : f.kind === 'dungeon' ? 2 : 3, x, y: y + geom.R * below });
     });
     return placeLabels(out, labelFont, compact);
   }, [w, geom, goalTile, labelFont, compact, heroTiles]);
