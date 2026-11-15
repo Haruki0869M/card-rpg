@@ -13,12 +13,20 @@ import { applyGameCommand, buildDungeon, createGame, createRng } from '../index'
 const P: PlayerId = 'P1';
 type Layout = NonNullable<DungeonDef['layout']>;
 
-/** シナリオ2の作り直す前の並び（型 + その時のイベント。沈んだ聖堂は 2026-11-15 まで、ほかの3か所は 2026-11-14 まで） */
+/**
+ * 作り直す前の並び（型 + その時のイベント）。
+ * シナリオ2: 沈んだ聖堂は 2026-11-15 まで、ほかの3か所は 2026-11-14 まで。
+ * シナリオ3: 4か所とも 2026-11-16 まで（docs/tasks/scenario3-rework-plan.md §3-4。「小舟の商人」を神殿と王冠号の2か所で使っていた）
+ */
 const BEFORE: Record<string, Layout> = {
   crystalCave: keyLayout1({ first: 'frostBridge', second: 'buriedChest', story: 'crystalGate' }),
   sunkenCathedral: keyLayout2({ first: 'iceSilhouette', second: 'frozenCamp', story: 'bishopAltar' }),
   giantMine: keyLayout3({ first: 'buriedChest', second: 'furTrader', story: 'giantGate' }),
   iceCastle: finaleLayout({ first: 'iceSilhouette', story: 'queenThrone' }),
+  wreckCave: keyLayout1({ first: 'seaCaveTide', second: 'sunkenChest', story: 'serpentNest' }),
+  // 海賊の隠れ島は作り直しを保留（dungeonShape.test.ts の REWORK_PENDING）。前の並びのままなので、ここには入れない
+  sunkenTemple: keyLayout3({ first: 'ghostSong', second: 'seaTrader', story: 'tideAltar' }),
+  ghostFlagship: finaleLayout({ first: 'seaTrader', story: 'admiralBridge' }),
 };
 const shapeOf = (L: Layout) => JSON.stringify(L.map((row) => row.map((x) => [x.type, x.next, x.eventId ?? null])));
 
@@ -32,7 +40,7 @@ function run(g: GameState, cmd: GameCommand): GameState {
 function savedInOldLayout(dungeonId: string): string {
   const def = DUNGEONS.get(dungeonId);
   const now = def.layout;
-  const g = createGame({ seed: 11, scenarioId: 'frozenKingdom', difficulty: 'normal', party: ['warrior', 'mage'].map((c, i) => ({ classId: c, gender: 'male' as const, name: `${c}${i}`, playerId: P })) });
+  const g = createGame({ seed: 11, scenarioId: DUNGEONS.scenarioOf(dungeonId)!, difficulty: 'normal', party: ['warrior', 'mage'].map((c, i) => ({ classId: c, gender: 'male' as const, name: `${c}${i}`, playerId: P })) });
   g.world = undefined;
   try {
     def.layout = BEFORE[dungeonId];
@@ -44,7 +52,11 @@ function savedInOldLayout(dungeonId: string): string {
   return JSON.stringify(g);
 }
 
-describe('シナリオ2: 並びを作り直す前に入ったダンジョンの途中の保存', () => {
+describe('シナリオ2・3: 並びを作り直す前に入ったダンジョンの途中の保存', () => {
+  it('前の並びは、シナリオ2の4か所とシナリオ3の3か所（海賊の隠れ島は保留）', () => {
+    expect(Object.keys(BEFORE).map((id) => DUNGEONS.scenarioOf(id)).sort()).toEqual([...Array(3).fill('cursedArchipelago'), ...Array(4).fill('frozenKingdom')]);
+  });
+
   it('作り直す前の並びのデータは、今の並びと違う（このテストが意味を持つ）', () => {
     for (const [id, L] of Object.entries(BEFORE)) expect(shapeOf(DUNGEONS.get(id).layout!), id).not.toBe(shapeOf(L));
   });
