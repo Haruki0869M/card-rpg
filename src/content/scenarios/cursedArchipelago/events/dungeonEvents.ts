@@ -2,7 +2,7 @@
 import type { EventDef } from '../../../../types';
 
 export const dungeonEvents: EventDef[] = [
-  // ----- 道中のイベント -----
+  // ----- 道中のイベント（2026-11-16 作り直し: どれも1か所ずつ。満ちてくる潮・沈んだ宝箱 = 難破船の洞窟、隠し財産・焚き火 = 海賊の隠れ島、小舟の商人 = 沈んだ神殿、霧の中の歌声 = 嘆きの王冠号） -----
   {
     id: 'seaCaveTide',
     title: '満ちてくる潮',
@@ -85,7 +85,7 @@ export const dungeonEvents: EventDef[] = [
     id: 'seaTrader',
     title: '小舟の商人',
     icon: 'merchant',
-    text: '洞窟の水路に、小舟が浮かんでいる。「こんな所まで来る客は珍しいねえ」',
+    text: '神殿の水路に、小舟が浮かんでいる。「こんな所まで来る客は珍しいねえ」',
     options: [
       { label: '回復薬を買う（30G）', cost: 30, success: [{ kind: 'loseGold', amount: 30 }, { kind: 'item', rarity: 'common', slot: 'consumable' }], successText: '「毎度あり！」' },
       { label: '掘り出し物を買う（90G）', cost: 90, success: [{ kind: 'loseGold', amount: 90 }, { kind: 'item', rarity: 'rare', slot: 'equipment' }], successText: '「いい目をしてるね！」' },

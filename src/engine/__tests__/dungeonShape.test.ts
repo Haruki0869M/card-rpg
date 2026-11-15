@@ -42,14 +42,15 @@ const shapeOf = (L: Layout) => JSON.stringify(L.map((row) => row.map((x) => [x.t
 const isKeyLayout1 = (d: DungeonDef) => !!d.layout && shapeOf(d.layout) === shapeOf(keyLayout1({ first: 'a', second: 'b', story: 'c' }));
 /**
  * 型の写しをやめて、並びをファイルに直接書いたシナリオ（2026-11-14 シナリオ2〜7の作り直し。docs/tasks/scenario2-rework-plan.md §2-4・§3-3 の6）。
- * 作り直すたびに足す。シナリオ1（corruptionKing）は前から手作り
+ * 作り直すたびに足す。シナリオ1（corruptionKing）は前から手作り。2026-11-16 シナリオ3（docs/tasks/scenario3-rework-plan.md §3-4）
  */
-const REWORKED_SCENARIOS: string[] = ['frozenKingdom'];
+const REWORKED_SCENARIOS: string[] = ['frozenKingdom', 'cursedArchipelago'];
 /**
  * 作り直したシナリオの中で、まだ型のままのダンジョン（決まりと形のテーマが両立せず、まとめ役・オーナーの判断待ち）。
- * 2026-11-15: 沈んだ聖堂は、オーナーの決定（計画 §11 の案イ「じょうご」の形）で作り直したので、今は無い
+ * 2026-11-15: 沈んだ聖堂は、オーナーの決定（計画 §11 の案イ「じょうご」の形）で作り直したので、今は無い。
+ * 2026-11-16: 海賊の隠れ島（シナリオ3）。計画 §3-4 ②の3行目の封魔の宝箱が「封魔の宝箱は4行目から」（overhaulStage3.test.ts）と両立しない
  */
-const REWORK_PENDING: string[] = [];
+const REWORK_PENDING: string[] = ['pirateIsland'];
 const TEMPLATES = { keyLayout1, keyLayout2, keyLayout3, finaleLayout };
 /**
  * ボスの前が「休憩 → イベント → ボス」の8行の鍵のダンジョンか（1つ目の鍵の型と、2026-11-13 の案イで同じ形にした翠の神殿）。

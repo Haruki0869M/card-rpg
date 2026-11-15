@@ -1,7 +1,12 @@
 // シナリオ3のダンジョン。
 // 制覇すると鍵（灯）が手に入り、3つそろうと最終ダンジョンに入れる。ボスの手前に「物語の部屋」（event）を置く
 import type { DungeonDef } from '../../../../types';
-import { finaleLayout, keyLayout1, keyLayout2, keyLayout3 } from '../../../common/dungeonLayouts';
+import { keyLayout2 } from '../../../common/dungeonLayouts';
+// 2026-11-16 シナリオ3の作り直し（docs/tasks/scenario3-rework-plan.md §3-4・最後の「憲章の点検の後の直し」B1・B2）:
+// 4か所のうち3か所は型（src/content/common/dungeonLayouts.ts）の写しをやめ、このシナリオだけの形をファイルに直接書いた（シナリオ1・2と同じ）。
+// 並びの決まりは src/engine/__tests__/dungeonShape.test.ts と cursedArchipelago.test.ts（ボスの1つ前は物語の部屋）。
+// 海賊の隠れ島だけは、決まりと両立しなかったので保留（前の型のまま。下の pirateIsland）。
+// 道中のイベントは、シナリオの中で1か所ずつ（前は「小舟の商人」を沈んだ神殿と王冠号の2か所で使っていた。「霧の中の歌声」を王冠号へ移した）。
 
 // 敵の組（K4 手順2）。弱点が同じ敵だけの組にならないようにする（海の生き物は雷、幽霊は聖に弱い）
 const WRECK_CAVE_POOLS: DungeonDef['pools'] = {
@@ -32,18 +37,6 @@ const TIDE_CAVE_POOLS: DungeonDef['pools'] = {
   boss: ['krakenTentacle', 'drownedKnight'],
 };
 
-type Layout = NonNullable<DungeonDef['layout']>;
-
-/** 難破船の洞窟（入門。潮と沈んだ宝箱） */
-// 部屋の並びは4つの型（src/content/common/dungeonLayouts.ts）を、このダンジョンのイベントで埋めた物
-const wreckCaveLayout: Layout = keyLayout1({ first: 'seaCaveTide', second: 'sunkenChest', story: 'serpentNest' });
-
-/** 海賊の隠れ島（海賊の財宝と罠） */
-const pirateIslandLayout: Layout = keyLayout2({ first: 'pirateStash', second: 'castawayCamp', story: 'captainCabin' });
-
-/** 沈んだ神殿（霧の歌と潮の祭壇） */
-const sunkenTempleLayout: Layout = keyLayout3({ first: 'ghostSong', second: 'seaTrader', story: 'tideAltar' });
-
 export const wreckCave: DungeonDef = {
   id: 'wreckCave',
   name: '難破船の洞窟',
@@ -54,7 +47,34 @@ export const wreckCave: DungeonDef = {
   bossChest: 'epic',
   rewardKey: 'lightStar',
   clearStory: ['海蛇の女王が、静かに海へ沈んでいった。', '洞窟に、星の灯がともった。', '星の灯を手に入れた！'],
-  layout: wreckCaveLayout,
+  // 形「岩棚と潮だまり」: 2行目で左右に分かれる。左の岩棚 = 満ちてくる潮（イベント）→ 戦闘か強敵。右の潮だまり = 宝箱（コモン）→ 強敵か休憩。
+  // 4行目は潮が引いた底: 岩棚の戦闘からは沈んだ宝箱（イベント）か鍵の宝箱へ、潮だまりの強敵からは鍵の宝箱か戦闘へ、休憩からは戦闘へ下りる。
+  // 鍵の宝箱は潮だまりの底（右）。沈んだ宝箱の後は戦闘か強敵、鍵の宝箱の後は戦闘だけ（強敵の後の道で、ふつうの戦闘が1回にならないように）。
+  // どの道でも、ふつうの戦闘は2〜3回（ボスの前が「休憩 → 物語の部屋」の8行の鍵）。強敵を通らない道 = 岩棚 → 戦闘 → 沈んだ宝箱 → 戦闘
+  layout: [
+    [{ type: 'battle', next: [0, 1] }],
+    [
+      { type: 'event', eventId: 'seaCaveTide', next: [0, 1] },
+      { type: 'chest', chest: { rarity: 'common', locked: false }, next: [1, 2] },
+    ],
+    [
+      { type: 'battle', next: [0, 2] },
+      { type: 'elite', next: [1, 2] },
+      { type: 'rest', next: [1] },
+    ],
+    [
+      { type: 'event', eventId: 'sunkenChest', next: [0, 1] },
+      { type: 'battle', next: [0] },
+      { type: 'chest', chest: { rarity: 'rare', locked: true }, next: [1] },
+    ],
+    [
+      { type: 'elite', next: [0] },
+      { type: 'battle', next: [0] },
+    ],
+    [{ type: 'rest', next: [0] }],
+    [{ type: 'event', eventId: 'serpentNest', next: [0] }],
+    [{ type: 'boss', next: [] }],
+  ],
 };
 
 export const pirateIsland: DungeonDef = {
@@ -69,7 +89,10 @@ export const pirateIsland: DungeonDef = {
   // 1つ目のダンジョンの鍵が要る（play-feedback-plan §4 C: 町や依頼を飛ばして、まっすぐ奥へ行けないように）
   requiresKeys: ['lightStar'],
   clearStory: ['海賊船長ガルドが、剣を落とした。', '「…灯台を、頼む」', '月の灯を手に入れた！'],
-  layout: pirateIslandLayout,
+  // 2026-11-16 作り直し保留（まとめ役の判断待ち）: 計画 §3-4 ②「隠し通路」（点検 B1 の入れ替え後）は、3行目の封魔の宝箱が
+  // 「封魔の宝箱は4行目から」の決まり（BALANCE.sealedChest.fromRow・overhaulStage3.test.ts）と両立しなかった。
+  // 決まりも計画の形も曲げずに止め、今は前の並び（2つ目の鍵の型）のまま。dungeonShape.test.ts の REWORK_PENDING に入れてある
+  layout: keyLayout2({ first: 'pirateStash', second: 'castawayCamp', story: 'captainCabin' }),
 };
 
 export const sunkenTemple: DungeonDef = {
@@ -85,7 +108,37 @@ export const sunkenTemple: DungeonDef = {
   requiresKeys: ['lightMoon'],
   requiresQuests: 1,
   clearStory: ['潮の神官が、祈りを止めて微笑んだ。', '「提督は、悲しんでおられる」', '日の灯を手に入れた！'],
-  layout: sunkenTempleLayout,
+  // 形「満ち潮の広間と引き潮の回廊」: 広間（3部屋）と回廊（1部屋の戦闘）が交互に来る。奥の広間（6行目）に封魔の宝箱。
+  // どの道でも、ふつうの戦闘は1・3・5行目の3回（7行目の戦闘を選ぶと4回）。5〜7行目の戦う部屋は2回以上。
+  // 強敵を通らない道 = 小舟の商人 → 戦闘 → 鍵の宝箱 → 戦闘 → 鍵の宝箱 → 戦闘
+  layout: [
+    [{ type: 'battle', next: [0, 1, 2] }],
+    [
+      { type: 'event', eventId: 'seaTrader', next: [0] },
+      { type: 'elite', next: [0] },
+      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
+    ],
+    [{ type: 'battle', next: [0, 1, 2] }],
+    [
+      { type: 'elite', next: [0] },
+      { type: 'chest', chest: { rarity: 'rare', locked: true }, next: [0] },
+      { type: 'rest', next: [0] },
+    ],
+    [{ type: 'battle', next: [0, 1, 2] }],
+    [
+      { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0, 1] },
+      // 封魔の宝箱（決まった部屋。格はエンジンが奥の行で決める物と同じ: 10行目より前はエピック）
+      { type: 'sealedChest', chest: { rarity: 'epic', locked: false, sealed: true }, next: [0, 1] },
+      { type: 'elite', next: [0] },
+    ],
+    [
+      { type: 'battle', next: [0] },
+      { type: 'elite', next: [0] },
+    ],
+    [{ type: 'rest', next: [0] }],
+    [{ type: 'event', eventId: 'tideAltar', next: [0] }],
+    [{ type: 'boss', next: [] }],
+  ],
 };
 
 export const ghostFlagship: DungeonDef = {
@@ -98,7 +151,46 @@ export const ghostFlagship: DungeonDef = {
   bossChest: 'legend',
   requiresKeys: ['lightStar', 'lightMoon', 'lightSun'],
   finale: true,
-  layout: finaleLayout({ first: 'seaTrader', story: 'admiralBridge' }),
+  // 形「昇降口と左右の舷」: 甲板の広間（3部屋）→ 昇降口（1部屋の戦闘）を下りるたびに左舷・右舷に分かれ、
+  // 5→6行目と9→10行目で舷が入れ替わる（はしご）。7行目が中ボス・8行目が休憩。
+  // どの道でも、ふつうの戦闘は4回（1・3行目、5か6行目のどちらか、9か10行目のどちらか）。
+  // 強敵を通らない道 = 霧の中の歌声 → 戦闘 → 休憩 → 鍵の宝箱 → 戦闘 → 中ボス → 休憩 → 戦闘 → 封魔の宝箱
+  layout: [
+    [{ type: 'battle', next: [0, 1, 2] }],
+    [
+      { type: 'elite', next: [0] },
+      { type: 'event', eventId: 'ghostSong', next: [0] },
+      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0] },
+    ],
+    [{ type: 'battle', next: [0, 1, 2] }],
+    [
+      { type: 'chest', chest: { rarity: 'common', locked: false }, next: [0] },
+      { type: 'rest', next: [0, 1] },
+      { type: 'elite', next: [0, 1] },
+    ],
+    [
+      { type: 'battle', next: [0] },
+      { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
+    ],
+    [
+      { type: 'elite', next: [0] },
+      { type: 'battle', next: [0] },
+    ],
+    [{ type: 'midboss', next: [0] }],
+    [{ type: 'rest', next: [0, 1] }],
+    [
+      { type: 'battle', next: [0] },
+      { type: 'elite', next: [1] },
+    ],
+    [
+      // 封魔の宝箱（決まった部屋。格はエンジンが奥の行で決める物と同じ: 10行目から先はレジェンド）
+      { type: 'sealedChest', chest: { rarity: 'legend', locked: false, sealed: true }, next: [0] },
+      { type: 'battle', next: [0] },
+    ],
+    [{ type: 'rest', next: [0] }],
+    [{ type: 'event', eventId: 'admiralBridge', next: [0] }],
+    [{ type: 'boss', next: [] }],
+  ],
 };
 
 // ランダムダンジョン: 潮騒の洞窟（部屋の並びを自動生成）
