@@ -1,6 +1,9 @@
 // ===== シナリオの解放判定（K4-0 段1）のテスト =====
 import { describe, expect, it } from 'vitest';
-import { SCENARIOS, getScenario, isScenarioUnlocked } from '../../data/scenarios';
+import { OPEN_ALL_SCENARIOS, SCENARIOS, getScenario, isScenarioUnlocked as rawUnlocked } from '../../data/scenarios';
+
+// 解放の条件そのものの決まりは、全部開ける設定（OPEN_ALL_SCENARIOS）を外して確かめる
+const isScenarioUnlocked = (sc: Parameters<typeof rawUnlocked>[0], cleared?: readonly string[]) => rawUnlocked(sc, cleared, false);
 import { createGame } from '../index';
 import { playToEnd } from '../bot';
 
@@ -31,6 +34,17 @@ describe('シナリオの解放判定', () => {
     expect(isScenarioUnlocked(frozen, [])).toBe(false);
     expect(isScenarioUnlocked(frozen, ['frozenKingdom'])).toBe(false);
     expect(isScenarioUnlocked(frozen, ['corruptionKing'])).toBe(true);
+  });
+});
+
+describe('全部のシナリオを開ける設定（オーナーの決定 2026-11-16）', () => {
+  it('OPEN_ALL_SCENARIOS が true の間は、クリアの記録が無くても全シナリオが遊べる。作成中（wip）は遊べない', () => {
+    expect(OPEN_ALL_SCENARIOS).toBe(true);
+    for (const s of SCENARIOS.all) {
+      expect(rawUnlocked(s), s.id).toBe(!s.wip);
+      expect(rawUnlocked(s, []), s.id).toBe(!s.wip);
+    }
+    expect(rawUnlocked({ unlocked: false, wip: true }, [])).toBe(false);
   });
 });
 

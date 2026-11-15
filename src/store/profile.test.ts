@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { createGame, stateHash } from '../engine';
-import { isScenarioUnlocked } from '../data/scenarios';
+import { isScenarioUnlocked as rawUnlocked } from '../data/scenarios';
+
+// 解放の条件そのものの決まりは、全部開ける設定（OPEN_ALL_SCENARIOS）を外して確かめる
+const isScenarioUnlocked = (sc: Parameters<typeof rawUnlocked>[0], cleared?: readonly string[]) => rawUnlocked(sc, cleared, false);
 import type { GameState, PlayerId } from '../types';
 import { canBeMyPet, clearedScenarioIds, collectSightings, emptyProfile, isNewPetCoat, mergeSightings, normalizeProfile, setMyPet, uchinokoTotals } from './profile';
 

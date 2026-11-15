@@ -84,13 +84,13 @@ for (const width of [360, 390, 480]) {
       await page.locator('[data-lore-detail]').getByText('閉じる', { exact: true }).click();
     }
   }
-  // 4) 冒険の準備: クリアの記録があっても、解放の条件の無いシナリオ（凍てつく王国）は鍵のまま（K4 が条件を入れるまで）
+  // 4) 冒険の準備: 2026-11-16 オーナーの決定で、今は全シナリオを無条件で遊べる（OPEN_ALL_SCENARIOS）。鍵が1つも付いていない事を見る
   await page.getByLabel('閉じる').click();
   await page.getByText('新しい冒険').click();
   // 保存がある時はゲーム内の確認が出る（フェーズ3）
   if (await page.getByRole('dialog').count()) await page.getByRole('dialog').getByText('上書きして始める', { exact: true }).click();
   await page.locator('[data-scenarios]').waitFor();
-  if (!(await page.locator('[data-scenario-lock]').count())) await ng('凍てつく王国の鍵が消えた');
+  if (await page.locator('[data-scenario-lock]').count()) await ng('全シナリオが開いているはずなのに、鍵の付いたシナリオがある');
   await shot('setup');
   await check('冒険の準備');
   // 5) うちの子図鑑・マイペット: 登録できる子を入れて、登録 → スタートの町で呼ぶ → 全滅の画面に記録

@@ -4,7 +4,10 @@ import { describe, expect, it } from 'vitest';
 import { DUNGEONS } from '../../data/dungeons';
 import { EVENTS } from '../../data/events';
 import { ITEMS } from '../../data/items';
-import { SCENARIOS, getScenario, isScenarioUnlocked } from '../../data/scenarios';
+import { SCENARIOS, getScenario, isScenarioUnlocked as rawUnlocked } from '../../data/scenarios';
+
+// 解放の条件そのものの決まりは、全部開ける設定（OPEN_ALL_SCENARIOS。オーナーの決定 2026-11-16）を外して確かめる
+const isScenarioUnlocked = (sc: Parameters<typeof rawUnlocked>[0], cleared?: readonly string[]) => rawUnlocked(sc, cleared, false);
 import { QUESTS, SHRINES, TOWNS } from '../../data/world';
 import { createGame } from '../index';
 
