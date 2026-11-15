@@ -28,6 +28,7 @@ export * from './game/rooms';
 export * from './game/migrations';
 export * from './game/world/hex';
 export * from './game/world/time';
+export { tideStatus, tideTileNote, type TideStatus } from './game/world/tide';
 export * from './game/world/corruptionShown';
 export * from './game/world/fog';
 export * from './game/world/wanderers';

@@ -1,6 +1,7 @@
 // ===== 六角形のマス（ヘックス）。縦長の地図（行が上下に並ぶ）。奇数行を右に半マスずらす（odd-r） =====
 import { getTerrain } from '../../../data/world';
 import type { WorldState } from '../../../types';
+import { tideNow } from './time';
 
 export const idxOf = (w: Pick<WorldState, 'width'>, col: number, row: number) => row * w.width + col;
 export const colOf = (w: Pick<WorldState, 'width'>, i: number) => i % w.width;
@@ -54,9 +55,18 @@ export function hexDistance(w: Pick<WorldState, 'width'>, a: number, b: number):
   return Math.max(Math.abs(ax - bx), Math.abs(ay - by), Math.abs(az - bz));
 }
 
-/** 入るのにかかる移動力（0 は通れない） */
-export function moveCostOf(w: WorldState, i: number): number {
+/**
+ * 入るのにかかる移動力（0 は通れない）。from = どのマスから入るか（潮のマスだけが見る。省略は「外から入る」）。
+ * 潮のマス（シナリオ3の作り直し §3-1）: 開いている潮の間だけ移動力1（潮の水道は船も要る）。閉じていても入る向きだけ閉じる（オーナーの決定 6-A）:
+ * 潮の首の盆地・入り江の中（Tile.tideIn）から首へは、いつでも出られる。潮のマスの上から隣の陸・海へ出るのは、そのマスの移動力のまま
+ */
+export function moveCostOf(w: WorldState, i: number, from?: number): number {
   const t = getTerrain(w.tiles[i].t);
+  if (t.tide) {
+    if (from !== undefined && w.tiles[from]?.tideIn) return 1;
+    if (tideNow(w) !== t.tide) return 0;
+    return t.tideShip ? (w.ship ? (t.shipCost ?? 1) : 0) : 1;
+  }
   // 海は船があるパーティだけが進める（K4 段3）
   return t.sea && w.ship ? (t.shipCost ?? 1) : t.moveCost;
 }
@@ -78,7 +88,7 @@ export function reachable(w: WorldState, from: number, budget: number): Map<numb
     if (cur !== from && enemyAt.has(cur)) continue;
     for (const n of neighbors(w, cur)) {
       if (!w.tiles[n].seen) continue;
-      const mc = moveCostOf(w, n);
+      const mc = moveCostOf(w, n, cur);
       if (mc <= 0) continue;
       const cost = base + mc;
       if (cost > budget) continue;

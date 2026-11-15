@@ -49,6 +49,8 @@ function shapeWideMap(game: GameState, def: ScenarioMapDef, w: WorldState, rng: 
   const open = (i: number | undefined) => {
     if (i !== undefined && !keep(i) && blocked(i)) tiles[i].t = mainLand(def, tiles[i].r);
   };
+  /** 潮のマス（シナリオ3の作り直し §3-1）: 仕切りの切れ目・盆地の首。全部作り終えてから置く（open() で陸に戻されないように）。inner = 首の中のマス */
+  const tideLater: { i: number; terrain: string; inner?: number }[] = [];
   // 仕切り: 偶数の行は even 列、奇数の行は odd 列。切れ目は Rng で選ぶ
   for (const b of def.barriers ?? []) {
     const rows: number[] = [];
@@ -62,6 +64,12 @@ function shapeWideMap(game: GameState, def: ScenarioMapDef, w: WorldState, rng: 
       if (cands.length) gaps.add(cands[rng.int(cands.length)]);
     }
     const line = new Set(rows.map((r) => idxOf(w, r % 2 ? b.odd : b.even, r)));
+    // 潮の切れ目: 切れ目を上から並べ、2つ目・4つ目…・3つ目・5つ目…の順に count 個（1つ目はいつも通れる切れ目に残す。乱数は引かない）
+    if (b.tideGaps) {
+      const real = [...gaps].sort((x, y) => x - y).filter((r) => !keep(idxOf(w, r % 2 ? b.odd : b.even, r)));
+      const order = [...real.filter((_, k) => k % 2 === 1), ...real.filter((_, k) => k % 2 === 0 && k > 0)];
+      for (const r of order.slice(0, Math.max(0, Math.min(b.tideGaps.count, real.length - 1)))) tideLater.push({ i: idxOf(w, r % 2 ? b.odd : b.even, r), terrain: b.tideGaps.terrain });
+    }
     for (const r of rows) {
       const i = idxOf(w, r % 2 ? b.odd : b.even, r);
       if (keep(i)) continue;
@@ -95,6 +103,7 @@ function shapeWideMap(game: GameState, def: ScenarioMapDef, w: WorldState, rng: 
     open(neck);
     if (neck !== undefined) {
       necks.add(neck);
+      if (p.neck && !keep(neck)) tideLater.push({ i: neck, terrain: p.neck, inner: at });
       const beyond = neighborInDir(w, neck, p.open);
       open(beyond);
       // 入口の先から外へ出られるように、まわり（壁でない所）の通れないマスも陸にする
@@ -103,6 +112,12 @@ function shapeWideMap(game: GameState, def: ScenarioMapDef, w: WorldState, rng: 
     if (tiles[at].f) continue;
     if (p.content === 'shrine' && shrineIds.length) tiles[at].f = { kind: 'shrine', id: pick(shrineIds, rng) };
     else tiles[at].f = { kind: 'chest', id: 'mapChest', chest: { rarity: rng.next() < POCKET_LEGEND_CHANCE ? 'legend' : 'epic', locked: false } };
+  }
+  // 潮のマスを置く（壁になったマス・道・施設には置かない）。首の中のマスには「中から出られる」印（オーナーの決定 6-A）
+  for (const x of tideLater) {
+    if (keep(x.i) || blocked(x.i)) continue;
+    tiles[x.i].t = x.terrain;
+    if (x.inner !== undefined) tiles[x.inner].tideIn = true;
   }
   return necks;
 }

@@ -5,6 +5,8 @@ export const mapEvents: EventDef[] = [
   {
     id: 'songStone',
     where: 'map',
+    // 名所だけ（オーナーの決定 9・シナリオ3の作り直しの点検 C9）: 依頼の春の歌の石碑が、ふつうのイベントのくじで何個も出ないように
+    placed: true,
     title: '春の歌の石碑',
     icon: 'stele',
     text: '雪に埋もれかけた石碑に、古い歌が刻まれている。「雪は溶け、花は咲く。灯を絶やさぬ者のもとに」',
