@@ -59,6 +59,17 @@ describe('景色の置き方（見た目だけ）', () => {
     expect(lake.n).toBeLessThan(ice.n / 2);
   });
 
+  it('海: 町のとなりの海に灯台が1つ、ほかの海に岩礁や難破船', () => {
+    // 全部を海にして、真ん中に町を1つ
+    const ts = tiles.map((t, i) => ({ ...t, t: 'sea', f: i === 2 * W + 3 ? { kind: 'town', id: 'x' } : undefined })) as unknown as WorldState['tiles'];
+    const items = scatter({ w: { ...w, tiles: ts }, geom, levels: ts.map(() => 0), links: new Map(), rivers: new Map(), blocked: (i) => !!ts[i].f, stage: 0 });
+    const lh = items.filter((it) => it.k === 'lighthouse');
+    expect(lh.length).toBe(1);
+    expect([0, 1, 2, 3, 4, 5].map((k) => neighborAt(w, 2 * W + 3, k))).toContain(lh[0].tile);
+    expect(items.some((it) => it.k === 'seaReef')).toBe(true);
+    expect(items.every((it) => ['lighthouse', 'seaReef', 'wreck'].includes(it.k))).toBe(true);
+  });
+
   it('見ていないマスには何も置かない', () => {
     const hidden = tiles.map((t) => ({ ...t, seen: false })) as WorldState['tiles'];
     expect(scatter({ w: { ...w, tiles: hidden }, geom, levels, links: new Map(), rivers: new Map(), blocked: () => false, stage: 3 })).toEqual([]);
