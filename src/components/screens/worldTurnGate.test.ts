@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chestLeaveGate, showTurnLock, worldChestTurnHero } from './worldTurnGate';
+import { chestLeaveGate, shrineShared, showTurnLock, worldChestTurnHero } from './worldTurnGate';
 import type { GameState, Hero, PlayerId } from '../../types';
 
 // 必要な項目だけの冒険の状態（画面用の判断なので、エンジンは通さない）
@@ -49,5 +49,52 @@ describe('世界マップの宝箱: だれが押せるか（2026-11-10 の実機
     const ev = state({ heroes: [eld, rina], mode: 'event', chest: undefined, event: { tile: 3 } as never });
     expect(showTurnLock(ev, onlyP2)).toBe(true);
     expect(showTurnLock({ ...ev, activeScene: 'x1' } as GameState, onlyP2)).toBe(false);
+  });
+});
+
+describe('祠: 覆い（2026-11-15 の実機の不具合: 同行して入った祠で、P1 の「世界マップへ」が覆いの下に隠れた）', () => {
+  const kai = hero('kai', 'P1');
+  const lilith = hero('lilith', 'P2');
+  const kai2 = hero('kai2', 'P1');
+  // 祠の状態（heroId = マスを踏んだキャラ。members = 一緒に入ったキャラ）
+  const shrine = (heroes: Hero[], heroId: string, members: string[], extra: Record<string, unknown> = {}) =>
+    state({ heroes, mode: 'shrine', chest: undefined, party: members, shrine: { shrineId: 's', tile: 4, heroId, members, ...extra } as never });
+
+  it('1人で入った祠: 今までどおり、踏んだ人でない人に覆いを出す', () => {
+    const g = shrine([kai, lilith], 'kai', ['kai']);
+    expect(shrineShared(g)).toBe(false);
+    expect(showTurnLock(g, onlyP2)).toBe(true);
+    expect(showTurnLock(g, onlyP1)).toBe(false);
+  });
+
+  it('2人の別々のプレイヤーが一緒に入った祠: どちらの画面にも覆いを出さない（踏んだのがどちらでも）', () => {
+    for (const first of ['kai', 'lilith']) {
+      const g = shrine([kai, lilith], first, ['kai', 'lilith']);
+      expect(shrineShared(g)).toBe(true);
+      expect(showTurnLock(g, onlyP1)).toBe(false);
+      expect(showTurnLock(g, onlyP2)).toBe(false);
+    }
+  });
+
+  it('祈った後・片方が先に「世界マップへ」を押した後も、覆いを出さない（残った人が出られる）', () => {
+    const prayed = shrine([kai, lilith], 'kai', ['kai', 'lilith'], { result: { optionIndex: 0, text: 'x' }, finished: ['lilith'] });
+    expect(showTurnLock(prayed, onlyP1)).toBe(false);
+    expect(showTurnLock(prayed, onlyP2)).toBe(false);
+  });
+
+  it('1人のプレイヤーが2キャラで入った祠: 今までどおり（ほかの人の画面には覆い）', () => {
+    const g = shrine([kai, kai2, lilith], 'kai', ['kai', 'kai2']);
+    expect(shrineShared(g)).toBe(false);
+    expect(showTurnLock(g, onlyP2)).toBe(true);
+    expect(showTurnLock(g, onlyP1)).toBe(false);
+  });
+
+  it('1台で2人（全員この端末）: 覆いは出ない', () => {
+    expect(showTurnLock(shrine([kai, lilith], 'kai', ['kai', 'lilith']), all)).toBe(false);
+    expect(showTurnLock(shrine([kai, lilith], 'kai', ['kai']), all)).toBe(false);
+  });
+
+  it('祠でない時（宝箱・イベント）は shrineShared は false', () => {
+    expect(shrineShared(state({ heroes: [kai, lilith] }))).toBe(false);
   });
 });

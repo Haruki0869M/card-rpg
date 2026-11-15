@@ -737,14 +737,14 @@ export function ShrineScreen() {
               </div>
               <div className="mt-2 flex flex-col gap-1.5">
                 {def.options.map((o, i) => (
-                  <button key={i} disabled={!isLocalPlayer(game.heroes.find(h => h.id === heroId)!.playerId) || facilityVisit(game)?.finished?.includes(heroId)} onClick={() => dispatchGame({ type: 'SHRINE_CHOOSE', playerId: game.heroes.find(h => h.id === heroId)!.playerId, optionIndex: i, heroId })} className="btn btn-dark min-h-12 rounded-xl px-3 text-left text-[14px] font-bold">
+                  <button key={i} disabled={!isLocalPlayer(game.heroes.find(h => h.id === heroId)!.playerId) || facilityVisit(game)?.finished?.includes(heroId)} onClick={() => dispatchGame({ type: 'SHRINE_CHOOSE', playerId: game.heroes.find(h => h.id === heroId)!.playerId, optionIndex: i, heroId })} className="btn btn-dark min-h-12 rounded-xl px-3 text-left text-[14px] font-bold" data-shrine-option={i}>
                     {o.label}
                   </button>
                 ))}
               </div>
             </>
           )}
-          {s.result && <div className="mt-3 text-center text-[16px] font-bold text-emerald-300">{s.result.text}</div>}
+          {s.result && <div className="mt-3 text-center text-[16px] font-bold text-emerald-300" data-shrine-result>{s.result.text}</div>}
         </div>
       </div>
       <div className="shrink-0 px-3 pt-1 pb-3">
