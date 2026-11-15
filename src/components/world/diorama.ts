@@ -23,6 +23,10 @@ export const TOP_SCALE = 0.93;
 const LEVEL: Record<string, number> = {
   water: 0,
   sea: 0,
+  // 潮の地形（シナリオ3）: 海と同じ高さ（干潟も、満ち潮で水に沈む低い所）
+  reef: 0,
+  tideChannel: 0,
+  tideFlat: 0,
   hills: 2,
   mountain: 2,
   // 段階6a の険しい山（通れない仕切り・盆地の壁）

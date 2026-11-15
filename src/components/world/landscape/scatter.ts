@@ -219,6 +219,16 @@ export function scatter({ w, geom, levels, links, rivers, blocked, stage }: Scat
       if (h(28) < 0.6) out.push({ k: t === 'blight' ? 'deadTree' : 'rock', x: c.x + (h(29) - 0.5) * R * 0.8, y: c.y + (h(30) - 0.4) * R * 0.7 * GROUND_K, h: R * (t === 'blight' ? 0.75 : 0.26), v: h(31), tile: i });
       continue;
     }
+    if (t === 'reef') {
+      // 暗礁: 岩礁の絵を1〜2つ（いつも閉じている。船でも通れない所が分かるように）
+      const n = 1 + (h(161) < 0.5 ? 1 : 0);
+      for (let q = 0; q < n; q++) {
+        const x = c.x + (n === 1 ? 0 : (q - 0.5) * R * 0.6) + (hash01(i * 4 + q, 162) - 0.5) * R * 0.2;
+        const y = c.y + (n === 1 ? 0.15 : q * 0.3 - 0.05) * R * GROUND_K;
+        out.push({ k: 'seaReef', x, y, h: R * (0.44 + hash01(i * 4 + q, 163) * 0.12), v: hash01(i * 4 + q, 164), tile: i });
+      }
+      continue;
+    }
     if (t === 'sea') {
       // 海（2026-11-16 シナリオ3）: 町のそばの海に灯台を1つ、ところどころに岩礁、まれに難破船。見た目だけ
       if (lighthouseTiles.has(i)) {
