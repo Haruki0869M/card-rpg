@@ -1,5 +1,6 @@
 // ===== 世界マップのマスの場面（イベント・宝箱・祠）で、手番でない人の画面に出す覆い =====
-// 2人以上のプレイヤーがいる宝箱（開け役の投票・取り合い）では出さない（showTurnLock）。宝箱の画面が押せる人を出し分ける
+// 2人以上のプレイヤーがいる宝箱（開け役の投票・取り合い）と、2人以上のプレイヤーが一緒に入った祠では出さない（showTurnLock）。
+// 宝箱・祠の画面が、押せる人を出し分ける（祠: 祈るのは先に押した人・「世界マップへ」は各自）
 import { PLAYER_COLOR } from '../../data/theme';
 import { LAYER } from './layers';
 import { isLocalPlayer } from '../../store/battleConfig';
