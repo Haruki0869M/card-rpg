@@ -35,6 +35,20 @@ describe('遊び方・用語集の中身', () => {
     for (const x of ['「装備」「道具」', '成長ボーナス → 自分のカード', '取り合い', '長押し', '約10秒', '読み込み直して']) expect(o, x).toContain(x);
   });
 
+  it('縦の低い画面の 💀×N・🔍・寒さと温泉の札・上の帯の「次: …」と、戦闘の「＋N」を説明している（公開前の点検 B3）', () => {
+    const w = topicOf('world')!.body.join('');
+    for (const x of ['縦の低い画面', 'LINE の中', '畳んでいます', '💀×N', '町・神殿・祠では1行の帯', '🔍', '＋・標準・−', '寒さ・温泉（♨）は短い札', '押すと全文', '上の帯を押す', '「次: …」']) expect(w, x).toContain(x);
+    const b = topicOf('battle')!.body.join('');
+    for (const x of ['「＋N」', '状態の一覧', '長押し']) expect(b, x).toContain(x);
+    expect(GLOSSARY.find((g) => g.term.startsWith('＋N'))?.topic).toBe('battle');
+  });
+
+  it('灯を喰らう影の悪さは「昼の視界」と書き、夜は変わらないと書く（夜はもともと1マス）', () => {
+    const c = topicOf('corruption')!.body.join('');
+    expect(c).not.toContain('昼も夜も');
+    expect(c).toContain('昼の視界−1（夜はもともと1マスなので、ふだんは変わらない）');
+  });
+
   it('用語集の行き先の項目がある', () => {
     for (const g of GLOSSARY) if (g.topic) expect(topicOf(g.topic), g.term).toBeTruthy();
   });

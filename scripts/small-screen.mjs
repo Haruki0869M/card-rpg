@@ -15,9 +15,11 @@
 // 狭い画面の直し 回3（2026-11-15）: 戦闘の状態の印（battleStatusPart。BATTLE_SIZES の大きさ × 敵1/2/3体 × 印0/2/4つ × カードを選んだ時）。
 //   SMALL_SCREEN_PARTS=sheets,battle で通す所を選ぶ（既定は両方）。BATTLE_SIZES の既定は 390x540,360x520,390x844,360x640。
 //   BATTLE_ONLY_MEASURE=1 は数字と写真だけ（直す前の作りで「前」の写真を撮る時。落ちても失敗にしない）。
+// 公開前の点検 B1（2026-11-15）: battle の時は続けて、一覧・長押しの説明を開いたまま戦闘を終える確認（scripts/small-screen-leftover.mjs。URL に ?debug を足して開く）。
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { chromium, startBattle } from './lib.mjs';
 import { edgeChecks, worldMapChecks } from './small-screen-world.mjs';
+import { leftoverChecks } from './small-screen-leftover.mjs';
 // 狭い画面の直し 回2（2026-11-15）: SMALL_SCREEN_PARTS=edges で、地図の端のマス（EDGE_SIZES・EDGE_SEEDS・EDGE_SCENARIOS。EDGE_ONLY_MEASURE=1 で数字だけ）。
 //   4つの大きさ × 2シナリオ × 種で重いので、既定の PARTS には入れない。
 
@@ -736,6 +738,8 @@ try {
     await page.close();
   }
   if (PARTS.has('battle')) await battleStatusPart(browser);
+  // 公開前の点検 B1: 一覧・長押しの説明を開いたまま戦闘が終わっても、結果の画面・ダンジョン・次の戦闘に残らない
+  if (PARTS.has('battle')) await leftoverChecks({ browser, BASE, OUT, check });
 } catch (e) {
   console.log('ERROR', e);
   problems.push(String(e).split('\n')[0]);

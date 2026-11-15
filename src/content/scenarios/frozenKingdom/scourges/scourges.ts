@@ -62,10 +62,10 @@ export const frozenScourges: ScourgeDef[] = [
     short: '影',
     boss: 'scourgeLightEater',
     minions: ['frozenGhoul', 'frostSprite', 'frozenGhoul'],
-    // 悪さ: 昼も夜も視界 −1（最低1マス。見晴らしの塔・見取り図は今のまま働く）
+    // 悪さ: 視界 −1（最低1マス。夜はもともと1マスなので、ふだんは昼だけ狭くなる。見晴らしの塔・見取り図は今のまま働く）
     curse: { visionDown: 1 },
     curseShort: '視界−1',
-    curseText: '昼も夜も、見える広さが1マス狭くなる（最低1マス。見晴らしの塔・見取り図は今までどおり）',
+    curseText: '昼の見える広さが1マス狭くなる（夜はもともと1マスなので、ふだんは変わらない。見晴らしの塔・見取り図は今までどおり）',
     reward: { elixir: 1 },
     // 錫杖。使えるジョブ（転職で届くジョブも）がいないパーティには出ない（scourgeFits）
     gear: 'springbringerScepter',

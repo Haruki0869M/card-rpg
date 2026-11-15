@@ -23,8 +23,8 @@ export async function depart(page, opts = {}) {
  * 新しい冒険を始めて（人数を指定）、世界マップの翠の神殿の入口から入り、最初の部屋で戦闘を始める。
  * enemies を渡すと、最初の部屋の敵をその組み合わせに差し替える（敵1〜4体の確認用）。
  */
-export async function startBattle(page, partySize, enemies, fast = true) {
-  await page.goto(URL);
+export async function startBattle(page, partySize, enemies, fast = true, url = URL) {
+  await page.goto(url);
   await page.evaluate((fast) => {
     localStorage.clear();
     localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: fast, vibration: false, firstGuide: false }));

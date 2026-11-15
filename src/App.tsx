@@ -44,6 +44,7 @@ import { FirstBattleGuide } from './components/battle/FirstBattleGuide';
 import { useDetail } from './hooks/usePress';
 import { useBattle } from './store/battleStore';
 import { useProfile } from './store/profileStore';
+import { watchViewChange } from './components/ui/localWindows';
 
 /** PC向けの補助ショートカット（任意機能） */
 function useKeyboard() {
@@ -226,6 +227,9 @@ export default function App() {
   const helpOpen = useHelp((s) => s.open);
   const loreOpen = useLore((s) => s.open);
   useEffect(() => { if (screen !== 'game') { useDetail.getState().hide(); useLore.getState().close(); } }, [screen]);
+  // 公開前の点検 B1: 戦闘が終わった・別の戦闘になった・画面（勝利・世界マップ・ダンジョンなど）が変わった時は、
+  // この端末だけの窓（状態の一覧・長押しの説明）を閉じる（勝利画面や次の戦闘の始めに残らないように）
+  useEffect(() => watchViewChange(useBattle), []);
   // 伝承の書（K5）: 冒険の状態が変わるたびに、見た物・手に入れた物をこの端末の記録に足す（見るだけ。状態・同期は変えない）
   useEffect(() => {
     useProfile.getState().observe(useBattle.getState().full);

@@ -98,7 +98,8 @@ function curseText(d: ScourgeDef): string {
   const c = d.curse;
   if (c.coldMul) return `寒さで減るHPが${c.coldMul}倍`;
   if (c.buryRoad) return '街道が雪に埋もれる（街道の上のサイコロ+1が無くなる）';
-  if (c.visionDown) return `昼も夜も視界−${c.visionDown}`;
+  // 夜はもともと狭い（visionRange − nightVisionPenalty = 1マス）。視界は最低1マスなので、ふだんの夜は変わらない
+  if (c.visionDown) return `昼の視界−${c.visionDown}（夜はもともと${BALANCE.visionRange - BALANCE.nightVisionPenalty}マスなので、ふだんは変わらない）`;
   return d.curseShort ?? d.name;
 }
 
@@ -199,6 +200,7 @@ export const HELP_TOPICS: HelpTopic[] = [
       `寒さ（寒い地域のシナリオ）: 雪原・氷原・湖の氷など寒いマスに立ったままワールドターンが終わると、HPが少し減ります（奥の地域ほど多い・HPは1で止まる・町は寒くない）。道によって倍率が違います（${frozenLaneColdText()}）。その番に野営したキャラと、温泉で温まったキャラは受けません。`,
       lakeIceText(),
       hotSpringText(),
+      '縦の低い画面（スマホの LINE の中で開いた時など）では、画面を広く使うために一部を畳んでいます。上の帯を押すと、遊び方の一番上に「次: …」（侵食度の次の変化）が読めます。💀×N は災厄の札を畳んだボタンで、押すと説明が開きます（町・神殿・祠では1行の帯）。🔍 は拡大のボタン（＋・標準・−）を畳んだ物で、押すと開き、もう1度 🔍 か地図を押すと閉じます。寒さ・温泉（♨）は短い札になり、押すと全文が出ます。',
     ],
   },
   {
@@ -255,6 +257,7 @@ export const HELP_TOPICS: HelpTopic[] = [
       '「次: 〇〇」が出ている時は、その敵の次の予告まで決まっています（溜め。溜めを BREAK すると、次の大技も消えます）。予告の枠の右上の数字は数え読みで、0になった予告で大技が来ます（数えている間に BREAK すると1つ戻ります）。',
       '属性の攻撃は、完全成功なら必ず状態異常が付きます（氷＝凍結で行動を止める、雷＝痺れで30%失敗、火＝火傷）。カードを選ぶと、予測の所に出ます。',
       'マナを使い切ったら、右下の『ターン終了』。全員が終えると敵の番です（オンラインでは『準備完了』）。',
+      '状態の印が入り切らない時は「＋N」（ほかにNつ）が出ます。押すと、その敵・味方の状態の一覧が開きます。小さい印は1つずつは押せないので、敵・味方を長押しして読みます（長押しの説明にも同じ一覧が出ます）。',
     ],
   },
   {
@@ -382,6 +385,7 @@ export const GLOSSARY: { term: string; text: string; topic?: HelpTopicId }[] = [
   { term: 'ブロック', text: '受けるダメージを先に引き受ける守り。', topic: 'battle' },
   { term: '行動予告', text: '敵の頭の上に出る、次の行動の印。', topic: 'battle' },
   { term: '状態異常', text: '毒・脆弱などの効果。アイコンをタップすると説明が出ます。', topic: 'battle' },
+  { term: '＋N（状態の印）', text: '戦闘で入り切らない状態の印の数。押すと状態の一覧。敵・味方の長押しでも読めます。', topic: 'battle' },
   { term: '応援', text: '良い状態の1つ。付いている間、与えるダメージが増えます。', topic: 'battle' },
   { term: '命の灯火', text: 'パーティ共有のやり直しの回数。', topic: 'lives' },
   { term: '侵食度', text: '世界のむしばまれ具合。100%でゲームオーバー。', topic: 'corruption' },
