@@ -202,11 +202,11 @@ function featureArtInner(t: WorldState['tiles'][number], i: number, geom: MapGeo
       return badge ? <g key={`f${i}`}>{mark}{badge}</g> : mark;
     }
     // 見晴らしの塔（段階6）: 仮のミニチュア。上の面から少し浮かせる
-    if (f.kind === 'tower') return <TowerMini key={`f${i}`} x={x} y={y - R * FACILITY_LIFT} R={R} used={f.used} />;
+    if (f.kind === 'tower') return <TowerMini key={`f${i}`} x={x} y={y - R * FACILITY_LIFT} R={R} used={f.used} tile={i} />;
     const mini: MiniKind | undefined = finale ? 'finale' : f.kind === 'event' || f.kind === 'temple' || f.kind === 'altar' ? f.kind : undefined;
     if (mini) {
       return (
-        <g key={`f${i}`} opacity={used ? 0.45 : 1} data-feature={`${f.kind}:${f.id}`} data-used={used || undefined}>
+        <g key={`f${i}`} opacity={used ? 0.45 : 1} data-feature={`${f.kind}:${f.id}`} data-tile={i} data-used={used || undefined}>
           <PlaceMini kind={mini} x={x} y={y - R * FACILITY_LIFT} R={R} />
         </g>
       );
@@ -216,7 +216,7 @@ function featureArtInner(t: WorldState['tiles'][number], i: number, geom: MapGeo
       // 描いた絵の場所: マスより少し大きく、影をつけて上の面から飛び出させる
       const big = R * (f.kind === 'town' ? 1.75 : f.kind === 'chest' ? 1.25 : 1.55);
       return (
-        <g key={`f${i}`} opacity={used ? 0.4 : 1} data-feature={`${f.kind}:${f.id}`} data-used={used || undefined}>
+        <g key={`f${i}`} opacity={used ? 0.4 : 1} data-feature={`${f.kind}:${f.id}`} data-tile={i} data-used={used || undefined}>
           <ellipse cx={x} cy={y - R * FACILITY_LIFT + big * 0.33} rx={big * 0.42} ry={big * 0.13} fill="rgba(0,0,0,.55)" />
           <image href={img} x={x - big / 2} y={y - R * FACILITY_LIFT - big * 0.62} width={big} height={big} filter="url(#place-shadow)" style={fallen ? { filter: 'grayscale(1) brightness(.6)' } : undefined} />
           {badge}
@@ -233,7 +233,7 @@ function featureMark(kind: string, i: number, x: number, y: number, R: number, u
     const sz = R * 0.95;
     const color = fallen ? '#7a6a7a' : FEATURE_COLOR[kind];
     return (
-      <g key={`f${i}`} opacity={used ? 0.35 : 1} data-feature={`${f.kind}:${f.id}`} data-used={used || undefined}>
+      <g key={`f${i}`} opacity={used ? 0.35 : 1} data-feature={`${f.kind}:${f.id}`} data-tile={i} data-used={used || undefined}>
         <circle cx={x} cy={y} r={sz * 0.62} fill="rgba(0,0,0,.55)" />
         <Icon x={x - sz / 2} y={y - sz / 2} width={sz} height={sz} color={color ?? '#ffd76a'} strokeWidth={2.2} />
       </g>
@@ -856,7 +856,7 @@ export function WorldMap({
 
   return (
     <div ref={wrapRef} className="relative min-h-0 flex-1" style={{ touchAction: 'pan-x pan-y' }}>
-    <div ref={box} className="absolute inset-0 overflow-auto overscroll-contain bg-[#0b0910]" style={{ touchAction: 'pan-x pan-y' }} data-world-map>
+    <div ref={box} className="absolute inset-0 overflow-auto overscroll-contain bg-[#0b0910]" style={{ touchAction: 'pan-x pan-y' }} data-world-map data-cols={w.width} data-rows={w.height}>
       {/* 地図の外（上下の余白）も雲の海（FogSea が余白まで広げる）。下地は雲の色 */}
       {/* 狭い画面 回2: 右にも余白（padR）。雲の海・時間帯の光も余白まで広げる */}
       <div style={{ paddingTop: padY, paddingBottom: padBottom, width: W + padR, background: time === 'night' ? '#20233c' : '#53587a' }} data-map-pad>
@@ -1065,6 +1065,7 @@ export function WorldMap({
               key={wd.id}
               className="pointer-events-none absolute"
               data-wanderer={wd.id}
+              data-tile={wd.tile}
               data-rare={wd.rare ? 'true' : undefined}
               data-scourge={wd.scourge}
               style={{ left: x - s / 2, top: y - s * 0.72, width: s, height: s, zIndex: depthZ(rowOf(dims, wd.tile), 0) }}
@@ -1162,6 +1163,7 @@ export function WorldMap({
                 key={id}
                 data-hero={id}
                 data-tile={tile}
+                data-seat={h.playerId}
                 data-active={active ? '' : undefined}
                 className="pointer-events-none absolute"
                 style={{

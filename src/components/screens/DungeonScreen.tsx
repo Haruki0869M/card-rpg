@@ -34,12 +34,14 @@ import {
   DEPTH_TIER_NAME,
   dungeonRows,
   isLegacyLayout,
+  needsVote,
   notVoted,
   partyGold,
   posOf,
   reachableRooms,
   retreatLoss,
   voters,
+  votesFor,
   walkableKeys,
   activeCells,
   mapKnowledge,
@@ -114,6 +116,8 @@ function DoorButtons({ game, choices, ok, canPin, pins, onOpen }: {
         const chill = chillDoorNote(run, room);
         const roomPins = pins.at({ kind: 'door', id: room.id });
         const cmd = { type: 'ENTER_ROOM', playerId: LOCAL_PLAYER, roomId: room.id } as const;
+        // 自動の確認用の見えない印: この端末の人がこの扉に票を入れているか（票の印 VoteChips と同じ数え方）
+        const myVote = needsVote(game, cmd) && votesFor(game, cmd).some((p) => isLocalPlayer(p));
         return (
           <div key={room.id} className="relative flex">
             <button
@@ -123,6 +127,7 @@ function DoorButtons({ game, choices, ok, canPin, pins, onOpen }: {
               className="btn flex min-h-14 w-full min-w-0 flex-col items-center justify-center rounded-xl border-2 bg-black/75 px-1 py-1 text-amber-50 backdrop-blur-[2px] disabled:opacity-45"
               style={{ borderColor: roomPins.length ? PLAYER_COLOR[roomPins[0].seat] : look.color, boxShadow: `0 0 10px ${look.color}` }}
               data-door-choice={room.id}
+              data-my-vote={myVote ? 1 : undefined}
               data-door-omen={doorKind(room) === 'door' ? (omenOfType(room.type) ?? '') : doorKind(room)}
               data-door-sealed={getRoomType(room.type).sealedChest || undefined}
             >
@@ -459,7 +464,7 @@ export function DungeonScreen() {
     <Screen>
       {/* 名前は上の場面のタブに出ているので、タブが無い時だけ出す（帯は1本にまとめた） */}
       {!hasTabs && <div className="font-display text-outline shrink-0 truncate px-2 pt-1 text-[17px] leading-6 text-amber-100">{run.name}</div>}
-      <div className="relative min-h-[200px] flex-1 overflow-hidden border-y border-amber-500/30">
+      <div className="relative min-h-[200px] flex-1 overflow-hidden border-y border-amber-500/30" data-dungeon={run.dungeonId}>
         {/* 一人称の通路（いつも前を向く） */}
         <AnimatedDungeonView run={runN} background={background} doors={doors} onShown={setShown} onDoor={tapDoor} />
         {/* 左上: メニュー・探索度・お金（帯を1本にまとめた）と、部屋の中なら部屋の種類 */}

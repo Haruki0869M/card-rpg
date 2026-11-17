@@ -125,6 +125,8 @@ export function BottomBar() {
         onClick={() => endTurn()}
         disabled={battle.phase !== 'ally'}
         className={`btn ${allDone ? 'btn-gold' : 'btn-dark'} font-display relative h-12 w-[116px] shrink-0 rounded-xl text-[16px]`}
+        // 自動の確認用の見えない印: ボタンの字と同じ分け方（end = ターン終了・ready = 準備完了・waiting = 準備完了を押して待っている・enemy = 敵の行動中）
+        data-end-turn={battle.phase === 'enemy' ? 'enemy' : iAmReady ? 'waiting' : battle.readyCheck ? 'ready' : 'end'}
       >
         {allDone && <span className="glow-pulse pointer-events-none absolute -inset-1.5 rounded-2xl border-2 border-amber-300" />}
         {battle.phase === 'enemy' ? '敵の行動中' : iAmReady ? (

@@ -56,7 +56,7 @@ export function VoteChips({ cmd }: { cmd: GameCommand }) {
   const who = votesFor(game, cmd);
   if (!who.length) return null;
   return (
-    <span className="ml-1 inline-flex gap-0.5 align-middle" aria-label={`${who.join('・')}が選択`}>
+    <span className="ml-1 inline-flex gap-0.5 align-middle" aria-label={`${who.join('・')}が選択`} data-vote-seats={who.join(',')}>
       {who.map((p) => (
         <span key={p} className="rounded px-1 text-[12px] leading-4 font-bold text-black" style={{ background: PLAYER_COLOR[p] }}>
           {p}

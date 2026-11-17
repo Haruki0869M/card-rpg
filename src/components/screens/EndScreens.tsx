@@ -100,7 +100,7 @@ export function GameOverScreen() {
   const abandon = useBattle((s) => s.abandonGame);
   return (
     <Screen>
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-5">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-5" data-gameover={game.world && game.world.corruption >= 100 ? 'corruption' : 'wipe'}>
         <Skull size={56} className="text-red-400" />
         <div className="font-display text-[38px] leading-[46px] text-red-300" style={{ filter: 'drop-shadow(0 2px 0 rgba(0,0,0,.8))' }}>
           {game.world && game.world.corruption >= 100 ? '世界の終わり…' : '全滅…'}

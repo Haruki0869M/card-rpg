@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { BottomBar, TopBar } from './components/battle/Bars';
 import { ConfirmDialog } from './components/ui/ConfirmDialog';
 import { Battlefield } from './components/battle/Battlefield';
@@ -188,6 +188,29 @@ function CurrentScreen() {
   }
 }
 
+/**
+ * 自動の確認（賢い検証 bot）用の見えない印（A1）: いちばん外に、今の画面（data-screen）・冒険の場面の種類（data-mode）・見ている場面（data-scene）。
+ * 描き直しを増やさないように、React の描画を通さず、ストアの変化を聞いて属性だけ書き換える（見た目・動きは変わらない）
+ */
+function useScreenMarks(ref: RefObject<HTMLDivElement | null>) {
+  useLayoutEffect(() => {
+    const mark = (el: HTMLElement, name: string, v: string | undefined) => {
+      if (v === undefined) el.removeAttribute(name);
+      else if (el.getAttribute(name) !== v) el.setAttribute(name, v);
+    };
+    const put = (s: ReturnType<typeof useBattle.getState>) => {
+      const el = ref.current;
+      if (!el) return;
+      const game = s.screen === 'game' ? s.game : null;
+      mark(el, 'data-screen', s.screen);
+      mark(el, 'data-mode', game?.mode);
+      mark(el, 'data-scene', game ? s.scene : undefined);
+    };
+    put(useBattle.getState());
+    return useBattle.subscribe(put);
+  }, [ref]);
+}
+
 /** 画面下に出る短いお知らせ（操作は止めない） */
 function Toast() {
   const toast = useBattle((s) => s.toast);
@@ -208,6 +231,7 @@ function Toast() {
           exit={{ opacity: 0 }}
           style={{ zIndex: LAYER.toast }}
           className="pointer-events-none absolute inset-x-4 bottom-24 rounded-xl border border-amber-300/50 bg-black/90 px-3 py-2 text-center text-[14px] text-amber-50"
+          data-toast
         >
           {toast.text}
         </motion.div>
@@ -251,6 +275,9 @@ export default function App() {
   useAppHeight();
   // 狭い画面 回0: 見えている高さが 640px 未満（672px 以上で戻る）の時は、いちばん外に data-low の印（低い画面の形に切り替える）
   const low = useLowScreen();
+  // 自動の確認用の見えない印（画面の種類・場面）。描き直しは増やさない
+  const rootRef = useRef<HTMLDivElement>(null);
+  useScreenMarks(rootRef);
 
   // 招待のリンク（?room=合言葉）で開いたら「部屋に参加」へ
   useEffect(() => {
@@ -274,7 +301,7 @@ export default function App() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="flex w-full justify-center bg-[#050407]" style={{ height: 'var(--app-h, 100dvh)' }} data-app-root data-low={low ? '' : undefined}>
+      <div ref={rootRef} className="flex w-full justify-center bg-[#050407]" style={{ height: 'var(--app-h, 100dvh)' }} data-app-root data-low={low ? '' : undefined}>
         <div className="relative flex h-full w-full max-w-[480px] flex-col overflow-hidden">
           {!moving && screen === 'game' && <SceneTabs />}
           <div className="relative flex min-h-0 w-full flex-1 justify-center">
