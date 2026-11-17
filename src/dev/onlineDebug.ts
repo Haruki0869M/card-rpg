@@ -1,7 +1,8 @@
 // ===== オンライン協力の確認用（エミュレーターにつないだ時だけ読み込む: URL に ?emu=1） =====
 // Playwright から window.__online を使って、自動プレイの操作を画面と同じ道（ストア）で送る。
 import { botNextCommand } from '../engine/bot';
-import { stateHash } from '../engine';
+import { moveIntoRoom, stateHash } from '../engine';
+import type { GameState } from '../types';
 import { useBattle } from '../store/battleStore';
 import { useOnline } from '../store/onlineStore';
 import type { GameCommand } from '../types';
@@ -55,6 +56,21 @@ const api = {
   openSheet: (name: string) => useBattle.getState().openSheet(name as Parameters<ReturnType<typeof useBattle.getState>['openSheet']>[0]),
   /** 確認用: この端末が持っている冒険の状態（1台で遊ぶ時も。回3） */
   full: () => structuredClone(useBattle.getState().full ?? null),
+  /**
+   * 確認用（2026-11-16 漂流物の山の2台の確認）: ダンジョンの場面 expeditions[index] を、type の部屋の扉の前まで進めた写しを返す
+   * （その部屋より前の行は片づけ済みにし、つながっている前の行の部屋に立つ）。差し込むのは inject で
+   */
+  beforeRoom: (game: unknown, index: number, type: string) => {
+    const g = structuredClone(game) as GameState;
+    const run = g.expeditions?.[index]?.dungeon;
+    const room = run?.rooms.find((r) => r.type === type);
+    const parent = room && run!.rooms.find((r) => r.next.includes(room.id));
+    if (!run || !room || !parent) return null;
+    for (const r of run.rooms) if (r.row <= parent.row) r.cleared = true;
+    run.currentRoomId = parent.id;
+    moveIntoRoom(run, parent.id);
+    return g;
+  },
   /** 部屋のピン（確認用） */
   pins: () => structuredClone(useOnline.getState().room?.pins ?? {}),
 };

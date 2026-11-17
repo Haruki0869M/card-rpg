@@ -98,6 +98,7 @@ import { EXPEDITION_MODES, findExpedition, mount, restoreSceneFields, saveSceneF
 import { addFeat, announceJobs, changeJob, pickJobCard } from './jobs';
 import { addPetActs, addPetLove, adoptPet, patPet } from './pets';
 import { doCardTask, peddlerBuy } from './tasks';
+import { pickFlotsam } from './flotsam';
 import { cardRewardOdds, chestOdds, newItem, rollCardOffers, rollChestContents, rollConsumable, rollEquipment, rollExclusive, rollGrade } from './loot';
 
 export const GAME_VERSION = STATE_VERSION;
@@ -417,12 +418,14 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
       case 'ADOPT_PET':
       case 'PET_PAT':
       case 'CARD_TASK':
-      case 'PEDDLER_BUY': {
+      case 'PEDDLER_BUY':
+      case 'FLOTSAM_PICK': {
         const h = findHero(game, cmd.heroId);
         if (!h || !ownedBy(h, cmd.playerId)) error = '担当していないキャラです';
         else if (cmd.type === 'ADOPT_PET') error = adoptPet(game, h, cmd.petId, cmd.color, cmd.name);
         else if (cmd.type === 'PET_PAT') error = patPet(game, h);
         else if (cmd.type === 'CARD_TASK') error = doCardTask(game, h, cmd.cardUid, rng, cmd.altar);
+        else if (cmd.type === 'FLOTSAM_PICK') error = pickFlotsam(game, h, cmd.index);
         else error = peddlerBuy(game, h, cmd.kind, cmd.index);
         break;
       }

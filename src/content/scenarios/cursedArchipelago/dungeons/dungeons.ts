@@ -1,11 +1,10 @@
 // シナリオ3のダンジョン。
 // 制覇すると鍵（灯）が手に入り、3つそろうと最終ダンジョンに入れる。ボスの手前に「物語の部屋」（event）を置く
 import type { DungeonDef } from '../../../../types';
-import { keyLayout2 } from '../../../common/dungeonLayouts';
 // 2026-11-16 シナリオ3の作り直し（docs/tasks/scenario3-rework-plan.md §3-4・最後の「憲章の点検の後の直し」B1・B2）:
-// 4か所のうち3か所は型（src/content/common/dungeonLayouts.ts）の写しをやめ、このシナリオだけの形をファイルに直接書いた（シナリオ1・2と同じ）。
+// 4か所とも型（src/content/common/dungeonLayouts.ts）の写しをやめ、このシナリオだけの形をファイルに直接書いた（シナリオ1・2と同じ）。
 // 並びの決まりは src/engine/__tests__/dungeonShape.test.ts と cursedArchipelago.test.ts（ボスの1つ前は物語の部屋）。
-// 海賊の隠れ島だけは、決まりと両立しなかったので保留（前の型のまま。下の pirateIsland）。
+// 海賊の隠れ島は、計画の形が「封魔の宝箱は4行目から」と両立しなかったので、オーナーの返事（案ア）で封魔の宝箱を4行目にずらした。
 // 道中のイベントは、シナリオの中で1か所ずつ（前は「小舟の商人」を沈んだ神殿と王冠号の2か所で使っていた。「霧の中の歌声」を王冠号へ移した）。
 
 // 敵の組（K4 手順2）。弱点が同じ敵だけの組にならないようにする（海の生き物は雷、幽霊は聖に弱い）
@@ -89,10 +88,36 @@ export const pirateIsland: DungeonDef = {
   // 1つ目のダンジョンの鍵が要る（play-feedback-plan §4 C: 町や依頼を飛ばして、まっすぐ奥へ行けないように）
   requiresKeys: ['lightStar'],
   clearStory: ['海賊船長ガルドが、剣を落とした。', '「…灯台を、頼む」', '月の灯を手に入れた！'],
-  // 2026-11-16 作り直し保留（まとめ役の判断待ち）: 計画 §3-4 ②「隠し通路」（点検 B1 の入れ替え後）は、3行目の封魔の宝箱が
-  // 「封魔の宝箱は4行目から」の決まり（BALANCE.sealedChest.fromRow・overhaulStage3.test.ts）と両立しなかった。
-  // 決まりも計画の形も曲げずに止め、今は前の並び（2つ目の鍵の型）のまま。dungeonShape.test.ts の REWORK_PENDING に入れてある
-  layout: keyLayout2({ first: 'pirateStash', second: 'castawayCamp', story: 'captainCabin' }),
+  // 形「隠し通路」（2026-11-16 オーナーの返事 2回目 1A = 案ア）: 右の扉（海賊の隠し財産）→ 見張りの強敵 → 奥の封魔の宝箱（財宝の番人）→ 出口の戦闘、の細い隠し通路。
+  // 真ん中 = 宝箱（レア）から戦闘か休憩へ、左 = 見張りの強敵から戦闘か休憩へ。封魔の宝箱は「4行目から」の決まり（BALANCE.sealedChest.fromRow）に合わせて4行目に置いた。
+  // どの道でも、ふつうの戦闘は3〜4回（1行目・7行目と、3行目か5行目）。強敵を通らない道 = 宝箱 → 休憩 → 封魔の宝箱 → 戦闘 → 休憩 → 戦闘
+  layout: [
+    [{ type: 'battle', next: [0, 1, 2] }],
+    [
+      { type: 'elite', next: [0, 1] },
+      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0, 1] },
+      { type: 'event', eventId: 'pirateStash', next: [2] },
+    ],
+    [
+      { type: 'battle', next: [0, 1] },
+      { type: 'rest', next: [2] },
+      { type: 'elite', next: [2] },
+    ],
+    [
+      { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0, 1] },
+      { type: 'event', eventId: 'castawayCamp', next: [0, 1] },
+      // 封魔の宝箱（決まった部屋。格はエンジンが奥の行で決める物と同じ: 10行目より前はエピック）
+      { type: 'sealedChest', chest: { rarity: 'epic', locked: false, sealed: true }, next: [0] },
+    ],
+    [
+      { type: 'battle', next: [0] },
+      { type: 'elite', next: [0] },
+    ],
+    [{ type: 'rest', next: [0] }],
+    [{ type: 'battle', next: [0] }],
+    [{ type: 'event', eventId: 'captainCabin', next: [0] }],
+    [{ type: 'boss', next: [] }],
+  ],
 };
 
 export const sunkenTemple: DungeonDef = {

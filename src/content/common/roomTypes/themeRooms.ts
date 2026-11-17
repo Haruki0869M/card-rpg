@@ -43,4 +43,18 @@ export const roomTypes: RoomTypeDef[] = [
     omenName: '氷漬けの箱',
     omenText: '凍えているほど良い箱',
   },
+  // 漂流物の山（漂流物の洞。2026-11-16 シナリオ3の作り直し・計画 §3-3 と点検 B4）: 全員が、それぞれ消耗品を3つから1つ選ぶ（engine/game/flotsam.ts）。
+  // 並びのデータには書かない（テーマが4行目に1部屋置く）。扉の予兆は金（宝）なので、3行目に宝箱は出ない（今の偏り防止の決まりのまま）
+  {
+    id: 'flotsamPile',
+    order: 5.5,
+    name: '漂流物の山',
+    icon: 'gift',
+    color: '#9fe0c8',
+    bg: '#0c2a26',
+    behavior: 'flotsam',
+    omen: 'treasure',
+    omenName: '漂流物の山',
+    omenText: '全員が消耗品を3つから1つ',
+  },
 ];

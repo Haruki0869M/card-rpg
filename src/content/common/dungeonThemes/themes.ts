@@ -63,4 +63,18 @@ export const dungeonThemes: DungeonThemeDef[] = [
       ],
     },
   },
+  // 2026-11-16 シナリオ3の作り直し（docs/tasks/scenario3-rework-plan.md §3-3・「憲章の点検の後の直し」B4・オーナーの OK）: シナリオ3だけのテーマ。
+  // 役割: 使い所に悩む強い消耗品を、選んで持ち帰る洞。2〜3行目はイベントと宝箱がやや多い（割合は計画の数字のまま）。
+  // 奥の漂流物の山で、全員がそれぞれ消耗品を3つから1つ選ぶ（1つはエピック以上）。古い保存のテーマ決めと、ほかのシナリオの乱数の順番を変えないよう、データの最後に置く
+  {
+    id: 'flotsamCave',
+    order: 5,
+    name: '漂流物の洞',
+    mark: '🛶',
+    description: 'イベントと宝箱がやや多い。奥の漂流物の山で、全員がそれぞれ強い消耗品を3つから1つ選べる（1つはエピック以上）',
+    weights: { battle: 25, elite: 15, event: 30, chest: 15, rest: 15 },
+    fixedRoom: 'flotsamPile',
+    scenario: 'cursedArchipelago',
+    flotsam: { choices: 3, epicSlots: 1 },
+  },
 ];

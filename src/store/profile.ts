@@ -255,6 +255,8 @@ export function collectSightings(game: GameState, isMine: (p: PlayerId) => boole
       s.items.seen.push(...h.peddler.items.map((x) => x.item.itemId));
       s.cards.seen.push(...h.peddler.cards.map((x) => x.cardId));
     }
+    // 漂流物の山の候補（2026-11-16）も「見た」品
+    if (h.flotsam) s.items.seen.push(...h.flotsam);
   }
   // 戦闘・報酬・宝箱は、世界マップ側と、ダンジョンの場面（expeditions）の両方を見る
   const scenes = [game, ...(game.expeditions ?? [])];

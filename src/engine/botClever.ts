@@ -23,6 +23,7 @@ import { jobOptions } from './game/jobs';
 import { livingHeroes } from './game/heroes';
 import { rarityIndex } from './game/dungeon';
 import { getItem } from '../data/items';
+import { pouchOverflow } from './game/common';
 
 /** 工夫する bot の覚え（BotMemo に入れる） */
 export interface CleverMemo {
@@ -155,6 +156,21 @@ export function cardTaskCommand(heroes: Hero[]): GameCommand | undefined {
     const low = [...h.deck].sort((a, b) => cardWorth(h, a.uid) - cardWorth(h, b.uid))[0];
     if (task === 'remove' && h.deck.length <= BALANCE.minDeckSize) return { type: 'CARD_TASK', playerId: h.playerId, heroId: h.id };
     return { type: 'CARD_TASK', playerId: h.playerId, heroId: h.id, cardUid: low?.uid };
+  }
+  return undefined;
+}
+
+/**
+ * 漂流物の山（漂流物の洞。2026-11-16）の候補が残っているキャラがいれば、その操作（どの bot も選ぶ）。
+ * 格がいちばん高い品（同じ格なら左）。袋に入らずお金に換わる品は後回し
+ */
+export function flotsamCommand(heroes: Hero[]): GameCommand | undefined {
+  for (const h of heroes) {
+    const offer = h.flotsam;
+    if (!offer?.length) continue;
+    const worth = (id: string) => rarityIndex(getItem(id).rarity) * 10 - (pouchOverflow(h, id) ? 100 : 0);
+    const index = offer.reduce((best, id, i) => (worth(id) > worth(offer[best]) ? i : best), 0);
+    return { type: 'FLOTSAM_PICK', playerId: h.playerId, heroId: h.id, index };
   }
   return undefined;
 }

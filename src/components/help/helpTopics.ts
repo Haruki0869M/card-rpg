@@ -87,6 +87,13 @@ function frozenVaultText(): string {
   return `${scenarioName(FROZEN)}だけのテーマ: ${th.mark}${th.name}。部屋に入るたびに凍えが1つ積もり、その場の全員のHPが「凍え×${c.hpPercent}%」減ります（HPは1で止まる）。焚き火（休憩の部屋）に入ると凍えは0。奥の氷漬けの箱は、凍えているほど良い箱です（${grades}）。温まるか、凍えたまま奥へ急ぐかを選びます。`;
 }
 
+/** 漂流物の洞（シナリオ3だけのテーマ。2026-11-16） */
+function flotsamCaveText(): string {
+  const th = DUNGEON_THEMES.get('flotsamCave');
+  const f = th.flotsam!;
+  return `${scenarioName(th.scenario!)}だけのテーマ: ${th.mark}${th.name}。イベントと宝箱がやや多く、奥の「漂流物の山」で、全員がそれぞれ消耗品を${f.choices}つから1つ選べます（${f.epicSlots}つはエピック以上）。選ぶのは自分の分だけで、ほかの人を待ちません。袋がいっぱいの時は、選んだ品はお金に換わります。`;
+}
+
 /** シナリオ2だけの災厄（シナリオ1の地図に無い物） */
 function frozenScourges(): ScourgeDef[] {
   const first = new Set(getScenario('corruptionKing').map?.scourges ?? []);
@@ -235,6 +242,7 @@ export const HELP_TOPICS: HelpTopic[] = [
       `ランダムダンジョン（寄り道）: 全5行の短いダンジョンです。最奥の主を倒すと必ず黄金箱が開き、${BALANCE.randomDungeon.exclusiveChance >= 100 ? '必ず' : `${BALANCE.randomDungeon.exclusiveChance}%で`}「専用」の装備（ここと闇商人でしか手に入らない）も1つ出ます。1か所1回だけで、制覇すると踏破済みになり、侵食度が${BALANCE.corruptionOnRandomDungeonClear}%下がります（負けた時は入り直せます）。`,
       'どのシナリオでも出るテーマは3つ: 💎古代の晶洞（イベントと宝箱が多い・晶石の祭壇でカードを強化か変異を2回）／⛓封魔の地下迷宮（強敵と封魔の宝箱が多い・敵Lv+1・エピックが2倍出やすい）／🗡無法者の隠れ処（戦闘が多い・闇商人が専用の装備を2つ並べ、1つ選んで買える）。',
       frozenVaultText(),
+      flotsamCaveText(),
       '最奥の主を倒すと: 黄金箱の秘宝を3つから1つ選べる（2人以上はみんなで決める）・👁見破り（次に挑む鍵のダンジョンのボスの大技と開幕の一手が、完全成功だけで崩せる）・帰りに「抜け道」を選ぶと、次の目的地の近くに出られる。',
     ],
   },

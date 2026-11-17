@@ -42,7 +42,7 @@ import {
   sealStep,
   dungeonEnemyLevel,
 } from './index';
-import { cardTaskCommand, cleverBattleCommand, cleverDetour, effectiveLevel, jobCommand, newCleverMemo, noteEncounter, restKind, cleverUses, type CleverMemo, type CleverPart } from './botClever';
+import { cardTaskCommand, flotsamCommand, cleverBattleCommand, cleverDetour, effectiveLevel, jobCommand, newCleverMemo, noteEncounter, restKind, cleverUses, type CleverMemo, type CleverPart } from './botClever';
 import { isRandomDungeonTile } from './game/world/randomDungeons';
 import {
   hurtLine,
@@ -540,6 +540,11 @@ export function botStep(g: GameState, log: BotLog, memo: BotMemo, inScene = fals
     }
     case 'dungeon': {
       const run = g.dungeon!;
+      // 漂流物の山（漂流物の洞の4行目。2026-11-16）: 候補が残っているキャラは、どの bot も1つ選ぶ（候補が無ければ何もしない）
+      {
+        const cmd = flotsamCommand(livingHeroes(g).filter((x) => !g.party || g.party.includes(x.id)));
+        if (cmd) return send(g, cmd, log);
+      }
       // 工夫する bot: 休憩で「技を磨く」を選んだ後などの、カードを1枚選ぶ作業
       if (memo.clever) {
         const cmd = cardTaskCommand(livingHeroes(g).filter((x) => !g.party || g.party.includes(x.id)));
