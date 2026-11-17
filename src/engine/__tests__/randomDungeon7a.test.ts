@@ -110,16 +110,15 @@ describe('段階7a: 世界マップのランダムダンジョン', () => {
       expect(tiles, sc).toHaveLength(2);
       const themes = tiles.map((i) => g.world!.tiles[i].f!.theme);
       expect(new Set(themes).size).toBe(2);
-      // シナリオ2は、シナリオ2だけのテーマ（氷漬けの宝物庫）も候補
-      expect(themes.every((x) => [...THEMES, ...(sc === 'frozenKingdom' ? ['frozenVault'] : [])].includes(x!))).toBe(true);
+      // シナリオ2は氷漬けの宝物庫、シナリオ3は漂流物の洞（そのシナリオだけのテーマ）も候補
+      expect(themes.every((x) => [...THEMES, ...(sc === 'frozenKingdom' ? ['frozenVault'] : sc === 'cursedArchipelago' ? ['flotsamCave'] : [])].includes(x!))).toBe(true);
       expect(randomTiles(newGame(sc, seed)).map((i) => newGame(sc, seed).world!.tiles[i].f!.theme)).toEqual(themes);
     }
     for (const sc of ['sandDynasty', 'clockworkEmpire', 'starCastle', 'dreamLabyrinth']) {
       const g = newGame(sc, 3);
       const tiles = randomTiles(g);
       expect(tiles, sc).toHaveLength(1);
-      // シナリオ3は、シナリオ3だけのテーマ（漂流物の洞。2026-11-16）も候補
-      expect([...THEMES, ...(sc === 'cursedArchipelago' ? ['flotsamCave'] : [])]).toContain(g.world!.tiles[tiles[0]].f!.theme);
+      expect([...THEMES]).toContain(g.world!.tiles[tiles[0]].f!.theme);
     }
   });
 
