@@ -94,6 +94,7 @@ export function WorldTopBar({ game, goldHeroId, goalLine, scourgeInParty }: { ga
         className="btn flex min-h-11 min-w-0 flex-1 flex-col justify-center rounded-lg bg-black/30 px-1.5 py-0.5 text-left"
         aria-label={`${cName}の説明`}
         data-help-open="corruption"
+        data-corruption={corruptionShown(w.corruption)}
       >
         <span className="flex items-center justify-between text-[12px] leading-4">
           <span className="font-display whitespace-nowrap text-fuchsia-200">{cName}</span>
@@ -122,7 +123,7 @@ export function WorldTopBar({ game, goldHeroId, goalLine, scourgeInParty }: { ga
           {game.heroes.find((h) => h.id === (goldHeroId ?? game.world?.turn))?.gold ?? 0}G
         </span>
       </button>
-      <div className="flex shrink-0 flex-col items-center text-[12px] leading-4">
+      <div className="flex shrink-0 flex-col items-center text-[12px] leading-4" data-time={time}>
         <span className="flex items-center gap-0.5 font-bold text-sky-100">
           <TimeIcon size={14} className={time === 'night' ? 'text-indigo-300' : 'text-amber-300'} />
           {dayOf(w.worldTurn)}日目{TIME_NAME[time]}
@@ -188,11 +189,11 @@ function MoveProposal({ game }: { game: GameState }) {
                 </span>
               ))}
             </span>
-            <button onClick={() => answerOf(mineToAnswer[0])(false)} className="btn btn-dark flex h-11 shrink-0 flex-col items-center justify-center rounded-lg px-1.5 text-[12px] leading-4 font-bold">
+            <button onClick={() => answerOf(mineToAnswer[0])(false)} className="btn btn-dark flex h-11 shrink-0 flex-col items-center justify-center rounded-lg px-1.5 text-[12px] leading-4 font-bold" data-move-agree="no">
               <span>{mineToAnswer[0]}:</span>
               <span>同行をやめる</span>
             </button>
-            <button onClick={() => answerOf(mineToAnswer[0])(true)} className="btn btn-gold flex h-11 shrink-0 flex-col items-center justify-center rounded-lg px-1.5 text-[13px] leading-4 font-bold">
+            <button onClick={() => answerOf(mineToAnswer[0])(true)} className="btn btn-gold flex h-11 shrink-0 flex-col items-center justify-center rounded-lg px-1.5 text-[13px] leading-4 font-bold" data-move-agree="yes">
               <span>{mineToAnswer[0]}:</span>
               <span>一緒に行く</span>
             </button>
@@ -208,10 +209,10 @@ function MoveProposal({ game }: { game: GameState }) {
             <div className="mt-1 flex flex-wrap items-center gap-1">{ownerChips}</div>
             {mineToAnswer.map((p) => (
               <div key={p} className="mt-1 grid grid-cols-2 gap-1.5">
-                <button onClick={() => answerOf(p)(false)} className="btn btn-dark h-11 rounded-lg text-[12px] font-bold">
+                <button onClick={() => answerOf(p)(false)} className="btn btn-dark h-11 rounded-lg text-[12px] font-bold" data-move-agree="no">
                   {p}: 同行をやめる
                 </button>
-                <button onClick={() => answerOf(p)(true)} className="btn btn-gold h-11 rounded-lg text-[13px] font-bold">
+                <button onClick={() => answerOf(p)(true)} className="btn btn-gold h-11 rounded-lg text-[13px] font-bold" data-move-agree="yes">
                   {p}: 一緒に行く
                 </button>
               </div>
@@ -243,10 +244,10 @@ function MoveProposal({ game }: { game: GameState }) {
         const answer = (accept: boolean) => dispatchGame({ type: 'WORLD_MOVE_AGREE', playerId: p as PlayerId, heroId, accept });
         return (
         <div key={p} className="mt-1.5 grid grid-cols-2 gap-1.5">
-          <button onClick={() => answer(false)} className="btn btn-dark h-11 rounded-lg text-[13px] font-bold">
+          <button onClick={() => answer(false)} className="btn btn-dark h-11 rounded-lg text-[13px] font-bold" data-move-agree="no">
             {p}: 同行をやめる
           </button>
-          <button onClick={() => answer(true)} className="btn btn-gold h-11 rounded-lg text-[14px] font-bold">
+          <button onClick={() => answer(true)} className="btn btn-gold h-11 rounded-lg text-[14px] font-bold" data-move-agree="yes">
             {p}: 一緒に行く
           </button>
         </div>
@@ -477,6 +478,14 @@ function interactLabel(game: GameState, tile: number): string | undefined {
   return { shrine: '祠で祈る', event: '調べる', landmark: '調べる', chest: '宝箱を開ける', tower: '見晴らしの塔に登る' }[f.kind];
 }
 
+/** 自動の確認用の見えない印: 「入る」ボタンが何に入るか（施設の種類と id。出現スポットは spawn と種類）。interactLabel と同じ物を見る */
+function interactTarget(game: GameState, tile: number): { kind: string; id: string } | undefined {
+  const f = game.world!.tiles[tile].f;
+  if (f) return { kind: f.kind, id: f.id };
+  const sp = spawnAt(game.world!, tile);
+  return sp ? { kind: 'spawn', id: sp.kind } : undefined;
+}
+
 export function WorldScreen({ movement }: { movement?: WorldMovePresentation } = {}) {
   const storeGame = useBattle((s) => s.game)!;
   // 移動の演出中は、移動を押す前の状態（視界・敵・手番・パネル）を見せ続ける。
@@ -578,6 +587,7 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
     if (isLocalPlayer(c.playerId) && !isOnlinePlay()) dispatchGame({ type: 'WORLD_INVITE_ANSWER', playerId: c.playerId, heroId: c.id, accept: true });
   };
   const label = interactLabel(game, here);
+  const target = label ? interactTarget(game, here) : undefined;
   const chance = statChance(hero, 'agi', 'move');
   // 広い地図では、街道の上で振ると +1（段階6a。エンジンの rollMove と同じ足し方）
   const roadBonus = terrainDiceBonus(game, w, here);
@@ -883,6 +893,8 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
                     disabled={!mine || st !== 'no'}
                     onClick={() => invite(c)}
                     aria-label={`${c.name}を誘う`}
+                    data-companion={c.id}
+                    data-invite={st}
                     className={`btn relative flex h-11 min-w-11 shrink-0 items-center gap-1 rounded-full border-2 px-1 disabled:opacity-100 ${st === 'yes' ? 'sel-on' : 'border-sky-300/50 bg-black/30'}`}
                   >
                     <HeroFace hero={c} size={30} dim={st !== 'yes'} />
@@ -896,6 +908,7 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
                   key={c.id}
                   onClick={() => setWithMe({ ...withMe, [c.id]: !on })}
                   aria-label={`${c.name}を${on ? '残す' : '連れて行く'}`}
+                  data-companion={c.id}
                   className={`btn relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 ${on ? 'sel-on' : 'border-white/10 bg-black/30'}`}
                 >
                   <HeroFace hero={c} size={34} dim={!on} />
@@ -933,6 +946,8 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
               }}
               className="btn btn-dark font-display mt-1.5 flex min-h-12 w-full items-center justify-center gap-1.5 rounded-xl px-2 text-[16px] leading-5 text-amber-100 shadow-[0_0_12px_rgba(255,200,90,.35)] low:mt-1 low:min-h-11"
               data-interact
+              data-interact-kind={target?.kind}
+              data-interact-id={target?.id}
             >
               {label}
             </button>

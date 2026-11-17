@@ -58,6 +58,8 @@ export function SceneTabs() {
             role="tab"
             aria-selected={on}
             onClick={() => setScene(t.id)}
+            data-scene-tab={t.id}
+            data-scene-need={need ? '' : undefined}
             className={`btn relative flex h-11 min-w-0 flex-1 items-center gap-1 rounded-t-xl border-x border-t px-1.5 text-[12px] font-bold ${on ? 'border-amber-300/80 bg-gradient-to-b from-[#3a3258] to-[#1c1830] text-amber-50 shadow-[0_-2px_10px_rgba(255,200,90,.25)]' : 'border-white/10 bg-black/40 text-zinc-400'}`}
           >
             {t.id === WORLD_SCENE && <MapIcon size={14} className="shrink-0 text-emerald-300" />}

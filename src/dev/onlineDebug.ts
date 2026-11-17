@@ -4,8 +4,10 @@ import { botNextCommand } from '../engine/bot';
 import { moveIntoRoom, stateHash } from '../engine';
 import type { GameState } from '../types';
 import { useBattle } from '../store/battleStore';
-import { useOnline } from '../store/onlineStore';
+import { startSeedHook, useOnline } from '../store/onlineStore';
 import type { GameCommand } from '../types';
+import { emulatorFromUrl } from '../net/onlineEnv';
+import type { Room, RoomEvent } from '../net/room';
 
 const memo = { interacted: new Set<string>() };
 
@@ -75,9 +77,69 @@ const api = {
   pins: () => structuredClone(useOnline.getState().room?.pins ?? {}),
 };
 
+// ---------- 賢い検証 bot の入口（エミュレーターにつないだ時だけ。?debug だけでは働かない） ----------
+
+/**
+ * URL の &seed=数字 を、オンラインの冒険の種にする（同じ種で同じ流れをもう1度流すため）。
+ * ?emu= の無い URL（本番・?debug だけ）では、いつも undefined（今までどおり部屋が種を決める）
+ */
+export function debugSeed(): number | undefined {
+  if (!emulatorFromUrl()) return undefined;
+  const v = new URLSearchParams(location.search).get('seed');
+  if (v === null || !/^\d{1,15}$/.test(v)) return undefined;
+  const n = Number(v);
+  return Number.isSafeInteger(n) ? n : undefined;
+}
+
+/** 取り直しの記録の1行（部屋が状態を丸ごと取り直した時。seq = 取り直した番号・reason = 理由・at = 部屋の時計） */
+export interface ResyncEntry {
+  seq: number;
+  reason: Extract<RoomEvent, { type: 'resync' }>['reason'];
+  at: number;
+}
+
+/** 取り直しの記録（古い物から。多すぎる時は古い物を捨てる） */
+const resyncEntries: ResyncEntry[] = [];
+const RESYNC_LOG_MAX = 500;
+
+/** 部屋の知らせを聞いて、取り直しだけを覚える（聞くだけ。部屋もゲームの状態も変えない） */
+function watchResyncs(): void {
+  let watched: Room | null = null;
+  let stop: (() => void) | null = null;
+  const follow = (room: Room | null) => {
+    if (room === watched) return;
+    stop?.();
+    stop = null;
+    watched = room;
+    if (!room) return;
+    stop = room.on((e) => {
+      if (e.type !== 'resync') return;
+      resyncEntries.push({ seq: e.seq, reason: e.reason, at: room.backend.now() });
+      if (resyncEntries.length > RESYNC_LOG_MAX) resyncEntries.splice(0, resyncEntries.length - RESYNC_LOG_MAX);
+    });
+  };
+  follow(useOnline.getState().room);
+  useOnline.subscribe((s) => follow(s.room));
+}
+
+/** エミュレーターの時だけ足す入口 */
+const emuApi = {
+  /** 取り直しの記録を読む（写し。読むだけ）。部屋に入る前（join の最初）の取り直しは入らない */
+  resyncLog: (): ResyncEntry[] => resyncEntries.map((x) => ({ ...x })),
+  /** 今の URL で決まる冒険の種（&seed= が無ければ null） */
+  seed: (): number | null => debugSeed() ?? null,
+};
+
+type OnlineDebugApi = typeof api & Partial<typeof emuApi>;
+
 declare global {
   interface Window {
-    __online?: typeof api;
+    __online?: OnlineDebugApi;
   }
 }
-window.__online = api;
+
+if (emulatorFromUrl()) {
+  startSeedHook.seed = debugSeed;
+  watchResyncs();
+}
+if (typeof window !== 'undefined') window.__online = emulatorFromUrl() ? { ...api, ...emuApi } : api;

@@ -13,16 +13,16 @@ export function ConfirmDialog({ title, text, detail, ok, onOk, onCancel, danger 
         onCancel();
       }}
     >
-      <div role="dialog" aria-label={title} onClick={(e) => e.stopPropagation()} className="panel panel-gold-edge panel-ornate w-full max-w-xs rounded-2xl p-4 pt-5">
+      <div role="dialog" aria-label={title} data-confirm onClick={(e) => e.stopPropagation()} className="panel panel-gold-edge panel-ornate w-full max-w-xs rounded-2xl p-4 pt-5">
         <Crest />
         <div className="font-display text-[18px]">{title}</div>
         <div className="mt-1 text-[13px] leading-5 text-zinc-300">{text}</div>
         {detail && <div className="mt-1 rounded-lg bg-black/35 px-2 py-1 text-[14px] leading-5 font-bold text-amber-200" data-confirm-detail>{detail}</div>}
         <div className="mt-4 flex gap-2">
-          <button onClick={onCancel} className="btn btn-dark h-12 flex-1 rounded-lg font-bold">
+          <button onClick={onCancel} className="btn btn-dark h-12 flex-1 rounded-lg font-bold" data-confirm-cancel>
             やめる
           </button>
-          <button onClick={onOk} className={`btn h-12 flex-1 rounded-lg font-bold ${danger ? 'border border-red-300/60 bg-red-700' : 'btn-gold'}`}>
+          <button onClick={onOk} className={`btn h-12 flex-1 rounded-lg font-bold ${danger ? 'border border-red-300/60 bg-red-700' : 'btn-gold'}`} data-confirm-ok>
             {ok}
           </button>
         </div>

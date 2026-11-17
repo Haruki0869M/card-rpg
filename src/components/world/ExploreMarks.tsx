@@ -19,19 +19,19 @@ function ArtMini({ href, x, y, R, size }: { href: string; x: number; y: number; 
 type Center = (i: number) => { x: number; y: number };
 
 /** 見晴らしの塔（石の塔と小さな旗）。登った後は薄くする */
-export function TowerMini({ x, y, R, used, fogTop }: { x: number; y: number; R: number; used?: boolean; /** 霧の上の塔の先として描く（施設の印は付けない） */ fogTop?: boolean }) {
+export function TowerMini({ x, y, R, used, fogTop, tile }: { x: number; y: number; R: number; used?: boolean; /** 霧の上の塔の先として描く（施設の印は付けない） */ fogTop?: boolean; /** どのマスの塔か（自動の確認用の見えない印） */ tile?: number }) {
   const h = R * 1.35;
   const bw = R * 0.42;
   const top = y - h * 0.62;
   const art = fogTop ? undefined : artImage('landscape/place-watchtower');
   if (art)
     return (
-      <g data-feature="tower:watchtower" data-used={used || undefined} opacity={used ? 0.45 : 1} pointerEvents="none">
+      <g data-feature="tower:watchtower" data-tile={tile} data-used={used || undefined} opacity={used ? 0.45 : 1} pointerEvents="none">
         <ArtMini href={art} x={x} y={y} R={R} size={1.6} />
       </g>
     );
   return (
-    <g data-feature={fogTop ? undefined : 'tower:watchtower'} data-used={used || undefined} opacity={used ? 0.45 : 1} pointerEvents="none">
+    <g data-feature={fogTop ? undefined : 'tower:watchtower'} data-tile={fogTop ? undefined : tile} data-used={used || undefined} opacity={used ? 0.45 : 1} pointerEvents="none">
       <ellipse cx={x} cy={y + R * 0.38} rx={R * 0.5} ry={R * 0.15} fill="rgba(0,0,0,.5)" />
       {/* 塔の胴（下が少し広い） */}
       <path d={`M${x - bw * 0.62} ${y + R * 0.36} L${x - bw * 0.48} ${top + R * 0.2} L${x + bw * 0.48} ${top + R * 0.2} L${x + bw * 0.62} ${y + R * 0.36} Z`} fill="#b9ab92" stroke="#3a3128" strokeWidth={1.4} />
@@ -205,7 +205,7 @@ export function SpawnMarks({ w, R, center }: { w: WorldState; R: number; center:
         const art = artImage(SPAWN_ART[s.kind]);
         const fs = Math.max(12, R * 0.42);
         return (
-          <g key={s.id} data-spawn={s.kind} data-spawn-left={left} pointerEvents="none">
+          <g key={s.id} data-spawn={s.kind} data-spawn-left={left} data-tile={s.tile} pointerEvents="none">
             {art ? <ArtMini href={art} x={x} y={y} R={R} size={1.35} /> : <Mini x={x} y={y} R={R} />}
             <rect x={x + R * 0.12} y={y - R * 1.02} width={fs * 2.3} height={fs * 1.25} rx={fs * 0.6} fill={left <= 1 ? '#5a0a0a' : '#1a1408'} stroke={left <= 1 ? '#ff8a8a' : '#ffd76a'} strokeWidth={1.5} />
             <text x={x + R * 0.12 + fs * 1.15} y={y - R * 1.02 + fs * 0.95} textAnchor="middle" fontSize={fs} fontWeight={900} fill={left <= 1 ? '#ffb0b0' : '#ffe9a8'}>

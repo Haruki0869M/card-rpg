@@ -96,7 +96,7 @@ export function EncounterScreen() {
       <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <BattleBackground kind={sceneBackground(game)} className="absolute inset-0 h-full w-full opacity-50" />
         <div className="relative px-3 pt-3">
-          <div className={`font-display text-outline text-center text-[24px] ${scourge ? 'text-fuchsia-200' : 'text-red-200'}`}>{e.ambushed ? '夜襲だ！' : scourge ? `💀 ${scourge.name}！` : wd?.raidTown ? '町を襲う魔物！' : '魔物に遭遇した！'}</div>
+          <div className={`font-display text-outline text-center text-[24px] ${scourge ? 'text-fuchsia-200' : 'text-red-200'}`} data-encounter={e.ambushed ? 'ambushed' : scourge ? 'scourge' : wd?.raidTown ? 'raid' : 'normal'}>{e.ambushed ? '夜襲だ！' : scourge ? `💀 ${scourge.name}！` : wd?.raidTown ? '町を襲う魔物！' : '魔物に遭遇した！'}</div>
           {scourge && (
             <div className="panel mt-1 rounded-xl border border-fuchsia-400/50 p-2 text-[12px] leading-4" data-encounter-scourge={scourge.id}>
               <div className="text-fuchsia-100">いま世界に: {scourgeText(game, scourge.curseText)}</div>
@@ -128,6 +128,7 @@ export function EncounterScreen() {
                     key={h.id}
                     disabled={!canTap}
                     onClick={() => (other ? dispatchGame({ type: 'ENCOUNTER_JOIN', playerId: h.playerId, heroId: h.id, join: !on }) : setJoined({ ...joined, [h.id]: !on }))}
+                    data-encounter-join={h.id}
                     className={`btn flex min-w-0 flex-1 flex-col items-center rounded-lg border-2 py-1 disabled:opacity-100 disabled:filter-none ${on ? 'sel-on' : 'border-white/10 bg-black/30'}`}
                   >
                     <HeroFace hero={h} size={32} dim={!on} />
@@ -185,6 +186,7 @@ export function EncounterScreen() {
           <div className="grid grid-cols-3 gap-1.5">
             <button
               onClick={() => dispatchGame({ type: 'ENCOUNTER_CHOOSE', playerId: mover.playerId, choice: 'fight', heroId: e.heroId, focusUsed: 0, participants })}
+              data-encounter-choice="fight"
               className="btn btn-gold font-display flex h-14 flex-col items-center justify-center rounded-xl text-[16px]"
             >
               <Swords size={20} />
@@ -196,6 +198,7 @@ export function EncounterScreen() {
                 setMode('ambush');
                 setHeroId([...rollers].sort((a, b) => statChance(b, 'per', 'ambush') - statChance(a, 'per', 'ambush'))[0].id);
               }}
+              data-encounter-choice="ambush"
               className="btn btn-dark flex h-14 flex-col items-center justify-center rounded-xl text-[13px] font-bold"
             >
               <Eye size={18} />
@@ -207,6 +210,7 @@ export function EncounterScreen() {
                 setMode('flee');
                 setHeroId([...rollers].sort((a, b) => statChance(b, 'agi', 'flee') - statChance(a, 'agi', 'flee'))[0].id);
               }}
+              data-encounter-choice="flee"
               className="btn btn-dark flex h-14 flex-col items-center justify-center rounded-xl text-[13px] font-bold"
             >
               <Wind size={18} />

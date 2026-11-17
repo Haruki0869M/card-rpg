@@ -19,7 +19,7 @@ export function TurnLock() {
   const turnHero = game.heroes.find((h) => h.id === (game.mode === 'shrine' ? game.shrine?.heroId : game.world!.turn))!;
   const who = useOnline.getState().room?.seatName(turnHero.playerId) ?? turnHero.playerId;
   return (
-    <div style={{ zIndex: LAYER.turnLock, height: `${TURN_LOCK_RATIO * 100}%` }} className="absolute inset-x-0 bottom-0 flex items-center justify-center bg-gradient-to-t from-black via-black/90 to-black/40 px-4" role="status" data-turn-lock>
+    <div style={{ zIndex: LAYER.turnLock, height: `${TURN_LOCK_RATIO * 100}%` }} className="absolute inset-x-0 bottom-0 flex items-center justify-center bg-gradient-to-t from-black via-black/90 to-black/40 px-4" role="status" data-turn-lock={turnHero.playerId}>
       <div className="flex items-center gap-1.5 text-[14px] text-zinc-100">
         <span className="rounded px-1 text-[12px] font-bold text-black" style={{ background: PLAYER_COLOR[turnHero.playerId] }}>
           {turnHero.playerId}

@@ -129,6 +129,12 @@ const resyncLoop: ResyncLoop = { seq: -1, count: 0, shown: false };
 const last = loadLast();
 let stampId = 1;
 
+/**
+ * 確認用（賢い検証 bot）: 冒険を始める時の種を決める口。エミュレーターにつないだ時だけ src/dev/onlineDebug.ts が入れる
+ * （URL の &seed=数字）。入っていなければ、今までどおり部屋が種を決める
+ */
+export const startSeedHook: { seed?: () => number | undefined } = {};
+
 export const useOnline = create<OnlineState>((set, get) => {
   const bump = () => set((s) => ({ tick: s.tick + 1 }));
 
@@ -249,7 +255,7 @@ export const useOnline = create<OnlineState>((set, get) => {
     claimSlot: (i, hero) => withRoom((r) => r.claimSlot(i, hero)),
     releaseSlot: (i) => withRoom((r) => r.releaseSlot(i)),
     updateSettings: (s) => withRoom((r) => r.updateSettings(s)),
-    start: () => withRoom((r) => r.start()),
+    start: () => withRoom((r) => r.start(startSeedHook.seed?.())),
     sendStamp: (kind) => void withRoom((r) => r.sendStamp(kind)),
     setProxy: (p, on) => void withRoom((r) => r.setProxy(p, on)),
     holdProxy: (p) => {

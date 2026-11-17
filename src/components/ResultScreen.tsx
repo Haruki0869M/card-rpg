@@ -103,6 +103,7 @@ export function ResultScreen() {
         <button
           onClick={() => dispatchGame({ type: 'FINISH_BATTLE', playerId: LOCAL_PLAYER })}
           data-result-button
+          data-result={win ? 'victory' : escaped ? 'escaped' : (outlook?.kind ?? 'gameover')}
           className="btn btn-gold font-display mt-4 h-12 w-full rounded-xl text-[18px]"
         >
           {button}
