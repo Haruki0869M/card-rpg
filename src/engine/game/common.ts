@@ -40,15 +40,26 @@ export function rollWithFocus(slots: number, focusUsed: number, chance: number, 
 
 export const successes = (r: SlotResult[]) => r.filter((x) => x !== 'miss').length;
 
+/**
+ * その消耗品を今もらうと、袋に入らずお金に換わるか（換わる時はその額と理由。入る時・消耗品でない時は undefined）。
+ * 袋が満杯（full）か、1人が持てる数（pouchMax）に達している（same）時。額は格で決まる（addItem と同じ）
+ */
+export function pouchOverflow(hero: Hero, itemId: string): { gold: number; why: 'full' | 'same' } | undefined {
+  const def = getItem(itemId);
+  if (def.slot !== 'consumable') return undefined;
+  const full = hero.pouch.length >= pouchLimitOf(hero);
+  if (!full && !(def.pouchMax !== undefined && hero.pouch.filter((p) => p.itemId === def.id).length >= def.pouchMax)) return undefined;
+  return { gold: rarityIndex(def.rarity) * 15 + 10, why: full ? 'full' : 'same' };
+}
+
 /** そのキャラの持ち物に入れる（消費アイテムは袋。袋が満杯ならゴールドに換える） */
 export function addItem(game: GameState, hero: Hero, item: ItemInstance, gainedInDungeon: boolean): string {
   const def = getItem(item.itemId);
   if (def.slot === 'consumable') {
-    const limit = pouchLimitOf(hero);
-    if (hero.pouch.length >= limit || (def.pouchMax !== undefined && hero.pouch.filter((p) => p.itemId === def.id).length >= def.pouchMax)) {
-      const g = rarityIndex(def.rarity) * 15 + 10;
-      earnGold(hero, g);
-      return `${def.name}（${hero.name}の袋が${hero.pouch.length >= limit ? '満杯' : `${def.name}でいっぱい`}のため${g}Gに換えた）`;
+    const over = pouchOverflow(hero, def.id);
+    if (over) {
+      earnGold(hero, over.gold);
+      return `${def.name}（${hero.name}の袋が${over.why === 'full' ? '満杯' : `${def.name}でいっぱい`}のため${over.gold}Gに換えた）`;
     }
     hero.pouch.push(item);
   } else {

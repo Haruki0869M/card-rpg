@@ -96,7 +96,9 @@ const BEFORE: Record<number, { kinds: string[]; state: string }> = {
 const BEFORE_MAPS: Record<string, string[]> = {
   corruptionKing: ['26c62f2f', 'e61644da', 'b4f77cef'],
   frozenKingdom: ['fbb04c0b', '46fb1ed4', '0d9f556e'],
-  cursedArchipelago: ['03673bf7', '9f451a2a', '965383ac'],
+  // 2026-11-16 シナリオ3だけのテーマ「漂流物の洞」を足した: ランダムダンジョンのマスのテーマ（f.theme）だけが変わった（種1・3 = 漂流物の洞・種2 = 古代の晶洞。
+  // 足す前と後の冒険の状態を全部比べて、違うのはこの3か所だけ。乱数の状態・地図・敵は同じ）。前の値: '03673bf7', '9f451a2a', '965383ac'
+  cursedArchipelago: ['c051efc9', '8afb0748', '95a3dba2'],
   sandDynasty: ['bb9a8be6', '93b10c4a', 'd723aecd'],
   starCastle: ['3636fe91', 'd44fae16', 'f00ba5cb'],
   clockworkEmpire: ['786d6478', '1084b75f', '2cf54543'],

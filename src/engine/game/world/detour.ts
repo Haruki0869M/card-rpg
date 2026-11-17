@@ -276,6 +276,9 @@ export function dungeonDetourLines(game: Pick<GameState, 'world' | 'scenarioId' 
       const grades = `${up.filter((c) => c.min > 0).map((c) => `凍え${c.min}以上で${CHEST_NAME[c.rarity]}`).join('・')}。少ないと${CHEST_NAME[up[0].rarity]}`;
       out.push(`🧊凍え: 部屋に入るたびに凍え+1、HPが「凍え×${chill.hpPercent}%」減る（HPは1で止まる）。🔥焚き火で凍えは0に戻る。奥の氷漬けの箱は、凍えたまま着くほど良い（${grades}）`);
     }
+    // 2026-11-16 シナリオ3の作り直し: テーマ「🛶 漂流物の洞」の奥（漂流物の山）を、行く前に分かるように
+    const flotsam = dungeonTheme(f.theme)?.flotsam;
+    if (flotsam) out.push(`🛶漂流物の山: 奥で、全員がそれぞれ消耗品を${flotsam.choices}つから1つ選べる（${flotsam.epicSlots}つはエピック以上）。袋がいっぱいだと、選んだ品はお金に換わる`);
     return out;
   }
   if (!def.rewardKey && !def.finale) return [];

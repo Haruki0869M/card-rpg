@@ -41,7 +41,8 @@ describe('段階7a: ランダムダンジョンの形（全5行・テーマ）',
   it('どのシナリオでも出るテーマは3つ。4行目の部屋は 晶石の祭壇・休憩・闇商人。どれも扉の予兆がある部屋の種類', () => {
     const common = DUNGEON_THEMES.all.filter((t) => !t.scenario);
     expect(common.map((t) => t.id)).toEqual(THEMES);
-    expect(DUNGEON_THEMES.all.map((t) => t.id)).toEqual([...THEMES, 'frozenVault']);
+    // シナリオだけのテーマはデータの最後（シナリオ2 = 氷漬けの宝物庫・シナリオ3 = 漂流物の洞。2026-11-16）
+    expect(DUNGEON_THEMES.all.map((t) => t.id)).toEqual([...THEMES, 'frozenVault', 'flotsamCave']);
     expect(common.map((t) => t.fixedRoom)).toEqual(['crystalAltar', 'rest', 'blackMarket']);
     for (const t of DUNGEON_THEMES.all) expect(getRoomType(t.fixedRoom).name).toBeTruthy();
     expect(DUNGEON_THEMES.get('sealedLabyrinth').enemyLevel).toBe(1);
@@ -117,7 +118,8 @@ describe('段階7a: 世界マップのランダムダンジョン', () => {
       const g = newGame(sc, 3);
       const tiles = randomTiles(g);
       expect(tiles, sc).toHaveLength(1);
-      expect(THEMES).toContain(g.world!.tiles[tiles[0]].f!.theme);
+      // シナリオ3は、シナリオ3だけのテーマ（漂流物の洞。2026-11-16）も候補
+      expect([...THEMES, ...(sc === 'cursedArchipelago' ? ['flotsamCave'] : [])]).toContain(g.world!.tiles[tiles[0]].f!.theme);
     }
   });
 

@@ -147,6 +147,11 @@ export interface Hero {
   peddler?: { items: { item: ItemInstance; price: number; sold?: boolean; group?: string }[]; cards: { cardId: string; price: number; sold?: boolean }[]; kind?: 'blackMarket' };
   /** 晶石の祭壇: 今の作業の後に、もう何回強化か変異ができるか（古代の晶洞は2回。2026-11-14。省略は0） */
   altarLeft?: number;
+  /**
+   * 漂流物の山（ランダムダンジョンのテーマ「漂流物の洞」の4行目。2026-11-16 シナリオ3の作り直し）: 選べる消耗品の候補（アイテムの ID・左から）。
+   * 部屋に入った時に引いて保存する（保存して再開しても・オンラインでも同じ）。本人が FLOTSAM_PICK で1つ選ぶ。だれも待たない
+   */
+  flotsam?: string[];
   /** 武器に宿った属性（その武器を持っている間だけ） */
   weaponElement?: { uid: string; element: string };
   /** 最後に突発イベントが起きたワールドターン（2手番続けては起きない） */
@@ -242,6 +247,11 @@ export interface DungeonThemeDef {
    * （HPは1で止まる）。休憩の部屋に入ると凍えは0（その部屋の寒さは受けない）。chest = 奥の箱の格（入った時の凍えが min 以上の、最初の物）
    */
   chill?: { hpPercent: number; chest: { min: number; rarity: Rarity }[] };
+  /**
+   * 漂流物の山（漂流物の洞。2026-11-16 シナリオ3の作り直し・計画 §3-3 と点検 B4）: その場の全員が、それぞれ消耗品を choices 個から1つ選ぶ。
+   * 候補のうち epicSlots 個はエピック以上（残りはレア以上）
+   */
+  flotsam?: { choices: number; epicSlots: number };
 }
 
 export interface ChestSpec {
@@ -674,6 +684,8 @@ export type GameCommand =
   | { type: 'CARD_TASK'; playerId: PlayerId; heroId: string; cardUid?: string; altar?: 'upgrade' | 'transmute' }
   /** 行商人の品物を買う（index を省くと店を閉じる） */
   | { type: 'PEDDLER_BUY'; playerId: PlayerId; heroId: string; kind?: 'item' | 'card'; index?: number }
+  /** 漂流物の山の候補から1つ選ぶ（index = Hero.flotsam の何番目か。heroId のキャラの担当の席が送る。2026-11-16） */
+  | { type: 'FLOTSAM_PICK'; playerId: PlayerId; heroId: string; index: number }
   | { type: 'CLAIM_LOOT'; playerId: PlayerId; heroId: string; choice: 'need' | 'greed' | 'pass'; /** 宝箱の取り合いの何番目か（戦闘の報酬では使わない） */ index?: number }
   /** 宝箱を開けるキャラを、みんなで決める（2人以上のプレイヤーの時。全員一致） */
   | { type: 'CHEST_OPENER'; playerId: PlayerId; heroId: string }

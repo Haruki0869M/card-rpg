@@ -4,7 +4,7 @@
 // 2人以上（別のプレイヤーのキャラ）が同行して一緒に入る場面を、P1・P2 の画面のボタンで最後まで押して進める:
 //   祠（P2 が先に祈って出る → P1 が出る／P1 が先に祈る／手番が P2）・町・神殿（祭壇も同じ画面）・マスのイベント（薬草の群生地・温泉）・
 //   マスの宝箱・遭遇・災厄の中ボス・見晴らしの塔・ランダムダンジョン／鍵のダンジョンの入口（鍵あり・なし）・野営・同行の解除・合流（誘う）・
-//   1人で入った祠（ほかの人は覆いのまま）・1台で2人（祠・町・神殿・マスのイベント）。
+//   1人で入った祠（ほかの人は覆いのまま）・1台で2人（祠・町・神殿・マスのイベント）・漂流物の洞の奥の山（片方が先に選ぶ。ONLY=flotsam）。
 // 見る事: 押したいボタンが画面の中にあり、上にほかの層（覆いなど）が乗っていない（elementFromPoint）・押せる（disabled でない）。
 //         片方が先に終わって待つ形で、残った人が押して進められる（お互いに待って止まらない）。最後に世界マップへ戻る。
 // エミュレーター（demo-card-rpg）だけを使う（URL の ?emu=）。本番の Firebase には書かない（URL に本番の名前があれば止まる）。
@@ -469,6 +469,65 @@ SCENES.world = async (r) => {
     check(await tryUntil(async () => (await game(r.A)).world.follow?.[r.hero(other)] === r.hero(leader), 4000), `${label}: また同行になった`);
     await press(P, '[data-world-wait], [data-roll-move]', `${label}: ${leader} は続けて手番の操作ができる`, { click: false });
   }
+};
+
+/**
+ * 漂流物の洞の奥の山（2026-11-16 シナリオ3の作り直し・点検 B4）: 2人で同行して入り、山の扉の前まで進めた状態を差し込み、山に入る。
+ * 2台とも自分の3択が出る → first が先に選ぶ → first は待たずに次の扉（ボス）が押せる・残った人の3択は覆いの下でなく押せる → 残った人が選ぶ。
+ * テーマはシナリオ3だけの物だが、確かめたいのは画面と命令なので、シナリオ1のランダムダンジョンの入口に漂流物の洞を付けて入る
+ */
+async function flotsamPile(r, { first, label }) {
+  const { g, w } = worldState(r, { at: 0, leader: 'P1' });
+  const t = tileOf(w, (f) => f.kind === 'dungeon' && f.id === 'randomForest');
+  if (t < 0) return note(`${label}: ランダムダンジョンの入口が無い（飛ばす）`);
+  w.tiles[t].f.used = false;
+  w.tiles[t].f.theme = 'flotsamCave';
+  for (const h of g.heroes) w.pos[h.id] = t;
+  await r.inject(g);
+  await press(r.A, '[data-interact]', `${label}: P1 が入口のボタン`);
+  if (!check(await tryUntil(async () => (await game(r.A))?.expeditions?.[0]?.heroes?.length === 2, 8000), `${label}: 2人とも入った`)) return;
+  for (const p of [r.A, r.B]) await closeStory(p);
+  const g1 = await game(r.A);
+  check(g1.expeditions[0].dungeon.theme === 'flotsamCave', `${label}: テーマは漂流物の洞`);
+  const g2 = await api(r.A, (x) => window.__online.beforeRoom(x, 0, 'flotsamPile'), g1);
+  if (!g2) return check(false, `${label}: 漂流物の山の部屋が無い`);
+  const pile = g2.expeditions[0].dungeon.rooms.find((x) => x.type === 'flotsamPile').id;
+  await r.inject(g2);
+  // 扉を開ける（2人の場面はみんなで決めるので、2台とも同じ扉を押す）
+  for (const pid of ['P1', 'P2']) {
+    const P = r.page(pid);
+    if ((await game(r.A)).heroes.some((h) => h.flotsam?.length)) break;
+    const door = P.locator(`[data-door-choice="${pile}"]`);
+    if (await tryUntil(async () => (await door.count()) > 0, 5000)) await press(P, door, `${label}: ${pid} が漂流物の山の扉`);
+  }
+  check(await tryUntil(async () => (await game(r.A)).heroes.every((h) => h.flotsam?.length === 3), 8000), `${label}: 2人とも候補が3つ配られた`);
+  for (const p of [r.A, r.B]) {
+    const skip = p.locator('[data-door-open]');
+    if (await skip.count()) await skip.first().click().catch(() => {});
+  }
+  const second = first === 'P1' ? 'P2' : 'P1';
+  const P = r.page(first), Q = r.page(second);
+  for (const pid of ['P1', 'P2']) {
+    const X = r.page(pid);
+    check(await tryUntil(async () => (await X.locator('[data-flotsam-options="3"]').count()) > 0, 5000), `${label}: ${pid} の画面に3択`);
+    check((await X.locator('[data-flotsam-pouch]').count()) > 0, `${label}: ${pid} の画面に袋の空き`);
+    await shot(X, `${label}-${pid}-flotsam`);
+  }
+  await press(P, '[data-flotsam-pick="0"]', `${label}: ${first} が先に1つ選ぶ`);
+  check(await tryUntil(async () => !(await game(r.A)).heroes.find((h) => h.id === r.hero(first)).flotsam, 5000), `${label}: ${first} の分が選ばれた`);
+  check(!!(await game(r.A)).heroes.find((h) => h.id === r.hero(second)).flotsam, `${label}: ${second} の分は残っている`);
+  // 先に選んだ人は待たない: 次の扉（ボス）のボタンが押せる所にある
+  check(await tryUntil(async () => (await P.locator('[data-door-choice]').count()) > 0, 5000), `${label}: ${first} の画面に次の扉`);
+  await press(P, '[data-door-choice]', `${label}: ${first} の次の扉（押さない）`, { click: false });
+  await shot(P, `${label}-${first}-after`);
+  // 残った人の3択は、覆いの下でなく押せる
+  await press(Q, '[data-flotsam-pick="1"]', `${label}: 残った ${second} が選ぶ`);
+  check(await tryUntil(async () => (await game(r.A)).heroes.every((h) => !h.flotsam), 5000), `${label}: 2人とも選び終えた`);
+  check(await tryUntil(async () => (await Q.locator('[data-door-choice]').count()) > 0, 5000), `${label}: ${second} の画面にも次の扉（止まらない）`);
+}
+SCENES.flotsam = async (r) => {
+  await flotsamPile(r, { first: 'P1', label: '漂流物の山-P1が先に選ぶ' });
+  await flotsamPile(r, { first: 'P2', label: '漂流物の山-P2が先に選ぶ' });
 };
 
 // ---------------- 1台で2人 ----------------

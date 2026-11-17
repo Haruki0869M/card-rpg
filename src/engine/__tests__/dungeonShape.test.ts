@@ -48,9 +48,9 @@ const REWORKED_SCENARIOS: string[] = ['frozenKingdom', 'cursedArchipelago'];
 /**
  * 作り直したシナリオの中で、まだ型のままのダンジョン（決まりと形のテーマが両立せず、まとめ役・オーナーの判断待ち）。
  * 2026-11-15: 沈んだ聖堂は、オーナーの決定（計画 §11 の案イ「じょうご」の形）で作り直したので、今は無い。
- * 2026-11-16: 海賊の隠れ島（シナリオ3）。計画 §3-4 ②の3行目の封魔の宝箱が「封魔の宝箱は4行目から」（overhaulStage3.test.ts）と両立しない
+ * 2026-11-16: 海賊の隠れ島（シナリオ3）は、オーナーの返事（案ア: 封魔の宝箱を4行目にずらす）で作り直したので、今は無い。
  */
-const REWORK_PENDING: string[] = ['pirateIsland'];
+const REWORK_PENDING: string[] = [];
 const TEMPLATES = { keyLayout1, keyLayout2, keyLayout3, finaleLayout };
 /**
  * ボスの前が「休憩 → イベント → ボス」の8行の鍵のダンジョンか（1つ目の鍵の型と、2026-11-13 の案イで同じ形にした翠の神殿）。

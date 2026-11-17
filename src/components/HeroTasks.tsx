@@ -2,14 +2,15 @@
 // イベントの窓・戦闘・報酬が閉じてから出す（どの場面にいても、この端末のキャラなら出す）
 import { ItemInfoArea } from './ItemDetail';
 import { motion } from 'framer-motion';
-import { Coins, Heart, X } from 'lucide-react';
+import { Backpack, Coins, Heart, X } from 'lucide-react';
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { CardPickPanel } from './ui/CardPickPanel';
 import { cardOf, getCard } from '../data/cards';
 import { getItem } from '../data/items';
 import { getPet } from '../data/pets';
 import { BALANCE } from '../data/balance';
-import { affinityFromStats, altarTransmutePool, finalChance, heroStats, isPetMaster } from '../engine';
+import { affinityFromStats, altarTransmutePool, finalChance, flotsamView, heroStats, isPetMaster } from '../engine';
+import { useLowScreen } from '../hooks/useLowScreen';
 import { isLocalPlayer } from '../store/battleConfig';
 import { useBattle } from '../store/battleStore';
 import type { GameCommand, Hero } from '../types';
@@ -287,6 +288,46 @@ function Peddler({ hero, send }: { hero: Hero; send: (c: GameCommand) => void })
   );
 }
 
+/**
+ * 漂流物の山（漂流物の洞の4行目。2026-11-16 シナリオ3の作り直し）: 候補3つから1つ選ぶ。選ぶのは自分の分だけ（ほかの人を待たない）。
+ * 袋の空きと、袋がいっぱいの時は「お金に換わる」を、選ぶ前に出す。品の名前を押すと詳しい説明（行商人と同じ）
+ */
+function Flotsam({ hero, send }: { hero: Hero; send: (c: GameCommand) => void }) {
+  const low = useLowScreen();
+  const view = flotsamView(hero);
+  return (
+    <Frame title="漂流物の山" hero={hero}>
+      <div className={`${low ? 'mt-0.5' : 'mt-1'} text-center text-[13px] leading-4 text-zinc-300`}>流れ着いた品から、1つ選んで持ち帰れます（自分の分だけ。ほかの人を待ちません）</div>
+      <div className={`${low ? 'mt-1' : 'mt-2'} flex items-center justify-center gap-1 text-[14px] font-bold ${view.full ? 'text-red-200' : 'text-emerald-200'}`} data-flotsam-pouch={`${view.pouch}/${view.limit}`}>
+        <Backpack size={15} /> 道具袋 {view.pouch}/{view.limit}
+      </div>
+      {view.full && <div className="mt-1 rounded-lg bg-red-950/60 px-2 py-1 text-center text-[13px] leading-4 text-red-100" data-flotsam-full>袋がいっぱいです。選んだ品は袋に入らず、お金に換わります</div>}
+      <div className={`${low ? 'mt-1 gap-1' : 'mt-2 gap-1.5'} flex min-h-0 flex-1 flex-col overflow-y-auto`} data-flotsam-options={view.items.length}>
+        {view.items.map((x, i) => {
+          const it = getItem(x.itemId);
+          return (
+            <div key={`${x.itemId}${i}`} className="panel flex items-center gap-2 rounded-lg p-1.5" data-flotsam-option={x.itemId}>
+              <ItemInfoArea itemId={it.id} heroId={hero.id} className="flex flex-1 items-center gap-2">
+                <ItemIcon item={it} size={low ? 38 : 44} />
+                <span className="block min-w-0 flex-1 leading-4">
+                  <span className="block text-[14px] font-bold" style={{ color: RARITY_STYLE[it.rarity].color }}>
+                    {it.name}
+                  </span>
+                  <span className="block truncate text-[12px] text-zinc-400">{itemSummary(it)}</span>
+                  {x.overflowGold !== undefined && <span className="block text-[12px] font-bold text-amber-200" data-flotsam-gold>→ 袋に入らず{x.overflowGold}Gに換わる</span>}
+                </span>
+              </ItemInfoArea>
+              <button onClick={() => send({ type: 'FLOTSAM_PICK', playerId: hero.playerId, heroId: hero.id, index: i })} className="btn btn-gold h-11 w-20 shrink-0 rounded-lg text-[14px] font-bold" data-flotsam-pick={i}>
+                選ぶ
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </Frame>
+  );
+}
+
 /** この端末のキャラに、イベントの後の作業があれば出す */
 export function HeroTaskOverlay() {
   const screen = useBattle(s => s.screen);
@@ -295,7 +336,7 @@ export function HeroTaskOverlay() {
   const dispatchWire = useBattle((s) => s.dispatchWire);
   const showToast = useBattle((s) => s.showToast);
   if (screen !== 'game' || !full || !mode || !CALM.has(mode)) return null;
-  const hero = full.heroes.find((h) => isLocalPlayer(h.playerId) && !h.jobPick?.length && (h.petOffer?.length || h.cardTask || h.peddler));
+  const hero = full.heroes.find((h) => isLocalPlayer(h.playerId) && !h.jobPick?.length && (h.petOffer?.length || h.cardTask || h.flotsam?.length || h.peddler));
   if (!hero) return null;
   const send = (c: GameCommand) => {
     const err = dispatchWire(c);
@@ -303,5 +344,6 @@ export function HeroTaskOverlay() {
   };
   if (hero.petOffer?.length) return <AdoptPet key={`pet${hero.id}`} hero={hero} send={send} />;
   if (hero.cardTask) return <CardTask key={`task${hero.id}`} hero={hero} send={send} />;
+  if (hero.flotsam?.length) return <Flotsam key={`flotsam${hero.id}`} hero={hero} send={send} />;
   return <Peddler key={`shop${hero.id}`} hero={hero} send={send} />;
 }

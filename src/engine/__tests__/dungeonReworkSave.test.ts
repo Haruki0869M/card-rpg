@@ -24,7 +24,8 @@ const BEFORE: Record<string, Layout> = {
   giantMine: keyLayout3({ first: 'buriedChest', second: 'furTrader', story: 'giantGate' }),
   iceCastle: finaleLayout({ first: 'iceSilhouette', story: 'queenThrone' }),
   wreckCave: keyLayout1({ first: 'seaCaveTide', second: 'sunkenChest', story: 'serpentNest' }),
-  // 海賊の隠れ島は作り直しを保留（dungeonShape.test.ts の REWORK_PENDING）。前の並びのままなので、ここには入れない
+  // 海賊の隠れ島は 2026-11-16 の2回目のオーナーの返事（案ア）で作り直した（前は2つ目の鍵の型）
+  pirateIsland: keyLayout2({ first: 'pirateStash', second: 'castawayCamp', story: 'captainCabin' }),
   sunkenTemple: keyLayout3({ first: 'ghostSong', second: 'seaTrader', story: 'tideAltar' }),
   ghostFlagship: finaleLayout({ first: 'seaTrader', story: 'admiralBridge' }),
 };
@@ -53,8 +54,8 @@ function savedInOldLayout(dungeonId: string): string {
 }
 
 describe('シナリオ2・3: 並びを作り直す前に入ったダンジョンの途中の保存', () => {
-  it('前の並びは、シナリオ2の4か所とシナリオ3の3か所（海賊の隠れ島は保留）', () => {
-    expect(Object.keys(BEFORE).map((id) => DUNGEONS.scenarioOf(id)).sort()).toEqual([...Array(3).fill('cursedArchipelago'), ...Array(4).fill('frozenKingdom')]);
+  it('前の並びは、シナリオ2の4か所とシナリオ3の4か所', () => {
+    expect(Object.keys(BEFORE).map((id) => DUNGEONS.scenarioOf(id)).sort()).toEqual([...Array(4).fill('cursedArchipelago'), ...Array(4).fill('frozenKingdom')]);
   });
 
   it('作り直す前の並びのデータは、今の並びと違う（このテストが意味を持つ）', () => {

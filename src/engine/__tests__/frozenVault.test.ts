@@ -44,7 +44,8 @@ function inVault(seed = 3, heroes = 1): GameState {
 
 describe('氷漬けの宝物庫: データとシナリオ', () => {
   it('データの最後の順番・シナリオ2だけ・宝箱は割合0で封魔にしない・奥は氷漬けの箱（宝の予兆）', () => {
-    expect(DUNGEON_THEMES.all.map((t) => t.id)).toEqual([...OLD, FV]);
+    // その後ろに、シナリオ3だけの漂流物の洞（2026-11-16）
+    expect(DUNGEON_THEMES.all.map((t) => t.id)).toEqual([...OLD, FV, 'flotsamCave']);
     const t = DUNGEON_THEMES.get(FV);
     expect(t.scenario).toBe(S2);
     expect(t.sealedChance).toBe(0);
@@ -53,7 +54,7 @@ describe('氷漬けの宝物庫: データとシナリオ', () => {
     expect(getRoomType(t.fixedRoom)).toMatchObject({ behavior: 'chest', omen: 'treasure', name: '氷漬けの箱' });
     expect(getRoomType(t.fixedRoom).layoutWeight ?? 0).toBe(0);
     for (const sid of DUNGEONS.all.filter((d) => d.random).map((d) => DUNGEONS.scenarioOf(d.id)!)) {
-      expect(themesForScenario(sid).map((x) => x.id), sid).toEqual(sid === S2 ? [...OLD, FV] : OLD);
+      expect(themesForScenario(sid).map((x) => x.id), sid).toEqual(sid === S2 ? [...OLD, FV] : sid === 'cursedArchipelago' ? [...OLD, 'flotsamCave'] : OLD);
     }
   });
 
