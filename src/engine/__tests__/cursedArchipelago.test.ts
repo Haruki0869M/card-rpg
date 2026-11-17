@@ -44,7 +44,8 @@ describe('呪われた群島', () => {
     expect(corruptionName('cursedArchipelago')).toBe('霧の濃さ');
   });
 
-  it('どの種でも: 船が無ければ港の島だけ、船があれば町・ダンジョンの全部に行ける。海のマスが十分ある', () => {
+  // 区切り2（15×42）から: 船が無くても中央の街道と東は歩ける（海賊の隠れ島と西の島は船）。歩ける所の細かい確かめは scenario3Map.test.ts
+  it('どの種でも: 船が無くても町を出て歩ける、船があれば町・ダンジョンの全部に行ける。海のマスが十分ある', () => {
     for (let seed = 1; seed <= 25; seed++) {
       const g = newGame(seed);
       const w = g.world!;

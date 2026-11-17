@@ -50,12 +50,12 @@ describe('回1: 方角（8つ）と地域の言い方', () => {
     expect(placeName(g, w, idxOf(w, 7, 40))).toBe('はじまりの平原');
   });
 
-  // 帯の無いシナリオの例（シナリオ2は、作り直しの区切り2で広い地図になったので、呪われた群島に替えた）
+  // 帯の無いシナリオの例（シナリオ2・3は、作り直しの区切り2で広い地図になったので、砂の王朝に替えた）
   it('前の広さの地図（帯の無いシナリオ）: 地域の名前だけ', () => {
-    const g = fresh(1, 'cursedArchipelago');
+    const g = fresh(1, 'sandDynasty');
     const w = g.world!;
     const t = w.tiles.findIndex((x) => x.f?.kind === 'dungeon');
-    expect(placeName(g, w, t)).toBe(getScenario('cursedArchipelago').map!.regions[w.tiles[t].r].name);
+    expect(placeName(g, w, t)).toBe(getScenario('sandDynasty').map!.regions[w.tiles[t].r].name);
     expect(signposts(g, w)).toEqual([]);
   });
 });

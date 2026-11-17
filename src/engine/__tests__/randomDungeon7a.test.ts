@@ -102,8 +102,8 @@ describe('段階7a: ランダムダンジョンの形（全5行・テーマ）',
 
 describe('段階7a: 世界マップのランダムダンジョン', () => {
   // シナリオ2は、作り直しの区切り2で広い地図（西と東に2か所）になった
-  it('シナリオ1・2（広い地図）は2か所・別のテーマ。ほかの5本は1か所でテーマあり。同じ種なら同じ', () => {
-    for (const sc of ['corruptionKing', 'frozenKingdom']) for (let seed = 1; seed <= 10; seed++) {
+  it('シナリオ1・2・3（広い地図）は2か所・別のテーマ。ほかの4本は1か所でテーマあり。同じ種なら同じ', () => {
+    for (const sc of ['corruptionKing', 'frozenKingdom', 'cursedArchipelago']) for (let seed = 1; seed <= 10; seed++) {
       const g = newGame(sc, seed);
       const tiles = randomTiles(g);
       expect(tiles, sc).toHaveLength(2);
@@ -113,7 +113,7 @@ describe('段階7a: 世界マップのランダムダンジョン', () => {
       expect(themes.every((x) => [...THEMES, ...(sc === 'frozenKingdom' ? ['frozenVault'] : [])].includes(x!))).toBe(true);
       expect(randomTiles(newGame(sc, seed)).map((i) => newGame(sc, seed).world!.tiles[i].f!.theme)).toEqual(themes);
     }
-    for (const sc of ['sandDynasty', 'cursedArchipelago', 'clockworkEmpire', 'starCastle', 'dreamLabyrinth']) {
+    for (const sc of ['sandDynasty', 'clockworkEmpire', 'starCastle', 'dreamLabyrinth']) {
       const g = newGame(sc, 3);
       const tiles = randomTiles(g);
       expect(tiles, sc).toHaveLength(1);

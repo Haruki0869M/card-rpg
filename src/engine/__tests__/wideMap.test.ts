@@ -220,8 +220,8 @@ describe('段階6a: シナリオ1の広い地図の形', () => {
   });
 
   // シナリオ2は、作り直しの区切り2で広い地図になった（scenario2Map.test.ts）
-  it('ほかの5本は前の地図のまま（帯が無い・幅も変わらない）', () => {
-    for (const s of SCENARIOS.all.filter((x) => x.id !== CK && x.id !== 'frozenKingdom' && x.map)) {
+  it('ほかの4本は前の地図のまま（帯が無い・幅も変わらない。シナリオ2・3は作り直しで広い地図）', () => {
+    for (const s of SCENARIOS.all.filter((x) => x.id !== CK && x.id !== 'frozenKingdom' && x.id !== 'cursedArchipelago' && x.map)) {
       const g = fresh(1, s.id);
       expect(s.map!.lanes, s.id).toBeUndefined();
       expect(g.world!.width, s.id).toBe(s.map!.width);
