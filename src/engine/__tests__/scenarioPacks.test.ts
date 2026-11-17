@@ -81,8 +81,8 @@ describe.each(PACKS)('追加シナリオ %s', (sid, gearCount, prevRaw, randomId
     }
     const g = createGame({ seed: 3, scenarioId: sid, difficulty: 'normal', party: [{ classId: 'warrior', gender: 'male', name: 'a', playerId: 'P1' }] });
     expect(g.world).toBeDefined();
-    // 地図の幅はデータのまま（シナリオ2は作り直しの区切り2で 15 列。ほかは 8 列）
+    // 地図の幅はデータのまま（シナリオ2・3は作り直しの区切り2で 15 列。ほかは 8 列）
     expect(g.world!.width).toBe(sc.map!.width);
-    expect(g.world!.width).toBe(sid === 'frozenKingdom' ? 15 : 8);
+    expect(g.world!.width).toBe(sid === 'frozenKingdom' || sid === 'cursedArchipelago' ? 15 : 8);
   });
 });

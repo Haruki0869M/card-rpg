@@ -64,11 +64,16 @@ function shapeWideMap(game: GameState, def: ScenarioMapDef, w: WorldState, rng: 
       if (cands.length) gaps.add(cands[rng.int(cands.length)]);
     }
     const line = new Set(rows.map((r) => idxOf(w, r % 2 ? b.odd : b.even, r)));
-    // 潮の切れ目: 切れ目を上から並べ、2つ目・4つ目…・3つ目・5つ目…の順に count 個（1つ目はいつも通れる切れ目に残す。乱数は引かない）
+    // 潮の切れ目: 町・ダンジョン（地図の固定の施設）に近い切れ目から count 個（点検 C3: 潮の切れ目が遠い方に出ると近道にならない。
+    // 同じ近さなら上から）。いつも通れる切れ目を必ず1つは残す（道が仕切りを横切る所があれば、それがいつも通れる切れ目）。乱数は引かない
     if (b.tideGaps) {
-      const real = [...gaps].sort((x, y) => x - y).filter((r) => !keep(idxOf(w, r % 2 ? b.odd : b.even, r)));
-      const order = [...real.filter((_, k) => k % 2 === 1), ...real.filter((_, k) => k % 2 === 0 && k > 0)];
-      for (const r of order.slice(0, Math.max(0, Math.min(b.tideGaps.count, real.length - 1)))) tideLater.push({ i: idxOf(w, r % 2 ? b.odd : b.even, r), terrain: b.tideGaps.terrain });
+      const at = (r: number) => idxOf(w, r % 2 ? b.odd : b.even, r);
+      const real = [...gaps].sort((x, y) => x - y).filter((r) => !keep(at(r)));
+      const roadCross = rows.some((r) => tiles[at(r)].t === def.roadTerrain);
+      const fixedAt = def.features.map((f) => idxOf(w, f.at[0], f.at[1]));
+      const near = (r: number) => Math.min(...fixedAt.map((i) => hexDistance(w, at(r), i)));
+      const order = [...real].sort((x, y) => near(x) - near(y) || x - y);
+      for (const r of order.slice(0, Math.max(0, Math.min(b.tideGaps.count, real.length - (roadCross ? 0 : 1))))) tideLater.push({ i: at(r), terrain: b.tideGaps.terrain });
     }
     for (const r of rows) {
       const i = idxOf(w, r % 2 ? b.odd : b.even, r);

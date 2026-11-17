@@ -342,8 +342,9 @@ describe('地図の生成の欄（BarrierDef.tideGaps・PocketDef.neck）', () =
     expect(JSON.stringify(again.world)).toBe(JSON.stringify(a.world));
   });
 
+  // シナリオ3は区切り2から潮の欄のある地図（scenario3Map.test.ts）。潮の無い前の 8×35 の保存は scenario3OldSave.test.ts
   it('潮の欄の無い地図は今までどおり（潮の地形・中の印が無い）', () => {
-    for (const s of ['corruptionKing', 'frozenKingdom', 'cursedArchipelago']) {
+    for (const s of ['corruptionKing', 'frozenKingdom', 'sandDynasty']) {
       const g = createGame({ seed: 1, scenarioId: s, difficulty: 'normal', party: [{ classId: 'warrior', gender: 'male', name: 'a', playerId: 'P1' }] });
       expect(g.world!.tiles.some((t) => TERRAINS.get(t.t).tide || t.tideIn || t.t === 'reef'), s).toBe(false);
       expect(g.world!.tideFrozen, s).toBeUndefined();

@@ -3,8 +3,27 @@
 // 2) 見えているマスを押すと、マスの説明に帯の1行が出る（西・中央・東）
 // 3) 表示の問題（layoutIssues）が無い。画面の写真は scripts/screenshots/three-roads-<幅>-<番号>.png
 // 使い方: URL=http://127.0.0.1:4188/card-rpg/ node scripts/three-roads.mjs
+// シナリオを選ぶ: TR_SCENARIO=cursedArchipelago node scripts/three-roads.mjs（省略は1本目の corruptionKing。シナリオ3の作り直し 計画 §3-6）。
+// 1本目以外は、伝承の書の記録に「ほかのシナリオをクリア済み」と入れて解放してから選ぶ（adventure.mjs・scourge-7b.mjs と同じ）。写真は three-roads-<シナリオ>-<幅>-<番号>.png
 import { mkdirSync } from 'node:fs';
 import { chromium, depart, layoutIssues, URL } from './lib.mjs';
+
+const SCENARIO_NAMES = {
+  corruptionKing: '侵食の魔王',
+  frozenKingdom: '凍てつく王国',
+  cursedArchipelago: '呪われた群島',
+};
+/** 帯の名前（西・中央・東）と、見取り図の札にあるはずの言葉（各シナリオの map.ts の lanes の name・tag） */
+const LANE_WORDS = {
+  corruptionKing: { lanes: ['西の森', '中央の街道', '東の丘'], tags: ['安全', '魔物多い', '宝'] },
+  frozenKingdom: { lanes: ['凍った湖の近道', '薪の街道', '巨人の尾根'], tags: ['寒い', '魔物多い', '宝'] },
+  cursedArchipelago: { lanes: ['外海の航路', '桟橋の街道', '呪いの島々'], tags: ['水道', '魔物多い', '干潟'] },
+};
+const FIRST_SCENARIO = 'corruptionKing';
+const SCENARIO = process.env.TR_SCENARIO ?? FIRST_SCENARIO;
+if (!SCENARIO_NAMES[SCENARIO]) throw new Error(`知らないシナリオ: ${SCENARIO}（${Object.keys(SCENARIO_NAMES).join(' / ')}）`);
+const WORDS = LANE_WORDS[SCENARIO];
+const SHOT = SCENARIO === FIRST_SCENARIO ? 'three-roads' : `three-roads-${SCENARIO}`;
 
 const browser = await chromium.launch();
 const problems = [];
@@ -14,7 +33,7 @@ for (const [width, height] of [[360, 640], [390, 844]]) {
   const ctx = await browser.newContext({ viewport: { width, height }, hasTouch: true });
   const page = await ctx.newPage();
   const ng = (m) => problems.push(`${width}px: ${m}`);
-  const shot = (n) => page.screenshot({ path: `scripts/screenshots/three-roads-${width}-${n}.png` });
+  const shot = (n) => page.screenshot({ path: `scripts/screenshots/${SHOT}-${width}-${n}.png` });
   const closeOverlays = async () => {
     for (let k = 0; k < 3; k++) {
       const cont = page.getByText('つづける', { exact: true });
@@ -31,8 +50,20 @@ for (const [width, height] of [[360, 640], [390, 844]]) {
 
   await page.goto(URL);
   await page.evaluate(() => { localStorage.clear(); localStorage.setItem('card-rpg/settings', JSON.stringify({ fastMode: true, vibration: false, firstGuide: false })); });
+  // 1本目以外: ほかのシナリオをクリア済みの記録を入れて解放する
+  if (SCENARIO !== FIRST_SCENARIO) {
+    const clears = Object.fromEntries(Object.keys(SCENARIO_NAMES).filter((id) => id !== SCENARIO).map((id) => [id, 1]));
+    await page.evaluate((c) => localStorage.setItem('card-rpg/profile', JSON.stringify({ version: 1, clears: c })), clears);
+  }
   await page.reload();
   await page.getByText('新しい冒険').click();
+  if (SCENARIO !== FIRST_SCENARIO) {
+    const card = page.locator('[data-scenarios] button', { hasText: SCENARIO_NAMES[SCENARIO] }).first();
+    await card.scrollIntoViewIfNeeded();
+    await card.click();
+    if (await card.locator('[data-scenario-lock]').count()) ng(`シナリオ ${SCENARIO} が解放されていない`);
+    await page.waitForTimeout(150);
+  }
   await page.getByText('2人', { exact: true }).click();
   await page.getByText('キャラクター作成へ').click();
   await depart(page);
@@ -67,7 +98,7 @@ for (const [width, height] of [[360, 640], [390, 844]]) {
     if (cut) ng(`帯の札 ${ids[k]} の文字が切れる`);
   }
   const text = await page.locator('[data-overview-lanes]').innerText();
-  for (const word of ['西の森', '中央の街道', '東の丘', '安全', '魔物多い', '宝']) if (!text.includes(word)) ng(`帯の札に「${word}」が無い`);
+  for (const word of [...WORDS.lanes, ...WORDS.tags]) if (!text.includes(word)) ng(`帯の札に「${word}」が無い`);
   const svg = await page.locator('[data-overview-map]').boundingBox();
   if (!svg || svg.y + svg.height > height + 1 || svg.x + svg.width > width + 1) ng(`見取り図の地図が画面からはみ出す（${JSON.stringify(svg)}）`);
   console.log(`${width}×${height} 帯の札: ${text.replace(/\n/g, ' | ')}`);
@@ -85,11 +116,11 @@ for (const [width, height] of [[360, 640], [390, 844]]) {
   }
   await page.waitForTimeout(500);
   const seen = w.tiles.map((t, i) => ({ t, i })).filter(({ t }) => t.seen && !t.f);
-  for (const [lane, word] of [['west', '西の森'], ['center', '中央の街道'], ['east', '東の丘']]) {
+  for (const [lane, word] of [['west', WORDS.lanes[0]], ['center', WORDS.lanes[1]], ['east', WORDS.lanes[2]]]) {
     const cols = lane === 'west' ? [0, 4] : lane === 'center' ? [5, 9] : [10, 14];
     const cands = seen.filter(({ i }) => i % w.width >= cols[0] && i % w.width <= cols[1])
       // 施設の絵と重ならないように、帯の真ん中の列・スタートの少し上の行の、陸のマス
-      .filter(({ t }) => !['water', 'lava', 'crag'].includes(t.t))
+      .filter(({ t }) => !['water', 'lava', 'crag', 'reef', 'tideChannel', 'tideFlat'].includes(t.t))
       .sort((a, b) => {
         const d = (x) => Math.abs(Math.floor(x.i / w.width) - 37) + Math.abs((x.i % w.width) - (cols[0] + cols[1]) / 2);
         return d(a) - d(b);

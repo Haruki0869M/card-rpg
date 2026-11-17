@@ -132,8 +132,8 @@ describe('段階7b: 災厄の中ボスのデータ', () => {
 describe('段階7b: 出る時期と場所（シナリオ1の広い地図だけ）', () => {
   it('新しい冒険: 広い地図は0体から。前の広さの地図のシナリオには出ない', () => {
     expect(newGame().world!.scourgeCount).toBe(0);
-    // 前の広さの地図のシナリオの例（シナリオ2は作り直しの区切り2で広い地図になったので、呪われた群島）
-    const other = newGame('cursedArchipelago');
+    // 前の広さの地図のシナリオの例（シナリオ2・3は作り直しの区切り2で広い地図になったので、砂の王朝）
+    const other = newGame('sandDynasty');
     expect(other.world!.scourgeCount).toBeUndefined();
     let g = other;
     g.world!.keys = ['x'];
