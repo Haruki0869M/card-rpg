@@ -236,10 +236,11 @@ function paintTide(ctx: CanvasRenderingContext2D, id: string, open: boolean, v: 
         const x = cx + (hash01(i * 8 + q, 180) - 0.5) * R * 1.1;
         const y = cy + (hash01(i * 8 + q, 181) - 0.5) * R * 0.8 * ky;
         blob(x, y, R * (0.22 + hash01(i * 8 + q, 182) * 0.12), R * 0.12 * ky * 1.3, hash01(i * 8 + q, 183) * 0.6);
-        ctx.fillStyle = 'rgba(206,186,140,.85)';
+        // 夜の暗い色の下でも砂だと分かるように、明るめの砂の色と濃いふち（2026-11-17）
+        ctx.fillStyle = 'rgba(236,214,160,.95)';
         ctx.fill();
-        ctx.strokeStyle = 'rgba(90,70,40,.6)';
-        ctx.lineWidth = Math.max(0.6, R * 0.025);
+        ctx.strokeStyle = 'rgba(70,50,24,.8)';
+        ctx.lineWidth = Math.max(0.8, R * 0.032);
         ctx.stroke();
       }
       for (let q = 0; q < 3; q++) {
@@ -259,12 +260,12 @@ function paintTide(ctx: CanvasRenderingContext2D, id: string, open: boolean, v: 
     }
   } else if (id === 'tideFlat') {
     if (open) {
-      // 引き潮: ぬれた砂。さざ波の跡と、小さな潮だまり・貝
-      ctx.fillStyle = 'rgba(120,100,70,.18)';
+      // 引き潮: ぬれた砂。さざ波の跡と、小さな潮だまり・貝（夜でも海と見分けられるように、砂を明るく）
+      ctx.fillStyle = 'rgba(240,222,170,.38)';
       poly(ctx, v);
       ctx.fill();
-      ctx.strokeStyle = 'rgba(90,72,46,.45)';
-      ctx.lineWidth = Math.max(0.7, R * 0.025);
+      ctx.strokeStyle = 'rgba(80,60,34,.6)';
+      ctx.lineWidth = Math.max(0.8, R * 0.03);
       for (let q = 0; q < 4; q++) {
         const y = cy + (q - 1.5) * R * 0.24 * ky;
         ctx.beginPath();

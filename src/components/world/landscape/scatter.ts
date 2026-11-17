@@ -116,12 +116,23 @@ export function scatter({ w, geom, levels, links, rivers, blocked, stage }: Scat
   const clearOf = (i: number, x: number, y: number, c: { x: number; y: number }, gap: number) =>
     nearLine(x, y, c.x, c.y, R, links.get(i)) > R * gap && nearLine(x, y, c.x, c.y, R, rivers.get(i)) > R * gap;
 
-  // 灯台: 町ごとに1つ、町のとなりの海のマスのうち、ハッシュで選んだ1マス（町が海に面していなければ無し）
+  // 灯台: 町ごとに1つ、町から2マス以内の海・暗礁のマスのうち、いちばん近い所からハッシュで選んだ1マス（近くに海が無ければ無し）
   const lighthouseTiles = new Set<number>();
   for (let j = 0; j < w.tiles.length; j++) {
     if (w.tiles[j].f?.kind !== 'town') continue;
-    const seas = [0, 1, 2, 3, 4, 5].map((k) => neighborAt(w, j, k)).filter((n): n is number => n !== undefined && T(n) === 'sea');
-    if (seas.length) lighthouseTiles.add(seas.sort((a, b) => hash01(a, 140) - hash01(b, 140))[0]);
+    let ring = [j];
+    const near = new Set([j]);
+    for (let step = 0; step < 2; step++) {
+      const next: number[] = [];
+      for (const a of ring) for (let k = 0; k < 6; k++) {
+        const b = neighborAt(w, a, k);
+        if (b !== undefined && !near.has(b)) { near.add(b); next.push(b); }
+      }
+      // 海か暗礁（岩の上の灯台）。潮の水道・干潟には立てない（開閉の見た目を隠さないように）
+      const seas = next.filter((n) => T(n) === 'sea' || T(n) === 'reef');
+      if (seas.length) { lighthouseTiles.add(seas.sort((a, b) => hash01(a, 140) - hash01(b, 140))[0]); break; }
+      ring = next;
+    }
   }
 
   for (let i = 0; i < w.tiles.length; i++) {
@@ -217,6 +228,10 @@ export function scatter({ w, geom, levels, links, rivers, blocked, stage }: Scat
     }
     if (t === 'blight' || t === 'ash') {
       if (h(28) < 0.6) out.push({ k: t === 'blight' ? 'deadTree' : 'rock', x: c.x + (h(29) - 0.5) * R * 0.8, y: c.y + (h(30) - 0.4) * R * 0.7 * GROUND_K, h: R * (t === 'blight' ? 0.75 : 0.26), v: h(31), tile: i });
+      continue;
+    }
+    if (t === 'reef' && lighthouseTiles.has(i)) {
+      out.push({ k: 'lighthouse', x: c.x + (h(150) - 0.5) * R * 0.2, y: c.y + R * 0.25 * GROUND_K, h: R * 1.05, v: h(151), tile: i });
       continue;
     }
     if (t === 'reef') {
