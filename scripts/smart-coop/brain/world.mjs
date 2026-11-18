@@ -284,6 +284,8 @@ export function worldBrain(v, board) {
   }
   // 5. 行き先を選んである →「ここへ進む」
   const go = findMark(v, 'data-move-go');
+  // 移動の直後に、決まっていない「移動する（移動力?を使う・?マス先）」が一瞬残る（区切り 2-Sb の通しで、押す前に消えて「押す物が無い」に当たった）。? の間は待つ
+  if (go?.enabled && /\?/.test(go.text)) return null;
   if (go?.enabled) return decide(G.moveGo, `「${go.text}」`, T);
   // 6. サイコロを振る
   const roll = findMark(v, 'data-roll-move');
