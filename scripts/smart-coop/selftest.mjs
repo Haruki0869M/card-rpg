@@ -122,6 +122,49 @@ export async function selftest() {
   brainChecks(check);
   // ---- 揺さぶり（区切り 3-S。作り物の View で、種と周期・始まり方・確かめが本物の不具合に当たるか） ----
   await shakeChecks(check);
+  // ---- 区切り 4: 報酬の「先へ進む」は、待つ枠の席の一覧に自分がいなければ押さない（4人で戦闘に出ていない人） ----
+  {
+    const { rewardBrain } = await import('./brain/reward.mjs');
+    const rv = (seat, voters) => ({ seat, screen: 'game', mode: 'reward', layers: [], waits: [], busy: [], actions: [{ css: '[data-reward-finish]', text: '先へ進む', nth: 0, enabled: true, marks: ['data-reward-finish'], rect: [0, 0, 300, 48] }], facts: { rewardVoteSeats: [{ 'data-vote-seats': 'P1,P2' }], voteStatusSeats: voters, rewardStep: [{ 'data-reward-step': 'finish' }] } });
+    const out = rewardBrain(rv('P3', ['P1', 'P2', 'P4']), {});
+    const in4 = rewardBrain(rv('P4', ['P1', 'P2', 'P4']), {});
+    check(out === null && !!in4, '報酬: 待つ枠の一覧に自分の席が無い人は「先へ進む」を押さない（票に入る人は押す）', JSON.stringify({ out, in4: in4?.what }));
+  }
+  // ---- 区切り 4: 扉の票のそろえ方（票の多い扉。同じなら席の番号の小さい人の扉。割れていて自分が少ない方なら、そろえ直す） ----
+  {
+    const { dungeonBrain } = await import('./brain/dungeon.mjs');
+    const door = (c, votes, mine) => ({ 'data-door-choice': c, 'data-door-omen': 'battle', 'data-my-vote': mine ? '1' : null, disabled: null, votes });
+    const dv = (seat, doors) => ({ seat, screen: 'game', mode: 'dungeon', layers: [], actions: [], waits: [], busy: [], facts: { dDoors: doors, dParty: [] } });
+    const a = dungeonBrain(dv('P4', [door('r1c0', 'P2', false), door('r1c1', 'P1', false)]), {});
+    const b = dungeonBrain(dv('P4', [door('r1c0', 'P4', true), door('r1c1', 'P1,P2', false)]), {});
+    const c = dungeonBrain(dv('P1', [door('r1c0', 'P2', false), door('r1c1', 'P1', true)]), {});
+    check(/r1c1/.test(a?.target?.css ?? '') && /r1c1/.test(b?.target?.css ?? '') && c === null, '扉の票: 同じ数なら席の小さい人の扉にそろえる・少ない方に入れていたらそろえ直す・そろえる先の人は待つ', JSON.stringify([a?.what, b?.what, c]));
+  }
+  // ---- 場面から（区切り 4）: 保存の書き換えが、目当ての隣に立たせ・書き換えた中身を報告の行に出す。無理な時は書き換えずに理由を返す ----
+  {
+    const { editSave } = await import('./scenes.mjs');
+    // 横 5 マスの1列の作り物の地図（隣 = 左右）。歩ける = 2 マス以内
+    const bits = {
+      classes: [{ id: 'monk', tier: 'mid' }, { id: 'sage', tier: 'special', from: ['monk'], requires: { feat: 'kills', count: 3, text: '3体倒す' }, name: '賢者' }, { id: 'king', tier: 'top', from: ['monk'], name: '拳王' }],
+      scourges: [{ id: 'sc', name: '災厄' }],
+      neighbors: (w, i) => [i - 1, i + 1].filter((n) => n >= 0 && n < w.tiles.length),
+      reachable: (w, from, b) => new Map(w.tiles.map((_, i) => i).filter((i) => Math.abs(i - from) <= b).map((i) => [i, { cost: 1, prev: from }])),
+      isRandomDungeonTile: (f) => f?.kind === 'dungeon' && f.id.startsWith('random'),
+      heroMaxHp: () => 50,
+    };
+    const g0 = () => ({ mode: 'world', heroes: [{ id: 'h0', classId: 'monk', hp: 10, level: 3, gold: 0 }, { id: 'h1', classId: 'monk', hp: 10, level: 3, gold: 0 }], world: { pos: { h0: 0, h1: 0 }, turn: 'h1', move: 2, worldTurn: 4, wanderers: [{ id: 'w', tile: 4, scourge: 'sc' }], tiles: [{ seen: true }, { seen: true }, { seen: false, f: { kind: 'temple', id: 't' } }, { seen: false }, { seen: false }] } });
+    const sc = editSave(g0(), 'scourge', bits);
+    check(!sc.error && sc.game.world.pos.h0 === 3 && sc.game.world.pos.h1 === 3 && sc.game.heroes.every((h) => h.hp === 50) && sc.changes.some((c) => /災厄/.test(c)), '場面から: 災厄の隣に立たせ、HP を満タンにし、書き換えを行に出す', JSON.stringify(sc.changes ?? sc.error));
+    const sp = editSave(g0(), 'special', bits);
+    check(!sp.error && sp.game.heroes.every((h) => h.level === 5 && h.feats.kills === 3) && [1, 3].includes(sp.game.world.pos.h0), '場面から: 特殊職の直前（Lv5・条件の記録・神殿の隣）', JSON.stringify(sp.changes ?? sp.error));
+    const pd = editSave(g0(), 'peddler', bits);
+    check(!pd.error && pd.game.world.spawns?.[0]?.kind === 'peddler' && pd.game.heroes.every((h) => h.gold === 300), '場面から: 行商人をキャラの隣に置き、お金を足す', JSON.stringify(pd.changes ?? pd.error));
+    const bad = editSave({ ...g0(), mode: 'battle' }, 'scourge', bits);
+    check(!!bad.error && !bad.game, '場面から: 世界マップの保存でなければ書き換えない（理由を返す）', JSON.stringify(bad));
+    const orig = g0();
+    editSave(orig, 'scourge', bits);
+    check(orig.world.pos.h0 === 0 && orig.heroes[0].hp === 10, '場面から: 元の保存は書き換えない（写しを書き換える）');
+  }
 
   // ---- __online を使うのは審判だけ（字で確かめる。計画 §2-4 の守り方1） ----
   const files = [];

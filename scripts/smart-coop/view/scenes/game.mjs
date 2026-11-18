@@ -63,6 +63,8 @@ export const SCENE = {
     eventVoteSeats: { sel: '[data-event-panel] [data-vote-seats]', read: 'marks', attrs: ['data-vote-seats'] },
     // 報酬
     rewardVoteSeats: { sel: '[data-reward-bottom] [data-vote-seats]', read: 'marks', attrs: ['data-vote-seats'] },
+    // 区切り 4: みんなの選択を待つ枠（VoteStatus）の席の札（P1・P2…）= この票に入る人。4人で戦闘に出ていない人は入らない
+    voteStatusSeats: { sel: '[data-vote-status] span.rounded', read: 'texts' },
     rewardStep: { sel: '[data-reward-step]', read: 'marks', attrs: ['data-reward-step'] },
     pickCards: { sel: '[data-pick-card]', read: 'marks', attrs: ['data-pick-card'] },
     // 場面のタブ（A2）

@@ -49,9 +49,13 @@ const sheetOf = (v) => v.layers.find((l) => l.id === 'sheet')?.value ?? null;
 export const offsetOf = (seed, id, p) => parseInt(shortHash(`${seed}|${id}`), 36) % p;
 
 /** 揺さぶりの板（board.sh）を用意する */
-export function shakeInit(board, seed) {
+export function shakeInit(board, seed, people = 2) {
   board.sh ??= {
     seed,
+    // 区切り 4: 人数（4人の時、S1 は P2 と P3 が交代・S13 は2台ずつ）
+    people,
+    // 区切り 4: S13 の種類ごとの数（起きた・OK・NG）
+    s13: {},
     k: Object.fromEntries(SHAKES.map((id) => [id, { opp: 0, count: 0, ok: 0, ng: 0, abort: 0, log: [] }])),
     sub: {},
     m: null,
@@ -422,6 +426,8 @@ function challengeOwner(v, sh) {
     const ck = (v.facts.checkMarks ?? [])[0];
     const spent = ck ? Number(ck['data-challenge-focus']) : 0;
     if (spent < 1 && v.facts.checkPlusOn) return decide(G.checkPlus, '揺さぶり S2: 持ち主がフォーカスを足して待つ', { turn: true, ...P });
+    // 区切り 4 の誤検知の直し: 足すボタンが押せない（持ち主のフォーカスが 0 など）と、確かめる物が無いのに「0 のまま」で NG にしていた（4人の P3）
+    if (spent < 1 && !v.facts.checkPlusOn) m.data.noPlus = true;
     if (!m.data.otherDone) return HOLD;
     return null; // 頭（brain/dungeon）が「挑戦する」
   }
@@ -512,6 +518,9 @@ function s11(v, sh) {
     const e = (v.facts.bEnemies ?? []).find((x) => x['data-dead'] === null && x.intent);
     if (!e) {
       note(sh, 'S11: 予告の出ている敵がいない');
+      // 区切り 4 の誤検知の直し: 4人の通しの1戦目（奇襲が成功して敵の予告がまだ無い・状態の印も無い）で、開く物が何も無いのに NG にしていた。
+      // 開く物が無かった時は「中断」（記録だけ）にする。開けた物が開かない時は、今までどおり NG
+      m.data.nothing = !m.data.listOpened;
       m.step = 'done';
       return null;
     }
@@ -558,10 +567,12 @@ function s10Decline(v, sh) {
 function s10Reinvite(v, sh) {
   const m = sh.m;
   if (m.step !== 'reinvite') return null;
-  const inv = v.actions.find((a) => a.enabled && a.marks.includes('data-invite=no'));
+  // 区切り 4（4人の通しの直し）: 断った人のキャラ（P<n> のキャラは h<n-1>）を誘い直す。前は一覧の先頭を誘い、4人では別の人（P3）のキャラを誘っていた
+  const mine = `h${Number(String(m.seat).slice(1)) - 1}`;
+  const inv = v.actions.find((a) => a.enabled && a.marks.includes('data-invite=no') && a.marks.includes(`data-companion=${mine}`));
   const hero = inv?.marks.find((x) => x.startsWith('data-companion='))?.slice('data-companion='.length);
   if (!hero) return null;
-  return decide(G.invite(hero), `揺さぶり S10: もう1度同行に誘う（${hero}）`, { turn: true, ...P, after: () => { m.step = 'accept'; m.data.hero = hero; } });
+  return decide(G.invite(hero), `揺さぶり S10: もう1度同行に誘う（${hero}）`, { turn: true, ...P, after: () => { m.step = 'accept'; m.data.hero = hero; m.data.inviter = v.seat; } });
 }
 
 // ---------------------------------------------------------------- S12（店の「ほしい！」）
@@ -619,6 +630,9 @@ export function shakeBrain(v, board) {
         return null;
       case 'S10':
         if (m.step === 'reinvite' && v.seat !== m.seat) return s10Reinvite(v, sh);
+        // 区切り 4（4人の通しの直し）: 誘い直した人は、相手が答えるまで動かずに待つ（人も返事を待つ。前は P4 が誘ってすぐ「移動する」を押し、
+        // 誘いが答えられないまま終わって「40 手のあいだ同行にならない」の NG になった。2人の時は P1 の手番の押す順で、たまたま先に答えていた）
+        if (m.step === 'accept' && v.seat === m.data.inviter) return HOLD;
         return null;
       case 'S11':
         return v.seat === m.seat ? s11(v, sh) : null;
@@ -647,6 +661,20 @@ export function shakeBrain(v, board) {
   // 挑む段（持ち主）: 選び直す・任せる・S2
   const ch = challengeOwner(v, sh);
   if (ch) return ch;
+  // 区切り 4: 4人の時、S1 は P2 と P3 が交代でする（計画 §5-2）。だれの番かは、S1 が起きた回数で決める（同じ種なら同じ）
+  const s1Seat = sh.people === 4 && sh.k.S1.count % 2 === 1 ? 'P3' : 'P2';
+  if (v.seat === 'P3' && s1Seat === 'P3') {
+    const pa = pendingAgree(v);
+    if (pa && pa.options.length) {
+      const key = `${pa.kind}|${agreeKey(v)}`;
+      if (opportunity(sh, 'S1', key)) {
+        begin(sh, 'S1', { step: 'open', seat: v.seat, tag: `${pa.kind}・${key.slice(0, 40)}` });
+        Object.assign(sh.m.data, { votes: votesOf(v), kind: pa.kind, other: pa.other, agree: agreeKey(v) });
+        const d = s1(v, sh);
+        return d === HOLD ? HOLD : d;
+      }
+    }
+  }
   if (v.seat === 'P2') {
     const b11 = s11Start(v, sh, board);
     if (b11) return b11;
@@ -669,7 +697,7 @@ export function shakeBrain(v, board) {
         Object.assign(sh.m.data, { other: pa.other, split });
         return s4(v, sh);
       }
-      if (opportunity(sh, 'S1', key)) {
+      if (s1Seat === 'P2' && opportunity(sh, 'S1', key)) {
         begin(sh, 'S1', { step: 'open', seat: v.seat, tag: `${pa.kind}・${key.slice(0, 40)}` });
         Object.assign(sh.m.data, { votes: votesOf(v), kind: pa.kind, other: pa.other, agree: agreeKey(v) });
         const d = s1(v, sh);
@@ -760,7 +788,12 @@ export function shakeObserve(views, board) {
   else if (m?.id === 'S4') observeS4(views, sh, p1, p2);
   else if (m?.id === 'S9') observeS9(views, sh, p1, p2);
   else if (m?.id === 'S10') observeS10(views, sh, p1, p2);
-  else if (m?.id === 'S11' && m.step === 'done') {
+  else if (m?.id === 'S11' && m.step === 'done' && m.data.nothing) {
+    // 開く物（状態の「＋N」・敵の予告）が画面に無かった: 確かめられないので中断（ゲームの不具合とは決めない）
+    sh.k.S11.abort++;
+    sh.k.S11.log.push(`中断: ${m.seat} の画面に、開く物（状態の「＋N」・敵の予告）が無かった`);
+    end(sh);
+  } else if (m?.id === 'S11' && m.step === 'done') {
     result(sh, 'S11', !!(m.data.listOpened || m.data.detailOpened), `${m.seat}: 状態の一覧${m.data.listOpened ? 'を開いて閉じた' : 'は無し'}・予告の説明${m.data.detailOpened ? 'を開いて閉じた' : 'は開かなかった'}`);
     sh.watch.push({ id: 'S11', kind: 'others-move', since: sh.n.tick, ticks: 0 });
     end(sh);
@@ -796,6 +829,22 @@ export function shakeObserve(views, board) {
   // 見張り（揺さぶりの後に「進む」か）
   for (const w of sh.watch.splice(0)) {
     w.ticks++;
+    if (w.kind === 'ready') {
+      // 押した人の画面の「ターン終了」の印が「準備完了を押せる（ready）」以外になった・戦闘が終わった = 進んだ
+      const moved = w.seats.some((s) => {
+        const sv = views.find((x) => x.seat === s);
+        const st = (sv?.facts.bEndTurn ?? [])[0]?.['data-end-turn'];
+        return !sv || sv.mode !== 'battle' || (st && st !== 'ready');
+      });
+      if (moved) {
+        result(sh, w.id, true, `${w.what}: 準備完了の後、ターンが進んだ（${w.ticks} 手）`);
+        continue;
+      }
+      if (w.ticks > 60) {
+        result(sh, w.id, false, `${w.what}: 準備完了の後、60 手のあいだターンが進まない`);
+        continue;
+      }
+    }
     if (w.kind === 'agree') {
       const k = p1 ? agreeKey(p1) : '';
       if (k !== w.key) {
@@ -862,22 +911,29 @@ function observeS1(views, sh, p1, p2) {
     }
   }
   if (m.step === 'afterClose') {
-    // 閉じた後、票の印が消えていない（P2 の画面: 仲間の票。P1 の画面: P1 自身の票）
+    // 閉じた後、票の印が消えていない（揺さぶった人の画面: 仲間の票。票を入れた仲間の画面: その人自身の票）
+    // 区切り 4: 4人で P3 が揺さぶる時にも使えるよう、P1・P2 の決め打ちをやめた（2人の時は前と同じ: 揺さぶる人 = P2・票を入れた仲間 = P1）
     const before = m.data.votes;
-    const now2 = votesOf(p2);
-    const now1 = votesOf(p1);
+    const me = findSeat(views, m.seat) ?? p2;
+    const nowMe = votesOf(me);
     const lost = [];
-    for (const [k, seats] of Object.entries(before)) for (const s of seats) if (!(now2[k] ?? []).includes(s)) lost.push(`P2 の画面の ${k} の ${s}`);
-    const myOnP1 = Object.entries(now1).filter(([, s]) => s.includes('P1')).map(([k]) => k);
+    for (const [k, seats] of Object.entries(before)) for (const s of seats) if (!(nowMe[k] ?? []).includes(s)) lost.push(`${m.seat} の画面の ${k} の ${s}`);
     const otherK = `${m.data.kind}:${m.data.other}`;
-    const p1ok = m.data.kind === 'opener' ? true : myOnP1.includes(otherK);
-    const ok = !lost.length && p1ok;
-    result(sh, 'S1', ok, `シートを閉じた後の票の印: ${ok ? '消えていない' : `消えた（${lost.join('・')}${p1ok ? '' : `・P1 の画面の自分の票 ${otherK}`}）`}`);
+    const voters = m.data.kind === 'opener' ? [] : (before[otherK] ?? []).filter((s) => s !== m.seat);
+    const ownLost = voters.filter((s) => {
+      const pv = findSeat(views, s);
+      return pv && !(votesOf(pv)[otherK] ?? []).includes(s);
+    });
+    const ok = !lost.length && !ownLost.length;
+    result(sh, 'S1', ok, `シートを閉じた後の票の印: ${ok ? '消えていない' : `消えた（${lost.join('・')}${ownLost.length ? `・${ownLost.map((s) => `${s} の画面の自分の票 ${otherK}`).join('・')}` : ''}）`}`);
     // 合意が進むかを見張る
     sh.watch.push({ id: 'S1', kind: 'agree', key: m.data.agree, ticks: 0, what: 'S1' });
     if (m.data.gave) {
       m.step = 'peer';
-      m.data.peer = views.find((v) => v.seat !== m.seat)?.seat;
+      // 区切り 4: 受け取った人 = 渡した相手のキャラの持ち主（キャラ h<n> は P<n+1>。4人で P3 が渡す時も、受け取った人の画面を見る）
+      const n = /^h(\d+)$/.exec(m.data.gave.to ?? '')?.[1];
+      const owner = n !== undefined ? `P${Number(n) + 1}` : null;
+      m.data.peer = (owner && owner !== m.seat && findSeat(views, owner) ? owner : null) ?? views.find((v) => v.seat !== m.seat)?.seat;
     } else end(sh);
     return;
   }
@@ -897,7 +953,11 @@ function observeS2(views, sh) {
     m.data.reset = true;
     result(sh, 'S2', false, `${m.owner}（持ち主）のフォーカスの指定が ${m.data.maxSpent} → ${spent} に戻った（ほかの人がシートを開け閉めしている間）`);
   }
-  if (m.data.otherDone && !m.data.checked && stage) {
+  if (m.data.otherDone && !m.data.checked && stage && m.data.noPlus && !m.data.maxSpent) {
+    m.data.checked = true;
+    sh.k.S2.abort++;
+    sh.k.S2.log.push(`中断: ${m.owner}（持ち主）がフォーカスを足せなかった（足すボタンが押せない）ので、確かめる物が無い`);
+  } else if (m.data.otherDone && !m.data.checked && stage) {
     m.data.checked = true;
     if (!m.data.reset) result(sh, 'S2', (spent ?? 0) >= 1, `ほかの人が装備・道具を開いて閉じた後も、${m.owner} のフォーカスの指定が ${spent}（data-challenge-focus）のまま`);
   }
@@ -921,7 +981,9 @@ function observeS3(views, sh, p1, p2) {
     }
     const chips = views.map((v) => `${v.seat}:${(v.facts.pinChips ?? []).filter((t) => t.includes('P2')).length}`).join(' ');
     const banner = (p1.facts.pinBanner ?? []).some((t) => t.includes('P2'));
-    const status = views.every((v) => v.mode === 'dungeon');
+    // 区切り 4 の誤検知の直し: 前は全端末が dungeon かを見ていた。4人では、ダンジョンに入っていない人（世界マップの P3）がいるので、
+    // 割れた票は正しく出ていたのに NG にしていた。票を入れた2人（P1・P2）がダンジョンの画面のまま（扉が開いていない）かを見る
+    const status = [p1, p2].every((v) => v?.mode === 'dungeon');
     result(sh, 'S3', !!split && status, `票が割れた（P1=${m.data.other}・P2=${m.data.split}）間は扉が開かない: ${split && status ? 'OK' : `NG（P1 の画面 ${p1.mode}）`}`);
     result(sh, 'S3', banner, `「こっち！」の帯が P1 の画面に出る（札 ${chips}）`);
     if (banner) sh.watch.push({ id: 'S3', kind: 'pin-gone', ticks: 0 });
@@ -992,7 +1054,8 @@ function observeS9(views, sh, p1, p2) {
 
 function observeS10(views, sh, p1, p2) {
   const m = sh.m;
-  const inviter = views.find((v) => v.seat !== m.seat);
+  // 区切り 4: 誘い直した人の画面を見る（4人では P1 とは限らない）
+  const inviter = views.find((v) => v.seat === m.data.inviter) ?? views.find((v) => v.seat !== m.seat);
   if (m.step === 'reinvite' && sh.n.tick - (m.data.declinedAt ?? sh.n.tick) > 30) {
     note(sh, 'S10: 断った後、30 手のあいだ誘い直せなかった（手番が移った見立て）', 'warn');
     result(sh, 'S10', true, '断った後に止まらなかった（誘い直しは手番が移ったので無し）');
@@ -1175,6 +1238,10 @@ export async function shakeAfterTick({ fleet, judge, views, board }) {
     const next = judge.actions.slice(c.idx).find((a) => a.result === 'tap' || a.result === 'long');
     if (next) {
       const again = c.presses.find((p) => p.seat === next.seat && next.target?.startsWith(p.css));
+      // 区切り 4: 種類ごとの OK・NG（S13 の NG が 0 になったかを、種類ごとに見る）
+      const t13 = (sh.s13[c.kind] ??= { count: 0, ok: 0, ng: 0, pairs: [] });
+      if (again) t13.ng++;
+      else t13.ok++;
       result(sh, 'S13', !again, again ? `${c.kind}: 2台で同時に押した後、${again.seat} がもう1度同じ物（${again.css}）を押した（${again.seat} の票・選択が画面に入っていなかった見立て。知らせ ${c.toasts.join('・') || 'なし'}）` : `${c.kind}: 同時に押した票が両方とも入った（次の手は ${next.seat}「${String(next.what).slice(0, 30)}」）`);
       sh.simCheck = null;
     } else if (sh.n.tick - (c.tick ??= sh.n.tick) > 40) sh.simCheck = null;
@@ -1275,10 +1342,21 @@ export function pickSimultaneous(wants, views, board) {
     if (ws.length < 2) continue;
     const key = `${ws.map((w) => views[w.i].sig).join(',')}`;
     if (!opportunity(sh, 'S13', key, k)) continue;
+    // 区切り 4: 4人の時は2台ずつ（計画 §5-2・直し3）。どの2台かは、その種類の S13 が起きた回数で順に回す（同じ種なら同じ）
+    const t13 = (sh.s13[k] ??= { count: 0, ok: 0, ng: 0, pairs: [] });
+    if (ws.length > 2) {
+      const a = t13.count % ws.length;
+      ws.splice(0, ws.length, ...[ws[a], ws[(a + 1) % ws.length]].sort((x, y) => x.i - y.i));
+    }
+    t13.count++;
+    t13.pairs.push(ws.map((w) => views[w.i].seat).join('+'));
     sh.k.S13.count++;
     sh.order.push(`S13(${k})`);
     note(sh, `揺さぶり S13 を始める（${k}・${ws.map((w) => `${views[w.i].seat}「${w.d.what}」`).join(' と ')}を同時に押す）`);
-    sh.watch.push({ id: 'S13', kind: 'agree', key: agreeKey(views.find((v) => v.seat === 'P1') ?? views[0]), ticks: 0, what: `S13（${k}）` });
+    // 区切り 4 の誤検知の直し: 「準備完了」は戦闘の中なので、合意の鍵（扉・選択肢など）がターンをまたいでも変わらず、4人の長い戦闘で
+    // 「60 手のあいだ合意が進まない」にしていた。準備完了は、押した人の「ターン終了」の印が変わったか（敵の番に進んだか）で見る
+    if (k === 'ready') sh.watch.push({ id: 'S13', kind: 'ready', seats: ws.map((w) => views[w.i].seat), ticks: 0, what: `S13（${k}）` });
+    else sh.watch.push({ id: 'S13', kind: 'agree', key: agreeKey(views.find((v) => v.seat === 'P1') ?? views[0]), ticks: 0, what: `S13（${k}）` });
     // 押した後の確かめ（shakeAfterTick）: 同時に押した人が、すぐ後にもう1度同じ物を押していないか（自分の票が入っていなかった形）
     sh.simCheck = { kind: k, presses: ws.map((w) => ({ seat: views[w.i].seat, css: w.d.target.css })), idx: null, toasts: [] };
     return { kind: k, wants: ws };
@@ -1295,6 +1373,9 @@ export function shakeReport(board) {
     const s = sh.k[id];
     lines.push(`| ${id} | ${SHAKE_NAME[id]} | ${s.opp} | ${s.count} | ${s.ok} | ${s.ng} | ${s.abort} |`);
   }
+  // 区切り 4: S13 の種類ごと（同時に押した2台の組・OK・NG）
+  const k13 = ['door', 'event', 'opener', 'ready', 'claim', 'reward'];
+  lines.push('', `S13 の種類ごと: ${k13.map((k) => { const t = sh.s13?.[k]; return `${k} 起きた ${t?.count ?? 0}・OK ${t?.ok ?? 0}・NG ${t?.ng ?? 0}${t?.pairs?.length ? `（組 ${[...new Set(t.pairs)].join('・')}）` : ''}`; }).join('／')}`);
   lines.push('', `起きた順（種 ${sh.seed}）: ${sh.order.join(' → ') || 'なし'}`, '');
   for (const id of SHAKES) {
     const s = sh.k[id];

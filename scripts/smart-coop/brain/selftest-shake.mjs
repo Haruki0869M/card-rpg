@@ -83,6 +83,106 @@ export async function shakeChecks(check) {
     views[0].sig = 'busy';
     check(pickSimultaneous(wants, views, b) === null, '揺さぶり S13: ほかの揺さぶりの最中は同時押しにしない');
   }
+  // 区切り 4: 4人の時、S13 は2台ずつ。組は起きた回数で順に回る（同じ種なら同じ）
+  {
+    const pairsOf = () => {
+      const b = {};
+      shakeInit(b, 7, 4);
+      const views = ['P1', 'P2', 'P3', 'P4'].map((s) => view(s, 'battle'));
+      const out = [];
+      for (let k = 0; k < 12; k++) {
+        views[0].sig = `a${k}`;
+        const wants = views.map((_, i) => ({ i, d: { target: { css: '[data-end-turn="ready"]' }, what: '準備完了', turn: true } }));
+        const p = pickSimultaneous(wants, views, b);
+        if (p) out.push(p.wants.map((w) => views[w.i].seat).join('+'));
+        b.sh.simCheck = null;
+      }
+      return out;
+    };
+    const ps = pairsOf();
+    check(ps.length >= 3 && ps.every((p) => p.split('+').length === 2) && new Set(ps).size >= 3 && ps.join() === pairsOf().join(), '揺さぶり S13（4人）: 2台ずつ・組が順に回る・同じ種なら同じ組', ps.join(' '));
+  }
+  // 区切り 4 の誤検知の直し: S11 で開く物（状態の「＋N」・敵の予告）が無い時は NG にせず中断。予告を長押ししても説明が開かない時は NG のまま
+  {
+    const s11case = (intent, detailOpens) => {
+      const b = {};
+      const sh = shakeInit(b, 7);
+      sh.m = { id: 'S11', step: 'intent', seat: 'P2', data: {}, stepTicks: 0, lastStep: 'intent' };
+      const bv = (layers = []) => view('P2', 'battle', { bEnemies: [{ 'data-enemy': 'e0', 'data-dead': null, intent: intent ? '攻撃 8' : null }] }, { layers });
+      for (let k = 0; k < 8 && sh.m; k++) {
+        const v = bv(k > 0 && detailOpens && intent ? [{ id: 'detail' }] : []);
+        const d = shakeBrain(v, b);
+        if (d && typeof d.after === 'function') d.after(); // 押せた事にする（conductor と同じ）
+        shakeObserve([view('P1', 'battle'), v], b);
+      }
+      return { ng: sh.k.S11.ng, ok: sh.k.S11.ok, abort: sh.k.S11.abort };
+    };
+    const none = s11case(false, false);
+    const broken = s11case(true, false);
+    check(none.ng === 0 && none.abort === 1, '揺さぶり S11: 開く物が画面に無い時は NG にしない（中断）', JSON.stringify(none));
+    check(broken.ng >= 1, '揺さぶり S11: 予告を長押ししても説明の窓が開かない時は NG', JSON.stringify(broken));
+  }
+  // 区切り 4 の誤検知の直し: S3 の「割れている間は開かない」は、ダンジョンにいない人（4人の P3）がいても OK。扉が開いた（P1 が別の画面）なら NG
+  {
+    const s3case = (p1mode) => {
+      const b = {};
+      const sh = shakeInit(b, 7, 4);
+      sh.m = { id: 'S3', step: 'checkSplit', seat: 'P2', data: { other: 'r1c1', split: 'r1c0' }, stepTicks: 0, lastStep: 'checkSplit' };
+      const doors = (mine) => ({ dDoors: [{ 'data-door-choice': 'r1c0', 'data-my-vote': mine === 'r1c0' ? '1' : null, votes: 'P2' }, { 'data-door-choice': 'r1c1', 'data-my-vote': mine === 'r1c1' ? '1' : null, votes: 'P1,P4' }], pinBanner: ['P2 こっち！'] });
+      const vs = [view('P1', p1mode, p1mode === 'dungeon' ? doors('r1c1') : {}), view('P2', 'dungeon', doors('r1c0')), view('P3', 'world'), view('P4', 'dungeon', doors('r1c1'))];
+      for (let k = 0; k < 8 && sh.m?.step === 'checkSplit'; k++) shakeObserve(vs, b);
+      return sh.k.S3.log.join('／');
+    };
+    check(/^OK: 票が割れた/.test(s3case('dungeon')), '揺さぶり S3（4人）: ダンジョンにいない人がいても、割れた票の間に扉が開かなければ OK', s3case('dungeon'));
+    check(/NG: 票が割れた/.test(s3case('battle')), '揺さぶり S3: 割れているのに扉が開いた（P1 が別の画面）なら NG', s3case('battle'));
+  }
+  // 区切り 4 の誤検知の直し: S2 で持ち主がフォーカスを足せない（足すボタンが押せない）時は中断。足せたのに 0 に戻った時は今までどおり NG
+  {
+    const s2case = (canPlus) => {
+      const b = {};
+      const sh = shakeInit(b, 7, 4);
+      sh.m = { id: 'S2', step: 'other', owner: 'P3', data: { otherDone: true }, stepTicks: 0, lastStep: 'other' };
+      const ov = view('P3', 'event', { dChallenge: [{ 'data-challenge-mine': '1', 'data-challenge-hero': 'h2' }], checkMarks: [{ 'data-challenge-focus': '0' }], checkPlusOn: canPlus });
+      shakeBrain(ov, b);
+      if (canPlus) sh.m.data.maxSpent = 1;
+      shakeObserve([view('P1', 'event'), ov], b);
+      return { ng: sh.k.S2.ng, abort: sh.k.S2.abort };
+    };
+    const np = s2case(false);
+    const back = s2case(true);
+    check(np.ng === 0 && np.abort === 1 && back.ng === 1, '揺さぶり S2: 持ち主が足せない時は中断・足した後に 0 に戻ったら NG', JSON.stringify({ np, back }));
+  }
+  // 区切り 4 の誤検知の直し: S13 の準備完了は「ターン終了」の印が ready から変われば進んだ（長い戦闘で 60 手を超えても NG にしない）
+  {
+    const readyCase = (after) => {
+      const b = {};
+      const sh = shakeInit(b, 7, 4);
+      sh.watch.push({ id: 'S13', kind: 'ready', seats: ['P3', 'P4'], ticks: 0, what: 'S13（ready）' });
+      const bv = (seat, st) => view(seat, 'battle', { bEndTurn: [{ 'data-end-turn': st }] });
+      for (let k = 0; k < 70; k++) shakeObserve([bv('P1', 'ready'), bv('P2', 'ready'), bv('P3', after), bv('P4', after)], b);
+      return { ok: sh.k.S13.ok, ng: sh.k.S13.ng };
+    };
+    const moved = readyCase('waiting');
+    const stuck = readyCase('ready');
+    check(moved.ok === 1 && moved.ng === 0 && stuck.ng === 1, '揺さぶり S13（準備完了）: 印が変われば OK・60 手 ready のままなら NG', JSON.stringify({ moved, stuck }));
+  }
+  // 区切り 4: 4人の時、S1 は P2 と P3 が交代（2回目は P3 が始める。2人の時は P3 では始めない）
+  {
+    const start = (people, count) => {
+      const b = {};
+      shakeInit(b, 7, people);
+      b.sh.k.S1.count = count;
+      let id = null;
+      for (let i = 0; i < 6 && !id; i++) {
+        const v = view('P3', 'dungeon', { ...doorsP2({ r1: 'P1' }), dEvent: `x${i}` }, { actions: [act('button[data-bar-button="装備"]', '装備', ['data-bar-button=装備'])] });
+        v.facts.dungeonId = [{ 'data-dungeon': `q${i}` }];
+        shakeBrain(v, b);
+        id = b.sh.m?.id ? `${b.sh.m.id}:${b.sh.m.seat}` : null;
+      }
+      return id;
+    };
+    check(start(4, 1) === 'S1:P3' && start(4, 0) === null && start(2, 1) === null, '揺さぶり S1（4人）: P3 は自分の番（起きた回数が奇数）の時だけ始める', `${start(4, 1)} ${start(4, 0)} ${start(2, 1)}`);
+  }
 
   // ---- 3. 確かめが本物の不具合に当たる ----
   const s5case = async ({ resultFocus, focusAfter }) => {
