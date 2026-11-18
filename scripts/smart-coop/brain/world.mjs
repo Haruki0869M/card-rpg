@@ -273,7 +273,11 @@ export function worldBrain(v, board) {
   // 行き先のマスに着いたのに入る物が無い（使い終わった・字が出ない）→ 行き先から外す
   if (plan && plan.c.tile === w.here && plan.c.kind !== 'goal') {
     ws.done.add(w.here);
+    // 依頼の行き先も外す（区切り 2-Sb の通しで、報告する町のマスに着いたのに「〜に入る」が出ず（襲われて落ちた町の形）、
+    // そのマスに留まって「サイコロ → 手番を終える」をくり返し、侵食度が100%になった。bot の間違い）
+    if (plan.c.kind === 'quest') (ws.questTried ??= new Set()).add(plan.c.id);
     ws.target = null;
+    ws.log.push(`行き先 マス ${w.here}（${plan.c.kind}:${plan.c.id}）に着いたが、入る物が無いので外した`);
   }
   // 5. 行き先を選んである →「ここへ進む」
   const go = findMark(v, 'data-move-go');
@@ -297,7 +301,19 @@ export function worldBrain(v, board) {
   }
   // 8. 潮で道が閉じている・近づけない →（夜なら）野営、それ以外は「待機」か「手番を終える」
   const wait = findMark(v, 'data-world-wait');
-  if (wait?.enabled) return decide(G.worldWait, `「${wait.text}」${plan ? '' : '（行き先が無い）'}`, T);
+  if (wait?.enabled) {
+    // 同じマスで同じ行き先のまま3回続けて手番を終えたら、その行き先をあきらめる（侵食度だけが進む形を避ける。次の目的 goal はあきらめない）
+    const key = `${w.here}|${plan?.c.kind}:${plan?.c.tile}`;
+    return decide(G.worldWait, `「${wait.text}」${plan ? '' : '（行き先が無い）'}`, { ...T, after: () => {
+      ws.idle = ws.idle?.key === key ? { key, n: ws.idle.n + 1 } : { key, n: 1 };
+      if (ws.idle.n >= 3 && plan && plan.c.kind !== 'goal') {
+        ws.unreachable.add(plan.c.tile);
+        if (plan.c.kind === 'quest') (ws.questTried ??= new Set()).add(plan.c.id);
+        ws.log.push(`行き先 マス ${plan.c.tile}（${plan.c.kind}:${plan.c.id}）へ3手番近づけないので外した`);
+        ws.target = null;
+      }
+    } });
+  }
   return null;
 }
 
