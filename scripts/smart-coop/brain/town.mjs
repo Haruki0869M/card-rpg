@@ -281,7 +281,8 @@ export function questBrain(v, board) {
   const ws = (board.world ??= {});
   board.questFlow ??= {};
   const qf = (board.questFlow[v.seat] ??= { open: null, need: true, prevMode: null });
-  if (v.mode === 'world' && qf.prevMode && qf.prevMode !== 'world') qf.need = true;
+  // 読み直す時: 次の目的が「町の依頼」の間は世界マップに戻るたび。それ以外は、ダンジョンを出た時・町を出た時（報告できる依頼を、通りがかりの町で報告するため）
+  if (v.mode === 'world' && qf.prevMode && qf.prevMode !== 'world' && (ws.questMode || ['cleared', 'town', 'dungeon'].includes(qf.prevMode))) qf.need = true;
   qf.prevMode = v.mode;
   if (v.mode === 'world') {
     const gt = (v.facts.goalText ?? []).map((x) => x['aria-label']).find(Boolean) ?? '';
@@ -306,6 +307,6 @@ export function questBrain(v, board) {
   }
   if (sheet === 'menu' && qf.open === 'menu') return decide(G.menuRow('依頼と封印の鍵'), 'メニュー「依頼と封印の鍵」', { after: () => { qf.open = 'quests'; } });
   if (v.layers.length || v.mode !== 'world') return null;
-  if (v.seat === 'P1' && ws.questMode && qf.need && !qf.open) return decide(G.worldMenu, `メニューを開く（次の目的が「町の依頼をあと${ws.questMode}つ」。依頼の状態を見る）`, { after: () => { qf.open = 'menu'; } });
+  if (v.seat === 'P1' && qf.need && !qf.open) return decide(G.worldMenu, `メニューを開く（${ws.questMode ? `次の目的が「町の依頼をあと${ws.questMode}つ」。` : ''}依頼の状態を見る）`, { after: () => { qf.open = 'menu'; } });
   return null;
 }

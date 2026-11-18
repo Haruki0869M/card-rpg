@@ -157,7 +157,7 @@ export function destinations(w, board) {
     }
   }
   // 依頼（次の目的が「町の依頼をあと N つ」の時）: 依頼の一覧で読んだ状態から、報告できる町・届ける物の町・名所・徘徊する敵へ（遠くても行く）
-  if (ws.questMode) {
+  {
     const W = KB.world;
     const tileOf = (kind, id) => {
       const vis = w.features.find((f) => f.kind === kind && f.id === id);
@@ -175,9 +175,12 @@ export function destinations(w, board) {
       else if (kind === 'visitLandmark') [t, why] = [tileOf('landmark', q.objective.landmarkId), `依頼「${q.id}」の名所`];
       else if (kind === 'defeatWanderers' && w.wanderers.length) [t, why] = [[...w.wanderers].sort((a, b) => a - b)[0], `依頼「${q.id}」の徘徊する敵`];
       if (t === null || t === undefined) continue;
+      // 次の目的が「町の依頼」でない時は、報告できる町だけを、寄り道として（近い時だけ）
+      if (!ws.questMode && q.state !== 'report') continue;
       const key = `${q.id}|${q.state}|${t}`;
       if (ws.questTried.has(key) && kind !== 'defeatWanderers') continue;
-      out.push({ tile: t, kind: 'quest', id: key, pri: 0, why });
+      if (ws.questMode) out.push({ tile: t, kind: 'quest', id: key, pri: 0, why });
+      else if (!hurry) out.push({ tile: t, kind: 'questNear', id: key, pri: 2, why: `${why}・通りがかり` });
     }
   }
   if (w.goalTile !== null) out.push({ tile: w.goalTile, kind: 'goal', id: 'goal', pri: 9, why: '次の目的（鍵のダンジョン・最後のダンジョン）' });
@@ -265,7 +268,7 @@ export function worldBrain(v, board) {
         ws.done.add(here);
         if (kind === 'town') ws.townsVisited.add(id);
         if (kind === 'temple' || kind === 'altar') ws.sanctuaryTried.add(here);
-        if (plan?.c.kind === 'quest' && plan.c.tile === here) (ws.questTried ??= new Set()).add(plan.c.id);
+        if ((plan?.c.kind === 'quest' || plan?.c.kind === 'questNear') && plan.c.tile === here) (ws.questTried ??= new Set()).add(plan.c.id);
         ws.target = null;
       } });
     }
@@ -275,7 +278,7 @@ export function worldBrain(v, board) {
     ws.done.add(w.here);
     // 依頼の行き先も外す（区切り 2-Sb の通しで、報告する町のマスに着いたのに「〜に入る」が出ず（襲われて落ちた町の形）、
     // そのマスに留まって「サイコロ → 手番を終える」をくり返し、侵食度が100%になった。bot の間違い）
-    if (plan.c.kind === 'quest') (ws.questTried ??= new Set()).add(plan.c.id);
+    if (plan.c.kind === 'quest' || plan.c.kind === 'questNear') (ws.questTried ??= new Set()).add(plan.c.id);
     ws.target = null;
     ws.log.push(`行き先 マス ${w.here}（${plan.c.kind}:${plan.c.id}）に着いたが、入る物が無いので外した`);
   }
