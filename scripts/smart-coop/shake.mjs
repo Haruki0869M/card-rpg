@@ -349,7 +349,12 @@ function s1Peer(v, sh) {
     const has = (v.facts.pItems ?? []).some((r) => r['data-item-row'] === m.data.gave.item);
     // 区切り5（シナリオ3の通しの誤検知の直し）: 受け取る人の袋がいっぱいの時、ゲームは渡すのを断り、渡した人の画面に理由の知らせ
     // （「〇〇の袋がいっぱいです」。src/engine/game/game.ts give）を出す。その時は「受け取った人の袋に無い」が正しい形
-    if (m.data.refused) result(sh, 'S1', !has, `${v.seat}（受け取る人）の袋がいっぱいで、ゲームが渡すのを断った（渡した人の知らせ「${m.data.refused}」）・受け取る人の持ち物に「${KB.items[m.data.gave.item]?.name}」が増えていない`);
+    // 受け取る人が同じ品をもともと持っている事があるので（短い通しで回復薬を持っていた）、あるか無いかでは決めない。
+    // 断りの知らせが出た事を確かめにし、受け取る人の同じ品の数は記録だけ（状態のずれは審判が毎手の状態の印で見ている）
+    if (m.data.refused) {
+      const n = (v.facts.pItems ?? []).filter((r) => r['data-item-row'] === m.data.gave.item).length;
+      result(sh, 'S1', true, `${v.seat}（受け取る人）の袋がいっぱいで、ゲームが渡すのを断り、渡した人に理由の知らせ「${m.data.refused}」が出た（受け取る人の「${KB.items[m.data.gave.item]?.name}」の行 ${n}・記録）`);
+    }
     else result(sh, 'S1', has, `${v.seat}（受け取った人）の画面の持ち物に「${KB.items[m.data.gave.item]?.name}」がある`);
     m.step = 'peerClose';
   }
