@@ -290,6 +290,16 @@ export function worldBrain(v, board) {
   if (roll?.enabled) return decide(G.rollMove, 'サイコロを振る', T);
   // 7. 行けるマスのうち、行き先までの道のりが一番短くなるマス（今の場所より近い時だけ。同じならかかる移動力の小さい方 → 番号の小さい方）
   const reach = v.facts.reach ?? [];
+  // 光るマスを押しても選ばれない（「ここへ進む」が出ない）マスは、2回で別のマスにする（区切り 2-Sb の通しで、今いる町の絵の当たりの範囲が
+  // 隣のマスの数字「1」に重なり、押すと今の町のマスが選ばれて進めなかった。WorldMap.tsx の tap の pickPlace。人が見て決める事として報告する）
+  ws.badReach ??= {};
+  const lr = ws.lastReach;
+  if (lr && lr.here === w.here && lr.sig === reach.map((r) => r['data-reach']).join(',')) {
+    const k = `${w.here}>${lr.tile}`;
+    ws.badReach[k] = (ws.badReach[k] ?? 0) + 1;
+    if (ws.badReach[k] === 2) (board.notes ??= []).push({ kind: 'warn', text: `${v.seat}: 世界マップの光るマス ${lr.tile}（数字の上）を2回押しても選ばれない（今いるマス ${w.here}）。施設の絵の当たりの範囲が隣のマスに重なっている形の見立て（WorldMap.tsx の tap → pickPlace）。bot は別のマスを選んだ` });
+  }
+  ws.lastReach = null;
   if (plan?.dist && reach.length) {
     const here = plan.dist[w.here];
     let best = null;
@@ -297,10 +307,12 @@ export function worldBrain(v, board) {
       const t = Number(r['data-reach']);
       const d = plan.dist[t];
       if (!(d < here)) continue;
+      if ((ws.badReach[`${w.here}>${t}`] ?? 0) >= 2) continue;
       const c = Number(r['data-cost'] ?? 0);
       if (!best || d < best.d || (d === best.d && (c < best.c || (c === best.c && t < best.t)))) best = { t, d, c };
     }
-    if (best) return decide(G.reach(best.t), `行けるマス ${best.t}（移動力 ${best.c}・行き先 ${plan.c.kind}:${plan.c.id} まで残り ${best.d}）`, { ...T, map: true });
+    const sig = reach.map((r) => r['data-reach']).join(',');
+    if (best) return decide(G.reach(best.t), `行けるマス ${best.t}（移動力 ${best.c}・行き先 ${plan.c.kind}:${plan.c.id} まで残り ${best.d}）`, { ...T, map: true, after: () => { ws.lastReach = { here: w.here, tile: best.t, sig }; } });
   }
   // 8. 潮で道が閉じている・近づけない →（夜なら）野営、それ以外は「待機」か「手番を終える」
   const wait = findMark(v, 'data-world-wait');
