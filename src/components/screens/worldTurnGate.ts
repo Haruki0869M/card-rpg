@@ -62,3 +62,15 @@ export function showTurnLock(game: GameState, isLocal: (p: PlayerId) => boolean)
 export function voteOutsider(game: GameState, cmd: GameCommand, isLocal: (p: PlayerId) => boolean): boolean {
   return needsVote(game, cmd) && !voters(game).some(isLocal);
 }
+
+/**
+ * この端末のキャラへの同行の誘いのうち、今答えられる物（オンラインの枠に出す）。
+ * 答えられるのは世界マップにいる時だけ（エンジンの worldInviteAnswer「世界マップにいません」）。
+ * ほかの人が遭遇（戦闘）に入った後などは出さない（2026-11-19 検証 bot の指摘。誘いは消えないので、世界マップに戻るとまた出る）
+ */
+export function answerableInvites(game: GameState, isLocal: (p: PlayerId) => boolean): { target: Hero; by: Hero }[] {
+  if (game.mode !== 'world') return [];
+  return Object.entries(game.world?.invites ?? {})
+    .map(([target, by]) => ({ target: game.heroes.find((h) => h.id === target)!, by: game.heroes.find((h) => h.id === by)! }))
+    .filter((x) => x.target && x.by && isLocal(x.target.playerId));
+}

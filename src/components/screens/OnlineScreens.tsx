@@ -22,6 +22,7 @@ import { HeroFace, Screen } from '../ui/game';
 import { InAppBrowserNote } from '../ui/InAppBrowserNote';
 import { useLowScreen } from '../../hooks/useLowScreen';
 import { chestClaimWaits, facilityWaits, rewardWaits } from './waitNotes';
+import { answerableInvites } from './worldTurnGate';
 
 /** 定型のスタンプ（spec §7.1） */
 export const STAMPS = ['いいね！', '待って！', 'ここ行こう', 'ありがとう', 'まかせて', 'ごめん！'];
@@ -408,10 +409,10 @@ export function OnlineOverlay() {
     if (next !== below) setBelow(next);
   });
   if (!room || screen !== 'game' || !game) return null;
-  // 同行に誘われている（この端末のキャラ）
-  const invites = Object.entries(game.world?.invites ?? {})
-    .map(([target, by]) => ({ target: game.heroes.find((h) => h.id === target)!, by: game.heroes.find((h) => h.id === by)! }))
-    .filter((x) => x.target && x.by && isLocalPlayer(x.target.playerId));
+  // 同行に誘われている（この端末のキャラ）。
+  // 答えられるのは世界マップにいる時だけ（エンジンの worldInviteAnswer「世界マップにいません」）。ほかの人が遭遇（戦闘）に入った後などは枠を出さない
+  // （2026-11-19 検証 bot の指摘: 枠が残り、押しても何も起きなかった。誘いは消えないので、世界マップに戻るとまた出る）
+  const invites = answerableInvites(game, isLocalPlayer);
   const offlineAwaited = awaitedSeats(game).filter((p) => !room.seatOnline(p) && !room.meta?.proxy?.[p] && livingHeroes(game).some((h) => h.playerId === p));
   return (
     <div ref={box} data-online-overlay data-online-below={below ?? undefined} style={{ zIndex: LAYER.online, paddingTop: below ?? undefined }} className="pointer-events-none absolute inset-x-0 top-0 flex flex-col items-center gap-1 px-3 pt-14">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chestLeaveGate, shrineShared, showTurnLock, voteOutsider, worldChestTurnHero } from './worldTurnGate';
+import { answerableInvites, chestLeaveGate, shrineShared, showTurnLock, voteOutsider, worldChestTurnHero } from './worldTurnGate';
 import type { GameState, Hero, PlayerId } from '../../types';
 
 // 必要な項目だけの冒険の状態（画面用の判断なので、エンジンは通さない）
@@ -134,5 +134,18 @@ describe('2026-11-19: その場面にいない人の票のボタン（押して�
     const down = { ...kai, hp: 0 } as Hero;
     const g = state({ heroes: [eld, rina, down], mode: 'reward', chest: undefined, party: ['eld', 'rina', 'kai'] });
     expect(voteOutsider(g, finish, onlyP3)).toBe(true);
+  });
+});
+
+describe('2026-11-19: 同行の誘いの枠は、答えられる時（世界マップ）だけ出す', () => {
+  const eld = hero('eld', 'P1');
+  const rina = hero('rina', 'P2');
+  const g = (mode: string) => ({ mode, heroes: [eld, rina], world: { turn: 'eld', invites: { rina: 'eld' } } }) as unknown as GameState;
+  it('世界マップ: 誘われた P2 の画面に出る。誘った P1 の画面には出ない', () => {
+    expect(answerableInvites(g('world'), onlyP2).map((x) => [x.target.id, x.by.id])).toEqual([['rina', 'eld']]);
+    expect(answerableInvites(g('world'), onlyP1)).toEqual([]);
+  });
+  it('遭遇の戦闘・報酬・町などに入った後は出さない', () => {
+    for (const m of ['battle', 'reward', 'town', 'encounter', 'chest']) expect(answerableInvites(g(m), onlyP2)).toEqual([]);
   });
 });
