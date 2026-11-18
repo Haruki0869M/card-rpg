@@ -24,10 +24,22 @@ function doorBrain(v, board) {
   if (!doors.length) return null;
   const st = dstate(board);
   const all = v.facts.dDoors ?? [];
-  // 自分の票が入っていれば待つ
-  if (all.some((d) => d['data-my-vote'] !== null)) return null;
+  // 区切り 4（4人の通しの直し）: そろえる先は「票の一番多い扉。同じ数なら、席の番号の一番小さい人の扉」（前は並びの先頭の扉で、4人では
+  // 揺さぶり S3 でわざと割った P2 の扉に P4 がそろえ、P2 がそろえ直した後も P4 が待ち続けて「互いに待つ」になった）
+  const seatNo = (s) => Number(String(s).slice(1)) || 9;
+  const tally = all.map((d) => {
+    const seats = [...new Set([...seatsOf(d.votes), ...(d['data-my-vote'] !== null ? [v.seat] : [])])];
+    return { d, n: seats.length, low: Math.min(9, ...seats.map(seatNo)) };
+  }).filter((x) => x.n > 0).sort((a, b) => b.n - a.n || a.low - b.low);
+  const mineD = all.find((d) => d['data-my-vote'] !== null);
+  // 自分の票が入っていれば待つ。ただし票が割れていて、自分の扉がそろえる先でなければ、そろえ直す
+  if (mineD) {
+    const lead = tally[0]?.d;
+    if (tally.length > 1 && lead && lead !== mineD && lead.disabled === null) return decide(G.doorPick(lead['data-door-choice']), `扉 ${lead['data-door-choice']}: 票が割れているので、票の多い（同じなら席の番号の小さい人の）扉にそろえ直す`, T);
+    return null;
+  }
   // ほかの人の票があれば、その扉にそろえる（全員一致で開く）
-  const voted = all.find((d) => seatsOf(d.votes).length > 0);
+  const voted = tally[0]?.d;
   if (voted) {
     const k = doorKindOf(voted);
     return decide(G.doorPick(voted['data-door-choice']), `扉 ${voted['data-door-choice']}（${DOOR_KINDS[k]?.name ?? k}）: 仲間の票にそろえる`, T);

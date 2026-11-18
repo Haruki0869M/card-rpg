@@ -130,6 +130,16 @@ export async function selftest() {
     const in4 = rewardBrain(rv('P4', ['P1', 'P2', 'P4']), {});
     check(out === null && !!in4, '報酬: 待つ枠の一覧に自分の席が無い人は「先へ進む」を押さない（票に入る人は押す）', JSON.stringify({ out, in4: in4?.what }));
   }
+  // ---- 区切り 4: 扉の票のそろえ方（票の多い扉。同じなら席の番号の小さい人の扉。割れていて自分が少ない方なら、そろえ直す） ----
+  {
+    const { dungeonBrain } = await import('./brain/dungeon.mjs');
+    const door = (c, votes, mine) => ({ 'data-door-choice': c, 'data-door-omen': 'battle', 'data-my-vote': mine ? '1' : null, disabled: null, votes });
+    const dv = (seat, doors) => ({ seat, screen: 'game', mode: 'dungeon', layers: [], actions: [], waits: [], busy: [], facts: { dDoors: doors, dParty: [] } });
+    const a = dungeonBrain(dv('P4', [door('r1c0', 'P2', false), door('r1c1', 'P1', false)]), {});
+    const b = dungeonBrain(dv('P4', [door('r1c0', 'P4', true), door('r1c1', 'P1,P2', false)]), {});
+    const c = dungeonBrain(dv('P1', [door('r1c0', 'P2', false), door('r1c1', 'P1', true)]), {});
+    check(/r1c1/.test(a?.target?.css ?? '') && /r1c1/.test(b?.target?.css ?? '') && c === null, '扉の票: 同じ数なら席の小さい人の扉にそろえる・少ない方に入れていたらそろえ直す・そろえる先の人は待つ', JSON.stringify([a?.what, b?.what, c]));
+  }
   // ---- 場面から（区切り 4）: 保存の書き換えが、目当ての隣に立たせ・書き換えた中身を報告の行に出す。無理な時は書き換えずに理由を返す ----
   {
     const { editSave } = await import('./scenes.mjs');
