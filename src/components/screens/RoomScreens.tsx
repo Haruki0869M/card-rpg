@@ -133,6 +133,9 @@ export function EventScreen() {
     if (!h) return null;
     return { stat: STAT_LABEL[c.stat], pct: optionPct(h, c), hero: h };
   };
+  // 世界マップのマスのイベントは、手番のキャラの担当の人だけが選ぶ。手番でない人の画面では、選択肢を薄くして押せなくする
+  // （2026-11-18: 明るいままで押せそうに見え、押しても「担当の人が操作します」と出るだけだったため。オーナーの決定 A。字は今までどおり読める）
+  const notMyTurn = showTurnLock(game, isLocalPlayer);
   const options = (
     <div className="mt-3 flex flex-col gap-2">
       <VoteStatus />
@@ -145,7 +148,8 @@ export function EventScreen() {
         return (
           <button
             key={i}
-            disabled={!!st.reason}
+            disabled={!!st.reason || notMyTurn}
+            data-option-wait={notMyTurn ? 1 : undefined}
             onClick={() => choose(i)}
             aria-pressed={shared ? mine : undefined}
             data-event-option={i}
