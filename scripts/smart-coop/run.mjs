@@ -30,6 +30,7 @@ import { coverageObserve } from './coverage.mjs';
 import { runFull } from './run-full.mjs';
 import { provisionalBrain } from './brain/provisional.mjs';
 import { shakeBrain } from './brain/shake.mjs';
+import { shakeBrain as shakeBrain3, shakeIdle, HOLD } from './shake.mjs';
 import { battleBrain, battleConfirmBrain, battleObserve } from './brain/battle.mjs';
 import { rewardBrain, meOf } from './brain/reward.mjs';
 import { dungeonBrain, dungeonObserve } from './brain/dungeon.mjs';
@@ -44,6 +45,19 @@ import { now, log, wait } from './util.mjs';
  * 戦闘で bot が自分で開いた道具袋のシートは、common が「うっかり開いたシート」として閉じないよう、戦闘の頭を先に聞く。
  */
 export function brainFor(shake) {
+  // 区切り 3-S: shake = 'all' … 揺さぶり S1〜S13（shake.mjs）を頭の前と後に聞く。'sheet-wait' … 区切り 1-J の揺さぶり1つだけ（brain/shake.mjs）
+  const all = shake === 'all';
+  const inner = innerBrain(all ? null : shake);
+  if (!all) return inner;
+  return (v, board) => {
+    const s = shakeBrain3(v, board);
+    if (s === HOLD) return null;
+    if (s) return s;
+    return inner(v, board) ?? shakeIdle(v, board);
+  };
+}
+
+function innerBrain(shake) {
   return (v, board) => {
     const pouch = v.mode === 'battle' && v.layers.some((l) => l.id === 'sheet' && l.value === 'pouch');
     return (

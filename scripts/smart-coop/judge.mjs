@@ -7,7 +7,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { assertLocalUrl } from './fleet.mjs';
 import { readAll } from './view/index.mjs';
-import { now, until, wait } from './util.mjs';
+import { now, until, wait, withTimeout } from './util.mjs';
 
 /** 書く入口（通しの間は使わない。計画 §2-4 の表） */
 const WRITERS = ['send', 'next', 'inject', 'resync', 'setProxy', 'goOffline', 'goOnline', 'stamp', 'openSheet', 'beforeRoom'];
@@ -30,6 +30,7 @@ export const KINDS = {
   seal: '書く入口が呼ばれた',
   timeout: '時間切れ',
   lobby: '部屋に入れない',
+  shake: '揺さぶりの確かめ NG',
 };
 
 /** 各端末で、書く入口を差し替える仕掛け（ページが読み込まれるたびに効く。__online が置かれた瞬間に包む） */
@@ -211,7 +212,7 @@ export class Judge {
 
   /** 全端末の状態の印（読むだけ） */
   fingerprints() {
-    return Promise.all(this.devices.map((d) => d.page.evaluate(readFingerprint).catch((e) => ({ ready: false, error: e.message }))));
+    return Promise.all(this.devices.map((d) => withTimeout(d.page.evaluate(readFingerprint), 15000, `fingerprint ${d.seat}`).catch((e) => ({ ready: false, error: e.message }))));
   }
 
   /** 全端末の seq の最大（押して効いたかの確かめ・止まりの検出に使う） */
@@ -327,6 +328,19 @@ export class Judge {
     const seq = await this.maxSeq();
     const sigs = views.map((v) => v.sig).join(',');
     const busy = views.some((v) => v.busy.length);
+    // 区切り 3-S の直し: 演出中の印がずっと消えない形を見逃していた（演出中は「進んでいる」扱いにしていたので、止まりにならず、通しが何分も黙って止まった）。
+    // 同じ演出の印が 45 秒より長く消えなければ「止まり」（計画 §3-1 の上限20秒を、重い PC のために長めに）。自己テスト: brain/selftest-shake.mjs「演出が終わらない」
+    const busyKey = views.map((v) => `${v.seat}:${v.busy.join('+')}`).filter((x) => !x.endsWith(':')).join(',');
+    if (busyKey) {
+      if (this.busyKey !== busyKey) {
+        this.busyKey = busyKey;
+        this.busySince = Date.now();
+      } else if (Date.now() - this.busySince > 45000) {
+        await this.fail('stuck', { text: `演出中の印が ${Math.round((Date.now() - this.busySince) / 1000)} 秒消えない: ${busyKey}`, key: `busy|${busyKey}` });
+        this.busySince = Date.now();
+        return 'stuck';
+      }
+    } else this.busyKey = null;
     if (seq > this.lastSeq || sigs !== this.lastSigs || busy) {
       this.lastProgress = Date.now();
       this.lastSeq = Math.max(this.lastSeq, seq);
@@ -363,6 +377,34 @@ export class Judge {
       return true;
     }
     return false;
+  }
+
+  /**
+   * 区切り 3-S: 揺さぶりの確かめ（S5・S6 のフォーカスが減ったか）に使う、キャラの数の写し（読むだけ。頭には渡さない）。
+   * 部屋に入っている最初の端末の状態の写し（__online.game()）から、キャラごとの id・席・HP・フォーカスだけを返す。読めなければ null
+   */
+  async heroes() {
+    for (const d of this.devices) {
+      if (d.page.isClosed()) continue;
+      const hs = await withTimeout(d.page
+        .evaluate(() => {
+          try {
+            const g = window.__online?.game();
+            return g?.heroes ? g.heroes.map((h) => ({ id: h.id, playerId: h.playerId, hp: h.hp, focus: h.focus })) : null;
+          } catch {
+            return null;
+          }
+        }), 15000, `heroes ${d.seat}`)
+        .catch(() => null);
+      if (hs) return hs;
+    }
+    return null;
+  }
+
+  /** 区切り 3-S: 席ごとの「ホストか」（S8 の記録。読むだけ） */
+  async hostOf() {
+    const fps = await this.fingerprints();
+    return Object.fromEntries(fps.map((f, i) => [this.devices[i].seat, f.ready ? !!f.isHost : null]));
   }
 
   /** 部屋に入る前に使う: 少し待つ（審判が見張る間隔） */

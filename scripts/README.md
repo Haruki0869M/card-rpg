@@ -38,6 +38,7 @@
 
 ## 賢いマルチプレイ検証 bot（`smart-online-coop.mjs`・中身は `smart-coop/`。計画 docs/tasks/smart-coop-bot-detail-plan.md）
 2〜4台（P1 390×844・P2 390×540・P3 360×640・P4 412×860）で、全部画面のボタンを押して遊び、押す前にかぶさり・窓の潰れ・はみ出しを調べ、毎ステップ全端末の状態の印を比べる。
+区切り 3-S で揺さぶり S1〜S13（`smart-coop/shake.mjs`。計画 §5・直し3）を足した。`SMART_MODE=full` では既定で全部入る（`SMART_SHAKE=none` で入れない）。順番は種と周期で決まる（同じ種なら同じ）。確かめが NG なら失敗「揺さぶりの確かめ NG」。報告の「揺さぶり」に機会・起きた回数・確かめの OK/NG、網羅の表に S1〜S13 と実機の不具合の確かめ6行が出る。`SMART_STOP_ON`（失敗の種類か字の正規表現）に当たる失敗を見つけたら、そこで終える（見逃しの証明で、壊した版に当てる時に使う）。
 区切り 2-Sb で `SMART_MODE=full`（新しい冒険 → エンディングかゲームオーバーまで。ゲームオーバーなら新しい冒険で網羅の表の残りを続ける。`SMART_RESTARTS` = やり直しの上限・既定 2）を足した。頭は `brain/world`（網羅の表から行き先・道探し・遭遇）・`brain/town`（町・祠・神殿・転職・装備）、網羅の表は `coverage.mjs`（ゲームのデータから作る）。報告に網羅の表・回ごとの結果・転職の時期・終わりの侵食度が出る。
 区切り 2-Sa（`SMART_MODE=first-dungeon` = 新しい冒険 → 最初の鍵のダンジョンをボスまで制覇して世界マップに戻るまで）。頭は `brain/battle`（予告を読む: BREAK・連携・回復・手数読み）・`brain/reward`（成長 → カード → 取り合い）・`brain/dungeon`（扉の種類・休憩・イベントの2段の合意・宝箱の開け役・漂流物の山・キャラの作業・制覇の後）・`brain/common`・`brain/world`（歩くだけ）・`brain/provisional`（残りの場面の仮の頭）。説明書き（カード・ジョブ・装備）は `content/`（始める前に vite で src を読む）。網羅の表・町・揺さぶりは後の区切り。
 - 自己テスト（ゲームもエミュレーターも要らない）: `node scripts/smart-coop/selftest.mjs`（または `SMART_MODE=selftest node scripts/smart-online-coop.mjs`）

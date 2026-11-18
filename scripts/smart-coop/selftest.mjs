@@ -15,6 +15,7 @@ import { Judge } from './judge.mjs';
 import { Conductor } from './conductor.mjs';
 import { wait } from './util.mjs';
 import { brainChecks } from './brain/selftest-brain.mjs';
+import { shakeChecks } from './brain/selftest-shake.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = process.env.SMART_OUTPUT ?? 'screenshots/smart-coop/selftest';
@@ -53,6 +54,9 @@ const FIX = {
   // 区切り 2-Sb の直し: シートの中の操作で開いた確認の窓が × の上にある（正しい形）／転職の専用カード選び（畳んだ案内は無い形）
   'sheet-confirm-above': page(`<div data-sheet="jobs" class="abs" style="left:0;top:0;width:390px;height:500px;background:#222;display:flex;flex-direction:column"><button data-sheet-close style="height:48px;width:48px">×</button><div data-sheet-body style="height:400px;overflow-y:auto"><div style="height:300px">転職先</div></div><div class="abs" style="left:0;top:0;width:390px;height:500px;background:rgba(0,0,0,.6)"><div data-confirm style="margin-top:300px"><button data-confirm-ok style="height:48px">転職する</button></div></div></div>`),
   'job-pick-ok': page(`<div data-job-pick class="abs" style="left:0;top:0;width:390px;height:500px;background:#0b0910;overflow-y:auto"><button data-pick-card="0" style="height:160px;width:100px">カード</button></div>`),
+  // 区切り 3-S の直し: 説明の窓（スクロールする）の中の状態の一覧（ul）は、窓の下に伸びていても画面の外の窓ではない／状態の一覧の窓そのものが外に出ていれば当たる
+  'detail-statuslist-ok': page(`<div data-detail-popup class="abs" style="left:8px;top:48px;width:370px;height:400px;overflow-y:auto;background:#222"><div style="height:300px">説明</div><ul data-status-list-body style="height:400px;margin:0">状態</ul></div>`),
+  'statuslist-off': page(`<div data-status-list class="abs" style="left:8px;top:400px;width:370px;height:300px;background:#222"><ul data-status-list-body>状態</ul></div>`),
   'sheet-offscreen': page(`<div data-sheet="pouch" class="abs" style="left:0;top:-60px;width:390px;height:400px;background:#222;display:flex;flex-direction:column"><div data-sheet-body style="height:300px;overflow-y:auto"><div style="height:600px">長い中身</div></div></div>`),
   // ③ はみ出し
   'overflow-bad': `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>body{margin:0;font:14px sans-serif}</style></head><body>
@@ -116,6 +120,8 @@ export async function selftest() {
 
   // ---- 頭（区切り 2-Sa。作り物の説明書きと View で、決まりどおりに選ぶか） ----
   brainChecks(check);
+  // ---- 揺さぶり（区切り 3-S。作り物の View で、種と周期・始まり方・確かめが本物の不具合に当たるか） ----
+  await shakeChecks(check);
 
   // ---- __online を使うのは審判だけ（字で確かめる。計画 §2-4 の守り方1） ----
   const files = [];
@@ -222,6 +228,12 @@ export async function selftest() {
     w = await win();
     check(w.some((t) => t.includes('画面の外')) && w.some((t) => t.includes('×')), '② 窓の潰れ: 画面の外に出た窓・×が無い窓に当たる', w.join('／'));
 
+    await open('detail-statuslist-ok');
+    w = await win();
+    check(!w.some((t) => t.includes('status-list') || t.includes('画面の外')), '② 窓の潰れ: 説明の窓の中の状態の一覧（ul が窓の下に伸びる）は当たらない（区切り 3-S の直し）', w.join('／'));
+    await open('statuslist-off');
+    w = await win();
+    check(w.some((t) => t.includes('画面の外')), '② 窓の潰れ: 状態の一覧の窓そのものが画面の外に出ていれば当たる', w.join('／'));
     await open('sheet-confirm-above');
     w = await win();
     check(!w.length, '② 窓の潰れ: シートの中の操作で開いた確認の窓が × の上にあるのは当たらない（区切り 2-Sb の直し）', w.join('／'));

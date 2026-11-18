@@ -120,6 +120,8 @@ function eventBrain(v, board) {
     const k = optionKind(o);
     let s = k === 'check' ? o.chance : k === 'leave' || k === 'other' ? 45 : k === 'pay' ? 35 : 30;
     if (!st.events[k]) s += k === 'check' ? 10 : 20;
+    // 区切り 3-S: 揺さぶり S5（挑む段でフォーカスを足して挑む）・「選び直す」「任せる」がまだなら、判定つきを先に（みんなで決めるイベントの時だけ）
+    if (k === 'check' && board.sh && !board.sh.flags.s5done && (v.facts.dParty ?? []).length >= 2) s += 40;
     if (!best || s > best.s) best = { o, k, s };
   }
   if (!best) return null;
@@ -181,7 +183,7 @@ function chestBrain(v, board) {
 }
 
 /** キャラの作業（data-hero-task の窓。ダンジョンでも世界マップでも出る） */
-export function heroTaskBrain(v) {
+export function heroTaskBrain(v, board = {}) {
   const task = (v.facts.dTask ?? [])[0];
   if (!task) return null;
   const title = task.title ?? '';
@@ -196,16 +198,49 @@ export function heroTaskBrain(v) {
     const f = ranked[0];
     return decide(G.flotsamPick(f.pick ?? f.i), `漂流物の山「${KB.items[f.id]?.name ?? f.id}」（${f.gold ? 'お金に換わる' : '袋に入る'}${(v.facts.dFlotsamFull ?? 0) ? '・袋がいっぱい' : ''}）`);
   }
+  // 区切り 3-S（2-Sb の作り残し）: 晶石の祭壇の2つの使い方（data-altar-mode）を両方通す。まだ使っていない方を先に（＋に強化 → 変異させる）
+  let altarMode = null;
+  if (kind === 'altar') {
+    const modes = v.facts.altarModes ?? [];
+    if (modes.length) {
+      const used = (board.altarUsed ??= {});
+      const want = !used.upgrade ? 'upgrade' : !used.transmute ? 'transmute' : 'upgrade';
+      const cur = modes.find((m) => m['aria-pressed'] === 'true')?.['data-altar-mode'];
+      if (cur !== want && modes.some((m) => m['data-altar-mode'] === want)) return decide(G.altarMode(want), `晶石の祭壇: 「${want === 'upgrade' ? '＋に強化' : '変異させる'}」を選ぶ（2つの使い方を両方通す）`);
+      altarMode = cur ?? want;
+    }
+  }
   // カードの作業（強化・外す・捧げる・祭壇）。行商人の札（買う物）はここで選ばない（区切り 2-Sb の通しで、お金の足りない札を選んで「決める」が押せなかった。bot の間違い）
   const cards = kind === 'peddler' ? [] : v.facts.dTaskCards ?? [];
   if (cards.length) {
     const me = { job: null };
     const vals = cards.map((c) => ({ i: c['data-pick-card'], name: c['aria-label'], val: cardValue(KB.cardByName[c['aria-label']], me.job), on: c['aria-pressed'] === 'true' }));
-    const worst = /外す|捧げる/.test(title);
+    // 変異させるのは値打ちの一番低い札（変わっても惜しくない札）【提案】
+    const worst = /外す|捧げる/.test(title) || altarMode === 'transmute';
     const pick = [...vals].sort((a, b) => (worst ? a.val - b.val : b.val - a.val) || Number(a.i) - Number(b.i))[0];
     const panel = (v.facts.dTaskPanel ?? [])[0];
-    if (pick.on && panel) return decide(G.taskCardGo, `${title}: 「${pick.name}」に決める`);
+    if (pick.on && panel) {
+      return decide(G.taskCardGo, `${title}: 「${pick.name}」に決める${altarMode ? `（${altarMode === 'upgrade' ? '＋に強化' : '変異させる'}）` : ''}`, altarMode ? { after: () => {
+        (board.altarUsed ??= {})[altarMode] = true;
+        (board.covMarks ??= []).push({ id: `altar:${altarMode}`, how: `${v.seat}: 晶石の祭壇で「${altarMode === 'upgrade' ? '＋に強化' : '変異させる'}」を選び、「${pick.name}」に決めた` });
+      } } : {});
+    }
     return decide(G.taskCard(pick.i), `${title}: 「${pick.name}」を選ぶ（${worst ? '値打ちの一番低い札' : '値打ちの一番高い札'}）`);
+  }
+  // 区切り 3-S（2-Sb の作り残し）: 行商人で1回は買う。お金の足りる一番安い品（同じなら上）。冒険の中で1回だけ【提案】
+  if (kind === 'peddler' && !board.peddlerBought) {
+    const gold = Number(/所持金\s*(\d+)/.exec(v.facts.peddlerGold ?? '')?.[1] ?? 0);
+    const items = (v.facts.peddlerItems ?? [])
+      .map((r, i) => ({ i, word: (r.price ?? '').trim(), price: Number(/(\d+)G/.exec(r.price ?? '')?.[1] ?? NaN), off: (r.off ?? 0) > 0, name: r.name }))
+      .filter((x) => !x.off && Number.isFinite(x.price) && x.price <= gold)
+      .sort((a, b) => a.price - b.price || a.i - b.i);
+    if (items.length) {
+      const it = items[0];
+      return decide(G.peddlerBuy(it.word), `行商人で「${it.name}」を買う（${it.price}G・所持金 ${gold}G）`, { after: () => {
+        board.peddlerBought = true;
+        (board.covMarks ??= []).push({ id: 'peddler-buy', how: `${v.seat}: 行商人で「${it.name}」の「${it.word}」を押した（所持金 ${gold}G）` });
+      } });
+    }
   }
   // お供: 毛色が出たら「お供にする」（名前は例のまま）
   if (kind === 'pet' || /旅のお供/.test(title)) {
@@ -276,7 +311,7 @@ export function dungeonObserve(views, board) {
 export function dungeonBrain(v, board) {
   if (v.screen !== 'game') return null;
   if (hasLayer(v, 'confirm') || hasLayer(v, 'story')) return null;
-  const task = heroTaskBrain(v);
+  const task = heroTaskBrain(v, board);
   if (task) return task;
   if (hasLayer(v, 'sheet')) return null;
   meOf(board, v.seat);

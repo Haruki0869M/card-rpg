@@ -25,7 +25,7 @@ export const PART = {
     wFeatures: { when: ['world'], sel: '[data-feature][data-tile]', read: 'attrs', attrs: ['data-feature', 'data-tile', 'data-used'], hidden: true },
     // 出現スポット（A8）・徘徊する敵（A9）・道しるべ
     wSpawns: { when: ['world'], sel: '[data-spawn]', read: 'attrs', attrs: ['data-spawn', 'data-tile', 'data-spawn-left'], hidden: true },
-    wWanderers: { when: ['world'], sel: '[data-wanderer]', read: 'attrs', attrs: ['data-wanderer', 'data-tile'], hidden: true },
+    wWanderers: { when: ['world'], sel: '[data-wanderer]', read: 'attrs', attrs: ['data-wanderer', 'data-tile', 'data-scourge'], hidden: true },
     // 上の帯（A11）: 侵食度・時間・潮
     wCorruption: { sel: '[data-corruption]', read: 'attrs', attrs: ['data-corruption'], hidden: true },
     wTime: { sel: '[data-time]', read: 'attrs', attrs: ['data-time'], hidden: true },

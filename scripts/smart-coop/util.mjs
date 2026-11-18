@@ -30,5 +30,16 @@ export function shortHash(s) {
   return h.toString(36);
 }
 
+/**
+ * 区切り 3-S: 上限つきで待つ（ページの中の処理が返らない時に、台本ごと止まらないように）。上限を超えたら例外（呼ぶ側が「読めない」として扱う）
+ */
+export function withTimeout(p, ms, label = '') {
+  let t;
+  return Promise.race([p, new Promise((_, rej) => { t = setTimeout(() => rej(new Error(`Timeout ${ms}ms ${label}`)), ms); })]).finally(() => clearTimeout(t));
+}
+
+/** 区切り 3-S: 今どの処理を待っているか（見張りが、長く返らない処理の名前を出す） */
+export const phase = { name: '', at: Date.now(), set(n) { this.name = n; this.at = Date.now(); } };
+
 export const now = () => new Date().toISOString();
 export const log = (...a) => console.log('[smart-coop]', ...a);

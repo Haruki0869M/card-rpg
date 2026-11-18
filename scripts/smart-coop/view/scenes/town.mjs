@@ -25,7 +25,7 @@ export const PART = {
     // 「〇〇が町にいます 120G」（お金は字だけ）
     tVisitor: { when: ['town'], sel: 'div.mx-3.mt-1', text: 'が町にいます', exact: false, read: 'texts' },
     tQuests: { sel: '[data-quest]', read: 'rows', attrs: ['data-quest', 'data-quest-state'], textMax: 80, sub: { action: { sel: '[data-quest-action]', read: 'attr', attr: 'data-quest-action' }, off: { sel: '[data-quest-action][disabled]', read: 'count' } } },
-    tShop: { sel: '[data-shop-row]', read: 'rows', attrs: ['data-shop-row', 'data-item-id', 'data-price'], textMax: 60, sub: { buyOff: { sel: '[data-shop-buy][disabled]', read: 'count' } } },
+    tShop: { sel: '[data-shop-row]', read: 'rows', attrs: ['data-shop-row', 'data-item-id', 'data-price'], textMax: 60, sub: { buyOff: { sel: '[data-shop-buy][disabled]', read: 'count' }, want: { sel: '[data-shop-want]', read: 'count' }, chips: { sel: '[data-pin-chips]', read: 'text' } } },
     tInn: { sel: '[data-town-inn]', read: 'rows', attrs: ['data-town-inn', 'disabled'], textMax: 20 },
     tInnHp: { when: ['town'], sel: 'span.tabular-nums', text: 'HP ', exact: false, read: 'texts' },
     tSell: { sel: '[data-sell-item]', read: 'rows', attrs: ['data-sell-item', 'aria-label'], textMax: 40 },
