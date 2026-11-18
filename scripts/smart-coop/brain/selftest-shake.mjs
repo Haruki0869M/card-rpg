@@ -3,7 +3,9 @@
 // 2. 合意待ちの P2 の画面で S1・S3 が決まりどおりに始まる・同時押し S13 の組を返す
 // 3. 確かめが本物の不具合に当たる（作り物の View で）: S5 で結果の枠の「使ったフォーカス」が足した数と違う・持ち主のフォーカスが減らない → NG
 //    S2 で持ち主のフォーカスの指定が 0 に戻る → NG。正しい形は OK
-import { shakeInit, opportunity, shakeBrain, shakeObserve, shakeAfterTick, pickSimultaneous, HOLD, offsetOf } from '../shake.mjs';
+import { Judge } from '../judge.mjs';
+import { BUSY } from '../view/scenes/game.mjs';
+import { shakeInit, opportunity, shakeBrain, shakeObserve, shakeAfterTick, shakeBeforePress, pickSimultaneous, HOLD, offsetOf } from '../shake.mjs';
 
 const view = (seat, mode, facts = {}, o = {}) => ({ seat, screen: 'game', mode, layers: [], actions: [], waits: [], busy: [], facts, sig: `${seat}|${mode}|${JSON.stringify(facts).length}`, ...o });
 const act = (css, text, marks = []) => ({ css, text, nth: 0, enabled: true, marks, rect: [0, 0, 50, 50] });
@@ -97,6 +99,7 @@ export async function shakeChecks(check) {
     const fleet = { devices: [] };
     for (const [spent, chance] of [[0, 60], [1, 85]]) {
       const views = [stage('P1', false, 0, 0), stage('P2', true, spent, chance)];
+      await shakeBeforePress({ judge, views, board: b });
       shakeObserve(views, b);
       await shakeAfterTick({ fleet, judge, views, board: b });
     }
@@ -132,4 +135,16 @@ export async function shakeChecks(check) {
   check(s2good.ok === 1 && s2good.ng === 0, '揺さぶり S2: ほかの人の開け閉めの後も持ち主の指定が残れば OK', JSON.stringify(s2good));
   check(s2bad.ng >= 1 && s2bad.fails >= 1, '揺さぶり S2: 持ち主のフォーカスの指定が 0 に戻ったら NG（審判の失敗）', JSON.stringify(s2bad));
   check(HOLD.hold === true, '揺さぶり: HOLD は「わざと待つ」の印');
+
+  // ---- 区切り 3-S の直し: 演出が終わらない（同じ演出の印が 45 秒消えない）は「止まり」・お供の演出はシルエットの間だけ ----
+  {
+    const j = new Judge({ outDir: process.env.SMART_OUTPUT ?? 'screenshots/smart-coop/selftest', devices: [] });
+    j.fail = async (kind, o) => { j.failures.push({ kind, ...o }); return o; };
+    const bv = [view('P1', 'event', {}, { busy: ['[data-pet-reveal="silhouette"]'] })];
+    await j.watch(bv);
+    j.busySince -= 50000;
+    const r = await j.watch(bv);
+    check(r === 'stuck' && j.failures.some((f) => f.kind === 'stuck' && /演出中の印/.test(f.text)), '審判: 演出が終わらない（同じ演出の印が 45 秒消えない）は止まり', JSON.stringify(j.failures));
+    check(BUSY.includes('[data-pet-reveal="silhouette"]') && !BUSY.includes('[data-pet-reveal]'), '画面を読む: お供の演出はシルエットの間だけ演出中（見せ終わった印 shown では待たない）');
+  }
 }

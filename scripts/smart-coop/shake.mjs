@@ -1080,6 +1080,23 @@ function startFromViews(views, sh, p1, p2, board) {
   }
 }
 
+/**
+ * 押す前（conductor の onViews。画面を読んだ直後・頭に聞く前）: S5・S6 のフォーカスの写しを取る（審判が読むだけ）。
+ * 区切り 3-S の試しの通しの直し: 前は押した後（同じステップの後）に取っていて、開けた後の数を「前」と取り違え、S6 を NG と誤検知した。
+ * 自己テスト: brain/selftest-shake.mjs（S5 の照らし合わせ。写しは押す前に取る形で流す）
+ */
+export async function shakeBeforePress({ judge, views, board }) {
+  const sh = board.sh;
+  if (!sh) return;
+  const stageNow = views.some((v) => (v.facts.dChallenge ?? [])[0]?.['data-challenge-mine'] === '1');
+  const chestNow = views.some((v) => (v.facts.chestOpenKind ?? []).length && (v.facts.checkMarks ?? []).length);
+  if (!stageNow && !chestNow) return;
+  const hs = await judge.heroes();
+  if (!hs) return;
+  if (stageNow) sh.s5before = hs;
+  if (chestNow) sh.s6before = hs;
+}
+
 // ---------------------------------------------------------------- 毎ステップの後（非同期）
 /**
  * ctx = { fleet, judge, views, board }。読み込み直し（S7・S8）・フォーカスの写しの照らし合わせ（S5・S6）・NG を審判の失敗にする
@@ -1087,16 +1104,7 @@ function startFromViews(views, sh, p1, p2, board) {
 export async function shakeAfterTick({ fleet, judge, views, board }) {
   const sh = board.sh;
   if (!sh) return;
-  // S5・S6: 挑む段・開ける前のフォーカスの写しを取り、終わったら照らす
-  const stageNow = views.some((v) => (v.facts.dChallenge ?? [])[0]?.['data-challenge-mine'] === '1');
-  const chestNow = views.some((v) => (v.facts.chestOpenKind ?? []).length && (v.facts.checkMarks ?? []).length);
-  if (stageNow || chestNow) {
-    const hs = await judge.heroes();
-    if (hs) {
-      if (stageNow && sh.s5 && !sh.s5.done) sh.s5.before = hs;
-      if (chestNow && sh.s6 && !sh.s6.done) sh.s6.before = hs;
-    }
-  }
+  // S5・S6: 押す前の写し（shakeBeforePress）と、終わった後の写しを照らす
   if (sh.s5?.ready) {
     const s = sh.s5;
     s.ready = false;
@@ -1111,8 +1119,9 @@ export async function shakeAfterTick({ fleet, judge, views, board }) {
       result(sh, 'S5', up, `イベント ${s.event}: フォーカスを足す前と後の成功率の字 ${s.chances[0] ?? '?'}% → ${s.chances[n]}%（${n}）`);
       const same = s.result.every((x) => x.r && Number(x.r['data-check-focus']) === n);
       result(sh, 'S5', same, `結果の枠の「使ったフォーカス」（data-check-focus）が足した数 ${n} と同じ（全端末）: ${s.checkScreen.res}`);
-      if (s.before && after) {
-        const diff = after.map((h) => ({ id: h.id, d: (s.before.find((b) => b.id === h.id)?.focus ?? h.focus) - h.focus }));
+      const before5 = sh.s5before;
+      if (before5 && after) {
+        const diff = after.map((h) => ({ id: h.id, d: (before5.find((b) => b.id === h.id)?.focus ?? h.focus) - h.focus }));
         const me = diff.find((x) => x.id === s.hero);
         const others = diff.filter((x) => x.id !== s.hero && x.d !== 0);
         result(sh, 'S5', me?.d === n && !others.length, `挑む役 ${s.hero} のフォーカスが ${me?.d ?? '?'} 減った（足した数 ${n}）・ほかのキャラの変化 ${others.map((x) => `${x.id} ${-x.d}`).join('・') || 'なし'}（審判が状態の写しで照らす）`);
@@ -1123,14 +1132,15 @@ export async function shakeAfterTick({ fleet, judge, views, board }) {
     const s = sh.s6;
     s.ready = false;
     const n = s.spent;
-    if (n >= 1 && s.before) {
+    const before6 = sh.s6before;
+    if (n >= 1 && before6) {
       const after = await judge.heroes();
       sh.k.S6.count++;
       sh.order.push('S6');
       const up = s.chances[0] === undefined || s.chances[n] > s.chances[0] || s.chances[0] >= 100;
       result(sh, 'S6', up, `宝箱（${s.kind}）: フォーカスを足す前と後の成功率の字 ${s.chances[0] ?? '?'}% → ${s.chances[n]}%（${n}）`);
       if (after) {
-        const diff = after.map((h) => ({ id: h.id, d: (s.before.find((b) => b.id === h.id)?.focus ?? h.focus) - h.focus })).filter((x) => x.d !== 0);
+        const diff = after.map((h) => ({ id: h.id, d: (before6.find((b) => b.id === h.id)?.focus ?? h.focus) - h.focus })).filter((x) => x.d !== 0);
         result(sh, 'S6', diff.length === 1 && diff[0].d === n, `開けた人のフォーカスだけが ${n} 減った（減ったキャラ ${diff.map((x) => `${x.id} ${x.d}`).join('・') || 'なし'}）`);
       }
     }

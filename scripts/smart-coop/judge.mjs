@@ -328,6 +328,19 @@ export class Judge {
     const seq = await this.maxSeq();
     const sigs = views.map((v) => v.sig).join(',');
     const busy = views.some((v) => v.busy.length);
+    // 区切り 3-S の直し: 演出中の印がずっと消えない形を見逃していた（演出中は「進んでいる」扱いにしていたので、止まりにならず、通しが何分も黙って止まった）。
+    // 同じ演出の印が 45 秒より長く消えなければ「止まり」（計画 §3-1 の上限20秒を、重い PC のために長めに）。自己テスト: brain/selftest-shake.mjs「演出が終わらない」
+    const busyKey = views.map((v) => `${v.seat}:${v.busy.join('+')}`).filter((x) => !x.endsWith(':')).join(',');
+    if (busyKey) {
+      if (this.busyKey !== busyKey) {
+        this.busyKey = busyKey;
+        this.busySince = Date.now();
+      } else if (Date.now() - this.busySince > 45000) {
+        await this.fail('stuck', { text: `演出中の印が ${Math.round((Date.now() - this.busySince) / 1000)} 秒消えない: ${busyKey}`, key: `busy|${busyKey}` });
+        this.busySince = Date.now();
+        return 'stuck';
+      }
+    } else this.busyKey = null;
     if (seq > this.lastSeq || sigs !== this.lastSigs || busy) {
       this.lastProgress = Date.now();
       this.lastSeq = Math.max(this.lastSeq, seq);

@@ -14,7 +14,7 @@ import { loadContent } from './content/load.mjs';
 import { jobByName } from './content/reward.mjs';
 import { coverageReport, coverageNextRun } from './coverage.mjs';
 import { now, log, wait, phase } from './util.mjs';
-import { shakeInit, shakeObserve, shakeAfterTick, pickSimultaneous, shakeReport, shakeCoverage } from './shake.mjs';
+import { shakeInit, shakeObserve, shakeAfterTick, shakeBeforePress, pickSimultaneous, shakeReport, shakeCoverage } from './shake.mjs';
 
 /** 新しい冒険（やり直し）の前に、前の冒険の板を空にする（網羅の表・戦闘の記録・遭遇の網羅の数は残す） */
 function resetAdventureBoard(board) {
@@ -119,6 +119,7 @@ export async function runFull({ brainFor, observe, battleLines }) {
     });
     // 画面での確かめ1 は押す前の形で写真を残す（conductor の onViews。押した後だと、もう結果の段になっている）
     c.onViews = async (views) => {
+      if (board.sh) await shakeBeforePress({ judge, views, board });
       // 画面での確かめ1（c4d9d83）: 世界マップのマスのイベントで、手番でない人の選択肢が押せない（disabled・data-option-wait="1"）
       if (!verify.optionWait) {
         for (const v of views) {

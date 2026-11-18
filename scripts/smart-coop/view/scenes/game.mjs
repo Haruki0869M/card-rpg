@@ -116,7 +116,9 @@ export const BUSY = [
   '[data-turn-cutin]',
   '[data-ability-cutin]',
   '[data-chest-video]',
-  '[data-pet-reveal]',
+  // 区切り 3-S の直し: お供の「シルエット → ポン！」は、演出が終わっても印が残る（値が silhouette → shown。PetReveal.tsx）。
+  // 前は値を見ずに演出中としていて、お供を迎える窓で bot が何も押さずに止まった（bot の間違い）。演出中はシルエットの間だけ
+  '[data-pet-reveal="silhouette"]',
 ];
 
 /** 待ちの印（字も読む） */
