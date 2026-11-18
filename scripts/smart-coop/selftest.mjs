@@ -35,6 +35,9 @@ const FIX = {
   'cover-inside': page(`<div data-turn-lock class="abs" style="left:0;top:90px;width:390px;height:80px;background:#222"><button id="t" style="margin:10px 40px" onclick="window.hits=(window.hits||0)+1">帯の中のボタン</button></div>`),
   // 一瞬の当たり: 板が 200ms で消える（show() でもう1度出す）
   // （押す直前に show() を呼ぶ。最初の検査では乗っていて、0.4秒あけた測り直しでは消えている長さ = 450ms）
+  // 買った時の字だけのお知らせ（1.2秒で消える。押しても通り抜ける）→ 消えるのを待って押す（区切り 2-Sb の直し）
+  'buy-notice': page(`${BTN}<div data-buy-notice="text" id="bn" class="abs" style="left:0;top:90px;width:390px;height:80px;background:rgba(0,0,0,.9);pointer-events:none">上回復薬を買った！</div>
+<script>setTimeout(()=>document.getElementById('bn').remove(),1200)</script>`),
   momentary: page(`${BTN}<div id="m" class="abs" style="left:20px;top:80px;width:220px;height:90px;background:#333;display:none">すぐ消える板</div>
 <script>function show(){const m=document.getElementById('m');m.style.display='block';setTimeout(()=>m.style.display='none',450)}</script>`),
   // 世界マップ: 地図の中の駒は当たりにしない。地図の外のパネルは「地図を動かす」
@@ -47,6 +50,9 @@ const FIX = {
   'sheet-collapsed': page(`<div data-sheet="pouch" class="abs" style="left:0;top:380px;width:390px;height:160px;background:#222;display:flex;flex-direction:column"><button data-sheet-close style="height:48px;width:48px">×</button><div data-sheet-body style="height:100px;overflow-y:auto"><div style="height:600px">長い中身</div></div></div>`),
   'sheet-short-ok': page(`<div data-sheet="pouch" class="abs" style="left:0;top:380px;width:390px;height:160px;background:#222;display:flex;flex-direction:column"><button data-sheet-close style="height:48px;width:48px">×</button><div data-sheet-body style="height:100px;overflow-y:auto"><div style="height:50px">短い中身</div></div></div>`),
   'sheet-good': page(`<div data-sheet="pouch" class="abs" style="left:0;top:100px;width:390px;height:400px;background:#222;display:flex;flex-direction:column"><button data-sheet-close style="height:48px;width:48px">×</button><div data-sheet-body style="height:300px;overflow-y:auto"><div style="height:600px">長い中身</div></div></div>`),
+  // 区切り 2-Sb の直し: シートの中の操作で開いた確認の窓が × の上にある（正しい形）／転職の専用カード選び（畳んだ案内は無い形）
+  'sheet-confirm-above': page(`<div data-sheet="jobs" class="abs" style="left:0;top:0;width:390px;height:500px;background:#222;display:flex;flex-direction:column"><button data-sheet-close style="height:48px;width:48px">×</button><div data-sheet-body style="height:400px;overflow-y:auto"><div style="height:300px">転職先</div></div><div class="abs" style="left:0;top:0;width:390px;height:500px;background:rgba(0,0,0,.6)"><div data-confirm style="margin-top:300px"><button data-confirm-ok style="height:48px">転職する</button></div></div></div>`),
+  'job-pick-ok': page(`<div data-job-pick class="abs" style="left:0;top:0;width:390px;height:500px;background:#0b0910;overflow-y:auto"><button data-pick-card="0" style="height:160px;width:100px">カード</button></div>`),
   'sheet-offscreen': page(`<div data-sheet="pouch" class="abs" style="left:0;top:-60px;width:390px;height:400px;background:#222;display:flex;flex-direction:column"><div data-sheet-body style="height:300px;overflow-y:auto"><div style="height:600px">長い中身</div></div></div>`),
   // ③ はみ出し
   'overflow-bad': `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>body{margin:0;font:14px sans-serif}</style></head><body>
@@ -188,6 +194,10 @@ export async function selftest() {
     await open('overlap-good');
     const pg = await press(s, dev, target, { what: '離れたボタン', expectEffect: false });
     check(pg.pressed && (await p.evaluate(() => window.hits)) === 1, '押す: 正しい形なら、指で1回押す', JSON.stringify(pg));
+    await open('buy-notice');
+    const nb = judge.failures.length;
+    const pb = await press(s, dev, target, { what: '買った時のお知らせの下のボタン', expectEffect: false });
+    check(pb.pressed && judge.failures.length === nb, '押す: 買った時の字だけのお知らせは、消えるのを待って押す（区切り 2-Sb の直し）', JSON.stringify({ pb, f: judge.failures.slice(nb).map((x) => x.text) }));
     await open('momentary');
     const n1 = judge.failures.length;
     await p.evaluate(() => window.show());
@@ -211,6 +221,13 @@ export async function selftest() {
     await open('sheet-offscreen');
     w = await win();
     check(w.some((t) => t.includes('画面の外')) && w.some((t) => t.includes('×')), '② 窓の潰れ: 画面の外に出た窓・×が無い窓に当たる', w.join('／'));
+
+    await open('sheet-confirm-above');
+    w = await win();
+    check(!w.length, '② 窓の潰れ: シートの中の操作で開いた確認の窓が × の上にあるのは当たらない（区切り 2-Sb の直し）', w.join('／'));
+    await open('job-pick-ok');
+    w = await win();
+    check(!w.length, '② 窓の潰れ: 転職の専用カード選び（畳んだ案内が無い形）は当たらない（区切り 2-Sb の直し）', w.join('／'));
 
     // ---- ③ はみ出し ----
     await open('overflow-bad');

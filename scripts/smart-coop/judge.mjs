@@ -126,7 +126,7 @@ export class Judge {
   /** 操作の記録（press.mjs から） */
   record(entry) {
     this.actions.push({ at: now(), ...entry });
-    if (this.actions.length > 5000) this.actions.splice(0, 1000);
+    if (this.actions.length > 200000) this.actions.splice(0, 10000); // 区切り 2-Sb: 通し全体（数千手）を残す
   }
 
   note(kind, text, extra = {}) {

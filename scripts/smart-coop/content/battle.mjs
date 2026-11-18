@@ -24,15 +24,20 @@ function elementsOf(titles = []) {
   return { weak, resist };
 }
 
-/** 敵の行（bEnemies）→ 頭が使う形 */
+/** 敵の行（bEnemies）→ 頭が使う形。区切り 2-Sb: 最大 HP・攻撃の合計は B2・B3 の印を先に使い、字の「12/30」と違えば mismatch に書く（直し8） */
 export function readEnemy(r) {
-  const { hp: hpT, max } = hpOf(r.hpText);
+  const { hp: hpT, max: maxT } = hpOf(r.hpText);
+  const maxM = num(r['data-max-hp']);
+  const max = maxM ?? maxT;
+  const mismatch = r['data-dead'] === null && hpT !== null && maxT !== null && (num(r['data-hp']) !== hpT || (maxM !== null && maxM !== maxT)) ? `敵 ${r['data-enemy']} の HP: 字 ${hpT}/${maxT}・印 ${r['data-hp']}/${r['data-max-hp']}` : null;
+  const dmgM = r.intentDamage;
   const lv = /Lv(\d+)/.exec(r.info ?? '');
   const atk = (r.atk ?? []).map((s) => {
     const m = /^(\d+)(?:×(\d+))?$/.exec(s.trim());
     return m ? Number(m[1]) * Number(m[2] ?? 1) : 0;
   });
   const punish = /(\d+)枚以上/.exec(r.brief ?? '');
+  const atkText = atk.reduce((a, b) => a + b, 0);
   return {
     uid: r['data-enemy'],
     dead: r['data-dead'] !== null,
@@ -45,7 +50,11 @@ export function readEnemy(r) {
     broken: (r.broken ?? 0) > 0,
     behavior: r.behavior ?? null,
     frenzy: (r.frenzy ?? 0) > 0,
-    atk: atk.reduce((a, b) => a + b, 0),
+    // B3: 予告の攻撃の合計（隠れている時は ? = 読まない）。印が無い古い版は字
+    atk: dmgM !== null && dmgM !== undefined && dmgM !== '' && dmgM !== '?' && Number.isFinite(Number(dmgM)) ? Number(dmgM) : atkText,
+    rank: r['data-rank'] ?? null,
+    block: num(r['data-block']) ?? 0,
+    mismatch,
     targets: r.targets ?? [],
     countdown: num(r.countdown),
     breakRule: r.breakRule ?? null,
@@ -54,9 +63,15 @@ export function readEnemy(r) {
   };
 }
 
-/** 味方の行（bAllies）→ 頭が使う形。mine = この端末のキャラ（字「N枚」「済」が出るのは自分のキャラだけ）→ B1 の data-seat */
-export function readAlly(r) {
-  const { hp, max } = hpOf(r.text);
+/**
+ * 味方の行（bAllies）→ 頭が使う形。区切り 2-Sb: B1 の印（席・HP・最大 HP・マナ・フォーカス・被弾の予告）を先に使う。
+ * mine = この端末のキャラ（印 data-seat = この端末の席。古い版は字「N枚」「済」）。字の HP と印が違えば mismatch に書く（直し8）
+ */
+export function readAlly(r, seat = null) {
+  const t = hpOf(r.text);
+  const hp = num(r['data-hp']) ?? t.hp;
+  const max = num(r['data-max-hp']) ?? t.max;
+  const mismatch = t.hp !== null && r['data-hp'] !== null && r['data-hp'] !== undefined && (t.hp !== hp || t.max !== max) ? `味方 ${r['data-ally']} の HP: 字 ${t.hp}/${t.max}・印 ${hp}/${max}` : null;
   // 区切り 2-Sa の通しの直し: 行の字の最後で見ていた時、状態の印（弱体など）が付くと字の最後が変わり、自分のキャラが分からなくなった
   const mineM = /^(\d+)枚$|^済$/.exec((r.count ?? '').trim());
   return {
@@ -65,11 +80,14 @@ export function readAlly(r) {
     done: r['data-done'] !== null,
     hp: hp ?? 0,
     max: max ?? 1,
-    incoming: num(r.incoming) ?? 0,
-    mana: num((r.mana ?? '').replace(/\D/g, '')),
-    focus: num(/^(\d+)/.exec(r.focus ?? '')?.[1]),
-    mine: !!mineM,
+    incoming: num(r['data-incoming']) ?? num(r.incoming) ?? 0,
+    mana: num(r['data-mana']) ?? num((r.mana ?? '').replace(/\D/g, '')),
+    focus: num(r['data-focus']) ?? num(/^(\d+)/.exec(r.focus ?? '')?.[1]),
+    block: num(r['data-block']) ?? 0,
+    seat: r['data-seat'] ?? null,
+    mine: seat && r['data-seat'] ? r['data-seat'] === seat : !!mineM,
     name: r.name ?? null,
+    mismatch,
   };
 }
 

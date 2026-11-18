@@ -66,8 +66,14 @@ export function writeReport(dir, r) {
   lines.push(`- 続き（節目の保存）で着いた所: ${r.reached?.checkpoint ?? '—（区切り 4 から）'}`);
   lines.push(`- 書き換えた保存で見た所: ${r.reached?.rewritten ?? '—（区切り 4 から）'}`);
   lines.push('');
+  if (r.runs?.length) {
+    lines.push('## 通しの回（直し10: 1回の通しで着いた所・やり直しの後で着いた所を分ける）');
+    for (const x of r.runs) lines.push(`- ${x}`);
+    lines.push('');
+  }
   lines.push('## 網羅の表');
-  lines.push('まだ作っていない（区切り 2-Sb）。');
+  if (r.coverage?.length) for (const c of r.coverage) lines.push(c);
+  else lines.push('まだ作っていない（区切り 2-Sb）。');
   lines.push('');
   lines.push('## 揺さぶり');
   lines.push('まだ作っていない（区切り 3-S）。');
@@ -75,7 +81,8 @@ export function writeReport(dir, r) {
   lines.push('## 戦闘・バランスの記録（直し14。数字は直さず記録だけ）');
   if (r.battle?.length) for (const b of r.battle) lines.push(b.startsWith('  ') ? b : `- ${b}`);
   else lines.push('戦闘の数（憲章の 32〜40 と並べる）・1戦のターン数・全滅の場所: この通しでは記録なし。');
-  lines.push('転職の時期・終わりの悪化の度合い: まだ作っていない（区切り 2-Sb・通し全体）。');
+  if (r.balance?.length) for (const b of r.balance) lines.push(`- ${b}`);
+  else lines.push('転職の時期・終わりの悪化の度合い: まだ作っていない（区切り 2-Sb・通し全体）。');
   lines.push('');
   lines.push('## 同期');
   lines.push(`比べた回数: ${j.syncChecks}　ずれ: ${j.failures.filter((f) => f.kind === 'desync').length}　追いつかない: ${j.failures.filter((f) => f.kind === 'lag').length}`);
@@ -102,7 +109,7 @@ export function writeReport(dir, r) {
   lines.push(`- 一瞬の当たり: ${momentary.length} 回${momentary.length ? `（${momentary.slice(0, 10).map((n) => n.text).join('／')}）` : ''}`);
   lines.push(`- わざと「…」で切っている字: ${ellipsisTotal} か所（画面ごとの数は report.json）`);
   lines.push(`- 手元以外への通信を捨てた（本番に書かない守り）: ${blocked.length} 回${blocked.length ? `（${[...new Set(blocked.map((n) => n.text))].slice(0, 5).join('／')}）` : ''}`);
-  for (const n of j.notes.filter((x) => !['momentary', 'blocked', 'pan'].includes(x.kind)).slice(0, 20)) lines.push(`- ${n.text}`);
+  for (const n of j.notes.filter((x) => !['momentary', 'blocked', 'pan'].includes(x.kind)).slice(0, 60)) lines.push(`- ${n.text}`);
   lines.push('');
   lines.push('## bot が見逃す物（いつも付ける）');
   for (const b of BLIND_SPOTS) lines.push(`- ${b}`);
@@ -137,6 +144,9 @@ export function writeReport(dir, r) {
         milestones: r.milestones ?? [],
         memory: r.mem ?? null,
         battle: r.battle ?? null,
+        balance: r.balance ?? null,
+        runs: r.runs ?? null,
+        coverage: r.coverageRows ?? null,
         resyncs: j.resyncs ?? [],
         seeds: Object.fromEntries(j.seeds ?? new Map()),
         blindSpots: BLIND_SPOTS,

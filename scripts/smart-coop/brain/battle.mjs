@@ -9,11 +9,13 @@ import { readAlly, readEnemy, cardScore, isHealCard, hpOf } from '../content/bat
 
 const T = { turn: true };
 
-/** 画面の字「残りフォーカス X / Y」→ { left, total, spent } */
-function panelFocus(text) {
+/** 画面の字「残りフォーカス X / Y」→ { left, total, spent }。区切り 2-Sb: 指定（spent）は B5 の印 data-focus-spend を先に使う */
+function panelFocus(text, mark = null) {
   const m = /残りフォーカス\s*(\d+)\s*\/\s*(\d+)/.exec(text ?? '');
   if (!m) return null;
-  return { left: Number(m[1]), total: Number(m[2]), spent: Number(m[2]) - Number(m[1]) };
+  const spentT = Number(m[2]) - Number(m[1]);
+  const spentM = mark?.['data-focus-spend'] !== undefined && mark?.['data-focus-spend'] !== null ? Number(mark['data-focus-spend']) : null;
+  return { left: Number(m[1]), total: Number(m[2]), spent: spentM ?? spentT, spentText: spentT, max: mark?.['data-focus-max'] !== undefined && mark?.['data-focus-max'] !== null ? Number(mark['data-focus-max']) : null };
 }
 
 /** フォーカスの窓のカードの名前（窓の字の先頭〜「成功率」）→ 説明書き */
@@ -26,7 +28,7 @@ function panelCard(text) {
 /** 戦闘の場面を読む（頭が使う形） */
 export function readBattle(v, board = {}) {
   const enemies = (v.facts.bEnemies ?? []).map(readEnemy);
-  const allies = (v.facts.bAllies ?? []).map(readAlly);
+  const allies = (v.facts.bAllies ?? []).map((r) => readAlly(r, v.seat));
   // 自分のキャラ: 「N枚」「済」の字が出ている札 → 無ければ、覚えている名前の札（倒れている時・字が出ない時）
   const myName = board.me?.[v.seat]?.name;
   const me = allies.find((a) => a.mine) ?? (myName ? allies.find((a) => a.name === myName) : null) ?? null;
@@ -97,7 +99,7 @@ function panelBrain(v, b) {
     return decide(G.allyChip(pick.id), `味方の的 ${pick.id}（${isHealCard(card) ? `回復・HP ${pick.hp}/${pick.max}` : '支援'}）`, T);
   }
   // 3. 要るだけフォーカスを足す（BREAK・撃破が「完全成功なら」の時。弱点で完全成功の決まりの敵も）
-  const f = panelFocus(text);
+  const f = panelFocus(text, (v.facts.bPanelMark ?? [])[0]);
   const sel = chips.find((c) => c['data-chip-selected'] !== null);
   const selE = sel ? b.enemies.find((e) => e.uid === sel['data-target-chip']) : null;
   let want = 0;
@@ -112,7 +114,7 @@ function panelBrain(v, b) {
     want = 1;
     why = 'フォーカスに余裕があるので1つ足す';
   }
-  if (f && f.spent < want && v.facts.bPlus) return decide(G.focusPlus, `フォーカスを足す（${f.spent}→${f.spent + 1}・${why}）`, T);
+  if (f && f.spent < want && v.facts.bPlus && (f.max === null || f.spent < f.max)) return decide(G.focusPlus, `フォーカスを足す（${f.spent}→${f.spent + 1}・${why}）`, T);
   // 4. 発動
   if (go.startsWith('発動') && !go.includes('タップ')) return decide(G.battleGo, `「発動」（${card?.name ?? '?'}・フォーカス ${f?.spent ?? 0}）`, T);
   return null;
@@ -238,6 +240,23 @@ export function battleObserve(views, board) {
     }
   }
   const end = (v.facts.bEndTurn ?? [])[0]?.['data-end-turn'] ?? null;
+  // 字と印の照らし合わせ（直し8）: 戦闘の HP（味方・敵）・フォーカスの窓の指定。演出中は数字が動くので測らない。2回続けて同じ違いを見た時だけ書く
+  board.mismatch ??= { last: new Set(), seen: new Set() };
+  const nowMis = new Set();
+  for (const x of views) {
+    if (x.mode !== 'battle' || x.busy.length) continue;
+    for (const r of x.facts.bAllies ?? []) { const a = readAlly(r, x.seat); if (a.mismatch) nowMis.add(`${x.seat}: ${a.mismatch}`); }
+    for (const r of x.facts.bEnemies ?? []) { const e = readEnemy(r); if (e.mismatch) nowMis.add(`${x.seat}: ${e.mismatch}`); }
+    const pf = panelFocus(x.facts.bPanel, (x.facts.bPanelMark ?? [])[0]);
+    if (pf && pf.spent !== pf.spentText) nowMis.add(`${x.seat}: フォーカスの窓の指定: 字 ${pf.spentText}・印 ${pf.spent}`);
+  }
+  for (const k of nowMis) {
+    if (board.mismatch.last.has(k) && !board.mismatch.seen.has(k)) {
+      board.mismatch.seen.add(k);
+      (board.notes ??= []).push({ kind: 'warn', text: `字と印が違う（直し8）: ${k}` });
+    }
+  }
+  board.mismatch.last = nowMis;
   if (v.mode === 'battle') {
     if (!s.current) {
       const room = s.place !== '世界マップ' && board.dungeon?.lastRoom?.mode === 'battle' ? board.dungeon.lastRoom.kind : null;

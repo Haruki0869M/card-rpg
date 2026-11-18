@@ -58,6 +58,8 @@ export class Conductor {
   async tick() {
     this.steps++;
     const views = await this.observe();
+    // 区切り 2-Sb: 押す前の画面を見る口（画面での確かめの写真を、押す前の形で残すため。頭ではない・押さない）
+    if (this.onViews) await this.onViews(views);
     const devs = this.fleet.devices;
     const wants = [];
     for (const [i, v] of views.entries()) {
@@ -77,6 +79,8 @@ export class Conductor {
     const r = await press(this.session, devs[i], d.target, { what: d.what, map: !!d.map, where: `${views[i].screen}/${views[i].mode ?? '-'}` });
     await this.judge.step();
     const after = await this.judge.maxSeq();
+    // 区切り 2-Sb: 押せた時だけ、頭の「押した後に板に書く事」を流す（どの端末の頭も毎回呼ばれ、押すのは1台だけなので、押していない頭が板を書き換えない）
+    if (r.pressed && typeof d.after === 'function') d.after();
     if (r.pressed) await this.judge.repeated(devs[i].seat, views[i].sig, d.what ?? JSON.stringify(d.target), after > before || r.effect);
     return { pressed: r.pressed, seat: devs[i].seat, what: d.what, allWaiting: false, views, stuck, stop: this.judge.shouldStop() };
   }
