@@ -83,6 +83,42 @@ export async function shakeChecks(check) {
     views[0].sig = 'busy';
     check(pickSimultaneous(wants, views, b) === null, '揺さぶり S13: ほかの揺さぶりの最中は同時押しにしない');
   }
+  // 区切り 4: 4人の時、S13 は2台ずつ。組は起きた回数で順に回る（同じ種なら同じ）
+  {
+    const pairsOf = () => {
+      const b = {};
+      shakeInit(b, 7, 4);
+      const views = ['P1', 'P2', 'P3', 'P4'].map((s) => view(s, 'battle'));
+      const out = [];
+      for (let k = 0; k < 12; k++) {
+        views[0].sig = `a${k}`;
+        const wants = views.map((_, i) => ({ i, d: { target: { css: '[data-end-turn="ready"]' }, what: '準備完了', turn: true } }));
+        const p = pickSimultaneous(wants, views, b);
+        if (p) out.push(p.wants.map((w) => views[w.i].seat).join('+'));
+        b.sh.simCheck = null;
+      }
+      return out;
+    };
+    const ps = pairsOf();
+    check(ps.length >= 3 && ps.every((p) => p.split('+').length === 2) && new Set(ps).size >= 3 && ps.join() === pairsOf().join(), '揺さぶり S13（4人）: 2台ずつ・組が順に回る・同じ種なら同じ組', ps.join(' '));
+  }
+  // 区切り 4: 4人の時、S1 は P2 と P3 が交代（2回目は P3 が始める。2人の時は P3 では始めない）
+  {
+    const start = (people, count) => {
+      const b = {};
+      shakeInit(b, 7, people);
+      b.sh.k.S1.count = count;
+      let id = null;
+      for (let i = 0; i < 6 && !id; i++) {
+        const v = view('P3', 'dungeon', { ...doorsP2({ r1: 'P1' }), dEvent: `x${i}` }, { actions: [act('button[data-bar-button="装備"]', '装備', ['data-bar-button=装備'])] });
+        v.facts.dungeonId = [{ 'data-dungeon': `q${i}` }];
+        shakeBrain(v, b);
+        id = b.sh.m?.id ? `${b.sh.m.id}:${b.sh.m.seat}` : null;
+      }
+      return id;
+    };
+    check(start(4, 1) === 'S1:P3' && start(4, 0) === null && start(2, 1) === null, '揺さぶり S1（4人）: P3 は自分の番（起きた回数が奇数）の時だけ始める', `${start(4, 1)} ${start(4, 0)} ${start(2, 1)}`);
+  }
 
   // ---- 3. 確かめが本物の不具合に当たる ----
   const s5case = async ({ resultFocus, focusAfter }) => {

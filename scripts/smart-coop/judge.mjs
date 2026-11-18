@@ -124,6 +124,29 @@ export class Judge {
     for (const d of this.devices) await d.ctx.addInitScript(sealInit, WRITERS);
   }
 
+  /**
+   * 区切り 4（場面から・計画 §6-3 の手順3）: 保存を差し込み終えた後に、今開いているページの書く入口をその場で封じる
+   * （arm() は次に読み込んだページから効く。差し込みの前に arm() すると差し込めないので、場面からは差し込みの後にこれと arm() を呼ぶ）
+   */
+  async sealNow() {
+    for (const d of this.devices) {
+      if (d.page.isClosed()) continue;
+      await d.page.evaluate((writers) => {
+        const box = (window.__smartCoopSeal = window.__smartCoopSeal || { violations: [] });
+        const o = window.__online;
+        if (!o) return;
+        for (const k of writers) {
+          if (typeof o[k] !== 'function') continue;
+          o[k] = () => {
+            box.violations.push({ name: k, at: new Date().toISOString() });
+            throw new Error(`smart-coop: 通しの間は __online.${k} を使いません`);
+          };
+        }
+      }, WRITERS);
+    }
+    await this.arm();
+  }
+
   /** 操作の記録（press.mjs から） */
   record(entry) {
     this.actions.push({ at: now(), ...entry });
@@ -399,6 +422,30 @@ export class Judge {
       if (hs) return hs;
     }
     return null;
+  }
+
+  /**
+   * 区切り 4: 節目の保存（計画 §6-3。読むだけ）。ホストの端末の状態の写し（__online.game()）を file に書く。
+   * 「場面から」（scenes.mjs）の元にする。返す物: 書いた時 true
+   */
+  async checkpoint(file, meta = {}) {
+    for (const d of this.devices) {
+      if (d.page.isClosed()) continue;
+      const got = await withTimeout(d.page.evaluate(() => {
+        try {
+          const o = window.__online;
+          if (!o?.isHost?.()) return null;
+          return { seq: o.seq(), hash: o.hash(), game: o.game() };
+        } catch {
+          return null;
+        }
+      }), 15000, `checkpoint ${d.seat}`).catch(() => null);
+      if (!got?.game) continue;
+      mkdirSync(file.replace(/[\\/][^\\/]*$/, ''), { recursive: true });
+      writeFileSync(file, JSON.stringify({ at: now(), host: d.seat, people: this.devices.length, seq: got.seq, hash: got.hash, ...meta, game: got.game }));
+      return true;
+    }
+    return false;
   }
 
   /** 区切り 3-S: 席ごとの「ホストか」（S8 の記録。読むだけ） */

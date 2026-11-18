@@ -128,8 +128,13 @@ export async function run() {
     const { selftest } = await import('./selftest.mjs');
     return selftest();
   }
-  if (!['lobby', 'first-reward', 'first-dungeon', 'full'].includes(mode)) throw new Error(`SMART_MODE は first-reward・first-dungeon・full・lobby・selftest です（${mode}）`);
+  if (!['lobby', 'first-reward', 'first-dungeon', 'full', 'scenes'].includes(mode)) throw new Error(`SMART_MODE は first-reward・first-dungeon・full・scenes・lobby・selftest です（${mode}）`);
   if (mode === 'full') return runFull({ brainFor, observe, battleLines });
+  // 区切り 4: 場面から（節目の保存を差し込んでから、画面のボタンで遊ぶ。scenes.mjs）
+  if (mode === 'scenes') {
+    const { runScene } = await import('./scenes.mjs');
+    return runScene({ brainFor, observe, battleLines });
+  }
   const people = Number(process.env.PEOPLE ?? 2);
   const seed = Number(process.env.SEED ?? 1) >>> 0;
   const scenario = Number(process.env.SCENARIO ?? 1);

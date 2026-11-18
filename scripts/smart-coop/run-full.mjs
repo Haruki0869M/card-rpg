@@ -50,6 +50,10 @@ export async function runFull({ brainFor, observe, battleLines }) {
   const outDir = process.env.SMART_OUTPUT ?? `screenshots/smart-coop/s${scenario}-${people}p-${seed}-full`;
   const limitMin = Number(process.env.SMART_LIMIT_MIN ?? 240);
   const stopOn = process.env.SMART_STOP_ON ? new RegExp(process.env.SMART_STOP_ON) : null;
+  // 区切り 4: 短い通し（SMART_UNTIL=first-dungeon … 最初の鍵のダンジョンを制覇して、全端末が世界マップに戻ったら終える）
+  const untilGoal = process.env.SMART_UNTIL ?? null;
+  // 区切り 4: 節目の保存（計画 §6-3）を書くか（既定 書く。SMART_CHECKPOINTS=0 で書かない）
+  const wantCheckpoints = process.env.SMART_CHECKPOINTS !== '0';
   const urlOf = (sd) => `${base}${base.includes('?') ? '&' : '?'}emu=${emu}&seed=${sd}`;
   assertLocalUrl(urlOf(seed));
   await loadContent({ scenarioIndex: scenario - 1 });
@@ -68,7 +72,12 @@ export async function runFull({ brainFor, observe, battleLines }) {
   const board = {};
   // 区切り 3-S: 揺さぶり（SMART_SHAKE=none で入れない。既定は全部 = all）
   const shake = process.env.SMART_SHAKE ?? 'all';
-  if (shake === 'all') shakeInit(board, seed);
+  if (shake === 'all') shakeInit(board, seed, people);
+  // 区切り 4: 侵食度の上がり方の記録（S10 の見直し。上がった時の直前の操作と、S10 が絡んでいたか）
+  const corr = { last: null, rows: [], s10Rises: 0, rises: 0, s10Sum: 0, sum: 0 };
+  // 区切り 4: 節目の保存の数（制覇した鍵のダンジョンの数・出た町の数）
+  const cp = { kd: 0, town: 0, files: [], lastWorldAt: 0 };
+  let untilDone = false;
   const milestones = [];
   const extra = [];
   const runs = [];
@@ -181,6 +190,59 @@ export async function runFull({ brainFor, observe, battleLines }) {
           rec.maxCorruption = Math.max(rec.maxCorruption, Number(cr));
         }
       }
+      // 区切り 4: 侵食度の上がり方（P1 の画面の数。上がった時、直前 12 手に S10 があったか）
+      {
+        const p1v = views.find((v) => v.seat === 'P1');
+        const cr = (p1v?.facts.wCorruption ?? [])[0]?.['data-corruption'];
+        if (cr !== undefined && cr !== null) {
+          const val = Number(cr);
+          if (corr.last !== null && val !== corr.last) {
+            const recent = judge.actions.slice(-12);
+            const s10 = recent.some((a) => /揺さぶり S10/.test(a.what ?? ''));
+            const d = val - corr.last;
+            if (d > 0) {
+              corr.rises++;
+              corr.sum += d;
+              if (s10) {
+                corr.s10Rises++;
+                corr.s10Sum += d;
+              }
+            }
+            const row = `${String(judge.actions.length).padStart(5, '0')} ${corr.last}→${val}（${d > 0 ? '+' : ''}${d}）${s10 ? ' ★直前12手に S10' : ''} | 直前: ${recent.slice(-4).map((a) => `${a.seat}「${String(a.what ?? '').slice(0, 30)}」`).join(' → ')}`;
+            corr.rows.push(row);
+            appendFileSync(`${outDir}/corruption.log`, `${row}\n`);
+          }
+          corr.last = val;
+        }
+      }
+      // 区切り 4: 節目の保存（計画 §6-3）。全端末が世界マップで、窓が無く、演出の途中でない時に書く
+      if (wantCheckpoints && views.length && views.every((v) => v.screen === 'game' && v.mode === 'world' && !v.busy.length && !v.layers.length)) {
+        const kdNow = (board.cov?.rows ?? []).filter((r) => r.group === 'keydungeon' && r.stepped).length;
+        const townNow = board.sh?.n?.townExit ?? 0;
+        let name = null;
+        if (kdNow > cp.kd) name = `kd${kdNow}`;
+        else if (townNow > cp.town) name = `town${townNow}`;
+        else if (judge.actions.length - cp.lastWorldAt >= 400) name = `w${judge.actions.length}`;
+        if (name) {
+          cp.kd = kdNow;
+          cp.town = townNow;
+          cp.lastWorldAt = judge.actions.length;
+          const file = `${outDir}/checkpoints/s${scenario}-${people}p-r${runNo}-${name}.json`;
+          if (await judge.checkpoint(file, { scenario, runNo, name, presses: judge.actions.length, battles: battlesNow(), jobs: r.jobs })) cp.files.push(file);
+        }
+        // 短い通し: 最初の鍵のダンジョンを制覇して、全端末が世界マップに戻った
+        if (untilGoal === 'first-dungeon' && kdNow >= 1) untilDone = true;
+      }
+      if (untilDone) {
+        rec.end = 'until';
+        rec.where = '短い通しの終わり（最初の鍵のダンジョンを制覇して、全端末が世界マップに戻った）';
+        reached = `${runNo}回目: ${rec.where}`;
+        milestones.push({ at: now(), text: reached, presses: judge.actions.length });
+        log(reached);
+        await shotAll(fleet, outDir, `until${runNo}`);
+        stopAll = true;
+        break;
+      }
       // 転職の時期（直し14）
       for (const v of views) {
         const jt = v.facts.jPickTitle;
@@ -283,7 +345,7 @@ export async function runFull({ brainFor, observe, battleLines }) {
   if (board.sh) shakeCoverage(board, judge);
   const cov = coverageReport(board);
   const shk = board.sh ? shakeReport(board) : null;
-  const endName = { ending: 'エンディング（クリア）', gameover: 'ゲームオーバー', stop: '途中で止まった', lobby: '部屋の用意で止まった' };
+  const endName = { until: '短い通しの終わり', ending: 'エンディング（クリア）', gameover: 'ゲームオーバー', stop: '途中で止まった', lobby: '部屋の用意で止まった' };
   const runLines = runs.map((x) => `${x.runNo}回目（種 ${x.seed}）: ${endName[x.end] ?? '途中'}・${x.where ?? ''}・${((new Date(x.endAt ?? endedAt) - new Date(x.startAt)) / 60000).toFixed(1)} 分・手数 ${x.presses ?? '?'}・戦闘 ${x.battles ?? '?'}・最後の侵食度 ${x.corruption ?? '?'}%（最大 ${x.maxCorruption}%）${x.endPanel ? `・エンディングの記録「${x.endPanel}」` : ''}`);
   const balance = [
     ...runs.map((x) => `${x.runNo}回目の冒険の戦闘の数: ${x.battles ?? '?'}（憲章の目安は1シナリオ 32〜40）・終わりの侵食度 ${x.corruption ?? '?'}%`),
@@ -295,6 +357,9 @@ export async function runFull({ brainFor, observe, battleLines }) {
     `確かめ3（マスの印）: ${verify.hexSample ? `値あり（${verify.hexSample.seat}・見えているマス ${verify.hexSample.n}・地形 ${Object.entries(verify.hexSample.by).map(([k, n]) => `${k} ${n}`).join('・')}・道 ${verify.hexSample.roads}・潮 ${verify.hexSample.tides}・例 ${verify.hexSample.sample.join(' ')}）` : '世界マップのマスが読めなかった'}`,
   ];
   extra.push(...verifyLines);
+  // 区切り 4: 侵食度の上がり方（S10 の見直し）と節目の保存
+  extra.push(`侵食度が上がった回数 ${corr.rises}（合計 +${corr.sum}）のうち、直前12手に揺さぶり S10 があった回数 ${corr.s10Rises}（合計 +${corr.s10Sum}）。1行ずつは corruption.log`);
+  extra.push(`節目の保存（計画 §6-3。読むだけで取った状態の写し）: ${cp.files.length ? cp.files.map((x) => x.replace(/^.*[\/]/, '')).join('・') : 'なし'}`);
   writeReport(outDir, {
     scenario: `シナリオ${scenario}`,
     people,
@@ -308,7 +373,7 @@ export async function runFull({ brainFor, observe, battleLines }) {
     milestones,
     extra,
     complete: false,
-    reachedGoal: ending,
+    reachedGoal: ending || untilDone,
     mem,
     battle,
     balance,
@@ -320,5 +385,5 @@ export async function runFull({ brainFor, observe, battleLines }) {
   });
   writeFileSync(`${outDir}/coverage.json`, JSON.stringify({ summary: cov.summary, rows: cov.rows, worldLog: board.world?.log ?? [] }, null, 1));
   log(`報告: ${outDir}/report.md（${judge.failures.length ? '失敗あり' : '失敗なし'}・${ending ? 'エンディングに着いた' : 'エンディングに着いていない'}）`);
-  return judge.failures.length || !ending ? 1 : 0;
+  return judge.failures.length || !(ending || untilDone) ? 1 : 0;
 }

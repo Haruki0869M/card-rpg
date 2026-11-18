@@ -49,9 +49,13 @@ const sheetOf = (v) => v.layers.find((l) => l.id === 'sheet')?.value ?? null;
 export const offsetOf = (seed, id, p) => parseInt(shortHash(`${seed}|${id}`), 36) % p;
 
 /** 揺さぶりの板（board.sh）を用意する */
-export function shakeInit(board, seed) {
+export function shakeInit(board, seed, people = 2) {
   board.sh ??= {
     seed,
+    // 区切り 4: 人数（4人の時、S1 は P2 と P3 が交代・S13 は2台ずつ）
+    people,
+    // 区切り 4: S13 の種類ごとの数（起きた・OK・NG）
+    s13: {},
     k: Object.fromEntries(SHAKES.map((id) => [id, { opp: 0, count: 0, ok: 0, ng: 0, abort: 0, log: [] }])),
     sub: {},
     m: null,
@@ -647,6 +651,20 @@ export function shakeBrain(v, board) {
   // 挑む段（持ち主）: 選び直す・任せる・S2
   const ch = challengeOwner(v, sh);
   if (ch) return ch;
+  // 区切り 4: 4人の時、S1 は P2 と P3 が交代でする（計画 §5-2）。だれの番かは、S1 が起きた回数で決める（同じ種なら同じ）
+  const s1Seat = sh.people === 4 && sh.k.S1.count % 2 === 1 ? 'P3' : 'P2';
+  if (v.seat === 'P3' && s1Seat === 'P3') {
+    const pa = pendingAgree(v);
+    if (pa && pa.options.length) {
+      const key = `${pa.kind}|${agreeKey(v)}`;
+      if (opportunity(sh, 'S1', key)) {
+        begin(sh, 'S1', { step: 'open', seat: v.seat, tag: `${pa.kind}・${key.slice(0, 40)}` });
+        Object.assign(sh.m.data, { votes: votesOf(v), kind: pa.kind, other: pa.other, agree: agreeKey(v) });
+        const d = s1(v, sh);
+        return d === HOLD ? HOLD : d;
+      }
+    }
+  }
   if (v.seat === 'P2') {
     const b11 = s11Start(v, sh, board);
     if (b11) return b11;
@@ -669,7 +687,7 @@ export function shakeBrain(v, board) {
         Object.assign(sh.m.data, { other: pa.other, split });
         return s4(v, sh);
       }
-      if (opportunity(sh, 'S1', key)) {
+      if (s1Seat === 'P2' && opportunity(sh, 'S1', key)) {
         begin(sh, 'S1', { step: 'open', seat: v.seat, tag: `${pa.kind}・${key.slice(0, 40)}` });
         Object.assign(sh.m.data, { votes: votesOf(v), kind: pa.kind, other: pa.other, agree: agreeKey(v) });
         const d = s1(v, sh);
@@ -862,22 +880,29 @@ function observeS1(views, sh, p1, p2) {
     }
   }
   if (m.step === 'afterClose') {
-    // 閉じた後、票の印が消えていない（P2 の画面: 仲間の票。P1 の画面: P1 自身の票）
+    // 閉じた後、票の印が消えていない（揺さぶった人の画面: 仲間の票。票を入れた仲間の画面: その人自身の票）
+    // 区切り 4: 4人で P3 が揺さぶる時にも使えるよう、P1・P2 の決め打ちをやめた（2人の時は前と同じ: 揺さぶる人 = P2・票を入れた仲間 = P1）
     const before = m.data.votes;
-    const now2 = votesOf(p2);
-    const now1 = votesOf(p1);
+    const me = findSeat(views, m.seat) ?? p2;
+    const nowMe = votesOf(me);
     const lost = [];
-    for (const [k, seats] of Object.entries(before)) for (const s of seats) if (!(now2[k] ?? []).includes(s)) lost.push(`P2 の画面の ${k} の ${s}`);
-    const myOnP1 = Object.entries(now1).filter(([, s]) => s.includes('P1')).map(([k]) => k);
+    for (const [k, seats] of Object.entries(before)) for (const s of seats) if (!(nowMe[k] ?? []).includes(s)) lost.push(`${m.seat} の画面の ${k} の ${s}`);
     const otherK = `${m.data.kind}:${m.data.other}`;
-    const p1ok = m.data.kind === 'opener' ? true : myOnP1.includes(otherK);
-    const ok = !lost.length && p1ok;
-    result(sh, 'S1', ok, `シートを閉じた後の票の印: ${ok ? '消えていない' : `消えた（${lost.join('・')}${p1ok ? '' : `・P1 の画面の自分の票 ${otherK}`}）`}`);
+    const voters = m.data.kind === 'opener' ? [] : (before[otherK] ?? []).filter((s) => s !== m.seat);
+    const ownLost = voters.filter((s) => {
+      const pv = findSeat(views, s);
+      return pv && !(votesOf(pv)[otherK] ?? []).includes(s);
+    });
+    const ok = !lost.length && !ownLost.length;
+    result(sh, 'S1', ok, `シートを閉じた後の票の印: ${ok ? '消えていない' : `消えた（${lost.join('・')}${ownLost.length ? `・${ownLost.map((s) => `${s} の画面の自分の票 ${otherK}`).join('・')}` : ''}）`}`);
     // 合意が進むかを見張る
     sh.watch.push({ id: 'S1', kind: 'agree', key: m.data.agree, ticks: 0, what: 'S1' });
     if (m.data.gave) {
       m.step = 'peer';
-      m.data.peer = views.find((v) => v.seat !== m.seat)?.seat;
+      // 区切り 4: 受け取った人 = 渡した相手のキャラの持ち主（キャラ h<n> は P<n+1>。4人で P3 が渡す時も、受け取った人の画面を見る）
+      const n = /^h(\d+)$/.exec(m.data.gave.to ?? '')?.[1];
+      const owner = n !== undefined ? `P${Number(n) + 1}` : null;
+      m.data.peer = (owner && owner !== m.seat && findSeat(views, owner) ? owner : null) ?? views.find((v) => v.seat !== m.seat)?.seat;
     } else end(sh);
     return;
   }
@@ -1175,6 +1200,10 @@ export async function shakeAfterTick({ fleet, judge, views, board }) {
     const next = judge.actions.slice(c.idx).find((a) => a.result === 'tap' || a.result === 'long');
     if (next) {
       const again = c.presses.find((p) => p.seat === next.seat && next.target?.startsWith(p.css));
+      // 区切り 4: 種類ごとの OK・NG（S13 の NG が 0 になったかを、種類ごとに見る）
+      const t13 = (sh.s13[c.kind] ??= { count: 0, ok: 0, ng: 0, pairs: [] });
+      if (again) t13.ng++;
+      else t13.ok++;
       result(sh, 'S13', !again, again ? `${c.kind}: 2台で同時に押した後、${again.seat} がもう1度同じ物（${again.css}）を押した（${again.seat} の票・選択が画面に入っていなかった見立て。知らせ ${c.toasts.join('・') || 'なし'}）` : `${c.kind}: 同時に押した票が両方とも入った（次の手は ${next.seat}「${String(next.what).slice(0, 30)}」）`);
       sh.simCheck = null;
     } else if (sh.n.tick - (c.tick ??= sh.n.tick) > 40) sh.simCheck = null;
@@ -1275,6 +1304,14 @@ export function pickSimultaneous(wants, views, board) {
     if (ws.length < 2) continue;
     const key = `${ws.map((w) => views[w.i].sig).join(',')}`;
     if (!opportunity(sh, 'S13', key, k)) continue;
+    // 区切り 4: 4人の時は2台ずつ（計画 §5-2・直し3）。どの2台かは、その種類の S13 が起きた回数で順に回す（同じ種なら同じ）
+    const t13 = (sh.s13[k] ??= { count: 0, ok: 0, ng: 0, pairs: [] });
+    if (ws.length > 2) {
+      const a = t13.count % ws.length;
+      ws.splice(0, ws.length, ...[ws[a], ws[(a + 1) % ws.length]].sort((x, y) => x.i - y.i));
+    }
+    t13.count++;
+    t13.pairs.push(ws.map((w) => views[w.i].seat).join('+'));
     sh.k.S13.count++;
     sh.order.push(`S13(${k})`);
     note(sh, `揺さぶり S13 を始める（${k}・${ws.map((w) => `${views[w.i].seat}「${w.d.what}」`).join(' と ')}を同時に押す）`);
@@ -1295,6 +1332,9 @@ export function shakeReport(board) {
     const s = sh.k[id];
     lines.push(`| ${id} | ${SHAKE_NAME[id]} | ${s.opp} | ${s.count} | ${s.ok} | ${s.ng} | ${s.abort} |`);
   }
+  // 区切り 4: S13 の種類ごと（同時に押した2台の組・OK・NG）
+  const k13 = ['door', 'event', 'opener', 'ready', 'claim', 'reward'];
+  lines.push('', `S13 の種類ごと: ${k13.map((k) => { const t = sh.s13?.[k]; return `${k} 起きた ${t?.count ?? 0}・OK ${t?.ok ?? 0}・NG ${t?.ng ?? 0}${t?.pairs?.length ? `（組 ${[...new Set(t.pairs)].join('・')}）` : ''}`; }).join('／')}`);
   lines.push('', `起きた順（種 ${sh.seed}）: ${sh.order.join(' → ') || 'なし'}`, '');
   for (const id of SHAKES) {
     const s = sh.k[id];
