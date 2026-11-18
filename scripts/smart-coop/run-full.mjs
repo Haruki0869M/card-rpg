@@ -320,6 +320,12 @@ export async function runFull({ brainFor, observe, battleLines }) {
         rec.end = 'stop';
         rec.where = res.stop ? '止める決まりに当たった（上限の時間・10種類・守り）' : res.stuck === 'deadlock' || fk.includes('deadlock') ? '互いに待つ（どの端末も押す物が無い）' : '止まり（40秒進まない）を2回';
         log(`ここで終える: ${rec.where}`);
+        // 区切り 4: 止まった時の頭の板（相談の板。bot の間違いを調べるため。Set は配列にして書く）
+        try {
+          writeFileSync(`${outDir}/board-at-stop.json`, JSON.stringify(board, (k, x) => (x instanceof Set ? [...x] : x instanceof Map ? Object.fromEntries(x) : x), 1));
+        } catch {
+          // 書けない形（循環）など。調べる用なので、無くても続ける
+        }
         await shotAll(fleet, outDir, `stop${runNo}`);
         stopAll = true;
         break;
@@ -337,6 +343,12 @@ export async function runFull({ brainFor, observe, battleLines }) {
     }
   }
   clearInterval(dog);
+  // 区切り 4: 終わった時の頭の板（bot の間違いを調べるため）
+  try {
+    writeFileSync(`${outDir}/board-final.json`, JSON.stringify(board, (k, x) => (x instanceof Set ? [...x] : x instanceof Map ? Object.fromEntries(x) : x), 1));
+  } catch {
+    // 調べる用なので、書けなくても続ける
+  }
   await shotAll(fleet, outDir, 'final');
   await fleet.close();
   const mem = await meter.stop();

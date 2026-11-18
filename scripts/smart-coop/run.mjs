@@ -68,6 +68,9 @@ function notVoterGuard(brain) {
     if (!d || !simKind(d)) return d;
     const voters = (v.facts.voteStatusSeats ?? []).map((t) => String(t).trim()).filter((t) => /^P\d$/.test(t));
     if (voters.length && !voters.includes(v.seat)) return null;
+    // ダンジョンの「〜さんの〜の番です 順番が来たら、次の扉を選べます」の間は、扉を押さない（4人の通しで、世界マップの別の人の手番の間に
+    // P1 が扉を押し続けて「押しても変わらない」になった。扉のボタンは押せる見た目だが、押しても票が入らない）
+    if (simKind(d) === 'door' && v.waits.some((w) => w.id === 'dungeon-wait' && /順番が来たら/.test(w.text ?? ''))) return null;
     return d;
   };
 }
