@@ -136,6 +136,22 @@ export async function shakeChecks(check) {
     check(/^OK: 票が割れた/.test(s3case('dungeon')), '揺さぶり S3（4人）: ダンジョンにいない人がいても、割れた票の間に扉が開かなければ OK', s3case('dungeon'));
     check(/NG: 票が割れた/.test(s3case('battle')), '揺さぶり S3: 割れているのに扉が開いた（P1 が別の画面）なら NG', s3case('battle'));
   }
+  // 区切り 4 の誤検知の直し: S2 で持ち主がフォーカスを足せない（足すボタンが押せない）時は中断。足せたのに 0 に戻った時は今までどおり NG
+  {
+    const s2case = (canPlus) => {
+      const b = {};
+      const sh = shakeInit(b, 7, 4);
+      sh.m = { id: 'S2', step: 'other', owner: 'P3', data: { otherDone: true }, stepTicks: 0, lastStep: 'other' };
+      const ov = view('P3', 'event', { dChallenge: [{ 'data-challenge-mine': '1', 'data-challenge-hero': 'h2' }], checkMarks: [{ 'data-challenge-focus': '0' }], checkPlusOn: canPlus });
+      shakeBrain(ov, b);
+      if (canPlus) sh.m.data.maxSpent = 1;
+      shakeObserve([view('P1', 'event'), ov], b);
+      return { ng: sh.k.S2.ng, abort: sh.k.S2.abort };
+    };
+    const np = s2case(false);
+    const back = s2case(true);
+    check(np.ng === 0 && np.abort === 1 && back.ng === 1, '揺さぶり S2: 持ち主が足せない時は中断・足した後に 0 に戻ったら NG', JSON.stringify({ np, back }));
+  }
   // 区切り 4: 4人の時、S1 は P2 と P3 が交代（2回目は P3 が始める。2人の時は P3 では始めない）
   {
     const start = (people, count) => {
