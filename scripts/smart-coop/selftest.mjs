@@ -122,6 +122,14 @@ export async function selftest() {
   brainChecks(check);
   // ---- 揺さぶり（区切り 3-S。作り物の View で、種と周期・始まり方・確かめが本物の不具合に当たるか） ----
   await shakeChecks(check);
+  // ---- 区切り 4: 報酬の「先へ進む」は、待つ枠の席の一覧に自分がいなければ押さない（4人で戦闘に出ていない人） ----
+  {
+    const { rewardBrain } = await import('./brain/reward.mjs');
+    const rv = (seat, voters) => ({ seat, screen: 'game', mode: 'reward', layers: [], waits: [], busy: [], actions: [{ css: '[data-reward-finish]', text: '先へ進む', nth: 0, enabled: true, marks: ['data-reward-finish'], rect: [0, 0, 300, 48] }], facts: { rewardVoteSeats: [{ 'data-vote-seats': 'P1,P2' }], voteStatusSeats: voters, rewardStep: [{ 'data-reward-step': 'finish' }] } });
+    const out = rewardBrain(rv('P3', ['P1', 'P2', 'P4']), {});
+    const in4 = rewardBrain(rv('P4', ['P1', 'P2', 'P4']), {});
+    check(out === null && !!in4, '報酬: 待つ枠の一覧に自分の席が無い人は「先へ進む」を押さない（票に入る人は押す）', JSON.stringify({ out, in4: in4?.what }));
+  }
   // ---- 場面から（区切り 4）: 保存の書き換えが、目当ての隣に立たせ・書き換えた中身を報告の行に出す。無理な時は書き換えずに理由を返す ----
   {
     const { editSave } = await import('./scenes.mjs');

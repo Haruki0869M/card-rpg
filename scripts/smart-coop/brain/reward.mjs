@@ -136,6 +136,10 @@ export function rewardBrain(v, board) {
   if (fin) {
     const seats = (v.facts.rewardVoteSeats ?? []).flatMap((x) => String(x['data-vote-seats'] ?? '').split(','));
     if (seats.includes(v.seat)) return null;
+    // 区切り 4（4人の通しの直し）: 待つ枠に席の一覧が出ていて、自分の席が無い = この票に入らない人（戦闘に出ていない）。押しても効かないので待つ
+    // （前は押し続けて「押しても変わらない」になり、票に入る P4 の番が来なかった。人も枠を見て待つ）
+    const voters = (v.facts.voteStatusSeats ?? []).map((t) => String(t).trim()).filter((t) => /^P\d$/.test(t));
+    if (voters.length && !voters.includes(v.seat)) return null;
     return decide(G.rewardDone, `「${fin.text.replace(/P\d/g, '').trim()}」`);
   }
   return null;
