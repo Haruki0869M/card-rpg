@@ -122,6 +122,20 @@ export async function shakeChecks(check) {
     check(none.ng === 0 && none.abort === 1, '揺さぶり S11: 開く物が画面に無い時は NG にしない（中断）', JSON.stringify(none));
     check(broken.ng >= 1, '揺さぶり S11: 予告を長押ししても説明の窓が開かない時は NG', JSON.stringify(broken));
   }
+  // 区切り 4 の誤検知の直し: S3 の「割れている間は開かない」は、ダンジョンにいない人（4人の P3）がいても OK。扉が開いた（P1 が別の画面）なら NG
+  {
+    const s3case = (p1mode) => {
+      const b = {};
+      const sh = shakeInit(b, 7, 4);
+      sh.m = { id: 'S3', step: 'checkSplit', seat: 'P2', data: { other: 'r1c1', split: 'r1c0' }, stepTicks: 0, lastStep: 'checkSplit' };
+      const doors = (mine) => ({ dDoors: [{ 'data-door-choice': 'r1c0', 'data-my-vote': mine === 'r1c0' ? '1' : null, votes: 'P2' }, { 'data-door-choice': 'r1c1', 'data-my-vote': mine === 'r1c1' ? '1' : null, votes: 'P1,P4' }], pinBanner: ['P2 こっち！'] });
+      const vs = [view('P1', p1mode, p1mode === 'dungeon' ? doors('r1c1') : {}), view('P2', 'dungeon', doors('r1c0')), view('P3', 'world'), view('P4', 'dungeon', doors('r1c1'))];
+      for (let k = 0; k < 8 && sh.m?.step === 'checkSplit'; k++) shakeObserve(vs, b);
+      return sh.k.S3.log.join('／');
+    };
+    check(/^OK: 票が割れた/.test(s3case('dungeon')), '揺さぶり S3（4人）: ダンジョンにいない人がいても、割れた票の間に扉が開かなければ OK', s3case('dungeon'));
+    check(/NG: 票が割れた/.test(s3case('battle')), '揺さぶり S3: 割れているのに扉が開いた（P1 が別の画面）なら NG', s3case('battle'));
+  }
   // 区切り 4: 4人の時、S1 は P2 と P3 が交代（2回目は P3 が始める。2人の時は P3 では始めない）
   {
     const start = (people, count) => {

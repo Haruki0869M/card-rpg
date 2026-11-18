@@ -959,7 +959,9 @@ function observeS3(views, sh, p1, p2) {
     }
     const chips = views.map((v) => `${v.seat}:${(v.facts.pinChips ?? []).filter((t) => t.includes('P2')).length}`).join(' ');
     const banner = (p1.facts.pinBanner ?? []).some((t) => t.includes('P2'));
-    const status = views.every((v) => v.mode === 'dungeon');
+    // 区切り 4 の誤検知の直し: 前は全端末が dungeon かを見ていた。4人では、ダンジョンに入っていない人（世界マップの P3）がいるので、
+    // 割れた票は正しく出ていたのに NG にしていた。票を入れた2人（P1・P2）がダンジョンの画面のまま（扉が開いていない）かを見る
+    const status = [p1, p2].every((v) => v?.mode === 'dungeon');
     result(sh, 'S3', !!split && status, `票が割れた（P1=${m.data.other}・P2=${m.data.split}）間は扉が開かない: ${split && status ? 'OK' : `NG（P1 の画面 ${p1.mode}）`}`);
     result(sh, 'S3', banner, `「こっち！」の帯が P1 の画面に出る（札 ${chips}）`);
     if (banner) sh.watch.push({ id: 'S3', kind: 'pin-gone', ticks: 0 });
