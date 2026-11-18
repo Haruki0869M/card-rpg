@@ -55,16 +55,18 @@ export function townBrain(v, board) {
   const cardAct = (v.facts.tCardPick ?? [])[0];
   if (tabSel === 'remove' && cardAct) {
     if (cardAct.disabled === null && !st.did.has('remove')) {
-      st.did.add('remove');
-      covMark(board, 'town-action:remove', `${v.seat}: 町「${st.town}」で「${cardAct.text.slice(0, 20)}」を押した（確認の窓「取り除く」へ）`);
-      return decide(G.cardPickAction, `カードを取り除く（${cardAct.text.slice(0, 20)}）`);
+      return decide(G.cardPickAction, `カードを取り除く（${cardAct.text.slice(0, 20)}）`, { after: () => {
+        st.did.add('remove');
+        covMark(board, 'town-action:remove', `${v.seat}: 町「${st.town}」で「${cardAct.text.slice(0, 20)}」を押した（確認の窓「取り除く」へ）`);
+      } });
     }
   }
   const itemAct = (v.facts.tItemPick ?? [])[0];
   if (tabSel === 'sell' && itemAct && itemAct.disabled === null && st.sold < 1) {
-    st.sold++;
-    covMark(board, 'town-action:sell', `${v.seat}: 町「${st.town}」で「${itemAct.text.slice(0, 20)}」を押した`);
-    return decide(G.itemPickAction, `装備を売る（${itemAct.text.slice(0, 20)}）`);
+    return decide(G.itemPickAction, `装備を売る（${itemAct.text.slice(0, 20)}）`, { after: () => {
+      st.sold++;
+      covMark(board, 'town-action:sell', `${v.seat}: 町「${st.town}」で「${itemAct.text.slice(0, 20)}」を押した`);
+    } });
   }
   // 1. 依頼: 報告 → 受ける
   if (!st.did.has('quests')) {
@@ -79,57 +81,58 @@ export function townBrain(v, board) {
   // 2. 宿: HP が7割より下で、お金が足りる時
   if (!st.did.has('inn')) {
     if (tabSel !== 'inn') return open('inn', 'HP を見る');
-    st.did.add('inn');
     const hp = /HP\s*(\d+)\s*\/\s*(\d+)/.exec((v.facts.tInnHp ?? [])[0] ?? '');
     const inn = (v.facts.tInn ?? [])[0];
     const r = hp ? Number(hp[1]) / Math.max(1, Number(hp[2])) : 1;
     if (inn && inn.disabled === null && r < 0.7 && gold >= Number(inn['data-town-inn'] ?? innCost)) {
-      covMark(board, 'town-action:inn', `${v.seat}: 町「${st.town}」で宿に泊まった（HP ${hp?.[1]}/${hp?.[2]}）`);
-      return decide(G.townInn, `宿に泊まる（HP ${hp?.[1]}/${hp?.[2]}・${inn['data-town-inn']}G）`);
+      return decide(G.townInn, `宿に泊まる（HP ${hp?.[1]}/${hp?.[2]}・${inn['data-town-inn']}G）`, { after: () => {
+        st.did.add('inn');
+        covMark(board, 'town-action:inn', `${v.seat}: 町「${st.town}」で宿に泊まった（HP ${hp?.[1]}/${hp?.[2]}）`);
+      } });
     }
+    st.did.add('inn');
   }
   // 3. 売る: 持ち物の装備（装備中の物は出ない）を1つ。値打ちの一番低い物
   if (!st.did.has('sell')) {
     if (tabSel !== 'sell') return open('sell', '要らない装備を売る');
-    st.did.add('sell');
     const rows = (v.facts.tSell ?? []).map((r) => ({ uid: r['data-sell-item'], name: r['aria-label'], val: itemValue(KB.items[KB.itemByName[r['aria-label']]], me.job) }));
     if (rows.length) {
       const pick = [...rows].sort((a, b) => a.val - b.val || (a.uid < b.uid ? -1 : 1))[0];
-      return decide(G.sellItem(pick.uid), `売る装備を選ぶ「${pick.name}」（値打ち ${pick.val}）`);
+      return decide(G.sellItem(pick.uid), `売る装備を選ぶ「${pick.name}」（値打ち ${pick.val}）`, { after: () => st.did.add('sell') });
     }
+    st.did.add('sell');
   }
   // 4. 削る: 山札が9枚より多く、お金に余裕がある時、値打ちの一番低い札
   if (!st.did.has('removeTab')) {
     if (tabSel !== 'remove') return open('remove', '山札の弱い札を削る');
-    st.did.add('removeTab');
     const cards = (v.facts.tRemove ?? []).map((c) => ({ v: c['data-pick-card'], name: c['aria-label'], val: cardValue(KB.cardByName[c['aria-label']], me.job) }));
     const cost = tdef?.removeCost ?? 50;
     if (cards.length > 9 && gold >= cost + reserve) {
       const pick = [...cards].sort((a, b) => a.val - b.val || (a.v < b.v ? -1 : 1))[0];
-      return decide(G.removeCard(pick.v), `削る札を選ぶ「${pick.name}」（値打ち ${pick.val}・山札 ${cards.length} 枚）`);
+      return decide(G.removeCard(pick.v), `削る札を選ぶ「${pick.name}」（値打ち ${pick.val}・山札 ${cards.length} 枚）`, { after: () => st.did.add('removeTab') });
     }
+    st.did.add('removeTab');
   }
   // 5. 買う: 回復の薬を1つ（お金が宿代2回分より多く残る時）
   if (!st.did.has('shop')) {
     if (tabSel !== 'shop') return open('shop', '回復の薬を買う');
-    st.did.add('shop');
     const potions = (v.facts.tShop ?? [])
       .map((r) => ({ uid: r['data-shop-row'], id: r['data-item-id'], price: Number(r['data-price'] ?? 9999), off: r.buyOff > 0 }))
       .filter((r) => !r.off && (KB.items[r.id]?.heal ?? 0) > 0 && gold - r.price >= reserve)
       .sort((a, b) => a.price - b.price || (a.uid < b.uid ? -1 : 1));
     if (potions.length) {
-      covMark(board, 'town-action:buy', `${v.seat}: 町「${st.town}」で「${KB.items[potions[0].id]?.name}」の「買う」を押した（${potions[0].price}G）`);
-      return decide(G.shopBuy(potions[0].uid), `回復の薬を買う「${KB.items[potions[0].id]?.name}」（${potions[0].price}G・残り ${gold - potions[0].price}G）`);
+      return decide(G.shopBuy(potions[0].uid), `回復の薬を買う「${KB.items[potions[0].id]?.name}」（${potions[0].price}G・残り ${gold - potions[0].price}G）`, { after: () => {
+        st.did.add('shop');
+        covMark(board, 'town-action:buy', `${v.seat}: 町「${st.town}」で「${KB.items[potions[0].id]?.name}」の「買う」を押した（${potions[0].price}G）`);
+      } });
     }
+    st.did.add('shop');
   }
   // 6. 転職（聖堂）: 1回の訪問で1回だけ見る
   if (!st.did.has('jobs')) {
-    st.did.add('jobs');
     const b = findText(v, '聖堂（転職）');
-    if (b?.enabled) {
-      jobFlow(board, v.seat).open = 'town';
-      return decide(G.townJobs, '「聖堂（転職）」を開く（転職できるか見る）');
-    }
+    if (b?.enabled) return decide(G.townJobs, '「聖堂（転職）」を開く（転職できるか見る）', { after: () => { st.did.add('jobs'); jobFlow(board, v.seat).open = 'town'; } });
+    st.did.add('jobs');
   }
   // 7. 町を出る
   return decide(G.facilityExit, `町を出る（${[...st.did].join('・')}）`);
@@ -149,12 +152,9 @@ export function facilityBrain(v, board) {
     const opt = (v.facts.sOptions ?? []).find((o) => o.disabled === null);
     if (opt && !v.facts.sResult) return decide(G.shrineOption(opt['data-shrine-option']), `祠の選択肢 ${opt['data-shrine-option']}「${opt.text.slice(0, 20)}」`);
   } else if (!st.jobs) {
-    st.jobs = true;
     const b = findText(v, '転職先を見る');
-    if (b?.enabled) {
-      jobFlow(board, v.seat).open = 'sanctuary';
-      return decide(G.sanctuaryJobs, '神殿・祭壇「転職先を見る」');
-    }
+    if (b?.enabled) return decide(G.sanctuaryJobs, '神殿・祭壇「転職先を見る」', { after: () => { st.jobs = true; jobFlow(board, v.seat).open = 'sanctuary'; } });
+    st.jobs = true;
   }
   if (exit === 'go') return decide(G.facilityExit, `${v.mode === 'shrine' ? '祠' : '神殿・祭壇'}を出る（世界マップへ）`);
   return null;
@@ -204,11 +204,9 @@ export function jobBrain(v, board) {
     if (ready.length && jf.tried < 2) {
       const cur = me.job;
       const pick = [...ready].sort((a, b) => (TIER_ORDER[a.cls?.tier] ?? 9) - (TIER_ORDER[b.cls?.tier] ?? 9) || Number(b.cls?.weaponType === cur?.weaponType) - Number(a.cls?.weaponType === cur?.weaponType))[0];
-      jf.tried++;
-      return decide(G.jobChange(pick.id), `転職する「${pick.cls?.name ?? pick.id}」（${pick.cls?.tier ?? '?'}${pick.cls?.weaponType === cur?.weaponType ? '・今の武器が使える' : ''}・転職できる先 ${ready.length}）`);
+      return decide(G.jobChange(pick.id), `転職する「${pick.cls?.name ?? pick.id}」（${pick.cls?.tier ?? '?'}${pick.cls?.weaponType === cur?.weaponType ? '・今の武器が使える' : ''}・転職できる先 ${ready.length}）`, { after: () => { jf.tried++; } });
     }
-    jf.open = null;
-    return decide(G.sheetClose, `転職の一覧を閉じる（${ready.length ? '2回押しても転職にならない' : '今すぐ転職できる先が無い'}${ws.jobPlace ? `・場所だけ足りない: ${ws.jobPlaceText}` : ''}）`);
+    return decide(G.sheetClose, `転職の一覧を閉じる（${ready.length ? '2回押しても転職にならない' : '今すぐ転職できる先が無い'}${ws.jobPlace ? `・場所だけ足りない: ${ws.jobPlaceText}` : ''}）`, { after: () => { jf.open = null; } });
   }
   // C. ステータス（パーティ・装備）のシート: 転職へ進む／装備を付け替える
   if (sheet === 'party' && (jf.open === 'status' || me.equipOpen)) {
@@ -229,14 +227,12 @@ export function jobBrain(v, board) {
     const party = v.facts.wParty ?? [];
     const mine = party.find((p) => name && String(p['aria-label'] ?? '').startsWith(name));
     if (mine && (mine.canJob ?? 0) > 0 && jf.tried < 2) {
-      jf.open = 'status';
-      return decide(G.statusButton, `ステータスを開く（${name} に「転職できます」の印）`);
+      return decide(G.statusButton, `ステータスを開く（${name} に「転職できます」の印）`, { after: () => { jf.open = 'status'; } });
     }
     // E. 装備: 手に入れた品がある → 自分の手番の始め（サイコロの前）にステータスを開く
     const active = (v.facts.activeHero ?? [])[0];
     if ((me.pendingSlots?.size ?? 0) > 0 && active?.['data-seat'] === v.seat && findMark(v, 'data-roll-move')?.enabled) {
-      me.equipOpen = true;
-      return decide(G.statusButton, `ステータスを開く（手に入れた装備を付けるか見る: ${[...me.pendingSlots].map((s) => SLOT_WORD[s] ?? s).join('・')}）`);
+      return decide(G.statusButton, `ステータスを開く（手に入れた装備を付けるか見る: ${[...me.pendingSlots].map((s) => SLOT_WORD[s] ?? s).join('・')}）`, { after: () => { me.equipOpen = true; } });
     }
   }
   return null;

@@ -229,11 +229,13 @@ export function worldBrain(v, board) {
     // 合流（先に入った仲間の組）は、字が「〜たちに合流する」
     const join = /合流する/.test(enter.text);
     if (atTarget || isGoal || join) {
-      ws.done.add(w.here);
-      if (kind === 'town') ws.townsVisited.add(id);
-      if (kind === 'temple' || kind === 'altar') ws.sanctuaryTried.add(w.here);
-      ws.target = null;
-      return decide(G.interact(kind, id), `「${enter.text}」（${atTarget ? plan.c.why : isGoal ? '次の目的' : '仲間に合流'}）`, T);
+      const here = w.here;
+      return decide(G.interact(kind, id), `「${enter.text}」（${atTarget ? plan.c.why : isGoal ? '次の目的' : '仲間に合流'}）`, { ...T, after: () => {
+        ws.done.add(here);
+        if (kind === 'town') ws.townsVisited.add(id);
+        if (kind === 'temple' || kind === 'altar') ws.sanctuaryTried.add(here);
+        ws.target = null;
+      } });
     }
   }
   // 行き先のマスに着いたのに入る物が無い（使い終わった・字が出ない）→ 行き先から外す
@@ -297,6 +299,5 @@ export function encounterBrain(v, board) {
   let why = scourge ? '災厄は戦う' : 'ふつうの敵は戦う';
   if (!scourge && choices.includes('ambush') && !es.ambush) [pick, why] = ['ambush', '網羅: 「奇襲を狙う」を1回通す'];
   else if (!scourge && choices.includes('flee') && !es.flee && es.ambush) [pick, why] = ['flee', '網羅: 「逃げる」を1回通す'];
-  es[pick]++;
-  return decide(G.encounterChoice(pick), `遭遇「${{ fight: '戦う', ambush: '奇襲を狙う', flee: '逃げる' }[pick]}」（${why}）`, T);
+  return decide(G.encounterChoice(pick), `遭遇「${{ fight: '戦う', ambush: '奇襲を狙う', flee: '逃げる' }[pick]}」（${why}）`, { ...T, after: () => { es[pick]++; } });
 }
