@@ -193,7 +193,8 @@ export function worldBrain(v, board) {
   if (v.facts.moveProposal) return null;
   // 3. 行き先を決める（前の行き先が残っていて、まだ使っていなければ続ける）
   const cands = destinations(w, board);
-  let target = ws.target && cands.find((c) => c.tile === ws.target.tile && c.kind === ws.target.kind);
+  // 寄り道の行き先だけを続ける（次の目的 = goal は毎回選び直す。試しの通しで、最初に goal を選ぶと、後で見えた宝箱・イベントへ寄らなかった）
+  let target = ws.target && ws.target.kind !== 'goal' && cands.find((c) => c.tile === ws.target.tile && c.kind === ws.target.kind);
   const { cost } = costMap(w.cols, w.rows, w.hexes, w.tide);
   // 徘徊する敵: HP が6割より下なら避ける（そのマスの見積もりを重くする）
   const extra = {};
