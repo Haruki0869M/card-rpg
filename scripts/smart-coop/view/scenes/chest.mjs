@@ -13,6 +13,9 @@ export const PART = {
     chestLeaveMark: (k) => ({ css: `[data-chest-leave="${k}"]` }),
     // 演出を飛ばす。印なし（字だけ）
     chestSkip: { css: 'button', text: 'タップで結果まで飛ばす', exact: false },
+    // 黄金箱の秘宝の3択（今ある印 data-relic-option）→ 説明の窓の「これを選ぶ」（今ある印 data-item-pick-action）
+    relicOption: (i) => ({ css: `[data-relic-option="${i}"]` }),
+    relicPick: { css: '[data-relic-picker] [data-item-pick-action]' },
   },
   facts: {
     // 開け役の候補: 字（「おすすめ」・「鍵が開く 45%（フォーカス2で70%）」・「器用5・運3・フォーカス2」）と票（今ある印）→ B9
@@ -38,6 +41,8 @@ export const PART = {
     lootItems: { sel: '[data-loot-item]', read: 'attrs', attrs: ['data-loot-item'] },
     chestButtons: { sel: 'button.btn-gold, button.btn-dark', read: 'rows', attrs: ['disabled'], textMax: 40 },
     claimArea: { sel: '[data-claim-area]', read: 'count' },
+    relicOpts: { sel: '[data-relic-option]', read: 'rows', attrs: ['data-relic-option', 'data-pick-item'], textMax: 60, sub: { votes: { sel: '[data-vote-seats]', read: 'attr', attr: 'data-vote-seats' }, name: { sel: 'span.truncate', read: 'text' } } },
+    relicAction: { sel: '[data-relic-picker] [data-item-pick-action]', read: 'rows', attrs: ['disabled'], textMax: 20 },
     leaveWait: { sel: '[data-leave-wait]', read: 'text' },
     sealResult: { sel: '[data-seal-result]', read: 'marks', attrs: ['data-seal-result'] },
   },

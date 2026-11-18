@@ -129,6 +129,17 @@ function eventBrain(v, board) {
 /** 宝箱の1手 */
 function chestBrain(v, board) {
   const st = dstate(board);
+  // 黄金箱の秘宝の3択（区切り 2-Sb の通しで、印はあるのに頭が答えず「互いに待つ」になった）: みんなの票。ほかの人の票があればそろえる・無ければ格の一番高い物（同じなら上）
+  const relics = v.facts.relicOpts ?? [];
+  if (relics.length) {
+    const rs = relics.map((r) => ({ i: r['data-relic-option'], name: r.name ?? '', votes: seatsOf(r.votes), rank: rarityRank(KB.items[KB.itemByName[r.name ?? '']]?.rarity) }));
+    if (rs.some((r) => r.votes.includes(v.seat))) return null;
+    const voted = rs.find((r) => r.votes.length);
+    const pick = voted ?? [...rs].sort((a, b) => b.rank - a.rank || Number(a.i) - Number(b.i))[0];
+    const act = (v.facts.relicAction ?? [])[0];
+    if (act && act.disabled === null && st.relicOpen === pick.i) return decide(G.relicPick, `秘宝「${pick.name}」を選ぶ（${voted ? '仲間の票にそろえる' : '格の一番高い物'}）`, T);
+    return decide(G.relicOption(pick.i), `秘宝の候補「${pick.name}」の説明を開く`, { ...T, after: () => { st.relicOpen = pick.i; } });
+  }
   const btn = (re) => (v.facts.chestButtons ?? []).find((b) => b.disabled === null && re.test(b.text));
   // 演出: 最初の1回は最後まで見る。2回目からは飛ばす
   const skip = btn(/^タップで結果まで飛ばす/);
