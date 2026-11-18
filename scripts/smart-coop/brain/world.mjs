@@ -207,6 +207,13 @@ export function destinations(w, board) {
   for (const sc of w.scourges ?? []) {
     if (keysDone >= 1 && minHpRatio(w.party) > 0.6 && !hurry && covWant(board, `scourge:${sc.id}:meet`)) out.push({ ...sc, pri: 5, why: `災厄「${sc.id}」（まだ遭遇していない）` });
   }
+  // 区切り5（シナリオ3の通しで、船があると潮のマスを一度も通らなかった）: 網羅の行「潮のマスを渡った」をまだ踏んでいなければ、
+  // 見えている潮のマス（船の要る水道は船がある時だけ）の一番番号の小さい物を寄り道にする。閉じていれば手前で潮を待つ（5b）
+  if (covWant(board, 'tide-cross') && !hurry) {
+    const terr = KB.world?.terrains ?? {};
+    const tideTiles = (w.hexes ?? []).filter((h) => h['data-tide'] && (!terr[h['data-terrain']]?.tideShip || ws.ship)).map((h) => Number(h['data-hex'])).filter((t) => !ws.unreachable.has(t) && !ws.done.has(t)).sort((a, b) => a - b);
+    if (tideTiles.length) out.push({ tile: tideTiles[0], kind: 'tide', id: 'tide-cross', pri: 4, why: '網羅: 潮のマスを渡る（閉じていれば手前で潮を待つ）' });
+  }
   if (w.goalTile !== null) out.push({ tile: w.goalTile, kind: 'goal', id: 'goal', pri: 9, why: '次の目的（鍵のダンジョン・最後のダンジョン）' });
   return out.sort((a, b) => a.pri - b.pri || a.tile - b.tile);
 }
@@ -274,7 +281,7 @@ export function worldBrain(v, board) {
       const d = dist[w.here];
       if (!Number.isFinite(d)) { ws.unreachable.add(c.tile); continue; }
       // 寄り道の上限: 災厄と、網羅の表で「必ず」のまだ入っていない町は遠くても行く（DETOUR_FAR）【提案】
-      const far = c.kind === 'scourge' || (c.kind === 'town' && covWant(board, `town:${c.id}`));
+      const far = c.kind === 'scourge' || c.kind === 'tide' || (c.kind === 'town' && covWant(board, `town:${c.id}`));
       if (c.kind !== 'goal' && c.kind !== 'quest' && d > (far ? DETOUR_FAR : DETOUR_MAX)) continue;
       return { c, dist, d };
     }

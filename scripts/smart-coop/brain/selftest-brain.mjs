@@ -109,6 +109,13 @@ export function brainChecks(check) {
     const t1 = worldBrain(structuredClone(tv), tb);
     t1?.after?.();
     check(t1?.target.css === '[data-camp]' && (tb.covMarks ?? []).some((m) => m.id === 'tide-wait'), '頭: 隣の潮のマスが閉じていれば、サイコロを振らずに野営して潮を待つ', JSON.stringify(t1));
+    // 網羅の「潮のマスを渡った」をまだ踏んでいなければ、見えている潮のマスを寄り道の行き先にする（シナリオ3の通しで一度も通らなかった直し）
+    const fv = structuredClone(tv);
+    fv.facts.activeHero = [{ 'data-hero': 'h0', 'data-seat': 'P1', 'data-tile': '15' }];
+    fv.facts.goalMark = [{ 'data-goal-mark': '0' }];
+    const fb = {};
+    worldBrain(fv, fb);
+    check(fb.world?.target?.kind === 'tide' && fb.world.target.tile === 22, '頭: まだ潮のマスを渡っていなければ、見えている潮のマスへ寄り道する', JSON.stringify(fb.world?.target));
     const ov = structuredClone(tv);
     ov.facts.wTide = [{ 'data-tide-icon': 'low', 'aria-label': '🐚 引き潮' }];
     check(worldBrain(ov, {})?.target.css === '[data-roll-move]', '頭: 潮が開いていれば、ふつうにサイコロを振る', '');
