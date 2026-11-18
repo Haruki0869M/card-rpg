@@ -156,6 +156,8 @@ interface StoreState {
   confirmAbandon: boolean;
   /** 「ターン終了」の確認（この端末の担当で、まだ行動できる仲間がいる時だけ出す） */
   confirmEndTurn: boolean;
+  /** 確認を出した時の「どの戦闘の何ターン目か」（別のターンに持ち越さないための印。2026-11-19） */
+  confirmEndTurnAt: string | null;
   setConfirmEndTurn: (v: boolean) => void;
   rollFx: RollFx | null;
   /** 重なりの演出（Step C）: 揺れ・広がる輪を始めた合図。見た目だけ（状態・乱数・同期は変えない） */
@@ -731,6 +733,7 @@ export const useBattle = create<StoreState>((set, get) => {
     sheetEpoch: 0,
     confirmAbandon: false,
     confirmEndTurn: false,
+    confirmEndTurnAt: null,
     rollFx: null,
     synergyFx: null,
     popups: [],
@@ -1006,7 +1009,7 @@ export const useBattle = create<StoreState>((set, get) => {
       // この端末の担当のキャラだけで判断する（1台で全員を動かす時も、オンラインで自分の分だけの時も同じ）。
       // 使えるカード（マナが足りる）が残っている仲間がいれば、押し間違いを防ぐために確認する
       const canAct = canStillAct(battle);
-      if (canAct && !force) { set({ selection: null, confirmEndTurn: true }); return; }
+      if (canAct && !force) { set({ selection: null, confirmEndTurn: true, confirmEndTurnAt: `${battle.seed}:${battle.turn}` }); return; }
       set({ selection: null, hint: null });
       // オンライン協力: この端末の担当のうち、まだ準備完了していない席の分を押す
       if (room) {
