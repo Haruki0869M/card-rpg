@@ -152,6 +152,20 @@ export async function shakeChecks(check) {
     const back = s2case(true);
     check(np.ng === 0 && np.abort === 1 && back.ng === 1, '揺さぶり S2: 持ち主が足せない時は中断・足した後に 0 に戻ったら NG', JSON.stringify({ np, back }));
   }
+  // 区切り 4 の誤検知の直し: S13 の準備完了は「ターン終了」の印が ready から変われば進んだ（長い戦闘で 60 手を超えても NG にしない）
+  {
+    const readyCase = (after) => {
+      const b = {};
+      const sh = shakeInit(b, 7, 4);
+      sh.watch.push({ id: 'S13', kind: 'ready', seats: ['P3', 'P4'], ticks: 0, what: 'S13（ready）' });
+      const bv = (seat, st) => view(seat, 'battle', { bEndTurn: [{ 'data-end-turn': st }] });
+      for (let k = 0; k < 70; k++) shakeObserve([bv('P1', 'ready'), bv('P2', 'ready'), bv('P3', after), bv('P4', after)], b);
+      return { ok: sh.k.S13.ok, ng: sh.k.S13.ng };
+    };
+    const moved = readyCase('waiting');
+    const stuck = readyCase('ready');
+    check(moved.ok === 1 && moved.ng === 0 && stuck.ng === 1, '揺さぶり S13（準備完了）: 印が変われば OK・60 手 ready のままなら NG', JSON.stringify({ moved, stuck }));
+  }
   // 区切り 4: 4人の時、S1 は P2 と P3 が交代（2回目は P3 が始める。2人の時は P3 では始めない）
   {
     const start = (people, count) => {

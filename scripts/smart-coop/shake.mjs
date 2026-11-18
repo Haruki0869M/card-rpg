@@ -829,6 +829,22 @@ export function shakeObserve(views, board) {
   // 見張り（揺さぶりの後に「進む」か）
   for (const w of sh.watch.splice(0)) {
     w.ticks++;
+    if (w.kind === 'ready') {
+      // 押した人の画面の「ターン終了」の印が「準備完了を押せる（ready）」以外になった・戦闘が終わった = 進んだ
+      const moved = w.seats.some((s) => {
+        const sv = views.find((x) => x.seat === s);
+        const st = (sv?.facts.bEndTurn ?? [])[0]?.['data-end-turn'];
+        return !sv || sv.mode !== 'battle' || (st && st !== 'ready');
+      });
+      if (moved) {
+        result(sh, w.id, true, `${w.what}: 準備完了の後、ターンが進んだ（${w.ticks} 手）`);
+        continue;
+      }
+      if (w.ticks > 60) {
+        result(sh, w.id, false, `${w.what}: 準備完了の後、60 手のあいだターンが進まない`);
+        continue;
+      }
+    }
     if (w.kind === 'agree') {
       const k = p1 ? agreeKey(p1) : '';
       if (k !== w.key) {
@@ -1337,7 +1353,10 @@ export function pickSimultaneous(wants, views, board) {
     sh.k.S13.count++;
     sh.order.push(`S13(${k})`);
     note(sh, `揺さぶり S13 を始める（${k}・${ws.map((w) => `${views[w.i].seat}「${w.d.what}」`).join(' と ')}を同時に押す）`);
-    sh.watch.push({ id: 'S13', kind: 'agree', key: agreeKey(views.find((v) => v.seat === 'P1') ?? views[0]), ticks: 0, what: `S13（${k}）` });
+    // 区切り 4 の誤検知の直し: 「準備完了」は戦闘の中なので、合意の鍵（扉・選択肢など）がターンをまたいでも変わらず、4人の長い戦闘で
+    // 「60 手のあいだ合意が進まない」にしていた。準備完了は、押した人の「ターン終了」の印が変わったか（敵の番に進んだか）で見る
+    if (k === 'ready') sh.watch.push({ id: 'S13', kind: 'ready', seats: ws.map((w) => views[w.i].seat), ticks: 0, what: `S13（${k}）` });
+    else sh.watch.push({ id: 'S13', kind: 'agree', key: agreeKey(views.find((v) => v.seat === 'P1') ?? views[0]), ticks: 0, what: `S13（${k}）` });
     // 押した後の確かめ（shakeAfterTick）: 同時に押した人が、すぐ後にもう1度同じ物を押していないか（自分の票が入っていなかった形）
     sh.simCheck = { kind: k, presses: ws.map((w) => ({ seat: views[w.i].seat, css: w.d.target.css })), idx: null, toasts: [] };
     return { kind: k, wants: ws };
