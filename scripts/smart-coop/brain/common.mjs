@@ -39,7 +39,9 @@ export function commonBrain(v) {
   }
   // 4. 同行の誘いには「一緒に行く」（計画 §4: 2人目以降は先頭の人に同行する）
   const inv = v.actions.find((a) => a.text === '一緒に行く' && a.enabled && !a.marks.some((m) => m.startsWith('data-move-agree')));
-  if (inv) return decide(G.inviteYes, '同行の誘い「一緒に行く」');
+  // 区切り 4（4人の通しの直し）: 誘いに答えられるのは世界マップの時だけ（ほかの人が遭遇・戦闘に入った後も誘いの枠が残って見えるが、
+  // 押しても効かない。前は押し続けて止まった。残って見える枠そのものは、報告に「人が困るかもしれない所」として書く）
+  if (inv && v.mode === 'world') return decide(G.inviteYes, '同行の誘い「一緒に行く」');
   // 5. 移動の提案には「一緒に行く」
   const agree = findMark(v, 'data-move-agree', 'yes');
   if (agree?.enabled) return decide(G.moveAgreeYes, `移動の提案「${agree.text}」`);

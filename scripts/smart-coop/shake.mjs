@@ -565,7 +565,9 @@ function s10Decline(v, sh) {
 function s10Reinvite(v, sh) {
   const m = sh.m;
   if (m.step !== 'reinvite') return null;
-  const inv = v.actions.find((a) => a.enabled && a.marks.includes('data-invite=no'));
+  // 区切り 4（4人の通しの直し）: 断った人のキャラ（P<n> のキャラは h<n-1>）を誘い直す。前は一覧の先頭を誘い、4人では別の人（P3）のキャラを誘っていた
+  const mine = `h${Number(String(m.seat).slice(1)) - 1}`;
+  const inv = v.actions.find((a) => a.enabled && a.marks.includes('data-invite=no') && a.marks.includes(`data-companion=${mine}`));
   const hero = inv?.marks.find((x) => x.startsWith('data-companion='))?.slice('data-companion='.length);
   if (!hero) return null;
   return decide(G.invite(hero), `揺さぶり S10: もう1度同行に誘う（${hero}）`, { turn: true, ...P, after: () => { m.step = 'accept'; m.data.hero = hero; m.data.inviter = v.seat; } });
