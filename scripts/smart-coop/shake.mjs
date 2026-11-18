@@ -737,6 +737,9 @@ export function shakeObserve(views, board) {
     if (v.seat === 'P1' && prev.mode === 'town' && v.mode === 'world') sh.n.townExit++;
     sh.prev[v.seat] = { inv, mv, stage, mode: v.mode, screen: v.screen };
   }
+  // 実機の不具合の確かめ④（取り合いとカード3択の順）の行: 報酬の画面で取り合いの窓を見たか（区切り 3-S の通しで、報酬の段の印の値が
+  // 'claim' でなく、取り合いを見たのに「見なかった」と書いていた。取り合いの行そのもの data-claim で数える）
+  if (views.some((v) => v.mode === 'reward' && (v.facts.claims ?? []).length)) sh.flags.claimSeen = true;
   // 手順の上限
   if (m) {
     if (m.step !== m.lastStep) {
