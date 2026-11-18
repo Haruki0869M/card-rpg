@@ -122,6 +122,24 @@ export async function shakeChecks(check) {
     check(none.ng === 0 && none.abort === 1, '揺さぶり S11: 開く物が画面に無い時は NG にしない（中断）', JSON.stringify(none));
     check(broken.ng >= 1, '揺さぶり S11: 予告を長押ししても説明の窓が開かない時は NG', JSON.stringify(broken));
   }
+  // 区切り5（シナリオ3の通しの誤検知の直し）: S1 で受け取る人の袋がいっぱいの時、ゲームが断って渡した人に知らせが出たら、
+  // 「受け取る人の袋に無い」を OK にする。知らせが無く袋にも無い時は NG のまま
+  {
+    const s1case = (toast) => {
+      const b = {};
+      const sh = shakeInit(b, 7);
+      sh.m = { id: 'S1', step: 'peer', seat: 'P2', data: { gave: { item: 'hiPotion', to: 'h0', at: 0 }, peer: 'P1' }, stepTicks: 0, lastStep: 'peer' };
+      const giver = view('P2', 'dungeon', { toasts: toast ? ['リュウの袋がいっぱいです'] : [] });
+      shakeObserve([view('P1', 'dungeon', { pItems: [] }), giver], b);
+      const pv = view('P1', 'dungeon', { pItems: [{ 'data-item-row': 'potion', 'data-item-kind': 'pouch' }] }, { layers: [{ id: 'sheet', value: 'party' }] });
+      shakeBrain(pv, b);
+      return { ng: sh.k.S1.ng, ok: sh.k.S1.ok };
+    };
+    const refused = s1case(true);
+    const lost = s1case(false);
+    check(refused.ng === 0 && refused.ok >= 1, '揺さぶり S1: 受け取る人の袋がいっぱいでゲームが断った時は、袋に無いのが正しい（誤検知の直し）', JSON.stringify(refused));
+    check(lost.ng >= 1, '揺さぶり S1: 断りの知らせが無いのに受け取った人の袋に無ければ NG のまま', JSON.stringify(lost));
+  }
   // 区切り 4 の誤検知の直し: S3 の「割れている間は開かない」は、ダンジョンにいない人（4人の P3）がいても OK。扉が開いた（P1 が別の画面）なら NG
   {
     const s3case = (p1mode) => {
