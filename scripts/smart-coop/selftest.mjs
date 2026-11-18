@@ -35,6 +35,9 @@ const FIX = {
   'cover-inside': page(`<div data-turn-lock class="abs" style="left:0;top:90px;width:390px;height:80px;background:#222"><button id="t" style="margin:10px 40px" onclick="window.hits=(window.hits||0)+1">帯の中のボタン</button></div>`),
   // 一瞬の当たり: 板が 200ms で消える（show() でもう1度出す）
   // （押す直前に show() を呼ぶ。最初の検査では乗っていて、0.4秒あけた測り直しでは消えている長さ = 450ms）
+  // 買った時の字だけのお知らせ（1.2秒で消える。押しても通り抜ける）→ 消えるのを待って押す（区切り 2-Sb の直し）
+  'buy-notice': page(`${BTN}<div data-buy-notice="text" id="bn" class="abs" style="left:0;top:90px;width:390px;height:80px;background:rgba(0,0,0,.9);pointer-events:none">上回復薬を買った！</div>
+<script>setTimeout(()=>document.getElementById('bn').remove(),1200)</script>`),
   momentary: page(`${BTN}<div id="m" class="abs" style="left:20px;top:80px;width:220px;height:90px;background:#333;display:none">すぐ消える板</div>
 <script>function show(){const m=document.getElementById('m');m.style.display='block';setTimeout(()=>m.style.display='none',450)}</script>`),
   // 世界マップ: 地図の中の駒は当たりにしない。地図の外のパネルは「地図を動かす」
@@ -191,6 +194,10 @@ export async function selftest() {
     await open('overlap-good');
     const pg = await press(s, dev, target, { what: '離れたボタン', expectEffect: false });
     check(pg.pressed && (await p.evaluate(() => window.hits)) === 1, '押す: 正しい形なら、指で1回押す', JSON.stringify(pg));
+    await open('buy-notice');
+    const nb = judge.failures.length;
+    const pb = await press(s, dev, target, { what: '買った時のお知らせの下のボタン', expectEffect: false });
+    check(pb.pressed && judge.failures.length === nb, '押す: 買った時の字だけのお知らせは、消えるのを待って押す（区切り 2-Sb の直し）', JSON.stringify({ pb, f: judge.failures.slice(nb).map((x) => x.text) }));
     await open('momentary');
     const n1 = judge.failures.length;
     await p.evaluate(() => window.show());

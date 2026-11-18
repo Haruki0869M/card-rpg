@@ -21,7 +21,10 @@ export const BANDS = [
 ];
 
 /** 短いお知らせ（数秒で消える）。当たったら消えるまで待つ（上限3秒） */
-export const TOASTS = ['[data-toast]'];
+// センサーの直し（2026-11-18・区切り 2-Sb）: 店の「〇〇を買った！」の字だけのお知らせ（data-buy-notice="text"。BuyNotice.tsx。押しても通り抜け、1.8秒で消える）も
+//   短いお知らせとして、消えるまで待ってから測り直す。前は続けて2つ買う時の2つ目の「買う」で「見た目のかぶさり」に当たっていた（誤検知）。自己テスト: selftest.mjs「買った時のお知らせ」
+//   装備を買った時の窓（data-buy-notice="equip"。閉じるまで残る）は、今までどおり帯として当てる
+export const TOASTS = ['[data-toast]', '[data-buy-notice="text"]'];
 
 /** 暗幕そのものを押して閉じる物（理由: 暗幕が押す物なので、上に乗っている事にならない） */
 export const BACKDROPS = ['[data-detail-backdrop]', '[data-scourge-backdrop]', '[data-status-list-backdrop]'];
