@@ -221,6 +221,8 @@ export function jobBrain(v, board) {
     return decide(G.sheetClose, 'ステータスを閉じる');
   }
   if (sheet) return null;
+  // 物語・確認の窓・見取り図などが上に開いている間は開かない（2-Sb の試しの通しで、制覇の後の物語の下のステータスを押そうとして止まった。bot の間違い）
+  if (v.layers.length) return null;
   // D. 世界マップ: 自分のキャラに「転職できます」の印 → ステータスを開く（手番でなくても開ける。手番の人を止めない）
   if (v.mode === 'world') {
     const name = myName(v, board);
