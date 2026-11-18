@@ -119,6 +119,12 @@ function EndTurnConfirm() {
   const open = useBattle((s) => s.confirmEndTurn && s.battle.phase === 'ally');
   const endTurn = useBattle((s) => s.endTurn);
   const setOpen = useBattle((s) => s.setConfirmEndTurn);
+  // 味方の番が終わったら（敵の番・戦闘の終わり）、答えていない確認を閉じる。
+  // 2026-11-18 賢い検証 bot が見つけた不具合: 2人で、P1 が確認に答える前に P2 が敵を倒すと、次の戦闘の最初のターンに同じ確認がまた出た
+  const stale = useBattle((s) => s.confirmEndTurn && s.battle.phase !== 'ally');
+  useEffect(() => {
+    if (stale) setOpen(false);
+  }, [stale, setOpen]);
   return (
     <AnimatePresence>
       {open && (
