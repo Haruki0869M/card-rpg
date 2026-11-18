@@ -388,13 +388,17 @@ export const LandscapeLayer = memo(function LandscapeLayer({ w, tiles, geom, lev
           </Fragment>
         ))}
       </div>
-      <HexShapes tiles={tiles} geom={geom} levels={levels} />
+      <HexShapes tiles={tiles} geom={geom} levels={levels} roadTerrain={roadTerrain} />
     </>
   );
 });
 
-/** マスの形（透明）。確認スクリプトが、マスの位置と大きさ・霧のマスの数を数える */
-const HexShapes = memo(function HexShapes({ tiles, geom, levels }: { tiles: WorldState['tiles']; geom: PaintGeom; levels: readonly number[] }) {
+/**
+ * マスの形（透明）。確認スクリプトが、マスの位置と大きさ・霧のマスの数を数える。
+ * 見えているマスだけに、地形（data-terrain）・道（data-road）・潮で開く時（data-tide = high/low）の印を付ける
+ * （2026-11-18 賢い検証 bot が道を探すため。docs/tasks/smart-coop-bot-detail-plan.md A7。霧のマスには付けない）
+ */
+export const HexShapes = memo(function HexShapes({ tiles, geom, levels, roadTerrain }: { tiles: WorldState['tiles']; geom: PaintGeom; levels: readonly number[]; roadTerrain: string }) {
   const { R } = geom;
   return (
     <svg width={geom.W} height={geom.H} className="pointer-events-none absolute inset-0 block" data-terrain-layer>
@@ -402,7 +406,7 @@ const HexShapes = memo(function HexShapes({ tiles, geom, levels }: { tiles: Worl
         if (!t.seen) return null;
         const { x, y } = geom.center(i);
         return (
-          <g key={i} data-hex={i} data-level={levels[i]}>
+          <g key={i} data-hex={i} data-level={levels[i]} data-terrain={t.t} data-road={t.t === roadTerrain ? '' : undefined} data-tide={TERRAINS.tryGet(t.t)?.tide}>
             <polygon points={pts(hexVerts(x, y, R * TOP_SCALE))} fill="transparent" />
           </g>
         );
