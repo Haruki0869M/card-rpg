@@ -255,6 +255,9 @@ export async function runScene({ brainFor, observe, battleLines }) {
     // 手順2: 差し込む・取り直す
     const same = await injectSave(fleet, judge, ed.game);
     if (!same) await judge.fail('desync', { text: '保存を差し込んだ後、20 秒たっても全端末の状態の印がそろわない' });
+    // 差し込みで起きた取り直しは用意の一部（同期のずれに数えない。1回目の D-scourge で数えてしまった誤検知の直し）
+    await wait(1500);
+    await judge.forgetSetupResyncs();
     // 手順3: 書く入口を封じる。ここから先は全部画面のボタン
     await judge.sealNow();
     judge.lastSeq = -1;

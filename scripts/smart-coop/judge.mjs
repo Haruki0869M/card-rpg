@@ -318,6 +318,20 @@ export class Judge {
     }
   }
 
+  /**
+   * 区切り 4（場面から）: 保存を差し込んだ時の取り直し（ほかの端末が、差し込まれた状態を「印が違う」として取り直す）は、台本の用意なので
+   * 同期のずれに数えない。今までの記録を「見た」にして、報告の取り直しの記録には「用意」として残す
+   */
+  async forgetSetupResyncs() {
+    const fps = await this.fingerprints();
+    for (const [i, f] of fps.entries()) {
+      if (!Array.isArray(f.resyncLog)) continue;
+      const seat = this.devices[i].seat;
+      for (const e of f.resyncLog.slice(this.resyncSeen.get(seat) ?? 0)) this.resyncs.push({ seat, ...e, setup: true });
+      this.resyncSeen.set(seat, f.resyncLog.length);
+    }
+  }
+
   /** 部屋に入っている端末の seq がそろうまで待ち、hash を比べる。返す物: { ok, seq, hashes } */
   async compare({ settleMs = 15000 } = {}) {
     let fps = [];
