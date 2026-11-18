@@ -6,7 +6,7 @@
 import { checkTarget, rectInPage, revealInPage } from './sensor.mjs';
 import { BUSY } from './view/scenes/game.mjs';
 import { readView } from './view/index.mjs';
-import { until, wait } from './util.mjs';
+import { until, wait, withTimeout } from './util.mjs';
 
 const BUSY_MS = 20000;
 const STABLE_MS = 1500;
@@ -14,6 +14,7 @@ const TOAST_MS = 3000;
 const EFFECT_MS = 3000;
 const EVAL_MS = 2000; // 押す物を測る1回の上限（消えた物を 30秒待たない）
 const SETTLE_MS = 800;
+const LONG_MS = 800; // 長押し（ゲームの長押しは約0.4秒。TIMING.longPress）
 
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -29,7 +30,7 @@ export const targetKey = (t) => `${t.css}${t.text !== undefined ? `「${t.text}�
 
 /** 演出中でなくなるまで待つ（上限 20秒）。待てたら true */
 export async function waitNotBusy(page, ms = BUSY_MS) {
-  return until(() => page.evaluate((sels) => !sels.some((s) => document.querySelector(s)), BUSY), ms, 100);
+  return until(() => withTimeout(page.evaluate((sels) => !sels.some((s) => document.querySelector(s)), BUSY), 15000, 'busy'), ms, 100);
 }
 
 /**
@@ -40,7 +41,7 @@ export async function waitNotBusy(page, ms = BUSY_MS) {
  * @param {object} o { what: 記録の名前, appearMs: 出てくるまで待つ上限, expectEffect: 効いたかを確かめるか }
  * 返す物: { pressed, failed, needPan, effect, problems }
  */
-export async function press(s, dev, target, { what = targetKey(target), appearMs = 8000, expectEffect = true, map = false, where = null } = {}) {
+export async function press(s, dev, target, { what = targetKey(target), appearMs = 8000, expectEffect = true, map = false, where = null, long = false } = {}) {
   const { judge } = s;
   const page = dev.page;
   const t0 = Date.now();
@@ -126,7 +127,14 @@ export async function press(s, dev, target, { what = targetKey(target), appearMs
     // 5. タップ（検査した点を指で押す）
     const before = expectEffect ? await probe(s, dev) : null;
     const handle = await loc.elementHandle({ timeout: EVAL_MS }).catch(() => null);
-    await page.touchscreen.tap(res.point.x, res.point.y);
+    if (long) {
+      // 区切り 3-S（揺さぶり S11）: 長押し。Playwright の指（touchscreen）には長押しが無いので、同じ点でマウスを押し下げ → LONG_MS 待つ → 離す
+      // （ゲームの長押しは pointer の押し下げと離す間の時間で決まる。usePress.ts。押す前の検査は同じ）
+      await page.mouse.move(res.point.x, res.point.y);
+      await page.mouse.down();
+      await wait(LONG_MS);
+      await page.mouse.up();
+    } else await page.touchscreen.tap(res.point.x, res.point.y);
     // 6. 効いたかを確かめる（3秒以内に、その端末の画面の指紋か、全体の番号が変われば良い）
     let effect = null;
     if (expectEffect) {
@@ -138,7 +146,7 @@ export async function press(s, dev, target, { what = targetKey(target), appearMs
       await until(async () => !(await handle.evaluate((e) => e.isConnected).catch(() => false)), SETTLE_MS, 50);
       await handle.dispose().catch(() => {});
     }
-    judge.record({ ...entry, scrolled, panned, result: 'tap', point: res.point, effect, ms: Date.now() - t0 });
+    judge.record({ ...entry, scrolled, panned, result: long ? 'long' : 'tap', point: res.point, effect, ms: Date.now() - t0 });
     return { pressed: true, effect, problems: [] };
   } catch (e) {
     // 押す物が、数えた後・測る前に消えた（場面が切り替わった・描き直した）。押していないので失敗にはせず、頭がもう1度決める。

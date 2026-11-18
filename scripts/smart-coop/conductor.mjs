@@ -6,6 +6,7 @@
 import { readAll, readViewSettled } from './view/index.mjs';
 import { checkOverflow, checkWindows } from './sensor.mjs';
 import { press } from './press.mjs';
+import { phase } from './util.mjs';
 
 export class Conductor {
   /**
@@ -57,6 +58,7 @@ export class Conductor {
    */
   async tick() {
     this.steps++;
+    phase.set('conductor: 画面を読む・点検');
     const views = await this.observe();
     // 区切り 2-Sb: 押す前の画面を見る口（画面での確かめの写真を、押す前の形で残すため。頭ではない・押さない）
     if (this.onViews) await this.onViews(views);
@@ -70,13 +72,33 @@ export class Conductor {
       if (d) wants.push({ i, d });
     }
     const allWaiting = wants.length === 0;
+    phase.set('conductor: 止まりの見張り');
     const stuck = await this.judge.watch(views, { allWaiting });
     if (!wants.length) return { pressed: false, allWaiting, views, stuck, stop: this.judge.shouldStop() || stuck === 'timeout' };
-    // 手番の人 → 席の番号の小さい順
-    wants.sort((a, b) => (b.d.turn ? 1 : 0) - (a.d.turn ? 1 : 0) || a.i - b.i);
+    // 区切り 3-S: 揺さぶり S13（同時押し）。2台以上が同じ種類の票を押そうとしていて、周期で選ばれた時だけ、全部を同時に押す
+    const sim = this.pickSim ? this.pickSim(wants, views) : null;
+    if (sim) {
+      const n0 = this.judge.actions.length;
+      const before = await this.judge.maxSeq();
+      const rs = await Promise.all(sim.wants.map(({ i, d }) => press(this.session, devs[i], d.target, { what: `${d.what}（揺さぶり S13: 同時押し）`, map: !!d.map, where: `${views[i].screen}/${views[i].mode ?? '-'}` })));
+      // 同じ種で2回流した記録をそろえるため、同時に押した記録は席の順に並べ直す（どちらが先に終わるかは時間で変わる）
+      const fresh = this.judge.actions.splice(n0).sort((a, b) => String(a.seat).localeCompare(String(b.seat)));
+      this.judge.actions.push(...fresh);
+      await this.judge.step();
+      const after = await this.judge.maxSeq();
+      sim.wants.forEach(({ d }, k) => {
+        if (rs[k].pressed && typeof d.after === 'function') d.after();
+      });
+      for (const [k, { i, d }] of sim.wants.entries()) if (rs[k].pressed) await this.judge.repeated(devs[i].seat, views[i].sig, d.what ?? JSON.stringify(d.target), after > before || rs[k].effect);
+      return { pressed: rs.some((r) => r.pressed), seat: sim.wants.map(({ i }) => devs[i].seat).join('+'), what: `S13 ${sim.kind}`, allWaiting: false, views, stuck, stop: this.judge.shouldStop() };
+    }
+    // 揺さぶりの手（prio）→ 手番の人 → 席の番号の小さい順
+    wants.sort((a, b) => (b.d.prio ? 1 : 0) - (a.d.prio ? 1 : 0) || (b.d.turn ? 1 : 0) - (a.d.turn ? 1 : 0) || a.i - b.i);
     const { i, d } = wants[0];
     const before = await this.judge.maxSeq();
-    const r = await press(this.session, devs[i], d.target, { what: d.what, map: !!d.map, where: `${views[i].screen}/${views[i].mode ?? '-'}` });
+    phase.set(`conductor: 押す ${devs[i].seat}「${d.what}」`);
+    const r = await press(this.session, devs[i], d.target, { what: d.what, map: !!d.map, long: !!d.long, where: `${views[i].screen}/${views[i].mode ?? '-'}` });
+    phase.set('conductor: 審判の点検（状態の印）');
     await this.judge.step();
     const after = await this.judge.maxSeq();
     // 区切り 2-Sb: 押せた時だけ、頭の「押した後に板に書く事」を流す（どの端末の頭も毎回呼ばれ、押すのは1台だけなので、押していない頭が板を書き換えない）

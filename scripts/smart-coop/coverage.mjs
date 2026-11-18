@@ -66,9 +66,13 @@ export function buildCoverage(world = KB.world) {
   if (world.special.tide) add('tide-cross', 'special', '潮を待って渡った', 'must', 'terrains の tide');
   if (world.special.cold) add('cold', 'special', '寒さ・焚き火', 'must', 'climate');
   if (world.special.ship) add('ship', 'special', '船に乗った', 'must', 'map の ship');
-  // 区切り3（揺さぶり・実機の不具合の確かめ）。この区切りでは作らない
-  for (const [k, label] of [['bug1', 'イベントの2段階の合意'], ['bug2', '狭い画面のシート'], ['bug3', '待ち中に「通信が切れています」が出ない'], ['bug4', '取り合いとカード3択の順'], ['bug5', '転職のカード選び'], ['bug6', '祠で片方が先に終わる']]) add(`check:${k}`, 'later', `実機の不具合の確かめ: ${label}`, 'later', '計画 §3-7');
-  for (let i = 1; i <= 13; i++) add(`shake:S${i}`, 'later', `揺さぶり S${i}`, 'later', '計画 §5・直し3');
+  // 区切り 3-S: 晶石の祭壇の2つの使い方・行商人で買う（2-Sb の作り残し）
+  add('altar:upgrade', 'altar', '晶石の祭壇「＋に強化」（data-altar-mode=upgrade）', 'maybe', 'HeroTasks の祭壇');
+  add('altar:transmute', 'altar', '晶石の祭壇「変異させる」（data-altar-mode=transmute）', 'maybe', 'HeroTasks の祭壇');
+  add('peddler-buy', 'spawn', '行商人で買った', 'maybe', 'HeroTasks の行商人');
+  // 区切り 3-S（揺さぶり・実機の不具合の確かめ）。前の区切りまでは「後の区切り」だった 19 行
+  for (const [k, label] of [['bug1', 'イベントの2段階の合意'], ['bug2', '狭い画面のシート'], ['bug3', '待ち中に「通信が切れています」が出ない'], ['bug4', '取り合いとカード3択の順'], ['bug5', '転職のカード選び'], ['bug6', '祠で片方が先に終わる']]) add(`check:${k}`, 'check', `実機の不具合の確かめ: ${label}`, 'must', '計画 §3-7');
+  for (let i = 1; i <= 13; i++) add(`shake:S${i}`, 'shake', `揺さぶり S${i}`, 'must', '計画 §5・直し3');
   return rows;
 }
 
@@ -224,8 +228,8 @@ export function coverageReport(board) {
     '|---|---|---|---|',
   ];
   for (const r of rows) {
-    const res = r.stepped ? (r.stepped.run === 1 ? '踏んだ（1回の通し）' : `踏んだ（やり直し ${r.stepped.run - 1} 回目の後）`) : r.need === 'later' ? '— 区切り3' : '踏んでいない';
-    lines.push(`| ${r.label} | ${needName[r.need]} | ${res} | ${r.stepped?.how ?? ''} |`);
+    const res = r.stepped ? (r.stepped.run === 1 ? '踏んだ（1回の通し）' : `踏んだ（やり直し ${r.stepped.run - 1} 回目の後）`) : r.need === 'later' ? '— 後の区切り' : r.ng ? '確かめ NG' : '踏んでいない';
+    lines.push(`| ${r.label} | ${needName[r.need]} | ${res} | ${r.stepped?.how ?? r.ng ?? r.why ?? ''} |`);
   }
   const notMust = rows.filter((r) => r.need === 'must' && !r.stepped);
   lines.push('', `踏めなかった「必ず」の行: ${notMust.length ? notMust.map((r) => r.label).join('／') : 'なし'}`);

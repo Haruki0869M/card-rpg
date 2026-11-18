@@ -76,7 +76,8 @@ export function writeReport(dir, r) {
   else lines.push('まだ作っていない（区切り 2-Sb）。');
   lines.push('');
   lines.push('## 揺さぶり');
-  lines.push('まだ作っていない（区切り 3-S）。');
+  if (r.shake?.length) for (const x of r.shake) lines.push(x);
+  else lines.push('この通しでは入れていない（SMART_SHAKE=all で入る）。');
   lines.push('');
   lines.push('## 戦闘・バランスの記録（直し14。数字は直さず記録だけ）');
   if (r.battle?.length) for (const b of r.battle) lines.push(b.startsWith('  ') ? b : `- ${b}`);
@@ -147,6 +148,7 @@ export function writeReport(dir, r) {
         balance: r.balance ?? null,
         runs: r.runs ?? null,
         coverage: r.coverageRows ?? null,
+        shakeOrder: r.shakeOrder ?? null,
         resyncs: j.resyncs ?? [],
         seeds: Object.fromEntries(j.seeds ?? new Map()),
         blindSpots: BLIND_SPOTS,

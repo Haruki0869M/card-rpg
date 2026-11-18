@@ -15,6 +15,7 @@ import { Judge } from './judge.mjs';
 import { Conductor } from './conductor.mjs';
 import { wait } from './util.mjs';
 import { brainChecks } from './brain/selftest-brain.mjs';
+import { shakeChecks } from './brain/selftest-shake.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = process.env.SMART_OUTPUT ?? 'screenshots/smart-coop/selftest';
@@ -116,6 +117,8 @@ export async function selftest() {
 
   // ---- 頭（区切り 2-Sa。作り物の説明書きと View で、決まりどおりに選ぶか） ----
   brainChecks(check);
+  // ---- 揺さぶり（区切り 3-S。作り物の View で、種と周期・始まり方・確かめが本物の不具合に当たるか） ----
+  await shakeChecks(check);
 
   // ---- __online を使うのは審判だけ（字で確かめる。計画 §2-4 の守り方1） ----
   const files = [];

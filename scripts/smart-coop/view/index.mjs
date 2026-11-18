@@ -14,10 +14,11 @@ import { PART as CHEST } from './scenes/chest.mjs';
 import { PART as DUNGEON } from './scenes/dungeon.mjs';
 import { PART as WORLD } from './scenes/world.mjs';
 import { PART as TOWN } from './scenes/town.mjs';
-import { shortHash, wait } from '../util.mjs';
+import { PART as SHAKE } from './scenes/shake.mjs';
+import { shortHash, wait, withTimeout } from '../util.mjs';
 
 // 区切り 2-Sa: 遊んでいる間の画面の表に、場面ごとのファイル（戦闘・報酬・宝箱・ダンジョンの部屋）の「押す物」と「読む物」を足す（直し12: 場面ごとに分ける）
-for (const part of [BATTLE, REWARD, CHEST, DUNGEON, WORLD, TOWN]) {
+for (const part of [BATTLE, REWARD, CHEST, DUNGEON, WORLD, TOWN, SHAKE]) {
   for (const k of Object.keys(part.sel)) if (k in GAME.sel) throw new Error(`押す物の名前がぶつかる: ${k}`);
   for (const k of Object.keys(part.facts)) if (k in GAME.facts) throw new Error(`読む物の名前がぶつかる: ${k}`);
   Object.assign(GAME.sel, part.sel);
@@ -194,7 +195,7 @@ export function sigOf(v) {
 export async function readView(dev) {
   let v;
   try {
-    v = await dev.page.evaluate(readPage, TABLE);
+    v = await withTimeout(dev.page.evaluate(readPage, TABLE), 15000, `readView ${dev.seat}`);
   } catch (e) {
     // 読み込み直しの途中など。ページが無い
     v = { url: dev.page.url(), screen: null, mode: null, layers: [], busy: [], waits: [], actions: [], facts: {}, textSample: '', error: String(e?.message ?? e) };

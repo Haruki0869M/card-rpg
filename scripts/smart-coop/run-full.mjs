@@ -13,11 +13,13 @@ import { meOf } from './brain/reward.mjs';
 import { loadContent } from './content/load.mjs';
 import { jobByName } from './content/reward.mjs';
 import { coverageReport, coverageNextRun } from './coverage.mjs';
-import { now, log, wait } from './util.mjs';
+import { now, log, wait, phase } from './util.mjs';
+import { shakeInit, shakeObserve, shakeAfterTick, pickSimultaneous, shakeReport, shakeCoverage } from './shake.mjs';
 
 /** 新しい冒険（やり直し）の前に、前の冒険の板を空にする（網羅の表・戦闘の記録・遭遇の網羅の数は残す） */
 function resetAdventureBoard(board) {
   for (const k of ['world', 'townVisit', 'facility', 'jobFlow', 'me', 'battle', 'rewardSeen', 'dungeon']) delete board[k];
+  if (board.sh) board.sh.m = null;
 }
 
 /** 画面の写真を全端末ぶん残す（節目・確かめの証拠） */
@@ -47,18 +49,26 @@ export async function runFull({ brainFor, observe, battleLines }) {
   const maxRestarts = Number(process.env.SMART_RESTARTS ?? 2);
   const outDir = process.env.SMART_OUTPUT ?? `screenshots/smart-coop/s${scenario}-${people}p-${seed}-full`;
   const limitMin = Number(process.env.SMART_LIMIT_MIN ?? 240);
+  const stopOn = process.env.SMART_STOP_ON ? new RegExp(process.env.SMART_STOP_ON) : null;
   const urlOf = (sd) => `${base}${base.includes('?') ? '&' : '?'}emu=${emu}&seed=${sd}`;
   assertLocalUrl(urlOf(seed));
   await loadContent({ scenarioIndex: scenario - 1 });
   const startedAt = now();
   log(`始める（通し）: ${urlOf(seed)}・${people}人・種 ${seed}・やり直しの上限 ${maxRestarts}・上限 ${limitMin} 分・結果 ${outDir}`);
   const fleet = await launchFleet({ people });
+  // 区切り 3-S: 見張り（1つの処理が 60 秒より長く返らない時に、何を待っているかを出す）
+  const dog = setInterval(() => {
+    if (Date.now() - phase.at > 60000) log(`見張り: 「${phase.name}」で ${Math.round((Date.now() - phase.at) / 1000)} 秒返らない`);
+  }, 30000);
   const meter = memoryMeter(fleet.browser);
   meter.start();
   const judge = new Judge({ outDir, devices: fleet.devices, limitMin, expectSeed: seed });
   await judge.arm();
   const s = { judge };
   const board = {};
+  // 区切り 3-S: 揺さぶり（SMART_SHAKE=none で入れない。既定は全部 = all）
+  const shake = process.env.SMART_SHAKE ?? 'all';
+  if (shake === 'all') shakeInit(board, seed);
   const milestones = [];
   const extra = [];
   const runs = [];
@@ -100,9 +110,10 @@ export async function runFull({ brainFor, observe, battleLines }) {
       rec.where = '物語が閉じきれない';
       break;
     }
-    const brain = brainFor(null);
+    const brain = brainFor(shake);
     const c = new Conductor({ fleet, judge, brains: Object.fromEntries(fleet.devices.map((d) => [d.seat, brain])) });
     c.board = board;
+    if (shake === 'all') c.pickSim = (wants, views) => pickSimultaneous(wants, views, board);
     fleet.devices.forEach((d, k) => {
       meOf(board, d.seat).job = jobByName(r.jobs?.[k]);
     });
@@ -141,6 +152,13 @@ export async function runFull({ brainFor, observe, battleLines }) {
       for (; liveN < judge.actions.length; liveN++) appendFileSync(`${outDir}/live.log`, `${actionLine(judge.actions[liveN], liveN)}\n`);
       const views = res.views ?? [];
       observe(views, board, judge);
+      if (board.sh) {
+        phase.set('揺さぶりの確かめ');
+        shakeObserve(views, board);
+        phase.set('揺さぶりの後（読み込み直し・写し）');
+        await shakeAfterTick({ fleet, judge, views, board });
+      }
+      phase.set('通しの見張り');
       // 戦闘の記録に、何回目の冒険かを付ける
       for (const b of (board.stats?.battles ?? []).slice(lastBattles)) b.run = runNo;
       lastBattles = battlesNow();
@@ -226,6 +244,14 @@ export async function runFull({ brainFor, observe, battleLines }) {
         break;
       }
       const fk = judge.failures.map((f) => f.kind);
+      // 区切り 3-S（見逃しの証明）: SMART_STOP_ON（失敗の種類か字に当たる正規表現）に当たる失敗を見つけたら、そこで終える
+      if (stopOn && judge.failures.some((f) => stopOn.test(`${f.kind} ${f.text}`))) {
+        rec.end = 'stop';
+        rec.where = `SMART_STOP_ON（${stopOn}）に当たる失敗を見つけたので終えた`;
+        await shotAll(fleet, outDir, `stopon${runNo}`);
+        stopAll = true;
+        break;
+      }
       if (res.stuck === 'stuck') stuckCount++;
       if (res.stop || res.stuck === 'deadlock' || fk.includes('deadlock') || stuckCount >= 2) {
         rec.end = 'stop';
@@ -247,12 +273,15 @@ export async function runFull({ brainFor, observe, battleLines }) {
       break;
     }
   }
+  clearInterval(dog);
   await shotAll(fleet, outDir, 'final');
   await fleet.close();
   const mem = await meter.stop();
   const endedAt = now();
   const battle = battleLines(board, judge);
+  if (board.sh) shakeCoverage(board, judge);
   const cov = coverageReport(board);
+  const shk = board.sh ? shakeReport(board) : null;
   const endName = { ending: 'エンディング（クリア）', gameover: 'ゲームオーバー', stop: '途中で止まった', lobby: '部屋の用意で止まった' };
   const runLines = runs.map((x) => `${x.runNo}回目（種 ${x.seed}）: ${endName[x.end] ?? '途中'}・${x.where ?? ''}・${((new Date(x.endAt ?? endedAt) - new Date(x.startAt)) / 60000).toFixed(1)} 分・手数 ${x.presses ?? '?'}・戦闘 ${x.battles ?? '?'}・最後の侵食度 ${x.corruption ?? '?'}%（最大 ${x.maxCorruption}%）${x.endPanel ? `・エンディングの記録「${x.endPanel}」` : ''}`);
   const balance = [
@@ -269,7 +298,7 @@ export async function runFull({ brainFor, observe, battleLines }) {
     scenario: `シナリオ${scenario}`,
     people,
     seed,
-    stage: `2-Sb（通し: エンディングかゲームオーバーまで。やり直しの上限 ${maxRestarts}）`,
+    stage: `3-S（通し: エンディングかゲームオーバーまで。揺さぶり ${shake}・やり直しの上限 ${maxRestarts}）`,
     devices: fleet.devices,
     judge,
     startedAt,
@@ -285,6 +314,8 @@ export async function runFull({ brainFor, observe, battleLines }) {
     runs: runLines,
     coverage: cov.lines,
     coverageRows: cov.rows,
+    shake: shk?.lines ?? null,
+    shakeOrder: shk?.order ?? null,
   });
   writeFileSync(`${outDir}/coverage.json`, JSON.stringify({ summary: cov.summary, rows: cov.rows, worldLog: board.world?.log ?? [] }, null, 1));
   log(`報告: ${outDir}/report.md（${judge.failures.length ? '失敗あり' : '失敗なし'}・${ending ? 'エンディングに着いた' : 'エンディングに着いていない'}）`);
