@@ -30,7 +30,7 @@ import { coverageObserve } from './coverage.mjs';
 import { runFull } from './run-full.mjs';
 import { provisionalBrain } from './brain/provisional.mjs';
 import { shakeBrain } from './brain/shake.mjs';
-import { shakeBrain as shakeBrain3, shakeIdle, HOLD } from './shake.mjs';
+import { shakeBrain as shakeBrain3, shakeIdle, HOLD, simKind } from './shake.mjs';
 import { battleBrain, battleConfirmBrain, battleObserve } from './brain/battle.mjs';
 import { rewardBrain, meOf } from './brain/reward.mjs';
 import { dungeonBrain, dungeonObserve } from './brain/dungeon.mjs';
@@ -48,12 +48,27 @@ export function brainFor(shake) {
   // 区切り 3-S: shake = 'all' … 揺さぶり S1〜S13（shake.mjs）を頭の前と後に聞く。'sheet-wait' … 区切り 1-J の揺さぶり1つだけ（brain/shake.mjs）
   const all = shake === 'all';
   const inner = innerBrain(all ? null : shake);
-  if (!all) return inner;
-  return (v, board) => {
+  if (!all) return notVoterGuard(inner);
+  return notVoterGuard((v, board) => {
     const s = shakeBrain3(v, board);
     if (s === HOLD) return null;
     if (s) return s;
     return inner(v, board) ?? shakeIdle(v, board);
+  });
+}
+
+/**
+ * 区切り 4（4人の通しの直し）: 票（扉・イベント・開け役・準備完了・取り合い・先へ進む）は、待つ枠（data-vote-status）に席の一覧が出ていて、
+ * 自分の席が無い時は押さない（その場面のパーティに自分のキャラがいない = 票に入らない人。押しても効かない。人も枠を見て待つ）。
+ * 4人の通しで、戦闘・宝箱に出ていない P2・P3 が「先へ進む」「任せる」を押し続けて「押しても変わらない」になり、票に入る人の番が来なかった
+ */
+function notVoterGuard(brain) {
+  return (v, board) => {
+    const d = brain(v, board);
+    if (!d || !simKind(d)) return d;
+    const voters = (v.facts.voteStatusSeats ?? []).map((t) => String(t).trim()).filter((t) => /^P\d$/.test(t));
+    if (voters.length && !voters.includes(v.seat)) return null;
+    return d;
   };
 }
 
