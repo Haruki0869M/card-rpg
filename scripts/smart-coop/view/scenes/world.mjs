@@ -61,6 +61,8 @@ export const PART = {
     // ゲームオーバー・エンディング
     gameover: { sel: '[data-gameover]', read: 'attrs', attrs: ['data-gameover'], hidden: true },
     ending: { sel: '[data-ending]', read: 'attrs', attrs: ['data-ending'], hidden: true },
+    // エンディングの記録の枠（かかった日数・最後の侵食度・命の灯火・戦闘の勝利・宝箱・最高の宝）。字
+    endPanel: { sel: '[data-ending] .panel', read: 'text' },
     // 結果の画面: 負けの後の行き先（退却・倒れた・ゲームオーバー）
     defeat: { sel: '[data-defeat-retreat], [data-defeat-downed], [data-defeat-gameover]', read: 'text' },
   },

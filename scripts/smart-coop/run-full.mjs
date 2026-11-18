@@ -197,6 +197,14 @@ export async function runFull({ brainFor, observe, battleLines }) {
       }
       // エンディング: 全端末がエンディングの画面に着いた
       if (views.length && views.every((v) => v.mode === 'ending')) {
+        // 終わりの侵食度は、エンディングの記録の枠の字（最後のダンジョンの中で進んだ分も入る。世界マップで最後に見た数より新しい）
+        const ep = views.map((v) => v.facts.endPanel).find(Boolean) ?? '';
+        const cm = /最後の\S*?\s*(\d+)%/.exec(ep);
+        if (cm) {
+          rec.corruption = Number(cm[1]);
+          rec.maxCorruption = Math.max(rec.maxCorruption, rec.corruption);
+        }
+        rec.endPanel = ep;
         rec.end = 'ending';
         rec.where = 'エンディングの画面（data-ending）に全端末が着いた';
         reached = `${runNo}回目の冒険でエンディングに着いた（画面のボタンだけ）`;
@@ -246,7 +254,7 @@ export async function runFull({ brainFor, observe, battleLines }) {
   const battle = battleLines(board, judge);
   const cov = coverageReport(board);
   const endName = { ending: 'エンディング（クリア）', gameover: 'ゲームオーバー', stop: '途中で止まった', lobby: '部屋の用意で止まった' };
-  const runLines = runs.map((x) => `${x.runNo}回目（種 ${x.seed}）: ${endName[x.end] ?? '途中'}・${x.where ?? ''}・${((new Date(x.endAt ?? endedAt) - new Date(x.startAt)) / 60000).toFixed(1)} 分・手数 ${x.presses ?? '?'}・戦闘 ${x.battles ?? '?'}・最後の侵食度 ${x.corruption ?? '?'}%（最大 ${x.maxCorruption}%）`);
+  const runLines = runs.map((x) => `${x.runNo}回目（種 ${x.seed}）: ${endName[x.end] ?? '途中'}・${x.where ?? ''}・${((new Date(x.endAt ?? endedAt) - new Date(x.startAt)) / 60000).toFixed(1)} 分・手数 ${x.presses ?? '?'}・戦闘 ${x.battles ?? '?'}・最後の侵食度 ${x.corruption ?? '?'}%（最大 ${x.maxCorruption}%）${x.endPanel ? `・エンディングの記録「${x.endPanel}」` : ''}`);
   const balance = [
     ...runs.map((x) => `${x.runNo}回目の冒険の戦闘の数: ${x.battles ?? '?'}（憲章の目安は1シナリオ 32〜40）・終わりの侵食度 ${x.corruption ?? '?'}%`),
     `転職の時期: ${jobLog.length ? jobLog.map((j) => `${j.run}回目 ${j.seat}「${j.title.replace(/！.*$/, '！')}」（冒険の始めから ${j.min} 分・${j.battles} 戦目の後・${j.presses} 手）`).join('／') : 'なし（転職しなかった）'}`,

@@ -184,7 +184,12 @@ export function coverageObserve(views, board) {
     const res = (f.bResult ?? [])[0]?.['data-result'];
     if (res === 'retreat') step(board, 'wipe-retreat', `${v.seat}: 結果のボタン data-result=retreat`);
     if (m === 'gameover' || (f.gameover ?? []).length) step(board, 'gameover', `${v.seat}: ゲームオーバーの画面（data-gameover）`);
-    if (m === 'ending' || (f.ending ?? []).length) step(board, 'ending', `${v.seat}: エンディングの画面（data-ending）`);
+    if (m === 'ending' || (f.ending ?? []).length) {
+      step(board, 'ending', `${v.seat}: エンディングの画面（data-ending）`);
+      // 最後のダンジョンは、制覇の画面を出さずにエンディングへ進む（ボスを倒した後）。エンディングを見た = 最後のダンジョンを制覇した
+      const fin = (KB.world.dungeons ?? []).find((d) => d.finale);
+      if (fin && cov.lastDungeon[v.seat] === fin.id) step(board, `dungeon:${fin.id}:clear`, `${v.seat}: 最後のダンジョン（data-dungeon=${fin.id}）の後にエンディングの画面`);
+    }
     cov.prev[v.seat] = m;
   }
   // 頭が押した事（押した後の字が画面に残らない物）: 板の covMarks から移す
