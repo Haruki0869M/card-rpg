@@ -24,10 +24,12 @@ function panelCard(text) {
 }
 
 /** 戦闘の場面を読む（頭が使う形） */
-export function readBattle(v) {
+export function readBattle(v, board = {}) {
   const enemies = (v.facts.bEnemies ?? []).map(readEnemy);
   const allies = (v.facts.bAllies ?? []).map(readAlly);
-  const me = allies.find((a) => a.mine) ?? null;
+  // 自分のキャラ: 「N枚」「済」の字が出ている札 → 無ければ、覚えている名前の札（倒れている時・字が出ない時）
+  const myName = board.me?.[v.seat]?.name;
+  const me = allies.find((a) => a.mine) ?? (myName ? allies.find((a) => a.name === myName) : null) ?? null;
   const endTurn = (v.facts.bEndTurn ?? [])[0]?.['data-end-turn'] ?? null;
   const hand = (v.facts.bHand ?? []).map((h) => ({ index: Number(h['data-card-index']), id: h['data-card-id'], usable: h['data-usable'] !== null, card: KB.cards[h['data-card-id']] }));
   const alive = enemies.filter((e) => !e.dead);
@@ -152,7 +154,7 @@ export function battleConfirmBrain(v, board) {
   if (v.screen !== 'game' || v.mode !== 'battle') return null;
   const c = v.layers.find((l) => l.id === 'confirm');
   if (!c || c.value !== 'ターン終了') return null;
-  const b = readBattle(v);
+  const b = readBattle(v, board);
   const st = turnState(board, v, b);
   const best = bestCard(b);
   const plays = Math.max(0, st.startHand - b.hand.length);
@@ -177,7 +179,7 @@ export function battleConfirmBrain(v, board) {
 export function battleBrain(v, board) {
   if (v.screen !== 'game' || v.mode !== 'battle') return null;
   if (hasLayer(v, 'confirm') || hasLayer(v, 'story')) return null;
-  const b = readBattle(v);
+  const b = readBattle(v, board);
   const st = turnState(board, v, b);
   // 最初の戦闘の案内は1回閉じる（手札の上に重なる帯）
   if ((v.facts.bFirstGuide ?? 0) > 0) return decide(G.firstGuideClose, '最初の戦闘の案内を閉じる', T);
@@ -190,8 +192,8 @@ export function battleBrain(v, board) {
   if (sheet) return null; // ほかのシートは common が閉じる
   if (v.facts.bPanel) return panelBrain(v, b);
   if (b.endTurn !== 'end' && b.endTurn !== 'ready') return null; // 敵の行動中・準備完了を押して待っている
-  if (!b.me || b.me.dead) {
-    // 倒れていても、自分の席の「準備完了」は押す（押さないと仲間が待ち続ける）
+  if ((!b.me || b.me.dead) && !b.hand.some((h) => h.usable)) {
+    // 倒れていても、自分の席の「準備完了」は押す（押さないと仲間が待ち続ける）。手札に使えるカードがあれば倒れていない（自分の札が読めていないだけ）
     return decide(G.endTurn(b.endTurn), `「${b.endTurn === 'ready' ? '準備完了' : 'ターン終了'}」（自分のキャラは戦闘不能）`, T);
   }
   // 敵がまだ描かれていない（戦闘の始まりの登場の途中）間は決めない（敵が見えないまま「準備完了」を押さない）
@@ -201,8 +203,8 @@ export function battleBrain(v, board) {
   const best = bestCard(b);
   // 手数読み: このターンに使った枚数が「N枚以上で反撃」の手前なら、倒し切れる時だけ使う
   const punishStop = b.punishMin < 99 && plays >= b.punishMin - 1 && !(best?.r.why ?? '').includes('倒し切れる');
-  // 回復のカードが無く、自分の HP が3割以下なら、道具袋の薬（1ターン1回まで見る）
-  const lowMe = b.me.hp / b.me.max <= 0.3 || b.me.incoming >= b.me.hp;
+  // 回復のカードが無く、自分の HP が3割以下なら、道具袋の薬（1ターン1回まで見る）。自分の札が読めない時は見ない
+  const lowMe = !!b.me && (b.me.hp / b.me.max <= 0.3 || b.me.incoming >= b.me.hp);
   const healInHand = usable.some((h) => isHealCard(h.card));
   if (lowMe && !healInHand && st.pouchTried !== st.turn) return decide(G.battlePouch, `道具袋を開く（自分の HP ${b.me.hp}/${b.me.max}・被弾の予告 ${b.me.incoming}）`, T);
   if (best && best.r.score > 0 && !punishStop) {
@@ -229,7 +231,7 @@ export function battleObserve(views, board) {
   // 自分のキャラの名前を覚える（取り合いで「獲得！」を読むのに使う）
   for (const x of views) {
     if (x.mode !== 'battle') continue;
-    const mine = (x.facts.bAllies ?? []).find((r) => /(\d+)枚$|済$/.test((r.text ?? '').trim()));
+    const mine = (x.facts.bAllies ?? []).find((r) => /^(\d+)枚$|^済$/.test((r.count ?? '').trim()));
     if (mine?.name) {
       board.me ??= {};
       (board.me[x.seat] ??= { job: null, picks: {}, gear: {}, name: null, claims: {} }).name = mine.name;

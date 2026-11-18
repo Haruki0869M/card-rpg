@@ -61,6 +61,8 @@ export const PART = {
       sub: {
         incoming: { sel: '[data-incoming]', read: 'attr', attr: 'data-incoming' },
         name: { sel: 'span.truncate', read: 'text' },
+        // 「N枚」「済」（自分のキャラの札だけに出る。行の一番右）→ B1 の data-seat。行の字の最後は状態の印の字になる事があるので、この字だけを読む
+        count: { sel: 'div.tabular-nums > span:last-child', read: 'text' },
         mana: { sel: '[aria-label="マナ"]', read: 'text' },
         // フォーカス（★の後ろの数）→ B1 の data-focus
         focus: { sel: 'span.text-amber-300', read: 'text' },

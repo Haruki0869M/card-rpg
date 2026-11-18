@@ -154,6 +154,7 @@ export async function run() {
       let rewardSeen = false;
       let clearedSeen = false;
       let liveN = 0;
+      const loop = [];
       let stuckCount = 0;
       for (let t = 0; t < (mode === 'first-dungeon' ? 20000 : 3000); t++) {
         const res = await c.tick();
@@ -168,6 +169,16 @@ export async function run() {
           reached = text;
         }
         observe(res.views ?? [], board, judge);
+        // 行ったり来たり（2つ以下の同じ操作を 16 回くり返して、全体の番号が進まない）: 頭の決まりの食い違いの形。画面の指紋が変わるので「同じ物を8回」では拾えない
+        if (res.pressed) {
+          loop.push({ k: `${res.seat}|${res.what}`, seq: judge.lastSeq });
+          if (loop.length > 16) loop.shift();
+          if (loop.length === 16 && new Set(loop.map((x) => x.k)).size <= 2 && loop[0].seq === loop[15].seq) {
+            await judge.fail('no-effect', { seat: res.seat, text: `同じ2つの操作を行ったり来たりして進まない: ${[...new Set(loop.map((x) => x.k))].join(' ／ ')}`, key: `loop|${[...new Set(loop.map((x) => x.k))].join('|')}` });
+            log('ここで終える（行ったり来たり）');
+            break;
+          }
+        }
         if ((res.views ?? []).some((v) => v.mode === 'reward')) rewardSeen = true;
         if ((res.views ?? []).some((v) => v.mode === 'cleared')) clearedSeen = true;
         if ((res.views ?? []).some((v) => v.mode === 'gameover')) {

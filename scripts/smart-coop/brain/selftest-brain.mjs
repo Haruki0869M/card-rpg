@@ -33,7 +33,7 @@ export function brainChecks(check) {
   const enemy = (uid, o = {}) => ({ 'data-enemy': uid, 'data-dead': null, 'data-hp': '30', info: 'Lv2 ゴブリン', hpText: 'Lv2 ゴブリン 30/30', marks: [], atk: ['6'], targets: [], ...o });
   const bv = view('battle', {
     bEnemies: [enemy('e1'), enemy('e2', { marks: ['火に弱い'], breakRule: 'any', big: 1 })],
-    bAllies: [{ 'data-ally': 'h0', 'data-dead': null, 'data-done': null, text: 'アル 30/30 3 2 3枚', incoming: '6', name: 'アル' }],
+    bAllies: [{ 'data-ally': 'h0', 'data-dead': null, 'data-done': null, text: 'アル 30/30 3 2 3枚 弱体2', incoming: '6', name: 'アル', count: '3枚' }],
     bHand: [{ 'data-card-index': '0', 'data-card-id': 'strike', 'data-usable': '' }, { 'data-card-index': '1', 'data-card-id': 'fireBolt', 'data-usable': '' }],
     bEndTurn: [{ 'data-end-turn': 'ready' }],
   });
@@ -45,7 +45,7 @@ export function brainChecks(check) {
   const d3 = battleBrain(pv, {});
   check(d3?.target.css === '[data-target-chip="e2"]', '頭: 的は BREAK! のチップの敵', JSON.stringify(d3));
   // 回復: HP の低い味方がいれば回復のカード
-  const hv = view('battle', { ...bv.facts, bAllies: [...bv.facts.bAllies.map((a) => ({ ...a, text: 'アル 8/30 3 2 3枚', incoming: '0' }))], bHand: [{ 'data-card-index': '0', 'data-card-id': 'strike', 'data-usable': '' }, { 'data-card-index': '1', 'data-card-id': 'mend', 'data-usable': '' }], bEnemies: [enemy('e1')] });
+  const hv = view('battle', { ...bv.facts, bAllies: [...bv.facts.bAllies.map((a) => ({ ...a, text: 'アル 8/30 3 2 3枚', incoming: '0', count: '3枚' }))], bHand: [{ 'data-card-index': '0', 'data-card-id': 'strike', 'data-usable': '' }, { 'data-card-index': '1', 'data-card-id': 'mend', 'data-usable': '' }], bEnemies: [enemy('e1')] });
   const d4 = battleBrain(hv, {});
   check(/回復/.test(d4?.what ?? '') && d4.target.css === '[data-card-index="1"][data-usable]', '頭: HP が3割ほどなら回復のカード', JSON.stringify(d4));
   // ---- 扉: HP が低ければ休憩・ほかの人の票にそろえる ----

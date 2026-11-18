@@ -57,7 +57,8 @@ export function readEnemy(r) {
 /** 味方の行（bAllies）→ 頭が使う形。mine = この端末のキャラ（字「N枚」「済」が出るのは自分のキャラだけ）→ B1 の data-seat */
 export function readAlly(r) {
   const { hp, max } = hpOf(r.text);
-  const mineM = /(\d+)枚$|済$/.exec((r.text ?? '').trim());
+  // 区切り 2-Sa の通しの直し: 行の字の最後で見ていた時、状態の印（弱体など）が付くと字の最後が変わり、自分のキャラが分からなくなった
+  const mineM = /^(\d+)枚$|^済$/.exec((r.count ?? '').trim());
   return {
     id: r['data-ally'],
     dead: r['data-dead'] !== null,
@@ -68,6 +69,7 @@ export function readAlly(r) {
     mana: num((r.mana ?? '').replace(/\D/g, '')),
     focus: num(/^(\d+)/.exec(r.focus ?? '')?.[1]),
     mine: !!mineM,
+    name: r.name ?? null,
   };
 }
 
