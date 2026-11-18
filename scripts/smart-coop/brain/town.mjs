@@ -116,6 +116,11 @@ export function townBrain(v, board) {
   // 5. 買う: 回復の薬を1つ（お金が宿代2回分より多く残る時）
   if (!st.did.has('shop')) {
     if (tabSel !== 'shop') return open('shop', '回復の薬を買う');
+    // 依頼の届け物（受けている依頼の目標が「〇〇を届ける」）: 店にあれば1つ買う（依頼の一覧で読んだ物だけ）
+    const deliv = (board.world?.questSheet ?? []).filter((q) => q.state !== 'done' && q.objective?.kind === 'deliverItem').map((q) => q.objective.itemId);
+    board.delivBought ??= new Set();
+    const want = (v.facts.tShop ?? []).find((r) => deliv.includes(r['data-item-id']) && !board.delivBought.has(r['data-item-id']) && !(r.buyOff > 0));
+    if (want) return decide(G.shopBuy(want['data-shop-row']), `依頼の届け物「${KB.items[want['data-item-id']]?.name}」を買う（${want['data-price']}G）`, { after: () => { board.delivBought.add(want['data-item-id']); } });
     const potions = (v.facts.tShop ?? [])
       .map((r) => ({ uid: r['data-shop-row'], id: r['data-item-id'], price: Number(r['data-price'] ?? 9999), off: r.buyOff > 0 }))
       .filter((r) => !r.off && (KB.items[r.id]?.heal ?? 0) > 0 && gold - r.price >= reserve)
@@ -264,4 +269,43 @@ function equipInSheet(v, board, me) {
   }
   me.equipOpen = false;
   return decide(G.sheetClose, 'ステータスを閉じる（装備を見終えた）');
+}
+
+/**
+ * 依頼（区切り 2-Sb の通しで、最後から2つ目の鍵のダンジョンが「町の依頼をあと1つ果たして、報告してから来よう」で開かず、止まった）。
+ * 次の目的の字に「町の依頼をあと N つ」が出たら、P1 がメニューの「依頼と封印の鍵」を開いて、依頼ごとの状態（報告できる・n/m・達成済み）と報告先を読む。
+ * 世界マップの頭（destinations）が、それを行き先にする（報告できる町・届ける物の町・名所・徘徊する敵）。読み直すのは、世界マップに戻った時。
+ */
+export function questBrain(v, board) {
+  if (v.screen !== 'game') return null;
+  const ws = (board.world ??= {});
+  board.questFlow ??= {};
+  const qf = (board.questFlow[v.seat] ??= { open: null, need: true, prevMode: null });
+  if (v.mode === 'world' && qf.prevMode && qf.prevMode !== 'world') qf.need = true;
+  qf.prevMode = v.mode;
+  if (v.mode === 'world') {
+    const gt = (v.facts.goalText ?? []).map((x) => x['aria-label']).find(Boolean) ?? '';
+    const m = /町の依頼をあと(\d+)つ/.exec(gt);
+    const was = ws.questMode;
+    ws.questMode = m ? Number(m[1]) : 0;
+    if (ws.questMode && !was) qf.need = true;
+  }
+  const sheet = v.layers.find((l) => l.id === 'sheet')?.value;
+  if (sheet === 'quests' && qf.open) {
+    const rows = [];
+    for (const t of v.facts.qRows ?? []) {
+      if (!/報告先/.test(t)) continue;
+      const q = (KB.world?.quests ?? []).find((x) => t.startsWith(x.title));
+      if (!q) continue;
+      const st = /達成済み/.test(t) ? 'done' : /報告できる/.test(t) ? 'report' : 'active';
+      const prog = /(\d+)\/(\d+)/.exec(t);
+      const town = (KB.world?.towns ?? []).find((x) => t.includes(`報告先: ${x.name}`));
+      rows.push({ id: q.id, state: st, now: prog ? Number(prog[1]) : null, goal: prog ? Number(prog[2]) : null, town: town?.id ?? q.reportTown, objective: q.objective });
+    }
+    return decide(G.sheetClose, `依頼の一覧を読んで閉じる（${rows.map((r) => `${r.id}:${r.state}${r.now !== null ? ` ${r.now}/${r.goal}` : ''}`).join('・') || '受けている依頼なし'}）`, { after: () => { ws.questSheet = rows; qf.open = null; qf.need = false; } });
+  }
+  if (sheet === 'menu' && qf.open === 'menu') return decide(G.menuRow('依頼と封印の鍵'), 'メニュー「依頼と封印の鍵」', { after: () => { qf.open = 'quests'; } });
+  if (v.layers.length || v.mode !== 'world') return null;
+  if (v.seat === 'P1' && ws.questMode && qf.need && !qf.open) return decide(G.worldMenu, `メニューを開く（次の目的が「町の依頼をあと${ws.questMode}つ」。依頼の状態を見る）`, { after: () => { qf.open = 'menu'; } });
+  return null;
 }

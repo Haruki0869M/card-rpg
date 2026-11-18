@@ -156,6 +156,30 @@ export function destinations(w, board) {
         break;
     }
   }
+  // 依頼（次の目的が「町の依頼をあと N つ」の時）: 依頼の一覧で読んだ状態から、報告できる町・届ける物の町・名所・徘徊する敵へ（遠くても行く）
+  if (ws.questMode) {
+    const W = KB.world;
+    const tileOf = (kind, id) => {
+      const vis = w.features.find((f) => f.kind === kind && f.id === id);
+      if (vis) return vis.tile;
+      const f = (W?.features ?? []).find((x) => x.kind === kind && x.id === id);
+      return f ? f.at[1] * w.cols + f.at[0] : null;
+    };
+    ws.questTried ??= new Set();
+    for (const q of ws.questSheet ?? []) {
+      if (q.state === 'done') continue;
+      const kind = q.objective?.kind;
+      let t = null;
+      let why = '';
+      if (q.state === 'report' || kind === 'deliverItem') [t, why] = [tileOf('town', q.town), `依頼「${q.id}」を報告する町（${q.state === 'report' ? '報告できる' : '届け物'}）`];
+      else if (kind === 'visitLandmark') [t, why] = [tileOf('landmark', q.objective.landmarkId), `依頼「${q.id}」の名所`];
+      else if (kind === 'defeatWanderers' && w.wanderers.length) [t, why] = [[...w.wanderers].sort((a, b) => a - b)[0], `依頼「${q.id}」の徘徊する敵`];
+      if (t === null || t === undefined) continue;
+      const key = `${q.id}|${q.state}|${t}`;
+      if (ws.questTried.has(key) && kind !== 'defeatWanderers') continue;
+      out.push({ tile: t, kind: 'quest', id: key, pri: 0, why });
+    }
+  }
   if (w.goalTile !== null) out.push({ tile: w.goalTile, kind: 'goal', id: 'goal', pri: 9, why: '次の目的（鍵のダンジョン・最後のダンジョン）' });
   return out.sort((a, b) => a.pri - b.pri || a.tile - b.tile);
 }
@@ -200,12 +224,19 @@ export function worldBrain(v, board) {
   const extra = {};
   if (minHpRatio(w.party) < 0.6) for (const t of w.wanderers) extra[t] = 8;
   const pick = () => {
+    // 依頼の行き先は、道のりの一番近い物（同じなら番号の小さい方）
+    const qs = cands.filter((c) => c.kind === 'quest').map((c) => {
+      const dist = c.tile === w.here ? null : distFrom(w.cols, w.rows, cost, c.tile, extra);
+      return { c, dist, d: dist ? dist[w.here] : 0 };
+    }).filter((x) => Number.isFinite(x.d)).sort((a, b) => a.d - b.d || a.c.tile - b.c.tile);
+    if (qs.length) return qs[0];
     for (const c of cands) {
+      if (c.kind === 'quest') continue;
       if (c.tile === w.here) return { c, dist: null, d: 0 };
       const dist = distFrom(w.cols, w.rows, cost, c.tile, extra);
       const d = dist[w.here];
       if (!Number.isFinite(d)) { ws.unreachable.add(c.tile); continue; }
-      if (c.kind !== 'goal' && d > DETOUR_MAX) continue;
+      if (c.kind !== 'goal' && c.kind !== 'quest' && d > DETOUR_MAX) continue;
       return { c, dist, d };
     }
     return null;
@@ -234,6 +265,7 @@ export function worldBrain(v, board) {
         ws.done.add(here);
         if (kind === 'town') ws.townsVisited.add(id);
         if (kind === 'temple' || kind === 'altar') ws.sanctuaryTried.add(here);
+        if (plan?.c.kind === 'quest' && plan.c.tile === here) (ws.questTried ??= new Set()).add(plan.c.id);
         ws.target = null;
       } });
     }

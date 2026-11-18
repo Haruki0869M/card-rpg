@@ -22,7 +22,10 @@ export async function readWorldContent(load, scenarioIndex) {
   const terrains = {};
   for (const t of W.TERRAINS.all) terrains[t.id] = { id: t.id, name: t.name, moveCost: t.moveCost ?? 0, sea: !!t.sea, tide: t.tide ?? null, tideShip: !!t.tideShip };
   const towns = W.TOWNS.forScenario(sid).map((t) => ({ id: t.id, name: t.name, quests: t.quests ?? [], innCost: t.innCost, removeCost: t.removeCost }));
-  const quests = W.QUESTS.forScenario(sid).map((q) => ({ id: q.id, title: q.title, town: q.town ?? null, reportTown: q.reportTown ?? null }));
+  // 依頼: 受ける町（町の説明書きの quests）・報告する町・目標の種類（町の掲示板に出る字と同じ決まった中身）
+  const townOfQuest = {};
+  for (const t of W.TOWNS.forScenario(sid)) for (const q of t.quests ?? []) townOfQuest[q] ??= t.id;
+  const quests = W.QUESTS.forScenario(sid).map((q) => ({ id: q.id, title: q.title, town: townOfQuest[q.id] ?? null, reportTown: q.reportTown ?? townOfQuest[q.id] ?? null, objective: q.objective ?? null }));
   const dungeons = DUNGEONS.forScenario(sid).map((d) => ({ id: d.id, name: d.name, random: !!d.random, finale: !!d.finale, rewardKey: d.rewardKey ?? null, requiresKeys: d.requiresKeys ?? [] }));
   const events = EVENTS.forScenario(sid).map((e) => ({ id: e.id, title: e.title, where: e.where ?? 'dungeon', common: !EVENTS.scenarioOf(e.id), hiddenIn: e.hiddenIn ?? null, placed: !!e.placed, night: !!e.night, terrain: e.terrain ?? null, needsPet: !!e.needsPet }));
   const shrines = W.SHRINES.forScenario(sid).map((s) => ({ id: s.id, name: s.name }));

@@ -25,7 +25,7 @@ import { appendFileSync } from 'node:fs';
 import { memoryMeter } from './mem.mjs';
 import { commonBrain } from './brain/common.mjs';
 import { worldBrain, encounterBrain } from './brain/world.mjs';
-import { townBrain, facilityBrain, jobBrain } from './brain/town.mjs';
+import { townBrain, facilityBrain, jobBrain, questBrain } from './brain/town.mjs';
 import { coverageObserve } from './coverage.mjs';
 import { runFull } from './run-full.mjs';
 import { provisionalBrain } from './brain/provisional.mjs';
@@ -52,6 +52,7 @@ export function brainFor(shake) {
       battleConfirmBrain(v, board) ??
       // 区切り 2-Sb: シートを開いて答える流れ（転職・装備）と、町・祠・神殿は common より先（common は「うっかり開いたシート」を閉じるため）
       jobBrain(v, board) ??
+      questBrain(v, board) ??
       townBrain(v, board) ??
       facilityBrain(v, board) ??
       commonBrain(v) ??

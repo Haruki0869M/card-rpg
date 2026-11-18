@@ -37,6 +37,10 @@ export const PART = {
     pSlots: { sel: '[data-sheet="party"] [data-equip-slot]', read: 'rows', attrs: ['data-equip-slot'], textMax: 60 },
     pEquip: { sel: '[data-sheet="party"] [data-row-equip]', read: 'rows', attrs: ['data-row-equip', 'disabled'], textMax: 10 },
     pExpanded: { sel: '[data-sheet="party"] button[aria-expanded="true"]', read: 'count' },
+    // 次の目的の字（aria-label。高さで片方が隠れるが中身は同じ）
+    goalText: { sel: '[data-goal-line], [data-goal-short]', read: 'attrs', attrs: ['aria-label'], hidden: true },
+    // 「依頼と封印の鍵」のシート（メニューから）: 依頼ごとの行の字（題・状態・報告先）
+    qRows: { sel: '[data-sheet="quests"] div.rounded-lg', read: 'texts' },
     wRevive: { sel: '[data-revive]', read: 'attrs', attrs: ['data-revive'] },
     // 遭遇（A13）
     eKind: { sel: '[data-encounter]', read: 'attrs', attrs: ['data-encounter'] },
