@@ -568,7 +568,7 @@ function s10Reinvite(v, sh) {
   const inv = v.actions.find((a) => a.enabled && a.marks.includes('data-invite=no'));
   const hero = inv?.marks.find((x) => x.startsWith('data-companion='))?.slice('data-companion='.length);
   if (!hero) return null;
-  return decide(G.invite(hero), `揺さぶり S10: もう1度同行に誘う（${hero}）`, { turn: true, ...P, after: () => { m.step = 'accept'; m.data.hero = hero; } });
+  return decide(G.invite(hero), `揺さぶり S10: もう1度同行に誘う（${hero}）`, { turn: true, ...P, after: () => { m.step = 'accept'; m.data.hero = hero; m.data.inviter = v.seat; } });
 }
 
 // ---------------------------------------------------------------- S12（店の「ほしい！」）
@@ -626,6 +626,9 @@ export function shakeBrain(v, board) {
         return null;
       case 'S10':
         if (m.step === 'reinvite' && v.seat !== m.seat) return s10Reinvite(v, sh);
+        // 区切り 4（4人の通しの直し）: 誘い直した人は、相手が答えるまで動かずに待つ（人も返事を待つ。前は P4 が誘ってすぐ「移動する」を押し、
+        // 誘いが答えられないまま終わって「40 手のあいだ同行にならない」の NG になった。2人の時は P1 の手番の押す順で、たまたま先に答えていた）
+        if (m.step === 'accept' && v.seat === m.data.inviter) return HOLD;
         return null;
       case 'S11':
         return v.seat === m.seat ? s11(v, sh) : null;
@@ -1025,7 +1028,8 @@ function observeS9(views, sh, p1, p2) {
 
 function observeS10(views, sh, p1, p2) {
   const m = sh.m;
-  const inviter = views.find((v) => v.seat !== m.seat);
+  // 区切り 4: 誘い直した人の画面を見る（4人では P1 とは限らない）
+  const inviter = views.find((v) => v.seat === m.data.inviter) ?? views.find((v) => v.seat !== m.seat);
   if (m.step === 'reinvite' && sh.n.tick - (m.data.declinedAt ?? sh.n.tick) > 30) {
     note(sh, 'S10: 断った後、30 手のあいだ誘い直せなかった（手番が移った見立て）', 'warn');
     result(sh, 'S10', true, '断った後に止まらなかった（誘い直しは手番が移ったので無し）');
