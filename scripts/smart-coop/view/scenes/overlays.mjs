@@ -63,7 +63,10 @@ export const WINDOWS = [
   { id: 'job-pick', css: '[data-job-pick]', required: [{ css: '[data-pick-card]', min: 1, label: 'カード' }] },
   { id: 'hero-task', css: '[data-hero-task]', required: [] },
   { id: 'flotsam', css: '[data-flotsam-options]', required: [] },
-  { id: 'status-list', css: '[data-status-list-body]', required: [] },
+  // センサーの直し（2026-11-18・区切り 3-S）: 状態の一覧の中身（data-status-list-body の ul）は、説明の窓（DetailPopup）の中にも同じ部品で出る。
+  //   説明の窓がスクロールする時、中の ul の四角は窓で切られずに画面の下へ伸びて見え、「窓が画面の外」と誤検知した（S11 で予告を長押しした時）。
+  //   測る窓は、状態の一覧の窓そのもの（data-status-list。StatusListPopup.tsx）にする。自己テスト: selftest.mjs「説明の窓の中の状態の一覧」
+  { id: 'status-list', css: '[data-status-list]', required: [] },
   { id: 'help', css: '[data-help]', required: [] },
   { id: 'scourge', css: '[data-scourge-dialog]', required: [] },
   { id: 'opener', css: '[data-opener-picker]', required: [] },

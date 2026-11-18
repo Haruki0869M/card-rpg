@@ -96,7 +96,7 @@ export const LAYERS = [
   { id: 'item-pick', css: '[data-item-pick-panel]' },
   { id: 'detail', css: '[data-detail-popup]' },
   { id: 'overview', css: '[data-overview]' },
-  { id: 'status-list', css: '[data-status-list-body]' },
+  { id: 'status-list', css: '[data-status-list]' }, // 区切り 3-S: 一覧の窓そのもの（説明の窓の中の同じ部品は数えない）
   { id: 'help', css: '[data-help]' },
   { id: 'lorebook', css: '[data-lorebook]' },
   { id: 'scourge', css: '[data-scourge-dialog]' },
