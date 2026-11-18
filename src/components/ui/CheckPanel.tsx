@@ -93,7 +93,8 @@ export function CheckPanel({
           <Plus size={20} />
         </button>
       </div>
-      <div className="text-center text-[13px]">
+      {/* 自動の確認用の見えない印（B6）: 今のフォーカスの指定と、その時の成功率（下の字と同じ数） */}
+      <div className="text-center text-[13px]" data-challenge-focus={focus} data-challenge-chance={p}>
         {bonusOnly ? `${successLabel}の確率` : '成功率'}{' '}
         <b className={bonusOnly ? 'text-amber-200' : p >= 80 ? 'text-emerald-300' : p >= 50 ? 'text-amber-200' : 'text-red-300'}>{p}%</b>
         <span className="text-zinc-400">

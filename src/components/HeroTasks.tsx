@@ -31,9 +31,10 @@ const TASK_TEXT = {
 /** 晶石の祭壇の2つの選び方の説明（段階7a） */
 const ALTAR_TEXT = { upgrade: '選んだカードを＋に強化します', transmute: '選んだカードが、同じ格の別のカードに変わります（何になるかは変わるまで秘密）' };
 
-function Frame({ title, hero, children }: { title: string; hero: Hero; children: React.ReactNode }) {
+/** kind = 自動の確認用の見えない印（B12）の値: どの課題か（pet = お供・card = カード・altar = 晶石の祭壇・peddler = 行商人／闇商人・flotsam = 漂流物の山） */
+function Frame({ title, hero, kind, children }: { title: string; hero: Hero; kind: 'pet' | 'card' | 'altar' | 'peddler' | 'flotsam'; children: React.ReactNode }) {
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 z-[70] flex flex-col bg-[#0b0910] px-3 pt-4 pb-3" data-hero-task>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 z-[70] flex flex-col bg-[#0b0910] px-3 pt-4 pb-3" data-hero-task={kind} data-task-hero={hero.id}>
       <div className="flex items-center justify-center gap-2">
         <HeroFace hero={hero} size={30} />
         <div className="font-display text-outline text-[22px] text-amber-100">{title}</div>
@@ -75,7 +76,7 @@ function AdoptPet({ hero, send }: { hero: Hero; send: (c: GameCommand) => void }
   };
   const master = isPetMaster(hero);
   return (
-    <Frame title="旅のお供" hero={hero}>
+    <Frame title="旅のお供" hero={hero} kind="pet">
       <div className="mt-1 text-center text-[13px] text-zinc-300">{offer.length > 1 ? '迎える子を選んでください' : `${def.name}が${hero.name}を見つめている`}</div>
       {offer.length > 1 && (
         <div className="mt-2 flex justify-center gap-2">
@@ -160,7 +161,7 @@ function CardTask({ hero, send }: { hero: Hero; send: (c: GameCommand) => void }
   const pickedInst = cards.find((c) => c.uid === sel);
   const picked = pickedInst ? (upgrading ? getCard(pickedInst.cardId, true) : cardOf(pickedInst)) : undefined;
   return (
-    <Frame title={title} hero={hero}>
+    <Frame title={title} hero={hero} kind={task === 'altar' ? 'altar' : 'card'}>
       <div className="mt-1 text-center text-[13px] text-zinc-300">{TASK_TEXT[task]}{task === 'altar' && hero.altarLeft ? `（この後もう${hero.altarLeft}回）` : ''}</div>
       {task === 'altar' && (
         <>
@@ -216,7 +217,7 @@ function Peddler({ hero, send }: { hero: Hero; send: (c: GameCommand) => void })
   const closeCardSel = useCallback(() => setCardSel(null), []);
   const selCard = cardSel !== null ? shop.cards[cardSel] : undefined;
   return (
-    <Frame title={black ? '闇商人' : 'さすらいの行商人'} hero={hero}>
+    <Frame title={black ? '闇商人' : 'さすらいの行商人'} hero={hero} kind="peddler">
       <div className="mt-1 flex items-center justify-center gap-1 text-[14px] font-bold text-amber-200">
         <Coins size={15} /> 所持金 {hero.gold}G
       </div>
@@ -296,7 +297,7 @@ function Flotsam({ hero, send }: { hero: Hero; send: (c: GameCommand) => void })
   const low = useLowScreen();
   const view = flotsamView(hero);
   return (
-    <Frame title="漂流物の山" hero={hero}>
+    <Frame title="漂流物の山" hero={hero} kind="flotsam">
       <div className={`${low ? 'mt-0.5' : 'mt-1'} text-center text-[13px] leading-4 text-zinc-300`}>流れ着いた品から、1つ選んで持ち帰れます（自分の分だけ。ほかの人を待ちません）</div>
       <div className={`${low ? 'mt-1' : 'mt-2'} flex items-center justify-center gap-1 text-[14px] font-bold ${view.full ? 'text-red-200' : 'text-emerald-200'}`} data-flotsam-pouch={`${view.pouch}/${view.limit}`}>
         <Backpack size={15} /> 道具袋 {view.pouch}/{view.limit}

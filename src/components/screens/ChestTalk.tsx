@@ -43,7 +43,8 @@ export function OpenerPicker({ chest, heroes }: { chest: ChestState; heroes: Her
         const cmd = { type: 'CHEST_OPENER', playerId: LOCAL_PLAYER, heroId: h.id } as const;
         const chosen = chest.opener === h.id;
         return (
-          <div key={h.id} className={`flex items-center gap-1.5 rounded-lg p-1 ${chosen ? 'bg-amber-500/25 ring-1 ring-amber-300' : 'bg-black/35'}`} data-opener={h.id}>
+          // 自動の確認用の見えない印（B9）: 「おすすめ」の字が出ている人・フォーカス0の時の成功率（太字の％と同じ数）
+          <div key={h.id} className={`flex items-center gap-1.5 rounded-lg p-1 ${chosen ? 'bg-amber-500/25 ring-1 ring-amber-300' : 'bg-black/35'}`} data-opener={h.id} data-opener-best={h.id === best ? 1 : undefined} data-opener-chance={p0}>
             <HeroFace hero={h} size={32} />
             <span className="min-w-0 flex-1 leading-4">
               <span className="flex items-center gap-1 text-[13px] font-bold">

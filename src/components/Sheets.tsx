@@ -331,6 +331,8 @@ function PartySheet() {
               setGoldAmount(null);
             }}
             className={`btn flex min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border-b-2 py-1 ${i === idx ? 'sel-on' : 'border-transparent bg-black/30'}`}
+            // 自動の確認用の見えない印（B18）: キャラの切り替え（値 = キャラの id）
+            data-sheet-hero={h.id}
           >
             <HeroFace hero={h} size={30} dim={h.hp <= 0} />
             <span className="flex min-w-0 flex-col items-start leading-[14px]">
@@ -461,6 +463,8 @@ function PartySheet() {
                       setSlot(null);
                     }}
                     className="btn btn-gold h-11 shrink-0 rounded-lg px-3 text-[14px] font-bold"
+                    // 自動の確認用の見えない印（B18）: 持ち物の候補を付けるボタン（値 = 品の id）
+                    data-row-equip={it.id}
                   >
                     装備
                   </button>
@@ -474,6 +478,8 @@ function PartySheet() {
                   setSlot(null);
                 }}
                 className="btn btn-dark h-11 rounded-lg text-[14px] font-bold"
+                // 自動の確認用の見えない印（B18）: 欄の物を外すボタン（値 = 欄の名前）
+                data-slot-unequip={slot}
               >
                 外す
               </button>

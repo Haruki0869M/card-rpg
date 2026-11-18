@@ -62,7 +62,8 @@ export function jobRequirements(opt: JobOption, level: number): { ok: boolean; t
 function JobCard({ opt, level, onPick }: { opt: JobOption; level: number; onPick: () => void }) {
   const j = opt.job;
   return (
-    <div className={`rounded-xl border p-2 ${opt.ready ? 'border-amber-300/70 bg-amber-500/10' : 'border-white/10 bg-black/30'}`}>
+    // 自動の確認用の見えない印（B17）: 転職先のジョブの id と、下の段と同じ分け方の状態（ready = 転職できる・place = 場所だけ足りない・locked = 条件が足りない）
+    <div className={`rounded-xl border p-2 ${opt.ready ? 'border-amber-300/70 bg-amber-500/10' : 'border-white/10 bg-black/30'}`} data-job-option={j.id} data-job-state={opt.ready ? 'ready' : opt.qualified ? 'place' : 'locked'}>
       <div className="flex items-center gap-2">
         <span className="text-[22px]" aria-hidden>
           {j.icon}
@@ -90,7 +91,7 @@ function JobCard({ opt, level, onPick }: { opt: JobOption; level: number; onPick
         ))}
       </div>
       {opt.ready ? (
-        <button onClick={onPick} className="btn btn-gold mt-1.5 flex h-11 w-full items-center justify-center gap-1.5 rounded-lg text-[15px] font-bold">
+        <button onClick={onPick} className="btn btn-gold mt-1.5 flex h-11 w-full items-center justify-center gap-1.5 rounded-lg text-[15px] font-bold" data-job-change={j.id}>
           <ArrowUpCircle size={18} /> {j.name}に転職する
         </button>
       ) : opt.qualified ? (

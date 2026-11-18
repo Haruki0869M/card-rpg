@@ -42,6 +42,14 @@ const AllyCard = memo(function AllyCard({ ally }: { ally: AllyState }) {
       data-selected-target={chosen || undefined}
       data-dead={ally.dead || undefined}
       data-done={done || undefined}
+      // 自動の確認用の見えない印（B1）: 席・HP・最大HP・守り・マナ・フォーカス（選んでいる途中の消費を引く前の数）・被弾の予告（隠れた予告の数字は足さない。上の赤い札と同じ数）
+      data-seat={ally.playerId}
+      data-hp={ally.hp}
+      data-max-hp={ally.maxHp}
+      data-block={ally.block}
+      data-mana={ally.mana}
+      data-focus={ally.focus}
+      data-incoming={ally.dead ? 0 : incoming}
       className={`panel ${chosen ? 'ring-2 ring-sky-300' : ''} relative flex min-w-0 flex-1 flex-col gap-[3px] rounded-xl px-1.5 pt-1 pb-1 transition-[transform,opacity,filter,box-shadow] duration-150 active:scale-[.97] ${
         ally.dead ? 'grayscale' : done && !active ? 'opacity-60' : ''
       }`}

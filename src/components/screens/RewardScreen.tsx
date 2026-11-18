@@ -210,7 +210,7 @@ export function RewardScreen() {
 
   return (
     <Screen>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pt-3 pb-2" data-reward-scroll data-reward-step={step.kind}>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pt-3 pb-2" data-reward-scroll data-reward-step={step.kind} data-reward-hero={luMine ? luHero?.id : cardHero}>
         <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-center">
           <div
             className={`font-display ${compact ? 'text-[28px] leading-8' : 'text-[34px] leading-10'}`}
@@ -223,6 +223,7 @@ export function RewardScreen() {
           </div>
         </motion.div>
 
+        {/* 自動の確認用の見えない印（B11）: 上の枠の data-reward-hero = 今この端末で選ぶキャラ（成長の窓・カードの見出しに出ているキャラ） */}
         {/* 経験値 */}
         <div className={`mt-2 ${grid ? 'grid grid-cols-2 gap-1' : 'flex flex-col gap-1.5'}`} data-reward-exp>
           {r.exp.map((e, i) => {
@@ -346,6 +347,9 @@ export function RewardScreen() {
                         key={i}
                         onClick={() => (o.kind === 'upgradeCard' ? setUpgradeFor(i) : dispatchGame({ type: 'CHOOSE_GROWTH', playerId: LOCAL_PLAYER, optionIndex: i }))}
                         className="btn btn-dark flex min-h-14 items-center gap-3 rounded-xl px-3 text-left"
+                        // 自動の確認用の見えない印（B11）: 成長の選択肢の番号と種類
+                        data-growth-option={i}
+                        data-growth-kind={o.kind}
                       >
                         <g.Icon size={26} className="shrink-0 text-amber-300" />
                         <span>

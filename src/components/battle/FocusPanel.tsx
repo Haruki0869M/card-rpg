@@ -193,6 +193,9 @@ export function FocusPanel() {
       // 段階A: 戦場を縮めず、味方の枠と手札の上に重ねる（すりガラス調の重い枠。下の端は手札の下の端にそろえる）
       className="absolute inset-x-1.5 bottom-0.5 z-50"
       data-focus-panel
+      // 自動の確認用の見えない印（B5）: 今の指定（★の数）と、指定できる最大（枠の数とフォーカスの残りの小さい方。「フォーカスを増やす」が押せなくなる数）
+      data-focus-spend={selection.focus}
+      data-focus-max={max}
     >
       {/* 高さ: 味方の枠と手札の高さ＋味方の下半身まで（頭と上半身は見える）。低い画面でも操作できる高さは残す */}
       <div className="glass-panel relative min-h-0 overflow-y-auto overscroll-contain rounded-xl p-1.5" style={{ maxHeight: 'min(46dvh, max(250px, calc(var(--dock-h, 220px) + var(--ally-reach, 60px))))' }}>
@@ -211,6 +214,7 @@ export function FocusPanel() {
         </div>
         <button
           onClick={confirm}
+          data-card-go
           className={`btn ${needsTarget ? 'btn-dark' : 'btn-gold'} flex h-12 w-[112px] shrink-0 flex-col items-center justify-center rounded-xl leading-5`}
         >
           <span className="font-display text-[19px]">発動</span>

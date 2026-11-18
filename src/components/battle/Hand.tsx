@@ -10,7 +10,7 @@ import { useElementSize } from '../../hooks/useElementSize';
 import { usePress } from '../../hooks/usePress';
 import { useTallScreen } from '../../hooks/useTallScreen';
 import { useBattle } from '../../store/battleStore';
-import { CardBody } from '../ui/CardBody';
+import { CardBody, cardElement } from '../ui/CardBody';
 import { EnemyOrderBar } from './EnemyOrderBar';
 
 export const CARD_H = 128;
@@ -82,6 +82,12 @@ const CardView = memo(function CardView({
       data-card-index={index}
       data-card-id={card.id}
       data-usable={!reason || undefined}
+      // 自動の確認用の見えない印（B4）: 今のコスト（宝石の数と同じ）・属性（絵の色と同じ。無ければ付けない）・種類・狙う相手・選んでいるか
+      data-cost={cost}
+      data-element={cardElement(card)}
+      data-category={card.category}
+      data-target={card.target}
+      data-selected={selected || undefined}
       className="absolute top-0 left-0"
       style={{
         width: w,

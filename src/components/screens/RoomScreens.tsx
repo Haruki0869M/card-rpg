@@ -56,7 +56,8 @@ export function LootList({ loot }: { loot: Loot[] }) {
         const def = getItem(l.item.itemId);
         const r = RARITY_STYLE[def.rarity];
         return (
-          <motion.div key={i} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 + i * 0.08 }} className="flex rounded-lg bg-black/30 p-1.5">
+          // 自動の確認用の見えない印（B9）: 手に入れた品の id（開けた後・結果に出た物だけ）
+          <motion.div key={i} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 + i * 0.08 }} className="flex rounded-lg bg-black/30 p-1.5" data-loot-item={def.id}>
             {/* 受け取ったキャラ（分からなければこの端末のキャラ）の今の装備と比べる */}
             <ItemInfoArea itemId={def.id} heroId={l.to ?? localHero} className="flex flex-1 items-center gap-2">
               <ItemIcon item={def} size={44} />
@@ -149,6 +150,9 @@ export function EventScreen() {
             aria-pressed={shared ? mine : undefined}
             data-event-option={i}
             data-my-vote={mine ? 1 : undefined}
+            // 自動の確認用の見えない印（B6）: 選択肢の、画面に出ている形だけ（check = 判定の％が出る・pay = 「〜を払う」が出る・plain = どちらも無い）。
+            // 結果（戦いになる・何も起きない）は選ぶまで見えない事があるので出さない（字で読む）
+            data-option-kind={[o.check && 'check', (o.cost || o.costFocus || o.costItem) && 'pay'].filter(Boolean).join(',') || 'plain'}
             className={`btn flex min-h-12 items-center gap-2 rounded-xl px-3 py-1 text-left ${mine ? 'border-2 border-amber-300 bg-amber-950/60 shadow-[0_0_10px_rgba(255,200,80,.35)]' : o.requiresTag ? 'border border-sky-300/60 bg-sky-950/60' : 'btn-dark'}`}
           >
             <span className="min-w-0 flex-1">
@@ -212,7 +216,8 @@ export function EventScreen() {
           animate={{ opacity: 1 }}
           transition={{ delay: TIMING.eventBang, duration: TIMING.eventWindowIn }}
           className="panel panel-ornate relative my-auto rounded-2xl p-3 pt-4"
-          data-event-window
+          // 自動の確認用の見えない印（B6）: イベントの id（題の字は同じ題が別のイベントにある事があるので id で）
+          data-event-window={ev.eventId}
         >
           <Crest />
           <div className="flex items-center gap-2">
@@ -226,7 +231,14 @@ export function EventScreen() {
           </div>
           <div className="mt-2 rounded-xl bg-black/35 p-2.5 text-[15px] leading-6">{def.text}</div>
           {ev.result ? (
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-3 flex flex-col items-center gap-2">
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-3 flex flex-col items-center gap-2"
+              // 自動の確認用の見えない印（B7）: 判定をした時だけ、成功・失敗（字の色と同じ分け方）と、使ったフォーカスの数（並んだ★の数）。使った成功率は出さない（結果に入っていない）
+              data-check-result={ev.result.results ? (ev.result.success ? 'success' : 'fail') : undefined}
+              data-check-focus={ev.result.results ? ev.result.results.filter((r) => r === 'focus').length : undefined}
+            >
               {ev.result.results && <RollStrip results={ev.result.results} />}
               <div className={`text-center text-[15px] font-bold ${ev.result.success ? 'text-emerald-300' : 'text-red-300'}`}>{ev.result.text}</div>
               {ev.result.loot.length > 0 && (

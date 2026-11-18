@@ -339,9 +339,10 @@ export function TownScreen() {
       </div>
       <MyPetCall game={game} hero={v} />
       {/* タブは画面の幅を5等分（横にスクロールさせない。「売却」が切れないように） */}
-      <div className="mt-1 grid shrink-0 grid-cols-5 gap-1 px-2 pb-1" data-town-tabs>
+      {/* 自動の確認用の見えない印（B13）: 町の id（タブの並びに付ける）・タブの id */}
+      <div className="mt-1 grid shrink-0 grid-cols-5 gap-1 px-2 pb-1" data-town-tabs data-town={def.id}>
         {TOWN_TABS.map((x) => (
-          <button key={x.id} onClick={() => setTab(x.id)} className={`btn flex min-h-11 min-w-0 flex-col items-center justify-center rounded-lg px-0.5 py-0.5 text-[12px] leading-4 font-bold ${tab === x.id ? 'btn-gold' : 'btn-dark'}`}>
+          <button key={x.id} onClick={() => setTab(x.id)} className={`btn flex min-h-11 min-w-0 flex-col items-center justify-center rounded-lg px-0.5 py-0.5 text-[12px] leading-4 font-bold ${tab === x.id ? 'btn-gold' : 'btn-dark'}`} data-town-tab={x.id}>
             <x.Icon size={16} />
             <span className="whitespace-nowrap">{x.name}</span>
           </button>
@@ -372,7 +373,8 @@ export function TownScreen() {
               const left = shopLeft(stock, s.item.itemId);
               const wants = pins.at({ kind: 'shopItem', id: s.item.uid });
               return (
-                <div key={s.item.uid} className={`relative flex items-center gap-2 rounded-lg bg-black/30 p-1.5 ${s.sold ? 'opacity-40' : ''}`} data-shop-row={s.item.uid}>
+                // 自動の確認用の見えない印（B14）: 品の id と、買うボタンの字の値段（売り切れの時は無し・無料券の時は 0）
+                <div key={s.item.uid} className={`relative flex items-center gap-2 rounded-lg bg-black/30 p-1.5 ${s.sold ? 'opacity-40' : ''}`} data-shop-row={s.item.uid} data-item-id={it.id} data-price={s.sold ? undefined : free ? 0 : shopPriceFor(v, s.price, game)}>
                   <ItemInfoArea itemId={it.id} heroId={v.id} className="flex flex-1 items-center gap-2">
                     <ItemIcon item={it} size={42} />
                     <span className="min-w-0 flex-1 leading-4">
@@ -402,6 +404,7 @@ export function TownScreen() {
                     disabled={!mine || s.sold || (!free && v.gold < shopPriceFor(v, s.price, game))}
                     onClick={() => buy('item', i)}
                     className="btn btn-gold flex h-11 w-[78px] shrink-0 items-center justify-center gap-0.5 rounded-lg text-[13px] font-bold"
+                    data-shop-buy
                   >
                     {s.sold ? '売り切れ' : free ? '無料券' : (
                       <>
@@ -440,6 +443,7 @@ export function TownScreen() {
                       onClick={() => setCardSel(i)}
                       className="btn btn-gold flex h-11 w-[96px] items-center justify-center gap-0.5 rounded-lg text-[13px] font-bold"
                       data-pick-card={i}
+                      data-price={c.sold ? undefined : shopPriceFor(v, c.price, game)}
                     >
                       {c.sold ? '売り切れ' : (
                         <>
@@ -493,6 +497,7 @@ export function TownScreen() {
               disabled={!mine || v.gold < def.innCost}
               onClick={() => dispatchGame({ type: 'TOWN_INN', heroId: v.id, playerId: p })}
               className="btn btn-gold font-display flex h-12 items-center justify-center gap-1 rounded-xl text-[18px]"
+              data-town-inn={def.innCost}
             >
               <BedDouble size={20} /> 泊まる（{def.innCost}G）
             </button>
@@ -507,14 +512,15 @@ export function TownScreen() {
               const prog = st ? questProgress(st) : undefined;
               const canReport = st ? canReportQuest(game, id) : false;
               return (
-                <div key={id} className="panel panel-gold-edge rounded-xl p-2">
+                // 自動の確認用の見えない印（B15）: 依頼の id と、下の字と同じ分け方の状態（new = まだ受けていない・active = 進行中・report = 報告できる・done = 達成済み）
+                <div key={id} className="panel panel-gold-edge rounded-xl p-2" data-quest={id} data-quest-state={!st ? 'new' : st.reported ? 'done' : canReport ? 'report' : 'active'}>
                   <div className="font-display text-[17px] text-amber-100">{q.title}</div>
                   <div className="text-[13px] leading-5 text-zinc-200">{q.text}</div>
                   <div className="mt-1 text-[12px] text-sky-200">目標: {objectiveHandler(q.objective).describe(q.objective as never)}</div>
                   <div className="text-[12px] text-amber-200">報酬: {q.rewardText}</div>
                   <div className="mt-1.5">
                     {!st ? (
-                      <button disabled={!mine} onClick={() => dispatchGame({ type: 'QUEST_ACCEPT', heroId: v.id, playerId: p, questId: id })} className="btn btn-gold h-11 w-full rounded-lg text-[14px] font-bold">
+                      <button disabled={!mine} onClick={() => dispatchGame({ type: 'QUEST_ACCEPT', heroId: v.id, playerId: p, questId: id })} className="btn btn-gold h-11 w-full rounded-lg text-[14px] font-bold" data-quest-action="accept">
                         依頼を受ける
                       </button>
                     ) : st.reported ? (
@@ -522,7 +528,7 @@ export function TownScreen() {
                         <Check size={16} /> 達成済み
                       </div>
                     ) : canReport ? (
-                      <button disabled={!mine} onClick={() => dispatchGame({ type: 'QUEST_REPORT', heroId: v.id, playerId: p, questId: id })} className="btn btn-gold h-11 w-full rounded-lg text-[14px] font-bold">
+                      <button disabled={!mine} onClick={() => dispatchGame({ type: 'QUEST_REPORT', heroId: v.id, playerId: p, questId: id })} className="btn btn-gold h-11 w-full rounded-lg text-[14px] font-bold" data-quest-action="report">
                         報告して報酬を受け取る
                       </button>
                     ) : (
@@ -685,7 +691,8 @@ export function SanctuaryScreen() {
   return (
     <Screen>
       <WorldTopBar game={game} />
-      <div data-sanctuary={def.kind} className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+      {/* 自動の確認用の見えない印（B16）: 神殿・祭壇の id（data-shrine。種類は data-sanctuary） */}
+      <div data-sanctuary={def.kind} data-shrine={def.id} className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
         {/* 回2: 世界マップと同じ「ステータス」（装備の付け替え・受け渡し） */}
         <div className="flex items-center gap-1.5">
           <div className="min-w-0 flex-1">
@@ -719,7 +726,8 @@ export function ShrineScreen() {
       <WorldTopBar game={game} goldHeroId={heroId} />
       <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <BattleBackground kind="shrine" className="absolute inset-0 h-full w-full opacity-40" />
-        <div className="relative px-3 pt-4">
+        {/* 自動の確認用の見えない印（B16）: 祠の id */}
+        <div className="relative px-3 pt-4" data-shrine={def.id}>
           <div className="flex items-center gap-2">
             <span className="flex h-12 w-12 items-center justify-center rounded-xl border-2 border-emerald-300 bg-emerald-950/60">
               <Sparkles size={26} className="text-emerald-200" />
@@ -767,7 +775,8 @@ export function EndingScreen() {
   const st = game.stats;
   return (
     <Screen>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-6">
+      {/* 自動の確認用の見えない印（A18 の残り）: エンディングの画面（値 = シナリオの id） */}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-6" data-ending={game.scenarioId}>
         <div className="font-display text-outline text-center text-[30px] text-amber-100">{getScenario(game.scenarioId).name}</div>
         <div className="font-display text-center text-[16px] text-amber-300">クリア！</div>
         <div className="mt-3 flex flex-col gap-2">
