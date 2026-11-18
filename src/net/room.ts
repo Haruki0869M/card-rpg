@@ -756,6 +756,8 @@ export class Room {
    */
   private async refresh(depth = 0): Promise<boolean> {
     const p = (...r: string[]) => roomPath(this.code, ...r);
+    // 読み直す前から待っていた依頼（読んでいる間に届いた依頼は、読んだ一覧に無くても捨てない。同時押しで P2 の操作が消える不具合の直し 2026-11-19）
+    const waiting = new Set(this.queue.map((q) => q.key));
     const [hostUid, log, reqs] = await Promise.all([
       this.backend.get<string>(p('meta', 'hostUid')),
       this.backend.get<Record<string, LogEntry>>(p('log')),
@@ -766,7 +768,7 @@ export class Room {
       this.stopHosting();
       return false;
     }
-    this.queue = this.queue.filter((q) => reqs?.[q.key] !== undefined);
+    this.queue = this.queue.filter((q) => !waiting.has(q.key) || reqs?.[q.key] !== undefined);
     const keys = Object.keys(log ?? {})
       .map(Number)
       .filter((n) => n > this.seq)
