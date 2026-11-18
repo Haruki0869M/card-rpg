@@ -22,6 +22,9 @@ function dstate(board) {
 function doorBrain(v, board) {
   const doors = (v.facts.dDoors ?? []).filter((d) => d.disabled === null);
   if (!doors.length) return null;
+  // 区切り5（区切り4 の4人の6回目の止まりの見直し）: 「P3 〇〇さんの△△の番です／順番が来たら、次の扉を選べます」の間は、扉を押しても
+  // 票にならない（仲間に「こっち！」を送るだけ）。前は P1 が押し続け、指揮が席の番号の小さい P1 ばかりを選んで、世界マップで手番の P3 が押せなかった
+  if (/順番が来たら/.test(v.facts.dWait ?? '')) return null;
   const st = dstate(board);
   const all = v.facts.dDoors ?? [];
   // 区切り 4（4人の通しの直し）: そろえる先は「票の一番多い扉。同じ数なら、席の番号の一番小さい人の扉」（前は並びの先頭の扉で、4人では

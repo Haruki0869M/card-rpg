@@ -59,6 +59,9 @@ export function brainChecks(check) {
   const dv3 = view('dungeon', { dDoors: [door('r1', 'danger'), door('r2', 'treasure')], dParty: party(1) });
   const b3 = { dungeon: { seen: { treasure: 1 }, lastKind: null, events: {}, chests: 0, restKinds: {}, doorsChosen: 1 } };
   check(dungeonBrain(dv3, b3)?.target.css === '[data-door-choice="r1"]', '頭: 扉はまだ入っていない種類を先に', JSON.stringify(dungeonBrain(dv3, b3)));
+  // 区切り5: 「順番が来たら、次の扉を選べます」の間は扉を押さない（押しても票にならず、世界マップで手番の仲間が押せなくなる）
+  const dvw = view('dungeon', { dDoors: [door('r1', 'danger')], dParty: party(1), dWait: 'P3 アキさんのエルドの番です 順番が来たら、次の扉を選べます' });
+  check(dungeonBrain(dvw, { dungeon: { seen: {}, lastKind: null, events: {}, chests: 0, restKinds: {}, doorsChosen: 0 } }) === null, '頭: 世界マップの仲間の番の間は、扉を押さない（区切り4の4人6回目の止まり）', '');
   // ---- 宝箱: 画面の成功率で選ぶ・「おすすめ」と違えば注意 ----
   const board = {};
   const cv = view('chest', { openers: [{ 'data-opener': 'h0', text: 'P1 アル おすすめ 鍵が開く 40%（フォーカス2で60%） 器用3・運2・フォーカス2', votes: null }, { 'data-opener': 'h1', text: 'P2 ベル 鍵が開く 45%（フォーカス3で80%） 器用5・運2・フォーカス3', votes: null }] });
