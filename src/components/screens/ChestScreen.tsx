@@ -526,7 +526,7 @@ export function ChestScreen() {
             <OpenerPicker chest={chest} heroes={sceneHeroes(game).filter((h) => !h.retired)} />
             <div className="mt-2 grid grid-cols-2 gap-2">
               {seal === 'guard' ? null : leaveGate.canLeave ? (
-                <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} className="btn btn-dark h-12 rounded-xl text-[14px] font-bold">
+                <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} className="btn btn-dark h-12 rounded-xl text-[14px] font-bold" data-chest-leave="leave">
                   {chest.spec.big ? '開けずに去る' : '立ち去る'}
                   <VoteChips cmd={{ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER }} />
                 </button>
@@ -583,7 +583,7 @@ export function ChestScreen() {
             )}
             <div className={`mt-2 grid gap-2 ${seal === 'guard' ? 'grid-cols-1' : 'grid-cols-[1fr_2fr]'}`}>
               {seal === 'guard' ? null : leaveGate.canLeave ? (
-                <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} className="btn btn-dark h-12 rounded-xl text-[14px] font-bold">
+                <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} className="btn btn-dark h-12 rounded-xl text-[14px] font-bold" data-chest-leave="leave">
                   {chest.spec.big ? '開けずに去る' : '立ち去る'}
                   <VoteChips cmd={{ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER }} />
                 </button>
@@ -621,7 +621,8 @@ export function ChestScreen() {
           // 世界マップの宝箱: 手番のキャラの担当の人が「先へ進む」を押す。ほかの人にはだれを待っているかを出す
           leaveWait('先へ進めるのを待っています')
         ) : (
-          <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} disabled={claimsLeft > 0} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px] disabled:opacity-40">
+          // 自動の確認用の見えない印（B9）: 宝箱を後にするボタン（leave = 開けずに立ち去る・done = 開けた後の「先へ進む」）
+          <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} disabled={claimsLeft > 0} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px] disabled:opacity-40" data-chest-leave="done">
             {claimsLeft > 0 ? `取り合いを待っています（残り${claimsLeft}）` : chest.spec.big ? 'ダンジョン制覇！' : '先へ進む'}
             <VoteChips cmd={{ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER }} />
           </button>

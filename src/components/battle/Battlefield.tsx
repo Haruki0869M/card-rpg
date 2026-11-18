@@ -129,6 +129,13 @@ function IntentTargetName({ id }: { id?: string }) {
   // 敵が3体以上で枠が狭い時も、短い名前で出す（「→P1」だと、2人とも P1 の時に誰か分からない）
   return a ? <span className="order-first w-full truncate text-center text-[12px] leading-4" data-intent-name>→{shortName(a.name)}</span> : null;
 }
+/** 自動の確認用の見えない印（B3）の値: 予告の攻撃の合計ダメージ。隠れている数字があれば '?'。攻撃が無ければ undefined（印を付けない） */
+function intentDamageMark(parts: IntentPart[]): number | '?' | undefined {
+  const hits = parts.filter((p): p is Extract<IntentPart, { kind: 'attack' | 'attackAll' }> => p.kind === 'attack' || p.kind === 'attackAll');
+  if (!hits.length) return undefined;
+  if (hits.some((p) => p.hidden)) return '?';
+  return hits.reduce((n, p) => n + p.damage * p.hits, 0);
+}
 /** narrow = 敵が3体以上で枠が狭い（状態異常の予告も、狙いの名前を1行目に折り返す。2026-11-13） */
 function IntentPartView({ p, narrow }: { p: IntentPart; narrow: boolean }) {
   switch (p.kind) {
@@ -230,6 +237,9 @@ function IntentBubble({ enemy, onTap, narrow }: { enemy: EnemyState; onTap: () =
           data-intent-broken={view.broken || undefined}
           data-intent-behavior={(!view.broken && view.behavior?.id) || undefined}
           data-intent-frenzy={(!view.broken && !!view.frenzy) || undefined}
+          // 自動の確認用の見えない印（B3）: 予告の種類（並んでいる順・カンマ区切り）と、攻撃の合計ダメージ（数×回数の和。隠れている数字が1つでもあれば ?・攻撃が無ければ付けない）
+          data-intent-kind={view.parts.map((p) => p.kind).join(',')}
+          data-intent-damage={intentDamageMark(view.parts)}
           style={
             view.broken
               ? { borderColor: 'rgba(251,191,36,.9)' }
@@ -401,6 +411,10 @@ const EnemyUnit = memo(function EnemyUnit({
       data-enemy={enemy.uid}
       data-dead={enemy.dead || undefined}
       data-hp={enemy.hp}
+      // 自動の確認用の見えない印（B2）: 最大HP・守り（HPの棒と同じ数）・戦闘の格（ボス・中ボス・強敵・ふつう。部屋の種類で決まる。敵1体ずつの格ではない）
+      data-max-hp={enemy.maxHp}
+      data-block={enemy.block}
+      data-rank={battle.boss ? 'boss' : battle.midboss ? 'midboss' : battle.elite ? 'elite' : 'normal'}
     >
       <div className="relative flex w-full justify-center" style={{ height: boxH, ...breath }}>
         {/* スポットライト: 上から差す光（狙う敵だけ） */}

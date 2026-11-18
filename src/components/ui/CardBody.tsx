@@ -18,8 +18,8 @@ export const CARD_METAL: Record<Rarity, { frame: string; edge: string; foil?: bo
   legend: { frame: 'linear-gradient(115deg,#ffe27a,#ff8ad8,#8ad8ff,#a8ff9a,#ffe27a,#ff8ad8)', edge: '#fff2b0', foil: true },
 };
 
-/** カードの属性（一番強い段階のダメージの属性。無ければ undefined） */
-function cardElement(card: CardDef): string | undefined {
+/** カードの属性（一番強い段階のダメージの属性。無ければ undefined）。手札の見えない印（data-element）でも使う */
+export function cardElement(card: CardDef): string | undefined {
   for (let i = card.tiers.length - 1; i >= 0; i--) {
     const e = card.tiers[i].effects.find((x) => x.kind === 'damage' && (x as { element?: string }).element) as { element?: string } | undefined;
     if (e?.element) return e.element;

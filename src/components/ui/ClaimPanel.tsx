@@ -16,7 +16,7 @@ export function ClaimPanel({ claim: c, index, title = '戦利品を取り合う'
   const def = getItem(c.item.itemId);
   const roll = (id: string) => c.rolls?.find((x) => x.heroId === id)?.roll;
   return (
-    <div className="panel panel-gold-edge mt-3 w-full rounded-xl p-2" data-claim={index ?? 0}>
+    <div className="panel panel-gold-edge mt-3 w-full rounded-xl p-2" data-claim={index ?? 0} data-claim-item={def.id}>
       <div className="font-display text-center text-[16px] text-amber-100">{title}</div>
       {/* 押すと詳細（この端末のキャラの今の装備と比べる）。「欲しい」等のボタンとは別 */}
       <ItemInfoArea itemId={def.id} heroId={c.heroes.find((id) => isLocalPlayer(findHero(game, id)!.playerId))} className="mt-1 flex w-full items-center gap-2">
@@ -37,7 +37,8 @@ export function ClaimPanel({ claim: c, index, title = '戦利品を取り合う'
           const ch = c.choices[id];
           const win = c.winner === id;
           return (
-            <div key={id} className={`flex items-center gap-1.5 rounded-lg p-1 ${win ? 'bg-amber-500/25 ring-1 ring-amber-300' : 'bg-black/30'}`}>
+            // 自動の確認用の見えない印（B10）: キャラの行（data-claim-hero）と、この端末のキャラのボタンの選択肢（data-claim-choice。ほかの人の選んだ物は、結果が出るまで字でも隠れているので出さない）
+            <div key={id} className={`flex items-center gap-1.5 rounded-lg p-1 ${win ? 'bg-amber-500/25 ring-1 ring-amber-300' : 'bg-black/30'}`} data-claim-hero={id}>
               <HeroFace hero={h} size={30} />
               <span className="min-w-0 flex-1 truncate text-[13px] font-bold">{h.name}</span>
               {c.rolls ? (
@@ -52,6 +53,7 @@ export function ClaimPanel({ claim: c, index, title = '戦利品を取り合う'
                     key={k}
                     onClick={() => dispatchGame({ type: 'CLAIM_LOOT', playerId: LOCAL_PLAYER, heroId: id, choice: k, index })}
                     className={`btn h-11 rounded-lg px-2 text-[13px] font-bold ${ch === k ? 'btn-gold' : 'btn-dark'}`}
+                    data-claim-choice={k}
                   >
                     {CLAIM_LABEL[k]}
                   </button>
