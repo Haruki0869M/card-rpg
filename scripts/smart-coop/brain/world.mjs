@@ -34,26 +34,39 @@ export function hexNeighbors(cols, rows, i) {
   return out;
 }
 
+/** 閉じた潮のマスの見積もり（潮が変わるまで待つ分）【提案】。いつも通れる切れ目が近ければ、そちらを選ぶ */
+export const TIDE_WAIT = 6;
+
 /**
  * 画面の印から、マスごとの「入るのにかかる移動力」を作る（0 = 通れない・FOG_COST = 霧）。
  * hexes = [{ 'data-hex', 'data-terrain', 'data-tide' }]（見えているマスだけ）・tide = 今の潮（high/low/null）
+ * ship = 船を持っているか（区切り5: シナリオ3。依頼「船を借りる」の達成の字か、行けるマスに海が光った事で知る。brain の板 board.world.ship）
+ * 返す物: { cost, seen, tideShut }（tideShut[i] = 今の潮で閉じているが、潮が変われば通れるマス）
  */
-export function costMap(cols, rows, hexes, tide, terrains = KB.world?.terrains ?? {}) {
+export function costMap(cols, rows, hexes, tide, terrains = KB.world?.terrains ?? {}, ship = false) {
   const n = cols * rows;
   const cost = new Array(n).fill(FOG_COST);
   const seen = new Array(n).fill(false);
+  const tideShut = new Array(n).fill(false);
   for (const h of hexes) {
     const i = Number(h['data-hex']);
     if (!(i >= 0 && i < n)) continue;
     seen[i] = true;
     const t = terrains[h['data-terrain']];
     let c = t ? t.moveCost : 1;
-    if (t?.sea) c = 0; // 船は画面の印が無いので、海は通れない物として扱う（シナリオ3の船は後で行を足す）
+    // 海: 船があれば移動力1（地形の shipCost。説明書きに無い時は1）。無ければ通れない
+    if (t?.sea) c = ship ? (t.shipCost ?? 1) : 0;
     const td = h['data-tide'];
-    if (td) c = tide && td === tide && !(t?.tideShip) ? 1 : 0;
+    if (td) {
+      // 潮のマス: 船の要る潮の水道は、船が無ければ通れない。開いていれば1、閉じていれば「待つ分」の見積もり（潮は時間で必ず変わる）
+      const usable = !t?.tideShip || ship;
+      if (!usable) c = 0;
+      else if (tide && td === tide) c = t?.tideShip ? (t.shipCost ?? 1) : 1;
+      else { c = TIDE_WAIT; tideShut[i] = true; }
+    }
     cost[i] = c;
   }
-  return { cost, seen };
+  return { cost, seen, tideShut };
 }
 
 /** 行き先 dest から全部のマスへの道のり（逆向きのダイクストラ。dist[x] = x から dest まで、入るマスの移動力の合計） */
@@ -81,6 +94,9 @@ export function distFrom(cols, rows, cost, dest, extra = null) {
   }
   return dist;
 }
+
+/** サイコロを振る前か（振るボタンが押せる） */
+const roll0 = (v) => !!findMark(v, 'data-roll-move')?.enabled;
 
 /** 世界マップの「見た事」を、頭の使う形にまとめる */
 export function readWorld(v) {
@@ -191,6 +207,13 @@ export function destinations(w, board) {
   for (const sc of w.scourges ?? []) {
     if (keysDone >= 1 && minHpRatio(w.party) > 0.6 && !hurry && covWant(board, `scourge:${sc.id}:meet`)) out.push({ ...sc, pri: 5, why: `災厄「${sc.id}」（まだ遭遇していない）` });
   }
+  // 区切り5（シナリオ3の通しで、船があると潮のマスを一度も通らなかった）: 網羅の行「潮のマスを渡った」をまだ踏んでいなければ、
+  // 見えている潮のマス（船の要る水道は船がある時だけ）の一番番号の小さい物を寄り道にする。閉じていれば手前で潮を待つ（5b）
+  if (covWant(board, 'tide-cross') && !hurry) {
+    const terr = KB.world?.terrains ?? {};
+    const tideTiles = (w.hexes ?? []).filter((h) => h['data-tide'] && (!terr[h['data-terrain']]?.tideShip || ws.ship)).map((h) => Number(h['data-hex'])).filter((t) => !ws.unreachable.has(t) && !ws.done.has(t)).sort((a, b) => a - b);
+    if (tideTiles.length) out.push({ tile: tideTiles[0], kind: 'tide', id: 'tide-cross', pri: 4, why: '網羅: 潮のマスを渡る（閉じていれば手前で潮を待つ）' });
+  }
   if (w.goalTile !== null) out.push({ tile: w.goalTile, kind: 'goal', id: 'goal', pri: 9, why: '次の目的（鍵のダンジョン・最後のダンジョン）' });
   return out.sort((a, b) => a.pri - b.pri || a.tile - b.tile);
 }
@@ -211,6 +234,16 @@ export function worldBrain(v, board) {
   ws.unreachable ??= new Set();
   ws.sanctuaryTried ??= new Set();
   ws.log ??= [];
+  // 区切り5（シナリオ3）: 船を持っているか。依頼「船を借りる」の達成の字（coverage が board.shipKnown に書く）か、
+  // 行けるマス（光るマス）に海が出た事で知る。知った時は「行けない」と決めた行き先を全部やり直す（海の向こうの物が行けるようになる）
+  const terr = KB.world?.terrains ?? {};
+  const hexAt = new Map(w.hexes.map((h) => [Number(h['data-hex']), h]));
+  const seaReach = (v.facts.reach ?? []).some((r) => terr[hexAt.get(Number(r['data-reach']))?.['data-terrain']]?.sea);
+  if (!ws.ship && (board.shipKnown || seaReach)) {
+    ws.ship = true;
+    ws.unreachable.clear();
+    ws.log.push(`船を持っている事を知った（${board.shipKnown ? `依頼の字: ${board.shipKnown}` : '行けるマスに海が光った'}）。行けないと決めた行き先をやり直す`);
+  }
   // 0. 同じマスで倒れている仲間を助け起こす（手番を使う）
   const rev = (v.facts.wRevive ?? [])[0];
   if (rev) return decide(G.revive(rev['data-revive']), `倒れた仲間 ${rev['data-revive']} を助け起こす`, T);
@@ -230,7 +263,7 @@ export function worldBrain(v, board) {
   const cands = destinations(w, board);
   // 寄り道の行き先だけを続ける（次の目的 = goal は毎回選び直す。試しの通しで、最初に goal を選ぶと、後で見えた宝箱・イベントへ寄らなかった）
   let target = ws.target && ws.target.kind !== 'goal' && cands.find((c) => c.tile === ws.target.tile && c.kind === ws.target.kind);
-  const { cost } = costMap(w.cols, w.rows, w.hexes, w.tide);
+  const { cost, tideShut } = costMap(w.cols, w.rows, w.hexes, w.tide, terr, !!ws.ship);
   // 徘徊する敵: HP が6割より下なら避ける（そのマスの見積もりを重くする）
   const extra = {};
   if (minHpRatio(w.party) < 0.6) for (const t of w.wanderers) extra[t] = 8;
@@ -248,7 +281,7 @@ export function worldBrain(v, board) {
       const d = dist[w.here];
       if (!Number.isFinite(d)) { ws.unreachable.add(c.tile); continue; }
       // 寄り道の上限: 災厄と、網羅の表で「必ず」のまだ入っていない町は遠くても行く（DETOUR_FAR）【提案】
-      const far = c.kind === 'scourge' || (c.kind === 'town' && covWant(board, `town:${c.id}`));
+      const far = c.kind === 'scourge' || c.kind === 'tide' || (c.kind === 'town' && covWant(board, `town:${c.id}`));
       if (c.kind !== 'goal' && c.kind !== 'quest' && d > (far ? DETOUR_FAR : DETOUR_MAX)) continue;
       return { c, dist, d };
     }
@@ -297,6 +330,24 @@ export function worldBrain(v, board) {
   // 移動の直後に、決まっていない「移動する（移動力?を使う・?マス先）」が一瞬残る（区切り 2-Sb の通しで、押す前に消えて「押す物が無い」に当たった）。? の間は待つ
   if (go?.enabled && /\?/.test(go.text)) return null;
   if (go?.enabled) return decide(G.moveGo, `「${go.text}」`, T);
+  // 5b. 区切り5（シナリオ3の潮）: 行き先へ一番近づく隣のマスが「今の潮で閉じた潮のマス」なら、サイコロを振らずに潮を待つ
+  //     （野営が押せれば野営 = 夜の回復・寒さを防ぐ。押せなければ「待機」）。待った回数は「近づけない」に数えない（潮は時間で必ず変わる）
+  if (plan?.dist && roll0(v)) {
+    const nbs = hexNeighbors(w.cols, w.rows, w.here);
+    const best = nbs.filter((t) => Number.isFinite(plan.dist[t])).sort((a, b) => plan.dist[a] - plan.dist[b] || a - b)[0];
+    if (best !== undefined && tideShut[best] && plan.dist[best] < plan.dist[w.here]) {
+      const tideText = (v.facts.wTide ?? [])[0]?.['aria-label'] ?? w.tide;
+      const camp = findMark(v, 'data-camp');
+      const mark = () => {
+        ws.tideWaits = (ws.tideWaits ?? 0) + 1;
+        ws.tideWaitAt = best;
+        (board.covMarks ??= []).push({ id: 'tide-wait', how: `${v.seat}: 潮のマス ${best} の手前（マス ${w.here}）で潮を待った（${tideText}）` });
+      };
+      if (camp?.enabled) return decide(G.camp, `潮を待つ: 野営（隣の潮のマス ${best} が閉じている・${tideText}・行き先 ${plan.c.kind}:${plan.c.id}）`, { ...T, after: mark });
+      const wt = findMark(v, 'data-world-wait');
+      if (wt?.enabled) return decide(G.worldWait, `潮を待つ:「${wt.text}」（隣の潮のマス ${best} が閉じている・${tideText}）`, { ...T, after: mark });
+    }
+  }
   // 6. サイコロを振る
   const roll = findMark(v, 'data-roll-move');
   if (roll?.enabled) return decide(G.rollMove, 'サイコロを振る', T);

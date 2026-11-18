@@ -5,7 +5,7 @@ import { claimChoice } from '../content/reward.mjs';
 import { battleBrain } from './battle.mjs';
 import { dungeonBrain } from './dungeon.mjs';
 import { rewardBrain } from './reward.mjs';
-import { hexNeighbors, costMap, distFrom, worldBrain } from './world.mjs';
+import { hexNeighbors, costMap, distFrom, worldBrain, TIDE_WAIT } from './world.mjs';
 
 const view = (mode, facts, o = {}) => ({ seat: 'P1', screen: 'game', mode, layers: [], actions: [], facts, ...o });
 
@@ -59,6 +59,9 @@ export function brainChecks(check) {
   const dv3 = view('dungeon', { dDoors: [door('r1', 'danger'), door('r2', 'treasure')], dParty: party(1) });
   const b3 = { dungeon: { seen: { treasure: 1 }, lastKind: null, events: {}, chests: 0, restKinds: {}, doorsChosen: 1 } };
   check(dungeonBrain(dv3, b3)?.target.css === '[data-door-choice="r1"]', '頭: 扉はまだ入っていない種類を先に', JSON.stringify(dungeonBrain(dv3, b3)));
+  // 区切り5: 「順番が来たら、次の扉を選べます」の間は扉を押さない（押しても票にならず、世界マップで手番の仲間が押せなくなる）
+  const dvw = view('dungeon', { dDoors: [door('r1', 'danger')], dParty: party(1), dWait: 'P3 アキさんのエルドの番です 順番が来たら、次の扉を選べます' });
+  check(dungeonBrain(dvw, { dungeon: { seen: {}, lastKind: null, events: {}, chests: 0, restKinds: {}, doorsChosen: 0 } }) === null, '頭: 世界マップの仲間の番の間は、扉を押さない（区切り4の4人6回目の止まり）', '');
   // ---- 宝箱: 画面の成功率で選ぶ・「おすすめ」と違えば注意 ----
   const board = {};
   const cv = view('chest', { openers: [{ 'data-opener': 'h0', text: 'P1 アル おすすめ 鍵が開く 40%（フォーカス2で60%） 器用3・運2・フォーカス2', votes: null }, { 'data-opener': 'h1', text: 'P2 ベル 鍵が開く 45%（フォーカス3で80%） 器用5・運2・フォーカス3', votes: null }] });
@@ -80,7 +83,15 @@ export function brainChecks(check) {
   const tideHexes = hexes.map((h) => (h['data-hex'] === '22' ? { ...h, 'data-terrain': 'tideFlat', 'data-tide': 'low' } : h));
   const shut = distFrom(5, 5, costMap(5, 5, tideHexes, 'high', terr).cost, 4, null);
   const open = distFrom(5, 5, costMap(5, 5, tideHexes, 'low', terr).cost, 4, null);
-  check(!Number.isFinite(shut[0]) && Number.isFinite(open[0]), '頭: 潮のマスは、今の潮が開く潮の時だけ通れる', JSON.stringify({ shut: shut[0], open: open[0] }));
+  // 区切り5: 閉じた潮のマスは「待つ分」の見積もり（TIDE_WAIT）で道に入れる（潮は時間で必ず変わる。前は通れない扱いで、行き先を「行けない」と決めていた）
+  const shutCm = costMap(5, 5, tideHexes, 'high', terr);
+  check(Number.isFinite(shut[0]) && Number.isFinite(open[0]) && shut[0] > open[0] && shutCm.tideShut[22] && shutCm.cost[22] === TIDE_WAIT, '頭: 潮のマスは、開いている時は1・閉じている時は待つ分の見積もり（道は潮のマスの手前まで）', JSON.stringify({ shut: shut[0], open: open[0] }));
+  // 区切り5（シナリオ3）: 海は船がある時だけ通れる・船の要る潮の水道は船が無ければ通れない
+  const terr3 = { ...terr, sea: { moveCost: 0, sea: true, shipCost: 1 }, tideChannel: { moveCost: 0, tide: 'high', tideShip: true, shipCost: 1 } };
+  const seaHexes = hexes.map((h) => (h['data-hex'] === '22' ? { ...h, 'data-terrain': 'sea' } : h['data-hex'] === '17' ? { ...h, 'data-terrain': 'tideChannel', 'data-tide': 'high' } : h));
+  const noShip = costMap(5, 5, seaHexes, 'high', terr3, false);
+  const withShip = costMap(5, 5, seaHexes, 'high', terr3, true);
+  check(noShip.cost[22] === 0 && noShip.cost[17] === 0 && withShip.cost[22] === 1 && withShip.cost[17] === 1, '頭: 海と潮の水道は、船がある時だけ通れる（船は依頼の字か光るマスで知る）', JSON.stringify({ n: [noShip.cost[22], noShip.cost[17]], s: [withShip.cost[22], withShip.cost[17]] }));
   // 行けるマスのうち、行き先に近づくマスを押す（自分の手番の時だけ）
   KB.world = { terrains: terr, width: 5, height: 5, dungeons: [], towns: [], quests: [], events: [], shrines: [], sanctuaries: [], scourges: [], classes: [], special: {}, towers: 0, scenarioName: '作り物', scenarioId: 'test' };
   const wv = view('world', { wMap: [{ 'data-cols': '5', 'data-rows': '5' }], wHexes: hexes, activeHero: [{ 'data-hero': 'h0', 'data-seat': 'P1', 'data-tile': '20' }], goalMark: [{ 'data-goal-mark': '24' }], reach: [{ 'data-reach': '15', 'data-cost': '1' }, { 'data-reach': '21', 'data-cost': '1' }], wFeatures: [], wSpawns: [], wWanderers: [], wParty: [] });
@@ -88,5 +99,26 @@ export function brainChecks(check) {
   const w2 = worldBrain(structuredClone(wv), {});
   check(w1?.target.css === '[data-reach="21"]' && JSON.stringify(w1) === JSON.stringify(w2), '頭: 世界マップは行き先に近づく行けるマスを押す（同じ View なら同じ答え）', JSON.stringify(w1));
   check(worldBrain(structuredClone({ ...wv, seat: 'P2' }), {}) === null, '頭: 世界マップは自分の手番でなければ押さない', '');
+  // 区切り5: 行き先へ一番近づく隣のマスが閉じた潮のマスなら、サイコロを振らずに野営して潮を待つ（網羅の行「潮を待った」）
+  {
+    // 4 = 右上の行き先。壁（列2）の切れ目は 22 だけ（潮の干潟・今は閉じている）。21 に立って、サイコロも野営も押せる
+    const tv = view('world', { wMap: [{ 'data-cols': '5', 'data-rows': '5' }], wHexes: tideHexes, wTide: [{ 'data-tide-icon': 'high', 'aria-label': '🌊 満ち潮（あと3ターンで引き潮）' }], activeHero: [{ 'data-hero': 'h0', 'data-seat': 'P1', 'data-tile': '21' }], goalMark: [{ 'data-goal-mark': '24' }], reach: [], wFeatures: [], wSpawns: [], wWanderers: [], wParty: [] }, {
+      actions: [{ enabled: true, text: 'サイコロ', marks: ['data-roll-move'] }, { enabled: true, text: '野営', marks: ['data-camp'] }, { enabled: true, text: '待機', marks: ['data-world-wait=wait'] }],
+    });
+    const tb = {};
+    const t1 = worldBrain(structuredClone(tv), tb);
+    t1?.after?.();
+    check(t1?.target.css === '[data-camp]' && (tb.covMarks ?? []).some((m) => m.id === 'tide-wait'), '頭: 隣の潮のマスが閉じていれば、サイコロを振らずに野営して潮を待つ', JSON.stringify(t1));
+    // 網羅の「潮のマスを渡った」をまだ踏んでいなければ、見えている潮のマスを寄り道の行き先にする（シナリオ3の通しで一度も通らなかった直し）
+    const fv = structuredClone(tv);
+    fv.facts.activeHero = [{ 'data-hero': 'h0', 'data-seat': 'P1', 'data-tile': '15' }];
+    fv.facts.goalMark = [{ 'data-goal-mark': '0' }];
+    const fb = {};
+    worldBrain(fv, fb);
+    check(fb.world?.target?.kind === 'tide' && fb.world.target.tile === 22, '頭: まだ潮のマスを渡っていなければ、見えている潮のマスへ寄り道する', JSON.stringify(fb.world?.target));
+    const ov = structuredClone(tv);
+    ov.facts.wTide = [{ 'data-tide-icon': 'low', 'aria-label': '🐚 引き潮' }];
+    check(worldBrain(ov, {})?.target.css === '[data-roll-move]', '頭: 潮が開いていれば、ふつうにサイコロを振る', '');
+  }
   KB.world = null;
 }

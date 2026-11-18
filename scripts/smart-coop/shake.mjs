@@ -347,7 +347,15 @@ function s1Peer(v, sh) {
       return null;
     }
     const has = (v.facts.pItems ?? []).some((r) => r['data-item-row'] === m.data.gave.item);
-    result(sh, 'S1', has, `${v.seat}（受け取った人）の画面の持ち物に「${KB.items[m.data.gave.item]?.name}」がある`);
+    // 区切り5（シナリオ3の通しの誤検知の直し）: 受け取る人の袋がいっぱいの時、ゲームは渡すのを断り、渡した人の画面に理由の知らせ
+    // （「〇〇の袋がいっぱいです」。src/engine/game/game.ts give）を出す。その時は「受け取った人の袋に無い」が正しい形
+    // 受け取る人が同じ品をもともと持っている事があるので（短い通しで回復薬を持っていた）、あるか無いかでは決めない。
+    // 断りの知らせが出た事を確かめにし、受け取る人の同じ品の数は記録だけ（状態のずれは審判が毎手の状態の印で見ている）
+    if (m.data.refused) {
+      const n = (v.facts.pItems ?? []).filter((r) => r['data-item-row'] === m.data.gave.item).length;
+      result(sh, 'S1', true, `${v.seat}（受け取る人）の袋がいっぱいで、ゲームが渡すのを断り、渡した人に理由の知らせ「${m.data.refused}」が出た（受け取る人の「${KB.items[m.data.gave.item]?.name}」の行 ${n}・記録）`);
+    }
+    else result(sh, 'S1', has, `${v.seat}（受け取った人）の画面の持ち物に「${KB.items[m.data.gave.item]?.name}」がある`);
     m.step = 'peerClose';
   }
   if (m.step === 'peerClose') {
@@ -892,6 +900,14 @@ export function shakeObserve(views, board) {
 function observeS1(views, sh, p1, p2) {
   const m = sh.m;
   // 渡した薬: 受け取った人の画面に「受け取りました」の知らせ（見えた時だけ記録）
+  if (m.data.gave && !m.data.refused) {
+    const giver = views.find((v) => v.seat === m.seat);
+    const t = (giver?.facts.toasts ?? []).find((x) => /袋がいっぱい/.test(x));
+    if (t) {
+      m.data.refused = t;
+      sh.k.S1.log.push(`記録: ${giver.seat} が渡そうとしたが、ゲームが断った「${t}」（受け取る人の袋がいっぱい。渡す相手のボタンは押せる見た目のまま。人が見て決める事）`);
+    }
+  }
   if (m.data.gave && !m.data.toastSeen) {
     const peer = views.find((v) => v.seat !== m.seat);
     if (peer && (peer.facts.toasts ?? []).some((t) => /受け取/.test(t))) {
