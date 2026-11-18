@@ -29,7 +29,11 @@ export const PART = {
     // 上の帯（A11）: 侵食度・時間・潮
     wCorruption: { sel: '[data-corruption]', read: 'attrs', attrs: ['data-corruption'], hidden: true },
     wTime: { sel: '[data-time]', read: 'attrs', attrs: ['data-time'], hidden: true },
-    wTide: { sel: '[data-tide-icon]', read: 'attrs', attrs: ['data-tide-icon'], hidden: true },
+    wTide: { sel: '[data-tide-icon]', read: 'attrs', attrs: ['data-tide-icon', 'aria-label'], hidden: true },
+    // 区切り5（シナリオ2・3の仕組み）: 寒さ・温まり（温泉・焚き火）・雪に埋もれた街道の注意（ふつうの画面は下のパネルの字、低い画面は短い札）
+    wClimate: { when: ['world'], sel: '[data-climate-note], [data-climate-chip]', read: 'attrs', attrs: ['data-climate-chip', 'aria-label'], hidden: true },
+    wWarmth: { when: ['world'], sel: '[data-warmth-note], [data-warmth-chip]', read: 'attrs', attrs: ['aria-label'], hidden: true },
+    wBuried: { when: ['world'], sel: '[data-road-buried]', read: 'attrs', attrs: ['aria-label'], hidden: true },
     // 仲間の列: 顔のボタン（aria-label「名前 HP12/30」）と「転職できます」の印（aria-label）
     wParty: { when: ['world'], sel: '[data-party-row] > button', read: 'rows', attrs: ['aria-label'], textMax: 10, sub: { canJob: { sel: '[aria-label="転職できます"]', read: 'count', hidden: true } } },
     wStatus: { sel: '[data-status-button]', read: 'attrs', attrs: ['aria-label'] },

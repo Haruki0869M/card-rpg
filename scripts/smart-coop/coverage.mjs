@@ -62,10 +62,24 @@ export function buildCoverage(world = KB.world) {
   add('wipe-retreat', 'common', '全滅からの立て直し（命の灯火で町へ退却）', 'maybe', '固定');
   add('gameover', 'common', 'ゲームオーバーの画面', 'maybe', '固定');
   add('ending', 'common', 'エンディングの画面（クリア）', 'must', '固定');
-  // シナリオだけの仕組み（あるシナリオだけ。行の形だけ用意）
-  if (world.special.tide) add('tide-cross', 'special', '潮を待って渡った', 'must', 'terrains の tide');
-  if (world.special.cold) add('cold', 'special', '寒さ・焚き火', 'must', 'climate');
-  if (world.special.ship) add('ship', 'special', '船に乗った', 'must', 'map の ship');
+  // シナリオだけの仕組み（あるシナリオだけ）。区切り5: シナリオ2・3 に合わせて、行を分けて、踏んだ印を画面から付ける
+  if (world.special.tide) {
+    add('tide-cross', 'special', '潮のマス（潮の水道・干潟）の上に立った（渡った）', 'must', 'terrains の tide');
+    add('tide-wait', 'special', '閉じた潮のマスの手前で、潮が変わるのを待った（野営か待機）', 'must', 'terrains の tide');
+  }
+  if (world.special.cold) {
+    add('cold', 'special', '寒さの注意が出た（寒い地域・地形で毎ターン HP が減る）', 'must', 'climate');
+    add('warmth', 'special', '温まった（温泉・焚き火の温もりの字が出た）', 'maybe', 'climate・herbEvent');
+    add('road-buried', 'special', '雪に埋もれた街道の札が出た', 'maybe', 'climate');
+  }
+  if (world.special.ship) {
+    add('ship-get', 'special', '船を手に入れた（船をくれる依頼が達成済み）', 'must', 'quests の ship');
+    add('ship', 'special', '船で海のマスに入った', 'must', 'terrains の sea');
+  }
+  for (const th of world.themes ?? []) {
+    if (th.chill) add(`theme:${th.id}`, 'special', `このシナリオだけのダンジョン「${th.name}」の凍え（data-chill）`, 'maybe', 'dungeonThemes');
+    if (th.flotsam) add(`theme:${th.id}`, 'special', `このシナリオだけのダンジョン「${th.name}」の漂流物の山`, 'maybe', 'dungeonThemes');
+  }
   // 区切り 3-S: 晶石の祭壇の2つの使い方・行商人で買う（2-Sb の作り残し）
   add('altar:upgrade', 'altar', '晶石の祭壇「＋に強化」（data-altar-mode=upgrade）', 'maybe', 'HeroTasks の祭壇');
   add('altar:transmute', 'altar', '晶石の祭壇「変異させる」（data-altar-mode=transmute）', 'maybe', 'HeroTasks の祭壇');
@@ -126,6 +140,11 @@ export function coverageObserve(views, board) {
           step(board, `quest:${q['data-quest']}:accept`, `${v.seat}: 依頼の状態 ${st}`);
           step(board, 'town-action:quest-accept', `${v.seat}: 依頼「${q['data-quest']}」の状態 ${st}`);
         }
+        // 区切り5: 船をくれる依頼（説明書きの報酬の種類）が達成済み = 船を持っている（世界マップの頭の道探しが使う）
+        if (st === 'done' && (KB.world.quests ?? []).some((x) => x.id === q['data-quest'] && x.ship)) {
+          board.shipKnown ??= `町「${town}」で依頼「${q['data-quest']}」が達成済み`;
+          step(board, 'ship-get', `${v.seat}: 船をくれる依頼「${q['data-quest']}」が達成済み（data-quest-state=done）`);
+        }
         if (st === 'done') {
           step(board, `quest:${q['data-quest']}:report`, `${v.seat}: 依頼の状態 done（達成済み）`);
           step(board, 'town-action:quest-report', `${v.seat}: 依頼「${q['data-quest']}」が達成済み`);
@@ -159,6 +178,24 @@ export function coverageObserve(views, board) {
       step(board, `sanctuary:${sh['data-shrine']}`, `${v.seat}: 神殿・祭壇の画面（data-sanctuary=${sh['data-sanctuary']}）`);
       step(board, 'sanctuaries', `${v.seat}: 「${sh['data-shrine']}」`);
     }
+    // 区切り5: シナリオ2・3の仕組み（世界マップ）。手番のキャラの立つマスの地形の印（A7）・上の帯と下のパネルの字
+    if (m === 'world') {
+      const act = (f.activeHero ?? [])[0];
+      const here = act && act['data-seat'] === v.seat ? Number(act['data-tile']) : null;
+      const hx = here === null ? null : (f.wHexes ?? []).find((h) => Number(h['data-hex']) === here);
+      const terr = hx ? KB.world.terrains?.[hx['data-terrain']] : null;
+      if (hx?.['data-tide']) step(board, 'tide-cross', `${v.seat}: 手番のキャラが潮のマス ${here}（${terr?.name ?? hx['data-terrain']}）に立った`);
+      if (terr?.sea) step(board, 'ship', `${v.seat}: 手番のキャラが海のマス ${here} に立った（船）`);
+      const cl = (f.wClimate ?? [])[0];
+      if (cl) step(board, 'cold', `${v.seat}: 寒さの注意「${String(cl['aria-label'] ?? cl['data-climate-chip'] ?? '下のパネルの字').slice(0, 30)}」`);
+      const wm = (f.wWarmth ?? [])[0];
+      if (wm) step(board, 'warmth', `${v.seat}: 温もりの字「${String(wm['aria-label'] ?? '下のパネルの字').slice(0, 30)}」`);
+      const bu = (f.wBuried ?? [])[0];
+      if (bu) step(board, 'road-buried', `${v.seat}: 雪に埋もれた街道の札「${String(bu['aria-label'] ?? '').slice(0, 30)}」`);
+    }
+    // ダンジョンのテーマ（このシナリオだけ）: 凍えの印・漂流物の山の作業
+    if ((f.dChill ?? []).length) for (const th of KB.world.themes ?? []) if (th.chill) step(board, `theme:${th.id}`, `${v.seat}: 凍えの印 data-chill=${f.dChill[0]['data-chill']}`);
+    if ((f.dFlotsam ?? []).length) for (const th of KB.world.themes ?? []) if (th.flotsam) step(board, `theme:${th.id}`, `${v.seat}: 漂流物の山の選択肢（data-flotsam-option）`);
     // 見晴らしの塔（地図の塔の印に data-used が付いた = 登った）
     if (m === 'world' && (f.wFeatures ?? []).some((x) => String(x['data-feature']).startsWith('tower:') && x['data-used'] !== null && x['data-used'] !== undefined)) step(board, 'tower', `${v.seat}: 地図の塔の印に data-used`);
     // 地図の宝箱（世界マップから宝箱の画面へ）
