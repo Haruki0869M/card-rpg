@@ -102,6 +102,26 @@ export async function shakeChecks(check) {
     const ps = pairsOf();
     check(ps.length >= 3 && ps.every((p) => p.split('+').length === 2) && new Set(ps).size >= 3 && ps.join() === pairsOf().join(), '揺さぶり S13（4人）: 2台ずつ・組が順に回る・同じ種なら同じ組', ps.join(' '));
   }
+  // 区切り 4 の誤検知の直し: S11 で開く物（状態の「＋N」・敵の予告）が無い時は NG にせず中断。予告を長押ししても説明が開かない時は NG のまま
+  {
+    const s11case = (intent, detailOpens) => {
+      const b = {};
+      const sh = shakeInit(b, 7);
+      sh.m = { id: 'S11', step: 'intent', seat: 'P2', data: {}, stepTicks: 0, lastStep: 'intent' };
+      const bv = (layers = []) => view('P2', 'battle', { bEnemies: [{ 'data-enemy': 'e0', 'data-dead': null, intent: intent ? '攻撃 8' : null }] }, { layers });
+      for (let k = 0; k < 8 && sh.m; k++) {
+        const v = bv(k > 0 && detailOpens && intent ? [{ id: 'detail' }] : []);
+        const d = shakeBrain(v, b);
+        if (d && typeof d.after === 'function') d.after(); // 押せた事にする（conductor と同じ）
+        shakeObserve([view('P1', 'battle'), v], b);
+      }
+      return { ng: sh.k.S11.ng, ok: sh.k.S11.ok, abort: sh.k.S11.abort };
+    };
+    const none = s11case(false, false);
+    const broken = s11case(true, false);
+    check(none.ng === 0 && none.abort === 1, '揺さぶり S11: 開く物が画面に無い時は NG にしない（中断）', JSON.stringify(none));
+    check(broken.ng >= 1, '揺さぶり S11: 予告を長押ししても説明の窓が開かない時は NG', JSON.stringify(broken));
+  }
   // 区切り 4: 4人の時、S1 は P2 と P3 が交代（2回目は P3 が始める。2人の時は P3 では始めない）
   {
     const start = (people, count) => {

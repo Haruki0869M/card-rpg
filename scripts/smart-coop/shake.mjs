@@ -516,6 +516,9 @@ function s11(v, sh) {
     const e = (v.facts.bEnemies ?? []).find((x) => x['data-dead'] === null && x.intent);
     if (!e) {
       note(sh, 'S11: 予告の出ている敵がいない');
+      // 区切り 4 の誤検知の直し: 4人の通しの1戦目（奇襲が成功して敵の予告がまだ無い・状態の印も無い）で、開く物が何も無いのに NG にしていた。
+      // 開く物が無かった時は「中断」（記録だけ）にする。開けた物が開かない時は、今までどおり NG
+      m.data.nothing = !m.data.listOpened;
       m.step = 'done';
       return null;
     }
@@ -778,7 +781,12 @@ export function shakeObserve(views, board) {
   else if (m?.id === 'S4') observeS4(views, sh, p1, p2);
   else if (m?.id === 'S9') observeS9(views, sh, p1, p2);
   else if (m?.id === 'S10') observeS10(views, sh, p1, p2);
-  else if (m?.id === 'S11' && m.step === 'done') {
+  else if (m?.id === 'S11' && m.step === 'done' && m.data.nothing) {
+    // 開く物（状態の「＋N」・敵の予告）が画面に無かった: 確かめられないので中断（ゲームの不具合とは決めない）
+    sh.k.S11.abort++;
+    sh.k.S11.log.push(`中断: ${m.seat} の画面に、開く物（状態の「＋N」・敵の予告）が無かった`);
+    end(sh);
+  } else if (m?.id === 'S11' && m.step === 'done') {
     result(sh, 'S11', !!(m.data.listOpened || m.data.detailOpened), `${m.seat}: 状態の一覧${m.data.listOpened ? 'を開いて閉じた' : 'は無し'}・予告の説明${m.data.detailOpened ? 'を開いて閉じた' : 'は開かなかった'}`);
     sh.watch.push({ id: 'S11', kind: 'others-move', since: sh.n.tick, ticks: 0 });
     end(sh);
