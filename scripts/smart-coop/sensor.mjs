@@ -176,7 +176,8 @@ export function checkWindowsInPage({ windows, collapse }) {
         const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
         // センサーの直し（2026-11-18・区切り 2-Sb）: シートの中の操作で開いた手前の窓（確認の窓「転職する」・転職の専用カード選び など。covered.above の物）が
         // × の上にある時は、× が押せないのが正しい形（手前の窓に答えるまで閉じない）。前は「× の上に別の物」と当てていた（誤検知）。自己テスト: selftest.mjs「シートの上の確認の窓」
-        const aboveOk = t && w.covered?.above.some((s) => t.closest(s));
+        // 確認の窓は、印の無い暗幕（外の枠）の中に印 data-confirm の窓がある形（ConfirmDialog.tsx）。暗幕が × の上にある時も同じ扱い（暗幕の中に「上に出てよい物」がある）
+        const aboveOk = t && w.covered?.above.some((s) => t.closest(s) || t.querySelector?.(s));
         if (!aboveOk && !(t && (t === e || e.contains(t)))) out.push({ kind: 'collapsed', win: w.id, text: `${req.label}の上に別の物が乗っていて押せない` });
       }
     }
