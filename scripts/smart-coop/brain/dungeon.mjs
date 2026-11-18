@@ -7,7 +7,7 @@
 // 決まり: 見るのは View と説明書きだけ。乱数を使わない（同じ点なら左）。board は「見た事」だけで書き換える。
 import { G, decide, hasLayer } from './common.mjs';
 import { KB, rarityRank } from '../content/load.mjs';
-import { DOOR_KINDS, doorKindOf, partyHp, restHp, optionKind, checkOf, openerOf } from '../content/dungeon.mjs';
+import { DOOR_KINDS, doorKindOf, partyHp, restHp, optionKind, checkFrom, openerOf } from '../content/dungeon.mjs';
 import { cardValue } from '../content/reward.mjs';
 import { claimBrain, meOf, boardNote } from './reward.mjs';
 
@@ -96,19 +96,21 @@ function eventBrain(v, board) {
   const ch = (v.facts.dChallenge ?? [])[0];
   if (ch) {
     if (ch['data-challenge-mine'] !== '1') return null;
-    const c = checkOf(v.facts.checkTexts);
+    const c = checkFrom(v);
+    if (c?.mismatch) boardNote(board, `mis|${c.mismatch}`, `字と印が違う（直し8）: ${v.seat}: ${c.mismatch}`, 'warn');
     if (c && (c.spent < 1 || c.pct <= 80) && v.facts.checkPlusOn) return decide(G.checkPlus, `挑む段: フォーカスを足す（${c.spent}→${c.spent + 1}・成功率 ${c.pct}%）`, T);
     return decide(G.challengeGo, `挑む段「挑戦する」（成功率 ${c?.pct ?? '?'}%・フォーカス ${c?.spent ?? '?'}）`, T);
   }
   // 1人で挑む判定（世界マップのマスのイベントなど、場面に自分のキャラだけの時）: 選択肢を押すと下の段に判定の窓と「挑戦する」（印なし）が出る
   const solo = (v.facts.dEventPanelButtons ?? []).find((b) => b.disabled === null && /^挑戦する/.test(b.text));
   if (solo) {
-    const c = checkOf(v.facts.checkTexts);
+    const c = checkFrom(v);
+    if (c?.mismatch) boardNote(board, `mis|${c.mismatch}`, `字と印が違う（直し8）: ${v.seat}: ${c.mismatch}`, 'warn');
     if (c && (c.spent < 1 || c.pct <= 80) && v.facts.checkPlusOn) return decide(G.checkPlus, `判定: フォーカスを足す（${c.spent}→${c.spent + 1}・成功率 ${c.pct}%）`, T);
     return decide(G.eventTry, `判定「挑戦する」（成功率 ${c?.pct ?? '?'}%・フォーカス ${c?.spent ?? '?'}）`, T);
   }
   // 選ぶ段
-  const opts =(v.facts.dOptions ?? []).map((o) => ({ i: o['data-event-option'], text: o.text, chance: o.chance === null ? null : Number(o.chance), mine: o['data-my-vote'] !== null, votes: seatsOf(o.votes), enabled: o.disabled === null }));
+  const opts = (v.facts.dOptions ?? []).map((o) => ({ i: o['data-event-option'], text: o.text, chance: o.chance === null ? null : Number(o.chance), kindMark: o['data-option-kind'], mine: o['data-my-vote'] !== null, votes: seatsOf(o.votes), enabled: o.disabled === null }));
   if (!opts.length) return null;
   if (opts.some((o) => o.mine)) return null;
   const other = opts.find((o) => o.votes.length > 0 && o.enabled);
@@ -135,6 +137,7 @@ function chestBrain(v, board) {
   const rows = (v.facts.openers ?? []).map(openerOf);
   if (rows.length) {
     // 画面の成功率の字で bot も選ぶ: フォーカスを足した時の成功率が一番高い人（同じなら「おすすめ」の人 → フォーカス0の成功率 → 上の行）
+    for (const r of rows) if (r.mismatch) boardNote(board, `mis|${r.mismatch}`, `字と印が違う（直し8）: ${v.seat}: ${r.mismatch}`, 'warn');
     const rec = rows.find((r) => r.best);
     const pick = [...rows].sort((a, b) => b.pMax - a.pMax || Number(b.best) - Number(a.best) || b.p0 - a.p0)[0];
     if (rec && rec.id !== pick.id) boardNote(board, `opener|${rows.map((r) => `${r.id}:${r.p0}/${r.pMax}`).join(',')}`, `開け役: 画面の成功率の字で bot が選んだ ${pick.id}（${pick.p0}%→${pick.pMax}%）と、ゲームの「おすすめ」${rec.id}（${rec.p0}%→${rec.pMax}%）が違う`, 'warn');
@@ -145,7 +148,8 @@ function chestBrain(v, board) {
   // 開ける（持ち主）: 鍵・封印は成功率 80% を超えるまで、運のスロットは1つだけフォーカスを足す
   const open = (v.facts.chestOpenKind ?? [])[0]?.['data-chest-open'];
   if (open) {
-    const c = checkOf(v.facts.checkTexts);
+    const c = checkFrom(v);
+    if (c?.mismatch) boardNote(board, `mis|${c.mismatch}`, `字と印が違う（直し8）: ${v.seat}: ${c.mismatch}`, 'warn');
     if (open !== 'guard' && c && v.facts.checkPlusOn) {
       const want = open === 'luck' ? c.spent < 1 : c.pct <= 80;
       if (want) return decide(G.checkPlus, `宝箱: フォーカスを足す（${c.spent}→${c.spent + 1}・${open === 'luck' ? '運のスロット' : `成功率 ${c.pct}%`}）`, T);
@@ -170,6 +174,8 @@ export function heroTaskBrain(v) {
   const task = (v.facts.dTask ?? [])[0];
   if (!task) return null;
   const title = task.title ?? '';
+  // 区切り 2-Sb: 作業の種類は B12 の印 data-hero-task（pet・card・altar・peddler・flotsam）
+  const kind = task['data-hero-task'] ?? null;
   const buttons = v.facts.dTaskButtons ?? [];
   const bt = (re) => buttons.find((b) => b.disabled === null && re.test(b.text));
   // 漂流物の山: 袋に入る品の中で格の一番高い物（同じなら左）。お金に換わる品は後回し
@@ -191,7 +197,7 @@ export function heroTaskBrain(v) {
     return decide(G.taskCard(pick.i), `${title}: 「${pick.name}」を選ぶ（${worst ? '値打ちの一番低い札' : '値打ちの一番高い札'}）`);
   }
   // お供: 毛色が出たら「お供にする」（名前は例のまま）
-  if (/旅のお供/.test(title)) {
+  if (kind === 'pet' || /旅のお供/.test(title)) {
     if (!(v.facts.dPetRevealed ?? 0)) return null;
     const b = bt(/お供にする/);
     return b ? decide(G.taskButton('お供にする'), 'お供を迎える（名前は例のまま）') : null;
@@ -237,7 +243,7 @@ export function dungeonObserve(views, board) {
   if (opts.length) {
     const w = (o) => seatsOf(o.votes).length + (o['data-my-vote'] !== null ? 1 : 0); // 1人で選ぶ時（世界マップのマス）は票の印が無く、自分の印だけ
     const top = [...opts].sort((a, b) => w(b) - w(a))[0];
-    st.lastOpt = w(top) ? optionKind({ text: top.text, chance: top.chance === null ? null : Number(top.chance) }) : null;
+    st.lastOpt = w(top) ? optionKind({ text: top.text, chance: top.chance === null ? null : Number(top.chance), kindMark: top['data-option-kind'] }) : null;
   } else if (st.lastOpt) {
     st.events[st.lastOpt] = (st.events[st.lastOpt] ?? 0) + 1;
     st.lastOpt = null;

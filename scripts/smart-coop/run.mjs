@@ -9,7 +9,9 @@
 //   PEOPLE        2 か 4（既定 2）
 //   SEED          種（既定 1）。ジョブの選び方と、ゲームの種（&seed=）に使う
 //   SCENARIO      シナリオの番号（1 = 1本目。既定 1。1本目以外の解放は後の区切り）
-//   SMART_MODE    first-reward（既定）・first-dungeon（最初の鍵のダンジョンを制覇して世界マップに戻るまで。区切り 2-Sa）・lobby（部屋の用意まで）・selftest
+//   SMART_MODE    first-reward（既定）・first-dungeon（最初の鍵のダンジョンを制覇して世界マップに戻るまで。区切り 2-Sa）・
+//                 full（新しい冒険 → エンディングかゲームオーバーまで。ゲームオーバーなら新しい冒険で網羅の表の残りを続ける。区切り 2-Sb）・lobby（部屋の用意まで）・selftest
+//   SMART_RESTARTS  full: ゲームオーバーの後に新しい冒険を始める回数の上限（既定 2）
 //   SMART_SHAKE   sheet-wait … 誘いの返事を待たせている間に P2 がパーティ・装備のシートを開いて閉じる（区切り 1-J の検出の確かめ）
 //   SMART_INDUCE  cover … わざと失敗させる（台本が P2 の画面に「押せない板」を置く。証拠が全端末ぶん残るかの確かめ。ゲームの不具合ではない）
 //   SMART_LIMIT_MIN  上限の分（既定: first-reward は 40 分）
@@ -22,7 +24,10 @@ import { writeReport, actionLine } from './report.mjs';
 import { appendFileSync } from 'node:fs';
 import { memoryMeter } from './mem.mjs';
 import { commonBrain } from './brain/common.mjs';
-import { worldBrain } from './brain/world.mjs';
+import { worldBrain, encounterBrain } from './brain/world.mjs';
+import { townBrain, facilityBrain, jobBrain } from './brain/town.mjs';
+import { coverageObserve } from './coverage.mjs';
+import { runFull } from './run-full.mjs';
 import { provisionalBrain } from './brain/provisional.mjs';
 import { shakeBrain } from './brain/shake.mjs';
 import { battleBrain, battleConfirmBrain, battleObserve } from './brain/battle.mjs';
@@ -45,7 +50,12 @@ export function brainFor(shake) {
       shakeBrain(v, board, shake) ??
       (pouch ? battleBrain(v, board) : null) ??
       battleConfirmBrain(v, board) ??
+      // 区切り 2-Sb: シートを開いて答える流れ（転職・装備）と、町・祠・神殿は common より先（common は「うっかり開いたシート」を閉じるため）
+      jobBrain(v, board) ??
+      townBrain(v, board) ??
+      facilityBrain(v, board) ??
       commonBrain(v) ??
+      encounterBrain(v, board) ??
       dungeonBrain(v, board) ??
       battleBrain(v, board) ??
       rewardBrain(v, board) ??
@@ -57,12 +67,13 @@ export function brainFor(shake) {
 }
 
 /** 2-Sa の頭が受け持つ場面（仮の頭 brain/provisional には渡さない） */
-const OWNED = new Set(['battle', 'reward', 'chest', 'dungeon', 'rest', 'event', 'cleared']);
+const OWNED = new Set(['battle', 'reward', 'chest', 'dungeon', 'rest', 'event', 'cleared', 'world', 'encounter', 'town', 'shrine', 'sanctuary', 'ending', 'gameover']);
 
 /** 毎ステップ、全端末の View から「見た事」を板に書く（入った部屋の種類・戦闘の記録）。板のメモは審判のメモへ移す */
 function observe(views, board, judge) {
   dungeonObserve(views, board);
   battleObserve(views, board);
+  coverageObserve(views, board);
   for (const n of (board.notes ?? []).splice(0)) judge.note(n.kind, n.text);
 }
 
@@ -102,7 +113,8 @@ export async function run() {
     const { selftest } = await import('./selftest.mjs');
     return selftest();
   }
-  if (!['lobby', 'first-reward', 'first-dungeon'].includes(mode)) throw new Error(`SMART_MODE は first-reward・first-dungeon・lobby・selftest です（${mode}）`);
+  if (!['lobby', 'first-reward', 'first-dungeon', 'full'].includes(mode)) throw new Error(`SMART_MODE は first-reward・first-dungeon・full・lobby・selftest です（${mode}）`);
+  if (mode === 'full') return runFull({ brainFor, observe, battleLines });
   const people = Number(process.env.PEOPLE ?? 2);
   const seed = Number(process.env.SEED ?? 1) >>> 0;
   const scenario = Number(process.env.SCENARIO ?? 1);

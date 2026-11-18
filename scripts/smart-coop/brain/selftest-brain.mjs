@@ -5,6 +5,7 @@ import { claimChoice } from '../content/reward.mjs';
 import { battleBrain } from './battle.mjs';
 import { dungeonBrain } from './dungeon.mjs';
 import { rewardBrain } from './reward.mjs';
+import { hexNeighbors, costMap, distFrom, worldBrain } from './world.mjs';
 
 const view = (mode, facts, o = {}) => ({ seat: 'P1', screen: 'game', mode, layers: [], actions: [], facts, ...o });
 
@@ -66,5 +67,26 @@ export function brainChecks(check) {
   // ---- 報酬: 成長は主に使う能力値 ----
   const rv = view('reward', { rLevelUp: 1, rGrowth: [{ text: '最大HP +5 最大HPが増える' }, { text: '知力 +1 魔法の成功率' }, { text: '力 +1 物理の成功率' }] });
   const d6 = rewardBrain(rv, { me: { P1: { job, picks: {}, gear: {}, name: null, claims: {} } } });
-  check(d6?.target.nth === 2, '頭: 成長は主に使う能力値（剣士 = 力）', JSON.stringify(d6));
+  check(d6?.target.css === '[data-growth-option="2"]', '頭: 成長は主に使う能力値（剣士 = 力）。押すのは B11 の印', JSON.stringify(d6));
+  // ---- 世界マップ（区切り 2-Sb）: 六角形の隣・通れない地形を回り込む道のり・潮・行き先へ近づくマス ----
+  const terr = { plains: { moveCost: 1 }, crag: { moveCost: 0 }, forest: { moveCost: 2 }, tideFlat: { moveCost: 0, tide: 'low' } };
+  check(JSON.stringify(hexNeighbors(5, 5, 6).sort((a, b) => a - b)) === JSON.stringify([1, 2, 5, 7, 11, 12]) && JSON.stringify(hexNeighbors(5, 5, 12).sort((a, b) => a - b)) === JSON.stringify([6, 7, 11, 13, 16, 17]), '頭: 六角形の隣（odd-r。奇数行は右に半マス）', JSON.stringify([hexNeighbors(5, 5, 6), hexNeighbors(5, 5, 12)]));
+  // 5×5 の地図。真ん中の列（2）に険しい山の壁（行0〜3）。左下（20）から右下（24）へは、壁の下（22）を通る
+  const hexes = [];
+  for (let i = 0; i < 25; i++) hexes.push({ 'data-hex': String(i), 'data-terrain': i % 5 === 2 && i < 20 ? 'crag' : 'plains', 'data-tide': null });
+  const cm = costMap(5, 5, hexes, null, terr);
+  const dist = distFrom(5, 5, cm.cost, 4, null);
+  check(Number.isFinite(dist[0]) && dist[0] >= 8 && cm.cost[2] === 0, '頭: 道のりは通れない地形（移動力0）を回り込む', JSON.stringify({ d0: dist[0], c2: cm.cost[2] }));
+  const tideHexes = hexes.map((h) => (h['data-hex'] === '22' ? { ...h, 'data-terrain': 'tideFlat', 'data-tide': 'low' } : h));
+  const shut = distFrom(5, 5, costMap(5, 5, tideHexes, 'high', terr).cost, 4, null);
+  const open = distFrom(5, 5, costMap(5, 5, tideHexes, 'low', terr).cost, 4, null);
+  check(!Number.isFinite(shut[0]) && Number.isFinite(open[0]), '頭: 潮のマスは、今の潮が開く潮の時だけ通れる', JSON.stringify({ shut: shut[0], open: open[0] }));
+  // 行けるマスのうち、行き先に近づくマスを押す（自分の手番の時だけ）
+  KB.world = { terrains: terr, width: 5, height: 5, dungeons: [], towns: [], quests: [], events: [], shrines: [], sanctuaries: [], scourges: [], classes: [], special: {}, towers: 0, scenarioName: '作り物', scenarioId: 'test' };
+  const wv = view('world', { wMap: [{ 'data-cols': '5', 'data-rows': '5' }], wHexes: hexes, activeHero: [{ 'data-hero': 'h0', 'data-seat': 'P1', 'data-tile': '20' }], goalMark: [{ 'data-goal-mark': '24' }], reach: [{ 'data-reach': '15', 'data-cost': '1' }, { 'data-reach': '21', 'data-cost': '1' }], wFeatures: [], wSpawns: [], wWanderers: [], wParty: [] });
+  const w1 = worldBrain(structuredClone(wv), {});
+  const w2 = worldBrain(structuredClone(wv), {});
+  check(w1?.target.css === '[data-reach="21"]' && JSON.stringify(w1) === JSON.stringify(w2), '頭: 世界マップは行き先に近づく行けるマスを押す（同じ View なら同じ答え）', JSON.stringify(w1));
+  check(worldBrain(structuredClone({ ...wv, seat: 'P2' }), {}) === null, '頭: 世界マップは自分の手番でなければ押さない', '');
+  KB.world = null;
 }

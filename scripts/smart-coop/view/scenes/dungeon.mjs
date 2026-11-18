@@ -1,6 +1,6 @@
 // 画面を読む: ダンジョンの部屋（扉・休憩・イベント・漂流物の山・キャラの作業・制覇の画面。区切り 2-Sa。頭は brain/dungeon.mjs）
 // シナリオ2・3の部屋（凍え・漂流物の山 など）も、この表に行を足せば頭から読める形にしてある。
-// B組の印が入ったら、各行の「→ B?」の印に差し替える。
+// 区切り 2-Sb: B組の印に差し替えた（B6 イベントの選択肢の形・B7 判定の結果・B12 キャラの作業の種類とキャラ）。
 export const PART = {
   sel: {
     // 扉（今ある印）
@@ -52,7 +52,7 @@ export const PART = {
     dOptions: {
       sel: '[data-event-option]',
       read: 'rows',
-      attrs: ['data-event-option', 'data-my-vote', 'disabled'],
+      attrs: ['data-event-option', 'data-my-vote', 'disabled', 'data-option-wait', 'data-option-kind'],
       textMax: 120,
       sub: { chance: { sel: '[data-option-chance]', read: 'attr', attr: 'data-option-chance' }, votes: { sel: '[data-vote-seats]', read: 'attr', attr: 'data-vote-seats' } },
     },
@@ -63,7 +63,8 @@ export const PART = {
     dFlotsam: { sel: '[data-flotsam-option]', read: 'rows', attrs: ['data-flotsam-option'], sub: { gold: { sel: '[data-flotsam-gold]', read: 'count' }, pick: { sel: '[data-flotsam-pick]', read: 'attr', attr: 'data-flotsam-pick' } } },
     dFlotsamFull: { sel: '[data-flotsam-full]', read: 'count' },
     // キャラの作業の窓（字の題 → B12 の値）・カード・お供
-    dTask: { sel: '[data-hero-task]', read: 'rows', textMax: 60, sub: { title: { sel: '.font-display', read: 'text' } } },
+    dTask: { sel: '[data-hero-task]', read: 'rows', attrs: ['data-hero-task', 'data-task-hero'], textMax: 60, sub: { title: { sel: '.font-display', read: 'text' } } },
+    dCheckResult: { sel: '[data-check-result]', read: 'attrs', attrs: ['data-check-result', 'data-check-focus'] },
     dTaskCards: { sel: '[data-hero-task] [data-pick-card]', read: 'rows', attrs: ['data-pick-card', 'aria-label', 'aria-pressed'], textMax: 20 },
     dTaskPanel: { sel: '[data-hero-task] [data-card-pick-panel]', read: 'marks', attrs: ['data-card-pick-panel'] },
     dPetRevealed: { sel: '[data-hero-task] [data-pet-revealed]', read: 'count' },

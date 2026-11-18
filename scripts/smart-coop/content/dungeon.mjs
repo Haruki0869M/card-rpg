@@ -39,14 +39,29 @@ export function restHp(texts = []) {
     .filter(Boolean);
 }
 
-/** イベントの選択肢の種類（字から。B6 の data-option-kind が入ったら印に替える） */
+/** イベントの選択肢の種類。区切り 2-Sb: 判定・払うは B6 の印 data-option-kind（o.kindMark）を先に使う。戦う・立ち去るは字（結果は選ぶまで見えないので印に無い） */
 export function optionKind(o) {
   const t = o.text ?? '';
-  if (o.chance !== null && o.chance !== undefined) return 'check';
-  if (/を払う/.test(t)) return 'pay';
+  const km = String(o.kindMark ?? '');
+  if (km.includes('check') || (o.chance !== null && o.chance !== undefined)) return 'check';
+  if (km.includes('pay') || /を払う/.test(t)) return 'pay';
   if (/戦う|挑む|襲いかかる/.test(t)) return 'fight';
   if (/立ち去る|去る|やめる|無視|通り過ぎる|引き返す/.test(t)) return 'leave';
   return 'other';
+}
+
+/**
+ * 判定の窓: 区切り 2-Sb は B6 の印（data-challenge-focus = 今の指定・data-challenge-chance = その時の成功率）を先に使う。
+ * 字「成功率 70%（フォーカス 2 → 1）」も読み、違えば mismatch に書く（直し8）。返す物: { pct, spent, mismatch }
+ */
+export function checkFrom(v) {
+  const t = checkOf(v.facts.checkTexts);
+  const m = (v.facts.checkMarks ?? [])[0];
+  if (!m) return t;
+  const pct = Number(m['data-challenge-chance']);
+  const spent = Number(m['data-challenge-focus']);
+  const mismatch = t && (t.pct !== pct || t.spent !== spent) ? `判定の窓: 字 ${t.pct}%・フォーカス ${t.spent}／印 ${pct}%・フォーカス ${spent}` : null;
+  return { pct, spent, focus: t?.focus ?? null, after: t?.after ?? null, mismatch };
 }
 
 /** 判定の窓の字「成功率 70%（フォーカス 2 → 1）」「完全成功の確率 12%（…）」→ { pct, focus, after, spent } */
@@ -62,6 +77,12 @@ export function openerOf(row) {
   const t = row.text ?? '';
   const p = /(?:鍵が開く|完全成功|罠を避ける)\s*(\d+)%/.exec(t);
   const q = /フォーカス\d+で(\d+)%/.exec(t);
-  const p0 = p ? Number(p[1]) : 0;
-  return { id: row['data-opener'], p0, pMax: q ? Number(q[1]) : p0, best: /おすすめ/.test(t), votes: String(row.votes ?? '').split(',').filter(Boolean) };
+  const p0T = p ? Number(p[1]) : 0;
+  // 区切り 2-Sb: B9 の印（data-opener-chance = フォーカス0の成功率・data-opener-best = おすすめ）を先に使い、字と違えば mismatch
+  const p0M = row['data-opener-chance'] !== null && row['data-opener-chance'] !== undefined ? Number(row['data-opener-chance']) : null;
+  const p0 = p0M ?? p0T;
+  const bestM = row['data-opener-best'] !== null && row['data-opener-best'] !== undefined;
+  const bestT = /おすすめ/.test(t);
+  const mismatch = p0M !== null && (p ? p0M !== p0T : false) ? `開け役 ${row['data-opener']}: 字 ${p0T}%・印 ${p0M}%` : bestM !== bestT && 'data-opener-best' in row ? `開け役 ${row['data-opener']}: 「おすすめ」の字 ${bestT}・印 ${bestM}` : null;
+  return { id: row['data-opener'], p0, pMax: q ? Number(q[1]) : p0, best: 'data-opener-best' in row ? bestM : bestT, votes: String(row.votes ?? '').split(',').filter(Boolean), mismatch };
 }

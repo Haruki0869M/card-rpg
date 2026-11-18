@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 /** 読んだ説明書き（頭はここから読む。読む前は空。selftest では小さな作り物を入れる） */
-export const KB = { ready: false, cards: {}, cardByName: {}, classes: {}, classByName: {}, items: {}, itemByName: {}, elements: {}, elementByName: {}, statLabel: {} };
+export const KB = { ready: false, cards: {}, cardByName: {}, classes: {}, classByName: {}, items: {}, itemByName: {}, elements: {}, elementByName: {}, statLabel: {}, world: null };
 
 const RARITY_RANK = { common: 0, rare: 1, epic: 2, legend: 3 };
 export const rarityRank = (r) => RARITY_RANK[r] ?? 0;
@@ -70,7 +70,7 @@ function classInfo(c, cards) {
   const deckIds = (c.deck ?? []).map((d) => d.cardId);
   // 回復役: 最初の山札に、味方を回復するカードがある（データの役割の字は見ない。カードの中身で決める）
   const healer = deckIds.some((id) => (cards[id]?.heal ?? 0) > 0 && cards[id]?.target !== 'enemy');
-  return { id: c.id, name: c.name, role: c.role, tier: c.tier ?? 'base', weaponType: c.weaponType, subWeapons: c.subWeapons ?? [], mainStat, healer, deck: deckIds };
+  return { id: c.id, name: c.name, role: c.role, tier: c.tier ?? 'base', weaponType: c.weaponType, subWeapons: c.subWeapons ?? [], mainStat, healer, deck: deckIds, altar: c.altar ?? null };
 }
 
 function itemInfo(i) {
@@ -93,9 +93,9 @@ function itemInfo(i) {
   };
 }
 
-/** 説明書きを読む（始める前に1回）。返す物: KB */
-export async function loadContent() {
-  if (KB.ready) return KB;
+/** 説明書きを読む（始める前に1回）。scenarioIndex（0 = 1本目）を渡すと、そのシナリオの世界の説明書き（KB.world）も読む。返す物: KB */
+export async function loadContent({ scenarioIndex = null } = {}) {
+  if (KB.ready && (scenarioIndex === null || KB.world)) return KB;
   const { createServer } = await import('vite');
   const server = await createServer({ root: ROOT, logLevel: 'silent', appType: 'custom', server: { middlewareMode: true, hmr: false, ws: false }, optimizeDeps: { noDiscovery: true } });
   try {
@@ -105,6 +105,11 @@ export async function loadContent() {
     const { ELEMENTS } = await server.ssrLoadModule('/src/data/elements/index.ts');
     const { STAT_LABEL } = await server.ssrLoadModule('/src/data/terms.ts');
     fillContent({ cards: CARDS.all, classes: CLASSES.all, items: ITEMS.all, elements: ELEMENTS.all, statLabel: STAT_LABEL });
+    if (scenarioIndex !== null) {
+      // 区切り 2-Sb: 世界の説明書き（地形の移動力・町・依頼・ダンジョン・イベント・祠・神殿と祭壇・災厄）。網羅の表と道探しに使う（決まった中身だけ。地図の乱数・霧の中は読まない）
+      const { readWorldContent } = await import('./world.mjs');
+      KB.world = await readWorldContent((m) => server.ssrLoadModule(m), scenarioIndex);
+    }
   } finally {
     await server.close();
   }

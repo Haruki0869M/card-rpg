@@ -1,5 +1,6 @@
 // 画面を読む: 戦闘（区切り 2-Sa。頭は brain/battle.mjs）
-// 今ある印と見えている字で読む。B組（区切り 2-G）の印が入ったら、各行の「→ B?」に書いた印に差し替える（字の読み取りをやめる）。
+// 区切り 2-Sb: B組（区切り 2-G）の印に差し替えた（B1 味方・B2 敵・B3 予告・B4 手札・B5 フォーカスの窓）。
+// 字でも出ている数（HP・フォーカスの残り）は字も読み、印と違えば報告する（直し8。brain/battle.mjs の battleObserve）。
 // 決まり: 画面に描かれた物だけ（隠れた予告の数字「？」は読まない・山札の中身は読まない）。
 export const PART = {
   sel: {
@@ -12,8 +13,8 @@ export const PART = {
     // フォーカスを増やす・減らす。印なし（aria-label だけ）→ B5 の data-focus-spend の窓の中のボタンに差し替える
     focusPlus: { css: '[data-focus-panel] button[aria-label="フォーカスを増やす"]' },
     focusMinus: { css: '[data-focus-panel] button[aria-label="フォーカスを減らす"]' },
-    // 「発動」。印なし（字だけ）→ B5 の data-card-go
-    battleGo: { css: '[data-focus-panel] button', text: '発動', exact: false },
+    // 「発動」（B5 の data-card-go）
+    battleGo: { css: '[data-card-go]' },
     // 選んだカードをやめる（×）。印なし（aria-label だけ）
     battleCancel: { css: '[data-focus-panel] button[aria-label="キャンセル"]' },
     // 確認の窓の「やめる」（A4 の印）
@@ -31,7 +32,8 @@ export const PART = {
     bEnemies: {
       sel: '[data-enemy]',
       read: 'rows',
-      attrs: ['data-enemy', 'data-dead', 'data-hp'],
+      // B2: 最大 HP・守り・戦闘の格（字の「12/30」も読んで照らす）
+      attrs: ['data-enemy', 'data-dead', 'data-hp', 'data-max-hp', 'data-block', 'data-rank'],
       sub: {
         info: { sel: '[data-enemy-info] > div', read: 'text' },
         marks: { sel: '[data-elements] > span', read: 'attrs', attr: 'title' },
@@ -40,8 +42,10 @@ export const PART = {
         broken: { sel: '[data-intent][data-intent-broken]', read: 'count' },
         behavior: { sel: '[data-intent][data-intent-behavior]', read: 'attr', attr: 'data-intent-behavior' },
         frenzy: { sel: '[data-intent][data-intent-frenzy]', read: 'count' },
-        // 攻撃の数字（赤い字の中の数。「？」は読まない）→ B3 の data-intent-damage
+        // 攻撃の数字（赤い字の中の数。「？」は読まない）。B3 の data-intent-damage（合計。隠れていれば ?）を先に使う
         atk: { sel: '[data-intent] span.text-red-300 > span.tabular-nums', read: 'texts' },
+        intentKind: { sel: '[data-intent][data-intent-kind]', read: 'attr', attr: 'data-intent-kind' },
+        intentDamage: { sel: '[data-intent][data-intent-damage]', read: 'attr', attr: 'data-intent-damage' },
         targets: { sel: '[data-intent-target]', read: 'attrs', attr: 'data-intent-target' },
         countdown: { sel: '[data-countdown]', read: 'attr', attr: 'data-countdown' },
         breakRule: { sel: '[data-break-hint]', read: 'attr', attr: 'data-break-rule' },
@@ -57,7 +61,8 @@ export const PART = {
     bAllies: {
       sel: '[data-ally]',
       read: 'rows',
-      attrs: ['data-ally', 'data-dead', 'data-done', 'data-selected-target'],
+      // B1: 席・HP・最大 HP・守り・マナ・フォーカス・被弾の予告（字も読んで照らす）
+      attrs: ['data-ally', 'data-dead', 'data-done', 'data-selected-target', 'data-seat', 'data-hp', 'data-max-hp', 'data-block', 'data-mana', 'data-focus', 'data-incoming'],
       sub: {
         incoming: { sel: '[data-incoming]', read: 'attr', attr: 'data-incoming' },
         name: { sel: 'span.truncate', read: 'text' },
@@ -69,10 +74,13 @@ export const PART = {
       },
     },
     // 手札（今ある印。コスト・属性・種類は説明書き content で引く → B4 の data-cost・data-element・data-category）
-    bHand: { sel: '[data-card-index]', read: 'rows', attrs: ['data-card-index', 'data-card-id', 'data-usable'], textMax: 40 },
+    // B4: 今のコスト・属性・種類・狙う相手・選択中
+    bHand: { sel: '[data-card-index]', read: 'rows', attrs: ['data-card-index', 'data-card-id', 'data-usable', 'data-cost', 'data-element', 'data-category', 'data-target', 'data-selected'], textMax: 40 },
     // フォーカスの窓: 字（成功率・残りフォーカス・「発動」の下の字）→ B5 の data-focus-spend・data-focus-max
     bPanel: { sel: '[data-focus-panel]', read: 'text' },
-    bGoText: { sel: '[data-focus-panel] button', text: '発動', exact: false, read: 'text' },
+    bGoText: { sel: '[data-card-go]', read: 'text' },
+    // B5: 今の指定（★の数）・指定できる最大（字「残りフォーカス X / Y」と照らす）
+    bPanelMark: { sel: '[data-focus-panel]', read: 'attrs', attrs: ['data-focus-spend', 'data-focus-max'] },
     bTiers: { sel: '[data-tier-label]', read: 'rows', attrs: ['data-tier-label', 'data-tier-values'] },
     bChips: { sel: '[data-target-chip]', read: 'rows', attrs: ['data-target-chip', 'data-chip-selected', 'data-chip-prediction', 'data-kill-badge', 'data-break-chip', 'data-miss-chip', 'data-weak-chip', 'data-resist-chip'] },
     bAllyChips: { sel: '[data-ally-target-chip]', read: 'rows', attrs: ['data-ally-target-chip', 'data-chip-selected'] },

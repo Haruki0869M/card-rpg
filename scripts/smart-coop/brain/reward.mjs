@@ -32,18 +32,28 @@ export function boardNote(board, key, text, kind = 'check') {
 export function claimBrain(v, board) {
   const me = meOf(board, v.seat);
   for (const c of v.facts.claims ?? []) {
-    const itemId = c.itemId ?? KB.itemByName[(c.item ?? '').replace(/^✨?専用/, '').trim()];
+    // 区切り 2-Sb: 品の id は B10 の印 data-claim-item を先に使う
+    const itemId = c['data-claim-item'] ?? c.itemId ?? KB.itemByName[(c.item ?? '').replace(/^✨?専用/, '').trim()];
     const name = KB.items[itemId]?.name ?? c.item ?? '?';
     // 結果（運の判定が出た後）: 自分のキャラが「獲得！」なら、覚えている装備を書き換える（見た事）
     if (me.name && itemId && new RegExp(`${me.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(欲しい|余れば|いらない)\\s*運\\s*\\d+\\s*獲得！`).test(c.text ?? '')) {
       const item = KB.items[itemId];
-      if (item && item.slot !== 'consumable' && me.gear[item.slot]?.id !== item.id) me.gear[item.slot] = item;
+      // 区切り 2-Sb: 手に入れた品は持ち物に入るだけ（付けるのはステータスのシート）。次の自分の手番に brain/town.mjs の付け替えで見る
+      const key = `${c.text?.slice(0, 40)}|${itemId}`;
+      me.wonSeen ??= new Set();
+      if (item && item.slot !== 'consumable' && !me.wonSeen.has(key)) {
+        me.wonSeen.add(key);
+        (me.pendingSlots ??= new Set()).add(item.slot);
+      }
     }
-    const mine = (c.buttons ?? []).filter((t) => t === '欲しい' || t === '余れば' || t === 'いらない');
+    // 自分の行のボタン（B10 の印 data-claim-choice。この端末のキャラの行にだけ出る）
+    const marks = (c.choices ?? []).filter(Boolean);
+    const mine = marks.length ? marks : (c.buttons ?? []).filter((t) => t === '欲しい' || t === '余れば' || t === 'いらない');
     if (mine.length < 3) continue; // 自分の行のボタンが無い（ほかの人の行・結果の後）
     if (c.chosen && Object.values(CLAIM_WORD).includes(c.chosen)) continue; // もう答えた
     const r = claimChoice(itemId, me.job, me.gear);
-    return decide(G.claimChoice(CLAIM_WORD[r.choice]), `取り合い「${CLAIM_WORD[r.choice]}」: ${name}（${r.why}）`);
+    const target = marks.length ? G.claimChoiceMark(c['data-claim'], r.choice) : G.claimChoice(CLAIM_WORD[r.choice]);
+    return decide(target, `取り合い「${CLAIM_WORD[r.choice]}」: ${name}（${r.why}）`);
   }
   return null;
 }
@@ -87,7 +97,8 @@ export function rewardBrain(v, board) {
   }
   const growth = v.facts.rGrowth ?? [];
   if ((v.facts.rLevelUp ?? 0) > 0 && growth.length) {
-    const ranked = growth.map((g, i) => ({ i, text: g.text, r: growthRank(g.text, me.job) })).sort((a, b) => a.r - b.r || a.i - b.i);
+    // 区切り 2-Sb: 押すのは B11 の印 data-growth-option（選択肢の番号）。並べる順は見えている字（「力 +1」など）
+    const ranked = growth.map((g, i) => ({ i: Number(g['data-growth-option'] ?? i), text: g.text, r: growthRank(g.text, me.job) })).sort((a, b) => a.r - b.r || a.i - b.i);
     const g = ranked[0];
     return decide(G.growthOption(g.i), `成長「${g.text.slice(0, 16)}」（${['主に使う能力値', 'カードの強化', '最大HP', 'フォーカスの最大', 'ほか'][g.r]}）`);
   }

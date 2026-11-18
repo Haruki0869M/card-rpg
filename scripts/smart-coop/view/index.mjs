@@ -12,10 +12,12 @@ import { PART as BATTLE } from './scenes/battle.mjs';
 import { PART as REWARD } from './scenes/reward.mjs';
 import { PART as CHEST } from './scenes/chest.mjs';
 import { PART as DUNGEON } from './scenes/dungeon.mjs';
+import { PART as WORLD } from './scenes/world.mjs';
+import { PART as TOWN } from './scenes/town.mjs';
 import { shortHash, wait } from '../util.mjs';
 
 // 区切り 2-Sa: 遊んでいる間の画面の表に、場面ごとのファイル（戦闘・報酬・宝箱・ダンジョンの部屋）の「押す物」と「読む物」を足す（直し12: 場面ごとに分ける）
-for (const part of [BATTLE, REWARD, CHEST, DUNGEON]) {
+for (const part of [BATTLE, REWARD, CHEST, DUNGEON, WORLD, TOWN]) {
   for (const k of Object.keys(part.sel)) if (k in GAME.sel) throw new Error(`押す物の名前がぶつかる: ${k}`);
   for (const k of Object.keys(part.facts)) if (k in GAME.facts) throw new Error(`読む物の名前がぶつかる: ${k}`);
   Object.assign(GAME.sel, part.sel);
@@ -104,6 +106,8 @@ function readPage(T) {
   const facts = {};
   const sc = T.screens.find((s) => s.id === screen);
   for (const [name, f] of Object.entries(sc?.facts ?? {})) {
+    // when = この場面の時だけ読む（区切り 2-Sb: 世界マップのマスは数百あるので、ほかの場面では読まない。時間を抑える）
+    if (f.when && !f.when.includes(mode)) continue;
     // hidden: true … 画面の幅で CSS が隠す双子の物（同じ値を2か所に持つ）も読む（値は見えている方と同じ）
     let els = f.hidden ? q(f.sel) : q(f.sel).filter(vis);
     if (f.text !== undefined) els = els.filter((el) => textMatch(el, f.text, f.exact));
@@ -133,6 +137,13 @@ function readPage(T) {
           else if (s.read === 'attr') o[k] = subs[0] ? subs[0].getAttribute(s.attr) : null;
           else o[k] = subs[0] ? textOf(subs[0]) : null;
         }
+        return o;
+      });
+    else if (f.read === 'attrs')
+      // 区切り 2-Sb: 印の値だけ（位置は測らない。マスのように数が多い物を軽く読む）
+      facts[name] = els.map((el) => {
+        const o = {};
+        for (const a of f.attrs ?? []) o[a] = el.getAttribute(a);
         return o;
       });
     else if (f.read === 'marks')
