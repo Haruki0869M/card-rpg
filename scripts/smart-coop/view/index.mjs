@@ -8,7 +8,19 @@ import { SCENE as JOIN } from './scenes/join.mjs';
 import { SCENE as LOBBY } from './scenes/lobby.mjs';
 import { SCENE as CREATE } from './scenes/create.mjs';
 import { SCENE as GAME, MODES, LAYERS, BUSY, WAITS } from './scenes/game.mjs';
+import { PART as BATTLE } from './scenes/battle.mjs';
+import { PART as REWARD } from './scenes/reward.mjs';
+import { PART as CHEST } from './scenes/chest.mjs';
+import { PART as DUNGEON } from './scenes/dungeon.mjs';
 import { shortHash, wait } from '../util.mjs';
+
+// 区切り 2-Sa: 遊んでいる間の画面の表に、場面ごとのファイル（戦闘・報酬・宝箱・ダンジョンの部屋）の「押す物」と「読む物」を足す（直し12: 場面ごとに分ける）
+for (const part of [BATTLE, REWARD, CHEST, DUNGEON]) {
+  for (const k of Object.keys(part.sel)) if (k in GAME.sel) throw new Error(`押す物の名前がぶつかる: ${k}`);
+  for (const k of Object.keys(part.facts)) if (k in GAME.facts) throw new Error(`読む物の名前がぶつかる: ${k}`);
+  Object.assign(GAME.sel, part.sel);
+  Object.assign(GAME.facts, part.facts);
+}
 
 /** 見分ける順（上から）。遊んでいる間の画面を先に（タイトルの字が後ろに残っていても、上の画面を取る） */
 export const SCREENS = [GAME, CREATE, LOBBY, JOIN, SETUP, TITLE];
@@ -100,6 +112,29 @@ function readPage(T) {
     else if (f.read === 'texts') facts[name] = els.map(textOf);
     else if (f.read === 'value') facts[name] = els[0]?.value ?? null;
     else if (f.read === 'enabled') facts[name] = els.length ? !els[0].disabled : null;
+    else if (f.read === 'rows')
+      // 区切り 2-Sa: 行ごとに「印の値・字・中の物」を読む（敵・味方・手札・選択肢など。読むのは画面に描かれた物だけ）。
+      // sub = { 名前: { sel, read: 'text'|'texts'|'attr'|'attrs'|'count', attr, hidden } }（行の中だけを探す）
+      facts[name] = els.map((el) => {
+        const r = el.getBoundingClientRect();
+        const o = { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), text: textOf(el).slice(0, f.textMax ?? 160) };
+        for (const a of f.attrs ?? []) o[a] = el.getAttribute(a);
+        for (const [k, s] of Object.entries(f.sub ?? {})) {
+          let subs;
+          try {
+            subs = [...el.querySelectorAll(s.sel)];
+          } catch {
+            subs = [];
+          }
+          if (!s.hidden) subs = subs.filter(vis);
+          if (s.read === 'count') o[k] = subs.length;
+          else if (s.read === 'texts') o[k] = subs.map(textOf);
+          else if (s.read === 'attrs') o[k] = subs.map((x) => x.getAttribute(s.attr));
+          else if (s.read === 'attr') o[k] = subs[0] ? subs[0].getAttribute(s.attr) : null;
+          else o[k] = subs[0] ? textOf(subs[0]) : null;
+        }
+        return o;
+      });
     else if (f.read === 'marks')
       // 印の値と、画面の上の真ん中の位置（人が「光るマスが目的地の輪に近い」と見るのと同じ。読むのは画面に描かれた物だけ）
       facts[name] = els.map((el) => {

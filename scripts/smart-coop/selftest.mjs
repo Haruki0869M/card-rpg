@@ -14,6 +14,7 @@ import { readView } from './view/index.mjs';
 import { Judge } from './judge.mjs';
 import { Conductor } from './conductor.mjs';
 import { wait } from './util.mjs';
+import { brainChecks } from './brain/selftest-brain.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = process.env.SMART_OUTPUT ?? 'screenshots/smart-coop/selftest';
@@ -63,6 +64,12 @@ const FIX = {
   // 押した形の縮み（.btn:active の scale(0.97)）は小さいボタンではない／本当に 40px のボタンは当たる（2026-11-18・区切り 1-J の直し）
   'pressed-shrink': page(`<button style="position:absolute;left:20px;top:20px;width:206px;height:44px;transform:translateY(2px) scale(0.97)">移動する</button>`),
   'small-real': page(`<button style="position:absolute;left:20px;top:20px;width:206px;height:40px">移動する</button>`),
+  // 窓が開く動き（親の scale 0.9 → 1。0.3秒）の途中は小さいボタンではない／ずっと縮んだ窓（親の scale 0.9 のまま）は当たる（2026-11-18・区切り 2-Sa の直し）
+  'open-anim': page(`<div id="w" style="position:absolute;left:20px;top:20px"><button style="width:60px;height:44px">欲しい</button></div>`, '@keyframes pop{from{transform:scale(.9)}to{transform:scale(1)}}'),
+  // 見えない広がり（::before 44×44px）で押せる範囲を足した 22×18px の札（状態の印の「＋N」と同じ形）は当たらない／広がりの無い 22×18px は当たる（2026-11-18・区切り 2-Sa の直し）
+  'widened-chip': page(`<button class="wide" style="position:absolute;left:40px;top:40px;width:22px;height:18px;font-size:12px;padding:0">＋2</button>`, '.wide::before{content:"";position:absolute;left:50%;top:50%;width:44px;height:44px;transform:translate(-50%,-50%)}'),
+  'tiny-chip': page(`<button style="position:absolute;left:40px;top:40px;width:22px;height:18px;font-size:12px;padding:0">＋2</button>`),
+  'scaled-stay': page(`<div style="position:absolute;left:20px;top:20px;transform:scale(.9)"><button style="width:60px;height:44px">欲しい</button></div>`),
   // シートの上に、シートの外の帯（同行の誘い。押せる物）が乗る（2b5b0f7 の前の重なりの形）／帯がシートの後ろなら当たらない（区切り 1-J で足した検査）
   'sheet-under-band': page(`<div data-sheet="pouch" class="abs" style="left:0;top:0;width:390px;height:540px;background:#222;z-index:50"><button data-sheet-close style="width:48px;height:48px">×</button><div data-sheet-body style="height:400px;overflow-y:auto">中身</div></div><div data-online-overlay class="abs" style="left:0;top:0;width:390px;height:220px;z-index:70;pointer-events:none"><div style="margin-top:106px;height:108px;background:#036;pointer-events:auto">同行に誘っています<button>一緒に行く</button></div></div>`),
   'sheet-over-band': page(`<div data-sheet="pouch" class="abs" style="left:0;top:0;width:390px;height:540px;background:#222;z-index:64"><button data-sheet-close style="width:48px;height:48px">×</button><div data-sheet-body style="height:400px;overflow-y:auto">中身</div></div><div data-online-overlay class="abs" style="left:0;top:0;width:390px;height:220px;z-index:62;pointer-events:none"><div style="margin-top:106px;height:108px;background:#036;pointer-events:auto">同行に誘っています<button>一緒に行く</button></div></div>`),
@@ -100,6 +107,9 @@ export async function selftest() {
   check(rejects('http://example.com/card-rpg/?emu=127.0.0.1'), '守り: ゲームのページが手元でない URL は動かない');
   check(!rejects('http://127.0.0.1:4192/card-rpg/?emu=127.0.0.1&seed=1'), '守り: 手元の URL（?emu=127.0.0.1）は動く');
   check(!rejects('http://localhost:4192/card-rpg/?emu=1'), '守り: localhost の ?emu=1 は動く');
+
+  // ---- 頭（区切り 2-Sa。作り物の説明書きと View で、決まりどおりに選ぶか） ----
+  brainChecks(check);
 
   // ---- __online を使うのは審判だけ（字で確かめる。計画 §2-4 の守り方1） ----
   const files = [];
@@ -237,6 +247,20 @@ export async function selftest() {
     await open('small-real');
     o = await checkOverflow(p, { heavy: true });
     check(o.problems.some((x) => x.text.startsWith('small button')), '③ はみ出し: 本当に 40px のボタンには当たる', o.problems.map((x) => x.text).join('／'));
+    await open('open-anim');
+    // 動きを測る直前に始め直す（開いた時の動きが、測る前に終わってしまわないように）
+    await p.evaluate(() => { const w = document.getElementById('w'); w.style.animation = 'none'; void w.offsetHeight; w.style.animation = 'pop .4s linear both'; });
+    o = await checkOverflow(p, { heavy: true });
+    check(!o.problems.some((x) => x.text.startsWith('small button')), '③ はみ出し: 窓が開く動き（親の scale 0.9→1）の途中は当たらない', o.problems.map((x) => x.text).join('／'));
+    await open('widened-chip');
+    o = await checkOverflow(p, { heavy: true });
+    check(!o.problems.some((x) => x.text.startsWith('small button')), '③ はみ出し: 見えない広がりで 44px の押せる範囲がある小さい札は当たらない', o.problems.map((x) => x.text).join('／'));
+    await open('tiny-chip');
+    o = await checkOverflow(p, { heavy: true });
+    check(o.problems.some((x) => x.text.startsWith('small button')), '③ はみ出し: 広がりの無い 22×18px の札は当たる', o.problems.map((x) => x.text).join('／'));
+    await open('scaled-stay');
+    o = await checkOverflow(p, { heavy: true });
+    check(o.problems.some((x) => x.text.startsWith('small button')), '③ はみ出し: ずっと縮んだ窓（親の scale 0.9 のまま）のボタンは当たる', o.problems.map((x) => x.text).join('／'));
 
     // ---- 演出中は測らない（conductor の点検）----
     await open('busy-small');
