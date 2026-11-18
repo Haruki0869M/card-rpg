@@ -38,12 +38,14 @@
 
 ## 賢いマルチプレイ検証 bot（`smart-online-coop.mjs`・中身は `smart-coop/`。計画 docs/tasks/smart-coop-bot-detail-plan.md）
 2〜4台（P1 390×844・P2 390×540・P3 360×640・P4 412×860）で、全部画面のボタンを押して遊び、押す前にかぶさり・窓の潰れ・はみ出しを調べ、毎ステップ全端末の状態の印を比べる。
-今は区切り 1-S（部屋を作って全員が世界マップに出るまで）。頭・揺さぶり・網羅の表は後の区切り。
+今は区切り 1-J（新しい冒険 → 世界マップを歩いて最初の鍵のダンジョン → 最初の戦闘 → 報酬を受け取り終えるまで。頭は `brain/common`・`brain/world`（歩くだけ）・`brain/provisional`（仮: まっすぐ進む＋先頭のカード））。本当の作戦・揺さぶり・網羅の表は後の区切り。
 - 自己テスト（ゲームもエミュレーターも要らない）: `node scripts/smart-coop/selftest.mjs`（または `SMART_MODE=selftest node scripts/smart-online-coop.mjs`）
 - 部屋の用意: ビルド → `npx vite preview --host 127.0.0.1 --port 4192 --strictPort` と `npm run emulators`（JDK 21。docs/STATUS.md）を起こし、
   `URL=http://127.0.0.1:4192/card-rpg/ PEOPLE=2 SEED=7 node C:/dev/card-rpg-tools/heavy.mjs node scripts/smart-online-coop.mjs`
-  （`PEOPLE` 2 か 4・`SEED`・`SCENARIO`・`EMU_HOST`・`SMART_OUTPUT`・`SMART_MIN_FREE_GB` = 始める前のメモリの空きの目安）
-- 結果: `screenshots/smart-coop/s<シナリオ>-<人数>p-<種>/report.md`（失敗ごとに全端末の写真・DOM・操作の記録）。合格 0・不合格 1。
+  （`PEOPLE` 2 か 4・`SEED`・`SCENARIO`・`EMU_HOST`・`SMART_OUTPUT`・`SMART_MIN_FREE_GB` = 始める前のメモリの空きの目安・`SMART_MODE` = first-reward（既定）／lobby／selftest・`SMART_LIMIT_MIN`・
+  `SMART_SHAKE=sheet-wait` = 誘いの返事を待たせている間に P2 がパーティ・装備のシートを開いて×で閉じる・`SMART_INDUCE=cover` = わざと失敗させて証拠が残るかを見る）
+- 同じ種で2回流したら `actions.log`（1行1手: 端末・画面・何を・どこを・結果）を `diff` で比べる（時刻・座標は actions.json だけ）。
+- 結果: `screenshots/smart-coop/s<シナリオ>-<人数>p-<種>/report.md`（失敗ごとに全端末の写真・DOM・操作の記録）・`actions.log`・`actions.json`。報告に、着いた順・メモリの最大・1手の時間・取り直しの記録・種。失敗なしで着いた 0・それ以外 1。
 - 守り: `?emu=` が手元（127.0.0.1・localhost）でなければ動かない。ブラウザは手元以外に届かない設定。`window.__online` を読むのは `judge.mjs` だけ（自己テストが字で確かめる）。
 
 ## その時の作業の確認（画面を変えた時に、関係する物だけ）

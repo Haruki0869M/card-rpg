@@ -92,13 +92,22 @@ function readPage(T) {
   const facts = {};
   const sc = T.screens.find((s) => s.id === screen);
   for (const [name, f] of Object.entries(sc?.facts ?? {})) {
-    let els = q(f.sel).filter(vis);
+    // hidden: true … 画面の幅で CSS が隠す双子の物（同じ値を2か所に持つ）も読む（値は見えている方と同じ）
+    let els = f.hidden ? q(f.sel) : q(f.sel).filter(vis);
     if (f.text !== undefined) els = els.filter((el) => textMatch(el, f.text, f.exact));
     if (f.read === 'count') facts[name] = els.length;
     else if (f.read === 'text') facts[name] = els[0] ? textOf(els[0]) : null;
     else if (f.read === 'texts') facts[name] = els.map(textOf);
     else if (f.read === 'value') facts[name] = els[0]?.value ?? null;
     else if (f.read === 'enabled') facts[name] = els.length ? !els[0].disabled : null;
+    else if (f.read === 'marks')
+      // 印の値と、画面の上の真ん中の位置（人が「光るマスが目的地の輪に近い」と見るのと同じ。読むのは画面に描かれた物だけ）
+      facts[name] = els.map((el) => {
+        const r = el.getBoundingClientRect();
+        const o = { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+        for (const a of f.attrs ?? []) o[a] = el.getAttribute(a);
+        return o;
+      });
   }
   return {
     url: location.href,

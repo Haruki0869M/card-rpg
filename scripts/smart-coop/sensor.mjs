@@ -143,6 +143,22 @@ export function checkWindowsInPage({ windows, collapse }) {
       if (needs && visH < collapse.minScrollable) out.push({ kind: 'collapsed', win: w.id, text: `スクロールが要るのに、見えている高さが ${Math.round(visH)}px（${collapse.minScrollable}px 未満）` });
       else if (visH < collapse.minAny && textOf(box)) out.push({ kind: 'collapsed', win: w.id, text: `見えている高さが ${Math.round(visH)}px（ボタン1つ分も無い）` });
     }
+    // 窓の上に、窓の外の物が乗っていないか（covered のある窓だけ）: 見えている部分に 5×5 の点を取り、一番上の要素が窓の中でも、
+    // 「上に出てよい物」でもない点が 2 つ以上 → 失敗（押しても通り抜ける飾りは elementFromPoint に出ないので数えない）
+    if (w.covered) {
+      const L = Math.max(wr.left, 0), T = Math.max(wr.top, 0), R = Math.min(wr.right, innerWidth), B = Math.min(wr.bottom, innerHeight);
+      const by = new Map();
+      let bad = 0;
+      for (let i = 0; i < 5; i++) for (let k = 0; k < 5; k++) {
+        const t = document.elementFromPoint(L + ((R - L) * (k + 0.5)) / 5, T + ((B - T) * (i + 0.5)) / 5);
+        if (!t || win.contains(t) || w.covered.above.some((s) => t.closest(s))) continue;
+        bad++;
+        const name = (t.closest('[data-online-overlay] > *, [data-turn-lock], [data-world-panel]') ?? t);
+        const label = `${name.tagName.toLowerCase()}「${textOf(name).slice(0, 20)}」`;
+        by.set(label, (by.get(label) ?? 0) + 1);
+      }
+      if (bad >= 2) out.push({ kind: 'collapsed', win: w.id, text: `窓の上に、窓の外の物が乗っている（25点のうち ${bad} 点: ${[...by.keys()].join('・')}）` });
+    }
     // 要る要素が描かれているか
     for (const req of w.required ?? []) {
       const find = (s) => { const inWin = win.matches(s) ? [win] : q(s, win); return inWin.length ? inWin : q(s); };
@@ -225,8 +241,25 @@ export function heavyOverflowInPage() {
   return { problems, ellipsis };
 }
 
-/** 押す物 loc の検査①（node の側） */
-export const checkTarget = (loc) => loc.evaluate(checkTargetInPage, TARGET_CFG);
+/**
+ * ページの中で流す: 押した形の小さな縮み（scale 0.9〜1 未満）がかかっていて、縮める前の大きさは 43.5px 以上のボタンの字（先頭 12字。lib.mjs の書き方と同じ）
+ */
+export function pressedShrinkInPage() {
+  const out = [];
+  for (const b of document.querySelectorAll('button')) {
+    const t = getComputedStyle(b).transform;
+    if (!t || t === 'none') continue;
+    const m = /^matrix\(([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+)/.exec(t);
+    if (!m) continue;
+    const sx = Math.hypot(Number(m[1]), Number(m[2])), sy = Math.hypot(Number(m[3]), Number(m[4]));
+    if (!(sx >= 0.9 && sx < 1 && sy >= 0.9 && sy < 1)) continue;
+    if (b.offsetWidth >= 43.5 && b.offsetHeight >= 43.5) out.push(b.textContent.slice(0, 12));
+  }
+  return out;
+}
+
+/** 押す物 loc の検査①（node の側）。押す物が途中で消えた時に長く待たない（5秒） */
+export const checkTarget = (loc) => loc.evaluate(checkTargetInPage, TARGET_CFG, { timeout: 5000 });
 
 /** 開いている窓の検査②（node の側） */
 export const checkWindows = (page) => page.evaluate(checkWindowsInPage, { windows: WINDOWS, collapse: COLLAPSE });
@@ -243,7 +276,17 @@ export async function checkOverflow(page, { heavy }) {
     problems.push(...h.problems);
     ellipsis = h.ellipsis;
     // lib.mjs の layoutIssues（12px 未満の字・小さいボタン・手札の幅・敵味方の大きさ。横スクロールと画面の外は上で見たので除く）
-    for (const s of await layoutIssues(page)) if (!/^(page overflow|offscreen)/.test(s)) problems.push({ kind: 'overflow', text: s });
+    // センサーの直し（2026-11-18・区切り 1-J）: 押した直後のボタンは、押した形（.btn:active の scale(0.97)）のまま測られることがあり、
+    // 44px のボタンが「69×43」「206×43」と当たった。押した形の縮みは、ボタンの大きさ（並べた時の大きさ）ではないので、
+    // 自分に小さな縮み（0.9 以上）がかかっていて、縮める前の大きさ（offsetWidth・offsetHeight）が 43.5px 以上のボタンは当たりにしない。
+    // 自己テスト: selftest.mjs「押した形の縮みは当たらない」
+    const pressed = new Set(await page.evaluate(pressedShrinkInPage).catch(() => []));
+    for (const s of await layoutIssues(page)) {
+      if (/^(page overflow|offscreen)/.test(s)) continue;
+      const m = /^small button: "(.*)" \d+x\d+$/s.exec(s);
+      if (m && pressed.has(m[1])) continue;
+      problems.push({ kind: 'overflow', text: s });
+    }
   }
   return { problems, ellipsis };
 }

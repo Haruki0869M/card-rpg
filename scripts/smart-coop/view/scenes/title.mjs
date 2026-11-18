@@ -9,7 +9,7 @@ export const SCENE = {
     joinRoom: { css: 'button', text: '部屋に参加', exact: false }, // 字だけ（印なし）
     backToRoom: { css: '[data-back-to-room]' },
     // 「新しい冒険を始めますか？」の確認（前の冒険が残っている時）
-    confirmNew: { css: '[role="dialog"] button', text: '上書きして始める' }, // 字だけ（1-G の A4 data-confirm-ok で差し替え）
+    confirmNew: { css: '[data-confirm] [data-confirm-ok]', text: '上書きして始める' }, // 確認の窓の印（A4）＋字（どの確認の窓かを取り違えない）
   },
   facts: {
     hasBackToRoom: { sel: '[data-back-to-room]', read: 'count' },

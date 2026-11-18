@@ -12,6 +12,8 @@ const BUSY_MS = 20000;
 const STABLE_MS = 1500;
 const TOAST_MS = 3000;
 const EFFECT_MS = 3000;
+const EVAL_MS = 2000; // 押す物を測る1回の上限（消えた物を 30秒待たない）
+const SETTLE_MS = 800;
 
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -38,10 +40,11 @@ export async function waitNotBusy(page, ms = BUSY_MS) {
  * @param {object} o { what: 記録の名前, appearMs: 出てくるまで待つ上限, expectEffect: 効いたかを確かめるか }
  * 返す物: { pressed, failed, needPan, effect, problems }
  */
-export async function press(s, dev, target, { what = targetKey(target), appearMs = 8000, expectEffect = true } = {}) {
+export async function press(s, dev, target, { what = targetKey(target), appearMs = 8000, expectEffect = true, map = false, where = null } = {}) {
   const { judge } = s;
   const page = dev.page;
-  const entry = { seat: dev.seat, what, target: targetKey(target) };
+  const t0 = Date.now();
+  const entry = { seat: dev.seat, where, what, target: targetKey(target) };
   // 1. 演出が終わるのを待つ
   if (!(await waitNotBusy(page))) {
     await judge.fail('stuck', { seat: dev.seat, text: `演出が ${BUSY_MS / 1000}秒終わらない（${what} を押す前）` });
@@ -54,59 +57,123 @@ export async function press(s, dev, target, { what = targetKey(target), appearMs
     judge.record({ ...entry, result: 'missing' });
     return { pressed: false, failed: true };
   }
-  // 2. スクロールの窓の中なら見える所へ（人が指で送るのと同じ）
-  const scrolled = await loc.evaluate(revealInPage).catch(() => false);
-  // 3. 四角が止まるのを待つ（80ミリ秒あけて2回測って同じ）
-  let prev = null;
-  await until(async () => {
-    const r = JSON.stringify(await loc.evaluate(rectInPage));
-    const same = r === prev;
-    prev = r;
-    return same;
-  }, STABLE_MS, 80);
-  // 4. 検査①
-  let res = await checkTarget(loc);
-  if (res.problems.some((p) => p.kind === 'toast')) {
-    // 短いお知らせは消えるまで待ってから測り直す（上限3秒）
-    await until(async () => !(await checkTarget(loc)).problems.some((p) => p.kind === 'toast'), TOAST_MS, 200);
-    res = await checkTarget(loc);
-  }
-  if (res.needPan) {
-    // 地図のマスに地図の外の物が乗っている → 地図を動かすのは頭の仕事（brain/world.mjs。区切り 1-J）
-    judge.record({ ...entry, scrolled, result: 'need-pan', sensor: res });
-    return { pressed: false, needPan: true, problems: res.problems };
-  }
-  if (res.problems.length) {
-    await wait(400);
-    const again = await checkTarget(loc);
-    const place = `${dev.seat}|${(await readView(dev)).sig}|${targetKey(target)}`;
-    if (!again.problems.length && !again.needPan) {
-      // 一瞬の当たり: 写真とメモ。同じ所で2回目なら失敗（オーナーの返事4）
-      const failed = await judge.momentaryHit(dev, place, `${what}: ${res.problems.map((p) => p.text).join('／')}`);
-      if (failed) {
-        judge.record({ ...entry, scrolled, result: 'momentary-fail', sensor: res });
+  try {
+    // 2. スクロールの窓の中なら見える所へ（人が指で送るのと同じ）
+    const scrolled = await loc.evaluate(revealInPage, undefined, { timeout: EVAL_MS }).catch(() => false);
+    // 3. 四角が止まるのを待つ（80ミリ秒あけて2回測って同じ）
+    let prev = null;
+    await until(async () => {
+      const r = JSON.stringify(await loc.evaluate(rectInPage, undefined, { timeout: EVAL_MS }));
+      const same = r === prev;
+      prev = r;
+      return same;
+    }, STABLE_MS, 80);
+    // 4. 検査①
+    let res = await checkTarget(loc);
+    if (res.problems.some((p) => p.kind === 'toast')) {
+      // 短いお知らせは消えるまで待ってから測り直す（上限3秒）
+      await until(async () => !(await checkTarget(loc)).problems.some((p) => p.kind === 'toast'), TOAST_MS, 200);
+      res = await checkTarget(loc);
+    }
+    let panned = 0;
+    if (res.needPan && map) {
+      // 地図のマスに地図の外の物（下のパネル・右のボタン・マスの説明の帯）が乗っている → 失敗ではなく地図を動かす（計画 §3-2 の例外）。
+      // 人が指で地図を送るのと同じく、地図の箱（overflow auto）をその場でスクロールする。4回動かしても出せなければ失敗
+      for (; panned < PAN_TRIES && res.needPan; panned++) {
+        const why = await loc.evaluate(panInPage, panned, { timeout: EVAL_MS }).catch(() => 'ページが無い');
+        judge.note('pan', `${dev.seat}: 地図を動かした（${why}）`, { reason: why });
+        prev = null;
+        await until(async () => {
+          const r = JSON.stringify(await loc.evaluate(rectInPage, undefined, { timeout: EVAL_MS }));
+          const same = r === prev;
+          prev = r;
+          return same;
+        }, STABLE_MS, 80);
+        res = await checkTarget(loc);
+      }
+      if (res.needPan) {
+        await judge.fail('overlap', { seat: dev.seat, text: `${what}: 地図を ${PAN_TRIES} 回動かしても、地図の外の物の下から出せない`, key: `pan|${dev.seat}|${targetKey(target)}` });
+        judge.record({ ...entry, scrolled, panned, result: 'blocked', sensor: res });
         return { pressed: false, failed: true, problems: res.problems };
       }
-      res = again;
-    } else {
-      // 残っている → 失敗。押さない（無理に押して進めない）
-      const p = again.problems[0] ?? res.problems[0];
-      const kind = p.kind === 'cover' || p.kind === 'toast' ? 'cover' : p.kind === 'disabled' ? 'missing' : p.kind === 'offscreen' || p.kind === 'strip' ? 'overflow' : 'overlap';
-      await judge.fail(kind, { seat: dev.seat, text: `${what}: ${again.problems.map((x) => x.text).join('／')}`, key: `${kind}|${place}` });
-      judge.record({ ...entry, scrolled, result: 'blocked', sensor: again });
-      return { pressed: false, failed: true, problems: again.problems };
     }
+    if (res.needPan) {
+      // 地図を動かしてよいと言われていない押し方（map: false）。押さずに返す
+      judge.record({ ...entry, scrolled, result: 'need-pan', sensor: res });
+      return { pressed: false, needPan: true, problems: res.problems };
+    }
+    if (res.problems.length) {
+      await wait(400);
+      const again = await checkTarget(loc);
+      const place = `${dev.seat}|${(await readView(dev)).sig}|${targetKey(target)}`;
+      if (!again.problems.length && !again.needPan) {
+        // 一瞬の当たり: 写真とメモ。同じ所で2回目なら失敗（オーナーの返事4）
+        const failed = await judge.momentaryHit(dev, place, `${what}: ${res.problems.map((p) => p.text).join('／')}`);
+        if (failed) {
+          judge.record({ ...entry, scrolled, result: 'momentary-fail', sensor: res });
+          return { pressed: false, failed: true, problems: res.problems };
+        }
+        res = again;
+      } else {
+        // 残っている → 失敗。押さない（無理に押して進めない）
+        const p = again.problems[0] ?? res.problems[0];
+        const kind = p.kind === 'cover' || p.kind === 'toast' ? 'cover' : p.kind === 'disabled' ? 'missing' : p.kind === 'offscreen' || p.kind === 'strip' ? 'overflow' : 'overlap';
+        await judge.fail(kind, { seat: dev.seat, text: `${what}: ${again.problems.map((x) => x.text).join('／')}`, key: `${kind}|${place}` });
+        judge.record({ ...entry, scrolled, result: 'blocked', sensor: again });
+        return { pressed: false, failed: true, problems: again.problems };
+      }
+    }
+    // 5. タップ（検査した点を指で押す）
+    const before = expectEffect ? await probe(s, dev) : null;
+    const handle = await loc.elementHandle({ timeout: EVAL_MS }).catch(() => null);
+    await page.touchscreen.tap(res.point.x, res.point.y);
+    // 6. 効いたかを確かめる（3秒以内に、その端末の画面の指紋か、全体の番号が変われば良い）
+    let effect = null;
+    if (expectEffect) {
+      effect = await until(async () => (await probe(s, dev)) !== before, EFFECT_MS, 150);
+    }
+    // 押した物が消える形（物語の「つづける」など）は、消える演出が終わるまで少し待つ（上限 0.8秒）。
+    // 消えていく途中の「つづける」を頭がもう1度選び、押す前に消える（記録が「gone」になる）事があり、同じ種で2回流した記録が違った（区切り 1-J）
+    if (handle) {
+      await until(async () => !(await handle.evaluate((e) => e.isConnected).catch(() => false)), SETTLE_MS, 50);
+      await handle.dispose().catch(() => {});
+    }
+    judge.record({ ...entry, scrolled, panned, result: 'tap', point: res.point, effect, ms: Date.now() - t0 });
+    return { pressed: true, effect, problems: [] };
+  } catch (e) {
+    // 押す物が、数えた後・測る前に消えた（場面が切り替わった・描き直した）。押していないので失敗にはせず、頭がもう1度決める。
+    // 同じ事が続けば、止まりの検出（40秒・同じ物を8回）が拾う
+    if (!/Timeout|detached|Target closed|Execution context/i.test(String(e?.message ?? e))) throw e;
+    judge.note('gone', `${dev.seat}: ${what} が測る前に消えた（押していない）`);
+    judge.record({ ...entry, result: 'gone' });
+    return { pressed: false, gone: true, problems: [] };
   }
-  // 5. タップ（検査した点を指で押す）
-  const before = expectEffect ? await probe(s, dev) : null;
-  await page.touchscreen.tap(res.point.x, res.point.y);
-  // 6. 効いたかを確かめる（3秒以内に、その端末の画面の指紋か、全体の番号が変われば良い）
-  let effect = null;
-  if (expectEffect) {
-    effect = await until(async () => (await probe(s, dev)) !== before, EFFECT_MS, 150);
+}
+
+const PAN_TRIES = 4;
+
+/**
+ * ページの中で流す: 地図のマス el が見えている地図（上の帯より下・下のパネルより上）に出るように、地図の箱をスクロールする。
+ * k = 0: 見えている地図の真ん中へ。1〜3: 右・左・下へずらす（広い地図の端で横に動かせない時。adventure.mjs と同じ考え）。
+ * 返す物: 動かした理由（真ん中に乗っていた物の名前）
+ */
+export function panInPage(el, k) {
+  const map = el.closest('[data-world-map]');
+  if (!map) return '地図が無い';
+  const b = el.getBoundingClientRect();
+  const x = b.left + b.width / 2, y = b.top + b.height / 2;
+  const t = document.elementFromPoint(x, y);
+  const why = !t ? '何も無い' : t.closest('[data-world-panel]') ? '下のパネル' : t.closest('[data-zoom-controls],[data-recenter],[data-goal-arrow],[data-overview-open]') ? '右のボタン' : t.closest('[data-tile-info]') ? 'マスの説明の帯' : `ほか（${t.tagName.toLowerCase()}）`;
+  if (k === 0) {
+    const m = map.getBoundingClientRect();
+    const panel = document.querySelector('[data-world-panel]')?.getBoundingClientRect();
+    const cy = (m.top + 64 + (panel ? panel.top : m.bottom)) / 2;
+    map.scrollBy({ left: x - (m.left + m.width / 2), top: y - cy, behavior: 'instant' });
+  } else {
+    const [left, top] = [[120, 0], [-120, 0], [0, 100]][k - 1];
+    map.scrollBy({ left, top, behavior: 'instant' });
   }
-  judge.record({ ...entry, scrolled, result: 'tap', point: res.point, effect });
-  return { pressed: true, effect, problems: [] };
+  return why;
 }
 
 /** 効いたかを見る印: 画面の指紋＋全体の番号（審判が読む） */
