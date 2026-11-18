@@ -84,8 +84,11 @@ export function townBrain(v, board) {
     const hp = /HP\s*(\d+)\s*\/\s*(\d+)/.exec((v.facts.tInnHp ?? [])[0] ?? '');
     const inn = (v.facts.tInn ?? [])[0];
     const r = hp ? Number(hp[1]) / Math.max(1, Number(hp[2])) : 1;
-    if (inn && inn.disabled === null && r < 0.7 && gold >= Number(inn['data-town-inn'] ?? innCost)) {
-      return decide(G.townInn, `宿に泊まる（HP ${hp?.[1]}/${hp?.[2]}・${inn['data-town-inn']}G）`, { after: () => {
+    // 区切り 3-S（2-Sb の作り残し）: HP の条件に当たらなくても、冒険の中で1回は泊まる（網羅の「宿に泊まった」）
+    const once = !board.innOnce;
+    if (inn && inn.disabled === null && (r < 0.7 || once) && gold >= Number(inn['data-town-inn'] ?? innCost)) {
+      return decide(G.townInn, `宿に泊まる（HP ${hp?.[1]}/${hp?.[2]}・${inn['data-town-inn']}G${r < 0.7 ? '' : '・網羅のために1回は泊まる'}）`, { after: () => {
+        board.innOnce = true;
         st.did.add('inn');
         covMark(board, 'town-action:inn', `${v.seat}: 町「${st.town}」で宿に泊まった（HP ${hp?.[1]}/${hp?.[2]}）`);
       } });

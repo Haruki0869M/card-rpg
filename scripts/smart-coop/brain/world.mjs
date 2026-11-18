@@ -16,6 +16,8 @@ const T = { turn: true };
 const FOG_COST = 2;
 /** 寄り道の上限（今の場所からの道のりの移動力）【提案】。遠い寄り道で時間を使い切らない */
 const DETOUR_MAX = 9;
+/** 災厄・網羅の「必ず」の町の寄り道の上限【提案】 */
+const DETOUR_FAR = 18;
 
 // ---- 六角形のマス（odd-r。src/engine/game/world/hex.ts と同じ並び。地図の決まった形） ----
 const EVEN = [[1, 0], [0, -1], [-1, -1], [-1, 0], [-1, 1], [0, 1]];
@@ -94,13 +96,15 @@ export function readWorld(v) {
   });
   const spawns = (v.facts.wSpawns ?? []).map((s) => ({ kind: 'spawn', id: s['data-spawn'], tile: Number(s['data-tile']), used: false }));
   const wanderers = (v.facts.wWanderers ?? []).map((w) => Number(w['data-tile']));
+  // 区切り 3-S: 災厄の中ボス（徘徊する敵の印 data-scourge。見えているマスの物だけ）
+  const scourges = (v.facts.wWanderers ?? []).filter((w) => w['data-scourge']).map((w) => ({ kind: 'scourge', id: w['data-scourge'], tile: Number(w['data-tile']), used: false }));
   const goalTile = (v.facts.goalMark ?? [])[0] ? Number(v.facts.goalMark[0]['data-goal-mark']) : null;
   const corruption = Number((v.facts.wCorruption ?? [])[0]?.['data-corruption'] ?? 0);
   const party = (v.facts.wParty ?? []).map((p) => {
     const mm = /^(.*?)(?:（(.*?)）)?\s*HP(\d+)\/(\d+)/.exec(p['aria-label'] ?? '');
     return mm ? { name: mm[1], status: mm[2] ?? '', hp: Number(mm[3]), max: Number(mm[4]), canJob: (p.canJob ?? 0) > 0 } : null;
   }).filter(Boolean);
-  return { cols, rows, tide, active, here, features, spawns, wanderers, goalTile, corruption, party, hexes: v.facts.wHexes ?? [] };
+  return { cols, rows, tide, active, here, features, spawns, wanderers, scourges, goalTile, corruption, party, hexes: v.facts.wHexes ?? [] };
 }
 
 /** パーティの HP の割合の一番低い値（仲間の列の字。退場・ダンジョンの中の仲間は除く） */
@@ -183,6 +187,10 @@ export function destinations(w, board) {
       else if (!hurry) out.push({ tile: t, kind: 'questNear', id: key, pri: 2, why: `${why}・通りがかり` });
     }
   }
+  // 区切り 3-S（2-Sb の作り残し）: 災厄の中ボスを行き先にする（1つ目の鍵の後・全員の HP が6割より上・まだ遭遇していない災厄。倒せなくても良い。遭遇して戦う所まで）
+  for (const sc of w.scourges ?? []) {
+    if (keysDone >= 1 && minHpRatio(w.party) > 0.6 && !hurry && covWant(board, `scourge:${sc.id}:meet`)) out.push({ ...sc, pri: 5, why: `災厄「${sc.id}」（まだ遭遇していない）` });
+  }
   if (w.goalTile !== null) out.push({ tile: w.goalTile, kind: 'goal', id: 'goal', pri: 9, why: '次の目的（鍵のダンジョン・最後のダンジョン）' });
   return out.sort((a, b) => a.pri - b.pri || a.tile - b.tile);
 }
@@ -239,7 +247,9 @@ export function worldBrain(v, board) {
       const dist = distFrom(w.cols, w.rows, cost, c.tile, extra);
       const d = dist[w.here];
       if (!Number.isFinite(d)) { ws.unreachable.add(c.tile); continue; }
-      if (c.kind !== 'goal' && c.kind !== 'quest' && d > DETOUR_MAX) continue;
+      // 寄り道の上限: 災厄と、網羅の表で「必ず」のまだ入っていない町は遠くても行く（DETOUR_FAR）【提案】
+      const far = c.kind === 'scourge' || (c.kind === 'town' && covWant(board, `town:${c.id}`));
+      if (c.kind !== 'goal' && c.kind !== 'quest' && d > (far ? DETOUR_FAR : DETOUR_MAX)) continue;
       return { c, dist, d };
     }
     return null;
