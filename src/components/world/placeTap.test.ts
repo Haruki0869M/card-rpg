@@ -1,6 +1,6 @@
 // ===== 回1の追加: 施設の絵を押して入る・名前の札の並べ方 =====
 import { describe, expect, it } from 'vitest';
-import { artBox, FACILITY_LIFT, labelBox, pickPlace, placeLabels, signpostBox, type PlaceLabel } from './placeTap';
+import { artBox, chooseTapTile, FACILITY_LIFT, labelBox, pickPlace, placeLabels, signpostBox, type PlaceLabel } from './placeTap';
 
 describe('回1の追加: 施設の絵の四角', () => {
   it('描いた絵: 浮かせた分だけ上にずれ、上の端はマスの面より上まで届く', () => {
@@ -50,5 +50,21 @@ describe('回1の追加: 名前の札', () => {
     const b = labelBox({ text: 'あいう', x: 50, y: 10 }, 12);
     expect(b.x1 - b.x0).toBe(3 * 12 + 8);
     expect(b.y0).toBe(10);
+  });
+});
+
+describe('2026-11-19: 光っている行き先のマスは、施設の絵より先に選ぶ', () => {
+  const reach = new Map([[11, 1], [12, 2]]);
+  it('今いる町の絵が隣の光るマスに重なっていても、光るマスの上の面を押せばそのマス', () => {
+    expect(chooseTapTile({ topFace: 11, place: 10, reach, here: 10 })).toBe(11);
+  });
+  it('光っていないマスの上の面なら、今までどおり施設の絵が先', () => {
+    expect(chooseTapTile({ topFace: 30, place: 10, reach, here: 10 })).toBe(10);
+  });
+  it('今いるマス・行き先が無い時は、施設の絵 → 上の面', () => {
+    expect(chooseTapTile({ topFace: 10, place: 10, reach, here: 10 })).toBe(10);
+    expect(chooseTapTile({ topFace: 11, place: 10 })).toBe(10);
+    expect(chooseTapTile({ topFace: 11 })).toBe(11);
+    expect(chooseTapTile({})).toBeUndefined();
   });
 });

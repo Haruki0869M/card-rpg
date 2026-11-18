@@ -27,7 +27,7 @@ import { cameraTop, clampLeft, dodgeButtons, edgeArrow, MAP_PAD_RIGHT, mapPadBot
 import { anchorScroll, baseRadius, clampZoom, COMPACT_ZOOM, minZoomFor, stepZoom, ZOOM_MAX, ZOOM_MIN } from './mapZoom';
 import { Overview } from './Overview';
 import { useLowScreen } from '../../hooks/useLowScreen';
-import { artBox, FACILITY_LIFT, pickPlace, placeLabels, signpostBox, type ArtShape, type Box, type PlaceLabel } from './placeTap';
+import { artBox, chooseTapTile, FACILITY_LIFT, pickPlace, placeLabels, signpostBox, type ArtShape, type Box, type PlaceLabel } from './placeTap';
 
 const SQRT3 = Math.sqrt(3);
 
@@ -733,21 +733,23 @@ export function WorldMap({
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const px = e.clientX - rect.left;
     const py = e.clientY - rect.top;
-    // 回1の追加: 施設の絵（立て札も）の上なら、その施設のマス
-    const hit = pickPlace(placeSpots, px, py);
-    if (hit !== undefined) {
-      onTapTile(hit);
-      return;
-    }
+    // 見えている上の面（手前の行から調べる）
     const half = (SQRT3 / 2) * R * TOP_SCALE;
+    let topFace: number | undefined;
     for (let i = w.tiles.length - 1; i >= 0; i--) {
       const c = center(i);
       const dx = Math.abs(px - c.x);
       const dy = Math.abs((py - c.y) / GROUND_K);
       if (dx <= half && dy <= R * TOP_SCALE - dx / SQRT3) {
-        onTapTile(i);
-        return;
+        topFace = i;
+        break;
       }
+    }
+    // 光っている行き先のマスの上の面 → 施設の絵（回1の追加。立て札も）→ 上の面の順（chooseTapTile）
+    const hit = chooseTapTile({ topFace, place: pickPlace(placeSpots, px, py), reach, here });
+    if (hit !== undefined) {
+      onTapTile(hit);
+      return;
     }
     let best = -1;
     let bd = Infinity;
