@@ -73,7 +73,9 @@ export function writeReport(dir, r) {
   lines.push('まだ作っていない（区切り 3-S）。');
   lines.push('');
   lines.push('## 戦闘・バランスの記録（直し14。数字は直さず記録だけ）');
-  lines.push('戦闘の数（憲章の 32〜40 と並べる）・1戦のターン数・全滅の場所・転職の時期・終わりの悪化の度合い: まだ作っていない（区切り 2-Sa）。');
+  if (r.battle?.length) for (const b of r.battle) lines.push(b.startsWith('  ') ? b : `- ${b}`);
+  else lines.push('戦闘の数（憲章の 32〜40 と並べる）・1戦のターン数・全滅の場所: この通しでは記録なし。');
+  lines.push('転職の時期・終わりの悪化の度合い: まだ作っていない（区切り 2-Sb・通し全体）。');
   lines.push('');
   lines.push('## 同期');
   lines.push(`比べた回数: ${j.syncChecks}　ずれ: ${j.failures.filter((f) => f.kind === 'desync').length}　追いつかない: ${j.failures.filter((f) => f.kind === 'lag').length}`);
@@ -134,6 +136,7 @@ export function writeReport(dir, r) {
         reachedGoal: r.reachedGoal ?? null,
         milestones: r.milestones ?? [],
         memory: r.mem ?? null,
+        battle: r.battle ?? null,
         resyncs: j.resyncs ?? [],
         seeds: Object.fromEntries(j.seeds ?? new Map()),
         blindSpots: BLIND_SPOTS,

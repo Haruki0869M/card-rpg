@@ -9,7 +9,7 @@
 //   PEOPLE        2 か 4（既定 2）
 //   SEED          種（既定 1）。ジョブの選び方と、ゲームの種（&seed=）に使う
 //   SCENARIO      シナリオの番号（1 = 1本目。既定 1。1本目以外の解放は後の区切り）
-//   SMART_MODE    first-reward（既定）・lobby（部屋の用意まで）・selftest
+//   SMART_MODE    first-reward（既定）・first-dungeon（最初の鍵のダンジョンを制覇して世界マップに戻るまで。区切り 2-Sa）・lobby（部屋の用意まで）・selftest
 //   SMART_SHAKE   sheet-wait … 誘いの返事を待たせている間に P2 がパーティ・装備のシートを開いて閉じる（区切り 1-J の検出の確かめ）
 //   SMART_INDUCE  cover … わざと失敗させる（台本が P2 の画面に「押せない板」を置く。証拠が全端末ぶん残るかの確かめ。ゲームの不具合ではない）
 //   SMART_LIMIT_MIN  上限の分（既定: first-reward は 40 分）
@@ -18,17 +18,73 @@ import { assertLocalUrl, launchFleet } from './fleet.mjs';
 import { Judge } from './judge.mjs';
 import { Conductor } from './conductor.mjs';
 import { setupRoom, LobbyStop } from './lobby.mjs';
-import { writeReport } from './report.mjs';
+import { writeReport, actionLine } from './report.mjs';
+import { appendFileSync } from 'node:fs';
 import { memoryMeter } from './mem.mjs';
 import { commonBrain } from './brain/common.mjs';
 import { worldBrain } from './brain/world.mjs';
 import { provisionalBrain } from './brain/provisional.mjs';
 import { shakeBrain } from './brain/shake.mjs';
+import { battleBrain, battleConfirmBrain, battleObserve } from './brain/battle.mjs';
+import { rewardBrain, meOf } from './brain/reward.mjs';
+import { dungeonBrain, dungeonObserve } from './brain/dungeon.mjs';
+import { loadContent } from './content/load.mjs';
+import { jobByName } from './content/reward.mjs';
 import { now, log, wait } from './util.mjs';
 
-/** 1-J の頭（端末ごとに同じ物。押す物は View だけで決める） */
+/**
+ * 頭（端末ごとに同じ物。押す物は View だけで決める）。
+ * 区切り 2-Sa: 戦闘・報酬・宝箱・取り合い・ダンジョンの部屋は brain/battle・reward・dungeon。世界マップは brain/world（2-Sb）。
+ * 残りの場面（遭遇・町 など）は、今までどおり仮の頭 brain/provisional に任せる。
+ * 戦闘で bot が自分で開いた道具袋のシートは、common が「うっかり開いたシート」として閉じないよう、戦闘の頭を先に聞く。
+ */
 export function brainFor(shake) {
-  return (v, board) => shakeBrain(v, board, shake) ?? commonBrain(v) ?? worldBrain(v, board) ?? provisionalBrain(v);
+  return (v, board) => {
+    const pouch = v.mode === 'battle' && v.layers.some((l) => l.id === 'sheet' && l.value === 'pouch');
+    return (
+      shakeBrain(v, board, shake) ??
+      (pouch ? battleBrain(v, board) : null) ??
+      battleConfirmBrain(v, board) ??
+      commonBrain(v) ??
+      dungeonBrain(v, board) ??
+      battleBrain(v, board) ??
+      rewardBrain(v, board) ??
+      worldBrain(v, board) ??
+      // 2-Sa の頭の場面で「待つ」（null）と答えた時に、仮の頭が代わりに押さないようにする（区切り 2-Sa の通しで、めくっている途中の報酬のカードを仮の頭が押した）
+      (OWNED.has(v.mode) ? null : provisionalBrain(v))
+    );
+  };
+}
+
+/** 2-Sa の頭が受け持つ場面（仮の頭 brain/provisional には渡さない） */
+const OWNED = new Set(['battle', 'reward', 'chest', 'dungeon', 'rest', 'event', 'cleared']);
+
+/** 毎ステップ、全端末の View から「見た事」を板に書く（入った部屋の種類・戦闘の記録）。板のメモは審判のメモへ移す */
+function observe(views, board, judge) {
+  dungeonObserve(views, board);
+  battleObserve(views, board);
+  for (const n of (board.notes ?? []).splice(0)) judge.note(n.kind, n.text);
+}
+
+/** 戦闘の記録を報告の行にする（直し14） */
+function battleLines(board, judge) {
+  const st = board.stats ?? { battles: [] };
+  const all = [...st.battles, ...(st.current ? [{ ...st.current, result: st.current.result ?? '（途中）' }] : [])];
+  const lostOf = (b) => b.result && !['victory', 'escaped', '（途中）'].includes(b.result);
+  const turns = all.filter((b) => b.turns).map((b) => b.turns);
+  const acts = judge.actions.filter((a) => a.result === 'tap');
+  const count = (re) => acts.filter((a) => re.test(a.what ?? '')).length;
+  const lines = [
+    `戦闘の数: ${all.length}（勝ち ${all.filter((b) => b.result === 'victory').length}・逃げた ${all.filter((b) => b.result === 'escaped').length}・負け ${all.filter(lostOf).length}）　憲章の目安は1シナリオ 32〜40（この通しは一部だけ）`,
+    `1戦のターン数: ${turns.length ? `平均 ${(turns.reduce((a, b) => a + b, 0) / turns.length).toFixed(1)}・最大 ${Math.max(...turns)}・最小 ${Math.min(...turns)}` : '—'}`,
+    `予告を読んだ手（押した数）: BREAK を狙う ${count(/BREAK/)}・連携（仲間が殴った敵）${count(/連携/)}・回復 ${count(/回復|薬を使う/)}・フォーカスを足す ${count(/フォーカスを足す/)}・手数読みで止める ${count(/手数読み/)}`,
+  ];
+  for (const b of all) lines.push(`  - ${b.n}戦目: ${b.where}・${b.enemies.join('・')}・${b.turns}ターン・${b.result ?? '?'}`);
+  const lost = all.filter(lostOf);
+  lines.push(`全滅・負けた場所: ${lost.length ? lost.map((b) => `${b.n}戦目（${b.where}・${b.enemies.join('・')}・結果 ${b.result}）`).join('／') : 'なし'}`);
+  const d = board.dungeon;
+  if (d) lines.push(`入った部屋の種類（扉の予兆）: ${Object.entries(d.seen).map(([k, n]) => `${k || '予兆なし'} ${n}`).join('・') || 'なし'}　イベントで選んだ種類: ${Object.keys(d.events).join('・') || 'なし'}　休憩: ${Object.keys(d.restKinds).join('・') || 'なし'}　宝箱: ${d.chests}`);
+  return lines;
 }
 
 /** わざと失敗させる板（台本が置く。ゲームの画面ではない）。P2 の画面全体を覆い、押す物の上に乗る */
@@ -46,7 +102,7 @@ export async function run() {
     const { selftest } = await import('./selftest.mjs');
     return selftest();
   }
-  if (mode !== 'lobby' && mode !== 'first-reward') throw new Error(`SMART_MODE は first-reward・lobby・selftest です（${mode}）`);
+  if (!['lobby', 'first-reward', 'first-dungeon'].includes(mode)) throw new Error(`SMART_MODE は first-reward・first-dungeon・lobby・selftest です（${mode}）`);
   const people = Number(process.env.PEOPLE ?? 2);
   const seed = Number(process.env.SEED ?? 1) >>> 0;
   const scenario = Number(process.env.SCENARIO ?? 1);
@@ -58,7 +114,9 @@ export async function run() {
   // 守り(1): 手元の確認用サーバーにつなぐ URL でなければ、何もせずに止まる
   assertLocalUrl(url);
   const outDir = process.env.SMART_OUTPUT ?? `screenshots/smart-coop/s${scenario}-${people}p-${seed}`;
-  const limitMin = Number(process.env.SMART_LIMIT_MIN ?? (mode === 'first-reward' ? 40 : people === 2 ? 180 : 300));
+  const limitMin = Number(process.env.SMART_LIMIT_MIN ?? (mode === 'first-reward' ? 40 : mode === 'first-dungeon' ? 120 : people === 2 ? 180 : 300));
+  // ゲームの説明書き（カード・ジョブ・装備・属性）を始める前に1回だけ読む（頭が使う。エンジンの状態ではない）
+  if (mode !== 'lobby') await loadContent();
   const startedAt = now();
   log(`始める: ${url}・${people}人・種 ${seed}・${mode}${shake ? `・揺さぶり ${shake}` : ''}${induce ? `・わざと失敗 ${induce}` : ''}・結果 ${outDir}`);
   const fleet = await launchFleet({ people });
@@ -67,6 +125,7 @@ export async function run() {
   const judge = new Judge({ outDir, devices: fleet.devices, limitMin, expectSeed: seed });
   await judge.arm();
   const s = { judge };
+  let board = {};
   let reached = '始める前';
   const milestones = [];
   const extra = [];
@@ -88,11 +147,18 @@ export async function run() {
       }
       const brain = brainFor(shake);
       const c = new Conductor({ fleet, judge, brains: Object.fromEntries(fleet.devices.map((d) => [d.seat, brain])) });
+      board = c.board;
+      // 自分のジョブ（部屋の用意で bot が選んだ物。人が自分の選んだジョブを覚えているのと同じ）
+      fleet.devices.forEach((d, k) => { meOf(board, d.seat).job = jobByName(r.jobs?.[k]); });
       const seen = new Set(['world']);
       let rewardSeen = false;
+      let clearedSeen = false;
+      let liveN = 0;
       let stuckCount = 0;
-      for (let t = 0; t < 3000; t++) {
+      for (let t = 0; t < (mode === 'first-dungeon' ? 20000 : 3000); t++) {
         const res = await c.tick();
+        // 途中の様子（live.log = 操作の記録の1行を、押すたびに足す。流している間に外から見るため。比べる記録は actions.log）
+        for (; liveN < judge.actions.length; liveN++) appendFileSync(`${outDir}/live.log`, `${actionLine(judge.actions[liveN], liveN)}\n`);
         for (const v of res.views ?? []) {
           if (!v.mode || seen.has(v.mode)) continue;
           seen.add(v.mode);
@@ -101,9 +167,25 @@ export async function run() {
           log(text);
           reached = text;
         }
+        observe(res.views ?? [], board, judge);
         if ((res.views ?? []).some((v) => v.mode === 'reward')) rewardSeen = true;
-        // 着いた: 報酬を見た後に、全端末が報酬・戦闘の画面から出た（報酬を受け取り終えた）
-        if (rewardSeen && (res.views ?? []).every((v) => v.screen === 'game' && v.mode && v.mode !== 'reward' && v.mode !== 'battle')) {
+        if ((res.views ?? []).some((v) => v.mode === 'cleared')) clearedSeen = true;
+        if ((res.views ?? []).some((v) => v.mode === 'gameover')) {
+          reached = `ゲームオーバー（全滅・命の灯火なし）: ${res.views.map((v) => `${v.seat}=${v.mode}`).join(' ')}`;
+          milestones.push({ at: now(), text: reached, presses: judge.actions.length });
+          log(reached);
+          break;
+        }
+        // 着いた（first-dungeon）: 制覇の画面を見た後に、全端末が世界マップに戻った
+        if (mode === 'first-dungeon' && clearedSeen && (res.views ?? []).every((v) => v.screen === 'game' && v.mode === 'world')) {
+          reached = '最初の鍵のダンジョンを制覇して、全端末が世界マップに戻った';
+          milestones.push({ at: now(), text: reached, presses: judge.actions.length });
+          complete = true;
+          log(reached);
+          break;
+        }
+        // 着いた（first-reward）: 報酬を見た後に、全端末が報酬・戦闘の画面から出た（報酬を受け取り終えた）
+        if (mode === 'first-reward' && rewardSeen && (res.views ?? []).every((v) => v.screen === 'game' && v.mode && v.mode !== 'reward' && v.mode !== 'battle')) {
           reached = `最初の戦闘の報酬を受け取り終えた（全端末: ${res.views.map((v) => `${v.seat}=${v.mode}`).join(' ')}）`;
           milestones.push({ at: now(), text: reached, presses: judge.actions.length });
           complete = true;
@@ -135,8 +217,9 @@ export async function run() {
   }
   const mem = await meter.stop();
   const endedAt = now();
-  const stage = mode === 'lobby' ? '1-J（部屋の用意まで）' : `1-J（最初の戦闘の報酬まで${shake ? `・揺さぶり ${shake}` : ''}${induce ? `・わざと失敗 ${induce}` : ''}）`;
-  const code = writeReport(outDir, { scenario: `シナリオ${scenario}`, people, seed, stage, devices: fleet.devices, judge, startedAt, endedAt, reached: { run: reached }, milestones, extra, complete: false, reachedGoal: complete, mem });
+  const stage = mode === 'lobby' ? '1-J（部屋の用意まで）' : mode === 'first-dungeon' ? `2-Sa（最初の鍵のダンジョンの制覇まで${shake ? `・揺さぶり ${shake}` : ''}）` : `1-J（最初の戦闘の報酬まで${shake ? `・揺さぶり ${shake}` : ''}${induce ? `・わざと失敗 ${induce}` : ''}）`;
+  const battle = mode === 'lobby' ? null : battleLines(board, judge);
+  const code = writeReport(outDir, { scenario: `シナリオ${scenario}`, people, seed, stage, devices: fleet.devices, judge, startedAt, endedAt, reached: { run: reached }, milestones, extra, complete: false, reachedGoal: complete, mem, battle });
   log(`報告: ${outDir}/report.md（${judge.failures.length ? '失敗あり' : '失敗なし'}・${complete ? '着いた' : '着いていない'}）`);
   return judge.failures.length || !complete ? (mode === 'lobby' && !judge.failures.length ? 0 : 1) : 0;
 }
