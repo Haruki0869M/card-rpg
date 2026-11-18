@@ -271,6 +271,24 @@ export function shrunkInPage() {
   return out;
 }
 
+/**
+ * ページの中で流す: 見えない広がり（::before・::after。content があって 43.5px 以上の四角）で、押せる範囲を足してあるボタンの字（先頭 12字）
+ */
+export function widenedInPage() {
+  const out = [];
+  for (const b of document.querySelectorAll('button')) {
+    for (const pe of ['::before', '::after']) {
+      const cs = getComputedStyle(b, pe);
+      if (!cs.content || cs.content === 'none' || cs.display === 'none') continue;
+      if (parseFloat(cs.width) >= 43.5 && parseFloat(cs.height) >= 43.5) {
+        out.push(b.textContent.slice(0, 12));
+        break;
+      }
+    }
+  }
+  return out;
+}
+
 /** 押す物 loc の検査①（node の側）。押す物が途中で消えた時に長く待たない（5秒） */
 export const checkTarget = (loc) => loc.evaluate(checkTargetInPage, TARGET_CFG, { timeout: 5000 });
 
@@ -300,11 +318,17 @@ export async function checkOverflow(page, { heavy }) {
     // 0.6秒あけてもう1度測り、まだ小さければ当たりにする（ずっと縮んだままの窓は、2回目でも当たる）。
     // 自己テスト: selftest.mjs「窓が開く動きの途中は当たらない」「ずっと縮んだ窓は当たる」
     const shrunk = new Set(await page.evaluate(shrunkInPage).catch(() => []));
+    // センサーの直し（2026-11-18・区切り 2-Sa）: 状態の印の「＋N」の札（StatusChips.tsx の MoreChip）は、見た目 22×18px だが、
+    // 押せる範囲を見えない広がり（::before の 44×44px）で作ってある。ボタンの四角だけを見ると「小さいボタン」に当たる（誤検知）。
+    // ::before が 43.5px 以上の広がりを持つボタンは、押せる範囲が足りているので当たりにしない。
+    // 自己テスト: selftest.mjs「見えない広がりで 44px の押せる範囲がある小さい札は当たらない」
+    const widened = new Set(await page.evaluate(widenedInPage).catch(() => []));
     let again = null;
     for (const s of await layoutIssues(page)) {
       if (/^(page overflow|offscreen)/.test(s)) continue;
       const m = /^small button: "(.*)" \d+x\d+$/s.exec(s);
       if (m && pressed.has(m[1])) continue;
+      if (m && widened.has(m[1])) continue;
       if (m && shrunk.has(m[1])) {
         if (!again) {
           await new Promise((r) => setTimeout(r, 600));
