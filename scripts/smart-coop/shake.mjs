@@ -426,6 +426,8 @@ function challengeOwner(v, sh) {
     const ck = (v.facts.checkMarks ?? [])[0];
     const spent = ck ? Number(ck['data-challenge-focus']) : 0;
     if (spent < 1 && v.facts.checkPlusOn) return decide(G.checkPlus, '揺さぶり S2: 持ち主がフォーカスを足して待つ', { turn: true, ...P });
+    // 区切り 4 の誤検知の直し: 足すボタンが押せない（持ち主のフォーカスが 0 など）と、確かめる物が無いのに「0 のまま」で NG にしていた（4人の P3）
+    if (spent < 1 && !v.facts.checkPlusOn) m.data.noPlus = true;
     if (!m.data.otherDone) return HOLD;
     return null; // 頭（brain/dungeon）が「挑戦する」
   }
@@ -935,7 +937,11 @@ function observeS2(views, sh) {
     m.data.reset = true;
     result(sh, 'S2', false, `${m.owner}（持ち主）のフォーカスの指定が ${m.data.maxSpent} → ${spent} に戻った（ほかの人がシートを開け閉めしている間）`);
   }
-  if (m.data.otherDone && !m.data.checked && stage) {
+  if (m.data.otherDone && !m.data.checked && stage && m.data.noPlus && !m.data.maxSpent) {
+    m.data.checked = true;
+    sh.k.S2.abort++;
+    sh.k.S2.log.push(`中断: ${m.owner}（持ち主）がフォーカスを足せなかった（足すボタンが押せない）ので、確かめる物が無い`);
+  } else if (m.data.otherDone && !m.data.checked && stage) {
     m.data.checked = true;
     if (!m.data.reset) result(sh, 'S2', (spent ?? 0) >= 1, `ほかの人が装備・道具を開いて閉じた後も、${m.owner} のフォーカスの指定が ${spent}（data-challenge-focus）のまま`);
   }
