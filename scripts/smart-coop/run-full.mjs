@@ -106,6 +106,22 @@ export async function runFull({ brainFor, observe, battleLines }) {
     fleet.devices.forEach((d, k) => {
       meOf(board, d.seat).job = jobByName(r.jobs?.[k]);
     });
+    // 画面での確かめ1 は押す前の形で写真を残す（conductor の onViews。押した後だと、もう結果の段になっている）
+    c.onViews = async (views) => {
+      // 画面での確かめ1（c4d9d83）: 世界マップのマスのイベントで、手番でない人の選択肢が押せない（disabled・data-option-wait="1"）
+      if (!verify.optionWait) {
+        for (const v of views) {
+          const lock = (v.facts.turnLock ?? [])[0]?.['data-turn-lock'];
+          const opts = v.facts.dOptions ?? [];
+          if (v.mode !== 'event' || !lock || lock === v.seat || !opts.length) continue;
+          const all = opts.every((o) => o.disabled !== null && o['data-option-wait'] === '1');
+          const files = await shotAll(fleet, outDir, 'verify1-option-wait');
+          verify.optionWait = { seat: v.seat, ok: all, opts: opts.map((o) => `${o['data-event-option']}:disabled=${o.disabled !== null}・wait=${o['data-option-wait']}`), files, event: (v.facts.eventId ?? [])[0]?.['data-event-window'] };
+          judge.note('check', `確かめ1（c4d9d83）: ${v.seat}（手番でない人）のマスのイベント「${verify.optionWait.event}」の選択肢 ${verify.optionWait.opts.join('・')} → ${all ? 'OK（全部押せない・待ちの印）' : 'NG'}`);
+          break;
+        }
+      }
+    };
     const seen = new Set();
     const loop = [];
     let stuckCount = 0;
@@ -153,19 +169,6 @@ export async function runFull({ brainFor, observe, battleLines }) {
           jobLog.push({ run: runNo, seat: v.seat, title: jt, min: ((Date.now() - new Date(rec.startAt)) / 60000).toFixed(1), battles: battlesNow() - rec.startBattles, presses: judge.actions.length - rec.startPresses });
           milestones.push({ at: now(), text: `${runNo}回目: ${v.seat}「${jt.replace(/！.*$/, '！')}」`, presses: judge.actions.length });
           await shotAll(fleet, outDir, `job${runNo}-${v.seat}-${jobLog.length}`);
-        }
-      }
-      // 画面での確かめ1（c4d9d83）: 世界マップのマスのイベントで、手番でない人の選択肢が押せない（disabled・data-option-wait="1"）
-      if (!verify.optionWait) {
-        for (const v of views) {
-          const lock = (v.facts.turnLock ?? [])[0]?.['data-turn-lock'];
-          const opts = v.facts.dOptions ?? [];
-          if (v.mode !== 'event' || !lock || lock === v.seat || !opts.length) continue;
-          const all = opts.every((o) => o.disabled !== null && o['data-option-wait'] === '1');
-          const files = await shotAll(fleet, outDir, 'verify1-option-wait');
-          verify.optionWait = { seat: v.seat, ok: all, opts: opts.map((o) => `${o['data-event-option']}:disabled=${o.disabled !== null}・wait=${o['data-option-wait']}`), files, event: (v.facts.eventId ?? [])[0]?.['data-event-window'] };
-          judge.note('check', `確かめ1（c4d9d83）: ${v.seat}（手番でない人）のマスのイベント「${verify.optionWait.event}」の選択肢 ${verify.optionWait.opts.join('・')} → ${all ? 'OK（全部押せない・待ちの印）' : 'NG'}`);
-          break;
         }
       }
       // 画面での確かめ3: マスの印（地形・道・潮）に値が入っている

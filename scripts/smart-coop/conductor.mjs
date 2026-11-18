@@ -58,6 +58,8 @@ export class Conductor {
   async tick() {
     this.steps++;
     const views = await this.observe();
+    // 区切り 2-Sb: 押す前の画面を見る口（画面での確かめの写真を、押す前の形で残すため。頭ではない・押さない）
+    if (this.onViews) await this.onViews(views);
     const devs = this.fleet.devices;
     const wants = [];
     for (const [i, v] of views.entries()) {
