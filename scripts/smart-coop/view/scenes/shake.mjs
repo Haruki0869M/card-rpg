@@ -55,6 +55,8 @@ export const PART = {
     cellPins: { sel: '[data-cell-pin]', read: 'count' },
     mapOverlay: { sel: '[data-map-overlay]', read: 'count' },
     mapDoors: { sel: '[data-map-overlay] [data-cell][data-door="open"]', read: 'attrs', attrs: ['data-cell', 'data-room'] },
+    // 大きな地図の押せるマス（aria-label = 部屋の種類・扉・通路）
+    mapCells: { sel: '[data-map-overlay] [data-cell]', read: 'attrs', attrs: ['data-cell', 'aria-label', 'data-room'] },
     pinPanel: { sel: '[data-pin-panel]', read: 'count' },
     // 待ちの字（だれを待っているか）・通信の知らせ
     waitNotes: { sel: '[data-wait-notes]', read: 'texts' },

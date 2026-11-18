@@ -372,7 +372,13 @@ function s3(v, sh) {
     }
   }
   if (m.step === 'mapCell') {
-    const cell = (v.facts.mapDoors ?? []).find((c) => c['data-room'] === m.data.other) ?? (v.facts.mapDoors ?? [])[0];
+    // 押すマスの候補: まだ開けていない扉（data-door="open"）→ 部屋のマス（通路・開かない扉でない）→ 通路。押しても「こっち！」の枠が出なければ次の候補
+    // （区切り 3-S の試しの通しの直し: 予兆の見えている扉は data-door が付かず、候補が無いとして地図を閉じていた）
+    const tried = (m.data.cellsTried ??= []);
+    const all = v.facts.mapCells ?? [];
+    const cands = [...(v.facts.mapDoors ?? []).map((c) => c['data-cell']), ...all.filter((c) => c['aria-label'] && !/通路|開かない扉/.test(c['aria-label'])).map((c) => c['data-cell']), ...all.filter((c) => c['aria-label'] === '通路').map((c) => c['data-cell'])].filter((k, i, a) => a.indexOf(k) === i && !tried.includes(k));
+    const cell = cands.length && tried.length < 4 ? { 'data-cell': cands[0] } : null;
+    if (cell) tried.push(cell['data-cell']);
     if (!cell) {
       m.data.cellWait = (m.data.cellWait ?? 0) + 1;
       if (m.data.cellWait < 4) return HOLD;
@@ -384,8 +390,8 @@ function s3(v, sh) {
     if (!(v.facts.pinPanel ?? 0)) {
       m.data.panelWait = (m.data.panelWait ?? 0) + 1;
       if (m.data.panelWait < 4) return HOLD;
-      note(sh, 'S3: マスを押しても「こっち！」の枠が出ない');
-      m.step = 'mapClose';
+      m.data.panelWait = 0;
+      m.step = 'mapCell'; // 次の候補のマス
     } else return decide(G.pinSend, `${what}: 地図で「こっち！」`, { ...P, after: () => { m.step = 'mapCheck'; m.data.pinAt = sh.n.tick; } });
   }
   if (m.step === 'mapClose') {
@@ -607,7 +613,10 @@ export function shakeBrain(v, board) {
         return v.seat === m.seat ? s4(v, sh) : null;
       case 'S9':
         if (v.seat === m.late) return m.step === 'release' ? null : HOLD;
-        return null; // 待つ人は shakeIdle
+        // 待つ人: シートを開いた後は、頭（common の「うっかり開いたシートを閉じる」）より先に、ここで閉じるまで答える
+        // （区切り 3-S の試しの通しの直し: 前はシートを開く → 頭が閉じる → また開く、を行ったり来たりした）
+        if (v.seat === m.waiter && m.data.sheet && m.step !== 'release') return s9Waiter(v, sh);
+        return null;
       case 'S10':
         if (m.step === 'reinvite' && v.seat !== m.seat) return s10Reinvite(v, sh);
         return null;
@@ -628,6 +637,9 @@ export function shakeBrain(v, board) {
     }
   }
   // ---- 始める（機会を数える）----
+  // キャラの作業の窓（カードの強化・お供・行商人など。画面いっぱいに出る data-hero-task）が出ている間は始めない
+  // （区切り 3-S の試しの通しの直し: 窓の下の帯の「装備」を押そうとして、窓の「やめる」が乗っていた。bot の間違い）
+  if ((v.facts.dTask ?? []).length) return null;
   if (v.layers.some((l) => l.id !== 'detail')) {
     // シート・確認の窓などが開いている間は始めない（挑む段の持ち主は、窓が無い時だけ）
     return null;
@@ -636,6 +648,8 @@ export function shakeBrain(v, board) {
   const ch = challengeOwner(v, sh);
   if (ch) return ch;
   if (v.seat === 'P2') {
+    const b11 = s11Start(v, sh, board);
+    if (b11) return b11;
     // S10: 同行の誘い・移動の提案（誘われた人）
     const dec = s10Decline(v, sh);
     if (dec) return dec;
@@ -675,19 +689,24 @@ export function shakeIdle(v, board) {
   const m = sh.m;
   if (m?.id === 'S9' && v.seat === m.waiter) return s9Waiter(v, sh);
   if (m) return null;
-  // S11: P2 が戦闘でほかの席の番を待っている（自分の準備完了を押した後）
-  if (v.seat === 'P2' && v.mode === 'battle' && !v.layers.length) {
-    // 「準備完了」を押して、ほかの席を待っている（data-end-turn="waiting"。Bars.tsx）
-    const ready = (v.facts.bEndTurn ?? [])[0]?.['data-end-turn'];
-    const t = board.battle?.[v.seat]?.turn ?? 0;
-    const n = (board.stats?.battles ?? []).length;
-    if (ready === 'waiting' && opportunity(sh, 'S11', `${n}|${t}`)) {
-      begin(sh, 'S11', { step: 'more', seat: v.seat, tag: `${n + 1}戦目・${t}ターン` });
-      sh.m.data.startTick = sh.n.tick;
-      return s11(v, sh);
-    }
-  }
   return null;
+}
+
+/**
+ * S11 を始めるか（P2・戦闘の味方の番）。区切り 3-S の試しの通しの直し: 「準備完了を押して待っている」時だけにしていたが、
+ * 押すのはいつも P1 が先なので、P2 が待つ形がほとんど出ず、30 分で機会 0 だった。戦闘の味方の番（ほかの席がまだ動ける間）の
+ * 始めに、ターンごとに1回数える（周期4）。揺さぶりの手は先に押す（prio）ので、P1 の番の途中に開け閉めする形になる
+ */
+function s11Start(v, sh, board) {
+  if (v.seat !== 'P2' || v.mode !== 'battle' || v.layers.length) return null;
+  const ready = (v.facts.bEndTurn ?? [])[0]?.['data-end-turn'];
+  if (!['ready', 'end', 'waiting'].includes(ready)) return null;
+  const t = board.battle?.[v.seat]?.turn ?? 0;
+  const n = (board.stats?.battles ?? []).length;
+  if (!opportunity(sh, 'S11', `${n}|${t}`)) return null;
+  begin(sh, 'S11', { step: 'more', seat: v.seat, tag: `${n + 1}戦目・${t}ターン` });
+  sh.m.data.startTick = sh.n.tick;
+  return s11(v, sh);
 }
 
 // ---------------------------------------------------------------- 毎ステップの確かめ（全端末の View）
@@ -1145,6 +1164,18 @@ export async function shakeAfterTick({ fleet, judge, views, board }) {
       }
     }
   }
+  // S13: 同時に押した票が両方とも入ったか（押した人が、次にもう1度同じ物を押したら「入らなかった」）
+  if (sh.simCheck) {
+    const c = sh.simCheck;
+    if (c.idx === null) c.idx = judge.actions.length;
+    for (const v of views) for (const t of v.facts.toasts ?? []) if (!c.toasts.includes(`${v.seat}「${t}」`)) c.toasts.push(`${v.seat}「${t}」`);
+    const next = judge.actions.slice(c.idx).find((a) => a.result === 'tap' || a.result === 'long');
+    if (next) {
+      const again = c.presses.find((p) => p.seat === next.seat && next.target?.startsWith(p.css));
+      result(sh, 'S13', !again, again ? `${c.kind}: 2台で同時に押した後、${again.seat} がもう1度同じ物（${again.css}）を押した（${again.seat} の票・選択が画面に入っていなかった見立て。知らせ ${c.toasts.join('・') || 'なし'}）` : `${c.kind}: 同時に押した票が両方とも入った（次の手は ${next.seat}「${String(next.what).slice(0, 30)}」）`);
+      sh.simCheck = null;
+    } else if (sh.n.tick - (c.tick ??= sh.n.tick) > 40) sh.simCheck = null;
+  }
   // S7・S8: 読み込み直し
   await reloads({ fleet, judge, views, board, sh });
   // 揺さぶりの間の P1 の押した数（S9 の遅らせた手数は observe の数で数える）
@@ -1245,6 +1276,8 @@ export function pickSimultaneous(wants, views, board) {
     sh.order.push(`S13(${k})`);
     note(sh, `揺さぶり S13 を始める（${k}・${ws.map((w) => `${views[w.i].seat}「${w.d.what}」`).join(' と ')}を同時に押す）`);
     sh.watch.push({ id: 'S13', kind: 'agree', key: agreeKey(views.find((v) => v.seat === 'P1') ?? views[0]), ticks: 0, what: `S13（${k}）` });
+    // 押した後の確かめ（shakeAfterTick）: 同時に押した人が、すぐ後にもう1度同じ物を押していないか（自分の票が入っていなかった形）
+    sh.simCheck = { kind: k, presses: ws.map((w) => ({ seat: views[w.i].seat, css: w.d.target.css })), idx: null, toasts: [] };
     return { kind: k, wants: ws };
   }
   return null;
