@@ -160,7 +160,10 @@ export function battleConfirmBrain(v, board) {
   const st = turnState(board, v, b);
   const best = bestCard(b);
   const plays = Math.max(0, st.startHand - b.hand.length);
-  if (best && best.r.score > 0 && b.enemies.some((e) => !e.dead)) {
+  // 区切り 3-S の通しの直し: 手数読みで止めて「準備完了」を押した時は、確認の窓を閉じない（前は「まだ使うカードがある」で閉じ、
+  // また「準備完了」を押す、を行ったり来たりした。bot の間違い。battleBrain の punishStop と同じ決まり）
+  const punishStop = b.punishMin < 99 && plays >= b.punishMin - 1 && !(best?.r.why ?? '').includes('倒し切れる');
+  if (best && best.r.score > 0 && b.enemies.some((e) => !e.dead) && !punishStop) {
     if (plays === 0) {
       board.notes ??= [];
       board.seenNotes ??= new Set();
