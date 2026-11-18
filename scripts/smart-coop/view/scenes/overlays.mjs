@@ -55,7 +55,9 @@ export const WINDOWS = [
   { id: 'reward', css: '[data-reward-scroll]', required: [{ css: '[data-reward-bottom]', inView: true, label: '下のボタンの段' }] },
   { id: 'claim', css: '[data-claim-area]', required: [] },
   { id: 'relic-picker', css: '[data-relic-picker]', required: [] },
-  { id: 'job-pick', css: '[data-job-pick]', required: [{ css: '[data-pick-card]', min: 1, label: 'カード' }, { css: '[data-job-pick-peek]', label: '下の案内' }] },
+  // センサーの直し（2026-11-18・区切り 2-Sb）: 「下の案内」（data-job-pick-peek）は、カード選びを下に畳んだ時だけ出る別の形（JobSheet.tsx の peek。
+  //   カード選びの窓 data-job-pick と同時には出ない）。前は「要る物」にしていて、転職のたびに当たっていた（誤検知）。自己テスト: selftest.mjs「転職の専用カード選び」
+  { id: 'job-pick', css: '[data-job-pick]', required: [{ css: '[data-pick-card]', min: 1, label: 'カード' }] },
   { id: 'hero-task', css: '[data-hero-task]', required: [] },
   { id: 'flotsam', css: '[data-flotsam-options]', required: [] },
   { id: 'status-list', css: '[data-status-list-body]', required: [] },

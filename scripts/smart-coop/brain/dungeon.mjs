@@ -185,8 +185,8 @@ export function heroTaskBrain(v) {
     const f = ranked[0];
     return decide(G.flotsamPick(f.pick ?? f.i), `漂流物の山「${KB.items[f.id]?.name ?? f.id}」（${f.gold ? 'お金に換わる' : '袋に入る'}${(v.facts.dFlotsamFull ?? 0) ? '・袋がいっぱい' : ''}）`);
   }
-  // カードの作業（強化・外す・捧げる・祭壇）
-  const cards = v.facts.dTaskCards ?? [];
+  // カードの作業（強化・外す・捧げる・祭壇）。行商人の札（買う物）はここで選ばない（区切り 2-Sb の通しで、お金の足りない札を選んで「決める」が押せなかった。bot の間違い）
+  const cards = kind === 'peddler' ? [] : v.facts.dTaskCards ?? [];
   if (cards.length) {
     const me = { job: null };
     const vals = cards.map((c) => ({ i: c['data-pick-card'], name: c['aria-label'], val: cardValue(KB.cardByName[c['aria-label']], me.job), on: c['aria-pressed'] === 'true' }));

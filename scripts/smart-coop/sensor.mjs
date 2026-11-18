@@ -174,7 +174,10 @@ export function checkWindowsInPage({ windows, collapse }) {
       if (req.inView && (r.top < -1 || r.bottom > innerHeight + 1 || r.left < -1 || r.right > innerWidth + 1)) out.push({ kind: 'collapsed', win: w.id, text: `${req.label}が画面の外` });
       if (req.pressable) {
         const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-        if (!(t && (t === e || e.contains(t)))) out.push({ kind: 'collapsed', win: w.id, text: `${req.label}の上に別の物が乗っていて押せない` });
+        // センサーの直し（2026-11-18・区切り 2-Sb）: シートの中の操作で開いた手前の窓（確認の窓「転職する」・転職の専用カード選び など。covered.above の物）が
+        // × の上にある時は、× が押せないのが正しい形（手前の窓に答えるまで閉じない）。前は「× の上に別の物」と当てていた（誤検知）。自己テスト: selftest.mjs「シートの上の確認の窓」
+        const aboveOk = t && w.covered?.above.some((s) => t.closest(s));
+        if (!aboveOk && !(t && (t === e || e.contains(t)))) out.push({ kind: 'collapsed', win: w.id, text: `${req.label}の上に別の物が乗っていて押せない` });
       }
     }
   }
