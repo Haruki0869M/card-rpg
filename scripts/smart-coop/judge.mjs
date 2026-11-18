@@ -72,6 +72,8 @@ function readFingerprint() {
     // 取り直しの記録（1-G で足す読むだけの入口。まだ無ければ null）
     resyncLog: typeof o.resyncLog === 'function' ? safe(() => o.resyncLog()) : null,
     hasResyncLog: typeof o.resyncLog === 'function',
+    // 今の URL で決まる冒険の種（1-G の読むだけの入口。&seed= が無ければ null）
+    seed: typeof o.seed === 'function' ? safe(() => o.seed()) : null,
     violations: seal?.violations?.length ?? 0,
   };
 }
@@ -82,7 +84,7 @@ export class Judge {
    * @param {string} o.outDir 結果の置き場所（screenshots/smart-coop/<シナリオ>-<人数>p-<種>）
    * @param {Array} o.devices 端末（fleet.mjs）
    */
-  constructor({ outDir, devices, maxKinds = 10, stuckMs = 40000, deadlockMs = 12000, repeatLimit = 8, limitMin = 180 }) {
+  constructor({ outDir, devices, maxKinds = 10, stuckMs = 40000, deadlockMs = 12000, repeatLimit = 8, limitMin = 180, expectSeed = null }) {
     this.outDir = outDir;
     this.devices = devices;
     this.maxKinds = maxKinds;
@@ -107,6 +109,12 @@ export class Judge {
     this.repeats = new Map();
     this.views = [];
     this.hasResyncLog = null;
+    // 取り直しの記録（端末ごとに、読んだ所までの数）と、理由ごとの数（報告に出す）
+    this.resyncSeen = new Map();
+    this.resyncs = [];
+    // 冒険の種（全端末で同じか。&seed= が効いているか）
+    this.seeds = new Map();
+    this.expectSeed = expectSeed;
     mkdirSync(outDir, { recursive: true });
   }
 
@@ -246,7 +254,44 @@ export class Judge {
     for (const [i, f] of fps.entries())
       if (f.violations) await this.fail('seal', { seat: this.devices[i].seat, text: `書く入口が ${f.violations} 回呼ばれた`, key: `seal|${this.devices[i].seat}` });
     if (this.hasResyncLog === null && fps.some((f) => f.ready)) this.hasResyncLog = fps.some((f) => f.hasResyncLog);
-    return this.compare({ settleMs });
+    await this.checkSeeds(fps);
+    const r = await this.compare({ settleMs });
+    // 比べ終わった後に取り直しの記録を読む（ずれを見つけて自分で直した時も、ここで数える。計画 §2-4）
+    await this.checkResyncs(await this.fingerprints());
+    return r;
+  }
+
+  /** 冒険の種: 全端末が URL の &seed= と同じ種を読んでいるか（違えば、同じ流れをもう1度流せない） */
+  async checkSeeds(fps) {
+    for (const [i, f] of fps.entries()) {
+      if (!f.ready || f.seed === undefined) continue;
+      const seat = this.devices[i].seat;
+      if (this.seeds.has(seat)) continue;
+      this.seeds.set(seat, f.seed);
+      if (this.expectSeed !== null && f.seed !== this.expectSeed)
+        await this.fail('guard', { seat, text: `冒険の種が URL の &seed=${this.expectSeed} と違う（読めた種: ${f.seed}）。同じ流れをもう1度流せない`, key: `seed|${seat}` });
+    }
+  }
+
+  /**
+   * 取り直しの記録（1-G の resyncLog。読むだけ）: 新しい行を数える。
+   * 部屋に入った時（join）・冒険を始めた時（start）以外の取り直し（hash = 状態の印がずれた・gap = 抜け・error = 通らない操作）は、
+   * 自動で直っていても「同期のずれ」に数える（計画 §2-4）
+   */
+  async checkResyncs(fps) {
+    for (const [i, f] of fps.entries()) {
+      if (!Array.isArray(f.resyncLog)) continue;
+      const seat = this.devices[i].seat;
+      const seen = this.resyncSeen.get(seat) ?? 0;
+      // 読み込み直しの後は記録が空から始まる（ページの中の記録のため）
+      const from = f.resyncLog.length < seen ? 0 : seen;
+      for (const e of f.resyncLog.slice(from)) {
+        this.resyncs.push({ seat, ...e });
+        if (e.reason !== 'join' && e.reason !== 'start')
+          await this.fail('desync', { seat, text: `部屋が状態を取り直した（理由 ${e.reason}・番号 ${e.seq}）。自動で直ったが、ずれが起きていた`, key: `resync|${seat}|${e.seq}|${e.reason}` });
+      }
+      this.resyncSeen.set(seat, f.resyncLog.length);
+    }
   }
 
   /** 部屋に入っている端末の seq がそろうまで待ち、hash を比べる。返す物: { ok, seq, hashes } */

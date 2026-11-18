@@ -17,6 +17,18 @@ export const BLIND_SPOTS = [
 ];
 
 /**
+ * 操作の記録の1行（どの端末・どの画面・何を・どこを・結果）。同じ種で2回流した時に比べるので、
+ * 時刻・押した点の座標・かかった時間・「効いたか」（時間で変わる）は入れない（それは actions.json に残す）
+ */
+export const actionLine = (a, i) => `${String(i + 1).padStart(4, '0')} ${a.seat ?? '-'} ${a.where ?? '-'} ${a.what ?? '-'} | ${a.target ?? '-'} | ${a.result ?? '-'}`;
+
+/** 操作の記録を書く（actions.log = 1行1手・actions.json = 全部） */
+export function writeActionLog(dir, actions) {
+  writeFileSync(`${dir}/actions.log`, `${actions.map(actionLine).join('\n')}\n`);
+  writeFileSync(`${dir}/actions.json`, JSON.stringify(actions, null, 1));
+}
+
+/**
  * 報告を書く。
  * @param {string} dir 置き場所
  * @param {object} r { title, scenario, people, seed, devices, judge, startedAt, endedAt, stage, reached: { run, checkpoint, rewritten }, extra }
@@ -27,7 +39,8 @@ export function writeReport(dir, r) {
   const failed = j.failures.length > 0;
   // 区切り 1-S の合格は「失敗 0」だけ。網羅の表・揺さぶりの線は後の区切りで足す（それまでは合格と書かず「失敗なし」と書く）
   const pass = !failed && r.complete === true;
-  const verdict = failed ? '不合格' : pass ? '合格' : '失敗なし（ただし、通しの全部はまだ作っていないので合格とは書かない）';
+  const goal = r.reachedGoal === undefined ? '' : r.reachedGoal ? '・目標に着いた' : '・目標に着いていない';
+  const verdict = failed ? `不合格${goal}` : pass ? '合格' : `失敗なし${goal}（ただし、通しの全部はまだ作っていないので合格とは書かない）`;
   const minutes = ((new Date(r.endedAt) - new Date(r.startedAt)) / 60000).toFixed(1);
   const byKind = {};
   for (const f of j.failures) byKind[f.label] = (byKind[f.label] ?? 0) + 1;
@@ -64,13 +77,30 @@ export function writeReport(dir, r) {
   lines.push('');
   lines.push('## 同期');
   lines.push(`比べた回数: ${j.syncChecks}　ずれ: ${j.failures.filter((f) => f.kind === 'desync').length}　追いつかない: ${j.failures.filter((f) => f.kind === 'lag').length}`);
-  lines.push(`取り直しの記録: ${j.hasResyncLog ? '読めた' : 'まだ読めない（確認用の入口 resyncLog は区切り 1-G で入る）'}`);
+  const why = {};
+  for (const x of j.resyncs ?? []) why[x.reason] = (why[x.reason] ?? 0) + 1;
+  lines.push(`取り直しの記録: ${j.hasResyncLog ? `読めた（${Object.entries(why).map(([k, n]) => `${k} ${n}`).join('・') || '0 回'}。join・start 以外はずれに数える）` : '読めない（確認用の入口 resyncLog が無い）'}`);
+  lines.push(`冒険の種（各端末が読んだ &seed=）: ${[...(j.seeds ?? new Map()).entries()].map(([k, v]) => `${k}=${v}`).join(' ') || '読めない'}`);
+  lines.push('');
+  if (r.milestones?.length) {
+    lines.push('## 着いた順（通し）');
+    for (const m of r.milestones) lines.push(`- ${m.at.slice(11, 19)}　手数 ${m.presses}　${m.text}`);
+    lines.push('');
+  }
+  // 重さ（計画 §7-2・区切り 1-J: メモリと1手の時間）
+  const taps = j.actions.filter((a) => a.result === 'tap' && typeof a.ms === 'number');
+  const avgMs = taps.length ? taps.reduce((a, b) => a + b.ms, 0) / taps.length : 0;
+  const total = (new Date(r.endedAt) - new Date(r.startedAt)) / 1000;
+  lines.push('## 重さ');
+  if (r.mem?.peak) lines.push(`- メモリの最大: 合計 ${r.mem.peak.totalGB}GB（ブラウザ ${r.mem.peak.browserGB}GB・プロセス ${r.mem.peak.procs} 個・台本の node ${r.mem.peak.nodeGB}GB。${r.mem.peak.at?.slice(11, 19) ?? ''}・${r.mem.samples.length} 回測った）`);
+  lines.push(`- 押した数: ${taps.length}　1手の平均（検査・押す・効いたかの確かめまで）: ${(avgMs / 1000).toFixed(2)} 秒　通し全体: ${total.toFixed(0)} 秒（押した数で割ると ${taps.length ? (total / taps.length).toFixed(2) : '-'} 秒／手。落ち着くのを待つ・読む時間を含む）`);
+  lines.push(`- 地図を動かし直した回数: ${j.notes.filter((n) => n.kind === 'pan').length}${(() => { const by = {}; for (const n of j.notes.filter((x) => x.kind === 'pan')) by[n.reason] = (by[n.reason] ?? 0) + 1; return Object.keys(by).length ? `（${Object.entries(by).map(([k, n]) => `${k} ${n}`).join('・')}）` : ''; })()}`);
   lines.push('');
   lines.push('## 注意（失敗ではない）');
   lines.push(`- 一瞬の当たり: ${momentary.length} 回${momentary.length ? `（${momentary.slice(0, 10).map((n) => n.text).join('／')}）` : ''}`);
   lines.push(`- わざと「…」で切っている字: ${ellipsisTotal} か所（画面ごとの数は report.json）`);
   lines.push(`- 手元以外への通信を捨てた（本番に書かない守り）: ${blocked.length} 回${blocked.length ? `（${[...new Set(blocked.map((n) => n.text))].slice(0, 5).join('／')}）` : ''}`);
-  for (const n of j.notes.filter((x) => !['momentary', 'blocked'].includes(x.kind)).slice(0, 20)) lines.push(`- ${n.text}`);
+  for (const n of j.notes.filter((x) => !['momentary', 'blocked', 'pan'].includes(x.kind)).slice(0, 20)) lines.push(`- ${n.text}`);
   lines.push('');
   lines.push('## bot が見逃す物（いつも付ける）');
   for (const b of BLIND_SPOTS) lines.push(`- ${b}`);
@@ -80,6 +110,7 @@ export function writeReport(dir, r) {
     for (const e of r.extra) lines.push(`- ${e}`);
   }
   writeFileSync(`${dir}/report.md`, `${lines.join('\n')}\n`);
+  writeActionLog(dir, j.actions);
   writeFileSync(
     `${dir}/report.json`,
     JSON.stringify(
@@ -100,6 +131,11 @@ export function writeReport(dir, r) {
         syncChecks: j.syncChecks,
         actions: j.actions.length,
         reached: r.reached,
+        reachedGoal: r.reachedGoal ?? null,
+        milestones: r.milestones ?? [],
+        memory: r.mem ?? null,
+        resyncs: j.resyncs ?? [],
+        seeds: Object.fromEntries(j.seeds ?? new Map()),
         blindSpots: BLIND_SPOTS,
       },
       null,

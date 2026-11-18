@@ -12,6 +12,7 @@ import { checkTarget, checkWindows, checkOverflow } from './sensor.mjs';
 import { press, locate } from './press.mjs';
 import { readView } from './view/index.mjs';
 import { Judge } from './judge.mjs';
+import { Conductor } from './conductor.mjs';
 import { wait } from './util.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -56,6 +57,17 @@ const FIX = {
   // 画面を読む
   blank: page(''),
   lobby: page(`<div data-testid="room-code">AB12</div><button>作る</button><button>冒険に出発</button>`),
+  // イベントの結果の段（選択肢が消えて「先へ進む」だけ）は窓の潰れではない／何も無い窓は潰れ（2026-11-18・区切り 1-J の直し）
+  'event-result': page(`<div data-event-panel class="abs" style="left:0;top:100px;width:390px;height:300px;background:#222"><div data-event-window>本文。足早にその場を離れた。</div><button>先へ進む</button></div>`),
+  'event-empty': page(`<div data-event-panel class="abs" style="left:0;top:100px;width:390px;height:300px;background:#222"><div data-event-window>本文</div></div>`),
+  // 押した形の縮み（.btn:active の scale(0.97)）は小さいボタンではない／本当に 40px のボタンは当たる（2026-11-18・区切り 1-J の直し）
+  'pressed-shrink': page(`<button style="position:absolute;left:20px;top:20px;width:206px;height:44px;transform:translateY(2px) scale(0.97)">移動する</button>`),
+  'small-real': page(`<button style="position:absolute;left:20px;top:20px;width:206px;height:40px">移動する</button>`),
+  // シートの上に、シートの外の帯（同行の誘い。押せる物）が乗る（2b5b0f7 の前の重なりの形）／帯がシートの後ろなら当たらない（区切り 1-J で足した検査）
+  'sheet-under-band': page(`<div data-sheet="pouch" class="abs" style="left:0;top:0;width:390px;height:540px;background:#222;z-index:50"><button data-sheet-close style="width:48px;height:48px">×</button><div data-sheet-body style="height:400px;overflow-y:auto">中身</div></div><div data-online-overlay class="abs" style="left:0;top:0;width:390px;height:220px;z-index:70;pointer-events:none"><div style="margin-top:106px;height:108px;background:#036;pointer-events:auto">同行に誘っています<button>一緒に行く</button></div></div>`),
+  'sheet-over-band': page(`<div data-sheet="pouch" class="abs" style="left:0;top:0;width:390px;height:540px;background:#222;z-index:64"><button data-sheet-close style="width:48px;height:48px">×</button><div data-sheet-body style="height:400px;overflow-y:auto">中身</div></div><div data-online-overlay class="abs" style="left:0;top:0;width:390px;height:220px;z-index:62;pointer-events:none"><div style="margin-top:106px;height:108px;background:#036;pointer-events:auto">同行に誘っています<button>一緒に行く</button></div></div>`),
+  // 演出中は測らない（2026-11-18・区切り 1-J の直し）: 歩きの演出の途中に、高さ 43px のボタン（演出の途中の形）。演出の印が消えたら当たる
+  'busy-small': page(`<div data-app-root data-screen="game" data-mode="world"><div data-world-map style="height:200px"></div><div id="mv" data-world-moving></div><button style="width:69px;height:43px">P2: 一緒に行く</button></div>`),
 };
 
 // ---------- 小さな配り手（127.0.0.1 だけ） ----------
@@ -203,6 +215,41 @@ export async function selftest() {
     await open('overflow-ellipsis');
     o = await checkOverflow(p, { heavy: true });
     check(!o.problems.length && o.ellipsis.length === 1, '③ はみ出し: わざと「…」で切った字は失敗にせず数える', JSON.stringify(o));
+
+    // ---- シートの上に乗る帯（区切り 1-J で足した検査）----
+    await open('sheet-under-band');
+    w = await win();
+    check(w.some((x) => x.includes('窓の上に、窓の外の物')), '② 窓: シートの上に、シートの外の帯（同行の誘い）が乗っていれば当たる', w.join('／'));
+    await open('sheet-over-band');
+    w = await win();
+    check(!w.length, '② 窓: 帯がシートの後ろ（シートが手前）なら当たらない', w.join('／'));
+
+    // ---- イベントの結果の段・押した形の縮み（区切り 1-J の直し）----
+    await open('event-result');
+    w = await win();
+    check(!w.length, '② 窓の潰れ: イベントの結果の段（「先へ進む」だけ）は当たらない', w.join('／'));
+    await open('event-empty');
+    w = await win();
+    check(w.some((x) => x.includes('要る物が無い')), '② 窓の潰れ: 選択肢もボタンも無いイベントの窓に当たる', w.join('／'));
+    await open('pressed-shrink');
+    o = await checkOverflow(p, { heavy: true });
+    check(!o.problems.some((x) => x.text.startsWith('small button')), '③ はみ出し: 押した形の縮み（scale 0.97）は小さいボタンに当たらない', o.problems.map((x) => x.text).join('／'));
+    await open('small-real');
+    o = await checkOverflow(p, { heavy: true });
+    check(o.problems.some((x) => x.text.startsWith('small button')), '③ はみ出し: 本当に 40px のボタンには当たる', o.problems.map((x) => x.text).join('／'));
+
+    // ---- 演出中は測らない（conductor の点検）----
+    await open('busy-small');
+    {
+      const j2 = new Judge({ outDir: `${OUT}/busy`, devices: [dev] });
+      const c2 = new Conductor({ fleet: { devices: [dev] }, judge: j2 });
+      await c2.observe();
+      const during = j2.failures.map((f) => f.text);
+      await p.evaluate(() => document.getElementById('mv').remove());
+      await c2.observe();
+      const after = j2.failures.map((f) => f.text);
+      check(!during.length && after.some((x) => x.includes('small button')), '点検: 演出中（歩きの途中）は測らず、演出が終わってから測って当たる', JSON.stringify({ during, after }));
+    }
 
     // ---- 画面を読む ----
     await open('blank');

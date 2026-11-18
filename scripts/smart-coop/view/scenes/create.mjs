@@ -7,7 +7,7 @@ export const SCENE = {
     job: (name) => ({ css: '[data-class-list] button', text: name }),
     decide: { css: '[data-depart]' }, // オンライン = 「このキャラに決める」
     // 「このまま出発しますか？」の確認
-    confirmDepart: { css: '[role="dialog"] button', text: '出発する' }, // 字だけ（1-G の A4 で差し替え）
+    confirmDepart: { css: '[data-confirm] [data-confirm-ok]', text: '出発する' }, // 確認の窓の印（A4）＋字
   },
   facts: {
     jobs: { sel: '[data-class-list] button', read: 'texts' },

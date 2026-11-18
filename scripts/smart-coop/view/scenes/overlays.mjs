@@ -38,14 +38,18 @@ export const MIN_STRIP = 43.5;
  * required = 要る要素: css・min（数）・inView（画面の中）・pressable（真ん中が押せる）・text（字が空でない）・anyOf（どれか1つ）
  */
 export const WINDOWS = [
-  { id: 'sheet', css: '[data-sheet]', scroll: '[data-sheet-body]', required: [{ css: '[data-sheet-close]', inView: true, pressable: true, label: '×' }] },
+  // sheet の covered: シートの上に、シートの外の物（押せる物）が乗っていないか（区切り 1-J で足した検査。実機の不具合②の形 =
+  //   通信の知らせ・同行の誘いの帯がシートの上に乗り、シートの中身が隠れて押せない）。above = シートの上に出てよい物（シートから開く窓など。理由: シートの中の操作で開く手前の窓）
+  { id: 'sheet', css: '[data-sheet]', scroll: '[data-sheet-body]', required: [{ css: '[data-sheet-close]', inView: true, pressable: true, label: '×' }], covered: { above: ['[data-confirm]', '[data-detail-popup]', '[data-detail-backdrop]', '[data-help]', '[data-lorebook]', '[data-card-pick-panel]', '[data-item-pick-panel]', '[data-job-pick]', '[data-hero-task]', '[data-status-list-body]', '[data-smart-induced]'] } },
   { id: 'sheet-party', css: '[data-sheet="party"]', scroll: '[data-sheet-body]', required: [{ css: '[data-equip-slot]', min: 1, label: '装備の欄' }, { css: '[data-party-items]', label: '持ち物の列' }] },
   // 道具袋の「行ごとに使う・渡す」は、行を開いた時だけ出る見立て【未確認】。区切り3（揺さぶり S1）で行を開いてから確かめる
   { id: 'sheet-pouch', css: '[data-sheet="pouch"]', scroll: '[data-sheet-body]', required: [] },
   { id: 'card-pick', css: '[data-card-pick-panel]', required: [{ css: '[data-card-summary]', text: true, label: '説明の文' }, { css: '[data-card-pick-action]', inView: true, label: '「このカードを選ぶ」' }] },
   { id: 'item-pick', css: '[data-item-pick-panel]', required: [] },
   { id: 'detail', css: '[data-detail-popup]', required: [{ self: true, text: true, label: '説明の文' }] },
-  { id: 'event', css: '[data-event-panel]', scroll: '[data-event-scroll]', required: [{ css: '[data-event-window]', text: true, label: '本文' }, { anyOf: ['[data-event-option]', '[data-challenge-go]', '[data-challenge-wait]'], label: '選択肢か「挑戦する」か待ちの字' }] },
+  // event: 結果の段（選んだ後）は、選択肢が消えて下の段に「先へ進む」「戦闘を始める」（印なし。data-event-panel の中のボタン）だけになる。
+  //   センサーの直し（2026-11-18・区切り 1-J）: 前はこの形を「要る物が無い」と当てていた（誤検知）。自己テスト: selftest.mjs「イベントの結果の段」
+  { id: 'event', css: '[data-event-panel]', scroll: '[data-event-scroll]', required: [{ css: '[data-event-window]', text: true, label: '本文' }, { anyOf: ['[data-event-option]', '[data-challenge-go]', '[data-challenge-wait]', '[data-event-panel] button'], label: '選択肢か「挑戦する」か待ちの字か結果の後のボタン' }] },
   { id: 'town', css: '[data-town-body]', required: [] },
   { id: 'town-exit', css: '[data-town-tabs]', required: [{ css: '[data-town-tabs] > button', min: 5, label: 'タブ5つ' }, { css: '[data-town-exit]', inView: true, label: '「町を出る」の段' }] },
   { id: 'reward', css: '[data-reward-scroll]', required: [{ css: '[data-reward-bottom]', inView: true, label: '下のボタンの段' }] },

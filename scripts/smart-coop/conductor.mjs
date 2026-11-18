@@ -35,6 +35,11 @@ export class Conductor {
         if (again.unreadable) await this.judge.fail('unreadable', { seat: dev.seat, text: `${again.unreadable}（字の始め: ${again.textSample?.slice(0, 60) ?? ''}）`, key: `unreadable|${dev.seat}|${again.textSample?.slice(0, 40)}` });
         continue;
       }
+      // 演出の途中（歩き・戦闘の見せ方・扉が開く など。View の busy）は測らない。センサーの直し（2026-11-18・区切り 1-J）:
+      // 歩きの演出の途中で、移動の提案のボタンが 69×43 と測られ「小さいボタン」に当たった（演出の無い時は 44px。同じ通しの前の手で測って当たっていない）。
+      // 動いている途中の大きさ・位置は、人が押す時の形ではない。演出が終わってから、同じ画面をもう1度測る（重い検査の「初めて見た」の印も付けない）。
+      // 自己テスト: selftest.mjs「演出中は測らない」
+      if (v.busy.length) continue;
       for (const p of await checkWindows(dev.page).catch(() => [])) await this.judge.fail(p.kind, { seat: dev.seat, text: `${v.screen}/${v.mode ?? '-'} の窓「${p.win}」: ${p.text}`, key: `${p.kind}|${dev.viewport.width}x${dev.viewport.height}|${p.win}|${p.text.replace(/\d+/g, 'N')}` });
       // 重い検査は、その端末でその画面の指紋を初めて見た時だけ
       const heavy = !this.heavySeen.has(`${dev.seat}|${v.sig}`);
@@ -64,15 +69,15 @@ export class Conductor {
     }
     const allWaiting = wants.length === 0;
     const stuck = await this.judge.watch(views, { allWaiting });
-    if (!wants.length) return { pressed: false, allWaiting, stop: this.judge.shouldStop() || stuck === 'timeout' };
+    if (!wants.length) return { pressed: false, allWaiting, views, stuck, stop: this.judge.shouldStop() || stuck === 'timeout' };
     // 手番の人 → 席の番号の小さい順
     wants.sort((a, b) => (b.d.turn ? 1 : 0) - (a.d.turn ? 1 : 0) || a.i - b.i);
     const { i, d } = wants[0];
     const before = await this.judge.maxSeq();
-    const r = await press(this.session, devs[i], d.target, { what: d.what });
+    const r = await press(this.session, devs[i], d.target, { what: d.what, map: !!d.map, where: `${views[i].screen}/${views[i].mode ?? '-'}` });
     await this.judge.step();
     const after = await this.judge.maxSeq();
     if (r.pressed) await this.judge.repeated(devs[i].seat, views[i].sig, d.what ?? JSON.stringify(d.target), after > before || r.effect);
-    return { pressed: r.pressed, seat: devs[i].seat, allWaiting: false, stop: this.judge.shouldStop() };
+    return { pressed: r.pressed, seat: devs[i].seat, what: d.what, allWaiting: false, views, stuck, stop: this.judge.shouldStop() };
   }
 }
