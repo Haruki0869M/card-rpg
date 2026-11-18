@@ -1,5 +1,6 @@
 // ===== 戦闘の報酬（ゴールド → 経験値 → レベルアップ → カード → 戦利品の取り合い → ドロップ） =====
-import { VoteChips, VoteStatus } from '../ui/Votes';
+import { OutsiderNote, VoteChips, VoteStatus } from '../ui/Votes';
+import { voteOutsider } from './worldTurnGate';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowUpCircle, Coins, Gift, Heart, Sparkles, Star, TrendingUp } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
@@ -199,6 +200,7 @@ export function RewardScreen() {
   // 実機の不具合④(1)（オーナーの決定）: 成長 → 自分のカード → 全員がそろってから戦利品の取り合い（真ん中に出す）。
   // エンジンの決まりは変えず、出し方だけで順番を作る（rewardStep）。1台で全員を動かす時も同じ順番
   const step = rewardStep(game, isLocalPlayer, isAway);
+  const finishOutsider = voteOutsider(game, { type: 'FINISH_REWARD', playerId: LOCAL_PLAYER }, isLocalPlayer);
   const luMine = step.kind === 'growth';
   const cardHero = step.kind === 'card' ? step.heroId : undefined;
   const claimVisible = rewardClaimVisible(game, isAway);
@@ -295,7 +297,9 @@ export function RewardScreen() {
         ) : (
           <>
             <VoteStatus className="mb-2" />
-            <button onClick={() => dispatchGame({ type: 'FINISH_REWARD', playerId: LOCAL_PLAYER })} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px]" data-reward-finish>
+            {/* その戦闘に出ていない人の画面: 押しても票が入らないので、薄くして押せなくし、だれが選んでいるかを出す（2026-11-19） */}
+            <OutsiderNote cmd={{ type: 'FINISH_REWARD', playerId: LOCAL_PLAYER }} className="mb-2" />
+            <button onClick={() => dispatchGame({ type: 'FINISH_REWARD', playerId: LOCAL_PLAYER })} disabled={finishOutsider} data-option-wait={finishOutsider ? 1 : undefined} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px]" data-reward-finish>
               {r.hiddenChest ? '隠し宝箱へ' : '先へ進む'}
               <VoteChips cmd={{ type: 'FINISH_REWARD', playerId: LOCAL_PLAYER }} />
             </button>

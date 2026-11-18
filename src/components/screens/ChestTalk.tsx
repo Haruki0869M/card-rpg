@@ -5,13 +5,14 @@ import { Hand } from 'lucide-react';
 import { BALANCE } from '../../data/balance';
 import { PLAYER_COLOR } from '../../data/theme';
 import { heroStats, sealStep, statChance } from '../../engine';
-import { LOCAL_PLAYER } from '../../store/battleConfig';
+import { isLocalPlayer, LOCAL_PLAYER } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
 import { useOnline } from '../../store/onlineStore';
 import type { ChestState, Hero } from '../../types';
 import { chanceAtLeast } from '../ui/CheckPanel';
 import { HeroFace } from '../ui/game';
-import { VoteChips } from '../ui/Votes';
+import { OutsiderNote, VoteChips } from '../ui/Votes';
+import { voteOutsider } from './worldTurnGate';
 
 /** 候補が開けた時の成功の確率（%）。鍵つき = 鍵が開く、鍵なし = 運のスロットの完全成功 */
 export function openerChance(h: Hero, locked: boolean, focus: number): number {
@@ -31,8 +32,13 @@ export function OpenerPicker({ chest, heroes }: { chest: ChestState; heroes: Her
   const slots = locked ? BALANCE.lockSlots : BALANCE.chestLuckSlots;
   const best = [...heroes].sort((a, b) => openerChance(b, locked, b.focus) - openerChance(a, locked, a.focus))[0]?.id;
   const seatName = (h: Hero) => useOnline.getState().room?.seatName(h.playerId);
+  // この宝箱に出ていない人の画面: 押しても票が入らないので、薄くして押せなくし、だれが選んでいるかを出す（2026-11-19）
+  const game = useBattle((s) => s.game)!;
+  const probe = { type: 'CHEST_OPENER', playerId: LOCAL_PLAYER, heroId: heroes[0]?.id ?? '' } as const;
+  const outsider = voteOutsider(game, probe, isLocalPlayer);
   return (
     <div className="flex flex-col gap-1" data-opener-picker>
+      <OutsiderNote cmd={probe} />
       <div className="text-[12px] leading-4 text-zinc-300">
         だれが開ける？ 全員が同じ人を選ぶと決まります（{sealed ? `封印を解く人。器用の判定・${slots}枠のうち${BALANCE.lockNeed}つで罠を避ける。その後、番人との戦闘` : locked ? `器用の判定・${slots}枠のうち${BALANCE.lockNeed}つで鍵が開く` : `運の判定・${slots}枠。成功が多いほど中身の格が上がる`}）
       </div>
@@ -63,7 +69,7 @@ export function OpenerPicker({ chest, heroes }: { chest: ChestState; heroes: Her
                 {seatName(h) ? `・${seatName(h)}` : ''}
               </span>
             </span>
-            <button onClick={() => dispatchGame(cmd)} className={`btn flex h-11 shrink-0 items-center gap-0.5 rounded-lg px-2 text-[13px] font-bold ${chosen ? 'btn-gold' : 'btn-dark'}`}>
+            <button onClick={() => dispatchGame(cmd)} disabled={outsider} data-option-wait={outsider ? 1 : undefined} className={`btn flex h-11 shrink-0 items-center gap-0.5 rounded-lg px-2 text-[13px] font-bold ${chosen ? 'btn-gold' : 'btn-dark'}`}>
               <Hand size={14} />
               任せる
               <VoteChips cmd={cmd} />
