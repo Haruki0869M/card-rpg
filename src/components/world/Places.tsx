@@ -335,21 +335,19 @@ export function TownScreen() {
       </div>
       {/* 回1の追加: 町の説明の下に、ランダムダンジョンのうわさ（いちばん近い未踏破の1つ。無ければ出さない） */}
       {/* 2026-11-19（検証 bot の指摘1）: 低い画面では、うわさと説明を1行に縮めて、品物の欄を広げる（うわさが先。入りきらない分は「…」） */}
-      <Heading
-        sub={
-          shortTown ? (
-            <span className="block truncate" data-town-sub-line>
-              {rumor && <span className="text-amber-200/90" data-town-rumor>{rumor}</span>}
-              {rumor && '　'}
-              {def.description}
-            </span>
-          ) : (
-            <>{def.description}{rumor && <span className="block text-amber-200/90" data-town-rumor>{rumor}</span>}</>
-          )
-        }
-      >
-        {def.name}
-      </Heading>
+      {/* 2026-11-19（オーナーの決定 A）: 低い画面では、町の名前も同じ1行にまとめる（名前 → うわさ → 説明。品物の欄を 150px 以上にするため） */}
+      {shortTown ? (
+        <div className="flex shrink-0 items-baseline gap-2 px-3 pt-1 text-[12px] leading-5 text-zinc-400" data-town-sub-line>
+          <span className="font-display text-outline shrink-0 text-[16px] tracking-wider text-amber-50" data-town-name>{def.name}</span>
+          <span className="min-w-0 flex-1 truncate">
+            {rumor && <span className="text-amber-200/90" data-town-rumor>{rumor}</span>}
+            {rumor && '　'}
+            {def.description}
+          </span>
+        </div>
+      ) : (
+        <Heading sub={<>{def.description}{rumor && <span className="block text-amber-200/90" data-town-rumor>{rumor}</span>}</>}>{def.name}</Heading>
+      )}
       <div className="mx-3 mt-1 flex shrink-0 items-center gap-2 rounded-lg bg-black/40 px-2 py-1 text-[13px]">
         <HeroFace hero={v} size={28} />
         <span className="min-w-0 flex-1 truncate">
