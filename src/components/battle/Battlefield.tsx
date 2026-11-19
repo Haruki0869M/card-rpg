@@ -27,7 +27,7 @@ import { getElement } from '../../data/elements';
 import { SCOURGES } from '../../data/world';
 import { StatusChips } from '../ui/StatusChips';
 import { UnitPopups } from './Popups';
-import { enemyMarks } from './statusMarks';
+import { enemyMarks, SMALL_CHIP } from './statusMarks';
 import { breakDropFor, CALLOUT_TOP } from './breakDrop';
 import { useBattleLowScreen } from './lowScreen';
 import { SlotOverlay } from './SlotOverlay';
@@ -340,11 +340,14 @@ const EnemyUnit = memo(function EnemyUnit({
   boxH,
   narrow,
   tight,
+  sideMarks = false,
 }: {
   /** 敵が3体以上で枠が狭い（BREAK の印を短い形にする） */
   narrow: boolean;
   /** 回3: 絵を縮めても敵の欄が戦場に入らない時、状態の印を2つまででも小さい札にする */
   tight: boolean;
+  /** 2026-11-19: それでも入らない時（390×540 のボス戦）、状態の印の行を HP の横に並べて、欄を1行ぶん詰める */
+  sideMarks?: boolean;
   enemy: EnemyState;
   left: number;
   top: number;
@@ -377,6 +380,8 @@ const EnemyUnit = memo(function EnemyUnit({
   const lit = spotOn && isTarget;
   const h = spriteH * (def.size ?? 1);
   const barW = Math.min(slotW - 6, 104);
+  // sideMarks の時の HP と状態の印の行の幅（枠からはみ出さない）
+  const sideRowW = Math.min(slotW - 6, barW + 100);
   // 次の攻撃の属性の色（足元のオーラ）
   const auraColor = useMemo(() => {
     if (enemy.dead) return undefined;
@@ -482,15 +487,33 @@ const EnemyUnit = memo(function EnemyUnit({
             {battle.boon?.uid === enemy.uid && <span className="ml-0.5 text-violet-300" data-boon-mark={battle.boon.ids.length}>💀{battle.boon.ids.length}</span>}
             {battle.insight === enemy.uid && <span className="ml-0.5 text-emerald-300" data-insight-mark>👁</span>} {enemyName(enemy)}
           </div>
-          <HpBar hp={enemy.hp} max={enemy.maxHp} block={enemy.block} tone="enemy" height={12} marks={phaseMarks(enemy).map((m) => m.at)} />
-          <ElementMarks enemy={enemy} />
+          {sideMarks ? (
+            // 状態の印を HP の横に（行の幅は枠の中で HP＋印の分まで広げる。HP の長さは変えず、入らない時だけ縮める）
+            <div className="flex items-center gap-1" style={{ width: sideRowW }} data-status-side>
+              <div className="shrink-0" style={{ width: Math.min(barW, sideRowW - 44) }}>
+                <HpBar hp={enemy.hp} max={enemy.maxHp} block={enemy.block} tone="enemy" height={12} marks={phaseMarks(enemy).map((m) => m.at)} />
+              </div>
+              <StatusChips marks={enemyMarks(enemy)} side="enemy" unit={enemy.uid} maxW={sideRowW - Math.min(barW, sideRowW - 44) - 4} inline />
+            </div>
+          ) : (
+            <HpBar hp={enemy.hp} max={enemy.maxHp} block={enemy.block} tone="enemy" height={12} marks={phaseMarks(enemy).map((m) => m.at)} />
+          )}
+          {sideMarks ? (
+            // 狙い・連携の印も、属性の印の横に（もう1行ぶん詰める）
+            <div className="flex items-center justify-center gap-1" style={{ width: sideRowW }} data-aims-side>
+              <ElementMarks enemy={enemy} />
+              <AimMarks battle={battle} enemyUid={enemy.uid} />
+            </div>
+          ) : (
+            <ElementMarks enemy={enemy} />
+          )}
           {/* 次の行動の予告（HPのすぐ下。誰を狙っているかの顔つき） */}
           <IntentBubble enemy={enemy} onTap={onTap} narrow={narrow} />
           {!narrow && <BehaviorBrief enemy={enemy} maxW={slotW - 8} />}
           <BreakHint enemy={enemy} narrow={narrow} maxW={narrow ? slotW - 4 : slotW - 8} />
-          <AimMarks battle={battle} enemyUid={enemy.uid} />
+          {!sideMarks && <AimMarks battle={battle} enemyUid={enemy.uid} />}
           {/* 回3: 状態の印（大事な印が先。3つ以上・低い画面は小さい札の1行＋「＋N」） */}
-          <StatusChips marks={enemyMarks(enemy)} side="enemy" unit={enemy.uid} maxW={barW} small={tight} />
+          {!sideMarks && <StatusChips marks={enemyMarks(enemy)} side="enemy" unit={enemy.uid} maxW={barW} small={tight} />}
         </div>
       )}
     </div>
@@ -788,6 +811,8 @@ export function Battlefield() {
   const [tight, setTight] = useState(false);
   // 縮めても案内の1行まで入らない時: 案内の1行を、敵の欄の下ではなく、敵の絵の足元の高さに重ねる（状態の印・予告を隠さない）
   const [briefUp, setBriefUp] = useState(false);
+  // 2026-11-19（検証 bot の指摘7）: ここまでしても入らない時、状態の印の行を HP の横に、狙い・連携の印を属性の印の横に並べる（390×540 のボス戦で「＋N」の札が戦場の外で切れた）
+  const [sideMarks, setSideMarks] = useState(false);
   const baseSpriteH = Math.max(40, Math.min(H * 0.56 - enemyInfoH, enemySlotW * 1.15));
   const enemySpriteH = Math.max(SPRITE_MIN, baseSpriteH - squeeze);
   // 大きな敵（size > 1）は、絵の箱より上へはみ出して描かれ、戦場の上の端（上の帯）で体が切れていた。
@@ -825,9 +850,11 @@ export function Battlefield() {
       else if (!tight) setTight(true);
       else if (!narrowAll) setCramped(true);
       else if (briefBar && !briefUp) setBriefUp(true);
+      else if (!sideMarks) setSideMarks(true);
     } else if (over < -1) {
       // 余る: 絵を戻す。戻しきって、大きな印に戻しても入る（余りが 22px＋α）時だけ大きな印に戻す
       if (squeeze > 0) setSqueeze(Math.max(0, Math.round(squeeze + over)));
+      else if (sideMarks && over < -(2 * SMALL_CHIP.h + 8)) setSideMarks(false);
       else if (briefUp && over < -(BRIEF_BAR_H + 4)) setBriefUp(false);
       else if (cramped && over < -40) setCramped(false);
       else if (tight && over < -26) setTight(false);
@@ -880,6 +907,7 @@ export function Battlefield() {
               boxH={enemySpriteH}
               narrow={narrowAll}
               tight={tight}
+              sideMarks={sideMarks}
             />
           ))}
           {/* 回3: 案内の1行は戦場の下の端より上に置く（低い画面で、戦場の外に出て見えなかった） */}

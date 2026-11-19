@@ -278,8 +278,15 @@ function s1(v, sh) {
     }
   }
   if (m.step === 'giveTo') {
-    const to = (f.pGiveTo ?? [])[0]?.['data-give-to'];
+    // 2026-11-19（src の直し9）: 袋がいっぱいの相手は、ボタンが押せない（disabled・data-give-full）。押せる相手だけを選ぶ
+    const all = f.pGiveTo ?? [];
+    const to = all.find((r) => r['data-give-full'] == null && r.disabled == null)?.['data-give-to'];
     if (!to) {
+      if (all.length) {
+        note(sh, `S1: 渡す相手の袋がいっぱいで、相手のボタンが押せない（${all.map((r) => r['data-give-to']).join('・')}。画面が先に止めている）`);
+        m.step = 'use';
+        return null;
+      }
       const why = (f.pGiveReason ?? []).join('／');
       if (!why) return HOLD;
       note(sh, `S1: 渡せない（${why}）`);

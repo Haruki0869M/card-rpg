@@ -4,7 +4,7 @@ import { facilityMembers, facilityVisit } from '../../engine/game/world/faciliti
 // ===== 世界マップの場面: 遭遇（spec §8.5）・町（§17）・祠（§8.4）・エンディング =====
 import { motion } from 'framer-motion';
 import { ArrowUpCircle, BedDouble, Check, Coins, Eye, HandCoins, ScrollText, Sparkles, Store, Swords, Trash2, Wind } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Heart } from 'lucide-react';
 import { usePins } from '../../store/pins';
 import { PinChips } from '../ui/PinChips';
@@ -236,6 +236,19 @@ const TOWN_TABS: { id: TownTab; name: string; Icon: typeof Store }[] = [
 
 const chanceOf = (hero: Hero, cardId: string) => finalChance(getCard(cardId), affinityFromStats(heroStats(hero)));
 
+/** 町の画面を低い形にする高さ（2026-11-19【提案】: 390×540・360×640 は低い形、390×844 は今までどおり） */
+const SHORT_TOWN = '(max-height: 700px)';
+const subscribeShortTown = (cb: () => void) => {
+  if (typeof window === 'undefined' || !window.matchMedia) return () => {};
+  const mq = window.matchMedia(SHORT_TOWN);
+  mq.addEventListener?.('change', cb);
+  return () => mq.removeEventListener?.('change', cb);
+};
+/** 見えている高さが低いか（町の説明とうわさを1行に縮める） */
+function useShortTown(): boolean {
+  return useSyncExternalStore(subscribeShortTown, () => typeof window !== 'undefined' && !!window.matchMedia?.(SHORT_TOWN).matches, () => false);
+}
+
 export function TownScreen() {
   const game = useBattle((s) => s.game)!;
   const dispatchGame = useBattle((s) => s.dispatchGame);
@@ -252,6 +265,7 @@ export function TownScreen() {
   const stock = w.shops[def.id];
   const townTile = w.tiles.findIndex((x) => x.f?.kind === 'town' && x.f.id === def.id);
   const rumor = townTile >= 0 ? rumorText(game, w, townTile) : undefined;
+  const shortTown = useShortTown();
   // 町に入ったキャラ（お金・持ち物はこのキャラのもの。操作できるのはこのキャラの担当だけ）
   const [visitorId, setVisitorId] = useState<string>();
   const visitors = game.heroes.filter(h => facilityMembers(game).includes(h.id));
@@ -320,7 +334,22 @@ export function TownScreen() {
         <StatusButton game={game} self={statusHero} />
       </div>
       {/* 回1の追加: 町の説明の下に、ランダムダンジョンのうわさ（いちばん近い未踏破の1つ。無ければ出さない） */}
-      <Heading sub={<>{def.description}{rumor && <span className="block text-amber-200/90" data-town-rumor>{rumor}</span>}</>}>{def.name}</Heading>
+      {/* 2026-11-19（検証 bot の指摘1）: 低い画面では、うわさと説明を1行に縮めて、品物の欄を広げる（うわさが先。入りきらない分は「…」） */}
+      <Heading
+        sub={
+          shortTown ? (
+            <span className="block truncate" data-town-sub-line>
+              {rumor && <span className="text-amber-200/90" data-town-rumor>{rumor}</span>}
+              {rumor && '　'}
+              {def.description}
+            </span>
+          ) : (
+            <>{def.description}{rumor && <span className="block text-amber-200/90" data-town-rumor>{rumor}</span>}</>
+          )
+        }
+      >
+        {def.name}
+      </Heading>
       <div className="mx-3 mt-1 flex shrink-0 items-center gap-2 rounded-lg bg-black/40 px-2 py-1 text-[13px]">
         <HeroFace hero={v} size={28} />
         <span className="min-w-0 flex-1 truncate">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chestLeaveGate, shrineShared, showTurnLock, worldChestTurnHero } from './worldTurnGate';
+import { answerableInvites, chestLeaveGate, shrineShared, showTurnLock, voteOutsider, worldChestTurnHero } from './worldTurnGate';
 import type { GameState, Hero, PlayerId } from '../../types';
 
 // 必要な項目だけの冒険の状態（画面用の判断なので、エンジンは通さない）
@@ -96,5 +96,56 @@ describe('祠: 覆い（2026-11-15 の実機の不具合: 同行して入った�
 
   it('祠でない時（宝箱・イベント）は shrineShared は false', () => {
     expect(shrineShared(state({ heroes: [kai, lilith] }))).toBe(false);
+  });
+});
+
+describe('2026-11-19: その場面にいない人の票のボタン（押しても票が入らない）', () => {
+  const eld = hero('eld', 'P1');
+  const rina = hero('rina', 'P2');
+  const kai = hero('kai', 'P3');
+  const finish = { type: 'FINISH_REWARD', playerId: 'P1' } as const;
+  const onlyP3 = (p: PlayerId) => p === 'P3';
+  // 世界マップの遭遇の報酬: P1・P2 が戦った（パーティ）。P3 は見ているだけ
+  const reward = state({ heroes: [eld, rina, kai], mode: 'reward', chest: undefined, party: ['eld', 'rina'] });
+
+  it('2人で決める報酬の「先へ進む」: 戦っていない P3 の画面は押せない。戦った人は押せる', () => {
+    expect(voteOutsider(reward, finish, onlyP3)).toBe(true);
+    expect(voteOutsider(reward, finish, onlyP1)).toBe(false);
+    expect(voteOutsider(reward, finish, onlyP2)).toBe(false);
+  });
+
+  it('1台で遊ぶ時（全員この端末）は、いつも押せる', () => {
+    expect(voteOutsider(reward, finish, all)).toBe(false);
+  });
+
+  it('1人で決める場面（票にならない）は、今までどおり', () => {
+    const solo = state({ heroes: [eld, rina, kai], mode: 'reward', chest: undefined, party: ['eld'] });
+    expect(voteOutsider(solo, finish, onlyP3)).toBe(false);
+  });
+
+  it('宝箱の開け役「任せる」・「立ち去る」: 宝箱に出ていない人は押せない', () => {
+    const chest = state({ heroes: [eld, rina, kai], party: ['eld', 'rina'], activeScene: 'x1' });
+    expect(voteOutsider(chest, { type: 'CHEST_OPENER', playerId: 'P1', heroId: 'eld' }, onlyP3)).toBe(true);
+    expect(voteOutsider(chest, { type: 'LEAVE_CHEST', playerId: 'P1' }, onlyP3)).toBe(true);
+    expect(voteOutsider(chest, { type: 'CHEST_OPENER', playerId: 'P1', heroId: 'eld' }, onlyP2)).toBe(false);
+  });
+
+  it('倒れたキャラだけの人は、票に入らない（エンジンの voters と同じ）', () => {
+    const down = { ...kai, hp: 0 } as Hero;
+    const g = state({ heroes: [eld, rina, down], mode: 'reward', chest: undefined, party: ['eld', 'rina', 'kai'] });
+    expect(voteOutsider(g, finish, onlyP3)).toBe(true);
+  });
+});
+
+describe('2026-11-19: 同行の誘いの枠は、答えられる時（世界マップ）だけ出す', () => {
+  const eld = hero('eld', 'P1');
+  const rina = hero('rina', 'P2');
+  const g = (mode: string) => ({ mode, heroes: [eld, rina], world: { turn: 'eld', invites: { rina: 'eld' } } }) as unknown as GameState;
+  it('世界マップ: 誘われた P2 の画面に出る。誘った P1 の画面には出ない', () => {
+    expect(answerableInvites(g('world'), onlyP2).map((x) => [x.target.id, x.by.id])).toEqual([['rina', 'eld']]);
+    expect(answerableInvites(g('world'), onlyP1)).toEqual([]);
+  });
+  it('遭遇の戦闘・報酬・町などに入った後は出さない', () => {
+    for (const m of ['battle', 'reward', 'town', 'encounter', 'chest']) expect(answerableInvites(g(m), onlyP2)).toEqual([]);
   });
 });

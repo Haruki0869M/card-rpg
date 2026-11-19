@@ -64,6 +64,20 @@ export function pickPlace(spots: readonly { tile: number; box: Box }[], px: numb
   return best;
 }
 
+/**
+ * 地図を押した時に選ぶマス（2026-11-19 検証 bot の指摘: 町のマスにいる時、町の大きな絵の当たりの範囲が
+ * 隣の光るマスに重なって、行き先を押しても選べなかった）。
+ * 1. 押した所に見えている上の面が「今、光っている行き先のマス」（今いるマスは除く）なら、そのマス（施設の絵より先）
+ * 2. 施設の絵（立て札も）の上なら、その施設のマス
+ * 3. 見えている上の面のマス
+ * それ以外は undefined（呼ぶ側が一番近いマスを探す）
+ */
+export function chooseTapTile(o: { topFace?: number; place?: number; reach?: { has(i: number): boolean }; here?: number }): number | undefined {
+  if (o.topFace !== undefined && o.topFace !== o.here && o.reach?.has(o.topFace)) return o.topFace;
+  if (o.place !== undefined) return o.place;
+  return o.topFace;
+}
+
 // ---------- 名前の札 ----------
 
 export interface PlaceLabel {

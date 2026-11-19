@@ -355,19 +355,29 @@ export function StatusButton({ game, self, className = '', fixed }: { game: Game
   );
 }
 
-/** 物語（冒頭・地域の紹介） */
+/**
+ * 物語（冒頭・地域の紹介・災厄の知らせ）。
+ * 文が長くて画面に入りきらない時（390×540 の災厄の出現）は、文の欄だけを縦にスクロールし、「つづける」は下に固定する
+ * （2026-11-19 検証 bot の指摘: 題の上が切れ、「つづける」が画面の外へはみ出して縮んでいた）
+ */
 function StoryOverlay({ title, lines, onNext }: { title: string; lines: string[]; onNext: () => void }) {
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-50 flex flex-col justify-center bg-black/85 px-5">
-      <div className="font-display text-outline mb-3 text-center text-[26px] text-amber-100">{title}</div>
-      {lines.map((l, i) => (
-        <motion.p key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 + i * 0.5 }} className="mb-2 text-[15px] leading-7 text-zinc-100">
-          {l}
-        </motion.p>
-      ))}
-      <button onClick={onNext} className="btn btn-gold font-display mt-4 h-12 rounded-xl text-[18px]">
-        つづける
-      </button>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-50 flex flex-col bg-black/85" data-story-overlay>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5" data-story-body>
+        <div className="flex min-h-full flex-col justify-center py-4">
+          <div className="font-display text-outline mb-3 text-center text-[26px] text-amber-100">{title}</div>
+          {lines.map((l, i) => (
+            <motion.p key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 + i * 0.5 }} className="mb-2 text-[15px] leading-7 text-zinc-100">
+              {l}
+            </motion.p>
+          ))}
+        </div>
+      </div>
+      <div className="shrink-0 px-5 pt-2 pb-4">
+        <button onClick={onNext} className="btn btn-gold font-display h-12 w-full shrink-0 rounded-xl text-[18px]" data-story-next>
+          つづける
+        </button>
+      </div>
     </motion.div>
   );
 }

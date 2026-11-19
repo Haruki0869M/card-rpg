@@ -46,7 +46,7 @@ export const PART = {
     pHeroTabs: { sel: '[data-sheet="party"] [data-sheet-hero]', read: 'attrs', attrs: ['data-sheet-hero', 'class'] },
     pItems: { sel: '[data-sheet="party"] [data-item-row]', read: 'rows', attrs: ['data-item-row', 'data-item-kind', 'data-open'], textMax: 40, sub: { use: { sel: '[data-row-use]', read: 'count' }, give: { sel: '[data-row-give]', read: 'count' } } },
     pHpText: { sel: '[data-sheet="party"] .tabular-nums', text: 'フォーカス', exact: false, read: 'text' },
-    pGiveTo: { sel: '[data-sheet="party"] [data-give-to]', read: 'attrs', attrs: ['data-give-to'] },
+    pGiveTo: { sel: '[data-sheet="party"] [data-give-to]', read: 'attrs', attrs: ['data-give-to', 'data-give-full', 'disabled'] },
     pUseTo: { sel: '[data-sheet="party"] [data-use-to]', read: 'rows', attrs: ['data-use-to', 'disabled'], textMax: 40 },
     pGiveReason: { sel: '[data-sheet="party"] [data-give-reason], [data-sheet="party"] [data-use-reason]', read: 'texts' },
     // ピン: 札（だれの・何の）・上の帯・地図のマスの印・地図の窓

@@ -360,7 +360,7 @@ function MapOverlay({ run, onClose, myTurn, pins, canPin, pinsOf }: {
     <div className="absolute inset-0 z-30 flex flex-col bg-[#0c0a08]" data-map-overlay>
       <div className="flex h-11 shrink-0 items-center gap-2 px-2">
         <span className="font-display min-w-0 flex-1 text-[16px] text-amber-100">地図（探索度 {exploredPercent(run)}%）</span>
-        <button onClick={onClose} aria-label="地図を閉じる" className="btn btn-dark flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
+        <button onClick={onClose} aria-label="地図を閉じる" className="btn btn-dark flex h-11 w-11 shrink-0 items-center justify-center rounded-lg">
           <X size={20} />
         </button>
       </div>

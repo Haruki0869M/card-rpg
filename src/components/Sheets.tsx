@@ -522,7 +522,7 @@ function PartySheet() {
                 <RowPanel mode={open.mode} onCancel={() => setRow(null)}>
                   {{
                     use: <UseSection game={game} hero={hero} itemUid={open.uid} activeId={activeId} onDone={() => setRow(null)} />,
-                    give: <GiveSection game={game} hero={hero} onPick={(to) => setGiveTo({ to, itemUid: open.uid })} />,
+                    give: <GiveSection game={game} hero={hero} pouch onPick={(to) => setGiveTo({ to, itemUid: open.uid })} />,
                   }}
                 </RowPanel>
               ) : null
@@ -692,17 +692,27 @@ function RowPanel({ mode, onCancel, children }: { mode: 'use' | 'give'; onCancel
 }
 
 /** 渡す相手（同じ場所の仲間）。渡せない時はボタンの代わりに理由の文 */
-function GiveSection({ game, hero, onPick }: { game: GameState; hero: Hero; onPick: (to: string) => void }) {
+/**
+ * 渡す相手の一覧。pouch = 道具（消耗品）を渡す時: 袋がいっぱいの相手は薄くして押せなくし、「袋がいっぱい」と出す
+ * （エンジンの give「〇〇の袋がいっぱいです」と同じ決まり。前は確認の後で断られた。2026-11-19 検証 bot の指摘）
+ */
+function GiveSection({ game, hero, pouch, onPick }: { game: GameState; hero: Hero; pouch?: boolean; onPick: (to: string) => void }) {
   const reason = giveBlockReason(game, hero);
   if (reason) return <div className="text-[13px] text-zinc-300" data-give-reason>{reason}</div>;
   return (
     <div className="grid grid-cols-2 gap-1">
-      {placeMates(game, hero).map((m) => (
-        <button key={m.id} onClick={() => onPick(m.id)} className="btn btn-dark flex h-12 items-center gap-1.5 rounded-lg px-2" data-give-to={m.id}>
-          <HeroFace hero={m} size={30} />
-          <span className="truncate text-[13px] font-bold">{m.name}</span>
-        </button>
-      ))}
+      {placeMates(game, hero).map((m) => {
+        const full = !!pouch && m.pouch.length >= pouchLimitOf(m);
+        return (
+          <button key={m.id} onClick={() => onPick(m.id)} disabled={full} className="btn btn-dark flex h-12 items-center gap-1.5 rounded-lg px-2" data-give-to={m.id} data-give-full={full ? '' : undefined}>
+            <HeroFace hero={m} size={30} />
+            <span className="min-w-0 flex-1 text-left leading-4">
+              <span className="block truncate text-[13px] font-bold">{m.name}</span>
+              {full && <span className="block truncate text-[12px] text-zinc-300">袋がいっぱい</span>}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

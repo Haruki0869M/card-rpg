@@ -416,7 +416,8 @@ export function RestScreen() {
     <Screen>
       <div className="relative min-h-0 flex-1 overflow-hidden">
         <BattleBackground kind={sceneBackground(game)} className="absolute inset-0 h-full w-full opacity-40" />
-        <div className="relative flex flex-col items-center px-3 pt-6">
+        {/* 低い画面で仲間が多い時に、撫でる・転職のボタンが箱の下で切れないように、中を縦にスクロールできるようにする（2026-11-19 検証 bot の指摘） */}
+        <div className="relative flex h-full flex-col items-center overflow-y-auto overscroll-contain px-3 pt-6 pb-2 [&>*]:shrink-0" data-rest-body>
           <motion.span
             animate={{ scale: [1, 1.08, 1] }}
             transition={{ duration: 1.6, repeat: Infinity }}
@@ -441,13 +442,13 @@ export function RestScreen() {
                   {h.focus}/{heroFocusMax(h)}
                 </span>
                 {h.pet && isLocalPlayer(h.playerId) && (
-                  <button onClick={() => dispatchGame({ type: 'PET_PAT', playerId: h.playerId, heroId: h.id })} className="btn btn-dark flex h-9 shrink-0 items-center gap-0.5 rounded-lg px-1.5 text-[12px] font-bold text-pink-100" aria-label={`${h.pet.name}を撫でる`}>
+                  <button onClick={() => dispatchGame({ type: 'PET_PAT', playerId: h.playerId, heroId: h.id })} className="btn btn-dark flex h-11 min-w-11 shrink-0 items-center justify-center gap-0.5 rounded-lg px-1.5 text-[12px] font-bold text-pink-100" aria-label={`${h.pet.name}を撫でる`} data-rest-pat>
                     <PetToken ownerId={h.id} pet={h.pet} size={20} />
                     {h.pet.patted ? '' : '+1'}
                   </button>
                 )}
                 {canChangeNow(game, h) && (
-                  <button onClick={() => openSheet('jobs')} className="btn btn-gold flex h-9 shrink-0 items-center gap-0.5 rounded-lg px-2 text-[12px] font-bold">
+                  <button onClick={() => openSheet('jobs')} className="btn btn-gold flex h-11 shrink-0 items-center gap-0.5 rounded-lg px-2 text-[12px] font-bold" data-rest-job>
                     <ArrowUpCircle size={14} />
                     転職
                   </button>

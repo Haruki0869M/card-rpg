@@ -7,6 +7,7 @@ import { useOnline } from '../../store/onlineStore';
 import { EVENTS } from '../../data/events';
 import { getItem } from '../../data/items';
 import type { GameCommand, GameState, PlayerId } from '../../types';
+import { voteOutsider } from '../screens/worldTurnGate';
 
 const name = (p: PlayerId) => useOnline.getState().room?.seatName(p) ?? p;
 
@@ -92,6 +93,30 @@ export function VoteStatus({ className = '' }: { className?: string }) {
           <span className={v.picks[p] ? 'text-amber-200' : 'text-zinc-500'}>{v.picks[p] ? voteLabel(game, v.picks[p]!) : '考え中…'}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * その場面にいない人の画面に出す短い1行「P1 〇〇さん・P2 △△さんが選んでいます」（2026-11-19 検証 bot の指摘）。
+ * 票のボタンは薄くして押せなくする（voteOutsider）。この端末が票を入れられる時は何も出さない
+ */
+export function OutsiderNote({ cmd, className = '' }: { cmd: GameCommand; className?: string }) {
+  const game = useBattle((s) => s.game);
+  useOnline((s) => s.tick);
+  if (!game || !voteOutsider(game, cmd, isLocalPlayer)) return null;
+  const who = voters(game);
+  return (
+    <div className={`flex flex-wrap items-center justify-center gap-1 rounded-lg bg-black/60 px-2 py-1 text-[13px] leading-5 text-zinc-100 ${className}`} role="status" data-vote-outsider={who.join(',')}>
+      {who.map((p, i) => (
+        <span key={p} className="flex items-center gap-1">
+          <span className="rounded px-1 text-[12px] font-bold text-black" style={{ background: PLAYER_COLOR[p] }}>
+            {p}
+          </span>
+          {name(p)}さん{i < who.length - 1 ? '・' : ''}
+        </span>
+      ))}
+      <span>が選んでいます</span>
     </div>
   );
 }
