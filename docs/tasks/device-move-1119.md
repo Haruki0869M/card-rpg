@@ -11,6 +11,8 @@
 
 写しは `C:\dev\card-rpg-move\` に用意してある（bundle・メモ・道具）。このフォルダを USB やクラウドの自分の置き場で新しい端末へ運べば足りる。
 
+**ほかに、絵の続きをするなら**: 絵の元の画像 `C:\dev\card-rpg-assets`（約1.2GB。リポジトリの外）も運ぶ。Playwright と firebase-tools は `package.json` に入っていないので、新しい端末で入れ直す（`docs/START-HERE.md` §2-1）。
+
 ## 2. コードの持っていき方（どちらか）
 - **A. bundle（1つのファイル）で運ぶ**: `C:\dev\card-rpg-move\card-rpg-1119.bundle` を新しい端末に写し、
   `git clone C:\dev\card-rpg-move\card-rpg-1119.bundle C:\dev\card-rpg -b ccr-d64a1cfc-debli5`
