@@ -11,15 +11,35 @@ import type { ClassDef, EnemyDef } from '../../types';
 import { applyCommand, createBattle } from '../index';
 import { nextTurn, play } from './helpers';
 
+/** 4段階（コモン〜レジェンド）がそろっている武器の種類 */
+const FULL_WEAPON_TYPES = ['sword', 'staff', 'hammer', 'bow'];
+
+// ジョブの最初の武器は、そのジョブで使える種類
+const STARTER_WEAPON = (c: { weaponType: string; subWeapons?: string[]; startingEquipment: { weapon?: string } }) =>
+  !c.startingEquipment.weapon || [c.weaponType, ...(c.subWeapons ?? [])].includes(ITEMS.get(c.startingEquipment.weapon).weaponType ?? '');
+
 describe('データの整合性', () => {
   it('職業: デッキのカードが存在し、能力値・名前がそろっている', () => {
     for (const c of CLASSES.all) {
       for (const d of c.deck) expect(CARDS.has(d.cardId), `${c.id}: ${d.cardId}`).toBe(true);
-      expect(c.deck.reduce((n, d) => n + d.count, 0)).toBeGreaterThanOrEqual(BALANCE.drawPerTurn);
+      // 最初から選べる基本ジョブだけが最初の山札を持つ（中位以上は転職でなる）
+      if ((c.tier ?? 'base') === 'base') expect(c.deck.reduce((n, d) => n + d.count, 0)).toBeGreaterThanOrEqual(BALANCE.drawPerTurn);
       for (const v of Object.values(c.stats)) expect(v).toBeGreaterThan(0);
       expect(c.names.male.length).toBeGreaterThan(0);
       expect(c.names.female.length).toBeGreaterThan(0);
       expect(c.baseMaxHp).toBeGreaterThan(0);
+    }
+  });
+  it('転職: 中位以上は転職元・代表3枚・候補を持つ（最上位5枚、その他6枚以上）', () => {
+    for (const c of CLASSES.all) {
+      if ((c.tier ?? 'base') === 'base') continue;
+      expect(c.from?.length, c.id).toBeGreaterThan(0);
+      for (const f of c.from ?? []) expect(CLASSES.has(f), `${c.id} from ${f}`).toBe(true);
+      expect(c.signature?.length, c.id).toBe(3);
+      for (const id of c.signature ?? []) expect(c.cardPool, `${c.id}: ${id}`).toContain(id);
+      // 調教師は5枚（憲章5: 「相棒の守り」は、同じ役の札があるので無くした。数を合わせるための札は足さない）
+      expect(c.cardPool.length, c.id).toBeGreaterThanOrEqual(c.tier === 'top' || c.id === 'petTrainer' ? 5 : 6);
+      expect(STARTER_WEAPON(c), c.id).toBe(true);
     }
   });
   it('カード: Tierが昇順で0成功から始まり、スロット数を超えない', () => {
@@ -49,8 +69,10 @@ describe('データの整合性', () => {
     for (const c of CLASSES.all) {
       for (const id of c.cardPool) expect(CARDS.has(id), `${c.id}: ${id}`).toBe(true);
       for (const id of Object.values(c.startingEquipment)) expect(ITEMS.has(id!), `${c.id}: ${id}`).toBe(true);
-      if (c.startingEquipment.weapon) expect(ITEMS.get(c.startingEquipment.weapon).weaponType).toBe(c.weaponType);
-      // 各職業の武器が4段階そろっている
+      // 最初の武器は、そのジョブが装備できる種類（得意か、使える）
+      if (c.startingEquipment.weapon) expect([c.weaponType, ...(c.subWeapons ?? [])]).toContain(ITEMS.get(c.startingEquipment.weapon).weaponType);
+      // 武器が4段階そろっている（転職で増えた種類は、武器を増やす第3弾でそろえる）
+      if (!FULL_WEAPON_TYPES.includes(c.weaponType)) continue;
       const rar = ITEMS.all.filter((i) => i.weaponType === c.weaponType).map((i) => i.rarity);
       expect(new Set(rar)).toEqual(new Set(['common', 'rare', 'epic', 'legend']));
     }

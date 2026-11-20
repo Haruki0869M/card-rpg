@@ -2,96 +2,81 @@
 // 保存データの形を変えた時は、GAME_VERSION（= battle の STATE_VERSION）を1つ上げ、ここに「前の版 → 次の版」の直し方を1つ足す。
 // 直し方が無い古い版は読み込まない（タイトルで「つづきから」が出ないだけで、新しく始められる）。
 import { CARDS } from '../../data/cards';
+import { MERGED_CARDS } from '../../data/cards/merged';
 import { CLASSES } from '../../data/classes';
 import { DUNGEONS } from '../../data/dungeons';
 import { ENEMIES } from '../../data/enemies';
 import { ITEMS } from '../../data/items';
 import { SCENARIOS } from '../../data/scenarios';
-import { getDifficulty, getRoomType } from '../../data/rules';
+import { SANCTUARIES } from '../../data/world';
+import { getRoomType } from '../../data/rules';
 import type { GameState } from '../../types';
 import { STATE_VERSION } from '../battle/battle';
-import { heroAbilities } from './hero';
 
 type Loose = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
+// v17 までの保存データは読まない（2026-11-11 オーナーの決定: 装備の作り直しで、古い保存は捨てて良い。置き換えの表は作らない）。
+// それより前の「直し方」（v3〜v16）は、もう通らないので消した。次に形を変える時は、ここに 18(g) { ... } から足す。
 const MIGRATIONS: Record<number, (g: Loose) => void> = {
-  // v3 → v4: 特殊能力の書き方が「きっかけ＋条件＋効果」に変わった。戦闘中のキャラの装備の能力を作り直す
-  3(g) {
-    if (g.battle) {
-      for (const a of g.battle.allies) {
-        const h = g.heroes.find((x: Loose) => x.id === a.id);
-        const abilities = h ? heroAbilities(h) : [];
-        if (abilities.length) a.abilities = abilities;
-        else delete a.abilities;
-      }
-      g.battle.version = 4;
-    }
-  },
-  // v4 → v5: 命の灯火（spec §11.4）が増えた。M2 までの冒険は仮の拠点のまま続ける
-  4(g) {
-    g.lives = getDifficulty(g.difficulty).lives;
-    if (g.battle) g.battle.version = 5;
-  },
-  // v5 → v6: ダンジョンは世界マップと別の場面（expeditions）になった。世界マップでダンジョンの中にいた冒険は、場面に移す
-  5(g) {
-    if (g.battle) g.battle.version = 6;
-    if (!g.world || !g.dungeon) return;
-    const heroes: string[] = g.party ?? g.heroes.filter((h: Loose) => h.hp > 0 && !h.retired).map((h: Loose) => h.id);
-    g.expeditions = [
-      {
-        id: 'x1',
-        heroes,
-        mode: g.mode,
-        dungeon: g.dungeon,
-        battle: g.battle,
-        reward: g.reward,
-        chest: g.chest,
-        event: g.event,
-        battleInfo: g.battleInfo,
-        battleBackground: g.battleBackground,
-      },
-    ];
-    g.nextExpeditionId = 2;
-    for (const k of ['dungeon', 'battle', 'reward', 'chest', 'event', 'battleInfo', 'battleBackground', 'party']) delete g[k];
-    g.mode = 'world';
-    // 世界マップに残っているキャラの手番から（全員ダンジョンなら止まる）
-    const onMap = g.heroes.filter((h: Loose) => h.hp > 0 && !h.retired && !heroes.includes(h.id));
-    if (!onMap.some((h: Loose) => h.id === g.world.turn)) g.world.turn = onMap[0]?.id ?? '';
-  },
-  // v6 → v7: お金・持ち物・道具袋がキャラごとになった。山分けして、品物は順番に配る
-  6(g) {
-    if (g.battle) g.battle.version = 7;
-    for (const x of g.expeditions ?? []) if (x.battle) x.battle.version = 7;
-    const hs: Loose[] = g.heroes.filter((h: Loose) => !h.retired);
-    const list = hs.length ? hs : g.heroes;
-    for (const h of g.heroes) {
-      h.gold = 0;
-      h.stash = [];
-      h.pouch = [];
-    }
-    const total: number = g.gold ?? 0;
-    list.forEach((h: Loose, i: number) => (h.gold = Math.floor(total / list.length) + (i < total % list.length ? 1 : 0)));
-    (g.stash ?? []).forEach((it: Loose, i: number) => list[i % list.length].stash.push(it));
-    (g.pouch ?? []).forEach((it: Loose, i: number) => list[i % list.length].pouch.push(it));
-    delete g.gold;
-    delete g.stash;
-    delete g.pouch;
-  },
-  // v7 → v8: ダンジョンのパーティも世界マップの手番の順番で動く（探索力）。今の手番がダンジョンなら判定から
-  7(g) {
-    if (g.battle) g.battle.version = 8;
-    for (const x of g.expeditions ?? []) {
-      if (x.battle) x.battle.version = 8;
-      if (x.dungeon) x.dungeon.explore = null;
-    }
-    const w = g.world;
-    if (w && !w.turn) {
-      const first = g.heroes.find((h: Loose) => h.hp > 0 && !h.retired);
-      w.turn = first?.id ?? '';
-      w.acted = [];
-    }
-  },
+  // v23 → v24（2026-11-12・憲章5）: 数字だけ違うカードをまとめた。消した札を、残した札に読み替える
+  23(g) { renameCards(g); },
+  // v24 → v25（2026-11-12・区切りG-1）: 武器にだけ付いていた札11枚と、区切りFの2枚をまとめた
+  24(g) { renameCards(g); },
+  // v25 → v26（2026-11-12・区切りG-2）: 鋼の連撃 → 手早い攻撃（MERGED_CARDS）。魔法の法衣 → 学び手の法衣
+  25(g) { renameCards(g); renameItems(g); },
 };
+
+/** 無くした装備 → 読み替える先（区切りG-2） */
+const RENAMED_ITEMS: Record<string, string> = { magicRobe: 'commonAdeptRobe' };
+
+/** 保存データの中の装備のID（itemId の項目。持ち物・袋・装備・行商人・町の店・宝箱の中身など、どこにあっても）を読み替える */
+function renameItems(v: unknown): void {
+  if (Array.isArray(v)) { v.forEach((x) => renameItems(x)); return; }
+  if (!v || typeof v !== 'object') return;
+  const o = v as Loose;
+  for (const k of Object.keys(o)) {
+    if (k === 'itemId' && typeof o[k] === 'string') { if (RENAMED_ITEMS[o[k]]) o[k] = RENAMED_ITEMS[o[k]]; }
+    else renameItems(o[k]);
+  }
+}
+
+/** 保存データの中のカードのID（cardId の項目と、名前に card が入る並び）を、まとめた先に読み替える。敵の行動のID（同じ文字の物がある）には触らない */
+function renameCards(v: unknown, key = ''): void {
+  if (Array.isArray(v)) {
+    const cardList = /card|jobPick|exhausted/i.test(key);
+    v.forEach((x, i) => {
+      if (typeof x === 'string') { if (cardList && MERGED_CARDS[x]) v[i] = MERGED_CARDS[x]; }
+      else renameCards(x, key);
+    });
+    return;
+  }
+  if (!v || typeof v !== 'object') return;
+  const o = v as Loose;
+  for (const k of Object.keys(o)) {
+    if (k === 'cardId' && typeof o[k] === 'string') { if (MERGED_CARDS[o[k]]) o[k] = MERGED_CARDS[o[k]]; }
+    else renameCards(o[k], k);
+  }
+}
+
+/**
+ * 版を上げずに直す物:
+ * - 世界マップの前の「スロットの判定」の結果は捨てる
+ * - ダンジョンの探索のサイコロ（選べる扉の数）は無くなった（扉1つ＝手番1回）。途中の保存に残っている項目は捨てる。
+ *   部屋の中（戦闘・宝箱など）で保存していたら「この手番に扉を開けた」ことにする（部屋を済ませたら手番が終わる）
+ * - 前の「周囲の警戒」（感知の判定）の結果は捨てる（今はフォーカス1で先読み）
+ */
+function normalizeDice(g: Loose) {
+  if (g.world && Array.isArray(g.world.moveRoll)) delete g.world.moveRoll;
+  const scenes: { d: Loose; mode: string; scene: boolean }[] = [{ d: g.dungeon, mode: g.mode, scene: false }, ...(g.expeditions ?? []).map((x: Loose) => ({ d: x.dungeon, mode: x.mode, scene: true }))];
+  for (const { d, mode, scene } of scenes) {
+    if (!d) continue;
+    const old = 'explore' in d || 'exploreDice' in d || 'exploreRoll' in d || 'watchRoll' in d || 'sensed' in d;
+    if (!old) continue;
+    if (scene && mode !== 'dungeon' && d.opened === undefined) d.opened = true;
+    if ('watchRoll' in d || 'sensed' in d) delete d.watchedAt;
+    for (const k of ['explore', 'exploreDice', 'exploreRoll', 'ended', 'exploreRoller', 'watchRoll', 'sensed']) delete d[k];
+  }
+}
 
 /** 古い版の冒険を今の版に直す。直せなければ null */
 export function migrateGame(raw: unknown): GameState | null {
@@ -104,6 +89,7 @@ export function migrateGame(raw: unknown): GameState | null {
     g.version += 1;
   }
   if (g.version !== STATE_VERSION) return null;
+  normalizeDice(g);
   return validateGame(g as GameState) ? (g as GameState) : null;
 }
 
@@ -111,6 +97,11 @@ export function migrateGame(raw: unknown): GameState | null {
 export function validateGame(g: GameState): boolean {
   try {
     if (!SCENARIOS.has(g.scenarioId)) return false;
+    for (const tile of g.world?.tiles ?? []) {
+      if (tile.f?.kind === 'temple' || tile.f?.kind === 'altar') {
+        if (SANCTUARIES.tryGet(tile.f.id)?.kind !== tile.f.kind) return false;
+      }
+    }
     for (const h of g.heroes) {
       if (!CLASSES.has(h.classId)) return false;
       if (!h.deck.every((c) => CARDS.has(c.cardId))) return false;

@@ -102,7 +102,8 @@ src/content/
    - `weak` / `resist`: 弱点・耐性の属性ID（例 `weak: ['fire']`）。弱点はダメージ×1.5、耐性はダメージ×0.5で、その属性の状態異常も効かない
    - 行動のダメージにも属性を付けられます（`{ kind: 'damage', amount: 8, element: 'fire' }`）
 3. 出す場所はダンジョンの `pools` に ID を書きます。
-4. **絵が必要です。** 描いた絵を `src/assets/art/enemy/<敵ID>.webp` に置きます（ボスの第2段階は `<敵ID>-1.webp`）。無ければ `src/art/enemies/` の SVG の絵（`export const enemyArt = { 敵ID: 絵 }`）、それも無ければ仮の絵（頭文字の丸）が出ます。敵どうしの大きさの差は、敵のデータの `size` で決めます。
+4. **亜種**（K3）: 元の敵の絵を使い回し、属性か開幕の特性を変えた敵は `makeVariant`（`src/data/enemyVariant.ts`）で作ります。`aura` で足元の色が付きます。詳しくは `docs/archive/tasks/K3-enemies.md`。
+5. **絵が必要です。** 描いた絵を `src/assets/art/enemy/<敵ID>.webp` に置きます（ボスの第2段階は `<敵ID>-1.webp`）。無ければ `src/art/enemies/` の SVG の絵（`export const enemyArt = { 敵ID: 絵 }`）、それも無ければ仮の絵（頭文字の丸）が出ます。敵どうしの大きさの差は、敵のデータの `size` で決めます。
 
 ## 武器・防具・装飾品・消費アイテムを足す
 
@@ -186,6 +187,10 @@ src/content/
   `chance` は乱数を使うので、常時型には使えません。
 - **説明文**は自動で作られます。雰囲気の文を足したい時だけ `description` を書きます。
 
+- **K2で足した条件**: `selfStatus`（自分が状態異常を持つ）・`selfHpAtLeast`（HPが○%以上）・`foeCount`（敵の数）・`cardCost`・`cardSlots`・`hasPet`。
+- **K2で足した常時型**: `elementGuard`（属性攻撃を無効・吸収・半減）・`convertElement`（属性の無い物理攻撃を別の属性に）。
+- 詳しい使い方は `docs/archive/tasks/K2-equipment.md`。装備には `explore`（世界マップの視界・野営の回復）と `scenario`（そのシナリオだけで出る）も書ける。
+
 ## 効果の部品（`kind`）
 
 | kind | 内容 | 主な数値 | 対象の既定 |
@@ -200,6 +205,11 @@ src/content/
 | `cleanse` | 悪い状態異常を治す | — | target |
 | `escape` | 戦闘から逃げる | — | self |
 | `healPctOfDealt` | 与えたダメージの○%回復 | `pct` | self |
+| `blockFromStatus` | 状態異常の量だけブロック | `status`, `of`, `mult`, `max` | self |
+| `convertStatus` | 状態異常を別の状態異常に変える | `status`, `into` | target |
+| `retaliate` | 反撃（`when: 'hurt'` の能力で、攻撃してきた相手に返す。毒などでは返さない） | `amount`, `element`, `perTurn` | — |
+| `drainFocus` | 味方のフォーカスを奪う（敵用。0より下にならない） | `amount` | target |
+| `summonEnemy` | 敵が敵を呼ぶ（戦場4体まで・1戦闘 `uses` 回・呼ばれた敵は報酬なし・次のターンから動く） | `enemy`, `count`, `uses` | self |
 
 **対象（`to`）**: 省略すると表の「既定」になります。
 
@@ -278,7 +288,8 @@ SRC=元画像のフォルダ python3 scripts/art/build_art.py enemy/ bg/  # 名�
   SIM=1 npx vitest run balance          # 結果は screenshots/balance.md
   SIM=1 SIM_SEEDS=20 SIM_PARTY=4人 SIM_DIFF=normal npx vitest run balance   # 回数・人数・難易度をしぼる
   ```
-- 目安（4人・自動プレイ）: やさしい 約65%・ふつう 約20〜25%・むずかしい 約10〜15%。人が遊ぶと自動プレイより上手なので、もう少し勝てます。
+- 目安（自動プレイ・侵食の魔王・ふつう・40シード、2026年11月 fed89f2 で測定）: **2人 約85%・4人 約90%**。新しいシナリオは「侵食の魔王と比べて ±10ポイント以内」を目安にします。やさしい・むずかしいは、まだ測り直していません。
+  - 前の目安（4人・ふつう 約20〜25%）は、自動プレイの宿の不具合（2人目が泊まれず町を出入りして日数を無駄にする。56efd01 で修正）があった頃の数字なので使いません。難易度の数値はそのままで、目安だけを直しました。
 
 ## 保存データの形を変える時
 

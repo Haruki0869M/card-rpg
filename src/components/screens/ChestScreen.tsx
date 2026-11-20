@@ -1,19 +1,30 @@
 // ===== 宝箱の画面: 運のスロット → 確率が上へずれる → 揺れと光の段階アップ → リーチ → レジェンド演出（spec §10.3） =====
 // 格はエンジンが1回だけ抽選済み。ここは結果を「段階的に見せる」だけ（ガセ演出なし: 光・リーチ・予告は本当の格のときだけ出る）
-import { VoteChips } from '../ui/Votes';
-import { AnimatePresence, motion } from 'framer-motion';
+import { OutsiderNote, VoteChips, VoteStatus } from '../ui/Votes';
+import { chestLeaveGate, voteOutsider } from './worldTurnGate';
+import { OthersTurnNote, WaitNotes } from './OnlineScreens';
+import { chestClaimWaits } from './waitNotes';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Check, ChevronsRight, Lock, Sparkles, Star, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BattleBackground, ChestImage } from '../../art';
 import { BALANCE, REVEAL_TIMING, VIBRATION } from '../../data/balance';
-import { chestOdds, expectedChestOdds, rarityIndex, statChance, sceneBackground, sceneHeroes } from '../../engine';
+import { chestOdds, chestShared, expectedChestOdds, findHero, rarityIndex, sealStep, statChance, sceneBackground, sceneHeroes, themeReward } from '../../engine';
+import { PLAYER_COLOR } from '../../data/theme';
+import { useOnline } from '../../store/onlineStore';
+import { ClaimPanel } from '../ui/ClaimPanel';
+import { OpenerPicker } from './ChestTalk';
 import { LOCAL_PLAYER, isLocalPlayer } from '../../store/battleConfig';
 import { speedFactor, useBattle, vibrate } from '../../store/battleStore';
+import { playSound } from '../../audio/player';
+import type { SfxId } from '../../audio/ids';
 import type { ChestRoll, Hero, Rarity, SlotResult } from '../../types';
 import { CheckPanel, RollStrip } from '../ui/CheckPanel';
 import { CHEST_NAME, fmtPct, OddsBar } from '../ui/ChestOdds';
-import { RARITY_STYLE, Screen } from '../ui/game';
+import { HeroFace, RARITY_STYLE, Screen } from '../ui/game';
+import { CHEST_VIDEO_SECONDS, ChestVideo, chestVideoUrl } from './ChestVideo';
 import { LootList } from './RoomScreens';
+import { RelicPicker } from './RelicPicker';
 
 /** 光の色（白 → 青 → 紫 → 金）。本当の格の色で止まる */
 const LIGHT = ['#ffffff', '#5ab0ff', '#c58bff', '#ffcf4a'];
@@ -26,12 +37,13 @@ type Step =
   | { kind: 'light'; level: number; dur: number }
   | { kind: 'reach'; dur: number }
   | { kind: 'premium'; dur: number }
+  | { kind: 'video'; dur: number }
   | { kind: 'result'; dur: 0 };
 
 const isTenpai = (results: SlotResult[]) => results.length >= 3 && results.slice(0, -1).every((r) => r !== 'miss');
 
-/** 演出の段取り（格が高いほど長く、段階が多い） */
-function buildTimeline(roll: ChestRoll): Step[] {
+/** 演出の段取り（格が高いほど長く、段階が多い）。video = 結果の前に、宝箱が開く動画を流す */
+export function buildTimeline(roll: ChestRoll, video = false): Step[] {
   const T = REVEAL_TIMING;
   const g = rarityIndex(roll.grade ?? 'common');
   const n = roll.results.length;
@@ -45,6 +57,8 @@ function buildTimeline(roll: ChestRoll): Step[] {
     steps.push({ kind: 'light', level: 3, dur: T.lightStep });
     steps.push({ kind: 'premium', dur: T.premium });
   }
+  // 動画は読み込みが遅れることがあるので、長さより少し長く待つ（終われば すぐ次へ）
+  if (video) steps.push({ kind: 'video', dur: CHEST_VIDEO_SECONDS + 0.6 });
   steps.push({ kind: 'result', dur: 0 });
   return steps;
 }
@@ -78,7 +92,11 @@ function Reels({ results, speed }: { results: SlotResult[]; speed: number }) {
       if (r === 'focus') return undefined;
       const last = i === results.length - 1;
       const t = (REVEAL_TIMING.reelStop * (i + 1) + (last && tenpai ? REVEAL_TIMING.reelTenpai : 0)) / speed;
-      return setTimeout(() => setStopped((s) => s.map((v, j) => (j === i ? true : v))), t * 1000);
+      return setTimeout(() => {
+        setStopped((s) => s.map((v, j) => (j === i ? true : v)));
+        playSound('sfx_slot_stop');
+        if (tenpai && i === results.length - 2) playSound('sfx_slot_reach');
+      }, t * 1000);
     });
     return () => timers.forEach((t) => t && clearTimeout(t));
   }, [results, speed, tenpai]);
@@ -198,17 +216,51 @@ export function ChestScreen() {
   const dispatchGame = useBattle((s) => s.dispatchGame);
   const chest = game.chest!;
   const locked = !chest.unlocked;
+  // 封魔の宝箱の今の段（sealed = 封印を解く前 / guard = 封印を解いた。番人との戦闘の前）
+  const seal = sealStep(chest);
   const look = chest.spec.rarity;
-  const [heroId, setHeroId] = useState(() => bestHero(sceneHeroes(game), (h) => statChance(h, locked ? 'dex' : 'luk')));
+  const [heroId, setHeroId] = useState(() => (!game.activeScene && game.world?.turn) || bestHero(sceneHeroes(game), (h) => statChance(h, locked || seal ? 'dex' : 'luk')));
   const [focus, setFocus] = useState(0);
+  const [recipientId, setRecipientId] = useState<string>();
+  useOnline((s) => s.tick);
+  // 2人以上のプレイヤー: 開け役をみんなで決め、中身は取り合う（ステップ2）。1人なら今までどおり
+  const shared = chestShared(game);
+  const opener = shared && chest.opener ? findHero(game, chest.opener) : undefined;
+  const myOpener = !!opener && isLocalPlayer(opener.playerId);
+  const [pickAgain, setPickAgain] = useState(false);
+  // 開け役が決まった・変わったら、選び直しの一覧を閉じる
+  useEffect(() => setPickAgain(false), [chest.opener]);
+  const claimsLeft = chest.claims?.filter((x) => !x.rolls).length ?? 0;
+  // 下のパネルに出す取り合い: この端末のキャラがまだ選んでいない物から。全部選んだら、待っている物
+  const claimIdx = (() => {
+    const cs = chest.claims ?? [];
+    const open = cs.map((c, i) => ({ c, i })).filter(({ c }) => !c.rolls);
+    return (open.find(({ c }) => c.heroes.some((id) => !c.choices[id] && isLocalPlayer(findHero(game, id)?.playerId ?? 'P1'))) ?? open[0])?.i ?? -1;
+  })();
   const opened = !!chest.contents;
+  // 世界マップの宝箱の「立ち去る」「先へ進む」は手番のキャラの担当だけ（エンジンと同じ決まり。オーナーの決定 4-B）。ほかの人には待っている表示
+  const leaveGate = chestLeaveGate(game, isLocalPlayer);
+  // この宝箱に出ていない人の画面: 「立ち去る」「先へ進む」を押しても票が入らないので、薄くして押せなくする（2026-11-19）
+  const leaveOutsider = voteOutsider(game, { type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER }, isLocalPlayer);
+  const leaveWait = (what: string) =>
+    leaveGate.waitFor ? (
+      <div className="flex h-12 items-center justify-center rounded-xl bg-black/40 px-2" data-leave-wait>
+        <OthersTurnNote seat={leaveGate.waitFor.playerId} name={`${useOnline.getState().room?.seatName(leaveGate.waitFor.playerId) ?? leaveGate.waitFor.playerId}さん`} what={what} />
+      </div>
+    ) : null;
   const roll = chest.lastRoll?.kind === 'luck' ? chest.lastRoll : undefined;
   const grade: Rarity = chest.grade ?? roll?.grade ?? look;
   const speed = speedFactor(settings);
+  // 宝箱が開く動画（宝箱の見た目の格ごと）。動作軽減・簡易のカットイン・読めなかった時は、今までの演出だけ
+  const reduced = useReducedMotion();
+  const [videoFailed, setVideoFailed] = useState(false);
+  const videoUrl = reduced || settings.cutinMode === 'simple' || videoFailed ? undefined : chestVideoUrl(look);
 
   // この端末で開けた時だけ演出する（再開した時は結果をそのまま見せる）
   const [stepIdx, setStepIdx] = useState<number | null>(null);
-  const timeline = useMemo(() => (roll && roll.grade ? buildTimeline(roll) : []), [roll]);
+  // 段取りは開けた時に決める（途中で動画が読めなくなっても、段取りは作り直さず、動画の段を飛ばす）
+  const useVideo = useRef(false);
+  const timeline = useMemo(() => (roll && roll.grade ? buildTimeline(roll, useVideo.current) : []), [roll]);
   const step = stepIdx === null ? undefined : timeline[stepIdx];
   const animating = !!step && step.kind !== 'result';
   const pendingOpen = useRef(false);
@@ -225,6 +277,12 @@ export function ChestScreen() {
     if (step.kind === 'light' && step.level > 0) vibrate(settings, VIBRATION.chestStep);
     if (step.kind === 'reach') vibrate(settings, VIBRATION.chestReach);
     if (step.kind === 'premium') vibrate(settings, VIBRATION.chestLegend);
+    // 音（K6）。簡易カットインでは、光は最後の段だけ鳴らす
+    const lastLight = Math.max(...timeline.map((s) => (s.kind === 'light' ? s.level : -1)));
+    if (step.kind === 'light' && (settings.cutinMode !== 'simple' || step.level === lastLight)) playSound(`sfx_chest_glow${step.level + 1}` as SfxId);
+    if (step.kind === 'shake') playSound('sfx_chest_shake');
+    if (step.kind === 'reach') playSound('sfx_chest_reach');
+    if (step.kind === 'premium') playSound('sfx_chest_legend');
     const t = setTimeout(() => setStepIdx((i) => (i === null ? i : i + 1)), (step.dur * 1000) / speed);
     return () => clearTimeout(t);
     // settings は振動の有無だけなので段取りの再実行はしない
@@ -233,6 +291,8 @@ export function ChestScreen() {
   const skip = () => {
     if (animating) setStepIdx(timeline.length - 1);
   };
+  /** 動画の段を終える（再生が終わった・読めなかった） */
+  const endVideo = () => setStepIdx((i) => (i !== null && timeline[i]?.kind === 'video' ? i + 1 : i));
 
   // 今の光の段階（-1 = まだ光っていない）
   let light = -1;
@@ -241,15 +301,18 @@ export function ChestScreen() {
   const showResult = opened && !animating;
 
   // 帯グラフ: 開ける前 = 今の設定での確率 / 演出中 = スロット後にずれる / 結果 = 当たった格を強調
-  const hero = sceneHeroes(game).find((h) => h.id === heroId) ?? sceneHeroes(game)[0];
+  const hero = opener ?? sceneHeroes(game).find((h) => h.id === heroId) ?? sceneHeroes(game)[0];
   const chance = statChance(hero, 'luk', 'luck');
   const slots = BALANCE.chestLuckSlots;
-  const expected = useMemo(() => expectedChestOdds(look, slots, Math.min(focus, slots, hero.focus), chance), [look, slots, focus, hero.focus, chance]);
-  const perfectOdds = useMemo(() => chestOdds(look, slots), [look, slots]);
-  const shownOdds = !opened ? expected : roll?.odds && (passed('shift') || showResult || !roll.oddsBefore) ? roll.odds : (roll?.oddsBefore ?? chestOdds(look, 0));
+  // 封魔の地下迷宮の宝箱はエピックが出やすい（ボスの黄金箱は別。段階7a。エンジンの openChest と同じ決め方）
+  const epicMul = chest.roomId && !chest.spec.big ? themeReward(game.dungeon).epicMul : 1;
+  const expected = useMemo(() => expectedChestOdds(look, slots, Math.min(focus, slots, hero.focus), chance, epicMul), [look, slots, focus, hero.focus, chance, epicMul]);
+  const perfectOdds = useMemo(() => chestOdds(look, slots, epicMul), [look, slots, epicMul]);
+  const shownOdds = !opened ? expected : roll?.odds && (passed('shift') || showResult || !roll.oddsBefore) ? roll.odds : (roll?.oddsBefore ?? chestOdds(look, 0, epicMul));
 
   const r = RARITY_STYLE[showResult ? grade : look];
-  const title = chest.spec.big ? `大宝箱（${CHEST_NAME[look]}）` : CHEST_NAME[look];
+  const title = chest.spec.big ? `大宝箱（${CHEST_NAME[look]}）` : chest.spec.sealed ? `封魔の宝箱（${CHEST_NAME[look]}）` : CHEST_NAME[look];
+  const sealTrap = `全員に最大HPの${BALANCE.sealedChest.trapHpPct}%ダメージ＋戦闘の初めに脆弱${BALANCE.sealedChest.trapVulnerable}`;
   const reach = step?.kind === 'reach';
   const premium = step?.kind === 'premium' || (showResult && grade === 'legend' && stepIdx !== null);
   const shakeClass = step?.kind === 'omen' ? 'chest-rattle' : step?.kind === 'shake' || step?.kind === 'light' ? (light >= 2 ? 'chest-shake-hard' : 'chest-shake') : '';
@@ -260,6 +323,19 @@ export function ChestScreen() {
         <BattleBackground kind={sceneBackground(game)} className="absolute inset-0 h-full w-full opacity-35" />
         {premium && <PremiumLayer dim={showResult} />}
         <AnimatePresence>{reach && <ReachLayer key="reach" />}</AnimatePresence>
+        {/* 宝箱が開く動画: 演出の初めから置いて読み込み、動画の段で見せて再生する */}
+        {animating && useVideo.current && videoUrl && (
+          <ChestVideo
+            src={videoUrl}
+            playing={step?.kind === 'video'}
+            speed={speed}
+            onDone={endVideo}
+            onFail={() => {
+              setVideoFailed(true);
+              endVideo();
+            }}
+          />
+        )}
         {/* 光が上がった瞬間のフラッシュ */}
         <AnimatePresence>
           {step?.kind === 'light' && step.level > 0 && (
@@ -280,18 +356,6 @@ export function ChestScreen() {
             {locked && <Lock size={18} className="ml-1 inline text-amber-200" />}
           </div>
 
-          {/* 確率の帯 */}
-          {!showResult && (
-            <div className="mt-1 w-full max-w-[380px] rounded-xl bg-black/45 px-2 py-1.5">
-              <OddsBar odds={shownOdds} label={!opened ? (locked ? '中身の格の確率（鍵を開けた後に運で上げられる）' : `${hero.name}・フォーカス${focus}で開けた時の確率`) : passed('shift') ? 'スロットの結果で確率が上がった！' : '中身の格の確率'} duration={REVEAL_TIMING.oddsShift / speed} />
-              {!opened && !locked && (
-                <div className="mt-1 opacity-80">
-                  <OddsBar odds={perfectOdds} label="完全成功（3つ全部成功）なら" height={8} />
-                </div>
-              )}
-            </div>
-          )}
-
           {/* 演出中のリール */}
           {roll && stepIdx !== null && animating && (
             <div className="mt-2">
@@ -299,6 +363,14 @@ export function ChestScreen() {
             </div>
           )}
 
+          {/* 封魔の宝箱: 何が起きるかを先に見せる（開けるか立ち去るかを選ぶ） */}
+          {seal === 'sealed' && (
+            <div className="mt-1 w-full max-w-[380px] rounded-xl border px-2 py-1 text-center text-[13px] leading-5 text-fuchsia-100" style={{ borderColor: '#c98bff', background: 'rgba(40,10,60,.7)' }} data-seal-note>
+              <b>封印されている。</b>解くと、罠の判定（器用）の後、<b>番人との戦闘</b>になる。
+              <span className="block text-[12px] text-zinc-300">勝てば、この箱を開けられる（逃げると箱は消える）</span>
+            </div>
+          )}
+          {!opened && !shared && !seal && <label className="flex items-center gap-2 text-[13px]">報酬を受け取る人<select aria-label="報酬を受け取る人" value={recipientId ?? heroId} onChange={e => setRecipientId(e.target.value)} className="min-h-11 max-w-[180px] rounded bg-zinc-900 px-2 text-[13px]">{sceneHeroes(game).map(h => <option key={h.id} value={h.id}>{h.playerId}・{h.name}</option>)}</select></label>}
           {/* 宝箱 */}
           <motion.div
             animate={reach || step?.kind === 'premium' ? { y: -14, scale: 1.12 } : showResult ? { y: 0, scale: [0.85, 1.15, 1] } : { y: 0, scale: 1 }}
@@ -306,6 +378,14 @@ export function ChestScreen() {
             className="relative my-2 flex h-[150px] w-[184px] shrink-0 items-center justify-center"
           >
             <span className="absolute inset-0 rounded-full" style={{ background: `radial-gradient(closest-side, ${showResult ? r.glow : light >= 0 ? `${LIGHT[light]}88` : RARITY_STYLE[look].glow}, transparent)` }} />
+            {/* レア以上: 格の色の後光（光の筋がゆっくり回る） */}
+            {showResult && rarityIndex(grade) >= 1 && (
+              <span
+                className="speed-lines pointer-events-none absolute -inset-[60%] rounded-full opacity-70"
+                style={{ background: `repeating-conic-gradient(from 0deg, ${r.glow} 0deg 6deg, transparent 6deg 18deg)`, maskImage: 'radial-gradient(closest-side, #000 30%, transparent 75%)', WebkitMaskImage: 'radial-gradient(closest-side, #000 30%, transparent 75%)' }}
+                data-halo
+              />
+            )}
             <div className={`relative h-[150px] w-[184px] ${shakeClass}`}>
               <ChestImage rarity={look} open={showResult} className="h-full w-full" />
               {/* 開いた瞬間: 中からはじける光（描いた宝箱は閉じた姿だけなので、光で開いたことを見せる） */}
@@ -347,6 +427,18 @@ export function ChestScreen() {
             {locked && !opened && <Lock size={28} className="absolute bottom-0 rounded-full bg-zinc-900 p-1 text-amber-200" />}
           </motion.div>
 
+          {/* 確率の帯 */}
+          {!showResult && (
+            <div className="mt-2 w-full max-w-[380px] rounded-xl border border-amber-300/25 bg-black/55 px-2 py-1.5" data-chest-odds>
+              <OddsBar odds={shownOdds} label={!opened ? (seal ? '中身の格の確率（番人を倒した後に運で上げられる）' : locked ? '中身の格の確率（鍵を開けた後に運で上げられる）' : `${hero.name}・フォーカス${focus}で開けた時の確率`) : passed('shift') ? 'スロットの結果で確率が上がった！' : '中身の格の確率'} duration={REVEAL_TIMING.oddsShift / speed} height={18} />
+              {!opened && !locked && !seal && (
+                <div className="mt-1 opacity-80">
+                  <OddsBar odds={perfectOdds} label="完全成功（3つ全部成功）なら" height={12} />
+                </div>
+              )}
+            </div>
+          )}
+
           {/* レジェンドの文字 */}
           <AnimatePresence>
             {step?.kind === 'premium' && (
@@ -377,6 +469,17 @@ export function ChestScreen() {
             </div>
           )}
 
+          {/* 封印を解いた結果（番人との戦闘の前） */}
+          {chest.lastRoll?.kind === 'seal' && seal === 'guard' && (
+            <div className="flex flex-col items-center gap-1" data-seal-result={chest.lastRoll.success ? 'ok' : 'trap'}>
+              <RollStrip results={chest.lastRoll.results} />
+              {chest.lastRoll.success ? <div className="text-[15px] font-bold text-emerald-300">罠を避けて、封印を解いた！</div> : <div className="text-center text-[15px] font-bold text-red-300">{chest.lastRoll.trap}</div>}
+              <div className="font-display text-outline text-[18px] text-fuchsia-200">番人が現れた！</div>
+            </div>
+          )}
+          {/* 番人を倒した後 */}
+          {chest.spec.sealed && chest.seal === 'cleared' && !opened && <div className="text-[15px] font-bold text-emerald-300" data-seal-cleared>番人を倒した！ 運のスロットで宝箱を開けよう</div>}
+
           {/* 結果 */}
           {showResult && (
             <div className="flex w-full max-w-[420px] flex-col items-center gap-1 pb-3">
@@ -402,57 +505,132 @@ export function ChestScreen() {
                 </div>
               )}
               {roll?.odds && <OddsBar odds={roll.odds} highlight={grade} height={8} />}
-              <div className="mt-1 w-full">
+              {/* 手に入れた物: 格の色の縁と金の四隅 */}
+              <div className="panel-ornate mt-1 w-full rounded-xl border-2 p-1.5" style={{ borderColor: r.color, background: 'rgba(0,0,0,.55)', boxShadow: `0 0 14px ${r.glow}` }} data-loot-frame>
                 <LootList loot={chest.contents!} />
-                <div className="mt-1 text-center text-[12px] text-zinc-400">装備品は「パーティ・装備」から誰にでも装備できます</div>
+                <div className="mt-1 text-center text-[12px] text-zinc-400">{chest.claims?.length ? '品物はみんなで取り合って決めます（お金はその場の全員で山分け）' : '装備品は「パーティ・装備」から誰にでも装備できます'}</div>
               </div>
+
             </div>
           )}
         </div>
       </div>
 
       <div className="panel relative z-20 shrink-0 rounded-t-2xl px-3 pt-2 pb-3">
+        {/* みんなの選択を待っている時の枠は、ボタンの上に普通に置く（重ねない） */}
+        {!animating && <VoteStatus className="mb-2" />}
         {animating ? (
           <button onClick={skip} className="btn btn-dark flex h-12 w-full items-center justify-center gap-1 rounded-xl text-[15px] font-bold">
             <ChevronsRight size={20} /> タップで結果まで飛ばす
           </button>
+        ) : !opened && shared && (!opener || pickAgain) ? (
+          <>
+            <OpenerPicker chest={chest} heroes={sceneHeroes(game).filter((h) => !h.retired)} />
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {seal === 'guard' ? null : leaveGate.canLeave ? (
+                <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} disabled={leaveOutsider} data-option-wait={leaveOutsider ? 1 : undefined} className="btn btn-dark h-12 rounded-xl text-[14px] font-bold" data-chest-leave="leave">
+                  {chest.spec.big ? '開けずに去る' : '立ち去る'}
+                  <VoteChips cmd={{ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER }} />
+                </button>
+              ) : (
+                leaveWait('立ち去るか決めます')
+              )}
+              {opener && (
+                <button onClick={() => setPickAgain(false)} className="btn btn-dark h-12 rounded-xl text-[14px] font-bold">
+                  もどる
+                </button>
+              )}
+            </div>
+          </>
+        ) : !opened && shared && opener && !myOpener ? (
+          <div className="flex flex-col gap-2" data-opener-wait>
+            <div className="flex items-center gap-2 rounded-lg bg-black/35 p-1.5 text-[13px]">
+              <HeroFace hero={opener} size={32} />
+              <span className="min-w-0 flex-1 leading-5">
+                <span className="rounded px-1 text-[12px] font-bold text-black" style={{ background: PLAYER_COLOR[opener.playerId] }}>
+                  {opener.playerId}
+                </span>{' '}
+                <b>{opener.name}</b>が開けます
+                <span className="block text-[12px] text-zinc-400">{useOnline.getState().room?.seatName(opener.playerId) ?? opener.playerId}さんが{seal === 'sealed' ? '封印を解く' : seal === 'guard' ? '番人との戦闘を始める' : locked ? '鍵を開ける' : '運のスロットを回す'}のを待っています</span>
+              </span>
+            </div>
+            <button onClick={() => setPickAgain(true)} className="btn btn-dark h-11 rounded-xl text-[13px] font-bold">
+              開ける人を選び直す
+            </button>
+          </div>
         ) : !opened ? (
           <>
+            {opener && (
+              <div className="mb-1 flex items-center gap-1.5 text-[12px] text-amber-100" data-opener-chosen>
+                <span className="min-w-0 flex-1">みんなで決めた開け役：<b>{opener.name}</b></span>
+                <button onClick={() => setPickAgain(true)} className="btn btn-dark h-11 shrink-0 rounded-lg px-2 text-[12px] font-bold">
+                  選び直す
+                </button>
+              </div>
+            )}
+            {seal === 'guard' ? null : (
             <CheckPanel
-              heroes={sceneHeroes(game)}
-              heroId={heroId}
+              heroes={opener ? [opener] : sceneHeroes(game).filter(h => !game.world || game.activeScene || chest.tile === undefined || h.id === game.world.turn)}
+              heroId={opener?.id ?? heroId}
               setHeroId={setHeroId}
               focus={focus}
               setFocus={setFocus}
-              stat={locked ? 'dex' : 'luk'}
-              tag={locked ? 'lock' : 'luck'}
-              slots={locked ? BALANCE.lockSlots : slots}
-              need={locked ? BALANCE.lockNeed : slots}
-              successLabel={locked ? '鍵が開く（0成功は罠：全員5ダメージ）' : '完全成功'}
-              bonusOnly={!locked}
+              stat={locked || seal ? 'dex' : 'luk'}
+              tag={locked || seal ? 'lock' : 'luck'}
+              slots={locked || seal ? BALANCE.lockSlots : slots}
+              need={locked || seal ? BALANCE.lockNeed : slots}
+              successLabel={seal ? `罠を避ける（0成功は罠：${sealTrap}）` : locked ? '鍵が開く（0成功は罠：全員5ダメージ）' : '完全成功'}
+              bonusOnly={!locked && !seal}
             />
-            <div className="mt-2 grid grid-cols-[1fr_2fr] gap-2">
-              <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} className="btn btn-dark h-12 rounded-xl text-[14px] font-bold">
-                {chest.spec.big ? '開けずに去る' : '立ち去る'}
-                <VoteChips cmd={{ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER }} />
-              </button>
+            )}
+            <div className={`mt-2 grid gap-2 ${seal === 'guard' ? 'grid-cols-1' : 'grid-cols-[1fr_2fr]'}`}>
+              {seal === 'guard' ? null : leaveGate.canLeave ? (
+                <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} disabled={leaveOutsider} data-option-wait={leaveOutsider ? 1 : undefined} className="btn btn-dark h-12 rounded-xl text-[14px] font-bold" data-chest-leave="leave">
+                  {chest.spec.big ? '開けずに去る' : '立ち去る'}
+                  <VoteChips cmd={{ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER }} />
+                </button>
+              ) : (
+                leaveWait('立ち去るか決めます')
+              )}
               <button
                 onClick={() => {
-                  if (!locked) pendingOpen.current = true;
-                  dispatchGame({ type: 'OPEN_CHEST', playerId: LOCAL_PLAYER, heroId, focusUsed: focus });
+                  if (!locked && !seal) {
+                    pendingOpen.current = true;
+                    useVideo.current = !!videoUrl;
+                  }
+                  const f = seal === 'guard' ? 0 : focus;
+                  dispatchGame(opener ? { type: 'OPEN_CHEST', playerId: LOCAL_PLAYER, heroId: opener.id, focusUsed: f } : { type: 'OPEN_CHEST', playerId: LOCAL_PLAYER, heroId, recipientId: recipientId ?? heroId, focusUsed: f });
                   setFocus(0);
                 }}
                 className="btn btn-gold font-display h-12 rounded-xl text-[18px]"
+                data-chest-open={seal ?? (locked ? 'lock' : 'luck')}
               >
-                {locked ? '鍵を開ける' : '運のスロットで開ける'}
+                {seal === 'sealed' ? '封印を解く' : seal === 'guard' ? '番人と戦う' : locked ? '鍵を開ける' : '運のスロットで開ける'}
               </button>
             </div>
           </>
+        ) : opened && chest.relics?.length && chest.relicPicked === undefined ? (
+          // 寄り道の値打ち（2026-11-14）: 黄金箱の秘宝を3つから1つ選ぶ（選ぶまで先へ進めない）
+          <RelicPicker game={game} chest={chest} />
+        ) : claimIdx >= 0 ? (
+          // 中身の取り合い（ステップ2）: 1つずつ。決まった物は上の一覧に「→ 名前」で出る
+          <div className="-mt-3 max-h-[46vh] overflow-y-auto overscroll-contain" data-claim-area>
+            <ClaimPanel claim={chest.claims![claimIdx]} index={claimIdx} title={`中身を取り合う（${claimIdx + 1}/${chest.claims!.length}）`} />
+            <div className="mt-1 text-center text-[12px] text-zinc-400">残り{claimsLeft}つ。全部決まると先へ進めます</div>
+            <WaitNotes notes={chestClaimWaits(game, isLocalPlayer)} className="mt-1" />
+          </div>
+        ) : claimsLeft === 0 && !leaveGate.canLeave ? (
+          // 世界マップの宝箱: 手番のキャラの担当の人が「先へ進む」を押す。ほかの人にはだれを待っているかを出す
+          leaveWait('先へ進めるのを待っています')
         ) : (
-          <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px]">
-            {chest.spec.big ? 'ダンジョン制覇！' : '先へ進む'}
+          // 自動の確認用の見えない印（B9）: 宝箱を後にするボタン（leave = 開けずに立ち去る・done = 開けた後の「先へ進む」）
+          <>
+          {claimsLeft === 0 && <OutsiderNote cmd={{ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER }} className="mb-2" />}
+          <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} disabled={claimsLeft > 0 || leaveOutsider} data-option-wait={claimsLeft === 0 && leaveOutsider ? 1 : undefined} className="btn btn-gold font-display h-12 w-full rounded-xl text-[18px] disabled:opacity-40" data-chest-leave="done">
+            {claimsLeft > 0 ? `取り合いを待っています（残り${claimsLeft}）` : chest.spec.big ? 'ダンジョン制覇！' : '先へ進む'}
             <VoteChips cmd={{ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER }} />
           </button>
+          </>
         )}
       </div>
     </Screen>

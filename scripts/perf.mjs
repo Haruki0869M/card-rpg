@@ -1,6 +1,6 @@
 // 性能計測: CPUを4倍遅くした状態で、カード使用〜敵フェーズ中のフレーム時間を測る
 // npm run build && npx vite preview --port 4173 を起動した状態で: node scripts/perf.mjs
-import { chromium, startBattle } from './lib.mjs';
+import { chromium, confirmEndTurn, startBattle } from './lib.mjs';
 
 const browser = await chromium.launch();
 const results = [];
@@ -37,6 +37,7 @@ for (const [n, enc] of [[2, ['goblinBrute', 'chaosShaman', 'goblinScout']], [4, 
     await page.waitForTimeout(700);
   }
   await page.locator('button:has-text("ターン終了")').click();
+  await confirmEndTurn(page);
   await page.waitForTimeout(2500);
   const frames = await page.evaluate(() => window.__frames.slice(2));
   frames.sort((a, b) => a - b);

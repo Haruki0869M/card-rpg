@@ -1,7 +1,9 @@
 // ===== 複数人で遊ぶ時のルール（M3-C）: みんなで決める・手番の人だけが操作・同行の誘い・戦闘への参加 =====
 import { describe, expect, it } from 'vitest';
 import type { GameCommand, GameState, PlayerId } from '../../types';
-import { applyGameCommand, createGame, findHero, notVoted, viewOf, votesFor } from '../index';
+import { applyGameCommand, createGame, findHero, notVoted, reachable, viewOf, votesFor } from '../index';
+
+const reachableFrom = (g: GameState, t: number) => reachable(g.world!, t, g.world!.move ?? 0).keys();
 
 const party = (players: PlayerId[]) => players.map((p, i) => ({ classId: ['warrior', 'mage', 'guardian'][i], gender: 'male' as const, name: `h${i}`, playerId: p }));
 const newWorld = (players: PlayerId[]) => createGame({ seed: 3, scenarioId: 'corruptionKing', difficulty: 'normal', party: party(players) });
@@ -27,9 +29,8 @@ function inTemple() {
   g = run(g, { type: 'WORLD_INVITE_ANSWER', playerId: 'P2', heroId: 'h1', accept: true });
   g = run(g, { type: 'WORLD_INTERACT', playerId: 'P1', heroId: 'h0', party: ['h0', 'h1'] });
   expect(g.expeditions![0].heroes).toEqual(['h0', 'h1']);
-  // 2人とも入ったので、ワールドターンが進んでダンジョンの番。探索力を決める
+  // 2人とも入ったので、ワールドターンが進んでダンジョンの番（すぐ扉を選べる）
   const x = g.expeditions![0].id;
-  g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: 'P1', heroId: 'h0', focusUsed: 0 }));
   return { g, x };
 }
 
@@ -48,7 +49,7 @@ describe('みんなで決める（ダンジョンの中）', () => {
     expect(viewOf(g, x).vote).toBeUndefined();
   });
 
-  it('意見が割れたら、先頭のキャラ（入った人）の選択になる。選び直しもできる', () => {
+  it('部屋の選択は全員一致。意見が割れたら決まらず、選び直しで決まる（指摘1）', () => {
     let { g, x } = inTemple();
     g.expeditions![0].mode = 'dungeon';
     const enter: GameCommand = { type: 'ENTER_ROOM', playerId: 'P1', roomId: 'r0c0' };
@@ -58,8 +59,12 @@ describe('みんなで決める（ダンジョンの中）', () => {
     expect(notVoted(viewOf(g, x))).toEqual(['P1', 'P2']);
     g = run(g, inScene(x, { type: 'VOTE', playerId: 'P2', command: retreat }));
     g = run(g, inScene(x, { type: 'VOTE', playerId: 'P1', command: enter }));
-    // 1対1 → P1（h0 が先頭）の「部屋に入る」
+    // 1対1でも、部屋の選択が入っていれば決まらない
     expect(g.expeditions).toHaveLength(1);
+    expect(viewOf(g, x).dungeon!.currentRoomId).toBeUndefined();
+    expect(votesFor(viewOf(g, x), enter)).toEqual(['P1']);
+    // P2 が同じ部屋に選び直すと決まる
+    g = run(g, inScene(x, { type: 'VOTE', playerId: 'P2', command: { ...enter, playerId: 'P2' } }));
     expect(viewOf(g, x).dungeon!.currentRoomId).toBe('r0c0');
   });
 
@@ -69,7 +74,6 @@ describe('みんなで決める（ダンジョンの中）', () => {
     const t = tileOf(g, 'dungeon', 'emeraldTemple');
     g.world!.pos.h0 = g.world!.pos.h1 = t;
     g = run(g, { type: 'WORLD_INTERACT', playerId: 'P1', heroId: 'h0', party: ['h0', 'h1'] });
-    g = run(g, inScene(g.expeditions![0].id, { type: 'EXPLORE_ROLL', playerId: 'P1', heroId: 'h0', focusUsed: 0 }));
     g = run(g, inScene(g.expeditions![0].id, { type: 'ENTER_ROOM', playerId: 'P1', roomId: 'r0c0' }));
     expect(viewOf(g, g.expeditions![0].id).dungeon!.currentRoomId).toBe('r0c0');
   });
@@ -89,7 +93,7 @@ describe('同行の誘い', () => {
   it('他の人のキャラは、誘って承知してもらうと一緒に動ける。断られたら連れて行けない', () => {
     let g = newWorld(['P1', 'P2']);
     g = run(g, { type: 'STORY_CONTINUE', playerId: 'P1' });
-    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: 'P1', heroId: 'h0', focusUsed: 0 });
+    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: 'P1', heroId: 'h0' });
     const w = g.world!;
     const to = [...Array(w.tiles.length).keys()].find((i) => i !== w.pos.h0 && Math.abs(i - w.pos.h0) <= 1 && !w.wanderers.some((x) => x.tile === i))!;
     const move: GameCommand = { type: 'WORLD_MOVE', playerId: 'P1', heroId: 'h0', to, companions: ['h1'] };
@@ -166,5 +170,33 @@ describe('報酬はみんなに（M3-C4・C5）', () => {
     expect(c.winner).toBe('h1');
     expect(c.rolls!.map((r) => r.heroId)).toEqual(['h1']);
     expect(findHero(g, 'h1')!.stash.some((i) => i.uid === 'loot1')).toBe(true);
+  });
+});
+
+describe('同行（指摘1）', () => {
+  it('同行は手番が変わっても続き、ダンジョンにも一緒に入る。他の人のキャラと動く時は、その人の同意で動く', () => {
+    let g = newWorld(['P1', 'P2']);
+    g = run(g, { type: 'STORY_CONTINUE', playerId: 'P1' });
+    const w = g.world!;
+    const start = w.pos.h0;
+    w.pos.h1 = start;
+    g = run(g, { type: 'WORLD_INVITE', playerId: 'P1', heroId: 'h0', targetId: 'h1' });
+    g = run(g, { type: 'WORLD_INVITE_ANSWER', playerId: 'P2', heroId: 'h1', accept: true });
+    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: 'P1', heroId: 'h0' });
+    // 施設・敵のいない、ただのマスへ（サイコロの目で行ける所が変わっても、出来事が起きないように）
+    // 移動中のランダムイベントは、この確認では起こさない（直前に起きたことにする。乱数の順番で変わるため）
+    g.heroes[0].lastRandomEvent = g.world!.worldTurn;
+    const to = [...reachableFrom(g, start)].find((t) => t !== start && !g.world!.tiles[t].f && !g.world!.wanderers.some((x) => x.tile === t))!;
+    g = run(g, { type: 'WORLD_MOVE', playerId: 'P1', heroId: 'h0', to, companions: ['h1'] });
+    // 提案だけ。P2 が同意するまで動かない
+    expect(g.world!.pos.h0).toBe(start);
+    expect(g.world!.moveProposal?.owners).toEqual(['P2']);
+    expect(applyGameCommand(g, { type: 'WORLD_MOVE_AGREE', playerId: 'P1', accept: true }).error).toBeDefined();
+    g = run(g, { type: 'WORLD_MOVE_AGREE', playerId: 'P2', accept: true });
+    expect(g.world!.pos.h0).not.toBe(start);
+    expect(g.world!.pos.h1).toBe(g.world!.pos.h0);
+    // 手番が変わっても同行は続く
+    g = run(g, { type: 'WORLD_WAIT', playerId: 'P1', heroId: 'h0' });
+    expect(g.world!.follow).toEqual({ h1: 'h0' });
   });
 });

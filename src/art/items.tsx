@@ -22,6 +22,12 @@ export const ItemArt = memo(function ItemArt({ icon, rarity, className }: { icon
   const glow = rarity !== 'common' ? <circle cx="32" cy="32" r="28" fill={url('glow')} /> : null;
   let body: React.ReactNode;
   switch (icon) {
+    case 'gun':
+      body = <g transform="rotate(-25 32 32)"><path d="M9 23H51V33H9Z" fill={metal} {...S} /><path d="M14 33H28L23 53H11Z" fill={wood} {...S} /><path d="M30 33V42H39V33" fill="none" {...S} /><path d="M49 20V35M12 21V34" stroke={a} strokeWidth="4" /></g>;
+      break;
+    case 'instrument':
+      body = <g transform="rotate(25 32 32)"><ellipse cx="30" cy="42" rx="17" ry="18" fill={wood} {...S} /><path d="M26 9H34V33H26Z" fill={wood} {...S} /><circle cx="30" cy="41" r="6" fill={INK} /><path d="M28 10V53M31 10V53" stroke="#ffe9a8" strokeWidth="1.3" /><path d="M22 51H38" stroke={a} strokeWidth="4" /></g>;
+      break;
     case 'sword':
       body = (
         <g transform="rotate(45 32 32)">

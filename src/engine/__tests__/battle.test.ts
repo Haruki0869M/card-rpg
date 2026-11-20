@@ -27,8 +27,8 @@ describe('成功率計算（能力値から適性補正）', () => {
     expect(finalChance(getCard('heavySwing'), affinityOf({ classId: 'warrior' }))).toBe(75);
     expect(finalChance(getCard('heavySwing'), affinityOf({ classId: 'mage' }))).toBe(55);
     expect(finalChance(getCard('gambleBolt'), affinityOf({ classId: 'mage' }))).toBe(60);
-    expect(affinityOf({ classId: 'guardian' })).toEqual({ physical: 0, magic: -20, skill: 10 });
-    expect(affinityOf({ classId: 'hunter' })).toEqual({ physical: 0, magic: 0, skill: 5 });
+    expect(affinityOf({ classId: 'guardian' })).toMatchObject({ physical: 0, magic: -20, skill: 10 });
+    expect(affinityOf({ classId: 'hunter' })).toMatchObject({ physical: 0, magic: 0, skill: 5 });
   });
   it('5%〜95%に制限される', () => {
     const card = { ...getCard('guard'), baseChance: 95 };
@@ -119,7 +119,7 @@ describe('山札', () => {
   });
   it('山札が尽きたら捨札をシャッフルして引く', () => {
     const a = mkAlly(2, 6);
-    expect(drawCards(a, 5, createRng(3))).toEqual({ drawn: 5, reshuffled: true });
+    expect(drawCards(a, 5, createRng(3))).toEqual({ drawn: 5, reshuffled: true, blocked: false });
     expect(a.hand.slice(0, 2).map((c) => c.uid)).toEqual(['d0', 'd1']);
     expect(a.drawPile).toHaveLength(3);
     expect(a.discard).toHaveLength(0);
@@ -129,7 +129,7 @@ describe('山札', () => {
     expect(drawCards(a, 5, createRng(1)).drawn).toBe(2);
   });
   it('山札も捨札も空なら引けない', () => {
-    expect(drawCards(mkAlly(0, 0), 5, createRng(1))).toEqual({ drawn: 0, reshuffled: false });
+    expect(drawCards(mkAlly(0, 0), 5, createRng(1))).toEqual({ drawn: 0, reshuffled: false, blocked: false });
   });
 });
 
@@ -149,9 +149,9 @@ describe('戦闘の生成', () => {
   it('1〜4人で作れる。人数ごとの敵HP倍率', () => {
     const hp = (n: number) => createBattle(setup(1, ['warrior', 'mage', 'guardian', 'hunter'].slice(0, n))).enemies.map((e) => e.maxHp);
     expect(hp(1)).toEqual([31, 21, 15]);
-    expect(hp(2)).toEqual([52, 36, 26]);
-    expect(hp(3)).toEqual([70, 48, 35]);
-    expect(hp(4)).toEqual([88, 61, 44]);
+    expect(hp(2)).toEqual([57, 39, 28]);
+    expect(hp(3)).toEqual([77, 53, 38]);
+    expect(hp(4)).toEqual([125, 87, 62]);
   });
   it('人数・敵の数が範囲外ならエラー', () => {
     expect(() => createBattle({ ...setup(1), party: [] })).toThrow();
@@ -169,7 +169,7 @@ describe('戦闘の生成', () => {
     const base = createBattle(setup(3, ['warrior', 'mage'], 'bruteAlone'));
     const lv = createBattle({ ...setup(3), encounter: { id: 'x', name: 'x', enemies: [{ defId: 'goblinBrute', level: 6 }] } });
     expect(base.enemies[0].level).toBe(4);
-    expect(lv.enemies[0].maxHp).toBe(Math.floor(52 * 1.2));
+    expect(lv.enemies[0].maxHp).toBe(Math.floor(52 * 1.2 * 1.1)); // 2人の敵HP倍率1.1
     expect(lv.enemies[0].attackMul).toBeCloseTo(1.16);
     // 叩きつけ 10 → 11（11.6 切り捨て）
     const ally = lv.allies.find((a) => a.id === lv.enemies[0].intent!.targetId)!;
@@ -198,7 +198,7 @@ describe('カードの使用', () => {
     const s = createBattle(setup(5));
     const [card] = giveHand(s, 'a0', ['heavySwing']);
     const { state } = applyCommand(s, play('a0', card.uid, 'e0', 3));
-    expect(state.enemies[0].hp).toBe(52 - 26);
+    expect(state.enemies[0].hp).toBe(57 - 33); // 敵HP 52×1.1=57。26 × 剣の心得（完全成功で1.3倍）
     expect(state.enemies[0].statuses.vulnerable).toBe(2);
   });
   it('不正な操作はエラーで状態不変', () => {

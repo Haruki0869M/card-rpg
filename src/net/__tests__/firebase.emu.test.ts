@@ -58,7 +58,8 @@ describe.skipIf(!process.env.EMU)('Firebase（エミュレーター）', () => {
 
     // 1台が切断 → ホストが代わりに操作 → つながり直して追いつく
     c.goOffline();
-    await until(() => host.seatOnline('P3') === false, 10_000, 'offline seen');
+    // 実機の不具合③: 切れてから約10秒（OFFLINE_GRACE_MS）は「動いている」扱いなので、待ちを長くした
+    await until(() => host.seatOnline('P3') === false, 25_000, 'offline seen');
     await host.setProxy('P3', true);
     await until(() => host.myPlayers().includes('P3'), 5000, 'proxy');
     await drive([host, rb], 50);
@@ -69,13 +70,59 @@ describe.skipIf(!process.env.EMU)('Firebase（エミュレーター）', () => {
 
     // ホストが切断 → B がホストに
     a.goOffline();
-    await until(() => rb.isHost, 15_000, 'host migration');
+    await until(() => rb.isHost, 25_000, 'host migration');
     await rb.setProxy('P1', true);
     await until(() => rb.myPlayers().includes('P1'), 5000, 'proxy P1');
     await drive([rb, rc], 30);
     expect(same([rb, rc])).toBe(true);
     for (const r of rooms) r.dispose();
   }, 180_000);
+
+  it('ホストの引き継ぎの直し（2026-11-14）: 古い状態の端末が、もう書かれた番号に記録を書こうとしても上書きしない（transaction）', async () => {
+    const [a, b] = await Promise.all([client(), client()]);
+    const host = await Room.create(a, { name: 'A', scenarioId: 'corruptionKing', difficulty: 'easy', partySize: 2 });
+    const rb = await Room.join(b, host.code, 'B');
+    const rooms = [host, rb];
+    await host.claimSlot(0, { classId: 'warrior', gender: 'male', name: 'A' });
+    await rb.claimSlot(1, { classId: 'mage', gender: 'female', name: 'B' });
+    await until(() => host.startProblem() === null, 5000, 'slots');
+    await host.start(5);
+    await until(() => rooms.every((r) => r.game), 5000, 'start');
+    await drive(rooms, 5);
+    // B の頭の中を、5手目の時に戻す（凍っていた端末と同じ）
+    const oldGame = structuredClone(rb.game!);
+    const oldSeq = rb.seq;
+    await drive(rooms, 6);
+    const key = `log/${String(oldSeq + 1).padStart(9, '0')}`;
+    const theirs = JSON.stringify(await a.get(`rooms/${host.code}/${key}`));
+    const inside = rb as unknown as { game: unknown; seq: number; handleRequest(r: { key: string; by: string; cmd: string }): Promise<'retry' | void> };
+    inside.game = oldGame;
+    inside.seq = oldSeq;
+    const cmd = botNextCommand(oldGame, { interacted: new Set<string>() })!;
+    expect(await inside.handleRequest({ key: 'zzzz-emu-stale', by: b.uid, cmd: JSON.stringify(cmd) })).toBe('retry');
+    expect(JSON.stringify(await a.get(`rooms/${host.code}/${key}`))).toBe(theirs);
+    // 取り直して、また全員一致する
+    await until(() => rb.seq === host.seq, 10_000, 'resync');
+    expect(same(rooms)).toBe(true);
+    for (const r of rooms) r.dispose();
+  }, 60_000);
+
+  it('実機の不具合③: 印が後から false と書かれても本人がすぐ書き直す（ルールは今のまま）。部屋を出たホストはすぐ引き継がれる', async () => {
+    const [a, b] = await Promise.all([client(), client()]);
+    const host = await Room.create(a, { name: 'A', scenarioId: 'corruptionKing', difficulty: 'easy', partySize: 2 });
+    const rb = await Room.join(b, host.code, 'B');
+    await until(() => !!host.members[b.uid] && !!rb.members[a.uid], 5000, 'members');
+    const mark = `rooms/${host.code}/members/${b.uid}/online`;
+    await a.set(mark, false);
+    await until(() => host.members[b.uid]?.online === true, 5000, 'rewrite');
+    expect(await a.get(mark)).toBe(true);
+    expect(host.seatOnline('P2')).toBe(true);
+    const t0 = Date.now();
+    await host.leave();
+    await until(() => rb.isHost, 5000, 'handover after leave');
+    expect(Date.now() - t0).toBeLessThan(5000);
+    rb.dispose();
+  }, 30_000);
 
   it('セキュリティルール: 部屋に入っていない人は、部屋の中身を読めない', async () => {
     const [a, x] = await Promise.all([client(), client()]);

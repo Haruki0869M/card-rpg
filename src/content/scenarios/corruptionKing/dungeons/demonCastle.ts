@@ -12,25 +12,44 @@ export const demonCastle: DungeonDef = {
   bossChest: 'legend',
   requiresKeys: ['emerald', 'azure', 'crimson'],
   finale: true,
+  // 並びの決まり（docs/review/2026-11-13-room-variety2.md）: どの道でもふつうの戦闘が4回・強敵を通らない道もある
   layout: [
     [{ type: 'battle', next: [0, 1] }],
     [
-      { type: 'battle', next: [0] },
-      { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [0] },
+      { type: 'event', eventId: 'wanderingMerchant', next: [0, 1] },
+      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [0, 1] },
     ],
-    [{ type: 'rest', next: [0, 1] }],
+    [
+      { type: 'battle', next: [0, 1] },
+      { type: 'rest', next: [2] },
+    ],
+    [
+      { type: 'chest', chest: { rarity: 'common', locked: false }, next: [0, 2] },
+      { type: 'elite', next: [0, 1] },
+      { type: 'battle', next: [1, 2] },
+    ],
     [
       { type: 'battle', next: [0] },
-      { type: 'event', eventId: 'mysticSpring', next: [0] },
-    ],
-    [{ type: 'elite', next: [0, 1] }],
-    [
-      { type: 'chest', chest: { rarity: 'legend', locked: false }, next: [0] },
-      { type: 'battle', next: [1] },
+      { type: 'chest', chest: { rarity: 'rare', locked: false }, next: [1] },
+      { type: 'elite', next: [1] },
     ],
     [
       { type: 'rest', next: [0] },
       { type: 'battle', next: [0] },
+    ],
+    [{ type: 'midboss', next: [0] }],
+    [{ type: 'rest', next: [0, 1] }],
+    [
+      { type: 'battle', next: [0] },
+      { type: 'chest', chest: { rarity: 'epic', locked: true }, next: [1] },
+    ],
+    [
+      { type: 'elite', next: [0, 1] },
+      { type: 'battle', next: [0, 1] },
+    ],
+    [
+      { type: 'chest', chest: { rarity: 'legend', locked: false }, next: [0] },
+      { type: 'event', eventId: 'mysticSpring', next: [0] },
     ],
     [{ type: 'rest', next: [0] }],
     [{ type: 'boss', next: [] }],

@@ -11,6 +11,7 @@ import { DIFFICULTIES, ROOM_TYPES, WEAPON_TYPES } from './rules';
 import { SCENARIOS } from './scenarios';
 import { STATUSES } from './statuses';
 import { BALANCE } from './balance';
+import { SANCTUARIES, SCOURGES } from './world';
 
 /** 32bit の FNV-1a を2回（違う初期値）で 16桁 */
 function hash(text: string): string {
@@ -41,6 +42,8 @@ export function contentVersion(): string {
       WEAPON_TYPES.all,
       DIFFICULTIES.all,
       ROOM_TYPES.all,
+      SANCTUARIES.all,
+      SCOURGES.all,
     ]),
   );
   return cached;

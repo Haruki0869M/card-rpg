@@ -1,10 +1,17 @@
+import { cardTargets, isAllyCard, needsCardTarget, selectedCardTarget, targetGuide, secondaryCard, secondaryCardTarget } from '../engine/battle/targets';
 // ===== Zustand ストア =====
 // ロジックは src/engine（冒険: applyGameCommand / 戦闘: applyCommand）を呼ぶだけ。
 // ここでは画面の切り替え・UI 用の一時状態（選択中のカード・演出）・保存・敵フェーズのタイマーを扱う。
 
 import { create } from 'zustand';
+import { normalizeSettings, type Settings } from './settings';
+import { playSound, setAudioVolumes } from '../audio/player';
+import { petCry } from '../audio/cues';
+import { battleFrames, explorationNotices, explorationSounds, receiveNotice, type CalloutDraft, type ImpactDraft, type PopupDraft, type PopupTone, type SynergyTier, type NoticeDraft, type PresentationFrame } from './presentation';
+export type { Settings } from './settings';
 import { TIMING, VIBRATION } from '../data/balance';
 import { cardOf } from '../data/cards';
+import { getItem } from '../data/items';
 import { CLASSES } from '../data/classes';
 import { contentVersion } from '../data/contentVersion';
 import { ENCOUNTERS } from '../data/enemies';
@@ -13,6 +20,7 @@ import {
   applyGameCommand,
   createBattle,
   createGame,
+  enemyName,
   findAlly,
   GAME_VERSION,
   migrateGame,
@@ -28,17 +36,15 @@ import {
   WORLD_SCENE,
 } from '../engine';
 import type { Room } from '../net/room';
-import type { BattleEvent, BattleState, Command, Difficulty, GameCommand, GameResult, GameState, Gender, PlayerId, SlotResult } from '../types';
-import { actorOf, autoName, battleActorOf, isLocalPlayer, LOCAL_PLAYER } from './battleConfig';
-
-export interface Settings {
-  fastMode: boolean;
-  vibration: boolean;
-}
+import type { BattleEvent, BattleState, Command, Difficulty, DungeonRun, GameCommand, GameResult, GameState, Gender, PlayerId, SlotResult, StatId } from '../types';
+import { pickAllyTarget } from './healTarget';
+import { actorOf, autoName, battleActorOf, isLocalPlayer, isOnlinePlay, LOCAL_PLAYER } from './battleConfig';
+import { handoffReplacesCutin } from './handoff';
 
 export interface Selection {
   cardUid: string;
   targetId?: string;
+  allyTargetId?: string;
   focus: number;
 }
 
@@ -47,14 +53,44 @@ export interface RollFx {
   results: SlotResult[];
   summary: string;
   perfect: boolean;
+  /** 成功の数（スロットの結果の音を選ぶ。K6） */
+  successes?: number;
+  /** 他の人の操作（音を少し小さく。K6） */
+  quiet?: boolean;
+}
+
+/** 扉が開く演出（入る前のダンジョンの様子と、その場面） */
+export interface DoorOpen {
+  id: number;
+  scene: string;
+  run: DungeonRun;
+  /** 開けた扉の部屋（扉の前まで自動で歩く様子を見せる） */
+  roomId?: string;
+}
+
+/** 手番のカットイン（docs/archive/tasks/turn-cutin.md） */
+export interface TurnCutin {
+  id: number;
+  heroId: string;
+  /** この端末で操作するキャラの番か（大きなカットイン）。違えば小さなお知らせ */
+  mine: boolean;
+  /** そのキャラのいる場面（世界マップかダンジョンの場面のID） */
+  scene: string;
 }
 
 export interface Popup {
   id: number;
   unitId: string;
   text: string;
-  tone: 'damage' | 'block' | 'status' | 'zero' | 'ability' | 'heal';
+  tone: PopupTone;
+  lane: number;
+  /** 重なりの段階（Step C。2 = 大きな金の数字、3 = さらに広がる輪） */
+  tier?: SynergyTier;
 }
+
+/** 段階B: 技名の帯・命中のエフェクト・戦場の揺れ・盾（見た目だけ。状態・乱数・同期には触れない） */
+export type Callout = CalloutDraft & { id: number };
+export type ImpactFx = Omit<ImpactDraft, 'unitId'> & { id: number };
 
 /** ユニットごとの動きの演出 */
 export interface UnitFx {
@@ -62,7 +98,7 @@ export interface UnitFx {
   id: number;
 }
 
-export type Sheet = null | 'menu' | 'log' | 'draw' | 'discard' | 'party' | 'pouch' | 'quests';
+export type Sheet = null | 'menu' | 'log' | 'draw' | 'discard' | 'party' | 'pouch' | 'quests' | 'jobs';
 export type Screen = 'title' | 'setup' | 'create' | 'game' | 'join' | 'lobby';
 
 /** 冒険の準備〜キャラクター作成の下書き */
@@ -73,7 +109,28 @@ export interface NewGameDraft {
   party: { classId: string; gender: Gender; name: string; playerId?: PlayerId }[];
 }
 
+export interface WorldMovePresentation {
+  id: number;
+  /** 移動を確定した後の状態（到着してから見せる） */
+  game: GameState;
+  /** 移動を押す前の状態。歩いている間はこちらの視界・敵の配置・手番を見せる（ゴールの敵が先に出ないように） */
+  before?: GameState;
+}
+
 interface StoreState {
+  presentationBusy: boolean;
+  /** 「ターン N」「敵のターン」の帯（数字の表示が全部終わってから出す。見た目だけ） */
+  phaseBanner: { id: number; phase: 'ally' | 'enemy'; turn: number } | null;
+  cutins: (NoticeDraft & { id: number })[];
+  petPulses: Record<string, { id: number }>;
+  worldMoves: WorldMovePresentation[];
+  finishWorldMove: (id: number) => void;
+  /** 手番が移った時のカットイン（mine = この端末で操作するキャラの番。見た目だけ。状態・同期は変えない） */
+  turnCutin: TurnCutin | null;
+  dismissTurnCutin: (id: number) => void;
+  /** ダンジョンの扉が開く演出（第3段階B2）。終わるまで、部屋の画面（戦闘など）への切り替えを待つ。端末の中の見た目だけ */
+  doorOpen: DoorOpen | null;
+  finishDoorOpen: (id: number) => void;
   screen: Screen;
   draft: NewGameDraft;
   /** 冒険の状態（全部の場面） */
@@ -88,16 +145,43 @@ interface StoreState {
   activeId: string;
   selection: Selection | null;
   sheet: Sheet;
+  /** パーティの窓で最初に見せるキャラ */
+  sheetHeroId: string | null;
+  /**
+   * つながり直し（状態の取り直し）の回数（実機の不具合② 点検 F6）。
+   * シートは開いたまま残し、シートの中の選択（選んでいた道具・渡す相手・開いていた行）は、この数が変わった時に消す
+   */
+  sheetEpoch: number;
   /** 冒険の放棄・リセットの確認 */
   confirmAbandon: boolean;
+  /** 「ターン終了」の確認（この端末の担当で、まだ行動できる仲間がいる時だけ出す） */
+  confirmEndTurn: boolean;
+  /** 確認を出した時の「どの戦闘の何ターン目か」（別のターンに持ち越さないための印。2026-11-19） */
+  confirmEndTurnAt: string | null;
+  setConfirmEndTurn: (v: boolean) => void;
   rollFx: RollFx | null;
+  /** 重なりの演出（Step C）: 揺れ・広がる輪を始めた合図。見た目だけ（状態・乱数・同期は変えない） */
+  synergyFx: { id: number; tier: 2 | 3 } | null;
   popups: Popup[];
   unitFx: Record<string, UnitFx>;
+  callout: Callout | null;
+  impactFx: Record<string, ImpactFx>;
+  fieldShake: { id: number } | null;
+  guardFx: Record<string, { id: number }>;
+  /** 回2: 敵が倒れた演出を始める合図（とどめのコマで出す。見た目だけ。状態・乱数・同期は変えない） */
+  deathFx: Record<string, { id: number }>;
   retargets: Record<string, number>;
   flash: { cardUid: string; text: string; id: number } | null;
   hint: { text: string; id: number } | null;
   /** 画面下に出す短いお知らせ（エラーなど） */
   toast: { text: string; id: number } | null;
+  /**
+   * 点検 2026-11-13 F6（オンライン）: ほかの人の「つづける」で閉じた物語の窓のうち、この端末でまだ押していない物。
+   * この端末だけの表示で、押すまで出しておく（ゲームの状態・進行は変えない）
+   */
+  heldStories: { title: string; lines: string[] }[];
+  /** 物語の窓の「つづける」（この端末だけの窓が残っていれば、それを閉じる。無ければ今の窓を閉じる操作を送る） */
+  continueStory: (playerId: PlayerId) => void;
 
   setScreen: (s: Screen) => void;
   /** 見る場面を切り替える */
@@ -112,15 +196,22 @@ interface StoreState {
   tapEnemy: (uid: string) => void;
   setFocus: (n: number) => void;
   confirm: () => void;
+  preview: () => void;
   cancel: () => void;
   setActive: (id: string) => void;
-  endTurn: () => void;
+  /** force = 確認なしで終える（確認の窓の「ターンを終了する」） */
+  endTurn: (force?: boolean) => void;
   /** 道具を使う（userId = 袋の持ち主。戦闘中は操作中のキャラ） */
-  usePouch: (itemUid: string, targetHeroId: string, userId?: string) => void;
+  /** cardUid = カード鍛錬の砥石で強化するカード（区切りE） */
+  /** stat = 災厄討ちの秘薬で上げる能力値（段階7b） */
+  /** keepSheet = 使った後もシートを閉じない（パーティ・装備のシートの持ち物の行から使う時。実機の不具合⑥） */
+  usePouch: (itemUid: string, targetHeroId: string, userId?: string, cardUid?: string, stat?: StatId, keepSheet?: boolean) => string | undefined;
   setSettings: (s: Partial<Settings>) => void;
-  openSheet: (s: Sheet) => void;
+  /** heroId: パーティの窓で最初に見せるキャラ（世界マップの顔を押した時など） */
+  openSheet: (s: Sheet, heroId?: string) => void;
   setConfirmAbandon: (v: boolean) => void;
-  showToast: (text: string) => void;
+  /** tone: error = 操作が通らなかった（音を変える。K6）、offline = 通信できなかった */
+  showToast: (text: string, tone?: 'info' | 'error' | 'offline') => void;
   /** 確認用: 場面の指定まで済んだ操作をそのまま送る（自動プレイの確認スクリプト用） */
   dispatchWire: (cmd: GameCommand) => string | undefined;
   /** オンライン協力: 部屋から届いた操作の結果を反映する */
@@ -129,6 +220,8 @@ interface StoreState {
   loadRemote: (game: GameState) => void;
   /** オンライン協力をやめた: この端末の1人用の冒険（保存）に戻す */
   exitOnline: () => void;
+  /** オンライン協力: この端末がホストを引き継いだ（敵の行動を進める役も引き継ぐ。回3 C） */
+  onBecameHost: () => void;
   /** 戻る操作などで一番上のものを閉じる。閉じたら true */
   closeTop: () => boolean;
 }
@@ -161,11 +254,11 @@ function loadSave(): SaveData | null {
 function loadSettings(): Settings {
   try {
     const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? 'null');
-    if (s && typeof s.fastMode === 'boolean') return s;
+    return normalizeSettings(s);
   } catch {
     /* noop */
   }
-  return { fastMode: false, vibration: true };
+  return normalizeSettings(null);
 }
 
 function writeSave(s: Pick<StoreState, 'full' | 'activeId'>) {
@@ -198,6 +291,25 @@ export function vibrate(settings: Settings, pattern: number | readonly number[])
   }
 }
 
+const isSoundOnly = (f: PresentationFrame) => !!f.sounds?.length && !f.roll && !f.motions?.length && !f.popups?.length && !f.notices?.length;
+/** コマの音を鳴らす。勝敗のジングルは、他の人の操作でも普通の大きさ（K6） */
+function playFrameSounds(f: PresentationFrame) {
+  for (const id of new Set(f.sounds ?? [])) playSound(id, { quiet: !!f.quiet && !id.startsWith('jgl_') });
+}
+
+/** 他の人の操作か（音を少し小さくする）。敵の行動は誰が送っても普通の大きさ。K6 */
+function remoteActor(wire: GameCommand): boolean {
+  const cmd = unwrapCommand(wire).command;
+  const inner = cmd.type === 'VOTE' ? cmd.command : cmd;
+  if (!inner) return false;
+  if (inner.type === 'BATTLE') {
+    if (inner.command.type === 'ENEMY_STEP') return false;
+    return 'playerId' in inner.command && !isLocalPlayer(inner.command.playerId);
+  }
+  const actor = 'playerId' in inner ? inner.playerId : undefined;
+  return !!actor && !isLocalPlayer(actor);
+}
+
 export function speedFactor(settings: Pick<Settings, 'fastMode'>): number {
   return settings.fastMode ? TIMING.fastModeFactor : 1;
 }
@@ -212,6 +324,15 @@ export const setStoreRoom = (r: Room | null) => {
 };
 /** ホストが送った「敵の行動」がまだ戻ってきていない */
 let enemyInFlight = false;
+/** この端末で「つづける」を押した物語の窓の版（点検 F6。押していない窓が、ほかの人の操作で閉じた時だけ、この端末に残す） */
+let storyPressed: number | null = null;
+
+/** この端末の担当で、まだ行動できる（使えるカードが残っている）仲間がいるか。オンラインで準備完了した席は数えない */
+export function canStillAct(battle: BattleState): boolean {
+  if (battle.phase !== 'ally') return false;
+  const waiting = battle.readyCheck ? new Set(waitingPlayers(battle)) : undefined;
+  return battle.allies.some((a) => isLocalPlayer(a.playerId) && (!waiting || waiting.has(a.playerId)) && !isDone(battle, a));
+}
 
 /** 次に操作するキャラ（この端末の担当キャラだけが対象） */
 function nextActive(battle: BattleState, current: string): string {
@@ -225,28 +346,6 @@ function nextActive(battle: BattleState, current: string): string {
   }
   if (cur && !cur.dead) return current;
   return mine.find((a) => !a.dead)?.id ?? mine[0]?.id ?? current;
-}
-
-function popupsFromEvents(events: BattleEvent[]): Popup[] {
-  const out: Popup[] = [];
-  for (const e of events) {
-    if (e.type === 'damage') {
-      if (e.amount > 0) out.push({ id: fxId++, unitId: e.unitId, text: `-${e.amount}`, tone: 'damage' });
-      else out.push({ id: fxId++, unitId: e.unitId, text: e.blocked > 0 ? `防御 ${e.blocked}` : '0', tone: 'zero' });
-    } else if (e.type === 'block') {
-      out.push({ id: fxId++, unitId: e.unitId, text: `+${e.amount}`, tone: 'block' });
-    } else if (e.type === 'heal') {
-      out.push({ id: fxId++, unitId: e.unitId, text: `+${e.amount}`, tone: 'heal' });
-    } else if (e.type === 'status') {
-      const n = { vulnerable: '脆弱', weak: '弱体', burn: '火傷', poison: '毒' }[e.status];
-      out.push({ id: fxId++, unitId: e.unitId, text: `${n} ${e.amount}`, tone: 'status' });
-    } else if (e.type === 'ability') {
-      out.push({ id: fxId++, unitId: e.unitId, text: e.name, tone: 'ability' });
-    } else if (e.type === 'enemyPhase') {
-      out.push({ id: fxId++, unitId: e.enemyUid, text: e.name, tone: 'ability' });
-    }
-  }
-  return out;
 }
 
 /** 戦闘が無い時の表示用の空の戦闘（画面部品の型を単純に保つため） */
@@ -291,6 +390,8 @@ function pickScene(full: GameState | null, current: string, follow = false): str
   return s;
 }
 const viewIn = (full: GameState | null, scene: string) => (full ? viewOf(full, scene) : null);
+/** OS の「動きを減らす」（扉の演出を出さない） */
+const reducedMotion = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 export const useBattle = create<StoreState>((set, get) => {
   /** 敵フェーズを自動で進める */
@@ -310,11 +411,14 @@ export const useBattle = create<StoreState>((set, get) => {
     if (!enemyScene()) return;
     // オンライン協力: 敵の行動はホストが代表して進める
     if (room && (!room.isHost || enemyInFlight)) return;
+    // 前の行動の数字・帯の表示が終わるまで待つ（終わった時に drainFrames からもう一度呼ぶ）。見た目の間だけで、結果は変わらない
+    if (get().presentationBusy || presentationTimer) { enemyWaiting = true; return; }
     enemyTimer = setTimeout(
       () => {
         enemyTimer = null;
         const s = enemyScene();
         if (!s) return;
+        if (get().presentationBusy || presentationTimer) { enemyWaiting = true; return; }
         if (room) enemyInFlight = true;
         const step: GameCommand = {
           type: 'BATTLE',
@@ -326,79 +430,188 @@ export const useBattle = create<StoreState>((set, get) => {
     );
   };
 
-  const applyEvents = (events: BattleEvent[]) => {
-    if (!events.length) return;
-    const { settings, battle } = get();
-    const patch: Partial<StoreState> = {};
-    const unitFx: Record<string, UnitFx> = { ...get().unitFx };
-    let unitFxChanged = false;
-    const setFx = (unitId: string, kind: UnitFx['kind']) => {
-      unitFx[unitId] = { kind, id: fxId++ };
-      unitFxChanged = true;
-    };
-    for (const e of events) {
-      if (e.type === 'roll') {
-        patch.rollFx = { id: fxId++, results: e.results, summary: e.summary, perfect: e.perfect };
-        const ally = findAlly(battle, e.characterId);
-        const inst = ally && [...ally.discard].reverse().find((c) => c.cardId === e.cardId);
-        const target = inst ? cardOf(inst).target : 'enemy';
-        setFx(e.characterId, target === 'self' ? 'cast' : 'attack');
-        if (e.perfect) vibrate(settings, VIBRATION.perfect);
-      } else if (e.type === 'retarget') {
-        patch.retargets = { ...(patch.retargets ?? get().retargets), [e.enemyUid]: fxId++ };
-      } else if (e.type === 'enemyAct') {
-        setFx(e.enemyUid, 'attack');
-      } else if (e.type === 'enemyPhase') {
-        setFx(e.enemyUid, 'phase');
-        vibrate(settings, VIBRATION.victory);
-      } else if (e.type === 'damage') {
-        if (e.amount > 0 || e.blocked > 0) setFx(e.unitId, 'hit');
-        if (e.amount > 0 && findAlly(battle, e.unitId)) vibrate(settings, VIBRATION.hurt);
-      } else if (e.type === 'phase' && e.phase === 'victory') {
-        vibrate(settings, VIBRATION.victory);
+  let frames: PresentationFrame[] = [];
+  let presentationTimer: ReturnType<typeof setTimeout> | null = null;
+  /** 敵の行動が、演出の終わりを待っている */
+  let enemyWaiting = false;
+  /** 最後に帯を出した戦闘・手番（同じ手番で2回出さない） */
+  let bannerKey = '';
+  const uiTimers = new Set<ReturnType<typeof setTimeout>>();
+  let pendingNotices: NoticeDraft[] = [];
+  const later = (fn: () => void, seconds: number) => {
+    const timer = setTimeout(() => { uiTimers.delete(timer); fn(); }, seconds * 1000 / speedFactor(get().settings));
+    uiTimers.add(timer);
+  };
+  const clearPresentation = () => {
+    if (presentationTimer) clearTimeout(presentationTimer);
+    presentationTimer = null; frames = []; pendingNotices = [];
+    for (const timer of uiTimers) clearTimeout(timer);
+    uiTimers.clear();
+    set({ presentationBusy: false, phaseBanner: null, cutins: [], petPulses: {}, popups: [], unitFx: {}, rollFx: null, synergyFx: null, callout: null, impactFx: {}, fieldShake: null, guardFx: {}, deathFx: {} });
+    if (enemyWaiting) { enemyWaiting = false; setTimeout(scheduleEnemy, 0); }
+  };
+  /** 見ている戦闘の手番が変わっていたら、帯を出す手番を返す（出したことにする） */
+  const takeBanner = (): { phase: 'ally' | 'enemy'; turn: number } | null => {
+    const { game, battle } = get();
+    if (game?.mode !== 'battle' || (battle.phase !== 'ally' && battle.phase !== 'enemy')) return null;
+    const key = `${battle.seed}:${battle.encounterId}:${battle.phase}:${battle.turn}`;
+    if (key === bannerKey) return null;
+    bannerKey = key;
+    return { phase: battle.phase, turn: battle.turn };
+  };
+  /** 演出がすべて終わった（帯も出し終えた）。待っていた敵の行動を進める */
+  const finishPresentation = () => {
+    set({ presentationBusy: false });
+    if (enemyWaiting) { enemyWaiting = false; scheduleEnemy(); }
+  };
+  const addPopup = (p: PopupDraft) => {
+    const current = [...get().popups], own = current.filter(x => x.unitId === p.unitId);
+    const replaced = own.length >= TIMING.popupRows ? own[0] : undefined;
+    const used = new Set(own.map(x => x.lane));
+    const lane = replaced?.lane ?? Array.from({ length: TIMING.popupRows }, (_, i) => i).find(i => !used.has(i)) ?? 0;
+    const id = fxId++;
+    set({ popups: [...current.filter(x => x.id !== replaced?.id), { ...p, lane, id }] });
+    later(() => set(s => ({ popups: s.popups.filter(x => x.id !== id) })), TIMING.resultPopup);
+  };
+  const pumpNotices = () => {
+    if (get().worldMoves.length) return;
+    while (pendingNotices.length && get().cutins.length < TIMING.cutinVisible) {
+      // 同じキャラのお供のカットインは、前のが消えてから出す（双子の魂の鈴の2回の行動で、お供が2回、順に跳ねるように。段階7a）
+      const head = pendingNotices[0];
+      if (head.source?.kind === 'pet' && get().cutins.some((c) => c.unitId === head.unitId && c.source?.kind === 'pet')) break;
+      const n = pendingNotices.shift()!, id = fxId++;
+      set(s => ({ cutins: [...s.cutins, { ...n, id }], petPulses: { ...s.petPulses, [n.unitId]: { id } } }));
+      // お供の能力カットイン: きらりと鳴いて知らせる（K6）
+      playSound('sfx_pet_cutin');
+      if (n.source?.kind === 'pet' && n.source.id) playSound(petCry(n.source.id));
+      later(() => set(s => {
+        const pulses = { ...s.petPulses }; if (pulses[n.unitId]?.id === id) delete pulses[n.unitId];
+        return { petPulses: pulses };
+      }), TIMING.petPulse);
+      later(() => { set(s => ({ cutins: s.cutins.filter(x => x.id !== id) })); pumpNotices(); }, TIMING.abilityCutin);
+    }
+  };
+  const showNotices = (notices: NoticeDraft[]) => {
+    for (const n of notices) {
+      if (n.source?.kind === 'pet') {
+        const existing = pendingNotices.find(x => x.unitId === n.unitId && x.name === n.name);
+        if (existing) existing.count = (existing.count ?? 1) + (n.count ?? 1);
+        else pendingNotices.push(n);
+      } else {
+        addPopup({ unitId: n.unitId, tone: 'ability', text: `【${n.source?.kind === 'inherited' ? '継承：' : ''}${n.name}】${(n.count ?? 1) > 1 ? `×${n.count}` : ''}` });
       }
     }
-    if (unitFxChanged) patch.unitFx = unitFx;
-    const newPopups = popupsFromEvents(events);
-    if (newPopups.length) {
-      patch.popups = [...get().popups, ...newPopups].slice(-10);
-      const ids = new Set(newPopups.map((p) => p.id));
-      setTimeout(() => set((s) => ({ popups: s.popups.filter((p) => !ids.has(p.id)) })), (TIMING.resultPopup * 1000 + 250) / speedFactor(settings));
-    }
-    set(patch);
+    pumpNotices();
   };
+  const applyFrame = (frame: PresentationFrame) => {
+    if (frame.roll) {
+      const e = frame.roll;
+      set({ rollFx: { id: fxId++, results: e.results, summary: e.summary, perfect: e.perfect, successes: e.successes, quiet: frame.quiet } });
+      if (e.perfect) vibrate(get().settings, VIBRATION.perfect);
+    }
+    playFrameSounds(frame);
+    if (frame.synergy && frame.synergy >= 2) set({ synergyFx: { id: fxId++, tier: frame.synergy as 2 | 3 } });
+    if (frame.motions?.length) set(s => ({ unitFx: { ...s.unitFx, ...Object.fromEntries(frame.motions!.map(m => [m.unitId, { kind: m.kind, id: fxId++ }])) } }));
+    if (frame.callout) set({ callout: { ...frame.callout, id: fxId++ } });
+    if (frame.impacts?.length) set(s => ({ impactFx: { ...s.impactFx, ...Object.fromEntries(frame.impacts!.map(({ unitId, ...rest }) => [unitId, { ...rest, id: fxId++ }])) } }));
+    if (frame.guards?.length) set(s => ({ guardFx: { ...s.guardFx, ...Object.fromEntries(frame.guards!.map(id => [id, { id: fxId++ }])) } }));
+    if (frame.deaths?.length) set(s => ({ deathFx: { ...s.deathFx, ...Object.fromEntries(frame.deaths!.map(id => [id, { id: fxId++ }])) } }));
+    if (frame.shake) set({ fieldShake: { id: fxId++ } });
+    for (const p of frame.popups ?? []) addPopup(p);
+    showNotices(frame.notices ?? []);
+  };
+  const drainFrames = () => {
+    presentationTimer = null;
+    const frame = frames.shift();
+    if (!frame) {
+      // 手番が変わった: 前の数字が消えるのを待ってから帯を出し、帯が消えてから次へ（帯と数字・敵の行動を重ねない）
+      const banner = takeBanner();
+      if (!banner) { finishPresentation(); return; }
+      set({ presentationBusy: true });
+      const linger = get().popups.length ? Math.max(0, TIMING.resultPopup - TIMING.actionLead) : 0;
+      const k = 1000 / speedFactor(get().settings);
+      presentationTimer = setTimeout(() => {
+        set({ phaseBanner: { id: fxId++, ...banner } });
+        presentationTimer = setTimeout(() => { set({ phaseBanner: null }); drainFrames(); }, TIMING.phaseBanner * k);
+      }, linger * k);
+      return;
+    }
+    const wait = frames.length > TIMING.presentationFramesMax ? 0 : frame.delay;
+    presentationTimer = setTimeout(() => {
+      presentationTimer = null; applyFrame(frame);
+      if (frames.length) drainFrames();
+      else presentationTimer = setTimeout(drainFrames, TIMING.actionLead * 1000 / speedFactor(get().settings));
+    }, wait * 1000 / speedFactor(get().settings));
+  };
+  /** quiet = 他の人の操作（音を少し小さく） */
+  const applyEvents = (events: BattleEvent[], quiet = false) => {
+    if (!events.length) return;
+    for (const e of events) {
+      if (e.type === 'retarget') set(s => ({ retargets: { ...s.retargets, [e.enemyUid]: fxId++ } }));
+      if (e.type === 'phase' && e.phase === 'victory') vibrate(get().settings, VIBRATION.victory);
+      if (e.type === 'damage' && e.amount > 0 && findAlly(get().battle, e.unitId)) vibrate(get().settings, VIBRATION.hurt);
+    }
+    const allyIds = new Set(get().battle.allies.map((a) => a.id));
+    const next = battleFrames(events, allyIds).map((f) => (quiet ? { ...f, quiet } : f));
+    // 音だけのコマ（手番が変わっただけ等）は、待たずにすぐ鳴らす（演出中の扱いにしない）
+    if (!frames.length && !presentationTimer && next.length === 1 && isSoundOnly(next[0])) { playFrameSounds(next[0]); settle(); return; }
+    frames.push(...next);
+    if (frames.length) { set({ presentationBusy: true }); if (!presentationTimer) drainFrames(); }
+    else settle();
+  };
+  /** 演出が止まっている時に手番が変わった（数字の出ない操作）: すぐ帯を出す */
+  const settle = () => { if (!frames.length && !presentationTimer) drainFrames(); };
 
   /** 新しい戦闘に入った時の UI のリセット */
-  const resetBattleUi = (b: BattleState): Partial<StoreState> => ({
+  const resetBattleUi = (b: BattleState): Partial<StoreState> => { clearPresentation(); bannerKey = ''; return ({
     selection: null,
     rollFx: null,
+    synergyFx: null,
     popups: [],
     unitFx: {},
+    callout: null,
+    impactFx: {},
+    fieldShake: null,
+    guardFx: {},
+    deathFx: {},
     retargets: {},
     flash: null,
     hint: null,
     activeId: nextActive(b, b.allies.find((a) => isLocalPlayer(a.playerId))?.id ?? b.allies[0].id),
-  });
+  }); };
 
   /** 操作の結果を画面に反映する（この端末の操作・部屋から届いた操作で共通） */
-  const commit = (r: GameResult, cmdScene: string) => {
+  const commit = (r: GameResult, cmdScene: string, wire: GameCommand) => {
     const before = get().full;
     const full = r.state;
     const prevBattle = get().game?.battle;
+    // 前に見ていた場面が世界マップの画面だったか（手番の受け渡しの画面が出ていたか。フェーズ2-C）
+    const worldBefore = get().scene === WORLD_SCENE && get().game?.mode === 'world';
     let scene = get().scene;
     // ダンジョンに入った: この端末のキャラが入ったなら、その場面を見る
     const added = (full.expeditions ?? []).find((x) => !before?.expeditions?.some((y) => y.id === x.id));
     if (added && added.heroes.some((id) => isLocalPlayer(full.heroes.find((h) => h.id === id)?.playerId ?? 'P1'))) scene = added.id;
+    // 先に入った仲間の組に合流した: この端末のキャラが加わったなら、その組の場面を見る（タブは1つのまま）
+    const joined = (full.expeditions ?? []).find((x) => {
+      const old = before?.expeditions?.find((y) => y.id === x.id);
+      return !!old && x.heroes.some((id) => !old.heroes.includes(id) && isLocalPlayer(full.heroes.find((h) => h.id === id)?.playerId ?? 'P1'));
+    });
+    if (joined) scene = joined.id;
     // 手番が移った: この端末のキャラの番なら、そのキャラのいる場面（世界マップかダンジョン）を見る（M3-D）
     const turn = full.world?.turn;
     if (turn && turn !== before?.world?.turn && isLocalPlayer(full.heroes.find((h) => h.id === turn)?.playerId ?? 'P1')) scene = sceneOfHero(full, turn);
     scene = pickScene(full, scene);
     const next = viewOf(full, scene);
+    if (scene !== get().scene) clearPresentation();
     const patch: Partial<StoreState> = { full, scene, game: next };
+    let opening: BattleEvent[] = [];
+    let startedBattle = false;
     if (next.battle) {
       patch.battle = next.battle;
       if (next.battle !== prevBattle && (!prevBattle || prevBattle.seed !== next.battle.seed || prevBattle.encounterId !== next.battle.encounterId)) {
         Object.assign(patch, resetBattleUi(next.battle));
+        opening = next.battle.openingEvents ?? [];
+        startedBattle = !!before;
       } else if (next.battle.phase === 'ally') {
         patch.activeId = nextActive(next.battle, get().activeId);
       }
@@ -410,9 +623,54 @@ export const useBattle = create<StoreState>((set, get) => {
       const sel = get().selection;
       if (sel && !findAlly(next.battle, get().activeId)?.hand.some((c) => c.uid === sel.cardUid)) patch.selection = null;
     }
+    // 扉を開けて部屋に入った（見ている場面）: 扉が開く演出が終わるまで、部屋の画面への切り替えを待つ（第3段階B2）
+    const was = before ? viewOf(before, cmdScene) : undefined;
+    if (was?.mode === 'dungeon' && was.dungeon && next.dungeon && cmdScene === scene && next.mode !== 'dungeon' && next.dungeon.currentRoomId !== was.dungeon.currentRoomId && !reducedMotion()) {
+      patch.doorOpen = { id: fxId++, scene, run: was.dungeon, roomId: next.dungeon.currentRoomId };
+    }
+    // 手番が移った: カットイン（自分のキャラなら大きく、ほかの人のキャラなら小さなお知らせ）
+    if (before && turn && turn !== before.world?.turn) {
+      const mine = isLocalPlayer(full.heroes.find((h) => h.id === turn)?.playerId ?? 'P1');
+      // 1台で、世界マップの画面のまま担当の人が変わる時は、受け渡しの画面（カットインと同じ見た目）だけを出す
+      const handoff = handoffReplacesCutin({
+        online: isOnlinePlay(),
+        worldBefore,
+        worldAfter: scene === WORLD_SCENE && next.mode === 'world',
+        prevPlayer: before.heroes.find((h) => h.id === before.world?.turn)?.playerId,
+        nextPlayer: full.heroes.find((h) => h.id === turn)?.playerId,
+        players: new Set(full.heroes.filter((h) => !h.retired && h.hp > 0).map((h) => h.playerId)).size,
+      });
+      patch.turnCutin = handoff ? null : { id: fxId++, heroId: turn, mine, scene: sceneOfHero(full, turn) };
+      if (mine) vibrate(get().settings, VIBRATION.turn);
+      playSound(mine ? 'sfx_turn_cutin' : 'sfx_turn_notice');
+    }
+    // 点検 F6: オンラインで、ほかの人の「つづける」で物語の窓が閉じた。この端末でまだ押していなければ、押すまで出しておく
+    const bw = before?.world;
+    if (room && bw?.story && unwrapCommand(wire).command.type === 'STORY_CONTINUE' && (full.world?.storyVer ?? 0) !== (bw.storyVer ?? 0) && storyPressed !== (bw.storyVer ?? 0)) {
+      patch.heldStories = [...get().heldStories, bw.story];
+    }
+    const lm = full.world?.lastMove;
+    if (before && scene === WORLD_SCENE && cmdScene === WORLD_SCENE && lm && lm.seq !== before.world?.lastMove?.seq && lm.path.length > 1) {
+      patch.worldMoves = [...get().worldMoves, { id: fxId++, game: full, before }];
+      patch.sheet = null;
+    }
     set(patch);
     // 見ている場面の出来事だけ演出する
-    if (cmdScene === scene) applyEvents(r.battleEvents);
+    // 実機の不具合⑥: 仲間が渡した物がこの端末のキャラに届いた（受け取った側の知らせ。見ている場面に関係なく出す）
+    if (before) {
+      const got = receiveNotice(before, full, wire, isLocalPlayer);
+      if (got) get().showToast(got);
+    }
+    if (cmdScene === scene) {
+      if (startedBattle) playSound('sfx_battle_start');
+      const quiet = remoteActor(wire);
+      applyEvents([...opening, ...r.battleEvents], quiet);
+      settle();
+      if (before) {
+        showNotices(explorationNotices(before, full, wire));
+        for (const id of explorationSounds(before, full, wire)) playSound(id, { quiet });
+      }
+    }
     scheduleSave(get);
     scheduleEnemy();
   };
@@ -421,26 +679,27 @@ export const useBattle = create<StoreState>((set, get) => {
   const send = (wire: GameCommand, silent: boolean): string | undefined => {
     const { full } = get();
     if (!full) return '冒険が始まっていません';
+    if (get().worldMoves.length && unwrapCommand(wire).scene === WORLD_SCENE) return '移動が終わるまでお待ちください';
     const isEnemyStep = (c: GameCommand): boolean => (c.type === 'SCENE' ? isEnemyStep(c.command) : c.type === 'BATTLE' && c.command.type === 'ENEMY_STEP');
     if (room) {
       const dry = applyGameCommand(full, wire);
       if (dry.error) {
         if (isEnemyStep(wire)) enemyInFlight = false;
-        else if (!silent) get().showToast(dry.error);
+        else if (!silent) get().showToast(dry.error, 'error');
         return dry.error;
       }
       room.send(wire).catch(() => {
         if (isEnemyStep(wire)) enemyInFlight = false;
-        get().showToast('送れませんでした。通信を確かめてください');
+        get().showToast('送れませんでした。通信を確かめてください', 'offline');
       });
       return undefined;
     }
     const r = applyGameCommand(full, wire);
     if (r.error) {
-      if (!silent) get().showToast(r.error);
+      if (!silent) get().showToast(r.error, 'error');
       return r.error;
     }
-    commit(r, unwrapCommand(wire).scene);
+    commit(r, unwrapCommand(wire).scene, wire);
     return undefined;
   };
 
@@ -452,24 +711,54 @@ export const useBattle = create<StoreState>((set, get) => {
     game: viewIn(saved?.game ?? null, pickScene(saved?.game ?? null, WORLD_SCENE, true)),
     battle: viewIn(saved?.game ?? null, pickScene(saved?.game ?? null, WORLD_SCENE, true))?.battle ?? EMPTY_BATTLE,
     settings: loadSettings(),
+    worldMoves: [],
+    presentationBusy: false, phaseBanner: null, cutins: [], petPulses: {}, turnCutin: null, doorOpen: null,
+    heldStories: [],
+    continueStory: (playerId) => {
+      const held = get().heldStories;
+      if (held.length) return set({ heldStories: held.slice(1) });
+      const w = get().full?.world;
+      if (!w?.story) return;
+      storyPressed = w.storyVer ?? 0;
+      get().dispatchGame({ type: 'STORY_CONTINUE', playerId, storyVer: w.storyVer ?? 0 });
+    },
+    finishWorldMove: id => {
+      set(s => ({ worldMoves: s.worldMoves[0]?.id === id ? s.worldMoves.slice(1) : s.worldMoves }));
+      if (!get().worldMoves.length) { pumpNotices(); scheduleEnemy(); }
+    },
     activeId: saved?.activeId ?? '',
     selection: null,
     sheet: null,
+    sheetHeroId: null,
+    sheetEpoch: 0,
     confirmAbandon: false,
+    confirmEndTurn: false,
+    confirmEndTurnAt: null,
     rollFx: null,
+    synergyFx: null,
     popups: [],
     unitFx: {},
+    callout: null,
+    impactFx: {},
+    fieldShake: null,
+    guardFx: {},
+    deathFx: {},
     retargets: {},
     flash: null,
     hint: null,
     toast: null,
 
-    setScreen: (screen) => set({ screen, sheet: null }),
+    setScreen: (screen) => { if (screen !== 'game') clearPresentation(); set({ screen, sheet: null, ...(screen !== 'game' ? { turnCutin: null } : {}) }); },
+    dismissTurnCutin: (id) => { if (get().turnCutin?.id === id) set({ turnCutin: null }); },
+    finishDoorOpen: (id) => { if (get().doorOpen?.id === id) set({ doorOpen: null }); },
     setScene: (s) => {
+      clearPresentation();
+      set({ doorOpen: null });
       const { full } = get();
       const scene = pickScene(full, s);
       const game = viewIn(full, scene);
       set({
+        worldMoves: [],
         scene,
         game,
         sheet: null,
@@ -481,6 +770,7 @@ export const useBattle = create<StoreState>((set, get) => {
     setDraft: (d) => set({ draft: { ...get().draft, ...d } }),
 
     startGame: () => {
+      clearPresentation();
       const d = get().draft;
       const game = createGame({
         seed: makeSeed(),
@@ -488,7 +778,8 @@ export const useBattle = create<StoreState>((set, get) => {
         difficulty: d.difficulty,
         party: d.party.map((m) => ({ ...m, playerId: m.playerId ?? LOCAL_PLAYER })),
       });
-      set({ full: game, scene: WORLD_SCENE, game, screen: 'game', battle: EMPTY_BATTLE, sheet: null, selection: null });
+      storyPressed = null;
+      set({ worldMoves: [], full: game, scene: WORLD_SCENE, game, screen: 'game', battle: EMPTY_BATTLE, sheet: null, selection: null, heldStories: [] });
       scheduleSave(get);
     },
 
@@ -496,25 +787,43 @@ export const useBattle = create<StoreState>((set, get) => {
       const { game } = get();
       if (!game) return;
       set({ screen: 'game', sheet: null });
-      if (game.battle) set({ battle: game.battle, ...resetBattleUi(game.battle) });
+      if (game.battle) {
+        // 保存した時に選んでいたキャラを保つ（読み込み直すたびに先頭のキャラへ戻さない。画面の選択だけで、ゲームの中身は変えない）
+        const saved = get().activeId;
+        const keep = game.battle.allies.some((a) => a.id === saved && isLocalPlayer(a.playerId) && !a.dead);
+        set({ battle: game.battle, ...resetBattleUi(game.battle), ...(keep ? { activeId: nextActive(game.battle, saved) } : {}) });
+      }
       scheduleSave(get);
       setTimeout(scheduleEnemy, 300);
     },
 
     exitOnline: () => {
+      clearPresentation();
       if (enemyTimer) clearTimeout(enemyTimer);
       enemyTimer = null;
       enemyInFlight = false;
       const local = loadSave();
       const scene = pickScene(local?.game ?? null, WORLD_SCENE, true);
       const game = viewIn(local?.game ?? null, scene);
-      set({ full: local?.game ?? null, scene, game, activeId: local?.activeId ?? '', screen: 'title', confirmAbandon: false, sheet: null, battle: game?.battle ?? EMPTY_BATTLE, selection: null });
+      storyPressed = null;
+      set({ worldMoves: [], full: local?.game ?? null, scene, game, activeId: local?.activeId ?? '', screen: 'title', confirmAbandon: false, sheet: null, battle: game?.battle ?? EMPTY_BATTLE, selection: null, heldStories: [] });
+    },
+
+    onBecameHost: () => {
+      // 前のホストが送るはずだった敵の行動は、もう来ない。止まっている敵の番があれば、ここから進める
+      enemyInFlight = false;
+      scheduleEnemy();
     },
 
     abandonGame: () => {
+      clearPresentation();
       if (enemyTimer) clearTimeout(enemyTimer);
       enemyTimer = null;
-      set({ full: null, scene: WORLD_SCENE, game: null, screen: 'title', confirmAbandon: false, sheet: null, battle: EMPTY_BATTLE, selection: null });
+      storyPressed = null;
+      set({ worldMoves: [], activeId: '', draft: defaultDraft(), full: null, scene: WORLD_SCENE, game: null, screen: 'title', confirmAbandon: false, sheet: null, battle: EMPTY_BATTLE, selection: null, heldStories: [] });
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = null;
+      enemyInFlight = false;
       writeSave({ full: null, activeId: '' });
     },
 
@@ -529,7 +838,7 @@ export const useBattle = create<StoreState>((set, get) => {
       if (needsVote(game, cmd)) {
         const mine = voters(game).filter((p) => isLocalPlayer(p));
         if (!mine.length) {
-          get().showToast('この場面のプレイヤーではありません');
+          get().showToast('この場面のプレイヤーではありません', 'error');
           return 'この場面のプレイヤーではありません';
         }
         for (const p of mine) {
@@ -543,7 +852,7 @@ export const useBattle = create<StoreState>((set, get) => {
         const actor = 'playerId' in cmd ? cmd.playerId : cmd.type === 'BATTLE' && 'playerId' in cmd.command ? cmd.command.playerId : undefined;
         if (actor && !isLocalPlayer(actor)) {
           const msg = `${actor}${room.seatName(actor) ? `（${room.seatName(actor)}）` : ''}の担当です`;
-          if (cmd.type !== 'BATTLE' || cmd.command.type !== 'ENEMY_STEP') get().showToast(msg);
+          if (cmd.type !== 'BATTLE' || cmd.command.type !== 'ENEMY_STEP') get().showToast(msg, 'error');
           return msg;
         }
       }
@@ -555,10 +864,11 @@ export const useBattle = create<StoreState>((set, get) => {
 
     applyRemote: (r, cmd) => {
       enemyInFlight = false;
-      commit(r, unwrapCommand(cmd).scene);
+      commit(r, unwrapCommand(cmd).scene, cmd);
     },
 
     loadRemote: (full) => {
+      clearPresentation();
       enemyInFlight = false;
       if (enemyTimer) clearTimeout(enemyTimer);
       enemyTimer = null;
@@ -567,7 +877,11 @@ export const useBattle = create<StoreState>((set, get) => {
       const exp = full.expeditions?.find((x) => mine.length && mine.every((h) => x.heroes.includes(h.id)));
       const scene = pickScene(full, exp?.id ?? get().scene, true);
       const game = viewOf(full, scene);
-      set({ full, scene, game, screen: 'game', sheet: null, battle: game.battle ?? EMPTY_BATTLE, ...(game.battle ? resetBattleUi(game.battle) : { selection: null }) });
+      // 実機の不具合②（点検 F6）: つながり直しても、開いていたシートは閉じない（前は黙って閉じて「装備の欄が消えた」に見えた）。
+      // シートの中の選択は sheetEpoch が変わった時に消す（取り直しで道具やキャラが変わっていても、古い物を指したまま描かない）。
+      // 冒険の画面に初めて入る時（待合室から）は、シートを開いていないので今までどおり
+      const keep = get().screen === 'game' ? get().sheet : null;
+      set({ worldMoves: [], turnCutin: null, doorOpen: null, full, scene, game, screen: 'game', sheet: keep, sheetEpoch: get().sheetEpoch + 1, battle: game.battle ?? EMPTY_BATTLE, ...(game.battle ? resetBattleUi(game.battle) : { selection: null }) });
       scheduleEnemy();
     },
 
@@ -588,11 +902,11 @@ export const useBattle = create<StoreState>((set, get) => {
       const inst = ally.hand.find((c) => c.uid === cardUid);
       if (!inst) return;
       if (selection?.cardUid === cardUid) {
-        get().confirm();
+        get().cancel();
         return;
       }
       const card = cardOf(inst);
-      const reason = unusableReason(battle, ally, card);
+      const reason = unusableReason(battle, ally, card, inst.uid);
       if (reason) {
         set({ flash: { cardUid, text: reason, id: fxId++ } });
         return;
@@ -602,7 +916,10 @@ export const useBattle = create<StoreState>((set, get) => {
         const alive = battle.enemies.filter((e) => !e.dead);
         if (alive.length === 1) targetId = alive[0].uid;
       }
-      set({ selection: { cardUid, targetId, focus: 0 }, flash: null });
+      // 回復・支援の最初の相手: HPが減っている味方（割合が一番低い）→ 全員満タンなら、敵の予告のダメージの合計が一番大きい味方
+      if (isAllyCard(card)) targetId = pickAllyTarget(battle, cardTargets(battle, ally, card)) ?? targetId;
+      const allyTargetId = card.secondaryTarget ? pickAllyTarget(battle, cardTargets(battle, ally, secondaryCard(card))) : undefined;
+      set({ selection: { cardUid, targetId, allyTargetId, focus: 0 }, flash: null });
     },
 
     tapEnemy: (uid) => {
@@ -636,8 +953,8 @@ export const useBattle = create<StoreState>((set, get) => {
       const inst = ally?.hand.find((c) => c.uid === selection.cardUid);
       if (!inst) return set({ selection: null });
       const card = cardOf(inst);
-      if (card.target === 'enemy' && !selection.targetId) {
-        set({ flash: { cardUid: selection.cardUid, text: '敵をタップして対象を選んでください', id: fxId++ } });
+      if (needsCardTarget(card) && (!ally || !selectedCardTarget(battle, ally, card, selection.targetId))) {
+        set({ flash: { cardUid: selection.cardUid, text: targetGuide(card), id: fxId++ } });
         return;
       }
       const err = get().dispatch({
@@ -645,9 +962,20 @@ export const useBattle = create<StoreState>((set, get) => {
         playerId: LOCAL_PLAYER,
         characterId: activeId,
         cardInstanceId: selection.cardUid,
-        targetId: card.target === 'enemy' ? selection.targetId : undefined,
+        targetId: needsCardTarget(card) ? selection.targetId : undefined,
+        allyTargetId: selection.allyTargetId,
         focusUsed: selection.focus,
       });
+      if (err) set({ flash: { cardUid: selection.cardUid, text: err, id: fxId++ } });
+      else set({ selection: null });
+    },
+
+    preview: () => {
+      const { selection, activeId, battle } = get();
+      if (!selection || battle.slotPreview) return;
+      const ally = findAlly(battle, activeId), inst = ally?.hand.find(c => c.uid === selection.cardUid);
+      if (!ally || !inst) return;
+      const err = get().dispatch({ type: 'PREVIEW_CARD', playerId: LOCAL_PLAYER, characterId: activeId, cardInstanceId: selection.cardUid, targetId: selection.targetId, allyTargetId: selection.allyTargetId, focusUsed: selection.focus });
       if (err) set({ flash: { cardUid: selection.cardUid, text: err, id: fxId++ } });
       else set({ selection: null });
     },
@@ -657,6 +985,16 @@ export const useBattle = create<StoreState>((set, get) => {
     },
 
     setActive: (id) => {
+      const { selection, battle, activeId } = get();
+      const source = findAlly(battle, activeId);
+      const inst = source?.hand.find(c => c.uid === selection?.cardUid);
+      if (selection && source && inst && (isAllyCard(cardOf(inst)) || cardOf(inst).secondaryTarget)) {
+        const card = cardOf(inst);
+        if (card.secondaryTarget && secondaryCardTarget(battle, source, card, id)) set({ selection: { ...selection, allyTargetId: id } });
+        else if (!card.secondaryTarget && selectedCardTarget(battle, source, card, id)) set({ selection: { ...selection, targetId: id } });
+        else get().showToast(targetGuide(card.secondaryTarget ? secondaryCard(card) : card));
+        return;
+      }
       const ally = findAlly(get().battle, id);
       if (!ally || ally.dead || !isLocalPlayer(ally.playerId)) return;
       if (get().activeId === id && !get().selection) return;
@@ -664,11 +1002,15 @@ export const useBattle = create<StoreState>((set, get) => {
       scheduleSave(get);
     },
 
-    endTurn: () => {
+    endTurn: (force = false) => {
       const { battle } = get();
+      set({ confirmEndTurn: false });
       if (battle.phase !== 'ally') return;
-      const canAct = battle.allies.some((a) => isLocalPlayer(a.playerId) && !isDone(battle, a));
-      set({ selection: null, hint: canAct ? { text: 'まだ行動できるキャラがいます', id: fxId++ } : null });
+      // この端末の担当のキャラだけで判断する（1台で全員を動かす時も、オンラインで自分の分だけの時も同じ）。
+      // 使えるカード（マナが足りる）が残っている仲間がいれば、押し間違いを防ぐために確認する
+      const canAct = canStillAct(battle);
+      if (canAct && !force) { set({ selection: null, confirmEndTurn: true, confirmEndTurnAt: `${battle.seed}:${battle.turn}` }); return; }
+      set({ selection: null, hint: null });
       // オンライン協力: この端末の担当のうち、まだ準備完了していない席の分を押す
       if (room) {
         for (const p of waitingPlayers(battle).filter((x) => isLocalPlayer(x))) get().dispatch({ type: 'END_TURN', playerId: p });
@@ -677,17 +1019,27 @@ export const useBattle = create<StoreState>((set, get) => {
       get().dispatch({ type: 'END_TURN', playerId: LOCAL_PLAYER });
     },
 
-    usePouch: (itemUid, targetHeroId, userId) => {
+    usePouch: (itemUid, targetHeroId, userId, cardUid, stat, keepSheet) => {
       const { game, activeId } = get();
       if (!game) return;
       const user = game.mode === 'battle' ? activeId : (userId ?? game.heroes.find((h) => h.pouch.some((p) => p.uid === itemUid))?.id ?? targetHeroId);
-      const err = get().dispatchGame({ type: 'USE_POUCH_ITEM', playerId: LOCAL_PLAYER, itemUid, userId: user, targetId: targetHeroId });
-      if (!err) set({ sheet: null });
+      const owner = game.heroes.find((h) => h.id === user);
+      const item = owner?.pouch.find((p) => p.uid === itemUid);
+      const err = get().dispatchGame({ type: 'USE_POUCH_ITEM', playerId: LOCAL_PLAYER, itemUid, userId: user, targetId: targetHeroId, ...(cardUid ? { cardUid } : {}), ...(stat ? { stat } : {}) });
+      if (!err) {
+        if (!keepSheet) set({ sheet: null });
+        // 実機の不具合⑥: だれに何を使ったかを出す（「ルーシアに回復薬を使いました」）
+        const target = game.heroes.find((h) => h.id === targetHeroId)?.name ?? (() => { const e = game.battle?.enemies.find((x) => x.uid === targetHeroId); return e ? enemyName(e) : undefined; })();
+        const name = item ? getItem(item.itemId).name : '道具';
+        get().showToast(target ? `${target}に${name}を使いました` : `${name}を使いました`);
+      }
+      return err;
     },
 
     setSettings: (s) => {
-      const settings = { ...get().settings, ...s };
+      const settings = normalizeSettings({ ...get().settings, ...s });
       set({ settings });
+      setAudioVolumes(settings);
       try {
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
       } catch {
@@ -695,13 +1047,18 @@ export const useBattle = create<StoreState>((set, get) => {
       }
     },
 
-    openSheet: (sheet) => set({ sheet, selection: sheet ? null : get().selection }),
+    openSheet: (sheet, heroId) => set({ sheet, sheetHeroId: heroId ?? null, selection: sheet ? null : get().selection }),
     setConfirmAbandon: (v) => set({ confirmAbandon: v }),
-    showToast: (text) => set({ toast: { text, id: fxId++ } }),
+    setConfirmEndTurn: (v) => set({ confirmEndTurn: v }),
+    showToast: (text, tone = 'info') => {
+      playSound(tone === 'error' ? 'sfx_ui_deny' : tone === 'offline' ? 'sfx_ui_error' : 'sfx_ui_notice');
+      set({ toast: { text, id: fxId++ } });
+    },
 
     closeTop: () => {
       const s = get();
       if (s.confirmAbandon) return set({ confirmAbandon: false }), true;
+      if (s.confirmEndTurn) return set({ confirmEndTurn: false }), true;
       if (s.sheet === 'log') return set({ sheet: 'menu' }), true;
       if (s.sheet) return set({ sheet: null }), true;
       if (s.selection) return set({ selection: null }), true;
@@ -725,3 +1082,6 @@ if (typeof window !== 'undefined') {
     if (document.visibilityState === 'hidden') flush();
   });
 }
+
+// 保存してある音量を、音の部品に伝える（K6）
+setAudioVolumes(useBattle.getState().settings);

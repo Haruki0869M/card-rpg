@@ -20,6 +20,6 @@ export const goblinBrute: EnemyDef = {
         { kind: 'damage', amount: 5 },
       ],
     },
-    { id: 'bigSwing', name: '大振り', effects: [{ kind: 'damage', amount: 16 }] },
+    { id: 'bigSwing', name: '大振り', big: true, effects: [{ kind: 'damage', amount: 16 }] },
   ],
 };

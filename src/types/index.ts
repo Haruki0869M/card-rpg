@@ -13,11 +13,12 @@ export type PlayerId = 'P1' | 'P2' | 'P3' | 'P4';
 export type StatId = 'str' | 'vit' | 'int' | 'per' | 'dex' | 'agi' | 'luk';
 export type Stats = Record<StatId, number>;
 /** カテゴリごとの成功率補正（%） */
-export type Affinity = Record<CardCategory, number>;
+/** 成功率の補正。カードの種類ごと＋能力値ごと（カードが参照する能力値を決めている時に使う） */
+export type Affinity = Record<CardCategory, number> & { byStat?: Partial<Record<StatId, number>> };
 
 // ---------- カード ----------
 
-export type CardTarget = 'enemy' | 'self' | 'allEnemies';
+export type CardTarget = 'enemy' | 'self' | 'allEnemies' | 'ally' | 'otherAlly' | 'fallenAlly';
 
 // ---------- 属性（spec §14。火・氷・雷・毒・闇・聖 など） ----------
 
@@ -42,7 +43,7 @@ export interface ElementDef {
  * target = 選んだ対象（カードの対象の敵 / 敵の行動の対象の味方 / アイテムを使う相手。全体カードなら相手全員）
  * self = 自分 / allies = 自分の側の全員 / otherAllies = 自分以外の自分の側 / foes = 相手の側の全員 / randomFoe = 相手からランダムに1人
  */
-export type EffectTarget = 'target' | 'self' | 'allies' | 'otherAllies' | 'foes' | 'randomFoe';
+export type EffectTarget = 'target' | 'self' | 'allies' | 'otherAllies' | 'foes' | 'randomFoe' | 'lowestAlly' | 'randomAlly' | 'allyTarget' | 'otherFoes' | 'attacker' | /** 今のカードが弱点を突いた敵（最初の1体） */ 'weakHit' | /** 今のカードで支援が成立した味方 */ 'helped';
 
 /**
  * 効果の種類ごとの数値。効果のファイル（src/engine/battle/effects/）が declare module でここに種類を足す。
@@ -72,12 +73,34 @@ export interface CardDef {
   /** 基礎成功率（%） */
   baseChance: number;
   target: CardTarget;
+  /** 攻撃と単体支援を組み合わせるカードの、別に選ぶ味方。 */
+  secondaryTarget?: 'ally' | 'otherAlly' | 'fallenAlly';
   /** minSuccesses 昇順 */
   tiers: CardTier[];
   /** 報酬・宝箱での出やすさの格（未指定はコモン扱い） */
   rarity?: Rarity;
   /** カードの特殊能力（エピック以上は必ず持つ。このカードを使っている間だけ働く。spec §13.1） */
   trait?: AbilityDef;
+  /** 成功率の基準にする能力値（例: 刀の見切り＝感知）。無ければカードの種類（物理＝力・魔法＝知力・スキル＝器用） */
+  stat?: StatId;
+  /** 報酬のスマート抽選に使う印（効果から自動で付く印に足す。例: 'combo'） */
+  tags?: string[];
+  /** 使用後はこの戦闘の間だけ山札から除く（冒険の山札は変えない） */
+  exhaust?: boolean;
+  /** 武器種カード: この武器種を装備できるジョブの報酬に出る（K1） */
+  weaponType?: string;
+  /** ほかにも置く武器種（1枚のカードを複数の武器種に置く。区切りD） */
+  weaponTypes?: string[];
+  /** 系統カード: この系統のジョブの報酬に出る（K1） */
+  lineage?: Lineage;
+  /** ほかにも置く系統（区切りD） */
+  lineages?: Lineage[];
+  /** 共通カード: どのジョブの報酬にも出る（K1） */
+  common?: boolean;
+  /** 仲間がいる時だけ報酬・店に出る（連携のカード。1人プレイでは出さない。オーナーの決定） */
+  teamOnly?: boolean;
+  /** 異端カード: 代償付きでルールを壊す。報酬・ショップには出ず、イベントでだけ手に入る（K1） */
+  heresy?: boolean;
 }
 
 // ---------- 特殊能力（職業・装備・カード・敵で共通。spec §2.4・§6.2・§12.7・§13.1） ----------
@@ -85,9 +108,17 @@ export interface CardDef {
 /**
  * 発動のきっかけ。戦闘の流れの決まった場面で呼ばれる。
  * battleStart 戦闘開始時 / turnStart 自分の側のフェーズ開始時 / turnEnd 自分の側のフェーズ終了時 /
- * afterCard カードを使った後 / perfect カードが完全成功した時 / kill 敵を倒した時 / hurt HPにダメージを受けた時
+ * afterCard カードを使った後 / perfect カードが完全成功した時 / kill 敵を倒した時 / hurt HPにダメージを受けた時 /
+ * petAct 自分のお供が行動した時（お供の発動型の能力が働いた時）/
+ * summonHit 自分の砲台・罠・召喚が敵のHPにダメージを与えた後 / overheal 自分の回復が味方のHPからあふれた時（満タンの味方を回復した時も） /
+ * cheerPerfect 自分が「応援」を付けた味方のカードが完全成功した時（1人パーティなら自分でも） / detonate 状態異常を起爆して消した時
  */
-export type AbilityTrigger = 'battleStart' | 'turnStart' | 'turnEnd' | 'afterCard' | 'perfect' | 'kill' | 'hurt';
+/**
+ * 段階7a（ランダムダンジョンの専用の装備）: allyCombo = 味方（自分も入れる）のカードで連携が起きた時 / broke = 自分の攻撃で敵を BREAK させた時 /
+ * itemUse = 戦闘中に自分が消耗品を使った時
+ */
+export type AbilityTrigger = 'battleStart' | 'turnStart' | 'turnEnd' | 'afterCard' | 'perfect' | 'kill' | 'hurt' | 'allyKill' | 'allyDown' | 'blocked' | 'inflict' | 'foeTick' | 'petAct' | 'summonHit' | 'overheal' | 'cheerPerfect' | 'detonate' | 'combo' | 'guarded' | 'selfBoost' | 'allyCombo' | 'broke' | 'itemUse' | /** 段階7b: 戦闘中に自分がお金を得た時（強欲王の黄金冠） */ 'goldGain' | /** 段階7b: 自分に悪い状態異常が付いた時（悪夢の毛皮） */ 'statusTaken'
+  | /** 点検 2026-11-13 F5: 味方のターン開始時のうち、凍結（マナ-1）・遅延（引く-1）の罰を受ける前（雪解けの指輪） */ 'turnStartBefore';
 
 /** 発動の条件の種類ごとの数値。条件のファイル（src/engine/abilities/conditions/）が declare module で種類を足す */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -101,24 +132,120 @@ export type AbilityCondition = { [K in keyof ConditionParams]: { kind: K } & Con
  */
 export type AbilityEffect =
   | { when: AbilityTrigger; if?: AbilityCondition[]; do: Effect[] }
-  | { modifier: 'damageDealt'; multiplier: number; if?: AbilityCondition[] }
+  | { modifier: 'damageDealt'; multiplier: number; /** 1回の攻撃ごとに足すダメージ（倍率を掛ける前） */ add?: number; /** add を、そのカード・効果の最初の1回の攻撃にだけ足す（弾込め） */ once?: boolean; if?: AbilityCondition[]; scale?: DamageScale; /** 自分の数え（counters）の値を add に足す（不動の拳。区切りD） */ addFromCounter?: string; /** 今のブロックの pct% を add に足す（最大 blockMax。重装衛士《不落》。区切りF） */ addFromBlock?: { pct: number; max: number } }
+  /** このカードの連携の上乗せの倍率（ファイナル・ユニゾン。区切りD） */
+  | { modifier: 'comboScale'; multiplier: number }
+  /** 属性の無い攻撃が、狙った敵の弱点の属性になる（エレメンタル・チェイン。区切りD） */
+  | { modifier: 'weaknessElement' }
+  /** HPが1より下がらない（命綱。区切りD） */
+  | { modifier: 'endure' }
+  /** 弱点の属性でなくても、弱点を突いた扱い（×1.5・BREAK。ラグナロク・ブレード。区切りD） */
+  | { modifier: 'alwaysWeak' }
+  /** 明鏡止水: 《後の先》の反撃が2倍・上限なし（区切りF） */
+  | { modifier: 'mirrorCounter' }
+  /** 受けの型: 《後の先》の1回の上限+add（区切りF） */
+  | { modifier: 'counterCap'; add: number; /** 《後の先》の1ターンの回数の上限に足す数（見切り） */ times?: number }
+  /** BREAK の「合計ダメージ」の数えを multiplier 倍にする（鎧通しの一撃。区切りD） */
+  | { modifier: 'breakCount'; multiplier: number; if?: AbilityCondition[] }
+  /** 成功が min 以上なら、完全成功でなくても BREAK のきっかけになる（魔力の楔。区切りD） */
+  | { modifier: 'breakOnSuccess'; min: number }
   | { modifier: 'ignoreBlock'; if?: AbilityCondition[] }
-  | { modifier: 'coverLethal'; chance: number };
+  | { modifier: 'coverLethal'; chance: number }
+  /** カードの成功率+bonus（狙い撃ちなど） */
+  | { modifier: 'cardChance'; bonus: number; if?: AbilityCondition[] }
+  | { modifier: 'completeSlots'; /** 1ターンに1枚だけ（この名前で数える） */ turnKey?: string; if?: AbilityCondition[] }
+  | { modifier: 'exhaust'; if?: AbilityCondition[] }
+  /** このカードは「このターンに使ったカード」に数えない（不動の構え: 《居合》をためながら使える） */
+  | { modifier: 'noPlayCount' }
+  | { modifier: 'slotPreview'; uses: number; if?: AbilityCondition[] }
+  /** カードのコストを変える（set = その値にする / delta = 足す。0より下にはならない）。turnKey があると1ターンに1枚だけ（使った時に数える） */
+  | { modifier: 'cardCost'; delta?: number; set?: number; turnKey?: string; if?: AbilityCondition[] }
+  /** ターンの始めに、前のターンのブロックが max まで残る（不動の錨） */
+  | { modifier: 'keepBlock'; max: number; /** 不落の城塞: 持ち越しの上限を BALANCE.keepBlockFortify まで上げる（区切りD） */ fortify?: boolean; /** 重装衛士《不落》: 今のブロックの pct% だけ残す（max まで。区切りF） */ pct?: number }
+  /** 自分の砲台・罠・召喚が2回ずつ発動する（永久機関） */
+  | { modifier: 'summonTwice' }
+  /** HPを回復した時、その pct 倍のブロックも得る（福音。0.5 = 50%） */
+  | { modifier: 'healToBlock'; pct: number }
+  /** 自分の砲台・罠・召喚の残りターン+add（歯車の目。戦闘の間ずっといる物は変わらない） */
+  | { modifier: 'summonTurns'; add: number }
+  /**
+   * 敵から悪い状態異常を受けるはずの時に防ぐ（春を待つ・暖かい灯）。
+   * statuses = その種類だけ（省略は悪い状態異常の全部） / block = 防いだ時に得るブロック /
+   * allies = 味方全員を守る（省略は自分だけ） / perBattle = 守られる1人につき、1回の戦闘で何回まで（省略は何回でも）
+   */
+  | { modifier: 'statusGuard'; statuses?: string[]; block?: number; allies?: boolean; perBattle?: number }
+  | { modifier: 'chestChance'; bonus: number; if?: AbilityCondition[] }
+  | { modifier: 'weaknessDamage'; multiplier: number; if?: AbilityCondition[] }
+  /** 属性の攻撃を受ける時: immune = 無効 / absorb = 受けるダメージ分回復 / half = 半分（K2。敵の攻撃から守る） */
+  | { modifier: 'elementGuard'; element: string; mode: 'immune' | 'absorb' | 'half'; if?: AbilityCondition[] }
+  /** 段階7a: 「×N回」の攻撃の回数+add（連装ガトリング銃。2回以上の攻撃だけ） */
+  | { modifier: 'extraHits'; add: number }
+  /** 段階7a: お供の自動の行動（お供の能力のきっかけで動いた時）が2回になる。カード・道具で動かした時は1回（双子の魂の鈴） */
+  | { modifier: 'petTwice' }
+  /** 段階7a: カードの成功が0だったら、完全成功に変わり、フォーカス+1（1ターンに1回。乱数は引かない。いかさま師の黄金賽） */
+  | { modifier: 'rigDice' }
+  /** 段階7a: ターンの始めに、使わずに残ったマナを最大 max まで持ち越す（過充填の魔導炉） */
+  | { modifier: 'carryMana'; max: number }
+  /** 段階7a: カードで自分が得たブロックの pct% を、HPの割合が一番低いほかの味方にも（共鳴する絆の指輪） */
+  | { modifier: 'shareBlock'; pct: number }
+  /** 段階7a: HPが減るたび、次の攻撃カード1枚のダメージ+pct%（最大+max%。使うと0に戻る。狂王の血鎧） */
+  | { modifier: 'rageStack'; pct: number; max: number }
+  /** 属性の無い物理攻撃を属性 into に変える（K2。炎の指輪など） */
+  | { modifier: 'convertElement'; into: string; if?: AbilityCondition[] }
+  /** 自分が付ける状態異常の量+amount（呪詛など） */
+  | { modifier: 'statusBonus'; statuses: string[]; amount: number; if?: AbilityCondition[]; /** 属性ダメージに付いてくる状態異常（火傷・毒など）にも乗る（種まき） */ element?: boolean };
+
+/**
+ * ダメージの倍率を状況で増やす（倍率 × (1 + per × 値)。max は上乗せの上限）。
+ * missingHp = 自分の減ったHPの割合（0〜1） / targetStatuses = 対象の悪い状態異常の種類の数 / selfStatus = 自分の状態異常 status の量 /
+ * gold = 戦闘を始めた時の自分の所持金（step ゴールドごとに1）
+ */
+export type DamageScale = { by: 'missingHp' | 'targetStatuses' | 'selfStatus' | 'gold' | 'companions'; per: number; max?: number; status?: string; step?: number };
+
+/** 演出用の出所。効果の判定には使わない。 */
+export interface AbilitySource {
+  kind: 'job' | 'inherited' | 'equipment' | 'pet' | 'card' | 'summon' | 'enemy' | 'other';
+  id?: string;
+  label?: string;
+  effectName?: string;
+}
+export interface AbilityNotice { name: string; source?: AbilitySource }
 
 export interface AbilityDef {
+  source?: AbilitySource;
   name: string;
+  /** お供の能力（活躍回数を数える） */
+  pet?: boolean;
   /** 説明文（省略すると中身から自動で作る。雰囲気の文を足したい時だけ書く） */
   description?: string;
   effect: AbilityEffect;
+  /** 同じ名前で一緒に持つ、ほかの中身（1つの装備に2つのきっかけ・常時型を持たせる時） */
+  also?: AbilityEffect[];
+  /** カードで得た一時的な能力: このターン（戦闘の通し番号）まで働く。次のターンの始めに消える（区切りD） */
+  untilTurn?: number;
 }
 
 /** 探索の特殊能力（世界マップ・イベントで効く） */
 export type ExploreAbility =
+  | { kind: 'combined'; effects: ExploreAbility[] }
+  | { kind: 'travel'; moveBonus: number; nightVision: boolean }
   | { kind: 'checkBonus'; check: string; bonus: number }
   /** 視界+N（M3）、隠し宝箱を見つける確率+X% */
   | { kind: 'tracking'; vision: number; hiddenFindBonus: number }
   | { kind: 'nightAmbushReduction'; multiplier: number }
-  | { kind: 'extraEventOption'; tag: string };
+  | { kind: 'extraEventOption'; tag: string }
+  /** 移動のサイコロ+1（前の「移動力の判定のスロット+N」。武闘家など） */
+  | { kind: 'moveSlots'; slots: number }
+  /** 野営・休憩の回復の倍率（僧侶など） */
+  | { kind: 'restBonus'; multiplier: number }
+  /** 祠とイベントのマスが、霧の中でも見える（召喚士など） */
+  | { kind: 'sense' }
+  /** 野営でフォーカスも回復する（闘士など） */
+  | { kind: 'campFocus'; amount: number }
+  /** 町の買い物の値引き（%。怪盗など） */
+  | { kind: 'shopDiscount'; percent: number }
+  /** 罠・イベントで受けるダメージが半分（拳聖《受け流し》。区切りF） */
+  | { kind: 'eventDamageHalf' };
 
 export interface ExploreAbilityDef {
   id: string;
@@ -150,8 +277,28 @@ export interface ClassDef {
   unlocked: boolean;
   /** レベルが1上がるごとの最大HP */
   hpPerLevel: number;
-  /** 装備できる武器の種類 */
+  /** 得意な武器の種類（初期装備。専用カードが出やすい） */
   weaponType: WeaponType;
+  /** 装備できるほかの武器の種類（専用カードは出にくい） */
+  subWeapons?: WeaponType[];
+  /** ジョブの段（無ければ基本）。転職システム（spec §6.4） */
+  tier?: JobTier;
+  /** 系統（武・魔・聖・技） */
+  lineage?: Lineage;
+  /** 転職元のジョブ（このジョブになれる元） */
+  from?: string[];
+  /** 転職の条件（その冒険の中で達成する。feat はキャラの記録のキー） */
+  requires?: { feat: string; count: number; text: string };
+  /** この特殊職へ転職できる祭壇の印（施設のデータと照合する）。 */
+  altar?: string;
+  /** 転職した時に山札へ加わるカード（1回きりの決め技など） */
+  jobCards?: string[];
+  /** 転職した時に3枚から1枚選べる、そのジョブを象徴する専用カード（残りは報酬に出る） */
+  signature?: string[];
+  /** お供の扱いが得意（お供の効果が2倍。獣使い系統） */
+  petMaster?: boolean;
+  /** イベントの選択肢の条件に使う印（例: 'scout' = 待ち伏せを見抜ける） */
+  tags?: string[];
   /** 初期装備（アイテムID） */
   startingEquipment: Partial<Record<EquipSlot, string>>;
   /** 報酬で出るカードの候補（カードID） */
@@ -159,6 +306,52 @@ export interface ClassDef {
   /** 成長ボーナスで伸びやすい能力値（重み） */
   growthWeights: Partial<Record<StatId, number>>;
 }
+
+// ---------- お供（ペット。設計 v2.1 §4） ----------
+
+/** お供の探索の効果（獣使い系統は数値が2倍） */
+export interface PetExplore {
+  /** 世界マップの視界+N */
+  vision?: number;
+  /** 夜でも視界が狭くならない */
+  nightVision?: boolean;
+  /** 移動のサイコロ+N */
+  moveBonus?: number;
+  /** 宝箱の運の判定の成功率+N% */
+  luckBonus?: number;
+  /** イベントの判定の成功率+N% */
+  eventBonus?: number;
+  /** 野営のHP回復+N（割合。0.2 = +20%） */
+  campHeal?: number;
+}
+
+export interface PetDef {
+  id: string;
+  order?: number;
+  name: string;
+  /** 絵が無い時の記号 */
+  icon: string;
+  /** 表示する場所: 肩（鳥）/ 足元 / 浮く（小竜） */
+  perch: 'shoulder' | 'feet' | 'float';
+  /** めったに出ない */
+  rare?: boolean;
+  colors: { id: string; name: string; color: string; rarity: 'normal' | 'rare' }[];
+  /** 名前の候補（入れなかった時） */
+  names: string[];
+  description: string;
+  /** 戦闘の能力（ふつう） */
+  abilities: AbilityDef[];
+  /** 戦闘の能力（獣使い系統: 数値が2倍） */
+  masterAbilities: AbilityDef[];
+  explore?: PetExplore;
+  /** イベントの選択肢の条件に使う印（例: 'scout' = 待ち伏せを見抜ける） */
+  tags?: string[];
+}
+
+/** ジョブの段: 基本 / 中位 / 最上位 / 特殊（中位からの脇道） */
+export type JobTier = 'base' | 'mid' | 'top' | 'special';
+/** 系統: 武・魔・聖・技 */
+export type Lineage = 'bu' | 'ma' | 'sei' | 'gi';
 
 /** 武器の種類のID（src/content の weaponTypes に登録したもの） */
 export type WeaponType = string;
@@ -189,12 +382,22 @@ export interface PartyMemberSpec {
   deck?: CardInstance[];
   /** 戦闘開始時のブロック（装備） */
   startBlock?: number;
+  /** 所持金（所持金で変わる能力が見る） */
+  gold?: number;
   /** 毎ターンのドロー枚数の追加（装備） */
   extraDraw?: number;
   /** 戦闘開始時の状態異常 */
   statuses?: Partial<Statuses>;
-  /** 職業以外から得た戦闘の特殊能力（装備） */
+  /** 区切りE: 1ターン目にお供が行動する回数（お供の特上ごちそう） */
+  petFeast?: number;
+  /** 職業以外から得た戦闘の特殊能力（装備・お供・持ち越し） */
   abilities?: AbilityDef[];
+  /** 連れているお供（足元・肩の表示用） */
+  pet?: { petId: string; color: string; name: string; love: number };
+  /** 武器に宿った属性（属性の無い物理攻撃がこの属性になる） */
+  weaponElement?: string;
+  /** 装備中の武器種（撃破実績にも使う）。 */
+  equippedWeaponType?: string;
 }
 
 // ---------- 敵 ----------
@@ -208,7 +411,72 @@ export interface EnemyActionDef {
   effects: EnemyEffect[];
   /** 自分以外の敵がいない時はこの行動に変える */
   fallbackIfAloneId?: string;
+  /** 大技（強敵・ボスの強い一撃や全体攻撃）。この予告が出ているターンは、味方が体勢を崩せる（BREAK。抜本的な見直し §3-2） */
+  big?: boolean;
+  /** 予告の説明（何が起きるか・どうすれば止まるか。予告をタップした説明に出す。敵の特殊な行動 1回目） */
+  hint?: string;
+  /**
+   * 敵の特殊な行動の種類（予告の枠の目立つ札と、いつも出す1行の案内を決める。src/data/enemyBehaviors.ts）。
+   * 特殊な行動の効果（手数読み・かばう・癒し封じ・仲間を呼ぶ・手負い狙い・盾砕き・浄化）を持つ行動には必ず付ける（テストで確かめる）
+   */
+  behavior?: EnemyBehaviorId;
+  /** いつも出す1行の案内（省略は種類ごとの既定の文） */
+  brief?: string;
+  /**
+   * 割り込み・優先（敵の特殊な行動の直し）: 条件が合う時は、決め方（順番・ランダム）を飛ばして、この行動を予告する。
+   * 割り込んだ時、順番の位置は進めない（次のターンは元の順番の続きから）。順番の中にも、ふつうに残る。
+   * - when: 'afflicted' = 自分に悪い状態異常が付いている（浄化） / 'canSummon' = この行動で仲間を呼べる（生きている敵が上限より少ない・回数が残っている）
+   * - rest: 1回割り込んだら、次の rest ターンは割り込まない（省略は2）
+   * - noRepeat: 2ターン続けては、この行動をしない（続く時は代わりの行動。仲間を呼ぶ）
+   */
+  cutIn?: { when: CutInWhen; rest?: number; noRepeat?: boolean };
+  /**
+   * 残り香（2026-11-14 開幕の一手）: BREAK で崩された時、元の効果の代わりに、この効果だけを行う（倍率は掛けない。小さい数字で書く）。
+   * BREAK の決まり（脆弱・ブロック0）はそのまま
+   */
+  breakResidue?: EnemyEffect[];
+  /** 代償（2026-11-14 開幕の一手）: この予告を BREAK した味方に、その場で付く効果（敵からの効果。元の行動は今までどおり止まる・半分） */
+  breakBacklash?: EnemyEffect[];
+  /**
+   * 溜め（2026-11-14 ボスの段階）: この行動を予告した時、次の予告をこの行動（同じ段階の行動のID）に決める（予告の下に「次: 〇〇」）。
+   * 溜めの行動が BREAK・凍結などで行われなかった時は、溜めた行動も消える（次は元の順番から）
+   */
+  chargeTo?: string;
+  /**
+   * 数え読み（2026-11-14 ボスの段階）: この行動を予告した時から数え始める。予告のたびに1つ減り、0になった予告で actionId を必ず出す
+   * （出したら turns に戻って、くり返す）。数えている間に BREAK されると、1つ戻る（turns まで）。予告の枠の右上に残りの数
+   */
+  countdown?: { actionId: string; turns: number };
+  /** 決め方（順番・ランダム）では選ばない（開幕の一手・溜め・数え読みでだけ出す行動。2026-11-14） */
+  scripted?: boolean;
+  /** この行動を予告している間だけの弱点（敵のデータ・段階の弱点の代わり。満ち潮・引き潮のように、予告と一緒に変わる。2026-11-14） */
+  weakWhile?: string[];
 }
+
+/**
+ * 割り込み・優先の条件（2026-11-14 特殊な行動のばらしで増やした）:
+ * afflicted = 自分に悪い状態異常（浄化の only があれば、その状態異常だけ見る） / canSummon = 呼べる /
+ * alone = ほかの生きている敵がいない / hurt = 自分のHPが最大の半分以下 / allyDown = 倒れた仲間がいる / foeLow = HPが半分以下の味方がいる。
+ * 呼ぶ行動は、どの条件でも「呼べる時」だけ
+ */
+export type CutInWhen = 'afflicted' | 'canSummon' | 'alone' | 'hurt' | 'allyDown' | 'foeLow';
+
+/**
+ * かばう時の形（guardAllies の効果の中身。2026-11-14）: cover = だれをかばうか（weakest = HPの割合がいちばん低い仲間だけ）／
+ * untilBlockGone = 自分のブロックが0の時はかばわない／half = 代わりに受けるダメージは半分／
+ * retaliate = 代わりに受けるたび、攻撃した味方にこの量のダメージ（属性 element）／status = 代わりに受けるたび、攻撃した味方に付ける状態異常
+ */
+export interface GuardStyle {
+  cover?: 'weakest';
+  untilBlockGone?: boolean;
+  half?: boolean;
+  retaliate?: number;
+  element?: string;
+  status?: { status: string; amount: number };
+}
+
+/** 敵の特殊な行動の種類（手数読み・かばう・癒し封じ・仲間を呼ぶ・手負い狙い・盾砕き・浄化） */
+export type EnemyBehaviorId = 'punish' | 'guard' | 'healSeal' | 'call' | 'hunt' | 'shatter' | 'purify';
 
 export interface EnemyDef {
   id: string;
@@ -221,6 +489,10 @@ export interface EnemyDef {
   /** 行動の決め方（src/engine/battle/ai/ のID。sequence = 順番 / random = ランダム） */
   pattern: string;
   actions: EnemyActionDef[];
+  /**
+   * 戦闘の1ターン目に必ず予告する行動（最初の段階だけ）。順番の敵は、2ターン目からその行動の次から続ける。
+   * 単独の時の代わり（fallbackIfAloneId）・呼べない時の代わり（orElse）は、ほかの行動と同じに働く
+   */
   firstActionId?: string;
   /** レベルが1上がるごとのHP・攻撃の増加率（省略は balance.ts の共通値） */
   hpPerLevel?: number;
@@ -233,11 +505,22 @@ export interface EnemyDef {
   gold: number;
   /** ボスの段階（HPが belowHpPct% 以下になると行動が変わる） */
   phases?: EnemyPhaseDef[];
+  /**
+   * 最後のダンジョンの中ボスの部屋の戦闘でだけ使う段階（2026-11-14 寄り道の値打ち 柱5）。ふつうの戦闘（地図の遭遇・ほかの部屋）では使わない
+   * （同じ敵が、ふつうの敵としても出るため）。戦闘を始める時、中ボスの戦闘なら EnemyState.phaseSet = 'midboss' にして、こちらを読む
+   */
+  midbossPhases?: EnemyPhaseDef[];
   /** 敵の特殊能力（味方と同じ書き方） */
   abilities?: AbilityDef[];
   /** 弱点の属性（ダメージ×1.5）・耐性のある属性（ダメージ×0.5・状態異常が効かない） */
   weak?: string[];
   resist?: string[];
+  /** レアの敵（K3）: 名前に★が付く。倒した時の経験値・ゴールドはデータで多めに書く。徘徊の rareEncounters かイベントの戦闘で出す */
+  rare?: boolean;
+  /** 亜種（K3）: 元の敵のID。絵は元の敵を使い回す。属性か開幕の特性を必ず1つ変える */
+  variantOf?: string;
+  /** 亜種の足元のオーラの色（data/enemyAuras.ts の ID） */
+  aura?: string;
 }
 
 export interface EnemyPhaseDef {
@@ -246,12 +529,43 @@ export interface EnemyPhaseDef {
   actions: EnemyActionDef[];
   pattern: string;
   maxConsecutive?: number;
+  /**
+   * 開幕の一手（2026-11-14 ボスの段階・docs/tasks/boss-phase-plan.md 柱1）: この段階に入った次の予告で、必ず出す行動（この段階の actions のID）。
+   * 境目を切った時の予告は変えない。一撃で2つの境目を越えた時は、深い方の段階の物だけ
+   */
+  openingActionId?: string;
+  /** この段階で新しく入る決まりの短い説明（HPバーの境目・予告の長押しに出す。例「根を張り、毎ターン回復する」） */
+  rule?: string;
+  /** この段階で増える弱点（元の弱点に足す） */
+  addWeak?: string[];
+  /** この段階の弱点（元の弱点の代わり。入れ替わる時だけ） */
+  weak?: string[];
+  /** この段階の耐性（元の耐性の代わり） */
+  resist?: string[];
+  /** 相方（同じ戦闘の、呼ばれていないほかの敵）が全部倒れた時にも、この段階に入る（HPの境目とは別の入り方。2026-11-14 最後の中ボス） */
+  onPartnerDown?: boolean;
+  /**
+   * 灯喰い（シナリオ2の災厄「灯を喰らう影」の段階。2026-11-14 区切り3b）: この段階の開幕の一手を予告した時から、味方がフォーカスを1つ使うたび
+   * 「喰った灯」（EnemyState.lampEaten）が+1（max まで）。この敵のダメージの攻撃は、1回ごとに「喰った灯 × per」だけ強くなる。BREAK で0に戻る
+   */
+  focusFeed?: { per: number; max: number };
 }
 
 export interface EncounterSpec {
   id: string;
   name: string;
-  enemies: { defId: string; level?: number }[];
+  /** eliteBody = 強敵の組（pools.elite）から来た「本体」（2026-11-13 強敵の本気。奥で足されるふつうの戦闘の敵には付けない） */
+  enemies: { defId: string; level?: number; eliteBody?: boolean }[];
+  /** ボスの部屋の戦闘（ボスには効き方が変わる効果が見る） */
+  boss?: boolean;
+  /** 中ボスの部屋の戦闘 */
+  midboss?: boolean;
+  /** 強敵の部屋の戦闘（BREAK の線を格ごとに分ける時に見る。BALANCE.breakDamagePctByRank） */
+  elite?: boolean;
+  /** 各シナリオの、鍵の順番で1つ目のダンジョンのボスの戦闘（大技の BREAK は今までどおり。effects の needsWeakPerfect） */
+  firstKeyBoss?: boolean;
+  /** 世界マップの災厄の戦闘（中ボスと同じ扱い。最後のダンジョンの中ボスの部屋だけの段階 midbossPhases は使わない。2026-11-14 区切り3b） */
+  scourge?: boolean;
 }
 
 // ---------- 戦闘の状態 ----------
@@ -288,10 +602,22 @@ export interface StatusDef {
   /** 敵: 次の行動を1回休む / 味方: 次のフェーズのマナが減る（凍結など）。どちらも起きた時に1減る */
   skipAction?: boolean;
   manaPenalty?: number;
+  /** 味方: 次のターンの初めに引くカードが「数×この値」枚減る（遅延など）。引いた時に全部消える */
+  drawPenalty?: number;
   /** 重ねられる上限（省略は上限なし） */
   maxStacks?: number;
+  /** 持ち主の element 属性の攻撃のダメージ +per×数。その攻撃で消える（聖光など） */
+  boostElement?: { element: string; per: number };
+  /** 味方: 次に使うカードの成功率 +数×この値。カードを使うと消える（応援など） */
+  chanceBonus?: number;
+  /** 味方: HPが減ると全部消える（竜王の槍の「構え」） */
+  loseOnHpLoss?: boolean;
+  /** 残りターン数によらず一定の成功率を加える。カード使用では消費しない。 */
+  flatChanceBonus?: number;
   /** 説明文（省略すると数値から自動で作る） */
   description?: string;
+  /** 弱点の案内で、名前の後に付ける短い一言（例: 凍結 →「凍結＝敵の行動阻止！」）。省略すると「〇〇確定」 */
+  guideNote?: string;
 }
 
 export interface CardInstance {
@@ -304,6 +630,59 @@ export interface CardInstance {
 }
 
 export interface AllyState {
+  /** 星の導き: 次に使うカードの、失敗した枠をこの数だけ成功に変える */
+  fixMiss?: number;
+  /** 狙いを合わせろ: このターン（turn）の終わりの召喚の攻撃を、この敵（uid）に向ける */
+  summonFocus?: { uid: string; turn: number };
+  /** 二重付与: 宿した属性が、あと何枚の物理攻撃カードに乗るか（無ければ1枚） */
+  imbueCards?: number;
+  /** 詠唱の栞: 引いたそのカード（uid）のコストを、このターン（turn）だけ delta する */
+  cheapCard?: { uid: string; turn: number; delta: number };
+  slotPreviewUsed?: number;
+  /** 次の攻撃カードへ蓄えた倍率。戦闘を越えて持ち越さない。 */
+  attackCharge?: { multiplier: number; category: CardCategory };
+  /** 次の物理攻撃へ宿す属性。 */
+  imbuedElement?: string;
+  exhaustedCards?: string[];
+  /** 最後に攻撃した敵（ターン終了時の追撃用） */
+  lastTargetId?: string;
+  /** 次の味方ターンに着地する跳躍 */
+  airborne?: { targetId: string; amount: number; turn: number };
+  /** この戦闘中だけ有効な与ダメージの上乗せ */
+  damageBonus?: number;
+  /** この戦闘の記録（転職の条件。敵を倒した数など。戦闘の後でキャラの記録に足す） */
+  feats?: Record<string, number>;
+  /** このターンに使ったカードの枚数（連撃など） */
+  played?: number;
+  /** 戦闘を始めた時の所持金（所持金で変わる能力が見る。戦闘中は変わらない） */
+  gold?: number;
+  /** 能力の数え（幻獣ゲージなど。キーは能力ごと） */
+  counters?: Record<string, number>;
+  /** 今付いている「応援」をくれた味方のID（輪唱。応援を使ったら消える） */
+  cheeredBy?: string;
+  /** 区切りD: 次の攻撃カードが弱点扱い（導きの光）・連携の段階+1（アシスト・パス） */
+  guided?: boolean;
+  comboBoost?: number;
+  /** 区切りD: 反転の呪印（このターン、味方1人を回復するカードが、この敵への聖ダメージになる） */
+  reversal?: { targetId: string; pct: number; max: number; turn: number };
+  /** 区切りD: 光の蓄え（このターンの番号。聖光が消えない） */
+  holdLight?: number;
+  /** 区切りD: 弾込め（次の「×N回」のカードの回数+） */
+  extraHits?: number;
+  /** 区切りD: このターンに使ったコスト0のカードの枚数（流れる連撃） */
+  playedZero?: number;
+  /** このターンに使った「攻撃の札」（敵を狙う札）の枚数（手数読みの数え方。2026-11-14。任意） */
+  playedAttack?: number;
+  /** 呼び出したお供（幻獣・獣など。ターン終了時に攻撃する。足元のトークンで表示） */
+  summons?: SummonState[];
+  /** このターンに使ったカードの枚数（種類ごと。子狼など） */
+  playedBy?: Partial<Record<CardCategory, number>>;
+  /** 連れているお供（表示用） */
+  pet?: { petId: string; color: string; name: string; love: number };
+  /** 武器に宿った属性 */
+  weaponElement?: string;
+  /** 装備中の武器種（撃破実績用）。 */
+  equippedWeaponType?: string;
   /** 戦闘内で一意のID（a0, a1, ...）。同じ職業が複数いても区別できる */
   id: string;
   classId: string;
@@ -332,9 +711,19 @@ export interface AllyState {
 export interface Intent {
   actionId: string;
   targetId?: string;
+  /** 強敵の本気の予告（いちばん強い攻撃・威力 ×BALANCE.eliteFrenzy.power。2026-11-13） */
+  frenzy?: boolean;
+  /** ボスの段階の開幕の一手の予告（その段階の番号。🌀の札。2026-11-14） */
+  opening?: number;
+  /** 数え読みの行動そのものの予告（数えが0になった。2026-11-14） */
+  countdownFire?: boolean;
 }
 
 export interface EnemyState {
+  /** 次のインテントだけ休む（状態異常とは別の行動休止）。 */
+  skipNextAction?: boolean;
+  /** 次の行動の数値にかかる倍率（行動後に消える） */
+  nextActionMultiplier?: number;
   uid: string;
   defId: string;
   /** 同じ敵が複数いる時の区別（A, B, ...） */
@@ -351,10 +740,55 @@ export interface EnemyState {
   seqIndex: number;
   history: string[];
   dead: boolean;
+  /** 先読みで決まっている次の次の行動（オカメインコの先読み。次のインテントを決める時に使う） */
+  queuedActionId?: string;
+  /** 戦闘から逃げた（倒したことにならない。報酬なし） */
+  fled?: boolean;
+  /** 戦闘中に別の敵に呼ばれた（増援）。経験値・お金は出ない */
+  summoned?: boolean;
   /** ボスの段階（0 = 最初） */
   phase: number;
   /** このターンにダメージを与えた味方（連携攻撃の判定。M3-C5） */
   hitBy?: string[];
+  /** このターンに味方から受けたHPのダメージの合計（BREAK の「最大HPの2割」の判定。ターンの初めに消す） */
+  turnDamage?: number;
+  /** 区切りD: このターンの印（弱点看破 = 次の攻撃が弱点扱い / 挟撃の陣の強さ / 挟撃の陣でフォーカスをもらった味方） */
+  exposed?: boolean;
+  /** 区切りE: このターンだけの弱点（紅蓮の油壺） */
+  tempWeak?: string;
+  /** 区切りF: 竜脈術師の《竜脈》で BREAK した（敵1体につき1戦闘1回） */
+  veinBroken?: boolean;
+  pincer?: number;
+  pincerFocus?: string[];
+  /** このターンの予告は、もう体勢を崩された（BREAK は1つの予告に1回。ターンの初めに消す） */
+  broken?: boolean;
+  /** かばう（魔王軍の騎士）: ほかの敵を狙った単体攻撃のカードのダメージを代わりに受ける。敵の番の始め・倒れた時に消える */
+  guarding?: boolean;
+  /** かばう時の形（敵ごとにちがう。2026-11-14 特殊な行動のばらし。無い = 基本の形。かばうと一緒に消える） */
+  guardStyle?: GuardStyle;
+  /** 歌の癒し封じ（セイレーン）: この敵が倒れると、味方全員の癒し封じが消える（2026-11-14。任意） */
+  sealBound?: boolean;
+  /** 最後に割り込み・優先（EnemyActionDef.cutIn）で予告を決めた時の戦闘のターン（任意。古い保存には無い = 割り込める） */
+  cutInTurn?: number;
+  /** 強敵の戦闘の「本体」（強敵の組から来た敵。2026-11-13 強敵の本気） */
+  eliteBody?: boolean;
+  /** この戦闘で、もう本気になった（1戦闘に1回） */
+  frenzyUsed?: boolean;
+  /** ボスの段階: 開幕の一手を、もう予告した一番深い段階の番号（任意。古い保存には無い = まだ出していない。2026-11-14） */
+  phaseOpened?: number;
+  /** ボスの段階: 数え読み（left = あと何回の予告で actionId を出すか。任意。古い保存には無い。2026-11-14） */
+  countdown?: { actionId: string; turns: number; left: number };
+  /** 段階のデータの出どころ（'midboss' = 敵のデータの midbossPhases を読む。省略は phases。2026-11-14） */
+  phaseSet?: 'midboss';
+  /**
+   * 吹雪に隠れている（シナリオ2の災厄「白狼王」の段階。2026-11-14 区切り3b）: 「敵1体が対象のカード」でこの敵に与えるダメージは0（外れる）。
+   * 線引きは、かばうと同じ（全体攻撃・お供と召喚・分身・毒などの継続ダメージ・反撃・道具は当たる）。BREAK はできる。敵の番の始め・倒れた時に消える
+   */
+  hidden?: boolean;
+  /** 鐘のこだま（シナリオ2の災厄「凍て鐘の亡霊」の段階・区切り3b）: こだまの予告が出ている味方の番に、この敵が受けた1回の当たりでいちばん大きいHPのダメージ（味方の番の始めに消す） */
+  echoMax?: number;
+  /** 灯喰い（シナリオ2の災厄「灯を喰らう影」の段階・区切り3b）: 喰った灯の数（EnemyPhaseDef.focusFeed）。BREAK で0 */
+  lampEaten?: number;
 }
 
 export type Phase = 'ally' | 'enemy' | 'victory' | 'defeat' | 'escaped';
@@ -374,6 +808,10 @@ export interface LogEntry {
 }
 
 export interface BattleState {
+  /** 戦闘開始直後だけ表示する結果。保存読込では再生しない。 */
+  openingEvents?: BattleEvent[];
+  /** 先読みで予約した結果。描画・読込では抽選しない。 */
+  slotPreview?: SlotPreview;
   version: number;
   seed: number;
   rngState: number;
@@ -393,6 +831,52 @@ export interface BattleState {
   readyCheck?: boolean;
   /** 準備完了を押したプレイヤー */
   ready?: PlayerId[];
+  /** 戦闘中に手に入れたお金（掠め取りなど。勝った時の報酬に足す） */
+  bonusGold?: number;
+  /** 区切りE: この戦闘で得るお金の倍率（黄金の招き猫）・閃光の破砕玉をボスに使った */
+  goldMul?: number;
+  flashBreakUsed?: boolean;
+  /** 味方みんなで数える「1ターンに何回まで」（輪唱など）。perTurn の条件の team が使う */
+  teamCounters?: Record<string, number>;
+  /** ボスの部屋の戦闘 */
+  boss?: boolean;
+  /** 中ボスの部屋の戦闘（大物狩り） */
+  midboss?: boolean;
+  /** 強敵の部屋の戦闘（BALANCE.breakDamagePctByRank が見る） */
+  elite?: boolean;
+  /** 各シナリオの、鍵の順番で1つ目のダンジョンのボスの戦闘（2026-11-13: 大技の BREAK は今までどおり。紫の札は除く） */
+  firstKeyBoss?: boolean;
+  /**
+   * 災厄の加護（2026-11-14 寄り道の値打ち 柱1）: この戦闘に掛かっている加護。ids = 加護を掛けている災厄のID / uid = 大物（加護の決まりが掛かる敵）/
+   * regen = 大物が敵の番の始めに回復する最大HPの% / ward = 最初の BREAK を1回防ぐ（wardUsed = もう防いだ）/ phaseBurn = 大物が段階を越えるたびの火傷 /
+   * bell = 鐘の響き（every の倍数のターンの鐘の番に、大物の単体攻撃がほかの味方にも pct% 響く）/ veil = 闇の帳（このターンの大物の予告は、名前と数字が画面に見えない）
+   */
+  boon?: { ids: string[]; uid: string; regen?: number; ward?: boolean; wardUsed?: boolean; phaseBurn?: number; bell?: { every: number; pct: number }; veil?: number };
+  /** 見破ったボスの戦闘（2026-11-14 寄り道の値打ち 柱2）: 見破った大物（この uid の敵）の大技と開幕の一手は、完全成功だけで崩れる */
+  insight?: string;
+}
+
+/** 呼び出したお供（turns = 残りのターン数。0になったら帰る） */
+export interface SummonState {
+  targetId?: string;
+  trigger?: 'enemyBeforeAction';
+  effects?: Effect[];
+  /** 同じ上限で数える召喚の印。 */
+  group?: string;
+  /** カード攻撃への追撃と、被弾の身代わりをする召喚 */
+  echoPct?: number;
+  intercept?: boolean;
+  /** 身代わりで攻撃を受けた時、攻撃者にこのダメージを返す（無明逆流れ。区切りD） */
+  counter?: number;
+  /** 装甲砲台（2026-11-14）: 撃つたびに、持ち主の今のブロックの blockPct% をダメージに足す（最大 blockMax。ブロックは減らない） */
+  blockPct?: number;
+  blockMax?: number;
+  id: string;
+  name: string;
+  icon: string;
+  damage: number;
+  turns: number;
+  element?: string;
 }
 
 export interface BattleSetup {
@@ -402,6 +886,8 @@ export interface BattleSetup {
   /** 敵のHP・攻撃の倍率（難易度など。省略は1） */
   enemyHpMul?: number;
   enemyAttackMul?: number;
+  /** 強敵の本体（eliteBody の敵）だけに掛かるHPの倍率（BALANCE.enemyHpByRank.elite。省略は1） */
+  eliteBodyHpMul?: number;
   /** 奇襲成功（敵は1ターン目に行動しない） */
   surprise?: boolean;
   /** オンライン協力: 全員の準備完了を待つ */
@@ -410,12 +896,16 @@ export interface BattleSetup {
 
 // ===== コマンド（シリアライズ可能・オンライン協力で同期する単位） =====
 export type Command =
+  | { type: 'PREVIEW_CARD'; playerId: PlayerId; characterId: string; cardInstanceId: string; targetId?: string; allyTargetId?: string; focusUsed: number }
+  | { type: 'REROLL_PREVIEW'; playerId: PlayerId; characterId: string }
+  | { type: 'CONFIRM_PREVIEW'; playerId: PlayerId; characterId: string }
   | {
       type: 'PLAY_CARD';
       playerId: PlayerId;
       characterId: string;
       cardInstanceId: string;
       targetId?: string;
+      allyTargetId?: string;
       focusUsed: number;
     }
   | { type: 'END_TURN'; playerId: PlayerId }
@@ -427,6 +917,18 @@ export type Command =
   | { type: 'ENEMY_STEP' };
 
 export type SlotResult = 'focus' | 'hit' | 'miss';
+
+export interface SlotPreview {
+  characterId: string;
+  cardInstanceId: string;
+  targetId?: string;
+  allyTargetId?: string;
+  focusUsed: number;
+  chance: number;
+  results: SlotResult[];
+  rerollResults: SlotResult[];
+  rerolled: boolean;
+}
 
 /** UI演出用のイベント */
 export type BattleEvent =
@@ -441,11 +943,14 @@ export type BattleEvent =
       perfect: boolean;
       summary: string;
     }
-  | { type: 'damage'; unitId: string; amount: number; blocked: number; sourceId?: string }
+  | { type: 'damage'; unitId: string; amount: number; rawAmount?: number; blocked: number; sourceId?: string; /** 吹雪に隠れた敵に、単体のカードが外れた（区切り3b） */ missed?: boolean }
+  | { type: 'resource'; unitId: string; resource: 'focus' | 'mana'; amount: number }
   | { type: 'block'; unitId: string; amount: number }
   | { type: 'status'; unitId: string; status: StatusId; amount: number }
-  | { type: 'ability'; unitId: string; name: string }
+  | { type: 'ability'; unitId: string; name: string; source?: AbilitySource }
   | { type: 'retarget'; enemyUid: string }
+  /** 大技の予告を崩した（BREAK）。why = きっかけ（弱点・完全成功・大ダメージ） */
+  | { type: 'break'; enemyUid: string; why: 'weak' | 'perfect' | 'damage' }
   | { type: 'enemyAct'; enemyUid: string; actionName: string; targetIds: string[] }
   | { type: 'death'; unitId: string }
   | { type: 'enemyPhase'; enemyUid: string; name: string }

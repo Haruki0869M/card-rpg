@@ -1,7 +1,7 @@
 // 実際のUIをタップ操作して、1〜4人それぞれで勝利・敗北まで到達できるか確認する
 // npm run build && npx vite preview --port 4173 を起動した状態で: node scripts/playthrough.mjs
 import { mkdirSync } from 'node:fs';
-import { chromium, layoutIssues, startBattle } from './lib.mjs';
+import { chromium, confirmEndTurn, layoutIssues, startBattle, waitForBattlePresentation } from './lib.mjs';
 
 mkdirSync('screenshots', { recursive: true });
 const browser = await chromium.launch();
@@ -16,19 +16,29 @@ async function tapCard(page, locator) {
 
 async function resultText(page) {
   if (await page.getByText('勝利！', { exact: true }).count()) return 'victory';
-  if (await page.getByText('全滅…', { exact: true }).count()) return 'defeat';
+  if (await page.getByText(/^(全滅…|敗北…|力尽きた…)$/).count()) return 'defeat';
   return null;
 }
 
 async function playToWin(page, tag) {
   for (let turn = 0; turn < 40; turn++) {
+    await waitForBattlePresentation(page);
     let r = await resultText(page);
     if (r) return r;
-    await page.waitForSelector('button:has-text("ターン終了"):not([disabled])', { timeout: 15000 });
+    try {
+      await page.waitForSelector('button:has-text("ターン終了"):not([disabled])', { timeout: 15000 });
+    } catch (e) {
+      // 止まった時の画面を残す（原因を調べるため）
+      await page.screenshot({ path: `screenshots/play-timeout-${tag}.png` });
+      throw e;
+    }
     for (let guard = 0; guard < 40; guard++) {
+      await waitForBattlePresentation(page);
       if ((r = await resultText(page))) return r;
       const allies = page.locator('[data-ally]:not([data-done]):not([data-dead])');
       if ((await allies.count()) === 0) break;
+      // 選んだままのカード（大きく浮いて味方の枠に重なる）を取り消してから
+      await page.keyboard.press('Escape');
       await allies.first().click();
       const cards = page.locator('[data-card-index][data-usable]');
       if ((await cards.count()) === 0) break;
@@ -61,8 +71,10 @@ async function playToWin(page, tag) {
       if (await go.count()) await go.click();
       await page.waitForTimeout(40);
     }
+    await waitForBattlePresentation(page);
     if ((r = await resultText(page))) return r;
     await page.locator('button:has-text("ターン終了")').click();
+    await confirmEndTurn(page);
     await page.waitForTimeout(100);
   }
   return 'timeout';
@@ -70,11 +82,13 @@ async function playToWin(page, tag) {
 
 async function playToLose(page) {
   for (let turn = 0; turn < 80; turn++) {
+    await waitForBattlePresentation(page);
     const r = await resultText(page);
     if (r) return r;
-    await page.locator('button:has-text("ターン終了"):not([disabled])').or(page.getByText('全滅…', { exact: true })).first().waitFor({ timeout: 15000 });
+    await page.locator('button:has-text("ターン終了"):not([disabled])').or(page.getByText(/^(全滅…|敗北…|力尽きた…)$/)).first().waitFor({ timeout: 15000 });
     if (await resultText(page)) continue;
     await page.locator('button:has-text("ターン終了")').click();
+    await confirmEndTurn(page);
     await page.waitForTimeout(50);
   }
   return 'timeout';

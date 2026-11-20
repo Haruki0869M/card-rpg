@@ -1,19 +1,28 @@
 // ===== オンライン協力の画面（部屋に参加・待合室・遊んでいる間の表示。spec §7.2） =====
+import { TopBar } from '../ui/fancy';
+import { LAYER } from '../ui/layers';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronLeft, Copy, Crown, LogIn, Share2, Swords, Users, Wifi, WifiOff } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Copy, Crown, LogIn, Share2, Swords, Users, Wifi, WifiOff } from 'lucide-react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { BALANCE } from '../../data/balance';
 import { CLASSES } from '../../data/classes';
-import { DIFFICULTIES, getDifficulty } from '../../data/rules';
-import { SCENARIOS } from '../../data/scenarios';
+import { DIFFICULTIES } from '../../data/rules';
+import { SCENARIOS, isScenarioUnlocked } from '../../data/scenarios';
+import { clearedScenarioIds } from '../../store/profile';
+import { useProfile } from '../../store/profileStore';
 import { PLAYER_COLOR } from '../../data/theme';
-import { livingHeroes, waitingPlayers } from '../../engine';
+import { eventChallenger, livingHeroes, notVoted, voters, waitingPlayers } from '../../engine';
+import { OPEN_EXTERNAL_PARAM } from '../../net/inAppBrowser';
 import { normalizeCode, SEATS } from '../../net/room';
 import { autoName, isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
-import { PROXY_WAIT_SEC, useOnline } from '../../store/onlineStore';
+import { proxyReadyAt, proxyWaitLeft, useOnline } from '../../store/onlineStore';
 import type { GameState, PlayerId } from '../../types';
-import { Heading, HeroFace, Screen } from '../ui/game';
+import { HeroFace, Screen } from '../ui/game';
+import { InAppBrowserNote } from '../ui/InAppBrowserNote';
+import { useLowScreen } from '../../hooks/useLowScreen';
+import { chestClaimWaits, facilityWaits, rewardWaits } from './waitNotes';
+import { answerableInvites } from './worldTurnGate';
 
 /** 定型のスタンプ（spec §7.1） */
 export const STAMPS = ['いいね！', '待って！', 'ここ行こう', 'ありがとう', 'まかせて', 'ごめん！'];
@@ -30,6 +39,8 @@ export function inviteUrl(code: string) {
   u.hash = '';
   u.searchParams.delete('as');
   u.searchParams.set('room', code);
+  // LINE で送った時、最初から外のブラウザ（Chrome など）で開くための印（点検 F4）。このゲームは読まない
+  u.searchParams.set(OPEN_EXTERNAL_PARAM, '1');
   return u.toString();
 }
 
@@ -64,16 +75,9 @@ export function JoinScreen() {
   };
   return (
     <Screen>
-      <div className="flex h-12 shrink-0 items-center px-2">
-        <button onClick={() => setScreen('title')} aria-label="戻る" className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-lg">
-          <ChevronLeft size={22} />
-        </button>
-        <div className="flex-1">
-          <Heading>部屋に参加</Heading>
-        </div>
-        <div className="w-11" />
-      </div>
+      <TopBar title="部屋に参加" onBack={() => setScreen('title')} />
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-4">
+        <InAppBrowserNote />
         <NameInput />
         <div>
           <div className="text-[13px] text-zinc-300">合言葉（4文字）</div>
@@ -119,10 +123,13 @@ export function LobbyScreen() {
   const setScreen = useBattle((s) => s.setScreen);
   const setDraft = useBattle((s) => s.setDraft);
   const toast = useBattle((s) => s.showToast);
+  const clears = useProfile((s) => s.profile.clears);
   if (!room?.meta) return null;
+  const cleared = clearedScenarioIds({ clears });
   const m = room.meta;
   const host = room.isHost;
-  const scenarios = SCENARIOS.all.filter((s) => s.unlocked);
+  // シナリオの解放は、部屋を作った人（ホスト）のこの端末の記録で決める（K5）。参加者はホストが選んだものを見るだけ
+  const scenarios = SCENARIOS.all.filter((s) => isScenarioUnlocked(s, cleared));
   const problem = room.startProblem();
   const editSlot = (i: number) => {
     const cur = room.slots[i];
@@ -148,22 +155,13 @@ export function LobbyScreen() {
   const members = Object.entries(room.members).sort((a, b) => a[1].seat.localeCompare(b[1].seat));
   return (
     <Screen>
-      <div className="flex h-12 shrink-0 items-center px-2">
-        <button
-          onClick={async () => {
-            await leave();
-            setScreen('title');
-          }}
-          aria-label="部屋を出る"
-          className="btn btn-dark flex h-11 w-11 items-center justify-center rounded-lg"
-        >
-          <ChevronLeft size={22} />
-        </button>
-        <div className="flex-1">
-          <Heading>待合室</Heading>
-        </div>
-        <div className="w-11" />
-      </div>
+      <TopBar
+        title="待合室"
+        onBack={async () => {
+          await leave();
+          setScreen('title');
+        }}
+      />
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
         <div className="panel panel-gold-edge mt-2 flex items-center gap-3 rounded-xl p-3">
           <div className="min-w-0 flex-1">
@@ -196,7 +194,7 @@ export function LobbyScreen() {
         <div className="font-display mt-3 text-[15px] text-amber-200">冒険の設定{host ? '' : '（ホストが決めます）'}</div>
         <div className="mt-1 flex flex-col gap-2">
           <div className="flex flex-wrap gap-1.5">
-            {(host ? scenarios : scenarios.filter((s) => s.id === m.scenarioId)).map((s) => (
+            {(host ? scenarios : SCENARIOS.all.filter((s) => s.id === m.scenarioId)).map((s) => (
               <button key={s.id} disabled={!host} onClick={() => update({ scenarioId: s.id })} className={`btn h-11 rounded-lg px-3 text-[14px] font-bold ${m.scenarioId === s.id ? 'btn-gold' : 'btn-dark'}`}>
                 {s.name}
               </button>
@@ -282,15 +280,33 @@ export function LobbyScreen() {
 
 // ---------- 遊んでいる間 ----------
 
-/** 今だれの操作を待っているか（席。手番・準備完了・成長の選択） */
+/** 今だれの操作を待っているか（席。手番・準備完了・成長の選択・みんなで決める場面の票） */
 export function awaitedSeats(game: GameState): PlayerId[] {
+  const base = [...awaitedTurnSeats(game)];
+  // ホストの引き継ぎの直し（2026-11-14・点検 D 2-2）: ダンジョンの中のみんなで決める場面（扉・撤退・イベント・続ける・宝箱の開け役）と
+  // 報酬の「続ける」で、まだ選んでいない席も待っている（相手が眠ったら「代わりに操作」の窓を出すため）。戦闘中・世界マップは今のまま
+  // イベントの挑む段（実機の不具合① 2026-11-14）: 待っているのは挑む役の持ち主だけ（票はもう無い）
+  const challenger = game.mode === 'event' && game.event?.decided && !game.event.result ? eventChallenger(game) : undefined;
+  if (challenger) return base.includes(challenger.playerId) ? base : [...base, challenger.playerId];
+  if (game.mode !== 'battle' && game.mode !== 'world' && (game.activeScene || game.mode === 'reward') && voters(game).length > 1)
+    for (const p of notVoted(game)) if (!base.includes(p)) base.push(p);
+  return base;
+}
+
+function awaitedTurnSeats(game: GameState): PlayerId[] {
   if (game.mode === 'world' && game.world && !game.world.story) {
     const h = game.heroes.find((x) => x.id === game.world!.turn);
     return h ? [h.playerId] : [];
   }
   if (game.mode === 'battle' && game.battle?.phase === 'ally') return waitingPlayers(game.battle);
-  if (game.mode === 'reward' && game.reward?.levelUps.length) {
-    const h = game.heroes.find((x) => x.id === game.reward!.levelUps[0].heroId);
+  // 回3 A・C: 報酬（成長・カード・取り合い）・宝箱の取り合い・施設も、まだ選んでいない人を待っている
+  const all = () => false;
+  const seats = (notes: { playerId: PlayerId }[]) => [...new Set(notes.map((n) => n.playerId))];
+  if (game.mode === 'reward') return seats(rewardWaits(game, all));
+  if (game.mode === 'chest' && game.chest?.claims?.some((c) => !c.rolls)) return seats(chestClaimWaits(game, all));
+  if (game.mode === 'town' || game.mode === 'shrine' || game.mode === 'sanctuary') return seats(facilityWaits(game, all));
+  if (game.mode === 'encounter' && game.encounter) {
+    const h = game.heroes.find((x) => x.id === game.encounter!.heroId);
     return h ? [h.playerId] : [];
   }
   return [];
@@ -322,12 +338,12 @@ export function OnlinePanel() {
             {mem.name}
             {room.meta!.hostUid === Object.entries(room.members).find(([, x]) => x === mem)?.[0] && <Crown size={13} className="ml-1 inline text-amber-300" />}
           </span>
-          {!mem.online && room.isHost && mem.seat !== room.seat && (
+          {!room.alive(mem) && room.isHost && mem.seat !== room.seat && (
             <button onClick={() => setProxy(mem.seat, !room.meta!.proxy?.[mem.seat])} className="btn btn-dark h-11 rounded-lg px-2 text-[12px] font-bold">
               {room.meta!.proxy?.[mem.seat] ? '代わりの操作をやめる' : '代わりに操作する'}
             </button>
           )}
-          {mem.online ? <Wifi size={14} className="text-emerald-300" /> : <WifiOff size={14} className="text-zinc-500" />}
+          {room.alive(mem) ? <Wifi size={14} className="text-emerald-300" /> : <WifiOff size={14} className="text-zinc-500" />}
         </div>
       ))}
       <div className="grid grid-cols-3 gap-1">
@@ -354,11 +370,22 @@ export function OnlineOverlay() {
   useOnline((s) => s.tick);
   const stamp = useOnline((s) => s.stamp);
   const offlineSince = useOnline((s) => s.offlineSince);
+  const proxyHold = useOnline((s) => s.proxyHold);
   const setProxy = useOnline((s) => s.setProxy);
+  const holdProxy = useOnline((s) => s.holdProxy);
   const game = useBattle((s) => s.game);
   const screen = useBattle((s) => s.screen);
   const [shownStamp, setShownStamp] = useState<number | null>(null);
   const [, setNow] = useState(0);
+  const hostNote = useOnline((s) => s.hostNote);
+  const [shownHost, setShownHost] = useState<number | null>(null);
+  // 回3 C: ホストの引き継ぎの知らせは12秒出す
+  useEffect(() => {
+    if (!hostNote) return;
+    setShownHost(hostNote.id);
+    const t = setTimeout(() => setShownHost(null), 12000);
+    return () => clearTimeout(t);
+  }, [hostNote]);
   useEffect(() => {
     if (!stamp) return;
     setShownStamp(stamp.id);
@@ -370,21 +397,42 @@ export function OnlineOverlay() {
     const t = setInterval(() => setNow((n) => n + 1), 1000);
     return () => clearInterval(t);
   }, []);
+  // 狭い画面 回2（B）: 低い画面では、知らせを仲間の列（世界マップの 💀×N がある列）より下に出す（地図の上に重なる。高さは今のまま）。
+  // 仲間の列が無い画面と、ふつうの画面は今までどおり上から 56px。描くたび（1秒ごと）に列の下の端を測り直す
+  const low = useLowScreen();
+  const box = useRef<HTMLDivElement>(null);
+  const [below, setBelow] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const el = box.current;
+    const row = low && el ? document.querySelector('[data-party-row]') : null;
+    const next = row && el ? Math.max(56, Math.round(row.getBoundingClientRect().bottom - el.getBoundingClientRect().top + 4)) : null;
+    if (next !== below) setBelow(next);
+  });
   if (!room || screen !== 'game' || !game) return null;
-  // 同行に誘われている（この端末のキャラ）
-  const invites = Object.entries(game.world?.invites ?? {})
-    .map(([target, by]) => ({ target: game.heroes.find((h) => h.id === target)!, by: game.heroes.find((h) => h.id === by)! }))
-    .filter((x) => x.target && x.by && isLocalPlayer(x.target.playerId));
+  // 同行に誘われている（この端末のキャラ）。
+  // 答えられるのは世界マップにいる時だけ（エンジンの worldInviteAnswer「世界マップにいません」）。ほかの人が遭遇（戦闘）に入った後などは枠を出さない
+  // （2026-11-19 検証 bot の指摘: 枠が残り、押しても何も起きなかった。誘いは消えないので、世界マップに戻るとまた出る）
+  const invites = answerableInvites(game, isLocalPlayer);
   const offlineAwaited = awaitedSeats(game).filter((p) => !room.seatOnline(p) && !room.meta?.proxy?.[p] && livingHeroes(game).some((h) => h.playerId === p));
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 z-[70] flex flex-col items-center gap-1 px-3 pt-14">
+    <div ref={box} data-online-overlay data-online-below={below ?? undefined} style={{ zIndex: LAYER.online, paddingTop: below ?? undefined }} className="pointer-events-none absolute inset-x-0 top-0 flex flex-col items-center gap-1 px-3 pt-14">
       {!room.connected && (
         <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-red-950/90 px-3 py-1.5 text-[13px] text-red-100">
           <WifiOff size={16} /> 通信が切れました。つながり直しています…
         </div>
       )}
+      {hostNote && shownHost === hostNote.id && (
+        <div className="pointer-events-auto flex w-full max-w-[400px] items-start gap-1.5 rounded-xl border border-amber-300/40 bg-black/90 px-3 py-2 text-[13px] text-amber-50" role="status" data-host-note>
+          <Crown size={16} className="mt-0.5 shrink-0 text-amber-300" />
+          <span>
+            ホスト（{hostNote.oldName}さん）との接続が切れました。{hostNote.mine ? 'あなたがホストを引き継ぎました。このまま続けられます' : `${hostNote.newName}さんが引き継ぎました。このまま続けられます`}
+          </span>
+        </div>
+      )}
       {offlineAwaited.map((p) => {
-        const left = Math.max(0, PROXY_WAIT_SEC - Math.floor((Date.now() - (offlineSince[p] ?? Date.now())) / 1000));
+        const now = room.backend.now();
+        const member = Object.values(room.members).find((m) => m.seat === p);
+        const left = proxyWaitLeft(now, proxyReadyAt(member, offlineSince[p] ?? now, proxyHold[p]));
         return (
           <div key={p} className="pointer-events-auto flex w-full max-w-[400px] flex-col gap-1 rounded-xl border border-amber-300/40 bg-black/90 px-3 py-2 text-[13px] text-amber-50">
             <div className="flex items-center gap-1.5">
@@ -398,7 +446,7 @@ export function OnlineOverlay() {
                   <button onClick={() => setProxy(p, true)} className="btn btn-gold h-11 flex-1 rounded-lg text-[13px] font-bold">
                     代わりに操作する
                   </button>
-                  <button onClick={() => useOnline.setState({ offlineSince: { ...offlineSince, [p]: Date.now() } })} className="btn btn-dark h-11 flex-1 rounded-lg text-[13px] font-bold">
+                  <button onClick={() => holdProxy(p)} className="btn btn-dark h-11 flex-1 rounded-lg text-[13px] font-bold">
                     もう少し待つ
                   </button>
                 </div>
@@ -456,5 +504,23 @@ export function OthersTurnNote({ seat, name, what }: { seat: PlayerId; name: str
   );
 }
 
-export const difficultyName = (id: string) => getDifficulty(id).name;
+/** 回3 A: 待っている相手と、相手が今していること（1行ずつ。「P2 ナツさんが、リナの山札に加えるカードを選んでいます」） */
+export function WaitNotes({ notes, className = '' }: { notes: { playerId: PlayerId; what: string }[]; className?: string }) {
+  useOnline((s) => s.tick);
+  if (!notes.length) return null;
+  const room = useOnline.getState().room;
+  return (
+    <div className={`flex flex-col gap-1 rounded-xl bg-black/50 px-2 py-1.5 ${className}`} role="status" data-wait-notes>
+      {notes.map((n, i) => (
+        <div key={i} className="flex items-start gap-1.5 text-[13px] leading-5 text-zinc-100">
+          <SeatChip p={n.playerId} small />
+          <span className="min-w-0">
+            {room?.seatName(n.playerId) ?? n.playerId}さんが、{n.what}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export { SEATS };

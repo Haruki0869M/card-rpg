@@ -1,0 +1,14 @@
+import { open, loadSave } from './common.mjs';
+const { browser, page, shot, text, issues, errors } = await open();
+const btns = async () => console.log('BTN', await page.evaluate(() => [...document.querySelectorAll('button')].filter(b => b.offsetParent).map(b => b.textContent.trim().slice(0,22) + '|' + (b.getAttribute('aria-label')||'')).join(' ; ')));
+await loadSave(page, 'scripts/archive/playtest/shots/save-battle.json');
+await page.waitForTimeout(1500);
+await page.getByText('セシル').first().click(); await page.waitForTimeout(600);
+await page.locator('[data-card-index="1"]').click(); await page.waitForTimeout(500);
+await shot('08f-heal-selected');
+console.log(await text()); await btns(); await issues('heal');
+await page.locator('[data-ally]').first().click().catch(e => console.log('ally click fail', e.message)); await page.waitForTimeout(500);
+await shot('08g-heal-ally-picked');
+console.log(await text()); await btns();
+await browser.close();
+console.log('errors', errors);

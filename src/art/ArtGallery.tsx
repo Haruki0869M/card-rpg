@@ -7,7 +7,7 @@ import type { Rarity } from '../types';
 import { BattleBackground, CharacterArt, ChestImage, EnemyArt, ItemImage } from './index';
 
 const RARITIES: Rarity[] = ['common', 'rare', 'epic', 'legend'];
-const ICONS = ['sword', 'staff', 'hammer', 'bow', 'armor', 'robe', 'ring', 'amulet', 'charm', 'crest', 'boots', 'potion', 'ether', 'antidote', 'smoke'];
+const ICONS = ['sword', 'staff', 'hammer', 'bow', 'axe', 'fist', 'dagger', 'spear', 'katana', 'tome', 'scythe', 'scepter', 'whip', 'instrument', 'gun', 'armor', 'robe', 'ring', 'amulet', 'charm', 'crest', 'boots', 'potion', 'ether', 'antidote', 'smoke'];
 
 function H({ children }: { children: React.ReactNode }) {
   return <h1 className="font-display mt-4 mb-2 text-[20px] text-amber-200">{children}</h1>;

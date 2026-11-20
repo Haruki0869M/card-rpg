@@ -13,8 +13,8 @@ import { ITEMS } from '../../data/items';
 import { DIFFICULTIES, ROOM_TYPES, WEAPON_TYPES } from '../../data/rules';
 import { SCENARIOS } from '../../data/scenarios';
 import { STATUSES } from '../../data/statuses';
-import { QUESTS, SHRINES, TERRAINS, TOWNS } from '../../data/world';
-import type { AbilityDef, Effect, EventOutcome, GameState } from '../../types';
+import { QUESTS, SANCTUARIES, SHRINES, TERRAINS, TOWNS } from '../../data/world';
+import type { AbilityDef, Effect, EventOutcome } from '../../types';
 import {
   conditionHandler,
   createGame,
@@ -34,12 +34,13 @@ import {
   validateGame,
 } from '../index';
 
-const TARGETS = ['target', 'self', 'allies', 'otherAllies', 'foes', 'randomFoe'];
+const TARGETS = ['target', 'self', 'allies', 'otherAllies', 'foes', 'randomFoe', 'lowestAlly', 'allyTarget', 'otherFoes', 'attacker', 'weakHit', 'helped'];
 
 /** 効果1つを検査（種類・対象・状態異常のID・説明文） */
 function checkEffect(e: Effect, where: string) {
   expect(hasEffectKind(e.kind), `${where}: 未登録の効果 ${e.kind}`).toBe(true);
   if (e.to) expect(TARGETS, `${where}: 対象 ${e.to}`).toContain(e.to);
+  if (e.kind === 'applyStatus' && e.bossStatus) expect(STATUSES.has(e.bossStatus), `${where}: ボス用の状態異常 ${e.bossStatus}`).toBe(true);
   if (e.kind === 'applyStatus') expect(STATUSES.has(e.status), `${where}: 未登録の状態異常 ${e.status}`).toBe(true);
   if (e.kind === 'damage' && e.element) expect(ELEMENTS.has(e.element), `${where}: 未登録の属性 ${e.element}`).toBe(true);
   expect(() => describeEffect(e), where).not.toThrow();
@@ -90,6 +91,8 @@ describe('コンテンツの検査', () => {
     for (const i of ITEMS.all) {
       if (i.weaponType) expect(WEAPON_TYPES.has(i.weaponType), `item ${i.id}`).toBe(true);
       if (i.ability) checkAbility(i.ability, `item ${i.id}`);
+      // also（同じ名前で持つ2つ目の中身）も同じように調べる
+      for (const effect of i.ability?.also ?? []) checkAbility({ name: i.ability!.name, effect }, `item ${i.id} also`);
       for (const e of i.use ?? []) checkEffect(e, `item ${i.id} use`);
     }
   });
@@ -131,6 +134,13 @@ describe('コンテンツの検査', () => {
     for (const ev of EVENTS.all) for (const o of ev.options) for (const x of [...o.success, ...(o.fail ?? [])]) checkOutcome(x, `event ${ev.id}`);
   });
 
+  it('イベント: お金がいる選択肢は、成功した時に実際にそのお金を払う', () => {
+    // cost は「払えるか」の条件だけ。実際に減らすのは結果の loseGold（迷い鳥の口笛・珍獣商人で抜けていた）
+    const paid = (outs: { kind: string; amount?: number }[]) => outs.filter((x) => x.kind === 'loseGold').reduce((n, x) => n + (x.amount ?? 0), 0);
+    for (const ev of EVENTS.all)
+      for (const o of ev.options) if (o.cost) expect(paid(o.success), `event ${ev.id}「${o.label}」`).toBeGreaterThanOrEqual(o.cost);
+  });
+
   it('シナリオ: 開始の持ち物が存在する', () => {
     for (const s of SCENARIOS.all) for (const p of [...(s.start.pouch ?? []), ...(s.start.stash ?? [])]) expect(ITEMS.has(p.itemId), `scenario ${s.id}`).toBe(true);
   });
@@ -146,7 +156,7 @@ describe('コンテンツの検査', () => {
       }
       expect(TERRAINS.has(m.roadTerrain)).toBe(true);
       for (const f of m.features) {
-        const reg = { town: TOWNS, dungeon: DUNGEONS, shrine: SHRINES, event: EVENTS, landmark: EVENTS, chest: undefined }[f.kind];
+        const reg = { town: TOWNS, dungeon: DUNGEONS, shrine: SHRINES, temple: SANCTUARIES, altar: SANCTUARIES, event: EVENTS, landmark: EVENTS, chest: undefined, tower: undefined }[f.kind];
         if (reg) expect(reg.has(f.id), `${sc.id} feature ${f.kind}:${f.id}`).toBe(true);
         expect(f.at[0] < m.width && f.at[1] < m.height, `${f.id} は地図の中`).toBe(true);
       }
@@ -183,17 +193,6 @@ describe('保存データの引き継ぎ', () => {
   it('今の版はそのまま読める', () => {
     const g = fresh();
     expect(migrateGame(structuredClone(g))).toEqual(g);
-  });
-
-  it('v3（古い特殊能力の書き方）の戦闘中の冒険を直して読める', () => {
-    const g = fresh() as GameState & { version: number };
-    g.heroes[0].equipment.armor = { uid: 'x', itemId: 'mithrilMail' };
-    const old = structuredClone(g) as unknown as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
-    old.version = 3;
-    old.battle = { version: 3, allies: [{ id: 'h0', abilities: [{ name: '聖銀の守り', effect: { kind: 'turnStartBlock', amount: 5 } }] }] };
-    const m = migrateGame(old)!;
-    expect(m.version).toBe(g.version);
-    expect(m.battle!.allies[0].abilities).toEqual([{ name: '聖銀の守り', effect: { when: 'turnStart', do: [{ kind: 'block', amount: 5 }] } }]);
   });
 
   it('消したデータを参照している冒険は読まない', () => {

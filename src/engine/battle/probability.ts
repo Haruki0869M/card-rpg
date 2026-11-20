@@ -3,7 +3,8 @@ import type { Affinity, CardDef, CardTier } from '../../types';
 
 /** 最終成功率 = 基礎成功率 + 適性補正（5%〜95%に制限） */
 export function finalChance(card: CardDef, affinity: Affinity): number {
-  const raw = card.baseChance + affinity[card.category];
+  // カードが参照する能力値を決めていれば、その能力値の補正。無ければカードの種類の補正
+  const raw = card.baseChance + (card.stat && affinity.byStat?.[card.stat] !== undefined ? affinity.byStat[card.stat]! : affinity[card.category]);
   return Math.max(BALANCE.chanceMin, Math.min(BALANCE.chanceMax, raw));
 }
 

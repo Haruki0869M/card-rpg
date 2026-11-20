@@ -9,30 +9,7 @@ const ba = (amount: number) => ({ kind: 'block', amount, to: 'allies' }) as cons
 
 export const WEAPON_CARDS: CardDef[] = [
   // ---------- 剣 ----------
-  { id: 'wSlash', name: '斬撃', category: 'physical', cost: 1, slots: 1, baseChance: 80, target: 'enemy', tiers: [{ minSuccesses: 0, effects: [d(5)] }, { minSuccesses: 1, effects: [d(8)] }] },
-  {
-    id: 'wSteelCombo',
-    rarity: 'rare',
-    name: '鋼の連撃',
-    category: 'physical',
-    cost: 1,
-    slots: 2,
-    baseChance: 75,
-    target: 'enemy',
-    tiers: [{ minSuccesses: 0, effects: [d(4)] }, { minSuccesses: 1, effects: [d(8)] }, { minSuccesses: 2, effects: [d(13)] }],
-  },
-  {
-    id: 'wMithrilSlash',
-    rarity: 'epic',
-    trait: { name: '貫通', effect: { modifier: 'ignoreBlock' } },
-    name: 'ミスリル斬り',
-    category: 'physical',
-    cost: 1,
-    slots: 2,
-    baseChance: 80,
-    target: 'enemy',
-    tiers: [{ minSuccesses: 0, effects: [d(6)] }, { minSuccesses: 1, effects: [d(11)] }, { minSuccesses: 2, effects: [d(17)] }],
-  },
+  // 区切りG-2（2026-11-12）: 「鋼の連撃」は「手早い攻撃」と形が同じなので無くした（data/cards/merged.ts で読み替える）
   {
     id: 'wFlameSlash',
     rarity: 'legend',
@@ -51,18 +28,6 @@ export const WEAPON_CARDS: CardDef[] = [
     ],
   },
   // ---------- 杖 ----------
-  { id: 'wManaBolt', name: '魔力弾', category: 'magic', cost: 1, slots: 1, baseChance: 80, target: 'enemy', tiers: [{ minSuccesses: 0, effects: [d(5)] }, { minSuccesses: 1, effects: [d(8)] }] },
-  {
-    id: 'wManaTorrent',
-    rarity: 'rare',
-    name: '魔力の奔流',
-    category: 'magic',
-    cost: 1,
-    slots: 2,
-    baseChance: 70,
-    target: 'enemy',
-    tiers: [{ minSuccesses: 0, effects: [el('ice', 4)] }, { minSuccesses: 1, effects: [el('ice', 9)] }, { minSuccesses: 2, effects: [el('ice', 14)] }],
-  },
   {
     id: 'wLightning',
     rarity: 'epic',
@@ -93,22 +58,7 @@ export const WEAPON_CARDS: CardDef[] = [
     ],
   },
   // ---------- 槌 ----------
-  { id: 'wPound', name: '打ち据え', category: 'physical', cost: 1, slots: 1, baseChance: 80, target: 'enemy', tiers: [{ minSuccesses: 0, effects: [d(5)] }, { minSuccesses: 1, effects: [d(8), b(3)] }] },
-  {
-    id: 'wIronHammer',
-    rarity: 'rare',
-    name: '鉄槌',
-    category: 'physical',
-    cost: 1,
-    slots: 2,
-    baseChance: 75,
-    target: 'enemy',
-    tiers: [
-      { minSuccesses: 0, effects: [d(5)] },
-      { minSuccesses: 1, effects: [d(9)] },
-      { minSuccesses: 2, effects: [d(14), { kind: 'applyStatus', status: 'weak', amount: 1 }] },
-    ],
-  },
+  { id: 'wPound', name: '強かな一打', category: 'physical', cost: 1, slots: 1, baseChance: 80, target: 'enemy', tiers: [{ minSuccesses: 0, effects: [d(5)] }, { minSuccesses: 1, effects: [d(8), b(3)] }] },
   {
     id: 'wHolyHammer',
     rarity: 'epic',
@@ -139,18 +89,6 @@ export const WEAPON_CARDS: CardDef[] = [
     ],
   },
   // ---------- 弓 ----------
-  { id: 'wAimedShot', name: '狙い射ち', category: 'physical', cost: 1, slots: 1, baseChance: 80, target: 'enemy', tiers: [{ minSuccesses: 0, effects: [d(4)] }, { minSuccesses: 1, effects: [d(8)] }] },
-  {
-    id: 'wDoubleShot',
-    rarity: 'rare',
-    name: '二連射',
-    category: 'physical',
-    cost: 1,
-    slots: 2,
-    baseChance: 75,
-    target: 'enemy',
-    tiers: [{ minSuccesses: 0, effects: [d(4)] }, { minSuccesses: 1, effects: [d(4), d(4)] }, { minSuccesses: 2, effects: [d(6), d(6)] }],
-  },
   {
     id: 'wGaleArrow',
     rarity: 'epic',
@@ -184,4 +122,9 @@ export const WEAPON_CARDS: CardDef[] = [
       { minSuccesses: 3, effects: [d(36), { kind: 'applyStatus', status: 'vulnerable', amount: 2 }] },
     ],
   },
+  // ---- 転職システムで増えた武器の種類（spec §6.4）----
+  { id: 'wJab', name: '速拳', category: 'physical', stat: 'agi', cost: 1, slots: 2, baseChance: 75, target: 'enemy', tiers: [{ minSuccesses: 0, effects: [d(2)] }, { minSuccesses: 1, effects: [d(3), d(3)] }, { minSuccesses: 2, effects: [d(4), d(4)] }] },
+  { id: 'wSpiritSpark', name: '精霊の火花', category: 'magic', cost: 1, slots: 2, baseChance: 75, target: 'enemy', tiers: [{ minSuccesses: 0, effects: [d(3)] }, { minSuccesses: 1, effects: [d(6)] }, { minSuccesses: 2, effects: [{ kind: 'damage', amount: 9, element: 'fire' }] }] },
+  { id: 'wChime', name: '鈴の音', category: 'skill', stat: 'per', cost: 1, slots: 2, baseChance: 80, target: 'ally', tiers: [{ minSuccesses: 0, effects: [{ kind: 'heal', amount: 2, to: 'target' }] }, { minSuccesses: 1, effects: [{ kind: 'heal', amount: 4, to: 'target' }] }, { minSuccesses: 2, effects: [{ kind: 'heal', amount: 6, to: 'target' }, { kind: 'block', amount: 3 }] }] },
+  { id: 'wReap', name: '呪いの鎌', category: 'magic', cost: 1, slots: 2, baseChance: 70, target: 'enemy', tiers: [{ minSuccesses: 0, effects: [d(3)] }, { minSuccesses: 1, effects: [d(5), { kind: 'applyStatus', status: 'curse', amount: 1 }] }, { minSuccesses: 2, effects: [{ kind: 'damage', amount: 7, element: 'dark' }, { kind: 'applyStatus', status: 'curse', amount: 1 }] }] },
 ];

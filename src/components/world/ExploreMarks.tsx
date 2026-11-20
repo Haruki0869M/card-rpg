@@ -1,0 +1,219 @@
+// ===== 段階6 探索の仕組みの、地図の上の印（仮のミニチュア） =====
+// 見晴らしの塔と、時間で消える出現スポット（流れ星・行商人・コソ泥）を、プログラムで描いた簡単な SVG で出す。
+// 絵が来たら、この中の Mini を差し替えるだけでよい（ゲームの中身・地図の描き方には触れない）。
+import type { SpawnKind, WorldState } from '../../types';
+import { spawnTurnsLeft } from '../../engine/game/world/explore';
+import { artImage } from '../../art';
+
+/** 描いた絵（箱庭の絵。墨線＋淡い水彩）。x, y = マスの上の面の中心。足元を中心より少し下に置く */
+function ArtMini({ href, x, y, R, size }: { href: string; x: number; y: number; R: number; size: number }) {
+  const big = R * size;
+  return (
+    <>
+      <ellipse cx={x} cy={y + big * 0.33} rx={big * 0.38} ry={big * 0.11} fill="rgba(0,0,0,.5)" />
+      <image href={href} x={x - big / 2} y={y - big * 0.62} width={big} height={big} />
+    </>
+  );
+}
+
+type Center = (i: number) => { x: number; y: number };
+
+/** 見晴らしの塔（石の塔と小さな旗）。登った後は薄くする */
+export function TowerMini({ x, y, R, used, fogTop, tile }: { x: number; y: number; R: number; used?: boolean; /** 霧の上の塔の先として描く（施設の印は付けない） */ fogTop?: boolean; /** どのマスの塔か（自動の確認用の見えない印） */ tile?: number }) {
+  const h = R * 1.35;
+  const bw = R * 0.42;
+  const top = y - h * 0.62;
+  const art = fogTop ? undefined : artImage('landscape/place-watchtower');
+  if (art)
+    return (
+      <g data-feature="tower:watchtower" data-tile={tile} data-used={used || undefined} opacity={used ? 0.45 : 1} pointerEvents="none">
+        <ArtMini href={art} x={x} y={y} R={R} size={1.6} />
+      </g>
+    );
+  return (
+    <g data-feature={fogTop ? undefined : 'tower:watchtower'} data-tile={fogTop ? undefined : tile} data-used={used || undefined} opacity={used ? 0.45 : 1} pointerEvents="none">
+      <ellipse cx={x} cy={y + R * 0.38} rx={R * 0.5} ry={R * 0.15} fill="rgba(0,0,0,.5)" />
+      {/* 塔の胴（下が少し広い） */}
+      <path d={`M${x - bw * 0.62} ${y + R * 0.36} L${x - bw * 0.48} ${top + R * 0.2} L${x + bw * 0.48} ${top + R * 0.2} L${x + bw * 0.62} ${y + R * 0.36} Z`} fill="#b9ab92" stroke="#3a3128" strokeWidth={1.4} />
+      <path d={`M${x} ${top + R * 0.2} L${x + bw * 0.48} ${top + R * 0.2} L${x + bw * 0.62} ${y + R * 0.36} L${x} ${y + R * 0.36} Z`} fill="#8f826c" />
+      {/* 見張り台と、のこぎりの歯の形の縁 */}
+      <rect x={x - bw * 0.68} y={top} width={bw * 1.36} height={R * 0.22} fill="#cbbda2" stroke="#3a3128" strokeWidth={1.4} />
+      {[-0.5, 0, 0.5].map((k) => (
+        <rect key={k} x={x + bw * k - bw * 0.14} y={top - R * 0.13} width={bw * 0.28} height={R * 0.14} fill="#cbbda2" stroke="#3a3128" strokeWidth={1.2} />
+      ))}
+      {/* 窓と旗 */}
+      <rect x={x - bw * 0.12} y={y - h * 0.22} width={bw * 0.24} height={R * 0.2} rx={bw * 0.12} fill="#2a2018" />
+      <line x1={x} y1={top - R * 0.13} x2={x} y2={top - R * 0.55} stroke="#3a3128" strokeWidth={1.4} />
+      <path d={`M${x} ${top - R * 0.55} l${R * 0.32} ${R * 0.09} l${-R * 0.32} ${R * 0.09} Z`} fill="#6ac8ff" stroke="#1a3a5a" strokeWidth={1} />
+    </g>
+  );
+}
+
+/**
+ * 霧の上に見える塔の先（回1）: まだ見えていないマスの塔は、見張り台と旗だけを霧の上に出す（まわりは霧のまま）。
+ * x, y = 霧の面の中心。clipPath で、胴の下の方を切る
+ */
+export function TowerTop({ x, y, R, id }: { x: number; y: number; R: number; id: string }) {
+  // 霧の上でも目に入るように、塔を少し大きく（1.3倍）描き、胴の上の方まで出す
+  const k = 1.3;
+  const cut = y - R * 0.3;
+  return (
+    <g data-tower-top={id} pointerEvents="none">
+      <defs>
+        <clipPath id={`tower-top-${id}`}>
+          <rect x={x - R * 2} y={y - R * 4} width={R * 4} height={cut - (y - R * 4)} />
+        </clipPath>
+        <linearGradient id={`tower-top-fade-${id}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#e8ebf8" stopOpacity={0} />
+          <stop offset="1" stopColor="#e8ebf8" stopOpacity={0.9} />
+        </linearGradient>
+        <radialGradient id={`tower-top-halo-${id}`}>
+          <stop offset="0" stopColor="#fff6d0" stopOpacity={0.55} />
+          <stop offset="1" stopColor="#fff6d0" stopOpacity={0} />
+        </radialGradient>
+      </defs>
+      {/* 霧の中の目印になる、うすい光 */}
+      <ellipse cx={x} cy={y - R * 0.95} rx={R * 0.85} ry={R * 0.95} fill={`url(#tower-top-halo-${id})`} />
+      <g clipPath={`url(#tower-top-${id})`}>
+        <g transform={`translate(${x} ${y}) scale(${k}) translate(${-x} ${-y})`}>
+          <TowerMini x={x} y={y} R={R} fogTop />
+        </g>
+      </g>
+      {/* 塔の立っているマス（霧の面）の印（見えない。確認スクリプトがマスの場所を知るため） */}
+      <circle cx={x} cy={y} r={1} fill="none" data-tower-foot />
+      {/* 霧から突き出している所を、白くぼかす */}
+      <rect x={x - R * 0.55} y={cut - R * 0.3} width={R * 1.1} height={R * 0.32} fill={`url(#tower-top-fade-${id})`} />
+    </g>
+  );
+}
+
+/**
+ * 分かれ道の立て札（回1）: 木の柱と、ダンジョンの方へ向いた矢印の板。east = 右向き（東の方）、false なら左向き。
+ * x, y = 立てる所（マスの上の面）
+ */
+/** 立て札の絵の寸法（scripts/art/make_signpost.py が作る。柱 115×353・板 214×93・板を付ける所 = 柱の絵の中の (30.6, 73)） */
+const SIGN = { postW: 115, postH: 353, boardW: 214, boardH: 93, hangX: 30.6, hangY: 73 };
+/** 板の傾き（度。右向きの板を、時計回りに回す角度）。西の3つは板を左右に返してから、逆に回す */
+const SIGN_TILT: Record<string, number> = { 東: 0, 西: 0, 北東: -32, 北西: -32, 南東: 32, 南西: 32, 北: -78, 南: 78 };
+/** 立て札の高さ ÷ マスの半径 */
+export const SIGN_HEIGHT = 1.25;
+
+export function SignpostMini({ x, y, R, east, dir }: { x: number; y: number; R: number; east: boolean; dir?: string }) {
+  const post = artImage('landscape/sign-post');
+  const board = artImage('landscape/sign-board');
+  if (post && board) {
+    // 描いた絵（箱庭と同じ絵柄）: 柱の足元 = (x, y)。板は、行き先の向き（8つ）に回す
+    const k = (R * SIGN_HEIGHT) / SIGN.postH;
+    const left = dir ? dir.includes('西') : !east;
+    const tilt = SIGN_TILT[dir ?? ''] ?? 0;
+    const hx = (SIGN.hangX - SIGN.postW / 2) * k, hy = (SIGN.hangY - SIGN.postH) * k;
+    return (
+      <g transform={`translate(${x.toFixed(1)},${y.toFixed(1)})`} data-signpost-mini data-signpost-dir={dir} pointerEvents="none">
+        <ellipse cx={0} cy={0} rx={R * 0.26} ry={R * 0.09} fill="rgba(0,0,0,.4)" />
+        <image href={post} x={(-SIGN.postW / 2) * k} y={-SIGN.postH * k + R * 0.04} width={SIGN.postW * k} height={SIGN.postH * k} />
+        <g transform={`translate(${hx.toFixed(1)},${(hy + R * 0.04).toFixed(1)}) rotate(${left ? -tilt : tilt}) scale(${left ? -1 : 1},1)`}>
+          <image href={board} x={(-SIGN.boardW / 2) * k} y={(-SIGN.boardH / 2) * k} width={SIGN.boardW * k} height={SIGN.boardH * k} />
+        </g>
+      </g>
+    );
+  }
+  // 小さい画面でも目に入るように、マスの半径の約1.1倍の高さ
+  const s = (R * 1.3) / 100;
+  const flip = east ? 1 : -1;
+  return (
+    <g transform={`translate(${x.toFixed(1)},${y.toFixed(1)}) scale(${(s * flip).toFixed(4)},${s.toFixed(4)})`} data-signpost-mini pointerEvents="none">
+      <ellipse cx="0" cy="6" rx="18" ry="6" fill="rgba(0,0,0,.45)" />
+      {/* 柱 */}
+      <rect x="-5" y="-78" width="10" height="84" rx="2" fill="#8a5a32" stroke="#3a2412" strokeWidth="3" />
+      {/* 矢印の板 */}
+      <path d="M-30 -74 H22 L38 -60 L22 -46 H-30 Z" fill="#d8b070" stroke="#3a2412" strokeWidth="3.5" strokeLinejoin="round" />
+      <path d="M-22 -60 H18" stroke="#6a4a22" strokeWidth="4" strokeLinecap="round" />
+      <path d="M8 -67 L19 -60 L8 -53" fill="none" stroke="#6a4a22" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+      {/* 小さな板（下） */}
+      <rect x="-20" y="-38" width="40" height="12" rx="2" fill="#c49a5e" stroke="#3a2412" strokeWidth="3" />
+    </g>
+  );
+}
+
+/** 流れ星の落下地点（光る星と、焦げたくぼみ） */
+function StarMini({ x, y, R }: { x: number; y: number; R: number }) {
+  const s = R * 0.42;
+  const pts = Array.from({ length: 10 }, (_, k) => {
+    const a = (Math.PI / 5) * k - Math.PI / 2;
+    const r = k % 2 ? s * 0.45 : s;
+    return `${x + r * Math.cos(a)},${y - R * 0.15 + r * Math.sin(a)}`;
+  }).join(' ');
+  return (
+    <g>
+      <ellipse cx={x} cy={y + R * 0.3} rx={R * 0.48} ry={R * 0.16} fill="#2a1e14" opacity={0.8} />
+      <circle cx={x} cy={y - R * 0.15} r={s * 1.35} fill="#fff3a0" opacity={0.35} />
+      <polygon points={pts} fill="#ffe35a" stroke="#8a5a00" strokeWidth={1.4} strokeLinejoin="round" />
+      <path d={`M${x + s * 0.7} ${y - R * 0.5} l${R * 0.45} ${-R * 0.35}`} stroke="#fff3a0" strokeWidth={R * 0.08} strokeLinecap="round" opacity={0.8} />
+    </g>
+  );
+}
+
+/** さすらいの行商人（しま模様の屋根の荷馬車） */
+function PeddlerMini({ x, y, R }: { x: number; y: number; R: number }) {
+  const w = R * 0.95;
+  const by = y - R * 0.05;
+  return (
+    <g>
+      <ellipse cx={x} cy={y + R * 0.38} rx={R * 0.55} ry={R * 0.14} fill="rgba(0,0,0,.5)" />
+      <rect x={x - w / 2} y={by - R * 0.2} width={w} height={R * 0.42} rx={2} fill="#8a5a32" stroke="#3a2412" strokeWidth={1.4} />
+      {/* しま模様の屋根 */}
+      <path d={`M${x - w * 0.56} ${by - R * 0.2} Q${x} ${by - R * 0.85} ${x + w * 0.56} ${by - R * 0.2} Z`} fill="#f4ead6" stroke="#3a2412" strokeWidth={1.4} />
+      {[-0.3, 0, 0.3].map((k) => (
+        <path key={k} d={`M${x + w * k - w * 0.07} ${by - R * 0.2} Q${x + w * k * 0.7} ${by - R * 0.7} ${x + w * k + w * 0.07} ${by - R * 0.2} Z`} fill="#d8443a" />
+      ))}
+      {[-0.28, 0.28].map((k) => (
+        <circle key={k} cx={x + w * k} cy={by + R * 0.28} r={R * 0.15} fill="#5a3a1e" stroke="#2a1a0a" strokeWidth={1.4} />
+      ))}
+    </g>
+  );
+}
+
+/** 黄金のコソ泥（金貨の袋と、こぼれた金貨） */
+function ThiefMini({ x, y, R }: { x: number; y: number; R: number }) {
+  const s = R * 0.4;
+  return (
+    <g>
+      <ellipse cx={x} cy={y + R * 0.36} rx={R * 0.45} ry={R * 0.13} fill="rgba(0,0,0,.5)" />
+      <path d={`M${x - s * 0.35} ${y - s * 0.9} Q${x - s * 1.2} ${y + s * 0.2} ${x - s * 0.6} ${y + s * 0.8} L${x + s * 0.6} ${y + s * 0.8} Q${x + s * 1.2} ${y + s * 0.2} ${x + s * 0.35} ${y - s * 0.9} Z`} fill="#e8b830" stroke="#6a4a00" strokeWidth={1.4} />
+      <path d={`M${x - s * 0.45} ${y - s * 0.85} L${x + s * 0.45} ${y - s * 0.85}`} stroke="#6a4a00" strokeWidth={2} />
+      <circle cx={x} cy={y + s * 0.15} r={s * 0.38} fill="#ffe680" stroke="#6a4a00" strokeWidth={1.2} />
+      <circle cx={x} cy={y + s * 0.15} r={s * 0.16} fill="none" stroke="#6a4a00" strokeWidth={1} />
+      <circle cx={x + s * 1.05} cy={y + s * 0.75} r={s * 0.28} fill="#ffd84a" stroke="#6a4a00" strokeWidth={1} />
+      <circle cx={x - s * 1.1} cy={y + s * 0.8} r={s * 0.22} fill="#ffd84a" stroke="#6a4a00" strokeWidth={1} />
+    </g>
+  );
+}
+
+const MINI: Record<SpawnKind, (p: { x: number; y: number; R: number }) => React.JSX.Element> = { star: StarMini, peddler: PeddlerMini, thief: ThiefMini };
+/** 出現スポットの描いた絵（あれば仮の図の代わりに使う） */
+const SPAWN_ART: Record<SpawnKind, string> = { star: 'landscape/spawn-star', peddler: 'landscape/place-merchant', thief: 'landscape/spawn-thief' };
+
+/** 出現スポットの印と、消えるまでのターン数（残1は赤） */
+export function SpawnMarks({ w, R, center }: { w: WorldState; R: number; center: Center }) {
+  return (
+    <>
+      {(w.spawns ?? []).map((s) => {
+        if (!w.tiles[s.tile]?.seen) return null;
+        const { x, y } = center(s.tile);
+        const left = spawnTurnsLeft(w, s);
+        const Mini = MINI[s.kind];
+        const art = artImage(SPAWN_ART[s.kind]);
+        const fs = Math.max(12, R * 0.42);
+        return (
+          <g key={s.id} data-spawn={s.kind} data-spawn-left={left} data-tile={s.tile} pointerEvents="none">
+            {art ? <ArtMini href={art} x={x} y={y} R={R} size={1.35} /> : <Mini x={x} y={y} R={R} />}
+            <rect x={x + R * 0.12} y={y - R * 1.02} width={fs * 2.3} height={fs * 1.25} rx={fs * 0.6} fill={left <= 1 ? '#5a0a0a' : '#1a1408'} stroke={left <= 1 ? '#ff8a8a' : '#ffd76a'} strokeWidth={1.5} />
+            <text x={x + R * 0.12 + fs * 1.15} y={y - R * 1.02 + fs * 0.95} textAnchor="middle" fontSize={fs} fontWeight={900} fill={left <= 1 ? '#ffb0b0' : '#ffe9a8'}>
+              残{left}
+            </text>
+          </g>
+        );
+      })}
+    </>
+  );
+}

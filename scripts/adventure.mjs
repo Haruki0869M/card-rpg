@@ -1,16 +1,72 @@
-// 実際の画面をタップして、キャラ作成 → 世界マップ（物語・移動・遭遇）→ 翠の神殿 → 宝箱 → レベルアップ → ボス撃破 → 大宝箱 → 地上 まで進める
+// 実際の画面をタップして、キャラ作成 → 世界マップ（物語・移動・遭遇）→ 最初のダンジョン（1本目は翠の神殿） → 宝箱 → レベルアップ → ボス撃破 → 大宝箱 → 地上 まで進める
 // 2人以上は担当プレイヤーを分けて、手番の受け渡しの画面も確かめる
 // npm run build && npx vite preview --port 4173 を起動した状態で: node scripts/adventure.mjs
-import { mkdirSync } from 'node:fs';
-import { chromium, layoutIssues, URL } from './lib.mjs';
+// 別のシナリオを通す時: ADVENTURE_SCENARIO=frozenKingdom node scripts/adventure.mjs（記録を入れて解放してから選ぶ）
+// 担当を「スマホを回して操作」（P1・P2…）にする時: ADVENTURE_SEATS=pass（省略は「1人で全員」から2人目だけ P2）
+// 他のセッションと同じポートを使わないよう、自分専用のポートで preview を起こし URL=http://127.0.0.1:<番号>/card-rpg/ を付ける
+// 画面の大きさ: ADVENTURE_VIEWPORT=390x540（狭い画面 回1。省略は今までどおり 360x640）。低い画面（高さ 640 未満）は世界マップが低い形になる
+// 世界マップのボタンは字ではなく data- の印で押す（低い画面で字の並びが変わっても止まらないように。狭い画面 回1）
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { chromium, confirmEndTurn, layoutIssues, URL, waitForWorldMovement, waitForBattlePresentation, depart } from './lib.mjs';
 
 mkdirSync('screenshots', { recursive: true });
+const output = process.env.ADVENTURE_OUTPUT ?? 'screenshots/adventure';
+// 遊ぶシナリオ（ADVENTURE_SCENARIO。省略は1本目の corruptionKing）。1本目以外は、記録を入れて解放してから選ぶ
+const FIRST_SCENARIO = 'corruptionKing';
+const SCENARIO_NAMES = {
+  corruptionKing: '侵食の魔王',
+  frozenKingdom: '凍てつく王国',
+  cursedArchipelago: '呪われた群島',
+  sandDynasty: '砂塵の王朝',
+  starCastle: '星降る天空城',
+  clockworkEmpire: '機械仕掛けの帝国',
+  dreamLabyrinth: '夢幻の大迷宮',
+};
+// 世界マップで最初に向かうダンジョン（シナリオごとの、いちばん入りやすい鍵のダンジョン）
+const FIRST_DUNGEON = {
+  corruptionKing: { id: 'emeraldTemple', name: '翠の神殿' },
+  frozenKingdom: { id: 'crystalCave', name: '氷晶の洞' },
+  cursedArchipelago: { id: 'wreckCave', name: '難破船の洞窟' },
+  sandDynasty: { id: 'scorpionTomb', name: '蠍の墓所' },
+  starCastle: { id: 'windmillTower', name: '風車の塔' },
+  clockworkEmpire: { id: 'gearFactory', name: '歯車の工場' },
+  dreamLabyrinth: { id: 'echoIceVault', name: '氷の記憶の洞' },
+};
+const SCENARIO = process.env.ADVENTURE_SCENARIO ?? FIRST_SCENARIO;
+if (!SCENARIO_NAMES[SCENARIO]) throw new Error(`知らないシナリオ: ${SCENARIO}（${Object.keys(SCENARIO_NAMES).join(' / ')}）`);
+mkdirSync(output, { recursive: true });
+async function record(page, party, result) {
+  const data = await page.evaluate(() => ({ text: document.body.innerText, saved: JSON.parse(localStorage.getItem('card-rpg/adventure')) }));
+  await page.screenshot({ path: `${output}/${party}p-${result}.png` });
+  writeFileSync(`${output}/${party}p-${result}.json`, JSON.stringify(data, null, 2));
+  console.log(`${party}人 ${result}: ${data.text.replace(/\n/g, ' ').slice(-700)}`);
+}
 const browser = await chromium.launch();
 const issues = new Set();
 const seen = new Set();
+// 目的のマスがボタン・パネルの下にあって、地図を動かし直した回数（狭い画面 回1。回2で 0 になる事を見る）
+let panFixes = 0;
+// 狭い画面 回2: 何の下にあって動かし直したか（パネル・右のボタン・マスの説明の帯・ほか）
+const panFixBy = {};
+const panFix = (why) => {
+  panFixes++;
+  panFixBy[why] = (panFixBy[why] ?? 0) + 1;
+};
 
 async function check(page, tag) {
   for (const i of await layoutIssues(page)) issues.add(`${tag}: ${i}`);
+}
+
+/** 名前がちょうど text の押せるボタンを押す（押せなければ false） */
+async function clickEnabled(page, text) {
+  const b = page.getByRole('button', { name: text, exact: true }).first();
+  if (!(await b.count()) || !(await b.isEnabled())) return false;
+  try {
+    await b.click({ timeout: 4000 });
+  } catch {
+    return false;
+  }
+  return true;
 }
 
 async function clickText(page, text, opts = {}) {
@@ -29,8 +85,20 @@ async function clickText(page, text, opts = {}) {
 
 async function playBattle(page) {
   for (let guard = 0; guard < 60; guard++) {
-    if (await page.locator('button:has-text("報酬を受け取る"), button:has-text("冒険の結果へ"), button:has-text("ダンジョンへ戻る")').count()) return;
-    const endBtn = page.locator('button:has-text("ターン終了"):not([disabled])');
+    await waitForBattlePresentation(page);
+    if (await page.locator('button:has-text("報酬を受け取る"), button:has-text("冒険の結果へ"), [data-result-button], button:has-text("ダンジョンへ戻る")').count()) return;
+    // うっかり開いたシート（山札・捨て札など）は閉じる（低い画面で、押す場所がずれた時）
+    if (await page.locator("[data-sheet] [data-sheet-close]").count()) {
+      await page.locator("[data-sheet] [data-sheet-close]").first().click({ timeout: 2000 }).catch(() => {});
+      continue;
+    }
+    // 詳細の窓（装備・カードの説明）が開いていたら閉じる（説明の文に「ターン終了」が入った装備のボタンを、終了のボタンと取り違えないように）
+    if (await page.locator('[data-detail-backdrop]').count()) {
+      await page.keyboard.press('Escape').catch(() => {});
+      await page.locator('[data-detail-backdrop]').first().click({ position: { x: 5, y: 5 }, timeout: 2000 }).catch(() => {});
+      continue;
+    }
+    const endBtn = page.locator('button:has-text("ターン終了"):not([disabled]):not([data-item-detail]):not([data-detail-card])');
     if (!(await endBtn.count())) {
       await page.waitForTimeout(150);
       continue;
@@ -38,6 +106,7 @@ async function playBattle(page) {
     const allies = page.locator('[data-ally]:not([data-done]):not([data-dead])');
     if ((await allies.count()) === 0) {
       await endBtn.click();
+      await confirmEndTurn(page);
       await page.waitForTimeout(200);
       continue;
     }
@@ -45,11 +114,14 @@ async function playBattle(page) {
     const cards = page.locator('[data-card-index][data-usable]');
     if (!(await cards.count())) {
       await endBtn.click();
+      await confirmEndTurn(page);
       continue;
     }
+    const availableCards = await cards.count();
     const card = cards.first();
     const box = await card.boundingBox();
-    await page.mouse.click(box.x + 14, box.y + 70);
+    // 低い画面（ADVENTURE_VIEWPORT=390x540 など）はカードが低いので、カードの高さの中を押す（下の「山札」のボタンを押さないように）
+    await page.mouse.click(box.x + 14, box.y + (page.viewportSize().height < 640 ? 24 : Math.min(70, box.height * 0.45)));
     await page.waitForTimeout(40);
     if (await page.getByText('敵をタップ').count()) {
       const e = page.locator('[data-enemy]:not([data-dead])').first();
@@ -58,7 +130,7 @@ async function playBattle(page) {
     }
     for (let i = 0; i < 3; i++) {
       const plus = page.getByLabel('フォーカスを増やす');
-      if ((await plus.count()) && (await plus.isEnabled()) && (await page.locator('[data-card-index][data-usable]').count()) <= 2) await plus.click();
+      if ((await plus.count()) && (await plus.isEnabled()) && availableCards <= 2) await plus.click();
     }
     if (!seen.has('focus')) {
       seen.add('focus');
@@ -71,13 +143,36 @@ async function playBattle(page) {
 }
 
 async function run(party, difficulty) {
-  const ctx = await browser.newContext({ viewport: { width: 360, height: 640 }, hasTouch: true, isMobile: true });
+  const [vw, vh] = (process.env.ADVENTURE_VIEWPORT ?? '360x640').split('x').map(Number);
+  const ctx = await browser.newContext({ viewport: { width: vw, height: vh }, hasTouch: true, isMobile: true });
   const page = await ctx.newPage();
+  // 前後の版を同じ冒険で比較するため、開始時の種だけを固定できるようにする。
+  if (process.env.ADVENTURE_SEED) await page.addInitScript(seed => {
+    const random = crypto.getRandomValues.bind(crypto);
+    crypto.getRandomValues = array => array instanceof Uint32Array && array.length === 1 ? (array[0] = seed, array) : random(array);
+  }, Number(process.env.ADVENTURE_SEED));
   page.on('pageerror', (e) => issues.add(`pageerror: ${e.message}`));
   await page.goto(URL);
-  await page.evaluate(() => localStorage.clear());
+  // はじめての戦闘の案内（Step A ④）は自動の確認では出さない（「閉じる」などの文言を探す操作とぶつからないように）
+  await page.evaluate(() => { localStorage.clear(); localStorage.setItem('card-rpg/settings', JSON.stringify({ firstGuide: false })); });
+  // 1本目以外を遊ぶ時は、伝承の書の記録（card-rpg/profile）に「ほかのシナリオをクリア済み」と入れてから始める（解放されるため）
+  if (SCENARIO !== FIRST_SCENARIO) {
+    const clears = Object.fromEntries(Object.keys(SCENARIO_NAMES).filter((id) => id !== SCENARIO).map((id) => [id, 1]));
+    await page.evaluate((c) => localStorage.setItem('card-rpg/profile', JSON.stringify({ version: 1, clears: c })), clears);
+  }
   await page.reload();
   await page.getByText('新しい冒険').click();
+  if (SCENARIO !== FIRST_SCENARIO) {
+    // シナリオの一覧（横にスワイプ）から、名前のカードを選ぶ
+    const card = page.locator('[data-scenarios] button', { hasText: SCENARIO_NAMES[SCENARIO] }).first();
+    await card.scrollIntoViewIfNeeded();
+    await card.click();
+    if (await page.locator('[data-scenario-lock]').count()) {
+      const locked = await card.locator('[data-scenario-lock]').count();
+      if (locked) issues.add(`シナリオ ${SCENARIO} が解放されていない（記録を入れても鍵が付いたまま）`);
+    }
+    await page.waitForTimeout(150);
+  }
   if (!(await page.getByText('高速モード').count())) {
     /* 設定はメニューから */
   }
@@ -86,33 +181,67 @@ async function run(party, difficulty) {
   await check(page, 'setup');
   await page.getByText('キャラクター作成へ').click();
   // 2人目以降は別のプレイヤーが担当（ローカル協力の手番の受け渡しを確かめる）
+  // ADVENTURE_SEATS=pass の時は「スマホを回して操作」（P1・P2…を自動で）を選ぶ。それ以外は2人目だけ P2（くわしく から）
   if (party > 1) {
-    await page.getByText('2人目').click();
-    await page.getByText('P2', { exact: true }).click();
-    await page.getByText('1人目').click();
+    if (process.env.ADVENTURE_SEATS === 'pass') await page.locator('[data-seat-choice="pass"]').click();
+    else {
+      await page.getByText('2人目', { exact: true }).click();
+      await page.locator('[data-seat-detail]').click();
+      await page.getByText('P2', { exact: true }).click();
+    }
+    // 全員のタブを確かめる（確かめると出発のボタンが光る）
+    for (let i = 2; i <= party; i++) await page.getByText(`${i}人目`, { exact: true }).click();
+    await page.getByText('1人目', { exact: true }).click();
+    if (!(await page.locator('[data-depart="ready"]').count())) issues.add('全員のタブを見ても出発のボタンが光らない');
   }
   await check(page, 'create');
-  await page.getByText('冒険に出発').click();
+  await depart(page);
   // 冒頭の物語
   await page.waitForTimeout(400);
   await page.screenshot({ path: `screenshots/adv-story.png` });
   await page.getByText('つづける').click();
   // 高速モード
   await page.getByLabel('メニュー').click();
-  await page.getByText('高速モード（演出2倍速）').click();
+  await page.getByRole('button', { name: '高速', exact: true }).click();
   await page.getByLabel('閉じる').click();
 
   let result = 'timeout';
-  for (let step = 0; step < 900; step++) {
+  let previous = '';
+  let unchanged = 0;
+  // 手数の上限: ダンジョンを大きくした（鍵40行）ので、4人で最初のダンジョンを抜けるまで900では足りない
+  for (let step = 0; step < 2400; step++) {
     await page.waitForTimeout(60);
+    if (await page.locator('[data-world-moving]').count()) {
+      await waitForWorldMovement(page);
+      unchanged = 0;
+    }
+    const { signature, text } = await page.evaluate(() => ({ signature: localStorage.getItem('card-rpg/adventure'), text: document.body.innerText }));
+    unchanged = signature === previous ? unchanged + 1 : 0;
+    previous = signature;
+    if (step % 25 === 0) console.log(`${party}人 step=${step}: ${text.replace(/\n/g, ' ').slice(-180)}`);
+    if (unchanged >= 25) {
+      console.log(`${party}人: 同じ画面のまま25回操作しても進まないため記録して停止`);
+      break;
+    }
     if (await page.getByText('地上に戻る', { exact: true }).count()) {
       result = 'cleared';
       await page.screenshot({ path: `screenshots/adv-${party}p-cleared.png` });
       await check(page, 'cleared');
       await page.getByText('地上に戻る').click();
       await page.waitForTimeout(300);
+      // 鍵のダンジョンを制覇すると、制覇後の物語（鍵を手に入れた・鍵の残り数）が出る
+      if (await page.locator('[data-world-map]').count()) {
+        const storyText = await page.locator('body').innerText();
+        if (storyText.includes('手に入れた！')) {
+          await page.screenshot({ path: `${output}/${party}p-clearstory.png` });
+          console.log(`${party}人 制覇後の物語: ${storyText.replace(/\n/g, ' ').slice(0, 200)}`);
+          await check(page, 'clearstory');
+          await clickText(page, 'つづける');
+          await page.waitForTimeout(200);
+        } else issues.add('制覇後の物語が出ない');
+      }
       // 地上に戻ったあと: 世界マップか、手番が来た別の組のダンジョン（M3-D）
-      if (!(await page.locator('[data-world-map]').count()) && !(await page.getByText('探索力の判定').count())) { issues.add('世界マップに戻れない'); await page.screenshot({ path: `screenshots/adv-${party}p-noworld.png` }); console.log((await page.locator('body').innerText()).slice(0, 300)); }
+      if (!(await page.locator('[data-world-map]').count()) && !(await page.locator('[data-door-choice]').count())) { issues.add('世界マップに戻れない'); await page.screenshot({ path: `screenshots/adv-${party}p-noworld.png` }); console.log((await page.locator('body').innerText()).slice(0, 300)); }
       break;
     }
     if (await page.getByText('世界の終わり…', { exact: true }).count()) {
@@ -140,89 +269,147 @@ async function run(party, difficulty) {
       continue;
     }
     if (await clickText(page, '戦闘開始')) continue;
+    if (await page.getByText('全員の利用終了後に地図へ戻ります', { exact: true }).count() && await clickText(page, '世界マップへ')) continue;
     if (await clickText(page, '町を出る')) continue;
     if (await clickText(page, '祈らずに去る')) continue;
+    if (await page.locator('[data-sanctuary]').count() && await clickText(page, '世界マップへ')) continue;
     // 世界マップ: 翠の神殿へ向かう
     if (await page.locator('[data-world-map]').count() && !(await page.getByText('撤退', { exact: true }).count())) {
+      // 光るマスが地図の右の操作ボタン（見取り図など。段階6a）の下にあると、ボタンを押してしまう。見取り図が開いたら閉じる
+      if (await page.locator('[data-overview-close]').count()) {
+        await page.locator('[data-overview-close]').click({ timeout: 3000 }).catch(() => {});
+        continue;
+      }
       if (!seen.has('world')) {
         seen.add('world');
         await check(page, 'world');
         await page.screenshot({ path: `screenshots/adv-world.png` });
       }
-      if (await clickText(page, '翠の神殿に入る')) continue;
-      if (await page.getByText('移動力の判定').count()) {
-        await page.getByText('移動力の判定').click({ timeout: 3000 }).catch(() => {});
+      if (await clickText(page, `${FIRST_DUNGEON[SCENARIO].name}に入る`)) continue;
+      if (await page.locator('[data-roll-move]').count()) {
+        await page.locator('[data-roll-move]').click({ timeout: 3000 }).catch(() => {});
         continue;
       }
       const reach = page.locator('[data-reach]');
       const n = await reach.count();
       if (n) {
-        const goal = page.locator('[data-feature="dungeon:emeraldTemple"]');
-        const gb = (await goal.count()) ? await goal.boundingBox() : null;
-        const target = gb ? { x: gb.x + gb.width / 2, y: gb.y + gb.height / 2 } : { x: 180, y: -100000 };
+        // 目的地は、保存データの地図から「マスの番号」で決める。
+        // （前は、目的のダンジョンがまだ霧の中だと「まっすぐ上」へ歩いていた。ダンジョンは道の左の列にあるので、
+        //   夜などで視界が狭いと見つけないまま通り過ぎ、地図の一番上で動けなくなって侵食度100%で終わることがあった。種 59675323）
+        const nav = await page.evaluate((id) => {
+          const w = JSON.parse(localStorage.getItem('card-rpg/adventure'))?.game?.world;
+          if (!w) return null;
+          return { width: w.width, goal: w.tiles.findIndex((t) => t.f?.kind === 'dungeon' && t.f.id === id), hero: w.pos[w.turn] };
+        }, FIRST_DUNGEON[SCENARIO].id);
+        if (!nav || nav.goal < 0) issues.add('目的のダンジョンが地図に無い');
+        // 六角形のマス（行ごとに半マスずれる）のだいたいの距離。近づくマスを選ぶだけなので、ずれの向きは気にしない
+        const at = (i) => ({ x: (i % nav.width) + (Math.floor(i / nav.width) % 2 ? 0.5 : 0), y: Math.floor(i / nav.width) * 0.866 });
+        const dist = (i) => (nav && nav.goal >= 0 ? (at(i).x - at(nav.goal).x) ** 2 + (at(i).y - at(nav.goal).y) ** 2 : Infinity);
         let best = null;
         let bestD = Infinity;
         for (let i = 0; i < n; i++) {
-          const b = await reach.nth(i).boundingBox();
-          if (!b) continue;
-          const d = (b.x + b.width / 2 - target.x) ** 2 + (b.y + b.height / 2 - target.y) ** 2;
+          const d = dist(Number(await reach.nth(i).getAttribute('data-reach')));
           if (d < bestD) (bestD = d), (best = i);
         }
-        const hb = await page.locator('[data-hero].glow-pulse').boundingBox();
-        const hd = hb ? (hb.x + hb.width / 2 - target.x) ** 2 + (hb.y + hb.height / 2 - target.y) ** 2 : Infinity;
+        const hd = nav && nav.hero != null ? dist(nav.hero) : Infinity;
         if (best !== null && bestD < hd) {
           await reach.nth(best).scrollIntoViewIfNeeded();
-          const b = await reach.nth(best).boundingBox();
+          // 狭い画面 回1: 目的のマスの真ん中に地図以外（下の操作パネル・ボタン）が乗っていたら、
+          // 見えている地図（パネルより上）の真ん中へ地図を動かす（パネルの「〜と話す」などを押してしまわないように）
+          const moved = await page.evaluate((i) => {
+            const el = document.querySelectorAll('[data-reach]')[i];
+            const map = document.querySelector('[data-world-map]');
+            if (!el || !map) return false;
+            const b = el.getBoundingClientRect();
+            const x = b.left + b.width / 2;
+            const y = b.top + b.height / 2;
+            const t = document.elementFromPoint(x, y);
+            if (t && t.closest('[data-world-map]') && !t.closest('button')) return false;
+            const why = !t ? 'なし' : t.closest('[data-world-panel]') ? 'パネル' : t.closest('[data-zoom-controls],[data-recenter],[data-goal-arrow]') ? '右のボタン' : t.closest('[data-tile-info]') ? 'マスの説明の帯' : 'ほか';
+            const m = map.getBoundingClientRect();
+            const panel = document.querySelector('[data-world-panel]')?.getBoundingClientRect();
+            const cy = (m.top + 64 + (panel ? panel.top : m.bottom)) / 2;
+            map.scrollBy({ left: x - (m.left + m.width / 2), top: y - cy, behavior: 'instant' });
+            return why;
+          }, best);
+          if (moved) {
+            panFix(moved);
+            await page.waitForTimeout(80);
+          }
+          let b = await reach.nth(best).boundingBox();
+          // 右の操作ボタン（見取り図・拡大・戻る）の下なら、地図を横に動かしてから押す（広い地図は横にもスクロールする。段階6a）
+          // 狭い画面 回1: 下の操作パネル・マスの説明の帯の下（地図の上に重なる）も「隠れている」に入れる
+          const under = async (bb) => {
+            for (const sel of ['[data-zoom-controls]', '[data-recenter]', '[data-world-panel]', '[data-tile-info]']) {
+              const c = await page.locator(sel).boundingBox().catch(() => null);
+              if (c && bb.x + bb.width / 2 >= c.x - 4 && bb.x + bb.width / 2 <= c.x + c.width + 4 && bb.y + bb.height / 2 >= c.y - 4 && bb.y + bb.height / 2 <= c.y + c.height + 4) return sel === '[data-world-panel]' ? 'パネル' : sel === '[data-tile-info]' ? 'マスの説明の帯' : '右のボタン';
+            }
+            return false;
+          };
+          // 右・左・下・上の順に地図を動かしてみる（シナリオ2の広い地図は、右の端・上の端で横に動かせず、
+          // 目的のマスが「見取り図」のボタンの下に残って押せないまま止まった。2026-11-15・種 874651857）
+          for (const [left, top] of [[120, 0], [-120, 0], [0, -100], [0, 100]]) {
+            const why = b && (await under(b));
+            if (!why) break;
+            panFix(`${why}（ずらし）`);
+            await page.evaluate(([left, top]) => document.querySelector('[data-world-map]')?.scrollBy({ left, top, behavior: 'instant' }), [left, top]);
+            await page.waitForTimeout(80);
+            b = await reach.nth(best).boundingBox();
+          }
           await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
           await page.waitForTimeout(80);
-          if (await page.locator('button:has-text("移動する")').count()) {
+          if (await page.locator('[data-move-go]').count()) {
             if (!seen.has('move')) {
               seen.add('move');
               await page.screenshot({ path: `screenshots/adv-move.png` });
             }
-            await page.locator('button:has-text("移動する")').click({ timeout: 3000 }).catch(() => {});
+            await page.locator('[data-move-go]').click({ timeout: 3000 }).catch(() => {});
             await page.waitForTimeout(250);
             continue;
           }
         }
       }
-      await clickText(page, '手番を終える') || (await clickText(page, '待機'));
+      // 「手番を終える」か「待機」（低い画面でも同じ印で押す）
+      await page.locator('[data-world-wait]').first().click({ timeout: 3000 }).catch(() => {});
+      continue;
+    }
+    // 戦闘の全滅（ステップB: 灯火が残っていれば「敗北…」＋「町で態勢を立て直す」、灯火が無く仲間が残れば「力尽きた…」）
+    if (await page.locator('[data-result-button]').count() && (await page.getByText(/^(全滅…|敗北…|力尽きた…)$/).count())) {
+      await page.locator('[data-result-button]').click();
       continue;
     }
     if (await page.getByText('全滅…', { exact: true }).count()) {
-      if (await page.locator('button:has-text("冒険の結果へ")').count()) {
-        await page.locator('button:has-text("冒険の結果へ")').click();
-        continue;
-      }
       result = 'gameover';
       break;
     }
-    // ダンジョンの地図: 光っている部屋を選んで進む
+    // ダンジョンの通路（第3段階）: 歩いて扉を探し、扉を開けて進む
     if (await page.getByText('撤退', { exact: true }).count()) {
       if (!seen.has('dungeon')) {
         seen.add('dungeon');
         await check(page, 'dungeon');
       }
-      // 手番の最初は探索力を決める。使い切ったら「手番を終える」（M3-D）
-      if (await page.getByText('探索力の判定').count()) {
-        await page.getByText('探索力の判定').click();
+      // 扉1つ＝手番1回（サイコロは無い）: 前にある扉のボタン（左の扉を先に）を押すと、扉が開く
+      const doorBtn = page.locator('[data-door-choice]:not([disabled])');
+      if ((await doorBtn.count()) && (await page.locator('[data-dungeon-controls="ready"]').count())) {
+        await doorBtn.first().click();
         continue;
       }
-      const rooms = page.locator('button[aria-label]').filter({ has: page.locator('.glow-pulse') });
-      if (await rooms.count()) {
-        await rooms.first().click();
-        if (await page.getByText('この部屋へ進む').count()) await page.getByText('この部屋へ進む').click();
-        else if (await page.getByText('手番を終える').count()) await page.getByText('手番を終える').click();
+      if (await page.locator('[data-dungeon-controls="busy"]').count()) {
+        await page.waitForTimeout(100);
+        continue;
       }
+      // ほかの人の番（世界マップにいる仲間）を待っている: 場面のタブで世界マップへ
+      await page.waitForTimeout(150);
       continue;
     }
-    if (await page.locator('button:has-text("ターン終了")').count()) {
+    // 装備の説明の文に「ターン終了」が入っている時（宝箱の中身など）は、戦闘と取り違えない
+    if (await page.locator('button:has-text("ターン終了"):not([data-item-detail]):not([data-detail-card])').count()) {
       if (!seen.has('battle')) {
         seen.add('battle');
         await check(page, 'battle');
       }
       await playBattle(page);
-      const fin = page.locator('button:has-text("報酬を受け取る"), button:has-text("冒険の結果へ"), button:has-text("ダンジョンへ戻る")');
+      const fin = page.locator('button:has-text("報酬を受け取る"), button:has-text("冒険の結果へ"), [data-result-button], button:has-text("ダンジョンへ戻る")');
       if (await fin.count()) await fin.first().click();
       continue;
     }
@@ -241,6 +428,19 @@ async function run(party, difficulty) {
         seen.add('reward');
         await check(page, 'reward');
         await page.screenshot({ path: `screenshots/adv-reward.png` });
+      }
+      // カードを押す → 説明の窓 →「このカードを選ぶ」（フェーズ3）。めくり終わる前の1回目はめくるだけ
+      const first = page.locator('[data-pick-card="0"]');
+      if (await first.count()) {
+        await first.click().catch(() => {});
+        await page.waitForTimeout(250);
+        if (!(await page.locator('[data-card-pick-action]').count())) await first.click().catch(() => {});
+        await page.waitForTimeout(250);
+        if (await page.locator('[data-card-pick-action]').count()) {
+          if (!seen.has('reward-panel')) { seen.add('reward-panel'); await check(page, 'reward-panel'); await page.screenshot({ path: `screenshots/adv-reward-panel.png` }); }
+          await page.locator('[data-card-pick-action]').click().catch(() => {});
+          continue;
+        }
       }
       await page.getByText(/はカードを選ばない/).click();
       continue;
@@ -261,12 +461,54 @@ async function run(party, difficulty) {
       await page.screenshot({ path: `screenshots/adv-chest-result.png` });
     }
     if (await clickText(page, '先へ進む')) continue;
+    if (await clickText(page, '戦闘を始める')) continue;
+    // イベントの後の作業（お供・カード・行商人）と転職のカード選び（J3a・J3b）
+    if (await page.locator('[data-hero-task]').count()) {
+      if (!seen.has('hero-task')) {
+        seen.add('hero-task');
+        await check(page, 'hero-task');
+        await page.screenshot({ path: `screenshots/adv-hero-task.png` });
+      }
+      for (const t of ['お供にする', 'やめる', '行商人と別れる']) if (await clickText(page, t)) break;
+      continue;
+    }
+    if (await page.locator('[data-job-pick]').count()) {
+      await page.locator('[data-job-pick] button[aria-pressed]').first().click();
+      await clickText(page, 'このカードにする');
+      continue;
+    }
+    // 突発イベント: 選べる選択肢の先頭（お金・フォーカスの足りない選択肢は押せない）
+    if (await page.locator('[data-event-window]').count() && !(await page.getByText('先へ進む').count()) && !(await page.getByText('戦闘を始める').count())) {
+      const opts = page.locator('[data-event-window] button:not([disabled])');
+      if (await opts.count()) {
+        if (!seen.has('random-event')) {
+          seen.add('random-event');
+          await check(page, 'random-event');
+          await page.screenshot({ path: `screenshots/adv-random-event.png` });
+        }
+        await opts.last().click();
+        continue;
+      }
+    }
     if (await page.locator('button:has-text("ダンジョン制覇！")').count()) {
       await page.screenshot({ path: `screenshots/adv-bigchest.png` });
       await page.locator('button:has-text("ダンジョン制覇！")').click();
       continue;
     }
     if (await clickText(page, '隠し宝箱へ')) continue;
+    // 封魔の宝箱（見直しの段階3）: 封印を解く → 番人と戦う → 勝つと、ふつうの宝箱と同じく運のスロットで開ける
+    if (await page.locator('[data-chest-open="sealed"], [data-chest-open="guard"]').count()) {
+      const b = page.locator('[data-chest-open="sealed"], [data-chest-open="guard"]').last();
+      const step = await b.getAttribute('data-chest-open');
+      if (!seen.has(`sealed-${step}`)) {
+        seen.add(`sealed-${step}`);
+        await check(page, `sealed-${step}`);
+        await page.screenshot({ path: `screenshots/adv-sealed-${step}.png` });
+      }
+      await b.click();
+      await page.waitForTimeout(150);
+      continue;
+    }
     // 宝箱
     if (await page.locator('button:has-text("開ける"), button:has-text("鍵を開ける")').count()) {
       if (!seen.has('chest')) {
@@ -283,7 +525,8 @@ async function run(party, difficulty) {
       await page.getByText('挑戦する').click();
       continue;
     }
-    const evOpts = page.locator('.panel button.btn-dark, .panel button.bg-sky-950\\/60').filter({ hasNotText: '戻る' });
+    // 選択肢のボタン（押せないボタンと、フォーカスを増減するボタンは除く）
+    const evOpts = page.locator('.panel button.btn-dark:not([disabled]):not([aria-label^="フォーカス"]), .panel button.bg-sky-950\\/60:not([disabled])').filter({ hasNotText: '戻る' });
     if (await page.getByText('能力値で判定').count() || (await page.getByText('立ち去る').count())) {
       if (!seen.has('event')) {
         seen.add('event');
@@ -304,13 +547,15 @@ async function run(party, difficulty) {
     }
   }
   console.log(`${party}人・${difficulty}: ${result}`);
+  await record(page, party, result);
   await ctx.close();
   return result;
 }
 
 const results = [];
-results.push(await run(4, 'やさしい'));
-results.push(await run(2, 'やさしい'));
+for (const party of (process.env.ADVENTURE_PARTIES ?? '4,2').split(',').map(Number)) results.push(await run(party, 'やさしい'));
 await browser.close();
+console.log(`地図を動かし直した回数: ${panFixes}${panFixes ? `（${Object.entries(panFixBy).map(([k, v]) => `${k} ${v}`).join('・')}）` : ''}`);
 if (issues.size) console.log('issues:', [...issues]);
-process.exit(issues.size || !results.includes('cleared') ? 1 : 0);
+// 一方の人数だけ通っても成功にしない。
+process.exit(issues.size || results.some(result => result !== 'cleared') ? 1 : 0);

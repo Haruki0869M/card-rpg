@@ -1,0 +1,50 @@
+// 武器種カード その2（K1）: 杖・魔導書・槌・弓・短剣 各7枚。決まりは weaponTypeCards.ts と同じ。
+// 7枚の役割: 単体・連撃（または手数）・守りか補助（コモン3）／全体・状態異常か補助（レア2）／特殊（エピック2）
+import type { CardDef, CardTarget, Effect, Rarity, StatId, AbilityDef, CardCategory } from '../../../types';
+
+const d = (amount: number): Effect => ({ kind: 'damage', amount });
+const dh = (amount: number, hits: number): Effect => ({ kind: 'damage', amount, hits });
+const el = (element: string, amount: number): Effect => ({ kind: 'damage', amount, element });
+const b = (amount: number): Effect => ({ kind: 'block', amount });
+const st = (status: string, amount: number): Effect => ({ kind: 'applyStatus', status, amount });
+const heal = (amount: number): Effect => ({ kind: 'heal', amount });
+const focus = (amount: number): Effect => ({ kind: 'gainFocus', amount });
+const mana = (amount: number): Effect => ({ kind: 'gainMana', amount });
+const draw = (amount: number): Effect => ({ kind: 'draw', amount });
+
+type Opt = { rarity?: Rarity; stat?: StatId; trait?: AbilityDef; tags?: string[]; weaponType?: string };
+/** カードを1枚作る。tiers は成功数0から順に（成功数 i の効果） */
+function c(id: string, name: string, category: CardCategory, cost: number, baseChance: number, target: CardTarget, tiers: Effect[][], o: Opt = {}): CardDef {
+  return { id, name, category, cost, slots: tiers.length - 1, baseChance, target, tiers: tiers.map((effects, i) => ({ minSuccesses: i, effects })), ...o };
+}
+
+const W = (weaponType: string) => ({ weaponType });
+
+export const WEAPON_TYPE_CARDS_2: CardDef[] = [
+  // ===== 杖（魔力の扱い。マナを増やして撃つ） =====
+  c('wtStaffTwin', '双星弾', 'magic', 1, 70, 'enemy', [[d(2)], [dh(3, 2)], [dh(4, 2)]], { ...W('staff'), tags: ['combo'] }),
+  c('wtStaffWard', '魔力の障壁', 'skill', 1, 80, 'self', [[b(4)], [b(6)], [b(8), mana(1)]], W('staff')),
+  c('wtStaffRain', '星屑の雨', 'magic', 2, 65, 'allEnemies', [[d(3)], [d(6)], [d(9)]], { ...W('staff'), rarity: 'rare' }),
+  c('wtStaffDrain', '魔力吸収', 'magic', 1, 75, 'enemy', [[d(3)], [d(5), mana(1)], [d(7), mana(1)]], { ...W('staff'), rarity: 'rare', tags: ['mana'] }),
+  c('wtStaffOverflow', '魔力の氾濫', 'magic', 2, 60, 'enemy', [[d(5)], [d(9), mana(1)], [d(14), mana(2)]], { ...W('staff'), rarity: 'epic', trait: { name: '魔力循環', effect: { when: 'perfect', do: [mana(1)] } } }),
+
+  // ===== 魔導書（属性の頁。属性ごとに性格が違う） =====
+  c('wtTomeFrost', '氷の頁', 'magic', 1, 75, 'enemy', [[el('ice', 2)], [el('ice', 5)], [el('ice', 7), st('weak', 1)]], W('tome')),
+  c('wtTomeVenom', '毒の頁', 'magic', 1, 75, 'enemy', [[el('poison', 2)], [el('poison', 3), st('poison', 2)], [el('poison', 4), st('poison', 3)]], { ...W('tome'), rarity: 'rare' }),
+  c('wtTomeHoly', '聖の頁', 'magic', 1, 80, 'ally', [[heal(4)], [heal(7)], [heal(10)]], { ...W('tome'), rarity: 'rare' }),
+  c('wtTomeForbidden', '禁書の頁', 'magic', 2, 60, 'enemy', [[el('dark', 5)], [el('dark', 9)], [el('dark', 13), st('curse', 1)]], { ...W('tome'), rarity: 'epic', trait: { name: '闇の囁き', effect: { when: 'perfect', do: [draw(1)] } } }),
+  c('wtTomeElements', '四元の大魔導', 'magic', 3, 55, 'allEnemies', [[el('fire', 3)], [el('ice', 6)], [el('thunder', 10)], [el('fire', 13), st('burn', 2)]], { ...W('tome'), rarity: 'epic', trait: { name: '元素の祝福', effect: { when: 'kill', do: [mana(1)] } } }),
+
+  // ===== 槌（重い一撃と守り） =====
+  c('wtHammerSkull', '脳天割り', 'physical', 1, 70, 'enemy', [[d(2)], [d(4)], [d(6), st('paralysis', 1)]], { ...W('hammer'), stat: 'str' }),
+  c('wtHammerTitan', '巨人の鉄槌', 'physical', 3, 50, 'enemy', [[d(8)], [d(15)], [d(22)], [d(32)]], { ...W('hammer'), rarity: 'epic', stat: 'str', tags: ['heavy'], trait: { name: 'めり込み', effect: { when: 'kill', do: [b(6)] } } }),
+
+  // ===== 弓（遠くから手数と狙い） =====
+  c('wtBowFire', '火矢', 'physical', 1, 75, 'enemy', [[el('fire', 3)], [el('fire', 5)], [el('fire', 7), st('burn', 1)]], { ...W('bow'), rarity: 'rare', stat: 'dex' }),
+
+  // ===== 短剣（軽い手数と状態異常） =====
+  { ...c('wtDaggerDodge', '紙一重', 'skill', 1, 80, 'self', [[b(4)], [b(6)], [b(8), focus(1)]], { ...W('dagger'), stat: 'agi' }), weaponTypes: ['gun'] }, // 区切りD: 紙一重＝遮蔽 をまとめた
+  c('wtDaggerShadow', '影刺し', 'physical', 1, 75, 'enemy', [[d(2)], [d(3), st('weak', 1)], [d(4), st('weak', 1), st('vulnerable', 1)]], { ...W('dagger'), rarity: 'rare', stat: 'dex' }),
+  c('wtDaggerAssassinate', '暗殺', 'physical', 2, 60, 'enemy', [[d(4)], [d(8)], [d(13)]], { ...W('dagger'), rarity: 'epic', stat: 'dex', trait: { name: '無音', effect: { when: 'perfect', do: [draw(1)] } } }),
+  c('wtDaggerMirage', '幻影の刃', 'physical', 1, 65, 'enemy', [[dh(1, 2)], [dh(2, 3)], [dh(2, 5)]], { ...W('dagger'), rarity: 'epic', stat: 'dex', tags: ['combo'], trait: { name: '残像', effect: { when: 'kill', do: [focus(1)] } } }),
+];

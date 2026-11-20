@@ -19,6 +19,7 @@ import {
   viewOf,
   handleDefeat,
   createRng,
+  corruptionShown,
 } from '../index';
 import { playToEnd } from '../bot';
 
@@ -77,29 +78,33 @@ describe('移動と手番', () => {
     g = run(g, { type: 'STORY_CONTINUE', playerId: P });
     return g;
   }
-  it('移動力を判定 → 経路の移動力だけ減る。同行したキャラは一緒に動き、行動を終える', () => {
+  it('移動力を判定 → 経路の移動力だけ減る。同行したキャラは一緒に動き、自分の手番も持つ', () => {
     let g = started();
-    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0', focusUsed: 2 });
+    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0' });
     const w = g.world!;
-    expect(w.move).toBeGreaterThanOrEqual(BALANCE.moveBase + 2);
+    expect(w.move).toBeGreaterThanOrEqual(1);
     const reach = reachable(w, w.pos.h0, w.move!);
-    const [to, info] = [...reach].find(([i, v]) => i !== w.pos.h0 && v.cost <= w.move! && !w.wanderers.some((x) => x.tile === i))!;
+    // 施設・敵のいないマスへ。移動中のランダムイベントは、この確認では起こさない（直前に起きたことにする。乱数の順番で変わるため）
+    g.heroes[0].lastRandomEvent = w.worldTurn;
+    const [to, info] = [...reach].find(([i, v]) => i !== w.pos.h0 && v.cost <= w.move! && !w.tiles[i].f && !w.wanderers.some((x) => x.tile === i))!;
     const before = w.move!;
     g = run(g, { type: 'WORLD_MOVE', playerId: P, heroId: 'h0', to, companions: ['h1'] });
     expect(g.world!.pos.h0).toBe(to);
     expect(g.world!.pos.h1).toBe(to);
     expect(g.world!.move).toBe(before - info.cost);
-    expect(g.world!.acted).toContain('h1');
-    // 待機 → 同行したキャラは行動済みなので、ワールドターンが進む
+    expect(g.world!.acted).not.toContain('h1');
+    // 運転者が待機すると同行者の手番。全員終わってからワールドターンが進む
     g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h0' });
+    expect(g.world!.turn).toBe('h1');
+    g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h1' });
     expect(g.world!.worldTurn).toBe(2);
     expect(g.world!.corruption).toBe(getDifficulty(g.difficulty).corruptionPerTurn ?? BALANCE.corruptionPerTurn);
     expect(g.world!.turn).toBe('h0');
   });
   it('手番でないキャラ・担当でないプレイヤーは動かせない', () => {
     const g = started();
-    expect(applyGameCommand(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h1', focusUsed: 0 }).error).toBeDefined();
-    expect(applyGameCommand(g, { type: 'WORLD_ROLL_MOVE', playerId: 'P2', heroId: 'h0', focusUsed: 0 }).error).toBeDefined();
+    expect(applyGameCommand(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h1' }).error).toBeDefined();
+    expect(applyGameCommand(g, { type: 'WORLD_ROLL_MOVE', playerId: 'P2', heroId: 'h0' }).error).toBeDefined();
   });
   it('侵食度100%でゲームオーバー', () => {
     let g = started();
@@ -131,7 +136,7 @@ describe('遭遇・命の灯火', () => {
     // スタートの隣に敵を置いて、そこへ移動する
     const next = neighbors(w, w.pos.h0).find((n) => TERRAINS.get(w.tiles[n].t).moveCost > 0 && !w.tiles[n].f)!;
     w.wanderers.push({ id: 'wx', tile: next, enemies: [{ defId: 'goblinScout', level: 1 }] });
-    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0', focusUsed: 4 });
+    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0' });
     g = run(g, { type: 'WORLD_MOVE', playerId: P, heroId: 'h0', to: next, companions: [] });
     return g;
   }
@@ -214,9 +219,9 @@ describe('町・祠・依頼', () => {
     expect(findHero(g, 'h0')!.hp).toBe(heroMaxHp(findHero(g, 'h0')!));
     g = run(g, { type: 'TOWN_BUY', playerId: P, kind: 'item', index: 0 });
     const stock = g.world!.shops.royalCapital;
-    expect(getItem(stock.items[0].item.itemId).id).toBe('holyWater');
+    expect(getItem(stock.items[0].item.itemId).id).toBe('antidote');
     // 町に入ったキャラ（h0）のお金で買い、h0 の袋に入る
-    expect(findHero(g, 'h0')!.pouch.some((i) => i.itemId === 'holyWater')).toBe(true);
+    expect(findHero(g, 'h0')!.pouch.some((i) => i.itemId === 'antidote')).toBe(true);
     expect(findHero(g, 'h1')!.gold).toBe(30);
     expect(applyGameCommand(g, { type: 'TOWN_BUY', playerId: P, kind: 'item', index: 0 }).error).toBeDefined();
   });
@@ -226,7 +231,8 @@ describe('町・祠・依頼', () => {
     const n = h.deck.length;
     g = run(g, { type: 'TOWN_REMOVE_CARD', playerId: P, heroId: 'h0', cardUid: h.deck[0].uid });
     expect(findHero(g, 'h0')!.deck.length).toBe(n - 1);
-    // 町に入っていないキャラ（h1）のカードは消せない
+    // 滞在メンバーから外れたキャラのカードは消せない
+    g.town!.members = ['h0'];
     expect(applyGameCommand(g, { type: 'TOWN_REMOVE_CARD', playerId: P, heroId: 'h1', cardUid: findHero(g, 'h1')!.deck[0].uid }).error).toBeDefined();
     findHero(g, 'h0')!.stash.push({ uid: 'sx', itemId: 'steelSword' });
     const gold = findHero(g, 'h0')!.gold;
@@ -297,8 +303,11 @@ describe('町・祠・依頼', () => {
     expect(g.mode).toBe('world');
     expect(g.expeditions?.length).toBe(1);
     expect(viewOf(g, g.expeditions![0].id).mode).toBe('dungeon');
-    // 入ると手番が終わり、1人なのでワールドターンも進む
-    expect(g.world!.corruption).toBe(BALANCE.corruptionOnDungeonEnter + (getDifficulty(g.difficulty).corruptionPerTurn ?? BALANCE.corruptionPerTurn));
+    // 入ると手番が終わり、1人なのでワールドターンも進む。全員がダンジョンの中なので、ダンジョンの番の量（難易度の値は倍率）
+    expect(g.world!.corruption).toBe(BALANCE.corruptionOnDungeonEnter + BALANCE.corruptionPerDungeonTurn * (getDifficulty(g.difficulty).corruptionPerTurn ?? 1));
+    // 画面では切り捨てて整数%
+    expect(corruptionShown(2.5)).toBe(2);
+    expect(corruptionShown(12.75)).toBe(12);
   });
 });
 
@@ -317,35 +326,33 @@ describe('ダンジョンも世界マップの手番の順番で動く（M3-D）
   it('入ると手番は次の人へ。ダンジョンの番が来るまで、ダンジョンの中は動かせない', () => {
     let { g, x } = h0InTemple();
     expect(g.world!.turn).toBe('h1');
-    expect(applyGameCommand(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0', focusUsed: 0 })).error).toMatch(/ほかのキャラの番/);
+    expect(applyGameCommand(g, inScene(x, { type: 'ENTER_ROOM', playerId: P, roomId: 'r0c0' })).error).toMatch(/ほかのキャラの番/);
     // h1 が手番を終えると、ワールドターンが進み、h0（ダンジョン）の番
     g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h1' });
     expect(g.world!.worldTurn).toBe(2);
     expect(g.world!.turn).toBe('h0');
     // 世界マップの操作はできない
-    expect(applyGameCommand(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0', focusUsed: 0 }).error).toMatch(/ダンジョン/);
+    expect(applyGameCommand(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0' }).error).toMatch(/ダンジョン/);
   });
 
-  it('探索力を判定（2〜4）→ 部屋に入るたびに1減る。使い切って通路に戻ると次の人の番', () => {
+  it('扉1つ＝手番1回: 扉を開けて部屋を済ませると、次の人の番。次に番が来たら、また扉を1つ', () => {
     let { g, x } = h0InTemple();
     g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h1' });
-    expect(applyGameCommand(g, inScene(x, { type: 'ENTER_ROOM', playerId: P, roomId: 'r0c0' })).error).toMatch(/探索力/);
-    // フォーカスを2つ使えば、探索力は必ず4
-    g.heroes[0].focus = 2;
-    g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0', focusUsed: 2 }));
-    expect(viewOf(g, x).dungeon!.explore).toBe(BALANCE.exploreBase + BALANCE.exploreSlots);
     g = run(g, inScene(x, { type: 'ENTER_ROOM', playerId: P, roomId: 'r0c0' }));
-    expect(viewOf(g, x).dungeon!.explore).toBe(3);
-    // 手番を終える → h1 の番（ワールドターンは同じ）
+    expect(viewOf(g, x).dungeon!.opened).toBe(true);
+    // 部屋の途中は h0 の番のまま
+    expect(g.world!.turn).toBe('h0');
+    // 部屋を済ませて通路に戻る → h1 の番（ワールドターンは同じ）
     g.expeditions![0].mode = 'dungeon';
     g.expeditions![0].battle = undefined;
-    g = run(g, inScene(x, { type: 'EXPLORE_END', playerId: P }));
+    g.expeditions![0].dungeon!.rooms.find((r) => r.id === 'r0c0')!.cleared = true;
+    g = run(g, inScene(x, { type: 'DUNGEON_TURN', playerId: P, heroId: 'h0', dir: 'left' }));
     expect(g.world!.turn).toBe('h1');
     expect(g.world!.worldTurn).toBe(2);
-    // 次にダンジョンの番が来たら、また判定から
+    // 次にダンジョンの番が来たら、また扉を選べる
     g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h1' });
     expect(g.world!.turn).toBe('h0');
-    expect(viewOf(g, x).dungeon!.explore).toBeNull();
+    expect(viewOf(g, x).dungeon!.opened).toBeUndefined();
   });
 
   it('撤退すると世界マップに戻り、次のワールドターンから地図で動く', () => {
@@ -356,7 +363,7 @@ describe('ダンジョンも世界マップの手番の順番で動く（M3-D）
     expect(g.world!.turn).toBe('h1');
     g = run(g, { type: 'WORLD_WAIT', playerId: P, heroId: 'h1' });
     expect(g.world!.turn).toBe('h0');
-    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0', focusUsed: 0 });
+    g = run(g, { type: 'WORLD_ROLL_MOVE', playerId: P, heroId: 'h0' });
   });
 
   it('全員がダンジョンの中でも、時間（ワールドターン・侵食度）は進む', () => {
@@ -364,9 +371,13 @@ describe('ダンジョンも世界マップの手番の順番で動く（M3-D）
     const turn = g.world!.worldTurn;
     expect(g.world!.turn).toBe('h0');
     expect(turn).toBe(2);
-    g = run(g, inScene(x, { type: 'EXPLORE_ROLL', playerId: P, heroId: 'h0', focusUsed: 0 }));
     const c = g.world!.corruption;
-    g = run(g, inScene(x, { type: 'EXPLORE_END', playerId: P }));
+    // 扉を開けて部屋を済ませると、ワールドターンが1つ進んで、すぐ同じ組の番
+    g = run(g, inScene(x, { type: 'ENTER_ROOM', playerId: P, roomId: 'r0c0' }));
+    g.expeditions![0].mode = 'dungeon';
+    g.expeditions![0].battle = undefined;
+    g.expeditions![0].dungeon!.rooms.find((r) => r.id === 'r0c0')!.cleared = true;
+    g = run(g, inScene(x, { type: 'DUNGEON_TURN', playerId: P, heroId: 'h0', dir: 'left' }));
     expect(g.world!.worldTurn).toBe(turn + 1);
     expect(g.world!.corruption).toBeGreaterThan(c);
     expect(g.world!.turn).toBe('h0');
@@ -382,10 +393,18 @@ describe('ダンジョンも世界マップの手番の順番で動く（M3-D）
 describe('自動プレイ（シナリオ1をエンディングまで）', () => {
   it('4人・やさしい: どの場面でもエラーが出ず、最後まで（エンディングか、負け）進む。何回かに1回はエンディングに着く', () => {
     let cleared = 0;
+    // 案Y（2026-11-13・大物のHP×2・後半の攻撃×1.5・大物は弱点で完全成功の時だけ BREAK）を入れた時、いつもの bot（予告を読まない）は
+    // やさしいでも 8種とも負けで終わった（測った）。案Y は取りやめたが、紫の札と大物は今も「弱点で完全成功」なので、
+    // エンディングに着く事は、引き続き工夫する bot（BREAK を狙う）で確かめる（テストの前提だけ直した）
     for (let seed = 1; seed <= 8; seed++) {
       const { game, log } = playToEnd(newWorld(seed, ['warrior', 'mage', 'guardian', 'hunter'], 'easy'));
       expect(log.errors, `seed ${seed}`).toEqual([]);
       expect(['ending', 'gameover'], `seed ${seed}`).toContain(game.mode);
+    }
+    for (let seed = 1; seed <= 3 && !cleared; seed++) {
+      const { game, log } = playToEnd(newWorld(seed, ['warrior', 'mage', 'guardian', 'hunter'], 'easy'), 60000, { clever: true });
+      expect(log.errors, `clever seed ${seed}`).toEqual([]);
+      expect(['ending', 'gameover'], `clever seed ${seed}`).toContain(game.mode);
       if (game.mode === 'ending') {
         cleared++;
         expect(game.world!.keys.sort()).toEqual(['azure', 'crimson', 'emerald']);

@@ -4,7 +4,7 @@
 import type { Expedition, GameCommand, GameState, PlayerId } from '../../types';
 
 /** 場面ごとに持つ項目 */
-export const SCENE_FIELDS = ['mode', 'party', 'dungeon', 'battle', 'reward', 'chest', 'event', 'battleInfo', 'battleBackground', 'encounter', 'town', 'shrine', 'vote'] as const;
+export const SCENE_FIELDS = ['mode', 'party', 'dungeon', 'battle', 'reward', 'chest', 'event', 'battleInfo', 'battleBackground', 'encounter', 'town', 'shrine', 'sanctuary', 'vote'] as const;
 type SceneField = (typeof SCENE_FIELDS)[number];
 
 /** ダンジョンの場面にいる時の mode（これ以外になったら場面は終わり） */

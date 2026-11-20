@@ -1,8 +1,8 @@
 name: Deploy to GitHub Pages
 
+# 自動では動かさない（2026-11-11・オーナーの決定）。公開は Firebase Hosting（npm run deploy:firebase）。
+# GitHub Pages に出したい時だけ、GitHub の Actions の画面から手で動かす。
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:

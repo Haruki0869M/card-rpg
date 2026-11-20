@@ -24,6 +24,7 @@ export function CheckPanel({
   need,
   successLabel,
   bonusOnly,
+  event,
 }: {
   heroes: Hero[];
   heroId: string;
@@ -37,9 +38,11 @@ export function CheckPanel({
   successLabel: string;
   /** 失敗しても損の無い判定（成功率を「〜の確率」と中立の色で出す） */
   bonusOnly?: boolean;
+  /** イベントの判定（お供の上乗せが入る） */
+  event?: boolean;
 }) {
   const hero = heroes.find((h) => h.id === heroId) ?? heroes[0];
-  const chance = hero ? statChance(hero, stat, tag) : 0;
+  const chance = hero ? statChance(hero, stat, tag, event) : 0;
   const max = hero ? Math.min(slots, hero.focus) : 0;
   const p = Math.round(chanceAtLeast(slots, Math.min(focus, max), chance, need) * 100);
   return (
@@ -49,7 +52,7 @@ export function CheckPanel({
       </div>
       <div className="flex gap-1">
         {heroes.map((h) => {
-          const c = statChance(h, stat, tag);
+          const c = statChance(h, stat, tag, event);
           const mine = isLocalPlayer(h.playerId);
           return (
             <button
@@ -59,7 +62,7 @@ export function CheckPanel({
                 setHeroId(h.id);
                 setFocus(0);
               }}
-              className={`btn flex min-w-0 flex-1 flex-col items-center rounded-lg border-2 py-1 ${h.id === hero?.id ? 'border-amber-300 bg-amber-500/15' : 'border-white/10 bg-black/30'}`}
+              className={`btn flex min-w-0 flex-1 flex-col items-center rounded-lg border-2 py-1 ${h.id === hero?.id ? 'sel-on' : 'border-white/10 bg-black/30'}`}
             >
               <HeroFace hero={h} size={30} dim={h.hp <= 0} />
               <span className="text-[12px] font-bold tabular-nums">{c}%</span>
@@ -90,7 +93,8 @@ export function CheckPanel({
           <Plus size={20} />
         </button>
       </div>
-      <div className="text-center text-[13px]">
+      {/* 自動の確認用の見えない印（B6）: 今のフォーカスの指定と、その時の成功率（下の字と同じ数） */}
+      <div className="text-center text-[13px]" data-challenge-focus={focus} data-challenge-chance={p}>
         {bonusOnly ? `${successLabel}の確率` : '成功率'}{' '}
         <b className={bonusOnly ? 'text-amber-200' : p >= 80 ? 'text-emerald-300' : p >= 50 ? 'text-amber-200' : 'text-red-300'}>{p}%</b>
         <span className="text-zinc-400">
@@ -100,6 +104,7 @@ export function CheckPanel({
     </div>
   );
 }
+
 
 /**
  * 判定の結果の表示（左から順に出る）。
@@ -116,7 +121,7 @@ export function RollStrip({ results, neutral, small }: { results: SlotResult[]; 
           initial={{ opacity: 0, scale: 1.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: i * 0.05, duration: 0.06 }}
-          className={`flex ${size} items-center justify-center rounded-lg border-2`}
+          className={`flex ${size} items-center justify-center rounded-full border-2`}
           style={
             r === 'focus'
               ? { background: 'linear-gradient(180deg,#ffe9a8,#e2a72a)', borderColor: '#fff3c4', color: '#5a3a06' }

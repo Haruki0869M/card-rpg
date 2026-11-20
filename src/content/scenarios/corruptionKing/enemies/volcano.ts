@@ -52,9 +52,9 @@ export const magmaGolem: EnemyDef = {
   gold: 25,
   pattern: 'sequence',
   actions: [
-    { id: 'slam', name: '溶岩の拳', effects: [{ kind: 'damage', element: 'fire', amount: 16 }] },
+    { id: 'slam', name: '溶岩の拳', big: true, effects: [{ kind: 'damage', element: 'fire', amount: 16 }] },
     { id: 'harden', name: '冷え固まる', effects: [{ kind: 'block', amount: 20 }] },
-    { id: 'eruption', name: '小噴火', effects: [{ kind: 'damage', element: 'fire', amount: 8, to: 'foes' }, { kind: 'applyStatus', status: 'burn', amount: 1, to: 'foes' }] },
+    { id: 'eruption', name: '小噴火', big: true, effects: [{ kind: 'damage', element: 'fire', amount: 8, to: 'foes' }, { kind: 'applyStatus', status: 'burn', amount: 1, to: 'foes' }] },
   ],
   abilities: [{ name: '溶岩の体', effect: { when: 'turnStart', do: [{ kind: 'block', amount: 4 }] } }],
 };
@@ -72,8 +72,8 @@ export const ignavarl: EnemyDef = {
   gold: 160,
   pattern: 'sequence',
   actions: [
-    { id: 'claw', name: '竜の爪', effects: [{ kind: 'damage', element: 'fire', amount: 18 }] },
-    { id: 'wingbeat', name: '羽ばたき', effects: [{ kind: 'damage', amount: 7, hits: 2, to: 'foes' }] },
+    { id: 'claw', name: '竜の爪', big: true, effects: [{ kind: 'damage', element: 'fire', amount: 18 }] },
+    { id: 'wingbeat', name: '羽ばたき', big: true, effects: [{ kind: 'damage', amount: 7, hits: 2, to: 'foes' }] },
     { id: 'scales', name: '竜鱗', effects: [{ kind: 'block', amount: 22 }, { kind: 'damage', amount: 9 }] },
   ],
   phases: [
@@ -81,10 +81,15 @@ export const ignavarl: EnemyDef = {
       belowHpPct: 50,
       name: '怒れる炎竜',
       pattern: 'sequence',
+      // ボスの段階（2026-11-14）: 溜め。息を吸い込むと、次の予告が全体の獄炎の息（順番でもくり返す）。答え: 溜めを氷で BREAK・守りを固める
+      openingActionId: 'deepBreath',
+      rule: '息を吸い込み、次の予告で全体に「獄炎の息」（溜めを氷で BREAK すると、息も消える）',
       actions: [
-        { id: 'inferno', name: '獄炎', effects: [{ kind: 'damage', element: 'fire', amount: 12, to: 'foes' }, { kind: 'applyStatus', status: 'burn', amount: 2, to: 'foes' }] },
-        { id: 'fangs', name: '灼熱の牙', effects: [{ kind: 'damage', element: 'fire', amount: 26 }] },
+        { id: 'deepBreath', name: '息を吸い込む', big: true, chargeTo: 'flameBreath', hint: '次の予告が「獄炎の息」（味方全員に火18・火傷2）になる。氷の弱点で BREAK すると溜めが止まり、獄炎の息も消える。止められなければ守りを固める。崩した人は熱い息を浴びて火傷2', breakBacklash: [{ kind: 'applyStatus', status: 'burn', amount: 2, to: 'attacker' }], effects: [{ kind: 'block', amount: 12 }] },
+        { id: 'flameBreath', name: '獄炎の息', big: true, scripted: true, effects: [{ kind: 'damage', element: 'fire', amount: 18, to: 'foes' }, { kind: 'applyStatus', status: 'burn', amount: 2, to: 'foes' }] },
+        { id: 'fangs', name: '灼熱の牙', big: true, effects: [{ kind: 'damage', element: 'fire', amount: 26 }] },
         { id: 'roar', name: '竜の咆哮', effects: [{ kind: 'applyStatus', status: 'vulnerable', amount: 2, to: 'foes' }, { kind: 'block', amount: 15 }] },
+        { id: 'inferno', name: '獄炎', big: true, effects: [{ kind: 'damage', element: 'fire', amount: 12, to: 'foes' }, { kind: 'applyStatus', status: 'burn', amount: 2, to: 'foes' }] },
       ],
     },
   ],

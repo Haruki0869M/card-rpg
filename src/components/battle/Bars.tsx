@@ -1,29 +1,41 @@
-import { TERMS } from '../../data/terms';
+import { corruptionName } from '../../data/scenarios';
 // ===== 上部バー・下部バー =====
 import { AnimatePresence, motion } from 'framer-motion';
-import { Backpack, Layers, Menu, Skull, Trash2 } from 'lucide-react';
+import { Backpack, Flame, Layers, Menu, Skull, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { findAlly, isDone, waitingPlayers } from '../../engine';
+import { corruptionShown, findAlly, isDone, waitingPlayers } from '../../engine';
 import { isLocalPlayer } from '../../store/battleConfig';
 import { useBattle } from '../../store/battleStore';
+import { useHelp } from '../../store/help';
 
 export function TopBar() {
   const turn = useBattle((s) => s.battle.turn);
   const openSheet = useBattle((s) => s.openSheet);
-  // 侵食度（M3で世界マップと連動。M1では表示のみ）
-  const corruption = 0;
+  // 侵食度と命の灯火（冒険の状態から）
+  const corruption = useBattle((s) => s.full?.world?.corruption ?? 0);
+  const lives = useBattle((s) => s.full?.lives);
+  const corruptionLabel = useBattle((s) => corruptionName(s.full?.scenarioId));
   return (
-    <div className="flex h-11 shrink-0 items-center gap-2 px-2">
+    <div className="flex h-11 shrink-0 items-center gap-2 px-2" data-cutin-anchor>
       <div className="font-display flex items-baseline gap-1 whitespace-nowrap text-amber-200">
         <span className="text-[12px] text-amber-200/70">ターン</span>
         <span className="text-outline text-[22px] leading-none">{turn}</span>
       </div>
-      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+      {/* 押すと遊び方の「侵食度」を開く（読むだけ。戦闘の選択は変えない） */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          useHelp.getState().openHelp('corruption');
+        }}
+        aria-label={`${corruptionLabel}の説明`}
+        className="btn flex h-11 min-w-0 flex-1 items-center gap-1.5 text-left"
+        data-help-open="corruption"
+      >
         <Skull size={16} className="shrink-0 text-fuchsia-300" />
         <div className="min-w-0 flex-1">
           <div className="flex justify-between text-[12px] leading-[13px]">
-            <span className="font-display text-fuchsia-200">{TERMS.corruption}</span>
-            <span className="font-bold text-fuchsia-200 tabular-nums">{corruption}%</span>
+            <span className="font-display text-fuchsia-200">{corruptionLabel}</span>
+            <span className="font-bold text-fuchsia-200 tabular-nums">{corruptionShown(corruption)}%</span>
           </div>
           <div className="mt-0.5 h-[7px] overflow-hidden rounded-full border border-fuchsia-900 bg-black/70">
             <div
@@ -32,7 +44,22 @@ export function TopBar() {
             />
           </div>
         </div>
-      </div>
+      </button>
+      {lives !== undefined && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            useHelp.getState().openHelp('lives');
+          }}
+          className="btn flex h-11 min-w-11 shrink-0 items-center justify-center"
+          aria-label="命の灯火の説明"
+          data-help-open="lives"
+        >
+          <span className="flex items-center gap-0.5 rounded-full border border-orange-400/40 bg-black/50 px-1.5 text-[13px] font-bold text-orange-200 tabular-nums" data-lives={lives}>
+            <Flame size={14} className="fill-orange-500/60 text-orange-300" />×{lives}
+          </span>
+        </button>
+      )}
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -95,9 +122,11 @@ export function BottomBar() {
         </AnimatePresence>
       </div>
       <button
-        onClick={endTurn}
+        onClick={() => endTurn()}
         disabled={battle.phase !== 'ally'}
         className={`btn ${allDone ? 'btn-gold' : 'btn-dark'} font-display relative h-12 w-[116px] shrink-0 rounded-xl text-[16px]`}
+        // 自動の確認用の見えない印: ボタンの字と同じ分け方（end = ターン終了・ready = 準備完了・waiting = 準備完了を押して待っている・enemy = 敵の行動中）
+        data-end-turn={battle.phase === 'enemy' ? 'enemy' : iAmReady ? 'waiting' : battle.readyCheck ? 'ready' : 'end'}
       >
         {allDone && <span className="glow-pulse pointer-events-none absolute -inset-1.5 rounded-2xl border-2 border-amber-300" />}
         {battle.phase === 'enemy' ? '敵の行動中' : iAmReady ? (

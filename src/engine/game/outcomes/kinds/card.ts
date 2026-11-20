@@ -1,6 +1,7 @@
 // カードを得る（判定したキャラの職業の候補から）
-import { getClass } from '../../../../data/classes';
 import { livingHeroes } from '../../heroes';
+import { pickCard } from '../../cardTags';
+import { heroCardPool } from '../../jobs';
 import type { OutcomeHandler } from '../types';
 
 declare module '../../../../types' {
@@ -15,8 +16,8 @@ export const outcome: OutcomeHandler<'card'> = {
   apply(ctx) {
     const h = ctx.actor ?? livingHeroes(ctx.game)[0];
     if (!h) return;
-    const pool = getClass(h.classId).cardPool;
-    ctx.loot.push({ kind: 'card', cardId: pool[ctx.rng.int(pool.length)], heroId: h.id });
+    const pool = heroCardPool(h, ctx.game.heroes.length === 1);
+    ctx.loot.push({ kind: 'card', cardId: pickCard(pool, h, ctx.rng, false), heroId: h.id });
   },
   describe: () => 'カード1枚',
 };

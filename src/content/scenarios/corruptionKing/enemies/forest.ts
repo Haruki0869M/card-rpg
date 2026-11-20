@@ -68,14 +68,14 @@ export const treeWarden: EnemyDef = {
   actions: [
     {
       id: 'rootBind',
-      name: '根の拘束',
+      name: '根の拘束', big: true,
       effects: [
         { kind: 'damage', amount: 6 },
         { kind: 'applyStatus', status: 'weak', amount: 2 },
       ],
     },
     { id: 'barkGuard', name: '樹皮の守り', effects: [{ kind: 'block', amount: 15 }] },
-    { id: 'branchSweep', name: '大枝の薙ぎ払い', effects: [{ kind: 'damage', amount: 9, to: 'foes' }] },
+    { id: 'branchSweep', name: '大枝の薙ぎ払い', big: true, effects: [{ kind: 'damage', amount: 9, to: 'foes' }] },
   ],
 };
 
@@ -92,7 +92,7 @@ export const treantKing: EnemyDef = {
   gold: 80,
   pattern: 'sequence',
   actions: [
-    { id: 'earthRoots', name: '大地の根', effects: [{ kind: 'damage', amount: 7, to: 'foes' }] },
+    { id: 'earthRoots', name: '大地の根', big: true, effects: [{ kind: 'damage', amount: 7, to: 'foes' }] },
     {
       id: 'sapCurse',
       name: '樹液の呪い',
@@ -103,7 +103,7 @@ export const treantKing: EnemyDef = {
     },
     {
       id: 'ancientBark',
-      name: '古木の鎧',
+      name: '古木の鎧', big: true,
       effects: [
         { kind: 'block', amount: 18 },
         { kind: 'damage', amount: 8 },
@@ -115,12 +115,16 @@ export const treantKing: EnemyDef = {
       belowHpPct: 50,
       name: '怒れる古樹',
       pattern: 'sequence',
+      // ボスの段階（2026-11-14）: 再生。開幕の一手で根を張り、毎ターン回復する（1回だけ）。答え: 火で BREAK・一気に削る・呪いで回復を減らす
+      openingActionId: 'rootDown',
+      rule: '根を張って「再生」。毎ターン回復する（火で BREAK すると止まる。呪いで回復が減る）',
       actions: [
-        { id: 'rageStorm', name: '怒りの暴風', effects: [{ kind: 'damage', amount: 11, to: 'foes' }] },
-        { id: 'stranglingVine', name: '絞め殺す蔓', effects: [{ kind: 'damage', amount: 20 }] },
+        { id: 'rootDown', name: '深く根を張る', big: true, scripted: true, hint: '自分に「再生」8（毎ターン、残りの数だけHPが戻る）とブロック10。火の弱点で BREAK すると止まる。止められなければ一気に削るか、呪いで回復を減らす。BREAK しても、浅い根で再生3だけ残る', breakResidue: [{ kind: 'applyStatus', status: 'regen', amount: 3, to: 'self' }], effects: [{ kind: 'applyStatus', status: 'regen', amount: 8, to: 'self' }, { kind: 'block', amount: 10 }] },
+        { id: 'rageStorm', name: '怒りの暴風', big: true, effects: [{ kind: 'damage', amount: 11, to: 'foes' }] },
+        { id: 'stranglingVine', name: '絞め殺す蔓', big: true, effects: [{ kind: 'damage', amount: 20 }] },
         {
           id: 'rotSpores',
-          name: '腐蝕の胞子',
+          name: '腐蝕の胞子', big: true,
           effects: [
             { kind: 'damage', element: 'poison', amount: 5, to: 'foes' },
             { kind: 'applyStatus', status: 'poison', amount: 3, to: 'foes' },

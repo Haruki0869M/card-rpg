@@ -32,7 +32,11 @@ export const hunter: ClassDef = {
   unlocked: true,
   hpPerLevel: 5,
   weaponType: 'bow',
+  subWeapons: ['dagger'],
+  tier: 'base',
+  lineage: 'gi',
+  tags: ['scout'],
   startingEquipment: { weapon: 'hunterBow', armor: 'travelerClothes' },
-  cardPool: ['poisonArrow', 'rapidShot', 'vitalShot', 'setTrap', 'evade', 'gambleBolt', 'heavySwing', 'meditate', 'snipe', 'shadowArrow'],
+  cardPool: ['poisonArrow', 'rapidShot', 'vitalShot', 'setTrap', 'evade', 'gambleBolt', 'heavySwing', 'meditate', 'snipe', 'shadowArrow', 'axWeakSight'],
   growthWeights: { dex: 3, per: 3, agi: 2, luk: 1 },
 };

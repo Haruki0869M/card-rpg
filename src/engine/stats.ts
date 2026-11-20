@@ -12,6 +12,8 @@ export function affinityFromStats(stats: Stats): Affinity {
     physical: statToAffinity(stats.str),
     magic: statToAffinity(stats.int),
     skill: statToAffinity(stats.dex),
+    // カードが参照する能力値を決めている時の補正（spec §6.4）
+    byStat: Object.fromEntries(Object.entries(stats).map(([k, v]) => [k, statToAffinity(v)])),
   };
 }
 

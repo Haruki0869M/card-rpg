@@ -1,0 +1,284 @@
+<title>クリスタリア レビュー資料</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
+<style>
+/* レイアウト: スマホ縦1列。動画 → 1〜6の吸い出し（表と箇条書き）→ ファイル一覧 → Gemini へのお願い */
+:root {
+  --bg: #f4f1f8; --panel: #ffffff; --fg: #1f1a2b; --muted: #645c75; --line: #ddd5e8;
+  --gold: #9a6a12; --gold-soft: #f6ead2;
+  --big: #c0263b; --big-soft: #fde7ea; --mid: #b5650c; --mid-soft: #fdf0dc; --small: #5d6577; --small-soft: #eceef3;
+  --good: #1f7a4d; --good-soft: #e3f4ea;
+  --display: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #15121d; --panel: #1f1a2b; --fg: #ece6f5; --muted: #a79fb9; --line: #362e47;
+  --gold: #e7bd62; --gold-soft: #3a2f1a;
+  --big: #ff7387; --big-soft: #43202a; --mid: #f2a54a; --mid-soft: #3f2e17; --small: #aab2c4; --small-soft: #2a2836;
+  --good: #6fd39f; --good-soft: #1b3428; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #15121d; --panel: #1f1a2b; --fg: #ece6f5; --muted: #a79fb9; --line: #362e47;
+  --gold: #e7bd62; --gold-soft: #3a2f1a;
+  --big: #ff7387; --big-soft: #43202a; --mid: #f2a54a; --mid-soft: #3f2e17; --small: #aab2c4; --small-soft: #2a2836;
+  --good: #6fd39f; --good-soft: #1b3428; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.75; }
+.wrap { max-width: 760px; margin: 0 auto; padding-block: 24px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 28px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.35; }
+h1 { font-size: 1.75rem; }
+h2 { font-size: 1.3rem; display: flex; gap: .5em; align-items: baseline; }
+h3 { font-size: 1.05rem; }
+h2 .no { color: var(--gold); font-size: 1rem; }
+p { margin: 0; }
+.lead { color: var(--muted); font-size: .92rem; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.how { font-size: .85rem; color: var(--muted); background: var(--gold-soft); border-radius: 10px; padding: 8px 12px; }
+.how b { color: var(--gold); }
+.strip { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x mandatory; }
+.strip figure { margin: 0; flex: 0 0 auto; width: min(62vw, 230px); scroll-snap-align: start; display: flex; flex-direction: column; gap: 4px; }
+.strip img { width: 100%; border-radius: 8px; border: 1px solid var(--line); display: block; }
+.strip figcaption, .vid figcaption { font-size: .78rem; color: var(--muted); line-height: 1.45; }
+.vids { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.vid { margin: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.vid video { width: 100%; max-width: 100%; border-radius: 10px; border: 1px solid var(--line); background: #000; aspect-ratio: 390 / 844; }
+ul.fx { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+ul.fx li { display: grid; grid-template-columns: 2.2em 1fr; gap: 8px; align-items: start; }
+ul.fx li > span:last-child { min-width: 0; }
+.sev { font-size: .78rem; font-weight: 700; text-align: center; border-radius: 6px; padding: 1px 0; line-height: 1.6; margin-top: 3px; }
+.s-big { color: var(--big); background: var(--big-soft); }
+.s-mid { color: var(--mid); background: var(--mid-soft); }
+.s-small { color: var(--small); background: var(--small-soft); }
+.s-good { color: var(--good); background: var(--good-soft); }
+.tbl { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .85rem; font-variant-numeric: tabular-nums; }
+th, td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+th { color: var(--muted); font-weight: 700; white-space: nowrap; }
+td.n { text-align: right; white-space: nowrap; }
+.req { white-space: pre-wrap; font-size: .9rem; background: var(--bg); border: 1px dashed var(--line); border-radius: 10px; padding: 12px; margin: 0; font-family: var(--body); }
+button.copy { align-self: flex-start; font: inherit; font-weight: 700; color: var(--panel); background: var(--gold); border: 0; border-radius: 999px; padding: 6px 18px; cursor: pointer; }
+button.copy:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+.small { font-size: .82rem; color: var(--muted); }
+code { font-size: .85em; background: var(--bg); border-radius: 4px; padding: 0 4px; overflow-wrap: anywhere; }
+</style>
+
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:8px">
+    <p class="small">DESTINY OF CRYSTALIA ／ 2026年11月9日 ／ スマホ縦 390×844 ／ 2人・ふつう・「侵食の魔王」</p>
+    <h1>レビュー資料：動画3本と、数値・作りの吸い出し</h1>
+    <p class="lead">プレイヤーが遊んで本当にワクワクするか、操作に違和感がないか、やりごたえがあるかを確かめるための材料です。人が遊ぶ速さ（操作ごとに0.4〜0.9秒の間）で動画を撮り、タップした所には赤い丸が出ます。数値はプログラムの中身から読み出しました（コードは直していません）。</p>
+  </header>
+
+  <section class="box">
+    <h2>いちばん大事な発見</h2>
+    <ul class="fx">
+      <li><span class="sev s-big">大</span><span><b>1台を回して2人で遊ぶ時、担当の違う仲間を連れて移動できません。</b>P2（セシル）が P1（レオン）を誘って同行にし、移動を決めると「P1: 一緒に行く」の確認が出ます。それを押すと「この提案に答える人ではありません」と出て、先へ進めません（動画①の最後・下の写真）。画面から送る返事が、今の手番の P2 の返事として扱われるためです（<code>WorldScreen.tsx</code> の返事のボタンと <code>world.ts:261</code>）。前に直した「P2 の番で止まる」不具合と同じ種類です。「同行をやめる」を押せば1人では動けます。</span></li>
+      <li><span class="sev s-good">良</span><span>別々に動く時の駒の安定は、ほぼ直っています。作り直しは0回、歩いている間に霧や敵が先に出ることも0回でした（下の 1）。</span></li>
+    </ul>
+    <div class="strip">
+      <figure><img src="img/v1-13b-invite.jpg" alt="誘って同行" loading="lazy"><figcaption>P2 がレオンを誘う（その場で同行になる）</figcaption></figure>
+      <figure><img src="img/v1-14-party-moving.jpg" alt="答える人ではありません" loading="lazy"><figcaption>「一緒に行く」→「この提案に答える人ではありません」</figcaption></figure>
+      <figure><img src="img/v1-16-pet-coat.jpg" alt="後ろに返事待ちが残る" loading="lazy"><figcaption>後ろには「P1 返事待ち」が残ったまま</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="box">
+    <h2>動画3本</h2>
+    <div class="vids">
+      <figure class="vid"><video src="01-world-and-party.mp4" controls preload="metadata" playsinline></video><figcaption>① 世界マップとパーティ（約1分）：タイトル →「はじめから」→ 準備 → キャラ作成 → P1・P2 が別々に移動 → 誘って同行 → 突発イベント → お供</figcaption></figure>
+      <figure class="vid"><video src="02-town-and-dungeon.mp4" controls preload="metadata" playsinline></video><figcaption>② 町とダンジョン（約50秒）：P1/P2 の切り替え・買い物・宿屋・依頼 → 聖堂の条件 → ダンジョン → 探索力の判定 → 装備 → 歩く → 地図</figcaption></figure>
+      <figure class="vid"><video src="03-battle-and-synergy.mp4" controls preload="metadata" playsinline></video><figcaption>③ 戦闘と報酬（約1分20秒）：敵4体 → 敵を選ぶ・選び直す → フォーカス → スロット → お供の応援 → 味方を選ぶ・選び直す → 敵の番 → 勝利 → 報酬</figcaption></figure>
+    </div>
+    <p class="how"><b>保存データを書き換えて出した所:</b> ① 別々の移動の前に突発イベントを止めた。同行の場面は、P2 の番・移動力3から始めた。同行の移動が通らなかったので、突発イベント（迷い鳥）は書き換えで出した。② 2人を王都へ。レオンを剣豪 Lv4 にして、条件の進み具合を「完全成功 9/15・刀で倒した数 7/10・属性で倒した数 3/10」にした。歩く場面は、最初の部屋の戦闘に勝った直後の保存から。③ 最初の部屋の敵を4体に。勝つ所は敵のHPを1にした。<br>「はじめから」の確認はブラウザ標準の窓なので、動画に写りません（自動で「OK」を押しています）。</p>
+  </section>
+
+  <section class="box">
+    <h2><span class="no">1</span>移動・描画の違和感（実測）</h2>
+    <p class="small">毎フレーム（1秒に約60回）、次の4つを測りました。駒の要素が作り直されたか。止まっている駒が、乗っているマスから何pxずれたか。歩いている間に霧のマスの数や敵の数が変わったか。</p>
+    <div class="tbl"><table>
+      <tr><th>場面</th><th>測ったフレーム数</th><th>駒の作り直し</th><th>止まっている駒のずれ</th><th>歩行中の霧・敵の先出し</th></tr>
+      <tr><td>P1 が単独で移動（2人が同じマスから出発）</td><td class="n">131（歩く29・到着20）</td><td class="n">0回</td><td class="n">4.9px</td><td class="n">0回 / 0回</td></tr>
+      <tr><td>P2 が単独で移動（別々のマス）</td><td class="n">101（歩く21・到着18）</td><td class="n">0回</td><td class="n">0.0px</td><td class="n">0回 / 0回（敵1体はそのまま）</td></tr>
+    </table></div>
+    <ul class="fx">
+      <li><span class="sev s-good">良</span><span>作り直し0回、先出し0回です。別々のマスにいる駒は1pxも動きません。</span></li>
+      <li><span class="sev s-small">小</span><span>4.9px は、同じマスに並んでいた2人のうち1人が出ていった時に、残った駒がマスの中央へ寄った分です。これが仕様なら問題ありませんが、「1ピクセルもずれない」を目標にするなら、寄る動きを滑らかにするか、寄せない作りが要ります。</span></li>
+      <li><span class="sev s-big">大</span><span>（前回の記録と同じ）行き先を選んだ時と歩いている間、下のパネルが画面の半分まで広がり、駒が地図の下の端で隠れます（動画①の 0:25 ごろ）。</span></li>
+      <li><span class="sev s-mid">中</span><span>1マス約0.17秒、到着の演出0.3秒（<code>balance.ts:187-188</code>）。歩くのは速いのに、到着の後の暗転と「！」の待ちが長く感じます。</span></li>
+    </ul>
+    <div class="strip">
+      <figure><img src="img/v1-07-map-start.jpg" alt="開始" loading="lazy"><figcaption>開始。P1 と P2 が同じマスに並ぶ</figcaption></figure>
+      <figure><img src="img/v1-09-P1-moving.jpg" alt="移動中" loading="lazy"><figcaption>P1 の移動中のフレーム</figcaption></figure>
+      <figure><img src="img/v1-11a-handoff.jpg" alt="手番の交代" loading="lazy"><figcaption>P2 の番へ：「スマホを渡して、タップで始める」</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="box">
+    <h2><span class="no">2</span>協力プレイ・同行・相手選びの完成度</h2>
+    <h3>はじめから</h3>
+    <ul class="fx">
+      <li><span class="sev s-mid">中</span><span>保存中の冒険がある時だけ、ブラウザ標準の確認の窓が出ます。消えるのは冒険の保存・下書き・場面だけです。設定と伝承の書は残ります（<code>TitleScreen.tsx:68-71</code>・<code>battleStore.ts:650-659</code>）。ゲーム内の確認の窓（ConfirmDialog）を使っていないので、見た目がそろっていません。</span></li>
+    </ul>
+    <h3>同行と手番の交代</h3>
+    <ul class="fx">
+      <li><span class="sev s-big">大</span><span>上の「いちばん大事な発見」のとおり、担当の違う仲間を連れて動けません。</span></li>
+      <li><span class="sev s-good">良</span><span>手番は、行動していない生きているキャラへ順に回ります（<code>world.ts:76-99</code>）。担当が変わる時は画面を隠して「P2 セシルの番です スマホを渡して、タップで始める」が出ます。同じ担当のキャラは最初から同行がオン、他の人のキャラは「誘う」です（1台で遊ぶ時は、誘った瞬間に承知になります）。</span></li>
+      <li><span class="sev s-mid">中</span><span>同行中の仲間の顔が灰色で表示され、「同行していない」ように見えます（動画①）。キャラ作成で担当を選ばないと全員 P1 になり、「誘う」も「→P2」も出ません（<code>CreateScreen.tsx:159</code>）。</span></li>
+      <li><span class="sev s-small">小</span><span>同行したキャラにも自分の手番が残ります。一方で、型の注釈（<code>types/game.ts:575</code>）は「行動を終える」のままで、説明と作りが食い違っています。</span></li>
+    </ul>
+    <h3>町（同行中の P1/P2 の切り替え）</h3>
+    <ul class="fx">
+      <li><span class="sev s-good">良</span><span>上のタブ「P1・レオン：利用中」「P2・セシル：利用中」で切り替えられます。全員が利用を終えると地図に戻ります。</span></li>
+      <li><span class="sev s-mid">中</span><span>上の帯の所持金は、切り替えても前のキャラのまま（セシルにしても270G）です。買い物の手応えもありません（「売り切れ」に変わるだけ）。装備の変更は町にはなく、地図・ダンジョンの「装備」から行います。</span></li>
+    </ul>
+    <h3>味方1人への技の相手選び</h3>
+    <div class="tbl"><table>
+      <tr><th>種類</th><th>今の作り</th></tr>
+      <tr><td>回復・支援・清め（癒し・応急処置・かばう構え・手当て・浄化・大いなる癒し・時の回復）</td><td>最初は「HPの割合が一番低い味方（自分を含む）」が選ばれ、味方の欄をタップで変えられる（<code>battleStore.ts:746-751, 817-826</code>）。案内は「回復・支援する味方を選んでください（選択中：○○）」。</td></tr>
+      <tr><td>2つ目の相手を選ぶ技（聖別の光・教皇の聖光）</td><td>2つ目の相手として選ぶ。</td></tr>
+      <tr><td>自動で決まるもの</td><td>癒しの祈り・浄罪は「一番弱った味方」。お供の「応援の歌」はランダムな味方（<code>pets.ts:195</code>）。祝福などは全体。</td></tr>
+      <tr><td>フォーカスを1人に渡す技</td><td><b>無い。</b>フォーカスを増やす技は、自分か全員だけ。</td></tr>
+      <tr><td>道具（ポーションなど）</td><td>毎回「誰に使う？」で選ぶ。最初から選ばれている相手は無い。気付け薬はフォーカス+2。</td></tr>
+    </table></div>
+    <ul class="fx">
+      <li><span class="sev s-mid">中</span><span>「使う人」（金色の枠）と「回復する相手」（青い枠）の区別が枠の色だけです。立ち絵の側には印が出ません。HP満タンの相手にも使え、注意は出ません。</span></li>
+    </ul>
+    <h3>まだ作っていない・直しかけの所</h3>
+    <ul class="fx">
+      <li><span class="sev s-small">注</span><span>お供のおやつは保留中（<code>consumables2.ts:2</code>）。施設が足りない時に聖堂で代わりにする仕組みは、まだ無い（STATUS.md:488）。スマホ2台と Firebase の実機の確認はまだ（STATUS.md:486）。駒は仮の見た目（<code>HeroPiece.tsx:4</code>）。きっかけ・反撃などの一部の能力はまだ（STATUS.md:344）。</span></li>
+    </ul>
+  </section>
+
+  <section class="box">
+    <h2><span class="no">3</span>やりごたえ・難しさの数値</h2>
+    <h3>難易度ごとの倍率（<code>difficulties/basic.ts:7-9</code>）</h3>
+    <div class="tbl"><table>
+      <tr><th>難易度</th><th>敵のレベル</th><th>命</th><th>敵のHP</th><th>敵の攻撃</th><th>その他</th></tr>
+      <tr><td>やさしい</td><td class="n">−1</td><td class="n">5</td><td class="n">×1.2</td><td class="n">×1.2</td><td></td></tr>
+      <tr><td>ふつう</td><td class="n">±0</td><td class="n">3</td><td class="n">×1.55</td><td class="n">×1.55</td><td></td></tr>
+      <tr><td>むずかしい</td><td class="n">+1</td><td class="n">2</td><td class="n">×1.7</td><td class="n">×1.7</td><td>報酬×0.8</td></tr>
+    </table></div>
+    <ul class="fx">
+      <li><span class="sev s-small">注</span><span>「ふつう」の×1.55 は、ふつう専用の倍率です。準備画面にそのまま出るので、「ふつうなのに強くなっている」と読めます。侵食度は3つとも1巡+1%で、差がありません。</span></li>
+      <li><span class="sev s-small">注</span><span>画面に出ない倍率がもう1つあります。人数ごとの敵のHPで、1人0.6・2人1.0・3人1.35・4人1.7（<code>balance.ts:28</code>）。難易度の倍率と掛け合わされます。敵のレベルが1上がるごとに、HP+10%・攻撃+8%です。</span></li>
+    </ul>
+    <h3>敵の強さの例（ふつう・2人）</h3>
+    <div class="tbl"><table>
+      <tr><th>段階</th><th>敵</th><th>レベル</th><th>HP</th><th>攻撃</th></tr>
+      <tr><td>序盤</td><td>森の狼</td><td class="n">3</td><td class="n">34</td><td class="n">噛みつき 10</td></tr>
+      <tr><td>序盤</td><td>毒キノコ</td><td class="n">3</td><td class="n">27</td><td class="n">毒 3</td></tr>
+      <tr><td>序盤の強敵</td><td>樹の番人</td><td class="n">5</td><td class="n">108</td><td class="n">薙ぎ払い 13</td></tr>
+      <tr><td>1つ目のボス</td><td>トレントの王</td><td class="n">7</td><td class="n">255（4人で434）</td><td class="n">絞め殺す蔓 33・大地の根 11</td></tr>
+      <tr><td>中盤のボス</td><td>モルデア</td><td class="n">9</td><td class="n">358</td><td class="n">魂裂き 36</td></tr>
+      <tr><td>後半のボス</td><td>イグナヴァル</td><td class="n">11</td><td class="n">460</td><td class="n">灼熱の牙 43</td></tr>
+      <tr><td>最後のボス</td><td>ヴァルグリム</td><td class="n">13</td><td class="n">682（4人で1159）</td><td class="n">消滅の一撃 56</td></tr>
+    </table></div>
+    <h3>味方のHPと回復</h3>
+    <ul class="fx">
+      <li><span class="sev s-small">注</span><span>最大HPの基本値（<code>hero.ts:24-28</code>）: 守護者72・剣士60・武闘家56・僧侶50・盗賊50・狩人50・召喚士46・魔道士42。体力60を超えた分の半分と、装備の分が足されます（剣士は実際70）。</span></li>
+      <li><span class="sev s-small">注</span><span>回復量: 癒し 4／7／10（成功の数ごと）。僧侶の「癒しの祈り」は毎ターン一番弱った味方に+3。休憩部屋は最大HPの35%、野営は20%（夜は夜襲35%）。宿屋は全回復で15〜30G。</span></li>
+      <li><span class="sev s-mid">中</span><span>つり合いの目安: 序盤の敵3体の1ターンの予告は合計で約25（10＋6×2＋毒3）です。僧侶の癒しは最大10、癒しの祈りは3。1ターンの回復は、受けるダメージの半分ほどです。1つ目のボスの大技33は、魔道士（HP42）なら1発で大きく削られます。難しめの方針には合っていますが、序盤は回復が追いつかない場面がありそうです。</span></li>
+    </ul>
+    <h3>侵食度と成功率</h3>
+    <ul class="fx">
+      <li><span class="sev s-small">注</span><span>侵食度は1巡ごとに+1%（1日8巡なので1日+8%）。ダンジョンに入ると+2%、町が陥落すると+5%、ダンジョンをクリアすると−5%。25%で敵が3体増え町が襲われる、50%と75%で敵のレベル+1、100%でゲームオーバー（<code>map.ts:86-91</code>）。</span></li>
+      <li><span class="sev s-small">注</span><span>カードの成功率は「カードの基本の成功率 ＋ (能力値−60)÷2」で、5〜95%に収まります（例：剣士は力70なので+5、ストライク80%→85%）。世界マップの判定は能力値をそのまま%として使います。フォーカス1点で1枠が必ず成功します（最初4・最大6）。</span></li>
+    </ul>
+  </section>
+
+  <section class="box">
+    <h2><span class="no">4</span>抽選・収集・成長のワクワク感</h2>
+    <ul class="fx">
+      <li><span class="sev s-mid">中</span><span><b>お供の毛色:</b> 通常の色が各35%、珍しい色が各15%（<code>balance.ts:56</code>）。迎える画面を開いた時には、もう色が決まって表示されています。珍しい色の時だけ「✨珍しい毛色！」が0.7秒光ります。めくる・溜めるといった「何色かな？」の演出はありません（動画①の最後はオカメインコのノーマル）。</span></li>
+      <li><span class="sev s-mid">中</span><span><b>転職の条件:</b> 「刀を装備して敵を10体倒す（7/10）」のように数字で出ます。ただ、同じ文が2回並び（説明と鍵の欄）、進み具合の棒はありません。数は戦闘・判定・稼いだお金・祈りなどで自動で増えます。</span></li>
+      <li><span class="sev s-big">大</span><span><b>戦闘のカード報酬:</b> 格の確率は、ふつうの戦闘が コモン72・レア24・エピック4％、強敵55・35・10、ボス35・45・20。1人3枚のうち2枚は「スマート抽選」（ジョブ・系統・武器に合うほど出やすい）、最後の1枚は完全にランダムです（<code>cardTags.ts:85-96</code>）。今回、剣士に「魔力の矢」（魔法の成功率が−15%のジョブに魔法のカード）が出て、僧侶には2回とも最初から持っている「ガード」が出ました。ガードは僧侶・守護者の候補表に入っていて、同じカードを持っていても外されません。</span></li>
+      <li><span class="sev s-good">良</span><span>レアのカードは青く光る枠と「レア」の文字が付き、裏返しのカードを「タップですぐにめくる」演出もあります（動画③の最後）。ここは「おっ！」と思える作りになっています。</span></li>
+      <li><span class="sev s-small">注</span><span>宝箱からはカードは出ません。装備か消費アイテム、ゴールド、25%でおまけが出ます。箱の見た目と運の判定で、格の確率が変わります。</span></li>
+    </ul>
+    <div class="strip">
+      <figure><img src="img/v1-15-event.jpg" alt="迷い鳥" loading="lazy"><figcaption>突発イベント「迷い鳥の口笛」</figcaption></figure>
+      <figure><img src="img/v1-17-pet-on-map.jpg" alt="お供と一緒" loading="lazy"><figcaption>お供にした後（後ろの返事待ちが残る）</figcaption></figure>
+      <figure><img src="img/v2-09-temple-conditions.jpg" alt="条件" loading="lazy"><figcaption>聖堂: 9/15・7/10・3/10</figcaption></figure>
+      <figure><img src="img/v3-14-card-pick-P1.jpg" alt="レオンの報酬" loading="lazy"><figcaption>剣士に「魔力の矢」（レア）</figcaption></figure>
+      <figure><img src="img/v3-15-card-pick-P2.jpg" alt="セシルの報酬" loading="lazy"><figcaption>僧侶にまた「ガード」</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="box">
+    <h2><span class="no">5</span>UIの見やすさ・伝わりやすさ</h2>
+    <ul class="fx">
+      <li><span class="sev s-mid">中</span><span><b>敵の予告と立ち絵:</b> 予告の宛先は「→P1・レオン」の形です。ただし敵が3体以上になると「→P1」だけになります（<code>Battlefield.tsx:59-65</code>）。担当を分けると P1/P2 と顔の丸で見分けられますが、全員 P1 のままだと区別できません。予告から立ち絵への赤い点線は、4体の時も重なりませんでした。</span></li>
+      <li><span class="sev s-big">大</span><span><b>敵を選んだ時:</b> 選んだ敵の上に「予測 下の一覧へ」の札が出て、敵の絵が隠れます（4体の時も同じ）。</span></li>
+      <li><span class="sev s-mid">中</span><span><b>ダメージ・回復の予測:</b> 下の一覧は、実際に戦闘を複製して計算しています。強化・弱体・脆弱×1.5・弱点と耐性・連携・能力・装備がすべて入り、ブロックで止まる分は「HP減少」として別に出ます。一方、上の色の帯はカードに書かれた数字のままです。だから「完全 7」と「完全：ダメージ9」がずれます（剣士の「剣の心得」で7×1.3＝9）。回復は「実際に回復した量」しか数えないので、相手が満タンだと0になり、「効果は上の表示を確認」と出ます。</span></li>
+      <li><span class="sev s-good">良</span><span><b>強化・状態異常のアイコン:</b> タップでも長押しでも詳しい窓が開きます（<code>StatusChips.tsx:20-21</code>）。ただし、外から渡されたタップの処理は使われていません。</span></li>
+      <li><span class="sev s-big">大</span><span><b>結果の帯:</b> 「完全成功！ 9 DMG ぴーちゃんの応援の歌（応…」が1行で画面の外にはみ出します。英語の DMG・BLOCK も混ざります（動画③のお供の応援）。</span></li>
+    </ul>
+    <div class="strip">
+      <figure><img src="img/v3-01-battle-4enemies.jpg" alt="敵4体" loading="lazy"><figcaption>敵4体の予告と立ち絵。子狼（セシルのお供）がレオンの足元にいる</figcaption></figure>
+      <figure><img src="img/v3-04-target-changed.jpg" alt="選び直し" loading="lazy"><figcaption>敵を選び直した所（札で絵が隠れる）</figcaption></figure>
+      <figure><img src="img/v3-05-focus.jpg" alt="フォーカス" loading="lazy"><figcaption>フォーカス1で「完全 100%」</figcaption></figure>
+      <figure><img src="img/v3-07-cutin.jpg" alt="お供の応援" loading="lazy"><figcaption>お供の応援と、はみ出す帯</figcaption></figure>
+      <figure><img src="img/v3-08-heal-default-target.jpg" alt="味方を選ぶ" loading="lazy"><figcaption>癒し：最初はレオン</figcaption></figure>
+      <figure><img src="img/v3-09-heal-target-changed.jpg" alt="味方の選び直し" loading="lazy"><figcaption>セシル自身に選び直す</figcaption></figure>
+      <figure><img src="img/v3-11-enemy-01.jpg" alt="敵の番" loading="lazy"><figcaption>敵の番（約1秒で終わる）</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="box">
+    <h2><span class="no">6</span>Claude の目で見た「まだ微妙・不自然」な所</h2>
+    <p class="small">前回のテストプレイ記録（大8・中22・小15）に、今回の動画で新しく気づいた点を足しました。</p>
+    <ul class="fx">
+      <li><span class="sev s-big">大</span><span>1台で2人の時、担当の違う仲間と一緒に動けない（上の発見）。</span></li>
+      <li><span class="sev s-big">大</span><span>「ターン終了」を1回押すと、まだカードを持っている仲間の番も終わる。小さな注意書きだけで、確認が出ない。</span></li>
+      <li><span class="sev s-big">大</span><span>敵の番が約1秒で終わる。数字（-3・防御7・毒+3・-6…）と「敵のターン」「ターン2」の帯が重なって追えない。ダメージの数字が体ではなく画面の真ん中に出る。</span></li>
+      <li><span class="sev s-big">大</span><span>報酬のカードが、ジョブに合わない（剣士に魔法）・最初から持っている（僧侶にガード）・ほぼ同じ数字の2枚、になりやすい。</span></li>
+      <li><span class="sev s-mid">中</span><span>お供の居場所: セシルの子狼が、戦闘でレオンの足元に立つ。インコは肩ではなく横に浮いている。お供の応援は左上の小さな札だけで、絵も出ない。</span></li>
+      <li><span class="sev s-mid">中</span><span>ダンジョンの扉は「全員が開けるを選ぶと開く」。1台で遊ぶ時は1回で開くが、その案内が常に画面の上に出ていて邪魔。戦闘の後の部屋で、左右の通路の先が真っ黒に見える。</span></li>
+      <li><span class="sev s-mid">中</span><span>操作が回りくどい所: 敵を狙う技は「カード → 敵 → 発動（運に任せる）」の3回。報酬は2人分で「ボーナス → ボーナス → カード → カード → 先へ進む」の5回。同行の移動は、誘う → 移動する → 一緒に行く の3回（しかも今は通らない）。</span></li>
+      <li><span class="sev s-mid">中</span><span>文字が詰まっている所: 転職の説明（3行）、移動の歩数の説明「1歩・扉で1歩（向くのは0歩）」、町の「8ワールドターンごとに入れ替わります」。</span></li>
+      <li><span class="sev s-small">小</span><span>「ふつう」の説明に×1.55 が出る。上の「×3」（命）と「★4/6」（フォーカス）の意味が書かれていない。「はじめから」の確認がブラウザ標準の窓。</span></li>
+    </ul>
+    <div class="strip">
+      <figure><img src="img/v1-02-setup.jpg" alt="準備" loading="lazy"><figcaption>冒険の準備</figcaption></figure>
+      <figure><img src="img/v1-03-create-p1.jpg" alt="キャラ作成" loading="lazy"><figcaption>キャラ作成（1人目）</figcaption></figure>
+      <figure><img src="img/v1-05-create-p2-ability.jpg" alt="2人目" loading="lazy"><figcaption>2人目の能力（P2 を選んだ所）</figcaption></figure>
+      <figure><img src="img/v2-02-town-P1.jpg" alt="町" loading="lazy"><figcaption>町（P1）</figcaption></figure>
+      <figure><img src="img/v2-04-town-P2.jpg" alt="町P2" loading="lazy"><figcaption>町（P2 に切り替え）</figcaption></figure>
+      <figure><img src="img/v2-15-equip.jpg" alt="装備" loading="lazy"><figcaption>パーティ・装備の画面</figcaption></figure>
+      <figure><img src="img/v2-13-dungeon-enter.jpg" alt="ダンジョン" loading="lazy"><figcaption>ダンジョンの入口（先に探索力の判定）</figcaption></figure>
+      <figure><img src="img/v2-18-walk-1.jpg" alt="歩く" loading="lazy"><figcaption>歩く画面</figcaption></figure>
+      <figure><img src="img/v2-19-dungeon-map.jpg" alt="地図" loading="lazy"><figcaption>ダンジョンの地図</figcaption></figure>
+      <figure><img src="img/v3-12-victory.jpg" alt="勝利" loading="lazy"><figcaption>勝利の記録</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="box">
+    <h2>ファイルの一覧</h2>
+    <p class="small">パソコンの <code>C:\dev\card-rpg\.claude\worktrees\trusting-nightingale-9f20e6\screenshots\review-pack\</code>（Git の管理の外）にあります。</p>
+    <ul class="fx">
+      <li><span class="sev s-small">動</span><span><code>01-world-and-party.mp4</code>（1.7MB・約59秒）、<code>02-town-and-dungeon.mp4</code>（1.6MB・約48秒）、<code>03-battle-and-synergy.mp4</code>（3.8MB・約79秒）。元の録画（.webm）も同じ所にあります。</span></li>
+      <li><span class="sev s-small">写</span><span><code>v1-*.png</code>（世界マップとパーティ）、<code>v2-*.png</code>（町とダンジョン）、<code>v3-*.png</code>（戦闘と報酬）で、全部で約100枚。<code>probe-world.json</code> は 1 の実測の生データです。</span></li>
+      <li><span class="sev s-small">注</span><span>指定の 4211 番は、別のプログラムが別のビルドを配信していました（止めてはいけないので触っていません）。そのため、自分のビルド（主ブランチ c0f153f）を 4219 番で配信して撮りました。</span></li>
+    </ul>
+  </section>
+
+  <section class="box">
+    <h2>Gemini へのレビューのお願い（そのまま貼れます）</h2>
+    <pre class="req" id="req">カードRPG「DESTINY OF CRYSTALIA」のレビュー資料です。スマホ縦（390×844）で、2人・ふつうで遊んだ動画3本（世界マップとパーティ／町とダンジョン／戦闘と報酬）と、プログラムから読み出した数値・作りのまとめがあります。
+企画・レビュアーとして、次の4つを見てください。
+1. 動画を見て「ワクワクするか・操作に違和感がないか」。特にテンポ（敵の番が約1秒・到着の後の待ち）と、操作の回数
+2. 難しさの数値（ふつう＝敵のHPと攻撃×1.55、1つ目のボスHP255・大技33、僧侶の回復4〜10）が、やりごたえとしてちょうど良いか
+3. 報酬とお供のワクワク（カードの3枚目は完全にランダム・毛色はすでに決まって表示される）を良くする案
+4. 直す順番の提案（1台2人で同行して動けない不具合を含む）
+前提: 難易度は今のまま（難しめが良い）。カードの報酬は「1枚はジョブ・系統・武器種のカード」に変える予定です。お供は可愛さと愛着を最優先にしています。最新の基準は spec.md・docs/STATUS.md・docs/design-v2.md です。</pre>
+    <button class="copy" id="copy" type="button">文をコピー</button>
+  </section>
+</div>
+
+<script>
+document.getElementById('copy').addEventListener('click', () => {
+  const t = document.getElementById('req').textContent;
+  const btn = document.getElementById('copy');
+  const fallback = () => { const r = document.createRange(); r.selectNodeContents(document.getElementById('req')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); btn.textContent = '選んだので長押しでコピー'; };
+  try { navigator.clipboard.writeText(t).then(() => { btn.textContent = 'コピーしました'; }, fallback); } catch (e) { fallback(); }
+});
+</script>

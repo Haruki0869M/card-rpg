@@ -10,14 +10,23 @@ import {
   Copy,
   Droplet,
   HeartCrack,
+  HeartOff,
   Megaphone,
+  ShieldOff,
+  ShieldHalf,
+  Eye,
   Shield,
   Skull,
   Snowflake,
+  CloudSnow,
+  Bell,
   Sun,
   Moon,
   Zap,
   Sparkles,
+  Hourglass,
+  StarOff,
+  Users,
   Star,
   Sword,
   Swords,
@@ -41,6 +50,8 @@ export const STATUS_ICONS: Record<string, LucideIcon> = {
   shield: Shield,
   sparkles: Sparkles,
   zap: Zap,
+  hourglass: Hourglass,
+  heartOff: HeartOff,
 };
 
 /** 属性のアイコン（属性のデータの icon のキー → アイコン） */
@@ -75,10 +86,41 @@ const TAUNT_STYLE: StatusStyle = {
   text: 'このユニットの単体攻撃の対象が、挑発した味方に固定される（次の敵フェーズ終了まで）',
 };
 
+/** かばう（魔王軍の騎士。状態異常ではないが、同じ並びに出す） */
+const GUARD_STYLE: StatusStyle = {
+  Icon: ShieldHalf,
+  name: 'かばう',
+  color: '#9ad0ff',
+  bg: '#0a2a4a',
+  text: '次の味方の番の間、ほかの敵を狙った単体攻撃のカードのダメージを、この敵が代わりに受ける。全体攻撃・お供と召喚の攻撃は、そのまま通る。この敵が倒れたら終わる',
+};
+/** 吹雪に隠れている（白狼王の段階。区切り3b。状態異常ではないが、同じ並びに出す） */
+const HIDDEN_STYLE: StatusStyle = {
+  Icon: CloudSnow,
+  name: '吹雪に隠れている',
+  color: '#d8f0ff',
+  bg: '#1a2a3a',
+  text: '次の敵の番まで、単体のカードのダメージは外れる（0）。全体攻撃・お供と召喚・毒などの継続ダメージ・反撃・道具は当たる。状態異常だけの効果は付く。BREAK はできる',
+};
+/** 喰った灯（灯を喰らう影の段階。区切り3b。数 = 喰った灯） */
+const LAMP_STYLE: StatusStyle = {
+  Icon: Flame,
+  name: '喰った灯',
+  color: '#e0b0ff',
+  bg: '#2a1240',
+  text: '味方がフォーカスを1つ使うたび+1（最大6）。1つにつき、この敵の攻撃が+2。この敵を BREAK すると0に戻る',
+};
+/** 状態異常ではない印（数を出さない） */
+export const MARK_STATUSES = new Set(['taunt', 'guard', 'hidden']);
+/** 状態異常ではない印（数を出す物も含む。長押しで「残りターン」を出さない） */
+export const PSEUDO_STATUSES = new Set(['taunt', 'guard', 'hidden', 'lamp']);
 const styleCache = new Map<string, StatusStyle>();
 /** 状態異常の見た目（データから作る） */
 export function statusStyle(id: string): StatusStyle {
   if (id === 'taunt') return TAUNT_STYLE;
+  if (id === 'guard') return GUARD_STYLE;
+  if (id === 'hidden') return HIDDEN_STYLE;
+  if (id === 'lamp') return LAMP_STYLE;
   let st = styleCache.get(id);
   if (!st) {
     const d = getStatus(id);
@@ -106,11 +148,25 @@ const EFFECT_ICON: Record<string, { Icon: LucideIcon; color: string }> = {
   heal: { Icon: HeartPulse, color: '#7dffa8' },
   healPctOfDealt: { Icon: HeartPulse, color: '#7dffa8' },
   cleanse: { Icon: Sparkles, color: '#9affd0' },
+  jump: { Icon: Swords, color: '#b4e7ff' },
+  fullRestore: { Icon: HeartPulse, color: '#7dffa8' },
+  stealIntent: { Icon: Sparkles, color: '#ffd06a' },
+  payHp: { Icon: HeartCrack, color: '#ff8aa0' },
+  drainFocus: { Icon: StarOff, color: '#ffd54a' },
+  summonEnemy: { Icon: Users, color: '#c8b0ff' },
+  shieldBreak: { Icon: ShieldOff, color: '#ff9a7a' },
+  purify: { Icon: Sparkles, color: '#9affd0' },
+  punishPlays: { Icon: Eye, color: '#ffb07a' },
+  guardAllies: { Icon: ShieldHalf, color: '#9ad0ff' },
+  hide: { Icon: CloudSnow, color: '#d8f0ff' },
+  echoBlow: { Icon: Bell, color: '#fff2b0' },
+  retaliate: { Icon: Swords, color: '#ffb07a' },
 };
 const FALLBACK_EFFECT_ICON = { Icon: Sparkles, color: '#e0d8c0' };
 
 /** カードの効果1つ分の短い表示（アイコン＋数値。全体なら「全」） */
-export function EffectChip({ e, size = 12 }: { e: CardEffect; size?: number }) {
+/** value = 今の相手に対する計算後の値（予測。あれば数字の代わりに出す） */
+export function EffectChip({ e, size = 12, value }: { e: CardEffect; size?: number; value?: string }) {
   const s = e.kind === 'applyStatus' ? statusStyle(e.status) : null;
   const el = e.kind === 'damage' && e.element ? getElement(e.element) : undefined;
   const { Icon, color } = s
@@ -120,7 +176,7 @@ export function EffectChip({ e, size = 12 }: { e: CardEffect; size?: number }) {
       : (EFFECT_ICON[e.kind] ?? FALLBACK_EFFECT_ICON);
   const to = targetOf(e);
   const all = to === 'allies' || to === 'otherAllies' || (to === 'foes' && e.kind !== 'taunt');
-  const text = `${all ? '全' : ''}${effectShort(e)}`;
+  const text = `${all ? '全' : ''}${value ?? effectShort(e)}`;
   const Shape = e.kind === 'block' && all ? ShieldPlus : Icon;
   return (
     <span className="inline-flex items-center gap-px whitespace-nowrap" style={{ color }}>

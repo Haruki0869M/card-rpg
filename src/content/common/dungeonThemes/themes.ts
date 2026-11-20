@@ -1,0 +1,80 @@
+// ランダムダンジョンのテーマ（段階7a・overhaul-plan-v2 §4-2）。部屋の並びとご褒美だけを変える。
+// 敵は、そのシナリオのランダムダンジョンの敵をそのまま使う（7本 × 3テーマを、敵のデータを増やさずに作る）。
+// 割合（weights）と封魔の宝箱の確率は【提案】（計画は「多い・少なめ」とだけ書いている）。ご褒美の倍率と敵のLv+1は計画の数字のまま
+import type { DungeonThemeDef } from '../../../types';
+
+export const dungeonThemes: DungeonThemeDef[] = [
+  {
+    id: 'crystalGrotto',
+    order: 1,
+    name: '古代の晶洞',
+    mark: '💎',
+    // 寄り道の値打ち（2026-11-14 オーナーの返事 5-A）: 宝箱のお金+50% の代わりに、晶石の祭壇を2回使える
+    description: 'イベントと宝箱が多く、戦闘は少なめ。奥に晶石の祭壇（カードの強化か変異を2回）',
+    weights: { battle: 22, elite: 8, event: 30, chest: 30, rest: 10 },
+    fixedRoom: 'crystalAltar',
+    reward: { altarUses: 2 },
+  },
+  {
+    id: 'sealedLabyrinth',
+    order: 2,
+    name: '封魔の地下迷宮',
+    mark: '⛓',
+    description: '強敵と封魔の宝箱が多い。敵のLv+1。カードと装備のエピックが出やすい（2倍）。奥に休憩が1つだけ',
+    // 休憩は4行目の1部屋だけ（2〜3行目には出さない）
+    weights: { battle: 30, elite: 30, event: 10, chest: 30 },
+    fixedRoom: 'rest',
+    enemyLevel: 1,
+    sealedChance: 60,
+    reward: { epicMul: 2 },
+  },
+  {
+    id: 'outlawDen',
+    order: 3,
+    name: '無法者の隠れ処',
+    mark: '🗡',
+    // 寄り道の値打ち（2026-11-14 オーナーの返事 5-A）: 戦闘のお金+30% の代わりに、闇商人の専用の装備を2つから選べる
+    description: '戦闘が多く、敵は数が多い組。奥に闇商人（専用の装備を2つ並べる。1つ選んで買える）',
+    weights: { battle: 50, elite: 16, event: 12, chest: 12, rest: 10 },
+    fixedRoom: 'blackMarket',
+    largeGroups: true,
+    reward: { blackMarketChoices: 2 },
+  },
+  // 2026-11-14 シナリオ2の作り直し（docs/tasks/scenario2-theme-scourge-proposal.md §1 A案・オーナーの OK）: シナリオ2だけのテーマ。
+  // 部屋に入るたびに凍え+1・HPが「凍え×2%」減る（1で止まる）。焚き火（休憩）で凍えは0。奥の氷漬けの箱は、凍えたまま着くほど良い箱。
+  // 宝箱は奥の1つだけ（割合0）・封魔にしない。古い保存のテーマ決めと、ほかのシナリオの乱数の順番を変えないよう、データの最後に置く。
+  // 割合と箱の格の境目は【提案】（案の表のとおり: 凍え1 = 鉄箱 / 2 = 装飾箱 / 4 = 黄金箱。3 は道の作りでは出ないが、装飾箱）
+  {
+    id: 'frozenVault',
+    order: 4,
+    name: '氷漬けの宝物庫',
+    mark: '🧊',
+    description: '部屋ごとに凍えが積もり、HPが減る。焚き火で凍えは消える。奥の氷漬けの箱は、凍えているほど良い品',
+    weights: { battle: 25, elite: 25, event: 20, rest: 30 },
+    fixedRoom: 'frozenChest',
+    sealedChance: 0,
+    scenario: 'frozenKingdom',
+    chill: {
+      hpPercent: 2,
+      chest: [
+        { min: 4, rarity: 'legend' },
+        { min: 2, rarity: 'epic' },
+        { min: 0, rarity: 'rare' },
+      ],
+    },
+  },
+  // 2026-11-16 シナリオ3の作り直し（docs/tasks/scenario3-rework-plan.md §3-3・「憲章の点検の後の直し」B4・オーナーの OK）: シナリオ3だけのテーマ。
+  // 役割: 使い所に悩む強い消耗品を、選んで持ち帰る洞。2〜3行目はイベントと宝箱がやや多い（割合は計画の数字のまま）。
+  // 奥の漂流物の山で、全員がそれぞれ消耗品を3つから1つ選ぶ（1つはエピック以上）。古い保存のテーマ決めと、ほかのシナリオの乱数の順番を変えないよう、データの最後に置く
+  {
+    id: 'flotsamCave',
+    order: 5,
+    name: '漂流物の洞',
+    mark: '🛶',
+    description: 'イベントと宝箱がやや多い。奥の漂流物の山で、全員がそれぞれ強い消耗品を3つから1つ選べる（1つはエピック以上）',
+    weights: { battle: 25, elite: 15, event: 30, chest: 15, rest: 15 },
+    fixedRoom: 'flotsamPile',
+    scenario: 'cursedArchipelago',
+    flotsam: { choices: 3, epicSlots: 1 },
+  },
+];

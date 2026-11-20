@@ -23,11 +23,17 @@ import {
   heroStats,
   isDone,
   reachableRooms,
+  doorFront,
+  dungeonNavigator,
+  findPath,
+  posOf,
   retreatLoss,
   statChance,
   unusableReason,
 } from '../index';
 import { party } from './helpers';
+import { cardTargets } from '../battle/targets';
+import { unitIdOf } from '../battle/units';
 
 const P: PlayerId = 'P1';
 /** ダンジョンの流れを確かめるため、世界マップを外して仮の拠点から始める（世界マップは world.test.ts で確かめる） */
@@ -59,7 +65,7 @@ describe('冒険の開始', () => {
     expect(heroMaxHp(w)).toBe(60 + 5 + 5); // 皮の鎧＋体力70（60を超えた分の半分。M3-C6）
     // 最初の道具（回復薬2つ）はキャラに順番に配られる
     expect(g.heroes.reduce((n, h) => n + h.pouch.length, 0)).toBe(2);
-    expect(battleDeck(w).filter((c) => c.fromWeapon).map((c) => c.cardId)).toEqual(['wSlash', 'wSlash']);
+    expect(battleDeck(w).filter((c) => c.fromWeapon).map((c) => c.cardId)).toEqual(['strike', 'strike']);
     expect(battleDeck(w)).toHaveLength(12);
     expect(g.mode).toBe('hub');
   });
@@ -109,7 +115,7 @@ describe('装備', () => {
     g = run(g, { type: 'EQUIP', playerId: P, heroId: 'h0', itemUid: 'x1' });
     expect(heroStats(g.heroes[0]).str).toBe(before + 4);
     expect(g.heroes[0].stash.some((s) => s.itemId === 'copperSword')).toBe(true);
-    expect(battleDeck(g.heroes[0]).filter((c) => c.fromWeapon).map((c) => c.cardId)).toEqual(['wSteelCombo', 'wSteelCombo']);
+    expect(battleDeck(g.heroes[0]).filter((c) => c.fromWeapon).map((c) => c.cardId)).toEqual(['cmAllOut', 'cmAllOut']);
     g = run(g, { type: 'EQUIP', playerId: P, heroId: 'h0', itemUid: 'x3' });
     expect(heroFocusMax(g.heroes[0])).toBe(BALANCE.focusMax + 1);
     expect(statChance(g.heroes[0], 'luk')).toBe(Math.min(95, 40 + 5));
@@ -172,7 +178,7 @@ describe('宝箱', () => {
     }
     expect(counts.legend).toBeGreaterThan(0);
     expect(counts.epic).toBeGreaterThan(0);
-  });
+  }, 20000); // 冒険を400回作る（段階6a でシナリオ1の地図が2.25倍になり、1回あたり約2ms→5ms。全部のテストを並べて動かすと5秒を超えるため）
   it('鍵開けに失敗すると罠（全員5ダメージ）。成功すれば開けられる', () => {
     let failed = false;
     let opened = false;
@@ -243,10 +249,10 @@ describe('戦闘 → 報酬 → 成長', () => {
 describe('新しい戦闘の要素', () => {
   it('全体攻撃・全員ブロック・全員回復', () => {
     const s = createBattle({ seed: 1, party: party('warrior', 'guardian'), encounter: { id: 't', name: 't', enemies: [{ defId: 'goblinScout' }, { defId: 'goblinScout' }] } });
-    s.allies[0].hand = [{ uid: 'z1', cardId: 'sweep' }];
+    s.allies[0].hand = [{ uid: 'z1', cardId: 'lnBuSwipe' }];
     let r = applyCommand(s, { type: 'PLAY_CARD', playerId: 'P1', characterId: 'a0', cardInstanceId: 'z1', focusUsed: 2 });
     expect(r.error).toBeUndefined();
-    expect(r.state.enemies.every((e) => e.hp === e.maxHp - 8)).toBe(true);
+    expect(r.state.enemies.map((e) => e.maxHp - e.hp)).toEqual([6, 6]); // 5 × 剣の心得（完全成功で1.3倍）。憲章5: 「旋風撃」（8）を「払い斬り」（5）にまとめた
     const s2 = r.state;
     s2.allies[1].hand = [{ uid: 'z2', cardId: 'guardFormation' }, { uid: 'z3', cardId: 'holyLight' }];
     s2.allies[0].hp = 30;
@@ -276,8 +282,12 @@ describe('新しい戦闘の要素', () => {
     expect(r.state.enemies[0].phase).toBe(1);
     expect(enemyName(r.state.enemies[0])).toBe('怒れる古樹');
     expect(r.events.some((e) => e.type === 'enemyPhase')).toBe(true);
-    // 次のターンの行動は第2形態の行動から選ばれる
+    // 次のターンの行動は第2形態の開幕の一手（2026-11-14 ボスの段階）、その次から第2形態の行動から選ばれる
     let st = applyCommand(r.state, { type: 'END_TURN', playerId: 'P1' }).state;
+    while (st.phase === 'enemy') st = applyCommand(st, { type: 'ENEMY_STEP' }).state;
+    expect(st.enemies[0].intent?.actionId).toBe('rootDown');
+    expect(st.enemies[0].intent?.opening).toBe(1);
+    st = applyCommand(st, { type: 'END_TURN', playerId: 'P1' }).state;
     while (st.phase === 'enemy') st = applyCommand(st, { type: 'ENEMY_STEP' }).state;
     expect(['rageStorm', 'stranglingVine', 'rotSpores']).toContain(st.enemies[0].intent?.actionId);
   });
@@ -331,7 +341,14 @@ function autoPlay(g: GameState, dungeonId: string, maxSteps = 4000): GameState {
     switch (g.mode) {
       case 'dungeon': {
         const rooms = reachableRooms(g.dungeon!);
-        g = run(g, { type: 'ENTER_ROOM', playerId: P, roomId: rooms[step % rooms.length].id });
+        const room = rooms[step % rooms.length];
+        // 第3段階: 扉の前まで歩いてから開ける
+        const front = doorFront(g.dungeon!, room.id)!;
+        for (const d of findPath(g.dungeon!, front)!) {
+          const rel = (['forward', 'right', 'back', 'left'] as const)[(d - posOf(g.dungeon!).facing + 4) % 4];
+          g = run(g, { type: 'DUNGEON_STEP', playerId: P, heroId: dungeonNavigator(g)!.id, dir: rel });
+        }
+        g = run(g, { type: 'ENTER_ROOM', playerId: P, roomId: room.id });
         break;
       }
       case 'battle': {
@@ -345,7 +362,7 @@ function autoPlay(g: GameState, dungeonId: string, maxSteps = 4000): GameState {
             const card = cardOf(c);
             const target = b.enemies.find((e) => !e.dead)?.uid;
             const focus = card.slots >= 3 ? Math.min(card.slots, a.focus) : 0;
-            g = run(g, { type: 'BATTLE', command: { type: 'PLAY_CARD', playerId: P, characterId: a.id, cardInstanceId: c.uid, targetId: card.target === 'enemy' ? target : undefined, focusUsed: focus } });
+            g = run(g, { type: 'BATTLE', command: { type: 'PLAY_CARD', playerId: P, characterId: a.id, cardInstanceId: c.uid, targetId: card.target === 'enemy' ? target : card.target === 'ally' ? cardTargets(b, a, card).map(unitIdOf)[0] : undefined, focusUsed: focus } });
             played = true;
             break;
           }
@@ -370,7 +387,9 @@ function autoPlay(g: GameState, dungeonId: string, maxSteps = 4000): GameState {
       }
       case 'chest': {
         const c = g.chest!;
-        if (c.contents) g = run(g, { type: 'LEAVE_CHEST', playerId: P });
+        // 2026-11-14（寄り道の値打ち）: ランダムダンジョンの黄金箱は、秘宝を3つから1つ選んでから立ち去る
+        if (c.contents && c.relics?.length && c.relicPicked === undefined) g = run(g, { type: 'PICK_RELIC', playerId: P, optionIndex: 0 });
+        else if (c.contents) g = run(g, { type: 'LEAVE_CHEST', playerId: P });
         else {
           const h = g.heroes.find((x) => x.hp > 0)!;
           g = run(g, { type: 'OPEN_CHEST', playerId: P, heroId: h.id, focusUsed: 0 });
@@ -383,11 +402,13 @@ function autoPlay(g: GameState, dungeonId: string, maxSteps = 4000): GameState {
         if (ev.result) g = run(g, { type: 'FINISH_EVENT', playerId: P });
         else {
           const def = EVENTS.get(ev.eventId);
-          const idx = def.options.findIndex((_, i) => {
-            const st = eventOptionState(g, ev.eventId, i);
-            return st.visible && !st.reason;
-          });
-          g = run(g, { type: 'CHOOSE_EVENT', playerId: P, optionIndex: idx, heroId: g.heroes.find((h) => h.hp > 0)!.id, focusUsed: 0 });
+          // 選ぶキャラは、その選択肢を選べる（お金がいる時は払える）キャラ
+          let pick = { idx: -1, heroId: '' };
+          for (let i = 0; i < def.options.length && pick.idx < 0; i++) {
+            const h = g.heroes.find((x) => x.hp > 0 && (() => { const st = eventOptionState(g, ev.eventId, i, x); return st.visible && !st.reason; })());
+            if (h) pick = { idx: i, heroId: h.id };
+          }
+          g = run(g, { type: 'CHOOSE_EVENT', playerId: P, optionIndex: pick.idx, heroId: pick.heroId, focusUsed: 0 });
         }
         break;
       }
@@ -414,7 +435,7 @@ describe('自動プレイ（ダンジョンを最後まで）', () => {
   it('翠の神殿・ランダムダンジョンを、例外なく制覇または全滅まで進む', () => {
     const results: string[] = [];
     for (let seed = 1; seed <= 12; seed++) {
-      for (const d of Object.values(DUNGEONS.all).map((x) => x.id)) {
+      for (const d of DUNGEONS.forScenario('corruptionKing').map((x) => x.id)) {
         const g = autoPlay(newGame(seed, ['warrior', 'mage', 'guardian', 'hunter'], 'easy'), d);
         results.push(g.mode);
         expect(['cleared', 'gameover']).toContain(g.mode);
@@ -428,7 +449,9 @@ describe('自動プレイ（ダンジョンを最後まで）', () => {
     }
     // 4人・やさしいなら、かなりの割合で制覇できる
     expect(results.filter((r) => r === 'cleared').length).toBeGreaterThan(results.length / 3);
-  });
+    // 第3段階: 扉の前まで1歩ずつ歩く分だけ操作が増え、単独で約3秒（以前は約2.8秒）。
+    // テスト全体を同時に流すと既定の5秒に近づき時々時間切れになるため、このテストだけ60秒にする（K4側の設定に合わせた）（確認する中身は同じ）
+  }, 60_000);
 
   it('同じシードなら同じ結果（オンライン協力で全員の結果が一致する前提）', () => {
     const a = autoPlay(newGame(9), 'emeraldTemple');

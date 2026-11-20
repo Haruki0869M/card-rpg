@@ -48,6 +48,3 @@ export function Limb({ d, fill, width }: { d: string; fill: string; width: numbe
     </>
   );
 }
-
-/** 左右反転（x = 240 - x） */
-export const mirror = (children: React.ReactNode) => <g transform="matrix(-1 0 0 1 240 0)">{children}</g>;

@@ -1,0 +1,12 @@
+// 寒さ・暑さのある地形（K4 段2）。シナリオの地域が terrain で指定した時だけ使われる（侵食の魔王では使わない）
+import type { TerrainDef } from '../../../types';
+
+export const climateTerrains: TerrainDef[] = [
+  { id: 'snow', order: 11, name: '雪原', moveCost: 2, color: '#c9d8e6', decor: 'snow', background: 'snow', climate: { kind: 'cold' } },
+  { id: 'ice', order: 12, name: '氷原', moveCost: 2, color: '#8fc4de', decor: 'cracks', background: 'snow', climate: { kind: 'cold' } },
+  // 湖の氷（シナリオ2の作り直し §2-1「凍った湖の近道」）: 凍った湖の上を滑るので速い（移動力1・サイコロ +2）が、寒い。
+  // 移動 +2 はオーナーの決定（計画 §8-1 の3。街道は +1 のまま）。街道ボーナスと同じ仕組み（moveDiceBonus）で、広い地図の時だけ足す。
+  // 氷原（移動力2で寒い）・街道（寒さ無しで移動 +1）と違う役割。色・模様・立てる物は絵のセッション（src/components/world/）の担当
+  { id: 'lakeIce', order: 19, name: '湖の氷', moveCost: 1, moveDiceBonus: 2, color: '#a8d4ea', decor: 'cracks', background: 'snow', climate: { kind: 'cold' } },
+  { id: 'desert', order: 13, name: '砂漠', moveCost: 2, color: '#d8b46a', decor: 'dunes', background: 'desert', climate: { kind: 'hot', night: { kind: 'cold' } } },
+];

@@ -1,12 +1,30 @@
 // ===== 徘徊する敵（spec §8.4・§8.5）: マップ上に姿が見えている敵 =====
 import { BALANCE } from '../../../data/balance';
+import { DUNGEONS } from '../../../data/dungeons';
 import { getDifficulty } from '../../../data/rules';
 import { getScenario } from '../../../data/scenarios';
 import { TERRAINS } from '../../../data/world';
 import type { GameState, Wanderer, WorldState } from '../../../types';
 import type { Rng } from '../../rng';
-import { hexDistance, neighbors, rowOf } from './hex';
+import { hexDistance, neighbors } from './hex';
 import { timeOfDay } from './time';
+import { isWideMap, laneDefOfTile } from './lanes';
+import { pickWeighted } from '../loot';
+import { startTileOf } from './start';
+import { scourgeCurse } from './scourgeCurse';
+
+/** 陸を歩いて行けるマス（地形は冒険の間変わらないので、同じマスの並びには作り置きを使う） */
+const reachMemo = new WeakMap<object, { from: number; key: string; set: Set<number> }>();
+function landReach(w: WorldState, from: number): Set<number> {
+  const key = w.tiles.length + ':' + w.tiles.reduce((h, t) => (h * 31 + t.t.length + t.t.charCodeAt(0)) | 0, 0);
+  const m = reachMemo.get(w.tiles);
+  if (m && m.from === from && m.key === key) return m.set;
+  const seen = new Set([from]);
+  const q = [from];
+  for (let k = 0; k < q.length; k++) for (const n of neighbors(w, q[k])) if (!seen.has(n) && TERRAINS.get(w.tiles[n].t).moveCost > 0) { seen.add(n); q.push(n); }
+  reachMemo.set(w.tiles, { from, key, set: seen });
+  return seen;
+}
 
 /** 侵食度の段階による敵のレベルの加算 */
 export function corruptionLevelBonus(game: GameState, w: WorldState): number {
@@ -17,12 +35,58 @@ export function corruptionLevelBonus(game: GameState, w: WorldState): number {
 /** 敵のレベル: 地域の基準 + 難易度 + 侵食度の段階 + 夜 */
 export function wandererLevel(game: GameState, w: WorldState, region: number): number {
   const def = getScenario(game.scenarioId).map!;
-  const night = timeOfDay(w.worldTurn) === 'night' ? BALANCE.nightEnemyLevel : 0;
+  // 夜は魔物が強い。氷嵐の魔女（災厄の中ボス・段階7b）が生きている間は、さらに強い
+  const night = timeOfDay(w.worldTurn) === 'night' ? BALANCE.nightEnemyLevel + scourgeCurse({ world: w }).nightLevel : 0;
   return Math.max(1, def.regions[region].enemyLevel + getDifficulty(game.difficulty).enemyLevel + corruptionLevelBonus(game, w) + night);
 }
 
-const blocked = (w: WorldState, i: number) =>
-  !!w.tiles[i].f || TERRAINS.get(w.tiles[i].t).moveCost <= 0 || w.wanderers.some((x) => x.tile === i) || Object.values(w.pos).includes(i);
+/** 入口のとなりのマスに敵を置かない施設: 町・鍵のダンジョン・最後のダンジョン（ランダムダンジョン・塔・祠などは今のまま） */
+const guardsEntrance = (f: WorldState['tiles'][number]['f']) => f?.kind === 'town' || (f?.kind === 'dungeon' && !DUNGEONS.tryGet(f.id)?.random);
+
+/**
+ * 回3 E: 町・鍵のダンジョン・最後のダンジョンの、となりのマス。
+ * 徘徊する敵は、ここに湧かない・動いて入らない（合流や入口へ向かう時に、入口の手前で戦闘にならないように。オーナーの実機の指摘）。
+ * もうここにいる敵（古い保存）は、そのまま。地形は冒険の間変わらないので、同じマスの並びには作り置きを使う
+ */
+const guardMemo = new WeakMap<object, Set<number>>();
+export function entranceGuardTiles(w: WorldState): Set<number> {
+  const memo = guardMemo.get(w.tiles);
+  if (memo) return memo;
+  const out = new Set<number>();
+  w.tiles.forEach((t, i) => {
+    if (guardsEntrance(t.f)) for (const n of neighbors(w, i)) if (!w.tiles[n].f) out.add(n);
+  });
+  guardMemo.set(w.tiles, out);
+  return out;
+}
+
+/** 敵やキャラ・施設のあるマス、入口のとなりのマス（回3 E）、または敵が入れない地形。海の敵（sea）は海のマスにだけ入る */
+const blocked = (w: WorldState, i: number, sea = false) => {
+  const t = TERRAINS.get(w.tiles[i].t);
+  const wrongTerrain = sea ? !t.sea : t.moveCost <= 0;
+  return !!w.tiles[i].f || wrongTerrain || entranceGuardTiles(w).has(i) || w.wanderers.some((x) => x.tile === i) || Object.values(w.pos).includes(i) || !!w.spawns?.some((x) => x.tile === i);
+};
+
+/** 地域の海のマスに、海の敵（幽霊船など）を1組置く（K4 段3）。置けたら返す */
+export function spawnSeaWanderer(game: GameState, w: WorldState, rng: Rng, region: number): Wanderer | undefined {
+  const reg = getScenario(game.scenarioId).map!.regions[region];
+  if (!reg.seaEncounters?.length) return undefined;
+  const heroes = Object.values(w.pos);
+  const cands: number[] = [];
+  for (let i = 0; i < w.tiles.length; i++) {
+    // 地域はマスに記録した番号で見る（道を長くする前の古い地図でも、行の範囲がずれない）
+    if (w.tiles[i].r !== region || blocked(w, i, true)) continue;
+    if (heroes.some((h) => hexDistance(w, h, i) <= 2)) continue;
+    cands.push(i);
+  }
+  if (!cands.length) return undefined;
+  const tile = cands[rng.int(cands.length)];
+  const group = reg.seaEncounters[rng.int(reg.seaEncounters.length)];
+  const level = wandererLevel(game, w, region);
+  const wd: Wanderer = { id: `w${w.nextWandererId++}`, tile, enemies: group.map((defId) => ({ defId, level })) };
+  w.wanderers.push(wd);
+  return wd;
+}
 
 /** 地域に敵を1組置く（見えているマス・キャラや町の近くは避ける）。置けたら返す */
 export function spawnWanderer(game: GameState, w: WorldState, rng: Rng, region: number, at?: number): Wanderer | undefined {
@@ -32,28 +96,48 @@ export function spawnWanderer(game: GameState, w: WorldState, rng: Rng, region: 
   if (tile === undefined) {
     const heroes = Object.values(w.pos);
     const cands: number[] = [];
+    // 広い地図（段階6a）: 仕切りや溶岩に閉じ込められた、歩いて行けないマスには置かない
+    const reach = isWideMap(game, w) ? landReach(w, startTileOf(game, w)) : undefined;
+    // 敵・キャラ・出現スポットのいるマス（blocked と同じ判定を、マスごとに数え直さないように先にまとめる）
+    const busy = new Set<number>([...w.wanderers.map((x) => x.tile), ...heroes, ...(w.spawns ?? []).map((x) => x.tile)]);
+    const guard = entranceGuardTiles(w);
     for (let i = 0; i < w.tiles.length; i++) {
-      const r = rowOf(w, i);
-      if (r < reg.rows[0] || r > reg.rows[1] || blocked(w, i)) continue;
+      if (w.tiles[i].r !== region || busy.has(i) || w.tiles[i].f || guard.has(i) || TERRAINS.get(w.tiles[i].t).moveCost <= 0) continue;
+      if (reach && !reach.has(i)) continue;
       if (heroes.some((h) => hexDistance(w, h, i) <= 2)) continue;
       cands.push(i);
     }
     if (!cands.length) return undefined;
-    tile = cands[rng.int(cands.length)];
+    // 3つの道（2026-11-14）: 広い地図は、帯の重み（街道は多く・西の森は少なく）でマスを選ぶ。乱数を引く回数は前と同じ1回
+    tile = reach ? cands[pickWeighted(cands.map((i) => laneDefOfTile(game, w, i)?.spawnWeight ?? 1), rng)] : cands[rng.int(cands.length)];
   }
-  const group = reg.encounters[rng.int(reg.encounters.length)];
-  const level = wandererLevel(game, w, region);
-  const wd: Wanderer = { id: `w${w.nextWandererId++}`, tile, enemies: group.map((defId) => ({ defId, level })) };
+  let group = reg.encounters[rng.int(reg.encounters.length)];
+  // レアの組（K3）: 地域に rareEncounters がある時だけ、確率で置き換える（ある時だけ乱数を引くので、無い地域の流れは変わらない）。襲撃など場所を決めた配置では出さない
+  let rare = false;
+  if (at === undefined && reg.rareEncounters?.length && rng.next() * 100 < BALANCE.rareWandererChance) {
+    group = reg.rareEncounters[rng.int(reg.rareEncounters.length)];
+    rare = true;
+  }
+  // 3つの道: 帯のレベルの加算（東の丘 +1。広い地図だけ）
+  const level = wandererLevel(game, w, region) + (laneDefOfTile(game, w, tile)?.enemyLevel ?? 0);
+  const wd: Wanderer = { id: `w${w.nextWandererId++}`, tile, enemies: group.map((defId) => ({ defId, level })), ...(rare ? { rare: true as const } : {}) };
   w.wanderers.push(wd);
   return wd;
 }
 
-/** ワールドターンの終わりに、敵が少し動く（町・施設・キャラのいるマスには入らない） */
-export function moveWanderers(w: WorldState, rng: Rng) {
+/**
+ * ワールドターンの終わりに、敵が少し動く（町・施設・キャラのいるマスには入らない）。
+ * 3つの道（2026-11-14）: 広い地図では、帯をまたいで動かない（湧いた帯の多い・少ないが、時間で薄まらないように）
+ */
+export function moveWanderers(w: WorldState, rng: Rng, game?: Pick<GameState, 'scenarioId'>) {
+  const wide = !!game && isWideMap(game, w);
   if (w.worldTurn % BALANCE.wandererMoveEvery !== 0) return;
   for (const wd of w.wanderers) {
-    if (wd.raidTown || rng.next() < 0.5) continue;
-    const opts = neighbors(w, wd.tile).filter((n) => !blocked(w, n) && w.tiles[n].r === w.tiles[wd.tile].r);
+    // 襲撃の敵と災厄の中ボス（巣にいる。段階7b）は動かない
+    if (wd.raidTown || wd.scourge || rng.next() < 0.5) continue;
+    const atSea = !!TERRAINS.get(w.tiles[wd.tile].t).sea;
+    const lane = wide ? laneDefOfTile(game!, w, wd.tile)?.id : undefined;
+    const opts = neighbors(w, wd.tile).filter((n) => !blocked(w, n, atSea) && w.tiles[n].r === w.tiles[wd.tile].r && (!wide || laneDefOfTile(game!, w, n)?.id === lane));
     if (opts.length) wd.tile = opts[rng.int(opts.length)];
   }
 }

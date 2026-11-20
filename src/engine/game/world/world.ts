@@ -1,23 +1,34 @@
+import { followingGroup, detachFollower } from './group';
 // ===== 世界マップの進行（spec §8）: 手番・移動・遭遇・野営・侵食度・町への襲撃・命の灯火 =====
 import { BALANCE } from '../../../data/balance';
+import { newDice, rerollDice, worldDiceBonus } from '../dice';
 import { getClass } from '../../../data/classes';
 import { DUNGEONS } from '../../../data/dungeons';
 import { EVENTS } from '../../../data/events';
-import { getScenario } from '../../../data/scenarios';
+import { corruptionName, getScenario } from '../../../data/scenarios';
 import { getDifficulty } from '../../../data/rules';
-import { QUESTS, TERRAINS, TOWNS } from '../../../data/world';
-import type { EncounterState, Expedition, GameCommand, GameState, Hero, QuestState, WorldState } from '../../../types';
+import { QUESTS, SANCTUARIES, TERRAINS, TOWNS } from '../../../data/world';
+import type { EncounterState, Expedition, GameCommand, GameState, Hero, QuestState, Wanderer, WorldState } from '../../../types';
 import type { Rng } from '../../rng';
-import { addLog, ownedBy, rollWithFocus, splitGold, statChance, successes } from '../common';
+import { addPetLove, petExplore } from '../pets';
+import { addLog, campFocusOf, ownedBy, restMultiplierOf, rollWithFocus, splitGold, statChance, successes } from '../common';
 import { enterDungeonFromWorld, startBattleWith } from '../game';
-import { heroFocusMax, heroMaxHp } from '../hero';
+import { equippedItems, heroFocusMax, heroMaxHp } from '../hero';
 import { activeHeroes, expeditionOf, findHero, livingHeroes, mapHeroes, sceneHeroes } from '../heroes';
+import { applyClimate, climateAt } from './climate';
 import { revealAround } from './fog';
-import { hexDistance, pathTo, reachable } from './hex';
+import { climbWatchtower, enterSpawn, spawnAt, tickSpawns } from './explore';
+import { hexDistance, moveCostOf, neighbors, pathTo, reachable } from './hex';
 import { objectiveHandler, type QuestSignal } from './objectives';
 import { timeOfDay } from './time';
+import { shutByTide } from './tide';
 import { ensureShop } from './town';
+import { dungeonGateError } from './questGate';
+import { bumpStoryVer, passByNotice, queueStory } from './guide';
 import { moveWanderers, spawnWanderer } from './wanderers';
+import { laneDefOfTile, terrainDiceBonus } from './lanes';
+import { scourgeCurse } from './scourgeCurse';
+import { tickScourges } from './scourges';
 
 type Cmd<T extends GameCommand['type']> = Extract<GameCommand, { type: T }>;
 
@@ -39,7 +50,9 @@ export function campAmbushChance(game: GameState, heroId: string): number {
     const e = getClass(h.classId).exploreAbility.effect;
     if (e.kind === 'nightAmbushReduction') mul = Math.min(mul, e.multiplier);
   }
-  return Math.round(BALANCE.nightAmbushChance * mul);
+  // 3つの道（2026-11-14）: 帯の夜襲の倍率（西の森は半分・東の丘は1.5倍。広い地図だけ）
+  const lane = laneDefOfTile(game, w, w.pos[heroId] ?? 0)?.ambush ?? 1;
+  return Math.min(100, Math.round(BALANCE.nightAmbushChance * mul * lane));
 }
 
 /** 次の侵食度の段階 */
@@ -74,9 +87,17 @@ export function advanceTurn(game: GameState, rng: Rng) {
   const w = game.world!;
   if (w.turn && !w.acted.includes(w.turn)) w.acted.push(w.turn);
   w.move = null;
-  w.moveRoll = undefined;
+  w.moveDice = undefined;
   w.invites = undefined;
-  w.follow = undefined;
+  w.moveProposal = undefined;
+  // 同行は、同じマスにいる間は続く（手番が変わっても。ダンジョンに入る時も一緒に入る。指摘1）
+  if (w.follow) {
+    for (const [id, leader] of Object.entries(w.follow)) {
+      const a = findHero(game, id);
+      const b = findHero(game, leader);
+      if (!a || !b || a.retired || b.retired || a.hp <= 0 || b.hp <= 0 || w.pos[id] === undefined || w.pos[id] !== w.pos[leader]) delete w.follow[id];
+    }
+  }
   // ダンジョンの中のキャラも同じ順番に入る（ダンジョンのパーティは、その中の最初のキャラの番にまとめて動く。M3-D）
   const next = livingHeroes(game).find((h) => !w.acted.includes(h.id));
   if (next) {
@@ -86,16 +107,11 @@ export function advanceTurn(game: GameState, rng: Rng) {
   endWorldTurn(game, rng);
 }
 
-/** 手番をそのキャラにする（ダンジョンの中なら、そのパーティの探索力の判定から） */
+/** 手番をそのキャラにする */
 function setTurn(game: GameState, heroId: string) {
   const w = game.world!;
   w.turn = heroId;
   w.prevTile = w.pos[heroId];
-  const exp = expeditionOf(game, heroId);
-  if (exp?.dungeon) {
-    exp.dungeon.explore = null;
-    exp.dungeon.exploreRoll = undefined;
-  }
 }
 
 /** そのダンジョンのパーティの番か */
@@ -111,14 +127,25 @@ export function endExpeditionTurn(game: GameState, heroes: string[], rng: Rng) {
 function endWorldTurn(game: GameState, rng: Rng) {
   const w = game.world!;
   const before = w.corruption;
+  applyClimate(game);
   w.worldTurn += 1;
   w.acted = [];
-  w.corruption = Math.min(100, w.corruption + (getDifficulty(game.difficulty).corruptionPerTurn ?? BALANCE.corruptionPerTurn));
+  w.movedBy = undefined;
+  w.relayCharged = undefined;
+  // 時間による侵食度: 生きているキャラが1人でもダンジョンの中なら、ダンジョンの番の量（ダンジョンが長いので小さめ）。難易度の値は倍率。
+  // 「全員が中」にすると、パーティが分かれた時（外で待つ仲間がいる時）だけ長いダンジョンの間ずっと+1%になり、侵食度が持たない
+  const inside = livingHeroes(game).some((x) => expeditionOf(game, x.id));
+  const perTurn = inside ? BALANCE.corruptionPerDungeonTurn : BALANCE.corruptionPerTurn;
+  // 瘴気を紡ぐ死霊術師（災厄の中ボス・段階7b）: 世界マップの番だけ、さらに上がる（ダンジョンの中の番には掛けない。オーナーの決定 2-A）
+  const curse = inside ? 0 : scourgeCurse(game).corruptionPerTurn;
+  w.corruption = Math.min(100, w.corruption + perTurn * (getDifficulty(game.difficulty).corruptionPerTurn ?? 1) + curse);
   onCorruptionChange(game, rng, before);
   // 夜は魔物が増える
   const def = getScenario(game.scenarioId).map!;
   if (timeOfDay(w.worldTurn) === 'night' && rng.next() * 100 < BALANCE.nightSpawnChance) spawnWanderer(game, w, rng, rng.int(def.regions.length));
-  moveWanderers(w, rng);
+  moveWanderers(w, rng, game);
+  // 時間で消える出現スポット（段階6）: 期限切れを消し、出る番なら1つ出す
+  tickSpawns(game, w, rng);
   // 町への襲撃の期限
   for (const raid of [...w.raids]) {
     if (w.worldTurn <= raid.deadline) continue;
@@ -127,16 +154,18 @@ function endWorldTurn(game: GameState, rng: Rng) {
     w.fallenTowns.push(raid.townId);
     const b2 = w.corruption;
     w.corruption = Math.min(100, w.corruption + BALANCE.corruptionOnTownFall);
-    addLog(game, `${TOWNS.get(raid.townId).name}が魔物に陥落した…（侵食度+${BALANCE.corruptionOnTownFall}%）`);
+    addLog(game, `${TOWNS.get(raid.townId).name}が魔物に陥落した…（${corruptionName(game.scenarioId)}+${BALANCE.corruptionOnTownFall}%）`);
     onCorruptionChange(game, rng, b2);
   }
+  // 災厄の中ボス（段階7b）: 越えた節目の分だけ出る（1ターンに1体）
+  if (game.mode !== 'gameover') tickScourges(game, w, rng);
   revealAround(game, w);
   const first = livingHeroes(game)[0];
   if (first) setTurn(game, first.id);
   else w.turn = '';
   if (w.corruption >= 100) {
     game.mode = 'gameover';
-    addLog(game, '侵食度が100%に達した。世界は侵食に呑まれた…');
+    addLog(game, `${corruptionName(game.scenarioId)}が100%に達した。世界は終わりを迎えた…`);
   }
 }
 
@@ -146,13 +175,13 @@ export function onCorruptionChange(game: GameState, rng: Rng, before: number) {
   const def = getScenario(game.scenarioId).map!;
   for (const st of def.corruptionStages) {
     if (before >= st.at || w.corruption < st.at) continue;
-    addLog(game, `侵食度${st.at}%: ${st.text}`);
+    addLog(game, `${corruptionName(game.scenarioId)}${st.at}%: ${st.text}`);
     for (let k = 0; k < (st.spawn ?? 0); k++) spawnWanderer(game, w, rng, rng.int(def.regions.length));
     if (st.raid) startRaid(game, rng);
   }
   if (w.corruption >= 100 && game.mode === 'world') {
     game.mode = 'gameover';
-    addLog(game, '侵食度が100%に達した。世界は侵食に呑まれた…');
+    addLog(game, `${corruptionName(game.scenarioId)}が100%に達した。世界は終わりを迎えた…`);
   }
 }
 
@@ -196,24 +225,43 @@ export function questSignal(game: GameState, s: QuestSignal) {
 
 // ---------- コマンド ----------
 
-/** 移動力の判定（素早さ。移動力 = moveBase + 成功数） */
+/** 移動のサイコロ（1d6 ＋ 素早さ・探索の能力・お供のボーナス。オーナーの案）。広い地図では、街道の上で振ると +1（段階6a。足し算だけで、乱数は増えない） */
 export function rollMove(game: GameState, cmd: Cmd<'WORLD_ROLL_MOVE'>, rng: Rng): string | undefined {
   const t = turnCheck(game, cmd.playerId, cmd.heroId);
   if (typeof t === 'string') return t;
   const { w, h } = t;
   if (w.move !== null) return 'もう移動力を決めました';
-  const slots = BALANCE.moveSlots;
-  if (!Number.isInteger(cmd.focusUsed) || cmd.focusUsed < 0 || cmd.focusUsed > Math.min(slots, h.focus)) return 'フォーカスの数が不正です';
-  h.focus -= cmd.focusUsed;
-  const results = rollWithFocus(slots, cmd.focusUsed, statChance(h, 'agi', 'move'), rng);
-  w.moveRoll = results;
-  w.move = BALANCE.moveBase + successes(results);
+  const d = newDice(game, BALANCE.moveDiceSides, [...worldDiceBonus(h), ...terrainDiceBonus(game, w, w.pos[h.id])], rng);
+  w.moveDice = d;
+  w.move = d.total;
   w.prevTile = w.pos[h.id];
+  addLog(game, `${h.name}の移動のサイコロ: ${d.face}${diceBonusText(d)} → 移動力${d.total}`);
   return undefined;
 }
 
+/** フォーカス1で移動のサイコロを振り直す（目を見た後・まだ動く前に1回だけ。2回目の目で決まる） */
+export function rerollMove(game: GameState, cmd: Cmd<'WORLD_REROLL_MOVE'>, rng: Rng): string | undefined {
+  const t = turnCheck(game, cmd.playerId, cmd.heroId);
+  if (typeof t === 'string') return t;
+  const { w, h } = t;
+  const d = w.moveDice;
+  if (w.move === null || !d) return '先に移動のサイコロを振ってください';
+  if (d.rerolled) return '振り直しは1回だけです';
+  if (w.move !== d.total || w.pos[h.id] !== w.prevTile) return '動いた後は振り直せません';
+  if (h.focus < 1) return 'フォーカスがありません';
+  h.focus -= 1;
+  const n = rerollDice(game, d, rng);
+  w.moveDice = n;
+  w.move = n.total;
+  addLog(game, `${h.name}がフォーカスで振り直した: ${n.face}${diceBonusText(n)} → 移動力${n.total}`);
+  return undefined;
+}
+
+/** ボーナスの文字（例: 「＋1（素早さ）」） */
+export const diceBonusText = (d: { bonus: { label: string; value: number }[] }) => d.bonus.map((b) => `＋${b.value}（${b.label}）`).join('');
+
 /** 移動（経路はエンジンが決める。敵のいるマスに入ったら遭遇） */
-export function moveHero(game: GameState, cmd: Cmd<'WORLD_MOVE'>): string | undefined {
+export function moveHero(game: GameState, cmd: Cmd<'WORLD_MOVE'>, rng: Rng): string | undefined {
   const t = turnCheck(game, cmd.playerId, cmd.heroId);
   if (typeof t === 'string') return t;
   const { w, h } = t;
@@ -224,14 +272,83 @@ export function moveHero(game: GameState, cmd: Cmd<'WORLD_MOVE'>): string | unde
   // 同行: 自分（同じ担当）のキャラか、誘いを承知したキャラだけ
   const companions = cmd.companions
     .map((id) => findHero(game, id))
-    .filter((c): c is Hero => !!c && c.id !== h.id && c.hp > 0 && !c.retired && w.pos[c.id] === from && !w.acted.includes(c.id))
-    .filter((c) => c.playerId === h.playerId || w.follow?.[c.id] === h.id);
+    .filter((c): c is Hero => !!c && c.id !== h.id && c.hp > 0 && !c.retired && !expeditionOf(game, c.id) && w.pos[c.id] === from)
+    .filter((c) => c.playerId === h.playerId || followingGroup(game, h.id).includes(c.id));
   if (companions.length !== cmd.companions.filter((id) => id !== h.id).length) return '同行できないキャラがいます（他の人のキャラは、誘って承知してもらいます）';
-  const path = pathTo(map, cmd.to);
+  // 他の人のキャラが一緒なら、移動先を提案して、その人たちの同意を待つ（全員一致で動く）
+  const owners = [...new Set(companions.map((c) => c.playerId).filter((p) => p !== h.playerId))];
+  if (owners.length) {
+    w.moveProposal = { heroId: h.id, to: cmd.to, companions: companions.map((c) => c.id), owners, agreed: [] };
+    return undefined;
+  }
+  // 一人で動いたら、この人について来ていた同行はそのまま、この人が誰かについて行っていたらやめる
+  if (!companions.length) detachFollower(game, h.id);
+  doMove(game, w, h, companions, cmd.to, map, rng);
+  return undefined;
+}
+
+/** 移動先の提案への返事（同行しているキャラの担当の人）。全員が同意したら動く。断ったらその人のキャラは同行をやめる */
+export function agreeMove(game: GameState, cmd: Cmd<'WORLD_MOVE_AGREE'>, rng: Rng): string | undefined {
+  const w = game.world;
+  const pr = w?.moveProposal;
+  if (!w || !pr) return '移動の提案はありません';
+  if (!pr.owners.includes(cmd.playerId)) return 'この提案に答える人ではありません';
+  if (!cmd.accept) {
+    for (const id of pr.companions) if (findHero(game, id)?.playerId === cmd.playerId) detachFollower(game, id);
+    w.moveProposal = undefined;
+    return undefined;
+  }
+  if (!pr.agreed.includes(cmd.playerId)) pr.agreed.push(cmd.playerId);
+  if (!pr.owners.every((p) => pr.agreed.includes(p))) return undefined;
+  w.moveProposal = undefined;
+  const h = findHero(game, pr.heroId)!;
+  if (w.move === null) return '先に移動力を判定してください';
+  const map = reachable(w, w.pos[h.id], w.move);
+  if (!map.has(pr.to)) {
+    // 潮が変わって行けなくなった時（シナリオ3の作り直し §3-1）: 提案を消して記録に1行（エラーにすると提案が残り、同意しても動けないまま止まる）。
+    // 手番の人は、別の行き先を選び直せる。潮の無い地図では今までどおり
+    if (!shutByTide(w, w.pos[h.id], pr.to)) return 'そこへは移動できません';
+    addLog(game, '潮が変わって、選んだ所へは行けなくなった（行き先を選び直してください）');
+    return undefined;
+  }
+  const companions = pr.companions.map((id) => findHero(game, id)!).filter((c) => c && w.pos[c.id] === w.pos[h.id]);
+  doMove(game, w, h, companions, pr.to, map, rng);
+  return undefined;
+}
+
+/**
+ * 交代運転（play-feedback-plan §4 A）: 同じワールドターンのうちに、前の人（別のキャラ）の手番ですでに動いたキャラを、
+ * この手番でまた動かしたら、時間がかかったことにして侵食度が上がる。1つの手番で上がるのは1回まで。交代運転そのものはできる
+ */
+function chargeRelayMove(game: GameState, w: WorldState, h: Hero, group: Hero[], rng: Rng) {
+  const movedBy = (w.movedBy ??= {});
+  const charged = w.relayCharged ?? [];
+  const relay = group.some((g) => movedBy[g.id] !== undefined && movedBy[g.id] !== h.id) && !charged.includes(h.id);
+  for (const g of group) movedBy[g.id] = h.id;
+  if (!relay || BALANCE.corruptionPerRelayMove <= 0) return;
+  (w.relayCharged ??= []).push(h.id);
+  const before = w.corruption;
+  w.corruption = Math.min(100, w.corruption + BALANCE.corruptionPerRelayMove);
+  addLog(game, `交代で先へ進んだぶん、時が流れた（${corruptionName(game.scenarioId)}+${BALANCE.corruptionPerRelayMove}%）`);
+  onCorruptionChange(game, rng, before);
+}
+
+function doMove(game: GameState, w: WorldState, h: Hero, companions: Hero[], to: number, map: ReturnType<typeof reachable>, rng: Rng) {
+  const from = w.pos[h.id];
+  const path = pathTo(map, to);
   const group = [h, ...companions];
-  for (const c of companions) if (!w.acted.includes(c.id)) w.acted.push(c.id);
+  chargeRelayMove(game, w, h, group, rng);
+  if (game.mode === 'gameover') return;
+  if (companions.length) {
+    if (w.follow) delete w.follow[h.id];
+    for (const c of companions) (w.follow ??= {})[c.id] = h.id;
+  }
+  // 画面の演出用: 通ったマス（敵に会ったら、そこまで）
+  const trail = [from];
+  w.lastMove = { seq: (w.lastMove?.seq ?? 0) + 1, heroes: group.map((g) => g.id), path: trail };
   let prev = from;
   for (const step of path) {
+    trail.push(step);
     for (const g of group) w.pos[g.id] = step;
     revealAround(game, w);
     visitRegion(game, w, step);
@@ -240,12 +357,56 @@ export function moveHero(game: GameState, cmd: Cmd<'WORLD_MOVE'>): string | unde
       w.prevTile = prev;
       w.move = 0;
       startEncounter(game, w, wd.id, step, h.id);
-      return undefined;
+      return;
     }
     prev = step;
   }
-  w.move = Math.max(0, w.move - map.get(cmd.to)!.cost);
-  return undefined;
+  w.move = Math.max(0, (w.move ?? 0) - map.get(to)!.cost);
+  // お供: 一緒に歩いたマスの数だけ懐く
+  for (const g of group) addPetLove(game, g, path.length);
+  maybeRandomEvent(game, w, h, group, to, rng);
+}
+
+/**
+ * 突発イベント（設計 v2 §5）: 何もないマスに移動し終えた時、確率で起きる。
+ * 同じキャラに2手番続けては起きない。夜・侵食度が高い時は悪いイベントが出やすい。終わっても手番は続く
+ */
+function maybeRandomEvent(game: GameState, w: WorldState, h: Hero, group: Hero[], tile: number, rng: Rng) {
+  if (w.tiles[tile].f || w.story || spawnAt(w, tile)) return;
+  if (h.lastRandomEvent !== undefined && h.lastRandomEvent >= w.worldTurn - 1) return;
+  if (rng.next() * 100 >= BALANCE.randomEventChance) return;
+  const ev = pickRandomEvent(game, rng, tile, group);
+  if (!ev) return;
+  h.lastRandomEvent = w.worldTurn;
+  game.party = group.map((g) => g.id);
+  game.event = { tile, eventId: ev, random: true };
+  game.mode = 'event';
+}
+
+/**
+ * 突発イベントを1つ選ぶ（重み付き。夜・侵食度50%以上なら悪いイベントの重みが上がる）。
+ * tile を渡すと地形の条件（terrain）、group を渡すとお供の条件（needsPet）で絞り込む。絞り込みでは乱数を引かない
+ */
+export function pickRandomEvent(game: GameState, rng: Rng, tile?: number, group?: Hero[]): string | undefined {
+  const w = game.world!;
+  const terrain = tile === undefined ? undefined : w.tiles[tile]?.t;
+  const hasPet = (group ?? []).some((g) => g.hp > 0 && g.pet);
+  const list = EVENTS.forScenario(game.scenarioId).filter(
+    (e) =>
+      e.where === 'random' &&
+      (!e.night || timeOfDay(w.worldTurn) === 'night') &&
+      (!e.terrain || (terrain !== undefined && e.terrain.includes(terrain))) &&
+      (!e.needsPet || hasPet),
+  );
+  if (!list.length) return undefined;
+  const harsh = timeOfDay(w.worldTurn) === 'night' || w.corruption >= 50;
+  const weights = list.map((e) => (e.weight ?? 10) * (harsh && e.tone === 'bad' ? BALANCE.randomEventBadMul : 1));
+  let x = rng.next() * weights.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < list.length; i++) {
+    x -= weights[i];
+    if (x < 0) return list[i].id;
+  }
+  return list[list.length - 1].id;
 }
 
 function visitRegion(game: GameState, w: WorldState, tile: number) {
@@ -254,6 +415,9 @@ function visitRegion(game: GameState, w: WorldState, tile: number) {
   w.visitedRegions.push(r);
   const reg = getScenario(game.scenarioId).map!.regions[r];
   if (reg.intro) w.story = { title: reg.name, lines: [reg.intro] };
+  // 回1: 次の目的の鍵のダンジョンを通り過ぎて、新しい地域に初めて入った時の知らせ（地域の紹介の後に、別の窓で1回だけ）
+  const notice = passByNotice(game, w, r, tile);
+  if (notice) queueStory(w, notice);
 }
 
 export function waitTurn(game: GameState, cmd: Cmd<'WORLD_WAIT'>, rng: Rng): string | undefined {
@@ -283,17 +447,25 @@ export function reviveAlly(game: GameState, cmd: Cmd<'WORLD_REVIVE'>, rng: Rng):
 }
 
 /** 野営（spec §8.6）: 少し回復して手番を終える。夜は夜襲の確率がある */
-export function camp(game: GameState, cmd: Cmd<'WORLD_CAMP'>, rng: Rng): string | undefined {
+/** opts.tent = テントの設営具（夜の魔物に襲われない・HPとフォーカスを50%回復。区切りE） */
+export function camp(game: GameState, cmd: Cmd<'WORLD_CAMP'>, rng: Rng, opts: { tent?: boolean } = {}): string | undefined {
   const t = turnCheck(game, cmd.playerId, cmd.heroId);
   if (typeof t === 'string') return t;
   const { w, h } = t;
   const tile = w.pos[h.id];
   if (w.tiles[tile].f?.kind === 'town') return '町の中では野営できません（宿屋を使えます）';
   if (w.move !== null && w.move < (BALANCE.moveBase as number)) return '移動した後は野営できません';
-  const chance = campAmbushChance(game, h.id);
-  h.hp = Math.min(heroMaxHp(h), h.hp + Math.ceil(heroMaxHp(h) * BALANCE.campHpRatio));
-  h.focus = Math.min(heroFocusMax(h), h.focus + BALANCE.campFocus);
-  addLog(game, `${h.name}は野営して体を休めた`);
+  const chance = opts.tent ? 0 : campAmbushChance(game, h.id);
+  const climateMul = climateAt(game, tile) ? BALANCE.climateCampHealMul : 1;
+  // 悪夢の魔獣（災厄の中ボス・段階7b）が生きている間は、HPの回復が半分（フォーカスとテントは変わらない）
+  const nightmare = scourgeCurse(game).campHeal;
+  if (opts.tent) {
+    h.hp = Math.min(heroMaxHp(h), h.hp + Math.ceil(heroMaxHp(h) * 0.5));
+    h.focus = Math.min(heroFocusMax(h), h.focus + Math.ceil(heroFocusMax(h) * 0.5));
+  } else h.hp = Math.min(heroMaxHp(h), h.hp + Math.ceil(heroMaxHp(h) * BALANCE.campHpRatio * climateMul * nightmare * (restMultiplierOf(h) + (petExplore(h).campHeal ?? 0) + equippedItems(h).reduce((n, i) => n + (i.explore?.campHeal ?? 0), 0))));
+  if (!opts.tent) h.focus = Math.min(heroFocusMax(h), h.focus + BALANCE.campFocus + campFocusOf(h));
+  (w.sheltered ??= []).push(h.id);
+  addLog(game, opts.tent ? `${h.name}はテントを張って、ぐっすり休んだ` : `${h.name}は野営して体を休めた${climateMul < 1 ? '（厳しい土地で、回復は半分）' : ''}${nightmare < 1 ? '（悪夢にうなされ、回復は半分）' : ''}`);
   if (chance > 0 && rng.next() * 100 < chance) {
     const wd = spawnWanderer(game, w, rng, w.tiles[tile].r, tile);
     if (wd) {
@@ -389,21 +561,22 @@ function beginEncounterBattle(game: GameState, e: EncounterState, participants: 
   const wd = w.wanderers.find((x) => x.id === e.wandererId);
   if (!wd) return '敵がいません';
   game.party = participants;
-  game.battleInfo = { roomType: wd.raidTown ? 'elite' : 'battle', wandererId: wd.id, tile: e.tile };
+  // 災厄の中ボス（段階7b）は中ボスと同じ扱いの戦闘（ふつうの装備のドロップは無い。専用の装備は勝った時に必ず渡す）
+  game.battleInfo = { roomType: wd.scourge ? 'scourge' : wd.raidTown ? 'elite' : 'battle', wandererId: wd.id, tile: e.tile };
   game.encounter = undefined;
   startBattleWith(game, wd.enemies, game.battleInfo.roomType, rng, { surprise, background: undefined });
   if (surprise) addLog(game, '奇襲成功！ 敵は最初のターンに動けない');
   return undefined;
 }
 
-/** 遭遇の戦闘に勝った時（敵を消す・襲撃を防ぐ・依頼） */
-export function onWandererDefeated(game: GameState, rng: Rng) {
+/** 遭遇の戦闘に勝った時（敵を消す・襲撃を防ぐ・依頼）。倒した敵の組を返す（災厄の中ボスの報酬は、呼んだ側で渡す） */
+export function onWandererDefeated(game: GameState, rng: Rng): Wanderer | undefined {
   const w = game.world;
   const info = game.battleInfo;
-  if (!w || !info?.wandererId) return;
+  if (!w || !info?.wandererId) return undefined;
   const wd = w.wanderers.find((x) => x.id === info.wandererId);
   w.wanderers = w.wanderers.filter((x) => x.id !== info.wandererId);
-  if (!wd) return;
+  if (!wd) return undefined;
   questSignal(game, { kind: 'defeatWanderer', region: w.tiles[wd.tile].r });
   if (wd.raidTown) {
     w.raids = w.raids.filter((r) => r.townId !== wd.raidTown);
@@ -413,6 +586,7 @@ export function onWandererDefeated(game: GameState, rng: Rng) {
     addLog(game, `${TOWNS.get(wd.raidTown).name}を魔物から守った！（${BALANCE.raidRewardGold}Gを山分け）`);
   }
   void rng;
+  return wd;
 }
 
 /** 場面（遭遇の戦闘・宝箱・イベント・祠・ダンジョン）が終わって世界マップに戻る */
@@ -438,13 +612,46 @@ export function backToWorld(game: GameState, rng: Rng, endTurn: boolean) {
 
 // ---------- 命の灯火（spec §11.4） ----------
 
+/** 戦闘に負けたキャラが目を覚ます町のマス（handleDefeat と全滅の画面の両方で使う。同じ答えになるように） */
+function respawnTownOf(game: GameState, participants: string[]): number | undefined {
+  const w = game.world;
+  return w ? nearestTown(w, w.pos[participants.find((id) => findHero(game, id))!] ?? 0) : undefined;
+}
+
+/** 全滅した時にどうなるか（画面の表示用。ステップB）。状態は変えない */
+export type DefeatOutlook =
+  | { kind: 'retreat'; townName?: string; livesBefore: number; livesAfter: number; hpPercent: number }
+  | { kind: 'downed' }
+  | { kind: 'gameover' };
+
+/**
+ * 全滅の画面で見せる「この後どうなるか」。handleDefeat と同じ決まりで答える:
+ * 命の灯火が残っていれば灯火を1つ使って最寄りの町へ退却（HPは reviveHpRatio）、
+ * 無ければその場に倒れる。ほかに冒険を続けているキャラがいなければ本当のゲームオーバー
+ */
+export function defeatOutlook(game: GameState, participants: string[]): DefeatOutlook {
+  if (!game.world) return { kind: 'gameover' };
+  if (game.lives > 0) {
+    const tile = respawnTownOf(game, participants);
+    const f = tile === undefined ? undefined : game.world.tiles[tile]?.f;
+    return {
+      kind: 'retreat',
+      townName: f?.kind === 'town' ? TOWNS.get(f.id).name : undefined,
+      livesBefore: game.lives,
+      livesAfter: game.lives - 1,
+      hpPercent: Math.round(BALANCE.reviveHpRatio * 100),
+    };
+  }
+  return activeHeroes(game).some((h) => !participants.includes(h.id)) ? { kind: 'downed' } : { kind: 'gameover' };
+}
+
 /** 戦闘に負けた参加者: 命の灯火があれば最寄りの町でHP半分で復活、無ければ退場 */
 export function handleDefeat(game: GameState, participants: string[], rng: Rng) {
   const w = game.world;
   const heroes = participants.map((id) => findHero(game, id)!).filter(Boolean);
   if (game.lives > 0) {
     game.lives -= 1;
-    const town = w ? nearestTown(w, w.pos[heroes[0]?.id] ?? 0) : undefined;
+    const town = respawnTownOf(game, participants);
     for (const h of heroes) {
       h.hp = Math.max(1, Math.ceil(heroMaxHp(h) * BALANCE.reviveHpRatio));
       h.nextBattleStatuses = {};
@@ -471,13 +678,31 @@ export function handleDefeat(game: GameState, participants: string[], rng: Rng) 
   if (w) backToWorld(game, rng, true);
 }
 
+/**
+ * 倒れた場所に一番近い町。今の移動手段（船があれば海も）で歩いて行ける町を優先する
+ * （船が無い時に、海の向こうの島の町で目を覚まして、島から出られなくなるのを防ぐ）。行ける町が無ければ、直線の距離で一番近い町
+ */
 function nearestTown(w: WorldState, from: number): number | undefined {
-  let best: number | undefined;
-  w.tiles.forEach((t, i) => {
-    if (t.f?.kind !== 'town' || w.fallenTowns.includes(t.f.id)) return;
-    if (best === undefined || hexDistance(w, from, i) < hexDistance(w, from, best)) best = i;
-  });
-  return best;
+  const reach = new Set<number>([from]);
+  const queue = [from];
+  while (queue.length) {
+    const cur = queue.shift()!;
+    for (const n of neighbors(w, cur)) {
+      if (reach.has(n) || moveCostOf(w, n, cur) <= 0) continue;
+      reach.add(n);
+      queue.push(n);
+    }
+  }
+  const pick = (onlyReachable: boolean) => {
+    let best: number | undefined;
+    w.tiles.forEach((t, i) => {
+      if (t.f?.kind !== 'town' || w.fallenTowns.includes(t.f.id)) return;
+      if (onlyReachable && !reach.has(i)) return;
+      if (best === undefined || hexDistance(w, from, i) < hexDistance(w, from, best)) best = i;
+    });
+    return best;
+  };
+  return pick(true) ?? pick(false);
 }
 
 // ---------- 今いるマスに入る（町・祠・イベント・宝箱・名所・ダンジョン） ----------
@@ -488,19 +713,37 @@ export function interact(game: GameState, cmd: Cmd<'WORLD_INTERACT'>, rng: Rng):
   const { w, h } = t;
   const tile = w.pos[h.id];
   const f = w.tiles[tile].f;
+  const here = heroesAt(game, tile).filter(x => x.playerId === h.playerId || followingGroup(game, h.id).includes(x.id)).map((x) => x.id);
+  const spawn = spawnAt(w, tile);
+  if (!f && spawn) {
+    enterSpawn(game, w, spawn, here);
+    return undefined;
+  }
   if (!f) return 'ここには何もありません';
   if (f.used && f.kind !== 'town' && f.kind !== 'dungeon') return 'もう調べました';
-  const here = heroesAt(game, tile).map((x) => x.id);
   switch (f.kind) {
+    case 'tower':
+      climbWatchtower(game, w, tile);
+      return undefined;
+    case 'temple':
+    case 'altar': {
+      const def = SANCTUARIES.tryGet(f.id);
+      if (!def || def.kind !== f.kind) return 'この施設には入れません';
+      game.party = here;
+      game.sanctuary = { sanctuaryId: f.id, tile, heroId: h.id, members: here };
+      game.mode = 'sanctuary';
+      return undefined;
+    }
     case 'town':
       if (w.fallenTowns.includes(f.id)) return 'この町は陥落している…';
-      game.town = { townId: f.id, heroId: h.id };
+      game.party = here;
+      game.town = { townId: f.id, heroId: h.id, members: here };
       game.mode = 'town';
       ensureShop(game, rng);
       return undefined;
     case 'shrine':
       game.party = here;
-      game.shrine = { shrineId: f.id, tile, heroId: h.id };
+      game.shrine = { shrineId: f.id, tile, heroId: h.id, members: here };
       game.mode = 'shrine';
       return undefined;
     case 'event':
@@ -517,21 +760,29 @@ export function interact(game: GameState, cmd: Cmd<'WORLD_INTERACT'>, rng: Rng):
       return undefined;
     case 'dungeon': {
       const def = DUNGEONS.get(f.id);
-      const missing = (def.requiresKeys ?? []).filter((k) => !w.keys.includes(k));
-      if (missing.length) {
-        const names = getScenario(game.scenarioId).story?.keys ?? {};
-        return `扉が開かない…（必要: ${missing.map((k) => names[k] ?? k).join('・')}）`;
-      }
+      // ランダムダンジョンは1か所1回（段階7a・オーナーの決定 6-A）。負けて出された時は f.used にならないので、また入れる
+      if (def.random && f.used) return 'このダンジョンは踏破済みです（黄金箱はもう開けた）';
+      const gate = dungeonGateError(game, def, tile);
+      if (gate) return gate;
+      // 先に入った仲間の組がいれば、新しいダンジョンは作らずに合流する（組が通路にいる時だけ。断る時は何も変えない）
+      const join = dungeonJoin(game, tile);
+      if (join?.blocked) return join.blocked;
       // 一緒に入るのは、自分のキャラか、誘いを承知した他の人のキャラ
-      const party = (cmd.party?.length ? cmd.party : here).filter((id) => here.includes(id) && (findHero(game, id)?.playerId === h.playerId || w.follow?.[id] === h.id));
+      const party = (cmd.party?.length ? cmd.party : here).filter((id) => here.includes(id) && (findHero(game, id)?.playerId === h.playerId || followingGroup(game, h.id).includes(id)));
       if (!party.includes(h.id)) party.unshift(h.id);
+      // 同行しているキャラ（他の人のキャラも）は、必ず一緒に入る（指摘1）
+      for (const id of here) if (followingGroup(game, h.id).includes(id) && !party.includes(id)) party.push(id);
       const before = w.corruption;
       w.corruption = Math.min(100, w.corruption + BALANCE.corruptionOnDungeonEnter);
       onCorruptionChange(game, rng, before);
       if (game.mode === 'gameover') return undefined;
       for (const id of party) if (!w.acted.includes(id) && id !== h.id) w.acted.push(id);
-      enterDungeonFromWorld(game, f.id, party, rng);
-      detachExpedition(game, rng);
+      if (join) {
+        joinExpedition(game, join.exp, party, rng);
+        return undefined;
+      }
+      enterDungeonFromWorld(game, f.id, party, rng, tile);
+      detachExpedition(game, rng, tile);
       return undefined;
     }
   }
@@ -542,12 +793,13 @@ export function interact(game: GameState, cmd: Cmd<'WORLD_INTERACT'>, rng: Rng):
  * 入ったダンジョンを「世界マップと別の場面」にする。
  * 入ったキャラは世界マップの手番から外れ、世界マップは残りのキャラで続く（spec M3-C）
  */
-function detachExpedition(game: GameState, rng: Rng) {
+function detachExpedition(game: GameState, rng: Rng, entranceTile?: number) {
   const n = game.nextExpeditionId ?? 1;
   game.nextExpeditionId = n + 1;
   const exp: Expedition = {
     id: `x${n}`,
     heroes: [...(game.party ?? [])],
+    entranceTile,
     mode: game.mode,
     dungeon: game.dungeon,
     battle: game.battle,
@@ -561,6 +813,41 @@ function detachExpedition(game: GameState, rng: Rng) {
   game.dungeon = game.battle = game.reward = game.chest = game.event = game.battleInfo = game.battleBackground = undefined;
   game.party = undefined;
   game.mode = 'world';
+  advanceTurn(game, rng);
+}
+
+/** 組が通路にいない時の、今している事（合流を断る文に使う） */
+const BUSY_TEXT: Record<string, string> = { battle: '戦闘中', reward: '戦利品を分けている所', chest: '宝箱を開けている所', event: '出来事の途中', rest: '休憩中', cleared: 'ボスを倒して帰る所' };
+
+/**
+ * そのマスのダンジョンに、先に入った仲間の組がいるか（合流の相手。抜本的な見直し §1-4・オーナーの決定 5-B）。
+ * 同じダンジョンの見分け: ダンジョンのIDと入口のマスが同じ組。入口のマスの記録が無い組（古い保存）は、固定のダンジョンならIDだけで見分け、
+ * ランダムダンジョン（同じIDが別のマスにもある）は合流の相手にしない。
+ * 合流できるのは、組が通路にいる時だけ。それ以外は blocked に断る文が入る（手番も侵食度も変えない）
+ */
+export function dungeonJoin(game: GameState, tile: number): { exp: Expedition; blocked?: string } | undefined {
+  const f = game.world?.tiles[tile]?.f;
+  if (!f || f.kind !== 'dungeon') return undefined;
+  const same = (game.expeditions ?? []).filter((x) => x.dungeon?.dungeonId === f.id && (x.entranceTile !== undefined ? x.entranceTile === tile : !x.dungeon.random));
+  if (!same.length) return undefined;
+  const open = same.find((x) => x.mode === 'dungeon');
+  if (open) return { exp: open };
+  const exp = same[0];
+  const lead = exp.heroes.map((id) => findHero(game, id)).find((x) => x && x.hp > 0 && !x.retired) ?? findHero(game, exp.heroes[0]);
+  return { exp, blocked: `${lead?.name ?? '仲間'}たちは今、${BUSY_TEXT[exp.mode] ?? '手が離せない所'}です。終わってから合流しよう` };
+}
+
+/**
+ * 先に入った組に合流する: 組の今の通路に追いつく（位置は組で1つ。入口から別々に歩く形は作らない）。乱数は引かない。
+ * 合流したキャラの手番は終わる（組の手番の順番は、今までの先頭のキャラのまま。後から来た人は末尾）。出しかけの票は無効にする
+ */
+function joinExpedition(game: GameState, exp: Expedition, party: string[], rng: Rng) {
+  const joined = party.filter((id) => !exp.heroes.includes(id));
+  exp.heroes.push(...joined);
+  exp.vote = undefined;
+  const names = joined.map((id) => findHero(game, id)?.name).filter(Boolean).join('と');
+  addLog(game, `${names}が${exp.dungeon?.name ?? 'ダンジョン'}の仲間に追いついた！`);
+  game.party = undefined;
   advanceTurn(game, rng);
 }
 
@@ -580,7 +867,7 @@ export function worldInvite(game: GameState, cmd: Cmd<'WORLD_INVITE'>): string |
   if (typeof t === 'string') return t;
   const { w, h } = t;
   const target = findHero(game, cmd.targetId);
-  if (!target || target.hp <= 0 || target.retired || w.pos[target.id] !== w.pos[h.id] || w.acted.includes(target.id)) return '誘えるキャラではありません';
+  if (!target || target.hp <= 0 || target.retired || expeditionOf(game, target.id) || w.pos[target.id] !== w.pos[h.id]) return '誘えるキャラではありません';
   if (target.playerId === h.playerId) return '自分のキャラは誘わなくても連れて行けます';
   (w.invites ??= {})[target.id] = h.id;
   return undefined;
@@ -600,15 +887,17 @@ export function worldInviteAnswer(game: GameState, cmd: Cmd<'WORLD_INVITE_ANSWER
   return undefined;
 }
 
-export function storyContinue(game: GameState): string | undefined {
+export function storyContinue(game: GameState, ver?: number): string | undefined {
   const w = game.world;
   if (!w?.story) return '物語はありません';
-  w.story = undefined;
+  // 点検 F6: もう閉じた窓（または中身が変わる前の窓）への「つづける」は、何もしない（次の窓を閉じない）
+  if (ver !== undefined && ver !== (w.storyVer ?? 0)) return undefined;
+  // 次の窓が並んでいれば、それを出す（回1: 災厄の知らせ・通り過ぎた時の知らせは、別の窓）
+  w.story = w.storyQueue?.shift();
+  if (!w.storyQueue?.length) delete w.storyQueue;
+  bumpStoryVer(w);
   return undefined;
 }
-
-/** 世界マップのイベントで出るイベント（名所・普通のイベント） */
-export const isMapEvent = (id: string) => EVENTS.tryGet(id)?.where === 'map';
 
 /** 今の場面の背景（ダンジョンならダンジョン、世界マップならそのマスの地形） */
 export function sceneBackground(game: GameState): string {
@@ -616,6 +905,6 @@ export function sceneBackground(game: GameState): string {
   if (game.battleBackground && game.mode === 'battle') return game.battleBackground;
   const w = game.world;
   if (!w) return 'plains';
-  const tile = game.chest?.tile ?? game.event?.tile ?? game.shrine?.tile ?? game.encounter?.tile ?? w.pos[w.turn];
+  const tile = game.chest?.tile ?? game.event?.tile ?? game.shrine?.tile ?? game.sanctuary?.tile ?? game.encounter?.tile ?? w.pos[w.turn];
   return tile !== undefined ? TERRAINS.get(w.tiles[tile].t).background : 'plains';
 }

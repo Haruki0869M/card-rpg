@@ -67,7 +67,7 @@ export const dungeonEvents: EventDef[] = [
     options: [
       {
         label: '罠を見破りながら進む',
-        check: { stat: 'per', slots: 3, need: 2 },
+        check: { stat: 'per', slots: 3, need: 2, purpose: 'mechanism' },
         success: [{ kind: 'gold', amount: 40 }, { kind: 'item', rarity: 'common', slot: 'consumable' }],
         fail: [{ kind: 'damage', amount: 5, all: true }],
         successText: '罠をすべて避け、奥の財宝を手に入れた！',
@@ -75,7 +75,7 @@ export const dungeonEvents: EventDef[] = [
       },
       {
         label: '一気に駆け抜ける',
-        check: { stat: 'agi', slots: 2, need: 1 },
+        check: { stat: 'agi', slots: 2, need: 1, purpose: 'mechanism' },
         success: [{ kind: 'nothing' }],
         fail: [{ kind: 'damage', amount: 8, all: true }],
         successText: '罠が作動する前に駆け抜けた！',

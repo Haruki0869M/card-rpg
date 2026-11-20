@@ -1,13 +1,28 @@
 // ===== 冒険のエンジンの小さな道具（game.ts と world/ で共有する） =====
 import { BALANCE } from '../../data/balance';
 import { getClass } from '../../data/classes';
-import { getItem, POUCH_LIMIT } from '../../data/items';
+import { getItem } from '../../data/items';
+import { getPet } from '../../data/pets';
 import type { GameState, Hero, ItemInstance, Loot, SlotResult, StatId } from '../../types';
 import type { Rng } from '../rng';
 import { finalChanceOf } from './checks';
 import { rarityIndex } from './dungeon';
 import { findHero, livingHeroes, sceneHeroes } from './heroes';
-import { heroStats } from './hero';
+import { equippedItems, heroStats, pouchLimitOf } from './hero';
+import { scourgePrice } from './world/scourgeCurse';
+import { petExplore } from './pets';
+import { exploreEffects } from './exploreAbilities';
+
+/** 報酬・売却で稼いだお金。初期所持金や仲間からの送金は含めない。 */
+export function earnGold(hero: Hero, amount: number) {
+  // 稼いだお金の倍率（測るための入れ物。既定 1 = 今のまま）
+  if (BALANCE.goldGainMul !== 1 && amount > 0) amount = Math.floor(amount * BALANCE.goldGainMul);
+  hero.gold += amount;
+  if (amount > 0) {
+    const f = (hero.feats ??= {});
+    f.goldEarned = (f.goldEarned ?? 0) + amount;
+  }
+}
 
 export function addLog(game: GameState, text: string) {
   game.log.push({ id: game.nextLogId++, text });
@@ -25,14 +40,26 @@ export function rollWithFocus(slots: number, focusUsed: number, chance: number, 
 
 export const successes = (r: SlotResult[]) => r.filter((x) => x !== 'miss').length;
 
+/**
+ * その消耗品を今もらうと、袋に入らずお金に換わるか（換わる時はその額と理由。入る時・消耗品でない時は undefined）。
+ * 袋が満杯（full）か、1人が持てる数（pouchMax）に達している（same）時。額は格で決まる（addItem と同じ）
+ */
+export function pouchOverflow(hero: Hero, itemId: string): { gold: number; why: 'full' | 'same' } | undefined {
+  const def = getItem(itemId);
+  if (def.slot !== 'consumable') return undefined;
+  const full = hero.pouch.length >= pouchLimitOf(hero);
+  if (!full && !(def.pouchMax !== undefined && hero.pouch.filter((p) => p.itemId === def.id).length >= def.pouchMax)) return undefined;
+  return { gold: rarityIndex(def.rarity) * 15 + 10, why: full ? 'full' : 'same' };
+}
+
 /** そのキャラの持ち物に入れる（消費アイテムは袋。袋が満杯ならゴールドに換える） */
 export function addItem(game: GameState, hero: Hero, item: ItemInstance, gainedInDungeon: boolean): string {
   const def = getItem(item.itemId);
   if (def.slot === 'consumable') {
-    if (hero.pouch.length >= POUCH_LIMIT) {
-      const g = rarityIndex(def.rarity) * 15 + 10;
-      hero.gold += g;
-      return `${def.name}（${hero.name}の袋が満杯のため${g}Gに換えた）`;
+    const over = pouchOverflow(hero, def.id);
+    if (over) {
+      earnGold(hero, over.gold);
+      return `${def.name}（${hero.name}の袋が${over.why === 'full' ? '満杯' : `${def.name}でいっぱい`}のため${over.gold}Gに換えた）`;
     }
     hero.pouch.push(item);
   } else {
@@ -47,7 +74,7 @@ export function addItem(game: GameState, hero: Hero, item: ItemInstance, gainedI
 export function splitGold(heroes: Hero[], amount: number) {
   if (!heroes.length || amount <= 0) return;
   const each = Math.floor(amount / heroes.length);
-  heroes.forEach((h, i) => (h.gold += each + (i < amount % heroes.length ? 1 : 0)));
+  heroes.forEach((h, i) => earnGold(h, each + (i < amount % heroes.length ? 1 : 0)));
 }
 
 /** 持ち物の数が一番少ない人（品物を配る時に、偏らないように） */
@@ -83,15 +110,22 @@ export const totalGold = (game: GameState) => game.heroes.reduce((n, h) => n + (
 /** 探索の特殊能力: 判定のボーナス */
 export function checkBonus(hero: Hero, tag: string | undefined): number {
   if (!tag) return 0;
-  const e = getClass(hero.classId).exploreAbility.effect;
-  return e.kind === 'checkBonus' && e.check === tag ? e.bonus : 0;
+  const effects = exploreEffects(hero);
+  // お供（黒猫）: 宝箱の運の判定
+  const pet = tag === 'luck' ? (petExplore(hero).luckBonus ?? 0) : 0;
+  const ab = getClass(hero.classId).battleAbility.effect;
+  const chest = tag === 'luck' && 'modifier' in ab && ab.modifier === 'chestChance' ? ab.bonus : 0;
+  return effects.reduce((n, e) => n + (e.kind === 'checkBonus' && e.check === tag ? e.bonus : 0), 0) + pet + chest;
 }
 
 /** 探索の特殊能力: 選択肢が増える（パーティの誰かが持っていればよい） */
 export function partyHasTag(game: GameState, tag: string): boolean {
-  return livingHeroes(game).some((h) => {
-    const e = getClass(h.classId).exploreAbility.effect;
-    return e.kind === 'extraEventOption' && e.tag === tag;
+  return sceneHeroes(game).some((h) => {
+    if (h.hp <= 0) return false;
+    const c = getClass(h.classId);
+    const e = c.exploreAbility.effect;
+    // 探索の能力・ジョブの印・お供の印（狩人の道やオカメインコは 'scout'）
+    return (e.kind === 'extraEventOption' && e.tag === tag) || !!c.tags?.includes(tag) || (!!h.pet && !!getPet(h.pet.petId).tags?.includes(tag));
   });
 }
 
@@ -105,7 +139,46 @@ export function hiddenChestChance(game: GameState): number {
   return BALANCE.hiddenChestBase + bonus;
 }
 
-/** 能力値による判定の成功率 */
-export function statChance(hero: Hero, stat: StatId, tag?: string): number {
-  return finalChanceOf(heroStats(hero)[stat] + checkBonus(hero, tag));
+/** 装備の「お供を連れている時、イベントの判定+N%」（夢つかみ）の合計。お供がいなければ 0 */
+export function petEventBonusOf(hero: Hero | undefined): number {
+  if (!hero?.pet) return 0;
+  return equippedItems(hero).reduce((n, it) => n + (it.explore?.petEvent ?? 0), 0);
 }
+
+/** ダンジョンの地図に最初から出る物（生きている仲間の装備。羅針盤 = 休憩部屋 / 星図 = 通路と扉の全部） */
+export function partyMapReveal(game: GameState): { rest: boolean; layout: boolean } {
+  const kinds = new Set(livingHeroes(game).flatMap((h) => equippedItems(h).map((it) => it.explore?.reveal)));
+  return { rest: kinds.has('rest'), layout: kinds.has('layout') };
+}
+
+/** 能力値による判定の成功率 */
+export function statChance(hero: Hero, stat: StatId, tag?: string, event?: boolean): number {
+  // イベントの判定: お供（子狐）の上乗せ・装備（夢つかみ）の上乗せ
+  return finalChanceOf(heroStats(hero)[stat] + checkBonus(hero, tag) + (event ? checkBonus(hero, 'event') + (petExplore(hero).eventBonus ?? 0) + petEventBonusOf(hero) : 0));
+}
+
+
+/** 探索の特殊能力: 野営・休憩の回復の倍率（僧侶など） */
+export function restMultiplierOf(hero: Hero): number {
+  const e = getClass(hero.classId).exploreAbility.effect;
+  return e.kind === 'restBonus' ? e.multiplier : 1;
+}
+
+/** 探索の特殊能力: 野営で追加で回復するフォーカス（闘士など） */
+export function campFocusOf(hero: Hero): number {
+  const e = getClass(hero.classId).exploreAbility.effect;
+  return e.kind === 'campFocus' ? e.amount : 0;
+}
+
+/**
+ * 町の買い物の値段: 災厄の中ボスの悪さ（強欲の盗賊王 +25%。段階7b）を掛けてから、探索の特殊能力の値引き（怪盗の変装など。切り捨て）。
+ * game を渡さない時は、災厄の悪さを掛けない
+ */
+export function shopPriceFor(hero: Hero | undefined, base: number, game?: Pick<GameState, 'world'>): number {
+  const price = scourgePrice(game, base);
+  const discount = hero ? Math.max(0, ...exploreEffects(hero).map(e => e.kind === 'shopDiscount' ? e.percent : 0)) : 0;
+  return discount ? Math.max(1, Math.floor(price * (100 - discount) / 100)) : price;
+}
+
+/** 探索の特殊能力: 祠とイベントのマスが霧の中でも見えるキャラがいるか（召喚士など） */
+export const partySenses = (game: GameState) => game.heroes.some((h) => !h.retired && getClass(h.classId).exploreAbility.effect.kind === 'sense');

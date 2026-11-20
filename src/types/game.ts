@@ -1,5 +1,5 @@
 // ===== 冒険（ゲーム全体）の型 =====
-import type { EncounterState, ScenarioMapDef, ScenarioStory, ShrineVisit, TownVisit, WorldState } from './world';
+import type { EncounterState, ScenarioMapDef, ScenarioStory, ShrineVisit, SanctuaryVisit, TownVisit, WorldState } from './world';
 import type {
   AbilityDef,
   BattleState,
@@ -18,6 +18,24 @@ import type {
 
 // ---------- アイテム ----------
 
+/** 連れているお供 */
+export interface HeroPet {
+  petId: string;
+  /** 色違いのID */
+  color: string;
+  name: string;
+  /** 懐き度の点数（一緒に歩いたマス・戦闘で増える。♡1〜5の段階は petLoveLevel） */
+  love: number;
+  /** 戦闘で活躍した回数（戦績に出す） */
+  acts: number;
+  /** この冒険でもう撫でた（フォーカス+1は1回だけ） */
+  patted?: boolean;
+  /** 伝承の書のマイペットから呼んだ子（その端末の記録の ID。K5） */
+  myPetUid?: string;
+  /** この冒険で一緒にダンジョンをクリアした回数（マイペットの登録の条件。K5） */
+  dungeonClears?: number;
+}
+
 export interface ItemDef {
   id: string;
   name: string;
@@ -33,13 +51,45 @@ export interface ItemDef {
   maxHp?: number;
   focusMax?: number;
   startBlock?: number;
+  /** 戦闘に勝った時のゴールドの上乗せ（0.25 = +25%。生き残った仲間の中で一番大きい物だけ効く） */
+  goldBonus?: number;
   extraDraw?: number;
   /** 装備中に山札へ加わるカード（武器） */
-  cards?: { cardId: string; count: number }[];
+  /** soloCardId = 戦闘に1人だけの時は、こちらのカードになる（湧泉のリュート: 輪唱 → 終曲。区切りD） */
+  cards?: { cardId: string; count: number; soloCardId?: string }[];
+  /** 報酬のスマート抽選に使う印（この装備と相性の良いカードが出やすくなる。例: "fire"・"poison"） */
+  tags?: string[];
   /** 消費アイテムの効果 */
   use?: ConsumableEffect;
   /** 装備の特殊能力（エピック以上は必ず持つ。spec §12.7） */
   ability?: AbilityDef;
+  /**
+   * 探索での効果（K2）。vision = 世界マップの視界+N / campHeal = 野営の回復量の割合を足す（0.25 = +25%） /
+   * petEvent = お供を連れている時、イベントの判定+N% /
+   * reveal = ダンジョンの地図に最初から出る物（rest = 休憩部屋の場所と種類 / layout = 通路と扉の場所の全部。種類は出ない）
+   */
+  explore?: { vision?: number; campHeal?: number; petEvent?: number; reveal?: 'rest' | 'layout' };
+  /** このシナリオの冒険でだけ宝箱・ショップに出る（K2/K4。省略は全シナリオ） */
+  scenario?: string;
+  /** 区切りE: お店で売らない（レジェンドの消耗品） */
+  noShop?: boolean;
+  /** 区切りE: 1人が袋に持てる数（不死鳥の羽根は1） */
+  pouchMax?: number;
+  /**
+   * 出どころ（段階7a）。randomDungeon = ランダムダンジョンの黄金箱と闇商人だけで手に入る専用の装備（町の店・ふつうの宝箱・戦闘のドロップ・行商人には出ない）
+   */
+  /** scourge = 災厄の中ボスが必ず落とす専用の装備と秘薬（段階7b。ほかのどこにも出ない） */
+  source?: 'randomDungeon' | 'scourge';
+  /**
+   * 災厄だけが落とす印（シナリオ2の作り直し §2-2・§8-2。シナリオの伝説品を災厄の専用の装備に移した物）: 落とす災厄の ID。
+   * その災厄が登録されていて・そのシナリオに出る災厄の一覧に入っていて・広い地図の冒険の時だけ、宝箱・店・ドロップ・行商人・闇商人に出ない（world/scourgeGear.ts）。
+   * それ以外（古い 8×35 の地図の冒険・災厄がまだ登録されていない時）は、今までどおり出る
+   */
+  scourgeGear?: string;
+  /** 仲間がいる時だけ出る（1人で遊ぶ冒険では出さない。共鳴する絆の指輪） */
+  teamOnly?: boolean;
+  /** 道具袋に持てる数を増やす（錬金術師のベルト） */
+  pouchBonus?: number;
 }
 
 export interface ItemInstance {
@@ -68,10 +118,44 @@ export interface Hero {
   equipment: Partial<Record<EquipSlot, ItemInstance>>;
   /** 次の戦闘の開始時に付く状態異常（イベントの失敗など） */
   nextBattleStatuses: Partial<Record<StatusId, number>>;
+  /** 区切りE: 次の戦闘の1ターン目にお供が行動する回数（お供の特上ごちそう） */
+  petFeast?: number;
   /** 命の灯火が無い時に戦闘に負けて、冒険から退場した（spec §11.4） */
   retired?: boolean;
   /** 祠の永続の加護の数（上限あり） */
   blessings?: number;
+  /** 今までのジョブ（転職した順。spec §6.4） */
+  jobs?: string[];
+  /** 持ち越している戦闘の特殊能力（そのジョブのID） */
+  carried?: string;
+  /** 転職の条件のための記録（敵を倒した数など。キーは feats の種類） */
+  feats?: Record<string, number>;
+  /** 転職した直後に選べる専用カード（PICK_JOB_CARD で1枚選ぶ） */
+  jobPick?: string[];
+  /** 連れているお供（1匹まで） */
+  pet?: HeroPet;
+  /** この冒険で、もうマイペットを呼んだ（1人1回。K5） */
+  myPetCalled?: boolean;
+  /** 迎えられるお供の候補（イベントの後。ADOPT_PET で選ぶ） */
+  petOffer?: string[];
+  /** 候補を出した時点で抽選・保存する毛色。採用時には引き直さない。 */
+  petOfferColors?: Record<string, string>;
+  /** イベントでカードを1枚選ぶ作業（強化 / 削除 / 変異。CARD_TASK で選ぶ） */
+  /** altar = 晶石の祭壇（段階7a。1枚を＋に強化するか、同じ格の別のカードに変異させるかを、本人が選ぶ） */
+  cardTask?: 'upgrade' | 'remove' | 'mutate' | 'altar';
+  /** さすらいの行商人の品物（PEDDLER_BUY で買う）。kind = blackMarket は無法者の隠れ処の闇商人（段階7a。品と値段だけが違う） */
+  peddler?: { items: { item: ItemInstance; price: number; sold?: boolean; group?: string }[]; cards: { cardId: string; price: number; sold?: boolean }[]; kind?: 'blackMarket' };
+  /** 晶石の祭壇: 今の作業の後に、もう何回強化か変異ができるか（古代の晶洞は2回。2026-11-14。省略は0） */
+  altarLeft?: number;
+  /**
+   * 漂流物の山（ランダムダンジョンのテーマ「漂流物の洞」の4行目。2026-11-16 シナリオ3の作り直し）: 選べる消耗品の候補（アイテムの ID・左から）。
+   * 部屋に入った時に引いて保存する（保存して再開しても・オンラインでも同じ）。本人が FLOTSAM_PICK で1つ選ぶ。だれも待たない
+   */
+  flotsam?: string[];
+  /** 武器に宿った属性（その武器を持っている間だけ） */
+  weaponElement?: { uid: string; element: string };
+  /** 最後に突発イベントが起きたワールドターン（2手番続けては起きない） */
+  lastRandomEvent?: number;
   /** 自分のお金・持ち物（装備していない装備品）・道具袋（M3-C: キャラごと） */
   gold: number;
   stash: ItemInstance[];
@@ -97,20 +181,77 @@ export interface RoomTypeDef {
   /** 戦闘の部屋の設定 */
   battle?: {
     /** ダンジョンの敵の組み合わせのどれを使うか */
-    pool: 'battle' | 'elite' | 'boss';
+    pool: 'battle' | 'elite' | 'boss' | 'midboss';
     /** 敵のレベルの加算 */
     levelBonus: number;
     /** カード報酬の確率（balance.ts の cardRewardOdds のキー） */
     cardOdds: string;
     /** ボス（倒すと大宝箱 → ダンジョン制覇。逃げられない。隠し宝箱は出ない） */
     boss?: boolean;
+    /** 逃げられない戦闘（中ボス。逃げて素通りできないように） */
+    noEscape?: boolean;
     /** 勝った時に装備を落とす（epicChance% でエピック、それ以外はレア） */
-    equipmentDrop?: { epicChance: number };
+    /** byDepth = エピック率を深層ボーナスの段で変える（BALANCE.eliteEpicChanceByDepth。ダンジョンの外の戦闘は入口の段。2026-11-13 強敵の計画 柱4） */
+    equipmentDrop?: { epicChance: number; byDepth?: boolean };
     /** 勝った時に chance% でコモンの消費アイテムを落とす */
     consumableDrop?: { chance: number };
   };
+  /** 扉の予兆の種類（無ければ behavior から決まる。強敵だけ別の色にする時などに書く） */
+  omen?: 'danger' | 'elite' | 'treasure' | 'rest' | 'mystery';
+  /** 重い扉で見せる部屋（中ボス。予兆の色は出さず、扉の見た目で分かる） */
+  heavyDoor?: boolean;
+  /** 扉の予兆の名前と説明（同じ色の中で、別の名前で見せる時。例: 金の扉の「封魔の宝箱」） */
+  omenName?: string;
+  omenText?: string;
+  /** 封魔の宝箱の部屋（宝箱の部屋が、ダンジョンを作る時に一定の確率でこの種類に変わる。敵は battle の設定で決める） */
+  sealedChest?: boolean;
   /** ランダムダンジョンの途中の行での出やすさ（0なら自動生成では出ない） */
   layoutWeight?: number;
+}
+
+/**
+ * ランダムダンジョンのテーマ（段階7a・overhaul-plan-v2 §4-2）。部屋の並びとご褒美だけを変える（敵はそのシナリオのランダムダンジョンのまま）。
+ * データは src/content/common/dungeonThemes/（自動で登録）
+ */
+export interface DungeonThemeDef {
+  id: string;
+  order?: number;
+  /** 名前（例: 古代の晶洞）。画面では「古代の晶洞（迷いの森の洞窟）」のように出す */
+  name: string;
+  /** 地図と見取り図の印（💎・⛓・🗡） */
+  mark: string;
+  /** 入口の説明（短く。全5行・黄金箱の文は画面が足す） */
+  description: string;
+  /** 2〜3行目の部屋の種類の割合（書いていない種類は出ない） */
+  weights: Partial<Record<RoomType, number>>;
+  /** 4行目（ボスの手前）の部屋の種類（1部屋だけ） */
+  fixedRoom: RoomType;
+  /** 敵のレベルの加算 */
+  enemyLevel?: number;
+  /** 戦闘・強敵の部屋の敵は、そのダンジョンの組のうち「数が多い」組から選ぶ */
+  largeGroups?: boolean;
+  /** 宝箱の部屋が封魔の宝箱になる確率（%。2行目から） */
+  sealedChance?: number;
+  /**
+   * ご褒美の倍率（ボスの黄金箱には掛けない）。chestGold = 宝箱のお金 / battleGold = 戦闘のお金 / epicMul = カードと装備のエピックの重み /
+   * altarUses = 晶石の祭壇で強化か変異ができる回数（省略は1）/ blackMarketChoices = 闇商人が並べる専用の装備の数（1つ買うと、ほかは下がる。省略は1）
+   */
+  reward?: { chestGold?: number; battleGold?: number; epicMul?: number; altarUses?: number; blackMarketChoices?: number };
+  /**
+   * そのシナリオでだけ候補にするテーマ（シナリオID）。無ければ全シナリオ（2026-11-14 シナリオ2の作り直し・氷漬けの宝物庫）。
+   * 古い保存のテーマ決め（ensureTileTheme）では選ばない（前と同じ結果にするため）
+   */
+  scenario?: string;
+  /**
+   * 凍え（氷漬けの宝物庫。docs/tasks/scenario2-theme-scourge-proposal.md §1 A案）: 部屋に入るたびに凍え+1、その場の全員のHPが「凍え × hpPercent%」減る
+   * （HPは1で止まる）。休憩の部屋に入ると凍えは0（その部屋の寒さは受けない）。chest = 奥の箱の格（入った時の凍えが min 以上の、最初の物）
+   */
+  chill?: { hpPercent: number; chest: { min: number; rarity: Rarity }[] };
+  /**
+   * 漂流物の山（漂流物の洞。2026-11-16 シナリオ3の作り直し・計画 §3-3 と点検 B4）: その場の全員が、それぞれ消耗品を choices 個から1つ選ぶ。
+   * 候補のうち epicSlots 個はエピック以上（残りはレア以上）
+   */
+  flotsam?: { choices: number; epicSlots: number };
 }
 
 export interface ChestSpec {
@@ -119,6 +260,8 @@ export interface ChestSpec {
   locked: boolean;
   /** 大宝箱（ボス撃破後） */
   big?: boolean;
+  /** 封魔の宝箱（封印を解くと罠の判定があり、番人との戦闘に勝つと開けられる。部屋の種類 sealedChest） */
+  sealed?: boolean;
 }
 
 export interface Room {
@@ -128,7 +271,7 @@ export interface Room {
   type: RoomType;
   next: string[];
   /** 戦闘の敵（生成済み） */
-  enemies?: { defId: string; level: number }[];
+  enemies?: { defId: string; level: number; eliteBody?: boolean }[];
   chest?: ChestSpec;
   eventId?: string;
   cleared: boolean;
@@ -144,17 +287,21 @@ export interface DungeonDef {
   mapBackground?: string;
   /** 敵の基準レベル */
   baseLevel: number;
-  /** 出現する敵（戦闘・強敵・ボス） */
-  pools: { battle: string[][]; elite: string[][]; boss: string[] };
+  /** 出現する敵（戦闘・強敵・ボス。midboss = 中ボスの部屋の敵。無ければ強敵の1組目） */
+  pools: { battle: string[][]; elite: string[][]; boss: string[]; midboss?: string[] };
   /** 固定の部屋の並び（行ごと）。無ければ自動生成 */
   layout?: { type: RoomType; next: number[]; chest?: ChestSpec; eventId?: string }[][];
   /** 大宝箱の見た目（中身の格の確率を決める） */
   bossChest: Rarity;
   /** 制覇すると手に入る封印の鍵（シナリオの story.keys のID） */
   rewardKey?: string;
+  /** 制覇した後に出る物語（2〜3行、1行30字まで。何が起きたかを伝える）。最後に鍵の残り数と次の目的地が自動で足される */
+  clearStory?: string[];
   /** 入るのに必要な鍵 */
   requiresKeys?: string[];
-  /** 制覇すると侵食度がこれだけ下がる */
+  /** 入るのに必要な、報告まで済ませた町の依頼の数（船を借りる依頼は数えない。冒険を長くする関門） */
+  requiresQuests?: number;
+  /** 制覇すると侵食度がこれだけ下がる（無ければ、鍵のダンジョンは BALANCE.corruptionOnKeyDungeonClear・それ以外は0） */
   corruptionOnClear?: number;
   /** 制覇するとシナリオのクリア（ラスボスのダンジョン） */
   finale?: boolean;
@@ -165,6 +312,8 @@ export interface DungeonDef {
 }
 
 export interface DungeonRun {
+  /** この制覇で新しく見破ったダンジョン（制覇の画面の知らせ用。見破れなかった時は無い。2026-11-14 点検21） */
+  insightGained?: string;
   dungeonId: string;
   /** ランダムダンジョンの時の名前 */
   name: string;
@@ -175,10 +324,24 @@ export interface DungeonRun {
   currentRoomId?: string;
   /** このダンジョンで手に入れたもの（撤退時に1つ失う候補） */
   gained: ItemInstance[];
-  /** 探索力（この手番で入れる部屋の残り。判定前は null。世界マップのあるシナリオだけ。M3-D） */
-  explore?: number | null;
-  exploreRoll?: ('focus' | 'hit' | 'miss')[];
+  /** この手番に扉を開けた（扉1つ＝手番1回。部屋を済ませて通路に戻ったら、その組の手番は終わる。抜本的な見直し §2-3） */
+  opened?: boolean;
+  /** ランダムダンジョンのテーマ（段階7a。古い保存の途中のダンジョンには無い = テーマなしの6行） */
+  theme?: string;
+  /** 入った世界マップのマス（ランダムダンジョンを制覇したら、そのマスを「踏破済み」にする。古い保存には無い） */
+  tile?: number;
+  /** 通路の地図の上の位置と向き（地図は部屋のつながりから毎回作る。engine/game/dungeonMap.ts） */
+  pos?: { x: number; y: number; facing: Facing };
+  /** 見たマス（"x,y"。オートマッピング） */
+  seen?: string[];
+  /** 「周囲の警戒」（フォーカス1）を使った通路（今いる部屋のID か 'entrance'。1つの通路で1回だけ。その通路にいる間、先読みが見える） */
+  watchedAt?: string;
+  /** 凍え（テーマに chill がある時だけ。部屋に入るたびに+1・休憩で0。古い保存・ほかのテーマには無い = 0） */
+  chill?: number;
 }
+
+/** 向き（0=北・奥 / 1=東 / 2=南 / 3=西） */
+export type Facing = 0 | 1 | 2 | 3;
 
 // ---------- 宝箱・イベント・報酬 ----------
 
@@ -199,14 +362,28 @@ export interface ChestState {
   contents?: Loot[];
   /** 抽選された中身の格（開ける前は undefined） */
   grade?: Rarity;
+  /** ランダムダンジョンの黄金箱から、専用の装備が余分に出た（中身の2つ目。段階7a。画面で知らせる） */
+  exclusive?: boolean;
   /** 判定の結果（演出用） */
   lastRoll?: ChestRoll;
   /** 戦闘の後に見つけた隠し宝箱（マスには残らない） */
   hidden?: boolean;
+  /** 2人以上のプレイヤーで開ける時: みんなで決めた開け役（そのキャラの担当の人が判定する。ステップ2） */
+  opener?: string;
+  /** 封魔の宝箱の進み具合（無し = 封印されている / broken = 封印を解いた。番人との戦闘の前 / cleared = 番人を倒した。開けられる） */
+  seal?: 'broken' | 'cleared';
+  /** 2人以上のプレイヤーで開けた時: 中の品物（装備・消耗品）の取り合い（戦闘の装備と同じ「欲しい／余れば／いらない」） */
+  claims?: LootClaim[];
+  /**
+   * ランダムダンジョンの黄金箱の秘宝の3択（2026-11-14 寄り道の値打ち 柱3）: 開けた時に引いた候補。PICK_RELIC で1つ選ぶまで立ち去れない。
+   * 選んだら relicPicked（候補の番号）。古い保存には無い（今までどおり、乱数の1つが中身に入っている）
+   */
+  relics?: ItemInstance[];
+  relicPicked?: number;
 }
 
 export interface ChestRoll {
-  kind: 'lock' | 'luck';
+  kind: 'lock' | 'luck' | 'seal';
   heroId: string;
   results: ('focus' | 'hit' | 'miss')[];
   success: boolean;
@@ -222,6 +399,8 @@ export interface ChestRoll {
 }
 
 export interface EventCheck {
+  /** 実績を数える用途。能力ボーナスのtagとは分ける。 */
+  purpose?: 'mechanism';
   stat: StatId;
   slots: number;
   /** 成功に必要な成功数 */
@@ -242,8 +421,14 @@ export interface EventOption {
   label: string;
   /** この選択肢を出すのに必要な探索の特殊能力のタグ */
   requiresTag?: string;
+  /** 場面のだれかがお供を連れている時だけ出す（K7） */
+  requiresPet?: boolean;
   /** 必要なゴールド */
   cost?: number;
+  /** 必要なフォーカス（選んだキャラが払う） */
+  costFocus?: number;
+  /** 使う消費アイテム（アイテムのID。持っているキャラが1つ使う） */
+  costItem?: string;
   check?: EventCheck;
   success: EventOutcome[];
   fail?: EventOutcome[];
@@ -253,14 +438,36 @@ export interface EventOption {
 
 export interface EventDef {
   id: string;
-  /** どこで起きるか（省略はダンジョンの部屋） */
-  where?: 'dungeon' | 'map';
+  /** どこで起きるか（省略はダンジョンの部屋。random = 世界マップの何もないマスで突然起きる。spawn = 時間で消える出現スポット専用） */
+  where?: 'dungeon' | 'map' | 'random' | 'spawn';
+  /** 突発イベントの出やすさ（省略は10） */
+  weight?: number;
+  /** 突発イベントの種類（bad = 夜・侵食度が高い時に出やすい） */
+  tone?: 'good' | 'bad' | 'pet' | 'shop' | 'battle';
   /** 夜だけ起きる */
   night?: boolean;
+  /** 突発イベント: この地形（TerrainDef の id）のマスでだけ起きる（K7） */
+  terrain?: string[];
+  /** 突発イベント: 移動した仲間のだれかがお供を連れている時だけ起きる（K7） */
+  needsPet?: boolean;
+  /** 隠しボスの名所（K3 C。where: 'map' と使う）: この地域（地域の id）の空いたマスに必ず1つだけ置く。ふつうのマップのイベントの候補には入れない */
+  hiddenIn?: string;
+  /** 地図のデータが置き場所を決めるイベント（段階6a の薬草の群生地。where: 'map' と使う）。ふつうのマップのイベントの候補には入れない */
+  placed?: boolean;
   title: string;
   text: string;
   icon: string;
   options: EventOption[];
+}
+
+/** イベントから始まる戦闘（待ち伏せ・黄金のコソ泥・護衛など） */
+export interface EventBattle {
+  /** 出てくる敵（無ければ今いる地域の敵） */
+  enemies?: { defId: string; level?: number }[];
+  /** 先制（敵は1ターン目に動けない） */
+  surprise?: boolean;
+  goldMul?: number;
+  onWin?: EventOutcome[];
 }
 
 export interface EventState {
@@ -268,6 +475,16 @@ export interface EventState {
   roomId?: string;
   tile?: number;
   eventId: string;
+  /** 突発イベント（世界マップを移動中に起きた。終わっても手番は続く） */
+  random?: boolean;
+  /** イベントの結果で始まる戦闘（「つづける」で始まる） */
+  battle?: EventBattle;
+  /**
+   * みんなで決めた判定つきの選択肢と、挑む役（2人以上のプレイヤー。実機の不具合① 2026-11-14・案A）。
+   * ある間は「挑む段」: 挑む役の持ち主だけがフォーカスを決めて挑む（EVENT_CHALLENGE）／任せる（EVENT_HANDOVER）／選び直す（EVENT_RECHOOSE）。
+   * 保存の版は上げない（無い = 選ぶ段。古い保存もそのまま選ぶ段から）
+   */
+  decided?: { optionIndex: number; heroId: string };
   /** 選んだ結果（選ぶ前は undefined） */
   result?: { optionIndex: number; heroId?: string; results?: ('focus' | 'hit' | 'miss')[]; success: boolean; text: string; loot: Loot[] };
 }
@@ -312,7 +529,7 @@ export interface LootClaim {
   winner?: string;
 }
 
-export type GameMode = 'hub' | 'world' | 'encounter' | 'town' | 'shrine' | 'dungeon' | 'battle' | 'reward' | 'chest' | 'event' | 'rest' | 'gameover' | 'cleared' | 'ending';
+export type GameMode = 'hub' | 'world' | 'encounter' | 'town' | 'shrine' | 'sanctuary' | 'dungeon' | 'battle' | 'reward' | 'chest' | 'event' | 'rest' | 'gameover' | 'cleared' | 'ending';
 
 export interface AdventureStats {
   battlesWon: number;
@@ -335,13 +552,15 @@ export interface GameLog {
 export interface Expedition {
   id: string;
   heroes: string[];
+  /** 入った入口のマスの番号（同じダンジョンに後から来た仲間が合流する時の見分け。古い保存には無い） */
+  entranceTile?: number;
   mode: GameMode;
   dungeon?: DungeonRun;
   battle?: BattleState;
   reward?: RewardState;
   chest?: ChestState;
   event?: EventState;
-  battleInfo?: { roomType: string; wandererId?: string; tile?: number };
+  battleInfo?: BattleInfo;
   battleBackground?: string;
   vote?: VoteState;
 }
@@ -353,6 +572,19 @@ export interface Expedition {
 export interface VoteState {
   ctx: string;
   picks: Partial<Record<PlayerId, GameCommand>>;
+}
+
+/** 今の戦闘の情報（どこで・何と） */
+export interface BattleInfo {
+  roomType: string;
+  wandererId?: string;
+  tile?: number;
+  /** 勝った時のお金の倍率（待ち伏せを迎え撃つなど） */
+  goldMul?: number;
+  /** 勝った時に起きること（護衛を倒してお供を保護するなど） */
+  onWin?: EventOutcome[];
+  /** 突発イベントの戦闘（終わっても手番は続く） */
+  random?: boolean;
 }
 
 export interface GameState {
@@ -385,10 +617,11 @@ export interface GameState {
   /** 今の戦闘の背景 */
   battleBackground?: string;
   /** 今の戦闘の情報（どこで・何と） */
-  battleInfo?: { roomType: string; wandererId?: string; tile?: number };
+  battleInfo?: BattleInfo;
   encounter?: EncounterState;
   town?: TownVisit;
   shrine?: ShrineVisit;
+  sanctuary?: SanctuaryVisit;
   /** オンライン協力の冒険（戦闘で全員の準備完了を待つ） */
   online?: boolean;
   /** 世界マップと別に進んでいる場面（ダンジョンに入ったキャラたち。M3-C） */
@@ -415,7 +648,7 @@ export interface DifficultyDef {
   enemyHp?: number;
   enemyAttack?: number;
   reward?: number;
-  /** 世界マップの1巡ごとに増える侵食度（省略は BALANCE.corruptionPerTurn） */
+  /** 時間による侵食度の倍率（BALANCE.corruptionPerTurn・corruptionPerDungeonTurn に掛ける。省略は1） */
   corruptionPerTurn?: number;
   /** 説明文（省略すると数値から自動で作る） */
   description?: string;
@@ -434,28 +667,61 @@ export type GameCommand =
   | { type: 'ENTER_DUNGEON'; playerId: PlayerId; dungeonId: string }
   | { type: 'ENTER_ROOM'; playerId: PlayerId; roomId: string }
   | { type: 'BATTLE'; command: Command }
-  | { type: 'USE_POUCH_ITEM'; playerId: PlayerId; itemUid: string; userId: string; targetId: string }
+  | { type: 'USE_POUCH_ITEM'; playerId: PlayerId; itemUid: string; userId: string; targetId: string; /** カード鍛錬の砥石: 強化するカード */ cardUid?: string; /** 秘薬（段階7b）: 上げる能力値 */ stat?: StatId }
   | { type: 'FINISH_BATTLE'; playerId: PlayerId }
   | { type: 'CHOOSE_GROWTH'; playerId: PlayerId; optionIndex: number; cardUid?: string }
   | { type: 'PICK_CARD'; playerId: PlayerId; offerIndex: number | null; /** 選ばない時: どのキャラの分か（省くと、その人のキャラ全員の分） */ heroId?: string }
   | { type: 'FINISH_REWARD'; playerId: PlayerId }
-  | { type: 'CLAIM_LOOT'; playerId: PlayerId; heroId: string; choice: 'need' | 'greed' | 'pass' }
-  | { type: 'OPEN_CHEST'; playerId: PlayerId; heroId: string; focusUsed: number }
+  /** 転職する（戦闘中以外。spec §6.4） */
+  | { type: 'CHANGE_JOB'; playerId: PlayerId; heroId: string; jobId: string }
+  | { type: 'PICK_JOB_CARD'; playerId: PlayerId; heroId: string; cardId: string }
+  /** お供を迎える（petId を空にすると見送る） */
+  | { type: 'ADOPT_PET'; playerId: PlayerId; heroId: string; petId?: string; color?: string; name?: string }
+  /** お供を撫でる（野営・休憩部屋。1回の冒険で最初の1回はフォーカス+1） */
+  | { type: 'PET_PAT'; playerId: PlayerId; heroId: string }
+  /** イベントのカードの作業（cardUid を空にするとやめる） */
+  /** altar = 晶石の祭壇の時の選び方（upgrade = ＋に強化 / transmute = 同じ格の別のカードに変異） */
+  | { type: 'CARD_TASK'; playerId: PlayerId; heroId: string; cardUid?: string; altar?: 'upgrade' | 'transmute' }
+  /** 行商人の品物を買う（index を省くと店を閉じる） */
+  | { type: 'PEDDLER_BUY'; playerId: PlayerId; heroId: string; kind?: 'item' | 'card'; index?: number }
+  /** 漂流物の山の候補から1つ選ぶ（index = Hero.flotsam の何番目か。heroId のキャラの担当の席が送る。2026-11-16） */
+  | { type: 'FLOTSAM_PICK'; playerId: PlayerId; heroId: string; index: number }
+  | { type: 'CLAIM_LOOT'; playerId: PlayerId; heroId: string; choice: 'need' | 'greed' | 'pass'; /** 宝箱の取り合いの何番目か（戦闘の報酬では使わない） */ index?: number }
+  /** 宝箱を開けるキャラを、みんなで決める（2人以上のプレイヤーの時。全員一致） */
+  | { type: 'CHEST_OPENER'; playerId: PlayerId; heroId: string }
+  | { type: 'OPEN_CHEST'; playerId: PlayerId; heroId: string; recipientId?: string; focusUsed: number }
   | { type: 'LEAVE_CHEST'; playerId: PlayerId }
   | { type: 'CHOOSE_EVENT'; playerId: PlayerId; optionIndex: number; heroId?: string; focusUsed: number }
+  /** 挑む段（EventState.decided）: 挑む役（heroId = 今の挑む役）の持ち主がフォーカスを決めて挑む */
+  | { type: 'EVENT_CHALLENGE'; playerId: PlayerId; heroId: string; focusUsed: number }
+  /** 挑む段: 挑む役を別のキャラに任せる（heroId = 今の挑む役。任せる先は toHeroId。点検 F1） */
+  | { type: 'EVENT_HANDOVER'; playerId: PlayerId; heroId: string; toHeroId: string }
+  /** 挑む段: 選ぶ段に戻る（heroId = 今の挑む役。挑めるキャラがいない時は省いてよい） */
+  | { type: 'EVENT_RECHOOSE'; playerId: PlayerId; heroId?: string }
   | { type: 'FINISH_EVENT'; playerId: PlayerId }
-  | { type: 'REST'; playerId: PlayerId; kind: 'hp' | 'focus' }
+  | { type: 'REST'; playerId: PlayerId; kind: 'hp' | 'focus' | 'upgrade' }
   | { type: 'RETREAT'; playerId: PlayerId }
-  | { type: 'RETURN_TO_HUB'; playerId: PlayerId }
+  /** kind = 'shortcut': ランダムダンジョンを制覇した後、抜け道を通って出る（2026-11-14。省略は入口へ戻る） */
+  | { type: 'RETURN_TO_HUB'; playerId: PlayerId; kind?: 'shortcut' }
+  /** ランダムダンジョンの黄金箱の秘宝を、3つの候補から1つ選ぶ（2人以上はみんなで決める。2026-11-14） */
+  | { type: 'PICK_RELIC'; playerId: PlayerId; optionIndex: number }
   | { type: 'EQUIP'; playerId: PlayerId; heroId: string; itemUid: string }
   | { type: 'UNEQUIP'; playerId: PlayerId; heroId: string; slot: EquipSlot }
   /** 同じ場所にいる仲間に、お金か持ち物を渡す */
   | { type: 'GIVE'; playerId: PlayerId; fromHeroId: string; toHeroId: string; itemUid?: string; gold?: number }
   // ---------- 世界マップ（spec §8） ----------
   /** 移動力の判定 */
-  | { type: 'WORLD_ROLL_MOVE'; playerId: PlayerId; heroId: string; focusUsed: number }
+  | { type: 'WORLD_ROLL_MOVE'; playerId: PlayerId; heroId: string }
+  /** フォーカス1で移動のサイコロを振り直す（1回目の目を見た後、まだ動く前。2回目の目で決まる） */
+  | { type: 'WORLD_REROLL_MOVE'; playerId: PlayerId; heroId: string }
   /** 移動（同行するキャラも一緒に動く。同行したキャラはこのワールドターンの行動を終える） */
   | { type: 'WORLD_MOVE'; playerId: PlayerId; heroId: string; to: number; companions: string[] }
+  /** 他の人のキャラと一緒に動く時: 移動先の提案に同意する / 断る（断ると同行をやめる。M3-D 指摘1） */
+  | {
+      type: 'WORLD_MOVE_AGREE'; playerId: PlayerId; accept: boolean;
+      /** 返事をする担当の、同行しているキャラ（画面から送る時の担当者を決めるだけ。エンジンは playerId で判定する） */
+      heroId?: string;
+    }
   | { type: 'WORLD_WAIT'; playerId: PlayerId; heroId: string }
   /** 倒れている仲間を助け起こす（同じマスで。手番を使う。M3-C5） */
   | { type: 'WORLD_REVIVE'; playerId: PlayerId; heroId: string; targetId: string }
@@ -466,27 +732,41 @@ export type GameCommand =
   | { type: 'ENCOUNTER_CHOOSE'; playerId: PlayerId; choice: 'fight' | 'ambush' | 'flee'; heroId: string; focusUsed: number; participants: string[] }
   /** 遭遇の判定の結果を見た後に進む */
   | { type: 'ENCOUNTER_CONTINUE'; playerId: PlayerId; participants: string[] }
-  | { type: 'STORY_CONTINUE'; playerId: PlayerId }
+  /** storyVer = 押した時に見ていた物語の窓の版（WorldState.storyVer）。違えば何もしない。無い（古い形）時は今出ている窓を閉じる（点検 F6） */
+  | { type: 'STORY_CONTINUE'; playerId: PlayerId; storyVer?: number }
   // ---------- 町・祠 ----------
-  | { type: 'TOWN_BUY'; playerId: PlayerId; kind: 'item' | 'card'; index: number }
-  | { type: 'TOWN_INN'; playerId: PlayerId }
+  /** free = 盗賊王の無料券を使う（装備・消耗品だけ。2026-11-14） */
+  | { type: 'TOWN_BUY'; playerId: PlayerId; heroId?: string; kind: 'item' | 'card'; index: number; free?: boolean }
+  | { type: 'TOWN_INN'; playerId: PlayerId; heroId?: string }
+  /** 伝承の書のマイペットを呼ぶ（スタートの町で1人1回・お金。中身はその端末の記録から送る。乱数は使わない。K5） */
+  | { type: 'BRING_MY_PET'; playerId: PlayerId; heroId: string; pet: { uid: string; petId: string; color: string; name: string; love: number } }
   | { type: 'TOWN_REMOVE_CARD'; playerId: PlayerId; heroId: string; cardUid: string }
-  | { type: 'TOWN_SELL'; playerId: PlayerId; itemUid: string }
-  | { type: 'QUEST_ACCEPT'; playerId: PlayerId; questId: string }
-  | { type: 'QUEST_REPORT'; playerId: PlayerId; questId: string }
-  | { type: 'LEAVE_TOWN'; playerId: PlayerId }
+  | { type: 'TOWN_SELL'; playerId: PlayerId; heroId?: string; itemUid: string }
+  | { type: 'QUEST_ACCEPT'; playerId: PlayerId; heroId?: string; questId: string }
+  | { type: 'QUEST_REPORT'; playerId: PlayerId; heroId?: string; questId: string }
+  | { type: 'LEAVE_TOWN'; playerId: PlayerId; heroId?: string }
   | { type: 'SHRINE_CHOOSE'; playerId: PlayerId; optionIndex: number; heroId: string }
-  | { type: 'LEAVE_SHRINE'; playerId: PlayerId }
+  | { type: 'LEAVE_SHRINE'; playerId: PlayerId; heroId?: string }
+  | { type: 'LEAVE_SANCTUARY'; playerId: PlayerId; heroId?: string }
   /** 世界マップと別に進んでいる場面（ダンジョン）の中の操作 */
   | { type: 'SCENE'; scene: string; command: GameCommand }
-  /** ダンジョンのパーティの手番: 探索力の判定（素早さ）/ 手番を終える */
-  | { type: 'EXPLORE_ROLL'; playerId: PlayerId; heroId: string; focusUsed: number }
-  | { type: 'EXPLORE_END'; playerId: PlayerId }
+  /**
+   * ダンジョンの通路を1歩進む（左・右・後ろは、その向きを向いて1歩）。歩くのは手番のキャラの担当の人（第3段階）。
+   * DUNGEON_STEP・DUNGEON_TURN・DUNGEON_WALK は、扉を選ぶだけの形になってから画面では使わない。テストでキャラの位置を動かす道具として残している
+   */
+  | { type: 'DUNGEON_STEP'; playerId: PlayerId; heroId: string; dir: 'forward' | 'left' | 'right' | 'back' }
+  /** その場で向きを変える（歩数は使わない） */
+  | { type: 'DUNGEON_TURN'; playerId: PlayerId; heroId: string; dir: 'left' | 'right' | 'back' }
+  /** 周囲の警戒（そのキャラのフォーカス1。判定なし。その通路にいる間、扉の先の中身と次の次の行の色が分かる。1つの通路で1回だけ） */
+  | { type: 'DUNGEON_SCOUT'; playerId: PlayerId; heroId: string }
+  /** 見えているマスまで歩く（歩いた数だけ歩数を使う）。face = 着いた後に向く向き */
+  | { type: 'DUNGEON_WALK'; playerId: PlayerId; heroId: string; x: number; y: number; face?: Facing }
   /** みんなで決める操作に1票入れる（command = 選んだ操作。null で取り消し） */
   | { type: 'VOTE'; playerId: PlayerId; command: GameCommand | null }
   /** 遭遇の戦闘に、自分のキャラを加える / 加えない（近くにいる、手番でない人のキャラ） */
   | { type: 'ENCOUNTER_JOIN'; playerId: PlayerId; heroId: string; join: boolean }
   /** 手番のキャラが、同じマスの他の人のキャラを同行に誘う / 誘われた人が答える */
+  | { type: 'WORLD_UNFOLLOW'; playerId: PlayerId; heroId: string }
   | { type: 'WORLD_INVITE'; playerId: PlayerId; heroId: string; targetId: string }
   | { type: 'WORLD_INVITE_ANSWER'; playerId: PlayerId; heroId: string; accept: boolean }
 
@@ -506,10 +786,20 @@ export interface ScenarioDef {
   name: string;
   synopsis: string;
   recommended: string;
+  /** 選ぶ画面の一枚絵（背景のID。無ければ title） */
+  art?: string;
   playTime: string;
   unlocked: boolean;
   /** 解放条件の説明（未解放の時に表示） */
   unlockText?: string;
+  /** 4人で遊ぶ時の敵の攻撃倍率（省略すると BALANCE.enemyAttackByPartySize の4人。シナリオごとの難しさの合わせ用） */
+  fourPlayerAttack?: number;
+  /** 解放の条件（クリア記録で決まる。無ければ従来の unlocked だけで決まる）。K4 */
+  unlockRequires?: { cleared: string[] };
+  /** 作成中（敵・数値がそろうまで、クリアの記録があっても遊べない。仕上げて登録する時にこの印を外す）。K4 */
+  wip?: boolean;
+  /** 世界の悪化の名前（画面の「侵食度」の代わりに出る言葉。無ければ TERMS.corruption）。K4 */
+  corruptionName?: string;
   /** 冒険の開始条件 */
   /** 世界マップ（無ければ仮の拠点から遊ぶ） */
   map?: ScenarioMapDef;

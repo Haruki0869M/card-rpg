@@ -1,8 +1,12 @@
 import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { BottomBar, TopBar } from './components/battle/Bars';
+import { ConfirmDialog } from './components/ui/ConfirmDialog';
 import { Battlefield } from './components/battle/Battlefield';
+import { StatusListPopup } from './components/battle/StatusListPopup';
 import { FocusPanel } from './components/battle/FocusPanel';
+import { useElementSize } from './hooks/useElementSize';
+import { SlotPreviewDialog } from './components/battle/SlotPreviewDialog';
 import { Hand } from './components/battle/Hand';
 import { PartyStrip } from './components/battle/PartyStrip';
 import { DetailPopup } from './components/DetailPopup';
@@ -13,26 +17,55 @@ import { ClearedScreen, GameOverScreen } from './components/screens/EndScreens';
 import { HubScreen } from './components/screens/HubScreen';
 import { RewardScreen } from './components/screens/RewardScreen';
 import { ChestScreen } from './components/screens/ChestScreen';
+import { DoorOpenScene } from './components/dungeon/DungeonAnim';
 import { WorldScreen } from './components/world/WorldScreen';
-import { EncounterScreen, EndingScreen, ShrineScreen, TownScreen } from './components/world/Places';
+import { EncounterScreen, EndingScreen, SanctuaryScreen, ShrineScreen, TownScreen } from './components/world/Places';
 import { EventScreen, RestScreen } from './components/screens/RoomScreens';
 import { SetupScreen } from './components/screens/SetupScreen';
 import { JoinScreen, LobbyScreen, OnlineOverlay } from './components/screens/OnlineScreens';
 import { TitleScreen } from './components/screens/TitleScreen';
 import { Sheets } from './components/Sheets';
+import { JobPickOverlay } from './components/JobSheet';
+import { HeroTaskOverlay } from './components/HeroTasks';
+import { AbilityCutins } from './components/ui/AbilityCutins';
 import { SceneTabs } from './components/SceneTabs';
-import { VoteStatus } from './components/ui/Votes';
 import { TurnLock } from './components/ui/TurnLock';
+import { TurnCutin } from './components/ui/TurnCutin';
 import { findAlly } from './engine';
 import { useBackButton } from './hooks/useBackButton';
+import { useAppHeight } from './hooks/useAppHeight';
+import { useLowScreen } from './hooks/useLowScreen';
+import { LAYER } from './components/ui/layers';
+import { HelpScreen } from './components/help/HelpScreen';
+import { useHelp } from './store/help';
+import { useLore } from './store/lore';
+import { Lorebook } from './components/lorebook/Lorebook';
+import { FirstBattleGuide } from './components/battle/FirstBattleGuide';
 import { useDetail } from './hooks/usePress';
 import { useBattle } from './store/battleStore';
+import { useProfile } from './store/profileStore';
+import { watchViewChange } from './components/ui/localWindows';
 
 /** PC向けの補助ショートカット（任意機能） */
 function useKeyboard() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // 遊び方・用語集を開いている間は、Esc で閉じるだけ（下の画面は操作しない）
+      if (useHelp.getState().open) {
+        if (e.key === 'Escape') useHelp.getState().back();
+        return;
+      }
+      // 冒険の途中に開いた伝承の書: Esc で1つ戻るだけ（下の画面は操作しない）
+      if (useLore.getState().open) {
+        if (e.key === 'Escape') useLore.getState().back();
+        return;
+      }
       const s = useBattle.getState();
+      if (s.worldMoves.length) return;
+      if (useDetail.getState().detail) {
+        if (e.key === 'Escape') useDetail.getState().back();
+        return;
+      }
       if (s.sheet || s.confirmAbandon) {
         if (e.key === 'Escape') s.closeTop();
         return;
@@ -55,23 +88,58 @@ function useKeyboard() {
 }
 
 function BattleScreen() {
+  const presenting = useBattle(s => s.presentationBusy);
   const selection = useBattle((s) => s.selection);
   const cancel = useBattle((s) => s.cancel);
+  const calm = useBattle((s) => s.settings.cutinMode === 'simple');
+  const [dockRef, dock] = useElementSize<HTMLDivElement>();
   return (
-    <div className="game-bg safe-pad relative flex h-full w-full max-w-[480px] flex-col overflow-hidden" onClick={() => selection && cancel()}>
+    <div className="game-bg safe-pad relative flex h-full w-full max-w-[480px] flex-col overflow-hidden" onClick={() => selection && cancel()} data-battle-presenting={presenting || undefined} data-calm={calm || undefined}>
       <TopBar />
+      <FirstBattleGuide />
       <Battlefield />
-      <PartyStrip />
-      {/* フォーカス注入パネル: 手札のすぐ上に重ねて出す */}
-      <div className="relative z-40 h-0">
-        <div className="absolute inset-x-0 bottom-1">
-          <AnimatePresence>{selection && <FocusPanel key="focus" />}</AnimatePresence>
-        </div>
+      {/* 段階A: 味方の枠と手札はいつも同じ高さで置く（カードを選んでも戦場は縮まない）。
+          操作パネルはその上に重ねる（味方の下半身〜手札の上。戦場の敵・味方の上半身は押せるまま） */}
+      <div ref={dockRef} className="relative flex min-h-0 flex-col" data-battle-dock style={{ ['--dock-h' as string]: `${dock.height}px` }}>
+        <PartyStrip />
+        <Hand />
+        <AnimatePresence>{selection && <FocusPanel key="focus" />}</AnimatePresence>
       </div>
-      <Hand />
       <BottomBar />
-      <ResultScreen />
+      {!presenting && <ResultScreen />}
+      <SlotPreviewDialog />
+      <EndTurnConfirm />
+      <StatusListPopup />
     </div>
+  );
+}
+
+/** 「ターン終了」の確認（まだ行動できる仲間がいる時だけ。押し間違いの防止） */
+function EndTurnConfirm() {
+  // 確認を出したターンの間だけ出す（オンラインで敵の番を一気に飛ばして次の味方の番が届いても、前のターンの確認を持ち越さない。2026-11-19）
+  const open = useBattle((s) => s.confirmEndTurn && s.battle.phase === 'ally' && s.confirmEndTurnAt === `${s.battle.seed}:${s.battle.turn}`);
+  const endTurn = useBattle((s) => s.endTurn);
+  const setOpen = useBattle((s) => s.setConfirmEndTurn);
+  // 味方の番が終わったら（敵の番・戦闘の終わり）、答えていない確認を閉じる。
+  // 2026-11-18 賢い検証 bot が見つけた不具合: 2人で、P1 が確認に答える前に P2 が敵を倒すと、次の戦闘の最初のターンに同じ確認がまた出た
+  const stale = useBattle((s) => s.confirmEndTurn && (s.battle.phase !== 'ally' || s.confirmEndTurnAt !== `${s.battle.seed}:${s.battle.turn}`));
+  useEffect(() => {
+    if (stale) setOpen(false);
+  }, [stale, setOpen]);
+  return (
+    <AnimatePresence>
+      {open && (
+        <ConfirmDialog
+          key="end-turn"
+          title="ターン終了"
+          text="まだ行動できる仲間がいます。ターンを終了しますか？"
+          ok="ターンを終了する"
+          danger={false}
+          onOk={() => endTurn(true)}
+          onCancel={() => setOpen(false)}
+        />
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -79,13 +147,20 @@ function BattleScreen() {
 function CurrentScreen() {
   const screen = useBattle((s) => s.screen);
   const mode = useBattle((s) => s.game?.mode);
-  if (screen === 'title' || !mode) {
+  const movement = useBattle(s => s.worldMoves[0]);
+  const door = useBattle((s) => (s.doorOpen && s.doorOpen.scene === s.scene ? s.doorOpen : null));
+  if (screen !== 'game' || !mode) {
     if (screen === 'setup') return <SetupScreen />;
     if (screen === 'create') return <CreateScreen />;
     if (screen === 'join') return <JoinScreen />;
     if (screen === 'lobby') return <LobbyScreen />;
     return <TitleScreen />;
   }
+  // 移動の演出は、いつもの世界マップの画面（同じ地図・同じ駒）のまま再生する。
+  // 下の case 'world' と同じ場所・同じ部品なので、画面も駒も作り直されない。
+  if (movement) return <WorldScreen movement={movement} />;
+  // 扉が開く演出の間は、部屋の画面（戦闘など）への切り替えを待つ（第3段階B2）
+  if (door) return <DoorOpenScene key={door.id} door={door} />;
   switch (mode) {
     case 'hub':
       return <HubScreen />;
@@ -95,6 +170,8 @@ function CurrentScreen() {
       return <EncounterScreen />;
     case 'town':
       return <TownScreen />;
+    case 'sanctuary':
+      return <SanctuaryScreen />;
     case 'shrine':
       return <ShrineScreen />;
     case 'ending':
@@ -118,6 +195,26 @@ function CurrentScreen() {
   }
 }
 
+/**
+ * 自動の確認（賢い検証 bot）用の見えない印（A1）: いちばん外に、今の画面（data-screen）・冒険の場面の種類（data-mode）・見ている場面（data-scene）。
+ * 描き直しを増やさないように、この小さな部品（何も描かない）だけが3つの値を聞き、変わった時だけ外の枠の属性を書き換える（見た目・動きは変わらない）
+ */
+function ScreenMarks({ target }: { target: RefObject<HTMLDivElement | null> }) {
+  const screen = useBattle((s) => s.screen);
+  const mode = useBattle((s) => (s.screen === 'game' ? s.game?.mode : undefined));
+  const scene = useBattle((s) => (s.screen === 'game' && s.game ? s.scene : undefined));
+  // useEffect: 外の枠の ref が付いた後に動く（子の useLayoutEffect は、親の ref より先に動くことがある）
+  useEffect(() => {
+    const el = target.current;
+    if (!el) return;
+    const mark = (name: string, v: string | undefined) => (v === undefined ? el.removeAttribute(name) : el.setAttribute(name, v));
+    mark('data-screen', screen);
+    mark('data-mode', mode);
+    mark('data-scene', scene);
+  }, [target, screen, mode, scene]);
+  return null;
+}
+
 /** 画面下に出る短いお知らせ（操作は止めない） */
 function Toast() {
   const toast = useBattle((s) => s.toast);
@@ -136,7 +233,9 @@ function Toast() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0 }}
-          className="pointer-events-none absolute inset-x-4 bottom-24 z-[80] rounded-xl border border-amber-300/50 bg-black/90 px-3 py-2 text-center text-[14px] text-amber-50"
+          style={{ zIndex: LAYER.toast }}
+          className="pointer-events-none absolute inset-x-4 bottom-24 rounded-xl border border-amber-300/50 bg-black/90 px-3 py-2 text-center text-[14px] text-amber-50"
+          data-toast
         >
           {toast.text}
         </motion.div>
@@ -149,11 +248,39 @@ export default function App() {
   const selection = useBattle((s) => s.selection);
   const sheet = useBattle((s) => s.sheet);
   const confirmAbandon = useBattle((s) => s.confirmAbandon);
+  const moving = useBattle(s => s.worldMoves.length > 0);
   const screen = useBattle((s) => s.screen);
   const closeTop = useBattle((s) => s.closeTop);
+  const detail = useDetail(s => s.detail);
+  const helpOpen = useHelp((s) => s.open);
+  const loreOpen = useLore((s) => s.open);
+  useEffect(() => { if (screen !== 'game') { useDetail.getState().hide(); useLore.getState().close(); } }, [screen]);
+  // 公開前の点検 B1: 戦闘が終わった・別の戦闘になった・画面（勝利・世界マップ・ダンジョンなど）が変わった時は、
+  // この端末だけの窓（状態の一覧・長押しの説明）を閉じる（勝利画面や次の戦闘の始めに残らないように）
+  useEffect(() => watchViewChange(useBattle), []);
+  // 伝承の書（K5）: 冒険の状態が変わるたびに、見た物・手に入れた物をこの端末の記録に足す（見るだけ。状態・同期は変えない）
+  useEffect(() => {
+    useProfile.getState().observe(useBattle.getState().full);
+    return useBattle.subscribe((s, prev) => {
+      if (s.full !== prev.full) useProfile.getState().observe(s.full);
+    });
+  }, []);
 
-  useBackButton(!!selection || !!sheet || confirmAbandon || screen === 'setup' || screen === 'create' || screen === 'join', closeTop);
+  useBackButton(helpOpen || loreOpen || !!detail || !!selection || !!sheet || confirmAbandon || screen === 'setup' || screen === 'create' || screen === 'join', () => {
+    // 遊び方・用語集が一番上（項目 → 目次 → 閉じる）。閉じると開いた画面に戻る
+    if (useHelp.getState().open) { useHelp.getState().back(); return true; }
+    // 伝承の書（冒険の途中）: 詳細 → 本の順に閉じる。閉じると開いたメニューに戻る
+    if (useLore.getState().open) { useLore.getState().back(); return true; }
+    if (useDetail.getState().detail) { useDetail.getState().back(); return true; }
+    return closeTop();
+  });
   useKeyboard();
+  // 実機の不具合②: 見えている高さ（visualViewport）を --app-h に入れる（LINE 内ブラウザで下が切れないように）
+  useAppHeight();
+  // 狭い画面 回0: 見えている高さが 640px 未満（672px 以上で戻る）の時は、いちばん外に data-low の印（低い画面の形に切り替える）
+  const low = useLowScreen();
+  // 自動の確認用の見えない印（画面の種類・場面）。描き直しは増やさない
+  const rootRef = useRef<HTMLDivElement>(null);
 
   // 招待のリンク（?room=合言葉）で開いたら「部屋に参加」へ
   useEffect(() => {
@@ -177,17 +304,30 @@ export default function App() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="flex h-dvh w-full justify-center bg-[#050407]">
+      <div ref={rootRef} className="flex w-full justify-center bg-[#050407]" style={{ height: 'var(--app-h, 100dvh)' }} data-app-root data-low={low ? '' : undefined}>
         <div className="relative flex h-full w-full max-w-[480px] flex-col overflow-hidden">
-          <SceneTabs />
+          <ScreenMarks target={rootRef} />
+          {!moving && screen === 'game' && <SceneTabs />}
           <div className="relative flex min-h-0 w-full flex-1 justify-center">
             <CurrentScreen />
           </div>
-          <Sheets />
-          <DetailPopup />
-          <OnlineOverlay />
-          <VoteStatus />
-          <TurnLock />
+          {!moving && <>
+            <Sheets />
+            {screen === 'game' && <JobPickOverlay />}
+            <HeroTaskOverlay />
+            <DetailPopup />
+            <OnlineOverlay />
+            {screen === 'game' && <TurnLock />}
+            {screen === 'game' && <AbilityCutins />}
+            {screen === 'game' && <TurnCutin />}
+          </>}
+          {/* 伝承の書（Step C ②）: 冒険の途中にメニューから開く。読むだけ。閉じると開いたメニューに戻る */}
+          {loreOpen && screen === 'game' && (
+            <div className="absolute inset-0" style={{ zIndex: LAYER.cardPick }}>
+              <Lorebook inAdventure onClose={() => useLore.getState().close()} />
+            </div>
+          )}
+          <HelpScreen />
           <Toast />
         </div>
       </div>
