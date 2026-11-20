@@ -129,7 +129,17 @@ export function checkWindowsInPage({ windows, collapse }) {
   const textOf = (e) => (e.innerText ?? e.textContent ?? '').replace(/\s+/g, ' ').trim();
   const out = [];
   for (const w of windows) for (const win of q(w.css).filter(vis)) {
-    const wr = win.getBoundingClientRect();
+    // センサーの直し（2026-11-20・区切り 5）: 町の「売却」の品物の説明の枠（data-item-pick-panel）は、スクロールする一覧の中に並ぶ枠で、
+    // 一覧より背が高い時に上の端がスクロールの箱の外（画面の上 -2px）に出て「窓が画面の外」と当たった。
+    // スクロールの箱の外の分は、箱が切って見せず、スクロールすれば見える（押す物は押す前に検査①が見る）。
+    // 窓の四角は、スクロールする親の箱で切ってから画面と比べる（スクロールの箱そのものが画面の外なら、切っても当たる）。
+    // 自己テスト: selftest.mjs「スクロールの中の枠は当たらない」「スクロールの箱ごと外なら当たる」
+    let wr = win.getBoundingClientRect();
+    for (let p = win.parentElement; p && p !== document.body; p = p.parentElement) {
+      if (!/(auto|scroll)/.test(getComputedStyle(p).overflowY)) continue;
+      const pr = p.getBoundingClientRect();
+      wr = { left: wr.left, right: wr.right, top: Math.max(wr.top, pr.top), bottom: Math.min(wr.bottom, pr.bottom) };
+    }
     if (wr.top < -1 || wr.bottom > innerHeight + 1 || wr.left < -1 || wr.right > innerWidth + 1)
       out.push({ kind: 'collapsed', win: w.id, text: `窓が画面の外に出ている（${Math.round(wr.left)},${Math.round(wr.top)},${Math.round(wr.right)},${Math.round(wr.bottom)}・画面 ${innerWidth}×${innerHeight}）` });
     // 縦にスクロールする箱: 表の scroll → 無ければ窓の中で一番大きいスクロールの箱
@@ -304,7 +314,16 @@ export const checkWindows = (page) => page.evaluate(checkWindowsInPage, { window
  * 返す物: { problems: [{ kind, text }], ellipsis: [字] }
  */
 export async function checkOverflow(page, { heavy }) {
-  const problems = await page.evaluate(lightOverflowInPage, page.viewportSize()?.width ?? null);
+  let problems = await page.evaluate(lightOverflowInPage, page.viewportSize()?.width ?? null);
+  // センサーの直し（2026-11-20・区切り 5）: ボス戦の敵の枠（data-enemy）は画面の幅いっぱいで、攻撃が当たった時の画面の揺れ
+  // （Battlefield.tsx の SynergyShake: 横に 3〜5px・約0.3秒）の途中で測ると「画面の外のボタン」と当たった。揺れの途中の位置は、止まった時の形ではない。
+  // 「画面の外のボタン」が出た時だけ、0.6秒あけてもう1度測り、2回とも出た物だけ当たりにする（ずっと外にある物は、2回目でも当たる）。
+  // 自己テスト: selftest.mjs「揺れの途中は当たらない」「ずっと外のボタンは当たる」
+  if (problems.some((x) => x.text.startsWith('画面の外のボタン'))) {
+    await page.waitForTimeout(600);
+    const again = new Set((await page.evaluate(lightOverflowInPage, page.viewportSize()?.width ?? null)).map((x) => x.text));
+    problems = problems.filter((x) => !x.text.startsWith('画面の外のボタン') || again.has(x.text));
+  }
   let ellipsis = [];
   if (heavy) {
     const h = await page.evaluate(heavyOverflowInPage);

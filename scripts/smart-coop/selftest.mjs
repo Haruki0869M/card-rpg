@@ -57,6 +57,12 @@ const FIX = {
   // 区切り 3-S の直し: 説明の窓（スクロールする）の中の状態の一覧（ul）は、窓の下に伸びていても画面の外の窓ではない／状態の一覧の窓そのものが外に出ていれば当たる
   'detail-statuslist-ok': page(`<div data-detail-popup class="abs" style="left:8px;top:48px;width:370px;height:400px;overflow-y:auto;background:#222"><div style="height:300px">説明</div><ul data-status-list-body style="height:400px;margin:0">状態</ul></div>`),
   'statuslist-off': page(`<div data-status-list class="abs" style="left:8px;top:400px;width:370px;height:300px;background:#222"><ul data-status-list-body>状態</ul></div>`),
+  // 区切り 5 の直し: スクロールする一覧の中の枠（町の売却の説明の枠）は、上の端が箱の外に出ていても当たらない／箱ごと画面の外なら当たる
+  'itempick-in-scroll': page(`<div class="abs" style="left:0;top:200px;width:390px;height:300px;overflow-y:auto"><div data-item-pick-panel="a" style="margin-top:-260px;height:540px;background:#222">説明</div></div>`),
+  'itempick-scroll-off': page(`<div class="abs" style="left:0;top:-80px;width:390px;height:300px;overflow-y:auto"><div data-item-pick-panel="a" style="height:540px;background:#222">説明</div></div>`),
+  // 区切り 5 の直し: 画面の幅いっぱいの敵の枠が、揺れの途中だけ外に出るのは当たらない／ずっと外なら当たる
+  'shake-enemy': page(`<div id="sh" style="position:absolute;left:0;top:0;width:390px;transform:translateX(-5px)"><button data-enemy="e0" style="width:390px;height:60px">ボス</button></div><script>setTimeout(()=>{document.getElementById('sh').style.transform='none'},250)</script>`),
+  'shake-enemy-stuck': page(`<div style="position:absolute;left:-5px;top:0;width:390px"><button data-enemy="e0" style="width:390px;height:60px">ボス</button></div>`),
   'sheet-offscreen': page(`<div data-sheet="pouch" class="abs" style="left:0;top:-60px;width:390px;height:400px;background:#222;display:flex;flex-direction:column"><div data-sheet-body style="height:300px;overflow-y:auto"><div style="height:600px">長い中身</div></div></div>`),
   // ③ はみ出し
   'overflow-bad': `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>body{margin:0;font:14px sans-serif}</style></head><body>
@@ -277,6 +283,12 @@ export async function selftest() {
     await open('statuslist-off');
     w = await win();
     check(w.some((t) => t.includes('画面の外')), '② 窓の潰れ: 状態の一覧の窓そのものが画面の外に出ていれば当たる', w.join('／'));
+    await open('itempick-in-scroll');
+    w = await win();
+    check(!w.length, '② 窓の潰れ: スクロールの中の枠は当たらない（区切り 5 の直し）', w.join('／'));
+    await open('itempick-scroll-off');
+    w = await win();
+    check(w.some((t) => t.includes('画面の外')), '② 窓の潰れ: スクロールの箱ごと外なら当たる', w.join('／'));
     await open('sheet-confirm-above');
     w = await win();
     check(!w.length, '② 窓の潰れ: シートの中の操作で開いた確認の窓が × の上にあるのは当たらない（区切り 2-Sb の直し）', w.join('／'));
@@ -294,6 +306,12 @@ export async function selftest() {
     await open('overflow-good');
     o = await checkOverflow(p, { heavy: true });
     check(!o.problems.length, '③ はみ出し: 正しい形には当たらない', o.problems.map((x) => x.text).join('／'));
+    await open('shake-enemy');
+    o = await checkOverflow(p, { heavy: false });
+    check(!o.problems.length, '③ はみ出し: 揺れの途中は当たらない（区切り 5 の直し）', o.problems.map((x) => x.text).join('／'));
+    await open('shake-enemy-stuck');
+    o = await checkOverflow(p, { heavy: false });
+    check(o.problems.some((x) => x.text.startsWith('画面の外のボタン')), '③ はみ出し: ずっと外のボタンは当たる', o.problems.map((x) => x.text).join('／'));
     await open('overflow-ellipsis');
     o = await checkOverflow(p, { heavy: true });
     check(!o.problems.length && o.ellipsis.length === 1, '③ はみ出し: わざと「…」で切った字は失敗にせず数える', JSON.stringify(o));
