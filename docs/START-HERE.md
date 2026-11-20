@@ -179,6 +179,7 @@ GitHub から取ったリポジトリと、この文書だけで続きができ�
 | `docs/review/charter-audit-1116/` | 別の目の点検の記録（公開の止め・A-1〜A-4・B-1〜B-7） |
 | `docs/review/` | Gemini のレビュー・公開ごとのチェック表・測定の記録 |
 | `docs/tasks/device-move-1119.md` | 端末を移す時の手順（bundle で運ぶ時） |
+| `docs/art/HANDOFF.md` | **絵の作業の引き継ぎ**（できた物・作りかけ・オーナーが決めた事・作り方の手順・リポジトリの外のフォルダ）。絵の指示文は `docs/art/prompts-*.md` |
 
 **古い所に注意**（食い違ったら、この文書と憲章が正しい）:
 - `AGENTS.md` の「今の進み具合」「Git（push しない・bundle）」「テストの数」「ジョブ44」は古い。
@@ -190,5 +191,9 @@ GitHub から取ったリポジトリと、この文書だけで続きができ�
 ## 6. 前の端末に置いてきた物（無くても続けられる）
 - 作業用の木（`.claude/worktrees/`）と、古い作業ブランチ: 中身は main に統合済み。
 - bot の通しの記録と写真の全部（前の端末の一時フォルダ）: 大事な写真は `docs/tasks/smart-coop-evidence/` に入れてある。数字は `smart-coop-bot-detail-plan.md` の末尾に書いてある。
-- **絵の元の画像**: `C:\dev\card-rpg-assets`（約1.2GB。リポジトリの外。ChatGPT で作った物・切り抜く前の物・BGM の元）。`scripts/art/build_art.py` などが使う。地図の箱庭の絵柄の見本2枚（`diorama\chatgpt	ry-tree.png`・`try-town.png`）もこの中。**絵の続きをする時は、オーナーにこのフォルダを運んでもらう**（無くても、コードの作業は続けられる）。
+- **絵の元のファイル**: `C:\dev\card-rpg-assets`（約1.2GB。ゲームのリポジトリの外）。`scripts/art/build_art.py` などが、この場所を読む。地図の箱庭の絵柄の見本2枚（`diorama\chatgpt\try-tree.png`・`try-town.png`）もこの中。
+  - 2026-11-20 に、このフォルダを git の管理にした（1回分のコミット）。**オーナーが GitHub に非公開のリポジトリ `card-rpg-assets` を作って、手で push する**（ゲームのリポジトリには入れない: 公開されるおそれ・重くなるため。オーナーの決定）。
+  - 新しい端末で絵の続きをする時: オーナーに、その非公開リポジトリを `C:\dev\card-rpg-assets` に取ってもらう（ゲームのリポジトリの隣）。無くても、コードの作業は続けられる。
+  - **BGM の原本の MP3（10曲）は入れていない**（「再配布しない・リポジトリにそのまま入れない」決まり。出どころの一覧は、そのフォルダの `bgm-original/README.md`）。要る時は、前の端末から手で写す。
+  - 絵の作業の記録（できた物・作りかけ・決めた事・作り方）は `docs/art/HANDOFF.md`。
 - Claude のメモ（`~/.claude/projects/.../memory`）: **中身は、この文書の §3 に移した。** 新しい端末では、この文書を読んだ後、要る物を自分のメモに書き直すと良い。
