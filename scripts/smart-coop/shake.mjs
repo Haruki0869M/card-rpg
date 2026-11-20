@@ -752,8 +752,13 @@ export function shakeIdle(v, board) {
  * 押すのはいつも P1 が先なので、P2 が待つ形がほとんど出ず、30 分で機会 0 だった。戦闘の味方の番（ほかの席がまだ動ける間）の
  * 始めに、ターンごとに1回数える（周期4）。揺さぶりの手は先に押す（prio）ので、P1 の番の途中に開け閉めする形になる
  */
-function s11Start(v, sh, board) {
+export function s11Start(v, sh, board) {
   if (v.seat !== 'P2' || v.mode !== 'battle' || v.layers.length) return null;
+  // 区切り 5 の直し（2026-11-20）: P2 がカードを選んで「発動」の枠が出ている時（印 bGoText）は始めない。
+  // 枠は味方の状態の「＋N」の上に出る（v.layers には入らない）ので、押そうとして「かぶさり」と当たり、40秒止まった（S1・4人の通し）。
+  // 人は、カードの枠が出ている間に下の「＋N」を押せない（枠を閉じてから押す）ので、その形は揺さぶりにしない。次の機会に回す。
+  // 自己テスト: selftest-shake.mjs「揺さぶり S11: カードを選んでいる間は始めない」
+  if (v.facts.bGoText) return null;
   const ready = (v.facts.bEndTurn ?? [])[0]?.['data-end-turn'];
   if (!['ready', 'end', 'waiting'].includes(ready)) return null;
   const t = board.battle?.[v.seat]?.turn ?? 0;

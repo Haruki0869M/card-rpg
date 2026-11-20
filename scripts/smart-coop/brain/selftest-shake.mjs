@@ -5,7 +5,7 @@
 //    S2 で持ち主のフォーカスの指定が 0 に戻る → NG。正しい形は OK
 import { Judge } from '../judge.mjs';
 import { BUSY } from '../view/scenes/game.mjs';
-import { shakeInit, opportunity, shakeBrain, shakeObserve, shakeAfterTick, shakeBeforePress, pickSimultaneous, HOLD, offsetOf, s1Peer } from '../shake.mjs';
+import { shakeInit, opportunity, shakeBrain, shakeObserve, shakeAfterTick, shakeBeforePress, pickSimultaneous, HOLD, offsetOf, s1Peer, s11Start } from '../shake.mjs';
 
 const view = (seat, mode, facts = {}, o = {}) => ({ seat, screen: 'game', mode, layers: [], actions: [], waits: [], busy: [], facts, sig: `${seat}|${mode}|${JSON.stringify(facts).length}`, ...o });
 const act = (css, text, marks = []) => ({ css, text, nth: 0, enabled: true, marks, rect: [0, 0, 50, 50] });
@@ -146,6 +146,19 @@ export async function shakeChecks(check) {
       }
       return { ng: sh.k.S11.ng, ok: sh.k.S11.ok, abort: sh.k.S11.abort };
     };
+    const starts = (go) => {
+      const b = { battle: {}, stats: { battles: [] } };
+      const sh = shakeInit(b, 7);
+      let n = 0;
+      for (let t = 1; t <= 12; t++) {
+        b.battle.P2 = { turn: t };
+        const v = view('P2', 'battle', { bEndTurn: [{ 'data-end-turn': 'ready' }], bGoText: go, bEnemies: [] });
+        s11Start(v, sh, b);
+        if (sh.m) { n++; sh.m = null; }
+      }
+      return n;
+    };
+    check(starts('発動 運に任せる') === 0 && starts(null) >= 1, '揺さぶり S11: カードを選んでいる間は始めない（区切り 5 の直し）', `${starts('発動 運に任せる')}・${starts(null)}`);
     const none = s11case(false, false);
     const broken = s11case(true, false);
     check(none.ng === 0 && none.abort === 1, '揺さぶり S11: 開く物が画面に無い時は NG にしない（中断）', JSON.stringify(none));
