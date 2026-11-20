@@ -1,6 +1,8 @@
 // ===== 低い画面の切り替え（狭い画面の配置の直し 回0。docs/tasks/small-screen-layout-plan.md の「点検の後の直し」2） =====
-// 「見えている高さ」（--app-h と同じ値 = useAppHeight の visibleHeight）が 640px 未満で低い形に入り、672px 以上でふつうに戻る。
-// 境目に幅を持たせて、アドレスバーの出入りなどで 639↔641 を行き来しても形がばたつかないようにする。
+// 「見えている高さ」（--app-h と同じ値 = useAppHeight の visibleHeight）が 700px 以下で低い形に入り、733px 以上でふつうに戻る。
+// 2026-11-20（オーナーの決定 A・検証 bot の4人の通しの指摘）: 入る線を「640 未満」から、町の低い形（Places.tsx の SHORT_TOWN）と同じ「700 以下」に広げた。
+// 360×640 がふつうの形のままで、混んだ世界マップ（場面のタブ＋災厄の4行の札＋寒さの注意）の見えている地図が約50px になり、マスが押せなかった。
+// 境目に幅を持たせて、アドレスバーの出入りなどで 699↔702 を行き来しても形がばたつかないようにする。
 // 指で拡大している時・文字を入力中（キーボード）は測らない（visibleHeight が null = 前の形のまま）。
 // 値は描く前に決める（useSyncExternalStore。最初の1コマがふつうの形で出てから切り替わる事が無い）。
 // アプリのいちばん外（[data-app-root]）に data-low の印を付け、CSS の `low:` の形（index.css の @custom-variant）でも使う。
@@ -8,15 +10,15 @@ import { useSyncExternalStore } from 'react';
 import { visibleHeight } from './useAppHeight';
 
 /** これより低いと、低い形に入る */
-export const LOW_ENTER = 640;
+export const LOW_ENTER = 701;
 /** これ以上になると、ふつうの形に戻る */
-export const LOW_EXIT = 672;
+export const LOW_EXIT = 733;
 
 /**
  * 次の形（true = 低い形）。
- * - prev が null（まだ決めていない）: 640 未満なら低い形
+ * - prev が null（まだ決めていない）: 700 以下（701 未満）なら低い形
  * - h が null（拡大中・入力中で測らない）: 前の形のまま
- * - 低い形の時: 672 以上で戻る。ふつうの形の時: 640 未満で入る
+ * - 低い形の時: 733 以上で戻る。ふつうの形の時: 701 未満で入る
  */
 export function nextLow(prev: boolean | null, h: number | null): boolean {
   if (h === null) return prev ?? false;
@@ -70,7 +72,7 @@ function getSnapshot(): boolean {
   return current;
 }
 
-/** 低い画面か（見えている高さが 640px 未満。672px 以上で戻る） */
+/** 低い画面か（見えている高さが 700px 以下。733px 以上で戻る） */
 export function useLowScreen(): boolean {
   return useSyncExternalStore(subscribe, getSnapshot, () => false);
 }
