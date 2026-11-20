@@ -6,6 +6,7 @@ import { battleBrain } from './battle.mjs';
 import { dungeonBrain } from './dungeon.mjs';
 import { rewardBrain } from './reward.mjs';
 import { hexNeighbors, costMap, distFrom, worldBrain, TIDE_WAIT } from './world.mjs';
+import { questBrain } from './town.mjs';
 
 const view = (mode, facts, o = {}) => ({ seat: 'P1', screen: 'game', mode, layers: [], actions: [], facts, ...o });
 
@@ -99,6 +100,13 @@ export function brainChecks(check) {
   const w2 = worldBrain(structuredClone(wv), {});
   check(w1?.target.css === '[data-reach="21"]' && JSON.stringify(w1) === JSON.stringify(w2), '頭: 世界マップは行き先に近づく行けるマスを押す（同じ View なら同じ答え）', JSON.stringify(w1));
   check(worldBrain(structuredClone({ ...wv, seat: 'P2' }), {}) === null, '頭: 世界マップは自分の手番でなければ押さない', '');
+  // 2026-11-20: キャラの作業の窓（お供を迎える など）が出ている間は、依頼を読むためのメニューを開きに行かない（4人の通しの止まりの直し）
+  {
+    const goal = { goalText: [{ 'aria-label': '次の目的: 町の依頼をあと1つ果たす' }] };
+    const q1 = questBrain(view('world', goal), {});
+    const q2 = questBrain(view('world', { ...goal, dTask: [{ 'data-hero-task': 'pet', 'data-task-hero': 'h0', title: '旅のお供' }] }), {});
+    check(/メニューを開く/.test(q1?.what ?? '') && q2 === null, '頭: 作業の窓が出ている間は、依頼を読むメニューを開かない（窓が無ければ開く）', JSON.stringify([q1?.what, q2]));
+  }
   // 2026-11-20: 交代運転を避ける。同じ世界のターンに、ほかの端末が「移動する」を押した後で、自分のマスが前の手番の終わりと違えば、サイコロを振らない
   {
     const acts = [{ enabled: true, text: 'サイコロ', marks: ['data-roll-move'] }, { enabled: true, text: '手番を終える', marks: ['data-world-wait=wait'] }];

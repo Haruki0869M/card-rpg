@@ -310,6 +310,9 @@ export function questBrain(v, board) {
   }
   if (sheet === 'menu' && qf.open === 'menu') return decide(G.menuRow('依頼と封印の鍵'), 'メニュー「依頼と封印の鍵」', { after: () => { qf.open = 'quests'; } });
   if (v.layers.length || v.mode !== 'world') return null;
+  // 2026-11-20（4人の通しの止まりの直し）: キャラの作業の窓（お供を迎える・カードの強化など。画面いっぱい）が出ている間は、メニューを開きに行かない。
+  // 窓の下のメニューは押せず、作業の頭（taskBrain）より先にここが答えて、通しが止まっていた（シナリオ2・4人・お供の入れ替えの窓）
+  if ((v.facts.dTask ?? []).length) return null;
   if (v.seat === 'P1' && qf.need && !qf.open) return decide(G.worldMenu, `メニューを開く（${ws.questMode ? `次の目的が「町の依頼をあと${ws.questMode}つ」。` : ''}依頼の状態を見る）`, { after: () => { qf.open = 'menu'; } });
   return null;
 }

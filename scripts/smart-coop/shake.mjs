@@ -341,6 +341,9 @@ function s1(v, sh) {
   return HOLD; // afterClose・peer は shakeObserve と P1 の頭が進める
 }
 
+/** イベントの窓（data-event-window）が出ている端末だけ（組が分かれている時、ほかの場所の端末は入らない） */
+export const inEventViews = (views) => views.filter((v) => (v.facts.eventId ?? []).length > 0);
+
 /** S1 の続き: P1（渡された人）が自分のシートを開いて、渡された薬を見て閉じる */
 export function s1Peer(v, sh) {
   const m = sh.m;
@@ -348,7 +351,8 @@ export function s1Peer(v, sh) {
   if (m.step === 'peer') {
     // 2026-11-20（4人の通しの誤検知の直し）: 受け取った人が「キャラの作業」（カードの強化・祭壇・行商人など。画面いっぱいの窓）の最中は、
     // 帯の「装備」が窓の下にあって押せないのが正しい形（人も、作業を終えてから開く）。押しに行かず、確かめられないので中断（記録だけ）にする
-    if (hasLayer(v, 'hero-task') && sheetOf(v) !== 'party') {
+    // 見分けは、作業の窓の印（data-hero-task = facts.dTask）。層の一覧（v.layers）には、作業の窓は入らない
+    if ((v.facts.dTask ?? []).length && sheetOf(v) !== 'party') {
       sh.k.S1.abort++;
       sh.k.S1.log.push(`中断: ${v.seat}（受け取った人）がキャラの作業の窓の最中なので、持ち物を開いて確かめていない`);
       m.step = 'done';
@@ -823,23 +827,35 @@ export function shakeObserve(views, board) {
   } else if (m?.id === 'S12') observeS12(views, sh, p1, p2);
   // 挑む段の「選び直す」「任せる」の確かめ
   if (sh.flags.rechoose && !sh.flags.rechooseChecked) {
-    const back = views.every((v) => (v.facts.dOptions ?? []).length > 0 && !(v.facts.dChallenge ?? []).length);
+    // 2026-11-20（4人の通しの誤検知の直し）: 見るのは、イベントの窓が出ている端末だけ（4人で組が分かれている時、
+    // 別の場所にいる端末には、そのイベントの画面が出ない。前は「全端末」を見ていて、必ず NG になった）
+    const there = inEventViews(views);
+    const back = there.length > 0 && there.every((v) => (v.facts.dOptions ?? []).length > 0 && !(v.facts.dChallenge ?? []).length);
     if (back) {
       sh.flags.rechooseChecked = true;
       sh.k.S5.log.push('OK: 「選び直す」の後、全端末が選ぶ段（選択肢）に戻った');
       note(sh, '確かめ: 「選び直す」の後、全端末が選ぶ段に戻った（OK）', 'check');
+    } else if (sh.n.tick - sh.flags.rechoose.at > 30 && !there.length) {
+      sh.flags.rechooseChecked = true;
+      sh.k.S5.abort++;
+      sh.k.S5.log.push('中断: 「選び直す」の後、イベントの窓が出ている端末が無くなったので、確かめられなかった');
     } else if (sh.n.tick - sh.flags.rechoose.at > 30) {
       sh.flags.rechooseChecked = true;
       result(sh, 'S5', false, '「選び直す」を押した後 30 手のあいだ、全端末が選ぶ段に戻らない');
     }
   }
   if (sh.flags.handover && !sh.flags.handoverChecked) {
-    const heroes = views.map((v) => (v.facts.dChallenge ?? [])[0]?.['data-challenge-hero']).filter(Boolean);
-    if (heroes.length === views.length && heroes.every((h) => h === sh.flags.handover.to)) {
+    const thereH = inEventViews(views);
+    const heroes = thereH.map((v) => (v.facts.dChallenge ?? [])[0]?.['data-challenge-hero']).filter(Boolean);
+    if (thereH.length > 0 && heroes.length === thereH.length && heroes.every((h) => h === sh.flags.handover.to)) {
       sh.flags.handoverChecked = true;
       const owners = views.filter((v) => (v.facts.dChallenge ?? [])[0]?.['data-challenge-mine'] === '1').map((v) => v.seat);
       sh.k.S5.log.push(`OK: 「任せる」の後、全端末の挑む役が ${sh.flags.handover.to} になった（持ち主の画面 ${owners.join(',')}）`);
       note(sh, `確かめ: 「任せる」の後、全端末の挑む役が ${sh.flags.handover.to}（持ち主の画面 ${owners.join(',') || 'なし'}）`, 'check');
+    } else if (sh.n.tick - sh.flags.handover.at > 30 && !thereH.length) {
+      sh.flags.handoverChecked = true;
+      sh.k.S5.abort++;
+      sh.k.S5.log.push('中断: 「任せる」の後、イベントの窓が出ている端末が無くなったので、確かめられなかった');
     } else if (sh.n.tick - sh.flags.handover.at > 30) {
       sh.flags.handoverChecked = true;
       result(sh, 'S5', false, `「任せる」を押した後 30 手のあいだ、挑む役が ${sh.flags.handover.to} にならない`);

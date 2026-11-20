@@ -83,12 +83,29 @@ export async function shakeChecks(check) {
     views[0].sig = 'busy';
     check(pickSimultaneous(wants, views, b) === null, '揺さぶり S13: ほかの揺さぶりの最中は同時押しにしない');
   }
+  // 2026-11-20: S5 の「選び直す」「任せる」の確かめは、イベントの窓が出ている端末だけを見る（4人で組が分かれている時の誤検知の直し）
+  {
+    const ev = { eventId: [{ 'data-event-window': 'x' }] };
+    const mk = (inEventOk) => {
+      const b = {};
+      shakeInit(b, 7, 4);
+      b.sh.flags.rechoose = { at: 0, event: 'x' };
+      const p12 = inEventOk ? { ...ev, dOptions: [{}, {}] } : { ...ev, dChallenge: [{ 'data-challenge-hero': 'h0' }] };
+      const vs = [view('P1', 'event', p12), view('P2', 'event', p12), view('P3', 'world'), view('P4', 'battle')];
+      for (let k = 0; k < 34; k++) shakeObserve(vs, b);
+      return b.sh.k.S5;
+    };
+    const ok = mk(true);
+    const ng = mk(false);
+    check(ok.ng === 0 && ok.log.some((l) => /選び直す.*戻った/.test(l)), '揺さぶり S5: 組が分かれている時、「選び直す」の確かめはイベントの窓が出ている端末だけを見る（ほかの場所の端末で NG にしない）', JSON.stringify(ok));
+    check(ng.ng === 1, '揺さぶり S5: イベントの窓が出ている端末が選ぶ段に戻らなければ NG のまま', JSON.stringify(ng));
+  }
   // 2026-11-20: S1 の受け取った人が「キャラの作業」の窓（カードの強化など）の最中は、帯の「装備」を押しに行かず、中断にする
   {
     const b = {};
     shakeInit(b, 7, 4);
     b.sh.m = { id: 'S1', step: 'peer', data: { peer: 'P3', gave: { item: 'potion' } } };
-    const busyTask = view('P3', 'dungeon', {}, { layers: [{ id: 'hero-task' }], actions: [act('[data-bar-button]', '装備', [['data-bar-button', '装備']])] });
+    const busyTask = view('P3', 'dungeon', { dTask: [{ 'data-hero-task': 'card', 'data-task-hero': 'h2', title: 'カードの強化' }] }, { actions: [act('[data-bar-button]', '装備', [['data-bar-button', '装備']])] });
     const d = s1Peer(busyTask, b.sh);
     check(d === null && b.sh.m.step === 'done' && b.sh.k.S1.abort === 1 && b.sh.k.S1.ng === 0, '揺さぶり S1: 受け取った人がキャラの作業の窓の最中は、帯の「装備」を押さずに中断（NG にしない）', JSON.stringify({ d, step: b.sh.m.step, k: b.sh.k.S1 }));
     b.sh.m = { id: 'S1', step: 'peer', data: { peer: 'P3', gave: { item: 'potion' } } };
