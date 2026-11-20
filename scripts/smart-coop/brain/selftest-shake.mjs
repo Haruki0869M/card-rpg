@@ -5,7 +5,7 @@
 //    S2 で持ち主のフォーカスの指定が 0 に戻る → NG。正しい形は OK
 import { Judge } from '../judge.mjs';
 import { BUSY } from '../view/scenes/game.mjs';
-import { shakeInit, opportunity, shakeBrain, shakeObserve, shakeAfterTick, shakeBeforePress, pickSimultaneous, HOLD, offsetOf } from '../shake.mjs';
+import { shakeInit, opportunity, shakeBrain, shakeObserve, shakeAfterTick, shakeBeforePress, pickSimultaneous, HOLD, offsetOf, s1Peer } from '../shake.mjs';
 
 const view = (seat, mode, facts = {}, o = {}) => ({ seat, screen: 'game', mode, layers: [], actions: [], waits: [], busy: [], facts, sig: `${seat}|${mode}|${JSON.stringify(facts).length}`, ...o });
 const act = (css, text, marks = []) => ({ css, text, nth: 0, enabled: true, marks, rect: [0, 0, 50, 50] });
@@ -82,6 +82,18 @@ export async function shakeChecks(check) {
     b.sh.m = { id: 'S1' };
     views[0].sig = 'busy';
     check(pickSimultaneous(wants, views, b) === null, '揺さぶり S13: ほかの揺さぶりの最中は同時押しにしない');
+  }
+  // 2026-11-20: S1 の受け取った人が「キャラの作業」の窓（カードの強化など）の最中は、帯の「装備」を押しに行かず、中断にする
+  {
+    const b = {};
+    shakeInit(b, 7, 4);
+    b.sh.m = { id: 'S1', step: 'peer', data: { peer: 'P3', gave: { item: 'potion' } } };
+    const busyTask = view('P3', 'dungeon', {}, { layers: [{ id: 'hero-task' }], actions: [act('[data-bar-button]', '装備', [['data-bar-button', '装備']])] });
+    const d = s1Peer(busyTask, b.sh);
+    check(d === null && b.sh.m.step === 'done' && b.sh.k.S1.abort === 1 && b.sh.k.S1.ng === 0, '揺さぶり S1: 受け取った人がキャラの作業の窓の最中は、帯の「装備」を押さずに中断（NG にしない）', JSON.stringify({ d, step: b.sh.m.step, k: b.sh.k.S1 }));
+    b.sh.m = { id: 'S1', step: 'peer', data: { peer: 'P3', gave: { item: 'potion' } } };
+    s1Peer(view('P3', 'dungeon'), b.sh);
+    check(b.sh.k.S1.abort === 1, '揺さぶり S1: キャラの作業の窓が無い時は、中断にしない（今までどおり）', JSON.stringify(b.sh.k.S1));
   }
   // 区切り 4: 4人の時、S13 は2台ずつ。組は起きた回数で順に回る（同じ種なら同じ）
   {

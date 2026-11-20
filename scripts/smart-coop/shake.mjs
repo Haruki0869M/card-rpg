@@ -342,10 +342,18 @@ function s1(v, sh) {
 }
 
 /** S1 の続き: P1（渡された人）が自分のシートを開いて、渡された薬を見て閉じる */
-function s1Peer(v, sh) {
+export function s1Peer(v, sh) {
   const m = sh.m;
   const what = '揺さぶり S1（受け取った人）';
   if (m.step === 'peer') {
+    // 2026-11-20（4人の通しの誤検知の直し）: 受け取った人が「キャラの作業」（カードの強化・祭壇・行商人など。画面いっぱいの窓）の最中は、
+    // 帯の「装備」が窓の下にあって押せないのが正しい形（人も、作業を終えてから開く）。押しに行かず、確かめられないので中断（記録だけ）にする
+    if (hasLayer(v, 'hero-task') && sheetOf(v) !== 'party') {
+      sh.k.S1.abort++;
+      sh.k.S1.log.push(`中断: ${v.seat}（受け取った人）がキャラの作業の窓の最中なので、持ち物を開いて確かめていない`);
+      m.step = 'done';
+      return null;
+    }
     const d = openParty(v, what);
     if (d) return d;
     if (d === false) {
