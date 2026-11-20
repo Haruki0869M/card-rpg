@@ -244,6 +244,28 @@ export function worldBrain(v, board) {
     ws.unreachable.clear();
     ws.log.push(`船を持っている事を知った（${board.shipKnown ? `依頼の字: ${board.shipKnown}` : '行けるマスに海が光った'}）。行けないと決めた行き先をやり直す`);
   }
+  // 交代運転を避ける（2026-11-20 オーナーの決定 A。bot の歩き方だけ・ゲームは変えない）: 同じ世界のターンのうちに、ほかの人の手番で
+  // もう動いた組を、次の人の手番でまた動かすと、ゲームの決まりで侵食度が上がる（world.ts chargeRelayMove）。4人の通しで終わりが 97〜99% になっていた。
+  // 見分け方（画面の物だけ）: 上の帯の字（日・時間帯・「夜まで N」）が同じ間 = 同じ世界のターン。このターンに、ほかの端末が「移動する」を押していて、
+  // 自分のキャラのマスが、前の自分の手番の終わりと違う（= 同行で運ばれた）なら、この手番はサイコロを振らない（入る・調べるは今までどおり）
+  const turnKey = v.facts.wTurnText ?? null;
+  const rel = (ws.relay ??= { key: null, movers: new Set(), decided: {}, last: {}, skipped: 0 });
+  if (turnKey !== null && rel.key !== turnKey) {
+    rel.key = turnKey;
+    rel.movers = new Set();
+    rel.decided = {};
+  }
+  if (turnKey !== null && !(v.seat in rel.decided)) {
+    const prev = rel.last[v.seat];
+    const others = [...rel.movers].some((s) => s !== v.seat);
+    rel.decided[v.seat] = others && prev !== undefined && prev !== w.here;
+    if (rel.decided[v.seat]) {
+      rel.skipped++;
+      ws.log.push(`交代運転を避ける: ${v.seat} は、この世界のターン（${turnKey}）に ${[...rel.movers].join('・')} の手番で運ばれた（マス ${prev} → ${w.here}）ので、サイコロを振らない`);
+    }
+  }
+  if (w.here !== null) rel.last[v.seat] = w.here;
+  const carried = turnKey !== null && rel.decided[v.seat] === true;
   // 0. 同じマスで倒れている仲間を助け起こす（手番を使う）
   const rev = (v.facts.wRevive ?? [])[0];
   if (rev) return decide(G.revive(rev['data-revive']), `倒れた仲間 ${rev['data-revive']} を助け起こす`, T);
@@ -329,7 +351,7 @@ export function worldBrain(v, board) {
   const go = findMark(v, 'data-move-go');
   // 移動の直後に、決まっていない「移動する（移動力?を使う・?マス先）」が一瞬残る（区切り 2-Sb の通しで、押す前に消えて「押す物が無い」に当たった）。? の間は待つ
   if (go?.enabled && /\?/.test(go.text)) return null;
-  if (go?.enabled) return decide(G.moveGo, `「${go.text}」`, T);
+  if (go?.enabled) return decide(G.moveGo, `「${go.text}」`, { ...T, after: () => rel.movers.add(v.seat) });
   // 5b. 区切り5（シナリオ3の潮）: 行き先へ一番近づく隣のマスが「今の潮で閉じた潮のマス」なら、サイコロを振らずに潮を待つ
   //     （野営が押せれば野営 = 夜の回復・寒さを防ぐ。押せなければ「待機」）。待った回数は「近づけない」に数えない（潮は時間で必ず変わる）
   if (plan?.dist && roll0(v)) {
@@ -348,8 +370,12 @@ export function worldBrain(v, board) {
       if (wt?.enabled) return decide(G.worldWait, `潮を待つ:「${wt.text}」（隣の潮のマス ${best} が閉じている・${tideText}）`, { ...T, after: mark });
     }
   }
-  // 6. サイコロを振る
+  // 6. サイコロを振る（このターンにもう運ばれた時は振らずに、待機・手番を終える。行き先はあきらめない）
   const roll = findMark(v, 'data-roll-move');
+  if (carried && roll?.enabled) {
+    const end = findMark(v, 'data-world-wait');
+    if (end?.enabled) return decide(G.worldWait, `「${end.text}」（交代運転を避ける: このターンはもう運ばれた）`, T);
+  }
   if (roll?.enabled) return decide(G.rollMove, 'サイコロを振る', T);
   // 7. 行けるマスのうち、行き先までの道のりが一番短くなるマス（今の場所より近い時だけ。同じならかかる移動力の小さい方 → 番号の小さい方）
   const reach = v.facts.reach ?? [];

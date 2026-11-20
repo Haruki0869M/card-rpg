@@ -99,6 +99,32 @@ export function brainChecks(check) {
   const w2 = worldBrain(structuredClone(wv), {});
   check(w1?.target.css === '[data-reach="21"]' && JSON.stringify(w1) === JSON.stringify(w2), '頭: 世界マップは行き先に近づく行けるマスを押す（同じ View なら同じ答え）', JSON.stringify(w1));
   check(worldBrain(structuredClone({ ...wv, seat: 'P2' }), {}) === null, '頭: 世界マップは自分の手番でなければ押さない', '');
+  // 2026-11-20: 交代運転を避ける。同じ世界のターンに、ほかの端末が「移動する」を押した後で、自分のマスが前の手番の終わりと違えば、サイコロを振らない
+  {
+    const acts = [{ enabled: true, text: 'サイコロ', marks: ['data-roll-move'] }, { enabled: true, text: '手番を終える', marks: ['data-world-wait=wait'] }];
+    const mk = (seat, tile, turn, extra = {}) => view('world', { wMap: [{ 'data-cols': '5', 'data-rows': '5' }], wHexes: hexes, wTurnText: turn, activeHero: [{ 'data-hero': 'h', 'data-seat': seat, 'data-tile': String(tile) }], goalMark: [{ 'data-goal-mark': '24' }], ...extra }, { seat, actions: acts });
+    const rb = {};
+    // ターン1: P2 が 20 で自分の手番（まだだれも動いていない）→ サイコロ
+    const a1 = worldBrain(mk('P2', 20, '1日目朝 夜まで6'), rb);
+    // ターン2: P1 が「移動する」を押す（P2 も同行で運ばれる）
+    const goV = mk('P1', 20, '1日目昼 夜まで5');
+    goV.actions = [{ enabled: true, text: '移動する（移動力2を使う・1マス先）', marks: ['data-move-go'] }];
+    const g1 = worldBrain(goV, rb);
+    g1?.after?.();
+    // ターン2: P2 の手番。マスが 20 → 21 に変わっている → サイコロを振らずに「手番を終える」
+    const a2 = worldBrain(mk('P2', 21, '1日目昼 夜まで5'), rb);
+    const a2b = worldBrain(mk('P2', 21, '1日目昼 夜まで5'), rb);
+    // ターン3: まだだれも動いていない → P2 はサイコロを振る
+    const a3 = worldBrain(mk('P2', 21, '1日目夕 夜まで4'), rb);
+    // 運ばれていない人（マスが変わっていない P3）は、同じターンでもサイコロを振る
+    const rb2 = {};
+    worldBrain(mk('P3', 10, '1日目朝 夜まで6'), rb2);
+    const g2 = worldBrain(goV, rb2);
+    g2?.after?.();
+    const a4 = worldBrain(mk('P3', 10, '1日目昼 夜まで5'), rb2);
+    check(a1?.target.css === '[data-roll-move]' && g1?.target.css === '[data-move-go]' && /^\[data-world-wait/.test(a2?.target.css ?? '') && /^\[data-world-wait/.test(a2b?.target.css ?? '') && a3?.target.css === '[data-roll-move]' && a4?.target.css === '[data-roll-move]',
+      '頭: 交代運転を避ける（このターンにほかの人の手番で運ばれたら振らない・次のターンは振る・運ばれていない人は振る）', JSON.stringify([a1?.target, g1?.target, a2?.target, a2b?.target, a3?.target, a4?.target]));
+  }
   // 区切り5: 行き先へ一番近づく隣のマスが閉じた潮のマスなら、サイコロを振らずに野営して潮を待つ（網羅の行「潮を待った」）
   {
     // 4 = 右上の行き先。壁（列2）の切れ目は 22 だけ（潮の干潟・今は閉じている）。21 に立って、サイコロも野営も押せる

@@ -29,6 +29,8 @@ export const PART = {
     // 上の帯（A11）: 侵食度・時間・潮
     wCorruption: { sel: '[data-corruption]', read: 'attrs', attrs: ['data-corruption'], hidden: true },
     wTime: { sel: '[data-time]', read: 'attrs', attrs: ['data-time'], hidden: true },
+    // 2026-11-20: 世界のターンの見分け（上の帯の字「2日目朝・夜まで5」。世界のターンごとに変わる。交代運転を避ける歩き方が使う）
+    wTurnText: { sel: '[data-time]', read: 'text' },
     wTide: { sel: '[data-tide-icon]', read: 'attrs', attrs: ['data-tide-icon', 'aria-label'], hidden: true },
     // 区切り5（シナリオ2・3の仕組み）: 寒さ・温まり（温泉・焚き火）・雪に埋もれた街道の注意（ふつうの画面は下のパネルの字、低い画面は短い札）
     wClimate: { when: ['world'], sel: '[data-climate-note], [data-climate-chip]', read: 'attrs', attrs: ['data-climate-chip', 'aria-label'], hidden: true },
