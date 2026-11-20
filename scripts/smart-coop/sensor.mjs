@@ -347,11 +347,17 @@ export async function checkOverflow(page, { heavy }) {
     // 自己テスト: selftest.mjs「見えない広がりで 44px の押せる範囲がある小さい札は当たらない」
     const widened = new Set(await page.evaluate(widenedInPage).catch(() => []));
     let again = null;
+    let widenedLate = null;
     for (const s of await layoutIssues(page)) {
       if (/^(page overflow|offscreen)/.test(s)) continue;
       const m = /^small button: "(.*)" \d+x\d+$/s.exec(s);
       if (m && pressed.has(m[1])) continue;
       if (m && widened.has(m[1])) continue;
+      // センサーの直し（2026-11-20・区切り 5）: 上の widened を読んだ後に「＋1」の札が出て（味方に状態が付いた直後）、layoutIssues だけがそれを見て当たった
+      // （シナリオ3・4人の通しの2件。札には 44px の広がりが付いていた）。当たりそうな時は、広がりをもう1度読んでから決める。
+      // 広がりの無い小さい札は、読み直しても当たる（自己テスト「広がりの無い 22×18px の札は当たる」）。
+      if (m && !widenedLate) { widenedLate = new Set(await page.evaluate(widenedInPage).catch(() => [])); }
+      if (m && widenedLate.has(m[1])) continue;
       if (m && shrunk.has(m[1])) {
         if (!again) {
           await new Promise((r) => setTimeout(r, 600));
