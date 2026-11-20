@@ -516,7 +516,8 @@ export function ChestScreen() {
         </div>
       </div>
 
-      <div className="panel relative z-20 shrink-0 rounded-t-2xl px-3 pt-2 pb-3">
+      {/* 4人の「だれが開ける？」が低い画面（390×540）で入りきらず「立ち去る」が切れたので、枠は画面の高さまで、一覧だけをスクロールにする */}
+      <div className="panel relative z-20 flex max-h-[calc(var(--app-h,100dvh)-52px)] shrink-0 flex-col rounded-t-2xl px-3 pt-2 pb-3">
         {/* みんなの選択を待っている時の枠は、ボタンの上に普通に置く（重ねない） */}
         {!animating && <VoteStatus className="mb-2" />}
         {animating ? (
@@ -525,8 +526,10 @@ export function ChestScreen() {
           </button>
         ) : !opened && shared && (!opener || pickAgain) ? (
           <>
-            <OpenerPicker chest={chest} heroes={sceneHeroes(game).filter((h) => !h.retired)} />
-            <div className="mt-2 grid grid-cols-2 gap-2">
+            <div className="min-h-0 overflow-y-auto overscroll-contain" data-opener-scroll>
+              <OpenerPicker chest={chest} heroes={sceneHeroes(game).filter((h) => !h.retired)} />
+            </div>
+            <div className="mt-2 grid shrink-0 grid-cols-2 gap-2">
               {seal === 'guard' ? null : leaveGate.canLeave ? (
                 <button onClick={() => dispatchGame({ type: 'LEAVE_CHEST', playerId: LOCAL_PLAYER })} disabled={leaveOutsider} data-option-wait={leaveOutsider ? 1 : undefined} className="btn btn-dark h-12 rounded-xl text-[14px] font-bold" data-chest-leave="leave">
                   {chest.spec.big ? '開けずに去る' : '立ち去る'}

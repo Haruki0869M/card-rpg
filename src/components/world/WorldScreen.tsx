@@ -672,6 +672,8 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
     setWithMe(Object.fromEntries(companions.map((h) => [h.id, false])));
   };
   const showCompanions = companions.length > 0 && (w.move === null || (w.move ?? 0) > 0);
+  // 低い画面で、同行の相手が3人いて「同行を解除」も同じ行に出る時（4人の協力）。行の幅が足りないので、字を減らす
+  const tightRow = low && unfollow && companions.length >= 3;
   const climateText = climate && !(warm && climate.kind === 'cold') ? `${climate.kind === 'cold' ? '❄️ 寒さ' : '☀️ 暑さ'}で毎ターン体力が減る（野営すれば防げる。ただし回復は半分）` : undefined;
   const warmLeft = warm ? /あと(\d+)ターン/.exec(warm)?.[1] : undefined;
   // 短い札を押すと、全文をパネルのすぐ上の帯（マスの説明と同じ所）に出す。もう1度押すと消える
@@ -890,10 +892,11 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
 
         {unfollow && !(low && showCompanions) && <button className="btn btn-dark my-1 min-h-11 w-full rounded-lg text-[13px] low:my-0.5" onClick={doUnfollow} data-unfollow>同行を解除して単独行動する</button>}
         {showCompanions && (
-          <div className="mt-1 flex items-center gap-1">
+          <div className="mt-1 flex items-center gap-1" data-companion-row>
             <span className="flex shrink-0 items-center gap-0.5 text-[12px] text-zinc-300">
               <Users size={14} />
-              同行
+              {/* 低い画面で3人並び、右に「同行を解除」も出る時は、幅が足りず右のボタンが画面の外に出た（4人・390×540）。「同行」の字と右の案内を出さない（人の印は残す） */}
+              {!tightRow && '同行'}
             </span>
             {companions.map((c) => {
               if (!ownMate(c)) {
@@ -927,7 +930,7 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
                 </button>
               );
             })}
-            <span className="truncate text-[12px] text-zinc-500">{companions.some((c) => !ownMate(c)) ? '他の人のキャラは誘って承知してもらう' : 'タップで一緒に行くか選ぶ'}</span>
+            {!tightRow && <span className="truncate text-[12px] text-zinc-500">{companions.some((c) => !ownMate(c)) ? '他の人のキャラは誘って承知してもらう' : 'タップで一緒に行くか選ぶ'}</span>}
             {/* 狭い画面 回1: 低い画面は「同行を解除」をこの行の右に（字は2行に折り返す。全文のまま） */}
             {low && unfollow && (
               <button className="btn btn-dark ml-auto flex h-11 w-[104px] shrink-0 items-center justify-center rounded-lg px-1 text-[12px] leading-4" onClick={doUnfollow} data-unfollow>
