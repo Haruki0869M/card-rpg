@@ -325,7 +325,8 @@ export function TownScreen() {
 
   return (
     <Screen bg="town" bgOpacity={0.28}>
-      <WorldTopBar game={game} goldHeroId={v.id} />
+      {/* 2026-11-20（オーナーの決定 A）: 低い町の画面では、災厄の帯を上の棒の 💀×N にまとめる（災厄がいる時、店の一覧が 105px まで縮んでいた） */}
+      <WorldTopBar game={game} goldHeroId={v.id} scourgeInBar={shortTown} />
       {/* 回2: 世界マップと同じ「ステータス」（装備の付け替え・受け渡し）。閉じると同じタブに戻る */}
       <div className="flex shrink-0 items-center gap-1.5 pr-2">
         <div className="min-w-0 flex-1">

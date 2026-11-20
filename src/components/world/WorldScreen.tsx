@@ -73,7 +73,7 @@ import { useLowScreen } from '../../hooks/useLowScreen';
 const TIME_ICON: Record<TimeOfDay, typeof Sun> = { morning: Sunrise, noon: Sun, evening: Sunset, night: Moon };
 
 /** 上部のバー: 侵食度・命の灯火・ゴールド・時間帯・メニュー */
-export function WorldTopBar({ game, goldHeroId, goalLine, scourgeInParty }: { game: GameState; /** 所持金を出すキャラ（町・神殿・祠では切り替えたキャラ。無ければ世界マップの手番のキャラ） */ goldHeroId?: string; /** 「次の目的」の行（回1。世界マップだけ。上の帯のすぐ下、💀の札の上に出す） */ goalLine?: React.ReactNode; /** 狭い画面 回1: 低い画面では、災厄の札を仲間の列の 💀×N に畳む（世界マップだけ） */ scourgeInParty?: boolean }) {
+export function WorldTopBar({ game, goldHeroId, goalLine, scourgeInParty, scourgeInBar }: { game: GameState; /** 所持金を出すキャラ（町・神殿・祠では切り替えたキャラ。無ければ世界マップの手番のキャラ） */ goldHeroId?: string; /** 「次の目的」の行（回1。世界マップだけ。上の帯のすぐ下、💀の札の上に出す） */ goalLine?: React.ReactNode; /** 狭い画面 回1: 低い画面では、災厄の札を仲間の列の 💀×N に畳む（世界マップだけ） */ scourgeInParty?: boolean; /** 低い町の画面（2026-11-20 オーナーの決定 A）: 災厄の帯を、この棒の中の 💀×N の小さなボタンにまとめる（店の一覧を広げるため） */ scourgeInBar?: boolean }) {
   const openSheet = useBattle((s) => s.openSheet);
   // 狭い画面 回1: 低い画面（data-low）では、帯を1行にする（「次: 25%で…」は帯を押すと遊び方の一番上に出る）
   const low = useLowScreen();
@@ -137,6 +137,7 @@ export function WorldTopBar({ game, goldHeroId, goalLine, scourgeInParty }: { ga
         {/* 災厄（氷嵐の魔女）が生きている間は、夜の魔物のレベルがさらに上がる（夜の間だけ出す。2026-11-13） */}
         {time === 'night' && curse.nightLevel > 0 && <span className="text-fuchsia-300" data-night-scourge>💀敵Lv+{curse.nightLevel}</span>}
       </div>
+      {scourgeInBar && <ScourgeStrip game={game} variant="button" compact />}
       <button onClick={() => openSheet('quests')} aria-label="依頼" className="btn btn-dark flex h-11 w-11 shrink-0 items-center justify-center rounded-lg">
         <ScrollText size={20} />
       </button>
@@ -146,7 +147,7 @@ export function WorldTopBar({ game, goldHeroId, goalLine, scourgeInParty }: { ga
     </div>
     {goalLine}
     {/* 災厄の中ボスの札（段階7b）。いる時だけ。低い画面の世界マップは仲間の列の 💀×N に畳む（町などは1行の帯） */}
-    {!(low && scourgeInParty) && <ScourgeStrip game={game} />}
+    {!(low && scourgeInParty) && !scourgeInBar && <ScourgeStrip game={game} />}
     </>
   );
 }

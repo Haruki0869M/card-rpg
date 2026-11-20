@@ -3,6 +3,8 @@
 // 押すと、悪さの中身・倒した時の報酬・場所が分かっているかを出す（見るだけ。だれでも開ける。ゲームの状態は変えない）
 // 狭い画面 回1（低い画面 = data-low の時だけ）: 世界マップでは仲間の列の「💀×N」の小さなボタン（variant="button"）、
 // 町・神殿・祠の画面では1行の短い帯（variant="line" か full。低い画面では1行になる）。どちらも押すと、今と同じ説明の窓が開く（情報は消さない）。
+// 低い町の画面（2026-11-20 オーナーの決定 A・検証 bot の指摘）: 町の画面が低い形（Places.tsx の SHORT_TOWN）の時は、1行の帯の代わりに、上の棒の中の「💀×N」の小さなボタン（variant="button"・compact）にまとめる。
+// 帯の1行ぶん、店の一覧が広がる（390×540 で 105px → 150px 以上）。押すと、今と同じ説明の窓が開く（情報は消さない）。
 // 低い画面の窓は、アプリのいちばん外の層に出す（LAYER.scourgeDialog。待ちの帯・通信の知らせより手前で、閉じるボタンが隠れない）
 import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
@@ -13,9 +15,11 @@ import type { GameState } from '../../types';
 import { useLowScreen } from '../../hooks/useLowScreen';
 import { LAYER } from '../ui/layers';
 
-export function ScourgeStrip({ game, variant = 'full', className = '' }: { game: GameState; /** full = 今の4行の札（低い画面では1行の短い帯）・button = 💀×N の小さなボタン（低い画面の世界マップの仲間の列だけ） */ variant?: 'full' | 'button'; className?: string }) {
+export function ScourgeStrip({ game, variant = 'full', compact = false, className = '' }: { game: GameState; /** full = 今の4行の札（低い画面では1行の短い帯）・button = 💀×N の小さなボタン（低い画面の世界マップの仲間の列だけ） */ variant?: 'full' | 'button'; /** 低い画面でなくても、小さなボタンの形にする（低い町の画面の上の棒。360×640 は「低い画面」ではないが、町は低い形になる） */ compact?: boolean; className?: string }) {
   const [open, setOpen] = useState(false);
-  const low = useLowScreen();
+  const lowScreen = useLowScreen();
+  // 小さなボタンの形の時は、窓も低い画面と同じ出し方（アプリのいちばん外の層）にする
+  const low = lowScreen || (compact && variant === 'button');
   const list = scourgeList(game);
   if (!list.length) return null;
   const one = list.length === 1;

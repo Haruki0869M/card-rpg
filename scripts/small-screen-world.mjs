@@ -5,7 +5,7 @@
 //       ふつうの時（1人で野原）・マスの説明の帯が出ている時も測って記録する（落とす線にはしない）
 //   (3) 12px より小さい字・44px より小さいボタン・横のはみ出しが無い（lib.mjs の layoutIssues）
 //   (4) 💀×N（仲間の列）・🔍（拡大）・♨／❄ の札が、押すと開き、もう1度押すか外（地図）を押すと閉じる。開いた中身に全文がある
-//   (5) 町の画面の災厄は1行の帯（畳まない）。押すと説明が開く
+//   (5) 町の画面の災厄は、上の棒の 💀×N の小さなボタン（2026-11-20。1行の帯は出さない）。押すと説明が開く。災厄3体でも、タブの下の欄は 150px 以上
 //   (6) 手番の駒の真ん中を押すと地図に当たる（ボタン・帯に当たらない）
 //   (7) 4人: 仲間の列は横に送れる（はみ出しても、ステータスのボタンまで送れる）
 //   (8) CSS の高さは 720px だが、見えている高さ（visualViewport）が 540px の時も低い形（「次の目的」の行は出ず、パネルの短い「次:」が出る）
@@ -109,6 +109,36 @@ const townOf = (base) =>
     w.prevTile = t;
     addScourges(w, t);
   });
+
+/**
+ * 町の画面（災厄3体）: 低い町の画面（高さ 700px 以下）では、災厄は上の棒の 💀×N の小さなボタン（2026-11-20 オーナーの決定 A。1行の帯は出さない = 店の一覧を広げる）。
+ * need150 = タブの下の欄の見える高さ 150px 以上を落とす線にする（390×540・360×640。360×520 は記録だけ）
+ */
+async function townCheck(page, BASE, base2, tag, shot, check, need150) {
+  await load(page, BASE, townOf(base2));
+  await page.locator('[data-interact]').click();
+  await wait(1200);
+  const skullT = await page.evaluate(() => {
+    const e = document.querySelector('[data-cutin-anchor] [data-scourge-button]');
+    if (!e) return null;
+    const b = e.getBoundingClientRect();
+    const list = document.querySelector('[data-town-body]');
+    return { w: Math.round(b.width), h: Math.round(b.height), line: document.querySelectorAll('[data-scourge-line]').length, listH: list ? Math.round(list.getBoundingClientRect().height) : null };
+  });
+  check(!!skullT && skullT.h >= 44 && skullT.w >= 44 && skullT.line === 0, `${tag} 町の画面の災厄は、上の棒の 💀×N のボタン（1行の帯は無い。${JSON.stringify(skullT)}）`, 'world');
+  if (need150) check(!!skullT && skullT.listH >= 150, `${tag} 町の画面（災厄3体）: タブの下の欄の見える高さ ${skullT?.listH}px ≥ 150px`, 'world');
+  for (const i of await layoutIssues(page)) check(false, `${tag} 町の画面（災厄3体）: ${i}`, 'world');
+  if (skullT) {
+    await page.locator('[data-cutin-anchor] [data-scourge-button]').click();
+    await wait(400);
+    check((await page.locator('[data-scourge-row]').count()) === 3, `${tag} 町の画面の 💀×N を押すと説明の窓が開く`, 'world');
+    check((await onTop(page, '[data-scourge-close]')) === true, `${tag} 町の画面の説明の窓の×が押せる`, 'world');
+    await shot('9-town');
+    await page.locator('[data-scourge-close]').click();
+    await wait(300);
+  }
+  if (!need150) console.log(`   ${tag} 町の画面（災厄3体）: タブの下の欄の見える高さ ${skullT?.listH}px（記録だけ）`);
+}
 
 const worldBox = (page) =>
   page.evaluate(() => {
@@ -321,25 +351,8 @@ export async function worldMapChecks({ browser, BASE, OUT, check }) {
       // ---- 狭い画面 回2（C）: 雪に埋もれた街道（凍て鐘の亡霊）の札。振るボタンのすぐ右・押すと全文 ----
       await buriedCheck(page, BASE, base2, tag, shot, check);
 
-      // ---- 町の画面: 災厄は1行の帯（畳まない） ----
-      await load(page, BASE, townOf(base2));
-      await page.locator('[data-interact]').click();
-      await wait(1200);
-      const line = await page.evaluate(() => {
-        const e = document.querySelector('[data-scourge-line]');
-        if (!e) return null;
-        const b = e.getBoundingClientRect();
-        return { h: Math.round(b.height), text: e.innerText.replace(/\n/g, ' ') };
-      });
-      check(!!line && line.h <= 48, `${tag} 町の画面の災厄は1行の帯（${JSON.stringify(line)}）`, 'world');
-      if (line) {
-        await page.locator('[data-scourge-line]').click();
-        await wait(400);
-        check((await page.locator('[data-scourge-row]').count()) === 3, `${tag} 町の画面の帯を押すと説明の窓が開く`, 'world');
-        await shot('9-town');
-        await page.locator('[data-scourge-close]').click();
-        await wait(300);
-      }
+      // ---- 町の画面: 災厄は、上の棒の 💀×N の小さなボタン（townCheck） ----
+      await townCheck(page, BASE, base2, tag, shot, check, H >= 540);
 
       // ---- 4人: 仲間の列（💀 を足すと 360 幅ではみ出す → 横に送れる） ----
       await load(page, BASE, worstOf(base4));
@@ -402,6 +415,17 @@ export async function worldMapChecks({ browser, BASE, OUT, check }) {
       await buriedCheck(page, BASE, base2, tag, (name) => page.screenshot({ path: `${OUT}/world-${tag}-${name}.png` }), check);
     } catch (e) {
       check(false, `${tag} 埋もれた街道: 途中で止まった（${String(e.message).split('\n')[0]}）`, 'world');
+    }
+    await page.close();
+  }
+
+  // ---- 町の画面だけ: 360×640（賢い検証 bot の P3。「低い画面」ではないが、町は低い形になる） ----
+  {
+    const page = await browser.newPage({ viewport: { width: 360, height: 640 }, deviceScaleFactor: 1 });
+    try {
+      await townCheck(page, BASE, base2, '360x640', (name) => page.screenshot({ path: `${OUT}/world-360x640-${name}.png` }), check, true);
+    } catch (e) {
+      check(false, `360x640 町の画面: 途中で止まった（${String(e.message).split('\n')[0]}）`, 'world');
     }
     await page.close();
   }
