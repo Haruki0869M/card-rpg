@@ -105,8 +105,8 @@ export function WorldTopBar({ game, goldHeroId, goalLine, scourgeInParty, scourg
           </span>
         </span>
         <Bar value={w.corruption} max={100} color="linear-gradient(90deg,#6a2a9a,#e04aff)" height={6} />
-        {/* 次の段階は省略せずに全文（2行まで）。低い画面は出さない（押すと遊び方の一番上に「次: …」が出る） */}
-        <span className="text-[12px] leading-[15px] text-zinc-400 low:hidden" data-corruption-next>{next ? `次: ${next.at}%で${next.text}` : ''}</span>
+        {/* 次の段階は省略せずに全文（2行まで）。低い画面は出さない（押すと遊び方の一番上に「次: …」が出る）。低い町の画面（💀×N を棒に入れる時）も出さない: 棒が狭くなって5行に折れるため（2026-11-20） */}
+        <span className={`text-[12px] leading-[15px] text-zinc-400 low:hidden ${scourgeInBar ? 'hidden' : ''}`} data-corruption-next>{next ? `次: ${next.at}%で${next.text}` : ''}</span>
       </button>
       {/* 命の灯火と所持金の列。押すと遊び方の「命の灯火」を開く（押しやすいように列ごと1つのボタン） */}
       <button

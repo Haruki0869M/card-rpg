@@ -330,7 +330,7 @@ export function TownScreen() {
       {/* 回2: 世界マップと同じ「ステータス」（装備の付け替え・受け渡し）。閉じると同じタブに戻る */}
       <div className="flex shrink-0 items-center gap-1.5 pr-2">
         <div className="min-w-0 flex-1">
-          <FacilityRoster game={game} selected={v.id} onSelect={setVisitorId} />
+          <FacilityRoster game={game} selected={v.id} onSelect={setVisitorId} oneRow={shortTown} />
         </div>
         <StatusButton game={game} self={statusHero} />
       </div>
@@ -672,7 +672,7 @@ export function TownScreen() {
         )}
       </div>
       <div className="relative shrink-0 px-3 pt-1 pb-3 shadow-[0_-10px_14px_-6px_rgba(0,0,0,.75)]" data-town-exit>
-        <FacilityExit game={game} />
+        <FacilityExit game={game} compact={shortTown} />
       </div>
       <BuyNotice game={game} bought={bought} onClose={closeBought} />
       {lastOne !== null && stock?.items[lastOne] && (

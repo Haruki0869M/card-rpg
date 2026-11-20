@@ -114,7 +114,7 @@ const townOf = (base) =>
  * 町の画面（災厄3体）: 低い町の画面（高さ 700px 以下）では、災厄は上の棒の 💀×N の小さなボタン（2026-11-20 オーナーの決定 A。1行の帯は出さない = 店の一覧を広げる）。
  * need150 = タブの下の欄の見える高さ 150px 以上を落とす線にする（390×540・360×640。360×520 は記録だけ）
  */
-async function townCheck(page, BASE, base2, tag, shot, check, need150) {
+async function townCheck(page, BASE, base2, tag, shot, check, need150, base4 = null) {
   await load(page, BASE, townOf(base2));
   await page.locator('[data-interact]').click();
   await wait(1200);
@@ -138,6 +138,27 @@ async function townCheck(page, BASE, base2, tag, shot, check, need150) {
     await wait(300);
   }
   if (!need150) console.log(`   ${tag} 町の画面（災厄3体）: タブの下の欄の見える高さ ${skullT?.listH}px（記録だけ）`);
+  // 4人（2026-11-20 オーナーの決定 A）: 利用中の札は横1列（縦に並ばない）。災厄3体でも、タブの下の欄は 150px 以上・「世界マップへ」が画面の中
+  if (base4) {
+    await load(page, BASE, townOf(base4));
+    await page.locator('[data-interact]').click();
+    await wait(1200);
+    const t4 = await page.evaluate(() => {
+      const box = (sel) => {
+        const e = document.querySelector(sel);
+        return e ? e.getBoundingClientRect() : null;
+      };
+      const r = box('[data-facility-members]');
+      const exit = box('[data-facility-exit]');
+      return { chips: document.querySelectorAll('[data-facility-members] button').length, rosterH: r ? Math.round(r.height) : null, listH: Math.round(box('[data-town-body]')?.height ?? 0), exitBottom: exit ? Math.round(exit.bottom) : null, viewH: window.innerHeight };
+    });
+    check(t4.chips >= 2 && t4.rosterH !== null && t4.rosterH <= 48, `${tag} 町の画面（4人）: 利用中の札 ${t4.chips} 枚が横1列（高さ ${t4.rosterH}px ≤ 48px）`, 'world');
+    check(t4.exitBottom !== null && t4.exitBottom <= t4.viewH, `${tag} 町の画面（4人）: 「世界マップへ」が画面の中（下端 ${t4.exitBottom}px ≤ ${t4.viewH}px）`, 'world');
+    if (need150) check(t4.listH >= 150, `${tag} 町の画面（4人・災厄3体）: タブの下の欄の見える高さ ${t4.listH}px ≥ 150px`, 'world');
+    else console.log(`   ${tag} 町の画面（4人・災厄3体）: タブの下の欄の見える高さ ${t4.listH}px（記録だけ）`);
+    for (const i of await layoutIssues(page)) check(false, `${tag} 町の画面（4人）: ${i}`, 'world');
+    await shot('9-town-4p');
+  }
 }
 
 const worldBox = (page) =>
@@ -352,7 +373,7 @@ export async function worldMapChecks({ browser, BASE, OUT, check }) {
       await buriedCheck(page, BASE, base2, tag, shot, check);
 
       // ---- 町の画面: 災厄は、上の棒の 💀×N の小さなボタン（townCheck） ----
-      await townCheck(page, BASE, base2, tag, shot, check, H >= 540);
+      await townCheck(page, BASE, base2, tag, shot, check, H >= 540, base4);
 
       // ---- 4人: 仲間の列（💀 を足すと 360 幅ではみ出す → 横に送れる） ----
       await load(page, BASE, worstOf(base4));
@@ -423,7 +444,7 @@ export async function worldMapChecks({ browser, BASE, OUT, check }) {
   {
     const page = await browser.newPage({ viewport: { width: 360, height: 640 }, deviceScaleFactor: 1 });
     try {
-      await townCheck(page, BASE, base2, '360x640', (name) => page.screenshot({ path: `${OUT}/world-360x640-${name}.png` }), check, true);
+      await townCheck(page, BASE, base2, '360x640', (name) => page.screenshot({ path: `${OUT}/world-360x640-${name}.png` }), check, true, base4);
     } catch (e) {
       check(false, `360x640 町の画面: 途中で止まった（${String(e.message).split('\n')[0]}）`, 'world');
     }
