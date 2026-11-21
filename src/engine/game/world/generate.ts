@@ -286,7 +286,14 @@ export function createWorld(game: GameState, rng: Rng): WorldState {
       const wts = [Math.max(20, 70 - d * 12), 25 + d * 4, 4 + d * 4, 1 + d];
       return { kind: 'chest', id: 'mapChest', chest: { rarity: RARITIES[pickWeighted(wts, rng)], locked: rng.next() < 0.3 } };
     }, def.prefer?.chest);
-    if (mapEvents.length) place(reg.events ?? 0, () => ({ kind: 'event', id: pick(mapEvents, rng).id }));
+    // 帯ごと・地域ごとの出し分け（EventDef.lanes・regions）: 置くマスに合うイベントだけから引く。合う物が無ければ全部から。
+    // 欄の無いシナリオでは fit === mapEvents（同じ並び）なので、今までと同じ結果
+    if (mapEvents.length)
+      place(reg.events ?? 0, (tile) => {
+        const lane = laneOfCol(def, colOf(w, tile))?.id;
+        const fit = mapEvents.filter((e) => (!e.lanes || (lane !== undefined && e.lanes.includes(lane))) && (!e.regions || e.regions.includes(reg.id)));
+        return { kind: 'event', id: pick(fit.length ? fit : mapEvents, rng).id };
+      });
     // 薬草の群生地（段階6a）: 決めた帯に置く
     const herb = herbEventOf(def);
     if (reg.herbs && EVENTS.tryGet(herb)) place(reg.herbs, () => ({ kind: 'event', id: herb }), def.prefer?.herb, true);

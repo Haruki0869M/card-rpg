@@ -32,6 +32,7 @@
 | `break-combo.mjs` | 戦闘の表示（見直しの段階3）: 大技の印・BREAK の手がかりと結果・完全成功の状態異常の手がかり・連携の段階（360・390・480） |
 | `dungeon-frames.mjs` | （旧）ダンジョンの歩く演出のチカチカ。見直しの段階2で歩く演出が無くなったので、今は「歩く演出なし」と出て通るだけ |
 | `chest-show.mjs` | 宝箱の演出 |
+| `scenario2-map-events.mjs` | シナリオ2だけの地図のイベント4種類（釣り小屋・番小屋・炉あと・灯籠）: 3つの画面で選択肢が届く・帆そりの +3・薪の束・武器なしの炉あと |
 | `online.mjs`・`dungeon-coop.mjs`・`coop-talk.mjs` | オンライン協力（Firebase のエミュレーター `npm run emulators` が要る。本番には書かない） |
 | `perf.mjs`・`world-perf.mjs` | 重さ（CPU を4倍遅くしたフレーム時間） |
 | `load-size.mjs` | 最初の読み込みの量 |

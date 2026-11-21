@@ -696,7 +696,12 @@ export function startBattleWith(game: GameState, enemies: EncounterSpec['enemies
   applyScourgeBoons(game, game.battle);
   applyInsight(game, game.battle);
   game.battleBackground = opts.background ?? worldBackground(game);
-  for (const h of sceneHeroes(game)) { h.nextBattleStatuses = {}; delete h.petFeast; }
+  for (const h of sceneHeroes(game)) {
+    h.nextBattleStatuses = {};
+    delete h.petFeast;
+    // 戦闘の数で切れる武器の属性（巨人の炉あと）: この戦闘には効き（戦闘の中の値は上で写した後）、残りを1減らす。0になったら消す
+    if (h.weaponElement?.battles !== undefined && --h.weaponElement.battles <= 0) delete h.weaponElement;
+  }
   game.mode = 'battle';
 }
 
@@ -1294,6 +1299,12 @@ export function eventOptionState(game: GameState, eventId: string, index: number
   if (opt.cost && !(payer ? [payer] : sceneHeroes(game)).some((h) => h.gold >= opt.cost!)) return { visible: true, reason: `ゴールドが足りません（${opt.cost}G）` };
   if (opt.costFocus && !(payer ? [payer] : sceneHeroes(game)).some((h) => h.focus >= opt.costFocus!)) return { visible: true, reason: `フォーカスが足りません（${opt.costFocus}）` };
   if (opt.costItem && !(payer ? [payer] : sceneHeroes(game)).some((h) => h.pouch.some((i) => i.itemId === opt.costItem))) return { visible: true, reason: `${getItem(opt.costItem).name}を持っていません` };
+  // 武器が要る選択肢（巨人の炉あと）: 世界マップのマスのイベントは手番のキャラ、ほかは払う人（いなければ場面のだれか）
+  if (opt.requiresWeapon) {
+    const turnHero = !payer && !game.activeScene && game.event?.tile !== undefined && game.world ? findHero(game, game.world.turn) : undefined;
+    const who = payer ?? turnHero;
+    if (!(who ? [who] : sceneHeroes(game)).some((h) => h.equipment.weapon)) return { visible: true, reason: '武器を持っていません' };
+  }
   return { visible: true };
 }
 

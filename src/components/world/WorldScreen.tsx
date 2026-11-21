@@ -602,7 +602,8 @@ export function WorldScreen({ movement }: { movement?: WorldMovePresentation } =
   const chance = statChance(hero, 'agi', 'move');
   // 広い地図では、街道の上で振ると +1（段階6a。エンジンの rollMove と同じ足し方）
   const roadBonus = terrainDiceBonus(game, w, here);
-  const diceBonus = [...worldDiceBonus(hero), ...roadBonus];
+  // 振る前にマスのイベントで増えた分（シナリオ2の釣り小屋の帆そり）も、振る前の見込みに入れる（エンジンの rollMove と同じ足し方）
+  const diceBonus = [...worldDiceBonus(hero), ...roadBonus, ...(w.moveBonus && mine ? [{ label: w.moveBonus.label, value: w.moveBonus.value }] : [])];
   const bonusSum = diceBonus.reduce((n, b) => n + b.value, 0);
   // 狭い画面 回2（C）: 凍て鐘の亡霊の悪さで、街道の +1 が無い時の知らせ（エンジンの文）。短い札は「❄街道 +1なし」、押すと全文
   const buried = roadBuriedNote(game, w, here);

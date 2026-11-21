@@ -97,7 +97,8 @@ const BEFORE: Record<number, { kinds: string[]; state: string }> = {
  */
 const BEFORE_MAPS: Record<string, string[]> = {
   corruptionKing: ['26c62f2f', 'e61644da', 'b4f77cef'],
-  frozenKingdom: ['fbb04c0b', '46fb1ed4', '0d9f556e'],
+  // 2026-11-21 シナリオ2は、地図のイベント4種類と帯ごとの出し分けを足したので取り直した（前の値: 'fbb04c0b', '46fb1ed4', '0d9f556e'。ほかの6本は変わらない事をこのテストで見ている）
+  frozenKingdom: ['491b9d3e', '1eec78ae', 'acb0d506'],
   // 2026-11-17 シナリオ3は、区切り2で地図を 15×42 に作り直し、テーマ「漂流物の洞」も足したので、両方を入れた状態で取り直した
   // （前の 8×35 の値: '03673bf7', '9f451a2a', '965383ac'。地図だけ = '54cdbd97', 'ae3be3a8', '852eb49e'・テーマだけ = 'c051efc9', '8afb0748', '95a3dba2'）
   cursedArchipelago: ['9eb54985', '36d3c10a', 'a2618fc6'],

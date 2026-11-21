@@ -45,7 +45,8 @@ export function warmthNote(game: GameState, heroId: string): string | undefined 
   const w = game.world;
   if (!w || !isWarm(w, heroId)) return undefined;
   const left = w.warm![heroId] - w.worldTurn + 1;
-  return `♨ 温泉で温まっている（次の朝まで寒さを受けない・あと${left}ターン）`;
+  // 温泉のほかに、釣り小屋の火（今の時間帯の間だけ）・薪の束でも温まる（2026-11-21）ので、出どころと「次の朝まで」は書かない
+  return `♨ 温まっている（寒さを受けない・あと${left}ターン）`;
 }
 
 /** ワールドターンの終わり: 寒さ・暑さのマスにいるキャラのHPを減らす（HPは1で止まる。今ターン野営したキャラ・温泉で温まったキャラ（寒さだけ）は受けない） */

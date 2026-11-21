@@ -33,7 +33,8 @@ describe('区切りE: 数', () => {
     // 段階7b の「災厄討ちの秘薬」（災厄を倒した時だけ。source: 'scourge'）は、店・宝箱の24個とは別に数える
     const all = ITEMS.all.filter((i) => i.slot === 'consumable' && !i.source);
     expect(all).toHaveLength(24);
-    expect(ITEMS.all.filter((i) => i.slot === 'consumable' && i.source).map((i) => i.id)).toEqual(['scourgeElixir']);
+    // 2026-11-21: シナリオ2の地図のイベント「薪の番小屋」だけが渡す「薪の束」（source: 'event'）も、24個とは別
+    expect(ITEMS.all.filter((i) => i.slot === 'consumable' && i.source).map((i) => i.id).sort()).toEqual(['firewoodBundle', 'scourgeElixir']);
     const n = (r: string) => all.filter((i) => i.rarity === r).length;
     expect([n('common'), n('rare'), n('epic'), n('legend')]).toEqual([5, 9, 7, 3]);
     const uses = all.map((i) => JSON.stringify(i.use));

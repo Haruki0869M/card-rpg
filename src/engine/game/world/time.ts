@@ -24,6 +24,9 @@ export const dayOf = (worldTurn: number) => Math.floor((worldTurn - 1) / (BALANC
 /** その日の最後のワールドターン（夜の最後。次のターンが次の朝）。温泉の効き目の終わり（シナリオ2の作り直し §8-2） */
 export const lastTurnOfDay = (worldTurn: number) => dayOf(worldTurn) * BALANCE.turnsPerTimeOfDay * TIMES.length;
 
+/** 今の時間帯（朝・昼・夕方・夜）の最後のワールドターン。釣り小屋の効き目の終わり（シナリオ2の地図のイベント） */
+export const lastTurnOfTime = (worldTurn: number) => Math.ceil(worldTurn / BALANCE.turnsPerTimeOfDay) * BALANCE.turnsPerTimeOfDay;
+
 // ---------- 潮（シナリオ3の作り直し §3-1） ----------
 
 /** 世界の潮（'high' = 満ち潮 / 'low' = 引き潮）。戦闘の中の潮（潮の神官の段階）とは別 */

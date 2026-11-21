@@ -397,7 +397,7 @@ describe('区切り2: 温泉（全員のHP回復＋次の朝まで寒さを受�
     const until = lastTurnOfDay(w.worldTurn);
     expect(w.warm).toEqual({ [a.id]: until, [b.id]: until });
     expect(isWarm(w, a.id)).toBe(true);
-    expect(warmthNote(g, a.id)).toContain('温泉');
+    expect(warmthNote(g, a.id)).toContain('温まっている');
     // 寒いマスに立って、ターンの終わりを迎えても減らない（夜の最後のターンまで）
     const cold = w.tiles.findIndex((t, i) => !t.f && t.t === 'snow' && lane(g, i) === 'west');
     w.pos[a.id] = cold;

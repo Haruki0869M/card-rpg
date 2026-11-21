@@ -88,6 +88,7 @@ export function advanceTurn(game: GameState, rng: Rng) {
   if (w.turn && !w.acted.includes(w.turn)) w.acted.push(w.turn);
   w.move = null;
   w.moveDice = undefined;
+  delete w.moveBonus;
   w.invites = undefined;
   w.moveProposal = undefined;
   // 同行は、同じマスにいる間は続く（手番が変わっても。ダンジョンに入る時も一緒に入る。指摘1）
@@ -231,7 +232,10 @@ export function rollMove(game: GameState, cmd: Cmd<'WORLD_ROLL_MOVE'>, rng: Rng)
   if (typeof t === 'string') return t;
   const { w, h } = t;
   if (w.move !== null) return 'もう移動力を決めました';
-  const d = newDice(game, BALANCE.moveDiceSides, [...worldDiceBonus(h), ...terrainDiceBonus(game, w, w.pos[h.id])], rng);
+  // 振る前にマスのイベントで増えた分（釣り小屋の帆そり）を足して消す
+  const extra = w.moveBonus ? [{ label: w.moveBonus.label, value: w.moveBonus.value }] : [];
+  delete w.moveBonus;
+  const d = newDice(game, BALANCE.moveDiceSides, [...worldDiceBonus(h), ...terrainDiceBonus(game, w, w.pos[h.id]), ...extra], rng);
   w.moveDice = d;
   w.move = d.total;
   w.prevTile = w.pos[h.id];

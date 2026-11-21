@@ -79,7 +79,8 @@ export interface ItemDef {
    * 出どころ（段階7a）。randomDungeon = ランダムダンジョンの黄金箱と闇商人だけで手に入る専用の装備（町の店・ふつうの宝箱・戦闘のドロップ・行商人には出ない）
    */
   /** scourge = 災厄の中ボスが必ず落とす専用の装備と秘薬（段階7b。ほかのどこにも出ない） */
-  source?: 'randomDungeon' | 'scourge';
+  /** event = 地図のイベントだけが名前で渡す品（薪の束。宝箱・店・ドロップのくじには出ない） */
+  source?: 'randomDungeon' | 'scourge' | 'event';
   /**
    * 災厄だけが落とす印（シナリオ2の作り直し §2-2・§8-2。シナリオの伝説品を災厄の専用の装備に移した物）: 落とす災厄の ID。
    * その災厄が登録されていて・そのシナリオに出る災厄の一覧に入っていて・広い地図の冒険の時だけ、宝箱・店・ドロップ・行商人・闇商人に出ない（world/scourgeGear.ts）。
@@ -152,8 +153,8 @@ export interface Hero {
    * 部屋に入った時に引いて保存する（保存して再開しても・オンラインでも同じ）。本人が FLOTSAM_PICK で1つ選ぶ。だれも待たない
    */
   flotsam?: string[];
-  /** 武器に宿った属性（その武器を持っている間だけ） */
-  weaponElement?: { uid: string; element: string };
+  /** 武器に宿った属性（その武器を持っている間だけ）。battles = 残りの戦闘の数（巨人の炉あと。戦闘が始まるたびに1減り、0で消える。無ければずっと） */
+  weaponElement?: { uid: string; element: string; battles?: number };
   /** 最後に突発イベントが起きたワールドターン（2手番続けては起きない） */
   lastRandomEvent?: number;
   /** 自分のお金・持ち物（装備していない装備品）・道具袋（M3-C: キャラごと） */
@@ -429,6 +430,8 @@ export interface EventOption {
   costFocus?: number;
   /** 使う消費アイテム（アイテムのID。持っているキャラが1つ使う） */
   costItem?: string;
+  /** 選ぶキャラ（世界マップなら手番のキャラ）が武器を持っている時だけ選べる（巨人の炉あと。持っていない時は理由を出して押せない） */
+  requiresWeapon?: boolean;
   check?: EventCheck;
   success: EventOutcome[];
   fail?: EventOutcome[];
@@ -454,6 +457,13 @@ export interface EventDef {
   hiddenIn?: string;
   /** 地図のデータが置き場所を決めるイベント（段階6a の薬草の群生地。where: 'map' と使う）。ふつうのマップのイベントの候補には入れない */
   placed?: boolean;
+  /**
+   * 帯ごと・地域ごとの出し分け（シナリオ2の地図のイベント・2026-11-21。where: 'map' のふつうのくじだけ）:
+   * 置くマスの帯（LaneDef の id）・地域（地域の id）が入っているイベントだけから引く。省略はどこにでも出る。
+   * そのマスに合うイベントが1つも無い時は、全部から引く（乱数を引く回数は変わらない）
+   */
+  lanes?: string[];
+  regions?: string[];
   title: string;
   text: string;
   icon: string;
