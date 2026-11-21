@@ -8,7 +8,7 @@ import { getItem } from '../../data/items';
 import { DUNGEON_THEMES, getRoomType } from '../../data/rules';
 import type { GameCommand, GameState, Hero, PlayerId } from '../../types';
 import { applyGameCommand, buildDungeon, createGame, createRng, migrateGame, moveIntoRoom, reachableRooms, roomKind } from '../index';
-import { dealFlotsam, flotsamPools, flotsamView, rollFlotsam } from '../game/flotsam';
+import { dealFlotsam, flotsamPools, flotsamView, swapGold, rollFlotsam } from '../game/flotsam';
 import { pouchLimitOf } from '../game/hero';
 import { rarityIndex } from '../game/dungeon';
 import { dungeonDetourLines } from '../game/world/detour';
@@ -84,7 +84,8 @@ describe('漂流物の洞: データとシナリオ', () => {
     // 2026-11-16: 漂流物の洞のデータを外して測った値と、足した後の値が同じだった（種 1〜5）
     const before: Record<string, string[][]> = {
       corruptionKing: [['sealedLabyrinth', 'crystalGrotto'], ['sealedLabyrinth', 'outlawDen'], ['outlawDen', 'sealedLabyrinth'], ['sealedLabyrinth', 'crystalGrotto'], ['sealedLabyrinth', 'crystalGrotto']],
-      frozenKingdom: [['frozenVault', 'sealedLabyrinth'], ['frozenVault', 'outlawDen'], ['outlawDen', 'sealedLabyrinth'], ['crystalGrotto', 'sealedLabyrinth'], ['crystalGrotto', 'frozenVault']],
+      // 2026-11-21（オーナーの決定 9-A）: シナリオだけのテーマは必ず1か所に出す。種3・4 は、2か所目が氷漬けの宝物庫に入れ替わった（前は sealedLabyrinth）
+      frozenKingdom: [['frozenVault', 'sealedLabyrinth'], ['frozenVault', 'outlawDen'], ['outlawDen', 'frozenVault'], ['crystalGrotto', 'frozenVault'], ['crystalGrotto', 'frozenVault']],
       sandDynasty: [['sealedLabyrinth'], ['crystalGrotto'], ['outlawDen'], ['outlawDen'], ['crystalGrotto']],
     };
     for (const [sid, list] of Object.entries(before)) {
@@ -92,6 +93,17 @@ describe('漂流物の洞: データとシナリオ', () => {
         const g = newGame(sid, i + 1);
         expect(randomTiles(g).map((t) => g.world!.tiles[t].f!.theme), `${sid} ${i + 1}`).toEqual(want);
       });
+    }
+  });
+
+  it('シナリオだけのテーマ（漂流物の洞・氷漬けの宝物庫）は、どの冒険でも必ず1か所に出る（種30個）', () => {
+    for (const [sid, own] of [[S3, 'flotsamCave'], ['frozenKingdom', 'frozenVault']] as const) {
+      for (let seed = 1; seed <= 30; seed++) {
+        const g = newGame(sid, seed);
+        const themes = randomTiles(g).map((t) => g.world!.tiles[t].f!.theme);
+        expect(themes.length, `${sid} ${seed}`).toBe(2);
+        expect(themes.filter((t) => t === own).length, `${sid} ${seed}: ${themes.join()}`).toBe(1);
+      }
     }
   });
 
@@ -238,6 +250,31 @@ describe('漂流物の山: 全員がそれぞれ選ぶ（だれも待たない�
     const g2 = enterPile(5, ['P1']);
     expect(flotsamView(g2.heroes[0]).full).toBe(false);
     expect(flotsamView(g2.heroes[0]).items.every((x) => x.overflowGold === undefined)).toBe(true);
+  });
+
+  it('袋が満杯: 袋の品1つと入れ替えられる（選んだ品が袋に入り、手放した品がお金に換わる。オーナーの決定 10-A）', () => {
+    let g = enterPile(5, ['P1']);
+    const h = g.heroes[0];
+    const limit = pouchLimitOf(h);
+    h.pouch = Array.from({ length: limit }, (_, i) => ({ uid: `p${i}`, itemId: 'potion' }));
+    const gold = h.gold;
+    const id = h.flotsam![0];
+    expect(swapGold('potion')).toBe(rarityIndex(getItem('potion').rarity) * 15 + 10);
+    // 袋に無い品とは入れ替えられない
+    expect(applyGameCommand(g, { ...pick(g, h, 0), swapUid: 'none' } as GameCommand).error).toBe('入れ替える品が袋にありません');
+    g = run(g, { ...pick(g, h, 0), swapUid: 'p1' } as GameCommand);
+    const a = g.heroes[0];
+    expect(a.pouch).toHaveLength(limit);
+    expect(a.pouch.some((p) => p.uid === 'p1')).toBe(false);
+    expect(a.pouch.filter((p) => p.itemId === id)).toHaveLength(1);
+    expect(a.gold).toBe(gold + swapGold('potion'));
+    expect(a.flotsam).toBeUndefined();
+    expect(g.log.some((l) => l.text.includes('手放した'))).toBe(true);
+    // 空きがある時は、入れ替えを受け付けない（何も手放さない）
+    const g2 = enterPile(5, ['P1']);
+    const h2 = g2.heroes[0];
+    h2.pouch = [{ uid: 'q0', itemId: 'potion' }];
+    expect(applyGameCommand(g2, { ...pick(g2, h2, 0), swapUid: 'q0' } as GameCommand).error).toBe('袋がいっぱいの時だけ、入れ替えられます');
   });
 
   it('退場したキャラには配らない', () => {

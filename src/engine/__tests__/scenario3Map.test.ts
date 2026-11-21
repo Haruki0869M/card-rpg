@@ -9,7 +9,7 @@ import { getScenario } from '../../data/scenarios';
 import { SANCTUARIES, TERRAINS } from '../../data/world';
 import type { GameCommand, GameState, HeroPet, PlayerId, WorldState } from '../../types';
 import { actorOf, setLocalPlayers } from '../../store/battleConfig';
-import { applyGameCommand, createGame, createRng, migrateGame, validateGame } from '../index';
+import { applyGameCommand, createGame, createRng, eventOptionState, migrateGame, validateGame } from '../index';
 import { botNextCommand, playToEnd } from '../bot';
 import { colOf, hexDistance, idxOf, linePath, moveCostOf, neighborInDir, neighbors, reachable, rowOf } from '../game/world/hex';
 import { isWideMap, laneOfCol, laneOfTile } from '../game/world/lanes';
@@ -468,7 +468,10 @@ describe('区切り2: 地図のイベント2つ（難破船の残骸・潮だま
       expect(EVENTS.scenarioOf(id)).toBe(CA);
       expect(ev.options.some((o) => !o.check && !o.requiresPet)).toBe(true);
     }
-    expect(EVENTS.get('wreckDebris').options[0]).toMatchObject({ success: [{ kind: 'item', rarity: 'rare', slot: 'equipment' }], fail: [{ kind: 'damage', amount: 8 }] });
+    // 2026-11-21: 潮で選択肢が変わる（引き潮 = 判定なし／満ち潮 = もぐる判定）
+    expect(EVENTS.get('wreckDebris').options[0]).toMatchObject({ tide: 'low', success: [{ kind: 'item', rarity: 'rare', slot: 'equipment' }] });
+    expect(EVENTS.get('wreckDebris').options[0].check).toBeUndefined();
+    expect(EVENTS.get('wreckDebris').options[1]).toMatchObject({ tide: 'high', success: [{ kind: 'item', rarity: 'rare', slot: 'equipment' }], fail: [{ kind: 'damage', amount: 8 }] });
     expect(EVENTS.get('tidePool').options[0]).toMatchObject({ requiresPet: true, success: [{ kind: 'petLove', amount: 8, all: true }] });
     expect(EVENTS.get('tidePool').options[1]).toMatchObject({ success: [{ kind: 'gold', amount: 40 }], fail: [{ kind: 'damage', amount: 4 }] });
     expect(EVENTS.get('tideStone').placed).toBe(true);
@@ -480,6 +483,8 @@ describe('区切り2: 地図のイベント2つ（難破船の残骸・潮だま
         let g = fresh(5100 + opt);
         const [a, b] = g.heroes;
         if (EVENTS.get(id).options[opt].requiresPet) for (const h of g.heroes) h.pet = pet();
+        // 潮で出る選択肢は、その潮にして確かめる（潮を止める = 時間帯にかかわらずその潮）
+        if (EVENTS.get(id).options[opt].tide) g.world!.tideFrozen = EVENTS.get(id).options[opt].tide;
         g = enter(g, id, [a.id, b.id]);
         expect(g.mode, `${id} ${opt}`).toBe('event');
         // 世界マップのマスのイベントは手番の人だけで決まる（ダンジョンの2段階の合意にならない = 相方を待たない）
@@ -524,16 +529,48 @@ describe('区切り2: 地図のイベント2つ（難破船の残骸・潮だま
     for (const x of h.heroes) expect(x.pet!.love, x.id).toBe(inScene.has(x.id) ? 8 : 0);
   });
 
+  it('難破船の残骸: 引き潮の間は判定なしで装備が手に入り、もぐる選択肢は出ない。満ち潮の間は逆（歩いて入る選択肢は選べない）', () => {
+    let g = fresh(5140, 1);
+    const a = g.heroes[0];
+    const hp0 = a.hp;
+    const gear = () => g.heroes[0].stash.length + Object.values(g.heroes[0].equipment).filter(Boolean).length;
+    g.world!.tideFrozen = 'low';
+    g = enter(g, 'wreckDebris', [a.id]);
+    expect(eventOptionState(g, 'wreckDebris', 0).visible).toBe(true);
+    expect(eventOptionState(g, 'wreckDebris', 1).visible).toBe(false);
+    expect(eventOptionState(g, 'wreckDebris', 2).visible).toBe(true);
+    expect(applyGameCommand(g, { type: 'CHOOSE_EVENT', playerId: a.playerId, optionIndex: 1, heroId: a.id, focusUsed: 0 }).error).toBe('選択肢がありません');
+    const n0 = gear();
+    g = choose(g, 0);
+    expect(g.heroes[0].hp).toBe(hp0);
+    expect(gear()).toBe(n0 + 1);
+    let h = fresh(5141, 1);
+    h.world!.tideFrozen = 'high';
+    h = enter(h, 'wreckDebris', [h.heroes[0].id]);
+    expect(eventOptionState(h, 'wreckDebris', 0).visible).toBe(false);
+    expect(eventOptionState(h, 'wreckDebris', 1).visible).toBe(true);
+  });
+
+  it('潮で出る選択肢（tide）を持つのは、シナリオ3のイベントだけ。どの潮でも、判定の無い選択肢が1つは出る', () => {
+    const withTide = EVENTS.all.filter((e) => e.options.some((o) => o.tide));
+    expect(withTide.map((e) => e.id)).toEqual(['wreckDebris']);
+    for (const e of withTide) {
+      expect(EVENTS.scenarioOf(e.id)).toBe(CA);
+      for (const t of ['high', 'low'] as const) expect(e.options.some((o) => (!o.tide || o.tide === t) && !o.check && !o.requiresPet), `${e.id} ${t}`).toBe(true);
+    }
+  });
+
   it('難破船の残骸: 失敗すると8ダメージ（入った人の HP が減る）・成功すると装備が1つ手に入る（判定の結果は種で決まり、保存して再開しても同じ）', () => {
     let okSeen = false, ngSeen = false;
     for (let s = 0; s < 12 && !(okSeen && ngSeen); s++) {
       let g = fresh(5130 + s, 1);
       const a = g.heroes[0];
       const hp0 = a.hp;
+      g.world!.tideFrozen = 'high';
       g = enter(g, 'wreckDebris', [a.id]);
       const saved = JSON.stringify(g);
-      g = choose(g, 0);
-      const again = choose(migrateGame(JSON.parse(saved))!, 0);
+      g = choose(g, 1);
+      const again = choose(migrateGame(JSON.parse(saved))!, 1);
       expect(canon(again.heroes)).toBe(canon(g.heroes));
       const hp = g.heroes[0].hp;
       if (hp < hp0) {

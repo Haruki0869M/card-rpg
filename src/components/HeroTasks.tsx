@@ -9,7 +9,7 @@ import { cardOf, getCard } from '../data/cards';
 import { getItem } from '../data/items';
 import { getPet } from '../data/pets';
 import { BALANCE } from '../data/balance';
-import { affinityFromStats, altarTransmutePool, finalChance, flotsamView, heroStats, isPetMaster } from '../engine';
+import { affinityFromStats, altarTransmutePool, finalChance, flotsamView, heroStats, isPetMaster, swapGold } from '../engine';
 import { useLowScreen } from '../hooks/useLowScreen';
 import { isLocalPlayer } from '../store/battleConfig';
 import { useBattle } from '../store/battleStore';
@@ -296,16 +296,74 @@ function Peddler({ hero, send }: { hero: Hero; send: (c: GameCommand) => void })
 function Flotsam({ hero, send }: { hero: Hero; send: (c: GameCommand) => void }) {
   const low = useLowScreen();
   const view = flotsamView(hero);
+  // 袋が満杯の時（オーナーの決定 10-A・2026-11-21）: 「選ぶ」の後に、袋の品1つと入れ替えるか、入れ替えずにお金に換えるかを決める段を出す
+  const [chosen, setChosen] = useState<number | undefined>(undefined);
+  const pick = view.items[chosen ?? -1];
+  if (chosen !== undefined && pick && view.full && !pick.same) {
+    const it = getItem(pick.itemId);
+    return (
+      <Frame title="漂流物の山" hero={hero} kind="flotsam">
+        <div className={`${low ? 'mt-0.5' : 'mt-1'} text-center text-[13px] leading-4 text-zinc-300`}>袋がいっぱいです。袋の品と入れ替えるか、入れ替えずにお金に換えるかを選べます</div>
+        <div className={`${low ? 'mt-1' : 'mt-2'} panel flex items-center gap-2 rounded-lg p-1.5`} data-flotsam-chosen={it.id}>
+          <ItemInfoArea itemId={it.id} heroId={hero.id} className="flex flex-1 items-center gap-2">
+            <ItemIcon item={it} size={low ? 38 : 44} />
+            <span className="block min-w-0 flex-1 leading-4">
+              <span className="block text-[12px] text-zinc-400">選んだ品</span>
+              <span className="block text-[14px] font-bold" style={{ color: RARITY_STYLE[it.rarity].color }}>
+                {it.name}
+              </span>
+            </span>
+          </ItemInfoArea>
+        </div>
+        <div className={`${low ? 'mt-1' : 'mt-2'} text-[13px] font-bold text-zinc-200`}>どの品と入れ替えますか（手放した品は、お金に換わります）</div>
+        <div className={`${low ? 'mt-0.5 gap-1' : 'mt-1 gap-1.5'} flex min-h-0 flex-1 flex-col overflow-y-auto`} data-flotsam-swap-step={it.id}>
+          {hero.pouch.map((p, k) => {
+            const d = getItem(p.itemId);
+            return (
+              <div key={p.uid} className="panel flex items-center gap-2 rounded-lg p-1.5" data-flotsam-swap-row={d.id}>
+                <ItemInfoArea itemId={d.id} heroId={hero.id} className="flex flex-1 items-center gap-2">
+                  <ItemIcon item={d} size={low ? 38 : 44} />
+                  <span className="block min-w-0 flex-1 leading-4">
+                    <span className="block text-[14px] font-bold" style={{ color: RARITY_STYLE[d.rarity].color }}>
+                      {d.name}
+                    </span>
+                    <span className="block text-[12px] font-bold text-amber-200">→ 手放すと{swapGold(d.id)}Gに換わる</span>
+                  </span>
+                </ItemInfoArea>
+                <button
+                  onClick={() => send({ type: 'FLOTSAM_PICK', playerId: hero.playerId, heroId: hero.id, index: chosen, swapUid: p.uid })}
+                  className="btn btn-gold h-11 w-24 shrink-0 rounded-lg text-[13px] font-bold"
+                  data-flotsam-swap={k}
+                >
+                  入れ替える
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-2 grid shrink-0 grid-cols-2 gap-2">
+          <button onClick={() => setChosen(undefined)} className="btn btn-dark h-12 rounded-xl text-[14px] font-bold" data-flotsam-back>
+            もどる
+          </button>
+          <button onClick={() => send({ type: 'FLOTSAM_PICK', playerId: hero.playerId, heroId: hero.id, index: chosen })} className="btn btn-dark h-12 rounded-xl text-[13px] leading-4 font-bold" data-flotsam-sell>
+            入れ替えずに{pick.overflowGold}Gに換える
+          </button>
+        </div>
+      </Frame>
+    );
+  }
   return (
     <Frame title="漂流物の山" hero={hero} kind="flotsam">
       <div className={`${low ? 'mt-0.5' : 'mt-1'} text-center text-[13px] leading-4 text-zinc-300`}>流れ着いた品から、1つ選んで持ち帰れます（自分の分だけ。ほかの人を待ちません）</div>
       <div className={`${low ? 'mt-1' : 'mt-2'} flex items-center justify-center gap-1 text-[14px] font-bold ${view.full ? 'text-red-200' : 'text-emerald-200'}`} data-flotsam-pouch={`${view.pouch}/${view.limit}`}>
         <Backpack size={15} /> 道具袋 {view.pouch}/{view.limit}
       </div>
-      {view.full && <div className="mt-1 rounded-lg bg-red-950/60 px-2 py-1 text-center text-[13px] leading-4 text-red-100" data-flotsam-full>袋がいっぱいです。選んだ品は袋に入らず、お金に換わります</div>}
+      {view.full && <div className="mt-1 rounded-lg bg-red-950/60 px-2 py-1 text-center text-[13px] leading-4 text-red-100" data-flotsam-full>袋がいっぱいです。選んだ後に、袋の品と入れ替えるか、お金に換えるかを決められます</div>}
       <div className={`${low ? 'mt-1 gap-1' : 'mt-2 gap-1.5'} flex min-h-0 flex-1 flex-col overflow-y-auto`} data-flotsam-options={view.items.length}>
         {view.items.map((x, i) => {
           const it = getItem(x.itemId);
+          // 袋が満杯で、入れ替えられる品（同じ品を持てる数に達していない）は、次の段で決める
+          const next = view.full && !x.same;
           return (
             <div key={`${x.itemId}${i}`} className="panel flex items-center gap-2 rounded-lg p-1.5" data-flotsam-option={x.itemId}>
               <ItemInfoArea itemId={it.id} heroId={hero.id} className="flex flex-1 items-center gap-2">
@@ -315,10 +373,14 @@ function Flotsam({ hero, send }: { hero: Hero; send: (c: GameCommand) => void })
                     {it.name}
                   </span>
                   <span className="block truncate text-[12px] text-zinc-400">{itemSummary(it)}</span>
-                  {x.overflowGold !== undefined && <span className="block text-[12px] font-bold text-amber-200" data-flotsam-gold>→ 袋に入らず{x.overflowGold}Gに換わる</span>}
+                  {x.overflowGold !== undefined && !next && <span className="block text-[12px] font-bold text-amber-200" data-flotsam-gold>→ 袋に入らず{x.overflowGold}Gに換わる</span>}
                 </span>
               </ItemInfoArea>
-              <button onClick={() => send({ type: 'FLOTSAM_PICK', playerId: hero.playerId, heroId: hero.id, index: i })} className="btn btn-gold h-11 w-20 shrink-0 rounded-lg text-[14px] font-bold" data-flotsam-pick={i}>
+              <button
+                onClick={() => (next ? setChosen(i) : send({ type: 'FLOTSAM_PICK', playerId: hero.playerId, heroId: hero.id, index: i }))}
+                className="btn btn-gold h-11 w-20 shrink-0 rounded-lg text-[14px] font-bold"
+                data-flotsam-pick={i}
+              >
                 選ぶ
               </button>
             </div>

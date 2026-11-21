@@ -36,6 +36,7 @@ import { applyRoomChill } from './dungeonChill';
 import { applyCommand, createBattle, STATE_VERSION } from '../battle/battle';
 import { createRng, type Rng } from '../rng';
 import { applyOutcome, checkOutcome, hasOutcomeKind, makeOutcomeCtx } from './outcomes';
+import { tideNow } from './world/time';
 import { expeditionOf, livingHeroes, findHero, sceneHeroes } from './heroes';
 import { recordCheck } from './checks';
 import { addItem, addLog, addLoot, restMultiplierOf, hiddenChestChance, isPartyPlayer, leastLoaded, ownedBy, partyHasTag, rollWithFocus, splitGold, statChance, successes } from './common';
@@ -425,7 +426,7 @@ function runCommand(game: GameState, cmd: GameCommand, rng: Rng, voteOk = false)
         else if (cmd.type === 'ADOPT_PET') error = adoptPet(game, h, cmd.petId, cmd.color, cmd.name);
         else if (cmd.type === 'PET_PAT') error = patPet(game, h);
         else if (cmd.type === 'CARD_TASK') error = doCardTask(game, h, cmd.cardUid, rng, cmd.altar);
-        else if (cmd.type === 'FLOTSAM_PICK') error = pickFlotsam(game, h, cmd.index);
+        else if (cmd.type === 'FLOTSAM_PICK') error = pickFlotsam(game, h, cmd.index, cmd.swapUid);
         else error = peddlerBuy(game, h, cmd.kind, cmd.index);
         break;
       }
@@ -1296,6 +1297,7 @@ export function eventOptionState(game: GameState, eventId: string, index: number
   if (!opt) return { visible: false };
   if (opt.requiresTag && !partyHasTag(game, opt.requiresTag)) return { visible: false };
   if (opt.requiresPet && !sceneHeroes(game).some((h) => h.hp > 0 && h.pet)) return { visible: false };
+  if (opt.tide && (!game.world || tideNow(game.world) !== opt.tide)) return { visible: false };
   if (opt.cost && !(payer ? [payer] : sceneHeroes(game)).some((h) => h.gold >= opt.cost!)) return { visible: true, reason: `ゴールドが足りません（${opt.cost}G）` };
   if (opt.costFocus && !(payer ? [payer] : sceneHeroes(game)).some((h) => h.focus >= opt.costFocus!)) return { visible: true, reason: `フォーカスが足りません（${opt.costFocus}）` };
   if (opt.costItem && !(payer ? [payer] : sceneHeroes(game)).some((h) => h.pouch.some((i) => i.itemId === opt.costItem))) return { visible: true, reason: `${getItem(opt.costItem).name}を持っていません` };

@@ -17,6 +17,9 @@ export const PART = {
     eventFinish: (word) => ({ css: '[data-event-panel] button', text: word, exact: false }),
     // 漂流物の山（今ある印）
     flotsamPick: (i) => ({ css: `[data-flotsam-pick="${i}"]` }),
+    // 袋が満杯の時の次の段（2026-11-21）: 袋の k 番目の品と入れ替える／入れ替えずにお金に換える
+    flotsamSwap: (k) => ({ css: `[data-flotsam-swap="${k}"]` }),
+    flotsamSell: { css: '[data-flotsam-sell]' },
     // キャラの作業（カードの強化・外す・捧げる・祭壇・お供・行商人）。カードは今ある印、決めるボタンは今ある印、ほかは字だけ → B12 の data-hero-task の値
     taskCard: (i) => ({ css: `[data-hero-task] [data-pick-card="${i}"]` }),
     taskCardGo: { css: '[data-hero-task] [data-card-pick-action]' },
@@ -62,6 +65,9 @@ export const PART = {
     // 漂流物の山（今ある印）
     dFlotsam: { sel: '[data-flotsam-option]', read: 'rows', attrs: ['data-flotsam-option'], sub: { gold: { sel: '[data-flotsam-gold]', read: 'count' }, pick: { sel: '[data-flotsam-pick]', read: 'attr', attr: 'data-flotsam-pick' } } },
     dFlotsamFull: { sel: '[data-flotsam-full]', read: 'count' },
+    // 袋が満杯の時の次の段: 選んだ品（data-flotsam-swap-step の値）と、袋の品の並び
+    dFlotsamChosen: { sel: '[data-flotsam-swap-step]', read: 'attr', attr: 'data-flotsam-swap-step' },
+    dFlotsamSwap: { sel: '[data-flotsam-swap-row]', read: 'rows', attrs: ['data-flotsam-swap-row'] },
     // キャラの作業の窓（字の題 → B12 の値）・カード・お供
     dTask: { sel: '[data-hero-task]', read: 'rows', attrs: ['data-hero-task', 'data-task-hero'], textMax: 60, sub: { title: { sel: '.font-display', read: 'text' } } },
     dCheckResult: { sel: '[data-check-result]', read: 'attrs', attrs: ['data-check-result', 'data-check-focus'] },

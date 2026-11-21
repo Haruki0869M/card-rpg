@@ -424,6 +424,8 @@ export interface EventOption {
   requiresTag?: string;
   /** 場面のだれかがお供を連れている時だけ出す（K7） */
   requiresPet?: boolean;
+  /** 世界の潮がこの潮の間だけ出す（'high' = 満ち潮〔朝・昼〕/ 'low' = 引き潮〔夕方・夜〕。シナリオ3の難破船の残骸・2026-11-21。世界マップの無い冒険では出さない） */
+  tide?: 'high' | 'low';
   /** 必要なゴールド */
   cost?: number;
   /** 必要なフォーカス（選んだキャラが払う） */
@@ -695,7 +697,7 @@ export type GameCommand =
   /** 行商人の品物を買う（index を省くと店を閉じる） */
   | { type: 'PEDDLER_BUY'; playerId: PlayerId; heroId: string; kind?: 'item' | 'card'; index?: number }
   /** 漂流物の山の候補から1つ選ぶ（index = Hero.flotsam の何番目か。heroId のキャラの担当の席が送る。2026-11-16） */
-  | { type: 'FLOTSAM_PICK'; playerId: PlayerId; heroId: string; index: number }
+  | { type: 'FLOTSAM_PICK'; playerId: PlayerId; heroId: string; index: number; /** 袋が満杯の時: 入れ替える袋の品（その品がお金に換わり、選んだ品が袋に入る。オーナーの決定 10-A） */ swapUid?: string }
   | { type: 'CLAIM_LOOT'; playerId: PlayerId; heroId: string; choice: 'need' | 'greed' | 'pass'; /** 宝箱の取り合いの何番目か（戦闘の報酬では使わない） */ index?: number }
   /** 宝箱を開けるキャラを、みんなで決める（2人以上のプレイヤーの時。全員一致） */
   | { type: 'CHEST_OPENER'; playerId: PlayerId; heroId: string }

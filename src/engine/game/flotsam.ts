@@ -4,10 +4,11 @@
 // - 候補のうち1つはエピック以上（残りはレア以上）。災厄討ちの秘薬など「出どころが決まった品」（source・scourgeGear）は出さない
 // - 選ぶのは本人（FLOTSAM_PICK。heroId のキャラの担当の席）。黄金箱の3択（開け役1人）とは別の形で、だれも待たない。部屋はすぐ片づく
 // - 袋が満杯の時は、選んだ品はお金に換わる（addItem のまま）。画面はそれを先に出す（pouchOverflow）
+// - 2026-11-21（オーナーの決定 10-A）: 袋が満杯の時は、袋の品1つと入れ替えられる（外した品が、満杯の時と同じ額のお金に換わる）
 import { ITEMS, getItem } from '../../data/items';
 import type { DungeonRun, DungeonThemeDef, GameState, Hero, ItemDef } from '../../types';
 import { shuffle, type Rng } from '../rng';
-import { addItem, addLog, pouchOverflow } from './common';
+import { addItem, addLog, earnGold, pouchOverflow } from './common';
 import { dungeonTheme, rarityIndex } from './dungeon';
 import { newItem } from './loot';
 import { sceneHeroes } from './heroes';
@@ -56,21 +57,36 @@ export function dealFlotsam(game: GameState, rng: Rng) {
   }
 }
 
-/** 候補から1つ選ぶ（FLOTSAM_PICK）。袋が満杯ならお金に換わる */
-export function pickFlotsam(game: GameState, h: Hero, index: number): string | undefined {
+/** 候補から1つ選ぶ（FLOTSAM_PICK）。袋が満杯ならお金に換わる。swapUid = 満杯の時に入れ替える袋の品（その品がお金に換わる） */
+export function pickFlotsam(game: GameState, h: Hero, index: number, swapUid?: string): string | undefined {
   const offer = h.flotsam;
   if (!offer?.length) return '漂流物の山で選べる品はありません';
   const id = offer[index];
   if (id === undefined) return 'その品はありません';
+  if (swapUid !== undefined) {
+    if (pouchOverflow(h, id)?.why !== 'full') return '袋がいっぱいの時だけ、入れ替えられます';
+    const at = h.pouch.findIndex((p) => p.uid === swapUid);
+    if (at < 0) return '入れ替える品が袋にありません';
+    const [out] = h.pouch.splice(at, 1);
+    const gold = swapGold(out.itemId);
+    earnGold(h, gold);
+    addLog(game, `🛶${h.name}は袋の${getItem(out.itemId).name}を手放した（${gold}Gに換えた）`);
+  }
   const got = addItem(game, h, newItem(game, getItem(id)), true);
   delete h.flotsam;
   addLog(game, `🛶${h.name}は漂流物の山から${got}を拾った`);
   return undefined;
 }
 
-/** 画面用: 候補ごとの名前と、袋に入らない時に換わるお金。袋の今の数と上限 */
-export function flotsamView(h: Hero): { items: { itemId: string; overflowGold?: number }[]; pouch: number; limit: number; full: boolean } {
+/** 入れ替えで手放す袋の品が換わるお金（袋が満杯の時に換わる額と同じ決まり = 格で決まる） */
+export const swapGold = (itemId: string) => rarityIndex(getItem(itemId).rarity) * 15 + 10;
+
+/** 画面用: 候補ごとの名前と、袋に入らない時に換わるお金（same = 同じ品を持てる数に達している。入れ替えられない）。袋の今の数と上限 */
+export function flotsamView(h: Hero): { items: { itemId: string; overflowGold?: number; same?: boolean }[]; pouch: number; limit: number; full: boolean } {
   const pouchLimit = pouchLimitOf(h);
-  const items = (h.flotsam ?? []).map((itemId) => ({ itemId, overflowGold: pouchOverflow(h, itemId)?.gold }));
+  const items = (h.flotsam ?? []).map((itemId) => {
+    const over = pouchOverflow(h, itemId);
+    return { itemId, overflowGold: over?.gold, ...(over?.why === 'same' ? { same: true } : {}) };
+  });
   return { items, pouch: h.pouch.length, limit: pouchLimit, full: h.pouch.length >= pouchLimit };
 }

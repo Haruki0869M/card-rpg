@@ -3,7 +3,7 @@
 import { fillContent, KB } from '../content/load.mjs';
 import { claimChoice } from '../content/reward.mjs';
 import { battleBrain } from './battle.mjs';
-import { dungeonBrain } from './dungeon.mjs';
+import { dungeonBrain, heroTaskBrain } from './dungeon.mjs';
 import { rewardBrain } from './reward.mjs';
 import { hexNeighbors, costMap, distFrom, worldBrain, TIDE_WAIT } from './world.mjs';
 import { questBrain } from './town.mjs';
@@ -153,6 +153,13 @@ export function brainChecks(check) {
     const ov = structuredClone(tv);
     ov.facts.wTide = [{ 'data-tide-icon': 'low', 'aria-label': '🐚 引き潮' }];
     check(worldBrain(ov, {})?.target.css === '[data-roll-move]', '頭: 潮が開いていれば、ふつうにサイコロを振る', '');
+  }
+  // 漂流物の山・袋が満杯の時の次の段（2026-11-21）: 格の低い品があれば入れ替える・無ければお金に換える
+  {
+    const sv = (chosen, pouch) => view('dungeon', { dTask: [{ 'data-hero-task': 'flotsam', title: '漂流物の山' }], dFlotsamChosen: chosen, dFlotsamSwap: pouch.map((id) => ({ 'data-flotsam-swap-row': id })) });
+    const a = heroTaskBrain(sv('bowA', ['bowA', 'swordA', 'katanaA']));
+    const b = heroTaskBrain(sv('swordA', ['bowA', 'bowA']));
+    check(a?.target.css === '[data-flotsam-swap="1"]' && b?.target.css === '[data-flotsam-sell]', '頭: 漂流物の山の入れ替えの段は、格の低い品（同じなら上）と入れ替える・無ければお金に換える', `${a?.target.css}・${b?.target.css}`);
   }
   KB.world = null;
 }

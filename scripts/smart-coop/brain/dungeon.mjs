@@ -206,6 +206,16 @@ export function heroTaskBrain(v, board = {}) {
   const kind = task['data-hero-task'] ?? null;
   const buttons = v.facts.dTaskButtons ?? [];
   const bt = (re) => buttons.find((b) => b.disabled === null && re.test(b.text));
+  // 漂流物の山・袋が満杯の時の次の段（2026-11-21。オーナーの決定 10-A）: 選んだ品より格の低い品が袋にあれば、いちばん格の低い品（同じなら上）と入れ替える。
+  // 無ければ、入れ替えずにお金に換える（人も、良い品を悪い品と入れ替えない）
+  const sw = v.facts.dFlotsamSwap ?? [];
+  if (sw.length) {
+    const chosen = [v.facts.dFlotsamChosen].flat()[0];
+    const cr = rarityRank(KB.items[chosen]?.rarity);
+    const low = sw.map((x, k) => ({ k, id: x['data-flotsam-swap-row'], r: rarityRank(KB.items[x['data-flotsam-swap-row']]?.rarity) })).sort((a, b) => a.r - b.r || a.k - b.k)[0];
+    if (low.r < cr) return decide(G.flotsamSwap(low.k), `漂流物の山: 袋の「${KB.items[low.id]?.name ?? low.id}」と入れ替える（選んだ品「${KB.items[chosen]?.name ?? chosen}」の方が格が高い）`);
+    return decide(G.flotsamSell, `漂流物の山: 入れ替えずにお金に換える（袋に、選んだ品「${KB.items[chosen]?.name ?? chosen}」より格の低い品が無い）`);
+  }
   // 漂流物の山: 袋に入る品の中で格の一番高い物（同じなら左）。お金に換わる品は後回し
   const fl = v.facts.dFlotsam ?? [];
   if (fl.length) {

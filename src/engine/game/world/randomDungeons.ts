@@ -25,6 +25,14 @@ export function assignDungeonThemes(w: WorldState, rng: Rng) {
   const themes = themesForScenario(DUNGEONS.scenarioOf(w.tiles[tiles[0]]?.f?.id ?? ''));
   if (!tiles.length || !themes.length) return;
   const order = shuffle(themes.map((t) => t.id), rng);
+  // そのシナリオだけのテーマ（漂流物の洞・氷漬けの宝物庫）は、2か所以上ある時、必ず1か所に出す（オーナーの決定 9-A・2026-11-21。前は冒険の2回に1回だった）。
+  // 配る分（先頭からマスの数だけ）に入っていなければ、最後のマスの分と入れ替える。乱数は引かない（シナリオだけのテーマが無い5本は、今までと同じ結果）
+  const own = themes.find((t) => t.scenario)?.id;
+  const dealt = Math.min(tiles.length, order.length);
+  if (own && tiles.length >= 2 && !order.slice(0, dealt).includes(own)) {
+    const at = order.indexOf(own);
+    [order[dealt - 1], order[at]] = [order[at], order[dealt - 1]];
+  }
   tiles.forEach((i, k) => (w.tiles[i].f!.theme = order[k % order.length]));
 }
 
